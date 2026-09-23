@@ -384,20 +384,106 @@ Dragging an edge continuously must produce continuously correct frames, never a 
 
 ## 6. Native selection
 
-> **Unbuilt as of 2026-07-31, and this note exists because nothing else recorded that.** C14 landed with §6 specified and no implementation: `Viewport` carries no `enterCopy`/`exitCopy`, no clipboard injection, and **T1.13, T1.14, T1.15, T3.14 and T5.6 are absent from the suite rather than deferred**. Absent is not deferred — a deferral is tracked and expires (`tools/enforce/todo-expiry.mjs`), while an absent test is indistinguishable from a component that had nothing to say. The five now exist as deferrals against the file that will hold this section, so they fail the moment it is written.
+> **This section was two modes, and that is why it could be built and unbuilt at
+> once.** The note here used to read *unbuilt as of 2026-07-31* and cite five
+> absent rows, while C22 T4.30–T4.32c assert the mode working end to end at a
+> real session. Both were true, of different halves.
 >
-> Until then, C16 takes `nativeSelection` as a boolean input and `exitNativeSelection` as an injected call. That is a seam standing in for something **unbuilt**, which is legitimate, as distinct from a seam standing in for something unspecified — the distinction that put `entryAtRow` in §2 rather than in C16's constructor.
+> The first two paragraphs are the **native handoff**: mouse is on by default, the
+> terminal's own selection wants the emulator's modifier, and the app stops
+> reading the selection because the terminal is doing it. That is `⌥⇧C`,
+> `R-SEL-001`, and it ships — `#setNativeSelection` in `src/shell/session.ts:1343`.
+>
+> The bullets under it are a **different mode**: *entering shows a row cursor*,
+> *movement keys extend a row-range selection*, *yank writes the selected rows'
+> text through an injected clipboard writer*. A cursor and a selection are the one
+> thing the handoff is defined by not having — C16 §5a A5 says so in as many
+> words, *the terminal's native selection, which the app does not see* — so these
+> bullets have contradicted A5 since both were written, and neither document
+> could see it while one name covered both. That mode is `⌥⇧V`,
+> `selection.semantic`, and it is §6a below.
+>
+> **The five absent rows were all of the second half**, which is the check that
+> settles the split rather than asserting it: T1.13, T1.14, T1.15, T3.14 and T5.6
+> each name a cursor, a movement or a yank, and not one of them names mouse
+> tracking. They re-home onto §6a and stay deferred there — a deferral is tracked
+> and expires (`tools/enforce/todo-expiry.mjs`), while an absent test is
+> indistinguishable from a component that had nothing to say.
+>
+> C16 takes `nativeSelection` as a boolean input and `exitNativeSelection` as an
+> injected call, and `semanticSelection` the same way. That is a seam standing in
+> for something **unbuilt**, which is legitimate, as distinct from a seam standing
+> in for something unspecified — the distinction that put `entryAtRow` in §2
+> rather than in C16's constructor.
 
 Mouse is on by default (D34), which takes the terminal's own text selection — the way people copy a UUID today. While the app captures the mouse, the terminal's native selection needs the emulator's modifier — shift-drag on most, option-drag on iTerm2 — and which modifier is the emulator's to say, not this framework's. Native selection is therefore not optional (A01 S30): it is the framework's answer rather than a documented bypass, and C16 owns its entry and its exit.
 
-- Entry is by a key binding C16 owns. Native selection is its own **focus target**, sitting above `pushedView` and below `overlay` in A02's priority order — it takes every key, including inside the dashboard, but a confirm raised over it still wins.
-- Entering freezes the viewport and shows a row cursor.
-- Movement keys extend a row-range selection.
-- Yank writes the selected rows' **text** — glyphs and content, no escape sequences, no gutter markers — through an injected `clipboard` writer.
-- Selection is by whole rows in v1. Column selection is Phase 1B.
+- Entry is by a key binding C16 owns. Native selection is its own **focus target** at the `copy` rung — it takes every key, but a confirm raised over it still wins (A02 §2).
+- Entering **freezes the screen and nothing else**: `#setNativeSelection` commits, flushes, suspends the scheduler and turns mouse tracking off. The far side is not frozen (C16 §5b B4); the catching-up frame arrives on exit.
+- There is **no cursor and no selection here**, and that is the mode rather than a gap in it. The reader is dragging with the emulator, and what they take never reaches this process.
 - `Shift`-drag remains documented as the native-selection bypass on terminals that honour it.
 
-The clipboard writer is injected because C14 must stay pure and testable; a component that shells out to `pbcopy` cannot be unit-tested.
+---
+
+## 6a. Semantic copy mode
+
+`⌥⇧V`, `selection.semantic` — the registry's *enter Calcium copy mode*, and the
+one the fifteen `R-SEL-*` rules are about. It is what §6's bullets were describing
+under the other mode's name.
+
+**Two modes at one rung, and that is the shape rather than a collision.** `RUNG_OF`
+maps both `nativeSelection` and `semanticSelection` to `copy`, and they are separate
+targets because their `escape` rows disagree: the handoff leaves on one press, and
+this mode's first press clears a selection if there is one (`R-SEL-005`). That is
+the pattern M5 bought when it separated *target* from *rung*, arriving with its
+second instance — the first was `panel` beside `pushedView`, and the view is gone.
+
+### What freezes, and the three things that do not
+
+`R-SEL-009`: the frame freezes, and exactly three things still redraw — **the mode
+label in the footer, the selection as it extends, and the count**. Not the spinners,
+not the elapsed counts, not arriving content.
+
+**This is a different mechanism from §6's, and taking the handoff's would be wrong
+in a way that reads as reuse.** `#setNativeSelection` suspends the *scheduler*,
+which is total by construction: nothing is written, which is exactly right when the
+reader's selection lives in the terminal's own buffer and any write destroys it.
+Here the selection is the app's, and three facts about it have to keep moving or the
+reader cannot see what they are taking — *a frozen owner that consumes everything is
+the one rung whose state the reader cannot otherwise see*, which is the rule's own
+reason. A suspended scheduler cannot draw them, so the mode holds the **content**
+still and lets the frame commit: arriving entries are buffered (`R-SEL-010`) and the
+footer says so while they are, which is a statement about what the transcript shows
+and not about whether a frame is written.
+
+**So the freeze is C13's and C14's, not C03's**, and the invariant to hold is that
+the rows under the caret do not move while the mode is up. A scheduler suspension
+would satisfy that too, and would also freeze the three things the rule requires to
+move — which is the reading that makes the two mechanisms look interchangeable.
+
+### The caret, and why it is not C26's focus
+
+The caret is an entry plus an element address, and the anchor is a second one — the
+same pair `StoredFocus` holds at `liveBlock` (`focus.ts:366`), with one difference
+that decides the model: **C26's pair lives inside one entry and this one does not.**
+`extendRow` takes an `entryId` and refuses a changed one, because a focus that
+wandered between entries is F764's defect. A copy-mode selection crosses entries by
+construction — `A` takes all loaded ones (`R-SEL-008`) — so the pair is the mode's,
+and C26's focus is what the caret is *seeded from* on entry and what is *restored* on
+exit.
+
+A block is atomic in it (`R-SEL-003`): an extend that reaches a block takes the whole
+block and continues past it, and this holds **continuously and not only at release**
+(`R-SEL-015`) — so the count is always the size of what a copy right now would take,
+and never a size no copy could produce.
+
+### Leaving
+
+`R-SEL-005`, and it is two presses rather than one: `esc` clears the selection if
+there is one, and a second `esc` leaves the mode. **A selection is state within a
+rung, not a rung of its own**, so this does not violate esc popping exactly one rung
+— and the footer says which press is next, which is the part that keeps the two
+presses from reading as a dropped keystroke.
 
 ---
 
@@ -409,7 +495,15 @@ The clipboard writer is injected because C14 must stay pure and testable; a comp
 | **detached** | → detached (T1.5) | → following (T1.7) | → copying (T1.13) | — |
 | **copying** | moves the cursor, not the view (T3.14) | — | no-op | → previous mode (T1.14) |
 
-Native selection remembers whether it was following, so leaving it resumes the tail rather than stranding the user.
+**`enterCopy` here is §6a's, and the table always was.** *Scroll up moves the cursor,
+not the view* is a statement about a mode that has a cursor, which the handoff does
+not — so this is the semantic mode's state machine and it was filed under the other
+one's name with the rest of §6's bullets. The handoff has no row of its own to add:
+it freezes the screen and leaves `followTail` exactly where it found it, because
+nothing it does touches the viewport at all.
+
+The mode remembers whether it was following, so leaving it resumes the tail rather
+than stranding the user.
 
 ---
 
@@ -428,7 +522,7 @@ Native selection remembers whether it was following, so leaving it resumes the t
 - **I11** — C14 reads no clock and performs no I/O; the clipboard writer is injected.
 - **I12** — C14 imports nothing from `terminal/`; dimensions arrive as data, and C14 never calls the frame scheduler. L4 orchestrates.
 - **I13** — The eviction marker is an ordinary entry (C13 I14); C14 holds no special case for it.
-- **I14** — Native selection restores the prior follow state on exit.
+- **I14** — **Semantic copy mode** restores the prior follow state on exit. It said *native selection* and named the mode that cannot move the viewport and therefore has no follow state to restore (§6a); the rule is unchanged and its subject is corrected.
 - **I15** — Cache invalidation is incremental, driven by C13's granular `Change`. An append invalidates nothing already measured; a patch invalidates one entry through its `rev`. Dropping the cache on every change would make the Fenwick tree pointless.
 - **I16** — There is no overscan in v1. Rows outside the viewport are not measured or rendered ahead, and adding it is a measurable change against M-T3's baseline rather than a default nobody chose.
 - **I17** — A page movement is exactly `viewportHeight − 1` rows, in both directions. The overlap is the point: a full-height page turn leaves a reader with no anchor in what they just read, and the off-by-one is the difference between the two.
@@ -461,7 +555,7 @@ Native selection remembers whether it was following, so leaving it resumes the t
 9. Width changes drop the cache; height changes do not (I8).
 10. The anchor is captured before remeasure and clamps within its entry (I7).
 11. No overscan in v1; it is a measurable addition, not a default (I16).
-12. Native selection is mandatory because mouse is on by default; the clipboard writer is injected (I11).
+12. Native selection is mandatory because mouse is on by default (§6); semantic copy mode is the framework's own selection beside it (§6a), and the clipboard writer is injected (I11).
 13. Summed visible rows equal the viewport height exactly (I10).
 14. C14 never calls C03; scrolling reports a change and L4 commits (I12).
 15. The eviction marker is an ordinary entry and needs no special handling (I13).
@@ -505,9 +599,9 @@ Fake heights, no rendering.
 - **T1.10** (I4): an entry above the viewport grows by 20 rows while detached → visible content is unchanged; `topRow` increased by 20.
 - **T1.11**: the same while following → the viewport tracks the bottom.
 - **T1.12** (I3): a theme change → zero cache entries invalidated.
-- **T1.13**: `enterCopy` from following and from detached → both enter copying.
-- **T1.14** (I14): `exitCopy` restores the prior follow state, both ways.
-- **T1.15**: native selection entered from inside a pushed view → keys route to native selection, not the view.
+- **T1.13** (§6a): `enterCopy` from following and from detached → both enter copying.
+- **T1.14** (I14, §6a): `exitCopy` restores the prior follow state, both ways.
+- **T1.15** (§6a): semantic copy mode entered over a panel → keys route to the mode, not to the panel. **Re-aimed off the pushed view** (R-EXA-082, F1254): the row is about a mode at the `copy` rung outranking a substate, and the view was only the substate it named.
 - **T1.16** (I18): exactly one visible entry reports `live: true`, and it is C13's `liveId`; a transcript with no live entry reports none.
 - **T1.17** (I18): measured heights are identical with and without the **live gutter** — it costs no rows. *Not the eviction marker, which is an ordinary entry and costs exactly the rows it measures (I13, C13 I14). Two different things were called "the marker" in one spec, and only the citation distinguished them.*
 - **T1.18** (I23): a 2 000-line `code` block and a 2 000-line `raw` block, windowed at `[0, 40)` through `windowSequence` → each windowed block measures at most `40 + skipRows + dropRows`, and the painted rows are the same forty the whole rendering would have put there (C09 I25). A block comment opening above the window and closing inside it → the rows inside are still drawn in the comment slot (the `lineRange` pin).
@@ -556,7 +650,7 @@ Fake heights, no rendering.
 - **T3.12c** (§5 step 6): a viewport **following the tail**, resized shorter → it is still at the tail, and the transcript's last row is still the last visible row. Step 6 was written in §5 and had no mechanism: `resize` went to `#restoreFromAnchor`, which for a follower (`anchor === null`) only clamps `topRow` into the new bounds, so shrinking the region slid the tail off the bottom one row per row lost. Invisible while `resize` fired only on `SIGWINCH` — one event deep, and it reads as the terminal's doing.
 - **T3.12b** (I21): a resize to the width and height already held → **no `Change` is emitted**, and `scroll`, `anchor` and `stats` are identical afterwards. Asserted from a *detached* viewport with a captured anchor, because from a tail-following one at the top of a short transcript the capture-and-restore is a round trip to the same value and the row passes with the guard removed — the state that distinguishes the two readings is the one that has something to lose.
 - **T3.13**: a patch that shrinks an entry below the current `topRow`'s dependence → `topRow` clamps rather than exceeding `totalRows`.
-- **T3.14**: movement in native selection moves the cursor and scrolls only when the cursor reaches an edge.
+- **T3.14** (§6a): movement in semantic copy mode moves the caret and scrolls only when the caret reaches an edge.
 - **T3.15**: yank with an empty selection → clipboard untouched, no throw.
 - **T3.16**: yank of rows containing tone spans and gutter markers → clipboard receives plain text only.
 - **T3.17**: 100,000 entries, scroll from top to bottom by page → every query within budget, no leak.
@@ -587,7 +681,7 @@ Fake heights, no rendering.
 - **T5.3**: a live `--logs` tail at 1,000 lines/s while scrolled up reading → the view does not move.
 - **T5.4**: the same, then `End` → snaps to the bottom and resumes following.
 - **T5.5**: dragging the terminal edge from 160 to 60 and back while scrolled to the middle → the same content is on screen at both ends, no blank frames.
-- **T5.6**: native selection selecting forty rows across three entries and yanking → the clipboard holds exactly those rows as plain text.
+- **T5.6** (§6a, R-SEL-004): semantic copy mode selecting forty rows across three entries and yanking → the clipboard holds exactly those rows as plain text, in document order with a blank line between entries.
 
 - **T4.11** (I24, with C13 and C09): a viewport over a transcript whose entry holds a 25-line `logs` block under `maxBlockRows: 10` → `totalRows` is `chrome + 11`, `visible()` at the foot selects the marker row, and the frame's last block row reads `… 10 of 25 rows`.
 
@@ -609,7 +703,7 @@ Fake heights, no rendering.
 - **T6.7** (I8): invalidating on height-only resizes → T3.12 fails and resizing becomes needlessly expensive.
 - **T6.8** (C13 I12): treating every `Change` as a full invalidation → T4.3 fails and T5.3 misses its budget.
 - **T6.9** (I10): an off-by-one in the visible range → T2.1 fails across the corpus.
-- **T6.10** (I14): dropping the prior follow state on native-selection exit → T1.14 fails and users are stranded detached.
+- **T6.10** (I14, §6a): dropping the prior follow state on semantic copy mode's exit → T1.14 fails and users are stranded detached.
 - **T6.11** (I11): shelling out to a clipboard binary → T2.4 fails.
 - **T6.13** (§4): restoring `settle` to "invalidates nothing" → T4.10 fails, and the app route's entry has zero height for the rest of the session: appended with no blocks, measured at zero, settled with the real document, never remeasured. The screen is blank with the entry in the store, and every assertion about anchors, clamping and the cache passes.
 - **T6.12** (I12): C14 calling `commit` directly → T4.8's spy fails, and L2 gains a dependency on L0-terminal.

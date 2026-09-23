@@ -350,12 +350,15 @@ Resolution order, first match wins:
 |---|---|
 | An overlay is on top of C15's stack | `overlay` |
 | C14 is in native selection | `nativeSelection` |
-| A view is on C15's stack | `pushedView` |
+| C14 is in semantic copy mode | `semanticSelection` |
+| A panel is on top of C15's stack | `panel` |
 | The prompt holds focus (the default) | `prompt` |
 | Focus has been moved into the live block | `liveBlock` |
 | — | `global` |
 
-Native selection sits above `pushedView` because it takes every key, including inside the dashboard; only a confirm raised over it wins (A02 §2).
+Both copy modes sit above `panel` because each takes every key; only a confirm raised over one wins (A02 §2). **The view row is gone and the panel row is not new** — it was the second target at `substate`, and R-EXA-082 (F1254) deleted the one this table happened to name.
+
+**The two copy rows are one rung and two targets** (`RUNG_OF` maps both to `copy`), which is the second instance of M5's separation of rung from target. They are separate targets because their `escape` rows disagree: `nativeSelection` leaves on one press, and `semanticSelection` clears a selection first (§5d, `R-SEL-005`). The first instance was `panel` beside `pushedView`, and the view retiring is an illustration retiring rather than the claim.
 
 `prompt` and `liveBlock` are the one pair that is genuinely a mode, and therefore the **one piece of stored focus state** in the system:
 
@@ -801,10 +804,11 @@ constructible case.
 | 1 | In-flight verb | `C23.inFlight` is `app` or `local`, any focus target | T1.11 |
 | 2 | Piped shell child | `C23.inFlight` is `shell` | T3.11 |
 | 3 | Dismissable overlay | completion menu or reverse search on top | T1.1x |
-| 4 | Non-dismissable overlay | a confirm on top — **over anything**, including native selection and a view | T1.12, T1.12b |
+| 4 | Non-dismissable overlay | a confirm on top — **over anything**, including either copy mode and a panel | T1.12, T1.12b |
 | 5 | Native selection | `nativeSelection` true, no layer on the stack | T4.3 |
-| 6 | Pushed view | a view on the stack, no overlay above it | T5.3 |
-| 7 | Interaction on a block | `StoredFocus.at === "liveBlock"`, `mode === "interact"`, a live entry, no layer, not native selection | T2.6b |
+| 5b | Semantic copy mode | `semanticSelection` true, no layer on the stack | T1.41 |
+| 6 | Panel | a panel on the stack, no overlay above it | T5.3 |
+| 7 | Interaction on a block | `StoredFocus.at === "liveBlock"`, `mode === "interact"`, a live entry, no layer, neither copy mode | T2.6b |
 | 8 | Focus in the live block | as above with `mode === "navigate"` | T1.14 |
 | 9 | Prompt with text | `StoredFocus.at === "prompt"`, buffer non-empty | T5.3 |
 | 10 | Prompt empty | as above, buffer empty | T1.9, T1.10 |
@@ -964,6 +968,40 @@ which is the signal to flip it. A todo cannot do that here: `todo-expiry` is ind
 component, and every component this needs already exists.
 
 ---
+
+## 5d. Semantic copy mode — the second target at the `copy` rung
+
+**A sequence trace, because every row is an event landing on a mode**, and indexed by
+the rules that meet in the cell rather than by the keys a reader might press. The
+mode is `⌥⇧V` (`selection.semantic`) and C14 §6a is its specification; this section
+is only what the router owes it.
+
+| # | Sequence | Rules meeting | Ruling |
+|---|---|---|---|
+| D1 | In the mode with a selection, press `esc` | `R-SEL-005`'s two presses meet §3's *`esc` is a target's own way out* | **The first press clears and consumes.** A selection is state within a rung, not a rung of its own, so clearing it pops nothing — and the footer says the next press leaves, which is what stops the two presses reading as a dropped keystroke |
+| D2 | In the mode with no selection, press `esc` | as D1, with the state absent | **Leaves the mode**, which is `nativeSelection`'s single-press behaviour arriving as the second half of this one. The two targets differ in exactly this cell, which is why they are two targets at one rung |
+| D3 | `⌥⇧C` while in semantic copy mode | the entry rows' targets meet the mode being its own target | **Dropped.** `activeTarget` answers `semanticSelection`, so neither entry row resolves and `global` has no such row — the same two-guard shape as §5c C5, and for the same reason |
+| D4 | A confirm is raised while in the mode | rung 4 dominates the `copy` rung (T1.12b) | **The confirm takes the key**, exactly as B3 rules for the handoff. One rung, one answer: this is the cell that would have needed its own argument if the modes were two rungs |
+| D5 | `⌃c` in the mode | the ladder's cancel meets the mode's own exit | **Leaves the mode**, as rung 5 does for the handoff. The ladder's shape is *undo the innermost thing*, and `esc`'s two presses are the target's own way out — I24 defends the pair, and `⌃c` does **not** inherit D1's clear-first step, because a cancel that sometimes did something else first is the ladder rung answering two questions |
+| D6 | Output arrives while in the mode | `R-SEL-010`'s buffering meets C13's append | **The far side is not frozen and the transcript is.** C13 appends as it always does; what is held is which rows C14 shows, and the footer says content is waiting. This is the mechanism the handoff does *not* share — §6's freeze is C03's scheduler suspension, which cannot draw the three things `R-SEL-009` requires to keep moving |
+
+### What it found
+
+**D5 is the row that was not obvious, and it is a rule interaction rather than a
+key.** `⌃c` and `esc` are both ways out at every other target, and D1 gives `esc` a
+first press that does something else. Carrying that over to `⌃c` reads as
+consistency and is the defect: the ladder's rung answers *cancel the innermost
+thing*, and a rung that first cleared a selection would be answering *and also tidy
+up*, which is the second-mechanism shape I23 objects to. So the two exits are not
+symmetrical, and the asymmetry is the ruling rather than an oversight.
+
+**D6 is where the two modes stop being one mechanism with two names.** Both freeze,
+and they freeze different things: §6 suspends the scheduler, which is total and
+correct when the selection lives in the terminal's buffer; §6a holds the transcript's
+content still and lets frames commit, because `R-SEL-009` names three things that
+must keep redrawing and a suspended scheduler draws none of them. Reusing
+`#setNativeSelection` here would satisfy *the screen does not move* and fail the rule
+that says why the screen does not move.
 
 ## 6. Keymap
 
@@ -1497,6 +1535,8 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I48** — **The layer order is the scroll order** (C15 I23, R-BLK-779, R-SEL-012). `overlay › panel › peek › base` decides which viewport a wheel moves exactly as it decides which layer a key reaches — *one ordering does both jobs*, and a wheel over a panel moves the panel rather than the transcript behind it for the same reason a key over a panel is the panel's. Beneath the layers the walk continues into the region: R-SEL-012's *the wheel takes the innermost scrollable under the pointer*, so a `scroll` inside a `scroll` takes it at the depth the pointer is actually in, and an element that declines leaves the wheel to the container above it. The rung used to stop at one level, which is correct for exactly as long as no `scroll` contains another.
 
 - **I49** — **The captured child is a rung with a subject, and its host escape is reserved, visible and refusable** (§5, §103, R-BLK-711, R-BLK-838, R-BLK-908, R-BLK-312, R-INT-007). `attachedChild` has **two** sources and they are one fact: a shell delegation in flight (`inFlight() === "shell"`), and an application's child attached over its own block. *An attached PTY transfers ownership without becoming a substate; only `host.detach` returns ownership* — so the rung is not entered by focus moving and is not left by `esc`.
+- **I50** — **Semantic copy mode is a second target at the `copy` rung, and the rung is not two** (§5d, `R-SEL-005`, `R-SEL-009`). `RUNG_OF` maps `nativeSelection` and `semanticSelection` to `copy`, so every rule written over the ladder — a confirm dominating, an intercept's verdict, the footer's owner line — answers once for both. They are separate **targets** because their `escape` rows disagree and for no other reason: two targets at one rung is what M5 bought when it separated the two, and this is its second instance after `panel` beside the retired `pushedView`.
+- **I51** — **`esc` clears then leaves; `⌃c` only leaves** (§5d D1, D2, D5, `R-SEL-005`). The first `esc` in semantic copy mode drops a selection if there is one and consumes the key, and the footer says the next press leaves; with no selection the first press leaves. `⌃c` never clears first. The asymmetry is the ruling: `esc` is the target's own way out and a selection is state within the rung, while the ladder's rung answers *cancel the innermost thing* and a rung that also tidied up would be answering two questions — which is the second-mechanism shape I23 objects to.
 
   **The child takes every key but one.** `esc` and `⌃c` are the child's (R-INT-007; R-BLK-842's interrupt row, *CHILD handles*), which is the whole of W5 and is why an unbound key may not fall through to a lower rung: a key that reached the prompt while a PTY held the terminal is the host typing into a line the reader cannot see. The handler therefore **consumes what it does not bind**, which is the one place in this component where declining is not passing.
 
@@ -1562,6 +1602,9 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.39** (I39): `INTERCEPTS` is asserted **total** — every id × every member of `OWNER_RUNGS` carries a verdict, by equality against `OWNER_RUNGS` rather than by a length. The type enforces it at compile time and this is what makes the rule survive a rung added with `as` or a table built dynamically; it is also the row that goes red the day a seventh rung lands with no decision taken.
 - **T1.40** (I40): `⌥↑` with a question open **scrolls the transcript**, and the question is **still open and still unanswered** — the three assertions together, because each alone is passed by a router that does the wrong thing. Stages are `["arming", "intercept:page-scroll:question:handle", "intercept:scroll:transcript"]`: the ladder is never consulted. The control is `⌃c` at the same rung, which is `reject` and *does* reach the question.
 - **T1.40b** (I40): `⌥↑` in **native selection** is `reject` — the frozen screen does not move, and the event is consumed rather than falling to the ladder.
+- **T1.41** (I50, §5d): `semanticSelection` true and nothing on the stack resolves to `semanticSelection`, and `RUNG_OF` puts it at `copy` — the same rung `nativeSelection` answers for. The control is the pair: with both flags false the same inputs resolve to `prompt`, so the row is about the flag and not about an empty stack.
+- **T1.41b** (I51, §5d D1, D2): `esc` in semantic copy mode with a selection **clears it and consumes the key**, and the mode is still up; a second `esc` leaves. With no selection the first `esc` leaves. Four assertions over two states, because a single-state row passes with the clear step missing.
+- **T1.41c** (I51, §5d D5): `⌃c` in semantic copy mode leaves it **without clearing first** — asserted with a selection open, which is the only state where the two exits differ and therefore the only one that can see the defect.
 - **T4.74** (I40, C04 I48): **with a `scroll` box focused, `⌥↑` scrolls the transcript and the box does not move; `PgUp` pages the box.** The pair, not either half: the first alone is passed by a router that reserved both keys, the second by one that reserved neither. This is the row the split exists for, and it is the one an implementation holding both on the reserved route cannot pass — it is why *the active viewport* could not be one answer. `⌥↑`'s stage is `intercept:scroll:transcript` and `PgUp` has no intercept stage at all, which is the mechanism behind the two outcomes.
 - **T1.92** (I40): `PgUp` produces **no intercept stage at any rung** — the absence the split rests on, asserted directly rather than implied by the rows that drive `⌥↑`. A table that reserved it again would pass every other row in §3a. It is not carved out of I8, because nothing in the design reserves it: the carve-out is exactly two chords wide.
 - **T1.93** (I41): `CSI 1;9A` decodes as `{name: "up", super: true}` when `keyboardProtocol` is `"kitty"` and as `{name: "up", meta: true}` when it is not — in `router-decode.test.ts`, with `modifiersOf`, so `c16-modifiers.mjs`'s mutation run reaches it — **the same bytes, twice, through two decoders**, which is the only shape that asserts the protocol is the condition. The control is `CSI 1;3A`, which is `meta` under both and is what makes this a test of bit 8 rather than of the parameter.

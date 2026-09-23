@@ -359,3 +359,15 @@ describe("C16 §3 — the stored location", () => {
     expect(Object.isFrozen(focus.current)).toBe(true);
   });
 });
+
+describe("C16 §5d — semantic copy mode is the second target at the `copy` rung (M10b)", () => {
+  it.todo(
+    "T1.41 (C16 I50, §5d): activeTarget with semanticSelection true and an empty stack answers semanticSelection, RUNG_OF puts it at copy beside nativeSelection, and the control is the same inputs with both flags false answering prompt — so the row is about the flag rather than about an empty stack — not deferred on a component: the target lands with the mode shell in this MR",
+  );
+  it.todo(
+    "T1.41b (C16 I51, §5d D1, D2): esc in semantic copy mode with a selection clears it, consumes the key and leaves the mode up; a second esc leaves; with no selection the first esc leaves — four assertions over two states, because a single-state row passes with the clear step missing — not deferred on a component: the exit lands with the mode shell in this MR",
+  );
+  it.todo(
+    "T1.41c (C16 I51, §5d D5): ctrl-C in semantic copy mode leaves it without clearing first, asserted with a selection open — the only state where the two exits differ and therefore the only one that can see the defect — not deferred on a component: the ladder rung lands with the mode shell in this MR",
+  );
+});
