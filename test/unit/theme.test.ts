@@ -886,3 +886,12 @@ describe("C10 I48 — the ground down the degradation ladder", () => {
     }
   });
 });
+
+describe("C10 §4b.1 — the pairing the registry declares", () => {
+  it.todo(
+    "T1.44 (C10 I49, §4b.1): every registry composition is carried by tokens.generated.ts at the design's value, read per selector and not per rule, the control being a rule naming three tones in one selector list — not deferred on a component: the generator's fix lands in this MR",
+  );
+  it.todo(
+    "T1.45 (C10 I49, §4b.1): SELECTION_SLOTS is derived from the registry's compositions so it holds muted and meta, and every derived pairing clears its floor through inkOn — not deferred on a component: red today at mono meta on selection 3.86 against 4.5, closed by the design's own value in this MR",
+  );
+});

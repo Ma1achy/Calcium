@@ -276,7 +276,42 @@ Recorded because the prediction and the outcome are worth having side by side. T
 
 That is C23 §8a A4's shape: **an artefact correct about the interaction it found and wrong about a mechanism it assumed existed.** The guarantee it wanted is delivered by the mechanism that does exist, which is §4a's — a foreground slot paired with a background surface, checked at that slot's own floor.
 
-So `surfaces.selection` is a text-bearing surface and `SELECTION_SLOTS` is its pairing. **One slot: `tone.default`.** The prompt's text is `default`; ghost text is `muted` and is drawn *after* the buffer's last cluster, so it is adjacent to a selection and never inside one.
+So `surfaces.selection` is a text-bearing surface and `SELECTION_SLOTS` is its pairing.
+
+**It was one slot — `tone.default` — and the design overturns that.** The reasoning was sound and its premise was the tree's rather than the design's: the prompt's text is `default`, ghost text is `muted` and is drawn *after* the buffer's last cluster, so it is adjacent to a selection and never inside one. That is true of the **prompt's** selection. The design's selection is the transcript's as well, and §4b.1 below is what the registry actually declares: nine tones repainted on `selection` across nine of the ten themes, `muted` among them in six. A tone the design gives a value *on this ground* is a tone the design says lands here.
+
+**The narrowing's own argument is what the design answers.** §4b declined `muted` because light's `muted` measures 2.14–2.42 : 1 against every candidate wash, under its 2.5 floor — *pairing it would reject a theme for a failure nobody can see*. The design does not exclude the pairing; it **repaints the tone on the ground**, which is the mechanism I48's `inkOn` already implements and §4d's ruling already names as the remedy (*a composed ink for that ground rather than a lighter ground*). The scope rule is untouched — the scope of a floor is still where the text goes — and what moved is the measurement of where the text goes.
+
+### 4b.1 — the pairing the registry declares, and the seven values that never arrived
+
+**Measured before the rule, through `inkOn` and not through the palettes.** The first pass read each theme's flat `tone` slot against each surface and reported 79 pairs below floor, 34 of them in the two high-contrast themes — and every one of those 34 was wrong. `hcDark` and `hcLight` take selection and focus as **bands** (I45, R-THM-003), so a band ink answers for every ref on that ground and the flat slot is never what lands. An instrument that does not go through the composition step measures a value the renderer never draws. Through `inkOn` the same sweep returns **one**.
+
+| | |
+|---|---|
+| `(theme, ground, tone)` overrides the registry declares | **81** |
+| carried by `tokens.generated.ts` at the design's value | **74** |
+| not carried at all | **7** |
+| pairs below floor through `inkOn`, over the ten themes | **1** — `mono` `meta` on `selection`, 3.86 : 1 against a 4.5 floor |
+
+**The seven are one defect in the generator and they are invisible for a second, independent reason.** `tools/theme/from-registry.mjs` matches `^\[data-theme="X"\] .bg-G .c-T` against `rule.selector` and `continue`s, under a comment that says *the registry writes it twice in one selector, descendant and same-element — **one pairing***. The first half is true of every rule. The second does not follow: a registry rule may carry **several tones** in one selector list, and six do — `[data-theme="mono"] .bg-selection .c-dim, … .c-muted…, … .c-meta…` is three pairings in one record. An anchored match takes the first and drops the rest. That is a correct sentence justifying the wrong decision, which review reads as deliberate because the sentence it checks is true.
+
+The seven lost values, every one on `selection`:
+
+| theme | tone | the design | the tree |
+|---|---|---|---|
+| `dark` | `muted` | `#bdbdbd` | `#8c8c8c` |
+| `light` | `muted` | `#4e515b` | `#6e6f76` |
+| `ink` | `muted` | `#bfc7d0` | `#7d8794` |
+| `warm` | `muted` | `#cfc7bf` | `#948a80` |
+| `nord` | `muted` | `#d8dee9` | `#98a0b0` |
+| `mono` | `muted` | `#b8b8b8` | `#8a8a8a` |
+| `mono` | `meta` | `#b8b8b8` | `#8e8e8e` |
+
+**And nothing could have failed.** `SELECTION_SLOTS` was `tone.default` alone, so no check ever asked what `muted` or `meta` take on a selection — the generator dropped seven values onto a ground whose scope excluded exactly those tones. **Two defects composing, each of which makes the other silent**: a loss with no reader, and a reader narrowed off the loss. Neither is visible from the other's side, which is why the widening and the generator's fix land together rather than one at a time.
+
+The single failure, `mono` `meta` on `selection`, **is the missing override**: the design gives it `#b8b8b8`, which clears, and the tree paints `#8e8e8e`, which does not. So the gate lands with a shipped defect to its name and the design's own value closes it — no colour is chosen here.
+
+---
 
 ### 4c. The wash a matrix paints, and the one word in I21 that decides it
 
@@ -1442,6 +1477,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 
   **The remedy the rule names is composition, not a lighter ground.** `hcLight` clears 7 : 1 by composing four darker inks for `bgElev` — `muted #525252→#4d4d4d`, `ok #005c00→#005b00`, `error #a80000→#a10000`, `identifier #00595e→#00575b`, each darkened along its own RGB ray so the hue is unchanged and only the value moves, by the least that clears. The alternative was one declaration — `bgElev` from `#ebebeb` to `#f5f5f5` — and it would have shrunk the elevation step against `#ffffff` from 9% lightness to 4%, on the theme whose point is that surfaces are tellable apart. **An elevated surface a reader cannot tell from the page is the failure the theme exists to prevent**, so the ground is what does not move. Four and not eight because `syntax.comment` `key` `operator` `string` derive from those four tones and inherit their composition. Asserted afterwards, because darkening four inks toward a floor is the edit that converges a palette: ten distinct tones on `bgElev`, closest pair 58 units apart in RGB, `muted` still recessive at 7.09 against `default`'s 17.62, and the tightest meaning pair in the theme exactly **7.00** (T2.24, T6.22).
 - **I48** — *(R-THM-001, R-THM-003, R-THM-004)* **The resolver takes the ground a run lands on, and `inkOn` is its composition step.** `resolve(ref, theme, caps, on?)` and `resolveTone(tone, theme, caps, on?)` answer *what ink does this slot take on that ground*; `on` absent is the page, which is every existing call site unchanged. **The composition is one function and it is the gate's own** — the band first (R-THM-003), then the theme's `(ground, ref)` composition (R-THM-001), then the flat slot — so the painter and `validateTokens` read one answer rather than two implementations of one rule. **This is what makes every floor in this component a claim about a drawn frame.** Before it, `inkOn` was called from `contrast.ts` and nowhere else and `resolve` had no ground to ask about, so **74 of 100 tone × surface pairs across the five themes that compose were an ink the gate checked and the painter never emitted** — R-THM-003's *one ink per band* verified against values the terminal never received, which is A03 §2's vacuity class wearing a passing gate (F1240). **The ladder is unchanged, and the ground binds on the two rungs that carry the theme's own values**: at 24-bit the composed hex is the hex; at 8-bit the composed inks are quantised **as a set on that ground**, per `(theme, palette, ground)`, because rank order and distinctness are properties of a set and a per-slot neighbour can see neither (§3). **At 4-bit and 1-bit the ground is inert, and that is a limit rather than an omission**: 4-bit is a curated sixteen-entry map the theme authored per ref and composed no second time, and at 1-bit no colour is emitted at all (I2), so there is no ink for a ground to change — a floor is a 24-bit claim and those two rungs already depart from the hexes wholesale. **What it does not reach, stated because an unrecorded limit reads as strength**: a ground reaches the resolver only where a painter passes it, so a renderer that washes a region and forgets to say so paints the page's ink on it. The seam is `RunContext.on` and the row that watches it is the composition frame, which reports each run's ink **beside the ground it stands on** rather than asserting one in isolation.
+- **I49** — *(R-THM-001, R-THM-004)* **A ground's pairing is every tone the design paints on it, and a composed value is a declaration that the tone lands there.** `SELECTION_SLOTS` is derived from the registry's `(theme, ground, tone)` compositions rather than authored, so a tone the design repaints on a ground enters that ground's floor check on the commit that adds it, and a tone it never paints there is never measured against it — §4a's scope rule with its premise read off the design instead of off this tree. **Every composition the registry declares is carried at the value it declares**, over every selector in a rule and not the first: a rule may name several tones in one selector list, and a value dropped by the generator is a value no floor can miss, because the pairing that would measure it is derived from the same records. The two clauses are one invariant because either alone is silent — a lost value on an unmeasured pairing is exactly the state this repository shipped in seven places (§4b.1).
 
 
 ## 8. Commitments
@@ -1484,6 +1520,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 36. **A theme's promise is a field, not a name** (I43, R-THM-002). The high-contrast themes were named for a ratio and shipped without one; `floor` makes the ratio declarable, `validateHighContrast` refuses a theme that breaks it, and the remedy when a ground costs an ink its margin is a composed ink for that ground rather than a lighter ground.
 37. **Focus is a ground of its own, and `▸` is what survives when it is not** (I47, §4k, R-STA-004). The tree told focus and selection apart by *ink on one ground* where the design tells them apart by *two grounds and a mark*, which is why `focusGround` shipped with a gate and no reader and why `▸` ships in `GLYPH_TABLE` read by nothing. Six compositions are classified rather than discovered one at a time, availability joins the precedence because *disabled + error* was a composition the list could not rank, and the four facts with no subject in this tree are named so a frame is not drawn for a state no producer can construct.
 38. **An ink is resolved against the ground it lands on, and the gate and the painter share the resolution** (I48, R-THM-003, F1240). The composition frames drew row 1 of §4k.2 and its third clause was false: a focused or selected row was repainted in one ink, so `failed` kept its glyph and its word and lost its tone — and retiring that rule alone would have painted the flat ink on a band, which is the value the gate already measures as wrong there. Both halves are one change: `resolve` gains the ground, `inkOn` becomes its composition step, and C11 I14's drop-to-one-ink rule retires in the same commit.
+39. **A pairing is derived from the design, and a dropped value is why it must be** (I49, §4b.1, R-THM-001, R-THM-004). `SELECTION_SLOTS` was `tone.default` on an argument that was right about the prompt and not about the transcript, and the generator's `^`-anchored selector match read one pairing per registry rule under a comment whose true first half concealed a false second. Seven declared values never reached `tokens.generated.ts`, all seven on `selection`, six of them `muted` — and nothing could have failed, because the scope that would have measured them excluded exactly those tones. The pairing becomes derived, the generator reads every selector in a rule, and the one contrast failure this exposes — `mono` `meta` on `selection` at 3.86 — is closed by the design's own `#b8b8b8` rather than by a colour chosen here.
 
 ---
 
@@ -1497,6 +1534,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.2** (I2): at depth 1, no returned `Style` has `colour`.
 - **T1.3**: at depth 1, tones map to the three §3 classes exactly.
 - **T1.4**: at depth 24, the returned colour is the token's hex verbatim.
+- **T1.44** (I49, §4b.1): every `(theme, ground, tone)` composition the registry declares is carried by `tokens.generated.ts` at the value it declares — read per **selector**, not per rule. The control is a rule with three tones in one selector list, which the anchored match reads as one.
+- **T1.45** (I49, §4b.1): `SELECTION_SLOTS` is derived from the registry's compositions, so it holds `muted` and `meta`; and every derived pairing clears its floor through `inkOn`. Measured red before the seven values land: `mono` `meta` on `selection` at 3.86 against 4.5.
 - **T1.5** (I5): at depth 4, the curated mapping is used — asserted against the theme's declared table, not against a computed nearest.
 - **T1.6**: `setVariant` swaps the variant and clears the cache.
 - **T1.7** (I3): a theme whose `error` fails 4.5:1 → `loadTheme` returns errors naming `error`, no theme produced.
