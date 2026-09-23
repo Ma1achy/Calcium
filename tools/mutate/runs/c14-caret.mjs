@@ -47,8 +47,10 @@ const MUTATIONS = [
     // right for every selection made in one direction, and that is most of them.
     name: "an extend adds to the selection instead of re-deriving it",
     file: MODEL,
-    from: "  return frozen(caret, anchor, blocksTouched(anchor, caret, spans, order));",
-    to: "  return frozen(caret, anchor, new Set([...mode.blocks, ...blocksTouched(anchor, caret, spans, order)]));",
+    from:
+      "  const caret = step(mode.caret, delta, spans, order);\n  return frozen(caret, anchor, blocksTouched(anchor, caret, spans, order));",
+    to:
+      "  const caret = step(mode.caret, delta, spans, order);\n  return frozen(caret, anchor, new Set([...mode.blocks, ...blocksTouched(anchor, caret, spans, order)]));",
     expect: "T1.38b",
   },
   {
@@ -57,8 +59,10 @@ const MUTATIONS = [
     // never grows — caught only because the row asserts the whole set.
     name: "the anchor follows the caret rather than staying where the extend began",
     file: MODEL,
-    from: "  const anchor = mode.anchor ?? mode.caret;",
-    to: "  const anchor = mode.caret;",
+    from:
+      "  const anchor = mode.anchor ?? mode.caret;\n  const caret = step(mode.caret, delta, spans, order);",
+    to:
+      "  const anchor = mode.caret;\n  const caret = step(mode.caret, delta, spans, order);",
     expect: "T1.38b",
   },
   {

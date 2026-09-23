@@ -55,6 +55,7 @@ import { selectionSpans, type CellSpan } from "../interaction/editor/index.js";
 import { extentOf } from "../interaction/router/focus.js";
 import { PROMPT_GUTTER, regionWidth } from "./config.js";
 import { cursorStyleFor, steadyWhileTyping } from "./cursor-style.js";
+import { autoscrollFor, beginDrag, type Drag } from "./drag-selection.js";
 import { createIdentityLoop } from "./identity.js";
 import {
   SessionStateError,
@@ -1479,6 +1480,106 @@ class Session implements TuiInstance {
     return frozen;
   }
 
+  /**
+   * The gesture in flight, and where its pointer was last reported
+   * (C14 §6f, I44).
+   *
+   * **Two fields and not one**, because the ticker needs the pointer's position
+   * on a wake that no report caused — which is the whole of I45: a terminal
+   * reports motion when the pointer changes cell and not while it sits still,
+   * so the last row *is* the current row until told otherwise.
+   */
+  #drag: Drag | null = null;
+  #dragRow = 0;
+  /** The autoscroll's handle — a **second** ticker, because I35 stopped the first. */
+  #autoscroll: Disposable | null = null;
+
+  /**
+   * A pointer gesture in semantic copy mode (C14 §6f, `R-SEL-012`).
+   *
+   * The width is taken once and used for all three of the caret, the spans and
+   * the boxes: two widths here would put the caret in a different block from
+   * the one the spans describe, and the drag would work.
+   */
+  #semanticDrag(regionRow: number, phase: "press" | "move" | "release"): boolean {
+    const graph = this.#graph;
+    if (graph === null || this.#semantic === null) return false;
+    if (phase === "release") {
+      // `R-SEL-013`'s *stops on release*. The selection stays — a release ends
+      // the gesture and not the mode.
+      this.#drag = null;
+      this.#stopAutoscroll();
+      return true;
+    }
+    const width = this.#composed().region.width;
+    const caret = graph.semanticCaretAt(regionRow, width);
+    this.#dragRow = regionRow;
+    // **A row with no entry under it is most of a drag, not an error.** The
+    // pointer is past the container — which is the state `R-SEL-013`'s bands
+    // exist for — so the gesture stays alive and the ticker is re-armed for the
+    // new distance. Only the caret stops moving, because there is no row to
+    // move it to.
+    if (caret === null) {
+      if (this.#drag === null) return false;
+      this.#armAutoscroll();
+      return true;
+    }
+
+    if (phase === "press") {
+      this.#drag = beginDrag(caret, graph.scrollBoxSpans());
+      this.#semantic = semantic.placeCaret(this.#semantic, caret);
+    } else {
+      if (this.#drag === null) return false;
+      this.#semantic = semantic.extendTo(
+        this.#semantic,
+        caret,
+        this.#selectionSpans(width),
+        this.#selectionOrder(),
+      );
+    }
+    this.#armAutoscroll();
+    graph.scheduler.commit("input");
+    return true;
+  }
+
+  /**
+   * Arm or re-arm the autoscroll for where the pointer is (C14 I45).
+   *
+   * **A ticker rather than a response to a report**, which is the rule and not
+   * the arithmetic: the wake re-reads `#dragRow` rather than waiting for a new
+   * one, so a reader holding the pointer still outside the container keeps
+   * scrolling — which is exactly when they are waiting for it to.
+   *
+   * Re-armed from the current position on every tick, so crossing into another
+   * band changes the rate at the next row rather than at the next report.
+   */
+  #armAutoscroll(): void {
+    this.#stopAutoscroll();
+    const graph = this.#graph;
+    const drag = this.#drag;
+    if (graph === null || drag === null) return;
+    // **The container's rect, not the frame's** (C14 I45). A drag anchored in a
+    // box measuring its distance against the whole region would not autoscroll
+    // until the pointer left the screen, and the box would never reach its end.
+    const rect = graph.containerRect(drag.container, this.#composed().region.width);
+    if (rect === null) return;
+    const step = autoscrollFor(drag, this.#dragRow, rect);
+    if (step === null) return;
+    this.#autoscroll = this.config.schedule(() => {
+      this.#autoscroll = null;
+      // **The container's end is read out of the container** (`R-SEL-013`):
+      // nothing moved means there is nowhere left, so the ticker stops rather
+      // than waking forever against a clamp.
+      if (!graph.scrollContainerBy(step.container, step.rows)) return;
+      this.#armAutoscroll();
+    }, step.afterMs);
+  }
+
+  #stopAutoscroll(): void {
+    this.#autoscroll?.[Symbol.dispose]();
+    this.#autoscroll = null;
+  }
+
   /** The held document's entry ids, in document order — the extend's axis. */
   #selectionOrder(): readonly string[] {
     return this.#graph?.documentEntries.map((e) => e.id) ?? [];
@@ -1602,6 +1703,7 @@ class Session implements TuiInstance {
       selectAllLoadedEntries: () => this.#selectEntries("all"),
       copySelectedEntries: () => this.#copySelectedEntries(),
       moveSemanticCaret: (delta, extend) => this.#moveSemanticCaret(delta, extend),
+      semanticDrag: (row, phase) => this.#semanticDrag(row, phase),
       enterNativeSelection: () => this.#setNativeSelection(true),
       exitNativeSelection: () => this.#setNativeSelection(false),
       region: () => this.#composed().region,

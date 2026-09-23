@@ -170,6 +170,39 @@ export function blocksTouched(
 }
 
 /**
+ * A press — put the caret where the pointer is and start a new selection
+ * (C14 §6f, I37).
+ *
+ * **The old blocks go, and that is derived rather than chosen.** I37 says the
+ * range is re-derived from the pair on every step and `R-SEL-015` says the count
+ * is always the size of what return would copy right now; a press that kept the
+ * previous set would make the count the union of two gestures, which no release
+ * could produce. The anchor goes with it, for `escape`'s reason.
+ */
+export function placeCaret(mode: SemanticMode, caret: Caret): SemanticMode {
+  return mode === null ? null : frozen(caret, null, new Set<string>());
+}
+
+/**
+ * A motion with the button held — extend from the anchor to here (C14 §6f).
+ *
+ * {@link extendCaret} with the caret given rather than stepped: a pointer names
+ * a position and a key names a delta, and everything after that is the same
+ * function, including the anchor being planted by the **first** extend so a
+ * press alone selects nothing.
+ */
+export function extendTo(
+  mode: SemanticMode,
+  caret: Caret,
+  spans: readonly BlockSpan[],
+  order: readonly string[],
+): SemanticMode {
+  if (mode === null || mode.caret === null) return mode;
+  const anchor = mode.anchor ?? mode.caret;
+  return frozen(caret, anchor, blocksTouched(anchor, caret, spans, order));
+}
+
+/**
  * A plain arrow — move the caret, touch nothing else (C14 I37).
  *
  * Without this the mode has no way to put the caret anywhere without selecting

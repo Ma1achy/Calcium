@@ -1139,6 +1139,7 @@ Fake heights, no rendering.
 
 ### Tier 4 — integration
 
+- **T4.37** (I44, I45, §6f): a real session, `⌥⇧V`, a press inside the transcript and a motion far below it → the view moves, and it **keeps** moving when the clock alone advances with no further report. That is the claim no model-level row can make: the chain is C16's mouse table, the mode's rung, the row-to-caret translation and the ticker, and each half passes on its own with the seam between them unbuilt. **The control is the same two reports with no mode up**, which scroll nothing — so a moved view is the drag's doing rather than a session that drifts. The release stops it, and a further 600 ms moves nothing.
 - **T4.34** (I35): the mode is entered with a spinner on screen → its cell is the same glyph across every wake while the mode is up, and it moves again after the exit. Sampled past the set's own cadence, as T4.35 is, so the row is about the ticker being stopped rather than about two cadences aliasing.
 - **T4.1** (with C09): summed measured heights of a visible range equal the rows actually rendered, at seven widths. **The drift test.**
 - **T4.2** (with C09, C11): expanding a table row shifts subsequent entries by exactly the measured delta.

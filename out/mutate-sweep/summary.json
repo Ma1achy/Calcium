@@ -1,11 +1,11 @@
 {
   "label": "all",
-  "only": "c14-drag",
+  "only": "c14-caret",
   "rows": [
     {
-      "run": "c14-drag.mjs",
+      "run": "c14-caret.mjs",
       "exit": 0,
-      "seconds": 4,
+      "seconds": 15,
       "state": "green",
       "restored": 0,
       "caught": 5,

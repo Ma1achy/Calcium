@@ -572,6 +572,25 @@ export function createRouter(
       return run("nativeSelection", e) || run("global", e);
     }
 
+    // **A pointer gesture in semantic copy mode is the mode's, wherever the
+    // pointer is** (C14 I44, §6f, `R-SEL-012`, `R-SEL-013`).
+    //
+    // Two things sit in this one line. Without the rung at all a press routes
+    // to `liveBlock` and moves focus — the other mode's gesture running inside
+    // this one, and the reader's drag selecting nothing while something else
+    // lights up. And **outside `inRegion`**, because a drag that autoscrolls is
+    // a drag whose pointer has *left* the container: `R-SEL-013`'s bands are
+    // measured in cells past the rect, so the reports that matter most are the
+    // ones an in-region test drops. *A gesture belongs to where it started* is
+    // the same sentence for the router as for the container.
+    //
+    // A wheel never reaches here — the arm above returns — so the viewport
+    // still scrolls under the hold (I32).
+    if (deps.semanticSelection()) {
+      stages.push("viewport:copy");
+      return run("semanticSelection", e);
+    }
+
     if (inRegion) {
       stages.push(hit === null ? "viewport:miss" : `viewport:${hit.id}`);
       return hit !== null && run("liveBlock", e);

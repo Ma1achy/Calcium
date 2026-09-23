@@ -61,6 +61,7 @@ import { SeriesVisibility } from "./series-visibility.js";
 import { VisibleIds } from "./visible-ids.js";
 import { pacedSchedule } from "./paced-schedule.js";
 import { RenderScratchStore } from "./render-scratch.js";
+import type { BoxSpan, DragContainer } from "./drag-selection.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
 import { createOverlayManager, takesInput } from "../viewport/overlay/index.js";
 import { createEditor } from "../interaction/editor/index.js";
@@ -328,6 +329,16 @@ export type FrameQueries = Readonly<{
    * the motions landing later cannot quietly change what it means.
    */
   semanticSelectionCount: () => number;
+  /**
+   * A pointer gesture inside the transcript while the mode is up (C14 §6f,
+   * `R-SEL-012`), by **region** row. `true` is consumed.
+   *
+   * Three phases and not an event, because the mode does not care which button
+   * or which bits: a press begins a gesture, a motion with the button held
+   * extends it, and a release ends it. The drag's state and the ticker live
+   * where the clock is (A03 SS1); the geometry lives here.
+   */
+  semanticDrag: (regionRow: number, phase: "press" | "move" | "release") => boolean;
   // **No consumer in `src/` yet, and the consumer is named** (M10c). The footer
   // label is what reads it, and the label is parked on a word the design does
   // not supply: `owner` is the *rung*, both modes map to `copy`, and the design
@@ -389,6 +400,26 @@ export type ConstructDeps = Readonly<{
 }>;
 
 export type Graph = Readonly<{
+  /**
+   * A region row as a selection caret, the scrollables it could bind to, and
+   * one autoscroll tick (C14 §6f).
+   *
+   * **Here rather than in `session.ts` because the geometry is here** — the
+   * entry map, the chrome's height and both scroll containers — and the drag's
+   * state and its ticker are there, because that is where the clock is (A03
+   * SS1). `scrollContainerBy` answers `false` at the container's end, which is
+   * `R-SEL-013`'s stop read out of the container rather than computed twice.
+   */
+  semanticCaretAt: (
+    regionRow: number,
+    width: number,
+  ) => Readonly<{ entryId: string; row: number }> | null;
+  scrollBoxSpans: () => readonly BoxSpan[];
+  scrollContainerBy: (container: DragContainer, rows: number) => boolean;
+  containerRect: (
+    container: DragContainer,
+    width: number,
+  ) => Readonly<{ from: number; to: number }> | null;
   /**
    * C28's instrumentation seam, or absent (C28 I30).
    *
@@ -2094,6 +2125,148 @@ export async function constructGraph(
   };
 
   /**
+   * A region row as a **selection caret** (C14 §6f, I20).
+   *
+   * **The translation is the whole reason this lives here.** `rowOffset` is in
+   * `chrome ++ blocks` and a caret's row is in block rows, so the command line
+   * comes off first — and the width is the caller's, because the spans the
+   * caret is compared against were laid out at one and two widths disagreeing
+   * puts the caret in a different block while every assertion about the drag
+   * passes.
+   *
+   * **The held document, not the record** (C14 I31): while the mode is up the
+   * frame draws the hold, and a caret resolved against the record would address
+   * an entry the reader cannot see.
+   *
+   * A press on the entry's own chrome clamps to its first block row rather than
+   * declining. The command line is part of the entry, and *nothing happened* is
+   * the report a decline produces.
+   */
+  const semanticCaretAt = (
+    regionRow: number,
+    width: number,
+  ): Readonly<{ entryId: string; row: number }> | null => {
+    const hit = entryAtRegionRow(regionRow);
+    if (hit === null) return null;
+    const entry = stores.documentEntries.find((e) => e.id === hit.id);
+    if (entry === undefined) return null;
+    return Object.freeze({
+      entryId: hit.id,
+      row: Math.max(0, hit.rowOffset - chromeRowsOf(entry, width)),
+    });
+  };
+
+  /**
+   * Every scrollable block's entry-local rows, **merged per block** (C14 I44).
+   *
+   * A container yields one block-level element per child, all keyed on the
+   * container's id (`R-SEL-014`'s *the inner one is never addressable*, which is
+   * how the span set already satisfies it). Taking them unmerged would offer
+   * `containerAt` several narrow spans for one box and let *innermost* pick a
+   * fragment of it.
+   */
+  const scrollBoxSpans = (): readonly BoxSpan[] => {
+    const out: BoxSpan[] = [];
+    for (const entry of stores.documentEntries) {
+      const boxes = new Set(
+        entry.doc.blocks.filter((b) => b.kind === "scroll").map((b) => b.id),
+      );
+      if (boxes.size === 0) continue;
+      const merged = new Map<string, { from: number; to: number }>();
+      // **Through `elementsOf`, which is the one call site** (C26 I8): the
+      // keyboard, the pointer and now the drag reach one resolver, so none of
+      // them can disagree about what is there. It lays out at
+      // `overlayRegion().width`, which `frame.ts` makes identical to the
+      // transcript region's, so these rows and the selection's spans are
+      // measured at the same number.
+      for (const { blockId, element } of elementsOf(entry.id)) {
+        if (element.level !== "block" || !boxes.has(blockId)) continue;
+        const held = merged.get(blockId);
+        merged.set(
+          blockId,
+          held === undefined
+            ? { from: element.rows.from, to: element.rows.to }
+            : {
+                from: Math.min(held.from, element.rows.from),
+                to: Math.max(held.to, element.rows.to),
+              },
+        );
+      }
+      for (const [blockId, rows] of merged) {
+        out.push(Object.freeze({ entryId: entry.id, blockId, from: rows.from, to: rows.to }));
+      }
+    }
+    return Object.freeze(out);
+  };
+
+  /**
+   * The container's rect in **region** rows — what `R-SEL-013`'s bands are
+   * measured past (C14 I45).
+   *
+   * **The rect is the container's and not the frame's**, which is the half a
+   * band table cannot state: a drag anchored in a box that measured its
+   * distance against the whole region would not autoscroll until the pointer
+   * left the *screen*, and the box would never reach its end.
+   *
+   * The arithmetic is `peekWanted`'s, which is `entryAtRegionRow`'s inverse —
+   * `blankRowsAbove` for the bottom-aligned short transcript, C14's `visible()`
+   * for what is on screen and how much of each, and the entry's chrome before
+   * its blocks (C14 I20). Clipped to the region, so a box running off the bottom
+   * ends where the reader can see it end.
+   *
+   * `null` is *the container is not on screen*, and the ticker stops rather than
+   * scrolling something nobody is looking at.
+   */
+  const containerRect = (
+    container: DragContainer,
+    width: number,
+  ): Readonly<{ from: number; to: number }> | null => {
+    const height = deps.frame.region().height;
+    if (container.kind === "viewport") return Object.freeze({ from: 0, to: height });
+    const entry = stores.documentEntries.find((e) => e.id === container.entryId);
+    if (entry === undefined) return null;
+    const span = scrollBoxSpans().find(
+      (b) => b.entryId === container.entryId && b.blockId === container.blockId,
+    );
+    if (span === undefined) return null;
+    const { viewportHeight, totalRows } = stores.viewport.scroll;
+    let top = blankRowsAbove(viewportHeight, totalRows);
+    for (const ve of stores.viewport.visible().entries) {
+      if (ve.id !== container.entryId) {
+        top += ve.takeRows;
+        continue;
+      }
+      const chrome = chromeRowsOf(entry, width);
+      const from = Math.max(0, top + chrome + span.from - ve.skipRows);
+      const to = Math.min(height, top + chrome + span.to - ve.skipRows);
+      return to <= from ? null : Object.freeze({ from, to });
+    }
+    return null;
+  };
+
+  /**
+   * One autoscroll tick's effect — `false` is **the container's end** (C14 I45).
+   *
+   * `R-SEL-013` stops there rather than rubber-banding, and the stop is read out
+   * of the container itself rather than computed a second time: the viewport
+   * clamps `topRow` and `ScrollOffsets` clamps against the ceiling its caller
+   * supplies, so *it did not move* is the same fact both ways and neither needs
+   * a bound written here.
+   */
+  const scrollContainerBy = (container: DragContainer, rows: number): boolean => {
+    if (container.kind === "viewport") {
+      const before = stores.viewport.scroll.topRow;
+      stores.viewport.scrollBy(rows);
+      if (stores.viewport.scroll.topRow === before) return false;
+      scheduler.commit("input");
+      return true;
+    }
+    const before = stores.scrollOffsets.get(container.entryId, container.blockId);
+    nudgeScroll(container.entryId, container.blockId, rows);
+    return stores.scrollOffsets.get(container.entryId, container.blockId) !== before;
+  };
+
+  /**
    * The element under a pointer, and the block that declared it (C16 §4a, I31).
    *
    * **One `find` over the list the keyboard walks** — `elementsOf`, at the same
@@ -2985,6 +3158,17 @@ export async function constructGraph(
     // bound and never consulted. Two targets at one rung need two of these,
     // because `register` is per target (C16 I50).
     router.register("semanticSelection", (e) => {
+      // **A pointer gesture is not a key** (C16 I23's boundary, the wheel's own
+      // reason): it has no `(target, key)` to resolve on, so it cannot come
+      // through the keymap and is not a second mechanism for one that could.
+      //
+      // A wheel never arrives here — C16's mouse table answers it above this
+      // rung — so the viewport still scrolls under the hold (C14 I32).
+      if (e.kind === "mouse") {
+        if (e.button === "none" || e.button.startsWith("wheel")) return false;
+        const phase = !e.press ? "release" : e.motion ? "move" : "press";
+        return deps.frame.semanticDrag(e.row - deps.frame.region().top, phase);
+      }
       const effect = bound("semanticSelection", e);
       if (effect === null) return false;
       effect();
@@ -3296,6 +3480,10 @@ export async function constructGraph(
     get bufferedEntries() {
       return stores.bufferedEntries;
     },
+    semanticCaretAt,
+    scrollBoxSpans,
+    scrollContainerBy,
+    containerRect,
     runner,
     lifecycle,
     scheduler,

@@ -59,6 +59,7 @@ const FRAME: FrameQueries = {
   nativeSelection: () => false,
   semanticSelection: () => false,
   semanticSelectionCount: () => 0,
+  semanticDrag: () => false,
   enterSemanticSelection: () => undefined,
   escapeSemanticSelection: () => undefined,
   exitSemanticSelection: () => undefined,

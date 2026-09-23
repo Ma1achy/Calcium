@@ -175,6 +175,7 @@ export const FRAME: FrameQueries = {
   nativeSelection: () => COPY_MODES.native,
   semanticSelection: () => COPY_MODES.semantic,
   semanticSelectionCount: () => 0,
+  semanticDrag: () => false,
   enterSemanticSelection: () => undefined,
   escapeSemanticSelection: () => undefined,
   exitSemanticSelection: () => undefined,
