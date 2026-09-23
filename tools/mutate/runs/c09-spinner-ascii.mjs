@@ -63,6 +63,30 @@ const results = runPass({
       expect: "T2.73",
     },
     {
+      // **The catalogue's membership.** A set dropped from the tree while the
+      // registry still registers it — the direction a subset check over the
+      // tree's own keys cannot see, and the one the six unregistered sets sat
+      // in for as long as they existed.
+      name: "a registered set is not built — `arc` leaves the catalogue",
+      file: G,
+      from: "  arc: Object.freeze({",
+      to: "  arcGone: Object.freeze({",
+      expect: "T2.163",
+    },
+    {
+      // `binary4`'s ASCII rung back to the decimal digits: a sixteen-state
+      // counter that cannot count to sixteen. The registry answers that range
+      // in `hex`'s record, and this is the row that holds the tree to it.
+      name: "`binary4` counts in ten digits again",
+      file: G,
+      // **Two lines, because one matches twice**: `hex` carries the same
+      // sixteen digits, and an anchor taking the first would measure a site
+      // nobody chose (F1113). The interval above it is what makes it `binary4`'s.
+      from: '    intervalMs: 120,\n    ascii: Object.freeze(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"]),',
+      to: '    intervalMs: 120,\n    ascii: Object.freeze(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]),',
+      expect: "T2.163",
+    },
+    {
       // A tool taking a bloom. `noise` is a dissolve and nothing to do with the
       // agent; one frame borrowed is the whole of R-MOT-008, and the fixture
       // says so itself — *a bloom set on a TOOL is a defect a grep finds*.

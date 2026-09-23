@@ -504,11 +504,11 @@ type SpinnerSet = Readonly<{
   narrowOnly?: boolean;
 }>;
 
-// **The two alphabets the unregistered sets still share** — `braille2`, `arc`,
-// `line` and `balloon`, which are in no registry record and so have no
-// `asciiPattern` to take (I98). `line` and `balloon` are ASCII-native and these
-// *are* their Unicode frames. `TOGGLE_ASCII` went with the port: `toggle` was
-// its only holder and the registry answers `<`/`>`.
+// **The two ASCII-native sets' own frames** — `line` and `balloon` draw these at
+// every rung, so the constant is a shared *alphabet* and not a shared fallback
+// (I98). `braille2` and `arc` held them as a fallback until both were
+// registered; `TOGGLE_ASCII` went with the port, since `toggle` was its only
+// holder and the registry answers `<`/`>`.
 const PULSE_ASCII = Object.freeze([".", "o", "O", "@", "*"]);
 const TURN_ASCII = Object.freeze(["-", "\\", "|", "/"]);
 const DIGITS = Object.freeze(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]);
@@ -659,7 +659,7 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
     // cycle, which is outside the 800–1600 band the same document states.
     // The rule is right and the row was not — found by asserting the rule.
     intervalMs: 110,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["|", "|", "/", "/", "-", "-", "\\", "\\"]),
   }),
   bounce: Object.freeze({
     frames: Object.freeze(["⠁", "⠂", "⠄", "⠂"]),
@@ -735,7 +735,7 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
       Array.from({ length: 16 }, (_unused, n) => String.fromCodePoint(0x2800 + n)),
     ),
     intervalMs: 120,
-    ascii: DIGITS,
+    ascii: Object.freeze(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"]),
   }),
 
   // toggle — a heartbeat rather than a spin. Two frames need ~400 ms or they
@@ -776,7 +776,7 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
     // `dots2`. Two of fifteen, which is why the band is asserted rather than
     // trusted.
     intervalMs: 130,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["|", "|", "/", "-", "-", "\\"]),
     narrowOnly: true,
   }),
   growVertical: Object.freeze({

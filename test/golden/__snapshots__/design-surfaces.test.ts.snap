@@ -55,7 +55,7 @@ cancelled       /
 ── §31 · every reusable spinner set
 agent           . . . . . . . o o o o o o o O O O O O O O @ @ @ @ @ @ @ O O O O O O O o o o o o o o . . o o O O @ @ O O o o . . . o o O O @ @ @ O O o o . . + * @ @ * + . o O @ O o
 braille         | | | / / - - - \\ \\
-braille2        - \\ | /
+braille2        | | / / - - \\ \\
 bounce          _ - ^ -
 orbit           | | / / - - \\ \\
 grow            . . o o O O @ @ O O o o
@@ -64,13 +64,13 @@ starfield       . . + * @ @ * +
 fullramp        . . . . . . . o o o o o o o O O O O O O O @ @ @ @ @ @ @ O O O O O O O o o o o o o o
 decimal         0 1 2 3 4 5 6 7 8 9
 hex             0 1 2 3 4 5 6 7 8 9 a b c d e f
-binary4         0 1 2 3 4 5 6 7 8 9
+binary4         0 1 2 3 4 5 6 7 8 9 a b c d e f
 toggle          < >
 line            - \\ | /
 balloon         . o O @ *
 circleQuarters  | / - \\
 boxBounce       | / - \\
-arc             - \\ | /
+arc             | | / - - \\
 growVertical    . . o o O @ @ O O o
 growHorizontal  . . o o O O @ @ O O o o
 noise           # * .
@@ -310,7 +310,7 @@ cancelled       /
 ── §31 · every reusable spinner set
 agent           . . . . . . . o o o o o o o O O O O O O O @ @ @ @ @ @ @ O O O O O O O o o o o o o o . . o o O O @ @ O O o o . . . o o O O @ @ @ O O o o . . + * @ @ * + . o O @ O o
 braille         | | | / / - - - \\ \\
-braille2        - \\ | /
+braille2        | | / / - - \\ \\
 bounce          _ - ^ -
 orbit           | | / / - - \\ \\
 grow            . . o o O O @ @ O O o o
@@ -319,13 +319,13 @@ starfield       . . + * @ @ * +
 fullramp        . . . . . . . o o o o o o o O O O O O O O @ @ @ @ @ @ @ O O O O O O O o o o o o o o
 decimal         0 1 2 3 4 5 6 7 8 9
 hex             0 1 2 3 4 5 6 7 8 9 a b c d e f
-binary4         0 1 2 3 4 5 6 7 8 9
+binary4         0 1 2 3 4 5 6 7 8 9 a b c d e f
 toggle          < >
 line            - \\ | /
 balloon         . o O @ *
 circleQuarters  | / - \\
 boxBounce       | / - \\
-arc             - \\ | /
+arc             | | / - - \\
 growVertical    . . o o O @ @ O O o
 growHorizontal  . . o o O O @ @ O O o o
 noise           # * .

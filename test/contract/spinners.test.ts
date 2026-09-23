@@ -204,17 +204,17 @@ const STATED_CYCLES: Readonly<Record<string, number>> = Object.freeze(
       );
     }
 
-    // **The other direction, with the residue named rather than bounded.** Six
-    // sets ship unregistered; M4 ruled they are registered from the repo's
-    // values and that has not landed. Naming them as a literal is what keeps
-    // this an equality: a seventh fails here, and a registered set going
-    // missing fails above.
+    // **The other direction, and the residue is empty.** Six sets shipped
+    // unregistered and M4 ruled they are registered from the repo's values;
+    // they are, so this is now an equality with nothing excused. A set added to
+    // either side alone fails here.
     const built = new Set(spinnerSetNames());
     const registered = new Set(REGISTERED.map((sp) => sp.id));
     expect(
       [...built].filter((n) => !registered.has(n)).sort(),
-      "built and not registered — owed to the registry, not to this file",
-    ).toEqual(["arc", "balloon", "binary4", "braille2", "decimal", "line"]);
+      "built and not registered",
+    ).toEqual([]);
+    expect([...built].sort(), "the two catalogues are one set").toEqual([...registered].sort());
   });
 
   it("T2.164 (C09 I98, R-MOT-008): the bloom family is the agent's, over its membership", () => {

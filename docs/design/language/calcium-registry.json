@@ -30857,6 +30857,266 @@
       "asciiTrajectory": {
         "type": "fit-cycle"
       }
+    },
+    {
+      "id": "braille2",
+      "initial": "⣾",
+      "keyframe": "k-braille2",
+      "cycleMs": 880,
+      "intervalMs": 110,
+      "frames": [
+        "⣾",
+        "⣽",
+        "⣻",
+        "⢿",
+        "⡿",
+        "⣟",
+        "⣯",
+        "⣷"
+      ],
+      "reusable": true,
+      "kind": "WORK",
+      "status": "current",
+      "ruleIds": [
+        "R-MOT-002",
+        "R-MOT-005"
+      ],
+      "reservedCells": 1,
+      "capabilityPolicy": "unicode-narrow-or-ascii",
+      "frameWidthByCapability": {
+        "unicodeNarrow": 1,
+        "ascii": 1
+      },
+      "asciiPattern": [
+        "|",
+        "/",
+        "-",
+        "\\"
+      ],
+      "asciiMotion": "rotation",
+      "asciiTrajectory": {
+        "type": "fit-cycle"
+      }
+    },
+    {
+      "id": "decimal",
+      "initial": "0",
+      "keyframe": "k-decimal",
+      "cycleMs": 1400,
+      "intervalMs": 140,
+      "frames": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "reusable": true,
+      "kind": "WORK",
+      "status": "current",
+      "ruleIds": [
+        "R-MOT-002",
+        "R-MOT-005"
+      ],
+      "reservedCells": 1,
+      "capabilityPolicy": "unicode-narrow-or-ascii",
+      "frameWidthByCapability": {
+        "unicodeNarrow": 1,
+        "ascii": 1
+      },
+      "asciiPattern": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "asciiMotion": "count",
+      "asciiTrajectory": {
+        "type": "fit-cycle"
+      }
+    },
+    {
+      "id": "binary4",
+      "initial": "⠀",
+      "keyframe": "k-binary4",
+      "cycleMs": 1920,
+      "intervalMs": 120,
+      "frames": [
+        "⠀",
+        "⠁",
+        "⠂",
+        "⠃",
+        "⠄",
+        "⠅",
+        "⠆",
+        "⠇",
+        "⠈",
+        "⠉",
+        "⠊",
+        "⠋",
+        "⠌",
+        "⠍",
+        "⠎",
+        "⠏"
+      ],
+      "reusable": true,
+      "kind": "WORK",
+      "status": "current",
+      "ruleIds": [
+        "R-MOT-002",
+        "R-MOT-005"
+      ],
+      "reservedCells": 1,
+      "capabilityPolicy": "unicode-narrow-or-ascii",
+      "frameWidthByCapability": {
+        "unicodeNarrow": 1,
+        "ascii": 1
+      },
+      "asciiPattern": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f"
+      ],
+      "asciiMotion": "count",
+      "asciiTrajectory": {
+        "type": "fit-cycle"
+      }
+    },
+    {
+      "id": "line",
+      "initial": "-",
+      "keyframe": "k-line",
+      "cycleMs": 520,
+      "intervalMs": 130,
+      "frames": [
+        "-",
+        "\\",
+        "|",
+        "/"
+      ],
+      "reusable": true,
+      "kind": "WORK",
+      "status": "current",
+      "ruleIds": [
+        "R-MOT-002",
+        "R-MOT-005"
+      ],
+      "reservedCells": 1,
+      "capabilityPolicy": "unicode-narrow-or-ascii",
+      "frameWidthByCapability": {
+        "unicodeNarrow": 1,
+        "ascii": 1
+      },
+      "asciiPattern": [
+        "-",
+        "\\",
+        "|",
+        "/"
+      ],
+      "asciiMotion": "rotation",
+      "asciiTrajectory": {
+        "type": "fit-cycle"
+      }
+    },
+    {
+      "id": "balloon",
+      "initial": ".",
+      "keyframe": "k-balloon",
+      "cycleMs": 800,
+      "intervalMs": 160,
+      "frames": [
+        ".",
+        "o",
+        "O",
+        "@",
+        "*"
+      ],
+      "reusable": true,
+      "kind": "WORK",
+      "status": "current",
+      "ruleIds": [
+        "R-MOT-002",
+        "R-MOT-005"
+      ],
+      "reservedCells": 1,
+      "capabilityPolicy": "unicode-narrow-or-ascii",
+      "frameWidthByCapability": {
+        "unicodeNarrow": 1,
+        "ascii": 1
+      },
+      "asciiPattern": [
+        ".",
+        "o",
+        "O",
+        "@",
+        "*"
+      ],
+      "asciiMotion": "growth",
+      "asciiTrajectory": {
+        "type": "fit-cycle"
+      }
+    },
+    {
+      "id": "arc",
+      "initial": "◜",
+      "keyframe": "k-arc",
+      "cycleMs": 780,
+      "intervalMs": 130,
+      "frames": [
+        "◜",
+        "◠",
+        "◝",
+        "◞",
+        "◡",
+        "◟"
+      ],
+      "reusable": true,
+      "kind": "WORK",
+      "status": "current",
+      "ruleIds": [
+        "R-MOT-002",
+        "R-MOT-005"
+      ],
+      "reservedCells": 1,
+      "capabilityPolicy": "unicode-narrow-or-ascii",
+      "frameWidthByCapability": {
+        "unicodeNarrow": 1,
+        "ascii": 1
+      },
+      "asciiPattern": [
+        "|",
+        "/",
+        "-",
+        "\\"
+      ],
+      "asciiMotion": "rotation",
+      "asciiTrajectory": {
+        "type": "fit-cycle"
+      }
     }
   ],
   "bars": [
