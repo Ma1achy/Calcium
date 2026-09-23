@@ -2899,6 +2899,107 @@ a band could have been mistaken for a reveal.
 
 ---
 
+## 7f. The scrollbar — one column, one family, twice the resolution (§021, `R-BLK-*`)
+
+§021 specifies it completely and the repository has none: no track, no thumb,
+no reserved column anywhere in `src/`. What follows is that figure read as
+arithmetic.
+
+### A track and a thumb are one shape at two weights
+
+`│ ┃ ╽ ╿` — light vertical, heavy vertical, and the two half-row forms. The
+design's argument is worth keeping because it rules out the obvious
+alternative: *a block on a hairline is two different things in one column. A
+light line and a heavy line are one thing at two weights — which is what a
+track and a thumb ARE.*
+
+### Half-row precision, derived from the figure rather than asserted
+
+A twelve-row gutter has **twenty-four positions**, and §021 works the example at
+four offsets. Reading them back gives the whole arithmetic, which is why it is
+recorded here rather than invented:
+
+| §021's row | the thumb it draws | what that says |
+|---|---|---|
+| `0 of 28` | `┃ ┃ ┃ ╿ │ …` | half-rows `[0, 7)` |
+| `5 of 28` | `│ ╽ ┃ ┃ ┃ │ …` | half-rows `[3, 10)` |
+| `14 of 28` | `… ┃ ┃ ┃ ╿ │ …` | half-rows `[8, 15)` |
+| `28 of 28` | `… ╽ ┃ ┃ ┃` | half-rows `[17, 24)` |
+
+Twelve rows and a maximum offset of 28 make the content `12 + 28 = 40`, so:
+
+- `positions = rows × 2` — 24.
+- `thumb = max(1, floor(positions × viewport ÷ content))` — `24 × 12 ÷ 40 = 7.2`,
+  and every one of the four rows draws seven half-rows.
+- `start = floor(offset ÷ maxOffset × (positions − thumb))` — `3.04`, `8.5` and
+  `17` against the figure's 3, 8 and 17, so the rounding is **floor** and the
+  last offset lands exactly at the end rather than being clamped there.
+
+A row's two halves then choose its glyph: both inside is `┃`, the lower half
+alone is `╽` — *starts mid-row* — the upper half alone is `╿`, and neither is
+`│`. **The track runs through the half-row forms**, which is what makes them a
+weight change rather than a block on a hairline.
+
+**Why the precision is load-bearing and not a flourish**: *without it a bar over
+a long document moves in visible jumps and sits still through half a page of
+scrolling — which reads as broken rather than coarse.*
+
+### The set degrades together, and the tree already ruled that
+
+*A set of mixed widths cannot ship, so it takes ascii* — `│` and `┃` are
+`East_Asian_Width=Ambiguous` and `╽` and `╿` are Narrow, so a terminal drawing
+ambiguous glyphs wide would draw this set at two widths in one column.
+
+**This is C02 I9's ruling arriving at a fourth subject rather than a new one.**
+`glyphs()` already returns the ASCII set whole at `ambiguousWidth: "wide"`, for
+the same reason and stated in the same words — *degradation preserves meaning,
+not appearance*. So the scrollbar inherits the behaviour §021 asks for, and what
+is owed is the **check**: the width test runs over the set, because *four
+characters that are each fine can still be unusable together.*
+
+**The four glyphs are their own set and not four `GlyphSet` slots**, on
+`BAR_STYLES`' precedent. The ASCII rung has no half-rows at all, so slots for
+them would carry a duplicate `#` — three Unicode characters against one ASCII
+one, which is exactly the 1:1 property T2.5 asserts over `SUBSTITUTIONS`. A set
+can say *this rung has no half-row form*; a pair cannot say it without lying.
+At the ASCII rung `positions = rows`, and the same arithmetic runs at whole-row
+resolution.
+
+### Nothing is drawn where a bar could not move
+
+*Nothing fits → NOTHING. A bar that cannot move is decoration.* Content that
+fits its viewport gets `null`, not a full-height thumb — a bar that is always
+full says *there is more* to a reader who glances at it, which is the one thing
+it exists to say.
+
+### The column is paid for once, and the reservation cannot oscillate
+
+A bar takes the last column, so the content is drawn one cell narrower — and a
+narrower content can be taller, which is the circularity to avoid: reserving on
+overflow changes the width that decides overflow.
+
+**Measured at the full width, and re-measured at one less only if it
+overflowed.** Narrowing never makes content shorter, so overflow at the full
+width implies overflow at the narrower one and the decision is reached once.
+The alternative — reserving the column unconditionally — costs a cell in every
+box that never needed one, and the alternative to both is a fixed point nobody
+can read.
+
+### The thumb takes the accent when its container has focus
+
+*The same rule the focused-container border takes, and it costs no extra
+column.* §021 draws the two states as the same eight glyphs at two tones, so the
+tone is the **column's** and not the thumb's alone; the renderer resolves
+`accent` against `muted` exactly as the residue row already does (C26 §7).
+
+### A bar and a count are not alternatives
+
+*A bar says WHERE. A count says HOW FAR*, and §021's own logs panel draws both.
+So C04 I49's residue row is untouched by this section — the two answer different
+questions and the design puts them on one box deliberately.
+
+---
+
 ## 8. Commitments
 
 1. C09 owns the registry; C04 owns the schema and the measurement contract (I13).
@@ -2978,11 +3079,15 @@ a band could have been mistaken for a reveal.
 73. **The trust boundary is measured over the registry, not over the call sites** (I89, §7d, `R-TRU-001`). The plan for this MR said the escaping was absent; it is built, at `data/text.ts`, and the measurement that mattered was whether it is *reached* — 38 of 39 kinds and a live session, no control byte to the frame, the payload's printable residue drawn as text, and the thirty-ninth exempt behind `C04 I110`'s gate rather than unchecked. What was missing is the scope: a rule phrased over the nineteen modules that remember to call it cannot see a twentieth, which is `SS65`'s shape one component over.
 74. **A trail is derived where the width is known** (I90). The block says it is streaming — that is C04's field and C04's argument for it; the band's cells are this layer's arithmetic, taken over the text so that chrome is composed whole by construction rather than by a rule the renderer must remember.
 75. **A trail costs no rows and `weight` is the 1-bit rung** (I90, I91). A band is a colour over cells that are drawn anyway; where there is no colour the four colour forms draw nothing, because substituting a mark would spend a cell the block never reserved.
+76. **The bar's arithmetic is read off the design's own figure, not invented beside it** (I92, §7f, §021). §021 works four offsets at twelve rows, and the four together fix the position count, the thumb's length, the rounding and where the last offset lands — so the table in §7f is a derivation with a check rather than a specification with an example. A bar whose rounding disagreed with that figure would be arithmetically self-consistent and draw a different picture.
+77. **A set of mixed widths cannot ship, so the width check runs on the set** (I93, §7f, C02 I9). Four characters that are each one cell can still be unusable together, and the tree already holds the ruling one subject over — `glyphs()` returns ASCII whole at `ambiguousWidth: "wide"`. What the scrollbar adds is the subject, not the rule.
 
 ---
 
 - **I90** — *(§7e, C04 §5c, C04 I122, C04 I123, `R-BLK-182`, `R-BLK-198`)* **The trail's band is the last `TRAIL_CELLS` cells of a streaming block's text, derived here and measured in cells.** Never over a glyph, a header or a border — chrome is composed whole — and never reaching further than the text, so a block whose text is shorter than the band takes a band of its whole text. The span it produces carries a `ramp` whose `to` is the run's own ink (C04 I123), and it costs no rows: `measure` is the same number with a trail and without one.
 - **I91** — *(§7e, C04 §5c, `R-MOT-005`)* **`weight` is the only form that survives 1-bit, and the others draw nothing there rather than something else.** A trail is a colour, and a rung with no colour has no trail — substituting a mark would spend a cell the block did not reserve, and substituting bold for every form would make four names one. `weight` is bold with one hard step to normal precisely because a terminal has bold or it has not, so there is no settle to lose.
+- **I92** — *(§7f, §021)* **A scrollbar is one column of `│ ┃ ╽ ╿` at half-row precision, and there is none where the content fits.** `positions` is twice the gutter's rows at the Unicode rung and its rows at the ASCII one; the thumb is `max(1, floor(positions × viewport ÷ content))` half-rows and starts at `floor(offset ÷ maxOffset × (positions − thumb))`, so the last offset lands at the end rather than being clamped there. A row takes `┃` where both halves are inside the thumb, `╽` where the lower half alone is, `╿` where the upper half alone is, and `│` otherwise — the track runs through the half-row forms. **Content that fits its viewport draws nothing**: a bar that cannot move is decoration, and one that is always full says *there is more* to a reader who glances at it.
+- **I93** — *(§7f, §021, C02 I9)* **The scrollbar's glyphs are a set and degrade as one.** `│` and `┃` are `East_Asian_Width=Ambiguous` and `╽` and `╿` are Narrow, so the four cannot ship together at `ambiguousWidth: "wide"` — the whole set takes the ASCII rung, where the track is `|`, the thumb is `#` and there is **no half-row form at all**, which is why this is a set rather than four `GlyphSet` slots: a pair would have to carry a duplicate `#` and break T2.5's 1:1 property to say *this rung has none*. The column it takes is reserved by measuring the content at the full width and re-measuring one cell narrower **only if it overflowed** — narrowing never shortens content, so the decision is reached once and cannot oscillate.
 
 
 ## 8b. The glyph axis — a classification table, and why it is not a trace
@@ -3156,6 +3261,9 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.51** (I77, F1202): `displayCells` equals `cells` of the SGR-stripped text over a corpus that reaches every arm — a plot-shaped row of braille under a colour change every twenty cells, a panel row of box drawing between two dim rails, blocks and arrows, a table unit before a variation selector (two cells), before a combining mark and before a joiner, a sextant pair, `図表`, a family and a keycap, an unstyled ASCII row, the empty string — at `narrow` and at `wide`; and the braille row at `narrow` takes the scan, which the row shows by asserting the count in a `soloUnit` sweep of its own.
 - **T1.52** (I78, F1204): `fitStyled` over rows under the width — a styled ASCII row, a plain one, a row holding a family and a keycap, a base with a combining mark, a row with a control character and one with an OSC hyperlink, a braille plot row under colour changes, the empty string — at the row's width plus one and plus twenty → each answer is exactly `width` display cells, begins with the row byte for byte, ends in `width − cells` blanks, and carries no reset the row did not; a row over the width still cuts and closes as T1.30 pins, and the same rows at their own width return by identity.
 - **T1.53** (I9, I79, F1205): `truncate` and `truncateParts` from both ends over a corpus — a long ASCII line, a line of CJK, a line where the cut falls one cell inside a double-width glyph, a family and a keycap at the cut, a base with a combining mark at the cut and a run that gives up its last unit to one, a line holding a control character, a braille row, a line mixing every one of these — at every width from 1 to the line's cells plus one, at `narrow` and at `wide` and at `ascii` → each answer is exactly `width` cells up to the line's own, and the line itself past it; `kept` is a prefix of the stripped line (a suffix from `"start"`, with `start` its code-unit offset), and every answer equals, byte for byte, a reference cut made in the test with the segmenter's iterator over the whole line — the walk this replaces, re-stated rather than imported.
+- **T1.59** (I92, §7f, §021): the four rows of §021's own figure, drawn back — twelve rows, a viewport of 12 in a content of 40, at offsets 0, 5, 14 and 28 → `┃┃┃╿││││││││`, `│╽┃┃┃│││││││`, `││││┃┃┃╿││││` and `││││││││╽┃┃┃`, glyph for glyph. The design's figure is the fixture, so a rounding that is self-consistent and different fails here rather than passing as a variant.
+- **T1.60** (I92, §7f, §021): content that fits its viewport draws nothing at every width and every offset, and one row more draws a bar — the boundary asserted from both sides, because *a bar that cannot move is decoration* is satisfied by a renderer that draws none at all. Then the properties over a sweep of viewports, contents and offsets: the column is always the gutter's height, the thumb is never empty, it never leaves the track, and it reaches the track's end exactly at the maximum offset.
+- **T1.61** (I93, §7f, C02 I9): the set at `ambiguousWidth: "wide"` is the ASCII set — `|` and `#`, no half-row form — and the whole set moves together, asserted as *every member of the Unicode set is one cell at `narrow` and the set has no member that is not*. The fabricated violation is the check run on one glyph rather than the set: `╽` alone passes at `wide` and the set it belongs to does not.
 - **T1.47** (I73): `rowCells` equals `cells` of the row with every SGR and OSC sequence removed, over the block corpus's rows at four widths under three capability sets and over T1.46's ten thousand seeded rows; and it counts a wide character as two, a combining mark as none, and an SGR-only row as zero. Not deferred on a component: the code commit replaces this row.
 
 ### Tier 2 — contract / interface

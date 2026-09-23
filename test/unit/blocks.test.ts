@@ -1258,3 +1258,15 @@ describe("C09 I76 — the window seam takes the caller's scratch, and the form i
     expect(on(big, measured), "two calls with no scratch, two whole-block measures each").toBe(beforePlain + 4);
   });
 });
+
+describe("C09 §7f — the scrollbar, owed at the spec commit", () => {
+  it.todo(
+    "T1.59 (C09 I92, §7f, §021): §021's four figure rows are drawn back glyph for glyph — twelve rows, a viewport of 12 in a content of 40, at offsets 0, 5, 14 and 28; not deferred on a component: the column lands in this MR",
+  );
+  it.todo(
+    "T1.60 (C09 I92, §7f, §021): content that fits draws nothing and one row more draws a bar, then the properties over a sweep — the column is the gutter's height, the thumb is never empty, never leaves the track, and reaches its end exactly at the maximum offset; not deferred on a component: the column lands in this MR",
+  );
+  it.todo(
+    "T1.61 (C09 I93, §7f, C02 I9): the set at wide is the ASCII set with no half-row form, and the width check run on one glyph rather than the set is the fabricated violation; not deferred on a component: the set lands in this MR",
+  );
+});
