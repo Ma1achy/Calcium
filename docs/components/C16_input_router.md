@@ -1392,6 +1392,16 @@ taken. A reserved name is every consumer's namespace.
    *the current scope first, the remaining bindings grouped by scope.* Durable
    because a reader who needs the map needs it while doing something else, and a
    layer that closes on the next key is not a reference.
+
+   **The ordering is the rule, so it has one owner and it is not the verb.**
+   `scopesInReadingOrder` lives with the keymap (L3) and answers *which scopes,
+   in what order* from the bindings and the reader's rung; `/help keys` composes
+   the blocks around it and the §019 census draws the same order. It was written
+   inside the `help` arm, which made the rule a property of one verb — so a
+   second renderer of the same listing would have had to restate it, and a
+   restated rule is the drift this clause exists to prevent. The blocks stay the
+   verb's: a `rule` per scope and a `keyValue` beneath it are a presentation
+   choice, where the order is R-KEY-005 itself.
 5. `docs/KEYS.md` is generated from the same source, with `Route`, `Profile` and
    `Condition` columns, and `npx tsx tools/keymap-table.mjs --check` gates it.
 
