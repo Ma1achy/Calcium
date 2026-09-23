@@ -809,6 +809,91 @@ loud rather than left for the reader to discover in a paste.
 
 ---
 
+## 6f. The drag — a gesture belongs to where it started
+
+`R-SEL-012`, `R-SEL-013` and `R-SEL-014`, which are the pointer half of semantic
+copy mode. Two of the three resolve against nothing in the tree; the third is
+three-quarters already built, for a reason worth writing down.
+
+### What the tree already does, measured rather than assumed
+
+| The clause | The tree |
+|---|---|
+| `R-SEL-012` — the container that scrolls under a drag is the anchor's, for the whole gesture | **absent.** `routeMouse` has no `copy` rung: a press inside the region goes to `liveBlock`, so a drag in the mode moves *focus* |
+| `R-SEL-013` — three bands, held-and-still still scrolls, stops at the container's end | **absent.** `autoscroll` appears nowhere in `src/` |
+| `R-SEL-014` — a container the drag passes through **does not scroll** | **absent**, with `R-SEL-012`: nothing scrolls under a drag at all |
+| `R-SEL-014` — a container the drag passes through is **taken whole** | **already true.** `blocksTouched` is an intersection and never a containment test (I36) |
+| `R-SEL-014` — a child of a passed-through container is **never addressable** | **already true, and measured.** `elementsOfEntry` keys a container's block-level elements on the *container's* id: a `scroll` holding two `text` children yields two block-level elements, both `blockId: "box"`, and none for either child. The span set has no key a child could be selected by |
+| `R-SEL-014` — dragging through a bounded block takes **all** its rows, not the ones on screen | **already true.** The copy is `copySequence` over the block (§6a); the window is the renderer's and never reaches the clipboard |
+
+### The three that are already true are one fact, not three coincidences
+
+**The selection's unit is the block and a block's address is the block** (I36,
+I38). A child inside a container has no key, so it cannot be selected; a window
+is not a source, so the rendered rows never reach the copy; an intersection takes
+what it touches, so a container crossed is a container taken. `R-SEL-014` reads
+as four new constraints and is one old one, seen from four sides.
+
+That is worth stating because a reader checking the rule against the tree finds
+nothing named after it and would reasonably conclude it is unbuilt. What is
+unbuilt is the clause about **scrolling**, and it is unbuilt because no drag
+scrolls anything yet.
+
+### The container is chosen at the press and never again
+
+`R-SEL-012`'s sentence is *the one place the pointer does not decide*, and the
+three-way table it sits in is the argument: the **wheel** takes the innermost
+scrollable under the pointer, the **arrows** take the scrollable you are inside,
+and a **drag** takes the scrollable the anchor is in — for the whole gesture.
+
+**Recomputing per motion report is the defect, and it reads as responsiveness.**
+A drag that leaves a box and re-resolved would start scrolling the transcript the
+moment the pointer crossed the border, which moves the box out from under the
+reader mid-gesture and is indistinguishable from the selection jumping. The
+anchor binds a gesture to a container the way press-arms binds one to an element
+(C16 I45, `R-PTR-005`), and it is the same mechanism: an identity taken at the
+press and held until the release.
+
+**A keyboard extend at an edge scrolls the same container**, which is the clause
+that stops the rule being about the mouse. The container is the mode's, not the
+gesture's — the gesture only chooses it.
+
+### Three bands, and what can be wrong about them
+
+| Past the container's rect | One row per |
+|---|---|
+| inside, or on the edge | nothing |
+| up to one cell | 120 ms |
+| more than one, up to four | 60 ms |
+| more than four | 30 ms |
+
+Horizontal autoscroll takes the same bands on columns. *Three, because two is too
+coarse to control and a continuous ramp is impossible to stop where you meant.*
+
+**The boundaries are the arithmetic and the continuation is the rule.** A terminal
+reports motion when the pointer changes cell and not while it sits still, so an
+autoscroll driven by motion reports stops the instant the reader holds the pointer
+where they want it — which is exactly when they are waiting for it to keep going.
+So the scroll is a **ticker**, armed while the button is held and the pointer is
+outside, and it survives a pointer that has stopped moving. That is the clause a
+band table cannot express and the one a fixture must construct.
+
+**It stops on release, on `esc`, and at the container's end** — where it stops
+rather than rubber-banding, there being nothing to rubber-band against in a cell
+grid. **The selection extends to the container's end and does not spill into the
+parent**, which is `R-SEL-014` again: the parent is a container the drag is not
+in, so it is taken whole rather than entered.
+
+### Where the ticker lives
+
+`session.ts`, because it is the one file that may read a clock (A03 SS1) and the
+one that already owns `#tick`. It is a second periodic thing beside the spinner's
+and it is not the spinner's: §6b I35 **stops** the spinner ticker for the whole
+mode, so a drag reusing it would have to restart the thing the freeze exists to
+stop. Two tickers, one stopped and one armed, is the honest shape.
+
+---
+
 ## 7. State machine
 
 | From ↓ / call → | scroll up | scroll to bottom / `End` | `enterCopy` | `exitCopy` |
@@ -879,6 +964,10 @@ than stranding the user.
 - **I42** — **A rectangular selection is a cell rectangle inside one block, and the block is the anchor's.** `R-SEL-007`'s *never crosses a block boundary* is enforced by **clipping the head**, not by refusing when the head has left: a containment test reads as the same rule and behaves as its opposite, making the selection vanish while the reader extends and reappear when they come back. The head's row is clamped into the anchor's block before a rectangle exists, and a head in another entry takes its direction from the transcript's order rather than from a row that means nothing in the anchor's space.
 - **I43** — **A rectangular copy is the rendered cells, and it carries no escape.** It is the single exception `R-SEL-004` names to copy taking the source, so its input is the line the **frame drew** and its window is `sliceCells` — a straddling cluster blanked rather than halved (C09 I9), which a substring cannot do and which only a painted line makes visible. The clipboard is text: an escape sequence in it is the rendering arriving where the content was asked for. **The order of the slice and the strip is not part of this**, and it reads as though it is: `sliceCells` already skips escapes when it counts cells, so both orders give the same string and a rule about the order would forbid nothing while reading as though it forbade the defect (A03 §2, §6e). The two clauses that can be violated are the input and the window.
 
+- **I44** — **A drag's container is chosen at the press and held for the whole gesture.** `R-SEL-012`'s *the one place the pointer does not decide*: the wheel takes the innermost scrollable under the pointer and a drag takes the scrollable the **anchor** is in, so a pointer that leaves the box does not hand the gesture to the transcript. Re-resolving per motion report reads as responsiveness and moves the box out from under the reader mid-gesture, which is indistinguishable from the selection jumping. It is `R-PTR-005`'s mechanism on a container instead of an element — an identity taken at the press and held to the release — and a keyboard extend at an edge scrolls the same one, which is what stops the rule being about the mouse.
+- **I45** — **Autoscroll is a ticker, not a response to motion.** `R-SEL-013`'s bands are 120 ms, 60 ms and 30 ms per row for one cell past the rect, up to four, and more than four, on columns as on rows. The **arithmetic is the boundaries and the rule is the continuation**: a terminal reports motion when the pointer changes cell and not while it sits still, so an autoscroll driven by motion reports stops exactly when the reader is holding still and waiting for it. It is armed while the button is held and the pointer is outside, and it stops on release, on `esc`, and at the container's end — where it stops rather than rubber-banding, there being nothing in a cell grid to rubber-band against.
+- **I46** — **A container the drag passes through is taken whole and never scrolls**, and three of `R-SEL-014`'s four clauses are I36 and I38 seen from another side. A child inside a container has no span key, so it cannot be addressed; the copy is the block's source and never the rendered window; an intersection takes what it touches. What is new is *does not scroll*, and it follows from I44: the gesture's container is the anchor's, so every other one is scenery. The selection extends to the container's end and does not spill into the parent, which is the same sentence — the parent is a container the drag is not in.
+
 ---
 
 ## 9. Commitments
@@ -927,6 +1016,10 @@ than stranding the user.
 
 38. **A boundary rule is kept by clipping, not by refusing** (I42, §6e). *Never crosses a block* and *both ends inside one block* read as one sentence and differ on every extend that leaves: one selects to the edge and stays, the other empties and comes back.
 39. **The one copy that takes the picture says so** (I43, §6e). Cells rather than source is `R-SEL-004`'s single exception, and the rule requires it to be explicit — so the mechanism lands here and the words land with the mode-label seam §6a parks. **And a clause was dropped before it shipped**: *the strip comes after the slice* was measured, found to name a distinction that does not exist, and replaced by the two that do.
+
+40. **A gesture belongs to where it started** (I44, §6f). The anchor binds a drag to a container as press-arms binds it to an element; recomputing under the pointer is the defect that reads as responsiveness.
+41. **A periodic effect the reader is waiting on cannot be driven by their input** (I45, §6f). A pointer held still sends nothing, so autoscroll is a ticker — and it is a second one, because the freeze stopped the first.
+42. **A rule can be already satisfied by a decision taken elsewhere** (I46, §6f). Three of `R-SEL-014`'s four clauses are the block being the selection's unit, seen from three sides; reading the tree for the rule's own name finds nothing and concludes wrongly.
 
 ---
 
@@ -984,6 +1077,10 @@ Fake heights, no rendering.
 
 - **T1.42** (I42, §6e): an anchor inside a three-row block and a head two rows past its last → the rectangle's rows end at the block's last row and the rectangle still exists. Extending further changes nothing, and bringing the head back inside gives the smaller rectangle again — asserted as a **clip**, since a containment test answers `null` for the same two heads and every assertion about the returned rows would be vacuous. The head in a later entry clamps to the last row, in an earlier entry to the first; an anchor in no block at all is `null`, which is the one refusal.
 - **T1.43** (I43, §6e): a rectangle over rendered lines carrying SGR → the text is the windowed cells, has no escape byte in it, and a double-width cluster straddling the right edge is a blank rather than half a glyph. **The control is a painted line and a substring taken from it**: the same columns as a `slice` give three bytes of the escape rather than the cells, so the fixture can tell a cell window from a byte window — which the order of the strip cannot, both orders being the same string.
+
+- **T1.44** (I44, §6f): a press inside a `scroll` box, then motion out of it and over the transcript → the container the gesture scrolls is still the box, and it stays the box for every later report including one back inside. **The control is the wheel in the same fixture**: the same position under a wheel takes the innermost scrollable under the pointer, so the row can tell *the anchor decides* from *the pointer decides* rather than asserting one against nothing.
+- **T1.45** (I45, §6f): the band for 0, 1, 2, 4, 5 and 40 cells past → nothing, 120, 60, 60, 30, 30, which pins both boundaries rather than the middle of each band. Then the continuation: with the button held and **no further motion reports**, the clock advanced by 300 ms scrolls the container by rows at the band's rate — the assertion no band table can make, and the defect a motion-driven implementation passes every other row of this file with.
+- **T1.46** (I46, §6f): a drag anchored in the transcript passing through a `scroll` box → the box's blocks are in the selection whole, the box's own offset is unchanged, and the copy carries the block's every row rather than the ones the window showed. Each of the three is a different clause of `R-SEL-014` and only the second is new, which the row says so a later reader does not take the other two for coverage of code this MR wrote.
 
 ### Tier 2 — contract / interface
 
