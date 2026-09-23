@@ -147,7 +147,7 @@ most-drawn line in the application.
 | 55 | surface | no | `states.test.ts` | a link's states |
 | 56 | prose | — | — | six pointer rulings |
 | 57 | prose | — | — | ⌃C across five contexts |
-| 58 | surface | `nativeSelection` | — | what copy takes |
+| 58 | surface | `nativeSelection` | `design-surfaces.test.ts` | what copy takes — the source beside the rendering, which is the only form that carries the claim: a copy text asserted alone reads as correct and a drawn row alone says nothing about what `y` takes. The table draws `par…` and copies the full TSV; the patch draws a gutter view and copies a unified diff; the rule declines and is absent from the join rather than empty in it (C09 I86, R-SEL-004). Tabs and newlines are shown as `⇥` and `↵` so the terminal cannot re-align the copy column into something resembling the padded one |
 | 59 | surface | `searchOpen` | `session-frame.test.ts` | find |
 | 60 | surface | `refreshAnchors` | `session-frame.test.ts` | resize |
 | 61 | prose | — | — | eight cases that are not edge cases |
@@ -217,7 +217,7 @@ that is the reconciliation working, and it should be visible as a number moving 
 than inferred from a suite staying green.
 
     surface 66 · prose 37 · app 6 · total 109
-    of the surfaces: built 60 · unbuilt 6 · framed 53
+    of the surfaces: built 60 · unbuilt 6 · framed 54
 
 **`framed` is the figure this MR moves, and `built` is the one that went backwards.**
 Seven surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks

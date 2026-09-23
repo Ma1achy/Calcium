@@ -61,7 +61,7 @@ M = {
  55:("frame","states.test.ts","a link's states"),
  56:("prose","—","six pointer rulings"),
  57:("prose","—","⌃C across five contexts"),
- 58:("owed","M10","what copy takes"),
+ 58:("frame","design-surfaces.test.ts","what copy takes — the source beside the rendering, which is the only form that carries the claim: a copy text asserted alone reads as correct and a drawn row alone says nothing about what `y` takes. The table draws `par…` and copies the full TSV; the patch draws a gutter view and copies a unified diff; the rule declines and is absent from the join rather than empty in it (C09 I86, R-SEL-004). Tabs and newlines are shown as `⇥` and `↵` so the terminal cannot re-align the copy column into something resembling the padded one"),
  59:("frame","session-frame.test.ts","find"),
  60:("frame","session-frame.test.ts","resize"),
  61:("prose","—","eight cases that are not edge cases"),

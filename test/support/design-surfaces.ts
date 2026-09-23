@@ -32,7 +32,7 @@ import {
 import { patchDefinition } from "../../src/presentation/patch/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { patchOf } from "./blocks.js";
-import { measurable } from "./render.js";
+import { measurable, registry } from "./render.js";
 import { styledScreenFrom } from "./styled-screen.js";
 import type { ResolvedTheme } from "../../src/presentation/theme/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
@@ -610,6 +610,64 @@ const keymapCensus = (width: number, caps: TerminalCapabilities, theme: Resolved
   ]);
 };
 
+
+/**
+ * §058 — what copy takes: **the source, never the rendering** (C09 I86,
+ * `R-SEL-004`).
+ *
+ * **The picture is the two columns side by side**, because that is the whole of
+ * §058's claim and neither column alone carries it: a copy text asserted on its
+ * own reads as correct, and a rendered row asserted on its own says nothing
+ * about what `y` would take. The section's own examples are the rows — *a table
+ * row, its values tab-separated, not the padded cells*; *a patch, a unified
+ * diff, not the coloured gutter* — and each is a pair.
+ *
+ * **Tabs and newlines are shown as `⇥` and `↵`** so the difference survives the
+ * frame. A copy text drawn with its real tabs would be re-aligned by the
+ * terminal into something that looks like the padded cells, which is exactly
+ * the distinction this section exists to draw — the census would then picture
+ * the two columns agreeing while the tree was right.
+ */
+/** §058's first row: a table, whose copy is TSV where the render pads to columns. */
+const COPY_TABLE = block({
+  kind: "table",
+  id: "ct",
+  columns: [
+    { key: "name", label: "name", align: "left" as const, priority: 1, minWidth: 4, sortable: false },
+    { key: "size", label: "size", align: "right" as const, priority: 2, minWidth: 4, sortable: false },
+  ],
+  rows: [
+    { id: "r1", cells: { name: { text: "parse.ts" }, size: { text: "4.2 kB" } } },
+    { id: "r2", cells: { name: { text: "keymap.ts" }, size: { text: "31 kB" } } },
+  ],
+}) as unknown as Block;
+
+const copyCensus = (width: number, caps: TerminalCapabilities, theme: ResolvedTheme): readonly string[] => {
+  const kit = registry([patchDefinition, tableDefinition] as never);
+  const m = measurable({ theme, capabilities: caps, definitions: [patchDefinition, tableDefinition] as never });
+  const subjects: readonly Readonly<{ name: string; block: Block }>[] = [
+    { name: "a table row — values, not the padded cells", block: COPY_TABLE },
+    { name: "a patch — a unified diff, not the gutter", block: DIFF },
+    { name: "a status — the message and its detail", block: STATUS },
+    { name: "a tape — the labels, not the marks", block: TAPE },
+    { name: "a rule — no source, so it declines", block: block({ kind: "rule", id: "cr", label: "files" }) },
+  ];
+  const out: string[] = [];
+  for (const s of subjects) {
+    out.push(s.name);
+    const drawn = m.renderToLines(s.block, Math.min(width, 60));
+    for (const row of drawn.slice(0, 3)) out.push(`  drawn  ${row.trimEnd()}`);
+    const copied = kit.copyOf(s.block);
+    // **`null` is the declining kind and is not the empty string** (C09 I86): a
+    // blank line is `R-SEL-004`'s entry separator, so a kind joining as `""`
+    // would forge a boundary inside one entry. The census draws the difference.
+    const shown = copied === null ? "— declines, and is absent from the join" : copied.replaceAll("\t", "⇥").replaceAll("\n", "↵");
+    out.push(`  copy   ${shown}`);
+    out.push("");
+  }
+  return out;
+};
+
 export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 95, name: "a tape, where a row of peers would shed", rows: draw(TAPE) },
   { section: 42, name: "widgets — a row of peers that sheds", rows: draw(PILLS) },
@@ -630,6 +688,7 @@ export const SURFACES: readonly Surface[] = Object.freeze([
     { name: "a posture, ex. 3 — TEXT, never a ground", block: POSTURES },
     { name: "a well — structural, never semantic", block: WELL },
   ]) },
+  { section: 58, name: "what copy takes — the source beside the rendering", rows: copyCensus },
   { section: 19, name: "the resolved keymap, the reader's own rung first", rows: keymapCensus },
   { section: 21, name: "the scrollbar — the set, and the bar beside a box", rows: (w, c, t) => [
     ...scrollbarCensus(w, c),
