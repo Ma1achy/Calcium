@@ -103,18 +103,33 @@ English lexicon, which nothing else in the tree does. **Held** — it is the onl
 part of §038 still owed; the agent's mark is C09 I98 and the degradation table
 is C09 I99.
 
+**13 · A second ASCII bar pair, and the design names no ASCII *absent* mark.**
+`plot/ramp.ts`'s `pairFor` is a second pair — `#` / `.` / absent `-` — and it is
+what a `keyValue` row's bar draws through `valueBar`. Its `empty` cannot take
+the registry's `-` without becoming its own `absent`, and §078's `R-TBL-003`
+keeps *missing* and *empty* distinct on purpose. The two collide only because
+this tree degrades the em dash where `ambiguousWidth` forbids it. A glyph
+choice, not a divergence left standing.
+
+**14 · Whether a sub-panel's border is the block's enclosure.** §017 says *a
+FRAME takes its border*, and `smallmultiples` and `pairplot` have four. The
+design does not say which, and lighting four sub-frames at once is a visible
+choice.
+
 ---
 
 ## Not yet recovered
 
-The running count reached **eighteen**. Twelve are above. **Six are not
-recoverable** from the session transcript by the searches run against it
-(`parked`, `yours to rule`, `on the ask list`, `the design does not specify`),
-and they are recorded as missing rather than reconstructed, because a parked
-question written from memory is a fabrication with a number attached — which is
-the failure mode this file exists to prevent.
+**Fourteen distinct questions are above, and the running count in the reports
+reached eighteen.** The gap was chased rather than left: the reports state a
+total at six, nine, twelve, fourteen, fifteen and eighteen, and the message
+ranges between *nine → twelve* and *twelve → fourteen* were read in full. **They
+name no new question.** So the discrepancy is in the counting, not in the
+record: the residue question was reported twice — once as a divergence from the
+fixtures and once as the diff a fixture comparison would read — and counted
+twice, and the same is true of at least one M13 item reported as still-open and
+as parked.
 
-They were introduced between the counts 3 → 6, 6 → 9 and 14 → 18. Recovering
-them means reading the per-MR reports in
-`~/.claude/projects/-Users-malachy-src-tui-kit/a6f49b7a-*.jsonl` at those
-boundaries; the count in each report's closing line is the index.
+The right reading is that **fourteen is the number**, and it is the one to
+work from. The count is not repeated anywhere as a figure, because a total that
+no longer resolves against a list is the thing this file was written to stop.
