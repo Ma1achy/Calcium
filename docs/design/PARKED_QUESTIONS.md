@@ -124,11 +124,28 @@ choice. **Done under assumption:** `chordText` answers the existing shorthand
 (`s+enter`, `m+C`) below the Unicode rung — the behaviour that already shipped,
 held as the arm to revisit rather than as an answer.
 
+**16 · §070's ten hues have no values.** `/colour` and `/label` are unbuilt end
+to end, and the section's mechanism is specified in detail — chrome only, per
+directory in `.calcium/config.toml`, a name resolved per theme against a hex
+taken literally, the hex gated by a choice-only contrast question with the safe
+answer focused and `esc` resolving to it, animation as an explicit decoration
+exception suppressed under `reduced` and `off`. What it does not give is **the
+ten hues**: *blue orange cyan pink lime violet yellow green red purple*, named
+and described only as *VIVID*, with no values in the section and **no palette
+anywhere in the registry** (searched for a record carrying all ten; there is
+none).
+
+Ten vivid colour values is the park list's own example of a visible choice.
+**Held whole rather than part-built**: the hex arm alone needs no new values,
+but a `/colour` that accepts a literal and refuses `blue`, `blue..pink` and the
+picker — three of the six forms its own help text lists — is not a smaller
+version of this feature. `viridis` would work, since the colormaps ship.
+
 ---
 
 ## Not yet recovered
 
-**Fifteen distinct questions are above, and the running count in the reports
+**Sixteen distinct questions are above, and the running count in the reports
 reached eighteen.** The gap was chased rather than left: the reports state a
 total at six, nine, twelve, fourteen, fifteen and eighteen, and the message
 ranges between *nine → twelve* and *twelve → fourteen* were read in full. **They

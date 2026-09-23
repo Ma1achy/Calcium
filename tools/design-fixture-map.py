@@ -73,7 +73,7 @@ M = {
  67:("frame","session-frame.test.ts","scrolled back while a turn runs"),
  68:("frame","compositions.test.ts","one exchange at three capability rungs"),
  69:("frame","session-frame.test.ts","the prompt's upper rule, labelled — three scenes, and the 1-bit one needed a capability override because no environment reaches the rung"),
- 70:("owed","M2","/colour, tinting the chrome"),
+ 70:("owed","M2","/colour and /label, tinting the chrome — **parked, not merely unbuilt**. The mechanism is specified in detail (chrome only, per directory in `.calcium/config.toml`, a name resolved per theme against a hex taken literally, the hex gated by a choice-only contrast question, animation an explicit decoration exception suppressed under reduced and off) and the **ten hues have no values**: named and described as VIVID, with no palette anywhere in the registry. Ten vivid colour values is the ask list's own example. Held whole — the hex arm needs no new values, but a verb that refuses three of the six forms its help lists is not a smaller version of this"),
  71:("prose","—","the five permission postures"),
  72:("frame","design-surfaces.test.ts","the background as a second channel — a ground census, one mask character per cell, because a stripped read calls a washed row and a bare one the same picture; three kinds paint and `meterFill` has no reader"),
  73:("owed","M3","painted chrome — the table header is built and framed (C11 I24); buttons, titles and widgets want kinds the tree has none of: no `button`, `slider`, `toggle`, `checkbox` or `radio` among the thirty-six"),
