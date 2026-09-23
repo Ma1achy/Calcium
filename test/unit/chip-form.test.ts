@@ -122,3 +122,9 @@ describe("C17 §5c — the chip", () => {
     expect(spans[0]?.to, "the span stops at the row").toBe(width);
   });
 });
+
+describe("C17 §5d — which chip the caret is on, owed at the spec commit", () => {
+  it.todo(
+    "T1.48 (C17 I27, §5d, §101): chipAt answers the chip before the caret across a buffer holding two chips and text between them, the chip after it at position 0, and null in the middle of the text — the control, without which the reader may answer the last chip minted wherever the caret is — reading the chip's content back rather than its label so the map is the editor's own; not deferred on a component: chipAt lands with C22's preview projection in this MR",
+  );
+});

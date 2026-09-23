@@ -2152,6 +2152,65 @@ second could not, and the failure is a range landing in the wrong place with a
 frame-read the only thing that would show it. So the row is cut once, at every
 boundary, from ranges the caller has already resolved.
 
+### 6l.12 — where a chip previews, and why it needs no chord (§101, `R-BLK-823`, `R-BLK-824`, `R-BLK-774`)
+
+*A CHIP PREVIEWS IN TWO PLACES, and FOCUS decides which* — a peek beside the
+element with focus in the transcript, a menu panel above the prompt with focus
+in the prompt, *where completion and find already are*. The design's argument
+for the second place is the one that also settles the mechanism: *a chip is
+INLINE in a wrapping editor, so anchoring beside it puts the preview somewhere
+different on every keystroke. While composing, every transient panel belongs in
+ONE PLACE.*
+
+**The transcript half is built and is not a chip's.** §6l's peek (C15 §2a, C26
+§5) already anchors beside the focused element whenever it declares a `detail`,
+reconciled after every delivered input and on every viewport change. Nothing
+about it is specific to a chip, and nothing should be: the rule is about *where
+a preview goes*, stated over the two places focus can be, and the transcript arm
+is the general peek arriving at a chip the day an element carries one. A second
+mechanism keyed on the kind would be the same rule written twice.
+
+**The prompt half is a projection of the caret, not a chord.** The registry
+names forty actions and forty-one bindings and **not one of them opens a
+preview**, which would be a gap if the design had not already answered it:
+*FOCUS decides which*. So the panel is derived the way the peek is derived —
+recomputed from the caret after every edit — and needs no key, no mode and no
+state of its own. That is the reading that costs nothing the design has not
+specified, and the alternative costs a chord the registry does not have.
+
+**`prefer: "above"`, the prompt's anchor, the whole region's width** — the
+completion menu's placement exactly, because *where completion and find already
+are* is a statement about a place and the place is one object. `kind: "panel"`,
+non-blocking, `dismissal: "escape"`: the triple C15 §2c gives a prompt substate,
+and `R-BLK-774`'s *the completion menu, find, a chip preview: these are MENUS,
+and a menu draws OVER what is behind it. NOTHING ABOVE MOVES.*
+
+**The chip before the caret, and after it only when there is none before.**
+`insertChip` leaves the caret past the chip it just inserted, so *the thing you
+just pasted* is what a reader expects to see, and taking the following chip
+first would preview the next one instead. §101's specimen draws the caret past
+`#2` with `#1` in the panel, which is `R-SEC-101`'s *specimen values and sample
+content remain examples* — the prescription is the place, and the pairing in a
+worked panel is not a rule about which chip.
+
+**Nothing is pushed while another layer is on the stack**, and this is the one
+clause a projection cannot do without. A question, a completion menu and a
+search are all things a reader is in the middle of, and a preview that pushed
+itself over one would be a panel arriving because the caret happened to be
+somewhere — C15's manager dismisses a panel when another opens (C15 §2c), so a
+projection with no such guard would fight it once per frame rather than lose to
+it once.
+
+**Two of the specimen's three key legends are owed elsewhere and the footer
+draws neither until they are.** `↑↓ scroll` is the scrollbar's, which is §021
+and does not exist in `src/` yet; `⏎ open in the editor` is `R-BLK-355`'s
+paste-chip edit view, which needs the second line-editor buffer `R-BLK-792`
+asks for and the typed reply builds. A footer naming a key that does nothing is
+worse than a footer without it, so the legend lands with its mechanism. `←→
+other chips` needs nothing: they are the caret's own motion, and a caret moving
+between chips moves the preview with it, which is the legend satisfied by the
+projection rather than by a binding.
+
 ### 6l.10 — the label on the prompt's rule (§069, `R-COL-003`)
 
 **The rules already exist, so a label in one costs no rows.** That is the
@@ -2477,6 +2536,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I110** — **A child surface is an entry the host keeps writing, not a layer it pushes** (C16 I49, C24 §, R-BLK-645, R-BLK-711, R-BLK-312, R-BLK-314). `openSurface` appends the surface's blocks as an ordinary transcript entry and replaces its document on every invalidation and resize; it pushes no layer and takes no region. *A CAPTURED CHILD OWNER over its block. The border says your keys go to the child; the transcript stays* — so the three things a pushed view cost are all returned at once: the reader can scroll, what settled while the child was attached is in the record (R-BLK-314), and the entry is still there after the detach rather than being a hole where the work was.
 - **I111** — *(§6l.10, §069, `R-COL-003`, `R-BLK-175`)* **The prompt's upper rule carries the application's label inline-end, painted as a ground, and it is the first thing the frame sheds.** One trailing rule glyph after it; `bgElev`, because a name is a thing and things take a ground; the header's rule and the prompt's lower rule stay bare. **Dropped at `MIN_COLUMNS` and whenever it cannot fit leaving at least one rule glyph**, and the drop is the frame's rather than the caller's — an application supplies the string and has no say in whether it is drawn, which is what *the least load-bearing thing on the screen* means as a mechanism. With no label supplied — or a string that strips to nothing, which is the same thing said by a caller that computes it — the frame is the one that shipped, glyph for glyph.
 - **I112** — *(§6l.11, C17 §5c, `R-STA-002`, `R-BLK-628`, `R-BLK-116`)* **A chip in the prompt is painted as a ground, and the selection outranks it.** `promptChips` is C17's cell ranges mapped through the prompt's window as the selection's are; the style is `tone.meta` resolved on `surface.bgDeep` — *a well* — and where a region reaches a chip the chip's ground gives way **entirely**, which is a property rather than a simplification: a chip is one grapheme (C17 I25), so a region endpoint is either before it or after it and a wash can only cover the whole label or none of it. **One pass over the row**: `styled` replaces `washed` and cuts at every boundary, because `sliceCells` cannot read a row that has already been painted and applying the second ground by a second call would measure SGR bytes as cells.
+- **I113** — *(§6l.12, §101, `R-BLK-823`, `R-BLK-824`, `R-BLK-774`)* **A chip previews as a panel above the prompt, derived from the caret and pushed only onto an empty stack.** The chip is the one before the caret, or the one after it when there is none before; the placement is the completion menu's — anchored at the prompt, `prefer: "above"`, the region's width — and the layer is `kind: "panel"`, non-blocking, `dismissal: "escape"`. **Recomputed after every edit and every motion**, as the transcript's peek is recomputed after every delivered input, because *focus decides which* and focus is a pull with no change stream (C16 I11). **No binding opens it**: the registry names none, and a projection is what the design's own sentence asks for rather than a chord it never gave. The panel is not pushed while any other layer is on the stack, so a question, a menu or a search is never covered by something that arrived because the caret moved.
 
   **The composition root owns both halves and they are separate.** *Where the blocks go* is this invariant; *who has the keyboard* is C16 I49, and the root wires the second by answering `attachedChild` from the attachment as well as from `inFlight() === "shell"`. Keeping them apart is what makes the child's ownership independent of where its output landed — which is the distinction the single `kind: "view"` flag could not hold, since a layer that filled the region carried both claims in one field and neither was declared.
 
@@ -2592,6 +2652,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 81. **A child surface is an entry, not a layer** (I110, R-BLK-645). Its blocks are appended and replaced in place, the transcript stays scrollable beneath the capture, and what settled while it was attached survives the detach. The keyboard half is C16 I49's and is wired separately, which is what the one `kind: "view"` flag could not express.
 82. **A label in a rule costs no rows** (I111, §6l.10, §069). The prompt's rules are drawn on every frame and their glyphs are the least load-bearing cells on the screen, so the design puts the application's identity in one rather than spending a region on it. Painted as a ground and not as text (`R-COL-003`), inline-end with one trailing glyph, on the upper rule alone, and shed first — `R-BLK-175` ranks it 1 of 4 in the frame's whole degradation order. I81's *never configurable* is amended to name the geometry it was always about.
 83. **A chip in the prompt is a ground and the selection outranks it** (I112, §6l.11). C17 says where the cells are and C22 paints them; where a region reaches a chip the region wins whole, because one cell takes one ground (`R-STA-002`) and a chip is one grapheme, so no region can cover part of one. The row is painted in one pass — a second pass would measure the first pass's escapes as cells.
+84. **A preview is a projection, not a mode** (I113, §6l.12, §101). The design puts a chip's preview in two places and names focus as what chooses between them, so both are derived rather than opened: the transcript's peek already is, and the prompt's panel becomes its sibling. The registry has no action and no binding for it, and that is the answer rather than the gap — a chord invented here would be a visible choice the design did not make. The two legends the specimen draws that the tree cannot yet honour land with the scrollbar and with the paste-chip editor, because a footer naming a dead key is worse than one that does not name it.
 
 ---
 
@@ -2932,6 +2993,8 @@ PTY harness.
 - **T1.67** (I112, §6l.11, C17 §5c): a prompt holding a chip paints a background over exactly the chip's cells and nothing else, and a prompt holding the same text without a chip paints none. Read off the emitted bytes, since the screen model folds SGR away.
 - **T1.68** (I112, §6l.11, `R-STA-002`): a selection over a chip leaves one ground on the row and it is the selection's; a region stopping short of the chip leaves two, which is the control — without it *one ground* is satisfied by a painter that has stopped drawing chips. Counted rather than named, so the row says *one ground per cell* rather than pinning a theme. Then the property the painter rests on and cannot check: **over every region endpoint in the buffer, no wash covers part of a chip.**
 - **T1.66** (I111, §6l.10, `R-BLK-175`): at 60 columns the frame draws its three rules **and** the label is gone; one column wider it is drawn. Gone too whenever it would leave no rule glyph, asserted at the measured boundary — 96 cells draw at a width of 100 and 97 shed — and the frame composes to the same height throughout, since a label costs no rows.
+- **T1.69** (I113, §6l.12, §101): a prompt holding a chip puts one panel above the prompt carrying that chip's label and its content, and the same prompt with the caret away from every chip has no layer at all. The caret moved from one chip to another moves the panel's content to the second, which is `←→ other chips` with no binding behind it. The control is the chipless prompt: without it, *a panel is present* is satisfied by a projection that pushes one for every buffer.
+- **T1.70** (I113, §6l.12, C15 §2c): the preview is not pushed onto a stack that already holds a layer, and a layer arriving over a live preview leaves one panel rather than two. Asserted as the stack's contents rather than as the top, because a preview pushed **under** something reads as absent from every assertion about the top and is still a layer the manager has to place.
   **The first draft of this row was vacuous and a mutation said so.** It asserted 40 and 59 columns, where `fallback.ts` has replaced the whole frame with the *Needs 60x24* notice: two notices agree with each other whatever the label does. The floor could be set to zero and nothing failed. §069's sentence is *at* 60, not below it, and 60 is `MIN_COLUMNS` — the narrowest width the frame draws at at all, which is what *and the frame still works* is naming.
 - **T2.100** (I91): a `TuiConfig.pty` reaches `createProcessRunner`'s deps identically — asserted by object identity across `resolveConfig`, and by the consumer's own `spawn` being the one the graph's runner calls — and a source scan finds `config.pty` read at **two** sites in `src/shell/`, each of them the same spread with nothing between.
   The row said *exactly one site* and the scan gives two: `config.ts` copies the consumer's field onto the resolved config, `construct.ts` hands the resolved one to the runner. Both comments say *the one site* and both are right about their own `config` object; the number is only wrong read as a grep, which is what a scan is (F923). What C22 I91 forbids is a read that is **not** a forward, so the row asserts that instead of a count.

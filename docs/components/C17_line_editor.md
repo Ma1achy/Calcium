@@ -275,6 +275,34 @@ The walk knows the row, the column and the width at the moment it draws, and
 nothing else does — which is *measured as it is drawn* applied to the ground
 rather than to the label.
 
+## 5d. Which chip the caret is on (§101, `R-BLK-823`)
+
+§101 previews a chip in two places and makes focus the thing that chooses. The
+place is C22's (§6l.12); what C17 owes is the answer to *which chip* — and it is
+the only component that can give one, because the sentinel and the side map are
+private to the editor and the buffer is the only thing that knows where the
+caret is.
+
+**The chip before the caret, and after it only when there is none before.**
+`insertChip` leaves the caret past the chip it inserted, so preferring the
+preceding one previews what was just pasted rather than what comes next. Both
+sides are read because a caret at the head of the buffer has nothing before it,
+and a rule that only looked backwards would answer nothing for the one position
+a reader arrives at by pressing `home`.
+
+**A reader over the same map `drawAs` resolves through, never a second table.**
+The map is the one `insertChip` writes and the walk reads (I24); a preview
+served from a copy could disagree with what is drawn, which is the whole class
+§5c exists to prevent. It is `null` for every position with no chip on either
+side, and that is most of them.
+
+**It was written once and removed before this section existed**, because its
+only consumer was unbuilt and CLAUDE.md refuses an export nothing consumes. The
+consumer is C22's projection, and the seam returns with it — which is what *name
+the queued consumer* means when the queue finally arrives.
+
+---
+
 ---
 
 ## 6. Undo
@@ -499,6 +527,7 @@ the space at index 77; `--seed=1234` does not fit and moves whole.
 
 - **I25** — *(§5c, §099, §101, `R-COL-005`, `R-BLK-628`, `R-BLK-116`)* **A chip's label is composed from its parts by C17, never supplied as a string.** `ordinal`, `kind`, `name` and an optional `lines`; the separator is the glyph table's, so the ASCII tier is taken from the same place every other separator is. Two rungs and one form: with colour, the name on `surface.bgDeep` in `tone.meta` with one space either side; at 1-bit, the same text in brackets and no ground. **The bracket is the unpainted rung of a painted thing** — §099's own caption is *a chip is one word that happens to be painted* — and reading the fixtures' two spellings as two formats is what would make the design contradict itself.
 - **I26** — *(§5c, §099, I18, I20)* **A chip is one wrap unit and its ground comes off the same walk that measured it.** The atomicity is `walk`'s existing *a cluster that does not fit moves whole* and was satisfied before this section was written; `chipSpans` returns the cell ranges a chip occupies, as `selectionSpans` returns the region's, so nothing measures a chip twice and a ground cannot land where the label was not — and the range is recorded **by the walk as it draws**, never derived from the position pair around the chip, which names the row the wrap moved it off. A chip wider than the whole row still overflows rather than being dropped (I20) — an editor never alters what the user typed, and a chip is what the user pasted.
+- **I27** — *(§5d, §101, `R-BLK-823`, C22 I113)* **`chipAt()` answers the chip the caret is on — the one immediately before it, or the one immediately after when there is none before — and `null` otherwise.** Read from the side map `insertChip` writes and `drawAs` resolves through, never from a copy, so a preview cannot disagree with the label drawn beside it. The preference is backwards because `insertChip` leaves the caret past the chip it inserted, and both sides are read because position 0 has nothing before it.
 
 ---
 
@@ -530,6 +559,7 @@ the space at index 77; `--seed=1234` does not fit and moves whole.
 
 24. A chip's label is C17's, composed from `ordinal`, `kind`, `name` and `lines` — not a string the application assembles, which would put §099's form in every application separately (I25).
 25. A chip is painted, and the bracket is the rung where there is no ground to paint with. One form, two rungs, and the fixtures' two spellings are the two rungs rather than two formats (I25, I26).
+26. The editor says which chip the caret is on and nothing else does, because the sentinel and its map are private to it (I27, §5d). The preview's place is C22's; the identity is C17's, and splitting them the other way would put a copy of the map in the composition root.
 
 ---
 
@@ -588,6 +618,7 @@ test rather than as its steps: the sequence is what the invariants do not constr
 - **T1.45** (I26, §5c, §099): a chip moves whole — a label that does not fit the cells left on a row appears in full on the next, and no row holds a prefix of it. Asserted over the whole label rather than at one width, because a half-painted chip is *two things that look like chips* and a row checking only the first cell cannot tell them apart. **This was already true when the section was written**, so the row is a watch on a built property, and its fabricated violation is the walk's atomicity removed.
 - **T1.46** (I26, §5c): `chipSpans` agrees with the walk that drew the label — every span's cells slice exactly the chip's label out of the row `layout` returns, at a spread of widths and on both sides of a wrap. A span that is right about the row and wrong about the column paints the prompt's own text as a chip, and no assertion about the presence of a ground would see it.
 - **T1.47** (I25, §5c, I20): a chip wider than the whole row overflows rather than being dropped, and its span still names the cells it took. The editor never alters what the user typed, and a chip is what the user pasted.
+- **T1.48** (I27, §5d, §101): `chipAt` answers the chip before the caret across a buffer holding two chips and text between them — after the first it is the first, after the second it is the second, and at position 0 with a chip at the head it is that chip, which is the forward arm. `null` in the middle of the text, which is the control: without it *the caret is on a chip* is satisfied by a reader that answers the last chip minted wherever the caret is. The map is the editor's own, asserted by minting a chip and reading its `content` back rather than its label.
 
 ### Tier 2 — contract / interface
 
