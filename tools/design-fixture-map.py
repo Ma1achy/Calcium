@@ -41,7 +41,7 @@ M = {
  34:("frame","design-surfaces.test.ts","active progress bars — and the painted rung beside the drawn one, as a mask, because the whole of the closing figure is in the channel a stripped read folds away"),
  35:("frame","design-surfaces.test.ts","quantity, granularity and liveness as three axes — five triples, two of them the presets and one that is neither; the segmented ASCII rung is PARKED, because §035 draws `[#][.]` where the registry's `bars.ascii` is one `#`/`-` pair"),
  36:("owed","M13","the operation and budget presets — the two triples are expressible now (C09 I97); what is owed is the operation SURFACE around them: the gerund head, the elapsed-and-delta aside, and the settlement that removes the bar"),
- 37:("owed","M2","every ink ramp, including the four one-shots"),
+ 37:("frame","design-surfaces.test.ts","every registered effect, on four axes — the five fills across an extent, the ladder from 24 bits to 1, the animations at a tick, and the same effects through time, which is the only axis six position-free effects are visible on; `centred` is the fill the registry registered and the type could not express"),
  38:("owed","M2","the agent's mark and the verb's ramp"),
  39:("prose","—","one interval, one family"),
  41:("prose","—","the spinner is chosen by the verb"),

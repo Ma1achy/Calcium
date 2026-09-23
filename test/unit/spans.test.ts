@@ -113,12 +113,22 @@ describe("C04 §3am — spans, the gate", () => {
   const span = (ramp: unknown): unknown => ({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp }] });
   const bar = (ramp: unknown): unknown => ({ kind: "progress", id: "p", label: "build", current: 3, total: 10, ramp });
 
-  it("T1.29 (C04 I106): the arity table at the gate — one backing for gradient and step, none for palette, bands on step alone in 2..8, each refusal naming its rule", () => {
+  it("T1.29 (C04 I106): the arity table at the gate — one backing for every fill but palette, none for palette, bands on step alone in 2..8, each refusal naming its rule", () => {
     const table: readonly Readonly<{ name: string; ramp: unknown; ok: boolean; names?: RegExp }>[] = [
       { name: "gradient, slot pair", ramp: { fill: "gradient", from: "default", to: "accent" }, ok: true },
       { name: "step, slot pair, bands 2", ramp: { fill: "step", from: "default", to: "accent", bands: 2 }, ok: true },
       { name: "step, slot pair, bands 8", ramp: { fill: "step", from: "default", to: "accent", bands: 8 }, ok: true },
       { name: "palette, bare", ramp: { fill: "palette" }, ok: true },
+      // **`centred` takes the same backings as `gradient` and refuses `bands`
+      // for the same reason** (C04 I106, §037): it is a sampling, so the gate's
+      // arity rule — written over *every fill but `palette`* — reaches it with
+      // no arm of its own, and these rows are what say that is true rather than
+      // merely intended.
+      { name: "centred, slot pair", ramp: { fill: "centred", from: "default", to: "accent" }, ok: true },
+      { name: "centred, animated", ramp: { fill: "centred", from: "default", to: "accent", animate: "wave" }, ok: true },
+      { name: "centred, both backings", ramp: { fill: "centred", from: "default", to: "accent", colormap: "viridis" }, ok: false, names: /one backing.*not both.*C04 I106/u },
+      { name: "centred, no backing", ramp: { fill: "centred" }, ok: false, names: /one backing.*C04 I106/u },
+      { name: "bands on a centred", ramp: { fill: "centred", from: "default", to: "accent", bands: 3 }, ok: false, names: /"bands" rides on "step" alone/u },
       { name: "gradient, animated", ramp: { fill: "gradient", from: "default", to: "accent", animate: "shimmer" }, ok: true },
       { name: "gradient, both backings", ramp: { fill: "gradient", from: "default", to: "accent", colormap: "viridis" }, ok: false, names: /one backing.*not both.*C04 I106/u },
       { name: "gradient, no backing", ramp: { fill: "gradient" }, ok: false, names: /one backing.*C04 I106/u },
@@ -131,7 +141,7 @@ describe("C04 §3am — spans, the gate", () => {
       { name: "bands 1", ramp: { fill: "step", from: "default", to: "accent", bands: 1 }, ok: false, names: /2\.\.8.*one band is a gradient/u },
       { name: "bands 9", ramp: { fill: "step", from: "default", to: "accent", bands: 9 }, ok: false, names: /2\.\.8/u },
       { name: "bands 2.5", ramp: { fill: "step", from: "default", to: "accent", bands: 2.5 }, ok: false, names: /2\.\.8/u },
-      { name: "an unknown fill", ramp: { fill: "rainbow" }, ok: false, names: /"fill" must be one of gradient, step, palette/u },
+      { name: "an unknown fill", ramp: { fill: "rainbow" }, ok: false, names: /"fill" must be one of gradient, centred, step, palette/u },
       { name: "an unknown key", ramp: { fill: "palette", easing: "ease-in" }, ok: false, names: /unknown member "easing".*C04 I106/u },
       { name: "not a record", ramp: "viridis", ok: false, names: /must be a record with a "fill"/u },
     ];

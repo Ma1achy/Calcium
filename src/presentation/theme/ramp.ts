@@ -82,7 +82,27 @@ export function rampStyle(ramp: Ramp, t: number, index: number, theme: ResolvedT
     const colour = resolve(refOf(index), theme, caps).colour;
     return colour === undefined ? undefined : { colour };
   }
-  const tt = ramp.fill === "step" ? stepOf(t, ramp.bands ?? 2) : t;
+  // **The fill's own shaping of `t`, and the arms are exclusive** (C04 I106,
+  // R-MOT-012). `centred` folds — `to` in the middle where `gradient`'s is at
+  // the end, which is the whole difference between §037's `gradient-centre` and
+  // its `gradient-linear`. `step` quantises. **Neither composes with the other**:
+  // `bands` rides on `step` alone and the gate refuses it elsewhere, so there is
+  // no ramp a fold and a quantiser both see.
+  //
+  // Written as a chain because of that. The first draft computed `folded` and
+  // passed it to `stepOf`, which reads as an order that matters and is
+  // unobservable — `stepOf(t)` and `stepOf(folded)` are byte-identical for every
+  // input this type admits, since `folded === t` on every ramp that reaches the
+  // quantiser. A mutation swapping them survived, and the survivor was about the
+  // shape of this expression rather than about a missing row.
+  //
+  // The shaping runs **ahead of the backing**, so a centred colormap and a
+  // centred slot pair are one figure drawn through two inks rather than two
+  // mechanisms.
+  const tt =
+    ramp.fill === "centred" ? 1 - Math.abs(2 * t - 1)
+    : ramp.fill === "step" ? stepOf(t, ramp.bands ?? 2)
+    : t;
   if (ramp.colormap !== undefined) {
     const map = COLORMAPS[ramp.colormap];
     if (map === undefined) return undefined;

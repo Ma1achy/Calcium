@@ -1,8 +1,6 @@
-frame 50 owed 16 prose 37 app 6 total 109
-missing: [25, 40]
-unclassified: []
-rows naming no fixture: []
-able is
+# The design fixtures, mapped
+
+**109 fixtures across 111 sections, and every one has a row here.** The table is
 parsed by `design-fixtures.test.ts` and compared against
 `docs/design/language/fixtures/` **by equality**, so a fixture with no row is a
 failure and a row naming no fixture is a failure. That is the whole reason this is a
@@ -129,7 +127,7 @@ most-drawn line in the application.
 | 34 | surface | `BAR_STYLES` | `design-surfaces.test.ts` | active progress bars — and the painted rung beside the drawn one, as a mask, because the whole of the closing figure is in the channel a stripped read folds away |
 | 35 | surface | `granularity` | `design-surfaces.test.ts` | quantity, granularity and liveness as three axes — five triples, two of them the presets and one that is neither; the segmented ASCII rung is PARKED, because §035 draws `[#][.]` where the registry's `bars.ascii` is one `#`/`-` pair |
 | 36 | surface | no | — | the operation and budget presets — the two triples are expressible now (C09 I97); what is owed is the operation SURFACE around them: the gerund head, the elapsed-and-delta aside, and the settlement that removes the bar |
-| 37 | surface | `RampAnimation` | — | every ink ramp, including the four one-shots |
+| 37 | surface | `RampAnimation` | `design-surfaces.test.ts` | every registered effect, on four axes — the five fills across an extent, the ladder from 24 bits to 1, the animations at a tick, and the same effects through time, which is the only axis six position-free effects are visible on; `centred` is the fill the registry registered and the type could not express |
 | 38 | surface | `RampAnimation` | — | the agent's mark and the verb's ramp |
 | 39 | prose | — | — | one interval, one family |
 | 41 | prose | — | — | the spinner is chosen by the verb |
@@ -219,7 +217,7 @@ that is the reconciliation working, and it should be visible as a number moving 
 than inferred from a suite staying green.
 
     surface 66 · prose 37 · app 6 · total 109
-    of the surfaces: built 60 · unbuilt 6 · framed 50
+    of the surfaces: built 60 · unbuilt 6 · framed 51
 
 **`framed` is the figure this MR moves, and `built` is the one that went backwards.**
 Seven surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks

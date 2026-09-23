@@ -20,8 +20,10 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { RAMP_ANIMATIONS, RAMP_FILLS, RAMP_ONE_SHOTS } from "../../src/data/viewmodel/types.js";
-import type { RampAnimation } from "../../src/data/viewmodel/types.js";
+import type { Ramp, RampAnimation, RampFill } from "../../src/data/viewmodel/types.js";
 import { animateT } from "../../src/presentation/blocks/ramp.js";
+import { DARK_THEME, FULL_CAPS } from "../support/render.js";
+import { rampStyle } from "../../src/presentation/theme/ramp.js";
 
 type RampRecord = Readonly<{ id: string; kind: string; direction?: string; semantic?: string }>;
 
@@ -57,10 +59,88 @@ describe("C04 §3am — the ink ramps are the registry's", () => {
     for (const id of statics) {
       expect(RAMP_ANIMATIONS as readonly string[], `${id} is a fill, not an animation`).not.toContain(id);
     }
-    // And the fills they project onto are the three the type carries: `centre`
-    // and `linear` are both `gradient`, `map` is `gradient` with a colormap.
-    expect([...RAMP_FILLS].sort()).toEqual(["gradient", "palette", "step"]);
+    // **The projection, by name.** This was `RAMP_FILLS` compared against the
+    // three the type then carried, above a comment reading *`centre` and
+    // `linear` are both `gradient`* — **true about the family and silent about
+    // the sampling**, which is the one shape review cannot catch, because the
+    // justification is correct and is not the question. A linear gradient runs
+    // end to end and a centred one turns round in the middle; they were one
+    // value, and *brightest in the middle* was a picture nothing in this tree
+    // could draw while this row asserted an equality and passed.
+    //
+    // So the map is written out per registered id, and a fill with nowhere to
+    // land fails here rather than being absorbed by a sentence. `linear` and
+    // `map` are one fill distinguished by **backing** — the arity the gate
+    // already checks — and registering a backing as a fill would put one axis
+    // in two places.
+    const PROJECTS: Readonly<Record<string, RampFill>> = {
+      "gradient-linear": "gradient",
+      "gradient-map": "gradient",
+      "gradient-centre": "centred",
+      "gradient-step": "step",
+      "gradient-palette": "palette",
+    };
+    expect([...statics].sort(), "every registered fill projects").toEqual(Object.keys(PROJECTS).sort());
+    expect(
+      [...new Set(Object.values(PROJECTS))].sort(),
+      "and the projection's image is the whole union — a fill with no registered source is as much a divergence",
+    ).toEqual([...RAMP_FILLS].sort());
     expect(current.length, "twenty-eight registered effects").toBe(28);
+  });
+
+  it("T2.117h (C04 I106, R-MOT-012): `centred` folds and `gradient` does not", () => {
+    // **The row that would have caught the missing fill**, and it is a picture
+    // rather than a set: *brightest in the middle* against *two tones across a
+    // run* is a claim about where `to` lands, which no comparison of names can
+    // reach. A subset check over fill names was satisfied the whole time.
+    // **Odd, and that is not arbitrary.** The fold peaks at `t = ½`, which an
+    // even extent straddles — twenty-four cells put the maximum between cells
+    // eleven and twelve and no cell reaches `to` at all, so the crisp claim
+    // *the middle is where `to` lands* has nowhere to be made. The first draft
+    // asserted it at twenty-four and failed on the fixture rather than on the
+    // code.
+    const N = 25;
+    const inks = (ramp: Ramp): readonly (string | undefined)[] =>
+      Array.from({ length: N }, (_, i) => {
+        const st = rampStyle(ramp, i / (N - 1), i, DARK_THEME, FULL_CAPS);
+        const c = st?.colour;
+        return c !== undefined && c.kind === "rgb" ? c.hex : undefined;
+      });
+
+    const linear = inks({ fill: "gradient", from: "muted", to: "accent" });
+    const centred = inks({ fill: "centred", from: "muted", to: "accent" });
+
+    // Symmetric about the middle — the fold's signature, and the whole figure.
+    for (let i = 0; i < N; i += 1) {
+      expect(centred[i], `cell ${String(i)} mirrors ${String(N - 1 - i)}`).toBe(centred[N - 1 - i]);
+    }
+    // `to` at the middle for one, at the end for the other.
+    expect(centred[(N - 1) / 2], "the middle cell is `to`").toBe(linear[N - 1]);
+    expect(centred[0]).toBe(linear[0]);
+    // And they are two pictures, not one seen twice.
+    const differ = linear.filter((v, i) => v !== centred[i]).length;
+    expect(differ, "at least half the extent differs").toBeGreaterThanOrEqual(N / 2);
+
+    // **The fold runs before the backing**, so it is a sampling and not an ink:
+    // a centred colormap is the same shape drawn through a different one.
+    // **Within one channel unit, and the residue is the argument's not the
+    // fold's.** `2/24` and `1 − 22/24` differ by an ulp, so the two halves of
+    // the extent are handed arguments that are equal in arithmetic and not in
+    // floats; a slot pair rounds both to the same hex and a colormap's
+    // interpolation carries the difference into one unit of one 8-bit channel.
+    // Asserting exact equality here fails on the double and says nothing about
+    // the sampling, which is what this row is for.
+    const map = inks({ fill: "centred", colormap: "viridis" });
+    const ch = (hex: string | undefined): readonly number[] =>
+      hex === undefined ? [] : [1, 3, 5].map((k) => Number.parseInt(hex.slice(k, k + 2), 16));
+    for (let i = 0; i < N; i += 1) {
+      const a = ch(map[i]);
+      const b = ch(map[N - 1 - i]);
+      expect(a.length, `colormap cell ${String(i)} resolved`).toBe(3);
+      a.forEach((v, k) => {
+        expect(Math.abs(v - (b[k] ?? 0)), `colormap cell ${String(i)} mirrors within a unit`).toBeLessThanOrEqual(1);
+      });
+    }
   });
 
   it("T2.117c (C04 I109): every effect is a value in [0, 1], at every tick, for every cell", () => {

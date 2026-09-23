@@ -35,7 +35,8 @@ import { measurable } from "./render.js";
 import { styledScreenFrom } from "./styled-screen.js";
 import type { ResolvedTheme } from "../../src/presentation/theme/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
-import type { Block, CallState } from "../../src/data/viewmodel/types.js";
+import { RAMP_ANIMATIONS, RAMP_ONE_SHOTS } from "../../src/data/viewmodel/types.js";
+import type { Block, CallState, Ramp, RampAnimation } from "../../src/data/viewmodel/types.js";
 
 export type Surface = Readonly<{
   /** The fixture this is the target appearance for — `DESIGN_FIXTURES.md`'s key. */
@@ -260,6 +261,210 @@ const meterAxes =
     ]);
   };
 
+// --- §037, the ink census ---------------------------------------------------
+
+/** The 24-cell swatch every §037 row is drawn over — ASCII, so the rung that
+ *  substitutes glyphs moves nothing here and the only channel is the ink. */
+const INK_EXTENT = 24;
+const SWATCH = "#".repeat(INK_EXTENT);
+
+/**
+ * One letter per distinct **foreground**, assigned **per row** and with no
+ * legend — the inverse of `maskOf` in both respects, and both differences are
+ * the subject's.
+ *
+ * **Foreground *and its attributes*, because a ramp replaces the run's
+ * foreground and nothing else** (C04 I107). §072's census is about grounds and
+ * reads `bg`; an ink census that read `bg` would draw twenty-four identical
+ * cells for every effect.
+ *
+ * **The attributes are not decoration here, they are the bottom rung.** At one
+ * bit `rampStyle` answers with `from`'s *class* — bold, dim or neither — because
+ * a colour value has no carrier, so a mask keyed on `fg` alone draws the whole
+ * 1-bit ladder as unstyled and says the ink vanished when what happened is that
+ * it changed channel. The first draft did exactly that, and it read as a frame
+ * confirming R-MOT-012 rather than as an instrument that cannot see the rung.
+ *
+ * **Per row, because the figure is a shape and not a value.** A 24-bit linear
+ * gradient over twenty-four cells has twenty-four distinct colours, so a shared
+ * legend would be six hundred lines of hex for a snapshot whose whole claim is
+ * that `gradient` climbs and `centred` turns round in the middle. Letters
+ * assigned in reading order within the row say that directly: `ABC…X` against
+ * `ABC…LLKJ…A`. The cost is that two rows' letters are not comparable, which is
+ * why nothing here compares across rows.
+ */
+function inkMaskOf(row: readonly { style: { fg: string; attrs: readonly number[] } }[]): string {
+  const seen = new Map<string, string>();
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  return row
+    .slice(0, INK_EXTENT)
+    .map((c) => {
+      const key = `${c.style.fg}/${[...c.style.attrs].sort((x, y) => x - y).join(",")}`;
+      if (key === "/") return ".";
+      const held = seen.get(key);
+      if (held !== undefined) return held;
+      const next = alphabet[seen.size] ?? "?";
+      seen.set(key, next);
+      return next;
+    })
+    .join("");
+}
+
+/** The middle cell's ink, at one depth and one tick — the census's time axis. */
+function inkAt(
+  ramp: Ramp,
+  depth: TerminalCapabilities["colourDepth"],
+  tick: number,
+  width: number,
+  capabilities: TerminalCapabilities,
+  theme: ResolvedTheme,
+): string {
+  const kit = measurable({ theme, capabilities: { ...capabilities, colourDepth: depth }, tick });
+  const lines = kit.renderToLines(
+    { kind: "raw", id: `t-${String(tick)}`, text: SWATCH, spans: [{ from: 0, to: INK_EXTENT, ramp }] } as never,
+    width,
+  );
+  const grid = styledScreenFrom([lines.join("\n")], { columns: width, rows: lines.length });
+  const cell = grid[0]?.[INK_EXTENT / 2];
+  return cell === undefined ? "" : `${cell.style.fg}/${[...cell.style.attrs].sort((x, y) => x - y).join(",")}`;
+}
+
+/** The swatch's first row, rendered at one depth and one tick, as a mask. */
+function inkRow(
+  ramp: Ramp,
+  depth: TerminalCapabilities["colourDepth"],
+  tick: number,
+  width: number,
+  capabilities: TerminalCapabilities,
+  theme: ResolvedTheme,
+): string {
+  const kit = measurable({ theme, capabilities: { ...capabilities, colourDepth: depth }, tick });
+  const lines = kit.renderToLines(
+    { kind: "raw", id: `ink-${String(depth)}-${String(tick)}`, text: SWATCH, spans: [{ from: 0, to: INK_EXTENT, ramp }] } as never,
+    width,
+  );
+  const grid = styledScreenFrom([lines.join("\n")], { columns: width, rows: lines.length });
+  return inkMaskOf(grid[0] ?? []);
+}
+
+/**
+ * **`muted` and not `default`, because the 1-bit rung has to be able to say
+ * something.** `rampStyle`'s answer at one bit is `from` resolved as the slot
+ * is — a *class*, bold or dim, since a colour value has no carrier there — and
+ * `default` resolves to no colour and no attribute, so a pair starting at it
+ * drew twenty-four unstyled cells and a reader could not tell *the ladder
+ * bottomed out correctly* from *the ladder is broken*. A fixture must respond
+ * to the thing under test.
+ */
+const PAIR = { from: "muted", to: "accent" } as const;
+
+/**
+ * A one-shot with no `since` rests (C04 I109), which is the honest answer for a
+ * ramp nobody started and an empty row in a census. The five are stamped at
+ * tick 0 and read at tick 7, so the block draws them mid-pass; the eighteen
+ * periodic effects refuse `since` at the gate and take none.
+ */
+const stamped = (a: RampAnimation): Ramp =>
+  RAMP_ONE_SHOTS.has(a)
+    ? { fill: "gradient", ...PAIR, animate: a, since: 0 }
+    : { fill: "gradient", ...PAIR, animate: a };
+
+/**
+ * §037 — **every registered effect, read as ink**.
+ *
+ * **Three blocks, because §037 makes three claims and only the first is a
+ * list.** The fills are a spatial figure, the animations are a temporal one
+ * read at a fixed tick, and `R-MOT-012` — *below 8-bit, motion stops because a
+ * small palette moving reads as flicker* — is a claim about a rung that neither
+ * of the other two can show.
+ *
+ * **The depth ladder is drawn inside rather than taken from the variant.** Ink
+ * has no Unicode axis at all, so this corpus's three arms give two distinct
+ * pictures (24-bit and 1-bit) and neither of the two rungs where the interesting
+ * things happen: 8-bit, where a mix quantises onto the 256 cube, and 4-bit,
+ * where a slot pair becomes two steps and `effectiveTick` stops the clock. A
+ * ladder whose middle rungs are never drawn is a ladder nothing checks — which
+ * is this file's own opening argument, applied to a second axis.
+ *
+ * **The fills block is what the tree could not draw until now.** `gradient`
+ * climbs from `from` to `to`; `centred` turns round at the middle, so the two
+ * halves of its row are one another reversed. They were a single `RampFill`
+ * value, reconciled by a sentence — *`centre` and `linear` are both `gradient`*
+ * — that is true about the family and silent about the sampling.
+ */
+const inkCensus =
+  () =>
+  (width: number, capabilities: TerminalCapabilities, theme: ResolvedTheme): readonly string[] => {
+    const at = (ramp: Ramp, depth: TerminalCapabilities["colourDepth"], tick: number): string =>
+      inkRow(ramp, depth, tick, width, capabilities, theme);
+    const label = (n: string): string => n.padEnd(18, " ");
+
+    const fills: readonly (readonly [string, Ramp])[] = [
+      ["gradient-linear", { fill: "gradient", ...PAIR }],
+      ["gradient-centre", { fill: "centred", ...PAIR }],
+      ["gradient-step", { fill: "step", ...PAIR, bands: 5 }],
+      ["gradient-palette", { fill: "palette" }],
+      ["gradient-map", { fill: "gradient", colormap: "viridis" }],
+      ["gradient-map · centred", { fill: "centred", colormap: "viridis" }],
+    ];
+
+    // A colormap backing is refused on a span (C04 I107), so the two map rows
+    // are drawn at the depth they are legal at through the bar instead — which
+    // this census does not do. They are named and shown as refused, because a
+    // reader counting five registered fills against four rows would otherwise
+    // read an omission as a divergence.
+    const spanFills = fills.filter(([, r]) => r.colormap === undefined);
+
+    const moving = RAMP_ANIMATIONS.filter((a) => a !== "none");
+
+    return [
+      "· the fills — 24 bits, one letter per distinct ink, assigned within the row",
+      ...spanFills.map(([name, ramp]) => `  ${label(name)}${at(ramp, 24, 0)}`),
+      `  ${label("(map backings)")}refused on a span — the floor is proven per slot (C04 I107)`,
+      "",
+      "· the fills, down the ladder — 8, 4 and 1 bit",
+      ...([8, 4, 1] as const).flatMap((d) => [
+        `  depth ${String(d).padStart(2, " ")}`,
+        ...spanFills.map(([name, ramp]) => `    ${label(name)}${at(ramp, d, 0)}`),
+      ]),
+      "",
+      `· the ${String(moving.length)} animated effects at 24 bits, tick 7`,
+      ...moving.map((a) => `  ${label(a)}${at(stamped(a), 24, 7)}`),
+      "",
+      // **The spatial block cannot see a cadence, and six of its rows are flat.**
+      // `breathe`, `pulse`, `heartbeat`, `flicker`, `neon` and `pop` are
+      // constant across the extent by construction — `animateT`'s own table
+      // says so — so a census indexed by position draws each of them as
+      // twenty-four identical cells, which is exactly what an effect that does
+      // nothing draws. The two are told apart on the other axis: one cell,
+      // twenty-four ticks. `pulse`'s two states, `heartbeat`'s two beats and a
+      // rest, and `neon`'s settle are figures only this block holds.
+      "· the same effects through time — the middle cell over 24 ticks, 24 bits",
+      ...moving.map((a) => {
+        const ramp = stamped(a);
+        const seen = new Map<string, string>();
+        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+        const row = Array.from({ length: 24 }, (_, k) => {
+          const key = inkAt(ramp, 24, k, width, capabilities, theme);
+          if (key === "/") return ".";
+          const held = seen.get(key);
+          if (held !== undefined) return held;
+          const next = alphabet[seen.size] ?? "?";
+          seen.set(key, next);
+          return next;
+        }).join("");
+        return `  ${label(a)}${row}`;
+      }),
+      "",
+      "· R-MOT-012 — below 8 bits motion stops: depth 4, ticks 3 and 11",
+      ...moving.map(
+        (a) =>
+          `  ${label(a)}${at(stamped(a), 4, 3)} | ` +
+          `${at(stamped(a), 4, 11)}`,
+      ),
+    ];
+  };
+
 /** §033: one bar per alphabet, all at the same fraction, so the rows compare. */
 const barAlphabets =
   () =>
@@ -372,6 +577,7 @@ export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 30, name: "the head mark's three rungs", rows: headMarks },
   { section: 31, name: "every reusable spinner set", rows: spinnerCensus },
   { section: 33, name: "nine alphabets, and where each belongs", rows: barAlphabets() },
+  { section: 37, name: "every registered ink ramp — the fills, the effects, and the rung where motion stops", rows: inkCensus() },
   { section: 34, name: "the same bar painted, and the glyph rung beneath it", rows: paintedBar() },
   { section: 35, name: "quantity, granularity and liveness — five triples, two of them the presets", rows: meterAxes() },
   { section: 72, name: "the background is a second channel — the ground census", rows: groundCensus([

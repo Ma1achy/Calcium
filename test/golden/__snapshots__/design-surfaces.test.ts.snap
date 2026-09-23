@@ -90,6 +90,105 @@ slant         ###############------- 70%
 squares       ###############------- 70%
 braille       ###############------- 70%
 ascii         ###############------- 70%
+── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
+· the fills — 24 bits, one letter per distinct ink, assigned within the row
+  gradient-linear   ABCDEFGHIJKLMNOPQRSTUVWX
+  gradient-centre   ABCDEFGHIJKLLKJIHGFEDCBA
+  gradient-step     AAAAABBBBBCCCCDDDDDEEEEE
+  gradient-palette  AAAAAAAAAAAAAAAAAAAAAAAA
+  (map backings)    refused on a span — the floor is proven per slot (C04 I107)
+
+· the fills, down the ladder — 8, 4 and 1 bit
+  depth  8
+    gradient-linear   AAAABBBBBBBBBCDDDDDDDDDD
+    gradient-centre   AABBBBBCCCCCCCCCCBBBBBAA
+    gradient-step     AAAAABBBBBBBBBCCCCCCCCCC
+    gradient-palette  AAAAAAAAAAAAAAAAAAAAAAAA
+  depth  4
+    gradient-linear   AAAAAAAAAAAABBBBBBBBBBBB
+    gradient-centre   AAAAAABBBBBBBBBBBBAAAAAA
+    gradient-step     AAAAAAAAAABBBBBBBBBBBBBB
+    gradient-palette  AAAAAAAAAAAAAAAAAAAAAAAA
+  depth  1
+    gradient-linear   AAAAAAAAAAAAAAAAAAAAAAAA
+    gradient-centre   AAAAAAAAAAAAAAAAAAAAAAAA
+    gradient-step     AAAAAAAAAAAAAAAAAAAAAAAA
+    gradient-palette  ........................
+
+· the 23 animated effects at 24 bits, tick 7
+  shimmer           AAAAABBAAAAAAAAAAAAAAAAA
+  wave              ABCDEFGHIJKLMNOPQRSTUVWA
+  breathe           AAAAAAAAAAAAAAAAAAAAAAAA
+  pulse             AAAAAAAAAAAAAAAAAAAAAAAA
+  heartbeat         AAAAAAAAAAAAAAAAAAAAAAAA
+  sweepbar          ABCDEFGGGGGGGGGGGGGGGGGG
+  glint             AAAAABBAAAAAAAAAAAAAAAAA
+  tide              ABCDEFGHIJKHLMNOPQRSTTSA
+  flicker           AAAAAAAAAAAAAAAAAAAAAAAA
+  twinkle           ABAAABAAAABAAAAAAABBABAB
+  pendulum          AAAAAABCBAAAAAAAAAAAAAAA
+  converge          AAAAABBAAAAAAAAAABBAAAAA
+  marquee           AAAAAAABBBBBBBBAAAAAAAAA
+  chase             AAAAAAABAAAAAAABAAAAAAAB
+  neon              AAAAAAAAAAAAAAAAAAAAAAAA
+  drift             ABCDEEEEDCBAFGHIJKLMNOPQ
+  bookend           AAAAABBAAAAAAAAAABBAAAAA
+  scatter           AAAAAAAAABAAAAAAAAAAAAAA
+  sweep             AAAAABBAAAAAAAAAAAAAAAAA
+  pop               AAAAAAAAAAAAAAAAAAAAAAAA
+  wipe              AAAAAAAABBBBBBBBBBBBBBBB
+  typewriter        AAAAAAAABBBBBBBBBBBBBBBB
+  ripple            AAAABCAAAAAAAAAAAACBAAAA
+
+· the same effects through time — the middle cell over 24 ticks, 24 bits
+  shimmer           AAAAAAAAAAAAABBAAAAAAAAA
+  wave              ABCDEFGHIJKLMNOPQRSTUVWX
+  breathe           ABCDEFEDCBAGHIJKJIHGABCD
+  pulse             AAAAABBBBBAAAAABBBBBAAAA
+  heartbeat         ABCABCCCCCCCABCABCCCCCCC
+  sweepbar          AAAAAAAAAAAAAABCDEFGHIJK
+  glint             AAAAAAAAAAAAABBAAAAAAAAA
+  tide              ABCDEFGHIJKLMNNMLOJPQGRS
+  flicker           ABCDEFGHIJKALBMNOPLMQRDS
+  twinkle           AAAABBAABBBBAAAABBAAAAAA
+  pendulum          AAAAAAAAAAABCBAAAAAAAAAA
+  converge          AAAAAAAAAAAABBBAAAAAAAAA
+  marquee           AAAAABBBBBBBBAAAAAAAAAAA
+  chase             AAAABAAAAAAABAAAAAAABAAA
+  neon              ABCDAAAAEAAAAAAAABCDAAAA
+  drift             ABCDEFGGFHCIJKLMNOPQRSTU
+  bookend           AAABBBBBBBBBBBBAAABBBBBB
+  scatter           AAAAAAAAAAAAAAAAAAABAAAA
+  sweep             AAAAAAAAAAAAABBAAAAAAAAA
+  pop               ABCDEFGGGGGGGGGGGGGGGGGG
+  wipe              AAAAAAAAAAAABBBBBBBBBBBB
+  typewriter        AAAAAAAAAAAABBBBBBBBBBBB
+  ripple            ABCCCCCCCCCCCCCCCCCCCCCC
+
+· R-MOT-012 — below 8 bits motion stops: depth 4, ticks 3 and 11
+  shimmer           AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  wave              AAAAAAAAAAAABBBBBBBBBBBA | AAAAAAAAAAAABBBBBBBBBBBA
+  breathe           AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  pulse             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  heartbeat         AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  sweepbar          AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  glint             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  tide              ABBBBBBBBBBBAAAAAAAAAAAA | ABBBBBBBBBBBAAAAAAAAAAAA
+  flicker           AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  twinkle           AAAAAABAAAAAAAAAAAABAAAA | AAAAAABAAAAAAAAAAAABAAAA
+  pendulum          ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
+  converge          AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  marquee           AAAAAAAABBBBBBBBBBBBBBBB | AAAAAAAABBBBBBBBBBBBBBBB
+  chase             ABBBBBBBABBBBBBBABBBBBBB | ABBBBBBBABBBBBBBABBBBBBB
+  neon              AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  drift             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  bookend           AAAAAAAAAABBBBAAAAAAAAAA | AAAAAAAAAABBBBAAAAAAAAAA
+  scatter           ABBBBBBBABBBBBBBBBBBBBBB | ABBBBBBBABBBBBBBBBBBBBBB
+  sweep             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  pop               AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  wipe              ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
+  typewriter        ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
+  ripple            AAAAAAAAAAABBAAAAAAAAAAA | AAAAAAAAAAABBAAAAAAAAAAA
 ── §34 · the same bar painted, and the glyph rung beneath it
 ..............AAAAAAAAAAAAAABBBBBBBB.... slant                                63%
   A = bg 48;2;49;90;52
@@ -246,6 +345,105 @@ slant                      ##################################--------------- 70%
 squares                    ##################################--------------- 70%
 braille                    ##################################--------------- 70%
 ascii                      ##################################--------------- 70%
+── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
+· the fills — 24 bits, one letter per distinct ink, assigned within the row
+  gradient-linear   ABCDEFGHIJKLMNOPQRSTUVWX
+  gradient-centre   ABCDEFGHIJKLLKJIHGFEDCBA
+  gradient-step     AAAAABBBBBCCCCDDDDDEEEEE
+  gradient-palette  AAAAAAAAAAAAAAAAAAAAAAAA
+  (map backings)    refused on a span — the floor is proven per slot (C04 I107)
+
+· the fills, down the ladder — 8, 4 and 1 bit
+  depth  8
+    gradient-linear   AAAABBBBBBBBBCDDDDDDDDDD
+    gradient-centre   AABBBBBCCCCCCCCCCBBBBBAA
+    gradient-step     AAAAABBBBBBBBBCCCCCCCCCC
+    gradient-palette  AAAAAAAAAAAAAAAAAAAAAAAA
+  depth  4
+    gradient-linear   AAAAAAAAAAAABBBBBBBBBBBB
+    gradient-centre   AAAAAABBBBBBBBBBBBAAAAAA
+    gradient-step     AAAAAAAAAABBBBBBBBBBBBBB
+    gradient-palette  AAAAAAAAAAAAAAAAAAAAAAAA
+  depth  1
+    gradient-linear   AAAAAAAAAAAAAAAAAAAAAAAA
+    gradient-centre   AAAAAAAAAAAAAAAAAAAAAAAA
+    gradient-step     AAAAAAAAAAAAAAAAAAAAAAAA
+    gradient-palette  ........................
+
+· the 23 animated effects at 24 bits, tick 7
+  shimmer           AAAAABBAAAAAAAAAAAAAAAAA
+  wave              ABCDEFGHIJKLMNOPQRSTUVWA
+  breathe           AAAAAAAAAAAAAAAAAAAAAAAA
+  pulse             AAAAAAAAAAAAAAAAAAAAAAAA
+  heartbeat         AAAAAAAAAAAAAAAAAAAAAAAA
+  sweepbar          ABCDEFGGGGGGGGGGGGGGGGGG
+  glint             AAAAABBAAAAAAAAAAAAAAAAA
+  tide              ABCDEFGHIJKHLMNOPQRSTTSA
+  flicker           AAAAAAAAAAAAAAAAAAAAAAAA
+  twinkle           ABAAABAAAABAAAAAAABBABAB
+  pendulum          AAAAAABCBAAAAAAAAAAAAAAA
+  converge          AAAAABBAAAAAAAAAABBAAAAA
+  marquee           AAAAAAABBBBBBBBAAAAAAAAA
+  chase             AAAAAAABAAAAAAABAAAAAAAB
+  neon              AAAAAAAAAAAAAAAAAAAAAAAA
+  drift             ABCDEEEEDCBAFGHIJKLMNOPQ
+  bookend           AAAAABBAAAAAAAAAABBAAAAA
+  scatter           AAAAAAAAABAAAAAAAAAAAAAA
+  sweep             AAAAABBAAAAAAAAAAAAAAAAA
+  pop               AAAAAAAAAAAAAAAAAAAAAAAA
+  wipe              AAAAAAAABBBBBBBBBBBBBBBB
+  typewriter        AAAAAAAABBBBBBBBBBBBBBBB
+  ripple            AAAABCAAAAAAAAAAAACBAAAA
+
+· the same effects through time — the middle cell over 24 ticks, 24 bits
+  shimmer           AAAAAAAAAAAAABBAAAAAAAAA
+  wave              ABCDEFGHIJKLMNOPQRSTUVWX
+  breathe           ABCDEFEDCBAGHIJKJIHGABCD
+  pulse             AAAAABBBBBAAAAABBBBBAAAA
+  heartbeat         ABCABCCCCCCCABCABCCCCCCC
+  sweepbar          AAAAAAAAAAAAAABCDEFGHIJK
+  glint             AAAAAAAAAAAAABBAAAAAAAAA
+  tide              ABCDEFGHIJKLMNNMLOJPQGRS
+  flicker           ABCDEFGHIJKALBMNOPLMQRDS
+  twinkle           AAAABBAABBBBAAAABBAAAAAA
+  pendulum          AAAAAAAAAAABCBAAAAAAAAAA
+  converge          AAAAAAAAAAAABBBAAAAAAAAA
+  marquee           AAAAABBBBBBBBAAAAAAAAAAA
+  chase             AAAABAAAAAAABAAAAAAABAAA
+  neon              ABCDAAAAEAAAAAAAABCDAAAA
+  drift             ABCDEFGGFHCIJKLMNOPQRSTU
+  bookend           AAABBBBBBBBBBBBAAABBBBBB
+  scatter           AAAAAAAAAAAAAAAAAAABAAAA
+  sweep             AAAAAAAAAAAAABBAAAAAAAAA
+  pop               ABCDEFGGGGGGGGGGGGGGGGGG
+  wipe              AAAAAAAAAAAABBBBBBBBBBBB
+  typewriter        AAAAAAAAAAAABBBBBBBBBBBB
+  ripple            ABCCCCCCCCCCCCCCCCCCCCCC
+
+· R-MOT-012 — below 8 bits motion stops: depth 4, ticks 3 and 11
+  shimmer           AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  wave              AAAAAAAAAAAABBBBBBBBBBBA | AAAAAAAAAAAABBBBBBBBBBBA
+  breathe           AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  pulse             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  heartbeat         AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  sweepbar          AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  glint             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  tide              ABBBBBBBBBBBAAAAAAAAAAAA | ABBBBBBBBBBBAAAAAAAAAAAA
+  flicker           AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  twinkle           AAAAAABAAAAAAAAAAAABAAAA | AAAAAABAAAAAAAAAAAABAAAA
+  pendulum          ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
+  converge          AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  marquee           AAAAAAAABBBBBBBBBBBBBBBB | AAAAAAAABBBBBBBBBBBBBBBB
+  chase             ABBBBBBBABBBBBBBABBBBBBB | ABBBBBBBABBBBBBBABBBBBBB
+  neon              AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  drift             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  bookend           AAAAAAAAAABBBBAAAAAAAAAA | AAAAAAAAAABBBBAAAAAAAAAA
+  scatter           ABBBBBBBABBBBBBBBBBBBBBB | ABBBBBBBABBBBBBBBBBBBBBB
+  sweep             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  pop               AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  wipe              ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
+  typewriter        ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
+  ripple            AAAAAAAAAAABBAAAAAAAAAAA | AAAAAAAAAAABBAAAAAAAAAAA
 ── §34 · the same bar painted, and the glyph rung beneath it
 ...........................AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBB.... slant                                                                        63%
   A = bg 48;2;49;90;52
@@ -402,6 +600,105 @@ slant         ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱
 squares       ■■■■■■■■■■■■■■■□□□□□□□ 70%
 braille       ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿        70%
 ascii         ###############------- 70%
+── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
+· the fills — 24 bits, one letter per distinct ink, assigned within the row
+  gradient-linear   ABCDEFGHIJKLMNOPQRSTUVWX
+  gradient-centre   ABCDEFGHIJKLLKJIHGFEDCBA
+  gradient-step     AAAAABBBBBCCCCDDDDDEEEEE
+  gradient-palette  AAAAAAAAAAAAAAAAAAAAAAAA
+  (map backings)    refused on a span — the floor is proven per slot (C04 I107)
+
+· the fills, down the ladder — 8, 4 and 1 bit
+  depth  8
+    gradient-linear   AAAABBBBBBBBBCDDDDDDDDDD
+    gradient-centre   AABBBBBCCCCCCCCCCBBBBBAA
+    gradient-step     AAAAABBBBBBBBBCCCCCCCCCC
+    gradient-palette  AAAAAAAAAAAAAAAAAAAAAAAA
+  depth  4
+    gradient-linear   AAAAAAAAAAAABBBBBBBBBBBB
+    gradient-centre   AAAAAABBBBBBBBBBBBAAAAAA
+    gradient-step     AAAAAAAAAABBBBBBBBBBBBBB
+    gradient-palette  AAAAAAAAAAAAAAAAAAAAAAAA
+  depth  1
+    gradient-linear   AAAAAAAAAAAAAAAAAAAAAAAA
+    gradient-centre   AAAAAAAAAAAAAAAAAAAAAAAA
+    gradient-step     AAAAAAAAAAAAAAAAAAAAAAAA
+    gradient-palette  ........................
+
+· the 23 animated effects at 24 bits, tick 7
+  shimmer           AAAAABBAAAAAAAAAAAAAAAAA
+  wave              ABCDEFGHIJKLMNOPQRSTUVWA
+  breathe           AAAAAAAAAAAAAAAAAAAAAAAA
+  pulse             AAAAAAAAAAAAAAAAAAAAAAAA
+  heartbeat         AAAAAAAAAAAAAAAAAAAAAAAA
+  sweepbar          ABCDEFGGGGGGGGGGGGGGGGGG
+  glint             AAAAABBAAAAAAAAAAAAAAAAA
+  tide              ABCDEFGHIJKHLMNOPQRSTTSA
+  flicker           AAAAAAAAAAAAAAAAAAAAAAAA
+  twinkle           ABAAABAAAABAAAAAAABBABAB
+  pendulum          AAAAAABCBAAAAAAAAAAAAAAA
+  converge          AAAAABBAAAAAAAAAABBAAAAA
+  marquee           AAAAAAABBBBBBBBAAAAAAAAA
+  chase             AAAAAAABAAAAAAABAAAAAAAB
+  neon              AAAAAAAAAAAAAAAAAAAAAAAA
+  drift             ABCDEEEEDCBAFGHIJKLMNOPQ
+  bookend           AAAAABBAAAAAAAAAABBAAAAA
+  scatter           AAAAAAAAABAAAAAAAAAAAAAA
+  sweep             AAAAABBAAAAAAAAAAAAAAAAA
+  pop               AAAAAAAAAAAAAAAAAAAAAAAA
+  wipe              AAAAAAAABBBBBBBBBBBBBBBB
+  typewriter        AAAAAAAABBBBBBBBBBBBBBBB
+  ripple            AAAABCAAAAAAAAAAAACBAAAA
+
+· the same effects through time — the middle cell over 24 ticks, 24 bits
+  shimmer           AAAAAAAAAAAAABBAAAAAAAAA
+  wave              ABCDEFGHIJKLMNOPQRSTUVWX
+  breathe           ABCDEFEDCBAGHIJKJIHGABCD
+  pulse             AAAAABBBBBAAAAABBBBBAAAA
+  heartbeat         ABCABCCCCCCCABCABCCCCCCC
+  sweepbar          AAAAAAAAAAAAAABCDEFGHIJK
+  glint             AAAAAAAAAAAAABBAAAAAAAAA
+  tide              ABCDEFGHIJKLMNNMLOJPQGRS
+  flicker           ABCDEFGHIJKALBMNOPLMQRDS
+  twinkle           AAAABBAABBBBAAAABBAAAAAA
+  pendulum          AAAAAAAAAAABCBAAAAAAAAAA
+  converge          AAAAAAAAAAAABBBAAAAAAAAA
+  marquee           AAAAABBBBBBBBAAAAAAAAAAA
+  chase             AAAABAAAAAAABAAAAAAABAAA
+  neon              ABCDAAAAEAAAAAAAABCDAAAA
+  drift             ABCDEFGGFHCIJKLMNOPQRSTU
+  bookend           AAABBBBBBBBBBBBAAABBBBBB
+  scatter           AAAAAAAAAAAAAAAAAAABAAAA
+  sweep             AAAAAAAAAAAAABBAAAAAAAAA
+  pop               ABCDEFGGGGGGGGGGGGGGGGGG
+  wipe              AAAAAAAAAAAABBBBBBBBBBBB
+  typewriter        AAAAAAAAAAAABBBBBBBBBBBB
+  ripple            ABCCCCCCCCCCCCCCCCCCCCCC
+
+· R-MOT-012 — below 8 bits motion stops: depth 4, ticks 3 and 11
+  shimmer           AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  wave              AAAAAAAAAAAABBBBBBBBBBBA | AAAAAAAAAAAABBBBBBBBBBBA
+  breathe           AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  pulse             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  heartbeat         AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  sweepbar          AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  glint             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  tide              ABBBBBBBBBBBAAAAAAAAAAAA | ABBBBBBBBBBBAAAAAAAAAAAA
+  flicker           AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  twinkle           AAAAAABAAAAAAAAAAAABAAAA | AAAAAABAAAAAAAAAAAABAAAA
+  pendulum          ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
+  converge          AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  marquee           AAAAAAAABBBBBBBBBBBBBBBB | AAAAAAAABBBBBBBBBBBBBBBB
+  chase             ABBBBBBBABBBBBBBABBBBBBB | ABBBBBBBABBBBBBBABBBBBBB
+  neon              AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  drift             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  bookend           AAAAAAAAAABBBBAAAAAAAAAA | AAAAAAAAAABBBBAAAAAAAAAA
+  scatter           ABBBBBBBABBBBBBBBBBBBBBB | ABBBBBBBABBBBBBBBBBBBBBB
+  sweep             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  pop               AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  wipe              ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
+  typewriter        ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
+  ripple            AAAAAAAAAAABBAAAAAAAAAAA | AAAAAAAAAAABBAAAAAAAAAAA
 ── §34 · the same bar painted, and the glyph rung beneath it
 ........................................ slant         ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 63%
 ........................................ slant         ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 63%
@@ -551,6 +848,105 @@ slant                      ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰�
 squares                    ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■□□□□□□□□□□□□□□□ 70%
 braille                    ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿                70%
 ascii                      ##################################--------------- 70%
+── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
+· the fills — 24 bits, one letter per distinct ink, assigned within the row
+  gradient-linear   ABCDEFGHIJKLMNOPQRSTUVWX
+  gradient-centre   ABCDEFGHIJKLLKJIHGFEDCBA
+  gradient-step     AAAAABBBBBCCCCDDDDDEEEEE
+  gradient-palette  AAAAAAAAAAAAAAAAAAAAAAAA
+  (map backings)    refused on a span — the floor is proven per slot (C04 I107)
+
+· the fills, down the ladder — 8, 4 and 1 bit
+  depth  8
+    gradient-linear   AAAABBBBBBBBBCDDDDDDDDDD
+    gradient-centre   AABBBBBCCCCCCCCCCBBBBBAA
+    gradient-step     AAAAABBBBBBBBBCCCCCCCCCC
+    gradient-palette  AAAAAAAAAAAAAAAAAAAAAAAA
+  depth  4
+    gradient-linear   AAAAAAAAAAAABBBBBBBBBBBB
+    gradient-centre   AAAAAABBBBBBBBBBBBAAAAAA
+    gradient-step     AAAAAAAAAABBBBBBBBBBBBBB
+    gradient-palette  AAAAAAAAAAAAAAAAAAAAAAAA
+  depth  1
+    gradient-linear   AAAAAAAAAAAAAAAAAAAAAAAA
+    gradient-centre   AAAAAAAAAAAAAAAAAAAAAAAA
+    gradient-step     AAAAAAAAAAAAAAAAAAAAAAAA
+    gradient-palette  ........................
+
+· the 23 animated effects at 24 bits, tick 7
+  shimmer           AAAAABBAAAAAAAAAAAAAAAAA
+  wave              ABCDEFGHIJKLMNOPQRSTUVWA
+  breathe           AAAAAAAAAAAAAAAAAAAAAAAA
+  pulse             AAAAAAAAAAAAAAAAAAAAAAAA
+  heartbeat         AAAAAAAAAAAAAAAAAAAAAAAA
+  sweepbar          ABCDEFGGGGGGGGGGGGGGGGGG
+  glint             AAAAABBAAAAAAAAAAAAAAAAA
+  tide              ABCDEFGHIJKHLMNOPQRSTTSA
+  flicker           AAAAAAAAAAAAAAAAAAAAAAAA
+  twinkle           ABAAABAAAABAAAAAAABBABAB
+  pendulum          AAAAAABCBAAAAAAAAAAAAAAA
+  converge          AAAAABBAAAAAAAAAABBAAAAA
+  marquee           AAAAAAABBBBBBBBAAAAAAAAA
+  chase             AAAAAAABAAAAAAABAAAAAAAB
+  neon              AAAAAAAAAAAAAAAAAAAAAAAA
+  drift             ABCDEEEEDCBAFGHIJKLMNOPQ
+  bookend           AAAAABBAAAAAAAAAABBAAAAA
+  scatter           AAAAAAAAABAAAAAAAAAAAAAA
+  sweep             AAAAABBAAAAAAAAAAAAAAAAA
+  pop               AAAAAAAAAAAAAAAAAAAAAAAA
+  wipe              AAAAAAAABBBBBBBBBBBBBBBB
+  typewriter        AAAAAAAABBBBBBBBBBBBBBBB
+  ripple            AAAABCAAAAAAAAAAAACBAAAA
+
+· the same effects through time — the middle cell over 24 ticks, 24 bits
+  shimmer           AAAAAAAAAAAAABBAAAAAAAAA
+  wave              ABCDEFGHIJKLMNOPQRSTUVWX
+  breathe           ABCDEFEDCBAGHIJKJIHGABCD
+  pulse             AAAAABBBBBAAAAABBBBBAAAA
+  heartbeat         ABCABCCCCCCCABCABCCCCCCC
+  sweepbar          AAAAAAAAAAAAAABCDEFGHIJK
+  glint             AAAAAAAAAAAAABBAAAAAAAAA
+  tide              ABCDEFGHIJKLMNNMLOJPQGRS
+  flicker           ABCDEFGHIJKALBMNOPLMQRDS
+  twinkle           AAAABBAABBBBAAAABBAAAAAA
+  pendulum          AAAAAAAAAAABCBAAAAAAAAAA
+  converge          AAAAAAAAAAAABBBAAAAAAAAA
+  marquee           AAAAABBBBBBBBAAAAAAAAAAA
+  chase             AAAABAAAAAAABAAAAAAABAAA
+  neon              ABCDAAAAEAAAAAAAABCDAAAA
+  drift             ABCDEFGGFHCIJKLMNOPQRSTU
+  bookend           AAABBBBBBBBBBBBAAABBBBBB
+  scatter           AAAAAAAAAAAAAAAAAAABAAAA
+  sweep             AAAAAAAAAAAAABBAAAAAAAAA
+  pop               ABCDEFGGGGGGGGGGGGGGGGGG
+  wipe              AAAAAAAAAAAABBBBBBBBBBBB
+  typewriter        AAAAAAAAAAAABBBBBBBBBBBB
+  ripple            ABCCCCCCCCCCCCCCCCCCCCCC
+
+· R-MOT-012 — below 8 bits motion stops: depth 4, ticks 3 and 11
+  shimmer           AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  wave              AAAAAAAAAAAABBBBBBBBBBBA | AAAAAAAAAAAABBBBBBBBBBBA
+  breathe           AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  pulse             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  heartbeat         AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  sweepbar          AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  glint             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  tide              ABBBBBBBBBBBAAAAAAAAAAAA | ABBBBBBBBBBBAAAAAAAAAAAA
+  flicker           AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  twinkle           AAAAAABAAAAAAAAAAAABAAAA | AAAAAABAAAAAAAAAAAABAAAA
+  pendulum          ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
+  converge          AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  marquee           AAAAAAAABBBBBBBBBBBBBBBB | AAAAAAAABBBBBBBBBBBBBBBB
+  chase             ABBBBBBBABBBBBBBABBBBBBB | ABBBBBBBABBBBBBBABBBBBBB
+  neon              AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  drift             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  bookend           AAAAAAAAAABBBBAAAAAAAAAA | AAAAAAAAAABBBBAAAAAAAAAA
+  scatter           ABBBBBBBABBBBBBBBBBBBBBB | ABBBBBBBABBBBBBBBBBBBBBB
+  sweep             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  pop               AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  wipe              ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
+  typewriter        ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
+  ripple            AAAAAAAAAAABBAAAAAAAAAAA | AAAAAAAAAAABBAAAAAAAAAAA
 ── §34 · the same bar painted, and the glyph rung beneath it
 ................................................................................ slant                      ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 63%
 ................................................................................ slant                      ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 63%
@@ -700,6 +1096,105 @@ slant         ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱
 squares       ■■■■■■■■■■■■■■■□□□□□□□ 70%
 braille       ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿        70%
 ascii         ###############------- 70%
+── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
+· the fills — 24 bits, one letter per distinct ink, assigned within the row
+  gradient-linear   ABCDEFGHIJKLMNOPQRSTUVWX
+  gradient-centre   ABCDEFGHIJKLLKJIHGFEDCBA
+  gradient-step     AAAAABBBBBCCCCDDDDDEEEEE
+  gradient-palette  AAAAAAAAAAAAAAAAAAAAAAAA
+  (map backings)    refused on a span — the floor is proven per slot (C04 I107)
+
+· the fills, down the ladder — 8, 4 and 1 bit
+  depth  8
+    gradient-linear   AAAABBBBBBBBBCDDDDDDDDDD
+    gradient-centre   AABBBBBCCCCCCCCCCBBBBBAA
+    gradient-step     AAAAABBBBBBBBBCCCCCCCCCC
+    gradient-palette  AAAAAAAAAAAAAAAAAAAAAAAA
+  depth  4
+    gradient-linear   AAAAAAAAAAAABBBBBBBBBBBB
+    gradient-centre   AAAAAABBBBBBBBBBBBAAAAAA
+    gradient-step     AAAAAAAAAABBBBBBBBBBBBBB
+    gradient-palette  AAAAAAAAAAAAAAAAAAAAAAAA
+  depth  1
+    gradient-linear   AAAAAAAAAAAAAAAAAAAAAAAA
+    gradient-centre   AAAAAAAAAAAAAAAAAAAAAAAA
+    gradient-step     AAAAAAAAAAAAAAAAAAAAAAAA
+    gradient-palette  ........................
+
+· the 23 animated effects at 24 bits, tick 7
+  shimmer           AAAAABBAAAAAAAAAAAAAAAAA
+  wave              ABCDEFGHIJKLMNOPQRSTUVWA
+  breathe           AAAAAAAAAAAAAAAAAAAAAAAA
+  pulse             AAAAAAAAAAAAAAAAAAAAAAAA
+  heartbeat         AAAAAAAAAAAAAAAAAAAAAAAA
+  sweepbar          ABCDEFGGGGGGGGGGGGGGGGGG
+  glint             AAAAABBAAAAAAAAAAAAAAAAA
+  tide              ABCDEFGHIJKHLMNOPQRSTTSA
+  flicker           AAAAAAAAAAAAAAAAAAAAAAAA
+  twinkle           ABAAABAAAABAAAAAAABBABAB
+  pendulum          AAAAAABCBAAAAAAAAAAAAAAA
+  converge          AAAAABBAAAAAAAAAABBAAAAA
+  marquee           AAAAAAABBBBBBBBAAAAAAAAA
+  chase             AAAAAAABAAAAAAABAAAAAAAB
+  neon              AAAAAAAAAAAAAAAAAAAAAAAA
+  drift             ABCDEEEEDCBAFGHIJKLMNOPQ
+  bookend           AAAAABBAAAAAAAAAABBAAAAA
+  scatter           AAAAAAAAABAAAAAAAAAAAAAA
+  sweep             AAAAABBAAAAAAAAAAAAAAAAA
+  pop               AAAAAAAAAAAAAAAAAAAAAAAA
+  wipe              AAAAAAAABBBBBBBBBBBBBBBB
+  typewriter        AAAAAAAABBBBBBBBBBBBBBBB
+  ripple            AAAABCAAAAAAAAAAAACBAAAA
+
+· the same effects through time — the middle cell over 24 ticks, 24 bits
+  shimmer           AAAAAAAAAAAAABBAAAAAAAAA
+  wave              ABCDEFGHIJKLMNOPQRSTUVWX
+  breathe           ABCDEFEDCBAGHIJKJIHGABCD
+  pulse             AAAAABBBBBAAAAABBBBBAAAA
+  heartbeat         ABCABCCCCCCCABCABCCCCCCC
+  sweepbar          AAAAAAAAAAAAAABCDEFGHIJK
+  glint             AAAAAAAAAAAAABBAAAAAAAAA
+  tide              ABCDEFGHIJKLMNNMLOJPQGRS
+  flicker           ABCDEFGHIJKALBMNOPLMQRDS
+  twinkle           AAAABBAABBBBAAAABBAAAAAA
+  pendulum          AAAAAAAAAAABCBAAAAAAAAAA
+  converge          AAAAAAAAAAAABBBAAAAAAAAA
+  marquee           AAAAABBBBBBBBAAAAAAAAAAA
+  chase             AAAABAAAAAAABAAAAAAABAAA
+  neon              ABCDAAAAEAAAAAAAABCDAAAA
+  drift             ABCDEFGGFHCIJKLMNOPQRSTU
+  bookend           AAABBBBBBBBBBBBAAABBBBBB
+  scatter           AAAAAAAAAAAAAAAAAAABAAAA
+  sweep             AAAAAAAAAAAAABBAAAAAAAAA
+  pop               ABCDEFGGGGGGGGGGGGGGGGGG
+  wipe              AAAAAAAAAAAABBBBBBBBBBBB
+  typewriter        AAAAAAAAAAAABBBBBBBBBBBB
+  ripple            ABCCCCCCCCCCCCCCCCCCCCCC
+
+· R-MOT-012 — below 8 bits motion stops: depth 4, ticks 3 and 11
+  shimmer           AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  wave              AAAAAAAAAAAABBBBBBBBBBBA | AAAAAAAAAAAABBBBBBBBBBBA
+  breathe           AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  pulse             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  heartbeat         AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  sweepbar          AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  glint             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  tide              ABBBBBBBBBBBAAAAAAAAAAAA | ABBBBBBBBBBBAAAAAAAAAAAA
+  flicker           AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  twinkle           AAAAAABAAAAAAAAAAAABAAAA | AAAAAABAAAAAAAAAAAABAAAA
+  pendulum          ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
+  converge          AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  marquee           AAAAAAAABBBBBBBBBBBBBBBB | AAAAAAAABBBBBBBBBBBBBBBB
+  chase             ABBBBBBBABBBBBBBABBBBBBB | ABBBBBBBABBBBBBBABBBBBBB
+  neon              AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  drift             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  bookend           AAAAAAAAAABBBBAAAAAAAAAA | AAAAAAAAAABBBBAAAAAAAAAA
+  scatter           ABBBBBBBABBBBBBBBBBBBBBB | ABBBBBBBABBBBBBBBBBBBBBB
+  sweep             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  pop               AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  wipe              ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
+  typewriter        ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
+  ripple            AAAAAAAAAAABBAAAAAAAAAAA | AAAAAAAAAAABBAAAAAAAAAAA
 ── §34 · the same bar painted, and the glyph rung beneath it
 ..............AAAAAAAAAAAAAABBBBBBBB.... slant                                63%
   A = bg 48;2;49;90;52
@@ -856,6 +1351,105 @@ slant                      ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰�
 squares                    ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■□□□□□□□□□□□□□□□ 70%
 braille                    ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿                70%
 ascii                      ##################################--------------- 70%
+── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
+· the fills — 24 bits, one letter per distinct ink, assigned within the row
+  gradient-linear   ABCDEFGHIJKLMNOPQRSTUVWX
+  gradient-centre   ABCDEFGHIJKLLKJIHGFEDCBA
+  gradient-step     AAAAABBBBBCCCCDDDDDEEEEE
+  gradient-palette  AAAAAAAAAAAAAAAAAAAAAAAA
+  (map backings)    refused on a span — the floor is proven per slot (C04 I107)
+
+· the fills, down the ladder — 8, 4 and 1 bit
+  depth  8
+    gradient-linear   AAAABBBBBBBBBCDDDDDDDDDD
+    gradient-centre   AABBBBBCCCCCCCCCCBBBBBAA
+    gradient-step     AAAAABBBBBBBBBCCCCCCCCCC
+    gradient-palette  AAAAAAAAAAAAAAAAAAAAAAAA
+  depth  4
+    gradient-linear   AAAAAAAAAAAABBBBBBBBBBBB
+    gradient-centre   AAAAAABBBBBBBBBBBBAAAAAA
+    gradient-step     AAAAAAAAAABBBBBBBBBBBBBB
+    gradient-palette  AAAAAAAAAAAAAAAAAAAAAAAA
+  depth  1
+    gradient-linear   AAAAAAAAAAAAAAAAAAAAAAAA
+    gradient-centre   AAAAAAAAAAAAAAAAAAAAAAAA
+    gradient-step     AAAAAAAAAAAAAAAAAAAAAAAA
+    gradient-palette  ........................
+
+· the 23 animated effects at 24 bits, tick 7
+  shimmer           AAAAABBAAAAAAAAAAAAAAAAA
+  wave              ABCDEFGHIJKLMNOPQRSTUVWA
+  breathe           AAAAAAAAAAAAAAAAAAAAAAAA
+  pulse             AAAAAAAAAAAAAAAAAAAAAAAA
+  heartbeat         AAAAAAAAAAAAAAAAAAAAAAAA
+  sweepbar          ABCDEFGGGGGGGGGGGGGGGGGG
+  glint             AAAAABBAAAAAAAAAAAAAAAAA
+  tide              ABCDEFGHIJKHLMNOPQRSTTSA
+  flicker           AAAAAAAAAAAAAAAAAAAAAAAA
+  twinkle           ABAAABAAAABAAAAAAABBABAB
+  pendulum          AAAAAABCBAAAAAAAAAAAAAAA
+  converge          AAAAABBAAAAAAAAAABBAAAAA
+  marquee           AAAAAAABBBBBBBBAAAAAAAAA
+  chase             AAAAAAABAAAAAAABAAAAAAAB
+  neon              AAAAAAAAAAAAAAAAAAAAAAAA
+  drift             ABCDEEEEDCBAFGHIJKLMNOPQ
+  bookend           AAAAABBAAAAAAAAAABBAAAAA
+  scatter           AAAAAAAAABAAAAAAAAAAAAAA
+  sweep             AAAAABBAAAAAAAAAAAAAAAAA
+  pop               AAAAAAAAAAAAAAAAAAAAAAAA
+  wipe              AAAAAAAABBBBBBBBBBBBBBBB
+  typewriter        AAAAAAAABBBBBBBBBBBBBBBB
+  ripple            AAAABCAAAAAAAAAAAACBAAAA
+
+· the same effects through time — the middle cell over 24 ticks, 24 bits
+  shimmer           AAAAAAAAAAAAABBAAAAAAAAA
+  wave              ABCDEFGHIJKLMNOPQRSTUVWX
+  breathe           ABCDEFEDCBAGHIJKJIHGABCD
+  pulse             AAAAABBBBBAAAAABBBBBAAAA
+  heartbeat         ABCABCCCCCCCABCABCCCCCCC
+  sweepbar          AAAAAAAAAAAAAABCDEFGHIJK
+  glint             AAAAAAAAAAAAABBAAAAAAAAA
+  tide              ABCDEFGHIJKLMNNMLOJPQGRS
+  flicker           ABCDEFGHIJKALBMNOPLMQRDS
+  twinkle           AAAABBAABBBBAAAABBAAAAAA
+  pendulum          AAAAAAAAAAABCBAAAAAAAAAA
+  converge          AAAAAAAAAAAABBBAAAAAAAAA
+  marquee           AAAAABBBBBBBBAAAAAAAAAAA
+  chase             AAAABAAAAAAABAAAAAAABAAA
+  neon              ABCDAAAAEAAAAAAAABCDAAAA
+  drift             ABCDEFGGFHCIJKLMNOPQRSTU
+  bookend           AAABBBBBBBBBBBBAAABBBBBB
+  scatter           AAAAAAAAAAAAAAAAAAABAAAA
+  sweep             AAAAAAAAAAAAABBAAAAAAAAA
+  pop               ABCDEFGGGGGGGGGGGGGGGGGG
+  wipe              AAAAAAAAAAAABBBBBBBBBBBB
+  typewriter        AAAAAAAAAAAABBBBBBBBBBBB
+  ripple            ABCCCCCCCCCCCCCCCCCCCCCC
+
+· R-MOT-012 — below 8 bits motion stops: depth 4, ticks 3 and 11
+  shimmer           AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  wave              AAAAAAAAAAAABBBBBBBBBBBA | AAAAAAAAAAAABBBBBBBBBBBA
+  breathe           AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  pulse             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  heartbeat         AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  sweepbar          AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  glint             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  tide              ABBBBBBBBBBBAAAAAAAAAAAA | ABBBBBBBBBBBAAAAAAAAAAAA
+  flicker           AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  twinkle           AAAAAABAAAAAAAAAAAABAAAA | AAAAAABAAAAAAAAAAAABAAAA
+  pendulum          ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
+  converge          AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  marquee           AAAAAAAABBBBBBBBBBBBBBBB | AAAAAAAABBBBBBBBBBBBBBBB
+  chase             ABBBBBBBABBBBBBBABBBBBBB | ABBBBBBBABBBBBBBABBBBBBB
+  neon              AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  drift             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  bookend           AAAAAAAAAABBBBAAAAAAAAAA | AAAAAAAAAABBBBAAAAAAAAAA
+  scatter           ABBBBBBBABBBBBBBBBBBBBBB | ABBBBBBBABBBBBBBBBBBBBBB
+  sweep             AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  pop               AAAAAAAAAAAAAAAAAAAAAAAA | AAAAAAAAAAAAAAAAAAAAAAAA
+  wipe              ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
+  typewriter        ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
+  ripple            AAAAAAAAAAABBAAAAAAAAAAA | AAAAAAAAAAABBAAAAAAAAAAA
 ── §34 · the same bar painted, and the glyph rung beneath it
 ...........................AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBB.... slant                                                                        63%
   A = bg 48;2;49;90;52

@@ -2801,31 +2801,54 @@ the gate refuses. What a ramp varies *over* is C09's to rule (C09 §5, `RAMP_EXT
 colour degrades is C10's (C10 §4e). This section says what one **is**.
 
 ```typescript
-type RampFill      = "gradient" | "step" | "palette";
-type RampAnimation = "none" | "shimmer" | "wave" | "breathe" | "pulse" | "heartbeat";
+type RampFill      = "gradient" | "centred" | "step" | "palette";
+type RampAnimation = "none" | …;              // the registry's 23 animated effects (I109)
 
 /** An ink that is a function of position (I106–I109). */
 type Ramp = Readonly<{
   fill:      RampFill;
-  from?:     Tone;            // a slot pair — `gradient` and `step`
+  from?:     Tone;            // a slot pair — every fill but `palette`
   to?:       Tone;
-  colormap?: ColormapName;    // `gradient` and `step`; on `progress` only (I107)
+  colormap?: ColormapName;    // every fill but `palette`; on `progress` only (I107)
   bands?:    number;          // `step` only; integer, 2 ≤ bands ≤ 8
   animate?:  RampAnimation;   // absent is "none"
+  since?:    number;          // a one-shot's birth tick (I109)
 }>;
 
 type TextSpan = Readonly<{ …; elide?: true; ramp?: Ramp }>;                        // the ninth member
 type Progress = Readonly<{ …; current: number; total: number; ramp?: Ramp }> & Gap;
 ```
 
-**Three fills, because they mean three things, and the backing's arity is the gate's** (I106).
-A `gradient` says *this varies continuously*, a `step` says *these are N groups*, a `palette`
+**Four fills, because they mean four things, and the backing's arity is the gate's** (I106,
+R-MOT-012). A `gradient` says *this varies continuously*, a `centred` says *this varies
+continuously and the middle is the extreme*, a `step` says *these are N groups*, a `palette`
 says *these are unordered identities*; drawing one as another is the encoding violation C12's
-ramp types already refuse (C12 §3b). `gradient` and `step` take **exactly one** backing — a
+ramp types already refuse (C12 §3b). Every fill but `palette` takes **exactly one** backing — a
 `from`/`to` pair of slots, or a `colormap` — and `palette` takes neither; `bands` rides on
-`step` alone. `RAMP_KEYS` is the key gate, six members, asserted as `TEXT_SPAN_KEYS` is. **No
+`step` alone. `RAMP_KEYS` is the key gate, seven members, asserted as `TEXT_SPAN_KEYS` is. **No
 member can hold a colour value**: the type is closed to `Tone` and `ColormapName`, so §3's
 *never embeds a colour* holds here by construction and no source scan is owed for it.
+
+**`centred` is a sampling and not a backing, which is why it is a fill and not a member**
+(I106, R-MOT-012). §037 registers **five** `static-tone` ramps and the type carried **three**
+fills, so the design's *brightest in the middle* — `gradient-centre`, whose own column reads
+`centred` where `gradient-linear`'s reads `linear` — was a picture nothing in this tree could
+draw. **The sentence that kept it out was true and about the wrong thing**: `centre` and
+`linear` *are* both gradients, and that is a fact about the family rather than about the
+sampling, so it read as a reconciliation while the two ends of a linear ramp and the one middle
+of a centred one stayed two different figures. `centred` folds the argument — `t' = 1 − |2t − 1|`
+— and hands it to whichever backing the ramp declares, so it composes with a slot pair and with
+a colormap exactly as `gradient` does and needs no arm of its own at the gate: the arity rule
+is already written over *every fill but `palette`*. It does **not** compose with `bands`, for
+the reason `gradient` does not: quantising a fold gives N groups whose order is not the
+extent's, which is the encoding violation two paragraphs up.
+
+**The other four registered fills are four of these and not five.** `gradient-linear` and
+`gradient-map` are one fill distinguished by **backing** — a slot pair against a `colormap` —
+which is the arity the gate already checks, and registering the backing as a second fill would
+put one axis in two places. `gradient-step` is `step` and `gradient-palette` is `palette`. So
+five registered records project onto four fills × two backings, and T2.117b is the row that
+compares the projection rather than the counts.
 
 **`palette` takes no name** (I106). The brief offered *a palette name*, citing the waffle and
 the pie; measured, both cycle the **theme's** categorical slots through `refOf`, and
@@ -3671,7 +3694,7 @@ band from, and it is asserted rather than left to follow.
 - **I103** — **A child's placement is computed once and read by the renderer and the element walk alike.** The offsets on both axes come from one function in `measure.ts`; the renderer applies them as margins and `elementsIn` lifts the child's elements by them, so an element sits where the frame drew it. F816 measured the alternative at HEAD: a `bottom` child drawn on row 3 whose chips answered `rows [0, 1)` (§3 *Both axes* R5, C09 I30, C26 §5).
 - **I104** — **The residue row's text is fixed by state and names no key: an open box reads `⋯ N above, M below`, a collapsed box reads `⋯ +N more`.** One mechanism for *what is hidden* (I49) and two texts, because the open box's direction was measured to matter (§3c T6) and the collapsed box has no direction to state — *0 above* on zero visible rows is a clause nothing can falsify (F826). No key name on either row: the affordance is `activate` and the footer shows its label (C16 I19).
 - **I105** — **`elide` is a span member marking the run a fitter shortens first, from its end; it is a boundary and never an appearance, and it is inert outside a fitted token.** `TEXT_SPAN_KEYS` admits it as the eighth member; `measure` reads it as it reads `from` and `to` (I83), so a `step` notice is one row with or without it and a wrapped notice wraps as it did. The consumer is the call's head, whose argument gives way before its verb, duration and outcome (C09 I46).
-- **I106** — **`Ramp` is a closed data type: three fills whose backing arity the gate checks, six keys in `RAMP_KEYS`, no member that can hold a colour value, and `palette` names nothing.** `gradient` and `step` take exactly one of a slot pair or a `colormap`; `palette` takes neither and no `bands`; `bands` is `step`'s alone, an integer in `2..8`. The type is closed to `Tone` and `ColormapName`, so §3's *never embeds a colour* holds by construction. A palette ramp cycles the theme's categorical slots and no other (C10 I16, F837).
+- **I106** — *(amended — R-MOT-012)* **`Ramp` is a closed data type: **four** fills whose backing arity the gate checks, seven keys in `RAMP_KEYS`, no member that can hold a colour value, and `palette` names nothing.** Every fill but `palette` takes exactly one of a slot pair or a `colormap`; `palette` takes neither and no `bands`; `bands` is `step`'s alone, an integer in `2..8`. **`centred` is the fourth** — §037's `gradient-centre`, *brightest in the middle* — and it is a **sampling** rather than a backing: it folds the argument to `1 − |2t − 1|` and hands it to whichever backing is declared, so it needs no arm at the gate and takes no `bands`. *The type carried three while the registry registered five static ramps, and the sentence that reconciled them — `centre` and `linear` are both `gradient` — was **true about the family and silent about the sampling**, so a linear ramp and a centred one were one value and one picture. Five records project onto four fills × two backings; the projection is what T2.117b compares.* The type is closed to `Tone` and `ColormapName`, so §3's *never embeds a colour* holds by construction. A palette ramp cycles the theme's categorical slots and no other (C10 I16, F837).
 - **I107** — **`TextSpan.ramp` is the ninth member and is appearance only: `measure` never reads it, it replaces the run's foreground colour and nothing else, it is refused beside `value`, and a colormap backing is refused on a span.** A slot pair is bounded by two colours whose floors C10 I26 proves; a sampled colour passes through no floor. The bar's ink reads by area (C10 I31), which is why the same backing is admitted there. The deferral's symbol is a floor-aware lift in `theme/contrast.ts`.
 - **I108** — **`Progress.ramp` is the one block-level carrier; `RAMP_EXTENT` is exhaustive over `BlockKind`, and a kind marked `none` has no member to carry a ramp.** The `on` cells take the ramp over the axis (→ C09), the `off` cells stay `muted`. Every other kind is a deferral with its symbol (`CALCIUM_INK_RAMPS_DESIGN.md` §7), admitted by a consumer appearing and never by symmetry.
 - **I109** — *(amended — R-MOT-012, R-MOT-005)* **`RampAnimation` is a closed union of the registry's twenty-three effects and `none` — eighteen periodic and the five that end; period and easing are never members; absent is `none`, and the static frame is `tick = 0` of the same evaluation.** Timing lives in the effect (→ C09), as the spinner's lives in the set. **A one-shot reads `Ramp.since`**, the tick it began on, and holds its final frame once its duration is past — so `measure` is untouched and *appearance animates, geometry never does* still holds. `since` is refused on a periodic effect, because a stamp nothing reads is a field that looks like it does something. **Every effect is a value in `[0, 1]` the fill is sampled at** and none of them decides which clusters show, which is R-MOT-005 and is what retires the old *position effect* exclusion.
@@ -3823,7 +3846,7 @@ band from, and it is asserted rather than left to follow.
 95. **One placement, both readers** (I103). The offset arithmetic lives in `measure.ts` beside `childWidths`, for the reason `childWidths` does: two halves that each compute it are two halves free to disagree, and F816 is the disagreement measured.
 96. **Two texts for one residue mechanism, and no key on either** (I104). The collapsed form's *0 above* was a sentence that could not be violated, and the design's `⏎ to expand` was a second keymap; the count survives from each and the rest does not (F826).
 97. **A span can say which run gives way first** (I105). `elide` is admitted by the call's head, the one consumer that knows which run is the argument; a boundary, read by `measure` as offsets are, inert wherever nothing is fitted.
-98. **An ink can be a function, and the function is data** (I106, I109). A `Ramp` is three fills, a backing the gate checks the arity of, and a closed set of loops with their timing in the effect; it carries no colour value, no period and no easing, so a far side can send one and the gate can refuse one (`CALCIUM_INK_RAMPS_DESIGN.md`).
+98. **An ink can be a function, and the function is data** (I106, I109). A `Ramp` is **four** fills — one of them a *sampling*, `centred`, rather than a backing — a backing the gate checks the arity of, and a closed set of loops with their timing in the effect; it carries no colour value, no period and no easing, so a far side can send one and the gate can refuse one (`CALCIUM_INK_RAMPS_DESIGN.md`).
 99. **Two carriers, each with an extent, and the rest refused by type** (I107, I108). A span's clusters and the bar's axis; a colormap on the bar and slot pairs on text, because a floor is proven per slot and a bar reads by area; every other kind is `none` in `RAMP_EXTENT` until a consumer appears.
 ---
 100. **A child's screen is a block, and its colours are its own** (I110, I111). The one kind carrying a literal `ColourValue`, on `image`'s argument that a child's bytes are data rather than the application's taste — with the containment gate that makes it safe to render without stripping.
@@ -3891,7 +3914,7 @@ Six tiers. No state machine, so no transition table.
 - **T1.24** (I84): each malformation is refused with **one error naming the span's index** — a non-integer `from`, a negative `from`, `from === to`, `from > to`, `to` past `text.length`, two spans out of `from` order, two spans that overlap by one unit, a boundary between the two halves of a surrogate pair, and an unknown attribute — nine documents, nine errors, and a tenth carrying all nine faults reports nine.
 - **T1.25** (I83): for every width in the golden sweep, `measure` of a `raw`, a `notice`, a `rule` and a one-column `table` is the **same number** with `spans` and with the same block stripped of them — the assertion is on the pair, so a measurer that started reading `spans` fails here before any frame does.
 - **T1.27** (I99): a two-series line plot measures the same height with `hidden: true` on one series, on both, and on neither, at widths 20, 40 and 80; an annotation `hidden` likewise. In `test/unit/plot-hidden.test.ts`.
-- **T1.29** (I106): the arity table at the gate — a `gradient` with a slot pair is admitted, with a `colormap` on `progress` is admitted, with both backings is refused, with neither is refused; a `palette` with a pair, with a `colormap`, or with `bands` is refused; a `step` with `bands` 1, 9 or 2.5 is refused and with 2 or 8 admitted; `bands` on a `gradient` is refused; each refusal's message names the rule it broke.
+- **T1.29** (I106): the arity table at the gate — a `gradient` with a slot pair is admitted, with a `colormap` on `progress` is admitted, with both backings is refused, with neither is refused; a `centred` takes the same five rows and refuses `bands`, which is what says the rule written over *every fill but `palette`* reaches a fourth member rather than merely intending to; a `palette` with a pair, with a `colormap`, or with `bands` is refused; a `step` with `bands` 1, 9 or 2.5 is refused and with 2 or 8 admitted; `bands` on a `gradient` is refused; each refusal's message names the rule it broke.
 - **T1.30** (I107, I108): a span carrying `value` and `ramp` is refused; a span whose ramp has a `colormap` backing is refused while the same ramp on a `progress` block is admitted; a `ramp` on a hunk line is refused; a `progress` without `ramp` validates as it did.
 - **T1.26** (I87): a document carrying spans on all four members satisfies §5a's round trip: `validateDocument(JSON.parse(JSON.stringify(d)))` is valid and structurally equal.
 - **T1.31** (I110): a `terminal` whose line text contains `\x1b[31m`, `\x07` or `\u009b` is refused by `validateDocument`, each naming the line index; the same text with those characters replaced by U+FFFD is admitted.
@@ -3945,11 +3968,13 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.113** (I104): a collapsed scroll of 392 children renders exactly `⋯ +392 more` in unicode and `~ +392 more` in ASCII at 80 and 20 cells; the same box expanded and paged to its middle renders `⋯ N above, M below` with `N + M + interior === 392`; neither row contains `⏎` or the word `expand`.
 - **T2.117** (I106, I109, R-MOT-012): `RAMP_KEYS` has **seven** members — `since` joins them — and an eighth is refused by name; the union is the registry's twenty-three animated effects and `none`; a document carrying a ramped span on every carrier and a ramped `progress` satisfies §5a's round trip. *(Rewritten — R-MOT-012. As first written it asserted six keys and that `animate: "sweep"` is refused, which the registry's one-shots overturned; the rows were rewritten with the code and this line was not, which is a repair stopping at its own sentence.)*
 - **T2.117a** (I109, R-MOT-012): the union is the registry's twenty-three `animated-tone` ramps and `none`, **compared by equality** against `calcium-registry.json` — the first row in the tree that reads the registry, so the union cannot drift from the design in either direction.
-- **T2.117b** (I109, R-MOT-012): the registry's five `static-tone` ramps are `RampFill` values and not animations, and the two sets together are the registry's twenty-eight. The row that keeps a static ramp from being admitted as motion because both are called ramps.
+- **T2.117b** (I106, I109, R-MOT-012): the registry's five `static-tone` ramps are `RampFill` values and not animations, and the two sets together are the registry's twenty-eight. The row that keeps a static ramp from being admitted as motion because both are called ramps. **The projection is asserted by name and not by count** — `linear`→`gradient`, `centre`→`centred`, `map`→`gradient` with a `colormap`, `step`→`step`, `palette`→`palette` — so a registered fill with nowhere to land fails here. *(Rewritten — R-MOT-012. As first written it asserted `RAMP_FILLS` equals the three the type then carried, above a comment saying `centre` and `linear` are both `gradient`: a **correct sentence justifying the wrong decision**, true about the family and silent about the sampling, which is the one shape review cannot catch because the justification reads as right. Five registered fills, four values, and `gradient-centre` was a picture nothing in the tree could draw while an equality assertion said the sets agreed.)*
+- **T2.117h** (I106, R-MOT-012): `centred` folds and `gradient` does not — over an extent of 24 a centred ramp is **symmetric about the middle** and reaches `to` there, a linear one reaches `to` at the end, and the two differ in at least half their cells; the fold runs **before** the backing, so a centred colormap and a centred slot pair are the same shape — the colormap's mirror to **within one channel unit**, because `2/24` and `1 − 22/24` are equal in arithmetic and an ulp apart in floats, and interpolation carries that where rounding a mix does not. And `bands` on a `centred` is refused at the gate, for `gradient`'s reason.
 - **T2.117c** (I106): `animateT` stays within `[0, 1]` over every effect × `n ∈ {1, 2, 3, 10, 40}` × 130 ticks. The bound is what every consumer assumes and no consumer checks.
 - **T2.117d** (I109): a one-shot with no stamp rests at `0`, runs over its ticks and holds its final frame; a periodic effect ignores `since` entirely, so the stamp is meaningful exactly where it is read.
 - **T2.117e** (I109): each effect's **defining** property — the one that distinguishes it from its neighbours — rather than a shared bound every effect satisfies, which would leave eighteen arms interchangeable.
 - **T2.117f** (I106): the same arguments give the same answer, so nothing in an arm reads a clock or a random source. `hash01` is deterministic by construction and this is what holds it so.
+- **T2.117i** (I106, I109, R-MOT-012, §037): the **ink census** — every registered effect drawn as a frame in `design-surfaces.test.ts`, on four axes because §037 makes four claims: the fills across an extent, the ladder from 24 bits to 1, the animations at a fixed tick, and the **same effects through time**. The fourth is not symmetry: six effects are constant across the extent by construction — `animateT`'s own table says so — and a census indexed by position draws each of them exactly as it draws an effect that does nothing. **Read as foreground *and attributes***, because at one bit the answer is `from`'s class rather than a colour, and a mask keyed on `fg` alone drew the whole bottom rung as unstyled while reading as a frame that confirmed R-MOT-012.
 - **T2.117g** (I109): **two one-shots in one document time independently.** Stamped four ticks apart, their frames are four ticks apart and the later one is exactly where the earlier one was — asserted for every member of `RAMP_ONE_SHOTS`. The row that says the clock is read **per effect** from its own stamp and not once per frame from the render context: a single `since` on the context would make both frames equal, and every other row here would still pass.
 - **T2.114** (I105, I107): `TEXT_SPAN_KEYS` has nine members and admits `elide` and `ramp`; a `notice` under `info` with an `elide` span measures and renders identically to the same block without it at every width of the sweep; on a `step` notice the marked run ends in the marker at a width that cannot hold the row, and the runs outside it are byte-identical to the unfitted text.
 - **T2.34** (§3am): the same translation on a list item and on a blockquote lands the spans on the `notice`, on a heading on the `rule`'s `label`, and on a pipe-table cell on the `Cell` — the four members of I88 — and on a fenced block **does not** run: `**` inside a fence is seven characters.

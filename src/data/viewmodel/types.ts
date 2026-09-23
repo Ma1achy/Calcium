@@ -378,12 +378,29 @@ export const TEXT_SPAN_KEYS: ReadonlySet<string> = new Set(["from", "to", "bold"
 // --- ramps ----------------------------------------------------------------
 
 /**
- * The three fills, because they mean three things (§3am.2, I106): a `gradient`
- * says *this varies continuously*, a `step` says *these are N groups*, a
- * `palette` says *these are unordered identities*.
+ * The four fills, because they mean four things (§3am.2, I106, R-MOT-012): a
+ * `gradient` says *this varies continuously*, a `centred` says *this varies
+ * continuously and the middle is the extreme*, a `step` says *these are N
+ * groups*, a `palette` says *these are unordered identities*.
+ *
+ * **`centred` is §037's `gradient-centre`, and it was missing while a true
+ * sentence said it was not.** The registry registers five `static-tone` ramps
+ * and this type carried three, reconciled by *`centre` and `linear` are both
+ * `gradient`* — which is a fact about the family and says nothing about the
+ * sampling, so *brightest in the middle* and *two tones across a run* were one
+ * value and two different pictures. `centred` folds the argument to
+ * `1 − |2t − 1|` and hands it to whichever backing is declared, so it composes
+ * with a slot pair and with a colormap exactly as `gradient` does; the gate's
+ * arity rule is already written over *every fill but `palette`* and needs no
+ * arm for it. It takes no `bands`, for `gradient`'s reason: quantising a fold
+ * gives N groups whose order is not the extent's.
+ *
+ * Five registered records, four fills, two backings — `gradient-linear` and
+ * `gradient-map` are one fill distinguished by which backing it carries, and
+ * registering the backing as a second fill would put one axis in two places.
  */
-export type RampFill = "gradient" | "step" | "palette";
-export const RAMP_FILLS: readonly RampFill[] = Object.freeze(["gradient", "step", "palette"]);
+export type RampFill = "gradient" | "centred" | "step" | "palette";
+export const RAMP_FILLS: readonly RampFill[] = Object.freeze(["gradient", "centred", "step", "palette"]);
 
 /**
  * **The registry's twenty-three animated ramps, and `none`** (I109, R-MOT-012).
