@@ -784,14 +784,23 @@ somewhere the reader was not.
 
 *Copies cells* is the rendered line, windowed by column — `sliceCells`, which is
 the same walk `paint` uses to window a row, so a cluster straddling either edge is
-blanked rather than halved and a copy is never a row one cell wide.
+blanked rather than halved and a copy is never a row one cell wide. **A substring
+is the thing it is not**, and a painted line is what makes the two differ: three
+characters from column 2 of a line whose ink opens at column 0 are three bytes of
+the escape.
 
-**And the SGR comes off.** The frame's line carries the ink that painted it, and a
-clipboard is text: a paste into an editor of `\x1b[38;5;203m` is the rendering
-arriving where the content was asked for. So the slice is taken with its style —
-because `sliceCells` has to carry a style forward to know what a cut leaves — and
-the style is stripped from the result. Taking the unstyled line first would be the
-wrong order: the widths would be measured over text the frame never drew.
+**And the SGR comes off**, because a clipboard is text: a paste into an editor of
+`\x1b[38;5;203m` is the rendering arriving where the content was asked for.
+
+**The order of those two is not the rule, and it reads as though it is.** An
+earlier draft of this section said the strip must come *after* the slice, on the
+reasoning that widths taken over unstyled text are widths the frame never drew.
+Measured rather than argued, the two orders give the same string: `sliceCells`
+already skips escapes when it counts cells, so stripping first changes no width
+and moves no edge. A sentence about the order would forbid nothing while reading
+as though it forbade the defect, which is A03 §2's class arriving in prose. What
+can be wrong is **the input** — a copy taken over the block's source rather than
+over the frame's line is the defect, and it is `R-SEL-004`'s exception inverted.
 
 **This is the single exception `R-SEL-004` names.** Every other copy takes the
 source — prose unwrapped, code with its own indentation, a patch as a unified diff
@@ -868,7 +877,7 @@ than stranding the user.
 - **I41** — **`R-SEL-006`'s precedence is the order of two operations, not a case in a table.** The mark is already in the rendered text and the wash changes the ground under it, so *selection wins the ground while focus keeps its mark* is true by construction — including over a diff ground, where `patch`'s own inks are what the wash lands on and the `+`/`−` marks carry the diff. At 1-bit `selectionStyle` answers `inverse` and the focus mark survives, so neither fact rests on colour alone and no new rung is added.
 
 - **I42** — **A rectangular selection is a cell rectangle inside one block, and the block is the anchor's.** `R-SEL-007`'s *never crosses a block boundary* is enforced by **clipping the head**, not by refusing when the head has left: a containment test reads as the same rule and behaves as its opposite, making the selection vanish while the reader extends and reappear when they come back. The head's row is clamped into the anchor's block before a rectangle exists, and a head in another entry takes its direction from the transcript's order rather than from a row that means nothing in the anchor's space.
-- **I43** — **A rectangular copy is the rendered cells with the ink taken off.** It is the single exception `R-SEL-004` names to copy taking the source, so the window is `sliceCells` over the frame's own line — a straddling cluster blanked rather than halved (C09 I9) — and the SGR is stripped **after** the slice, because a slice measured over unstyled text would be measured over a line the frame never drew. The clipboard is text: an escape sequence in it is the rendering arriving where the content was asked for.
+- **I43** — **A rectangular copy is the rendered cells, and it carries no escape.** It is the single exception `R-SEL-004` names to copy taking the source, so its input is the line the **frame drew** and its window is `sliceCells` — a straddling cluster blanked rather than halved (C09 I9), which a substring cannot do and which only a painted line makes visible. The clipboard is text: an escape sequence in it is the rendering arriving where the content was asked for. **The order of the slice and the strip is not part of this**, and it reads as though it is: `sliceCells` already skips escapes when it counts cells, so both orders give the same string and a rule about the order would forbid nothing while reading as though it forbade the defect (A03 §2, §6e). The two clauses that can be violated are the input and the window.
 
 ---
 
@@ -917,7 +926,7 @@ than stranding the user.
 37. **Precedence expressed as an order needs no table** (I41). Painting the ground under text that already carries the mark makes *selection wins the ground, focus keeps its mark* true by construction, at every colour depth.
 
 38. **A boundary rule is kept by clipping, not by refusing** (I42, §6e). *Never crosses a block* and *both ends inside one block* read as one sentence and differ on every extend that leaves: one selects to the edge and stays, the other empties and comes back.
-39. **The one copy that takes the picture says so** (I43, §6e). Cells rather than source is `R-SEL-004`'s single exception, and the rule requires it to be explicit — so the mechanism lands here and the words land with the mode-label seam §6a parks.
+39. **The one copy that takes the picture says so** (I43, §6e). Cells rather than source is `R-SEL-004`'s single exception, and the rule requires it to be explicit — so the mechanism lands here and the words land with the mode-label seam §6a parks. **And a clause was dropped before it shipped**: *the strip comes after the slice* was measured, found to name a distinction that does not exist, and replaced by the two that do.
 
 ---
 
@@ -974,7 +983,7 @@ Fake heights, no rendering.
 - **T1.40b** (I41): `washRow` over a row already carrying a mark → the mark is still in the text and the ground is the selection's, which is *selection wins the ground while focus keeps its mark* as the order of two operations. At 1-bit the same call emits SGR 7 rather than a background, so neither fact rests on colour alone.
 
 - **T1.42** (I42, §6e): an anchor inside a three-row block and a head two rows past its last → the rectangle's rows end at the block's last row and the rectangle still exists. Extending further changes nothing, and bringing the head back inside gives the smaller rectangle again — asserted as a **clip**, since a containment test answers `null` for the same two heads and every assertion about the returned rows would be vacuous. The head in a later entry clamps to the last row, in an earlier entry to the first; an anchor in no block at all is `null`, which is the one refusal.
-- **T1.43** (I43, §6e): a rectangle over rendered lines carrying SGR → the text is the windowed cells, has no escape byte in it, and a double-width cluster straddling the right edge is a blank rather than half a glyph. **The vacuity control is in the row**: the same window over the *unstyled* lines gives different text, so the fixture can tell a slice taken over the frame's line from one taken over its content.
+- **T1.43** (I43, §6e): a rectangle over rendered lines carrying SGR → the text is the windowed cells, has no escape byte in it, and a double-width cluster straddling the right edge is a blank rather than half a glyph. **The control is a painted line and a substring taken from it**: the same columns as a `slice` give three bytes of the escape rather than the cells, so the fixture can tell a cell window from a byte window — which the order of the strip cannot, both orders being the same string.
 
 ### Tier 2 — contract / interface
 
