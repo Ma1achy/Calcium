@@ -28,6 +28,12 @@ const CMD =
   "npx vitest run test/unit/session-paint.test.ts test/unit/theme.test.ts " +
   "test/integration/theme.test.ts test/contract/theme.test.ts";
 const PAINT = "src/shell/paint.ts";
+// **`based` moved to L1** (C11 I25): C11's expanded detail needs the same
+// ground-behind-painted-lines pass, so the one implementation lives in
+// `presentation/blocks/paint.ts` and `shell/paint.ts` calls it. The two
+// mutations that cut into its body follow it; the ones about the session's
+// base sequence and the `--no-bg` flag stay, because those are L4's.
+const BASED = "src/presentation/blocks/paint.ts";
 const RESOLVE = "src/presentation/theme/resolve.ts";
 const HANDLERS = "src/shell/local/handlers.ts";
 const FRAMEWORK = "src/data/manifest/framework.ts";
@@ -69,7 +75,7 @@ const MUTATIONS = [
     // rest of the row is the terminal's — visible in a frame read and in
     // nothing else.
     name: "a reset returns to the terminal's default",
-    file: PAINT,
+    file: BASED,
     from: "    (line) => `${base}${line.replace(toDefault, (seq) => `${seq}${base}`)}${SGR_RESET}`,",
     to: "    (line) => `${base}${line}${SGR_RESET}`,",
     expect: "T1.23",
@@ -90,7 +96,7 @@ const MUTATIONS = [
     // `release()` for this; closing the row makes the state unreachable, and
     // this is the mutation that says so.
     name: "a painted row ends with the base live",
-    file: PAINT,
+    file: BASED,
     from: "(seq) => `${seq}${base}`)}${SGR_RESET}`,",
     to: "(seq) => `${seq}${base}`)}`,",
     expect: "T1.23b",

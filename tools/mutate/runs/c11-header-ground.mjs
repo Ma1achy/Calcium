@@ -64,8 +64,12 @@ const results = runPass({
       // still exactly where it was.
       name: "the body rows take the header's ground too",
       file: TABLE,
-      from: "    const emit = (spans: readonly Span[], marked = false): void => {\n      parts.push(paint([...lead(marked), ...clampSpans(spans, inner, ctx.capabilities)]));",
-      to: "    const emit = (spans: readonly Span[], marked = false): void => {\n      parts.push(paint([...lead(marked), ...clampSpans(spans, inner, ctx.capabilities)].map((sp) => ({ text: sp.text, style: { ...sp.style, background: background(\"surface.bgElev\", ctx.theme, ctx.capabilities).background } }))));",
+      // **Re-anchored when `emit` took the row's ground** (§5c): the row is
+      // built before it is painted now, so the mutation lands on the array
+      // rather than on the `parts.push` that consumed it. What it does is
+      // unchanged — every body row washed with the header's surface.
+      from: "      const row = [...lead(marked), ...clampSpans(spans, inner, ctx.capabilities)];",
+      to: "      const row = [...lead(marked), ...clampSpans(spans, inner, ctx.capabilities)].map((sp) => ({ text: sp.text, style: { ...sp.style, background: background(\"surface.bgElev\", ctx.theme, ctx.capabilities).background } }));",
       expect: "T2.161",
     },
     {

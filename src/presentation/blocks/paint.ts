@@ -10,7 +10,7 @@
  * them and lays out no text of its own (C09 §3).
  */
 import type { AmbiguousWidth } from "../text.js";
-import { SGR_RESET, sgr } from "../../terminal/escapes.js";
+import { SGR_RESET, sgr, toTerminalDefault } from "../../terminal/escapes.js";
 import { resolve, resolveBackground, resolveTone, type Style } from "../theme/index.js";
 import type { ColourRef, ColourValue, ResolvedTheme } from "../theme/index.js";
 import { COLORMAPS, continuousColour } from "../theme/colormap.js";
@@ -414,4 +414,85 @@ export function rows(lines: readonly string[]): readonly string[] {
 /** One row, as an element. */
 export function row(spans: readonly Span[]): readonly string[] {
   return rows([paint(spans)]);
+}
+
+/**
+ * The theme's background, re-established after every reset in a finished row
+ * (C22 I65, C10 I25).
+ *
+ * **One place repairs every reset a row contains**, which the walk did not expect
+ * and the implementation settled: `fitStyled` closes a cut line, `composite`
+ * writes two per composited row, `paint()` closes each styled run the *shell*
+ * draws — and by the time a row reaches here all of them are **inside this
+ * string**. `render-frame`'s per-row prefix is the one outside, and it is
+ * answered by the row's own leading base landing immediately after it.
+ *
+ * **And the set is not `SGR_RESET`, which is the correction the code made to the
+ * walk.** L1's rendered rows do not contain a full reset at all: Ink closes a
+ * foreground run with `39` and a background run with `49`, and the two are not
+ * equivalent here. `39` restores the default *foreground* and a base survives
+ * it untouched. **`49` restores the default *background* — the terminal's, not
+ * ours** — and a patch row ends with exactly that, so the padding after it would
+ * show through. The walk counted the sites that write `\x1b[0m` and the property
+ * that matters is *returns a channel to the terminal's default*, which `49`
+ * satisfies and `39` does not.
+ *
+ * **Blind spot, stated rather than left to be discovered**: a compound sequence
+ * carrying `0` or `49` among other parameters — `\x1b[0;1m` — is not repaired.
+ * Nothing in the tree emits one; `sgr()` never writes `0`, and Ink writes both
+ * closers alone. It is a measurement rather than a guarantee.
+ *
+ * **The base is a default and not a span**, which is the whole distinction: a
+ * wash sets `background` on the cells between two offsets, and every reset in
+ * the tree returns to the *terminal's* default rather than to ours. That is why
+ * a selection's wash still wins for its own cells — it sets the channel
+ * explicitly — and why the base resumes immediately after it closes.
+ *
+ * **And every row closes itself**, which is what the walk expected to need a
+ * lifecycle change for. A row that ended with the base live would leave an
+ * attribute on the wire that outlives the frame — the alternate screen restores
+ * cell contents and not SGR state — so `suspend()` and `release()` would each
+ * owe a reset, on the cursor shape's third-category path (C01 I20). Closing the
+ * row costs the same four bytes and owes nothing: no live attribute ever escapes
+ * a single row, so a handoff, a resize, an exit and a fault are all covered by
+ * the same rule and none of them needs to know a background exists.
+ *
+ * Nothing is written where a theme inherits: `sgr(NO_STYLE)` is empty, so the
+ * arm every session runs today costs one comparison per frame and produces byte
+ * for byte what it produced before.
+ *
+ * **L1, with two consumers** (C11 I25, C22 I65). It lived in `shell/paint.ts`
+ * for the session's own base colour; C11's expanded detail needs the same thing
+ * one layer down — a ground behind lines a child has already painted — and a
+ * second copy of an escape-repair pass is the class this module exists to hold
+ * one of. The mechanism is identical and only the base differs: a theme's
+ * inherited surface there, `surface.bgElev` here.
+ */
+/**
+ * A surface ref as the sequence that opens it — `based`'s `base`, from a token.
+ *
+ * Here so the one caller that needs a ground behind already-painted lines does
+ * not import `sgr` to build it: the escape and the token both stay on this side
+ * of the seam, and a theme that inherits the surface answers `NO_STYLE`, whose
+ * sequence is `""` — which `based` returns unchanged (C10 I25, `R-COL-004`).
+ */
+export function groundSequence(
+  ref: ColourRef,
+  theme: ResolvedTheme,
+  caps: TerminalCapabilities,
+): string {
+  return sgr(background(ref, theme, caps));
+}
+
+export function based(lines: readonly string[], base: string): readonly string[] {
+  if (base === "") return lines;
+  // **One regexp per call, not one per row.** `toTerminalDefault()` is a
+  // factory because a `/g` pattern carries `lastIndex` and a shared one is a
+  // hazard across independent scans — but `String.replace` with a global
+  // pattern sets `lastIndex` to 0 before it iterates and leaves it there, so
+  // reuse inside a single pass is safe and the allocation was per row per frame.
+  const toDefault = toTerminalDefault();
+  return lines.map(
+    (line) => `${base}${line.replace(toDefault, (seq) => `${seq}${base}`)}${SGR_RESET}`,
+  );
 }

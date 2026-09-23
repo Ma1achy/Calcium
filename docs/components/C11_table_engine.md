@@ -286,6 +286,16 @@ exactly that frame: its focused-and-selected row is one span run of `bg-selectio
 being read — and R-SEL-006, the rule the comment reached for, is silent on the mark's **cell** and
 speaks only about which ground wins.
 
+**At 1-bit the band runs the whole row, and that is the rung to look at.** The guard is the
+header's — *no ground, so no padding either* — and it asks whether the **surface** resolved, not
+whether colour is available: `selection` and `focusGround` answer **inverse** at `colourDepth: 1`
+rather than `NO_STYLE`, so a focused or selected row is a full-width reverse-video band there and
+its `▸` is inverted with it. That is R-SEL-006's own rung drawn exactly — *at 1-bit the selection
+becomes reverse video while the focus mark persists* — and the mark persists as a mark, not as an
+un-inverted cell: it is still the only glyph in the gutter and still the thing that says *here*
+inside an extent. Where a surface genuinely does not resolve, `bgElev` on a theme that inherits it,
+nothing is padded and nothing is drawn (I24, I25, `R-COL-004`).
+
 **The block already answered this once, the other way.** The header row takes `bgElev` *across the
 whole row, gutter included* (I24, §073) on the reasoning that a header is a surface the rows sit
 under, so a ground stopping at the text would say *these words* are the surface. That argument is

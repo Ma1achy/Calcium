@@ -244,14 +244,14 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.fmx.io/family: vola
 · r1 at rest · r2 focused and selected · r3 selected — selection wins the ground, the head keeps ▸
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   commit   run     state
 ........................................   a3f9b21  digit~  runni~
-..BBBBBBBBBBBBBBBBBBBBBBB............... > 7c2d4e1  decod~  succe~
-..BBBBBBBBBBBBBBBBBBBBBBB...............   2e8a04c  graph~  failed
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB > 7c2d4e1  decod~  succe~
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   2e8a04c  graph~  failed
   A = bg 48;2;34;34;34
   B = bg 48;2;38;64;87
 
 · r1 focused alone — focusGround and the mark · r2 and r3 at rest
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   commit   run     state
-..BBBBBBBBBBBBBBBBBBBBBBB............... > a3f9b21  digit~  runni~
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB > a3f9b21  digit~  runni~
 ........................................   7c2d4e1  decod~  succe~
 ........................................   2e8a04c  graph~  failed
   A = bg 48;2;34;34;34
@@ -283,6 +283,26 @@ a tape — the labels, not the marks
 a rule — no source, so it declines
   drawn  -- files -------------------------------
   copy   — declines, and is absent from the join
+
+── §82 · no pushed views — a row expanded in place, and the rows below carrying on
+· r1 focused and expanded — the ground opens under ▸, the detail takes bgElev, and r2 beneath it takes none
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   uuid     family            status
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB > a3f9b21  digit-classifier  running
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     open
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
+........................................   7c2d4e1  decoder-zoom      succeeded
+  A = bg 48;2;34;34;34
+  B = bg 48;2;46;46;46
+
+· r1 expanded with nothing focused — the detail is grounded and the row above it is not: the ground follows expansion
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   uuid     family            status
+........................................   a3f9b21  digit-classifier  running
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     open
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
+........................................   7c2d4e1  decoder-zoom      succeeded
+  A = bg 48;2;34;34;34
 
 ── §19 · the resolved keymap, the reader's own rung first
 -- prompt — where you are               
@@ -673,14 +693,14 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 · r1 at rest · r2 focused and selected · r3 selected — selection wins the ground, the head keeps ▸
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   commit   run     state
 ................................................................................   a3f9b21  digit~  runni~
-..BBBBBBBBBBBBBBBBBBBBBBB....................................................... > 7c2d4e1  decod~  succe~
-..BBBBBBBBBBBBBBBBBBBBBBB.......................................................   2e8a04c  graph~  failed
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB > 7c2d4e1  decod~  succe~
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   2e8a04c  graph~  failed
   A = bg 48;2;34;34;34
   B = bg 48;2;38;64;87
 
 · r1 focused alone — focusGround and the mark · r2 and r3 at rest
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   commit   run     state
-..BBBBBBBBBBBBBBBBBBBBBBB....................................................... > a3f9b21  digit~  runni~
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB > a3f9b21  digit~  runni~
 ................................................................................   7c2d4e1  decod~  succe~
 ................................................................................   2e8a04c  graph~  failed
   A = bg 48;2;34;34;34
@@ -712,6 +732,24 @@ a tape — the labels, not the marks
 a rule — no source, so it declines
   drawn  -- files ---------------------------------------------------
   copy   — declines, and is absent from the join
+
+── §82 · no pushed views — a row expanded in place, and the rows below carrying on
+· r1 focused and expanded — the ground opens under ▸, the detail takes bgElev, and r2 beneath it takes none
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA      uuid     family            status
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB > v  a3f9b21  digit-classifier  running
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
+................................................................................      7c2d4e1  decoder-zoom      succeeded
+  A = bg 48;2;34;34;34
+  B = bg 48;2;46;46;46
+
+· r1 expanded with nothing focused — the detail is grounded and the row above it is not: the ground follows expansion
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA      uuid     family            status
+................................................................................   v  a3f9b21  digit-classifier  running
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
+................................................................................      7c2d4e1  decoder-zoom      succeeded
+  A = bg 48;2;34;34;34
 
 ── §19 · the resolved keymap, the reader's own rung first
 -- prompt — where you are                                                       
@@ -1131,6 +1169,23 @@ a rule — no source, so it declines
   drawn  ── files ───────────────────────────────
   copy   — declines, and is absent from the join
 
+── §82 · no pushed views — a row expanded in place, and the rows below carrying on
+· r1 focused and expanded — the ground opens under ▸, the detail takes bgElev, and r2 beneath it takes none
+........................................   uuid     family            status
+........................................ ▸ a3f9b21  digit-classifier  running
+........................................     open
+........................................     node  gpu-04.fmx.internal · 2×A100
+........................................     mr    !1248  auto-merged
+........................................   7c2d4e1  decoder-zoom      succeeded
+
+· r1 expanded with nothing focused — the detail is grounded and the row above it is not: the ground follows expansion
+........................................   uuid     family            status
+........................................   a3f9b21  digit-classifier  running
+........................................     open
+........................................     node  gpu-04.fmx.internal · 2×A100
+........................................     mr    !1248  auto-merged
+........................................   7c2d4e1  decoder-zoom      succeeded
+
 ── §19 · the resolved keymap, the reader's own rung first
 ── prompt — where you are               
 ⇧⏎      insertNewline
@@ -1549,6 +1604,21 @@ a rule — no source, so it declines
   drawn  ── files ───────────────────────────────────────────────────
   copy   — declines, and is absent from the join
 
+── §82 · no pushed views — a row expanded in place, and the rows below carrying on
+· r1 focused and expanded — the ground opens under ▸, the detail takes bgElev, and r2 beneath it takes none
+................................................................................      uuid     family            status
+................................................................................ ▸ ▿  a3f9b21  digit-classifier  running
+................................................................................     node  gpu-04.fmx.internal · 2×A100
+................................................................................     mr    !1248  auto-merged
+................................................................................      7c2d4e1  decoder-zoom      succeeded
+
+· r1 expanded with nothing focused — the detail is grounded and the row above it is not: the ground follows expansion
+................................................................................      uuid     family            status
+................................................................................   ▿  a3f9b21  digit-classifier  running
+................................................................................     node  gpu-04.fmx.internal · 2×A100
+................................................................................     mr    !1248  auto-merged
+................................................................................      7c2d4e1  decoder-zoom      succeeded
+
 ── §19 · the resolved keymap, the reader's own rung first
 ── prompt — where you are                                                       
 ⇧⏎      insertNewline
@@ -1938,14 +2008,14 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.fmx.io/family: vola
 · r1 at rest · r2 focused and selected · r3 selected — selection wins the ground, the head keeps ▸
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   commit   run     state
 ........................................   a3f9b21  digit…  runni…
-..BBBBBBBBBBBBBBBBBBBBBBB............... ▸ 7c2d4e1  decod…  succe…
-..BBBBBBBBBBBBBBBBBBBBBBB...............   2e8a04c  graph…  failed
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB ▸ 7c2d4e1  decod…  succe…
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   2e8a04c  graph…  failed
   A = bg 48;2;34;34;34
   B = bg 48;2;38;64;87
 
 · r1 focused alone — focusGround and the mark · r2 and r3 at rest
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   commit   run     state
-..BBBBBBBBBBBBBBBBBBBBBBB............... ▸ a3f9b21  digit…  runni…
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB ▸ a3f9b21  digit…  runni…
 ........................................   7c2d4e1  decod…  succe…
 ........................................   2e8a04c  graph…  failed
   A = bg 48;2;34;34;34
@@ -1977,6 +2047,26 @@ a tape — the labels, not the marks
 a rule — no source, so it declines
   drawn  ── files ───────────────────────────────
   copy   — declines, and is absent from the join
+
+── §82 · no pushed views — a row expanded in place, and the rows below carrying on
+· r1 focused and expanded — the ground opens under ▸, the detail takes bgElev, and r2 beneath it takes none
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   uuid     family            status
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB ▸ a3f9b21  digit-classifier  running
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     open
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
+........................................   7c2d4e1  decoder-zoom      succeeded
+  A = bg 48;2;34;34;34
+  B = bg 48;2;46;46;46
+
+· r1 expanded with nothing focused — the detail is grounded and the row above it is not: the ground follows expansion
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   uuid     family            status
+........................................   a3f9b21  digit-classifier  running
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     open
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
+........................................   7c2d4e1  decoder-zoom      succeeded
+  A = bg 48;2;34;34;34
 
 ── §19 · the resolved keymap, the reader's own rung first
 ── prompt — where you are               
@@ -2367,14 +2457,14 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 · r1 at rest · r2 focused and selected · r3 selected — selection wins the ground, the head keeps ▸
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   commit   run     state
 ................................................................................   a3f9b21  digit…  runni…
-..BBBBBBBBBBBBBBBBBBBBBBB....................................................... ▸ 7c2d4e1  decod…  succe…
-..BBBBBBBBBBBBBBBBBBBBBBB.......................................................   2e8a04c  graph…  failed
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB ▸ 7c2d4e1  decod…  succe…
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   2e8a04c  graph…  failed
   A = bg 48;2;34;34;34
   B = bg 48;2;38;64;87
 
 · r1 focused alone — focusGround and the mark · r2 and r3 at rest
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   commit   run     state
-..BBBBBBBBBBBBBBBBBBBBBBB....................................................... ▸ a3f9b21  digit…  runni…
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB ▸ a3f9b21  digit…  runni…
 ................................................................................   7c2d4e1  decod…  succe…
 ................................................................................   2e8a04c  graph…  failed
   A = bg 48;2;34;34;34
@@ -2406,6 +2496,24 @@ a tape — the labels, not the marks
 a rule — no source, so it declines
   drawn  ── files ───────────────────────────────────────────────────
   copy   — declines, and is absent from the join
+
+── §82 · no pushed views — a row expanded in place, and the rows below carrying on
+· r1 focused and expanded — the ground opens under ▸, the detail takes bgElev, and r2 beneath it takes none
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA      uuid     family            status
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB ▸ ▿  a3f9b21  digit-classifier  running
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
+................................................................................      7c2d4e1  decoder-zoom      succeeded
+  A = bg 48;2;34;34;34
+  B = bg 48;2;46;46;46
+
+· r1 expanded with nothing focused — the detail is grounded and the row above it is not: the ground follows expansion
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA      uuid     family            status
+................................................................................   ▿  a3f9b21  digit-classifier  running
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
+................................................................................      7c2d4e1  decoder-zoom      succeeded
+  A = bg 48;2;34;34;34
 
 ── §19 · the resolved keymap, the reader's own rung first
 ── prompt — where you are                                                       

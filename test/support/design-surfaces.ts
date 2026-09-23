@@ -732,6 +732,75 @@ const selectionGrounds = (width: number, capabilities: TerminalCapabilities, the
   ];
 };
 
+/**
+ * §082 — **there are no pushed views**, and the ground is what makes that
+ * readable without a frame.
+ *
+ * The section's argument is architectural and its picture is one table: a row
+ * expanded in place, with the rows below carrying on underneath. Two claims in
+ * it are about a ground's **extent**, which is exactly what `maskOf` shows and
+ * what no assertion about a string can — `R-BLK-941`'s focused row opens its
+ * ground at the block's edge, under the `▸`, and its detail sits on `bgElev`
+ * to the same edge while the row after it carries nothing.
+ *
+ * **Two passes, because expansion is not focus.** One focus can only show the
+ * detail under the head, where the head's own ground is directly above it and a
+ * reader cannot tell a detail that took `bgElev` from one that inherited. The
+ * second pass expands a row nothing is focused on: the detail is grounded and
+ * the row above it is not, which is the pair that says the ground follows
+ * **expansion** (C11 I9 — block state, not context).
+ */
+const EXPANSION_TABLE = block({
+  kind: "table",
+  id: "ps",
+  columns: [
+    { key: "open", label: "", align: "left" as const, priority: 1, minWidth: 1, sortable: false, role: "expand" as const },
+    { key: "id", label: "uuid", align: "left" as const, priority: 2, minWidth: 7, sortable: false },
+    { key: "name", label: "family", align: "left" as const, priority: 3, minWidth: 16, sortable: false },
+    { key: "state", label: "status", align: "left" as const, priority: 4, minWidth: 9, sortable: false },
+  ],
+  rows: [
+    {
+      id: "r1",
+      cells: { open: { text: "" }, id: { text: "a3f9b21" }, name: { text: "digit-classifier" }, state: { text: "running" } },
+      expanded: true,
+      detail: [
+        {
+          kind: "keyValue" as const,
+          id: "r1-detail",
+          rows: [
+            { label: "node", value: "gpu-04.fmx.internal · 2×A100" },
+            { label: "mr", value: "!1248  auto-merged" },
+          ],
+        },
+      ],
+    },
+    { id: "r2", cells: { open: { text: "" }, id: { text: "7c2d4e1" }, name: { text: "decoder-zoom" }, state: { text: "succeeded" } } },
+  ],
+}) as unknown as Block;
+
+const expansionGrounds = (
+  width: number,
+  capabilities: TerminalCapabilities,
+  theme: ResolvedTheme,
+): readonly string[] => {
+  const pass = (rowId: string | null, caption: string): readonly string[] => {
+    const kit = measurable({
+      theme,
+      capabilities,
+      ...(rowId === null ? {} : { focus: { blockId: "ps", rowId } }),
+      definitions: [tableDefinition] as never,
+    });
+    const lines = kit.renderToLines(EXPANSION_TABLE, width);
+    const grid = styledScreenFrom([lines.join("\n")], { columns: width, rows: lines.length });
+    return [caption, ...maskOf(grid), ""];
+  };
+  return [
+    ...pass("r1", "· r1 focused and expanded — the ground opens under ▸, the detail takes bgElev, and r2 beneath it takes none"),
+    ...pass(null, "· r1 expanded with nothing focused — the detail is grounded and the row above it is not: the ground follows expansion"),
+  ];
+};
+
 export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 95, name: "a tape, where a row of peers would shed", rows: draw(TAPE) },
   { section: 42, name: "widgets — a row of peers that sheds", rows: draw(PILLS) },
@@ -754,6 +823,7 @@ export const SURFACES: readonly Surface[] = Object.freeze([
   ]) },
   { section: 44, name: "two selections, one clipboard — the four grounds R-SEL-006 names", rows: selectionGrounds },
   { section: 58, name: "what copy takes — the source beside the rendering", rows: copyCensus },
+  { section: 82, name: "no pushed views — a row expanded in place, and the rows below carrying on", rows: expansionGrounds },
   { section: 19, name: "the resolved keymap, the reader's own rung first", rows: keymapCensus },
   { section: 21, name: "the scrollbar — the set, and the bar beside a box", rows: (w, c, t) => [
     ...scrollbarCensus(w, c),

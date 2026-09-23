@@ -20,7 +20,14 @@ const drawnOrder = (block: Table, width = 160): readonly string[] =>
   tableElements(block, width, registry.measure).map((e) => e.id);
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { psColumns, psTable } from "../support/blocks.js";
-import { MONO_UNICODE_CAPS, measurable, visible } from "../support/render.js";
+import { DARK_THEME, FULL_CAPS, MONO_UNICODE_CAPS, measurable, visible } from "../support/render.js";
+import { styledScreenFrom } from "../support/styled-screen.js";
+import { background, focusStyle } from "../../src/presentation/blocks/paint.js";
+import { sgr } from "../../src/terminal/escapes.js";
+
+/** `sgr(style)` without the frame, so an expected ground reads as the model's channel. */
+const params = (style: Parameters<typeof sgr>[0]): string =>
+  sgr(style).replace(/^\u001b\[/u, "").replace(/m$/u, "");
 import { glyphFor } from "../../src/presentation/blocks/glyphs.js";
 import { cells } from "../../src/presentation/text.js";
 import type { Cell, ColumnDef, Table } from "../../src/data/viewmodel/index.js";
@@ -585,11 +592,91 @@ describe("C11 tier 1 — planColumns", () => {
     }
   });
 
-  // **Spec-first: §5c and I25 land as rows before the renderer moves.** Both
-  // assert a ground's *extent*, which is a thing a frame shows and a count does
-  // not, so each carries its control in the spec text rather than here.
-  it.todo("T1.29 (I14, §5c): a focused row's ground opens at the block's edge and covers the focus mark's cell — not deferred on a component; the spec landed this commit and the renderer follows in the next");
-  it.todo("T1.30 (I25): an expanded row's detail carries `bgElev` the block's whole width, and the row beneath it carries none — not deferred on a component; the spec landed this commit and the renderer follows in the next");
+  // **A ground's EXTENT is what these two read, and only a grid can answer it.**
+  // Every assertion about `▸` — which row carries it, what tone it takes,
+  // whether it survives 1-bit — passes whether the mark's cell is on the row's
+  // ground or on the page beside it, because the glyph, the column and the ink
+  // are identical either way. One cell of background is the whole difference,
+  // so the rows below fold the frame into a styled grid and compare cells.
+  const gridOf = (block: Table, width: number, focus: { blockId: string; rowId: string } | null) => {
+    const kit = measurable({
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      ...(focus === null ? {} : { focus }),
+      definitions: [tableDefinition],
+    });
+    const lines = kit.renderToLines(block, width);
+    return styledScreenFrom([lines.join("\n")], { columns: width, rows: lines.length });
+  };
+  /** The row a grid holds whose text contains `needle`. */
+  const rowWith = (grid: ReturnType<typeof gridOf>, needle: string) =>
+    grid.find((r) => r.map((c) => c.ch).join("").includes(needle));
+
+  it("T1.29 (I14, §5c): a focused row's ground opens at the block's edge and covers the focus mark's cell", () => {
+    const table = psTable({ rows: 3 });
+    const focused = rowWith(gridOf(table, 80, { blockId: "ps", rowId: "r1" }), "a3f9b21");
+    expect(focused, "the focused row was found").toBeDefined();
+    if (focused === undefined) return;
+    const mark = focused.findIndex((c) => c.ch === "▸");
+    expect(mark, "the mark is in the gutter, at the block's edge").toBe(0);
+
+    // **The claim is the ground, not the ink.** The mark's cell carries the same
+    // background as the cells beside it and the background is real — two halves,
+    // because "same as its neighbour" is satisfied by a row with no ground at all.
+    const ground = focused[0]?.style.bg ?? "";
+    expect(ground, "the mark's cell is grounded").not.toBe("");
+    expect(ground, "and it is the focus ground").toBe(params(focusStyle(DARK_THEME, FULL_CAPS)));
+    const bgs = new Set(focused.map((c) => c.style.bg));
+    expect([...bgs], "one ground across the whole row, gutter to edge").toEqual([ground]);
+
+    // **The control, and it is the row this could not otherwise be told from.**
+    // At rest the same block draws the same columns in the same places with
+    // nothing in the gutter and no ground anywhere — without it, a renderer
+    // that grounded every gutter unconditionally passes every line above.
+    const rest = rowWith(gridOf(table, 80, null), "a3f9b21");
+    expect(rest, "the control row was found").toBeDefined();
+    expect(new Set((rest ?? []).map((c) => c.style.bg)), "no ground at rest").toEqual(new Set([""]));
+  });
+
+  it("T1.30 (I25): an expanded row's detail carries `bgElev` the block's whole width, and the row beneath it carries none", () => {
+    // **Asserted with nothing focused**, so the detail's ground is shown to
+    // follow *expansion* (C11 I9 — block state) rather than being the head's
+    // ground spilling downward, which one focus on the row above cannot separate.
+    const table = psTable({ rows: 3, expanded: [1], detail: true });
+    const grid = gridOf(table, 80, null);
+    const elev = params(background("surface.bgElev", DARK_THEME, FULL_CAPS));
+    expect(elev, "bgElev is a real ground at 24-bit").toMatch(/^48;/u);
+
+    const rowText = (r: (typeof grid)[number]): string => r.map((c) => c.ch).join("");
+    const headAt = grid.findIndex((r) => rowText(r).includes("a3f9b21"));
+    const nextAt = grid.findIndex((r) => rowText(r).includes("7c2d4e1"));
+    expect(headAt, "the expanded row was found").toBeGreaterThanOrEqual(0);
+    expect(nextAt, "and the row after its detail").toBeGreaterThan(headAt + 1);
+
+    const detail = grid.slice(headAt + 1, nextAt);
+    expect(detail.length, "the detail drew rows").toBeGreaterThan(0);
+    for (const [i, r] of detail.entries()) {
+      expect(new Set(r.map((c) => c.style.bg)), `detail row ${String(i)} is bgElev, edge to edge`).toEqual(
+        new Set([elev]),
+      );
+    }
+
+    // **The second half is the one §082 rests on.** A ground that leaked past
+    // the detail would draw the pushed frame the section exists to refuse, and
+    // the row above is the other end of the same claim.
+    expect(new Set(rowText(grid[nextAt] ?? []) === "" ? [] : (grid[nextAt] ?? []).map((c) => c.style.bg)),
+      "the row beneath the detail carries none").toEqual(new Set([""]));
+    expect(new Set((grid[headAt] ?? []).map((c) => c.style.bg)),
+      "and neither does the unfocused row the detail belongs to").toEqual(new Set([""]));
+
+    // **The control**: with `expanded` cleared those lines are absent entirely
+    // rather than merely unpainted, so the row cannot pass by measuring a
+    // renderer that draws no detail at all.
+    const flat = gridOf(psTable({ rows: 3, detail: true }), 80, null);
+    const flatHead = flat.findIndex((r) => rowText(r).includes("a3f9b21"));
+    const flatNext = flat.findIndex((r) => rowText(r).includes("7c2d4e1"));
+    expect(flatNext - flatHead, "collapsed, the two rows are adjacent").toBe(1);
+  });
 
   it("T1.25 (I22): `maxWidth` on a column with no `flex` cannot change a plan, at any width", () => {
     const drop = (c: ColumnDef): ColumnDef => {

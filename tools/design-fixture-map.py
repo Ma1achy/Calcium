@@ -85,7 +85,7 @@ M = {
  79:("frame","theme-tokens.test.ts","tones and surfaces, across ten themes — the corpus's first frame of colour"),
  80:("app","examples/","Prism — the rework in one sentence"),
  81:("app","examples/","Prism — /ps"),
- 82:("owed","M9","no pushed views"),
+ 82:("frame","M9","no pushed views — a row expanded in place, `design-surfaces` §082, two passes. The section's argument is architectural and its picture is one table; what it settles that the tree did not hold is a ground's **extent** — `R-BLK-941` opens the focused row's ground under the `▸` and puts the detail on `bgElev`, where the tree painted the gutter on the page and the detail on nothing. C11 §5c and I25. The second pass expands a row nothing is focused on, which is what says the detail's ground follows expansion rather than the head's spilling downward"),
  83:("app","examples/","Prism — submit"),
  84:("app","examples/","Prism — logs, as a block"),
  85:("app","examples/","Prism — the six-hour run"),

@@ -66,8 +66,12 @@ const results = runPass({
   run,
   control: {
     file: TABLE,
-    from: "      parts.push(paint([...lead(marked), ...clampSpans(spans, inner, ctx.capabilities)]));",
-    to: "      parts.push(paint([...clampSpans(spans, inner, ctx.capabilities)]));",
+    // **Re-anchored when the lead took the row's ground** (§5c): `emit` now
+    // builds the row before painting it, because the ground has to go on with
+    // the gutter included. The control is unchanged in what it does — no lead
+    // on any row — and only the line it cuts moved.
+    from: "      const row = [...lead(marked), ...clampSpans(spans, inner, ctx.capabilities)];",
+    to: "      const row = [...clampSpans(spans, inner, ctx.capabilities)];",
     why: "with no lead on any row the content edge moves in every frame together, the columns no longer sit under their header, and every suite that reads a table row goes with it",
   },
   mutations: [
@@ -99,6 +103,29 @@ const results = runPass({
       from: "              { text: blank },\n              ...spans,",
       to: "        ...spans,",
       expect: "T2.11",
+    },
+    {
+      // **§5c, and it is invisible to every row that reads the mark.** The lead
+      // painted on the page rather than on the row's ground draws the *same
+      // glyph in the same column in the same accent*; what moves is one cell of
+      // background, which is a thing `maskOf` shows and a string assertion does
+      // not. This is the divergence §082 found, reinstated.
+      name: "the lead is painted on the page rather than on the row's ground",
+      file: TABLE,
+      from: "      parts.push(paint(grounded(tail === 0 ? row : [...row, { text: \" \".repeat(tail) }], ground)));",
+      to: "      parts.push(paint([...lead(marked), ...grounded([...clampSpans(spans, inner, ctx.capabilities), { text: \" \".repeat(tail) }], ground)]));",
+      expect: "T1.29",
+    },
+    {
+      // **I25: the detail takes no ground.** Every count, every width and every
+      // row's text is unchanged — the detail is in the same place with the same
+      // content — and the surface that says *inside this row* is gone. A
+      // mutation that fails nothing here would be a finding about §082's frame.
+      name: "the expanded detail takes no ground",
+      file: TABLE,
+      from: "          : groundSequence(\"surface.bgElev\", ctx.theme, ctx.capabilities);",
+      to: "          : \"\";",
+      expect: "T1.30",
     },
     {
       // **The sentinel by size.** Green on every frame the tree draws today,
@@ -164,8 +191,12 @@ const results = runPass({
       // detail child's left edge. T2.11 grew the assertion.
       name: "a detail child forgets the gutter",
       file: TABLE,
-      from: "          parts.push(line === \"\" ? \"\" : `${blank}${fitRow(pad + line, inner)}`);",
-      to: "          parts.push(line === \"\" ? \"\" : fitRow(pad + line, inner));",
+      // **Re-anchored onto the grounded path** (I25): the detail now pads and
+      // grounds its line, so the gutter is spent inside `based`'s argument and
+      // the ungrounded branch below it is the 1-bit rung. Anchored on the
+      // coloured one, which is the rung every suite in this run's command draws.
+      from: "          const [drawn] = based([`${blank}${body}${\" \".repeat(tail)}`], elevBase);",
+      to: "          const [drawn] = based([`${body}${\" \".repeat(tail)}`], elevBase);",
       expect: "T2.11",
     },
   ],

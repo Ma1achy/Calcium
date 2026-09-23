@@ -23,9 +23,9 @@ import { NO_SPAN } from "../../data/viewmodel/index.js";
 import { atLeastOne, insetWidth, normaliseWidth, sequenceHeight } from "../../data/viewmodel/index.js";
 import type { Block, MeasureFn, Table, TableRow } from "../../data/viewmodel/index.js";
 import { cells } from "../text.js";
-import { fitRow } from "../rows.js";
+import { fitRow, rowCells } from "../rows.js";
 import { glyphCells, glyphFor } from "../blocks/glyphs.js";
-import { background, clampSpans, focusStyle, paint, selectionStyle, tone, withBackground, type Span } from "../blocks/paint.js";
+import { background, based, clampSpans, focusStyle, groundSequence, paint, selectionStyle, tone, withBackground, type Span } from "../blocks/paint.js";
 import type { BlockDefinition, NavElement, Rendered, RenderContext, Windowed } from "../blocks/types.js";
 import { emptySpans, headerSpans, markedSeriesColumns, rowSpans } from "./cells.js";
 import { detailBlocks, isExpandable } from "./detail.js";
@@ -349,18 +349,37 @@ export const tableDefinition: BlockDefinition<Table> = {
     // when one was not; a detail child is the only part that could be the
     // second, and since F1209 it cannot be.
     const parts: string[] = [];
-    // **The lead is painted on the page, not on the row's ground.** The mark
-    // says *which* row; the ground says *what the row is*. A ground that ran
-    // under the gutter would make the two one block of colour, which is the
-    // frame §044 does not draw.
+    // **The lead takes the row's ground** (§5c, I14, I15). It used to be painted
+    // on the page, on the argument that *a ground running under the gutter
+    // would make the two one block of colour, which is the frame §044 does not
+    // draw* — and §044 draws exactly that frame: its focused-and-selected row is
+    // one run of `bg-selection` opening with `▸ `. Four more figures agree
+    // across three grounds (§082, §072, §043, §071). The sentence was true about
+    // a risk and false about its source, and R-SEL-006 is silent on the mark's
+    // cell. The header has always run its ground gutter-inclusive (I24, §073)
+    // and one block cannot hold two answers about one column.
     const blank = " ".repeat(GUTTER_CELLS); // cells-ok — the reserved gutter
     const lead = (marked: boolean): readonly Span[] =>
       marked
         ? [{ text: `${glyphFor("focus", ctx.capabilities)} `, style: tone("accent", ctx.theme, ctx.capabilities) }]
         : [{ text: blank }];
     /** One exit, so no emitted row can forget the gutter (I15). */
-    const emit = (spans: readonly Span[], marked = false): void => {
-      parts.push(paint([...lead(marked), ...clampSpans(spans, inner, ctx.capabilities)]));
+    const emit = (spans: readonly Span[], marked = false, ground: Span["style"] | null = null): void => {
+      const row = [...lead(marked), ...clampSpans(spans, inner, ctx.capabilities)];
+      if (ground === null) {
+        parts.push(paint(row));
+        return;
+      }
+      // **A ground runs to the block's edge, so the row is padded to it** — the
+      // header's arithmetic (I24), for the same reason and on the same guard:
+      // the pad exists only to give the ground cells to paint, so it is taken
+      // here where a ground is known and nowhere else. Reading §082's frame is
+      // what found this: the ground opened under the mark correctly and stopped
+      // at the last column, which the mask shows and a string assertion about
+      // the mark cannot.
+      const drawn = row.reduce((n, sp) => n + cells(sp.text, ctx.capabilities.ambiguousWidth), 0);
+      const tail = Math.max(0, width - drawn); // cells-ok — the row's own residue
+      parts.push(paint(grounded(tail === 0 ? row : [...row, { text: " ".repeat(tail) }], ground)));
     };
 
     if (hasHeader(block)) {
@@ -441,8 +460,12 @@ export const tableDefinition: BlockDefinition<Table> = {
           ? "focusGround"
           : undefined;
       const spans = rowSpans(block, row, plan, ctx, { expandable, on, marked });
+      // **The ground goes to `emit`, not to the spans** (§5c). Applied here it
+      // stopped at the gutter, which is the divergence: the reserved column is
+      // part of the row it leads, so the ground has to be put on where the
+      // gutter is known and that is the one exit.
       const ground = on === "selection" ? wash : on === "focusGround" ? focusGround : null;
-      emit(ground === null ? spans : grounded(spans, ground), isHead);
+      emit(spans, isHead, ground);
 
       if (row.expanded !== true) continue;
       // **A count, not a span.** Each detail child goes through `renderChild`,
@@ -459,11 +482,44 @@ export const tableDefinition: BlockDefinition<Table> = {
       // row; a child that answers an element is its padded box, as before.
       const inset = inner - insetWidth(inner); // cells-ok — the detail's own indent, inside the gutter
       const pad = " ".repeat(inset);
+      // **The detail sits on `bgElev`, the block's whole width, gutter
+      // included** (I25, §082 `R-BLK-941`). `based` and not a span pass,
+      // because a child has already painted its own line and the ground has to
+      // survive every reset inside it — which is the mechanism `shell/paint.ts`
+      // has used for the session's base colour since F889, moved down to L1 so
+      // there is one of it. **A blank line stays blank**: a ground on a row the
+      // detail did not draw would run past the detail's own extent, and I25's
+      // second half — *the rows below carry on underneath* — is the half §082
+      // rests on, because a ground that leaked downward draws the pushed frame
+      // the section refuses.
+      // **No ground, so no padding either** — the header's own guard, and for
+      // its reason (I24): the pad exists only to give the ground cells to
+      // paint, and padding a monochrome frame puts trailing blanks in the
+      // corpus for a surface that is not there.
+      const detailElev = background("surface.bgElev", ctx.theme, ctx.capabilities);
+      const elevBase =
+        detailElev.background === undefined
+          ? ""
+          : groundSequence("surface.bgElev", ctx.theme, ctx.capabilities);
       detailBlocks(block, row, plan, ctx.capabilities).forEach((child) => {
         // **Cut to the width** (F1211): a detail child answering a row wider
         // than its inset used to become a padded Ink box, which wrapped.
         for (const line of ctx.renderChild(child, insetWidth(inner))) {
-          parts.push(line === "" ? "" : `${blank}${fitRow(pad + line, inner)}`);
+          if (line === "") {
+            // **A blank line stays blank** (I25): a ground on a row the detail
+            // did not draw runs past the detail's own extent, and *the rows
+            // below carry on underneath* is the half §082 rests on.
+            parts.push("");
+            continue;
+          }
+          const body = fitRow(pad + line, inner);
+          if (elevBase === "") {
+            parts.push(`${blank}${body}`);
+            continue;
+          }
+          const tail = Math.max(0, inner - rowCells(body)); // cells-ok — the row's own residue
+          const [drawn] = based([`${blank}${body}${" ".repeat(tail)}`], elevBase);
+          parts.push(drawn ?? `${blank}${body}`);
         }
       });
     }

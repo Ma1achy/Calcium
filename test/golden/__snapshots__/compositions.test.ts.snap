@@ -4,13 +4,13 @@ exports[`C10 §4k — the compositions, as frames > case 1 — focused + selecte
 "-- the frame
     Name          State     
     alpha         ✓ running 
-  ▸ bravo         ✗ failed  
+  ▸ bravo         ✗ failed                
     charlie       ✓ running 
 
 -- which fact took the ground, run by run
   dim/-:"Name        " dim/-:"State     "
   page/-:"  alpha         " bold/-:"✓ running "
-  bold/-:"▸ " inverse/-:"bravo         " inverse+bold/-:"✗ failed  "
+  inverse+bold/-:"▸ " inverse/-:"bravo         " inverse+bold/-:"✗ failed  "
   page/-:"  charlie       " bold/-:"✓ running "
 
 -- the ruling (C10 §4k.2 row 1)
@@ -31,13 +31,13 @@ exports[`C10 §4k — the compositions, as frames > case 1 — focused + selecte
 "-- the frame
     Name          State                   
     alpha         ✓ running 
-  ▸ bravo         ✗ failed  
+  ▸ bravo         ✗ failed                
     charlie       ✓ running 
 
 -- which fact took the ground, run by run
   bgElev/muted:"Name        " bgElev/muted:"State     "
   page/default:"alpha       " page/ok:"✓ running "
-  page/accent:"▸ " selection/default:"bravo       " selection/error:"✗ failed  "
+  selection/accent:"▸ " selection/default:"bravo       " selection/error:"✗ failed  "
   page/default:"charlie     " page/ok:"✓ running "
 
 -- the ruling (C10 §4k.2 row 1)
@@ -58,13 +58,13 @@ exports[`C10 §4k — the compositions, as frames > case 1 — focused + selecte
 "-- the frame
     Name          State                   
     alpha         + running 
-  > bravo         x failed  
+  > bravo         x failed                
     charlie       + running 
 
 -- which fact took the ground, run by run
   bgElev/muted:"Name        " bgElev/muted:"State     "
   page/default:"alpha       " page/ok:"+ running "
-  page/accent:"> " selection/default:"bravo       " selection/error:"x failed  "
+  selection/accent:"> " selection/default:"bravo       " selection/error:"x failed  "
   page/default:"charlie     " page/ok:"+ running "
 
 -- the ruling (C10 §4k.2 row 1)

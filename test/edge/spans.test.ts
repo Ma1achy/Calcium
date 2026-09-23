@@ -230,8 +230,16 @@ describe("C09 §5 — tone and value, the frames", () => {
     // across the cell — is unchanged and is still what is asserted; what moved
     // is that the colour is no longer the *first* thing on the line.
     expect(visible(focused ?? ""), "the mark in the reserved column").toContain("▸ run make now");
-    expect(focused, "the mark takes the accent").toContain(`${accent}▸ `);
-    expect(focused, "and the row takes the focus ground").toContain(sgr(focusStyle(DARK_THEME, FULL_CAPS)));
+    // **The mark carries the accent *and* the ground** (§5c). This asserted
+    // `accent` immediately followed by `▸`, which held while the gutter was
+    // painted on the page; the ground now opens between them, because the
+    // reserved column is part of the row it leads. The two sequences and the
+    // mark, in that order, is a **stronger** claim than the contiguous pair —
+    // it says both which ink and which ground, where the old form said the ink
+    // and was silent about the cell.
+    const ground = sgr(focusStyle(DARK_THEME, FULL_CAPS));
+    expect(focused, "the mark takes the accent, on the row's ground").toContain(`${accent}${ground}▸ `);
+    expect(focused, "and the row takes the focus ground").toContain(ground);
     const inRow = (focused ?? "").slice((focused ?? "").indexOf("run make now"));
     expect(inRow.match(/\x1b\[38;/gu) ?? [], "no second colour inside the row").toHaveLength(0);
   });

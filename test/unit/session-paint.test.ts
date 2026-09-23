@@ -673,7 +673,13 @@ describe("C22 §6g — the theme's background is a base, not a span (C22 I65)", 
     //
     // Reuse is safe *within one pass* because `String.replace` with a global
     // pattern sets `lastIndex` to 0 before it iterates and leaves it there.
-    const src = readFileSync("src/shell/paint.ts", "utf8")
+    // **The file moved and the row follows it** (C11 I25). `based` went to
+    // `presentation/blocks/paint.ts` when C11's expanded detail needed the same
+    // ground-behind-painted-lines pass one layer down; a source assertion that
+    // kept naming `shell/paint.ts` would have gone green the day the function
+    // it watches stopped being there, which is the failure this row's own
+    // subject is about.
+    const src = readFileSync("src/presentation/blocks/paint.ts", "utf8")
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/(^|[^:])\/\/.*$/gm, "$1");
     const body = /function based\([\s\S]*?\n}/.exec(src)?.[0] ?? "";
