@@ -195,4 +195,11 @@ describe("C23 §7f — replace or float", () => {
     expect(e.line(), "the reader's line survives the escape").toBe("git push --force");
   });
 
+  it.todo(
+    "T1.70 (C23 I75, I36, §051, `R-QST-002`) — not deferred on a component: the inspection lands in this MR's next commit: an inspection choice suspends without answering, esc returns to the same unresolved question, and the settlement count over the whole sequence is one",
+  );
+  it.todo(
+    "T1.70b (C23 I75, `R-QST-004`) — not deferred on a component: the inspection lands in this MR's next commit: the inspection is reachable as a choice and by no other key, which is the arm that refuses a second key-only route",
+  );
+
 });
