@@ -77,6 +77,20 @@ const twentyLines = (): readonly string[] => {
   return out;
 };
 
+/**
+ * A chrome that names the application on the upper rule (§069).
+ *
+ * **Header and footer are the defaults' shape and only `label` is the subject.**
+ * A chrome supplying three new things would move three parts of the frame, and
+ * then the label's row could not be read against the fixture without first
+ * subtracting two unrelated changes.
+ */
+const labelledChrome = (name: string): Scene["chrome"] => ({
+  header: () => [],
+  footer: () => [],
+  label: () => name,
+});
+
 const SCENES: Readonly<Record<string, Scene>> = {
   /** Nothing typed. The frame a session opens with, written whole from `ESC[H`. */
   boot: { columns: 80, rows: 24, drive: [] },
@@ -105,10 +119,69 @@ const SCENES: Readonly<Record<string, Scene>> = {
    * marker being unwashed is the only place that fix is visible.
    */
   "window-wash": { columns: 60, rows: 16, drive: [...thirteenLines(), SELECT_ALL] },
+
+  /**
+   * §069's labelled rule — **the first scene in this corpus with an
+   * application's chrome**.
+   *
+   * `chrome.label?.(ctx)` is what `frame.ts` asks and every scene here answered
+   * `null`, because none of them supplied a `chrome` at all: the prompt's upper
+   * rule is bare in every frame the directory holds, so the labelled form was
+   * built, wired and drawn by nothing. §069 specifies it completely — inline at
+   * the end, one rule glyph to its right, painted as a **ground** rather than
+   * as text, the bottom rule staying bare, one label per prompt.
+   */
+  label: { columns: 80, rows: 24, drive: [], chrome: labelledChrome("Calcium") },
+
+  /**
+   * The same chrome at sixty columns, where the label is **shed**.
+   *
+   * §069's own ordering: *at 60 columns the label drops before anything else,
+   * and the frame still works* — `R-BLK-175` ranks it 1 of 4 in the whole
+   * degradation order. Sixty is the narrowest width the frame draws at at all,
+   * and the shed is `<=`, so this scene is the boundary rather than a width
+   * below it: the three rules are here and the label is not.
+   */
+  "label-shed": { columns: 60, rows: 16, drive: [], chrome: labelledChrome("Calcium") },
+
+  /**
+   * The label at one bit, where it is shed for a different reason.
+   *
+   * There is no ground to paint with, and drawing it as plain text would put
+   * the application's identity in the rule's own voice — which is the one thing
+   * `R-COL-003` separates. Two sheds with two causes, and a frame showing only
+   * the width one would read as though the rule had a single condition.
+   */
+  "label-mono": { columns: 80, rows: 24, drive: [], chrome: labelledChrome("Calcium") },
 };
 
 /** A terminal with no colour beyond the sixteen and no Unicode (C02 §3). */
 const ASCII_ENV = { TERM: "xterm", LANG: "C" } as const;
+
+/**
+ * One bit, where §069's label is shed for want of a ground rather than width.
+ *
+ * **No environment reaches this rung, and the first draft's did not.** It read
+ * `{TERM: "xterm-mono", LANG: "C.UTF-8", NO_COLOR: "1"}` and the row was named
+ * `1-bit`; the frame came back at **4** — `fg 90  bg 40` in the styles grid,
+ * with the label drawn rather than shed, which is the row asserting the
+ * opposite of what it exists to show. `detectColourDepth`
+ * (`capabilities.ts:202`) answers `1` for `dumb` or an absent `TERM` and for
+ * nothing else — `NO_COLOR` is not one of its five sources and `xterm-mono`
+ * falls through to the `4` default.
+ *
+ * **And `dumb` cannot be driven**: `unusableCause` (`session.ts:161`) refuses
+ * it by name, so `readFrame` threw. The two gates between them make the rung
+ * unreachable from the environment, which is why the arm takes
+ * `TuiConfig.capabilities` — the app-facing override, the same door a consumer
+ * pinning a rung would use. A name chosen for the rung an arm was meant to be
+ * at is not a measurement of the rung it reaches.
+ */
+const MONO_ARM = {
+  theme: "dark",
+  env: { TERM: "xterm-256color", LANG: "C.UTF-8" },
+  caps: { colourDepth: 1 as const },
+};
 
 /**
  * The arms each scene is drawn at.
@@ -130,6 +203,9 @@ const CORPUS: readonly Readonly<{ scene: string; arm: Arm; name: string }>[] = [
   { scene: "window-head", arm: { theme: "dark" }, name: "window-head · dark" },
   { scene: "window-both", arm: { theme: "dark" }, name: "window-both · dark" },
   { scene: "window-wash", arm: { theme: "dark" }, name: "window-wash · dark" },
+  { scene: "label", arm: { theme: "dark" }, name: "label · dark" },
+  { scene: "label-shed", arm: { theme: "dark" }, name: "label-shed · dark" },
+  { scene: "label-mono", arm: MONO_ARM, name: "label-mono · 1-bit" },
   { scene: "boot", arm: { theme: "dark", env: ASCII_ENV }, name: "boot · ascii" },
   { scene: "window-tail", arm: { theme: "dark", env: ASCII_ENV }, name: "window-tail · ascii" },
 ];
@@ -163,7 +239,9 @@ describe("golden frames — a composed session, not a block", () => {
         `scenes drawn at ${theme}`,
       ).toBeGreaterThan(0); // cells-ok — a count
     }
-    expect(CORPUS.length, "scene-arms").toBe(THEMES.length * 2 + 9); // cells-ok — a count
+    // Twelve fixed arms: nine, plus §069's three — `label`, `label-shed` and
+    // `label-mono`, which are one subject at three rungs and not one scene.
+    expect(CORPUS.length, "scene-arms").toBe(THEMES.length * 2 + 12); // cells-ok — a count
     expect(new Set(CORPUS.map((c) => c.name)).size, "names are distinct").toBe(CORPUS.length);
     expect(new Set(CORPUS.map((c) => c.scene)), "every scene is drawn").toEqual(
       new Set(Object.keys(SCENES)),

@@ -38,6 +38,8 @@
  */
 
 import { defaultTheme } from "../../src/presentation/theme/index.js";
+import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
+import type { TuiConfig } from "../../src/shell/types.js";
 import type { ThemeSet } from "../../src/presentation/theme/index.js";
 import { fakeStdin } from "./fake-terminal.js";
 import { buildSession } from "./session.js";
@@ -71,6 +73,21 @@ export type Arm = Readonly<{
   theme: string;
   /** The environment C02 detects from. Omitted is a 256-colour UTF-8 terminal. */
   env?: Readonly<Record<string, string>>;
+  /**
+   * C02's answers, overridden — the only route to the 1-bit rung in a session.
+   *
+   * **The environment cannot reach it**, which is a property of the two gates
+   * meeting rather than of either: `detectColourDepth` answers `1` for `dumb`
+   * or an absent `TERM` and for nothing else, and both of those are exactly
+   * what `unusableCause` refuses — *`TERM` is `dumb`, which declares no
+   * alternate screen*. So every arm this corpus can drive through `env` is at
+   * 4 bits or better, and the rung where a tone has no carrier was unreachable
+   * here while the block corpora have had `MONO_CAPS` all along.
+   *
+   * `TuiConfig.capabilities` is the app-facing override and is what a consumer
+   * pinning a rung would use, so the harness takes the same door.
+   */
+  caps?: Partial<TerminalCapabilities>;
 }>;
 
 export type Scene = Readonly<{
@@ -78,6 +95,16 @@ export type Scene = Readonly<{
   rows: number;
   /** Bytes into the terminal, in order. The last call is the one `writes` reads. */
   drive: readonly string[];
+  /**
+   * The application's chrome, where a scene needs one (§069).
+   *
+   * **Every scene in this corpus supplied none until now**, so
+   * `chrome.label?.(ctx)` answered `null` on every frame and the prompt's upper
+   * rule was bare in all of them — which is why §069's labelled rule is built,
+   * wired and drawn by no golden. A scene's chrome is the application's, and
+   * the corpus had no way to be an application with one.
+   */
+  chrome?: TuiConfig["chrome"];
 }>;
 
 export type FrameReading = Readonly<{
@@ -104,6 +131,8 @@ export async function readFrame(scene: Scene, arm: Arm): Promise<FrameReading> {
       stdin: stdin as never,
       theme: opening(arm.theme),
       ...(arm.env === undefined ? {} : { env: arm.env }),
+      ...(arm.caps === undefined ? {} : { capabilities: arm.caps }),
+      ...(scene.chrome === undefined ? {} : { chrome: scene.chrome }),
     },
     size,
   );

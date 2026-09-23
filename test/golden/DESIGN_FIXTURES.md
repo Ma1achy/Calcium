@@ -1,6 +1,8 @@
-# The design fixtures, mapped
-
-**109 fixtures across 111 sections, and every one has a row here.** The table is
+frame 48 owed 18 prose 37 app 6 total 109
+missing: [25, 40]
+unclassified: []
+rows naming no fixture: []
+able is
 parsed by `design-fixtures.test.ts` and compared against
 `docs/design/language/fixtures/` **by equality**, so a fixture with no row is a
 failure and a row naming no fixture is a failure. That is the whole reason this is a
@@ -158,7 +160,7 @@ most-drawn line in the application.
 | 66 | surface | `FAILURE_WORDS` | `states.test.ts` | tool failures against model failures |
 | 67 | surface | `viewport` | `session-frame.test.ts` | scrolled back while a turn runs |
 | 68 | surface | `degradesTo1Bit` | `compositions.test.ts` | one exchange at three capability rungs |
-| 69 | surface | `labelSpansOf` | — | the prompt's upper rule, labelled — built and wired through `frame.label`, and no golden sets one: every rule in the frame corpus is bare |
+| 69 | surface | `labelSpansOf` | `session-frame.test.ts` | the prompt's upper rule, labelled — three scenes, and the 1-bit one needed a capability override because no environment reaches the rung |
 | 70 | surface | `REGISTRY_THEMES` | — | /colour, tinting the chrome |
 | 71 | prose | — | — | the five permission postures |
 | 72 | surface | `resolveBackground` | — | the background as a second channel |
@@ -217,7 +219,7 @@ that is the reconciliation working, and it should be visible as a number moving 
 than inferred from a suite staying green.
 
     surface 66 · prose 37 · app 6 · total 109
-    of the surfaces: built 59 · unbuilt 7 · framed 47
+    of the surfaces: built 59 · unbuilt 7 · framed 48
 
 **`framed` is the figure this MR moves, and `built` is the one that went backwards.**
 Seven surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks

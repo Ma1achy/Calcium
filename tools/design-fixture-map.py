@@ -72,7 +72,7 @@ M = {
  66:("frame","states.test.ts","tool failures against model failures"),
  67:("frame","session-frame.test.ts","scrolled back while a turn runs"),
  68:("frame","compositions.test.ts","one exchange at three capability rungs"),
- 69:("owed","M16","the prompt's upper rule, labelled — built and wired through `frame.label`, and no golden sets one: every rule in the frame corpus is bare"),
+ 69:("frame","session-frame.test.ts","the prompt's upper rule, labelled — three scenes, and the 1-bit one needed a capability override because no environment reaches the rung"),
  70:("owed","M2","/colour, tinting the chrome"),
  71:("prose","—","the five permission postures"),
  72:("owed","M3","the background as a second channel"),

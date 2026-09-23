@@ -16,7 +16,14 @@ import { fsIo, report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const PAINT = "src/shell/paint.ts";
 const FRAME = "src/shell/frame.ts";
-const FILES = "test/unit/frame-rule-label.test.ts";
+// **Two corpora, because the unit rows cannot reach one of the two sheds.**
+// `labelSpansOf` drops the label at 1-bit — there is no ground to paint with,
+// and drawing it flat would put the application's identity in the rule's own
+// voice — and no row in the unit file is at that rung. The golden's
+// `label-mono` arm is, and it only became so on a capability override: no
+// environment reaches 1-bit in a session, because `detectColourDepth` answers
+// `1` for `dumb` alone and `unusableCause` refuses `dumb` by name.
+const FILES = "test/unit/frame-rule-label.test.ts test/golden/session-frame.test.ts";
 
 const { read, write } = fsIo(ROOT);
 const run = () => {
@@ -94,6 +101,29 @@ const results = runPass({
       from: "  if (left < glyphCells) return null;",
       to: "  if (left < 0) return null;",
       expect: "T1.66",
+    },
+    {
+      // **The 1-bit shed removed**, and it is the branch no unit row reaches.
+      // It is also the mutation the golden's first draft could not have caught:
+      // that arm read `{TERM: "xterm-mono", NO_COLOR: "1"}`, came back at four
+      // bits — `fg 90  bg 40` in the styles grid — and drew the label the row
+      // exists to watch shed. An arm named for the rung it was meant to be at
+      // is not a measurement of the rung it reaches.
+      name: "the label is drawn where there is no ground for it",
+      file: PAINT,
+      from: "  if (deps.capabilities.colourDepth === 1) return null;",
+      to: "  if (deps.capabilities.colourDepth === 0) return null;",
+      expect: "label-mono",
+    },
+    {
+      // The one trailing glyph, gone. The fixture is `──── calcium ─`, and a
+      // label flush to the right edge has stopped being inline-end — which is
+      // a change to the grid and to nothing else.
+      name: "the label runs to the edge with no glyph after it",
+      file: PAINT,
+      from: "    { text: glyph, style: muted },",
+      to: "    { text: \" \", style: muted },",
+      expect: "T1.65",
     },
     {
       // **A string that strips to nothing becomes a label.** The frame narrows
