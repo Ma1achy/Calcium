@@ -238,6 +238,47 @@ const results = runPass({
       expect: "T1.50",
     },
     {
+      // **THE DEFECT the invariant is named for.** The inspection answers the
+      // question instead of suspending it — the owner is handed a choice the
+      // reader made about *looking*, and the entry settles while they are
+      // still reading. Every frame up to that point is identical.
+      name: "THE DEFECT: choosing the inspection answers the question",
+      file: CONFIRM,
+      from: "                if (pick?.inspect === true) return suspend();",
+      to: "                if (false) return suspend();",
+      expect: "T1.70",
+    },
+    {
+      // **Esc inside the inspection resolves the request** rather than leaving
+      // the inspection (`R-BLK-794`), which answers a question the reader was
+      // still reading — and reads on screen as the box simply closing.
+      name: "escape inside an inspection resolves the question",
+      file: CONFIRM,
+      from: '          if (suspended) return name === "escape" || (ctrl && name === "c") ? "leave" : "none";',
+      to: '          if (false) return "leave";',
+      expect: "T1.70",
+    },
+    {
+      // **A second key-only route** (`R-QST-004`): the evidence opens on a
+      // chord that is not among the choices, which is invisible at exactly the
+      // moment it matters.
+      name: "a key that is not a choice opens the source",
+      file: CONFIRM,
+      from: "          if (suspended) return",
+      to: '          if (!suspended && e.key.name === "tab") { suspend(); return "none"; }\n          if (suspended) return',
+      expect: "T1.70b",
+    },
+    {
+      // **The source is not bounded.** The payload goes in bare, so the panel
+      // is as tall as the patch and `composite.ts` writes `lines[0 … height)`
+      // — the reader gets the head of the diff and no way back.
+      name: "the inspected source is not bounded",
+      file: CONFIRM,
+      from: '      height: Math.max(1, rows), // cells-ok — a row count',
+      to: '      height: 100_000, // cells-ok — a row count',
+      expect: "T1.70",
+    },
+    {
       // **A replaced prompt keeps its caret.** The rows on screen are the
       // question's, so a cell placed by the editor's arithmetic lands inside a
       // box the editor has no coordinates in.

@@ -50,6 +50,24 @@ export type Choice = Readonly<{
    * choice's `key` and the text the reader composed.
    */
   reply?: true;
+  /**
+   * This choice opens an **inspection** — it suspends, it does not answer
+   * (C23 I75, §051, `R-QST-002`, `R-QST-004`).
+   *
+   * §051 draws it as a third peer — `no  yes  show full diff` — because the
+   * payload of a question that does not fit is **replaced** rather than
+   * marked, and without a way to it a reader approves a change they cannot
+   * see. Choosing this shows the payload bounded, on the same question with
+   * the same id and the same handler awaiting; `Esc` inside it leaves the
+   * inspection and not the request.
+   *
+   * **The label is the caller's and the route is this field.** There is no
+   * second key-only path (`R-QST-004`): a chord that opened the evidence
+   * without appearing among the choices is invisible at exactly the moment it
+   * matters, because a reader who cannot see the payload also cannot see that
+   * there is a way to.
+   */
+  inspect?: true;
 }>;
 
 /**

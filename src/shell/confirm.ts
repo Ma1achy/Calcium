@@ -235,6 +235,37 @@ function truncated(deps: ConfirmDeps): boolean {
  * only what they could not read anyway — the alternative, shrinking the detail,
  * needs a measurement this file cannot make.
  */
+/**
+ * The question **suspended**, showing its payload bounded (I75, §051).
+ *
+ * **The same panel, with the evidence where the question was.** The layer
+ * keeps its id and its owner keeps waiting, so what changes is only what is
+ * drawn — which is what *suspends* means and why an inspection cannot be a
+ * second layer: two layers would be two questions to `answerHandler`, and the
+ * one underneath would be answering keys meant for the one on top.
+ *
+ * **A `scroll` box rather than the payload bare**, because the payload is here
+ * precisely because it did not fit. The box bounds it and C04 I49 puts the
+ * residue row on it, so the reader can see there is more rather than finding
+ * the tail cut off — which is the failure `render`'s cut arm exists to avoid
+ * one level up.
+ */
+function inspection(opts: AskOptions, rows: number): readonly Block[] {
+  const children: Block[] = [
+    questionNotice(opts.question, "confirm-question"),
+    block({
+      kind: "scroll",
+      id: "confirm-source",
+      // At least one row: a region too small to hold anything still has to
+      // draw a box, and a height of 0 is a box C04 refuses.
+      height: Math.max(1, rows), // cells-ok — a row count
+      children: opts.detail === undefined ? [] : [opts.detail],
+    }),
+    block({ kind: "raw", id: "confirm-leave", text: "esc  back to the question" }),
+  ];
+  return [block({ kind: "panel", id: "confirm-panel", title: "Confirm", children })];
+}
+
 function render(opts: AskOptions, selected: number, cut = false): readonly Block[] {
   const children: Block[] = [
     questionNotice(opts.question, "confirm-question"),
@@ -300,7 +331,7 @@ function placementOf(
  * here, and `handler` and the predicate both read it rather than each carrying a
  * copy of the same four cases.
  */
-type Meaning = "resolve" | "move" | "compose" | "none";
+type Meaning = "resolve" | "move" | "compose" | "leave" | "none";
 
 export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
   let handler: ((e: InputEvent) => boolean) | null = null;
@@ -311,6 +342,15 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
   let consumer: ReturnType<typeof questionConsumer> | null = null;
   /** The `reply…` choice the reader picked, or `null` — §101's third row. */
   let replying: Choice | null = null;
+  /**
+   * Whether the open question is **suspended** in an inspection (I75).
+   *
+   * A boolean rather than the chosen `Choice`, because nothing downstream
+   * needs to know *which* inspection: `R-QST-004` gives a question one, and a
+   * field holding the choice would be a record of something the design says
+   * is singular.
+   */
+  let suspended = false;
 
   return {
     get open() {
@@ -388,6 +428,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
           meaning = null;
           consumer = null;
           replying = null;
+          suspended = false;
           disposable[Symbol.dispose]();
           deps.invalidate();
           resolve(text === undefined ? { key } : { key, text });
@@ -426,6 +467,31 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
           return true;
         };
 
+        /**
+         * Suspend, and come back (I75, `R-QST-002`).
+         *
+         * **Neither of these settles**, which is the whole invariant. The
+         * promise this closure resolves is untouched by both, so the owner is
+         * still awaiting and a second question behind this one still waits —
+         * suspended is *unresolved*, which is what the word is for.
+         */
+        const suspend = (): boolean => {
+          suspended = true;
+          deps.overlays.update(CONFIRM_LAYER_ID, {
+            // Bounded by the region rather than by a constant: the payload is
+            // here because it did not fit, so the figure that matters is how
+            // much room there is.
+            content: inspection(opts, Math.max(1, deps.overlayRegion().height - 6)), // cells-ok — the panel's own chrome
+          });
+          deps.invalidate();
+          return true;
+        };
+
+        const leaveInspection = (): boolean => {
+          suspended = false;
+          return redraw();
+        };
+
         const redraw = (): boolean => {
           deps.overlays.update(CONFIRM_LAYER_ID, { content: render(opts, selected()) });
           deps.invalidate();
@@ -442,6 +508,11 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
         const classify = (e: InputEvent): Meaning => {
           if (e.kind !== "key") return "none";
           const { name, ctrl } = e.key;
+          // **An inspection owns escape and nothing else** (I75). `Esc` inside
+          // it leaves the inspection and not the request, so it cannot be a
+          // `resolve` here — and no accelerator answers, because the reader is
+          // reading the evidence rather than choosing between answers.
+          if (suspended) return name === "escape" || (ctrl && name === "c") ? "leave" : "none";
           if (name === "escape" || (ctrl && name === "c")) return "resolve";
           if (name === "return" || name === "enter") return "resolve";
           // **A floating reply owns two keys and no others** (I73). The reader
@@ -494,8 +565,14 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
                 // The caller is still awaiting, the layer keeps its id, and the
                 // prompt comes live beneath — §101's *the question moves UP*.
                 if (pick?.reply === true && replying === null) return toReply(pick);
+                // **And an inspection does not resolve either; it suspends**
+                // (I75). The reader is going to look at what they are being
+                // asked about, which is not an answer to it.
+                if (pick?.inspect === true) return suspend();
                 return settle(pick?.key ?? name);
               }
+            case "leave":
+              return leaveInspection();
             case "compose":
               // **Not consumed.** C16 hands a `false` back down the ladder to
               // the prompt beneath, which is what makes the layer *float*

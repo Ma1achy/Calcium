@@ -13,6 +13,91 @@ import { questionConsumer, routingFor, type QuestionConsumer } from "../../src/s
 
 const ALL: readonly QuestionConsumer[] = ["approval", "choice", "reply", "peek", "completion", "find"];
 
+/** The region the question is placed against, named so the bound can be read against it. */
+const REGION = { width: 80, height: 24 } as const;
+
+/** A payload no ordinary region holds — which is why the inspection exists. */
+const PATCH = Array.from({ length: 60 }, (_, i) => `  ${String(i)} - let inQuote = false;`).join("\n");
+
+const INSPECTABLE = [
+  { key: "n", label: "no", default: true as const },
+  { key: "y", label: "yes" },
+  { key: "s", label: "show full diff", inspect: true as const },
+];
+
+/** What the layer says, flattened. */
+const drawn = (w: Readonly<{ overlays: { stack: readonly { id: string; content: unknown }[] } }>): string =>
+  JSON.stringify(w.overlays.stack.find((l) => l.id === "confirm")?.content ?? "");
+
+/**
+ * Is the question suspended in an inspection?
+ *
+ * **Read off the bounded box and not off the payload's text.** The payload is
+ * drawn with the question too whenever it fits — `render` replaces it only
+ * when the region cannot hold it — so *the patch is on screen* is true before
+ * anything has been inspected, and a row asserting it measures nothing. What
+ * is the inspection's alone is that the source is in a `scroll` box, which is
+ * how it is bounded at all.
+ */
+const inspecting = (
+  w: Readonly<{ overlays: { stack: readonly { id: string; content: unknown }[] } }>,
+): boolean => sourceHeight(w) !== null;
+
+/**
+ * The bounded source's height in rows, or `null` when it is not open.
+ *
+ * **The number, not the presence.** A box that exists and is as tall as the
+ * patch is not bounded: `composite.ts` writes `lines[0 … height)`, so the
+ * reader gets the head of the diff and no bottom border — which is the exact
+ * failure `render`'s cut arm was written against, arriving one level down.
+ */
+const sourceHeight = (
+  w: Readonly<{ overlays: { stack: readonly { id: string; content: unknown }[] } }>,
+): number | null => {
+  const found = /"id":"confirm-source","height":(\d+)/u.exec(drawn(w));
+  return found === null ? null : Number(found[1]);
+};
+
+const world = (): Readonly<{
+  confirm: ReturnType<typeof createConfirmHost>;
+  overlays: ReturnType<typeof createOverlayManager>;
+  type: (text: string) => void;
+  line: () => string;
+  drafted: () => string;
+  press: (name: string) => boolean;
+}> => {
+  const overlays = createOverlayManager({
+    registry: { measureSequence: (b) => b.length }, // cells-ok — a row count
+  });
+  let draft = "";
+  let held = "";
+  const confirm = createConfirmHost({
+    overlays,
+    anchor: () => ({ row: 20, rows: 1 }),
+    draft: () => draft,
+    holdDraft: () => {
+      held = draft;
+      draft = "";
+    },
+    restoreDraft: () => {
+      draft = held;
+      held = "";
+    },
+    overlayRegion: () => REGION,
+    invalidate: () => undefined,
+  });
+  return {
+    confirm,
+    overlays,
+    type: (text) => {
+      draft = text;
+    },
+    line: () => draft,
+    drafted: () => draft,
+    press: (name) => confirm.answerHandler()?.({ kind: "key", key: { name } } as InputEvent) ?? false,
+  };
+};
+
 describe("C23 §7f — replace or float", () => {
   it("T1.68 (C23 I73, §7f, §101): the table is total and its two axes are independent", () => {
     // §101's table, transcribed — the only place in the tree it is written
@@ -77,46 +162,6 @@ describe("C23 §7f — replace or float", () => {
   });
 
   it("T1.69 (C23 I73, I36, §7f): reply… moves one question, and the answer carries both facts", async () => {
-    const world = (): Readonly<{
-      confirm: ReturnType<typeof createConfirmHost>;
-      overlays: ReturnType<typeof createOverlayManager>;
-      type: (text: string) => void;
-      line: () => string;
-      drafted: () => string;
-      press: (name: string) => boolean;
-    }> => {
-      const overlays = createOverlayManager({
-        registry: { measureSequence: (b) => b.length }, // cells-ok — a row count
-      });
-      let draft = "";
-      let held = "";
-      const confirm = createConfirmHost({
-        overlays,
-        anchor: () => ({ row: 20, rows: 1 }),
-        draft: () => draft,
-        holdDraft: () => {
-          held = draft;
-          draft = "";
-        },
-        restoreDraft: () => {
-          draft = held;
-          held = "";
-        },
-        overlayRegion: () => ({ width: 80, height: 24 }),
-        invalidate: () => undefined,
-      });
-      return {
-        confirm,
-        overlays,
-        type: (text) => {
-          draft = text;
-        },
-        line: () => draft,
-        drafted: () => draft,
-        press: (name) => confirm.answerHandler()?.({ kind: "key", key: { name } } as InputEvent) ?? false,
-      };
-    };
-
     const CHOICES = [
       { key: "a", label: "approve" },
       { key: "d", label: "deny", default: true as const },
@@ -195,11 +240,88 @@ describe("C23 §7f — replace or float", () => {
     expect(e.line(), "the reader's line survives the escape").toBe("git push --force");
   });
 
-  it.todo(
-    "T1.70 (C23 I75, I36, §051, `R-QST-002`) — not deferred on a component: the inspection lands in this MR's next commit: an inspection choice suspends without answering, esc returns to the same unresolved question, and the settlement count over the whole sequence is one",
-  );
-  it.todo(
-    "T1.70b (C23 I75, `R-QST-004`) — not deferred on a component: the inspection lands in this MR's next commit: the inspection is reachable as a choice and by no other key, which is the arm that refuses a second key-only route",
-  );
+  it("T1.70 (C23 I75, I36, §051, `R-QST-002`): an inspection suspends, and the question settles exactly once", async () => {
+    const w = world();
+    // **The payload is what the inspection exists to reach.** `render`'s cut
+    // arm replaces it with `...` when it does not fit, and this row is about
+    // the way back to it.
+    const answer = w.confirm.ask({
+      question: "apply this change?",
+      detail: { kind: "raw", id: "patch", text: PATCH },
+      choices: INSPECTABLE,
+    });
+
+    // **Settled exactly once, counted rather than awaited.** A promise cannot
+    // resolve twice, so an inspection that settled and re-asked would hand the
+    // *owner* an answer while the reader was still reading — visible only as
+    // this flag flipping early.
+    let settlements = 0;
+    void answer.then(() => {
+      settlements += 1;
+    });
+    const flush = async (): Promise<void> => {
+      for (let i = 0; i < 4; i += 1) await Promise.resolve();
+    };
+
+    const opened = w.overlays.stack.find((l) => l.id === "confirm");
+    expect(opened, "the question is up").toBeDefined();
+
+    expect(w.press("s"), "the inspection choice is consumed").toBe(true);
+    await flush();
+    expect(settlements, "suspending is not answering").toBe(0);
+    expect(w.confirm.open, "and the owner is still awaiting").toBe(true);
+    expect(w.overlays.stack.filter((l) => l.id === "confirm"), "one layer, not two").toHaveLength(1);
+    expect(inspecting(w), "the source is open").toBe(true);
+    expect(drawn(w), "and it is the payload").toContain("inQuote");
+    // **Bounded by the region, which is the half a presence check misses.**
+    // The payload is 60 rows; a box that took all of them draws past the
+    // bottom of the screen and loses its own way back.
+    const height = sourceHeight(w) ?? 0; // cells-ok — a row count
+    expect(height, "the source is bounded by the region").toBeLessThanOrEqual(REGION.height);
+    expect(height, "and it is worth opening").toBeGreaterThan(1);
+
+    // **Esc leaves the inspection and not the request** (`R-BLK-794`). A build
+    // that resolved here answers a question the reader was still reading, and
+    // the frames it drew on the way are identical.
+    expect(w.press("escape"), "escape is the inspection's").toBe(true);
+    await flush();
+    expect(settlements, "and it did not resolve the question").toBe(0);
+    expect(w.confirm.open, "the same unresolved question").toBe(true);
+    expect(drawn(w), "which is drawn again, choices and all").toContain("apply this change?");
+    expect(inspecting(w), "with the source closed").toBe(false);
+
+    // Only now does it resolve, and only once across the whole sequence.
+    expect(w.press("y")).toBe(true);
+    await expect(answer).resolves.toEqual({ key: "y" });
+    await flush();
+    expect(settlements, "one settlement across suspend, escape and answer").toBe(1);
+    expect(w.overlays.stack, "and the question is gone").toHaveLength(0);
+  });
+
+  it("T1.70b (C23 I75, `R-QST-004`): the inspection has one route in, and it is a choice", async () => {
+    const w = world();
+    const answer = w.confirm.ask({
+      question: "apply this change?",
+      detail: { kind: "raw", id: "patch", text: PATCH },
+      choices: INSPECTABLE,
+    });
+
+    // **No second key-only path.** A chord that opened the evidence without
+    // appearing among the choices is invisible at the one moment it matters —
+    // a reader who cannot see the payload cannot see that there is a way to.
+    for (const name of ["tab", "space", "d", "i", "v", "?"]) {
+      w.press(name);
+      expect(inspecting(w), `\`${name}\` must not open the source`).toBe(false);
+    }
+
+    // The control: the choice's own accelerator does, so the loop above is
+    // reading a closed door rather than a broken handle.
+    expect(w.press("s")).toBe(true);
+    expect(inspecting(w), "the choice opens it").toBe(true);
+
+    w.press("escape");
+    w.press("n");
+    await expect(answer).resolves.toEqual({ key: "n" });
+  });
 
 });
