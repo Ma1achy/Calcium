@@ -92,8 +92,12 @@ const results = runPass({
       // saying the header is in the set is not an assertion that it is.
       name: "the header sits outside the reservation",
       file: TABLE,
-      from: "      emit(headerSpans(block, plan, ctx));",
-      to: "      parts.push(paint(clampSpans(headerSpans(block, plan, ctx), inner, ctx.capabilities)));",
+      // **Re-anchored when the header took its ground** (C11 I24): the header
+      // no longer goes through `emit`, because it paints its own row to the
+      // block's edge. The gutter is now the `{ text: blank }` lead the ground
+      // is merged onto, and dropping it is the same mutation as before.
+      from: "              { text: blank },\n              ...spans,",
+      to: "        ...spans,",
       expect: "T2.11",
     },
     {

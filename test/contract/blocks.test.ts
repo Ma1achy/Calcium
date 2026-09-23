@@ -1032,6 +1032,11 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
       "patch",
       // ` ERROR ` — the one painted label in the system
       "status",
+      // the header row — §073's *the one place a full-width ground is right*,
+      // a SURFACE the rows sit under rather than a status (C11 I24). It read
+      // three kinds until this one joined by a spec edit, which is the whole
+      // point of comparing by equality rather than checking the three paint.
+      "table",
     ]);
 
     // **The extent, which is the claim a mask makes and a count cannot.** A

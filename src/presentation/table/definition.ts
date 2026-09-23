@@ -25,7 +25,7 @@ import type { Block, MeasureFn, Table, TableRow } from "../../data/viewmodel/ind
 import { cells } from "../text.js";
 import { fitRow } from "../rows.js";
 import { glyphCells, glyphFor } from "../blocks/glyphs.js";
-import { clampSpans, focusStyle, paint, selectionStyle, tone, type Span } from "../blocks/paint.js";
+import { background, clampSpans, focusStyle, paint, selectionStyle, tone, withBackground, type Span } from "../blocks/paint.js";
 import type { BlockDefinition, NavElement, Rendered, RenderContext, Windowed } from "../blocks/types.js";
 import { emptySpans, headerSpans, markedSeriesColumns, rowSpans } from "./cells.js";
 import { detailBlocks, isExpandable } from "./detail.js";
@@ -364,7 +364,40 @@ export const tableDefinition: BlockDefinition<Table> = {
     };
 
     if (hasHeader(block)) {
-      emit(headerSpans(block, plan, ctx));
+      // **`bgElev` across the whole row, gutter included** (I24, §073, §072).
+      // §073 names this *the one place a full-width ground is right* and gives
+      // the reason the rule turns on: the header is a **surface the rows sit
+      // under**, not a status. So the ground runs to the block's edge rather
+      // than stopping where the last label ends — a ground that stopped at the
+      // text would say *these words* are the surface, where the claim is that
+      // the row is.
+      //
+      // It degrades to nothing and loses nothing: at one bit
+      // `resolveBackground` answers `NO_STYLE`, the header is `muted` text over
+      // the page as it always was, and the header never carried a fact — the
+      // column names are the carrier and they are still drawn.
+      const elev = background("surface.bgElev", ctx.theme, ctx.capabilities);
+      if (elev.background === undefined) {
+        // **No ground, so no padding either**, and the difference matters: the
+        // pad exists only to give the ground cells to paint. Padding anyway
+        // would put trailing blanks on every monochrome frame in the corpus for
+        // a surface that is not there — which is what the first draft did, and
+        // four goldens that carry no colour at all moved to say so.
+        emit(headerSpans(block, plan, ctx));
+      } else {
+        const spans = clampSpans(headerSpans(block, plan, ctx, "bgElev"), inner, ctx.capabilities);
+        const drawn = spans.reduce((n, sp) => n + cells(sp.text, ctx.capabilities.ambiguousWidth), 0);
+        const tail = Math.max(0, inner - drawn); // cells-ok — the row's own residue
+        parts.push(
+          paint(
+            [
+              { text: blank },
+              ...spans,
+              ...(tail === 0 ? [] : [{ text: " ".repeat(tail) }]),
+            ].map((sp) => ({ text: sp.text, style: withBackground(sp.style, elev) })),
+          ),
+        );
+      }
     }
 
     if (!hasBody(block)) {

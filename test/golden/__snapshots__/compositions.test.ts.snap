@@ -29,13 +29,13 @@ exports[`C10 §4k — the compositions, as frames > case 1 — focused + selecte
 
 exports[`C10 §4k — the compositions, as frames > case 1 — focused + selected + failed, at 24-bit 1`] = `
 "-- the frame
-    Name          State     
+    Name          State                   
     alpha         ✓ running 
   ▸ bravo         ✗ failed  
     charlie       ✓ running 
 
 -- which fact took the ground, run by run
-  page/muted:"Name        " page/muted:"State     "
+  bgElev/muted:"Name        " bgElev/muted:"State     "
   page/default:"alpha       " page/ok:"✓ running "
   page/accent:"▸ " selection/default:"bravo       " selection/error:"✗ failed  "
   page/default:"charlie     " page/ok:"✓ running "
@@ -56,13 +56,13 @@ exports[`C10 §4k — the compositions, as frames > case 1 — focused + selecte
 
 exports[`C10 §4k — the compositions, as frames > case 1 — focused + selected + failed, at ascii 1`] = `
 "-- the frame
-    Name          State     
+    Name          State                   
     alpha         + running 
   > bravo         x failed  
     charlie       + running 
 
 -- which fact took the ground, run by run
-  page/muted:"Name        " page/muted:"State     "
+  bgElev/muted:"Name        " bgElev/muted:"State     "
   page/default:"alpha       " page/ok:"+ running "
   page/accent:"> " selection/default:"bravo       " selection/error:"x failed  "
   page/default:"charlie     " page/ok:"+ running "

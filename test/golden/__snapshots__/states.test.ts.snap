@@ -28,7 +28,7 @@ climb +
        -60 ticks                     now
 0          100 - 27 older not shown
 ── table · table-value-bar
-  NAME      CPU               
+  NAME      CPU                         
   api         ........... 4.2%
   worker    ! ######### 101.2%
   db          -               
@@ -92,7 +92,7 @@ climb +
        -60 ticks                                                             now
 0          100
 ── table · table-value-bar
-  NAME      CPU               
+  NAME      CPU                                                                 
   api         ........... 4.2%
   worker    ! ######### 101.2%
   db          -               
@@ -151,7 +151,7 @@ climb ┤
        -60 ticks                     now
 0          100 · 27 older not shown
 ── table · table-value-bar
-  NAME      CPU               
+  NAME      CPU                         
   api         ░░░░░░░░░░░ 4.2%
   worker    ▲ █████████ 101.2%
   db          —               
@@ -215,7 +215,7 @@ climb ┤
        -60 ticks                                                             now
 0          100
 ── table · table-value-bar
-  NAME      CPU               
+  NAME      CPU                                                                 
   api         ░░░░░░░░░░░ 4.2%
   worker    ▲ █████████ 101.2%
   db          —               
@@ -274,7 +274,7 @@ climb +
        -60 ticks                     now
 0          100 - 27 older not shown
 ── table · table-value-bar
-  NAME      CPU               
+  NAME      CPU                         
   api         ⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄ 4.2%
   worker    ! ⣿⣿⣿⣿⣿⣿⣿⣿⣿ 101.2%
   db          -               
@@ -338,7 +338,7 @@ climb +
        -60 ticks                                                             now
 0          100
 ── table · table-value-bar
-  NAME      CPU               
+  NAME      CPU                                                                 
   api         ⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄ 4.2%
   worker    ! ⣿⣿⣿⣿⣿⣿⣿⣿⣿ 101.2%
   db          -               
@@ -397,7 +397,7 @@ climb ┤
        -60 ticks                     now
 0          100 · 27 older not shown
 ── table · table-value-bar
-  NAME      CPU               
+  NAME      CPU                         
   api         ░░░░░░░░░░░ 4.2%
   worker    ▲ █████████ 101.2%
   db          —               
@@ -461,7 +461,7 @@ climb ┤
        -60 ticks                                                             now
 0          100
 ── table · table-value-bar
-  NAME      CPU               
+  NAME      CPU                                                                 
   api         ░░░░░░░░░░░ 4.2%
   worker    ▲ █████████ 101.2%
   db          —               

@@ -20,7 +20,7 @@ import { fakeStdin, capabilities } from "../support/fake-terminal.js";
 import { rowContaining, styleAt, styledScreenFrom, textOf, type CellStyle } from "../support/styled-screen.js";
 import { measurable, visible } from "../support/render.js";
 import type { FocusState } from "../../src/presentation/blocks/index.js";
-import { focusStyle, selectionStyle, tone } from "../../src/presentation/blocks/paint.js";
+import { background, focusStyle, selectionStyle, tone } from "../../src/presentation/blocks/paint.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
@@ -270,8 +270,16 @@ describe("C11 I14 — the renderer, handed the extent directly", () => {
     expect(cellOf(three, "charlie")).toEqual({ fg: plainOnWash, bg: wash, attrs: [] });
     expect(cellOf(three, "delta")).toEqual({ fg: plain, bg: "", attrs: [] });
     expect(accentOnWash, "kept resolved so the row does not depend on a value it never reads").not.toBe("");
-    // The header row above `alpha` is not washed either.
-    expect(cellOf(three, "Name").bg).toBe("");
+    // **The header row above `alpha` is not washed either** — and it is
+    // asserted against the wash now rather than against a bare ground.
+    // `bg === ""` stood for *not washed* while nothing painted a header; C11
+    // I24 gives it `bgElev` across the whole row, and the row went red on a
+    // table whose selection reaches exactly as far as it always did. A proxy
+    // for the subject holds until something else acquires the same property.
+    expect(cellOf(three, "Name").bg, "the header is not washed").not.toBe(wash);
+    expect(cellOf(three, "Name").bg, "it carries its own structural ground").toBe(
+      params(background("surface.bgElev", theme, caps)),
+    );
 
     // **Under another block's id the same pairs paint nothing here.** Filtered
     // by the pair's block, not gated on the head's (T6.17's third mutation).

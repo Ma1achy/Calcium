@@ -76,7 +76,7 @@ M = {
  70:("owed","M2","/colour, tinting the chrome"),
  71:("prose","—","the five permission postures"),
  72:("frame","design-surfaces.test.ts","the background as a second channel — a ground census, one mask character per cell, because a stripped read calls a washed row and a bare one the same picture; three kinds paint and `meterFill` has no reader"),
- 73:("owed","M3","painted chrome — buttons, titles, widgets, headers"),
+ 73:("owed","M3","painted chrome — the table header is built and framed (C11 I24); buttons, titles and widgets want kinds the tree has none of: no `button`, `slider`, `toggle`, `checkbox` or `radio` among the thirty-six"),
  74:("frame","theme-tokens.test.ts","weight, and why it is not free — the 1-bit rung of the same table, where `identifier` was off the ladder"),
  75:("frame","blocks.test.ts","/config, and where a value came from"),
  76:("owed","M13","per-token values — a VALUED span over the model's own output, which the fixture itself calls reserved; not a theme token, and the probe said otherwise"),

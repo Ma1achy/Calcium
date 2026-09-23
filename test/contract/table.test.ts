@@ -9,7 +9,10 @@ import { SCAN_BUDGET_MS } from "../support/budget.js";
 
 import { planColumns, tableDefinition } from "../../src/presentation/table/index.js";
 import { psColumns, psTable, TABLE_CORPUS } from "../support/blocks.js";
-import { measurable, registry as bareRegistry } from "../support/render.js";
+import { DARK_THEME, FULL_CAPS, MONO_UNICODE_CAPS, measurable, registry as bareRegistry } from "../support/render.js";
+import { styledScreenFrom } from "../support/styled-screen.js";
+import { background, tone } from "../../src/presentation/blocks/paint.js";
+import { sgr } from "../../src/terminal/escapes.js";
 import {
   checkMeasurement,
   DEFAULT_WIDTHS,
@@ -261,5 +264,91 @@ describe("C11 §3 — priority is declared, never inferred", () => {
       /(?<!\.)\bpriority\s*[:=](?!\s*(?:number|undefined))/.test("const priority = rank(rows);"),
       "the pattern can fire",
     ).toBe(true);
+  });
+  it("T2.161 (C11 I24, §073, §072, C10 I48): the header takes `bgElev` to the block's edge, and loses nothing when it goes", () => {
+    // **A table whose header falls short of the width**, because the extent is
+    // the claim and `psTable` at 60 fills every cell — so the first form of
+    // this row asserted a full ground against a fixture that would have had one
+    // with no padding at all, and the mutation that stops the ground at the
+    // last label **survived**. A fixture must respond to the thing under test.
+    const narrow: Table = {
+      kind: "table",
+      id: "t-narrow",
+      columns: [
+        { key: "a", label: "Name", align: "left", priority: 1, minWidth: 6, sortable: false },
+        { key: "b", label: "State", align: "left", priority: 2, minWidth: 7, sortable: false },
+      ],
+      rows: [
+        { id: "r1", cells: { a: { text: "api" }, b: { text: "running" } } },
+        { id: "r2", cells: { a: { text: "worker" }, b: { text: "idle" } } },
+      ],
+    };
+    const rowsOf = (caps: typeof FULL_CAPS, theme = DARK_THEME) => {
+      const lines = measurable({
+        theme,
+        capabilities: caps,
+        definitions: [tableDefinition] as never,
+      }).renderToLines(narrow, 60);
+      return styledScreenFrom([lines.join("\n")], { columns: 60, rows: lines.length });
+    };
+
+    // **To the block's edge, gutter included.** §073 calls this *the one place
+    // a full-width ground is right*, and the reason is what fixes the extent:
+    // the header is a surface the rows sit under. A ground stopping where the
+    // last label ends would say *these words* are the surface, which is a
+    // different claim and passes every assertion about the header's text.
+    const lit = rowsOf(FULL_CAPS);
+    const head = lit[0] ?? [];
+    expect(head.filter((c) => c.style.bg !== "").length, "every cell of the header").toBe(60); // cells-ok — a count
+    const elev = sgr(background("surface.bgElev", DARK_THEME, FULL_CAPS)).replaceAll(/[\u001b[m]/gu, "");
+    expect([...new Set(head.map((c) => c.style.bg))].join(""), "and the ground is `bgElev`").toContain(elev);
+
+    // **And only the header.** The body rows sit *under* the surface; a table
+    // washed whole is §073's *a wash over content is a MODE, and there is none*.
+    expect(
+      lit.slice(1).flat().filter((c) => c.style.bg !== "").length,
+      "no body cell is painted",
+    ).toBe(0); // cells-ok — a count
+
+    // **The ink is resolved on the ground** (C10 I48). `tone`'s fourth argument
+    // is the composition step, so a theme repainting `muted` on `bgElev` is
+    // honoured here rather than measured elsewhere and drawn flat.
+    const labelAt = head.findIndex((c) => c.ch !== " ");
+    expect(labelAt, "the header draws a label").toBeGreaterThan(0); // cells-ok — a column
+    expect(head[labelAt]?.style.fg, "the label is muted, composed on the ground").toBe(
+      sgr(tone("muted", DARK_THEME, FULL_CAPS, "bgElev")).replaceAll(/[\u001b[m]/gu, ""),
+    );
+
+    // **And the composition is what the ground is for** (C10 I48). A theme
+    // that repaints `muted` on `bgElev` must be honoured here rather than
+    // measured elsewhere and drawn flat — and **no shipped theme composes on
+    // `bgElev` at all**, so dropping the `on` argument changed nothing and the
+    // mutation survived. The theme the sentence is about is constructed, under
+    // its own `name` because the resolver caches on one (C10 I11).
+    const composing = {
+      ...DARK_THEME,
+      name: "prism-composed-elev",
+      tokens: {
+        ...DARK_THEME.tokens,
+        composed: { "surface.bgElev": { "tone.muted": "#9c7f4a" } },
+      },
+    } as typeof DARK_THEME;
+    const composed = rowsOf(FULL_CAPS, composing)[0] ?? [];
+    const at = composed.findIndex((c) => c.ch !== " ");
+    expect(composed[at]?.style.fg, "the header's ink takes the theme's composition").toBe(
+      sgr(tone("muted", composing, FULL_CAPS, "bgElev")).replaceAll(/[\u001b[m]/gu, ""),
+    );
+    expect(composed[at]?.style.fg, "and it is not the flat value").not.toBe(
+      sgr(tone("muted", composing, FULL_CAPS)).replaceAll(/[\u001b[m]/gu, ""),
+    );
+
+    // **It degrades to nothing and loses nothing** (`R-COL-004`). The header
+    // never carried a fact — the column names are the carrier — so at one bit
+    // the ground is gone and every label is still drawn, which is the half a
+    // row asserting only *the background disappears* would not say.
+    const dark = rowsOf(MONO_UNICODE_CAPS);
+    expect(dark.flat().filter((c) => c.style.bg !== "").length, "nothing is painted at one bit").toBe(0); // cells-ok — a count
+    const textOf = (g: typeof dark) => (g[0] ?? []).map((c) => c.ch).join("").trimEnd();
+    expect(textOf(dark), "and the header reads the same").toBe(textOf(lit));
   });
 });

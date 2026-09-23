@@ -145,9 +145,18 @@ export function headerSpans(
   block: Table,
   plan: PlannedColumns,
   ctx: RenderContext,
+  /**
+   * The ground the row is painted on — a surface name (I24, C10 I48).
+   *
+   * **Passed rather than assumed**, on `rowSpans`' own argument: *which ground
+   * did this row take* is one question, and two answers to it is how the ink
+   * and the ground stopped agreeing (F1240). The caller that paints the row is
+   * the caller that names it here.
+   */
+  on?: string,
 ): readonly Span[] {
   const g = glyphs(ctx.capabilities);
-  const dim = tone("muted", ctx.theme, ctx.capabilities);
+  const dim = tone("muted", ctx.theme, ctx.capabilities, on);
   const byKey = new Map<string, ColumnDef>(block.columns.map((c) => [c.key, c]));
 
   const spans: Span[] = [];
