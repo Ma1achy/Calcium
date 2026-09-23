@@ -663,6 +663,64 @@ the rule was written to prevent.
 what they put in the set is now every block of those entries. The rule's own
 sentence is untouched and nothing about the keys moves.
 
+## 6d. The selection's ground — one row per block, painted outside the cache
+
+`R-SEL-006` and `R-SEL-003`'s third clause, which are one mechanism: *selection
+owns the ground and focus keeps its mark*, and *the block takes the selection
+ground on its frame or its first row, never on every cell of its body*.
+
+**The shell paints it, not the kinds, and the rule says so.** A kind washing its
+own body is exactly what the third clause forbids, and asking twenty-six kinds to
+each decline correctly is a rule enforced twenty-six times. The shell already
+knows every block's entry-local rows — the same spans the caret moves over
+(§6c) — so it washes **one row per selected block**, at the block's first row,
+across the full width.
+
+**And *frame or first row* is one rule rather than two arms.** A bordered block's
+first row **is** its frame: `panel`, `status` and every container that draws a box
+open with the top border, so washing the first row satisfies both readings and no
+kind is consulted about which it has.
+
+### Painted after the cache is written, and that is the ruling
+
+The render cache keys on nine axes and the selection is none of them. Two ways
+out, and only one survives being written down:
+
+- **A tenth axis.** Correct, and it busts the whole entry's slot on every
+  keystroke in the mode — which is exactly what C22 I103 split `tick` out to stop,
+  one rung coarser: there the cost was one glyph, here it is an entry per key.
+- **Outside the cache.** The wash is a transformation of the finished lines, so
+  it is applied to the copy that goes on screen and never to the copy that is
+  stored. The cache holds the entry as it renders, the frame shows it selected,
+  and the two cannot disagree because the second is a function of the first.
+
+The second, and the invariant is that **nothing selection-dependent is ever
+written into a cache slot**. A wash baked in would serve a selected frame to a
+later unselected read, which is the *correct frame, previous state* symptom C22
+I71 names as the one whose report says *it froze*.
+
+### The precedence falls out of the order rather than being asserted
+
+`R-SEL-006`'s table — at rest nothing; focused takes `focusGround` and its mark;
+selected takes `selectionGround` and no mark; both takes `selectionGround` and
+**keeps** the focus mark — is four rows, and three of them are already what the
+tree does. The fourth is the only one this section decides, and washing over the
+rendered line is what makes it true: the mark is already in the text, the wash
+changes the ground under it, and *selection wins the ground while focus keeps its
+mark* is the order of the two operations rather than a case in a table.
+
+Selection winning over a **diff** ground is the same sentence: `patch` inks its
+own rows and the wash lands over them, with the `+` and `−` marks carrying the
+diff exactly as the rule says they must.
+
+### 1-bit needs no new rung
+
+`selectionStyle` already answers `inverse` where `resolveBackground` has no
+colour (C09 §paint) — *an attribute survives the depth where a colour does not* —
+and the focus mark `▸` survives with it. So at 1-bit a selected row is reverse
+video and a focused one is a mark, which is `R-SEL-006`'s last sentence with
+nothing added: **neither fact rests on colour alone.**
+
 ---
 
 ## 7. State machine
@@ -728,6 +786,10 @@ than stranding the user.
 - **I37** — **The anchor is a second caret, planted where the extend began, and the range is re-derived from the pair on every step.** With no extend in flight there is no anchor; an extend that over-shoots and comes back gives the selection that going there directly would have given, which is `R-SEL-015`'s *the count is always the size of what return would copy right now* stated for a keyboard. A plain arrow moves the caret and touches neither the anchor nor the selection — without that pair the caret cannot be placed anywhere without selecting on the way.
 - **I38** — **The count is blocks.** `R-SEL-015` counts what a copy would take, and an entry-level count reports a half-taken entry as a whole one — the number wrong in exactly the direction the rule exists to prevent. `a` and `A` are unchanged in meaning and changed in unit: they put every block of their entries into the set, and `R-SEL-008`'s sentence is untouched.
 
+- **I39** — **The selection's ground is painted by the shell, one row per selected block, at the block's first row and across the full width.** A kind washing its own body is what `R-SEL-003`'s third clause forbids, and a rule delegated to twenty-six kinds is a rule enforced twenty-six times. *Frame or first row* is one arm rather than two: a bordered block's first row **is** its frame, so no kind is consulted about which it has. The spans are the ones the caret moves over (I36), so what is washed and what an extend took cannot disagree.
+- **I40** — **Nothing selection-dependent is ever written into a render-cache slot.** The cache keys on nine axes and the selection is none of them; a wash baked into the stored lines would serve a selected frame to a later unselected read, which is C22 I71's *correct frame, previous state* — the symptom whose report says *it froze*. A tenth axis would be correct and would bust an entry's whole slot on every keystroke in the mode, one rung coarser than the cost C22 I103 split `tick` out to avoid. So the wash is a transformation of the finished lines, applied to the copy that goes on screen and never to the copy that is stored.
+- **I41** — **`R-SEL-006`'s precedence is the order of two operations, not a case in a table.** The mark is already in the rendered text and the wash changes the ground under it, so *selection wins the ground while focus keeps its mark* is true by construction — including over a diff ground, where `patch`'s own inks are what the wash lands on and the `+`/`−` marks carry the diff. At 1-bit `selectionStyle` answers `inverse` and the focus mark survives, so neither fact rests on colour alone and no new rung is added.
+
 ---
 
 ## 9. Commitments
@@ -769,6 +831,10 @@ than stranding the user.
 32. **A rule needs a granularity it can be violated at** (I36, §6c). Atomicity is a constraint because the caret is a row and the selection is a block; with both at the block it would be a property of the type, satisfied by everything and asserted by nothing.
 33. **The anchor makes an extend re-derivable rather than incremental** (I37). Over-shooting and coming back gives what going there directly gives, and a plain arrow moves without selecting.
 34. **The count is what a copy would take** (I38), which is blocks — an entry count lies about a half-taken entry, and lies in the direction the rule was written against.
+
+35. **A rule about where a ground goes belongs to whoever knows the geometry** (I39). The shell holds every block's rows already; delegating the third clause to the kinds would be the same rule written twenty-six times.
+36. **A cache may not hold anything its key cannot express** (I40). The wash is applied to the frame and never to the stored lines, so no slot can serve a state it was not keyed for.
+37. **Precedence expressed as an order needs no table** (I41). Painting the ground under text that already carries the mark makes *selection wins the ground, focus keeps its mark* true by construction, at every colour depth.
 
 ---
 
@@ -817,6 +883,9 @@ Fake heights, no rendering.
 - **T1.37b** (I36): the caret's row is entry-local — the same caret over a document with a taller entry above it names the same block, where a viewport row would name a different one.
 - **T1.38b** (I37): `⇧↓` three times then `⇧↑` twice gives the block set of `⇧↓` once, by equality and not by size; a plain `↓` between them moves the caret and leaves both the anchor and the set alone; and the anchor is planted by the first extend, not by entering the mode. **The caret starts two rows above a block boundary, and the mutation pass is why**: with it at the top of a ten-row block every step of the row stays inside that block, so the set never changes and both *accumulate rather than re-derive* and *a plain arrow that also extends* survive against a fixture that cannot see them. A corpus chosen for a property may not have it.
 - **T1.39** (I38): the count is the blocks, so an extend stopping inside a two-block entry reads 1 where an entry count would read 1 and a whole-entry extend reads 2 where it would still read 1 — the pair, because either alone agrees with the wrong rule.
+
+- **T1.40** (I39, I40): a two-block entry with the second block selected → exactly one row carries the selection ground, and it is the second block's first row; the block's remaining rows are untouched, which is the third clause's *never on every cell of its body*. **And the cache is read back**: the stored lines for that entry are the unwashed ones, so a later frame with nothing selected draws no ground — the pair, because the on-screen half alone passes against a wash baked into the slot.
+- **T1.40b** (I41): the same row focused and selected → the ground is the selection's and the focus mark is still in the text; focused alone is `focusGround` and the mark; at 1-bit the selected row is `inverse` and the focused one is the mark alone. Read as frames, because the claim is about what a reader sees and a style object is a proxy for it.
 
 ### Tier 2 — contract / interface
 

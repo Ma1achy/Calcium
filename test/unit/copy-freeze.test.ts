@@ -257,3 +257,14 @@ describe("C14 §6c — the caret and the anchor", () => {
     expect(count(far)).toBe(2);
   });
 });
+
+// C14 §6d — the selection's ground.
+// Spec-first: the rows land with the code in this MR's second commit.
+describe("C14 §6d — the selection's ground", () => {
+  it.todo(
+    "T1.40 (C14 I39, I40): one row per selected block carries the ground, at its first row, and the cache holds the unwashed lines — not deferred on a component: the wash lands in this MR's code commit",
+  );
+  it.todo(
+    "T1.40b (C14 I41): selected wins the ground and focus keeps its mark, read as frames at colour and at 1-bit — not deferred on a component: the wash lands in this MR's code commit",
+  );
+});
