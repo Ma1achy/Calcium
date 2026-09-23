@@ -32,9 +32,16 @@
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import type { RenderScratch } from "../presentation/blocks/types.js";
 import { cells, hardWrapCells, sliceCells } from "../presentation/text.js";
-import { paint as paintSpans, tone, selectionStyle } from "../presentation/blocks/paint.js";
+import {
+  background,
+  paint as paintSpans,
+  selectionStyle,
+  tone,
+  withBackground,
+  type Span,
+} from "../presentation/blocks/paint.js";
 import { SGR_RESET, sgr, toTerminalDefault } from "../terminal/escapes.js";
-import { HEADER_ROWS, HEADER_RULE_ROWS, promptFor, PROMPT_GUTTER } from "./config.js";
+import { HEADER_ROWS, HEADER_RULE_ROWS, MIN_COLUMNS, promptFor, PROMPT_GUTTER } from "./config.js";
 import { glyphs } from "../presentation/blocks/index.js";
 import { composite } from "./composite.js";
 import type { ChromeCache, ChromeRole } from "./chrome-cache.js";
@@ -168,10 +175,83 @@ function spinnerGlyph(caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWid
  * comes from C09's table so the ASCII tier gets `-` from the same place every
  * other rule in the frame does.
  */
-function rule(width: number, deps: PaintDeps): string {
-  const text = glyphs(deps.capabilities).horizontal.repeat(width);
-  if (deps.capabilities.colourDepth === 1) return text;
-  return paintSpans([{ text, style: tone("muted", deps.theme, deps.capabilities) }]);
+function rule(width: number, deps: PaintDeps, label: string | null = null): string {
+  const glyph = glyphs(deps.capabilities).horizontal;
+  const mark = labelSpansOf(label, width, deps);
+  if (mark === null) {
+    const text = glyph.repeat(width);
+    if (deps.capabilities.colourDepth === 1) return text;
+    return paintSpans([{ text, style: tone("muted", deps.theme, deps.capabilities) }]);
+  }
+  return paintSpans(mark);
+}
+
+
+/**
+ * The upper rule's spans when a label is drawn, or `null` when it is shed.
+ *
+ * **Inline-end with one trailing glyph, and painted as a ground** (§069,
+ * `R-COL-003`): *a name is a THING, and things take a ground*. `bgElev` is the
+ * design's rest-ground for a thing (`R-BLK-490`); the rule's own glyphs keep
+ * the muted tone they always had, so the row is the same row with a span in it.
+ *
+ * **Shed by the frame, never by the caller** (`R-BLK-175` ranks it 1 of 4 in
+ * the whole degradation order). Two conditions, and neither is a number chosen
+ * here. The first is `MIN_COLUMNS` — §069's *at 60 columns the label drops
+ * before anything else, and the frame still works*, which names the narrowest
+ * width the frame draws at at all: at that width the label is gone and the
+ * three rules are not, which is what *still works* means as a mechanism.
+ *
+ * **It is `<=` rather than `<`, and the difference is the whole rule.** A
+ * strict comparison against a private copy of 60 is unreachable: below 60 there
+ * is no frame — `fallback.ts` replaces it with the *Needs 60x24* notice — so the
+ * label's floor could only ever fire where the rule it sits on does not exist.
+ * A mutation setting that copy to 0 survived, which is how it was found: A03
+ * §2's vacuity class, arriving as two constants that had to agree with nothing
+ * holding them together.
+ *
+ * The second is derived rather than chosen: the label is gone whenever it would
+ * not leave at least one rule glyph to its left — a label that filled the row
+ * would have stopped being a label.
+ *
+ * At 1-bit there is no ground to paint with, so the label is shed there too:
+ * drawing it as plain text would put the application's identity in the rule's
+ * own voice, which is the one thing `R-COL-003` separates.
+ */
+function labelSpansOf(
+  label: string | null,
+  width: number,
+  deps: PaintDeps,
+): readonly Span[] | null {
+  if (label === null || width <= MIN_COLUMNS) return null;
+  if (deps.capabilities.colourDepth === 1) return null;
+  const glyph = glyphs(deps.capabilities).horizontal;
+  const ambiguous = deps.capabilities.ambiguousWidth;
+  const glyphCells = cells(glyph, ambiguous);
+  if (glyphCells <= 0) return null;
+
+  // ` <label> ` between the rule and its one trailing glyph — the fixture's
+  // `──── calcium ─`, whose two spaces are what keep the name off the dashes.
+  const text = ` ${label} `;
+  const used = cells(text, ambiguous) + glyphCells;
+  const left = width - used;
+  if (left < glyphCells) return null;
+
+  const muted = tone("muted", deps.theme, deps.capabilities);
+  // **The ink is resolved against the ground it lands on** (C10 I48): `tone`'s
+  // fourth argument is the composition step, so a theme that repaints `default`
+  // on `bgElev` is honoured here rather than measured elsewhere and drawn flat.
+  const ink = tone("default", deps.theme, deps.capabilities, "bgElev");
+  const ground = withBackground(ink, background("surface.bgElev", deps.theme, deps.capabilities));
+  const lead = glyph.repeat(Math.floor(left / glyphCells));
+  // The remainder when the glyph is two cells wide — spaces rather than a
+  // half glyph, and on the left where the rule is, not against the label.
+  const pad = left - cells(lead, ambiguous);
+  return [
+    { text: lead + " ".repeat(pad), style: muted },
+    { text, style: ground },
+    { text: glyph, style: muted },
+  ];
 }
 
 /**
@@ -726,7 +806,10 @@ export function paint(
       // below it, whatever the footer holds. The lower one is drawn with a
       // footer of zero rows too: a frame whose bottom edge moved with whether
       // the app returned a block would flicker on content (§6l.2 row 3).
-      rule(width, deps),
+      // **The upper rule carries the label; the other two stay bare** (I111,
+      // §6l.10) — *two rules with two labels is a header, and the header
+      // already exists*.
+      rule(width, deps, frame.label),
       ...promptRegion(frame, deps, width),
       rule(width, deps),
       // **The composed height, not `1`** (I80, I82). `region()` truncates to it

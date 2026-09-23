@@ -163,7 +163,28 @@ export type ChromeFn = (ctx: ChromeContext) => readonly Block[];
  * no footer at all (I82). Nothing here is a height — the one thing an app
  * decides is what its footer returns (§6l.4 F).
  */
-export type Chrome = Readonly<{ header: ChromeFn; footer: ChromeFn }>;
+/**
+ * The application's identity, for the prompt's upper rule (C22 I111, §6l.10,
+ * §069, `R-COL-003`).
+ *
+ * **A function of the frame rather than a string, and the design's own ladder
+ * is why**: *the app*, *the app and the branch*, *and the dirty count*. A
+ * branch and a dirty count are facts the application recomputes, and it is
+ * identity rather than status — it does not change during a turn, which is what
+ * earns it a permanent slot instead of a region.
+ *
+ * `null` is no label, and so is a string that strips to nothing. **Whether it
+ * is drawn is never the caller's**: the frame sheds it first, below 60 columns
+ * and whenever it would leave no rule glyph, which is what *the least
+ * load-bearing thing on the screen* means once it is a mechanism.
+ */
+export type LabelFn = (ctx: ChromeContext) => string | null;
+
+/**
+ * §6l — the chrome's three members. `label` is optional and absent is the frame
+ * that shipped, glyph for glyph (C22 I81, as amended in §6l.10).
+ */
+export type Chrome = Readonly<{ header: ChromeFn; footer: ChromeFn; label?: LabelFn }>;
 
 /**
  * Superset of C20's `HistoryFs` (C22 §2), so the injected value passes straight

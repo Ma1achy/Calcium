@@ -28,7 +28,7 @@
 
 import { NO_SPAN } from "../data/viewmodel/index.js";
 import type { Probe } from "../data/viewmodel/index.js";
-import { cells } from "../presentation/text.js";
+import { cells, stripControl } from "../presentation/text.js";
 import {
   DEFAULT_FOOTER_ROWS,
   HEADER_ROWS,
@@ -51,6 +51,15 @@ export type Composed = Readonly<{
   now: number;
   header: readonly Block[];
   footer: readonly Block[];
+  /**
+   * The application's label for the prompt's upper rule, or `null` (I111).
+   *
+   * **Resolved with the chrome and carried on the frame**, for the reason
+   * `footerRows` is: the painter reads one value and the composer reads it
+   * once. A label computed at paint time would be a second call into the
+   * application from a place that is meant to be pure drawing.
+   */
+  label: string | null;
   /**
    * Rows the footer occupies — its blocks' measured height, clamped to
    * `MAX_FOOTER_ROWS`, zero for `[]` (I82). Carried so `heightsSum` and the
@@ -148,9 +157,17 @@ export type ComposeDeps = Readonly<{
 function chromeOf(
   deps: ComposeDeps,
   ctx: Parameters<Chrome["header"]>[0],
-): { header: readonly Block[]; footer: readonly Block[] } {
+): { header: readonly Block[]; footer: readonly Block[]; label: string | null } {
   using _s = deps.probe?.span("chrome") ?? NO_SPAN;
-  return { header: deps.chrome.header(ctx), footer: deps.chrome.footer(ctx) };
+  // **The label is under the same span and for the same reason** (C28 I39):
+  // the question is *how much of this frame is the application's chrome*, and a
+  // third span firing once would be the same answer written so nobody adds it up.
+  const raw = deps.chrome.label?.(ctx) ?? null;
+  // A string that strips to nothing is no label — the caller supplying `""` or
+  // a line of control characters means the same thing as supplying nothing, and
+  // two spellings of absence is how a slot acquires a blank it draws.
+  const label = raw === null ? null : (stripControl(raw).trim() || null);
+  return { header: deps.chrome.header(ctx), footer: deps.chrome.footer(ctx), label };
 }
 
 export function compose(deps: ComposeDeps): Composed {
@@ -174,7 +191,7 @@ export function compose(deps: ComposeDeps): Composed {
     ...(capabilities === null ? {} : { capabilities }),
   };
 
-  const { header, footer } = chromeOf(deps, ctx);
+  const { header, footer, label } = chromeOf(deps, ctx);
   // **The footer is its content** (I82, §6l.4 B): measured at this frame's
   // width, clamped to the maximum the size gate can hold, and zero for `[]` —
   // the lower rule is the prompt's edge, not the footer's head, so a frame
@@ -206,6 +223,7 @@ export function compose(deps: ComposeDeps): Composed {
     now,
     header,
     footer,
+    label,
     footerRows,
     // Below the header and its rule (I87, §6l.7), and one column narrower than
     // the terminal (I109, §6l.9): the transcript is measured and drawn at this,
