@@ -2630,6 +2630,8 @@ the same overrun in smaller form.
 - **I84** — *(§096, §3a-ter, F239, F230)* **A status has three parts and the cap is on the box, not on the message.** The **banner** never truncates, the **message** wraps, and the **detail** truncates and is bounded with a residue row. `CONTENT_LINE_CAP = 7` bounds the rows a box **requests** — 4 for the worst measured message and 3 for the detail, both measured at the top rung's content width — and `DETAIL_LINE_CAP = 3` bounds the detail. Inside a granted interior the allocation is three clauses: a present, non-empty detail reserves **one row**; the message wraps into what remains and truncates with its existing mark; the detail expands into what the message did not take, its last row a residue when it was cut. **With no detail the block draws exactly what it drew before**, and the only figure that moves is the request, upward, for a message over four rows. F239's argument is unchanged and only its subject is: it was always about the box's over-draw inside a bounded container, and capping the message was one way to bound the box (→ I34, I31, C04 I49).
 - **I85** — *(§047, §048, §096)* **`empty` is a fourth status state, and it is not an error.** No banner, no mark, no error tone, and its content **centred on both axes**. The vertical half is inherited rather than added: `render` already centres the whole group in the interior, on a ruling taken about a tall error box, so what this invariant contributes is the **horizontal** centring — every other state's rows go through a left-aligned `fit` — and the three absences. A refusal states its reason; it is not an error and never red (→ I84, I31).
 - **I86** — *(§7a, `R-SEL-004`)* **A kind declares its copy text, and a kind that declines is absent from the join rather than empty in it.** `BlockDefinition.copy` is the block-level pair of `NavElement.copy` and carries the same rule — the **source**, never the rendering — so a `table` copies as TSV with its header including the columns this width dropped, a `patch` as unified diff rather than the rendered two-column view, an `image` as its alt text and its path. The default is **omission, not the empty string**: a blank line is `R-SEL-004`'s entry separator, so a kind joining as `""` forges an entry boundary inside one. Measured before the seam existed: `copyTextOf` answered six kinds and `""` for the rest, so five of the seven kinds the rule names by name copied blank — and a `scroll` holding a table produced a copy that succeeded and was empty.
+- **I87** — *(§7b, `R-SEL-002`)* **Nothing is drawn to the left of a block's first column, on any row.** `R-SEL-002`'s *a wrapped line's continuation carries no decoration in the gutter*, generalised past `notice`: the gutter is the columns before content begins, and anything put there on a continuation row is picked up by a naive drag as though it were text. **The rail is not a carve-out** (I41) — it fills columns **at** the head's own first column and never before it — so the property is one sentence over every kind rather than a list with an exception, and a kind joins the check by being in the registry. The constraint is on **layout**, which is `R-SEL-002`'s own last sentence and the reason this is a row over the whole corpus rather than a comment in one kind (→ I41, C04 I95).
+
 ## 7a. `copy` — a kind's source, one level up from an element's
 
 `R-SEL-004` is a per-kind rule and it is written about **blocks**: *prose copies as
@@ -2667,6 +2669,49 @@ and the exact class `NavElement.copy`'s prose is about.
 **`copyTextOf` becomes the registry's, and its six kinds become six declarations.**
 The private switch is then the thing it always looked like from outside: a table of
 which kinds answer, kept in one file, disagreeing with the registry by construction.
+
+## 7b. Surviving a naive drag — the gutter, and the three clauses that land elsewhere
+
+`R-SEL-002` is four clauses and one constraint: *the render must survive a naive
+drag*. A reader who selects with the mouse gets the emulator's rectangle
+(`R-SEL-001`), so whatever is in those columns comes with the text — and the
+rule's own last sentence is that this is **a constraint on layout, not a note**.
+
+| The clause | Where it lands |
+|---|---|
+| a wrapped line's continuation carries no decoration in the gutter | **here**, as I87, generalised over the registry |
+| the scrollbar is the last column, so a drag that stops short of it is clean | **M14**, with the scrollbar. There is no scrollbar in `src/` to hold to it |
+| nothing meaningful is drawn in a column a reader would not drag through | **M14**, the same subject read from the other side: the column a reader would not drag through *is* the scrollbar's |
+| a bounded block's content does not sit inside vertical rules | **parked.** Read literally it forbids the box the design's own fixtures draw — §021's logs panel, §045's live terminal, §047's refusal, §048's loading state, §096's error frame all put content between two `│` |
+
+**The parked clause is a reading, not a gap.** Two readings survive the fixtures
+and they ask for different work. One: *a bounded block's content is not bordered
+on its sides*, which the fixtures contradict six times. Two: *a bounded block's
+content does not sit beside anything else on its rows* — nothing is drawn in the
+columns to either side of it — which is C19's own finding one component over
+(*a menu narrower than the region leaves the diff's red and green resuming to its
+right, and a reader sees two unrelated things on one line*), and which the repo
+**does** violate: `row` places two 39-wide tables at cols [0, 39) and [40, 79),
+and a drag across those rows splices them. The second reading is the one the rule
+argues for and the one that costs a layout change, so it is asked rather than
+assumed.
+
+### The gutter clause, as a property over the registry
+
+**Generalised rather than asserted of `notice`.** The gutter is `notice`'s word
+for it and the hazard is every kind's: a bordered block's `│`, a table's rule, a
+`scroll`'s residue mark are all things a drag picks up if they sit left of where
+the content starts. So the property is stated over **columns** and not over
+tokens — *on every row, the cells before the block's first occupied column are
+spaces* — and a kind joins it by being in the registry rather than by anyone
+extending a list.
+
+**The rail costs no exception**, which is the check's own argument for this
+phrasing: `quote` draws on every row *at* the head's first column, so it satisfies
+the property unchanged, and a carve-out for it would have been a hole the next
+decoration could walk through.
+
+---
 
 ## 8. Commitments
 
@@ -3045,6 +3090,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.45** (I32): `FULL_CAPS` and `WIDE_CAPS` give the default the same frames, and a `narrowOnly` set gives its ASCII pair at `wide`. **Both routes to the ASCII pair, because a set can reach it by width or by `unicode: "ascii"`** and one assertion cannot tell which fired.
 - **T3.46** (I31, §3a): the tag is the only painted run — **exactly one** background introducer in the whole frame at 24-, 8- and 4-bit — and the pair moves together at every rung, so a ground with no ink and an ink with no ground are both failures. At 1-bit neither arrives and the `▲` and the word are what carry it. **The depths are asserted apart and were not**: one arm covering 4 and 1 together stated a forced absence at a rung that has a ground (F240).
 - **T3.47** (I31, §3a): the ASCII arm draws `+ - |` and `!`, and **no box-drawing codepoint appears in the frame** — asserted over the whole frame rather than over the corners, because a border is four glyphs and a mistake is usually one of them.
+- **T2.154** (I87, §7b, `R-SEL-002`): over the whole corpus × the wrapping widths → on every row of every block, every cell before that block's **first occupied column** is a space. Stated over columns rather than over tokens, so a kind joins by being in the registry; the rail needs no carve-out, because it draws at the head's own column and not before it. **The control is a fabricated block that fails it** — a copy of a corpus notice with a mark written one column left on its continuation rows — so the row is known to be able to see the defect rather than assumed to be.
 - **T2.10a** (I34, I11): **golden frames for the contained failure**, three messages × three widths × three variants, both frames of the two-frame path. **There were none**, through three commits about this path: nothing in `test/golden/` rendered a definition that throws, so golden passed each time on the absence of a subject rather than the absence of a change. Frame 1 is recorded too, because F230's ruling makes the short box a specified state rather than a transient.
 - **T3.48** (I31): `status` declares no `window`, and `windowSequence` keeps it whole and pays for it out of `skipRows` — `plot`'s and `scroll`'s case, and the same assertion.
 
