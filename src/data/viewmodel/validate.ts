@@ -43,6 +43,7 @@ import {
   MARKER3_MEMBERS,
   STYLE_ARMS,
   TEXT_SPAN_KEYS,
+  TRAIL_FORMS,
   TERMINAL_KEYS,
   TERMINAL_RUN_KEYS,
   type OHLC,
@@ -1366,6 +1367,20 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
     requireGlyph(b["glyph"], e, at);
     checkColormapName(b, e, at);
     checkSpans(b, "text", e, at);
+    // **A misspelled trail is refused, not defaulted** (C04 I123, §5c). Falling
+    // back to `hotEdge` would leave the document saying one thing and the
+    // screen showing another, with nothing anywhere reporting the disagreement
+    // — the `matrixAnchor` class. `trail` with no `streaming` is legal and
+    // means nothing: a settled block has no head.
+    if (b["trail"] !== undefined && !TRAIL_FORMS.includes(b["trail"] as never)) {
+      e.push(
+        `${at} "trail" is outside its union (C04 I123) — one of ` +
+          `${TRAIL_FORMS.map((f) => `"${f}"`).join(", ")}`,
+      );
+    }
+    if (b["streaming"] !== undefined && typeof b["streaming"] !== "boolean") {
+      e.push(`${at} "streaming" must be a boolean (C04 I122)`);
+    }
     // The one button a notice may carry (C04 §3, arc 6 §5) — a chip's `Action`,
     // refused by the same rule as a tip's.
     if (b["action"] !== undefined) checkAction(b["action"], `${at}.action`, e);

@@ -481,6 +481,38 @@ export type Ramp = Readonly<{
 /** The members of a ramp, for a gate that cannot silently take a seventh (I106). */
 export const RAMP_KEYS: ReadonlySet<string> = new Set(["fill", "from", "to", "colormap", "bands", "animate", "since"]);
 
+// --- trails ---------------------------------------------------------------
+
+/**
+ * The five forms a streaming run's trail takes (§5c, §026, I123).
+ *
+ * **A band at the head, not a timeline.** §026 rules out a per-character fade
+ * over time — there is no per-cell timeline, so an age-based fade repaints
+ * every character of the trail on every frame — and a glyph rising into its
+ * cell, which needs a sub-cell position a terminal has not got. What is
+ * affordable is a fixed band whose cost is its width and not the reply's
+ * length.
+ *
+ * **`hotEdge` and `hue` differ by their target, not by their head.** Both
+ * arrive in the accent; `hotEdge` cools to the run's own ink and `hue` to the
+ * block's body tone. They coincide when a run has no ink of its own and
+ * separate the moment one does, which is the case `R-BLK-196` is written
+ * about — a dim run's trail must cool to dim.
+ *
+ * `weight` is the only one that survives 1-bit: a terminal has bold or it has
+ * not, so there is no settle to lose.
+ */
+export type TrailForm = "hotEdge" | "fade" | "hue" | "ripple" | "weight";
+
+export const TRAIL_FORMS: readonly TrailForm[] = Object.freeze([
+  "hotEdge", "fade", "hue", "ripple", "weight",
+]);
+
+/** The forms that are a colour, and therefore draw nothing at 1-bit (C09 I91). */
+export const TRAIL_COLOUR_FORMS: ReadonlySet<TrailForm> = new Set<TrailForm>([
+  "hotEdge", "fade", "hue", "ripple",
+]);
+
 // --- table ----------------------------------------------------------------
 
 export type Cell = Readonly<{
@@ -672,6 +704,24 @@ export type Notice = Readonly<{
   tone: Tone;
   glyph?: Glyph;
   text: string;
+  /**
+   * Whether more text is still arriving (§5c, I122, §025, §026).
+   *
+   * **The fact, and never the band.** `Panel.live`'s precedent (C09 I38): a
+   * block names what is true and C09 derives the appearance. Here it is not a
+   * preference — the band's offsets depend on the terminal's width, which a
+   * producer cannot see, so a producer writing the span would be writing a
+   * number it cannot compute.
+   *
+   * Absent is settled, and a settled block has no head: `trail` alone draws
+   * nothing.
+   */
+  streaming?: boolean;
+  /**
+   * Which of the five forms the trail takes (§5c, I123). Absent is `hotEdge`,
+   * which is §026's default, and it is read only while `streaming`.
+   */
+  trail?: TrailForm;
   /** Styled runs inside `text`, by code-unit offset (§3am, I83). */
   spans?: readonly TextSpan[];
   /** The map a span's `value` reads through (I90). Required the moment any span carries one. */

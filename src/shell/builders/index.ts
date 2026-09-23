@@ -212,6 +212,11 @@ function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: NoticeOpts): N
       // present, the renderer resolves the mark by capability and the row joins
       // the focus ring; absent, the notice is an ordinary line.
       ...(opts?.state === undefined ? {} : { state: opts.state }),
+      // **The stream's two members** (C04 I122, C04 I123): written only when
+      // supplied, so a settled notice is byte-identical to what this built
+      // before and the band costs nothing it does not draw.
+      ...(opts?.streaming === undefined ? {} : { streaming: opts.streaming }),
+      ...(opts?.trail === undefined ? {} : { trail: opts.trail }),
     } as Notice,
     opts,
     false,

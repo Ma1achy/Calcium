@@ -14,7 +14,7 @@
  * oversight.
  */
 
-import type { Action, Block, CallState, Cell, ColormapName, ErrorLike, Glyph, HeadingLevel, KeyValue, Tone, TextSpan } from "../../data/viewmodel/index.js";
+import type { Action, Block, CallState, Cell, ColormapName, ErrorLike, Glyph, HeadingLevel, KeyValue, Tone, TextSpan, TrailForm } from "../../data/viewmodel/index.js";
 import type { ProducerContext } from "../../data/adapters/types.js";
 
 /**
@@ -102,6 +102,22 @@ export type NoticeOpts = ValuedTextOpts &
      * a producer has never seen one.
      */
     state?: CallState;
+    /**
+     * Whether the notice's text is still arriving (C04 I122, C09 §7e).
+     *
+     * **The band is a property of the stream, not of the block's shape**, so
+     * an author composing their own streaming line declares it here rather
+     * than styling a run: the trail's arithmetic is the renderer's and the
+     * cells it covers are a question about the terminal.
+     */
+    streaming?: boolean;
+    /**
+     * Which of the five trails the band draws (C04 I123, §026).
+     *
+     * Omitted, `hotEdge` — the design's default. It is read only while
+     * `streaming` is true, so a settled notice carrying one draws nothing.
+     */
+    trail?: TrailForm;
   }>;
 
 /**

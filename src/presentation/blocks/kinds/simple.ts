@@ -8,7 +8,7 @@
  */
 import type { AmbiguousWidth } from "../../text.js";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
-import type { Glyph, Notice, Pills, Progress, Raw, Rule, Tip } from "../../../data/viewmodel/index.js";
+import type { Glyph, Notice, Pills, Progress, Raw, Rule, Tip, Tone } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate, truncateParts, wrapCells } from "../../text.js";
 import type { Run } from "../../runs.js";
 import { runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../runs.js";
@@ -305,6 +305,109 @@ function noticeElements(block: Notice, width: number): readonly NavElement[] {
   ]);
 }
 
+/**
+ * How many cells of the head a trail covers (C09 I90, §7e).
+ *
+ * **Three, and the design names no number.** §026 costs its own example at one
+ * cell and at three — *about two repaints per cell at a one-cell band, four at
+ * three* — so three is the wider of the two figures the design itself works
+ * with. Decided rather than specified, and recorded as such.
+ */
+const TRAIL_CELLS = 3;
+
+/**
+ * The head colour each form arrives in (C04 §5c, C04 I123).
+ *
+ * **`fade`'s head is a decided value.** §026 says *the newest character IS the
+ * ground and emerges toward the ink*, and a `Ramp` is closed to `Tone` so no
+ * member can hold a colour value (C10 I16) — there is no tone that names the
+ * surface. `muted` is the dimmest legal head and is what *emerges toward the
+ * ink* reads as through this mechanism; the design's own word is *the ground*,
+ * and the gap is parked rather than papered over.
+ */
+const TRAIL_HEAD: Readonly<Record<"hotEdge" | "fade" | "hue" | "ripple", Tone>> = Object.freeze({
+  hotEdge: "accent",
+  fade: "muted",
+  hue: "accent",
+  ripple: "accent",
+});
+
+/**
+ * The trail's band, laid over the head of a streaming notice (C09 I90, I91, §7e).
+ *
+ * **Derived here because only here knows the width** (C04 I122). The block says
+ * it is streaming; which cells are in the band is this layer's arithmetic, and
+ * a producer writing the span would be writing an offset it cannot compute.
+ *
+ * **Over the text, so chrome is whole by construction** (`R-BLK-198`). The rows
+ * handed in are the wrapped *text*; the head mark is added by the caller after
+ * this runs, so there is no rule for the renderer to remember — a header has no
+ * position in the stream, so it exists complete or not at all.
+ *
+ * **The target is the run's own ink** (C04 I123, `R-BLK-196`): `hotEdge` and
+ * `fade` cool to whatever tone the run already carries, `hue` to the block's
+ * body tone. A trail whose target is fixed repaints a dim run to white, which
+ * is a defect that reads as a styling choice.
+ *
+ * **Geometry is untouched**: this restyles cells that are drawn anyway, so
+ * `measure` is the same number with a trail and without one.
+ */
+function withTrail(
+  wrapped: readonly (readonly Run[])[],
+  block: Notice,
+  ambiguous: AmbiguousWidth,
+  colourDepth: number,
+): readonly (readonly Run[])[] {
+  if (block.streaming !== true) return wrapped;
+  const form = block.trail ?? "hotEdge";
+  // **At 1-bit the four colour forms draw nothing rather than something else**
+  // (I91). Substituting a mark would spend a cell the block never reserved, and
+  // substituting bold for every form would make four names one.
+  if (colourDepth === 1 && form !== "weight") return wrapped;
+
+  const last = wrapped.length - 1; // cells-ok — an array index
+  const line = wrapped[last];
+  if (line === undefined) return wrapped;
+  const text = runsText(line);
+  const total = cells(text, ambiguous);
+  if (total === 0) return wrapped;
+
+  // Where the band starts, in code units: walk back from the end until the tail
+  // is `TRAIL_CELLS` wide. A whole band on a short line is the whole line —
+  // "never reaching further than the text" (I90).
+  let start = text.length; // cells-ok — a code-unit cursor
+  while (start > 0 && cells(text.slice(start - 1), ambiguous) <= TRAIL_CELLS) start -= 1; // cells-ok — a code-unit cursor
+  if (start >= text.length) return wrapped; // cells-ok — a code-unit comparison
+
+  const head = sliceRuns(line, 0, start);
+  const band = sliceRuns(line, start, text.length - start); // cells-ok — a code-unit length
+  if (band.length === 0) return wrapped; // cells-ok — a run count
+
+  const banded: Run[] = [];
+  let at = 0; // graphemes-ok — the run's place in its ramped span
+  const of = band.reduce((n, r) => n + [...r.text].length, 0); // cells-ok — a cluster count
+  for (const run of band) {
+    if (form === "weight") {
+      banded.push({ ...run, attrs: { ...run.attrs, bold: true } });
+      continue;
+    }
+    const target = form === "hue" ? block.tone : (run.tone ?? block.tone);
+    const ramp = {
+      fill: "gradient" as const,
+      from: TRAIL_HEAD[form],
+      to: target,
+      ...(form === "ripple" ? { animate: "ripple" as const } : {}),
+    };
+    const count = [...run.text].length; // cells-ok — a cluster count
+    banded.push({ ...run, ramp: { ramp, at, of, ordinal: 0 } });
+    at += count; // graphemes-ok — a cluster cursor
+  }
+
+  const out = [...wrapped];
+  out[last] = [...head, ...banded];
+  return out;
+}
+
 export const noticeDefinition: BlockDefinition<Notice> = {
   kind: "notice",
 
@@ -348,7 +451,15 @@ export const noticeDefinition: BlockDefinition<Notice> = {
       ? { ...tone(block.tone, ctx.theme, ctx.capabilities, "focusGround"), ...focusStyle(ctx.theme, ctx.capabilities) }
       : tone(block.tone, ctx.theme, ctx.capabilities);
     const prefix = prefixCells(block.glyph);
-    const wrapped = noticeRows(block, ctx.width, ctx.capabilities);
+    // **The band, over the wrapped text and before the glyph is added** (I90,
+    // §7e): chrome is composed whole, and putting the derivation here is what
+    // makes that structural rather than a rule the row below has to remember.
+    const wrapped = withTrail(
+      noticeRows(block, ctx.width, ctx.capabilities),
+      block,
+      ctx.capabilities.ambiguousWidth,
+      ctx.capabilities.colourDepth,
+    );
     // **The wrapped rows, not the text's length** (C28 I45). `noticeRows` is
     // what the cost is in and `wrapped` is already here, so the gauge is free —
     // and it is the number that moves when a notice gets slow, because the wrap
