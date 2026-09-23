@@ -3343,6 +3343,84 @@ split fails rather than passing on a message that reads as covering it.
 
 ---
 
+## 5c. The trail — a band at the head of a streaming run (§025, §026, `R-MOT-004`, `R-MOT-005`, `R-MOT-012`)
+
+**Two facts, two carriers** (`R-BLK-184`): the *trail* says what just arrived and
+the *mark* says more is coming. They are separate because they stop at different
+moments — the trail is a property of a character's position in the stream and
+survives the pause; the mark is a property of the stream itself and goes the
+instant it ends, with nothing replacing it.
+
+### What the terminal cannot do, and what that leaves
+
+§026 rules out two implementations by cost, and the rulings are the design's own:
+
+- **A per-character fade over time.** There is no per-cell timeline — a terminal
+  is repainted — so an age-based fade repaints every character of the trail on
+  every frame. At a 100 ms window that is ten repaints per character, and a
+  500-character reply is 5,000 cell writes a second.
+- **A glyph rising into its cell.** There is no sub-cell position to animate
+  toward. A character is at a cell or it is not. `R-MOT-005` says the same thing
+  as a rule: an animation may change a cell's glyph, colour, opacity or
+  brightness and nothing else.
+
+What is affordable is **a fixed band at the head**: only the cells entering and
+leaving it are repainted, so the cost is a function of the band's width and not
+of the reply's length — about two repaints per cell at a one-cell band and four
+at three.
+
+### The fact is the block's; the band is C09's
+
+**`Panel.live`'s precedent, and it is the one the design argues for.** A panel
+names the fact and C09 derives the mark (C09 I38), because a glyph on the block
+is a producer deciding an appearance. The same holds here: a block says it is
+**streaming**, and C09 derives which cells are in the band and what they take.
+A producer writing the band itself would be writing a span whose offsets depend
+on the terminal's width, which the producer cannot see.
+
+`streaming` is therefore a fact and `trail` is a choice among five forms the
+design names, defaulting to `hotEdge`. Absent `streaming`, `trail` does nothing
+— the band is what streaming means, and a settled block has no head.
+
+### The five, and what each is when the mechanism is a ramp
+
+| form | the head | the target | at 1-bit |
+|---|---|---|---|
+| **`hotEdge`** (default) | `accent` | **the run's own ink** | nothing |
+| `fade` | the surface the run lands on | the run's own ink | nothing |
+| `hue` | `accent` | the block's **body tone** | nothing |
+| `ripple` | — | the band animates `ripple`, the one non-monotonic trail | nothing |
+| `weight` | bold | one hard step to normal | **the only survivor** |
+
+**`hotEdge` and `hue` are not the same rule, and the difference is the target.**
+§026 gives `hotEdge` *it cools to the ink rather than to a second tone* and
+`hue` *cools to the body tone*; they coincide exactly when a run has no ink of
+its own, and separate the moment one does — which is the case `R-BLK-196` is
+written about.
+
+**A run keeps its own ink as the trail's target** (`R-BLK-194`, `R-BLK-196`).
+The reasoning block is dim, so its trail cools to dim and not to the body
+colour: *a trail whose target is fixed repaints every run to white, which is a
+bug that looks like a styling choice.*
+
+**Stated blind spot: the overshoot is not expressible.** `hotEdge` *overshoots
+the accent at the head, holds, then cools*; a `gradient` ramp is a straight
+sample from `from` to `to` and has no curve. What lands is the hold's endpoints
+and not its shape. The distinction that carries meaning — which colour the band
+cools **to** — is expressible and is what separates the forms; the easing is
+not, and is recorded rather than approximated with a second ramp fill.
+
+### Chrome is never revealed
+
+`R-BLK-198`: the head mark and the reasoning header appear **whole**. *The
+reveal is a property of the stream; the trail is a property of a character's
+position in it. A header has no position in the stream, so it exists complete or
+not at all.* So the band is taken over the block's **text** and never over a
+glyph, a header or a border — which is a statement about where C09 measures the
+band from, and it is asserted rather than left to follow.
+
+---
+
 ## 6. Invariants
 
 - **I1** — `ViewDocument` and every `Block` are deeply immutable. All mutation is `applyPatch` returning a new value. **The walk that establishes it remembers what it has already walked, and the reason is a measurement rather than tidiness** (F1065). `applyPatch` deep-freezes the document it returns, so a streaming entry re-froze its whole block on every tick: with a `logs` block held at a fixed **8 000** lines and the same array re-sent, a thousand patches cost **1 140 ms**, against **5.7 ms** once the walk is memoised — 200×, and flat where it was linear in the block. What is memoised is *this function's own* completed walks, held in a `WeakSet`, **not `Object.isFrozen`**: the tree shallow-freezes objects in a dozen places and a shallow freeze says nothing about depth, so reading one as a memo hit would leave `blocks[0].rows[2]` mutable — which is the exact failure this invariant opens with, reintroduced by the optimisation for it. The entry is recorded **after** the freeze rather than before, because it is a claim that the subtree is done and a walk that threw part-way would otherwise leave that claim standing over an unfrozen tree; the cycle guard stays a per-call set, since it has to be added to first. **A second cost was the walk's own allocation**: `Object.getOwnPropertyNames` on an n-element array builds an n-string array to iterate, once per array node per walk, and a document of blocks and lines is mostly array nodes. Arrays walk by index instead — 2 069 ms to **496 ms** over the same 8 000 ticks, **9×** from where it started. Its one narrowing is stated rather than assumed: an array's own *non-index* property is no longer walked. It is still frozen with the array, so it cannot be replaced; what is no longer reached is its interior, and nothing in a `ViewDocument` has one because `JSON.parse` cannot produce one (T1.41). **What neither fixes is the shape**: a block that genuinely grows still costs a walk of its own spine per tick, so a whole-block `replace` remains O(lines) and a growing log remains quadratic. That residue is inherent to deep immutability over plain arrays — an immutable append **is** a copy — which is why the operation F1065 asks for would buy the producer's copy and nothing else: 36 ms across 8 000 ticks, against the 496 ms the rest of the tick costs.
@@ -3529,6 +3607,10 @@ split fails rather than passing on a message that reads as covering it.
 
 - **I121** — **`childGap` is the container's space *between* its children, and it is charged per placed child.** A container spends `max(0, placed − 1) × childGap` on its own axis — `1` by default across and `0` down, which is `ROW_GUTTER`'s behaviour given a name (F1226) — and `padding` takes its edges outside all of them, so a container with both draws one gap above the first child rather than two (§3b). It is the container's and never the composer's (C09 I17): `sequenceHeight` adds nothing and a document's top level has no `childGap`, the row between entries being the entry's own closing run (C22 I85). A container with one child or none spends nothing, whatever the field says. A gapped container remains windowable, because the gap rows are the definition's rather than the registry's.
 
+- **I122** — *(§5c, §025, §026, `R-MOT-005`, `R-MOT-012`)* **A block says it is streaming; it never says which cells are in the trail.** `streaming?: boolean` is the fact and `trail?: TrailForm` is the form, defaulting to `hotEdge`; C09 derives the band. The band's offsets depend on the terminal's width and a producer cannot see one, so a producer writing the span would be writing a number it cannot compute — `Panel.live`'s precedent (C09 I38), applied to the one other place a block was about to be handed an appearance.
+- **I123** — *(§5c, §026, `R-BLK-194`, `R-BLK-196`)* **A trail's target is the run's own ink, never a fixed colour.** `hotEdge` and `fade` cool to the ink the run already has; `hue` cools to the block's body tone, and that is the whole difference between it and `hotEdge`. A trail whose target is fixed repaints a dim run to white, which is a defect that reads as a styling choice. `trail` with no `streaming` draws nothing — the band is what streaming means, and a settled block has no head.
+
+
 ## 7. Commitments
 
 1. `ViewDocument` is a pure, deeply immutable value with no reference to Ink, terminals or the network (I1).
@@ -3649,11 +3731,16 @@ split fails rather than passing on a message that reads as covering it.
 109. **A stated blind spot has two halves and reading checks only one of them** (I118, F1085). MG31 named the two escapes a textual parse has, which is right, and then asserted the corpus reached neither. `xFormat?: Plot["yFormat"]` had been in the file for twenty-five days — not stale, **false when written** — and the assertion is what stopped anyone looking, because it converts a stated gap into a stated non-issue. Naming a limit is a claim about the rule and review can check it; claiming the corpus does not reach the limit is a claim about the corpus, and only a measurement can. It is *a negative claim inverts a resolver's verdict* one level up: **there is no such member** reads most convincingly the day it stops being true, because the gate is green either way. One grep over the body the rule already brace-matches.
 
 
+110. A block names the fact that it is streaming and C09 derives the band; a producer cannot compute a span whose offsets depend on a width it cannot see (I122).
+111. A trail cools to the run's own ink. The five forms differ by where the band starts and what it cools to, and `weight` is the one that survives 1-bit (I123).
+
 ## 8. Tests
 
 Six tiers. No state machine, so no transition table.
 
 ### Tier 1 — unit
+- **T1.46** (I122, §5c): `streaming` and `trail` survive the round trip and the key gate; a ninth member on a block carrying them is still refused, so the two fields were added to the gate's list and not around it.
+- **T1.47** (I123, §5c): `trail` with no `streaming` validates and means nothing — a settled block has no head — and an unknown `trail` name is refused rather than defaulted, because a misspelled form drawn as `hotEdge` is a silent disagreement between the document and the screen.
 
 - **T1.1** (I1): every constructor returns a frozen value; mutation attempts do not change it, at every nesting depth.
 - **T1.39** (I1, F1065): the memo — a subtree handed to `deepFreeze` twice is **walked once**, observed through an accessor that counts its own reads, and the value is frozen at depth either way. A count and not a duration, because a timing assertion on a shared runner measures the runner (F929).

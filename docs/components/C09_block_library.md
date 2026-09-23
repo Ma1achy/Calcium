@@ -2871,6 +2871,34 @@ separate decision and no rule here forbids it.
 
 ---
 
+## 7e. The trail's band — derived here, because only here knows the width (C04 §5c, §025, §026)
+
+C04 I122 gives the block a fact and a form; this is where they become cells.
+
+**The band is the last `TRAIL_CELLS` cells of the block's rendered text**, which
+is the point of arrival — *the trail is anchored to the point of arrival, so it
+advances toward inline-end with the head* (`R-BLK-182`). Measured in cells and
+not in characters, because a wide cluster fills two of them and a band counted
+in characters is a band of a different width on every line.
+
+**Three, and the design does not name a number.** §026 costs its own example at
+one cell and at three — *about two repaints per cell at a one-cell band, four at
+three* — so three is the wider of the two figures the design itself works with.
+It is a decided value rather than a specified one and is recorded as such.
+
+**Over the text and never over chrome** (`R-BLK-198`, C04 I122). The head mark, a
+header and a border are composed whole: *a header has no position in the stream,
+so it exists complete or not at all.* The band is therefore taken from the
+block's `text` and the offsets it produces are into `text`, which is what makes
+that rule structural rather than a thing the renderer has to remember.
+
+**It costs no rows** (the measurement invariant). A trail is a colour over cells
+that are drawn anyway, so `measure` is the same number with a trail and without
+one — which is *appearance animates, geometry never does* at the one seam where
+a band could have been mistaken for a reveal.
+
+---
+
 ## 8. Commitments
 
 1. C09 owns the registry; C04 owns the schema and the measurement contract (I13).
@@ -2948,8 +2976,14 @@ separate decision and no rule here forbids it.
 71. **The status cap was on the message and belongs to the box** (I84, §3a-ter, F239). `MESSAGE_LINE_CAP` bound the **request** and never the render, which is a distinction the constant's name hid: the message has always been uncapped inside a box it was granted. So the design's *the message wraps* costs one line, and what it buys is the part the repo did not have — a detail, which truncates into a residue row where prose would have lost the end. The figures are measured, not chosen: 4 is the worst message once a trace stops being one, and it is the same 4 F239 measured.
 72. **An empty block is a correct block about nothing** (I85, §047). It gets a state rather than a tone, because the thing that makes it not-an-error is the *absence* of the banner, the mark and the red — three absences no tone can express. Its vertical centring was already built for an unrelated reason, which is the whole of what this state costs on that axis and is why the ruling is one word about the horizontal one.
 73. **The trust boundary is measured over the registry, not over the call sites** (I89, §7d, `R-TRU-001`). The plan for this MR said the escaping was absent; it is built, at `data/text.ts`, and the measurement that mattered was whether it is *reached* — 38 of 39 kinds and a live session, no control byte to the frame, the payload's printable residue drawn as text, and the thirty-ninth exempt behind `C04 I110`'s gate rather than unchecked. What was missing is the scope: a rule phrased over the nineteen modules that remember to call it cannot see a twentieth, which is `SS65`'s shape one component over.
+74. **A trail is derived where the width is known** (I90). The block says it is streaming — that is C04's field and C04's argument for it; the band's cells are this layer's arithmetic, taken over the text so that chrome is composed whole by construction rather than by a rule the renderer must remember.
+75. **A trail costs no rows and `weight` is the 1-bit rung** (I90, I91). A band is a colour over cells that are drawn anyway; where there is no colour the four colour forms draw nothing, because substituting a mark would spend a cell the block never reserved.
 
 ---
+
+- **I90** — *(§7e, C04 §5c, C04 I122, C04 I123, `R-BLK-182`, `R-BLK-198`)* **The trail's band is the last `TRAIL_CELLS` cells of a streaming block's text, derived here and measured in cells.** Never over a glyph, a header or a border — chrome is composed whole — and never reaching further than the text, so a block whose text is shorter than the band takes a band of its whole text. The span it produces carries a `ramp` whose `to` is the run's own ink (C04 I123), and it costs no rows: `measure` is the same number with a trail and without one.
+- **I91** — *(§7e, C04 §5c, `R-MOT-005`)* **`weight` is the only form that survives 1-bit, and the others draw nothing there rather than something else.** A trail is a colour, and a rung with no colour has no trail — substituting a mark would spend a cell the block did not reserve, and substituting bold for every form would make four names one. `weight` is bold with one hard step to normal precisely because a terminal has bold or it has not, so there is no settle to lose.
+
 
 ## 8b. The glyph axis — a classification table, and why it is not a trace
 
@@ -3064,6 +3098,11 @@ frame later than the fault.
 Six tiers. Every cell of the §6 transition table is covered.
 
 ### Tier 1 — unit
+- **T1.54** (I90, §7e): the band is the last three **cells** of the text — asserted against a line ending in a wide cluster, where a band counted in characters is a different width. A block whose whole text is shorter than the band takes all of it, and the offsets never reach past `text`.
+- **T1.55** (I90, §7e, `R-BLK-198`): chrome is never in the band — a streaming block with a head mark, and the span's offsets are into `text` with the glyph outside them at every width, including the width where the text wraps to one cluster on its last row.
+- **T1.56** (I90, C04 I123, §7e): the target is the run's own ink — a block whose run carries `tone: "dim"` produces a ramp cooling to dim, and the same block with no run tone cools to the body tone. Two documents one field apart, because a fixed target passes any row that only asks whether a ramp is present.
+- **T1.57** (I90, §7e): a trail costs no rows — `measure` is the same number with `streaming` and without it, at a spread of widths, and the rendered rows differ only in their styling. The measurement invariant is the one carve-out the design does not override, so it is asserted rather than argued.
+- **T1.58** (I91, §7e): at 1-bit `weight` draws bold over the band and the other four draw nothing at all — not a mark, not a substitution. Asserted as the rendered rows being byte-identical to the untrailed block for the four, which is what *nothing* means where a row could otherwise pass by drawing something smaller.
 
 - **IF8** (C22 I77): `Frames.advance` is a function of elapsed time — four wakes of 25 ms and one of 100 leave the index, the remainder and `due` where one wake of 200 does; a full loop is frame 0 and keys as untouched; a minute idle lands where the clock says; a still and a zero advance are no-ops. In `test/edge/image-frames.test.ts` beside the rows that consume it.
 - **IF9** (I39): `transmitAnimation` is one `a=T` as raw RGBA, one `a=f` per later frame carrying its delay in `z`, an `a=a` for the root frame's gap and an `a=a,s=3` to run — every escape under 4096 bytes — and on the 8x8 fixture the whole upload is under ten ticks of retransmission.
