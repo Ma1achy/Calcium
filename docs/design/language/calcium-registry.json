@@ -29342,6 +29342,14 @@
       "ruleIds": [
         "R-KEY-007"
       ]
+    },
+    {
+      "id": "host.detach",
+      "label": "leave a captured child and return ownership to the host",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-007"
+      ]
     }
   ],
   "bindings": [
@@ -29862,6 +29870,34 @@
         "R-KEY-007"
       ],
       "kind": "key"
+    },
+    {
+      "id": "binding.host-detach",
+      "actionId": "host.detach",
+      "chord": "⌃]",
+      "scope": "global",
+      "label": "host escape",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "when": "attached"
+    },
+    {
+      "id": "binding.host-detach-enhanced",
+      "actionId": "host.detach",
+      "chord": "⌥esc",
+      "scope": "global",
+      "label": "enhanced detach",
+      "profile": "enhanced-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "when": "attached"
     }
   ],
   "spinners": [

@@ -64,7 +64,7 @@ import {
   type TuiConfigInput,
   type TuiInstance,
 } from "./types.js";
-import type { PushedSurface, PushedSurfaceHandle } from "./surface.js";
+import type { ChildSurface, ChildSurfaceHandle } from "./surface.js";
 
 /**
  * §8 step 4 — the caller's code, per caller.
@@ -426,7 +426,7 @@ class Session implements TuiInstance {
     return this.#graph?.session.snapshot ?? emptySnapshot(this.config);
   }
 
-  openSurface(surface: PushedSurface): PushedSurfaceHandle {
+  openSurface(surface: ChildSurface): ChildSurfaceHandle {
     if (this.#state !== "running" || this.#graph === null) {
       throw new SessionStateError("openSurface", this.#state);
     }

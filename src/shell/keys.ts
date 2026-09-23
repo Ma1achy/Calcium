@@ -85,6 +85,20 @@ export type KeyDeps = Readonly<{
   submit: (line: string) => void;
   /** Move focus into the transcript, for `⇧⇥` (`focus.previous`, §6a). */
   focusTranscript: () => void;
+  /**
+   * Leave a captured child and return ownership to the host (C16 I49,
+   * R-BLK-908).
+   *
+   * **Not `reserved`**, and this is the one row where the difference is the
+   * whole point: *a captured child reserves one `host.detach` action because a
+   * `/command` cannot reach the host while capture is active… may never leave
+   * capture without a visible, reachable host escape.* A reservation here is a
+   * session with no way out of a child that has stopped answering.
+   *
+   * A no-op with nothing attached, because the chord is only ever resolved at
+   * the `child` target and that target is only reachable while one is.
+   */
+  detachChild: () => void;
   /** Where the prompt sits, from the composed frame rather than a fresh read. */
   anchor: () => PromptAnchor;
   /** How big a layer may be (C15 `Region`), for the menu's "… n more". */
@@ -580,6 +594,9 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
    *
    * Fifteen of these: the nine agent slots, `agent.next`/`agent.previous`,
    * `posture.cycle`, `values.toggle`, `queue.drop` and `selection.semantic`.
+   * **`host.detach` is not among them** — it arrived with a chord in the same
+   * shape and it is the one action whose reservation would be a defect, because
+   * it is the only exit from a rung nothing else can leave (C16 I49).
    * The chord is the design's and the feature is not built, and leaving it
    * unbound is the worse of the two — an unbound chord is one an application
    * takes, so the feature arrives needing a key that is gone. §6's closed set
@@ -606,6 +623,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     agent7: reserved,
     agent8: reserved,
     agent9: reserved,
+    hostDetach: () => void deps.detachChild(),
     postureCycle: reserved,
     valuesToggle: reserved,
     queueDrop: reserved,

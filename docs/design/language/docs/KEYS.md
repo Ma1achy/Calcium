@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT. Source: ../calcium-registry.json; builder: ../build-calcium.mjs -->
 # Calcium keys
 
-Revision 0.9 · 39 current bindings · profile: default-terminal
+Revision 0.9 · 41 current bindings · profile: default-terminal
 
 The universal set gives one purpose to each key and does not depend on what has focus; the active owner resolves that purpose.
 
@@ -42,6 +42,8 @@ docs/KEYS.md and the help entry come from the same source; a hand-written keymap
 | key | ⌥p | always | posture.cycle | cycle permission posture |
 | key | ⌥⇧C | always | selection.native | hand the mouse to the terminal |
 | key | ⌥⇧V | always | selection.semantic | enter Calcium copy mode |
+| key | ⌃] | attached | host.detach | host escape |
+| key | ⌥esc | attached | host.detach | enhanced detach |
 
 ## prompt
 

@@ -53,8 +53,8 @@ export type {
 } from "./shell/types.js";
 export { SurfaceError } from "./shell/surface.js";
 export type {
-  PushedSurface,
-  PushedSurfaceHandle,
+  ChildSurface,
+  ChildSurfaceHandle,
   SurfaceActionEvent,
   SurfaceCloseOutcome,
   SurfaceContext,

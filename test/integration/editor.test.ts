@@ -45,6 +45,9 @@ function wire(editor: LineEditor): {
   const focus = createFocusStore();
   const deps: RouterDeps = {
     keyReleasesReported: () => false,
+    // **The `child` rung's second source** (C16 I49). Required rather than
+    // optional, so a harness that means to attach one has to say so.
+    childAttached: () => false,
     overlayWouldResolve: () => null,
     overlayAnswerCallback: () => null,
     overlayTop: () => null,

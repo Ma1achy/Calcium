@@ -38,6 +38,9 @@ function world() {
   const deps: RouterDeps = {
     overlayRegion: () => ({ width: 80, height: 24 }),
     keyReleasesReported: () => false,
+    // **The `child` rung's second source** (C16 I49). Required rather than
+    // optional, so a harness that means to attach one has to say so.
+    childAttached: () => false,
     overlayWouldResolve: () => null,
     overlayAnswerCallback: () => null,
     overlayTop: () => {

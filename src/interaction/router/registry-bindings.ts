@@ -57,6 +57,8 @@ export const REGISTRY_BINDINGS: readonly RegistryBinding[] = Object.freeze([
   { id: "binding.035", actionId: "posture.cycle", key: { name: "p", meta: true } },
   { id: "binding.036", actionId: "values.toggle", key: { name: "v", meta: true } },
   { id: "binding.037", actionId: "queue.drop", key: { name: "backspace", meta: true } },
+  { id: "binding.host-detach", actionId: "host.detach", key: { name: "]", ctrl: true } },
+  { id: "binding.host-detach-enhanced", actionId: "host.detach", key: { name: "escape", meta: true } },
   { id: "binding.selection-native", actionId: "selection.native", key: { name: "C", meta: true } },
   { id: "binding.selection-semantic", actionId: "selection.semantic", key: { name: "V", meta: true } },
 ]);

@@ -96,6 +96,15 @@ export type RouterDeps = Readonly<{
    */
   inFlight: () => "app" | "local" | "shell" | null;
   /**
+   * An application's child surface holds the keyboard (I49, R-BLK-711).
+   *
+   * The `child` rung's **second** source. Separate from `inFlight` because the
+   * two are different mechanisms answering one question — a shell delegation is
+   * C23's and an attachment is C22's — and one dep covering both would make a
+   * component report another's state.
+   */
+  childAttached: () => boolean;
+  /**
    * C23's, for the same reason. `runner.killAll()` kills the child and leaves the
    * entry streaming forever; C23 I10 settles it `partial` with output retained,
    * and only C23 can do that.
@@ -307,7 +316,14 @@ export function createRouter(
     return {
       overlayTop: deps.overlayTop(),
       copyMode: deps.copyMode(),
-      attachedChild: deps.inFlight() === "shell",
+      // **Two sources, one fact** (I49, R-BLK-711). A shell delegation and an
+      // attached child surface are the same claim — the terminal's keys are not
+      // the host's — and the rung has to answer for both or the second has a
+      // target with nothing that reaches it. `||` rather than a precedence:
+      // neither can be true while the other is (a delegation suspends raw mode),
+      // and a rule about which wins would be a rule about an unconstructible
+      // state.
+      attachedChild: deps.inFlight() === "shell" || deps.childAttached(),
       liveEntry: deps.liveEntry(),
       stored: focus.current,
     };

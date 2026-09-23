@@ -113,6 +113,11 @@ function world(
     overlayAnswerCallback: confirm.answerHandler,
     overlayWouldResolve: confirm.resolvesHandler,
     keyReleasesReported: () => false,
+    // **The cast below is why this has to be written out** (C16 I49). The other
+    // four `RouterDeps` sites are checked, so a required dep forces each of
+    // them; this one is `as unknown as RouterDeps`, so a missing field is a
+    // `TypeError` at the first dispatch rather than an error at the build.
+    childAttached: () => false,
     overlayTop: () => {
       const top = overlays.top;
       return top === null ? null : { kind: top.kind, id: top.id, blocking: top.blocking, dismissal: top.dismissal };

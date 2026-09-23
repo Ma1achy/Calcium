@@ -26,7 +26,8 @@
 
 import { createAdapterRegistry } from "../data/adapters/index.js";
 import { blankRowsAbove, commandRows } from "./paint.js";
-import { noticeDoc } from "./documents.js";
+import { childBorderLegend } from "./chrome.js";
+import { compose, noticeDoc } from "./documents.js";
 import type { MeasureMemo, NavElement } from "../presentation/blocks/index.js";
 import { initialRegionHeight } from "./frame.js";
 import { elementsOfEntry, measureEntry } from "./entry-layout.js";
@@ -1456,6 +1457,7 @@ export async function constructGraph(
           confirm,
           (row) => entryAtRegionRow(row),
           () => detection.capabilities.keyboardProtocol === "kitty",
+          () => surface.attached,
         ),
         // C28 I39 — the `handler` span. Spread in here rather than threaded
         // through `routerDeps`, whose seven parameters are all C16's own and
@@ -2331,6 +2333,10 @@ export async function constructGraph(
     // rather than rendering a second listing: help renders from the table
     // dispatch uses, and a key with its own renderer is that claim undone.
     submit: (line) => void pipeline?.submit(line),
+    // **The one exit from the `child` rung** (C16 I49, R-BLK-908). Late for the
+    // same reason `submit` is: the host is built below, and this is only ever
+    // called from a keystroke.
+    detachChild: () => void surface.close("detach"),
     focusTranscript: () => {
       const id = stores.transcript.liveId ?? stores.transcript.entries.at(-1)?.id ?? null;
       if (id !== null) focus.enterLiveBlock(id, null);
@@ -2838,6 +2844,20 @@ export async function constructGraph(
       return false;
     });
 
+    // **The captured child's one key, registered before any child exists**
+    // (C16 I49, R-BLK-908). *A captured child reserves one `host.detach`
+    // action* — reserving it at construction is what makes it a reservation:
+    // the surface host registers its consuming handler at attach time and
+    // lands behind this one, so the escape is in front of the capture rather
+    // than inside it. An ordinary key resolves to nothing here and falls to
+    // the child's handler, which is the rest of *takes all but host.detach*.
+    router.register("child", (e) => {
+      const effect = bound("child", e);
+      if (effect === null) return false;
+      effect();
+      return true;
+    });
+
     // **An escapable overlay still needs its `esc` run** (C16 I26). The menu
     // and the search moved to `panel` above and took `bound` with them, and
     // the `overlay:escape → dismiss` row did not move — a confirm that says it
@@ -3036,8 +3056,44 @@ export async function constructGraph(
     lifecycle.onInput((chunk) => void deliver(decoded(() => decoder.push(chunk))));
   });
 
+  /**
+   * C22 I110 — the child's blocks as a transcript entry, not a layer.
+   *
+   * **One panel block, appended once and replaced in place.** The wrapper is
+   * what carries the on-screen half of the reservation: `footer` is the block's
+   * border legend, and the entry keeps it after the detach, which is the record
+   * of a capture having happened. The panel is also what makes `replace` one
+   * `blockId` rather than a diff over a list the child is free to reshape
+   * between renders.
+   *
+   * **`origin: "shell"` and the entry is settled from the start** (C13 §6). The
+   * far-side gate refuses a patch to a settled entry; the shell speaking about
+   * an entry it holds is the other claim, and a captured child is exactly that —
+   * nothing is streaming, the host is rewriting a block it owns.
+   */
+  const childBlock = (id: string, blocks: readonly Block[]): Block =>
+    Object.freeze({
+      kind: "panel",
+      id: `${id}-child`,
+      title: id,
+      footer: childBorderLegend(detection.capabilities),
+      children: blocks,
+    }) as Block;
+
   const surface = createSurfaceHost({
-    overlays: stores.overlays,
+    entry: {
+      append: (id, blocks) =>
+        stores.transcript.append(
+          compose({ command: `child ${id}`, blocks: [childBlock(id, blocks)] }),
+        ),
+      replace: (entryId, id, blocks) => {
+        stores.transcript.patch(
+          entryId,
+          { op: "replace", blockId: `${id}-child`, block: childBlock(id, blocks) },
+          "shell",
+        );
+      },
+    },
     router,
     lifecycle,
     context: () => {
@@ -3051,6 +3107,28 @@ export async function constructGraph(
     now: config.clock,
     schedule: config.schedule,
     invalidate: () => void scheduler.commit("input"),
+    // **From the table, not from a literal** (C16 I49, R-BLK-908). The reserved
+    // chords are the rows the keymap carries at `child` — the same rows `/help`
+    // renders and the border names — so a rebinding moves all three together.
+    // Profile-filtered, because a chord the terminal cannot deliver is not one
+    // an application is taking anything from by binding.
+    reservedChords: () =>
+      defaultKeymap
+        .filter(
+          (b) =>
+            b.target === "child" &&
+            (b.profile === undefined ||
+              b.profile ===
+                (detection.capabilities.keyboardProtocol === "kitty"
+                  ? "enhanced-terminal"
+                  : "default-terminal")),
+        )
+        .map((b) => ({
+          name: b.key.name,
+          ...(b.key.ctrl === true ? { ctrl: true } : {}),
+          ...(b.key.meta === true ? { meta: true } : {}),
+          ...(b.key.shift === true ? { shift: true } : {}),
+        })),
   });
 
   return Object.freeze({
@@ -3187,6 +3265,8 @@ function routerDeps(
   confirm: ConfirmHost,
   entryAtRegionRow: RouterDeps["entryAtRow"],
   keyReleasesReported: () => boolean,
+  /** The `child` rung's second source, late because the host is built after the router (C16 I49). */
+  childAttached: () => boolean,
 ): RouterDeps {
   const top = (): Readonly<{ id: string; kind: "overlay" | "view" | "panel"; blocking: boolean; dismissal: "escape" | "focus" | "answer" }> | null => {
     const layer = stores.overlays.top;
@@ -3223,6 +3303,11 @@ function routerDeps(
     // runner-sourced answer says "idle" while a verb is in flight, and Ctrl-C
     // fell past every rung and cleared the prompt.
     inFlight: () => pipeline()?.inFlight ?? null,
+    // **The `child` rung's second source** (C16 I49). A parameter rather than a
+    // capture: this function is module-level and the surface host is built
+    // inside `construct`, after the router that takes these deps — the same
+    // lateness `pipeline` is threaded as a thunk for.
+    childAttached,
     // §5's subscription rung. Read through the same accessor as `inFlight`,
     // because the pipeline is constructed after the router and a captured
     // reference here would be the null one.

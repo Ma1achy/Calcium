@@ -1983,10 +1983,10 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "SurfaceActionEvent.phase":
     "application boundary — the surface consumer maps native or synthesized " +
     "press/repeat/release phases onto application actions",
-  "PushedSurface.onClose":
+  "ChildSurface.onClose":
     "application boundary — the surface owner releases its process and model state " +
     "when Calcium reports closure",
-  "PushedSurfaceHandle.inputFidelity":
+  "ChildSurfaceHandle.inputFidelity":
     "application boundary — the app renders the reduced-fidelity disclosure",
 
   // **The second entry of that category, and it arrived by a satisfier going

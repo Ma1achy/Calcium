@@ -455,6 +455,21 @@ export function createDecoder(options: DecoderOptions): Decoder {
       if (code >= 1 && code <= 26) {
         return out.push(key(String.fromCharCode(96 + code), ch, { ctrl: true })), 1;
       }
+      // **The four above the letters, by the same ASCII rule** (C16 I17, I49).
+      // `0x1c`–`0x1f` are `⌃\`, `⌃]`, `⌃^` and `⌃_`, which is `code + 64` in
+      // the same table `code + 96` reads for the letters — and the arm was
+      // missing, so each arrived as a key **named by its own control byte**:
+      // unbindable, because no chord can be written for a name that is an
+      // unprintable character.
+      //
+      // Found by T2.13 rather than by reading (M9): `host.detach`'s base
+      // candidate is `⌃]` *because* it is a byte every terminal sends without
+      // being persuaded, and the one thing that could not be done with it was
+      // bind it. `0x1b` is ESC and is handled above; `0x00` is `⌃@` and stays
+      // out, because a NUL in the stream is not a keystroke anyone pressed.
+      if (code >= 28 && code <= 31) {
+        return out.push(key(String.fromCharCode(code + 64), ch, { ctrl: true })), 1;
+      }
       return out.push(key(ch, ch)), 1;
     }
 

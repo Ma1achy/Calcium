@@ -124,8 +124,8 @@ restores enhanced keyboard mode, and returns ownership to the host before the
 session releases the terminal.
 
 **The renames are 0.x and carry no deprecation cycle** (`00-AUTHORITY.md`).
-`PushedSurface` → `ChildSurface`, `PushedSurfaceHandle` → `ChildSurfaceHandle`,
-and the schema string `"calcium.pushed-surface/1"` → `"calcium.child-surface/1"`,
+`ChildSurface` → `ChildSurface`, `ChildSurfaceHandle` → `ChildSurfaceHandle`,
+and the schema string `"calcium.child-surface/1"` → `"calcium.child-surface/1"`,
 because a schema that still says *pushed* is a record of the model this MR
 retired. The rest of the family keeps its names — `SurfaceContext`,
 `SurfaceKeyBinding`, `SurfaceError` and the others never claimed a push, and

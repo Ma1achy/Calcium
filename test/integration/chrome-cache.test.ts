@@ -159,7 +159,7 @@ describe("C22 I102 — the chrome cache", () => {
     const s = await session(definition, { header: () => [], footer: () => [] });
     let label = "view";
     const handle = s.tui.openSurface({
-      schema: "calcium.pushed-surface/1",
+      schema: "calcium.child-surface/1",
       id: "s1",
       keymap: [],
       render: () => [chip("v", label, 2)],
@@ -181,7 +181,7 @@ describe("C22 I102 — the chrome cache", () => {
 
     await handle.close();
     const second = s.tui.openSurface({
-      schema: "calcium.pushed-surface/1",
+      schema: "calcium.child-surface/1",
       id: "s2",
       keymap: [],
       render: () => [chip("w", "other", 1)],

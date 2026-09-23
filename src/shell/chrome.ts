@@ -16,6 +16,7 @@
 
 import { block } from "../data/viewmodel/index.js";
 import type { Block, Pills } from "../data/viewmodel/index.js";
+import { glyphs } from "../presentation/blocks/index.js";
 import { cells } from "../presentation/text.js";
 import type { ChromeContext, ChromeFn } from "./types.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
@@ -240,6 +241,34 @@ export function shedToWidth(
     if (!keep.has(i)) kept.splice(i, 1);
   }
   return kept;
+}
+
+/**
+ * The captured child's border legend (C22 I110, R-BLK-312, R-BLK-844).
+ *
+ * **The second carrier, and neither is optional.** The footer's owner line says
+ * `attached · keys → child · ⌃] host escape` and this says the same thing on the
+ * block itself — because a reader who has scrolled the transcript has the entry
+ * and not the footer in front of them, and *an owner you cannot see is an owner
+ * you will fight*. Written here rather than in the composition root so the two
+ * spellings of the chord are one line apart and move together.
+ *
+ * It is a string rather than chips because a `panel`'s `footer` is border text
+ * (C04 §3) — so the separator is this line's to draw, which is the one place
+ * C09 I49's rule does not reach.
+ */
+export function childBorderLegend(caps: TerminalCapabilities): string {
+  // **The separator is resolved, not typed** (C09 I49, F828). A literal `\u00b7`
+  // in a source string is the unresolved join T2.116 refuses across `src/shell`,
+  // and it is wrong for the reason the gate exists: at the ASCII rung the glyph
+  // table answers `:`, and a hard-coded middle dot would be a cell the terminal
+  // draws as a question mark between two chords a reader is trying to read.
+  const sep = ` ${glyphs(caps).separator} `;
+  return [
+    mark(["\u2303] host escape", "C-] host escape"], caps),
+    mark(["\u2325esc enhanced detach", "M-esc enhanced detach"], caps),
+    mark(["\u2303c interrupts child", "C-c interrupts child"], caps),
+  ].join(sep);
 }
 
 export function ownerLine(

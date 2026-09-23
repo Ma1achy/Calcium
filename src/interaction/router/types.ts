@@ -482,6 +482,12 @@ export type KeyAction =
   | "agent8"
   | "agent9"
   | "postureCycle"
+  // **The one key a captured child does not get** (C16 I49, R-BLK-908). It is
+  // in the union rather than handled inside the child's own handler because the
+  // reservation is the host's: the chord has to be collision-tested against
+  // every other route before an attach is allowed, and a key a handler swallows
+  // privately is a key no table can be asked about.
+  | "hostDetach"
   | "valuesToggle"
   | "queueDrop"
   | "enterSemanticSelection"

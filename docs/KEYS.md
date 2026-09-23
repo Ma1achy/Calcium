@@ -40,6 +40,7 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `m+V` † | both |  |  |  |  |  |  | enterSemanticSelection | enterSemanticSelection |  |
 | `[` | both |  |  |  |  |  |  |  | orbitLeft |  |
 | `]` | both |  |  |  |  |  |  |  | orbitRight |  |
+| `c+]` | both | hostDetach |  |  |  |  |  |  |  |  |
 | `c+a` † | both |  |  |  |  |  |  | home | selectAllElements |  |
 | `m+a` | both |  |  |  |  |  |  | selectAll |  |  |
 | `m+b` | both |  |  |  |  |  |  | wordLeft |  |  |
@@ -60,6 +61,7 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `m+enter` † | both |  |  |  |  |  |  | insertNewline | rerunEntry |  |
 | `s+enter` † | both |  |  |  |  |  |  | insertNewline | rerunEntry |  |
 | `escape` † | both |  | dismiss | exitCopyMode | dismiss | viewPop |  |  | focusPrompt |  |
+| `m+escape` | enhanced-terminal | hostDetach |  |  |  |  |  |  |  |  |
 | `m+f` | both |  |  |  |  |  |  | wordRight |  |  |
 | `f1` | both |  |  |  |  |  |  |  |  | helpKeymap |
 | `g` | both |  |  |  |  | viewTop |  |  |  |  |
@@ -105,4 +107,4 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `{` | both |  |  |  |  |  |  |  | tiltDown |  |
 | `}` | both |  |  |  |  |  |  |  | tiltUp |  |
 
-122 bindings · 93 keys · 17 resolved by the ladder (†).
+124 bindings · 95 keys · 17 resolved by the ladder (†).

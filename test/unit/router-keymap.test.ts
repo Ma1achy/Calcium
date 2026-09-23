@@ -337,6 +337,16 @@ describe("§6 — the default table (C17 I12)", () => {
       "overlay escape": ["\u001b"],
       "panel escape": ["\u001b"],
 
+      // **The captured child's one key** (C16 I49, R-BLK-908). `⌃]` is
+      // `0x1d` — the ASCII group separator, which is what `ctrl` does to `]`
+      // — and it is a byte rather than a name a terminal has to be persuaded
+      // to send, which is half the argument for it as the base candidate.
+      // `⌥esc` is `ESC ESC`: the second `ESC` closes the first's
+      // disambiguation window, so it needs the stepped clock exactly as a
+      // lone `Esc` does, and it is `enhanced-terminal` only.
+      "child c+]": ["\u001d"],
+      "child m+escape": ["\u001b\u001b"],
+
       // C20's four. The arrows carry both forms for the reason the `right`
       // row above gives — a rule satisfied by only the normal form is
       // satisfied on half the terminals — and `\u0012` is Ctrl-R, a byte
@@ -888,14 +898,17 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     // **121 until M8**, which moved six rows from `overlay` to `panel` and added
     // the 122nd: `escape → dismiss` is bound at both, because a panel is
     // escapable by its kind and an overlay by its `dismissal` (C15 I26, I27).
+    // **124 from M9**: the captured child's `host.detach`, once per profile.
+    // They are the only two rows at `child`, because the child's handler
+    // consumes what it does not bind and there is nothing else to list.
     //
     // The count is pinned as well as the set: a table that lost a row *and*
     // gained an equal one would satisfy a set comparison alone.
     const rows = defaultKeymap
       .map((b) => `${b.target}\t${keyText(b.key)}\t${b.action}\t${b.profile ?? "both"}`)
       .sort();
-    expect(rows).toHaveLength(122);
-    expect(new Set(rows).size, "no two rows are identical").toBe(122);
+    expect(rows).toHaveLength(124);
+    expect(new Set(rows).size, "no two rows are identical").toBe(124);
 
     // Every row whose chord the registry names resolves to the registry's key —
     // the join asserted from the table's side, so a `chordOf` call that silently
@@ -903,7 +916,15 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     const byAction = new Map(REGISTRY_BINDINGS.map((b) => [b.actionId, keyText(b.key)]));
     const registryChords = new Set(byAction.values());
     const fromRegistry = defaultKeymap.filter((b) => registryChords.has(keyText(b.key)));
-    expect(fromRegistry.length, "the rows the registry supplies a chord for").toBe(59);
+    expect(
+      fromRegistry.length,
+      // 60 and not 61: `host.detach` has two registry bindings, and the set
+      // this counts against is a set of **chord texts** — `⌥esc` is already in
+      // it as the `escape` action's own enhanced spelling, so the second row
+      // joins an entry rather than adding one. Counting bindings would give 61
+      // and would be counting a different thing.
+      "the rows the registry supplies a chord for",
+    ).toBe(60);
   });
 
   it("T1.94 (I41): ⌘↑ and ⌥↑ are two actions under the enhanced profile and one under the base", () => {
@@ -990,6 +1011,12 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
       "agentNext c+tab",
       "agentPrevious cs+tab",
       "copySelection cs+c",
+      // **`⌥esc`, enhanced only** (I49, R-BLK-908). Without the protocol it is
+      // `ESC ESC`, which is the lone-`Esc` disambiguation window rather than a
+      // chord — and `esc` belongs to the child, so a base-profile row would
+      // take the child's own key away on the terminals least able to say so.
+      // `⌃]` is the base route and is unconditional, which is the pair.
+      "hostDetach m+escape",
       // **`transcript.top`/`transcript.bottom`, enhanced only** (I41). Without
       // the protocol bit 8 is Meta, so these bytes *are* `⌥↑`/`⌥↓` and the rows
       // would collide with `scrollPageUp`/`scrollPageDown`. The profile is what
@@ -1092,6 +1119,9 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
       "queue.drop": "queueDrop",
       "selection.native": "enterCopyMode",
       "selection.semantic": "enterSemanticSelection",
+      // M9 — the captured child's one key (C16 I49, R-BLK-908). Two registry
+      // bindings, one action: `⌃]` base and `⌥esc` enhanced.
+      "host.detach": "hostDetach",
     });
 
     const base = createKeymap(defaultKeymap, "default-terminal");

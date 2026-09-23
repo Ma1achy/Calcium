@@ -51,6 +51,9 @@ function harness(over: Partial<RouterDeps> = {}, start = 1_000) {
   const layer = { top: null as Placed["layer"] | null, placed: [] as Placed[] };
   const deps: RouterDeps = {
     keyReleasesReported: () => false,
+    // **The `child` rung's second source** (C16 I49). Required rather than
+    // optional, so a harness that means to attach one has to say so.
+    childAttached: () => false,
     overlayWouldResolve: () => null,
     overlayAnswerCallback: () => null,
     overlayTop: () => layer.top,
@@ -1253,18 +1256,6 @@ describe("C16 §7 and §4a — the epoch, the question guard and pointer commit 
     router.resetFocus();
     expect(router.commitPointer("a")).toBe(false);
   });
-});
-
-describe("C16 §5 — the captured child, owed at the spec commit (M9)", () => {
-  it.todo(
-    "T1.106 (C16 I49, R-INT-007, R-BLK-838): with a child attached, esc and ctrl-c reach the child's handler and a key it binds nothing to is consumed at the child rung, reaching no lower one; the control is the same three keys with nothing attached — not deferred on a component: the second source of attachedChild and the child's handler land in this MR",
-  );
-  it.todo(
-    "T1.106b (C16 I49, R-BLK-908): ctrl-] is the one key the child does not get — the handler never sees it and the attachment ends; the enhanced profile's alt-esc does the same and the base profile's does not — not deferred on a component",
-  );
-  it.todo(
-    "T1.107 (C16 I49, R-BLK-908): an attach whose reserved host escape resolves to nothing reachable is refused and the refusal names the chord; the control is the reachable one, which attaches — not deferred on a component",
-  );
 });
 
 describe("C16 §4a — the dismissing click and the scroll order (M8)", () => {

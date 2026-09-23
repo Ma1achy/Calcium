@@ -555,6 +555,26 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
     profile: "enhanced-terminal",
   },
 
+  // --- the captured child's one key (I49, R-BLK-908) ---------------------
+  //
+  // **Every other key is the child's, and that is the handler's doing rather
+  // than the table's**: the child's handler consumes what it does not bind, so
+  // there is nothing here to list. What the table owns is the exception — *a
+  // captured child reserves one `host.detach` action because a `/command`
+  // cannot reach the host while capture is active.*
+  //
+  // `⌥esc` is `enhanced-terminal` only. Without the protocol it arrives as
+  // `ESC ESC`, which is the lone-`Esc` disambiguation window rather than a
+  // chord — and `esc` belongs to the child (R-INT-007), so a base-profile row
+  // would take the child's own key away on the terminals least able to say so.
+  { target: "child", key: chordOf("host.detach"), action: "hostDetach" },
+  {
+    target: "child",
+    key: chordOfBinding("binding.host-detach-enhanced"),
+    action: "hostDetach",
+    profile: "enhanced-terminal",
+  },
+
   // `posture.cycle` — reserved, no effect (I38).
   { target: "global", key: chordOf("posture.cycle"), action: "postureCycle" },
 
@@ -685,6 +705,23 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
  * unmodified forms — so generating `profile` from the registry would bind chords
  * on terminals that can never send them. It stays a row's own declaration.
  */
+/**
+ * The chord of one **named binding**, for an action the registry gives two.
+ *
+ * `chordOf` takes the first row for an action and that is right while an action
+ * has one chord. `host.detach` has two by design — *its base candidate is `⌃]`;
+ * `⌥esc` is an enhancement* (R-BLK-908) — so the profile split lives in the
+ * registry rather than in a literal here, and the row that wants the second one
+ * has to say which. Asking by id rather than by `(actionId, profile)` because
+ * the profile is the keymap row's own declaration and reading it from two
+ * places is the drift §6b exists to end.
+ */
+function chordOfBinding(id: string): Binding["key"] {
+  const found = REGISTRY_BINDINGS.find((b) => b.id === id);
+  if (found === undefined) throw new Error(`no registry binding ${id}`);
+  return found.key;
+}
+
 function chordOf(actionId: string): Binding["key"] {
   const found = REGISTRY_BINDINGS.find((b) => b.actionId === actionId);
   // A build-time fact, thrown rather than defaulted: a missing id means the
@@ -790,6 +827,7 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
     agent7: true,
     agent8: true,
     agent9: true,
+    hostDetach: true,
     postureCycle: true,
     valuesToggle: true,
     queueDrop: true,

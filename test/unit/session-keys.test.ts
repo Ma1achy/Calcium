@@ -87,6 +87,25 @@ function openOverlay(graph: Graph): void {
 }
 
 /**
+ * A child surface, so the `child` rung has a subject (C16 I49).
+ *
+ * **Nothing is cleared first, and that is the measurement C22 I110 bought.**
+ * Until the child's blocks became an entry the attach pushed a `kind: "view"`
+ * layer, C15 I1 refused a view onto a non-empty stack, and a peek left by an
+ * earlier binding in this walk made the attach throw — so the helper opened by
+ * emptying the stack. The entry route touches no layer at all.
+ */
+function attachChild(graph: Graph): void {
+  graph.surface.open({
+    schema: "calcium.child-surface/1",
+    id: "probe-child",
+    keymap: [],
+    render: () => [],
+    onAction: () => undefined,
+  });
+}
+
+/**
  * A panel, which is anchored, non-blocking and closed by `escape` — and refused
  * in any other combination (C15 I27). The menu's four rows and the search's one
  * answer here rather than at `overlay` since M8.
@@ -199,6 +218,11 @@ describe("C22 §3 step 11 — the effect table", () => {
     for (const b of base) {
       if (b.target === "overlay") openOverlay(graph);
       if (b.target === "panel") openPanel(graph);
+      // **The `child` rung needs a child** (C16 I49). Without one `activeTarget`
+      // answers `prompt` and `⌃]` is typed into the editor — the row would fail
+      // for a reason that has nothing to do with whether its effect exists,
+      // which is the argument `pushedView` made one target earlier.
+      if (b.target === "child") attachChild(graph);
       // `liveBlock` needs both halves of what `activeTarget` reads: a live
       // entry in C13 and focus stored there (C16 §3).
       if (b.target === "liveBlock") enterLive(graph);
@@ -298,6 +322,9 @@ describe("C22 §3 step 11 — the effect table", () => {
     const effects = createKeyEffects({
       submit: () => undefined,
       focusTranscript: () => undefined,
+      // C16 I49 — the child's one exit. Counted here rather than stubbed
+      // silent, because this harness is the one that walks every action.
+      detachChild: () => undefined,
       editor: spy,
       // The third owner of `pushedView`, as the root wires it (C28 §3c).
       profileView: graph.profileView,

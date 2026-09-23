@@ -2601,9 +2601,9 @@ sites and every one of them would need its own answer:
 | reader | what it does with the string |
 |---|---|
 | `shell/construct.ts:2525` | `pipeline?.submit(stores.editor.resolved)` — **C23 takes a string**, and `resolved` is declared `readonly resolved: string` |
-| `shell/keys.ts:382`, `:652` | `contextAt(text, cursor, manifest)` — C19 completes against it |
-| `shell/keys.ts:486` | `const before = deps.editor.text`, then `setText` — an **edit round-trip** through a plain string |
-| `shell/keys.ts:701`, `:977` | `history.previous(text)`, `searchOpen(text)` — **C20 stores strings** |
+| `shell/keys.ts:407`, `:716` | `contextAt(text, cursor, manifest)` — C19 completes against it |
+| `shell/keys.ts:511` | `const before = deps.editor.text`, then `setText` — an **edit round-trip** through a plain string |
+| `shell/keys.ts:765`, `:1049` | `history.previous(text)`, `searchOpen(text)` — **C20 stores strings** |
 | `shell/session.ts:1242` | `selectionSpans(text, …)` — C09's wash |
 | `shell/session.ts:1282` | `contextAt(text, cursor, …)` inside `completion.ghost(…)` — C19 again, from the shell (`:579` when this was written) |
 | `shell/construct.ts:3010` | `promptHasText` |
