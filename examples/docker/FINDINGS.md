@@ -56048,3 +56048,47 @@ and the search's width is a performance question standing next to it.
 ask what the code does with the mutated value before strengthening the fixture
 again.** The second fixture here was correct, necessary and insufficient, and
 looked exactly like the fix.
+
+---
+
+## F1253 — a second route acquires the first route's obligations one defect at a time ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | C22 §13a's view route — `runIntoView`, `streamIntoView`, `document-view.ts`. |
+| **Reached for** | `R-EXA-082`: *logs → a block with follow. It was already a scroll container; it needed no frame.* |
+| **Verdict** | **Every question §13a answered was answered correctly, and the question it did not ask was whether to push at all.** |
+
+The route was written new rather than derived, and §13a says so: `declareLive`,
+`release` and `cancelInFlight` were each entry-only, each found one at a time,
+and each read as an isolated oversight. The section calls them *three samples of
+one cause* and responds by **enumerating** the entry route's obligations against
+the view route — a good instrument, and the one that keeps a second route
+honest once you have decided to have one.
+
+**The tell that the second route was never distinguished is in its own
+invariants.** C22 I48's rule that *an append holds the window at the bottom if
+it was at the bottom* is `followTail` (C04 I97), which `ScrollOffsets` already
+called. C22 I46's *no second height codepath* was a rule the transcript route
+did not need, because C14 windows by row through the same registry. C22 I45's
+whole argument — decide before step 3, because C23 I3 appends first and C13 has
+no delete — is sound, and it is an argument about **how to push**, reached only
+once pushing was assumed.
+
+**A route whose distinguishing rule is implemented by a function the other route
+already calls is not distinguished.** That is checkable, it is cheaper than an
+obligation table, and it would have been true the day I48 landed.
+
+**What it cost, counted.** Four invariants (C22 I45–I48), two more that had
+outlived their first subject (I41, I42), one manifest field with two declaration
+sites and three parse refusals (C05 I20), twenty-nine test rows, a notice
+builder, a `ProducerContext.height` arm and 552 lines of owner. Three of the
+refusals had each closed a real defect — F1022 closing F23 and F129 is the
+sharpest, where the `view`/`local` pair parsed, sealed, validated, ran and
+appended an ordinary transcript entry with nothing saying so. **An ordinary
+transcript entry is now the correct outcome**, which is the cleanest statement
+available of what the declaration was doing.
+
+**The design reaches this by a shorter path than the obligation table.** It asks
+one question of anything that wants a frame — *does it have its own prompt and
+its own context?* — and a verb's result has neither.

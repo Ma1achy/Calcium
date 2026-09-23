@@ -2313,14 +2313,14 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I38** — **The completion spinner is read at paint time and armed at request time, and both halves are needed.** C19 answers `spinning` — the earliest source call still in flight is older than 500 ms — and until now no file under `src/shell` read it, so C19 §7's spinner had an implementation on one side of the seam and none on the other. Two separate mechanisms, because the wrong implementations fail differently and both look right: the frame composes the indicator from a **fresh read on every paint**, so a value cached at request time can never become true; and the request **arms a wake** at the threshold, so the frame that first shows it is one nothing else would have drawn. Without the wake the spinner appears only when the user next types — the *key that appears to do nothing until you press another one*, which is C22 I32's symptom arriving through a different timer. It is **appearance and never geometry**: the glyph is painted into the prompt's last row over padding it does not lengthen, so `measure` never sees it and the prompt's height is the same whether a request is in flight or not.
 - **I39** — **A keystroke cancels a pending completion**, and until now nothing did. C19 §7 commits that a keystroke during a pending request supersedes it — the old sequence abandoned, the spinner cleared, nothing arriving late to overwrite the buffer — and C19 holds the whole mechanism: `cancel()` invalidates the token, and a superseded request already resolves with no candidates (C19 I13). What was missing is the caller. No file under `src/shell` called `cancel()`, so typing after a `Tab` on a slow source left the request live, and a menu opened a second and a half later for a prefix the user had moved past. The same shape as I38 and found by the row I38 unblocked: a component complete on its own side of a seam, with nothing on the other. The printable and paste paths cancel; the guard in the effect table does not cover it, because that one compares the shell's own sequence and a printable keystroke does not advance it.
 - **I40** — **The theme variant is persisted by C22 and repaired on read.** `/theme <variant>` writes it to `${stateDir}/theme` at the moment of the change rather than at exit, because a session killed by `SIGKILL` runs no shutdown path and a preference that survives a clean exit and not a crash is one people stop trusting. On construction the file is read; anything **the set does not hold as a name** is treated as absent, the base theme is retained, and **a notice is committed** — C20's precedent, where history repairs a corrupt file at open rather than failing. The notice is the half that matters: without it "absent" and "corrupt" look identical to a user who chose light and got dark. It is C22's and not C10's because C10 is a pure function over tokens and this is session state with a filesystem behind it; a store reaching a disk from L1 is MG23's neighbourhood. **The file holds a name, not a variant**, and this invariant said *variant* until C22 §6h needed the two to be different things: C10 I27 keyed the set by name and the guard here has read `names.includes` ever since, so the word was one fork out of date in four places including the notice the reader sees (F215). *Absent* now reaches I68's polarity rule rather than only the base theme — the two arms are one sentence there and neither displaces this one.
-- **I41** — **A pushed view holds one piece of state: its row offset.** ~~`n` and `p` compute a hunk's first row from the offset; `g` and `G` set it.~~ — **the patch view was this invariant's first subject and is deleted** (C25 §3b, R-EXA-082, F1251); the document view is the subject now, and its unit is a block rather than a hunk. The rule is unchanged and the example moved. A view holding an offset *and* a hunk index has two cursors for one position — `G` leaves the index pointing at the hunk the reader scrolled away from, so `p` jumps upward from a place nothing on screen explains — and no test that drives one motion at a time can see it (C25 §3c A4). **Beside the offset the view holds one derived value, and it is a cache and not a cursor**: the window plan (C25 I22) of the live block at the region's width, keyed on the block's identity and the width, dropped and re-derived when the entry is patched or the region resizes, its misses reported as `absent`, `rev` and `width` through the profiler's probe (F1187: a motion re-derived the plan about thirty times over, and the plan is a property of the block and the width alone). A motion over an unchanged block at an unchanged width walks no line of the patch.
-- **I42** — **A pushed view rewindows from the live block on every motion, and is dismissed with `anchorEvicted` when its entry goes.** (The patch view was the first subject and is deleted — C25 §3b.) A snapshot taken at push time shows a diff the entry no longer holds, and `expand` produces exactly such a patch one keystroke earlier. C15 supplies the reason code and cannot detect the condition — it subscribes to nothing and holds no entry ids (C15 I10) — so the owner watches the transcript, and `Esc` never meets a dangling view because the view is gone before it (C25 §3c A6).
+- **I41** — **Retired with the last view that held an offset** (F1253). (§13a.) It read *a pushed view holds one piece of state: its row offset*, and it was right twice over: a view holding an offset **and** a cursor has two records of one position, and `G` leaving the cursor behind is invisible to any test driving one motion at a time (C25 §3c A4). **The finding is about a caller holding a position into something it is windowing**, and there is no such caller — the patch view went with M9b (F1251) and the document view with M9c. C14 holds the transcript's offset, one of it, and that is A01 D3's decision kept by there being one scroll model rather than by placing a second carefully.
+- **I42** — **Retired with I41 and for its reason** (F1253). (§13a.) It read *a pushed view rewindows from the live block on every motion, and is dismissed with `anchorEvicted` when its entry goes* — a snapshot taken at push time showing a diff the entry no longer holds, with `expand` producing exactly such a patch one keystroke earlier. **The hazard survives the invariant and is C13's**: a reader of an entry's blocks reads them live, and C14 drops a window when its entry is evicted. What retires is the *owner* that had to be told, because there is no owner and no push to dangle after.
 - **I43** — The identity source is `config.identity`, defaulting to a fetcher that returns `null`, and **C22 signals the notice rather than writing it** — the loop hands its text to C23, which appends (C23 I19). Both halves are the invariant: a seam with no default is a wire only the tests hold together (I22), and a signal delivered to a discarding callback is a mechanism that passes every test of its own and reaches nobody.
 - **I44** — §4 step 7 fires `config.greeting` and does not await it, and C23 appends what it returns through the ordinary append path. A rejection or a hang leaves the prompt usable and **draws nothing**; nothing about startup waits on it. *Produces no entry* is what this sentence said until I99, and it stopped being true when the slot was reserved: a rejection now leaves an entry that is empty, settled, invisible and evictable, and a hang leaves one that is empty and still streaming. Neither reaches the screen — the reservation carries `command: ""`, which `commandRows` answers with no rows at all, and no blocks, which I85 already rules reserves no blank. The step existed in the list, in T3.10 and T3.11, and in S02's `Source` row, and **no code fired anything** — step 12's shape a second time in the same list, and the reason S02's welcome could be specified in detail by three documents and reachable by none. Appending through C23 rather than rendering here is A02 Seam 4: C22 produces a fact, C23 is the only component that appends, and a live part in the greeting is driven because it took the same route every other document takes (C23 I33a).
-- **I45** — **A verb's result is a view when its declaration says so; the decision is taken before step 3, and the view is pushed where the pending entry would have been.** Pushed before the transport is invoked and filled after it, so the ordering C23 I3 protects is unchanged and a slow verb is not a blank screen; a failure renders into the view rather than into a transcript that has nothing to show. Read from the manifest at step 2, never from the document the adapter returns: C23 I3 appends the pending entry before the transport runs and C13 has no delete, so an adapter-side decision could only produce a view *and* the entry B03 §2 says a push does not leave. The party is the one `ToolDef.interactive` already names — the app author — because a view is a handoff of input ownership and detection is not available for either.
-- **I46** — **A pushed view is owned by a shell-side component holding one offset, and C15 holds none.** The owner windows at **block boundaries** and hands C15 a smaller sequence, which is C25 I18's shape generalised: C15 measures the result through the same registry as everything else, so there is no second height codepath and `Placed` gains no scroll offset. A plot is atomic within that window and always will be — C12 I1 puts its series out of the height's reach, so *granular where the kind divides, atomic where it does not* is the ceiling, and row-granular scroll is not on the path. C15 §183 moved this duty to the owner deliberately, to avoid a second scroll model beside C14's (A01 D3). I41 and I42 were written for the patch view and are the general shape: one piece of state, rewindowed from what the host holds rather than snapshotted at push time. A view whose parts tick releases them **at the pop**, not when a later fetch discovers the layer has gone.
-- **I47** — **A pushed view whose content C15 truncated says so on screen.** I46's window falls on block boundaries and the projection emits at least one block whatever its height, so a block taller than the region is shown cut and cannot be scrolled — the offset indexes blocks, and with one block there is no second offset to move to. The owner's remedy is to split, and splitting has a floor: a leaf with no children to split by has no smaller form that is still that leaf, so a producer can promise zero unreachable rows for every document whose leaves fit and not in general. **The two are one ruling and neither half is sufficient** — split alone leaves a silent residue, and the indicator alone leaves a document nothing can cross. `Placed.truncated` carries the fact already and C19's menu reads it (C19 §5); the duty here is to read it for a view. Content stopping mid-object with no indicator is indistinguishable from content ending, which is why this is not decoration.
-- **I48** — **A verb declared both `view` and `streams` runs into the view, and its patches are applied through the owner.** The owner gains `patch(view: ViewPatch)` over C04's `applyPatch` — the same function C13 calls, so there is no second answer to what a patch means — and keeps `putBlock` for the refresh driver, whose contract is total where this one reports C13's three arms. **All three address a block by id at any depth, and the resolution is one walk rather than three that agree**: `putBlock` rewrites through the same `applyPatch`, and `blockAt` reads through C04's `descendants`, so both resolve an id through `childBlocks` — the compiler-checked question `tree.ts` owns. The contracts differ and the addressing must not: `patch` descended and the driver's two seams scanned the top level, so a live panel inside a `group` — which `liveDeclarations` already recurses to declare — was declared, patched by the stream, and unreachable to the read and the write. **A read and a write that disagree are worse here than a missed write**, because C23 I70 reads `putBlock`'s `false` as `hostGone` and releases the *host*: one part the walk could not reach stopped every sibling on it (T4.87). The route releases the submission guard **before** its loop and registers its canceller in the live-stream set **before** awaiting it, exactly as the entry route does (C23 I6, C16 §5); omitting the second here loses the session rather than a cancellation, because the view's loop is the only thing on screen. **A view has no settlement**: `end`, a malformed patch and a failure each append a notice and leave the view open, because the stream ending is not the reader having finished with it and B03 §2 makes the pop the reader's. A **cancelled** view pops; a finished one does not. **An append holds the window at the bottom if it was at the bottom**, and leaves it alone otherwise — a follow whose window never moves shows its first screen for ever, and a window that moves under a reader who scrolled up is the same fault reversed.
+- **I45** — **Retired with the declaration it read** (F1253). (§13a.) It read *a verb's result is a view when its declaration says so; the decision is taken before step 3, and the view is pushed where the pending entry would have been.* The argument was sound and every premise of it still holds — C23 I3 appends before the transport, C13 has no delete, B03 §2 says a push leaves the transcript untouched — which is why the conclusion had to be *decide before step 3*. `R-EXA-082` removes the push instead: a verb's result has no prompt and no context of its own, so it is an entry, and there is nothing for a declaration to select. `ToolDef.view` and `FlagDef.view` retire with their only reader, and C05 I20's refusals retire with them.
+- **I46** — **Retired with the pushed view whose offset it placed** (F1253). (§13a.) It read *a pushed view is owned by a shell-side component holding one offset, and C15 holds none*, windowing at block boundaries so that there was no second height codepath. The subject is a **caller holding an offset over a document**, and the design leaves no such caller: C14 scrolls the transcript by row, through the same registry, and A01 D3's *one scroll model* is kept by there being one rather than by placing the second carefully. The block-boundary rule, the `measureSequence` correction it carried (a projection that added `measure(block)` one at a time packed nearly twice what the region held) and the plot's atomicity all retire with the projection; C12 I1 is unaffected and is stated where it belongs.
+- **I47** — **Retired with the window that cut** (F1253). (§13a.) It read *a pushed view whose content C15 truncated says so on screen*, and it was a pair on purpose — split what you can, report what you could not — because I46's projection emitted at least one block whatever its height, so a block taller than the region was shown cut with no second offset to move to. An entry is as tall as it is and C14 scrolls past it by row, so nothing truncates and there is nothing to report. **The finding survives where it can still be violated**: content stopping mid-object with no indicator is indistinguishable from content ending, which is C04 I49's residue row and is asserted there. The `/inspect --raw` case that forced this — 245 rows against a 37-row region — is now an ordinary long entry.
+- **I48** — **Retired with the fourth route** (F1253). (§13a.) It read *a verb declared both `view` and `streams` runs into the view, and its patches are applied through the owner* — the owner gaining `patch`, keeping `putBlock`, and all three seams addressing a block at any depth. **Every clause of it is the entry route's and was already true there**: `streamInto` patches through `transcript.patch`, C13 resolves an id at depth through `applyPatch`, the guard is released before the loop and the canceller registered before it is awaited (C23 I6, C16 §5), and the tail follow is `followTail`, which `ScrollOffsets` already shares (C04 I97). A route whose distinguishing rule is implemented by a function the other route already calls is not distinguished, and that is the tell the overturn was available before `R-EXA-082` named it. The depth-addressing ruling and its measurement (T4.87: `{cpu: 1, mem: 1}` nested against a flat control's `{3, 3}`) survive as C13's, where the read and the write ask `childBlocks` one question.
 - **I49** — **C02's capability overrides have a producer, and it is `TuiConfig.capabilities`.** The parameter, its validation, its precedence rule (C02 I4) and its e2e row all existed while nothing an application could call supplied it; `construct.ts` passed one argument and the only other caller was a test fixture reaching in by deep import. A parameter with no producer passes every test written about it, which is why this survived: A03 §2's vacuity class reached through an argument, where C24 I16 is written about exports and MG25 scans functions and constants. **The measured consequence is that `colourDepth: 1` was unreachable by any application** — the only rule producing it is the `dumb` gate, which also clears `altScreen`, and C02 I7 makes that the one refusal that stops the shell. Overrides are still C02's to validate; C22's duty is to hand them over and to surface the warnings where it surfaces C02's others.
 - **I50** — **Ghost text is composited into the prompt, and it is appearance rather than geometry.** T4.7 has claimed this since C22 was written and nothing implemented it: `ghost()` had exactly one caller in the tree — the accept path in `keys.ts`, which *inserts* it — so the suggestion existed, was computed on every keystroke, and was invisible until the key that consumed it. `test/contract/editor.test.ts` recorded the other half as deferred *"when C22 lands"*; C22 landed and the row was never written, which is a deferral expressed as a comment and therefore one that could not expire.
 - **I51** — **An overlay that is chrome for the prompt forwards what it does not bind to the `prompt` handler.** C19's menu is the case: `activeTarget` answers `overlay` for anything on the stack (C16 §3), the overlay handler consumes only its six actions, and step 3's `global` binds no printable key — so a character typed while the menu is up is dropped, measured against a control with no layer open. A menu that opens by itself (C19 I19) cannot live with that, because it would stop typing at the moment it appeared — and a menu the user requested must not either, since C19 §8's keystroke cell narrows it in place and that cell is unreachable while the character never arrives. So the forward is the menu's, whichever opened it, and **while it holds no selection the prompt's bindings resolve first** (C19 I20). **The decision is C22's rather than C16's**: the ladder is right, and which layers are an extension of the prompt is a fact about this shell's composition — L4 is where the menu's and the search's identities are both known. C20's reverse search is the same shape and is not wired here: its `type()` has no caller in `src/`, so a query typed after `⌃R` is dropped exactly as the character was, and the rules for narrowing to a hit are C20 §5's.
@@ -2448,10 +2448,10 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 18. C22 owns the pushed view: one piece of state, rewindowed from the live block, dismissed on eviction with the reason C15 declares and cannot detect (I41, I42).
 16a. A keystroke during a pending completion cancels it, so nothing arrives late to a prompt that has moved on. C19 holds the mechanism; L4 is the caller that was missing (I39).
 16. The completion spinner is composed from a fresh read of C19's `spinning` on every paint, and a request arms a wake at the threshold so a frame exists to show it. Appearance, never geometry (I38).
-19. A verb's result is a view when its tool or one of its flags declares it, decided before the pending entry exists — so `Esc` finds no entry to touch and selection survives because nothing appended (I45, §13a).
-20. A pushed view's offset belongs to its owner and never to C15, and its parts are released at the pop (I46, §13a).
-21. A view whose content C15 truncated reports it on screen, because a block taller than the region is shown cut and cannot be scrolled — and splitting, the owner's half of the remedy, has a floor at a leaf with no children (I47, §13a).
-22. A verb that is both a view and a stream patches through the view's owner, releases the guard before its loop and registers its canceller before awaiting it; its stream ending appends a notice rather than closing the view, and only a cancellation pops one (I48, §13a).
+19. ~~A verb's result is a view when its tool or one of its flags declares it~~ — **retired; a verb's result is an entry** (I45, §13a, R-EXA-082).
+20. ~~A pushed view's offset belongs to its owner and never to C15~~ — **retired; the transcript's offset is C14's** (I46, §13a).
+21. ~~A view whose content C15 truncated reports it on screen~~ — **retired; an entry is as tall as it is, and the residue row is C04 I49's** (I47, §13a).
+22. ~~A verb that is both a view and a stream patches through the view's owner~~ — **retired; it streams into its entry, as every stream does** (I48, §13a).
 23. C02's capability overrides reach C02, because a parameter no application can supply is tested and unreachable at once (I49, §2).
 24. **Ghost text reaches the frame**, composited into the prompt as appearance and never as geometry: the spinner wins the row, a suggestion that does not fit is dropped rather than truncated, and `measure` never sees it (I50, C19 I7).
 25. A layer that is chrome for the prompt does not stop typing. What the overlay handler does not bind is forwarded to the prompt's, because the alternative is measured and is not "the menu takes the key" but "nobody does" (I51, C19 I20).
@@ -2689,28 +2689,7 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T4.62** (I83, §6l.2 row 12; C23 I55): a local verb answering one notice of `columns − 1` cells → the frame shows `⏺ verb · ok`, then two blanks, `⎿ ` and the first `columns − 4` cells, then four blanks and the remaining three, then the entry's blank row and the upper rule — the body wrapped once more at `width − 4` and the frame holds every row of it. The wiring row: T1.41 and T1.42 call `entryLayout` directly, and a `visibleRows` that never called it would pass both.
 - **T4.63** (I84, I85; C23 I57; §6l.6 rows 16–19): **frame read.** A session holding a muted `continuation` notice and a settled card whose body is a `table` with a default gap → both `⎿` at column 2; the card's hook row carries the table's header and not a blank; exactly one blank row between the two entries and one above the upper rule.
 - **T4.64** (C09 I61, I86; C28 I31): **the wiring row.** A real session at tier `spans` → `pills#chrome.header.left` and `.right` at **`measures` of `frames` and `renders` of `frames`**, so `calls` is `2 × frames`; the header `group` at **0 measures** and `frames` renders; the footer `group` at one of each; and the footer's pills at **`2 × frames` measures** against one render, so `calls` is `3 × frames` — one measure more each, and the one is `compose`'s `measureSequence` (I82), a registry call of its own and therefore a memo of its own. **Each seam is asserted apart from the other and the sum beside them** (C28 I31): the header pair and the footer pair both sat above a marker reading the sum, because that sum's floor is 2 for any block that is drawn, and the footer's genuine second measure was one step of a floor the table never stated (F1098). Asserted as exactly one more rather than as a ceiling, so the row says where the extra ask lives instead of tolerating it. Before C09 I61 the header pills read 3.0 and the footer's 4.0 (F940). C09's own rows count definition calls and cannot see the property C28 wraps, so the memo read at the child seam removed alone fails here and nowhere else.
-- **T4.65** (C15 I25, §13a): a real `createOverlayManager` and `createDocumentView`, `open("/watch api")`, then the manager's `pop()` — the ladder's call, not the owner's — → `openFor` is `null` before `pop()` returns, `move("down")` is `false`, the owner's own `pop()` returns `false` having nothing to dismiss, and `open("/watch db")` is accepted with exactly one layer on the stack. F944 measured every one of those the other way round.
-- **T4.66** (I45): the fixture measures what `document-view.test.ts` assumes it measures — a block is three rows, two fill an eight-row region as a sequence, and a third does not.
-- **T4.67** (I45): open pushes a view before the document exists, and fill replaces it.
-- **T4.68** (C15 I1): a second open is refused, and the refusal names the command.
-- **T4.69** (I46): the window falls on block boundaries and move walks it.
-- **T4.70** (I46): `putBlock` is total — an unknown id is false, never a throw.
-- **T4.71** (§13a): a block scrolled out of the window is still there to be patched.
-- **T4.72** (I45): pop closes the view and leaves nothing behind.
-- **T4.73** (C24 I12, gap 7): a live part in a pushed view ticks, and the frame shows it.
-- **T4.74** (I46): release at the pop stops the parts, before any later fetch would.
-- **T4.75** (§13a): a part scrolled out of the window keeps ticking.
-- **T4.76** (I47): a block taller than the region is unscrollable, and says so.
-- **T4.77** (I47): the count is what the reader cannot reach, wrap included.
-- **T4.78** (I47): more blocks below is not truncation, and gets no indicator.
-- **T4.79** (I48): a `ViewPatch` appends, which `putBlock` cannot do.
-- **T4.80** (I48): it goes through C04's `applyPatch`, so C04 I14 is enforced here too.
-- **T4.81** (I48): a patch after the pop is refused, never thrown.
-- **T4.82** (I48): a replace reaches a block the window is not showing.
-- **T4.83** (I48): an append holds the bottom, so a follow follows.
-- **T4.84** (I48): a reader who scrolled up is left alone.
-- **T4.86** (I48, §13a): the read, the write and the patch all reach a block inside a `group` — the patch arm is the control, because it descended while the other two did not.
-- **T4.87** (I48, C23 I70, §13a): a live part inside a container keeps ticking and its top-level sibling is not torn down with it. **The reference is a run rather than a figure** — the same two parts flat, so a cadence change moves both arms together and the claim stays *nesting changes nothing*. Measured at HEAD: `{cpu: 1, mem: 1}` nested against `{cpu: 3, mem: 3}` flat, over three sweeps, with the container still showing `loading`. **It carries `gapBefore` as well as the two counters, and that figure is the only one here a working write cannot supply**: `livePanel` sets no gap, so `put` carries one only from the block `blockAt` hands back. Without it the row was green against a reverted read (T6.110).
+- ~~**T4.65**–**T4.84**, **T4.86**, **T4.87**, **T6.110**~~ — **struck with the pushed view they exercised** (F1253, §13a). Twenty-three rows over `document-view.ts`: the push, the projection, the block-boundary window, the truncation indicator, the patch seam and its mutation. **Two claims outlive the file and are asserted where they can still be violated** — the depth-addressing pair (T4.86, T4.87) is C13's, where `applyPatch` and `descendants` ask `childBlocks` one question, and the tail follow (T4.83, T4.84) is `followTail`'s, which C04 I97 already owns and `ScrollOffsets` already exercises.
 - **T4.85** (§2c, C28 I1): `profile: {}` builds a recorder at `counters` and `tier: "off"` builds none — the recorder's `DEFAULT_TIER`, read by the root rather than restated (F967).
 - **T4.17d** (I58, C10 I11): `/theme light` → a render. **Its own session, because focus is stateful**: written as a fourth step of T4.17 it failed against working code, since after two `↓` the keys are going to the live block and the command never reached the prompt. `light` and not `dark` because the session starts dark and `setVariant` is correctly a no-op for the active variant (C10 T3.6) — the first draft failed on that too. Both are the fixture not responding to the thing under test, and the number each produced was indistinguishable from a key that omits the theme.
 - **T4.17e** (I71): the **key axis alone** — the camera store is nudged directly and the entry renders twice, and both renders happen. It goes deliberately **around** the binding, so the row can only be about the key.
@@ -2800,7 +2779,6 @@ PTY harness.
 - **T6.20** (I4a): making the signal or fault path asynchronous — an `await` anywhere between release and exit → T2.1b fails. Nothing else objects, and `session.stopping` is not set on those paths, so a submission could interleave where today none can.
 - **T6.21** (I9): giving the fallback renderer its own writer instead of taking one → T3.15b fails, and the launch-time fallback either writes into an alternate screen that was never entered or the mid-session one is overwritten by the next frame.
 - **T6.22** (I7a): constructing steps 2–11 in `createTui` → T1.9 fails, because `stop` from `created` now has a lifecycle to release; and a manifest given as a path cannot be read at all, since a constructor cannot await.
-- **T6.110** (I48): returning `blockAt` or `putBlock` to a top-level scan of `state.blocks` — `.find`/`.some` and `.map` over the held sequence, which is what both were — → **T4.86 and T4.87 both fail, on either half alone**. The halves fail *differently*, which is why T4.87 carries two kinds of figure: reverting the **write** leaves the counters at `{cpu: 1, mem: 1}` against the flat control's `{3, 3}`, which is the host teardown; reverting the **read** leaves the counters and the frame correct and drops `gapBefore`, because `put` writes without reading and `currentPanel` is the gap's only carrier on this arm. **The gap figure exists because the first pass measured the read reverting to nothing at all** — a mutation that fails nothing is a finding about the row, and the row was blind to every read-side consumer F408 names (I35's re-title, I52's elapsed counter and its countdown), none of which has a view-arm row even now. Restored by copy and compared by digest after each, green at 22 of 22. `test/contract/refresh.test.ts` imports nothing from this file, so its intermittent reds under load — three runs, three different sets, and the same rows red at HEAD without the change — are not the mutation's.
 - **T6.23** (I13a): reading the clock once per chrome function instead of once per frame → T4.11 fails. **Structural guard as well** (A02 17a): `ChromeContext` carries `now` as a value, so a second read has nothing to read from — the shape is what prevents it, and T4.11 is what stops the shape being widened back to a function.
 - **T6.25** (I28): widening the layer region back to the whole terminal → T1.12 and T1.12d fail, and a pushed view covers the header, the prompt and the footer. Nothing in §3's arithmetic can see it.
 - **T6.29** (I32): moving the empty-batch guard back above `arm()` → T1.14 fails, and `Esc` does nothing until the next key. Every unit test of C16's decoder passes throughout: it reports the deadline correctly and nobody polls it.
@@ -2968,321 +2946,78 @@ One value, one file: `${stateDir}/theme`, holding the **name** of the chosen the
 
 ---
 
-## 13a. A verb whose result is a view — the ruling §13 reserved
+## 13a. A verb whose result is a document — §13's ruling, and what the design overturned
 
-§13 held this open through four stretches and warned that **a partial producer is the most
-likely thing to be mistaken for a resolution**. It was right to wait: C25's fullscreen patch
-looked like a producer and answers none of the questions below, and the first attempt at
-this ruling read S3's drawing as an *affordance* and had to be withdrawn against
-`B03_drill_chain.md` §2 (FINDINGS F21b).
+**There is no fourth route.** `R-EXA-082` answers this section's subject by name — *logs →
+**A BLOCK with follow**. It was already a scroll container; it needed no frame* — and its
+test for anything that wants a frame of its own is *does it have its own **prompt** and its
+own **context**?* A verb's result has neither. So a verb's result is an **entry**, always,
+and the transcript is the scroll container it was already.
 
-The concrete case is docker-tui's S3 — `⏎` on a `ps` row `fill`s the prompt with
-`/ps <uuid> --watch`, and the next `⏎` submits it. The general rule falls out of it; it was
-not reasoned in the abstract, because S1 was drawn that way and contradicted I9.
+The section below is kept as the record of what was ruled here, because the reasoning is
+what makes the overturn legible: every question §13 reserved was answered correctly *given a
+push*, and the design removed the push rather than any of the answers.
 
-### What makes a verb's result a view
+### What the design settles, and what falls out
 
-**A01 D4's test, and the framework already has it**: *live vs pushed is decided by input
-ownership — a pushed view takes letter keys while the prompt would otherwise hold focus, so
-the prompt must go.* S3 binds `n`/`p`, `L` and `d`; S12 binds `l`, `g`, `G` and `/`. Nothing
-new is invented here. What was missing was never the test — it was **who applies it, and
-when**.
+| §13's question | the pushed-view answer | the design's |
+|---|---|---|
+| what makes a verb's result a view | a declaration, read before step 3 (I45) | **nothing does.** `ToolDef.view` and `FlagDef.view` retire with their only reader |
+| who owns the scroll offset | a shell-side owner holding one (I46) | **C14 does**, as it does for every entry. There was never a second scroll model to avoid — A01 D3's decision is kept by having one |
+| what `Esc` does to the source entry | nothing; there is no source entry | **there is one**, and `Esc` does to it what it does to every entry |
+| what is on screen while the verb runs | the view, pushed at step 3's moment | **the pending entry**, which is C23 I3 unamended and was always the mechanism this route was standing in for |
+| `view` with `streams` | the fourth route (I48) | **the third route.** `streamInto` already streams patches into an entry with tail follow |
 
-### Who decides, and why it cannot be the adapter
+**The follow is C14's and was never the owner's.** I48's *an append holds the window at the
+bottom if it was at the bottom* is exactly `followTail`, which `ScrollOffsets` already shares
+(C04 I97) — the view owner was a second caller of the shared comparison, not a second answer.
+That is the tell the overturn was available earlier: a route whose distinguishing rule is
+implemented by a function the other route already calls is not distinguished.
 
-**The manifest, read before the verb runs.** Not the adapter, and this is forced rather
-than preferred:
+**And the truncation pair retires with the thing that truncated.** I47's ruling — split what
+you can, report what you could not — was a pair because a view's window emitted **at least
+one block whatever its height** and a block taller than the region was therefore shown cut
+and unscrollable. An entry is as tall as it is; nothing cuts it, and C14 scrolls past it by
+row. The `/inspect --raw` case that forced I47 (245 rows against a 37-row region) is an
+ordinary long entry.
 
-- **C23 I3 — the pending entry is appended before the transport is invoked** (`§4` step 3
-  before step 4). By the time an adapter has seen a result and could say *this wants the
-  screen*, its entry is in the transcript.
-- **C13 has no delete, and C23 §8a A4 already ruled that it must not gain one.** So the
-  entry cannot be withdrawn.
-- **B03 §2 says a push leaves the transcript untouched.**
+**What does *not* change**, and is worth stating so this reads as a deletion rather than a
+rewrite: C23 I3's ordering, the submission guard released before a stream's loop (C23 I6),
+the canceller registered before the loop is awaited (C16 §5), `resetFocus` on append, and
+the refresh driver's parts. Each was enumerated against the view route because the route was
+written new rather than derived — and every one of them is the entry route's, which is the
+route that is left.
 
-Those three cannot hold together with an adapter-side decision. The tier must therefore be
-known **before step 3**, and the only thing known before a verb runs is its declaration.
+### The obligations enumerated against a route that no longer exists
 
-This is the same argument, and the same party, as `ToolDef.interactive`: *"the app author is
-the only party who can know this. Detection is not available."* A view is a handoff of input
-ownership exactly as a TTY handoff is, so it is declared where that one is.
+**`runIntoView` was written new rather than derived, and inherited whichever obligations its
+author noticed.** `declareLive`, `release` and `cancelInFlight` were each entry-only, each
+found one at a time, and each looked like an isolated oversight. Three samples of one cause,
+and the general finding survives the route: **a second route for a thing the first route
+already carries acquires its obligations one defect at a time.** That is the argument the
+design reaches by a shorter path — it asks whether the second route has its own prompt and
+its own context, and refuses it when the answer is no.
 
-**Both a tool and a flag may declare it, and the invocation is a view if either does.** One
-rule, two declaration sites, because the surfaces need both: `/dashboard` is a verb, while
-S12's `--logs` and S3's `--watch` are flags on `ps`, and a verb-level field alone cannot
-express a tool whose tier depends on how it was invoked. C05 I20 holds the field and its
-refusals.
+**A cancelled view popped and left no record.** B03 §2 named that as a cost and this section
+accepted it: *"a logs excursion leaves no transcript record, because the push that opened it
+left none either."* With no push, the premise is gone and so is the cost — a cancelled run
+is an entry with a cancellation in it, which is what `R-EXA-082` means by *the record is the
+product here*.
 
-### What `Esc` does to the source entry
+### What the decision left behind when it threw
 
-**Nothing, because there is no source entry.** The decision precedes step 3, so no pending
-entry is ever appended: the transcript is untouched in the strong sense B03 §2 means, and
-`↑⏎` re-runs the line from history like any other.
-
-Selection survives for a reason already in the tree rather than a new one — **C16 I2 resets
-focus only on append**, and no append happens. A01 D7 is satisfied by the absence, which is
-what B03 means by *"reversing a push touches the transcript exactly as much as making one
-did."*
-
-**The command is still recorded in history**, which is not a contradiction: history is
-C20's line store and not the transcript, and a view the reader cannot re-open from `↑` would
-be a surface reachable exactly once.
-
-**And the owner learns of the pop from C15, not from the key.** `Esc` reaches the owner's
-`pop()`, which clears its state and dismisses the layer; the ⌃c ladder answers a pushed view
-with `overlays.pop()` (C16's `pushedView` rung) and calls no owner, so the view's `openFor`
-kept naming its command over an empty stack and `keys.ts`, which reads `openFor` to decide
-whose view a key belongs to, routed to a view that was not there (F944, measured). Every
-removal now emits one change carrying the layer's id before the removing call returns (C15
-I25), and the owner subscribes at construction and tears down on the change carrying its id
-— so `Esc`, the ladder and a dismissal from anywhere end on one line, and the owner's own
-`pop()` is one more caller of it (T4.65; C25 T2.15 for the patch view, C28 I50 for the
-profiler's).
-
-### Who owns the scroll offset
-
-**The view's owner, which is a shell-side component, and C15 gains nothing.** C15 §183 is
-already explicit — *"A view's content is already the region's worth, and C15 does not scroll
-it. The owner windows it"* — and says why: an offset there is a second scroll model beside
-C14's, which A01 D3 spent a decision avoiding.
-
-What did not exist is an owner for a document that is not a patch. `patch-view.ts` owns one
-for `Patch` blocks and refuses everything else (`its `open` returns a refusal for any other
-kind`), so the ruling names its sibling: a **document view**, holding I41's one piece of
-state — a row offset — over a `ViewDocument`'s blocks.
-
-I41 and I42 were written for the patch view and are now the general shape: one offset and no
-second cursor; rewindowed from what the host holds rather than snapshotted.
-
-### What is on screen while the verb runs
-
-**The view is pushed at step 3's moment and its content is replaced when the document
-arrives.** Neither §13's three questions nor the fourth asks this, and it falls out of the
-answers: step 3 exists so that *something is on screen before the transport is invoked*
-(C23 I3), and ruling the pending entry away removes that without saying what takes its
-place. A consequence between two rulings, owned by neither — so it is ruled here rather
-than discovered when a slow verb looks like a hung terminal.
-
-The view replaces the entry **one for one**, and the ordering is unchanged: pushed before
-step 4, filled after it. C15's `update` is the mechanism and needs nothing new — it is what
-the part-refresh driver already uses on this host (C23 §3b), and §2's transition table has
-four states of which `update` changes none.
-
-Three things follow, and each closes a hole the pending entry used to cover:
-
-- **A failing verb renders its error into the view**, because the view is where the reader
-  is looking and the transcript has nothing to show them. `Esc` still pops, and still
-  appends nothing.
-- **A cancelled view pops**, which is the one case where the reader gets no record at all.
-  That is deliberate and is the cost B03 §2 already names: *"a logs excursion leaves no
-  transcript record, because the push that opened it left none either."*
-- **The push cannot be deferred until the document is in hand.** That reading is tempting
-  and wrong for the same reason step 3 precedes step 4 — feedback that waits for the work
-  is feedback the slow case never gets, and the slow case is the only one that needs it.
-
-### How a view windows what it holds
-
-**C25 I18's shape, already ruled — cited rather than invented.** *"A window is a `Patch`,
-not a list of rows. `Layer.content` is `Block[]`, so the owner of a pushed view cannot hand
-C15 a slice of rendered output — it hands back a smaller block, and C15 measures and draws
-it through the same registry as everything else."* The document view is that sentence with
-`Patch` replaced by a block sequence: the owner holds the whole document and an offset, and
-puts on the layer the blocks that fit.
-
-**The window falls on block boundaries.** A block is included or it is not, and I46's one
-piece of state indexes blocks rather than rows.
-
-**And the window is measured as a sequence, not a block at a time.** A rendered sequence
-separates its blocks, so *n* blocks occupy *n* rows more than the sum of their heights — and
-a projection that adds `measure(block)` one at a time packs nearly twice what the region
-holds, which C15 then cuts in silence. The registry has `measureSequence` for this and C14
-is already given it; the document view was handed the per-block one and nobody noticed
-until a surface arrived whose blocks were numerous enough for the error to be visible.
-
-**It was invisible for the same reason S3's granularity was**: with four blocks the
-discrepancy is four rows against a region with room to spare, and with 103 it is 103. A
-defect proportional to a count that every existing surface kept small reads as correct until
-one does not — and no arithmetic finds it, because both sides of the comparison are the
-code's own. It was found by reading a frame and seeing a blank row between every block.
-
-**The plot is atomic for windowing, permanently.** C12 I1 makes a plot's height a function
-of the block alone and puts the series deliberately out of reach — *"a 200-epoch run's block
-is the same height as a 10-epoch one"* — so reducing a plot's data changes nothing about its
-height, and reducing its `height` **rescales the curve** rather than windowing it. There is
-no version of this that yields the top half of a plot.
-
-So the upgrade path is **granular where the kind divides, atomic where it does not**, and it
-is written that way on purpose: *row-granular scroll* is a promise C12 I1 forbids for the one
-block S3 leads with, and a spec that offered it would be describing something no
-implementation can deliver.
-
-**Per-kind reducers are shape-available and unwritten.** `table`, `keyValue` and `panel`
-divide at rows and children with no mid-row slicing and no measurer change — which is why
-this is not the mid-row option, whose cost lands on the measurer, the one thing that must
-never drift. But `windowPatch` needed a dedicated file and a concept of indivisible *units*
-to get right, and each further reducer is that work again. They are deferred until a
-consumer forces one, in the same way and for the same reason as everything else here.
-
-**The deferral is measured rather than assumed.** S3 filled measures **30 rows at 120 and at
-80**, and a view fills the region (C15 §4), so at any realistic terminal height nothing is
-out of view and the granularity is invisible for this surface:
-
-```
-width 120: TOTAL 26  [keyValue#container-head=2  panel#cpu=14  panel#io=7  panel#details=3]
-width  80: TOTAL 26  [keyValue#container-head=2  panel#cpu=14  panel#io=7  panel#details=3]
-```
-
-**26 as declared, 30 once the parts fill**, and the difference is not slack: `details` is
-declared holding the framework's `loading…` placeholder and grows to four rows of key-values
-when its one-shot fetch returns. So the figure a measurer sees before anything ticks is not
-the figure the terminal shows, and for a surface near the region's height the safe one is
-the larger. Both are read from the built application — 26 through the same registry C15
-measures with, 30 counted off a replayed capture at each width.
-
-**The figure was 21 and named three blocks that were never built** (`memnet-panel`,
-`ports`). It was an estimate of the drawing, taken before S3 existed, and it survived into a
-sentence beginning *measured rather than assumed*. The built surface has four blocks, three
-of them bordered panels, and an eight-row plot. The conclusion is unchanged and the margin
-it had was half what this claimed.
-
-And the attempts before *that* returned **13**, measured against a registry holding no plot
-definition (`registry.ts` — *"`table`, `plot` and `patch` are not here"*). The same fault
-recurred while correcting this passage: a fresh probe answered **17**, because
-`createBlockRegistry()` alone still has no plot and the shell registers it separately at
-`construct.ts:297`. A probe built on the framework's defaults is measuring a different
-application than the one that runs, and the number it returns is plausible every time.
-
-### The block that does not fit, and the pair that makes it honest
-
-**S3 was the surface where the granularity was invisible, and it is not the general case.**
-docker-tui's `/inspect --raw` is the first consumer with more content than region — a real
-`docker inspect` is **245 rows against a 37-row region** — and it found that the ceiling
-above has a floor beneath it.
-
-Two rules meet here and neither is wrong on its own. The window falls on block boundaries
-(I46), and the projection emits **at least one block whatever its height**, because a block
-taller than the region would otherwise window to nothing and an empty view is
-indistinguishable from a broken one. Together they mean **a single tall block is shown, cut,
-and unscrollable**: the offset indexes blocks, so with one block there is no second offset
-to move to and the motion is *refused* rather than unhelpful. The reader presses a
-documented key and nothing happens.
-
-**The consumer's half is to split, and splitting has a floor.** An app that emits one block
-per top-level key takes the unreachable rows from 208 to 77; splitting a second level
-wherever a block still overflows takes them to 0, at 103 blocks. But the rule does not
-terminate: a leaf with no children to split by — a `Config.Env` of 300 variables, **302
-rows** — has no smaller form that is still that leaf, and one block per string is 300 blocks
-with the structure gone. So a producer can promise zero unreachable rows **for every document
-whose leaves fit**, and not in general.
-
-**So the ruling is a pair, and neither half is sufficient.** The owner splits what it can,
-and the view **reports what it could not**: when C15 places the layer truncated, the view
-says so on screen. `Placed.truncated` already carries the fact — C19's menu reads it and
-draws `N more` (C19 §5) — and until this consumer the document view cited that field as the
-mechanism reporting its overflow without ever reading it.
-
-The failure mode is why the second half is load-bearing rather than decorative: **content
-stopping mid-object with no indicator is indistinguishable from content ending.** A reader
-who is told the frame was cut goes looking; a reader who is not, stops. Stating the two as
-one ruling is deliberate — split alone leaves a silent residue, and the indicator alone
-leaves a document nothing can cross.
-
-**A comment citing a mechanism is evidence its author knew of the mechanism, not evidence
-the file uses it.** That is the general form of how this was missed, and it is worth the
-sentence: the file named `Placed.truncated`, named what it was for, and had no consumer of
-it, which reads exactly like a file that reads it.
-
-### The obligations a route carries, and the one that is not yet built
-
-**`runIntoView` was written new rather than derived, and inherited whichever
-obligations its author noticed.** That is not a remark about care: `declareLive`,
-`release` and `cancelInFlight` were each entry-only, each found one at a time, and each
-looked like an isolated oversight. Three samples of one cause. The entry route's
-obligations are therefore enumerated against the view route rather than recalled, and the
-`n/a` rows carry reasons — *"the view route does not need that"* is the assumption that
-produced the first three.
-
-Two of those reasons are worth keeping here, because both are rulings rather than notes:
-
-- **`resetFocus` is not called, and calling it would be a defect.** It exists because an
-  append freezes the previous entry and focus must not remain in a frozen block. The view
-  route appends nothing and freezes nothing, and A01 D7 requires the selection to survive
-  the push and be intact on the pop. The absence is the invariant, not an omission.
-- **A cancelled view pops rather than settling**, since there is no entry to settle. The
-  reader gets no record, which is the cost B03 §2 already names for a logs excursion.
-
-**`view` with `streams` is the fourth route, and it is now built** (I48). It was reserved
-here through one stretch, refused loudly at run time rather than silently, and taken by the
-first consumer concrete enough to force it: docker-tui's S9 `/logs`, where `docker logs -f`
-is a stream with no natural end and A01 D4's test makes it a view.
-
-The reservation was right and the refusal was the right shape. Both are kept below, because
-*what it refused to guess* is the useful record — the pair currently fell to the
-non-streaming path, blocked until the process exited, and **held the submission guard for
-the whole of it**, which is precisely what C23 I6 exists to prevent. A silent version of
-that would have been found by a reader watching a shell stop accepting input.
-
-**Three obligations have no equivalent on this route, and the ruling on each is what makes
-it a route rather than a copy.**
-
-- **The patch has nowhere to go.** `streamInto` calls `transcript.patch(id, view)`; the
-  owner has `putBlock(id, block)`, which replaces an existing block and refuses one it does
-  not hold — so a stream's first `append` would be refused and every `/logs` patch with it.
-  (`putBlock` addresses at depth now, through `applyPatch` itself; it did not when this was
-  written, and the sentence above was true of the top level only.)
-  The owner therefore gains **`patch(view: ViewPatch)`, applied through C04's `applyPatch`**:
-  the same pure function C13 itself calls, so the view and the transcript cannot disagree
-  about what a patch means. This is I46's *no second height codepath* argument pointed at
-  patching. `putBlock` stays and is not merged with it — the refresh driver holds a total
-  contract that returns `false`, and `patch` reports C13's three-armed outcome because that
-  is what the streaming loop branches on.
-- **A view cannot settle, and must not pop when the stream ends.** `docker logs` without
-  `-f` ends immediately, and a view that popped on `end` would flash and vanish before
-  anything could be read: **the stream ending is not the reader having finished with it**,
-  and B03 §2 already makes the pop the reader's. So `end`, a malformed patch and a stream
-  failure all collapse to the same shape — *append a notice, stop consuming, leave the view*
-  — and only the wording differs. `refresh.settled` still fires, because the stall machinery
-  is per-host and only `transcript.settle` has no counterpart here.
-- **An append keeps the window at the bottom when the window was at the bottom.** A follow
-  whose window does not move shows its first screen and nothing after it, so the output the
-  reader asked to watch — and the terminal notice above it — are both below the fold for
-  ever. **Only when it was already at the bottom**: a reader who has scrolled up is reading,
-  and moving the window under them is the same failure in the other direction. This is tail
-  semantics, and it belongs to the owner rather than the route, because the owner is what
-  knows where the window is.
-
-  It is ruled here because **neither walk artefact reaches it.** A rule about what a frame
-  *contains* is invisible to a table indexed by obligations and to a trace indexed by
-  events — the fifth recorded blind spot, and the third surface it has caught. Found by
-  reading a frame in which a stopped container's follow showed twenty-six lines of start-up
-  and no sign that anything had happened since.
-- **The subscription is keyed by `DOCUMENT_VIEW_ID`.** There is no entry and so no pending
-  id, and this is the name `refresh` already uses for the view host, so `liveStreams`, the
-  refresh registry and the overlay agree without a fourth. C15 I1 makes it unique while it
-  exists.
-
-**And one obligation is a severity higher here than on the entry route.** Registering the
-canceller in `liveStreams` before the loop is awaited gives the verb C16 §5's newest-first
-rung. Omit it on an entry and a Ctrl-C fails to cancel; omit it here and Ctrl-C falls past
-the rung and **quits the session**, because the view's loop is the only thing on screen. The
-asymmetry that falls out of the same rung: **a cancelled view pops and a finished one does
-not** — Ctrl-C is the reader saying stop, `end` is the far side saying it.
-
-### What the decision leaves behind when it throws
-
-Asked because a ruling's rejection path is where it leaves state, and neither a trace nor a
+Kept because a ruling's rejection path is where it leaves state, and neither a trace nor a
 table indexes it (C13's `settle(id, doc)` is the measured case).
 
-- **A refused declaration throws at parse**, where C05 I19 already puts `interactive`'s
-  refusals — before a session exists, so there is no half-built state to leave.
-- **A push that fails leaves no entry**, because none was appended. This is the property
-  that makes the ruling safe rather than merely tidy: the failure mode of an adapter-side
-  decision would have been an orphaned pending entry that nothing could settle or remove —
-  C23 I9's forbidden state, two components from the decision that produced it.
-- **The owner's `putBlock` is total.** It patches the held document and reprojects the window, and a reprojection that threw after the document had been updated would leave the owner holding a document no frame ever displayed — the same two-step hazard as C13's `settle(id, doc)`, in a component two removed from the driver that called it. So it reprojects into a local, assigns both, and returns `false` rather than throwing; the driver's existing `false → release(host)` covers the other side. **And that other side is why the rewrite is `applyPatch`'s and not this file's**: `false` is read as *the host is gone*, so any input the write refuses and the read accepts becomes a host teardown — the arm below, one component along.
-- **A pop while parts are in flight** is the one real hazard, and it belongs to the producer
-  rather than to this ruling: release must happen at the pop and not one tick later, or a
-  fetch resolves into a layer that has gone. C23 I33's teardown set gains the trigger.
+- **A refused declaration threw at parse**, where C05 I19 puts `interactive`'s refusals.
+  With the declaration gone there is nothing to refuse, and the refusal retires with it.
+- **A push that failed left no entry.** The property that made the ruling safe is the
+  property the design makes unnecessary: there is no push to fail, and the pending entry is
+  appended by the one step that has always appended it.
+- **The owner's `putBlock` was total**, reprojecting into a local so that a throw could not
+  leave a document no frame had displayed. The hazard was the *two-step* — patch the held
+  document, then reproject a window — and the second step is what retires. C13 patches an
+  entry in one step and has no window to reproject.
 
 ---
 
@@ -3305,7 +3040,7 @@ goes unexamined.)
 |---|---|---|---|---|
 | 1 | F15 — `/dashboard` | prompt clears, no entry | the document was **rejected**: two blocks with id `running` (C04 I14) | **destroyed diagnostic** |
 | 2 | F35 — `/drift no-such-container` | prompt clears, no entry | three app documents set `status: "error"` and omitted `error` (C04 I3) | **destroyed diagnostic** |
-| 3 | C22 I47 — a view taller than its region | content stops mid-object | C15 truncated it and nothing said so | **destroyed diagnostic** |
+| 3 | ~~C22 I47 — a view taller than its region~~ — **struck with the view** (F1253); the class it named is C04 I49's residue row, which is built | content stops mid-object | the window cut it and nothing said so | **destroyed diagnostic** |
 | 4 | `/drift` agreeing, `/config` identical | an empty block | **nothing is wrong**: the two sources match | **nothing to say, said as nothing** |
 
 **Rows 1–3 are one mechanism and row 4 is not.** In 1–3 the framework knows precisely what
@@ -3323,7 +3058,7 @@ for row 4 — the state row 4 describes is a **success**.
 |---|---|
 | F15 | **CLOSED.** Two channels — a fault notice at the moment with `origin: "defect"`, and `Pipeline.faults` drained at §8 step 3. Two because *the reporting path is the path that failed* |
 | F35 | app-side ×3, closed as a class by `examples/docker/test/documents.test.ts`; the framework half is F15's |
-| I47 | **specified, and the walk owes whether it is built.** `Placed.truncated` carries the fact and C19's menu reads it; the duty to read it *for a view* is I47's, and I47 is an invariant with an owner |
+| ~~I47~~ | **Struck with the view** (F1253). The duty was *read `Placed.truncated` for a pushed view*, and there is no pushed view. What the walk owed is owed by C04 I49's residue row instead, which is built and asserted — so the row closes rather than moving |
 
 **So entry 6.1 does not own rows 1–3.** It owns row 4, and naming that is what stops the entry
 being planned once and fixed never — *would landing this close it* is the test, and a fix for
@@ -3375,4 +3110,4 @@ first row when it is built, and it is stated so the entry is not read as closed 
 | The auth flow itself | The far side; C22 displays and offers |
 | Prism's chrome content | `prism-tui` |
 | Multi-cluster sessions | Phase 2 |
-| ~~A verb whose result is a pushed view~~ | **Taken — §13a.** Reserved through four stretches and settled by the first consumer concrete enough to force it: docker-tui's S3, a live single-container view reached the way S12's logs view is. The row stays in the table, struck through rather than deleted, because *what it refused to guess* is the useful record |
+| ~~A verb whose result is a pushed view~~ | **Taken, then retired — §13a.** Reserved through four stretches, settled by docker-tui's S3, and overturned by `R-EXA-082`: a verb's result has no prompt and no context of its own, so it is an entry and the transcript is the scroll container. The row stays struck rather than deleted because *what it refused to guess* is still the useful record, and so is the fact that the answer was right about every question except whether to push |
