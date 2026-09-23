@@ -156,6 +156,14 @@ const STATED_CYCLES: Readonly<Record<string, number>> = Object.freeze(
     }
   });
 
+  // **Spec-first: C09 I98's three rows land with the code that makes them green.**
+  // T2.163 is red on HEAD by construction — nineteen of twenty-seven `ascii`
+  // columns disagree with the registry — so it arrives as a `todo` in the spec
+  // commit rather than as a row asserting the collapse it exists to remove.
+  it.todo("T2.163 (C09 I98, R-MOT-010): SPINNER_SETS against the registry, by equality and field by field — not deferred on a component: the registry's per-set ASCII rung lands with I98 in this same MR");
+  it.todo("T2.164 (C09 I98, R-MOT-008): the bloom family is the agent's, asserted over its membership — not deferred on a component: the registry's per-set ASCII rung lands with I98 in this same MR");
+  it.todo("T2.165 (C09 I98, R-MOT-009): a ping-pong traverses 0 → N → 1, so neither endpoint doubles at the seam — not deferred on a component: the registry's per-set ASCII rung lands with I98 in this same MR");
+
   it("T2.73: the ASCII pair keeps the shape of motion", () => {
     // Degradation preserves meaning rather than appearance — but a bloom
     // falling to a rotation loses more than it needs to, so the pairing is by
