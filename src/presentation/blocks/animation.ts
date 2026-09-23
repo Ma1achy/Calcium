@@ -44,6 +44,10 @@ export const ANIMATES: Readonly<Record<KnownBlockKind, boolean>> = Object.freeze
   scroll: false,
   status: true,
   steps: true,
+  // A running member draws the spinner in its duration slot (§030), which is
+  // the same fact `steps` animates for — the window itself never moves on a
+  // tick, only when the current leaves it (C04 I124).
+  tape: true,
   table: false,
   tip: false,
 });

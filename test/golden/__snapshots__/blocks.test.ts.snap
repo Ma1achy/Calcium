@@ -36,6 +36,8 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 40 1`] = `
 {"kind":"patch","id":"patch-1","path":"~
 ── pills · measured 1 · rendered 1
 [38;2;232;168;124mall[39m  [38;2;140;140;140mfailed[39m
+── tape · measured 1 · rendered 1
+[38;2;212;212;212mseams +[39m  [38;2;212;212;212marm +[39m  [38;2;232;168;124m* count .[39m  [38;2;212;212;212mprobe o[39m  [38;2;140;140;140m1][39m
 ── tip · measured 1 · rendered 1
 [38;2;138;138;138mPress ? for keys.   Show keys[39m
 ── panel · measured 4 · rendered 4
@@ -107,6 +109,8 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 60 1`] = `
 {"kind":"patch","id":"patch-1","path":"src/server.ts","lang~
 ── pills · measured 1 · rendered 1
 [38;2;232;168;124mall[39m  [38;2;140;140;140mfailed[39m
+── tape · measured 1 · rendered 1
+[38;2;212;212;212mseams +[39m  [38;2;212;212;212marm +[39m  [38;2;232;168;124m* count .[39m  [38;2;212;212;212mprobe o[39m  [38;2;212;212;212mtrace x[39m
 ── tip · measured 1 · rendered 1
 [38;2;138;138;138mPress ? for keys.   Show keys[39m
 ── panel · measured 4 · rendered 4
@@ -178,6 +182,8 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 80 1`] = `
 {"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","~
 ── pills · measured 1 · rendered 1
 [38;2;232;168;124mall[39m  [38;2;140;140;140mfailed[39m
+── tape · measured 1 · rendered 1
+[38;2;212;212;212mseams 2:53 +[39m  [38;2;212;212;212marm 3:46 +[39m  [38;2;232;168;124m* count . 4:02[39m  [38;2;212;212;212mprobe 0:11 o[39m  [38;2;212;212;212mtrace 1:30 x[39m
 ── tip · measured 1 · rendered 1
 [38;2;138;138;138mPress ? for keys.   Show keys[39m
 ── panel · measured 4 · rendered 4
@@ -249,6 +255,8 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 120 1`] = `
 {"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","hunks":[{"header":"@@ -18,7 +18,9 @@","l~
 ── pills · measured 1 · rendered 1
 [38;2;232;168;124mall[39m  [38;2;140;140;140mfailed[39m
+── tape · measured 1 · rendered 1
+[38;2;212;212;212mseams 2:53 +[39m  [38;2;212;212;212marm 3:46 +[39m  [38;2;232;168;124m* count . 4:02[39m  [38;2;212;212;212mprobe 0:11 o[39m  [38;2;212;212;212mtrace 1:30 x[39m
 ── tip · measured 1 · rendered 1
 [38;2;138;138;138mPress ? for keys.   Show keys[39m
 ── panel · measured 4 · rendered 4
@@ -320,6 +328,8 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 40 1`] = `
 {"kind":"patch","id":"patch-1","path":"…
 ── pills · measured 1 · rendered 1
 [38;2;232;168;124mall[39m  [38;2;140;140;140mfailed[39m
+── tape · measured 1 · rendered 1
+[38;2;212;212;212mseams ✓[39m  [38;2;212;212;212marm ✓[39m  [38;2;232;168;124m› count ⋅[39m  [38;2;212;212;212mprobe ○[39m  [38;2;140;140;140m1»[39m
 ── tip · measured 1 · rendered 1
 [38;2;138;138;138mPress ? for keys.   Show keys[39m
 ── panel · measured 4 · rendered 4
@@ -391,6 +401,8 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 60 1`] = `
 {"kind":"patch","id":"patch-1","path":"src/server.ts","lang…
 ── pills · measured 1 · rendered 1
 [38;2;232;168;124mall[39m  [38;2;140;140;140mfailed[39m
+── tape · measured 1 · rendered 1
+[38;2;212;212;212mseams ✓[39m  [38;2;212;212;212marm ✓[39m  [38;2;232;168;124m› count ⋅[39m  [38;2;212;212;212mprobe ○[39m  [38;2;212;212;212mtrace ✗[39m
 ── tip · measured 1 · rendered 1
 [38;2;138;138;138mPress ? for keys.   Show keys[39m
 ── panel · measured 4 · rendered 4
@@ -462,6 +474,8 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 80 1`] = `
 {"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","…
 ── pills · measured 1 · rendered 1
 [38;2;232;168;124mall[39m  [38;2;140;140;140mfailed[39m
+── tape · measured 1 · rendered 1
+[38;2;212;212;212mseams 2:53 ✓[39m  [38;2;212;212;212marm 3:46 ✓[39m  [38;2;232;168;124m› count ⋅ 4:02[39m  [38;2;212;212;212mprobe 0:11 ○[39m  [38;2;212;212;212mtrace 1:30 ✗[39m
 ── tip · measured 1 · rendered 1
 [38;2;138;138;138mPress ? for keys.   Show keys[39m
 ── panel · measured 4 · rendered 4
@@ -533,6 +547,8 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 120 1`] = `
 {"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","hunks":[{"header":"@@ -18,7 +18,9 @@","l…
 ── pills · measured 1 · rendered 1
 [38;2;232;168;124mall[39m  [38;2;140;140;140mfailed[39m
+── tape · measured 1 · rendered 1
+[38;2;212;212;212mseams 2:53 ✓[39m  [38;2;212;212;212marm 3:46 ✓[39m  [38;2;232;168;124m› count ⋅ 4:02[39m  [38;2;212;212;212mprobe 0:11 ○[39m  [38;2;212;212;212mtrace 1:30 ✗[39m
 ── tip · measured 1 · rendered 1
 [38;2;138;138;138mPress ? for keys.   Show keys[39m
 ── panel · measured 4 · rendered 4
@@ -604,6 +620,8 @@ exports[`C09 T2.10 — golden frames > light-ascii at 40 1`] = `
 {"kind":"patch","id":"patch-1","path":"~
 ── pills · measured 1 · rendered 1
 [38;2;31;96;240mall[39m  [38;2;110;111;118mfailed[39m
+── tape · measured 1 · rendered 1
+[38;2;56;58;66mseams +[39m  [38;2;56;58;66marm +[39m  [38;2;31;96;240m* count .[39m  [38;2;56;58;66mprobe o[39m  [38;2;110;111;118m1][39m
 ── tip · measured 1 · rendered 1
 [38;2;105;108;119mPress ? for keys.   Show keys[39m
 ── panel · measured 4 · rendered 4
@@ -675,6 +693,8 @@ exports[`C09 T2.10 — golden frames > light-ascii at 60 1`] = `
 {"kind":"patch","id":"patch-1","path":"src/server.ts","lang~
 ── pills · measured 1 · rendered 1
 [38;2;31;96;240mall[39m  [38;2;110;111;118mfailed[39m
+── tape · measured 1 · rendered 1
+[38;2;56;58;66mseams +[39m  [38;2;56;58;66marm +[39m  [38;2;31;96;240m* count .[39m  [38;2;56;58;66mprobe o[39m  [38;2;56;58;66mtrace x[39m
 ── tip · measured 1 · rendered 1
 [38;2;105;108;119mPress ? for keys.   Show keys[39m
 ── panel · measured 4 · rendered 4
@@ -746,6 +766,8 @@ exports[`C09 T2.10 — golden frames > light-ascii at 80 1`] = `
 {"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","~
 ── pills · measured 1 · rendered 1
 [38;2;31;96;240mall[39m  [38;2;110;111;118mfailed[39m
+── tape · measured 1 · rendered 1
+[38;2;56;58;66mseams 2:53 +[39m  [38;2;56;58;66marm 3:46 +[39m  [38;2;31;96;240m* count . 4:02[39m  [38;2;56;58;66mprobe 0:11 o[39m  [38;2;56;58;66mtrace 1:30 x[39m
 ── tip · measured 1 · rendered 1
 [38;2;105;108;119mPress ? for keys.   Show keys[39m
 ── panel · measured 4 · rendered 4
@@ -817,6 +839,8 @@ exports[`C09 T2.10 — golden frames > light-ascii at 120 1`] = `
 {"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","hunks":[{"header":"@@ -18,7 +18,9 @@","l~
 ── pills · measured 1 · rendered 1
 [38;2;31;96;240mall[39m  [38;2;110;111;118mfailed[39m
+── tape · measured 1 · rendered 1
+[38;2;56;58;66mseams 2:53 +[39m  [38;2;56;58;66marm 3:46 +[39m  [38;2;31;96;240m* count . 4:02[39m  [38;2;56;58;66mprobe 0:11 o[39m  [38;2;56;58;66mtrace 1:30 x[39m
 ── tip · measured 1 · rendered 1
 [38;2;105;108;119mPress ? for keys.   Show keys[39m
 ── panel · measured 4 · rendered 4
@@ -888,6 +912,8 @@ exports[`C09 T2.10 — golden frames > light-unicode at 40 1`] = `
 {"kind":"patch","id":"patch-1","path":"…
 ── pills · measured 1 · rendered 1
 [38;2;31;96;240mall[39m  [38;2;110;111;118mfailed[39m
+── tape · measured 1 · rendered 1
+[38;2;56;58;66mseams ✓[39m  [38;2;56;58;66marm ✓[39m  [38;2;31;96;240m› count ⋅[39m  [38;2;56;58;66mprobe ○[39m  [38;2;110;111;118m1»[39m
 ── tip · measured 1 · rendered 1
 [38;2;105;108;119mPress ? for keys.   Show keys[39m
 ── panel · measured 4 · rendered 4
@@ -959,6 +985,8 @@ exports[`C09 T2.10 — golden frames > light-unicode at 60 1`] = `
 {"kind":"patch","id":"patch-1","path":"src/server.ts","lang…
 ── pills · measured 1 · rendered 1
 [38;2;31;96;240mall[39m  [38;2;110;111;118mfailed[39m
+── tape · measured 1 · rendered 1
+[38;2;56;58;66mseams ✓[39m  [38;2;56;58;66marm ✓[39m  [38;2;31;96;240m› count ⋅[39m  [38;2;56;58;66mprobe ○[39m  [38;2;56;58;66mtrace ✗[39m
 ── tip · measured 1 · rendered 1
 [38;2;105;108;119mPress ? for keys.   Show keys[39m
 ── panel · measured 4 · rendered 4
@@ -1030,6 +1058,8 @@ exports[`C09 T2.10 — golden frames > light-unicode at 80 1`] = `
 {"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","…
 ── pills · measured 1 · rendered 1
 [38;2;31;96;240mall[39m  [38;2;110;111;118mfailed[39m
+── tape · measured 1 · rendered 1
+[38;2;56;58;66mseams 2:53 ✓[39m  [38;2;56;58;66marm 3:46 ✓[39m  [38;2;31;96;240m› count ⋅ 4:02[39m  [38;2;56;58;66mprobe 0:11 ○[39m  [38;2;56;58;66mtrace 1:30 ✗[39m
 ── tip · measured 1 · rendered 1
 [38;2;105;108;119mPress ? for keys.   Show keys[39m
 ── panel · measured 4 · rendered 4
@@ -1101,6 +1131,8 @@ exports[`C09 T2.10 — golden frames > light-unicode at 120 1`] = `
 {"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","hunks":[{"header":"@@ -18,7 +18,9 @@","l…
 ── pills · measured 1 · rendered 1
 [38;2;31;96;240mall[39m  [38;2;110;111;118mfailed[39m
+── tape · measured 1 · rendered 1
+[38;2;56;58;66mseams 2:53 ✓[39m  [38;2;56;58;66marm 3:46 ✓[39m  [38;2;31;96;240m› count ⋅ 4:02[39m  [38;2;56;58;66mprobe 0:11 ○[39m  [38;2;56;58;66mtrace 1:30 ✗[39m
 ── tip · measured 1 · rendered 1
 [38;2;105;108;119mPress ? for keys.   Show keys[39m
 ── panel · measured 4 · rendered 4

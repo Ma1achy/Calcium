@@ -74,9 +74,21 @@ describe("C09 I72 — the two arms agree", () => {
       for (const width of WIDTHS) {
         for (const [capsName, capabilities] of NAMED_CAPS) {
           const name = oracleName(`t2143-${keyOf(b)}`, capsName, width);
-          const expected = oracle.frozen(name);
           const { probe, names } = recording();
           const got = renderToLines(r, b, width, { theme: ORACLE_THEME, capabilities, probe });
+          // **A kind Ink never drew is swept for its arm and not for its
+          // bytes**, and the exemption is driven from the other side: there
+          // must be no capture under its key, so the day one appears this
+          // fails rather than the entry sitting in the list being true of
+          // nothing.
+          const beyond = oracle.postInk(b.kind);
+          if (beyond !== null) {
+            expect(oracle.has(name), `${name} is ${beyond}, and a capture exists`).toBe(false);
+            expect(names.filter((n) => n === "rows"), `${b.kind} at ${String(width)}`).toHaveLength(1);
+            rowsArm += 1;
+            continue;
+          }
+          const expected = oracle.frozen(name);
           // **A retired capture is asserted to differ, never skipped** (F1233).
           // A ruling changed what this kind draws, so Ink's bytes are the
           // record of the frame before it — and the day the two agree again the

@@ -147,6 +147,24 @@ export const ONE_PER_KIND: Readonly<Record<KnownBlockKind, Block>> = Object.free
     ],
   }),
 
+  // C04 §3ao — the tape. **Five members, one running and one settled**, so
+  // the representative reaches both orderings of the state part (§030) and is
+  // wide enough that the corpus's narrow widths slide the window rather than
+  // drawing it whole — a fixture that always fits tests the ladder's first
+  // rung and nothing below it.
+  tape: block({
+    kind: "tape",
+    id: "tape-1",
+    members: [
+      { id: "seams", label: "seams", detail: "2:53", state: "succeeded" },
+      { id: "arm", label: "arm", detail: "3:46", state: "succeeded" },
+      { id: "count", label: "count", detail: "4:02", state: "running" },
+      { id: "probe", label: "probe", detail: "0:11", state: "queued" },
+      { id: "trace", label: "trace", detail: "1:30", state: "failed" },
+    ],
+    current: "count",
+  }),
+
   tip: block({
     kind: "tip",
     id: "tip-1",

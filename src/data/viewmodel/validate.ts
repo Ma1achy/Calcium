@@ -1782,6 +1782,12 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
     }
   },
   pills: (b, e, at) => requireArray(b, "chips", e, at),
+  // **`current` is not required and is not checked against the members**
+  // (C04 I124). A tape nobody is in is still a tape, and a `current` naming no
+  // member is the state a producer is in between rebuilding the row and
+  // choosing within it — refusing it would make a document invalid for a
+  // moment that is legitimate.
+  tape: (b, e, at) => requireArray(b, "members", e, at),
   tip: (b, e, at) => {
     requireString(b, "text", e, at);
     checkActions(b, e, at);

@@ -247,6 +247,7 @@ const KEPT_WHOLE: Readonly<Record<string, string>> = {
   scroll: "a region whose height is declared cannot measure less without becoming a different box; it bounds its own content instead (C04 I47, I49)",
   status: "a bordered box the registry draws rather than the definition, with two ladders on it and neither may change the row count (I27, §3a)",
   steps: "one row per step, `logs`' shape again, so it divides in principle and does not — an unmeasured F424 candidate",
+  tape: "one row at every width, and the window it slides is horizontal — there is no vertical unit to divide into, and shedding a member is the one thing §095 exists to refuse (C04 I124)",
   tip: "`ceil(cells(text) / w)` of one text, as `notice` — dim, with fill actions, and nothing to divide into",
 };
 
@@ -630,7 +631,7 @@ describe("C09 §2a — a block reduced to a valid smaller block", () => {
 
 describe("C09 §2c width — the registry's answer (I42, I44)", () => {
   const FILLING = ["rule", "progress", "plot", "image", "scroll", "mosaic"] as const;
-  const DECLARING = ["notice", "raw", "pills", "keyValue", "code", "table", "group", "panel"];
+  const DECLARING = ["notice", "raw", "pills", "tape", "keyValue", "code", "table", "group", "panel"];
 
   it("T2.110 (C09 I42): a kind declaring no width answers the width, and an answer outside the range is clamped and reported", () => {
     const kit = measurable({ definitions: [plotDefinition as never, tableDefinition as never] });

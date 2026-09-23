@@ -61,6 +61,7 @@ export type {
   Patch,
   PatchResult,
   Pills,
+  Tape,
   Plot,
   Camera,
   PlotForm,

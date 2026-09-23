@@ -5,6 +5,8 @@
 // neither `cells()` nor a frame-read on the machine that picked it will show it:
 // the disagreement depends on locale. So it is asserted here, over every set, on
 // both arms.
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { FREE_WIDTH_SLOTS, glyphs, spinnerFrames, spinnerIntervalMs } from "../../src/presentation/blocks/index.js";
@@ -74,6 +76,22 @@ describe("roadmap 51 — the spinner sets", () => {
     for (const c of "·❈★☆") expect(hasEmojiForm(c.codePointAt(0) ?? 0), `${c} was on the list and has no emoji form`).toBe(false);
   });
 
+/**
+ * The cycles the registry states, read from it rather than copied (T2.72).
+ *
+ * **Read and not written**: a number copied here would be a second record of
+ * the design's, and the two would drift silently — which is the failure the
+ * whole registry projection exists to stop.
+ */
+const STATED_CYCLES: Readonly<Record<string, number>> = Object.freeze(
+  Object.fromEntries(
+    (JSON.parse(readFileSync("docs/design/language/calcium-registry.json", "utf8")).spinners as
+      readonly Readonly<{ id: string; cycleMs?: number }>[])
+      .filter((sp) => typeof sp.cycleMs === "number")
+      .map((sp) => [sp.id, sp.cycleMs as number]),
+  ),
+);
+
   it("T2.72: the interval belongs to the set, and the product lands in the band", () => {
     // **A caller picking a 28-frame set and getting a 10-frame default makes it
     // frantic**, which is the whole reason the interval is not the caller's.
@@ -97,6 +115,19 @@ describe("roadmap 51 — the spinner sets", () => {
 
       if (name === "fullramp") {
         expect(cycle, "a second category — present, not working").toBeGreaterThan(2000);
+        continue;
+      }
+      // **A set whose registry record states its own cycle is held to that
+      // number, not to the band — which is stronger and not weaker.** The band
+      // exists because nothing else pins the figure; where the design states
+      // one, a bracket that merely contains it would let the set drift by
+      // hundreds of milliseconds and stay green. `agent` walks for 9.84 s and
+      // is neither a turn nor a pulse: it is a bloom that does not repeat
+      // inside a call, and §095 draws it as the mark of a thing still running
+      // rather than of a thing turning.
+      const stated = STATED_CYCLES[name];
+      if (stated !== undefined) {
+        expect(cycle, `${name} is pinned to the registry's own cycle`).toBe(stated);
         continue;
       }
       if (TOGGLES.has(name)) {

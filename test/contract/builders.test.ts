@@ -140,6 +140,9 @@ const BUILDERS: readonly Readonly<{
     make: (o) => b.patch({ ...o, path: "a.ts", language: "ts", hunks: [{ header: "@@", lines: [{ kind: "context", text: "x" }] }] }),
   },
   { name: "pills", gaps: false, kind: "pills", make: (o) => b.pills([{ label: "running" }], o) },
+  // **`gaps: false`, like `pills`.** A row of peers takes no leading space;
+  // a tape is that row with a window over it (C04 §3ao).
+  { name: "tape", gaps: false, kind: "tape", make: (o) => b.tape([{ id: "a", label: "seams" }], "a", o) },
   { name: "tip", gaps: true, kind: "tip", make: (o) => b.tip("press ? for help", undefined, o) },
   { name: "panel", gaps: true, kind: "panel", make: (o) => b.panel("details", [b.raw("x")], o) },
   { name: "group", gaps: false, kind: "group", make: (o) => b.group("column", [b.raw("x")], o) },
@@ -210,8 +213,8 @@ const BUILDERS: readonly Readonly<{
   },
 ];
 
-describe("C24 §4 — the twenty-four builders", () => {
-  it("T2.9: the enumeration covers every block-returning builder, and twenty-four is the count", () => {
+describe("C24 §4 — the twenty-five builders", () => {
+  it("T2.9: the enumeration covers every block-returning builder, and twenty-five is the count", () => {
     // The count is asserted so that adding a builder without a row fails here
     // rather than silently going untested — which is exactly how §4's paragraph
     // came to name two builders that did not exist.

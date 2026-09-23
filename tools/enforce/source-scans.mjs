@@ -1670,12 +1670,6 @@ export const GLYPH_HOMES = Object.freeze({
     + "whose `[unicode, ascii]` pair `frame.ts` already asserts is `PROMPT_GUTTER.first` cells "
     + "wide (C22 I52). It is chrome the shell draws, not a block's vocabulary, and moving it "
     + "into `glyphs.ts` would put a prompt token in the block library.",
-  "tape-left":
-    "`«` is the tape's left residue mark and the tape is unbuilt — M14 builds it as a "
-    + "framework primitive with its own window arithmetic. This entry is itself a violation "
-    + "the day that MR lands.",
-  "tape-right":
-    "`»` is the tape's right residue mark; parked with `tape-left` on the same MR.",
 });
 
 export function checkGlyphPresence(

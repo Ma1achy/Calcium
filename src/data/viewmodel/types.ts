@@ -3007,6 +3007,42 @@ export type Pills = Readonly<{
   }>[];
 }> & Padded & Floor;
 
+/**
+ * A row of peers you navigate, which slides rather than sheds (C04 §3ao, I124,
+ * §095, `R-BLK-792`).
+ *
+ * **The sibling of `Pills` and not a variant of it.** The distinction §095 draws
+ * is whether anything points into the row — a focus, a current, a key that walks
+ * it. A row of peers nobody walks can lose its tail, because nothing is pointing
+ * at what went; a tape keeps every member and moves the window instead.
+ */
+export type Tape = Readonly<{
+  kind: "tape";
+  id: string;
+  members: readonly Readonly<{
+    id: string;
+    label: string;
+    /**
+     * The all-or-nothing group — §095's elapsed time (I126).
+     *
+     * Every member's detail is shed together or none is, and it goes **before**
+     * one member goes offscreen: knowing an agent exists beats knowing how long
+     * it has run. A row with three clocks and two blanks says the blanks are
+     * still running.
+     */
+    detail?: string;
+    state?: CallState;
+  }>[];
+  /**
+   * The member the window holds — **an id, never an index** (I124).
+   *
+   * A tape's members arrive and settle while a reader is in it, and an index
+   * names a different member the moment one is inserted before it. An id naming
+   * no member is valid and draws no mark: a tape nobody is in is still a tape.
+   */
+  current?: string;
+}> & Padded & Floor;
+
 export type Tip = Readonly<{
   kind: "tip";
   id: string;
@@ -3665,6 +3701,7 @@ export type KnownBlockKinds = {
   comparison: Comparison;
   patch: Patch;
   pills: Pills;
+  tape: Tape;
   tip: Tip;
   panel: Panel;
   group: Group;

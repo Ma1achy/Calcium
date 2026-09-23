@@ -184,6 +184,28 @@ export type GlyphSet = Readonly<{
    */
   residue: string;
   /**
+   * The tape's left residue mark — *n members are off the left end* (C04 I124,
+   * §095, `R-GLY-003`).
+   *
+   * **A third answer beside `residue` rather than a use of it**, and the design
+   * is what separates them: a residue says *some rows are not shown*, and this
+   * says *the window starts here and what is before it is still there*. §095
+   * puts both on one screen — the gutter's `⋯` leads the row the tape is drawn
+   * in — so one mark would have to mean two things a reader can see together.
+   */
+  tapeLeft: string;
+  /**
+   * The tape's right residue mark — *n members are off the right end*.
+   *
+   * **`»` has a second rôle and this slot is not it.** §003, §004 and §007 lead
+   * the mode line with `» auto ✦ …`, which is a chrome row's lead in its own
+   * strip and not a shed count. Nothing renders it yet, and the registry's own
+   * record says its first renderer registers it as its own mark rather than
+   * reusing this one — a shared mark with two meanings is F161's hazard, and
+   * here the two meanings are a count and a lead.
+   */
+  tapeRight: string;
+  /**
    * The separator between a call head's fields — `verb · args · duration ·
    * outcome` (C09 I49, `AGENT_TUI_DESIGN.md` §9e).
    *
@@ -200,6 +222,8 @@ export type GlyphSet = Readonly<{
 
 const UNICODE: GlyphSet = Object.freeze({
   residue: "\u22ef",
+  tapeLeft: "\u00ab",
+  tapeRight: "\u00bb",
   separator: "\u00b7",
   horizontal: "─",
   vertical: "│",
@@ -262,6 +286,11 @@ const ASCII: GlyphSet = Object.freeze({
   // measurably, the pie chart's figure, whose legend column is sized by its
   // widest row. `FREE_WIDTH_SLOTS` is where that is declared.
   residue: "...",
+  // `[` and `]`, which the registry names — not `<<` and `>>`. Two cells where
+  // the mark is one breaks T2.5's 1:1 pairing, and the count beside it is what
+  // makes the direction readable without the chevron doing it.
+  tapeLeft: "[",
+  tapeRight: "]",
   // `:` and not `-` (F834): `-` is `TURN_ASCII`'s first frame, and a dispatched
   // head read `verb - -`. The rung is a character no set's ASCII frames use.
   separator: ":",
@@ -474,6 +503,117 @@ const DIGITS = Object.freeze(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"])
  * that stops the next addition being `▓ ▒ ░`.
  */
 export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze({
+  /**
+   * The agent's mark — the `✦` walk (§095, §030, `R-MOT-002`, `R-MOT-005`).
+   *
+   * **Ported from the registry whole**, frames and interval alike: 82 frames at
+   * 120 ms is a 9.84 s cycle, which the registry states and this does not
+   * recompute. It is the mark a tape's running member draws in its duration
+   * slot, and §095's figure is where its `✦` comes from.
+   *
+   * **The ASCII rung needs no composite, and that is a measurement rather than
+   * a simplification.** The registry records an `asciiTrajectory` of *composite*
+   * over `fullramp grow bloom starfield pulse` — and all five of those sets
+   * carry `PULSE_ASCII`, the same five frames. So the composite is a claim about
+   * which Unicode families the walk visits, and at the ASCII rung every one of
+   * them is already the same ramp. A bespoke ASCII array here would be a sixth
+   * copy of one that five sets share.
+   */
+  agent: Object.freeze({
+    frames: Object.freeze([
+      "⋅",
+      "∘",
+      "◦",
+      "✧",
+      "✦",
+      "✢",
+      "✲",
+      "✵",
+      "✶",
+      "✷",
+      "✱",
+      "✺",
+      "✹",
+      "✸",
+      "✼",
+      "✻",
+      "❃",
+      "❁",
+      "✾",
+      "❀",
+      "✿",
+      "❂",
+      "✿",
+      "❀",
+      "✾",
+      "❁",
+      "❃",
+      "✻",
+      "✼",
+      "✸",
+      "✹",
+      "✺",
+      "✱",
+      "✷",
+      "✶",
+      "✵",
+      "✲",
+      "✢",
+      "✦",
+      "✧",
+      "◦",
+      "∘",
+      "✦",
+      "✢",
+      "✲",
+      "✶",
+      "✷",
+      "✹",
+      "✺",
+      "✹",
+      "✷",
+      "✶",
+      "✲",
+      "✢",
+      "⋅",
+      "✧",
+      "✦",
+      "✢",
+      "✻",
+      "✾",
+      "❀",
+      "✿",
+      "❀",
+      "✾",
+      "✻",
+      "✢",
+      "✦",
+      "✧",
+      "✶",
+      "✷",
+      "✸",
+      "✹",
+      "✺",
+      "✹",
+      "✸",
+      "✷",
+      "✢",
+      "✲",
+      "✱",
+      "✻",
+      "✱",
+      "✲",
+    ]),
+    intervalMs: 120,
+    // **Narrow-only, and the registry says so before the measurement does.**
+    // Its `capabilityPolicy` is `unicode-narrow-or-ascii`, and measuring the
+    // frames agrees: `⋅`, `∘` and `◦` are East Asian Ambiguous and draw two
+    // cells at `wide` where the other seventy-six draw one. A set of mixed
+    // widths cannot ship (C09 I93's rule, one subject over), so the whole
+    // walk takes the ASCII rung there rather than three frames of it.
+    narrowOnly: true,
+    ascii: PULSE_ASCII,
+  }),
   // braille — the de-facto default, and narrow everywhere.
   /**
    * **Named `braille` and not `dots`, and the rename is a finding.** MG24
@@ -516,7 +656,7 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   // rotate, and a rotation built from them reads as a flicker.
   grow: Object.freeze({
     frames: Object.freeze(["✦", "✢", "✲", "✶", "✷", "✹", "✺", "✹", "✷", "✶", "✲", "✢"]),
-    intervalMs: 90,
+    intervalMs: 120,
     ascii: PULSE_ASCII,
   }),
   /**
@@ -532,13 +672,13 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
    */
   bloom: Object.freeze({
     frames: Object.freeze(["⋅", "✧", "✦", "✢", "✻", "✾", "❀", "✿", "❀", "✾", "✻", "✢", "✦", "✧"]),
-    intervalMs: 95,
+    intervalMs: 120,
     ascii: PULSE_ASCII,
     narrowOnly: true,
   }),
   starfield: Object.freeze({
     frames: Object.freeze(["✶", "✷", "✸", "✹", "✺", "✹", "✸", "✷"]),
-    intervalMs: 110,
+    intervalMs: 120,
     ascii: PULSE_ASCII,
   }),
 
@@ -554,11 +694,8 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
    * form is two cells wherever the font prefers it whatever the locale says.
    */
   fullramp: Object.freeze({
-    frames: Object.freeze([
-      "⋅", "∘", "◦", "✧", "✦", "✢", "✲", "✵", "✶", "✷", "✱",
-      "✺", "✹", "✸", "✼", "✻", "❃", "❁", "✾", "❀", "✿", "❂",
-    ]),
-    intervalMs: 130,
+    frames: Object.freeze(["⋅", "∘", "◦", "✧", "✦", "✢", "✲", "✵", "✶", "✷", "✱", "✺", "✹", "✸", "✼", "✻", "❃", "❁", "✾", "❀", "✿", "❂", "✿", "❀", "✾", "❁", "❃", "✻", "✼", "✸", "✹", "✺", "✱", "✷", "✶", "✵", "✲", "✢", "✦", "✧", "◦", "∘"]),
+    intervalMs: 120,
     ascii: PULSE_ASCII,
     // `⋅ ∘ ◦` — see `bloom`.
     narrowOnly: true,
@@ -1181,6 +1318,8 @@ export const GLYPH_SET_DOMAINS: Readonly<Record<keyof GlyphSet, readonly string[
   // The residue mark is a whole row in a container and an in-row shed mark in a
   // table cell (`kinds/containers.ts`, `shed.ts`) — both, and both inside a row.
   residue: ["row-lead", "inline"],
+  tapeLeft: ["inline"],
+  tapeRight: ["inline"],
   separator: ["inline"],
 
   horizontal: ["border"],

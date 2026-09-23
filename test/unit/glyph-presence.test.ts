@@ -47,24 +47,27 @@ describe("C09 §7c — the carrier matrix's marks", () => {
     // **Asserted as the mark, not as a length.** A character count measures the
     // prose and is green for eighty characters of anything; what an exemption
     // owes is the mark it excuses, so the entry can be found from the glyph.
-    expect(GLYPH_HOMES).toEqual({
-      reader: expect.stringContaining("❯"),
-      "tape-left": expect.stringContaining("«"),
-      "tape-right": expect.stringContaining("»"),
-    });
+    expect(GLYPH_HOMES).toEqual({ reader: expect.stringContaining("❯") });
 
-    // **The bidirectional arm**, which is what stops the list outliving its
-    // reasons: the day M14 gives the tape its marks, its entries are the
-    // violation. Written as a slot rather than a comment — a comment is exactly
-    // what the scan drops, and the first draft of this fixture was one.
-    const withTape = `${GLYPHS}\nconst TAPE = ["«", "»"];\n`;
-    const found = checkGlyphPresence(REGISTRY, withTape);
-    expect(found.map((v) => v.rule)).toEqual(["SS65", "SS65"]);
-    for (const id of ["tape-left", "tape-right"]) {
-      expect(
-        found.some((v) => v.message.startsWith(`GLYPH_HOMES names ${id},`)),
-        `${id}'s entry is itself the violation`,
-      ).toBe(true);
-    }
+    // **The bidirectional arm fired, and this is the row after it fired.** It
+    // was written against `tape-left` and `tape-right`, whose entries said *this
+    // entry is itself a violation the day that MR lands* — and M14 landed them,
+    // `make enforce` reported both, and the entries came out. So the subject is
+    // now **fabricated**: a live entry for a mark the file certainly holds. A
+    // row that lost its arm when the arm worked would be a check that expires
+    // the moment it succeeds, which is the opposite of what the list needs.
+    // **The real list plus one fabrication**, not a list of one: replacing the
+    // homes wholesale un-excuses `reader`, whose `❯` is a registry mark that
+    // deliberately lives elsewhere — so the row would report two violations and
+    // only one of them would be the one under test.
+    const found = checkGlyphPresence(REGISTRY, GLYPHS, {
+      ...GLYPH_HOMES,
+      current: "a fabricated home for `›`, a registry mark `glyphs.ts` certainly holds",
+    });
+    expect(found.map((v) => v.rule)).toEqual(["SS65"]);
+    expect(
+      found[0]?.message.startsWith("GLYPH_HOMES names current,"),
+      "an entry whose glyph has arrived is itself the violation",
+    ).toBe(true);
   });
 });

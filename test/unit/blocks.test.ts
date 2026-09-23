@@ -263,6 +263,7 @@ describe("C09 §6 — the registry's transition table", () => {
       code: 2, // lines
       comparison: 2, // rows + header
       pills: 1, // one logical row
+      tape: 1, // one row at every width — the window is what changes
       tip: 1, // ceil(cells / w)
       panel: 4, // children + 2
       group: 1, // row: max of children

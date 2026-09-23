@@ -45,6 +45,9 @@ export const RAMP_EXTENT: Readonly<Record<KnownBlockKind, RampExtent>> = Object.
   scroll: "none",
   status: "none",
   steps: "none",
+  // A tape is one row of labels and marks; there is no run of text for a ramp
+  // to cool along, on the reason `steps` and `pills` both give.
+  tape: "none",
   table: "clusters",
   tip: "none",
 });

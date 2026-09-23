@@ -72,6 +72,7 @@ import type {
   Scroll,
   Patch,
   Pills,
+  Tape,
   Plot,
   Progress,
   Ramp,
@@ -94,6 +95,7 @@ import type {
   NoticeOpts,
   CellInput,
   ChipInput,
+  TapeMember,
   ComparisonRow,
   EventLine,
   KeyValueInput,
@@ -1144,6 +1146,27 @@ function pills(chips: readonly ChipInput[], opts?: BlockOpts): Pills {
   return finish<Pills>({ kind: "pills", id: idOf(opts, "pills"), chips } as Pills, opts, false);
 }
 
+/**
+ * A row of peers you navigate, which slides rather than sheds (C04 §3ao, §095).
+ *
+ * `current` is a member's **id** and not an index (C04 I124): a tape's members
+ * arrive and settle while a reader is in it, and an index names a different
+ * member the moment one is inserted before it. An id naming no member is valid
+ * and draws no mark — a tape nobody is in is still a tape.
+ */
+function tape(members: readonly TapeMember[], current?: string, opts?: BlockOpts): Tape {
+  return finish<Tape>(
+    {
+      kind: "tape",
+      id: idOf(opts, "tape"),
+      members,
+      ...(current === undefined ? {} : { current }),
+    } as Tape,
+    opts,
+    false,
+  );
+}
+
 function tip(text: string, actions?: readonly Action[], opts?: BlockOpts): Tip {
   return finish<Tip>(
     {
@@ -1877,6 +1900,7 @@ export const b = {
   comparison,
   patch,
   pills,
+  tape,
   tip,
   panel,
   group,

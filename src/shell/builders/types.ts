@@ -208,6 +208,19 @@ export type ChipInput = Readonly<{
   active?: boolean;
 }>;
 
+/**
+ * A member for `b.tape` (§4, C04 §3ao, §095).
+ *
+ * `detail` is the all-or-nothing group — every member's goes together or none
+ * does, and it goes before one member goes offscreen (C04 I126).
+ */
+export type TapeMember = Readonly<{
+  id: string;
+  label: string;
+  detail?: string;
+  state?: CallState;
+}>;
+
 /** A row for `b.comparison` (§4). Two axes, never one (C04 I36). */
 export type ComparisonRow = Readonly<{
   field: string;

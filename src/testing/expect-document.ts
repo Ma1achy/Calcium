@@ -567,6 +567,16 @@ export function expectDocument(
               }
             }
             break;
+          case "tape":
+            for (const m of block.members) {
+              if (bare(undefined, undefined, m.label)) {
+                offences.push(
+                  `tape "${block.id}" has a member with an empty label — ` +
+                    `a member has no glyph field of its own, and its state mark is derived`,
+                );
+              }
+            }
+            break;
           case "table":
             for (const r of block.rows) {
               for (const [key, cell] of Object.entries(r.cells)) {

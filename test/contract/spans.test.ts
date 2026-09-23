@@ -340,7 +340,7 @@ describe("C09 §5 — ramps, the extent and the split", () => {
     expect(bar(10).length, "a full bar still draws").toBeGreaterThan(20);
   });
 
-  it("T2.120 (C09 I54): tickIntervalOf answers spinnerIntervalMs() for a shimmer span, null for none or no animate, finds it inside a panel; ANIMATES keeps two true entries", () => {
+  it("T2.120 (C09 I54): tickIntervalOf answers spinnerIntervalMs() for a shimmer span, null for none or no animate, finds it inside a panel; ANIMATES keeps three true entries", () => {
     const moving = block({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp: { fill: "palette", animate: "shimmer" } }] });
     const still = block({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp: { fill: "palette", animate: "none" } }] });
     const plain = block({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp: { fill: "palette" } }] });
@@ -359,7 +359,10 @@ describe("C09 §5 — ramps, the extent and the split", () => {
     const nested = block({ kind: "group", id: "g", direction: "column", children: [block({ kind: "panel", id: "pn", title: "t", children: [moving] })] } as never);
     expect(animationIntervalOf([nested])).toBe(spinnerIntervalMs());
     expect(animationIntervalOf([block({ kind: "panel", id: "pn", title: "t", children: [still] } as never)])).toBeNull();
-    expect(Object.values(ANIMATES).filter((v) => v).length, "by kind, still two").toBe(2);
+    // **Three, and the third is the tape.** A running member draws the spinner
+    // in its duration slot (§030), which is the fact `steps` already animates
+    // for; the window itself never moves on a tick (C04 I124).
+    expect(Object.values(ANIMATES).filter((v) => v).length, "by kind, now three").toBe(3);
   });
 });
 

@@ -67,6 +67,30 @@ const SCROLLBAR =
   "C09 I92 and C09 I93 / §7f / §021 (M14): a scroll whose content overflows spends its last column on a bar, so its content is laid out one cell narrower and every interior row gains a track or thumb glyph";
 const RESIDUE_AND_SCROLLBAR = `${RESIDUE_ASCII} — and, at this rung too, ${SCROLLBAR}`;
 
+/**
+ * Kinds that landed **after** Ink was removed, and why each is not a retirement.
+ *
+ * **A third disposition, and it had to be one.** A retirement says *Ink drew
+ * this and a ruling changed it*, and it is driven by asserting the bytes still
+ * differ — which needs bytes. A kind registered after the producer was deleted
+ * has no capture and can never have one, so there is nothing to differ from:
+ * the byte-equality half of the sweep is simply unavailable for it.
+ *
+ * **Driven the only way it can be**: a row reaching one of these asserts that
+ * no capture exists under its key. The day a capture appears the entry is
+ * wrong and says so, which is the same expiry a retirement has, inverted.
+ * What the sweep keeps for these kinds is the other half of its subject — that
+ * exactly one `rows` arm opens — so they are swept and not skipped.
+ */
+export const POST_INK: ReadonlyMap<string, string> = new Map([
+  [
+    "tape",
+    "C04 I124 / §3ao / §095 (M14): the tape is a kind §095 asks for and Ink never "
+    + "drew — it was registered after the producer was deleted, so no capture of it "
+    + "exists and none can be made",
+  ],
+]);
+
 /** Every width the two sweeps render at, so a rung-wide ruling is not a hand-copied list. */
 const ALL_WIDTHS = [2, 12, 24, 32, 40, 60, 80, 100, 120, 160, 200] as const;
 
@@ -169,6 +193,21 @@ export class InkOracle {
   retired(name: string): string | null {
     this.#seen.add(name);
     return RETIRED.get(name) ?? null;
+  }
+
+  /**
+   * The ruling that puts this kind beyond Ink's reach, or `null`.
+   *
+   * Not counted as asked: there is no capture to ask for, and counting one
+   * would make {@link settle}'s equality demand a file nothing can write.
+   */
+  postInk(kind: string): string | null {
+    return POST_INK.get(kind) ?? null;
+  }
+
+  /** Whether a capture exists — what drives {@link postInk}'s entries. */
+  has(name: string): boolean {
+    return existsSync(join(this.#dir, name));
   }
 
   /** A capture. Its producer is deleted, so a missing file cannot be restored. */
