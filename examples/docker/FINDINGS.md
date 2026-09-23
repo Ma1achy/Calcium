@@ -55975,3 +55975,43 @@ existence, and the row fits because that is what a cut is. It also makes the com
 which is what the pass deleting Ink needs: a decline with no element arm to fall into has nowhere
 to go, and the honest answer is not to have one.
 
+
+---
+
+## F1251 — an invariant that was true, correct and about a caller that has gone ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | C25 I20a and I20b — the pushed patch view's offset ceiling, and its snap. |
+| **Reached for** | Every caller in `src/` holding an offset into a patch. |
+| **Verdict** | **Both real, both still true of the arithmetic, and neither has a subject.** |
+
+The design language deletes the pushed view (R-EXA-082: *a run's detail EXPANDS IN
+PLACE*), and M9b deletes `src/shell/patch-view.ts` with it. The two invariants survive
+the deletion as *statements about a function*, which is why they read as safe to keep.
+
+**They are not statements about a function. They are statements about a caller.** I20a
+says the ceiling is the first offset whose window reaches the last row, *not*
+`total − height` — a rule about what a caller may be handed. I20b says every motion
+lands on an offset a window may begin at — a rule about where a caller's snapping
+happens. `patch-view.ts` was the only caller either had, and `clampOffset`,
+`windowPlan`, `hunkHeaderRows` and `windowPatch` were reachable from nowhere else.
+
+**The transcript route holds no offset and cannot.** `BlockDefinition.window` is asked
+for rows `from`–`to` by C14, which derives them from the viewport; a patch's own row
+arithmetic is never the source. So there is no second consumer to re-home the rules
+onto, and keeping them would leave two invariants green over an absent subject — which
+is A03 §2's vacuity class, arriving by a caller being deleted rather than by a rule
+being written badly.
+
+**What survives, and where.** I19's cut-at-run-boundaries is the window builder's own
+and is still violable; I19a's additivity is the transcript route's and is asserted
+there. The *reasoning* in the struck test rows is kept in the spec — the round trip is
+the only observable form from outside, and neither direction is visible to a test that
+drives one motion — because it is general and was learned expensively. What goes is the
+rows, because a row citing a retired invariant reads exactly like coverage.
+
+**The tell, for next time: an invariant whose subject is a parameter rather than a
+return value retires with its callers, not with its function.** Both of these could be
+restated about `clampOffset` alone and would then be vacuously true, since the function
+would have nobody to be wrong for.

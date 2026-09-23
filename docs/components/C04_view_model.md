@@ -1591,8 +1591,7 @@ type Action =
   | { kind: "fill";   label: string; command: string }
   | { kind: "exec";   label: string; command: string }
   | { kind: "open";   label: string; url: string }
-  | { kind: "expand"; label: string; target: string }
-  | { kind: "view";   label: string; target: string };
+  | { kind: "expand"; label: string; target: string };
 ```
 
 `fill` is the default; `exec` is the exception. Populating the prompt lets the dev read and edit before running, which matters when the command is `production cancel <uuid>`. Only filter pills use `exec`, because a filter is trivially reversible (A01 D8).
@@ -1601,44 +1600,48 @@ type Action =
 log*, *dismiss* — a notice that says something went wrong is where a reader wants the thing to do about
 it, and `pills` chips were the only element with an `activate`. No new kind: `action?: Action`, the same
 union a chip carries, validated at the gate exactly as `Tip.actions` and `Patch.actions` are — `kind`
-one of the five and the kind's own field a string — so a far side may send one. When present, C09's
+one of the four and the kind's own field a string — so a far side may send one. When present, C09's
 `notice` declares **one block-level element**, the whole notice, with `activate: action` and `copy:
 text`; absent, it declares none and the notice is what it was — `↓` does not stop on it and no frame of
-it changes. **Which of the five**: any at the gate, as a chip's. In use, `fill` is the retry — the
+it changes. **Which of the four**: any at the gate, as a chip's. In use, `fill` is the retry — the
 command lands in the prompt for the reader to read before running — and `open` is the log; `exec` stays
 the filter pills' by D8's argument, which a notice does not have. On a **settled** entry C23 I18 refuses
-`fill`, `exec`, `open` and `view` and patches the refusal — a `warn` notice — into the entry the action
+`fill`, `exec` and `open` and patches the refusal — a `warn` notice — into the entry the action
 came from, so a stale retry is answered beside the notice that offered it; `expand` is I18's one exception
 and fires. `b.notice(...)` and its four tone arms take `{ action }` (C24 I18, MG27).
 
-#### `view` is the fifth, and `target` is the half that needed a ruling
+#### ~~`view` is the fifth~~ — retired, and `expand` took its subject
 
-`view` fills the screen with one block — C25 §3b's fullscreen patch is its first
-and so far only producer. It is the same category as `expand`: an affordance on a
-block that the *reader* invokes, not something the far side causes.
+`view` filled the screen with one block, and C25 §3b's fullscreen patch was its
+first and only producer. The design language deletes that surface (R-EXA-082: *a
+run's detail EXPANDS IN PLACE*), so the kind has no producer and no destination.
+**The union is four.**
 
-**It is not the thing C22 §13 records as undecided, and the two must not be
-conflated.** That row asks what makes *a verb's result* a pushed view — who
-decides, and what `Esc` does to the entry it came from. This kind answers none of
-it. Something in the tree finally pushes a `kind: "view"` layer, which narrows the
-gap; the ruling C15 T5.5 waits on is untouched.
+**`expand` took the subject, and the merge was already argued for here.** This
+section said `view` *is the same category as `expand`: an affordance on a block
+that the reader invokes, not something the far side causes* — which is a statement
+that the two were one kind wearing two names, written one paragraph above the
+paragraph explaining why they were two. The distinction it drew was *`expand` needs
+no resolution at all — it toggles a row on the entry it came from* against *a view
+has to say what fills the screen*. That difference went when nothing fills a screen:
+both now name something on the entry the action fired from, and both are refused by
+name when they do not resolve.
 
-**`target` names a block id, and it is resolved against the blocks of the entry the
-action fired from.** Never trusted, never searched across the transcript, and never
-permitted to name a block in another entry. The distinction from `expand` is that
-`expand` needs no resolution at all — it toggles a row on the entry it came from,
-and the entry is already in hand — whereas a view has to say *what* fills the
-screen, and `target` is a free string an adapter supplies. An unresolvable target
-is refused with a notice, not silently ignored: an adapter emitting a stale block
-id would otherwise produce a key that does nothing and reports nothing.
+**`target` widens by exactly one word.** It named *a row* and now names **a row or a
+block** — a table row, a folded `scroll`, or a `patch` — resolved against the blocks
+of the entry the action fired from, at any depth, and never searched across the
+transcript (I34, C23 I31). Rows are looked for first, so a row id equal to a block id
+has a known answer.
 
-**And the kind is `view` rather than `fullscreen`** because C15's layer kind is
-already `"view"`. Two words for one concept is what the vocabulary audits keep
-finding, and this is the moment it would have been introduced.
+**The naming argument retires with the kind and is worth keeping.** `view` was
+chosen over `fullscreen` *because C15's layer kind is already `"view"`* — two words
+for one concept being what the vocabulary audits keep finding. The same reasoning now
+says `expand`: C25 §3a's two presentations are `collapsed` and `expanded`, so the
+action and the presentation share a word rather than inventing a second.
 
 **`actions` is on `Patch` for the same reason it is on `Tip` and `Notice`**: the
 affordance is data the producer supplies, so a patch that should not offer
-fullscreen simply does not carry the action. The alternative — a key binding that
+expansion simply does not carry the action. The alternative — a key binding that
 applies to every patch — makes the offer unconditional and gives the block no way
 to decline, which is the shape C09 I1's neighbours keep rejecting.
 
@@ -3376,7 +3379,7 @@ split fails rather than passing on a message that reads as covering it.
 - **I31** — Row ids are unique within a table, checked by `validateDocument` alongside I14's block ids. Three things address a row by id — `merge` upserts by it (I9), C16's focus names it, and a rendered row is keyed by it — so a duplicate is ambiguous in three ways at once. It is a separate invariant from I14 because the namespaces are separate: two tables may each hold a row `r1`, and a row id never collides with a block id. Raised from C11, the first component to depend on it.
 - **I32** — `ColumnDef.role` declares presentation intent, not view state. A surface names the column whose content a renderer supplies; the flag never changes with what the user does, so it is part of the schema `merge` carries and not part of what I9 protects.
 - **I33** — `patch` and `comparison` are distinct kinds and never merge. One is rows of field comparisons, the other hunks of text with line numbers and two palettes; a merged kind's height would depend on which mode it was in, and I7 — measured height equals rendered height — is the invariant that cannot bend (D50).
-- **I34** — A `view` action's `target` denotes a block id **within the document the action fired from**, and denotes nothing else. The kind carries no content of its own, so a target resolved against a wider scope would let one entry's action fill the screen with another entry's data. C04 owns what the field means; C23 owns refusing one that does not resolve (C23 I31).
+- **I34** — An `expand` action's `target` denotes **a row or a block id within the document the action fired from**, and denotes nothing else. The kind carries no content of its own, so a target resolved against a wider scope would let one entry's action act on another entry's data. C04 owns what the field means; C23 owns refusing one that does not resolve (C23 I31). **It read `view` and named a block alone until the design deleted the pushed view** (R-EXA-082); `expand` took the subject and the field widened by one word. The old wording's argument — *would let one entry's action fill the screen with another entry's data* — is unchanged in force and weaker only in consequence: the wrong entry's row unfolding is quieter than the wrong entry's diff filling the screen, and is the same defect.
 - **I35** — A categorical axis other than `Tone` is never carried by colour. A block names the fact — a marker, a word, or a closed union a renderer maps — and the renderer derives any tone from it; no producer supplies a colour for such an axis, and none is representable. This is why `Tone` stays a judgement axis: the alternative is not a second palette but a distinction that survives `colourDepth: 1` because nothing else was ever available to carry it. Four surfaces reached the boundary independently (F30, F49, F51, F81) and three of them found it correctly by hand.
 - **I36** — `Comparison`'s row carries `change` and `verdict` as separate optional fields, never one union. `comparisonTone` has always coloured the verdict half and left the change half neutral, so one union names two axes that already render differently — and `added`/`removed` have no member of it to join (I35, F30).
 - **I37** — A block kind exempted from D29's sweep is exempted by the *fields it carries*, not by its name. Adding a meaning-bearing field to an exempted kind removes the exemption; the compile-time guard on `KINDS_WITH_NOTHING_TO_CHECK` catches a new kind and cannot catch a new field, so the reason is recorded per kind and re-read when the kind changes (F102).
@@ -3563,7 +3566,7 @@ split fails rather than passing on a message that reads as covering it.
 29. C04's constructors enforce the shape invariants and C24's `b` delegates to them. One enforcement point for I1 (I1).
 30. `validateDocument` terminates on a cyclic structure, via a path-scoped seen-set (I27).
 31. `Result` is declared once, in C04, and nowhere else in the tree (I26). Enforced by SS35, which existed before this commitment did — a build gate with no contract behind it, found by tracing the citation graph.
-32. A `view` action's `target` names a block within its own document and nothing wider; the refusal when it does not resolve is C23's (I34, → C23 I31).
+32. An `expand` action's `target` names a row or a block within its own document and nothing wider; the refusal when it does not resolve is C23's (I34, → C23 I31).
 33. A categorical axis other than `Tone` is a marker or a word with a renderer-derived tone, never a second palette and never a colour a producer supplies. Four surfaces found the boundary independently; three of them got it right unaided, which is the argument for naming the pattern rather than widening the vocabulary (I35).
 34. `Comparison` carries change and judgement in separate fields, because the renderer has always rendered them as separate axes (I36).
 35. D29's sweep exempts a kind for the fields it has, and the exemption is re-read when the fields change — the compile-time guard sees a new kind and is blind to a new field (I37).
