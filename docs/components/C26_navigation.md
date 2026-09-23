@@ -1042,10 +1042,18 @@ each kind names which:
   the glyph keeps its character, so `▲` still says *warn* while the colour says *focused*. A
   notice without an `action` declares no element and cannot be focused, so no frame of one
   moves (C09's row, T1.29's byte-identical arm).
-- **`scroll`** — the residue row, in `accent` where it was `dim`. It is the box's only chrome and
-  it is present exactly when there is something scrolled out of view; a box whose content fits
-  has no residue row and under focus draws as it did. That is the rule's consequence and is said
-  here rather than absorbed — the cost falls on the one box that has nothing to scroll to.
+- **`scroll`** — the residue row, in `accent` where it was `dim`, **and the scrollbar's column
+  with it** (C09 I92, §7f, §021). Both are chrome the box reserves whether or not a reader is in
+  it, and both are present exactly when there is something scrolled out of view; a box whose
+  content fits has neither and under focus draws as it did. That is the rule's consequence and is
+  said here rather than absorbed — the cost falls on the one box that has nothing to scroll to.
+
+  **The bar was a second subject arriving under a clause written for one**, and §021 settles it
+  in the same words this section already uses: *the thumb takes the ACCENT when its container has
+  focus — the same rule the focused-container border takes, and it costs no extra column.* The
+  tone is the **whole column's** and not the thumb's alone, because §021 draws the two states as
+  the same eight glyphs at two tones. So *and nothing else* still holds and its subject is now
+  the box's chrome rather than one row of it.
 - **`pills`** — the head chip is `accent` **over the selection ground** (`surface.selection`, or
   reverse video at 1-bit), where the table's head is `accent` alone. The reason is the data:
   `active` already spends `accent` (C04 §3), so a focused inactive chip beside an active one was
