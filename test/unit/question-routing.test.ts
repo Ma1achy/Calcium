@@ -6,6 +6,9 @@
 // the typed reply is the cell that separates the design from the tie.
 import { describe, expect, it } from "vitest";
 
+import { createConfirmHost } from "../../src/shell/confirm.js";
+import { createOverlayManager } from "../../src/viewport/overlay/index.js";
+import type { InputEvent } from "../../src/interaction/router/types.js";
 import { questionConsumer, routingFor, type QuestionConsumer } from "../../src/shell/question-routing.js";
 
 const ALL: readonly QuestionConsumer[] = ["approval", "choice", "reply", "peek", "completion", "find"];
@@ -73,6 +76,97 @@ describe("C23 §7f — replace or float", () => {
     expect(routingFor(questionConsumer(many, true)).replaces, "and now it floats").toBe(false);
   });
 
-  it.todo("T1.69 (C23 I73, §7f) — not deferred on a component: the reply's composition lands in this MR's next commit: choosing reply… moves one question from replacing to floating, with its id and its owner unchanged");
+  it("T1.69 (C23 I73, I36, §7f): reply… moves one question, and the answer carries both facts", async () => {
+    const world = (): Readonly<{
+      confirm: ReturnType<typeof createConfirmHost>;
+      overlays: ReturnType<typeof createOverlayManager>;
+      type: (text: string) => void;
+      drafted: () => string;
+      press: (name: string) => boolean;
+    }> => {
+      const overlays = createOverlayManager({
+        registry: { measureSequence: (b) => b.length }, // cells-ok — a row count
+      });
+      let draft = "";
+      const confirm = createConfirmHost({
+        overlays,
+        anchor: () => ({ row: 20, rows: 1 }),
+        draft: () => draft,
+        clearDraft: () => {
+          draft = "";
+        },
+        overlayRegion: () => ({ width: 80, height: 24 }),
+        invalidate: () => undefined,
+      });
+      return {
+        confirm,
+        overlays,
+        type: (text) => {
+          draft = text;
+        },
+        drafted: () => draft,
+        press: (name) => confirm.answerHandler()?.({ kind: "key", key: { name } } as InputEvent) ?? false,
+      };
+    };
+
+    const CHOICES = [
+      { key: "a", label: "approve" },
+      { key: "d", label: "deny", default: true as const },
+      { key: "r", label: "reply…", reply: true as const },
+    ];
+
+    // ---- the transition -----------------------------------------------------
+    const w = world();
+    const answer = w.confirm.ask({ question: "may I?", choices: CHOICES });
+
+    const opened = w.overlays.stack.find((l) => l.id === "confirm");
+    expect(opened, "the question is up").toBeDefined();
+    expect(w.confirm.replacing, "and it replaces the prompt").not.toBeNull();
+
+    expect(w.press("r"), "reply… is consumed").toBe(true);
+
+    // **The identity, which is the discriminator.** A build that popped the
+    // layer and pushed a second one draws the same picture and leaves the
+    // caller below awaiting a promise nothing will resolve.
+    const stack = w.overlays.stack.filter((l) => l.id === "confirm");
+    expect(stack, "one layer, not two").toHaveLength(1);
+    expect(w.confirm.open, "and the same owner is still awaiting it").toBe(true);
+    expect(w.confirm.replacing, "it floats now, and the prompt is live beneath").toBeNull();
+
+    // **Not consumed while composing** — which is what *float* means to a key.
+    // C16 hands a false back down the ladder to the prompt (router.ts:395).
+    expect(w.press("y"), "a letter belongs to the prompt, not to the question").toBe(false);
+    expect(w.press("down"), "and so does a motion in the line").toBe(false);
+
+    w.type("because the tests say so");
+    expect(w.press("return"), "⏎ answers").toBe(true);
+    await expect(answer, "both facts").resolves.toEqual({
+      key: "r",
+      text: "because the tests say so",
+    });
+    expect(w.drafted(), "and the prompt clears, as it does for a submitted line").toBe("");
+
+    // **The assertion that catches a pop-and-push, and the first three did
+    // not.** A transition that disposed the layer and pushed a replacement
+    // leaves one layer with the same id on the stack and an owner still
+    // awaiting, so every identity assertion above reads green — the two
+    // pictures are the same picture. What differs is what `settle` can reach:
+    // it disposes the handle `ask` captured, which the second push does not
+    // own, so the question stays on screen after it has been answered.
+    expect(w.overlays.stack, "answering takes the question down").toHaveLength(0);
+    expect(w.confirm.open, "and the host holds no handler").toBe(false);
+
+    // ---- the other arm ------------------------------------------------------
+    // **`text` is a record of what happened, not a field always filled.** An
+    // escape out of the reply state is still an escape: `""` would say the
+    // reader replied with nothing.
+    const e = world();
+    const escaped = e.confirm.ask({ question: "may I?", choices: CHOICES });
+    expect(e.press("r")).toBe(true);
+    e.type("half a thought");
+    expect(e.press("escape")).toBe(true);
+    await expect(escaped, "the default's key and no text").resolves.toEqual({ key: "d" });
+    expect(e.overlays.stack, "and the escape takes it down too").toHaveLength(0);
+  });
 
 });

@@ -46,7 +46,9 @@ function ctxWith(answer: string): LocalContext & { asked: AskOptions[] } {
     asked,
     ask: (opts: AskOptions) => {
       asked.push(opts);
-      return Promise.resolve(answer);
+      // A key and no text: none of these questions carries a `reply…`, so
+      // `text` being absent is the record that nothing was composed.
+      return Promise.resolve({ key: answer });
     },
   } as LocalContext & { asked: AskOptions[] };
 }

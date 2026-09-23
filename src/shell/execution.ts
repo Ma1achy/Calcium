@@ -1327,7 +1327,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       deps.transcript.patch(pendingId, { op: "replace", blockId: call.id, block: header(0, undefined, true) }, "shell");
       deps.scheduler.commit("input");
       const answer = await deps.confirm.ask(approvalPrompt(call, approval.consequence, approval.choices));
-      if (answer === DENY_KEY) {
+      if (answer.key === DENY_KEY) {
         finishCard("denied");
         refresh.settled(pendingId);
         deps.transcript.settle(pendingId);

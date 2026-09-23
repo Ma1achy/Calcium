@@ -1807,7 +1807,7 @@ class Session implements TuiInstance {
             ],
           })
           .then((answer) => {
-            if (answer === "y") void this.stop("eof");
+            if (answer.key === "y") void this.stop("eof");
           });
       },
     };

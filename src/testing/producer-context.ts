@@ -88,7 +88,7 @@ export function localContext(over: Partial<LocalContext> = {}): LocalContext {
   return Object.freeze({
     ...producerContext(over),
     command: "/probe",
-    ask: (opts) => Promise.resolve(opts.choices[defaultStart(opts.choices)]?.key ?? ""),
+    ask: (opts) => Promise.resolve({ key: opts.choices[defaultStart(opts.choices)]?.key ?? "" }),
     // **Empty by default, which is the failed-validation arm** (C22 I66). A
     // handler tested without saying what was parsed takes the path a malformed
     // invocation takes, and a test meaning to exercise the other arm says so.

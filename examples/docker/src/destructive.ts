@@ -88,7 +88,7 @@ export function createRmHandler(
           { key: "n", label: "no", default: true },
         ],
       });
-      if (answer !== "y") {
+      if (answer.key !== "y") {
         return okDoc(ctx.command, ["rm", ref], [b.notice.warn(`not removed — ${state.name} is unchanged`)]);
       }
     }
@@ -137,7 +137,7 @@ export function createRmiHandler(
           { key: "n", label: "no", default: true },
         ],
       });
-      if (answer !== "y") {
+      if (answer.key !== "y") {
         return okDoc(ctx.command, ["rmi", ref], [b.notice.warn(`not removed — ${ref} is unchanged`)]);
       }
     }
@@ -274,7 +274,7 @@ export function createPruneHandler(
           { key: "n", label: "no", default: true },
         ],
       });
-      if (answer !== "y") {
+      if (answer.key !== "y") {
         return okDoc(ctx.command, [...verb], [b.notice.warn("nothing removed")]);
       }
     }

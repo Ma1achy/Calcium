@@ -24,14 +24,13 @@ import { block } from "../data/viewmodel/construct.js";
 import type { Block } from "../data/viewmodel/types.js";
 import type { InputEvent } from "../interaction/router/types.js";
 import type { Layer, OverlayManager, Placement } from "../viewport/overlay/index.js";
-import type { AskOptions, Choice } from "./local/registry.js";
+import type { AskAnswer, AskOptions, Choice } from "./local/registry.js";
 import { questionNotice } from "./documents.js";
 import { questionConsumer, routingFor } from "./question-routing.js";
 import { cells } from "../presentation/text.js";
 import { createChoiceSelection, defaultStart } from "./choice-selection.js";
 
 export const CONFIRM_LAYER_ID = "confirm";
-
 /**
  * How wide the question asks to be.
  *
@@ -62,6 +61,21 @@ export type ConfirmDeps = Readonly<{
    */
   anchor: () => Readonly<{ row: number; rows: number }>;
   /**
+   * The prompt's line, and the clearing of it — for a typed reply (I73, §101).
+   *
+   * **The whole of the question's key rules stay in this file**, which is the
+   * argument C16's rung 4 already makes for `answerHandler`: `⏎` under a
+   * floating reply means *answer with what I typed*, and a submit path that
+   * knew that would hold half a rule whose other half lives here.
+   *
+   * `clearDraft` is C23 I28 arriving at the third state: the reply **became**
+   * the line, so the prompt clears exactly as it does for a submitted one. The
+   * draft that was there before the question is a separate fact and is not
+   * this seam's.
+   */
+  draft: () => string;
+  clearDraft: () => void;
+  /**
    * The region C15 places against, for the truncation pass (entry 16 R2).
    *
    * The same seam C19's menu takes. How much fits is a fact about the frame and
@@ -75,7 +89,7 @@ export type ConfirmDeps = Readonly<{
 
 export interface ConfirmHost {
   /** C23 I36 — resolves with a choice on every path, never null. */
-  ask(opts: AskOptions): Promise<string>;
+  ask(opts: AskOptions): Promise<AskAnswer>;
   /**
    * C16 I25 — the top layer's answer handler, or null.
    *
@@ -281,7 +295,7 @@ function placementOf(
  * here, and `handler` and the predicate both read it rather than each carrying a
  * copy of the same four cases.
  */
-type Meaning = "resolve" | "move" | "none";
+type Meaning = "resolve" | "move" | "compose" | "none";
 
 export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
   let handler: ((e: InputEvent) => boolean) | null = null;
@@ -290,6 +304,8 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
   // `null` when nothing is open; the consumer otherwise, so the table is asked
   // rather than a boolean being kept beside it.
   let consumer: ReturnType<typeof questionConsumer> | null = null;
+  /** The `reply…` choice the reader picked, or `null` — §101's third row. */
+  let replying: Choice | null = null;
 
   return {
     get open() {
@@ -332,7 +348,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
       // is not yet taking a typed reply; writing them out again is how the two
       // records come to disagree the day the third state lands.
       consumer = questionConsumer(opts.choices, false);
-      const routing = routingFor(consumer);
+      let routing = routingFor(consumer);
 
       const layer: Layer = {
         id: CONFIRM_LAYER_ID,
@@ -361,14 +377,43 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
         deps.overlays.update(CONFIRM_LAYER_ID, { content: render(opts, selected(), true) });
       }
 
-      return new Promise<string>((resolve) => {
-        const settle = (key: string): boolean => {
+      return new Promise<AskAnswer>((resolve) => {
+        const settle = (key: string, text?: string): boolean => {
           handler = null;
           meaning = null;
           consumer = null;
+          replying = null;
           disposable[Symbol.dispose]();
           deps.invalidate();
-          resolve(key);
+          resolve(text === undefined ? { key } : { key, text });
+          return true;
+        };
+
+        /**
+         * Move this question to §101's third row (I73, §7f).
+         *
+         * **The same layer, updated** — not popped and pushed. The id is what
+         * `answerHandler` and C16's rung 4 resolve against, and the promise
+         * this closure resolves is the one the handler is awaiting: a second
+         * layer would draw identically and leave the first one's owner waiting
+         * for ever. That is why T1.69's discriminator is the identity and not
+         * the picture.
+         *
+         * The placement moves with the state, because the question is now
+         * chrome for a prompt that is live beneath it (C15 I20's argument for
+         * an anchored layer declaring no width: a layer narrower than the
+         * region leaves two unrelated things on one row).
+         */
+        const toReply = (choice: Choice): boolean => {
+          replying = choice;
+          consumer = questionConsumer(opts.choices, true);
+          routing = routingFor(consumer);
+          const at = deps.anchor();
+          deps.overlays.update(CONFIRM_LAYER_ID, {
+            content: render(opts, selected()),
+            placement: { kind: "anchored", row: at.row, rows: at.rows, prefer: "above" },
+          });
+          deps.invalidate();
           return true;
         };
 
@@ -390,6 +435,11 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
           const { name, ctrl } = e.key;
           if (name === "escape" || (ctrl && name === "c")) return "resolve";
           if (name === "return" || name === "enter") return "resolve";
+          // **A floating reply owns two keys and no others** (I73). The reader
+          // is composing text, so `y` is a letter and `↓` is a motion in the
+          // line — an accelerator arm here would make a question whose choices
+          // spell a word unanswerable by typing it.
+          if (replying !== null) return "compose";
           if (name === "up" || name === "left") return "move";
           if (name === "down" || name === "right" || name === "tab") return "move";
           if (!ctrl && !e.key.meta && opts.choices.some((c) => c.key === name)) return "resolve";
@@ -397,18 +447,45 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
         };
         meaning = classify;
 
+        const chosen = (key: string): Choice | undefined =>
+          opts.choices.find((c) => c.key === key);
+
         handler = (e) => {
           if (e.kind !== "key") return false;
           const { name, ctrl } = e.key;
           switch (classify(e)) {
             case "resolve":
               if (name === "escape" || (ctrl && name === "c")) {
+                // **The default's key and no text, on every path** (I36). An
+                // escape from the reply state is still an escape: the reader
+                // declined, and a `text` of `""` would say they replied with
+                // nothing.
                 return settle(defaultChoice(opts.choices).key);
               }
-              if (name === "return" || name === "enter") {
-                return settle(opts.choices[selected()]!.key);
+              if (replying !== null) {
+                // **The answer carries both facts** (I36): which choice opened
+                // the reply, and what was composed under it. The text is read
+                // at the keystroke rather than held, because the prompt is the
+                // record and a copy taken earlier is a second one.
+                const text = deps.draft();
+                const key = replying.key;
+                deps.clearDraft();
+                return settle(key, text);
               }
-              return settle(name);
+              {
+                const pick =
+                  name === "return" || name === "enter" ? opts.choices[selected()] : chosen(name);
+                // **`reply…` does not resolve; it moves the question** (I73).
+                // The caller is still awaiting, the layer keeps its id, and the
+                // prompt comes live beneath — §101's *the question moves UP*.
+                if (pick?.reply === true && replying === null) return toReply(pick);
+                return settle(pick?.key ?? name);
+              }
+            case "compose":
+              // **Not consumed.** C16 hands a `false` back down the ladder to
+              // the prompt beneath, which is what makes the layer *float*
+              // rather than merely draw in a different place (router.ts:395).
+              return false;
             case "move":
               if (name === "up" || name === "left") selection.prev();
               else selection.next();

@@ -59,7 +59,7 @@ const ctx = (
 ): LocalContext => ({
   ...producerContext(over),
   command: "/profile",
-  ask: () => Promise.resolve(""),
+  ask: () => Promise.resolve({ key: "" }),
   args,
 });
 

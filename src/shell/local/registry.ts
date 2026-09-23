@@ -21,6 +21,20 @@ import type { Manifest } from "../../data/manifest/index.js";
 import type { Block, LocalDocument } from "../../data/viewmodel/index.js";
 import type { ProducerContext } from "../../data/adapters/types.js";
 
+/**
+ * What a question resolves with (C23 I36, I73, §101).
+ *
+ * **A record because a question can be answered two ways at once.** Which
+ * choice was picked and what was typed under it are two facts, and one string
+ * holds one of them — a caller whose free text happens to equal one of its own
+ * accelerators cannot tell which it got.
+ *
+ * `text` is **absent** rather than empty when no reply was composed, and that
+ * is the distinction the floating state exists to create: *the reader typed
+ * nothing* and *the reader never got the chance* must not be one value.
+ */
+export type AskAnswer = Readonly<{ key: string; text?: string }>;
+
 export type Choice = Readonly<{
   key: string;
   label: string;
@@ -87,8 +101,13 @@ export type LocalContext = ProducerContext & Readonly<{
    * the choice marked `default`, and `Esc` and `⌃c` resolve with it too — so
    * there is no second representation of *nothing happened* for a caller to
    * handle and no path by which it could tell the two apart if there were.
+   *
+   * `key` is that choice. `text` is present only when the reader composed a
+   * typed reply (`Choice.reply`), and its absence is a fact: *nothing was
+   * typed* and *there was nothing to type into* are the same for a caller, and
+   * an empty string would claim the reader replied with nothing.
    */
-  ask: (opts: AskOptions) => Promise<string>;
+  ask: (opts: AskOptions) => Promise<AskAnswer>;
   /**
    * C28's report, or absent — and absent is the overwhelming case.
    *

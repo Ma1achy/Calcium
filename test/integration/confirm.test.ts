@@ -101,9 +101,17 @@ function world(
   const globalSeen: InputEvent[] = [];
   let cancels = 0;
 
+  // **A real line, not a stub** (F1153's rule about a fixture supplying the
+  // behaviour): T1.69 asserts the text the reply carries, so the harness must
+  // hold one the row can set and watch cleared.
+  let draft = "";
   const confirm = createConfirmHost({
     overlays,
     anchor: () => anchorAt,
+    draft: () => draft,
+    clearDraft: () => {
+      draft = "";
+    },
     overlayRegion: () => overlayRegion,
     invalidate,
   });
@@ -187,7 +195,10 @@ function world(
  * `x` is neutral by the question's own classification: not an escape, not
  * `⏎`, not an arrow, and not an accelerator of `YES_NO`.
  */
-const present = (w: ReturnType<typeof world>, opts: Parameters<typeof w.confirm.ask>[0]): Promise<string> => {
+const present = (
+  w: ReturnType<typeof world>,
+  opts: Parameters<typeof w.confirm.ask>[0],
+): ReturnType<typeof w.confirm.ask> => {
   const p = w.confirm.ask(opts);
   w.router.dispatch(key("x"));
   return p;
@@ -204,7 +215,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
 
     // **Through the router.** This is the line the mutation removes.
     expect(w.router.dispatch(key("y"))).toBe(true);
-    await expect(answer).resolves.toBe("y");
+    await expect(answer).resolves.toEqual({ key: "y" });
 
     // Answering pops it — the owner's disposal, not the router's.
     expect(w.overlays.top).toBeNull();
@@ -214,7 +225,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     const w = world();
     const answer = present(w, { question: "Stop api-gateway?", choices: YES_NO });
     expect(w.router.dispatch(key("escape"))).toBe(true);
-    await expect(answer).resolves.toBe("n");
+    await expect(answer).resolves.toEqual({ key: "n" });
   });
 
   it("T4.3 (C23 I36, C16 I25): ⌃c resolves with the default, and is not consumed into silence", async () => {
@@ -227,7 +238,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     // non-dismissable top returned true and did nothing (C16 I8), so "consumed" and
     // "the layer is gone" are both satisfiable without the question ever being
     // answered. The promise is the only thing that tells them apart.
-    await expect(answer).resolves.toBe("n");
+    await expect(answer).resolves.toEqual({ key: "n" });
     expect(w.overlays.top).toBeNull();
   });
 
@@ -238,7 +249,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     // Default is `n` (index 1); up moves to `y`.
     expect(w.router.dispatch(key("up"))).toBe(true);
     expect(w.router.dispatch(key("return"))).toBe(true);
-    await expect(answer).resolves.toBe("y");
+    await expect(answer).resolves.toEqual({ key: "y" });
   });
 
   it("T4.5 (C16 I8, I40): ⌥↑ scrolls the transcript with a question open, and the question is neither answered nor dismissed", async () => {
@@ -279,7 +290,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     // rather than of "the question stopped taking keys".** An ordinary key still
     // goes to the question: `y` answers it.
     w.router.dispatch(key("y"));
-    await expect(answer).resolves.toBe("y");
+    await expect(answer).resolves.toEqual({ key: "y" });
   });
 
   it("T4.78 (C16 I44, R-BLK-786, R-BLK-788): a newly presented question refuses one activation and says so", async () => {
@@ -299,7 +310,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
 
     // The second `y` is the reader's own, and it answers.
     expect(w.router.dispatch(key("y"))).toBe(true);
-    await expect(answer).resolves.toBe("y");
+    await expect(answer).resolves.toEqual({ key: "y" });
   });
 
   it("T4.79 (C16 I44): a neutral key ends the guard without answering", async () => {
@@ -316,7 +327,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
 
     expect(w.router.dispatch(key("y")), "and the next key answers, unrefused").toBe(true);
     expect(w.router.lastStages).not.toContain("question-guard");
-    await expect(answer).resolves.toBe("y");
+    await expect(answer).resolves.toEqual({ key: "y" });
   });
 
   it("T4.5b (C16 I8): an ordinary global binding is still held under a question", async () => {
@@ -348,7 +359,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     expect(w.overlays.top?.id).toBe("confirm");
 
     w.router.dispatch(key("y"));
-    await expect(answer).resolves.toBe("y");
+    await expect(answer).resolves.toEqual({ key: "y" });
   });
 
   it("T4.7 (C16 I25): the callback comes from the top layer only", async () => {
@@ -378,7 +389,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
 
     w.overlays.pop();
     w.router.dispatch(key("y"));
-    await expect(answer).resolves.toBe("y");
+    await expect(answer).resolves.toEqual({ key: "y" });
   });
 
   it("T4.9 (C16 I8, C23 I36): the flag is the backstop for what the handler declines", async () => {
@@ -413,7 +424,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     const answer = present(w, { question: "Stop api-gateway?", choices: YES_NO });
     expect(w.router.dispatch(ctrlC)).toBe(true);
 
-    await expect(answer).resolves.toBe("n");
+    await expect(answer).resolves.toEqual({ key: "n" });
     expect(cancelled(), "the verb must not be cancelled — it was waiting for us").toBe(0);
     // **The rung that answered is the intercept table's, not §5's** (M5). §103
     // gives `interrupt` an owner-applicability table where a QUESTION *rejects*
@@ -563,7 +574,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     expect(w.overlays.top?.id).toBe("confirm");
 
     w.router.dispatch(key("escape"));
-    return expect(answer).resolves.toBe("n");
+    return expect(answer).resolves.toEqual({ key: "n" });
   });
 
   it("T4.28 (entry 16 R2, C15 I8): a question that does not fit keeps its choices", () => {
@@ -691,7 +702,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     expect(drawn.find((l) => l.includes("[n]")), "opens on the last").toContain("•");
 
     w.router.dispatch(key("escape"));
-    return expect(answer, "and escapes to it").resolves.toBe("n");
+    return expect(answer, "and escapes to it").resolves.toEqual({ key: "n" });
   });
 
   it("T4.33 (entry 16): the whole entry, read at 24 rows with a twenty-row payload", () => {
@@ -738,8 +749,13 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
       const answer = present(w, { question: "q?", choices: YES_NO });
       w.router.dispatch(k);
       const got = await answer;
-      expect(typeof got).toBe("string");
-      expect(["y", "n"]).toContain(got);
+      // **A key on every path, and no `text` on any of them** (I36, I73). None
+      // of these choices opens a typed reply, so `text` being absent is the
+      // record that nothing was composed — not a default that would make the
+      // reply's own arm indistinguishable from an escape.
+      expect(typeof got.key).toBe("string");
+      expect(["y", "n"]).toContain(got.key);
+      expect(got.text, "nothing was composed under any of them").toBeUndefined();
     }
   });
 });

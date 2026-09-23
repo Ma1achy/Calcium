@@ -23,6 +23,7 @@ const ROOT = process.cwd();
 const SESSION = "src/shell/session.ts";
 const PAINT = "src/shell/paint.ts";
 const ROUTING = "src/shell/question-routing.ts";
+const CONFIRM = "src/shell/confirm.ts";
 const FILES =
   "test/integration/question-slot.test.ts test/unit/question-routing.test.ts " +
   "test/integration/confirm.test.ts test/unit/session-paint.test.ts";
@@ -131,6 +132,58 @@ const results = runPass({
       from: "  if (replying) return \"reply\";",
       to: "  if (false) return \"reply\";",
       expect: "T1.68b",
+    },
+    {
+      // **THE DEFECT the identity assertion exists for.** The transition pops
+      // the question and pushes a second one. It draws the same picture — same
+      // content, same placement, same id on the stack — and the promise the
+      // first layer's owner is awaiting is dropped on the floor. A reader
+      // checking *the reply is up* cannot see it.
+      name: "THE DEFECT: choosing reply… opens a second question rather than moving the first",
+      file: CONFIRM,
+      from: "          deps.overlays.update(CONFIRM_LAYER_ID, {\n            content: render(opts, selected()),\n            placement:",
+      to: "          disposable[Symbol.dispose]();\n          deps.overlays.push({ ...layer, blocking: false });\n          deps.overlays.update(CONFIRM_LAYER_ID, {\n            content: render(opts, selected()),\n            placement:",
+      expect: "T1.69",
+    },
+    {
+      // **`reply…` settles like any other choice**, which is the state the whole
+      // MR is about never being reached: the caller gets `{key:"r"}` with no
+      // text and the prompt never comes live.
+      name: "reply… resolves the question rather than moving it",
+      file: CONFIRM,
+      from: "                if (pick?.reply === true && replying === null) return toReply(pick);",
+      to: "                if (false) return toReply(pick);",
+      expect: "T1.69",
+    },
+    {
+      // **The floating question keeps eating keys.** It draws in the right
+      // place over a prompt that can never be typed into — *float* as a
+      // placement rather than as an ownership fact (C16 I25, router.ts:395).
+      name: "a floating reply consumes the keystrokes the prompt needs",
+      file: CONFIRM,
+      from: "            case \"compose\":\n",
+      to: "            case \"compose\":\n              return true;\n              // eslint-disable-next-line no-unreachable\n",
+      expect: "T1.69",
+    },
+    {
+      // **The answer drops the text.** Every assertion about the transition
+      // still passes; what is lost is the fact the reply existed to carry, and
+      // `{key}` is exactly what an escape answers — so the two arms collapse.
+      name: "the reply answers with its key and discards what was composed",
+      file: CONFIRM,
+      from: "                return settle(key, text);",
+      to: "                return settle(key);",
+      expect: "T1.69",
+    },
+    {
+      // **The reply's key is the highlighted choice rather than the one that
+      // opened it.** The selection is wherever the reader left it, so a caller
+      // routing on `key` acts on a choice nobody picked.
+      name: "the reply answers with the selected choice rather than the reply choice",
+      file: CONFIRM,
+      from: "                const key = replying.key;",
+      to: "                const key = opts.choices[selected()]?.key ?? replying.key;",
+      expect: "T1.69",
     },
     {
       // **A replaced prompt keeps its caret.** The rows on screen are the

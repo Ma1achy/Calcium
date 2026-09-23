@@ -247,7 +247,7 @@ export function createMutationHandler(
       // **Declined is `ok`, not `error`.** Nothing failed — the user was asked
       // and said no, and colouring that red would make a working confirm look
       // like a broken command.
-      if (answer !== "y") {
+      if (answer.key !== "y") {
         return okDoc(ctx.command, argvFor(verb, ref, args), [
           b.notice.warn(`not ${DONE[verb]} — ${state.name} is unchanged`),
         ]);

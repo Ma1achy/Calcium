@@ -80,8 +80,12 @@ const results = runPass({
       // and the opposite of the rule the shell applies.
       name: "the fake reimplements the default choice as the first",
       file: PRODUCER,
-      from: "    ask: (opts) => Promise.resolve(opts.choices[defaultStart(opts.choices)]?.key ?? \"\"),",
-      to: "    ask: (opts) => Promise.resolve((opts.choices.find((c) => c.default) ?? opts.choices[0])?.key ?? \"\"),",
+      // **Re-aimed when the answer stopped being a string** (C23 I36, M15):
+      // `ask` now resolves `{key}`, so the anchor's old text is no longer in
+      // the tree. The mutation is unchanged — the marked choice against the
+      // first — and only its spelling moved.
+      from: "    ask: (opts) => Promise.resolve({ key: opts.choices[defaultStart(opts.choices)]?.key ?? \"\" }),",
+      to: "    ask: (opts) => Promise.resolve({ key: (opts.choices.find((c) => c.default) ?? opts.choices[0])?.key ?? \"\" }),",
       expect: "T2.16",
     },
     {

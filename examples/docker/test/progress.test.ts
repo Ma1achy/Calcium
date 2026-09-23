@@ -35,7 +35,7 @@ const fresh = (): Progress => ({
 // `as unknown as LocalContext`, which satisfied the type by erasure — the
 // double narrower than the interface it stands for, which is the shape that
 // cost four diagnoses in this tree. `localContext()` is the real record.
-const ctx: LocalContext = { ...localContext(), command: "/build .", ask: () => Promise.resolve("y") };
+const ctx: LocalContext = { ...localContext(), command: "/build .", ask: () => Promise.resolve({ key: "y" }) };
 
 /** The first `table` block anywhere in a tree, so an assertion can read cells. */
 function findTable(block: Block): Extract<Block, { kind: "table" }> {

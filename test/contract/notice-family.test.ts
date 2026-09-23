@@ -125,6 +125,8 @@ describe("SS56 — the fourteen notices draw the same bytes through the family",
     const confirm = createConfirmHost({
       overlays,
       anchor: () => ({ row: 8, rows: 1 }),
+      draft: () => "",
+      clearDraft: () => undefined,
       overlayRegion: () => ({ width: 80, height: 24 }),
       invalidate: () => undefined,
     });

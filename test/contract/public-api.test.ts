@@ -347,7 +347,7 @@ describe("C24 §7 — the published surface answers for itself", () => {
     // falls back to the *last* choice because a destructive verb offers the safe
     // option last; this fake said *first*, so a consumer's handler tested here
     // deleted where a user pressing `Esc` would have cancelled.
-    await expect(local.ask({ question: "Delete?", choices: YES_NO } as never)).resolves.toBe("no");
+    await expect(local.ask({ question: "Delete?", choices: YES_NO } as never)).resolves.toEqual({ key: "no" });
 
     // And a marked one wins, so the row above is reading the fallback rather
     // than the ordering.
@@ -356,7 +356,7 @@ describe("C24 §7 — the published surface answers for itself", () => {
         question: "Delete?",
         choices: [{ key: "yes", label: "Delete", default: true }, { key: "no", label: "Cancel" }],
       } as never),
-    ).resolves.toBe("yes");
+    ).resolves.toEqual({ key: "yes" });
 
     // The failed-validation arm: `args` is empty unless a test says what was
     // parsed, so a handler tested without one takes the path a malformed
