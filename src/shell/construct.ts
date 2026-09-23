@@ -340,6 +340,8 @@ export type FrameQueries = Readonly<{
   selectAllLoadedEntries: () => void;
   /** `y` — the selection to the clipboard, with `R-SEL-011`'s refusal when it cannot leave the process. */
   copySelectedEntries: () => void;
+  /** A plain arrow and a shifted one, over the held document (C14 I37, §6c). */
+  moveSemanticCaret: (delta: number, extend: boolean) => void;
   /**
    * Where the transcript sits, for mouse routing (C16 `RouterDeps.region`).
    *
@@ -2427,6 +2429,7 @@ export async function constructGraph(
     selectEntryUnderCaret: deps.frame.selectEntryUnderCaret,
     selectAllLoadedEntries: deps.frame.selectAllLoadedEntries,
     copySelectedEntries: deps.frame.copySelectedEntries,
+    moveSemanticCaret: deps.frame.moveSemanticCaret,
     exitNativeSelection: deps.frame.exitNativeSelection,
     // **One walk, and it is the registry's** (C26 §5, §8b.4). This asked C11
     // directly and tested `block.kind === "table"`, which was one of *three*

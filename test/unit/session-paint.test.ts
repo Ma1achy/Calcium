@@ -902,7 +902,7 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
       "last  12.4ms",
       "~/work",
       "copy",
-      "←→↑↓ extend",
+      "↑↓ extend",
       "⏎ copy",
       // Two chips: the separator between them is the cluster's to draw, and a
       // literal `·` inside a label is the unresolved join T2.116 refuses.

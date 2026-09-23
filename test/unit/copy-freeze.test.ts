@@ -9,7 +9,17 @@ import { describe, expect, it } from "vitest";
 import { block } from "../../src/data/viewmodel/index.js";
 import { doc } from "../support/blocks.js";
 import { buildGraph } from "../support/session.js";
-import { copyTextOf } from "../../src/shell/semantic-selection.js";
+import {
+  blocksTouched,
+  copyTextOf,
+  count,
+  enter,
+  extendCaret,
+  keyOf,
+  moveCaret,
+  type BlockSpan,
+  type SemanticMode,
+} from "../../src/shell/semantic-selection.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 
 const entryDoc = (id: string, text = id) =>
@@ -102,7 +112,11 @@ describe("C14 §6b — the freeze", () => {
     // that made this getter answer the record survived against a row that could
     // not tell them apart.
     const held = graph.documentEntries;
-    const mode = { caret: id, entries: new Set([id]) };
+    const mode = {
+      caret: { entryId: id, row: 0 },
+      anchor: null,
+      blocks: new Set([keyOf(id, "e1")]),
+    };
     const textOf = (entries: readonly { id: string; doc: { blocks: readonly Block[] } }[]): string =>
       copyTextOf(
         mode,
@@ -135,18 +149,111 @@ describe("C14 §6b — the freeze", () => {
 });
 
 // C14 §6c — the caret, the anchor and the granularity atomicity needs.
-// Spec-first: the rows land with the code in this MR's second commit.
+//
+// **The fixture is two entries of unequal block heights**, because that is where
+// the touching rule bites: a range of one row inside a ten-row block and a range
+// covering all ten give the same answer, and a containment test gets it wrong by
+// returning fewer blocks every one of which is right.
 describe("C14 §6c — the caret and the anchor", () => {
-  it.todo(
-    "T1.36 (C14 I36, §6c): a range touching one row of a block and a range covering it give the same block set, with a one-row-block control — not deferred on a component: the motions land in this MR's code commit",
-  );
-  it.todo(
-    "T1.37b (C14 I36): the caret's row is entry-local, so a taller entry above it does not move which block it names — not deferred on a component: the motions land in this MR's code commit",
-  );
-  it.todo(
-    "T1.38b (C14 I37): an extend that over-shoots and returns equals the direct one, and a plain arrow moves without selecting — not deferred on a component: the motions land in this MR's code commit",
-  );
-  it.todo(
-    "T1.39 (C14 I38): the count is blocks, asserted as the pair where an entry count and a block count disagree — not deferred on a component: the motions land in this MR's code commit",
-  );
+  // e1: a 10-row block then a 2-row one. e2: two 1-row blocks.
+  const SPANS: readonly BlockSpan[] = [
+    { key: keyOf("e1", "big"), from: 0, to: 10 },
+    { key: keyOf("e1", "tail"), from: 10, to: 12 },
+    { key: keyOf("e2", "a"), from: 0, to: 1 },
+    { key: keyOf("e2", "b"), from: 1, to: 2 },
+  ].map((sp) => Object.freeze(sp));
+  const ORDER = ["e1", "e2"];
+  const keys = (m: SemanticMode): readonly string[] => [...(m?.blocks ?? [])].sort();
+
+  it("T1.36 (C14 I36, §6c): a range touching one row of a block takes it whole, and a containment fixture tells the two rules apart", () => {
+    // One row inside the tall block.
+    expect([...blocksTouched({ entryId: "e1", row: 3 }, { entryId: "e1", row: 4 }, SPANS, ORDER)])
+      .toEqual([keyOf("e1", "big")]);
+    // All ten of it — the same answer, which is atomicity.
+    expect([...blocksTouched({ entryId: "e1", row: 0 }, { entryId: "e1", row: 9 }, SPANS, ORDER)])
+      .toEqual([keyOf("e1", "big")]);
+    // Reaching past it takes the next one whole too.
+    expect(
+      [...blocksTouched({ entryId: "e1", row: 9 }, { entryId: "e1", row: 10 }, SPANS, ORDER)].sort(),
+    ).toEqual([keyOf("e1", "big"), keyOf("e1", "tail")].sort());
+    // Across entries: everything between the ends, and the ends clipped by
+    // their own rows — `e2`'s second block is below row 0 and is not taken.
+    expect(
+      [...blocksTouched({ entryId: "e1", row: 11 }, { entryId: "e2", row: 0 }, SPANS, ORDER)].sort(),
+    ).toEqual([keyOf("e1", "tail"), keyOf("e2", "a")].sort());
+
+    // **The control that distinguishes the two rules.** Against one-row blocks
+    // touching and containing agree, so a fixture of them cannot tell them
+    // apart — this is the same range over `e2`, where both answer the same.
+    expect([...blocksTouched({ entryId: "e2", row: 0 }, { entryId: "e2", row: 0 }, SPANS, ORDER)])
+      .toEqual([keyOf("e2", "a")]);
+  });
+
+  it("T1.37b (C14 I36): the caret's row is entry-local, so what is above it does not move which block it names", () => {
+    // The same caret against a layout with a taller entry above: `e2` row 0 is
+    // `e2`'s first block either way. A viewport row would name a different one.
+    const taller: readonly BlockSpan[] = [
+      Object.freeze({ key: keyOf("e1", "big"), from: 0, to: 40 }),
+      ...SPANS.filter((sp) => sp.key !== keyOf("e1", "big") && sp.key !== keyOf("e1", "tail")),
+    ];
+    expect([...blocksTouched({ entryId: "e2", row: 0 }, { entryId: "e2", row: 0 }, SPANS, ORDER)])
+      .toEqual([...blocksTouched({ entryId: "e2", row: 0 }, { entryId: "e2", row: 0 }, taller, ["e1", "e2"])]);
+  });
+
+  it("T1.38b (C14 I37): an extend that over-shoots and returns equals the direct one, and a plain arrow moves without selecting", () => {
+    // **Row 8, not row 0, and the mutation pass is why.** The tall block is ten
+    // rows, so an extend starting at the top stays inside it for every step the
+    // row takes — accumulating instead of re-deriving, and extending on a plain
+    // arrow, both survived against a fixture where the set never changed. A
+    // corpus chosen for a property may not have it; two rows down from here the
+    // selection crosses a block boundary, which is the only place either rule
+    // is observable.
+    const start = enter(null, { entryId: "e1", row: 8 });
+    const down = (m: SemanticMode, n: number): SemanticMode => {
+      let out = m;
+      for (let i = 0; i < n; i += 1) out = extendCaret(out, 1, SPANS, ORDER);
+      return out;
+    };
+    // **The anchor is planted by the first extend, not by entering.**
+    expect(start?.anchor, "no extend is in flight on entry").toBeNull();
+    expect(down(start, 1)?.anchor).toEqual({ entryId: "e1", row: 8 });
+    expect(keys(down(start, 1)), "one down is still inside the tall block").toEqual([
+      keyOf("e1", "big"),
+    ]);
+    expect(keys(down(start, 3)), "three down has reached the one below it").toEqual(
+      [keyOf("e1", "big"), keyOf("e1", "tail")].sort(),
+    );
+
+    // Three down, two up — by equality against one down, not by size. The set
+    // has to *shrink*, which is what an accumulating extend cannot do.
+    let there = down(start, 3);
+    there = extendCaret(there, -1, SPANS, ORDER);
+    there = extendCaret(there, -1, SPANS, ORDER);
+    expect(keys(there)).toEqual(keys(down(start, 1)));
+
+    // A plain arrow moves the caret and touches neither the anchor nor the set
+    // — moved far enough to cross the boundary, so an arrow that also extended
+    // would show it.
+    const moved = moveCaret(down(start, 1), 2, SPANS, ORDER);
+    expect(moved?.caret).toEqual({ entryId: "e1", row: 11 });
+    expect(moved?.anchor).toEqual({ entryId: "e1", row: 8 });
+    expect(keys(moved)).toEqual(keys(down(start, 1)));
+
+    // And it crosses into the next entry at the edge, clamping at the end.
+    const top = enter(null, { entryId: "e1", row: 0 });
+    expect(moveCaret(top, 12, SPANS, ORDER)?.caret).toEqual({ entryId: "e2", row: 0 });
+    expect(moveCaret(top, 99, SPANS, ORDER)?.caret).toEqual({ entryId: "e2", row: 1 });
+  });
+
+  it("T1.39 (C14 I38): the count is blocks, asserted where a block count and an entry count disagree", () => {
+    const start = enter(null, { entryId: "e1", row: 0 });
+    // An extend stopping inside `e1` takes one of its two blocks: 1 either way,
+    // so this half agrees with the wrong rule and is here as the pair's control.
+    expect(count(extendCaret(start, 1, SPANS, ORDER))).toBe(1);
+    // Reaching past the tall block takes both: 2, where an entry count still
+    // reads 1. This is the half that tells them apart.
+    let far = start;
+    for (let i = 0; i < 11; i += 1) far = extendCaret(far, 1, SPANS, ORDER);
+    expect(count(far)).toBe(2);
+  });
 });

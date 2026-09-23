@@ -307,7 +307,12 @@ function ownerChips(
       // The frozen screen is the fact, not a hint: it is why nothing responds.
       return [
         { label: "copy", tone: "warn" },
-        { label: mark(["←→↑↓ extend", "arrows extend"], caps), tone: "muted" },
+        // **`↑↓`, not `←→↑↓`** (C14 §6c). `selection.left`/`selection.right` are
+        // horizontal and at block granularity there is no horizontal extent —
+        // the axis belongs to `R-SEL-007`'s rectangular selection, which copies
+        // cells rather than source. A footer naming a key that does nothing is
+        // C16 I19's second keymap disagreeing with the first.
+        { label: mark(["↑↓ extend", "arrows extend"], caps), tone: "muted" },
         { label: mark(["⏎ copy", "enter copy"], caps), tone: "muted" },
         // **Two chips, not one label with a `·` in it.** The separator is the
         // cluster's to draw (C09 I49) — a literal one in a string is the head's

@@ -1,11 +1,11 @@
 {
   "label": "all",
-  "only": "c14-freeze",
+  "only": "c14-caret",
   "rows": [
     {
-      "run": "c14-freeze.mjs",
+      "run": "c14-caret.mjs",
       "exit": 0,
-      "seconds": 16,
+      "seconds": 15,
       "state": "green",
       "restored": 0,
       "caught": 5,

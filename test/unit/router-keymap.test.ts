@@ -522,6 +522,10 @@ describe("§6 — the default table (C17 I12)", () => {
       "semanticSelection a": ["a"],
       "semanticSelection A": ["A"],
       "semanticSelection y": ["y"],
+      "semanticSelection up": ["\u001b[A"],
+      "semanticSelection down": ["\u001b[B"],
+      "semanticSelection s+up": ["\u001b[1;2A"],
+      "semanticSelection s+down": ["\u001b[1;2B"],
 
       // Scrolling (I23). **This is the check the ruling asked for**, and it
       // came out positive: `⌃Home` and `⌃End` reach the decoder in both of the
@@ -920,8 +924,8 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     const rows = defaultKeymap
       .map((b) => `${b.target}\t${keyText(b.key)}\t${b.action}\t${b.profile ?? "both"}`)
       .sort();
-    expect(rows).toHaveLength(117);
-    expect(new Set(rows).size, "no two rows are identical").toBe(117);
+    expect(rows).toHaveLength(121);
+    expect(new Set(rows).size, "no two rows are identical").toBe(121);
 
     // Every row whose chord the registry names resolves to the registry's key —
     // the join asserted from the table's side, so a `chordOf` call that silently
@@ -946,8 +950,14 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
       // registry names, so it joins that entry's rows. `a` and `A` are
       // `R-SEL-008`'s prose rather than registry bindings, so neither is in
       // this count — which is the distinction the figure is measuring.
+      //
+      // **60 from M10e**: the caret's four. `⇧↑`/`⇧↓` are the registry's
+      // `selection.up`/`selection.down` taking a third target, and the plain
+      // `↑`/`↓` spell chords the registry names for the transcript's motions —
+      // so all four are in this count, where `a`, `A` and `y` are not. The
+      // figure measures *which spelling the registry owns*, not which action.
       "the rows the registry supplies a chord for",
-    ).toBe(56);
+    ).toBe(60);
   });
 
   it("T1.94 (I41): ⌘↑ and ⌥↑ are two actions under the enhanced profile and one under the base", () => {

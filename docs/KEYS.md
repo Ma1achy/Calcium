@@ -50,9 +50,9 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `cs+c` | enhanced-terminal |  |  |  |  |  |  | copySelection |  |  |
 | `m+d` | both |  |  |  |  |  |  | killWordRight |  |  |
 | `delete` | both |  |  |  |  |  |  | delete |  |  |
-| `down` † | both |  |  |  |  | menuNext |  | historyNext | rowDown |  |
+| `down` † | both |  |  |  | moveSemanticCaretDown | menuNext |  | historyNext | rowDown |  |
 | `m+down` | both |  |  |  |  |  |  |  |  | scrollPageDown |
-| `s+down` | both |  |  |  |  |  |  |  | extendRowDown |  |
+| `s+down` † | both |  |  |  | extendSemanticSelectionDown |  |  |  | extendRowDown |  |
 | `u+down` | enhanced-terminal |  |  |  |  |  |  |  |  | scrollBottom |
 | `c+e` | both |  |  |  |  |  |  | end |  |  |
 | `c+end` | both |  |  |  |  |  |  |  |  | scrollBottom |
@@ -91,9 +91,9 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `tab` † | both |  |  |  |  | menuNext |  | complete | entryNext |  |
 | `c+u` | both |  |  |  |  |  |  | killToStart |  |  |
 | `m+up` | both |  |  |  |  |  |  |  |  | scrollPageUp |
-| `s+up` | both |  |  |  |  |  |  |  | extendRowUp |  |
+| `s+up` † | both |  |  |  | extendSemanticSelectionUp |  |  |  | extendRowUp |  |
 | `u+up` | enhanced-terminal |  |  |  |  |  |  |  |  | scrollTop |
-| `up` † | both |  |  |  |  | menuPrev |  | historyPrev | rowUp |  |
+| `up` † | both |  |  |  | moveSemanticCaretUp | menuPrev |  | historyPrev | rowUp |  |
 | `cs+v` | enhanced-terminal |  |  |  |  |  |  | yank |  |  |
 | `m+v` † | both |  |  |  |  |  |  | valuesToggle | valuesToggle |  |
 | `c+w` | both |  |  |  |  |  |  | killWordLeft |  |  |
@@ -105,4 +105,4 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `{` | both |  |  |  |  |  |  |  | tiltDown |  |
 | `}` | both |  |  |  |  |  |  |  | tiltUp |  |
 
-117 bindings · 93 keys · 18 resolved by the ladder (†).
+121 bindings · 93 keys · 20 resolved by the ladder (†).

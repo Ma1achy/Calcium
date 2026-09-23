@@ -328,6 +328,7 @@ describe("C22 §3 step 11 — the effect table", () => {
     selectEntryUnderCaret: () => undefined,
     selectAllLoadedEntries: () => undefined,
     copySelectedEntries: () => undefined,
+    moveSemanticCaret: () => undefined,
     exitNativeSelection: () => undefined,
       manifest: null,
       viewport: recordingViewport().viewport,

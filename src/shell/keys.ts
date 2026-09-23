@@ -136,6 +136,8 @@ export type KeyDeps = Readonly<{
    * a copy cannot leave the process is the mode's statement rather than a key's.
    */
   copySelectedEntries: () => void;
+  /** The caret's four, as one dep with two axes (C14 I37, §6c). */
+  moveSemanticCaret: (delta: number, extend: boolean) => void;
   /**
    * Every navigable element in the live entry, addressed and in reading order,
    * or empty (C16 I22, C26 §5).
@@ -631,6 +633,14 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     selectEntryUnderCaret: () => void deps.selectEntryUnderCaret(),
     selectAllLoadedEntries: () => void deps.selectAllLoadedEntries(),
     copySelectedEntries: () => void deps.copySelectedEntries(),
+    // **Four actions over one dep**, because the two axes are the whole
+    // difference: a plain arrow moves and a shifted one extends (C14 I37), and
+    // the direction is the sign. Four deps would be four places for the pair to
+    // come apart.
+    moveSemanticCaretUp: () => void deps.moveSemanticCaret(-1, false),
+    moveSemanticCaretDown: () => void deps.moveSemanticCaret(1, false),
+    extendSemanticSelectionUp: () => void deps.moveSemanticCaret(-1, true),
+    extendSemanticSelectionDown: () => void deps.moveSemanticCaret(1, true),
 
     // --- C17 ---------------------------------------------------------------
     insertNewline: () => void deps.editor.insert("\n"),

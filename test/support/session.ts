@@ -181,6 +181,7 @@ export const FRAME: FrameQueries = {
   selectEntryUnderCaret: () => undefined,
   selectAllLoadedEntries: () => undefined,
   copySelectedEntries: () => undefined,
+  moveSemanticCaret: () => undefined,
   enterNativeSelection: () => undefined,
   exitNativeSelection: () => undefined,
   region: () => ({ top: 1, height: 20 }),

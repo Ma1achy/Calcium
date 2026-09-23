@@ -78,14 +78,14 @@ const MUTATIONS = [
     expect: "T1.41i",
   },
   {
-    // **Selection order for document order** (R-SEL-004). `entries` is a `Set`
+    // **Selection order for document order** (R-SEL-004). `blocks` is a `Set`
     // and a set is insertion-ordered, so walking it gives a copy that pastes in
     // whichever order the reader happened to choose — which is right for every
     // selection made top to bottom, and that is most of them.
     name: "the join walks the selection rather than the document",
     file: MODEL,
-    from: "  return loaded\n    .filter((e) => mode.entries.has(e.id))\n    .map((e) => copySequence(e.blocks))",
-    to: "  return [...mode.entries]\n    .flatMap((id) => loaded.filter((e) => e.id === id))\n    .map((e) => copySequence(e.blocks))",
+    from: "  const selected = mode.blocks;\n  return loaded\n    .map((e) => copySequence(e.blocks.filter((b) => selected.has(keyOf(e.id, b.id)))))",
+    to: "  const selected = mode.blocks;\n  return [...selected]\n    .flatMap((k) => loaded.filter((e) => e.id === entryOf(k)))\n    .map((e) => copySequence(e.blocks.filter((b) => selected.has(keyOf(e.id, b.id)))))",
     expect: "T1.41i",
   },
 ];

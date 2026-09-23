@@ -400,6 +400,23 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // than per target, so reusing the name would give this key the editor's
   // region copy and a mode that selects entries would paste the prompt.
   { target: "semanticSelection", key: { name: "y" }, action: "copySelectedEntries" },
+  // **The caret moves, and the shifted pair extends** (C14 I37, §6c). `⇧←` and
+  // `⇧→` are deliberately absent: `selection.left`/`selection.right` are
+  // horizontal, and at block granularity there is no horizontal extent — the
+  // axis belongs to `R-SEL-007`'s rectangular selection, which copies cells
+  // rather than source and is a different thing to select.
+  { target: "semanticSelection", key: { name: "up" }, action: "moveSemanticCaretUp" },
+  { target: "semanticSelection", key: { name: "down" }, action: "moveSemanticCaretDown" },
+  {
+    target: "semanticSelection",
+    key: chordOf("selection.up"),
+    action: "extendSemanticSelectionUp",
+  },
+  {
+    target: "semanticSelection",
+    key: chordOf("selection.down"),
+    action: "extendSemanticSelectionDown",
+  },
 
   { target: "global", key: { name: "pageup" }, action: "scrollPageUp" },
   { target: "global", key: { name: "pagedown" }, action: "scrollPageDown" },
@@ -839,6 +856,10 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
     selectEntryUnderCaret: true,
     selectAllLoadedEntries: true,
     copySelectedEntries: true,
+    moveSemanticCaretUp: true,
+    moveSemanticCaretDown: true,
+    extendSemanticSelectionUp: true,
+    extendSemanticSelectionDown: true,
   } satisfies Readonly<Record<KeyAction, true>>),
 );
 

@@ -577,7 +577,17 @@ export type KeyAction =
   // (`R-SEL-004`, C14 §6a). **Its own action and not `copySelection`**, which
   // is the prompt's `⌥w`: an effect is resolved per action rather than per
   // target, so sharing the name would give this key the editor's region copy.
-  | "copySelectedEntries";
+  | "copySelectedEntries"
+  // The caret's four (C14 I36, I37, §6c). **Plain arrows move and shifted ones
+  // extend**, and the pair is why both exist: a mode whose only vertical key
+  // extends cannot put the caret anywhere without selecting on the way. The
+  // shifted two are the registry's `selection.up`/`selection.down` taking a
+  // third target; the plain two the registry does not name, because moving a
+  // caret is not an action the design has a chord for.
+  | "moveSemanticCaretUp"
+  | "moveSemanticCaretDown"
+  | "extendSemanticSelectionUp"
+  | "extendSemanticSelectionDown";
 
 export type Binding = Readonly<{
   target: FocusTarget;

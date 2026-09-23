@@ -41,7 +41,7 @@ import { focusKey } from "./render-cache.js";
 import { reserveNeeded } from "./block-faults.js";
 import { descendants } from "../data/viewmodel/index.js";
 import type { Block, Image, Plot } from "../data/viewmodel/index.js";
-import { entryLayout, renderEntryPieces, windowEntry } from "./entry-layout.js";
+import { elementsOfEntry, entryLayout, renderEntryPieces, windowEntry } from "./entry-layout.js";
 import { animationIntervalOf } from "../presentation/blocks/index.js";
 import type { EntryParts } from "./render-cache.js";
 import type { EntryPiece } from "./entry-layout.js";
@@ -1400,13 +1400,83 @@ class Session implements TuiInstance {
     const graph = this.#graph;
     if (graph === null || this.#semantic !== null) return;
     const stored = graph.focus.current;
-    const caret =
+    const entryId =
       stored.at === "liveBlock" ? stored.entryId : (graph.transcript.entries.at(-1)?.id ?? null);
-    this.#semantic = semantic.enter(this.#semantic, caret);
+    // **Row 0 of the entry** (C14 I36). The caret is an entry plus an
+    // entry-local row and the focus store holds only the entry, so the top of it
+    // is where the reader is put — the same place a `⇧↓` from a fresh mode would
+    // start extending from.
+    this.#semantic = semantic.enter(this.#semantic, entryId === null ? null : { entryId, row: 0 });
     // **The hold, and it is the view rather than the record** (C14 I31, §6b).
     // Taken at the width and height the last frame composed, because a held
     // document measured at anything else describes rows nobody is looking at.
     graph.freezeView(this.#composed().region);
+    this.#spans = null;
+    graph.scheduler.commit("input");
+  }
+
+  /**
+   * Every block's entry-local rows over the document the frame is drawing
+   * (C14 I36, §6c).
+   *
+   * **Memoised on the document and the width**, because the document is held
+   * while the mode is up (I31) so the spans cannot move under a keystroke — and
+   * without the memo every arrow re-measures the whole transcript. The width is
+   * in the key because a resize re-lays the held document, which is the one
+   * thing that does move them.
+   */
+  #spans: Readonly<{ at: readonly unknown[]; width: number; spans: readonly semantic.BlockSpan[] }> | null =
+    null;
+
+  #selectionSpans(): readonly semantic.BlockSpan[] {
+    const graph = this.#graph;
+    if (graph === null) return [];
+    const entries = graph.documentEntries;
+    const width = this.#composed().region.width;
+    const held = this.#spans;
+    if (held !== null && held.at === entries && held.width === width) return held.spans;
+
+    const spans: semantic.BlockSpan[] = [];
+    for (const entry of entries) {
+      for (const { blockId, element } of elementsOfEntry(
+        graph.blocks,
+        entry.doc.blocks,
+        width,
+        entry.doc.command,
+      )) {
+        // **Block-level elements only.** A row or a cell is finer than the
+        // selection's unit, and taking their spans would put the same block in
+        // the set once per row — which reads as a count that climbs while the
+        // selection does not change (C14 I38).
+        if (element.level !== "block") continue;
+        spans.push(
+          Object.freeze({
+            key: semantic.keyOf(entry.id, blockId),
+            from: element.rows.from,
+            to: element.rows.to,
+          }),
+        );
+      }
+    }
+    const frozen = Object.freeze(spans);
+    this.#spans = Object.freeze({ at: entries, width, spans: frozen });
+    return frozen;
+  }
+
+  /** The held document's entry ids, in document order — the extend's axis. */
+  #selectionOrder(): readonly string[] {
+    return this.#graph?.documentEntries.map((e) => e.id) ?? [];
+  }
+
+  /** A plain arrow, and a shifted one (C14 I37, §6c). */
+  #moveSemanticCaret(delta: number, extend: boolean): void {
+    const graph = this.#graph;
+    if (graph === null || this.#semantic === null) return;
+    const spans = this.#selectionSpans();
+    const order = this.#selectionOrder();
+    this.#semantic = extend
+      ? semantic.extendCaret(this.#semantic, delta, spans, order)
+      : semantic.moveCaret(this.#semantic, delta, spans, order);
     graph.scheduler.commit("input");
   }
 
@@ -1422,7 +1492,10 @@ class Session implements TuiInstance {
     this.#semantic = semantic.escape(this.#semantic);
     // Only the press that *leaves* drops the hold — a clear is state within the
     // rung and the frame stays held (C14 I34, `R-SEL-005`).
-    if (this.#semantic === null) this.#graph?.thawView();
+    if (this.#semantic === null) {
+      this.#spans = null;
+      this.#graph?.thawView();
+    }
     this.#graph?.scheduler.commit("input");
   }
 
@@ -1430,6 +1503,7 @@ class Session implements TuiInstance {
   #exitSemanticSelection(): void {
     if (this.#semantic === null) return;
     this.#semantic = null;
+    this.#spans = null;
     // One ordinary commit draws the record, and never a repaint: nothing on the
     // terminal became unknown while the view was held (C14 I34, C03 I14).
     this.#graph?.thawView();
@@ -1448,15 +1522,12 @@ class Session implements TuiInstance {
     if (graph === null || this.#semantic === null) return;
     this.#semantic =
       which === "all"
-        ? semantic.selectAll(
-            this.#semantic,
-            // **The view, not the record** (C14 I33, `R-SEL-008`): *the window
-            // is not the record* is the rule's own sentence, and `A` selecting
-            // an entry that arrived after the freeze selects one the reader
-            // cannot see.
-            graph.documentEntries.map((e) => e.id),
-          )
-        : semantic.selectCaret(this.#semantic);
+        ? // **The view, not the record** (C14 I33, `R-SEL-008`): *the window is
+          // not the record* is the rule's own sentence, and `A` selecting an
+          // entry that arrived after the freeze selects one the reader cannot
+          // see.
+          semantic.selectAll(this.#semantic, this.#selectionSpans())
+        : semantic.selectCaret(this.#semantic, this.#selectionSpans());
     graph.scheduler.commit("input");
   }
 
@@ -1514,6 +1585,7 @@ class Session implements TuiInstance {
       selectEntryUnderCaret: () => this.#selectEntries("caret"),
       selectAllLoadedEntries: () => this.#selectEntries("all"),
       copySelectedEntries: () => this.#copySelectedEntries(),
+      moveSemanticCaret: (delta, extend) => this.#moveSemanticCaret(delta, extend),
       enterNativeSelection: () => this.#setNativeSelection(true),
       exitNativeSelection: () => this.#setNativeSelection(false),
       region: () => this.#composed().region,
