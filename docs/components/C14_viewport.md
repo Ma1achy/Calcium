@@ -527,6 +527,78 @@ rung, not a rung of its own**, so this does not violate esc popping exactly one 
 — and the footer says which press is next, which is the part that keeps the two
 presses from reading as a dropped keystroke.
 
+## 6b. The freeze — a held view over a record that keeps moving
+
+`R-SEL-009` and `R-SEL-010`, walked before anything was built. The component has
+state (the mode's lifetime) and structure (which reader sees the record and which
+sees the view), so it takes **both** artefact shapes: a trace for the rules that
+meet because something happened in between, and a table for the two that hold at
+rest. Taking the trace alone because a mode is obviously a state machine is how the
+structural half goes unexamined, and the structural half is where the finding was.
+
+**The ruling the whole section rests on: the record keeps taking writes and the
+*view* is held.** §6a already says the freeze is C13's and C14's rather than C03's;
+this says which of the two, and the answer is neither — it is a hold the shell puts
+between them.
+
+**Why not a queue at the store**, which is what *buffered* first suggests. C13's
+`patch` returns an outcome and C23 branches on it — `outcome.ok`, and three arms on
+`outcome.reason`, one of which kills the child. A queue would have to answer before
+it applied, so it would have to **fabricate a verdict it cannot know**: a malformed
+patch accepted optimistically leaves the entry unsettleable and the child alive,
+which is C23 §8a A2's arm reached by a decision nobody took. A deferral that returns
+a value is not a deferral. The record therefore takes everything, in order, at the
+moment it arrives, exactly as it does with no mode up.
+
+### The trace
+
+| # | with the mode up | and then | the two rules that meet | ruling |
+|---|---|---|---|---|
+| A1 | selection empty | an entry arrives | `R-SEL-009` *the frame freezes* · C13's record is the record | the record takes it and the view does not. The buffer is the difference between them, which is a subtraction rather than a queue |
+| A2 | anything | a live entry is patched and its height changes | `R-SEL-009` · C14's height index, rebuilt from the record | the held view needs **its own heights**, so entries and index are captured together. An index rebuilt from the record under a held document is the half-applied store F-defect one component over |
+| A3 | caret on the last held entry | the caret moves up | `R-SEL-009` *nothing else moves* · the caret must stay on screen | **the scroll moves and the document does not.** Freezing `visible()` outright walks the caret off the screen and makes the mode unusable; the hold is over content, and scroll is not content |
+| A4 | anything | a resize | `R-SEL-009` · C03 I13, *stale, never unknown* | the held document re-lays at the new width. Heights are width-dependent (I8), so width invalidates the held index exactly as it invalidates the live one — the hold is over **content**, not over geometry, and the same sentence answers A3 and A4 |
+| A5 | content buffered | the mode exits | `R-SEL-010` | drop the hold, one commit. Where it lands is follow-tail's (§3), unchanged — a reader who scrolled up stays where they were |
+| A6 | an entry **in the selection** is patched | `y` | `R-SEL-003`/`R-SEL-004` · the record moved | **`y` takes the held blocks.** What the reader saw is what they copy; a copy carrying text that arrived after the freeze is a copy of something that was never on the screen, and the reader has no way to know it happened |
+| A7 | anything | the live entry settles | `R-SEL-009` · C23 I9 | the settle lands on the record and not on the view. The held view keeps the pre-settle rendering, which is a *rendering* difference — the entry is final in the record the whole time, so nothing downstream sees a document that cannot exist |
+
+**A6 is the row that pays for the whole ruling.** Every other row is satisfied by a
+frame that merely does not redraw; A6 is not, because `y` is not a frame. A hold
+implemented in the paint path alone would freeze the screen correctly and copy the
+record, and the two would disagree by exactly the content the freeze exists to keep
+out of the reader's way.
+
+### The table — who reads the record, who reads the view
+
+| reader | which | why |
+|---|---|---|
+| `visibleRows` | **view** | it is the frame |
+| the height index behind `visible()` | **view** | heights must agree with what is drawn (A2) |
+| `copySelectedEntries` / `y` | **view** | A6 |
+| `selectAllLoadedEntries` | **view** | `R-SEL-008`'s *the window is not the record* is this sentence already, written about `A` |
+| `actions.ts`, `execution.ts`, `refresh.ts` reading `transcript.entries` | **record** | none of them draw, and one of them is what is arriving |
+| the footer's buffered notice | **the difference** | the only subject that needs both |
+
+The last row is the finding. Everything else here reads one side; the notice is the
+one thing that can only be written by something holding both, and it is also the
+only observable the mode has for the hold — without it a held view and a broken
+render are the same picture.
+
+### What still moves, and it is not in the document
+
+`R-SEL-009`'s *not the spinners, not the elapsed counts* is two different mechanisms
+and the hold only answers one of them. **Elapsed counts are content**: `refresh`
+recomputes a duration into the record, and a held view does not show it — no code is
+needed. **Spinners are not**: the frame index is `RenderContext.tick`, a counter on
+the session that no document carries, so a held document still draws a turning
+spinner. The ticker is therefore stopped explicitly while the mode is up — `#tick`
+does not advance, orbits do not turn, animated images do not step — and that is the
+one thing in this section that is a statement about C22 rather than about C14.
+
+Three things redraw and the rule names them: the mode label, the selection, the
+count. All three change only on a key, so a commit at `input` is the whole of it and
+no other reason needs to reach the terminal.
+
 ---
 
 ## 7. State machine
@@ -582,6 +654,12 @@ than stranding the user.
 - **I29** — **The measure seam is told *whose* blocks these are.** `measureSequence` takes the entry's id beside the blocks and the width, as `chromeRows` already takes the entry itself — C14 reads neither and passes both, so this adds nothing C14 can be wrong about. What it buys is at the other end: block ids are unique within a document (C04 I14) and a transcript holds many, so a measurer handed only `(blocks, width)` cannot tell one entry's `table#t1` from another's. Measured — with the height cache warm the shell attributes every element from its own render loop and this path opens nothing; on a miss it opens the whole entry, and three unattributed calls in three frames on a four-entry fixture become every entry on a resize, which is the axis this component exists to make cheap (C28 I42, F892). **Optional, and the default is the shipped behaviour**: a caller that omits it measures exactly as before, so this is not a second way to measure.
 - **I30** — **`visible()` returns the same frozen range until the viewport moves, and every movement drops it at the clamp.** The memo is invalidated in `#setTop` and nowhere else, because every path that changes what is visible — a scroll, `#afterContent` after any content change, `resize` on either arm, `clear` — ends there (I2). A second call with nothing moved is the first call's object by identity; a call after a scroll, an append or a resize is a fresh one. `stats.visibleMemo` counts the hits and the misses. **Why** (F1198): the range was recomputed per question — a `locate`, a walk, an object per entry — and C23 asks the question per live part per sweep; 200 parts at 16 ms were twelve thousand computations a second, 585 ms of a six-second profile, for an answer that moves only with the viewport (→ I2, I9, I27, C23 I46).
 
+- **I31** — **While semantic copy mode is up the frame draws a document held at the moment of entry, and the record keeps taking every write.** The hold is entries *and* the heights measured over them, captured together (§6b A2), because an index rebuilt from a record the view no longer shows describes a document nobody is looking at. The record is never queued and never answers a write it has not applied: C13's `patch` returns an outcome C23 branches on, so a deferral there would have to fabricate a verdict (§6b). **Width invalidates the held index and nothing else does** — the hold is over content, not over geometry, which is the same sentence I8 makes about the live one.
+- **I32** — **Scroll moves under the hold; the document does not.** The caret is what pulls the viewport, so a hold that froze `visible()` would walk the caret off the screen and make the mode unusable (§6b A3). `topRow`, `followTail` and the anchor all behave exactly as they do with no mode up, over the held heights rather than the live ones — so I2's clamp is against the held total and moves only when the held document does, which is never while the mode is up.
+- **I33** — **What `y` takes is the held document, not the record** (§6b A6). This is the row a paint-path freeze cannot satisfy, because `y` is not a frame: the screen would be right and the clipboard would carry content that was never on it. `copyTextOf`'s `loaded` argument is therefore the held entries, and `A` selects the held ones for the same reason `R-SEL-008` gives about the window and the record.
+- **I34** — **The footer states the difference while it is non-zero, and the hold is dropped by one commit on exit.** The buffered notice (`R-SEL-010`) is the only subject that reads both sides, and the only observable the hold has: without it a held view and a render that has stopped working are the same picture. On exit the hold is dropped and a single `commit("input")` draws the record — an ordinary frame, not a repaint, for C03 I14's reason: nothing on the terminal became unknown.
+- **I35** — **The ticker stops with the mode and the document does not carry it.** Elapsed counts are content and a held view already holds them; the spinner's frame index is `RenderContext.tick`, a counter on the session that no document carries, so a held document still draws a turning spinner unless the ticker is stopped. `#tick`, orbit angles and animated image frames do not advance while the mode is up, which is `R-SEL-009`'s *not the spinners* and is the one clause here that constrains C22 rather than C14.
+
 ---
 
 ## 9. Commitments
@@ -614,6 +692,11 @@ than stranding the user.
 25a. **A seam carries the identity of the thing it is asked about** (I29). `chromeRows` takes the entry and `measureSequence` takes its id; C14 reads neither, and a measurer that wants to attribute what it measured cannot recover the identity from the blocks.
 26. **A cache that publishes its size publishes its hit rate and its miss reasons** (I27, I28). The comparisons already happen; which one rejected is free, and the value comparison that says a miss was pointless costs one more. A size cannot say whether the cache is working.
 27. **A pure function of the component's own state is answered once per state** (I30, F1198). `visible()` is memoised at the one point every movement passes through, so a caller asking it per part per sweep pays the walk once per movement; the memo publishes its rate beside the height cache's.
+
+28. **The freeze is a held view over a record that keeps moving** (I31, §6b). Semantic copy mode holds the document the frame draws and buffers nothing: the store takes every write at the moment it arrives, and what the reader is spared is the *view* of it. A queue at the store would have to answer a write before applying it, and C13's `patch` returns a verdict C23 branches on.
+29. **Scroll runs under the hold and `y` reads it** (I32, I33). The caret pulls the viewport as it always did, over the held heights; the clipboard takes what was on the screen, which is the one requirement a paint-path freeze cannot meet.
+30. **The buffered notice is the hold's only observable, and it is the one reader of both sides** (I34). Without it a held view is indistinguishable from a render that has stopped.
+31. **A counter the document does not carry must be stopped by hand** (I35). Elapsed counts are content and freeze with the view; the spinner's tick is not, and would keep turning under a perfectly held document.
 
 ---
 
@@ -649,6 +732,13 @@ Fake heights, no rendering.
 - **T1.18** (I23): a 2 000-line `code` block and a 2 000-line `raw` block, windowed at `[0, 40)` through `windowSequence` → each windowed block measures at most `40 + skipRows + dropRows`, and the painted rows are the same forty the whole rendering would have put there (C09 I25). A block comment opening above the window and closing inside it → the rows inside are still drawn in the comment slot (the `lineRange` pin).
 - **T1.19** (I24): with `maxBlockRows: 10`, a 25-line `logs` block measures 11 and renders ten lines and the row `… 10 of 25 rows`; a 10-line block measures 10, renders no marker, and `windowSequence` hands back the **same block reference**; the same for `raw`, `code`, `keyValue`, `patch` and `table` — six kinds, one code path. A `plot` and a `panel` of the same nominal size are untouched, and the panel's 25-line child is capped inside it (I26).
 - **T1.20** (I24, I25): the marker is a row the window sees — `windowSequence` over a 25-line `logs` block capped at 10, at `[9, 11)`, yields a piece measuring 2 with `skipRows` 0 (line 9, then the marker); at `[10, 11)` a piece measuring 2 with `skipRows` 1, whose kept row is the marker alone; at `[3, 7)` a piece with no marker and no `capped` field whose rows equal the uncapped block's 3–6 byte for byte. **Read as frames**: the row text is asserted, not the count.
+
+- **T1.30** (I31, §6b A1, A2): the mode is entered over three entries; a fourth is appended and the live one is patched twice → the held entries are the three, by identity, and the held heights are the heights measured before the patches. The record answers four the whole time, so the row is the **difference** and not a store that stopped working.
+- **T1.31** (I31, §6b A4): a resize while the mode is up → the held document re-measures at the new width and is still the same three entries. Width invalidates the held index and the arriving fourth entry still does not appear, which is the pair that says the hold is over content and not over geometry.
+- **T1.32** (I32, §6b A3): with the mode up and the caret moved to an entry above the window, `visible()` moves and the held entry list does not. Asserted as a scroll that happened **and** a document that did not, because either alone is satisfied by the mode doing nothing.
+- **T1.33** (I33, §6b A6): an entry is selected, then patched with new blocks, then `y` → the clipboard carries the blocks the entry had when the mode was entered. The control is the same sequence with no mode up, where the copy takes the patched blocks.
+- **T1.34** (I34): content arrives while the mode is up → the buffered count is the number of entries the record has and the view does not, and it is zero before anything arrives. On exit the hold is dropped, the record's entries draw, and the count is zero again.
+- **T1.35** (I35): the mode is entered with a spinner and an orbiting plot on screen → `tick` does not advance across three ticker wakes and the orbit's angle is unchanged, and both resume on exit. Elapsed counts are asserted in the same row as the **contrast**: they freeze with no code stopping them, because they are content.
 
 ### Tier 2 — contract / interface
 
