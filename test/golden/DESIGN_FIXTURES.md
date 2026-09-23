@@ -126,7 +126,7 @@ most-drawn line in the application.
 | 31 | surface | `SPINNER_SETS` | `design-surfaces.test.ts` | every reusable spinner set at its own interval |
 | 32 | prose | — | — | the four spinner rules |
 | 33 | surface | `BAR_STYLES` | `design-surfaces.test.ts` | nine alphabets, and where each belongs — where `ascii`'s empty was found to be `.`; `plot/ramp.ts` holds a second ASCII pair whose empty cannot follow without colliding with its absent mark, and that is a parked question |
-| 34 | surface | `BAR_STYLES` | `design-surfaces.test.ts` | active progress bars |
+| 34 | surface | `BAR_STYLES` | `design-surfaces.test.ts` | active progress bars — and the painted rung beside the drawn one, as a mask, because the whole of the closing figure is in the channel a stripped read folds away |
 | 35 | surface | no | — | quantity, granularity and liveness as three axes — `Progress` has `style` and `ramp` and no third member, so this is genuinely unbuilt |
 | 36 | surface | no | — | the operation and budget presets — semantics on §035's members, which do not exist |
 | 37 | surface | `RampAnimation` | — | every ink ramp, including the four one-shots |

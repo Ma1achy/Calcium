@@ -24,7 +24,7 @@ import {
 } from "../support/render.js";
 import { rowContaining, styleAt, styledScreenFrom } from "../support/styled-screen.js";
 import { CONTENT_LINE_CAP, statusRowsFor } from "../../src/presentation/blocks/kinds/status.js";
-import { focusStyle, tone } from "../../src/presentation/blocks/paint.js";
+import { background, focusStyle, tone } from "../../src/presentation/blocks/paint.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { sgr } from "../../src/terminal/escapes.js";
 import { cells, hasEmojiForm, TEXT_PRESENTATION } from "../../src/presentation/text.js";
@@ -1077,5 +1077,84 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
       mono.renderToLines(ONE_PER_KIND.patch, 80).map(visible).join("\n"),
       "and the marker carries it",
     ).toMatch(/[-+] /u);
+  });
+  it("T2.160 (C09 I96, §034, §072, `R-BLK-234`): a painted bar is two structural grounds, and the glyphs are its lower rung", () => {
+    const bar = (painted: boolean, caps = FULL_CAPS) =>
+      measurable({ theme: DARK_THEME, capabilities: caps }).renderToLines(
+        block({ kind: "progress", id: "m", label: "slant", current: 15, total: 24, style: "slant", painted }),
+        80,
+      );
+    const gridOf = (lines: readonly string[]) =>
+      styledScreenFrom([lines.join("\n")], { columns: 80, rows: lines.length })[0] ?? [];
+
+    // **Two grounds, and they are the two the design names.** A single-symbol
+    // check would pass on a bar painted one colour end to end, which draws the
+    // extent and hides where the fill stops — the whole of what a bar says.
+    const on = gridOf(bar(true));
+    const grounds = [...new Set(on.filter((c) => c.style.bg !== "").map((c) => c.style.bg))];
+    const meter = sgr(background("surface.meterFill", DARK_THEME, FULL_CAPS)).replaceAll(/[\u001b[m]/gu, "");
+    expect(grounds.length, "the fill and the track are different grounds").toBe(2); // cells-ok — a count
+    expect(grounds.join("|"), "and the fill's is `meterFill`").toContain(meter);
+
+    // **No glyph under either.** §034 draws the painted bar with no bar
+    // character at all — the ground IS the extent — so a row asserting only
+    // that a background arrived would pass on glyphs wearing a wash.
+    const bars = on.filter((c) => c.style.bg !== "").map((c) => c.ch);
+    expect([...new Set(bars)], "the painted cells are spaces").toEqual([" "]);
+
+    // **The lower rung is the alphabet, not nothing** (§034: *the glyphs are
+    // the 1-bit rung*). At one bit the painted bar and the drawn one are the
+    // same bytes, which is stronger than either alone: it says the fallback is
+    // the bar `style` named rather than a bar that vanished.
+    expect(bar(true, MONO_UNICODE_CAPS), "painted falls back into its alphabet").toEqual(
+      bar(false, MONO_UNICODE_CAPS),
+    );
+    expect(bar(true, MONO_UNICODE_CAPS).join(""), "and that alphabet is `slant`").toContain("▰");
+
+    // **A theme with no `meterFill` falls to the glyphs too, and this arm is
+    // here because the mutation pass said the sentence forbade nothing.**
+    // I96 says the rung is read off the ground resolving rather than off the
+    // depth, and keying it on `colourDepth > 1` instead **survived** a pass:
+    // all ten shipped themes carry `meterFill`, so the two predicates agree on
+    // every input the tree can produce and the distinction was true of nothing.
+    // A03 §2's vacuity class arriving in prose. Constructing the theme the
+    // sentence is about is what makes it checkable — and it is the case a
+    // consumer's own theme can reach, since `ThemeTokens` is public.
+    const { meterFill: _dropped, ...withoutMeter } = DARK_THEME.tokens.surfaces;
+    // **Its own `name`, because the resolver's cache is keyed on one** (C10
+    // I11). The first draft kept `prism` and the stripped theme resolved from
+    // the warm entry the real one had filled — it painted, and read exactly
+    // like the fallback not existing.
+    const noMeter = {
+      ...DARK_THEME,
+      name: "prism-no-meter",
+      tokens: { ...DARK_THEME.tokens, surfaces: withoutMeter },
+    } as typeof DARK_THEME;
+    expect(
+      measurable({ theme: noMeter, capabilities: FULL_CAPS }).renderToLines(
+        block({ kind: "progress", id: "m", label: "slant", current: 15, total: 24, style: "slant", painted: true }),
+        80,
+      ).join(""),
+      "a theme with no `meterFill` draws the alphabet",
+    ).toContain("▰");
+
+    // **The percentage is `muted`** — all five of §034's bars read it so, and
+    // the tree drew `meta` from the day the kind landed with no row naming it.
+    // **Read off the grid, not off the bytes**, and the first draft was the
+    // other way. The `off` cells and the percent now share one style, so the
+    // painter coalesces them and there is no fresh SGR before `63%` at all — a
+    // substring match on `<muted>63%` failed against a row drawing the percent
+    // in muted perfectly well.
+    const drawnRow = gridOf(bar(false));
+    const digit = drawnRow.findIndex((c, i) => c.ch === "6" && drawnRow[i + 1]?.ch === "3");
+    expect(digit, "the percent is drawn").toBeGreaterThan(0); // cells-ok — a column
+    const fg = (style: ReturnType<typeof tone>) => sgr(style).replaceAll(/[\u001b[m]/gu, "");
+    expect(drawnRow[digit]?.style.fg, "the percent is muted").toBe(
+      fg(tone("muted", DARK_THEME, FULL_CAPS)),
+    );
+    expect(
+      drawnRow.map((c) => c.style.fg),
+      "and no cell of the row is meta",
+    ).not.toContain(fg(tone("meta", DARK_THEME, FULL_CAPS)));
   });
 });

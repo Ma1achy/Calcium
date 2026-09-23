@@ -338,14 +338,24 @@ describe("C09 §5 — ramps, the extent and the split", () => {
     const bar = (current: number): string =>
       renderSequenceToLines(registry, [block({ kind: "progress", id: "p", label: "build", current, total: 10, ramp: { fill: "gradient", colormap: "viridis" } })], 40, { theme, capabilities: FULL_CAPS })[0] ?? "";
     const spansOf = (line: string): string[] => line.split(/(?=\x1b\[[0-9;]*m)/u).filter((s) => s.includes("█"));
+    /** The `off` glyph's cells — the subject, where `muted` was only its sign. */
+    const glyphOf = (line: string): number => [...line].filter((c) => c === "░").length; // cells-ok — a count
     const at30 = spansOf(bar(3));
     const at100 = spansOf(bar(9));
     expect(at30.length).toBeGreaterThan(2);
     expect(at100.length).toBeGreaterThan(at30.length);
     for (let i = 0; i < at30.length; i += 1) expect(fgOf(at30[i] ?? ""), `cell ${String(i)}`).toBe(fgOf(at100[i] ?? ""));
+    // **The `off` cells are asserted by their glyph, and the first form used
+    // the tone as a proxy for them.** `muted`'s presence stood for *there is an
+    // off cell*, which held only while the percent was `meta`; §034 reads the
+    // percent in `c-muted` on all five of its bars, the tone moved (C09 I96),
+    // and the row went red on a bar drawing no `off` cell at all. A proxy for
+    // the subject is fine until something else acquires the same property.
     const muted = fgOf(sgr(resolveTone("muted", theme, FULL_CAPS)));
-    expect(bar(3)).toContain(muted);
-    expect(bar(10), "a full bar has no off cell").not.toContain(muted);
+    const off = glyphOf(bar(3));
+    expect(bar(3), "the off cells are muted").toContain(muted);
+    expect(off, "a partial bar draws an off cell").toBeGreaterThan(0); // cells-ok — a count
+    expect(glyphOf(bar(10)), "a full bar has no off cell").toBe(0); // cells-ok — a count
     expect(bar(10).length, "a full bar still draws").toBeGreaterThan(20);
   });
 

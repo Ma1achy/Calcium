@@ -1047,9 +1047,9 @@ function spark(values: readonly number[], opts?: BlockOpts): Plot {
  * decoration over a number that is already correct.
  */
 function progress(
-  spec: BlockOpts & { label: string; current: number; total: number; style?: string; ramp?: Ramp },
+  spec: BlockOpts & { label: string; current: number; total: number; style?: string; ramp?: Ramp; painted?: boolean },
 ): Progress {
-  const { label, current, total, style, ramp } = spec;
+  const { label, current, total, style, ramp, painted } = spec;
   return finish<Progress>(
     {
       kind: "progress",
@@ -1060,6 +1060,9 @@ function progress(
       ...(style === undefined ? {} : { style }),
       // An ink over the bar's `on` cells, along the axis (C04 I108).
       ...(ramp === undefined ? {} : { ramp }),
+      // §034's painted rung (C09 I96): the fill is a ground, and the alphabet
+      // `style` names is where it degrades to rather than a peer of it.
+      ...(painted === undefined ? {} : { painted }),
     } as Progress,
     spec,
     false,

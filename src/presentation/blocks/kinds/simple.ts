@@ -15,7 +15,7 @@ import { runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../runs.js";
 import { NO_STYLE, rampStyle } from "../../theme/index.js";
 import { animateT, effectiveTick, extentT } from "../ramp.js";
 import { barStyle, glyphFor, glyphCells, glyphs, headMark } from "../glyphs.js";
-import { clampSpans, focusStyle, pad, paint, paintRuns, rows, selectionStyle, tone, type Span } from "../paint.js";
+import { background, clampSpans, focusStyle, pad, paint, paintRuns, rows, selectionStyle, tone, withBackground, type Span } from "../paint.js";
 import type { BlockDefinition, NavElement, RenderContext, Windowed, Rendered } from "../types.js";
 
 /** Chips in a `pills` row are separated by two spaces — one is too close to read. */
@@ -584,13 +584,43 @@ export const progressDefinition: BlockDefinition<Progress> = {
     // keeps its colour as the bar fills. The other answer — the filled length —
     // moves every painted cell on every patch for no information (C04 I108).
     const accent = tone("accent", ctx.theme, ctx.capabilities);
+
+    // **The painted rung, and the predicate is the ground rather than the
+    // depth** (I96, §034, `R-BLK-234`). §034 draws the same 62% twice and says
+    // which is which: *the ground is the extent and the glyphs are the 1-bit
+    // rung*. So `painted` is a channel choice over the alphabet `style` already
+    // named, and it falls back **into** that alphabet — `resolveBackground`
+    // answers `NO_STYLE` without colour (C10 I8), so a 1-bit terminal and a
+    // theme carrying no `meterFill` reach the glyphs by one predicate rather
+    // than by a number compared in two places.
+    //
+    // **Both surfaces are structural**, which is why a bar may take them at all:
+    // §072 forbids mixing structural and semantic grounds, and a bar drawn in
+    // `ok` or `warn` would be a status painted as an extent.
+    const meter = background("surface.meterFill", ctx.theme, ctx.capabilities);
+    const well = background("surface.bgDeep", ctx.theme, ctx.capabilities);
+    const painted = block.painted === true && meter.background !== undefined;
+    const onGlyph = painted ? " " : bar.on;
+    const onInk = painted ? withBackground(accent, meter) : accent;
+    const muted = tone("muted", ctx.theme, ctx.capabilities);
+    const offInk = painted
+      ? withBackground(tone("default", ctx.theme, ctx.capabilities), well)
+      : muted;
+
     const onCells: Span[] =
       block.ramp === undefined
-        ? [{ text: bar.on.repeat(filled), style: accent }]
+        ? [{ text: onGlyph.repeat(filled), style: onInk }]
         : Array.from({ length: filled }, (_, i) => {
             const t = animateT(block.ramp?.animate, extentT(i, barWidth), effectiveTick(ctx.tick, ctx.capabilities), barWidth, i);
             const sampled = block.ramp === undefined ? undefined : rampStyle(block.ramp, t, i, ctx.theme, ctx.capabilities);
-            return { text: bar.on, style: sampled === undefined ? accent : { ...accent, ...sampled } };
+            // **The ramp survives the rung and I52 is untouched**: the ink still
+            // varies along the axis and still takes the `on` cells only. What
+            // moves is that the cell beneath it is a space — and the ground is
+            // merged *under* the sample rather than over it, so a ramp does not
+            // lose the track it is painted on. §034 carries `rmp-sweepbar` on
+            // the painted bar, so the pairing is the design's.
+            const ink = sampled === undefined ? onInk : { ...onInk, ...sampled };
+            return { text: onGlyph, style: painted ? withBackground(ink, meter) : ink };
           });
 
     return rows([
@@ -600,10 +630,13 @@ export const progressDefinition: BlockDefinition<Progress> = {
             { text: `${labelColumn} `, style: tone("default", ctx.theme, ctx.capabilities) },
             ...onCells,
             {
-              text: bar.off.repeat(barWidth - filled),
-              style: tone("muted", ctx.theme, ctx.capabilities),
+              text: (painted ? " " : bar.off).repeat(barWidth - filled),
+              style: offInk,
             },
-            { text: ` ${percent}`, style: tone("meta", ctx.theme, ctx.capabilities) },
+            // **`muted`, and it was `meta`** (I96). All five of §034's bars read
+            // their percent in `c-muted`, painted and drawn alike; the tree drew
+            // `meta` from the day the kind landed and no row named the tone.
+            { text: ` ${percent}`, style: muted },
           ],
           width,
           ctx.capabilities,

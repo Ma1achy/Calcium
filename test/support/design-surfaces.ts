@@ -199,6 +199,29 @@ const SCROLLED = block({
   ),
 });
 
+/**
+ * §034's closing figure: **the same bar painted, and the glyphs beneath it**.
+ *
+ * Drawn as a mask beside the text for the same reason §072's census is — the
+ * whole claim is in the channel a stripped read folds away, and a painted bar
+ * and an empty row are the same picture without it.
+ */
+const paintedBar =
+  () =>
+  (width: number, capabilities: TerminalCapabilities, theme: ResolvedTheme): readonly string[] => {
+    const kit = measurable({ theme, capabilities });
+    return (["slant", "block"] as const).flatMap((style) =>
+      [true, false].flatMap((painted) => {
+        const lines = kit.renderToLines(
+          block({ kind: "progress", id: `m-${style}-${String(painted)}`, label: style, current: 15, total: 24, style, painted }),
+          width,
+        );
+        const grid = styledScreenFrom([lines.join("\n")], { columns: width, rows: lines.length });
+        return maskOf(grid);
+      }),
+    ).flat();
+  };
+
 /** §033: one bar per alphabet, all at the same fraction, so the rows compare. */
 const barAlphabets =
   () =>
@@ -211,6 +234,37 @@ const barAlphabets =
     );
 
 // --- §072, the ground census ------------------------------------------------
+
+/**
+ * One character per cell: `.` for no ground, and a letter per **distinct**
+ * background in the block, with a legend.
+ *
+ * **A single `#` was the first draft and it could not see the figure.** §034's
+ * painted bar is fifteen cells on `meterFill` beside nine on `bgDeep`, and a
+ * one-symbol mask draws that as twenty-four identical cells — the extent is
+ * visible and *where the fill ends* is not, which is the whole of what the bar
+ * says. Two grounds want two letters.
+ */
+function maskOf(
+  grid: readonly (readonly { ch: string; style: { bg: string } }[])[],
+): readonly string[] {
+  const seen = new Map<string, string>();
+  const letter = (bg: string): string => {
+    if (bg === "") return ".";
+    const held = seen.get(bg);
+    if (held !== undefined) return held;
+    const next = String.fromCharCode(65 + seen.size);
+    seen.set(bg, next);
+    return next;
+  };
+  const body = grid.map((row) => {
+    const mask = row.map((c) => letter(c.style.bg)).join("");
+    return `${mask} ${row.map((c) => c.ch).join("").replace(/\s+$/u, "")}`;
+  });
+  return seen.size === 0
+    ? body
+    : [...body, ...[...seen].map(([bg, l]) => `  ${l} = bg ${bg}`)];
+}
 
 /**
  * **A background is for an EXTENT; a foreground is for a MARK** (§072).
@@ -247,13 +301,7 @@ const groundCensus =
     return subjects.flatMap(({ name, block: b }) => {
       const lines = kit.renderToLines(b, width);
       const grid = styledScreenFrom([lines.join("\n")], { columns: width, rows: lines.length });
-      return [
-        `· ${name}`,
-        ...grid.map((row) => {
-          const mask = row.map((c) => (c.style.bg === "" ? "." : "#")).join("");
-          return `${mask} ${row.map((c) => c.ch).join("").replace(/\s+$/u, "")}`;
-        }),
-      ];
+      return [`· ${name}`, ...maskOf(grid)];
     });
   };
 
@@ -286,6 +334,7 @@ export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 30, name: "the head mark's three rungs", rows: headMarks },
   { section: 31, name: "every reusable spinner set", rows: spinnerCensus },
   { section: 33, name: "nine alphabets, and where each belongs", rows: barAlphabets() },
+  { section: 34, name: "the same bar painted, and the glyph rung beneath it", rows: paintedBar() },
   { section: 72, name: "the background is a second channel — the ground census", rows: groundCensus([
     { name: "a changed line, ex. 1 — the ground runs to the block's edge", block: DIFF },
     { name: "a tag with extent, ex. 3 — and the error tag is the only one", block: STATUS },

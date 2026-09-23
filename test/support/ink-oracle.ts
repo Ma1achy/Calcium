@@ -68,6 +68,8 @@ const SCROLLBAR =
 const RESIDUE_AND_SCROLLBAR = `${RESIDUE_ASCII} — and, at this rung too, ${SCROLLBAR}`;
 const BAR_EMPTY =
   "C09 I94 / R-PRG-001 / §033 (M16): the ASCII bar's empty cell is the registry's `-` where Ink drew `.` — a track against an absence, and the pair shipped wrong from the day `BAR_STYLES` existed because every row over the table measured a width and none named an `off`";
+const BAR_PERCENT =
+  "C09 I96 / §034 (M16): the bar's percentage is `muted` where Ink drew `meta` — all five of §034's bars read it in `c-muted`, painted and drawn alike, and the tree drew `meta` from the day the kind landed with no row naming the tone";
 
 /**
  * Kinds that landed **after** Ink was removed, and why each is not a retirement.
@@ -163,6 +165,18 @@ const RETIRED: ReadonlyMap<string, string> = new Map(
       // character is the *whole* run rather than its tail.
       ["t2143-progress-prog-1", BAR_WIDTHS, BAR_EMPTY, ["ascii", "mono"]],
       ["t2143-progress-adv-zero-total", BAR_WIDTHS, BAR_EMPTY, ["ascii", "mono"]],
+      // **The percentage's tone, and the shape of the list is the measurement.**
+      // `full` at every width, because the tone is a colour and the colour is
+      // in every capture that has one. `ascii` and `mono` at **two columns
+      // only** — not because the typographic collapse spares them, but because
+      // `BAR_EMPTY` already retired those two rungs at the other ten widths,
+      // and two is the width where there is no bar left to have an empty cell.
+      // So the union of the two rulings is the full grid and neither list is a
+      // cross product: 26 captures, swept before the run and read after.
+      ["t2143-progress-prog-1", ALL_WIDTHS, BAR_PERCENT, ["full"]],
+      ["t2143-progress-adv-zero-total", ALL_WIDTHS, BAR_PERCENT, ["full"]],
+      ["t2143-progress-prog-1", [2], BAR_PERCENT, ["ascii", "mono"]],
+      ["t2143-progress-adv-zero-total", [2], BAR_PERCENT, ["ascii", "mono"]],
     ] as const
   ).flatMap(([key, widths, why, only]) =>
     widths.flatMap((width) =>

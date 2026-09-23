@@ -2860,6 +2860,20 @@ export type Progress = Readonly<{
    * a colormap backing is admitted — the ink fills its cell and reads by area.
    */
   ramp?: Ramp;
+  /**
+   * The fill is a **ground** rather than glyphs (§034, `R-BLK-234`, C09 I96).
+   *
+   * **Not a tenth alphabet.** §034 draws the same 62% twice — once in slant
+   * glyphs, once as fifteen spaces on `meterFill` beside nine on `bgDeep` — and
+   * says *the ground is the extent and the glyphs are the 1-bit rung*. So this
+   * is a channel choice over whatever `style` already named, and it degrades
+   * **into** that alphabet rather than into nothing.
+   *
+   * The rung is read off the ground resolving, not off a depth: a 1-bit
+   * terminal and a theme with no `meterFill` fall to the glyphs by the same
+   * predicate (C10 I8).
+   */
+  painted?: boolean;
 }> & Padded & Floor;
 
 export type Code = Readonly<{

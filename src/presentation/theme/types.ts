@@ -67,6 +67,23 @@ export type Surfaces = Readonly<{
    */
   focusGround?: string;
   /**
+   * A meter's fill — the ground a painted bar's `on` cells take (§034, C09 I96).
+   *
+   * **Named here because a renderer reads it now.** Every one of the ten themes
+   * has carried the slot since the registry was ported and this type declared
+   * eleven of the twenty-four the projection assigns, so the value shipped,
+   * quantised and contrast-checked with **no reader and no declaration** — its
+   * only occurrences in `src/` were the generated keys of the quantised table.
+   * §034's *the same, painted rather than drawn in glyphs* is the reader.
+   *
+   * **Optional, and absent means this theme's bars are drawn rather than
+   * painted** — the same shape as `focusGround`, and for the same reason: the
+   * glyphs are the lower rung, so a theme that omits it loses nothing a reader
+   * needs. C09 I96's predicate is the ground resolving, which covers a missing
+   * slot and a 1-bit terminal with one question.
+   */
+  meterFill?: string;
+  /**
    * The selection wash (C17 §5b, roadmap entry 23).
    *
    * **A surface rather than a palette entry, and the entry said otherwise.**

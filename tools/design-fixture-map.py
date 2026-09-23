@@ -38,7 +38,7 @@ M = {
  31:("frame","design-surfaces.test.ts","every reusable spinner set at its own interval"),
  32:("prose","—","the four spinner rules"),
  33:("frame","design-surfaces.test.ts","nine alphabets, and where each belongs — where `ascii`'s empty was found to be `.`; `plot/ramp.ts` holds a second ASCII pair whose empty cannot follow without colliding with its absent mark, and that is a parked question"),
- 34:("frame","design-surfaces.test.ts","active progress bars"),
+ 34:("frame","design-surfaces.test.ts","active progress bars — and the painted rung beside the drawn one, as a mask, because the whole of the closing figure is in the channel a stripped read folds away"),
  35:("owed","M4","quantity, granularity and liveness as three axes — `Progress` has `style` and `ramp` and no third member, so this is genuinely unbuilt"),
  36:("owed","M4","the operation and budget presets — semantics on §035's members, which do not exist"),
  37:("owed","M2","every ink ramp, including the four one-shots"),

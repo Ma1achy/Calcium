@@ -959,6 +959,40 @@ wrinkle, measured on landing**: the bar takes the residual after the percent (§
 growing a digit — `90%` to `100%` — narrows the bar by one cell and every cell re-samples by a
 hair. T2.119 compares 30% against 90% for that reason, and the row says so.
 
+**And the bar has a second rung above the glyphs: it can be PAINTED** (§034, `R-BLK-234`,
+`R-PRG-001`). §034's closing figure draws the same 62% twice — once in slant glyphs and once
+with no glyph at all, fifteen spaces on `meterFill` beside nine on `bgDeep` — and says what
+the relationship is: *the ground is the extent and the glyphs are the 1-bit rung.*
+
+So `painted` is not a tenth alphabet. It is a **channel choice over the alphabet a bar
+already names**, and it degrades into that alphabet rather than into nothing:
+
+```
+24 · 8 · 4 bit   the fill is a ground        meterFill under accent · bgDeep under default
+1 bit            the fill is the glyphs      whatever `style` named, drawn as it always was
+```
+
+**The predicate is the ground resolving, not the depth.** `resolveBackground` answers
+`NO_STYLE` where there is no colour (C10 I8), so the rung is read off the answer rather than
+off a number — one predicate, the same one every other surface in the tree degrades by, and a
+theme that shipped without `meterFill` would fall to the glyphs for the same reason a 1-bit
+terminal does.
+
+**The two surfaces are structural and that is why they may be used here.** §072's rule is that
+structural and semantic grounds never mix: `meterFill` is a track's fill and `bgDeep` is a well
+— *content inside* — and neither carries a judgement, which is what a bar must not do. A bar
+painted in `ok` or `warn` would be a status drawn as an extent.
+
+**A painted bar keeps the ramp** and keeps I52 exactly: the ink still varies along the axis
+over the `on` cells, and what changes is that the cell under it is a space rather than a
+glyph. §034's own figure carries `rmp-sweepbar` on the painted bar, so this is the design's
+pairing rather than an inference.
+
+**And the percentage is `muted`, not `meta`.** Every bar in §034 — all five, painted and drawn
+— reads its percent in `c-muted`, and the tree drew `meta`. That is a colour the design
+specifies rather than a choice left open, so the tone moves and the goldens with it.
+
+
 ---
 
 ### `rule` — three tiers, and the axis is the fill
@@ -3159,6 +3193,7 @@ subject, and the surface has no consumer until it lands.
 - **I93** — *(§7f, §021, C02 I9)* **The scrollbar's glyphs are a set and degrade as one.** Every member is two cells at `ambiguousWidth: "wide"` in this tree — `DRAWN_AS_GEOMETRY` widens the box-drawing block entire, which is a deliberate one-directional deviation from the property (F665) and a superset of §021's own reason, that `│` and `┃` are Ambiguous where `╽` and `╿` are Narrow — so the whole set takes the ASCII rung, where the track is `|`, the thumb is `#` and there is **no half-row form at all**, which is why this is a set rather than four `GlyphSet` slots: a pair would have to carry a duplicate `#` and break T2.5's 1:1 property to say *this rung has none*. **A collapsed box reserves nothing**: it has no interior for a bar to sit in (C04 I98), and the column would be taken out of the residue row — the fold's one line, and the only thing a collapsed box draws. The column it takes is reserved by measuring the content at the full width and re-measuring one cell narrower **only if it overflowed** — narrowing never shortens content, so the decision is reached once and cannot oscillate.
 - **I94** — *(§7f, §033, `R-PRG-001`, `R-PRG-002`)* **The bar alphabets are the registry's `bars`, by equality in both directions, and the `ascii` pair is `#` and `-`.** Nine names — `block halfblock rectangle beads posts slant squares braille ascii` — each with a `filled` and an `empty` character taken from `calcium-registry.json` and not restated here except for the one that was wrong: `ascii` drew `#`/`.` until this row, against the registry's `#`/`-`, and `.` is an absence where `-` is a track. **The rows that existed could not have caught it**: a bar's `off` character is named by no assertion in the tree, and a width row is satisfied by any one-cell glyph. **`braille`'s empty is a space and that is the design's own**, drawn so in §033's fixture, which is why the row compares characters rather than asserting every alphabet has two visible ones. The comparison is by equality both ways on the *names* and on the *pairs*: a name in the tree that the registry does not register is as much a divergence as one the registry registers and the tree lacks, and a subset check in either direction is satisfied by the failure it exists to catch. `narrowOnly` stays the tree's, because it is a property of this terminal's width tables and not of the design (C02 I9) — the registry records what a bar is drawn with and the tree records where that is safe.
 - **I95** — *(§7g, §072, `R-COL-004`, `R-BLK-569`, `R-BLK-570`)* **Three block kinds paint a ground and the rest are text, and each of the three paints for a declared reason.** §072's test is *am I painting a THING or a FACT about a thing* — a background is for an **extent**, a foreground for a **mark** — and measured over `ONE_PER_KIND` at 24 bits exactly three kinds carry a background cell: `patch`, where a changed line is an extent and the ground runs to the **block's edge** rather than the text's (C25 I13, T4.9); `status`, whose error tag is the **one painted label in the system**, which is what lets a red posture be drawn in text and never be read as an error; and `image`, the one place a ground doubles the resolution rather than decorating it, since a half-block cell carries two full colours. Everything else — a pill, a panel, a table, a bar — is a mark or a label, and takes a tone. **The set is declared and moves on purpose**: §073's painted chrome will add to it, and a kind that starts painting without the invariant moving is the failure this row exists to catch. **A stripped read cannot see any of it** — `design-surfaces.test.ts` folds SGR away, which is right for a fixture about shape and blind to one about the channel — so §072's frame is a *mask*, one character per cell, computed from the styled screen and emitted as text. **What the measurement also found**: `meterFill` is carried by all ten themes, projected by the registry, and read by **no renderer** — §034's *the same, painted rather than drawn in glyphs* and §072's *a cell's magnitude — the ground IS the number* are one unbuilt subject, and the surface has no consumer until it lands.
+- **I96** — *(§4, §034, §072, `R-BLK-234`, `R-PRG-001`, C10 I8)* **A bar may be painted instead of drawn, and the glyphs are its lower rung rather than its alternative.** `Progress.painted` makes the fill a **ground**: the `on` cells are spaces on `surface.meterFill` under `accent`, the `off` cells spaces on `surface.bgDeep` under `default`, and the percentage follows the row as it always did. **The rung is read off the ground resolving, not off a depth** — `resolveBackground` answers `NO_STYLE` where there is no colour, so a 1-bit terminal and a theme with no `meterFill` fall to the same place by the same predicate, and that place is the alphabet `style` already named rather than nothing at all (§034: *the ground is the extent and the glyphs are the 1-bit rung*). **Both surfaces are structural, which is the reason they are admissible**: §072 forbids mixing structural and semantic grounds, a bar drawn in `ok` or `warn` would be a status painted as an extent, and `meterFill` is a track while `bgDeep` is a well. **I52 is untouched** — the ramp still varies over the axis and still takes the `on` cells only; what moves is that the cell beneath it is a space. **`measure` cannot see any of it**, which is the property that keeps the seam legal: the row is one row at every rung and the fill's width is the same integer painted or drawn, so appearance animates and geometry does not. **The percentage is `muted`** — §034 reads it so in all five of its bars and the tree drew `meta`, which is a colour the design specifies rather than one it leaves open.
 
 
 ## 8b. The glyph axis — a classification table, and why it is not a trace
