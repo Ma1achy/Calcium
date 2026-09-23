@@ -471,10 +471,24 @@ export function glyphs(caps: GlyphCaps): GlyphSet {
  * exception is a **second category** rather than a slow spinner — see
  * `fullramp`.
  *
- * **`ascii` is paired by shape of motion, not by name.** Degradation preserves
- * meaning rather than appearance, and a bloom falling to a rotation loses more
- * than it needs to: a pulse falls to a pulse, a rotation to a rotation, a
- * counter is already ASCII, a toggle to two frames.
+ * **`ascii` is the registry's, per set** (I98, `R-MOT-010`, `R-MOT-011`).
+ * Degradation preserves meaning rather than appearance, and a bloom falling to
+ * a rotation loses more than it needs to — which is the right principle and was
+ * applied at the wrong granularity. This read *paired by shape of motion, not by
+ * name*, and paired **nineteen sets onto three families**: `PULSE_ASCII`,
+ * `TURN_ASCII` and `TOGGLE_ASCII`. So `bounce`, whose motion is a vertical
+ * bounce, fell to a grow ramp, and `triangle`, which turns through four
+ * directions, fell to `-\|/`. **A correct sentence justifying the wrong
+ * decision**, which is the one shape review cannot catch.
+ *
+ * **And the cost was the cadence, not only the characters.** The rung was a
+ * four- or five-frame pattern at the *same interval*, so `braille` — ten frames
+ * at 80 ms, an 800 ms cycle — spun at 320 ms in ASCII, two and a half times
+ * faster. The registry fits its pattern to the set's own frame count
+ * (`asciiTrajectory: "fit-cycle"`), which holds each glyph longer and keeps the
+ * cycle, and that is what `R-MOT-010`'s *shape of its motion* means. `R-MOT-011`
+ * — one alphabet, one cadence — was green on the collapse the whole time, with
+ * three consistent families and no mismatch.
  *
  * **`narrowOnly` is a tier and not a refusal**, which is what `ambiguousWidth`
  * changed. Every frame of these sets is `East_Asian_Width=Ambiguous` — the
@@ -490,9 +504,13 @@ type SpinnerSet = Readonly<{
   narrowOnly?: boolean;
 }>;
 
+// **The two alphabets the unregistered sets still share** — `braille2`, `arc`,
+// `line` and `balloon`, which are in no registry record and so have no
+// `asciiPattern` to take (I98). `line` and `balloon` are ASCII-native and these
+// *are* their Unicode frames. `TOGGLE_ASCII` went with the port: `toggle` was
+// its only holder and the registry answers `<`/`>`.
 const PULSE_ASCII = Object.freeze([".", "o", "O", "@", "*"]);
 const TURN_ASCII = Object.freeze(["-", "\\", "|", "/"]);
-const TOGGLE_ASCII = Object.freeze(["+", "x"]);
 const DIGITS = Object.freeze(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]);
 
 /**
@@ -511,13 +529,15 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
    * recompute. It is the mark a tape's running member draws in its duration
    * slot, and §095's figure is where its `✦` comes from.
    *
-   * **The ASCII rung needs no composite, and that is a measurement rather than
-   * a simplification.** The registry records an `asciiTrajectory` of *composite*
-   * over `fullramp grow bloom starfield pulse` — and all five of those sets
-   * carry `PULSE_ASCII`, the same five frames. So the composite is a claim about
-   * which Unicode families the walk visits, and at the ASCII rung every one of
-   * them is already the same ramp. A bespoke ASCII array here would be a sixth
-   * copy of one that five sets share.
+   * **The ASCII rung is the composite, and the measurement that said otherwise
+   * was about a collapse** (I98). This read *the ASCII rung needs no composite*,
+   * because all five sets the `asciiTrajectory` names — `fullramp grow bloom
+   * starfield pulse` — carried `PULSE_ASCII`, the same five frames, so the walk
+   * visited one ramp five times. That was true of the tree and not of the
+   * design: the registry gives `starfield` a twinkle (`.+*@*+`) and `grow` a
+   * growth (`.oO@Oo`), and the composite over the five is eighty-two frames that
+   * actually change family. A measurement is about what it measured, and this
+   * one measured the thing being fixed.
    */
   agent: Object.freeze({
     frames: Object.freeze([
@@ -612,7 +632,7 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
     // widths cannot ship (C09 I93's rule, one subject over), so the whole
     // walk takes the ASCII rung there rather than three frames of it.
     narrowOnly: true,
-    ascii: PULSE_ASCII,
+    ascii: Object.freeze([".", ".", ".", ".", ".", ".", ".", "o", "o", "o", "o", "o", "o", "o", "O", "O", "O", "O", "O", "O", "O", "@", "@", "@", "@", "@", "@", "@", "O", "O", "O", "O", "O", "O", "O", "o", "o", "o", "o", "o", "o", "o", ".", ".", "o", "o", "O", "O", "@", "@", "O", "O", "o", "o", ".", ".", ".", "o", "o", "O", "O", "@", "@", "@", "O", "O", "o", "o", ".", ".", "+", "*", "@", "@", "*", "+", ".", "o", "O", "@", "O", "o"]),
   }),
   // braille — the de-facto default, and narrow everywhere.
   /**
@@ -631,7 +651,7 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   braille: Object.freeze({
     frames: Object.freeze(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]),
     intervalMs: 80,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["|", "|", "|", "/", "/", "-", "-", "-", "\\", "\\"]),
   }),
   braille2: Object.freeze({
     frames: Object.freeze(["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"]),
@@ -644,12 +664,12 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   bounce: Object.freeze({
     frames: Object.freeze(["⠁", "⠂", "⠄", "⠂"]),
     intervalMs: 130,
-    ascii: PULSE_ASCII,
+    ascii: Object.freeze(["_", "-", "^", "-"]),
   }),
   orbit: Object.freeze({
     frames: Object.freeze(["⠁", "⠈", "⠐", "⠠", "⢀", "⡀", "⠄", "⠂"]),
     intervalMs: 90,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["|", "|", "/", "/", "-", "-", "\\", "\\"]),
   }),
 
   // dingbats — these vary by weight and spoke count, so they pulse rather than
@@ -657,7 +677,7 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   grow: Object.freeze({
     frames: Object.freeze(["✦", "✢", "✲", "✶", "✷", "✹", "✺", "✹", "✷", "✶", "✲", "✢"]),
     intervalMs: 120,
-    ascii: PULSE_ASCII,
+    ascii: Object.freeze([".", ".", "o", "o", "O", "O", "@", "@", "O", "O", "o", "o"]),
   }),
   /**
    * **`narrowOnly` because of one frame**, and the catalogue is wrong about it:
@@ -673,13 +693,13 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   bloom: Object.freeze({
     frames: Object.freeze(["⋅", "✧", "✦", "✢", "✻", "✾", "❀", "✿", "❀", "✾", "✻", "✢", "✦", "✧"]),
     intervalMs: 120,
-    ascii: PULSE_ASCII,
+    ascii: Object.freeze([".", ".", ".", "o", "o", "O", "O", "@", "@", "@", "O", "O", "o", "o"]),
     narrowOnly: true,
   }),
   starfield: Object.freeze({
     frames: Object.freeze(["✶", "✷", "✸", "✹", "✺", "✹", "✸", "✷"]),
     intervalMs: 120,
-    ascii: PULSE_ASCII,
+    ascii: Object.freeze([".", ".", "+", "*", "@", "@", "*", "+"]),
   }),
 
   /**
@@ -696,7 +716,7 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   fullramp: Object.freeze({
     frames: Object.freeze(["⋅", "∘", "◦", "✧", "✦", "✢", "✲", "✵", "✶", "✷", "✱", "✺", "✹", "✸", "✼", "✻", "❃", "❁", "✾", "❀", "✿", "❂", "✿", "❀", "✾", "❁", "❃", "✻", "✼", "✸", "✹", "✺", "✱", "✷", "✶", "✵", "✲", "✢", "✦", "✧", "◦", "∘"]),
     intervalMs: 120,
-    ascii: PULSE_ASCII,
+    ascii: Object.freeze([".", ".", ".", ".", ".", ".", ".", "o", "o", "o", "o", "o", "o", "o", "O", "O", "O", "O", "O", "O", "O", "@", "@", "@", "@", "@", "@", "@", "O", "O", "O", "O", "O", "O", "O", "o", "o", "o", "o", "o", "o", "o"]),
     // `⋅ ∘ ◦` — see `bloom`.
     narrowOnly: true,
   }),
@@ -708,7 +728,7 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   hex: Object.freeze({
     frames: Object.freeze([..."0123456789abcdef"]),
     intervalMs: 110,
-    ascii: Object.freeze([..."0123456789abcdef"]),
+    ascii: Object.freeze(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"]),
   }),
   binary4: Object.freeze({
     frames: Object.freeze(
@@ -724,7 +744,7 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   toggle: Object.freeze({
     frames: Object.freeze(["⊶", "⊷"]),
     intervalMs: 400,
-    ascii: TOGGLE_ASCII,
+    ascii: Object.freeze(["<", ">"]),
     narrowOnly: true,
   }),
 
@@ -740,13 +760,13 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   circleQuarters: Object.freeze({
     frames: Object.freeze(["◴", "◷", "◶", "◵"]),
     intervalMs: 140,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["|", "/", "-", "\\"]),
     narrowOnly: true,
   }),
   boxBounce: Object.freeze({
     frames: Object.freeze(["▖", "▘", "▝", "▗"]),
     intervalMs: 140,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["|", "/", "-", "\\"]),
     narrowOnly: true,
   }),
   arc: Object.freeze({
@@ -762,7 +782,7 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   growVertical: Object.freeze({
     frames: Object.freeze(["▁", "▃", "▄", "▅", "▆", "▇", "▆", "▅", "▄", "▃"]),
     intervalMs: 100,
-    ascii: PULSE_ASCII,
+    ascii: Object.freeze([".", ".", "o", "o", "O", "@", "@", "O", "O", "o"]),
     narrowOnly: true,
   }),
   /**
@@ -777,37 +797,37 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   growHorizontal: Object.freeze({
     frames: Object.freeze(["▏", "▎", "▍", "▌", "▋", "▊", "▉", "▊", "▋", "▌", "▍", "▎"]),
     intervalMs: 120,
-    ascii: PULSE_ASCII,
+    ascii: Object.freeze([".", ".", "o", "o", "O", "O", "@", "@", "O", "O", "o", "o"]),
     narrowOnly: true,
   }),
   noise: Object.freeze({
     frames: Object.freeze(["▓", "▒", "░"]),
     intervalMs: 100,
-    ascii: PULSE_ASCII,
+    ascii: Object.freeze(["#", "*", "."]),
     narrowOnly: true,
   }),
   boxBounce2: Object.freeze({
     frames: Object.freeze(["▌", "▀", "▐", "▄"]),
     intervalMs: 120,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["|", "/", "-", "\\"]),
     narrowOnly: true,
   }),
   triangle: Object.freeze({
     frames: Object.freeze(["◢", "◣", "◤", "◥"]),
     intervalMs: 120,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["v", "<", "^", ">"]),
     narrowOnly: true,
   }),
   circleHalves: Object.freeze({
     frames: Object.freeze(["◐", "◓", "◑", "◒"]),
     intervalMs: 120,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["|", "/", "-", "\\"]),
     narrowOnly: true,
   }),
   pipe: Object.freeze({
     frames: Object.freeze(["┤", "┘", "┴", "└", "├", "┌", "┬", "┐"]),
     intervalMs: 100,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["|", "|", "/", "/", "-", "-", "\\", "\\"]),
     narrowOnly: true,
   }),
   // **The cardinal four, since F833.** The set shipped as eight, and the four
@@ -818,7 +838,7 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   arrow: Object.freeze({
     frames: Object.freeze(["←", "↑", "→", "↓"]),
     intervalMs: 200,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["<", "^", ">", "v"]),
     narrowOnly: true,
   }),
 
@@ -828,7 +848,7 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   pulse: Object.freeze({
     frames: Object.freeze(["✢", "✲", "✱", "✻", "✱", "✲"]),
     intervalMs: 120,
-    ascii: PULSE_ASCII,
+    ascii: Object.freeze([".", "o", "O", "@", "O", "o"]),
   }),
 });
 

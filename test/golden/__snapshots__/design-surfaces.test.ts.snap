@@ -22,7 +22,7 @@ download      ###############------- 70%
 +--------------------------------------+
 ── §48 · block states
 + resolve  12 packages
-- fetch    3 remaining
+| fetch    3 remaining
 . link   
 x verify   checksum
 ── §6 · the canonical marks, as a glyph census
@@ -53,33 +53,33 @@ failed          x
 cancelled       /
 (state glyph)   o * + x /
 ── §31 · every reusable spinner set
-agent           . o O @ *
-braille         - \\ | /
+agent           . . . . . . . o o o o o o o O O O O O O O @ @ @ @ @ @ @ O O O O O O O o o o o o o o . . o o O O @ @ O O o o . . . o o O O @ @ @ O O o o . . + * @ @ * + . o O @ O o
+braille         | | | / / - - - \\ \\
 braille2        - \\ | /
-bounce          . o O @ *
-orbit           - \\ | /
-grow            . o O @ *
-bloom           . o O @ *
-starfield       . o O @ *
-fullramp        . o O @ *
+bounce          _ - ^ -
+orbit           | | / / - - \\ \\
+grow            . . o o O O @ @ O O o o
+bloom           . . . o o O O @ @ @ O O o o
+starfield       . . + * @ @ * +
+fullramp        . . . . . . . o o o o o o o O O O O O O O @ @ @ @ @ @ @ O O O O O O O o o o o o o o
 decimal         0 1 2 3 4 5 6 7 8 9
 hex             0 1 2 3 4 5 6 7 8 9 a b c d e f
 binary4         0 1 2 3 4 5 6 7 8 9
-toggle          + x
+toggle          < >
 line            - \\ | /
 balloon         . o O @ *
-circleQuarters  - \\ | /
-boxBounce       - \\ | /
+circleQuarters  | / - \\
+boxBounce       | / - \\
 arc             - \\ | /
-growVertical    . o O @ *
-growHorizontal  . o O @ *
-noise           . o O @ *
-boxBounce2      - \\ | /
-triangle        - \\ | /
-circleHalves    - \\ | /
-pipe            - \\ | /
-arrow           - \\ | /
-pulse           . o O @ *
+growVertical    . . o o O @ @ O O o
+growHorizontal  . . o o O O @ @ O O o o
+noise           # * .
+boxBounce2      | / - \\
+triangle        v < ^ >
+circleHalves    | / - \\
+pipe            | | / / - - \\ \\
+arrow           < ^ > v
+pulse           . o O @ O o
 ── §33 · nine alphabets, and where each belongs
 block         ###############------- 70%
 halfblock     ###############------- 70%
@@ -277,7 +277,7 @@ download                   ##################################--------------- 70%
 +------------------------------------------------------------------------------+
 ── §48 · block states
 + resolve  12 packages
-- fetch    3 remaining
+| fetch    3 remaining
 . link   
 x verify   checksum
 ── §6 · the canonical marks, as a glyph census
@@ -308,33 +308,33 @@ failed          x
 cancelled       /
 (state glyph)   o * + x /
 ── §31 · every reusable spinner set
-agent           . o O @ *
-braille         - \\ | /
+agent           . . . . . . . o o o o o o o O O O O O O O @ @ @ @ @ @ @ O O O O O O O o o o o o o o . . o o O O @ @ O O o o . . . o o O O @ @ @ O O o o . . + * @ @ * + . o O @ O o
+braille         | | | / / - - - \\ \\
 braille2        - \\ | /
-bounce          . o O @ *
-orbit           - \\ | /
-grow            . o O @ *
-bloom           . o O @ *
-starfield       . o O @ *
-fullramp        . o O @ *
+bounce          _ - ^ -
+orbit           | | / / - - \\ \\
+grow            . . o o O O @ @ O O o o
+bloom           . . . o o O O @ @ @ O O o o
+starfield       . . + * @ @ * +
+fullramp        . . . . . . . o o o o o o o O O O O O O O @ @ @ @ @ @ @ O O O O O O O o o o o o o o
 decimal         0 1 2 3 4 5 6 7 8 9
 hex             0 1 2 3 4 5 6 7 8 9 a b c d e f
 binary4         0 1 2 3 4 5 6 7 8 9
-toggle          + x
+toggle          < >
 line            - \\ | /
 balloon         . o O @ *
-circleQuarters  - \\ | /
-boxBounce       - \\ | /
+circleQuarters  | / - \\
+boxBounce       | / - \\
 arc             - \\ | /
-growVertical    . o O @ *
-growHorizontal  . o O @ *
-noise           . o O @ *
-boxBounce2      - \\ | /
-triangle        - \\ | /
-circleHalves    - \\ | /
-pipe            - \\ | /
-arrow           - \\ | /
-pulse           . o O @ *
+growVertical    . . o o O @ @ O O o
+growHorizontal  . . o o O O @ @ O O o o
+noise           # * .
+boxBounce2      | / - \\
+triangle        v < ^ >
+circleHalves    | / - \\
+pipe            | | / / - - \\ \\
+arrow           < ^ > v
+pulse           . o O @ O o
 ── §33 · nine alphabets, and where each belongs
 block                      ##################################--------------- 70%
 halfblock                  ##################################--------------- 70%

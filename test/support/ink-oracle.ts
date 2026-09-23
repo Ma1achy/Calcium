@@ -68,6 +68,8 @@ const SCROLLBAR =
 const RESIDUE_AND_SCROLLBAR = `${RESIDUE_ASCII} — and, at this rung too, ${SCROLLBAR}`;
 const BAR_EMPTY =
   "C09 I94 / R-PRG-001 / §033 (M16): the ASCII bar's empty cell is the registry's `-` where Ink drew `.` — a track against an absence, and the pair shipped wrong from the day `BAR_STYLES` existed because every row over the table measured a width and none named an `off`";
+const SPINNER_ASCII =
+  "C09 I98 / R-MOT-010 / R-MOT-011 / §038 (M16): a spinner set's ASCII rung is the registry's `asciiPattern`, fitted to the set's own frame count, where Ink drew one of three shared alphabets — so a running lead is `|` where it was `-`, and the rung keeps the set's cycle instead of running two and a half times faster";
 const BAR_PERCENT =
   "C09 I96 / §034 (M16): the bar's percentage is `muted` where Ink drew `meta` — all five of §034's bars read it in `c-muted`, painted and drawn alike, and the tree drew `meta` from the day the kind landed with no row naming the tone";
 
@@ -157,12 +159,33 @@ const RETIRED: ReadonlyMap<string, string> = new Map(
       // The one panel that declares `live`. Width 2 is absent for a different
       // reason than the scrolls': at two columns the title is gone entirely, so
       // there is no mark to change.
-      ["t2144-panel-p-live", [12, 24, 32, 40, 60, 80, 100, 120, 160, 200], LIVE_SPINNER],
+      //
+      // **And the ASCII arm came off the list without anyone touching it**
+      // (C09 I98). Ink drew `Glyph.live`'s `▌`, whose ASCII half is `|`; the
+      // tree drew a spinner frame, whose ASCII rung was `TURN_ASCII` and opened
+      // on `-`. Porting the rung to the registry moved the rotation sets onto
+      // `|`, so at tick 0 the two now agree **byte for byte at both ASCII rungs, for different
+      // reasons** — a static rail mark and the first frame of a turn.
+      //
+      // The ruling behind the retirement is untouched: the mark still means
+      // something else. What is gone is the **divergence**, and an entry
+      // claiming one that no longer exists is a dead exemption outliving its
+      // reason — which is precisely what T2.144's *and still matches* arm is
+      // for, and it is what reported this rather than anything noticing.
+      ["t2144-panel-p-live", [12, 24, 32, 40, 60, 80, 100, 120, 160, 200], LIVE_SPINNER, ["full"]],
       // **The two progress keys, at the two rungs that take the ASCII pair.**
       // The `full` arm is absent because it draws `█░` and never the ASCII
       // pair, and `adv-zero-total` is on the list beside `prog-1` because a
       // bar at 0% is all empty cells — the one capture where the changed
       // character is the *whole* run rather than its tail.
+      // **The two blocks that draw a spinner frame, at the two rungs that take
+      // the ASCII set.** Measured with the sweep rather than reasoned: 44
+      // captures, every width including 2 — a `steps` lead and a `status`
+      // activity mark are one cell and survive where a title does not — and
+      // `ascii` and `mono` only, because the Unicode frames did not move and
+      // the `full` arm agrees with Ink exactly as it did.
+      ["t2143-steps-steps-1", ALL_WIDTHS, SPINNER_ASCII, ["ascii", "mono"]],
+      ["t2143-status-status-1", ALL_WIDTHS, SPINNER_ASCII, ["ascii", "mono"]],
       ["t2143-progress-prog-1", BAR_WIDTHS, BAR_EMPTY, ["ascii", "mono"]],
       ["t2143-progress-adv-zero-total", BAR_WIDTHS, BAR_EMPTY, ["ascii", "mono"]],
       // **The percentage's tone, and the shape of the list is the measurement.**

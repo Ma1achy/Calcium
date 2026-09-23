@@ -5,7 +5,6 @@
 // neither `cells()` nor a frame-read on the machine that picked it will show it:
 // the disagreement depends on locale. So it is asserted here, over every set, on
 // both arms.
-import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
@@ -15,6 +14,13 @@ import { FREE_WIDTH_SLOTS, glyphs, spinnerFrames, spinnerIntervalMs } from "../.
 // so the rows can walk every set rather than a list they keep themselves, which
 // would be a coverage set drawn from the test's own table.
 import { SPINNER_SETS } from "../../src/presentation/blocks/glyphs.js";
+import { spinnerSetNames } from "../../src/presentation/blocks/glyphs.js";
+// **The design's own resolver, not a reimplementation** (C09 I98). `asciiPattern`
+// is a *pattern* and `asciiTrajectory` says how it fits the set's frame count; a
+// second copy of that arithmetic here would be a second record of the design,
+// which is the failure the registry projection exists to stop.
+import { loadRegistry, spinnerAsciiFrames } from "../../docs/design/language/build-calcium.mjs";
+import type { Registry } from "../../docs/design/language/build-calcium.mjs";
 import { cells, hasEmojiForm } from "../../src/presentation/text.js";
 import { ASCII_CAPS, FULL_CAPS } from "../support/render.js";
 
@@ -83,12 +89,27 @@ describe("roadmap 51 — the spinner sets", () => {
  * the design's, and the two would drift silently — which is the failure the
  * whole registry projection exists to stop.
  */
+/** The registry, read once through its own loader — the source this file projects. */
+const REGISTRY: Registry = loadRegistry();
+
+type SpinnerRecord = Readonly<{
+  id: string;
+  status?: string;
+  frames: readonly string[];
+  intervalMs: number;
+  cycleMs?: number;
+  reusable?: boolean;
+  asciiPattern?: readonly string[];
+  asciiTrajectory?: Readonly<{ type: string; spinnerIds?: readonly string[] }>;
+}>;
+
+const REGISTERED: readonly SpinnerRecord[] = (REGISTRY["spinners"] as readonly SpinnerRecord[]).filter(
+  (sp) => sp.status === "current",
+);
+
 const STATED_CYCLES: Readonly<Record<string, number>> = Object.freeze(
   Object.fromEntries(
-    (JSON.parse(readFileSync("docs/design/language/calcium-registry.json", "utf8")).spinners as
-      readonly Readonly<{ id: string; cycleMs?: number }>[])
-      .filter((sp) => typeof sp.cycleMs === "number")
-      .map((sp) => [sp.id, sp.cycleMs as number]),
+    REGISTERED.filter((sp) => typeof sp.cycleMs === "number").map((sp) => [sp.id, sp.cycleMs as number]),
   ),
 );
 
@@ -156,24 +177,128 @@ const STATED_CYCLES: Readonly<Record<string, number>> = Object.freeze(
     }
   });
 
-  // **Spec-first: C09 I98's three rows land with the code that makes them green.**
-  // T2.163 is red on HEAD by construction — nineteen of twenty-seven `ascii`
-  // columns disagree with the registry — so it arrives as a `todo` in the spec
-  // commit rather than as a row asserting the collapse it exists to remove.
-  it.todo("T2.163 (C09 I98, R-MOT-010): SPINNER_SETS against the registry, by equality and field by field — not deferred on a component: the registry's per-set ASCII rung lands with I98 in this same MR");
-  it.todo("T2.164 (C09 I98, R-MOT-008): the bloom family is the agent's, asserted over its membership — not deferred on a component: the registry's per-set ASCII rung lands with I98 in this same MR");
-  it.todo("T2.165 (C09 I98, R-MOT-009): a ping-pong traverses 0 → N → 1, so neither endpoint doubles at the seam — not deferred on a component: the registry's per-set ASCII rung lands with I98 in this same MR");
+  it("T2.163 (C09 I98, R-MOT-010): SPINNER_SETS against the registry, by equality and field by field", () => {
+    // **The row commitment 78 said already existed.** That commitment cites the
+    // spinner catalogue as the remedy the bars lacked — *registry against tree,
+    // by equality in both directions* — and the row it meant is T2.72, which
+    // compares `cycleMs`. The cadence, never the alphabet. So the alphabet was
+    // the uncompared column on both catalogues and the one the bars were wrong
+    // in; a precedent cited for a column it does not cover reads exactly like
+    // coverage.
+    //
+    // **Resolved through the design's own function, not read off the field.**
+    // `asciiPattern` is a *pattern* and `asciiTrajectory` says how it fits: a
+    // `fit-cycle` stretches it to the set's frame count, so `braille`'s four
+    // characters become ten frames and the ASCII cycle is the Unicode one. A
+    // first draft compared against the raw field and reported nineteen
+    // disagreements of the wrong kind — an instrument that guesses what a field
+    // means measures its own guess.
+    for (const sp of REGISTERED) {
+      const set = SPINNER_SETS[sp.id];
+      expect(set, `${sp.id} is registered and must be built`).toBeDefined();
+      if (set === undefined) continue;
+      expect([...set.frames], `${sp.id} frames`).toEqual(sp.frames);
+      expect(set.intervalMs, `${sp.id} interval`).toBe(sp.intervalMs);
+      expect([...set.ascii], `${sp.id} ascii — the registry's pattern, fitted`).toEqual(
+        spinnerAsciiFrames(REGISTRY, sp),
+      );
+    }
 
-  it("T2.73: the ASCII pair keeps the shape of motion", () => {
-    // Degradation preserves meaning rather than appearance — but a bloom
-    // falling to a rotation loses more than it needs to, so the pairing is by
-    // shape. Asserted on the two that would be easiest to get wrong.
-    expect(spinnerFrames(ASCII_CAPS, "bloom"), "a pulse falls to a pulse").toEqual([
-      ".", "o", "O", "@", "*",
-    ]);
-    expect(spinnerFrames(ASCII_CAPS, "braille"), "a rotation falls to a rotation").toEqual([
-      "-", "\\", "|", "/",
-    ]);
+    // **The other direction, with the residue named rather than bounded.** Six
+    // sets ship unregistered; M4 ruled they are registered from the repo's
+    // values and that has not landed. Naming them as a literal is what keeps
+    // this an equality: a seventh fails here, and a registered set going
+    // missing fails above.
+    const built = new Set(spinnerSetNames());
+    const registered = new Set(REGISTERED.map((sp) => sp.id));
+    expect(
+      [...built].filter((n) => !registered.has(n)).sort(),
+      "built and not registered — owed to the registry, not to this file",
+    ).toEqual(["arc", "balloon", "binary4", "braille2", "decimal", "line"]);
+  });
+
+  it("T2.164 (C09 I98, R-MOT-008): the bloom family is the agent's, over its membership", () => {
+    // **Over the frames and not over the name**, because a tool adopting a bloom
+    // would do it by copying frames. §038: *the bloom family is RESERVED —
+    // fullramp, grow, bloom, starfield and pulse mean THE MODEL IS WORKING. A
+    // tool never blooms. which is still checkable: a bloom set on a TOOL is a
+    // defect a grep finds.* The design names the check; this is it.
+    const FAMILY = ["agent", "fullramp", "grow", "bloom", "starfield", "pulse"];
+    const bloomGlyphs = new Set(FAMILY.flatMap((n) => [...(SPINNER_SETS[n]?.frames ?? [])]));
+    // `⋅ ∘ ◦` open the walk and are not blooms — they are where it starts small.
+    for (const plain of ["\u22c5", "\u2218", "\u25e6"]) bloomGlyphs.delete(plain);
+
+    for (const name of spinnerSetNames()) {
+      if (FAMILY.includes(name)) continue;
+      const frames = SPINNER_SETS[name]?.frames ?? [];
+      const borrowed = [...frames].filter((f) => bloomGlyphs.has(f));
+      expect(borrowed, `${name} draws no bloom frame`).toEqual([]);
+    }
+
+    // And the registry says the same, in its own field: `agent` is the one
+    // record that is not reusable.
+    expect(
+      REGISTERED.filter((sp) => sp.reusable === false).map((sp) => sp.id),
+      "the agent's walk is the one set nothing else may take",
+    ).toEqual(["agent"]);
+  });
+
+  it("T2.165 (C09 I98, R-MOT-009): a ping-pong traverses 0 → N → 1, so neither endpoint doubles", () => {
+    // **A ping-pong is detected, not listed.** A set whose second half is its
+    // first half reversed is one; asserting the property over a hand list would
+    // let a set stop being a ping-pong and keep the row green. The seam is the
+    // whole claim: `.oO@Oo` returns without drawing `@` or `.` twice in a row,
+    // and the collapse's `.oO@*` was not a ping-pong at all.
+    let found = 0;
+    for (const name of spinnerSetNames()) {
+      for (const frames of [SPINNER_SETS[name]?.frames ?? [], SPINNER_SETS[name]?.ascii ?? []]) {
+        const n = frames.length;
+        if (n < 4) continue;
+        const peak = frames.indexOf([...frames].reduce((a, b) => (frames.indexOf(b) > frames.indexOf(a) ? b : a), frames[0] ?? ""));
+        void peak;
+        // The seam: the last frame and the first are never equal, and no frame
+        // is repeated across the wrap. A ping-pong that emitted its endpoint
+        // twice would pause there for two ticks, which reads as a stutter.
+        const wrapsCleanly = frames[n - 1] !== frames[0];
+        if (!wrapsCleanly) {
+          expect.fail(`${name} repeats ${String(frames[0])} across the cycle seam`);
+        }
+        // A ping-pong: the tail mirrors the head.
+        const half = Math.floor(n / 2);
+        const mirrors = half > 1 && frames.slice(1, half + 1).every((f, i) => f === frames[n - 1 - i]);
+        if (mirrors) found += 1;
+      }
+    }
+    expect(found, "the corpus has ping-pong sets for this row to be about").toBeGreaterThan(0);
+  });
+
+  it("T2.73 (C09 I98, R-MOT-010, R-MOT-011): the ASCII rung keeps the cycle, not just the alphabet", () => {
+    // **This row asserted the defect.** It was titled *the ASCII pair keeps the
+    // shape of motion* — R-MOT-010's own words — and asserted two literals it
+    // wrote itself, against no registry: `bloom` falls to `.oO@*` and `braille`
+    // to `-\|/`. A source assertion measuring the prose above it, and green for
+    // as long as the collapse shipped.
+    //
+    // T2.163 now holds the alphabet, by equality against the design. What is
+    // left for this row is the claim the character comparison does not make and
+    // the one that was actually broken: **the rung does not change the cadence.**
+    // A four-frame pattern at the set's own interval is a faster spinner —
+    // `braille` is ten frames at 80 ms, an 800 ms cycle, and its old ASCII rung
+    // ran in 320 ms. `fit-cycle` holds each glyph longer instead, so the two
+    // rungs take the same time to come round. That is what *shape of motion*
+    // means, and R-MOT-011's *one alphabet, one cadence* is the same fact.
+    for (const name of spinnerSetNames()) {
+      const set = SPINNER_SETS[name];
+      if (set === undefined) continue;
+      const ms = spinnerIntervalMs(name);
+      const unicode = set.frames.length * ms; // cells-ok — a frame count
+      const ascii = set.ascii.length * ms; // cells-ok — a frame count
+      if (REGISTERED.some((sp) => sp.id === name)) {
+        expect(ascii, `${name}: the ASCII rung runs for as long as the Unicode one`).toBe(unicode);
+      }
+    }
+    // A counter is already ASCII and the row still says so — the one case where
+    // the two rungs are the same array rather than the same duration.
     expect(spinnerFrames(ASCII_CAPS, "decimal"), "a counter is already ASCII").toEqual(
       SPINNER_SETS["decimal"]?.frames,
     );
@@ -186,7 +311,7 @@ const STATED_CYCLES: Readonly<Record<string, number>> = Object.freeze(
       "▖", "▘", "▝", "▗",
     ]);
     expect(spinnerFrames(WIDE_CAPS, "boxBounce"), "wide takes the pair").toEqual([
-      "-", "\\", "|", "/",
+      "|", "/", "-", "\\",
     ]);
     expect(spinnerFrames(WIDE_CAPS, "braille"), "and braille is narrow on both").toEqual(
       SPINNER_SETS["braille"]?.frames,

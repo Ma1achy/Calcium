@@ -15,7 +15,7 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 40 1`] = `
 {"kind":"table","id":"table-1","columns~
 ── steps · measured 3 · rendered 3
 [38;2;135;184;108m+ [38;2;212;212;212mResolve[39m
-[38;2;232;168;124m- [38;2;212;212;212mBuild  [39m  [38;2;184;156;210mlayer 3 of 7[39m
+[38;2;232;168;124m| [38;2;212;212;212mBuild  [39m  [38;2;184;156;210mlayer 3 of 7[39m
 [38;2;140;140;140m. Push   [39m
 ── logs · measured 2 · rendered 2
 [38;2;184;156;210m12:00:01[39m  [38;2;127;174;207minfo [39m  [38;2;212;212;212mlistening on :8080[39m
@@ -50,7 +50,7 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 40 1`] = `
 |                                      |
 | [38;2;240;90;90m--------------[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;240;90;90m---------------[39m |
 | [38;2;240;90;90m! connection refused                [39m |
-| - retrying in 8s (attempt 2)         |
+| | retrying in 8s (attempt 2)         |
 |                                      |
 +--------------------------------------+
 ── image · measured 3 · rendered 3
@@ -88,7 +88,7 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 60 1`] = `
 {"kind":"table","id":"table-1","columns":[{"key":"name","la~
 ── steps · measured 3 · rendered 3
 [38;2;135;184;108m+ [38;2;212;212;212mResolve[39m
-[38;2;232;168;124m- [38;2;212;212;212mBuild  [39m  [38;2;184;156;210mlayer 3 of 7[39m
+[38;2;232;168;124m| [38;2;212;212;212mBuild  [39m  [38;2;184;156;210mlayer 3 of 7[39m
 [38;2;140;140;140m. Push   [39m
 ── logs · measured 2 · rendered 2
 [38;2;184;156;210m12:00:01[39m  [38;2;127;174;207minfo [39m  [38;2;212;212;212mlistening on :8080[39m
@@ -123,7 +123,7 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 60 1`] = `
 |                                                          |
 | [38;2;240;90;90m------------------------[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;240;90;90m-------------------------[39m |
 | [38;2;240;90;90m! connection refused                                    [39m |
-| - retrying in 8s (attempt 2)                             |
+| | retrying in 8s (attempt 2)                             |
 |                                                          |
 +----------------------------------------------------------+
 ── image · measured 3 · rendered 3
@@ -161,7 +161,7 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 80 1`] = `
 {"kind":"table","id":"table-1","columns":[{"key":"name","label":"Name","align":~
 ── steps · measured 3 · rendered 3
 [38;2;135;184;108m+ [38;2;212;212;212mResolve[39m
-[38;2;232;168;124m- [38;2;212;212;212mBuild  [39m  [38;2;184;156;210mlayer 3 of 7[39m
+[38;2;232;168;124m| [38;2;212;212;212mBuild  [39m  [38;2;184;156;210mlayer 3 of 7[39m
 [38;2;140;140;140m. Push   [39m
 ── logs · measured 2 · rendered 2
 [38;2;184;156;210m12:00:01[39m  [38;2;127;174;207minfo [39m  [38;2;212;212;212mlistening on :8080[39m
@@ -196,7 +196,7 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 80 1`] = `
 |                                                                              |
 | [38;2;240;90;90m----------------------------------[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;240;90;90m-----------------------------------[39m |
 | [38;2;240;90;90m! connection refused                                                        [39m |
-| - retrying in 8s (attempt 2)                                                 |
+| | retrying in 8s (attempt 2)                                                 |
 |                                                                              |
 +------------------------------------------------------------------------------+
 ── image · measured 3 · rendered 3
@@ -234,7 +234,7 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 120 1`] = `
 {"kind":"table","id":"table-1","columns":[{"key":"name","label":"Name","align":"left","priority":10,"minWidth":8,"sorta~
 ── steps · measured 3 · rendered 3
 [38;2;135;184;108m+ [38;2;212;212;212mResolve[39m
-[38;2;232;168;124m- [38;2;212;212;212mBuild  [39m  [38;2;184;156;210mlayer 3 of 7[39m
+[38;2;232;168;124m| [38;2;212;212;212mBuild  [39m  [38;2;184;156;210mlayer 3 of 7[39m
 [38;2;140;140;140m. Push   [39m
 ── logs · measured 2 · rendered 2
 [38;2;184;156;210m12:00:01[39m  [38;2;127;174;207minfo [39m  [38;2;212;212;212mlistening on :8080[39m
@@ -269,7 +269,7 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 120 1`] = `
 |                                                                                                                      |
 | [38;2;240;90;90m------------------------------------------------------[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;240;90;90m-------------------------------------------------------[39m |
 | [38;2;240;90;90m! connection refused                                                                                                [39m |
-| - retrying in 8s (attempt 2)                                                                                         |
+| | retrying in 8s (attempt 2)                                                                                         |
 |                                                                                                                      |
 +----------------------------------------------------------------------------------------------------------------------+
 ── image · measured 3 · rendered 3
@@ -599,7 +599,7 @@ exports[`C09 T2.10 — golden frames > light-ascii at 40 1`] = `
 {"kind":"table","id":"table-1","columns~
 ── steps · measured 3 · rendered 3
 [38;2;60;121;60m+ [38;2;56;58;66mResolve[39m
-[38;2;31;96;240m- [38;2;56;58;66mBuild  [39m  [38;2;166;38;164mlayer 3 of 7[39m
+[38;2;31;96;240m| [38;2;56;58;66mBuild  [39m  [38;2;166;38;164mlayer 3 of 7[39m
 [38;2;110;111;118m. Push   [39m
 ── logs · measured 2 · rendered 2
 [38;2;166;38;164m12:00:01[39m  [38;2;1;115;165minfo [39m  [38;2;56;58;66mlistening on :8080[39m
@@ -634,7 +634,7 @@ exports[`C09 T2.10 — golden frames > light-ascii at 40 1`] = `
 |                                      |
 | [38;2;194;31;16m--------------[38;2;255;255;255m[48;2;168;31;18m ERROR [49m[38;2;194;31;16m---------------[39m |
 | [38;2;194;31;16m! connection refused                [39m |
-| - retrying in 8s (attempt 2)         |
+| | retrying in 8s (attempt 2)         |
 |                                      |
 +--------------------------------------+
 ── image · measured 3 · rendered 3
@@ -672,7 +672,7 @@ exports[`C09 T2.10 — golden frames > light-ascii at 60 1`] = `
 {"kind":"table","id":"table-1","columns":[{"key":"name","la~
 ── steps · measured 3 · rendered 3
 [38;2;60;121;60m+ [38;2;56;58;66mResolve[39m
-[38;2;31;96;240m- [38;2;56;58;66mBuild  [39m  [38;2;166;38;164mlayer 3 of 7[39m
+[38;2;31;96;240m| [38;2;56;58;66mBuild  [39m  [38;2;166;38;164mlayer 3 of 7[39m
 [38;2;110;111;118m. Push   [39m
 ── logs · measured 2 · rendered 2
 [38;2;166;38;164m12:00:01[39m  [38;2;1;115;165minfo [39m  [38;2;56;58;66mlistening on :8080[39m
@@ -707,7 +707,7 @@ exports[`C09 T2.10 — golden frames > light-ascii at 60 1`] = `
 |                                                          |
 | [38;2;194;31;16m------------------------[38;2;255;255;255m[48;2;168;31;18m ERROR [49m[38;2;194;31;16m-------------------------[39m |
 | [38;2;194;31;16m! connection refused                                    [39m |
-| - retrying in 8s (attempt 2)                             |
+| | retrying in 8s (attempt 2)                             |
 |                                                          |
 +----------------------------------------------------------+
 ── image · measured 3 · rendered 3
@@ -745,7 +745,7 @@ exports[`C09 T2.10 — golden frames > light-ascii at 80 1`] = `
 {"kind":"table","id":"table-1","columns":[{"key":"name","label":"Name","align":~
 ── steps · measured 3 · rendered 3
 [38;2;60;121;60m+ [38;2;56;58;66mResolve[39m
-[38;2;31;96;240m- [38;2;56;58;66mBuild  [39m  [38;2;166;38;164mlayer 3 of 7[39m
+[38;2;31;96;240m| [38;2;56;58;66mBuild  [39m  [38;2;166;38;164mlayer 3 of 7[39m
 [38;2;110;111;118m. Push   [39m
 ── logs · measured 2 · rendered 2
 [38;2;166;38;164m12:00:01[39m  [38;2;1;115;165minfo [39m  [38;2;56;58;66mlistening on :8080[39m
@@ -780,7 +780,7 @@ exports[`C09 T2.10 — golden frames > light-ascii at 80 1`] = `
 |                                                                              |
 | [38;2;194;31;16m----------------------------------[38;2;255;255;255m[48;2;168;31;18m ERROR [49m[38;2;194;31;16m-----------------------------------[39m |
 | [38;2;194;31;16m! connection refused                                                        [39m |
-| - retrying in 8s (attempt 2)                                                 |
+| | retrying in 8s (attempt 2)                                                 |
 |                                                                              |
 +------------------------------------------------------------------------------+
 ── image · measured 3 · rendered 3
@@ -818,7 +818,7 @@ exports[`C09 T2.10 — golden frames > light-ascii at 120 1`] = `
 {"kind":"table","id":"table-1","columns":[{"key":"name","label":"Name","align":"left","priority":10,"minWidth":8,"sorta~
 ── steps · measured 3 · rendered 3
 [38;2;60;121;60m+ [38;2;56;58;66mResolve[39m
-[38;2;31;96;240m- [38;2;56;58;66mBuild  [39m  [38;2;166;38;164mlayer 3 of 7[39m
+[38;2;31;96;240m| [38;2;56;58;66mBuild  [39m  [38;2;166;38;164mlayer 3 of 7[39m
 [38;2;110;111;118m. Push   [39m
 ── logs · measured 2 · rendered 2
 [38;2;166;38;164m12:00:01[39m  [38;2;1;115;165minfo [39m  [38;2;56;58;66mlistening on :8080[39m
@@ -853,7 +853,7 @@ exports[`C09 T2.10 — golden frames > light-ascii at 120 1`] = `
 |                                                                                                                      |
 | [38;2;194;31;16m------------------------------------------------------[38;2;255;255;255m[48;2;168;31;18m ERROR [49m[38;2;194;31;16m-------------------------------------------------------[39m |
 | [38;2;194;31;16m! connection refused                                                                                                [39m |
-| - retrying in 8s (attempt 2)                                                                                         |
+| | retrying in 8s (attempt 2)                                                                                         |
 |                                                                                                                      |
 +----------------------------------------------------------------------------------------------------------------------+
 ── image · measured 3 · rendered 3
