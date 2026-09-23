@@ -2633,6 +2633,7 @@ the same overrun in smaller form.
 - **I87** — *(§7b, `R-SEL-002`)* **Nothing is drawn to the left of a block's *head*, on any row.** `R-SEL-002`'s *a wrapped line's continuation carries no decoration in the gutter*, generalised past `notice`: the gutter is the columns before content begins, and anything put there on a continuation row is picked up by a naive drag as though it were text. **The rail is not a carve-out** (I41) — it fills columns **at** the head's own first column and never before it — so the property is one sentence over every kind rather than a list with an exception, and a kind joins the check by being in the registry. The reference is the **head** — the block's first drawn row — and taking the *minimum over its rows* instead is a **tautology**: nothing can be left of the minimum over the same rows, so the property would be satisfied by every input including the defect it names. That was written first and caught by the row's own control rather than by review, which is A03 §2's class arriving in a checker. The constraint is on **layout**, which is `R-SEL-002`'s own last sentence and the reason this is a row over the whole corpus rather than a comment in one kind (→ I41, C04 I95).
 
 - **I88** — *(§7c, `R-TAB-001`, `R-COR-003`, `R-GLY-003`)* **Every `current` registry glyph resolves to a mark this tree can draw, and a carrier is made of marks.** The carrier matrix is `stateTableGroups` and it is already normative — fourteen components, seven facts each, every one naming at least two carriers — so what this repository owes is not a second copy of it but the marks it is written in. **Measured when the rule was written: three are absent** — `question` `⟩` is in no file in `src/` while both question components name it as their first carrier, `current` `›` exists only in `overlay/place.ts` under another meaning, and `reader` `❯` lives in the shell's config. `SS64` cannot see any of them, and the reason is structural rather than an oversight: it is a **collision** rule, so it compares marks appearing on both sides and a mark with no character never enters a pair. A glyph living outside `glyphs.ts` is named with where and why; a glyph whose subject is unbuilt names the MR, and that entry is itself a violation the day the MR lands (→ I45, C10 I26).
+- **I89** — *(§7d, `R-TRU-001`)* **No control byte survives from a block's fields to its rendered lines, over every registered kind.** Stated over the registry rather than over the modules that call `stripControl`, because the mechanism is built and only its *coverage* is in question: nineteen modules call it because nineteen authors remembered, and a twentieth path is invisible to any rule phrased over the nineteen. A kind joins by being registered. The other two clauses of `R-TRU-001` hold elsewhere and are not restated here — the escape-writer clause is A03 `SS14`, and the PTY clause is `TerminalSnapshot`'s shape, which carries lines an emulator has already painted rather than bytes to interpret. **Stated blind spot:** the printable residue of a stripped sequence is text and is permitted (→ I18, I87).
 
 ## 7a. `copy` — a kind's source, one level up from an element's
 
@@ -2778,6 +2779,68 @@ was looking.
 
 ---
 
+## 7d. The trust boundary — three clauses, and which of them this tree already holds
+
+`R-TRU-001`: *only the renderer emits terminal controls; user, model, tool,
+path, URL, and log content is escaped; a PTY interprets controls only inside
+its emulator boundary.*
+
+**Measured before the rule, because the plan for this MR said the escaping was
+absent and it is built.** `stripControl` is in `src/data/text.ts`, at the layer
+both halves of L0 can reach, and its own comment already carries the argument
+this clause makes — *a boundary defence that runs at the far end is not one*.
+What was never established is whether it is **reached**, which is a different
+question from whether it exists, and it is the one a list of call sites cannot
+answer.
+
+| the clause | where it lives | state |
+|---|---|---|
+| only the renderer emits terminal controls | A03 `SS14` — the ESC byte outside `terminal/escapes.ts`, allowing the decoder and the replay | **built and gated** |
+| untrusted content is escaped | `stripControl`, called from nineteen modules | **built and reached, gated by nothing** |
+| a PTY interprets controls only inside its emulator boundary | `TerminalSnapshot` — lines the emulator has already painted, plus the width it painted them at | **built, by construction** |
+
+### The measurement
+
+A payload of three classes — an SGR span, an erase-display, and an OSC with its
+`BEL` terminator — appended to **every string field of every block**, then the
+frame read back:
+
+- **39 registry kinds, and no control byte reaches the frame.** No ESC, no BEL,
+  no OSC introducer. What survives is the payload's printable residue — the
+  frame carries `[2J` and `0;t` as *text*, which is what a stripped escape is
+  and is the correct outcome rather than a leak.
+- **The same through a live session**, far side to frame: a document whose
+  command, body and hint all carry the payload renders as `body[31mX[2J]0;t`
+  under the call's head.
+
+**And the session probe was vacuous on its first run**, which is why it is
+written down: nothing reached the frame at all, and *no control bytes found* is
+what a probe that sees nothing reports. The tell was the benign half of the
+payload also being absent. `test/support/README.md`'s rule — a fixture must be
+shown to respond to the thing under test before it is asserted against — with
+the frame read, not the assertion counted.
+
+### The rule, and it is a scope rather than a mechanism
+
+The mechanism is right and its **coverage is by convention**: nineteen modules
+call `stripControl` because nineteen authors remembered. A twentieth render path,
+or a fifteenth kind, is invisible to everything here — which is `SS65`'s shape
+one component over, an absence a rule about what exists cannot see.
+
+So the property is stated over the **registry** and not over a list of call
+sites: *no control byte survives from a block's fields to its rendered lines,
+over every registered kind*. A kind joins by being registered, exactly as I87's
+gutter property does, and the two are deliberately the same shape — both are
+constraints on what a reader can end up holding, and neither can be satisfied by
+a kind that opts out.
+
+**Its stated blind spot** is the printable residue: `[2J` drawn as four
+characters is not a control sequence and this rule permits it. A kind that wants
+to *show* a payload legibly — a log viewer escaping rather than deleting — is a
+separate decision and no rule here forbids it.
+
+---
+
 ## 8. Commitments
 
 1. C09 owns the registry; C04 owns the schema and the measurement contract (I13).
@@ -2854,6 +2917,7 @@ was looking.
 70. **A notice takes the focus ground and not a column** (I83, R-SEL-006). The tree told focus and selection apart by ink on one ground, which is why `focusGround` shipped with a gate and no reader; focus takes a ground of its own here and the mark belongs to the block that has rows to point at. The first ruling put the column on the notice and the frame refused it — the head moved and its body did not — and four fixtures put it where C11 I15 said it could not go.
 71. **The status cap was on the message and belongs to the box** (I84, §3a-ter, F239). `MESSAGE_LINE_CAP` bound the **request** and never the render, which is a distinction the constant's name hid: the message has always been uncapped inside a box it was granted. So the design's *the message wraps* costs one line, and what it buys is the part the repo did not have — a detail, which truncates into a residue row where prose would have lost the end. The figures are measured, not chosen: 4 is the worst message once a trace stops being one, and it is the same 4 F239 measured.
 72. **An empty block is a correct block about nothing** (I85, §047). It gets a state rather than a tone, because the thing that makes it not-an-error is the *absence* of the banner, the mark and the red — three absences no tone can express. Its vertical centring was already built for an unrelated reason, which is the whole of what this state costs on that axis and is why the ruling is one word about the horizontal one.
+73. **The trust boundary is measured over the registry, not over the call sites** (I89, §7d, `R-TRU-001`). The plan for this MR said the escaping was absent; it is built, at `data/text.ts`, and the measurement that mattered was whether it is *reached* — 39 kinds and a live session, no control byte to the frame, the payload's printable residue drawn as text. What was missing is the scope: a rule phrased over the nineteen modules that remember to call it cannot see a twentieth, which is `SS65`'s shape one component over.
 
 ---
 
@@ -3156,6 +3220,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.46** (I31, §3a): the tag is the only painted run — **exactly one** background introducer in the whole frame at 24-, 8- and 4-bit — and the pair moves together at every rung, so a ground with no ink and an ink with no ground are both failures. At 1-bit neither arrives and the `▲` and the word are what carry it. **The depths are asserted apart and were not**: one arm covering 4 and 1 together stated a forced absence at a rung that has a ground (F240).
 - **T3.47** (I31, §3a): the ASCII arm draws `+ - |` and `!`, and **no box-drawing codepoint appears in the frame** — asserted over the whole frame rather than over the corners, because a border is four glyphs and a mistake is usually one of them.
 - **T2.155** (I88, §7c, `R-GLY-003`): every `current` glyph and delimiter in the registry × the tree's glyph vocabulary → each resolves to a mark, or is named in the scan's own exemption list with its home and its reason. **The control is the rule's own first run**: it named `question`, `current` and `reader`, which is three glyphs `SS64` has read past on every commit since it landed — a collision rule compares the marks on both sides and a mark with no character never enters a pair.
+- **T2.156** (I89, §7d, `R-TRU-001`): every registered kind, with an SGR span, an erase-display and an OSC-with-`BEL` appended to every string field, renders to lines carrying no ESC, no BEL and no OSC introducer. The corpus is the registry, so a kind joins by being registered; the control is the payload's own printable residue, which **must** appear, because a sweep over a corpus that dropped the payload reports the same clean page as one that stripped it.
 - **T2.154** (I87, §7b, `R-SEL-002`): over the whole corpus × the wrapping widths → no row of any block begins left of that block's **head**. Stated over columns rather than over tokens, so a kind joins by being in the registry; the rail needs no carve-out, because it draws at the head's own column and not before it. **The control is a fabricated block that fails it** — two rows, the second beginning one column left of the first — so the row is known to be able to see the defect rather than assumed to be. It earned its place immediately: the first phrasing took the minimum over the block's own rows and was green against that control, and nothing but the control would have said so.
 - **T2.10a** (I34, I11): **golden frames for the contained failure**, three messages × three widths × three variants, both frames of the two-frame path. **There were none**, through three commits about this path: nothing in `test/golden/` rendered a definition that throws, so golden passed each time on the absence of a subject rather than the absence of a change. Frame 1 is recorded too, because F230's ruling makes the short box a specified state rather than a transient.
 - **T3.48** (I31): `status` declares no `window`, and `windowSequence` keeps it whole and pays for it out of `skipRows` — `plot`'s and `scroll`'s case, and the same assertion.
