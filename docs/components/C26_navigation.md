@@ -1076,11 +1076,29 @@ tone on furniture the data draws*, and a mosaic draws none: measured at 60 colum
 grid of notices puts `A` at column 0 and `B` at column 30 with no gap, no rail and no border
 between them, and every non-blank cell of the frame lies inside a child's rectangle
 (`mosaicRects`). There is no cell of the mosaic's own to tone, and toning the *child* would be a
-second focus rule living in every kind a mosaic can hold. So a focused mosaic is invisible, said
-here rather than absorbed, and `render-focus.test.ts` T1.28 pins it from both sides: the focused
-frame is byte-identical, **and** no non-blank cell lies outside a child's rectangle — the row
-that goes red the day the mosaic gains a gap or a border, which is the day this ruling expires
-and the residue-row precedent applies.
+second focus rule living in every kind a mosaic can hold.
+
+**That ruling is overturned by §017, and the premise it rests on is still true** — which is why it
+survived being read. *A tone on furniture the data draws* is a rule about **tone**, and the design's
+focus model is **grounds**: §017 gives the four their jobs in one line each, and `focusGround` is
+*a REGION you are on*. A mosaic pane is a region by that vocabulary — more than one row, holding a
+child rather than being one, and the thing a key acts on — so it takes the region's ground. **A
+ground needs no furniture**, which is the whole of what the old argument turned on. The second
+argument is answered rather than contradicted: grounding the pane is not toning the child, the
+child's own lines are untouched (`R-FOC-004`, *rather than painting its data*), and the rule lives
+once, in the container.
+
+**And the container is the only place it can live.** A pane's element id is the child's id and the
+focus names `(mosaic.id, child.id)`; a child's own predicate tests its **own** block id — `plot`'s
+`focusedOn` is `blockId === id && rowId === id` — which a mosaic-scoped focus never matches, so a
+focused pane holding a plot could not light it however the plot were written.
+
+**Measured, and the measurement is what forced this**: `mosaic` publishes **four** focusable
+elements and drew nothing for any of them — the one kind in the library that offers a reader a
+target and shows them nothing when they land on it, where `table`, `plot`, `pills`, `tape` and
+`scroll` all draw a treatment (§017's census). C09 I100 is the rule; `render-focus.test.ts` T1.28
+keeps its **structural** half, which was always the sound one — no non-blank cell lies outside a
+child's rectangle — and its byte-identical half is replaced by the ground.
 
 **The chrome says the mode, the block says the focus** — `NAV` / `EDIT`, the way vim shows
 `-- INSERT --`. **This spec does not decide the chrome row.** Chrome is one row each by

@@ -183,6 +183,8 @@ describe("MG — the mosaic's grid", () => {
     expect(lines[5], "down to its last").toMatch(/six/u);
   });
 
+  it.todo("T1.62 (C09 I100, §017 R-COL-005): a focused pane takes the region's ground, and no other pane does — not deferred on a component; the spec landed this commit and the renderer follows in the next");
+
   it("MS6 (C09 I35, C25 I1): a cell bounds an over-tall child, and F239 does not transfer", () => {
     // `scroll` draws an over-tall child whole — `measure=4 rendered=8` (F239) —
     // because it needs a slice at an arbitrary offset. A mosaic needs a clip at
