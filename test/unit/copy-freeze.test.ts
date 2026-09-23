@@ -133,3 +133,20 @@ describe("C14 §6b — the freeze", () => {
     expect(graph.bufferedEntries).toBe(0);
   });
 });
+
+// C14 §6c — the caret, the anchor and the granularity atomicity needs.
+// Spec-first: the rows land with the code in this MR's second commit.
+describe("C14 §6c — the caret and the anchor", () => {
+  it.todo(
+    "T1.36 (C14 I36, §6c): a range touching one row of a block and a range covering it give the same block set, with a one-row-block control — not deferred on a component: the motions land in this MR's code commit",
+  );
+  it.todo(
+    "T1.37b (C14 I36): the caret's row is entry-local, so a taller entry above it does not move which block it names — not deferred on a component: the motions land in this MR's code commit",
+  );
+  it.todo(
+    "T1.38b (C14 I37): an extend that over-shoots and returns equals the direct one, and a plain arrow moves without selecting — not deferred on a component: the motions land in this MR's code commit",
+  );
+  it.todo(
+    "T1.39 (C14 I38): the count is blocks, asserted as the pair where an entry count and a block count disagree — not deferred on a component: the motions land in this MR's code commit",
+  );
+});

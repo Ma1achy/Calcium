@@ -599,6 +599,70 @@ Three things redraw and the rule names them: the mode label, the selection, the
 count. All three change only on a key, so a commit at `input` is the whole of it and
 no other reason needs to reach the terminal.
 
+## 6c. The caret, the anchor, and the granularity that makes atomicity a rule
+
+`R-SEL-003`, and the section exists because the rule is **vacuous at the wrong
+granularity**. *A block is atomic in a selection: you take all of it or none of
+it* forbids nothing if the selection's unit is already the block — the type
+satisfies it and no mutation can violate it, which is A03 §2's class arriving
+through a data model rather than through wording. The rule only bites when the
+**caret is finer than the thing selected**.
+
+So the two are split, and the split is the ruling:
+
+- **The caret is an entry plus a display row**, entry-local.
+- **The selection's unit is the block.**
+
+An extend therefore maps a *row range* to a *block set* by **touching**, not by
+containment — and that is the rule, executable: a range reaching row 5 of a
+ten-row table takes the whole table, and the caret carries on to row 6. Reaching
+is the predicate, the block is what comes back, and a range that covers half a
+block and a range that covers all of it give the same answer.
+
+**Why the row is the entry's own and not the viewport's.** A viewport row is not
+an address — it moves when anything above it changes height, which is the same
+argument C14 I6 makes about the anchor, and the freeze does not remove it because
+the caret survives a resize and a resize re-lays the held document (I31). An
+entry id plus an entry-local row is stable under every movement the mode allows.
+
+**The anchor is a second caret and is set where the extend began.** With no
+extend in flight there is no anchor; the first `⇧↑` or `⇧↓` plants it at the
+caret and every subsequent one re-derives the whole range from the pair, so a
+reader who over-shoots and comes back gets the selection they would have got by
+going there directly. `R-SEL-015` says the same thing about a drag — *the count
+is always the size of what return would copy right now* — and this is that
+sentence with a keyboard instead of a mouse.
+
+### What moves, and what the registry gave
+
+`⇧↑` and `⇧↓` are the registry's `selection.up` and `selection.down`, already
+bound at `prompt` and `liveBlock`; they take a third target here. **Plain `↑`
+and `↓` move the caret without changing the selection**, which is the pair the
+mode needs and the registry does not name — a mode whose only vertical key
+extends cannot put the caret anywhere without selecting on the way.
+
+**`⇧←` and `⇧→` are not bound here yet, and the footer stops claiming them.**
+`selection.left` and `selection.right` are horizontal, and at block granularity
+there is no horizontal extent: the horizontal axis belongs to `R-SEL-007`'s
+rectangular selection, which copies **cells rather than source** and is a
+different thing to select. The owner line said `←→↑↓ extend` and now says
+`↑↓ extend`, because a footer naming a key that does nothing is worse than one
+naming fewer keys — it is C16 I19's second keymap, disagreeing with the first.
+
+### The count is blocks
+
+`R-SEL-015`: *the count is always the size of what return would copy right now*.
+That is the blocks, not the entries, and the two differ exactly when an extend
+stops inside an entry — which is most of them. A count of entries would report a
+half-taken entry as a whole one, which is the number being wrong in the direction
+the rule was written to prevent.
+
+### `a` and `A` are unchanged in meaning and changed in unit
+
+`R-SEL-008` still reads *the entry under the caret* and *all loaded entries*;
+what they put in the set is now every block of those entries. The rule's own
+sentence is untouched and nothing about the keys moves.
+
 ---
 
 ## 7. State machine
@@ -660,6 +724,10 @@ than stranding the user.
 - **I34** — **The footer states the difference while it is non-zero, and the hold is dropped by one commit on exit.** The buffered notice (`R-SEL-010`) is the only subject that reads both sides, and the only observable the hold has: without it a held view and a render that has stopped working are the same picture. On exit the hold is dropped and a single `commit("input")` draws the record — an ordinary frame, not a repaint, for C03 I14's reason: nothing on the terminal became unknown.
 - **I35** — **The ticker stops with the mode and the document does not carry it.** Elapsed counts are content and a held view already holds them; the spinner's frame index is `RenderContext.tick`, a counter on the session that no document carries, so a held document still draws a turning spinner unless the ticker is stopped. `#tick`, orbit angles and animated image frames do not advance while the mode is up, which is `R-SEL-009`'s *not the spinners* and is the one clause here that constrains C22 rather than C14.
 
+- **I36** — **The caret is an entry plus an entry-local display row, and the selection's unit is the block.** The split is what makes `R-SEL-003` a rule rather than a property of the type: a selection whose unit is already the block satisfies *all of it or none of it* by construction, and nothing can be written that violates it (A03 §2). An extend maps a row range to a block set by **intersection** — every block whose entry-local rows meet the range, taken whole — so a range covering one row of a table and a range covering all of them give the same answer, and the caret continues past the block it took. The row is the entry's own and never the viewport's, for the reason I6 gives about the anchor: a viewport row moves when anything above it changes height, and an entry-local row survives a resize, which the mode must, because a resize re-lays the held document (I31).
+- **I37** — **The anchor is a second caret, planted where the extend began, and the range is re-derived from the pair on every step.** With no extend in flight there is no anchor; an extend that over-shoots and comes back gives the selection that going there directly would have given, which is `R-SEL-015`'s *the count is always the size of what return would copy right now* stated for a keyboard. A plain arrow moves the caret and touches neither the anchor nor the selection — without that pair the caret cannot be placed anywhere without selecting on the way.
+- **I38** — **The count is blocks.** `R-SEL-015` counts what a copy would take, and an entry-level count reports a half-taken entry as a whole one — the number wrong in exactly the direction the rule exists to prevent. `a` and `A` are unchanged in meaning and changed in unit: they put every block of their entries into the set, and `R-SEL-008`'s sentence is untouched.
+
 ---
 
 ## 9. Commitments
@@ -697,6 +765,10 @@ than stranding the user.
 29. **Scroll runs under the hold and `y` reads it** (I32, I33). The caret pulls the viewport as it always did, over the held heights; the clipboard takes what was on the screen, which is the one requirement a paint-path freeze cannot meet.
 30. **The buffered notice is the hold's only observable, and it is the one reader of both sides** (I34). Without it a held view is indistinguishable from a render that has stopped.
 31. **A counter the document does not carry must be stopped by hand** (I35). Elapsed counts are content and freeze with the view; the spinner's tick is not, and would keep turning under a perfectly held document.
+
+32. **A rule needs a granularity it can be violated at** (I36, §6c). Atomicity is a constraint because the caret is a row and the selection is a block; with both at the block it would be a property of the type, satisfied by everything and asserted by nothing.
+33. **The anchor makes an extend re-derivable rather than incremental** (I37). Over-shooting and coming back gives what going there directly gives, and a plain arrow moves without selecting.
+34. **The count is what a copy would take** (I38), which is blocks — an entry count lies about a half-taken entry, and lies in the direction the rule was written against.
 
 ---
 
@@ -740,6 +812,11 @@ Fake heights, no rendering.
   **The row was unreachable until the code moved, and the mutation pass is what said so.** The choice began as a `?? transcript.entries` repeated in the three readers, and a mutation on any one copy could not be seen by a row that computed the same expression itself — A03 §2's vacuity class arriving through duplication rather than through wording. It has one owner now, `Graph.documentEntries`, which is the seam this row reads and the line the mutation changes. **And the row must read it after the patch**: C13 rebuilds the entries array on every write, so a reference captured at freeze time holds the old blocks whichever document it came from, and the first draft could not tell the two apart. Anchor in `tools/mutate/runs/c14-freeze.mjs`.
   **What no harness here can still do**: drive a far-side patch through a *real* session — `LocalHandler` returns one document and never streams — so the session's own call to `documentEntries` is covered by T4.34's wiring and by this row's seam rather than end to end.
 - **T1.34** (I34): content arrives while the mode is up → the buffered count is the number of entries the record has and the view does not, and it is zero before anything arrives. On exit the hold is dropped, the record's entries draw, and the count is zero again.
+
+- **T1.36** (I36, §6c): a range covering one row of a ten-row table and a range covering all ten give the same block set — the table, whole. A range between two blocks takes both and the one it only touches; a range inside a single block takes that block and nothing else. **The vacuity control is in the row**: the same ranges against a layout of one-row blocks give different sets, so the fixture can tell a touching rule from a containing one.
+- **T1.37b** (I36): the caret's row is entry-local — the same caret over a document with a taller entry above it names the same block, where a viewport row would name a different one.
+- **T1.38b** (I37): `⇧↓` three times then `⇧↑` twice gives the block set of `⇧↓` once, by equality and not by size; a plain `↓` between them moves the caret and leaves both the anchor and the set alone; and the anchor is planted by the first extend, not by entering the mode.
+- **T1.39** (I38): the count is the blocks, so an extend stopping inside a two-block entry reads 1 where an entry count would read 1 and a whole-entry extend reads 2 where it would still read 1 — the pair, because either alone agrees with the wrong rule.
 
 ### Tier 2 — contract / interface
 
