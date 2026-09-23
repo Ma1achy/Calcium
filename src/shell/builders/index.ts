@@ -1047,9 +1047,19 @@ function spark(values: readonly number[], opts?: BlockOpts): Plot {
  * decoration over a number that is already correct.
  */
 function progress(
-  spec: BlockOpts & { label: string; current: number; total: number; style?: string; ramp?: Ramp; painted?: boolean },
+  spec: BlockOpts & {
+    label: string;
+    current: number;
+    total: number;
+    style?: string;
+    ramp?: Ramp;
+    painted?: boolean;
+    quantity?: Progress["quantity"];
+    granularity?: Progress["granularity"];
+    liveness?: Progress["liveness"];
+  },
 ): Progress {
-  const { label, current, total, style, ramp, painted } = spec;
+  const { label, current, total, style, ramp, painted, quantity, granularity, liveness } = spec;
   return finish<Progress>(
     {
       kind: "progress",
@@ -1063,6 +1073,11 @@ function progress(
       // §034's painted rung (C09 I96): the fill is a ground, and the alphabet
       // `style` names is where it degrades to rather than a peer of it.
       ...(painted === undefined ? {} : { painted }),
+      // §035's three axes (C09 I97) — independent, each with one consequence,
+      // and each outranked by the explicit declaration it stands in for.
+      ...(quantity === undefined ? {} : { quantity }),
+      ...(granularity === undefined ? {} : { granularity }),
+      ...(liveness === undefined ? {} : { liveness }),
     } as Progress,
     spec,
     false,

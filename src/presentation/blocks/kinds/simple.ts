@@ -548,7 +548,18 @@ export const progressDefinition: BlockDefinition<Progress> = {
     // **Resolved here, per render, and never stored on the block** — the same
     // rule `glyphs()` follows: a block names a style and the terminal decides
     // which arm of it is drawn, so one document is correct on both terminals.
-    const bar = barStyle(ctx.capabilities, block.style);
+    // **The alphabet, with granularity as the default and `style` outranking
+    // it** (I97, §035). The registry's placement text is the deferral this
+    // implements — *use only when its texture is declared by the component* —
+    // so a block that names a style has declared its texture and granularity
+    // says nothing more; a block that names none takes the alphabet the design
+    // draws for its granularity, `block` for continuous and `slant` for
+    // segmented.
+    const alphabet =
+      block.style ?? (block.granularity === "segmented" ? "slant"
+        : block.granularity === "continuous" ? "block"
+        : undefined);
+    const bar = barStyle(ctx.capabilities, alphabet);
     // **The bar clamps and the number does not** (I28). `100/100` and `150/100`
     // drawing identically is the same defect `examples/docker`'s CPU bar was
     // built around — a bar that stops at its ceiling draws a busy thing exactly
@@ -560,7 +571,17 @@ export const progressDefinition: BlockDefinition<Progress> = {
     const total = block.total > 0 ? block.total : 0;
     const fraction = total === 0 ? 0 : Math.max(0, block.current / total);
     const fill = Math.min(1, fraction);
-    const percent = `${Math.round(fraction * 100)}%`;
+    // **The readout is the quantity's** (I97, §035). A capacity is glanced at,
+    // so it carries the pair as well as the share; a count has units, so it
+    // carries the pair alone and no percentage at all — *the unit is what tells
+    // you whether 44% is nearly done or nowhere near*. `progress`, and an
+    // undeclared quantity, read as they always did.
+    const share = `${Math.round(fraction * 100)}%`;
+    const pair = `${String(block.current)}/${String(block.total)}`;
+    const percent =
+      block.quantity === "capacity" ? `${share}  ${pair}`
+      : block.quantity === "count" ? `${String(block.current)} of ${String(block.total)}`
+      : share;
 
     // The same clamp and the same reason as `rule` (C28 I45): `stripControl`
     // walks the whole label, `truncate` throws most of it away, and `measure`
@@ -607,12 +628,30 @@ export const progressDefinition: BlockDefinition<Progress> = {
       ? withBackground(tone("default", ctx.theme, ctx.capabilities), well)
       : muted;
 
+    // **Liveness sets the motion on a ramp that exists, and never invents one**
+    // (I97, §035). A bar with no ink has nothing to animate, and choosing a
+    // `fill` for it would be choosing a value the design never names — §035
+    // puts that carrier outside the bar, on a spinner or a text status. A
+    // declared `animate` outranks the axis.
+    // **The ramp is read once, and that is what makes the rule breakable.**
+    // The two branches below both asked `block.ramp === undefined` and produced
+    // byte-identical output when it was — adjacent spans with one style
+    // coalesce — so a mutation that let liveness reach the sampled branch
+    // changed nothing and survived. One binding is the site where *liveness
+    // never invents a ramp* can be violated (I97).
+    const ramp = block.ramp;
+    const animation =
+      ramp?.animate ??
+      (block.liveness === "active" ? "shimmer"
+        : block.liveness === "stalled" ? "pulse"
+        : undefined);
+
     const onCells: Span[] =
-      block.ramp === undefined
+      ramp === undefined
         ? [{ text: onGlyph.repeat(filled), style: onInk }]
         : Array.from({ length: filled }, (_, i) => {
-            const t = animateT(block.ramp?.animate, extentT(i, barWidth), effectiveTick(ctx.tick, ctx.capabilities), barWidth, i);
-            const sampled = block.ramp === undefined ? undefined : rampStyle(block.ramp, t, i, ctx.theme, ctx.capabilities);
+            const t = animateT(animation, extentT(i, barWidth), effectiveTick(ctx.tick, ctx.capabilities), barWidth, i);
+            const sampled = ramp === undefined ? undefined : rampStyle(ramp, t, i, ctx.theme, ctx.capabilities);
             // **The ramp survives the rung and I52 is untouched**: the ink still
             // varies along the axis and still takes the `on` cells only. What
             // moves is that the cell beneath it is a space — and the ground is

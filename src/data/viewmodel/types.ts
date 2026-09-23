@@ -2874,6 +2874,34 @@ export type Progress = Readonly<{
    * predicate (C10 I8).
    */
   painted?: boolean;
+  /**
+   * **What is being measured** (§035, `R-PRG-001`, C09 I97).
+   *
+   * `capacity` persists and is read in the corner of the eye; `progress`
+   * completes, and when it does the bar is gone rather than full; `count` has
+   * countable units. It decides the readout beside the bar — `NN%
+   * current/total`, `NN%`, `current of total` — which is the one consequence of
+   * the three axes that moves a frame with no colour and no motion.
+   */
+  quantity?: "capacity" | "progress" | "count";
+  /**
+   * **Whether the measurement is continuous or segmented** (§035, C09 I97).
+   *
+   * It picks the alphabet where `style` names none — `continuous` → `block`,
+   * `segmented` → `slant` — and a declared `style` outranks it, which is the
+   * registry's own deferral: *use only when its texture is declared by the
+   * component*.
+   */
+  granularity?: "continuous" | "segmented";
+  /**
+   * **Whether the work is moving** (§035, §036, C09 I97).
+   *
+   * It sets `animate` on a **declared** ramp — `still` → none, `active` →
+   * `shimmer`, `stalled` → `pulse` — and a declared `animate` outranks it. It
+   * does **not** fabricate a ramp: a bar with no ink has nothing to animate,
+   * and §035 puts that carrier outside the bar, on a spinner or a text status.
+   */
+  liveness?: "still" | "active" | "stalled";
 }> & Padded & Floor;
 
 export type Code = Readonly<{

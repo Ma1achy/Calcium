@@ -65,7 +65,7 @@ const results = runPass({
       // C09 I52 (T2.119, T6.96) — the brief's other answer: the ramp compresses as the bar shortens.
       name: "the bar's extent is its filled length",
       file: SIMPLE,
-      from: "            const t = animateT(block.ramp?.animate, extentT(i, barWidth), effectiveTick(ctx.tick, ctx.capabilities), barWidth, i);",
+      from: "            const t = animateT(animation, extentT(i, barWidth), effectiveTick(ctx.tick, ctx.capabilities), barWidth, i);",
       to: "            const t = animateT(block.ramp?.animate, extentT(i, filled), effectiveTick(ctx.tick, ctx.capabilities), filled, i);",
       expect: "T2.119",
     },

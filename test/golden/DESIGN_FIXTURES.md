@@ -1,4 +1,4 @@
-frame 49 owed 17 prose 37 app 6 total 109
+frame 50 owed 16 prose 37 app 6 total 109
 missing: [25, 40]
 unclassified: []
 rows naming no fixture: []
@@ -127,8 +127,8 @@ most-drawn line in the application.
 | 32 | prose | — | — | the four spinner rules |
 | 33 | surface | `BAR_STYLES` | `design-surfaces.test.ts` | nine alphabets, and where each belongs — where `ascii`'s empty was found to be `.`; `plot/ramp.ts` holds a second ASCII pair whose empty cannot follow without colliding with its absent mark, and that is a parked question |
 | 34 | surface | `BAR_STYLES` | `design-surfaces.test.ts` | active progress bars — and the painted rung beside the drawn one, as a mask, because the whole of the closing figure is in the channel a stripped read folds away |
-| 35 | surface | no | — | quantity, granularity and liveness as three axes — `Progress` has `style` and `ramp` and no third member, so this is genuinely unbuilt |
-| 36 | surface | no | — | the operation and budget presets — semantics on §035's members, which do not exist |
+| 35 | surface | `granularity` | `design-surfaces.test.ts` | quantity, granularity and liveness as three axes — five triples, two of them the presets and one that is neither; the segmented ASCII rung is PARKED, because §035 draws `[#][.]` where the registry's `bars.ascii` is one `#`/`-` pair |
+| 36 | surface | no | — | the operation and budget presets — the two triples are expressible now (C09 I97); what is owed is the operation SURFACE around them: the gerund head, the elapsed-and-delta aside, and the settlement that removes the bar |
 | 37 | surface | `RampAnimation` | — | every ink ramp, including the four one-shots |
 | 38 | surface | `RampAnimation` | — | the agent's mark and the verb's ramp |
 | 39 | prose | — | — | one interval, one family |
@@ -219,7 +219,7 @@ that is the reconciliation working, and it should be visible as a number moving 
 than inferred from a suite staying green.
 
     surface 66 · prose 37 · app 6 · total 109
-    of the surfaces: built 59 · unbuilt 7 · framed 49
+    of the surfaces: built 60 · unbuilt 6 · framed 50
 
 **`framed` is the figure this MR moves, and `built` is the one that went backwards.**
 Seven surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks

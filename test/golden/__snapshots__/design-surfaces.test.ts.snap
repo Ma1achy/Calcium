@@ -99,6 +99,17 @@ ascii         ###############------- 70%
   A = bg 48;2;49;90;52
   B = bg 48;2;20;20;20
 ........................................ block         ##############-------- 63%
+── §35 · quantity, granularity and liveness — five triples, two of them the presets
+· BUDGET · capacity · continuous · still
+work          #########------ 62%  31/50
+· OPERATION · progress · segmented · active
+work          ##############-------- 62%
+· a training run · progress · continuous · active
+work          ##############-------- 62%
+· a step count · count · segmented · still
+work          ###########------ 31 of 50
+· stalled · progress · segmented · stalled
+work          ##############-------- 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ........................................ -- serving/volatility-estimator.yaml ---
@@ -244,6 +255,17 @@ ascii                      ##################################--------------- 70%
   A = bg 48;2;49;90;52
   B = bg 48;2;20;20;20
 ................................................................................ block                      ###############################------------------ 63%
+── §35 · quantity, granularity and liveness — five triples, two of them the presets
+· BUDGET · capacity · continuous · still
+work                       ##########################---------------- 62%  31/50
+· OPERATION · progress · segmented · active
+work                       ##############################------------------- 62%
+· a training run · progress · continuous · active
+work                       ##############################------------------- 62%
+· a step count · count · segmented · still
+work                       ###########################----------------- 31 of 50
+· stalled · progress · segmented · stalled
+work                       ##############################------------------- 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ................................................................................ -- serving/volatility-estimator.yaml -------------------------------------------
@@ -385,6 +407,17 @@ ascii         ###############------- 70%
 ........................................ slant         ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 63%
 ........................................ block         ██████████████░░░░░░░░ 63%
 ........................................ block         ██████████████░░░░░░░░ 63%
+── §35 · quantity, granularity and liveness — five triples, two of them the presets
+· BUDGET · capacity · continuous · still
+work          █████████░░░░░░ 62%  31/50
+· OPERATION · progress · segmented · active
+work          ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 62%
+· a training run · progress · continuous · active
+work          ██████████████░░░░░░░░ 62%
+· a step count · count · segmented · still
+work          ▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱ 31 of 50
+· stalled · progress · segmented · stalled
+work          ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ........................................ ── serving/volatility-estimator.yaml ───
@@ -523,6 +556,17 @@ ascii                      ##################################--------------- 70%
 ................................................................................ slant                      ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 63%
 ................................................................................ block                      ███████████████████████████████░░░░░░░░░░░░░░░░░░ 63%
 ................................................................................ block                      ███████████████████████████████░░░░░░░░░░░░░░░░░░ 63%
+── §35 · quantity, granularity and liveness — five triples, two of them the presets
+· BUDGET · capacity · continuous · still
+work                       ██████████████████████████░░░░░░░░░░░░░░░░ 62%  31/50
+· OPERATION · progress · segmented · active
+work                       ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+· a training run · progress · continuous · active
+work                       ██████████████████████████████░░░░░░░░░░░░░░░░░░░ 62%
+· a step count · count · segmented · still
+work                       ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 31 of 50
+· stalled · progress · segmented · stalled
+work                       ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ................................................................................ ── serving/volatility-estimator.yaml ───────────────────────────────────────────
@@ -665,6 +709,17 @@ ascii         ###############------- 70%
   A = bg 48;2;49;90;52
   B = bg 48;2;20;20;20
 ........................................ block         ██████████████░░░░░░░░ 63%
+── §35 · quantity, granularity and liveness — five triples, two of them the presets
+· BUDGET · capacity · continuous · still
+work          █████████░░░░░░ 62%  31/50
+· OPERATION · progress · segmented · active
+work          ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 62%
+· a training run · progress · continuous · active
+work          ██████████████░░░░░░░░ 62%
+· a step count · count · segmented · still
+work          ▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱ 31 of 50
+· stalled · progress · segmented · stalled
+work          ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ........................................ ── serving/volatility-estimator.yaml ───
@@ -810,6 +865,17 @@ ascii                      ##################################--------------- 70%
   A = bg 48;2;49;90;52
   B = bg 48;2;20;20;20
 ................................................................................ block                      ███████████████████████████████░░░░░░░░░░░░░░░░░░ 63%
+── §35 · quantity, granularity and liveness — five triples, two of them the presets
+· BUDGET · capacity · continuous · still
+work                       ██████████████████████████░░░░░░░░░░░░░░░░ 62%  31/50
+· OPERATION · progress · segmented · active
+work                       ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+· a training run · progress · continuous · active
+work                       ██████████████████████████████░░░░░░░░░░░░░░░░░░░ 62%
+· a step count · count · segmented · still
+work                       ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 31 of 50
+· stalled · progress · segmented · stalled
+work                       ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ................................................................................ ── serving/volatility-estimator.yaml ───────────────────────────────────────────

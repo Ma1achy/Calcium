@@ -222,6 +222,44 @@ const paintedBar =
     ).flat();
   };
 
+/**
+ * §035: the three axes, drawn as the triples they are.
+ *
+ * **The two presets and one that is neither.** `R-BLK-237` warns that BUDGET and
+ * OPERATION are *named presets, not the only possible types*, and §035 names the
+ * case that motivates the split — *a six-hour training run is progress ·
+ * continuous · active, without pretending it is a capacity*. A frame of the two
+ * presets alone would be a picture of an enum.
+ */
+const meterAxes =
+  () =>
+  (width: number, capabilities: TerminalCapabilities, theme: ResolvedTheme): readonly string[] => {
+    const kit = measurable({ theme, capabilities });
+    const triples = [
+      { name: "BUDGET · capacity · continuous · still", quantity: "capacity", granularity: "continuous", liveness: "still" },
+      { name: "OPERATION · progress · segmented · active", quantity: "progress", granularity: "segmented", liveness: "active" },
+      { name: "a training run · progress · continuous · active", quantity: "progress", granularity: "continuous", liveness: "active" },
+      { name: "a step count · count · segmented · still", quantity: "count", granularity: "segmented", liveness: "still" },
+      { name: "stalled · progress · segmented · stalled", quantity: "progress", granularity: "segmented", liveness: "stalled" },
+    ] as const;
+    return triples.flatMap((t) => [
+      `· ${t.name}`,
+      ...kit.renderToLines(
+        block({
+          kind: "progress",
+          id: `ax-${t.quantity}-${t.granularity}-${t.liveness}`,
+          label: "work",
+          current: 31,
+          total: 50,
+          quantity: t.quantity,
+          granularity: t.granularity,
+          liveness: t.liveness,
+        }),
+        width,
+      ),
+    ]);
+  };
+
 /** §033: one bar per alphabet, all at the same fraction, so the rows compare. */
 const barAlphabets =
   () =>
@@ -335,6 +373,7 @@ export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 31, name: "every reusable spinner set", rows: spinnerCensus },
   { section: 33, name: "nine alphabets, and where each belongs", rows: barAlphabets() },
   { section: 34, name: "the same bar painted, and the glyph rung beneath it", rows: paintedBar() },
+  { section: 35, name: "quantity, granularity and liveness — five triples, two of them the presets", rows: meterAxes() },
   { section: 72, name: "the background is a second channel — the ground census", rows: groundCensus([
     { name: "a changed line, ex. 1 — the ground runs to the block's edge", block: DIFF },
     { name: "a tag with extent, ex. 3 — and the error tag is the only one", block: STATUS },

@@ -34,8 +34,11 @@ const results = runPass({
   run,
   control: {
     file: SIMPLE,
-    from: "    const percent = `${Math.round(fraction * 100)}%`;",
-    to: '    const percent = "";',
+    // Re-anchored when §035's `quantity` split the readout in three (C09 I97):
+    // the share is computed once and the readout composed from it, so the
+    // control now empties the share rather than the whole readout.
+    from: "    const share = `${Math.round(fraction * 100)}%`;",
+    to: '    const share = "";',
     why: "no percentage at all — if this survives, nothing reads the number and every row below is unearned",
   },
   mutations: [
@@ -45,8 +48,8 @@ const results = runPass({
       // against from the other side.
       name: "THE DEFECT: the number is read off the clamped fill",
       file: SIMPLE,
-      from: "    const percent = `${Math.round(fraction * 100)}%`;",
-      to: "    const percent = `${Math.round(fill * 100)}%`;",
+      from: "    const share = `${Math.round(fraction * 100)}%`;",
+      to: "    const share = `${Math.round(fill * 100)}%`;",
       expect: "T1.24",
     },
     {

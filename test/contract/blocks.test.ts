@@ -1162,4 +1162,78 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
       "and no cell of the row is meta",
     ).not.toContain(fg(tone("meta", DARK_THEME, FULL_CAPS)));
   });
+  it("T2.162 (C09 I97, §035, §036, `R-PRG-001`): quantity, granularity and liveness are three axes, each with one consequence and each outranked", () => {
+    const at = (spec: Record<string, unknown>, caps = FULL_CAPS) =>
+      measurable({ theme: DARK_THEME, capabilities: caps })
+        .renderToLines(
+          block({ kind: "progress", id: "m", label: "work", current: 6, total: 10, ...spec } as never),
+          40,
+        )
+        .map(visible)
+        .join("");
+
+    // **Granularity picks the alphabet, and `style` outranks it.** The two the
+    // design draws — `block` for continuous, `slant` for segmented — and the
+    // registry's own deferral for the rest: *use only when its texture is
+    // declared by the component*.
+    expect(at({ granularity: "continuous" }), "continuous is the block alphabet").toContain("█");
+    expect(at({ granularity: "segmented" }), "segmented is the slant alphabet").toContain("▰");
+    expect(at({ granularity: "segmented", style: "beads" }), "a declared style outranks it").toContain("•");
+
+    // **Quantity picks the readout, and it is the one axis that moves a frame
+    // with no colour and no motion** — which is why it is asserted at one bit
+    // as well. `capacity` carries the pair beside the share; `count` carries
+    // the pair alone, because the unit is what says whether 44% is nearly done.
+    for (const caps of [FULL_CAPS, MONO_UNICODE_CAPS]) {
+      expect(at({ quantity: "progress" }, caps), "a progress reads its share").toContain("60%");
+      expect(at({ quantity: "capacity" }, caps), "a capacity reads both").toContain("60%  6/10");
+      expect(at({ quantity: "count" }, caps), "a count reads its units").toContain("6 of 10");
+      expect(at({ quantity: "count" }, caps), "and no share at all").not.toContain("60%");
+      expect(at({}, caps), "an undeclared quantity reads as it always did").toContain("60%");
+    }
+
+    // **Liveness sets the motion on a ramp that exists and never invents one.**
+    // The two arms are the whole of the rule: with a ramp the animation is the
+    // axis's, and with no ramp the bar is unmoved — a row asserting only the
+    // first would pass on a member that fabricated a `fill` the design never
+    // names.
+    // **Read with the ink kept, and at a tick.** Motion is a colour and
+    // `visible` strips colour, so the first form of these four compared two
+    // frames that differ in the only channel it had thrown away — and the row
+    // went red saying two identical strings were identical.
+    const ink = (spec: Record<string, unknown>) =>
+      measurable({ theme: DARK_THEME, capabilities: FULL_CAPS, tick: 7 })
+        .renderToLines(
+          block({ kind: "progress", id: "m", label: "work", current: 6, total: 10, ...spec } as never),
+          40,
+        )
+        .join("");
+    const ramp = { fill: "gradient" as const, colormap: "viridis" as const };
+    const still = ink({ ramp });
+    expect(ink({ ramp, liveness: "active" }), "active moves a declared ramp").not.toBe(still);
+    expect(ink({ ramp, liveness: "stalled" }), "and stalled moves it differently").not.toBe(
+      ink({ ramp, liveness: "active" }),
+    );
+    expect(ink({ ramp, liveness: "still" }), "and `still` is the ramp unmoved").toBe(still);
+    expect(
+      ink({ ramp: { ...ramp, animate: "wave" as const }, liveness: "active" }),
+      "a declared animate outranks it",
+    ).toBe(ink({ ramp: { ...ramp, animate: "wave" as const } }));
+    expect(ink({ liveness: "active" }), "and with no ramp there is nothing to move").toBe(ink({}));
+
+    // **The presets are two triples and not the only two** (`R-BLK-237`). A row
+    // asserting BUDGET and OPERATION alone is satisfied by an enum with two
+    // members wearing three field names; §035 names the case that is neither —
+    // *a six-hour training run is progress · continuous · active, without
+    // pretending it is a capacity*.
+    const budget = at({ quantity: "capacity", granularity: "continuous", liveness: "still" });
+    const operation = at({ quantity: "progress", granularity: "segmented", liveness: "active" });
+    const training = at({ quantity: "progress", granularity: "continuous", liveness: "active", ramp });
+    expect(budget, "BUDGET is continuous and carries its pair").toContain("█");
+    expect(budget, "BUDGET reads both").toContain("60%  6/10");
+    expect(operation, "OPERATION is segmented").toContain("▰");
+    expect(operation, "and reads its share alone").not.toContain("6/10");
+    expect(training, "the third triple is expressible and is neither preset").toContain("█");
+    expect(training, "and it is a progress, not a capacity").not.toContain("6/10");
+  });
 });
