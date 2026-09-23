@@ -184,7 +184,8 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
       kind: "view",
       placement: { kind: "fill" },
       content: render(),
-      dismissable: false,
+      blocking: true,
+      dismissal: "answer",
     });
 
     const emit = (

@@ -50,12 +50,17 @@ const MUTATIONS = [
     // The copy-mode-above-overlay contradiction with a different subject: a
     // block being interacted with taking keys from a confirm that must be
     // answered. T2.5 compares FOCUS_ORDER to the reached set — which this
-    // satisfies, both being the same seven — and then pins the first and last
+    // satisfies, both being the same nine — and then pins the first and last
     // positions, which is what catches it.
+    //
+    // **Re-anchored in M8**: `"panel"` joined the array between `copyMode` and
+    // `pushedView`, and the anchor reached across the pair. It anchors on the
+    // two rows that bracket the insertion point instead, which is the least
+    // context that stays unique.
     name: "interaction placed above every layer",
     file: FOCUS,
-    from: '  "overlay",\n  "copyMode",\n  "pushedView",',
-    to: '  "interaction",\n  "overlay",\n  "copyMode",\n  "pushedView",',
+    from: '  "child",\n  "overlay",\n  "copyMode",',
+    to: '  "child",\n  "interaction",\n  "overlay",\n  "copyMode",',
     expect: "T2.5",
   },
   {

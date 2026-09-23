@@ -41,7 +41,7 @@ const box = (
   id: string,
   at: Readonly<{ top: number; left: number; height: number; width: number }>,
 ): Placed => ({
-  layer: { id, kind: "overlay", dismissable: true },
+  layer: { id, kind: "overlay", blocking: false, dismissal: "escape" },
   ...at,
 });
 
@@ -138,11 +138,11 @@ describe("C16 §4 — dispatch", () => {
     const globalHandler = vi.fn(() => true);
     router.register("global", globalHandler);
 
-    layer.top = { id: "menu", kind: "overlay", dismissable: true };
+    layer.top = { id: "menu", kind: "overlay", blocking: false, dismissal: "escape" };
     expect(router.dispatch(key("t")), "dismissable: a theme switch is harmless").toBe(true);
     expect(globalHandler).toHaveBeenCalledTimes(1);
 
-    layer.top = { id: "confirm", kind: "overlay", dismissable: false };
+    layer.top = { id: "confirm", kind: "overlay", blocking: true, dismissal: "answer" };
     // **Consumed, not dropped** (M5, §103, R-OWN-001): a blocking layer REJECTS
     // the key rather than letting it fall, and a reject spends the event exactly
     // as a handle does. The invariant this row is about — *nothing reaches past
@@ -157,7 +157,7 @@ describe("C16 §4 — dispatch", () => {
 describe("C16 §5 — the ladder, as handlers on their targets", () => {
   it("T1.11 (I7): a verb in flight cancels, ahead of everything else", () => {
     const { router, calls, layer } = harness({ inFlight: () => "app" });
-    layer.top = { id: "confirm", kind: "overlay", dismissable: false };
+    layer.top = { id: "confirm", kind: "overlay", blocking: true, dismissal: "answer" };
 
     expect(router.dispatch(ctrlC)).toBe(true);
     expect(calls, "not the confirm, not the view — the promote").toEqual(["cancel"]);
@@ -182,7 +182,7 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     // **Below the layer rungs**: a modal over a running stream still takes the
     // key, which is the copy-mode ordering applied to the new rung.
     const modal = harness({ ...stream, promptHasText: () => true });
-    modal.layer.top = { id: "confirm", kind: "overlay", dismissable: false };
+    modal.layer.top = { id: "confirm", kind: "overlay", blocking: true, dismissal: "answer" };
     expect(modal.router.dispatch(ctrlC)).toBe(true);
     expect(modal.calls, "the confirm consumed it; nothing was cancelled").toEqual([]);
 
@@ -234,7 +234,7 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
 
   it("T1.12, T1.12b (I8): a confirm is a no-op, and nothing beneath it moves", () => {
     const { router, calls, layer } = harness({ copyMode: () => true });
-    layer.top = { id: "confirm", kind: "overlay", dismissable: false };
+    layer.top = { id: "confirm", kind: "overlay", blocking: true, dismissal: "answer" };
 
     expect(router.dispatch(ctrlC), "consumed").toBe(true);
     expect(calls, "copy mode is untouched and no layer popped").toEqual([]);
@@ -272,7 +272,7 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
         offered.push(e.kind === "key" ? e.key.name : "mouse"), false
       ),
     });
-    layer.top = { id: "confirm", kind: "overlay", dismissable: false };
+    layer.top = { id: "confirm", kind: "overlay", blocking: true, dismissal: "answer" };
     router.register("global", () => (calls.push("scroll"), true));
     router.register("overlay", () => (calls.push("overlay"), true));
 
@@ -345,14 +345,19 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     // The row above it in the same table: a completion menu is dismissable *and*
     // small, and everything reaches past one. Without it this passes for a
     // router that skips the guard whenever any layer is open.
-    layer.top = { id: "menu", kind: "overlay", dismissable: true };
+    layer.top = { id: "menu", kind: "overlay", blocking: false, dismissal: "escape" };
     layer.placed = [box("menu", { top: 4, left: 10, height: 6, width: 30 })];
     expect(router.dispatch(reserved)).toBe(true);
     expect(router.dispatch(ordinary)).toBe(true);
     expect(calls).toEqual(["up", "pageup"]);
 
     calls.length = 0;
-    layer.top = { id: "dash", kind: "view", dismissable: true };
+    // **`blocking: true`, declared** (M8, C15 I26). A view owns the region and
+    // owns input, and under the old predicate the box said so on its behalf —
+    // the three shipped views were corrected to declare it in the same MR. A
+    // fixture left at `false` is a full-region layer that blocks nothing, which
+    // is now a thing the type can say and this row does not mean.
+    layer.top = { id: "dash", kind: "view", blocking: true, dismissal: "escape" };
     layer.placed = [box("dash", { top: 0, left: 0, height: 24, width: 80 })];
 
     // The reserved route reaches the viewport scroller, ahead of the ladder.
@@ -375,37 +380,42 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     expect(layer.top?.id, "the layer is not dismissed by either").toBe("dash");
   });
 
-  it("T1.31 (I8): coverage is read from the box, not from the kind", () => {
-    // **The proxy passes every test written about views.** A layer that is not a
-    // view but spans the region blocks step 3, and a view whose box was clamped
-    // smaller does not — neither case is expressible by a kind test, and the
-    // second is the one that would be silently wrong.
+  it("T1.31 (I8, C15 I26): modality is read from `blocking`, not from the box", () => {
+    // **The geometry is now irrelevant, and both boxes are built to disagree
+    // with their flags so that a row whose numbers agree cannot pass by
+    // accident.** A full-region layer that declares it blocks nothing lets the
+    // global keymap through; a one-row layer that declares it owns input holds
+    // it. Neither is expressible by a coverage test, and under the old
+    // predicate each is wrong in the opposite direction.
     const { router, calls, layer } = harness();
     router.register("global", () => (calls.push("global"), true));
 
-    layer.top = { id: "wide", kind: "overlay", dismissable: true };
+    // Spans the region, blocks nothing — a peek-shaped thing drawn large.
+    layer.top = { id: "wide", kind: "overlay", blocking: false, dismissal: "answer" };
     layer.placed = [box("wide", { top: 0, left: 0, height: 24, width: 80 })];
+    expect(router.dispatch(key("pageup"))).toBe(true);
+    expect(calls, "a full-region layer that owns no input holds no key").toEqual(["global"]);
+
+    // One row, and it owns input — §101's typed reply, the combination the
+    // coverage test could never answer for.
+    calls.length = 0;
+    layer.top = { id: "reply", kind: "overlay", blocking: true, dismissal: "answer" };
+    layer.placed = [box("reply", { top: 20, left: 0, height: 1, width: 80 })];
     // **Consumed, not dropped** (M5, §103, R-OWN-001): a blocking layer REJECTS
     // the key rather than letting it fall, and a reject spends the event exactly
     // as a handle does. The invariant this row is about — *nothing reaches past
-    // it* — is the `calls`/spy assertion beside this line and is unchanged; the
-    // boolean was only ever a proxy for it, and the proxy is what moved.
+    // it* — is the `calls` assertion beside this line.
     expect(router.dispatch(key("pageup"))).toBe(true);
-
-    calls.length = 0;
-    layer.top = { id: "small-view", kind: "view", dismissable: true };
-    layer.placed = [box("small-view", { top: 0, left: 0, height: 8, width: 80 })];
-    expect(router.dispatch(key("pageup"))).toBe(true);
-    expect(calls).toEqual(["global"]);
+    expect(calls, "and a one-row layer that does own it holds every key").toEqual([]);
   });
 
   it("a dismissable overlay pops; a view beneath is reached only when it is the top", () => {
     const { router, calls, layer } = harness();
-    layer.top = { id: "menu", kind: "overlay", dismissable: true };
+    layer.top = { id: "menu", kind: "overlay", blocking: false, dismissal: "escape" };
     router.dispatch(ctrlC);
     expect(calls).toEqual(["pop"]);
 
-    layer.top = { id: "dash", kind: "view", dismissable: true };
+    layer.top = { id: "dash", kind: "view", blocking: false, dismissal: "escape" };
     router.dispatch(ctrlC);
     expect(calls).toEqual(["pop", "pop"]);
   });
@@ -423,7 +433,7 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     // The pairwise form again: each rung firing in isolation is true under any
     // permutation. A confirm over copy mode is the pair the reorder turned on.
     const { router, calls, layer } = harness({ copyMode: () => true });
-    layer.top = { id: "menu", kind: "overlay", dismissable: true };
+    layer.top = { id: "menu", kind: "overlay", blocking: false, dismissal: "escape" };
     router.dispatch(ctrlC);
     expect(calls, "overlay beats copy mode").toEqual(["pop"]);
   });
@@ -501,7 +511,7 @@ describe("C16 §4 — mouse routes by position", () => {
     );
 
     layer.placed = [
-      { layer: { id: "confirm", kind: "overlay", dismissable: false }, top: 2, left: 10, height: 3, width: 20 },
+      { layer: { id: "confirm", kind: "overlay", blocking: true, dismissal: "answer" }, top: 2, left: 10, height: 3, width: 20 },
     ];
     router.dispatch(click(3, 12));
     expect(router.lastStages, "inside the placed region, both axes").toContain("layer:confirm");
@@ -522,7 +532,7 @@ describe("C16 §4 — mouse routes by position", () => {
     // frame's second row, and the frame's first is the header.
     const { router, layer } = harness();
     layer.placed = [
-      { layer: { id: "menu", kind: "overlay", dismissable: true }, top: 0, left: 0, height: 1, width: 40 },
+      { layer: { id: "menu", kind: "overlay", blocking: false, dismissal: "escape" }, top: 0, left: 0, height: 1, width: 40 },
     ];
 
     router.dispatch(click(0, 4));
@@ -601,7 +611,7 @@ describe("C16 §4 — mouse routes by position", () => {
     // T3.12b's half, kept: a layer covering the point takes it and nothing else sees it.
     seen.length = 0;
     layer.placed = [
-      { layer: { id: "menu", kind: "overlay", dismissable: true }, top: 2, left: 0, height: 1, width: 40 },
+      { layer: { id: "menu", kind: "overlay", blocking: false, dismissal: "escape" }, top: 2, left: 0, height: 1, width: 40 },
     ];
     router.dispatch(click(3, 4, "wheelDown"));
     expect(seen).toEqual([]);
@@ -616,7 +626,7 @@ describe("C16 §4 — mouse routes by position", () => {
     const seen: string[] = [];
     router.register("liveBlock", () => (seen.push("liveBlock"), true));
     router.register("global", () => (seen.push("global"), true));
-    layer.top = { id: "confirm", kind: "overlay", dismissable: false };
+    layer.top = { id: "confirm", kind: "overlay", blocking: true, dismissal: "answer" };
     layer.placed = [
       { layer: layer.top, top: 5, left: 10, height: 3, width: 20 },
     ];
@@ -644,11 +654,25 @@ describe("C16 §4 — mouse routes by position", () => {
     router.dispatch(click(6, 12));
     expect(seen).toEqual(["overlay"]);
 
-    // A dismissable layer is not modal: the entry beneath is reachable.
-    layer.top = { id: "menu", kind: "overlay", dismissable: true };
+    // **An escapable layer is not modal, and a click beside it is still not
+    // passed down** (I47, R-BLK-779): *a click off it CLOSES it, and the click
+    // stops there*. One gesture, one effect — the dismissal is the effect.
+    seen.length = 0;
+    layer.top = { id: "menu", kind: "overlay", blocking: false, dismissal: "escape" };
     layer.placed = [];
-    router.dispatch(click(3, 0));
-    expect(seen).toEqual(["overlay", "liveBlock"]);
+    expect(router.dispatch(click(3, 0)), "consumed by the dismissal").toBe(true);
+    expect(seen, "and nothing beneath it is reached").toEqual([]);
+    expect(router.lastStages).toEqual(["arming", "mouse", "dismiss"]);
+
+    // **Non-modality survives on the wheel**, which is where this row now reads
+    // it: the gesture that moves a viewport without changing state, under an
+    // escapable top exactly as under a blocking one (I40).
+    seen.length = 0;
+    layer.top = { id: "menu", kind: "overlay", blocking: false, dismissal: "escape" };
+    layer.placed = [];
+    expect(router.dispatch(click(3, 0, "wheelDown")), "consumed").toBe(true);
+    expect(seen, "the viewport moves beneath a menu").toEqual(["liveBlock"]);
+    expect(layer.top?.id, "and the menu is not dismissed by a wheel").toBe("menu");
   });
 
   it("T3.12 (I3): mouse events are dropped when the capability is absent", () => {
@@ -663,7 +687,7 @@ describe("C16 §4 — mouse routes by position", () => {
     expect(router.lastStages).toContain("viewport:wheel");
 
     layer.placed = [
-      { layer: { id: "menu", kind: "overlay", dismissable: true }, top: 0, left: 0, height: 9, width: 40 },
+      { layer: { id: "menu", kind: "overlay", blocking: false, dismissal: "escape" }, top: 0, left: 0, height: 9, width: 40 },
     ];
     router.dispatch(click(3, 0, "wheelUp"));
     expect(router.lastStages).toContain("layer:menu");
@@ -708,7 +732,7 @@ describe("C16 — the dispatch trace, run against the implementation", () => {
     };
 
     step("p", key("p"));
-    layer.top = { id: "menu", kind: "overlay", dismissable: true };
+    layer.top = { id: "menu", kind: "overlay", blocking: false, dismissal: "escape" };
     step("down (menu open)", key("down"));
     layer.top = null;
     step("down (menu gone)", key("down"));
@@ -717,9 +741,9 @@ describe("C16 — the dispatch trace, run against the implementation", () => {
     step("ctrl-c (live block)", ctrlC);
     step("click row 2", click(3));
     step("wheel", click(3, 0, "wheelUp"));
-    layer.top = { id: "dash", kind: "view", dismissable: true };
+    layer.top = { id: "dash", kind: "view", blocking: false, dismissal: "escape" };
     step("f (pushed view)", key("f"));
-    layer.top = { id: "confirm", kind: "overlay", dismissable: false };
+    layer.top = { id: "confirm", kind: "overlay", blocking: true, dismissal: "answer" };
     step("ctrl-c (confirm)", ctrlC);
     step("t (global, under confirm)", key("t"));
     layer.top = null;
@@ -1002,8 +1026,8 @@ describe("C16 §3a — the global-intercept table and the child rung (M5)", () =
         const { router, layer, focus } = atRung(rung);
         // The rung-specific state each one needs, set here so the row constructs
         // what it claims rather than asserting against a default prompt.
-        if (rung === "question") layer.top = { id: "confirm", kind: "overlay", dismissable: false };
-        if (rung === "substate") layer.top = { id: "dash", kind: "view", dismissable: true };
+        if (rung === "question") layer.top = { id: "confirm", kind: "overlay", blocking: true, dismissal: "answer" };
+        if (rung === "substate") layer.top = { id: "dash", kind: "view", blocking: false, dismissal: "escape" };
         if (rung === "inside") {
           focus.enterLiveBlock("e1", addr("r1"));
           focus.setMode("interact");
@@ -1062,7 +1086,7 @@ describe("C16 §7 and §4a — the epoch, the question guard and pointer commit 
   const withQuestion = (opts: Partial<RouterDeps> = {}) => {
     const q = { open: false };
     const h = harness({
-      overlayTop: () => (q.open ? { kind: "overlay" as const, id: "confirm", dismissable: false } : null),
+      overlayTop: () => (q.open ? { kind: "overlay" as const, id: "confirm", blocking: true, dismissal: "answer" } : null),
       overlayAnswerCallback: () => (q.open ? (): boolean => true : null),
       // `y` and `⏎` resolve; an arrow moves the selection and `x` does nothing.
       // The vocabulary is the question's, which is the whole reason the router
@@ -1231,14 +1255,85 @@ describe("C16 §7 and §4a — the epoch, the question guard and pointer commit 
   });
 });
 
-describe("C16 §4a — the dismissing click and the scroll order, owed at the spec commit (M8)", () => {
-  it.todo(
-    "T1.103 (C16 I47, R-BLK-854, R-BLK-855): a press beside a panel closes it and reaches no target; T1.103b, a press on it is the panel's, and a press beside a blocking layer closes nothing and does nothing — not deferred on a component: the panel kind and the two fields land in the same MR",
-  );
-  it.todo(
-    "T1.104 (C16 I48, C15 I23, R-BLK-779): a wheel over a placed panel is the panel's and the transcript does not move; the control is the same wheel one row outside it — not deferred on a component",
-  );
-  it.todo(
-    "T1.105 (C16 I48, R-SEL-012): a scroll inside a scroll takes the wheel at the depth the pointer is in, both counters asserted after each step — not deferred on a component",
-  );
+describe("C16 §4a — the dismissing click and the scroll order (M8)", () => {
+  const PANEL = { id: "menu", kind: "panel", blocking: false, dismissal: "escape" } as const;
+
+  it("T1.103 (I47, R-BLK-854, R-BLK-855): a press beside a panel closes it and reaches no target", () => {
+    // *The thing you meant to hit was covered a moment ago*, so a press that
+    // closed the panel **and** activated what was underneath would act on
+    // something the reader could not see when they decided to press. One
+    // gesture, one effect.
+    const { router, layer, calls } = harness();
+    const seen: string[] = [];
+    router.register("liveBlock", () => (seen.push("liveBlock"), true));
+    router.register("panel", () => (seen.push("panel"), true));
+
+    layer.top = PANEL;
+    layer.placed = [{ layer: PANEL, top: 5, left: 10, height: 3, width: 20 }];
+
+    expect(router.dispatch(click(3, 0)), "consumed by the dismissal").toBe(true);
+    expect(calls, "and it is the layer that was closed").toEqual(["pop"]);
+    expect(seen, "nothing beneath it was reached").toEqual([]);
+    expect(router.lastStages).toEqual(["arming", "mouse", "dismiss"]);
+  });
+
+  it("T1.103b (I47, I8): a press on the panel is the panel's; beside a blocking layer it is neither", () => {
+    // **The three cells are what separate *dismisses* from *acts* from *does
+    // neither*.** A row holding one of them passes for a router that answers
+    // the same way in all three.
+    const { router, layer, calls } = harness();
+    const seen: string[] = [];
+    router.register("liveBlock", () => (seen.push("liveBlock"), true));
+    router.register("panel", () => (seen.push("panel"), true));
+
+    // On it: the panel's, and it is not closed.
+    layer.top = PANEL;
+    layer.placed = [{ layer: PANEL, top: 5, left: 10, height: 3, width: 20 }];
+    // Region top is 1, so terminal row 7 is region row 6 — inside [5, 8).
+    expect(router.dispatch(click(7, 12)), "consumed").toBe(true);
+    expect(seen).toEqual(["panel"]);
+    expect(calls, "acting on a panel does not close it").toEqual([]);
+
+    // Beside a blocking layer: I8's answer, which is that nothing happens at
+    // all — no dismissal, because an owner is waiting.
+    seen.length = 0;
+    const question = { id: "q", kind: "overlay", blocking: true, dismissal: "answer" } as const;
+    layer.top = question;
+    layer.placed = [{ layer: question, top: 5, left: 10, height: 3, width: 20 }];
+    expect(router.dispatch(click(3, 0)), "consumed").toBe(true);
+    expect(seen, "and nothing beneath it").toEqual([]);
+    expect(calls, "closes nothing").toEqual([]);
+    expect(router.lastStages).toEqual(["arming", "mouse", "modal"]);
+  });
+
+  it("T1.104 (I48, C15 I23, R-BLK-779): a wheel over a panel is the panel's, and over nothing is the viewport's", () => {
+    // *One ordering does both jobs*: the layer order decides which viewport a
+    // wheel moves exactly as it decides which layer a key reaches.
+    const { router, layer } = harness();
+    const seen: string[] = [];
+    router.register("panel", () => (seen.push("panel"), true));
+    router.register("liveBlock", () => (seen.push("liveBlock"), true));
+    router.register("global", () => (seen.push("global"), true));
+
+    layer.top = PANEL;
+    layer.placed = [{ layer: PANEL, top: 5, left: 10, height: 3, width: 20 }];
+
+    expect(router.dispatch(click(7, 12, "wheelDown")), "consumed").toBe(true);
+    expect(seen, "the panel's, and the transcript beneath it does not move").toEqual(["panel"]);
+    expect(router.lastStages).toContain("layer:menu");
+
+    // **The control is one row outside it**, which is what makes the row about
+    // the box rather than about a panel being open at all. Above it rather
+    // than below, because the harness's transcript ends at region row 4.
+    seen.length = 0;
+    expect(router.dispatch(click(4, 12, "wheelDown")), "consumed").toBe(true);
+    expect(seen, "outside the panel: the entry under the pointer").toEqual(["liveBlock"]);
+
+    // **A peek is not a third case at this seam, and the spec row said it
+    // was.** C15 I21 keeps a peek out of `top` and L4 filters it out of
+    // `placed` before the router is handed either, so *the wheel falls past a
+    // peek* is byte-identical here to *no layer is open* — an assertion about
+    // it would be an assertion about the fixture. Where it is observable is
+    // C15's own `top` row (T1.23) and the filter in `construct.ts`.
+  });
 });

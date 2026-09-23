@@ -53,7 +53,11 @@ export function searchBlocks(state: SearchState): readonly Block[] {
 export function searchLayer(state: SearchState, anchor: Anchor): Layer {
   return Object.freeze({
     id: SEARCH_ID,
-    kind: "overlay" as const,
+    // **A panel** (C15 §2c, I27, R-BLK-109, R-BLK-323). *search — the prompt
+    // stays, the panel grows above it*, and find is a PROMPT SUBSTATE rather
+    // than a question: reverse-i-search relabels the prompt, it does not ask
+    // anything, and nothing is waiting on an answer from it.
+    kind: "panel" as const,
     placement: Object.freeze({
       kind: "anchored" as const,
       row: anchor.row,
@@ -61,7 +65,8 @@ export function searchLayer(state: SearchState, anchor: Anchor): Layer {
       prefer: "above" as const,
     }),
     content: searchBlocks(state),
-    dismissable: true,
+    blocking: false,
+    dismissal: "escape",
     width: cells(searchLine(state)) + CHROME_CELLS,
     // **The search has a cursor and the menu does not** (C15 I19). Text is
     // being typed into this one, and leaving the terminal's cursor blinking at
@@ -113,7 +118,8 @@ export function clearConfirmLayer(count: number): Layer {
         text: clearQuestion(count),
       } satisfies Block,
     ]),
-    dismissable: false,
+    blocking: true,
+    dismissal: "answer",
     width: cells(clearQuestion(count)) + CHROME_CELLS,
   });
 }

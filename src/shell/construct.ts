@@ -1850,7 +1850,7 @@ export async function constructGraph(
     if (have) {
       stores.overlays.update(PEEK_ID, { content, placement });
     } else {
-      stores.overlays.push({ id: PEEK_ID, kind: "peek", placement, content, dismissable: true });
+      stores.overlays.push({ id: PEEK_ID, kind: "peek", placement, content, blocking: false, dismissal: "focus" });
     }
     peekKey = want.key;
     peekRow = want.row;
@@ -2079,6 +2079,57 @@ export async function constructGraph(
       }
     }
     return best;
+  };
+
+  /**
+   * The innermost `scroll` under the pointer (C16 I48, R-SEL-012).
+   *
+   * **`elementAt` stops at the outermost box, and that is not a defect in it.**
+   * A `scroll` owns one element per child and the element walk does not descend
+   * past a container that owns its elements (C26 §4b cell 3), so the deepest
+   * *element* under the pointer belongs to the outermost scroll however deeply
+   * the boxes nest. Which is right for focus — the child is the navigable thing
+   * — and wrong for the wheel, whose subject is the box rather than the thing
+   * in it: *the wheel takes the innermost scrollable under the pointer*, and a
+   * wheel inside an inner box that moved the outer one is the box moving under
+   * the reader's hand while the thing they are looking at stays put.
+   *
+   * The descent is by **id**: a scroll's element carries `r.child.id`, so the
+   * element that was hit names the child block, and a child that is itself a
+   * scroll is the next box down. At each rung the pointer's row is translated
+   * through that box's own offset, clamped exactly as the renderer clamps it —
+   * the same arithmetic `elementAt` does for the first rung, which is why the
+   * two cannot drift about where a row is.
+   *
+   * Terminates because each step descends one level of a finite tree.
+   */
+  const innermostScrollUnder = (
+    entryId: EntryId,
+    start: Readonly<{ block: Block; element: NavElement; row: number }>,
+  ): Block => {
+    const width = deps.frame.overlayRegion().width;
+    let box = start.block;
+    let elementId = start.element.id;
+    let rowInChild = start.row;
+    for (;;) {
+      if (box.kind !== "scroll") return box;
+      const child = box.children.find((c) => c.id === elementId);
+      if (child === undefined || child.kind !== "scroll") return box;
+
+      // Inside `child`'s box now. Its content rows are measured from the box's
+      // top and never from the offset (C26 I3), so the offset is added here.
+      const els = built.blocks.elementsOf(child, width);
+      const content = els.reduce((n, el) => Math.max(n, el.rows.to), 0);
+      const held = stores.scrollOffsets.get(entryId, child.id);
+      const contentRow =
+        rowInChild + Math.min(Math.max(0, Math.trunc(held)), Math.max(0, content - child.height));
+      const at = els.find((el) => contentRow >= el.rows.from && contentRow < el.rows.to);
+      // Past the last child — the box's own rows, which are still the box's.
+      if (at === undefined) return child;
+      box = child;
+      elementId = at.id;
+      rowInChild = contentRow - at.rows.from;
+    }
   };
 
   /**
@@ -2517,8 +2568,10 @@ export async function constructGraph(
       if (e.button !== "wheelUp" && e.button !== "wheelDown") return null;
       const under = elementAt(hit, e.col);
       if (under === null || under.block.kind !== "scroll") return null;
+      // **The innermost, not the outermost** (C16 I48, R-SEL-012).
+      const box = innermostScrollUnder(hit.id, under);
       const rows = e.button === "wheelUp" ? -WHEEL_ROWS : WHEEL_ROWS;
-      return () => nudgeScroll(hit.id, under.block.id, rows);
+      return () => nudgeScroll(hit.id, box.id, rows);
     }
 
     // Recorded rather than absorbed: a second button has no key equal yet, and
@@ -2741,7 +2794,11 @@ export async function constructGraph(
 
     router.register("prompt", promptKeys);
 
-    router.register("overlay", (e) => {
+    // **The menu and the search answer at `panel`** (C15 §2c, I27). Both are
+    // panels now — prompt substates rather than questions — and a handler left
+    // on `overlay` is a handler `activeTarget` can no longer reach, which is
+    // the migration's actual cost and is paid here rather than deferred.
+    router.register("panel", (e) => {
       // **A completion menu holding no selection lets the prompt answer first**
       // (C19 I20). It is a display of what is available rather than a choice
       // being made, so `Enter` submits, `↑` is history, `Tab` is `complete` and
@@ -2751,7 +2808,7 @@ export async function constructGraph(
       // not bind it and it falls through to `dismiss` below.
       if (promptUnderMenu() && promptKeys(e)) return true;
 
-      const effect = bound("overlay", e);
+      const effect = bound("panel", e);
       if (effect !== null) {
         effect();
         return true;
@@ -2779,6 +2836,18 @@ export async function constructGraph(
         }
       }
       return false;
+    });
+
+    // **An escapable overlay still needs its `esc` run** (C16 I26). The menu
+    // and the search moved to `panel` above and took `bound` with them, and
+    // the `overlay:escape → dismiss` row did not move — a confirm that says it
+    // is escapable is escapable at the `overlay` target, and a binding with no
+    // handler is a key that resolves and does nothing (T1.4h).
+    router.register("overlay", (e) => {
+      const effect = bound("overlay", e);
+      if (effect === null) return false;
+      effect();
+      return true;
     });
 
     // **The target `↓` now leads to** (C16 I22). Registered for the same reason
@@ -3119,11 +3188,11 @@ function routerDeps(
   entryAtRegionRow: RouterDeps["entryAtRow"],
   keyReleasesReported: () => boolean,
 ): RouterDeps {
-  const top = (): Readonly<{ kind: "overlay" | "view"; id: string; dismissable: boolean }> | null => {
+  const top = (): Readonly<{ id: string; kind: "overlay" | "view" | "panel"; blocking: boolean; dismissal: "escape" | "focus" | "answer" }> | null => {
     const layer = stores.overlays.top;
     return layer === null
       ? null
-      : { kind: layer.kind, id: layer.id, dismissable: layer.dismissable };
+      : { kind: layer.kind, id: layer.id, blocking: layer.blocking, dismissal: layer.dismissal };
   };
 
   return {

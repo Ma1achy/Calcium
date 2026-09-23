@@ -25,7 +25,7 @@ import type { ElementAddress, FocusTarget, StoredFocus } from "./types.js";
  */
 export type FocusInputs = Readonly<{
   /** C15's `top`. `null` when the stack is empty. */
-  overlayTop: Readonly<{ kind: "overlay" | "view" }> | null;
+  overlayTop: Readonly<{ kind: "overlay" | "view" | "panel" }> | null;
   copyMode: boolean;
   /**
    * A child process holds the terminal (§103, R-OWN-002).
@@ -55,6 +55,12 @@ export const FOCUS_ORDER = Object.freeze([
   "child",
   "overlay",
   "copyMode",
+  // **A ninth target at an existing rung** (§2c, R-BLK-109). `RUNG_OF` maps it
+  // to `substate`, beside `pushedView`, which is what "targets are not rungs"
+  // buys: a panel and a view own the same rung and cannot share a target,
+  // because their `escape` rows disagree — `dismiss` at a panel, `viewPop` in a
+  // view — and two bindings for one `(target, key)` is a construction error.
+  "panel",
   "pushedView",
   // **Above `prompt` and below every layer** (C26 I2). A block being interacted
   // with outranks the prompt, which is the whole of the navigation/interaction
@@ -83,6 +89,14 @@ export function activeTarget(deps: FocusInputs): FocusTarget {
   if (deps.attachedChild) return "child";
   if (deps.overlayTop?.kind === "overlay") return "overlay";
   if (deps.copyMode) return "copyMode";
+  // **A panel is a SUBSTATE and not a question** (§2c, R-BLK-109, R-BLK-866).
+  // *FIND and COMPLETION are PROMPT SUBSTATES — the prompt, relabelled*, and
+  // *a command palette is a PANEL whose list is a ladder*. So a panel joins
+  // `pushedView`, whose rung is `substate`: the mapping M5 wrote down and could
+  // not express while a completion menu was an `overlay` and therefore a
+  // question. It sits below `copyMode` for the same reason a view does — a
+  // frozen screen outranks a thing you opened on top of a live one.
+  if (deps.overlayTop?.kind === "panel") return "panel";
   if (deps.overlayTop?.kind === "view") return "pushedView";
   // **Before the `prompt` row, and gated on the live entry** (C26 I2). The mode
   // is stored, so it can outlive the entry that was being interacted with —

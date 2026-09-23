@@ -3,7 +3,7 @@
 //
 // Two of these could not be written at the unit tier at all. The confirm's
 // undismissability is a property of C15's stack and C16's one `escape` row
-// together — a store asserting `dismissable: false` on a layer it built is
+// together — a store asserting `blocking: true, dismissal: "answer"` on a layer it built is
 // asserting its own literal. And whether the search overlay narrows without a
 // re-push is a claim about the manager, not about the blocks.
 import { describe, expect, it } from "vitest";
@@ -40,7 +40,8 @@ describe("T4.3 (with C15) — the search overlay", () => {
       kind: "overlay",
       placement: { kind: "centred" },
       content: [{ kind: "raw", id: "later-row", text: "later" }],
-      dismissable: true,
+      blocking: false,
+      dismissal: "escape",
       // Declared, because a centred layer must be (C15 I20). This stand-in is
       // "a confirm, say" and a confirm has a width; it was reaching I16's
       // fallback and standing in for a `fill` layer.

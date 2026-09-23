@@ -195,6 +195,7 @@ describe("C16 §3 — activeTarget", () => {
       at({ attachedChild: true }),
       at({ overlayTop: { kind: "overlay" } }),
       at({ copyMode: true }),
+      at({ overlayTop: { kind: "panel" } }),
       at({ overlayTop: { kind: "view" } }),
       at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "interact" } }),
       at(),

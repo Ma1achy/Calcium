@@ -469,6 +469,82 @@ describe("C16 §4a — the wheel scrolls the box under it, or else the transcrip
     expect(graph.router.dispatch(mouse(5, 2))).toBe(false);
     expect(graph.focus.current).toEqual(AT(boxed, "n5", "s"));
   });
+
+  /**
+   * A three-row inner box inside a five-row outer one, with prose above the
+   * inner so the outer has rows of its own to be pointed at.
+   *
+   * Outer content rows, unscrolled: 0 `o1`, 1–3 the inner box, 4 `o5`, and
+   * `o6`/`o7` past the window. The inner's content is four one-row children in
+   * a three-row window, so its ceiling is 1; the outer's is 2. **Both boxes can
+   * move**, which is what makes the control a control: with an outer ceiling of
+   * zero the row would be satisfied by an implementation that moves nothing.
+   */
+  const NESTED = {
+    kind: "scroll",
+    id: "outer",
+    height: 5,
+    children: [
+      { kind: "raw", id: "o1", text: "OUTER ONE" },
+      {
+        kind: "scroll",
+        id: "inner",
+        height: 3,
+        children: [
+          { kind: "raw", id: "i1", text: "INNER ONE" },
+          { kind: "raw", id: "i2", text: "INNER TWO" },
+          { kind: "raw", id: "i3", text: "INNER THREE" },
+          { kind: "raw", id: "i4", text: "INNER FOUR" },
+        ],
+      },
+      { kind: "raw", id: "o5", text: "OUTER FIVE" },
+      { kind: "raw", id: "o6", text: "OUTER SIX" },
+      { kind: "raw", id: "o7", text: "OUTER SEVEN" },
+    ],
+  };
+
+  /** Resolved against the ceiling, as T4.66 reads the single box's (C04 I97). */
+  const INNER_CEILING = 1; // four one-row children in a three-row window
+  const OUTER_CEILING = 2; // 1 + 3 + 1 + 1 + 1 content rows in a five-row window
+
+  it("T1.105 (C16 I48, R-SEL-012): a scroll inside a scroll takes the wheel at the depth the pointer is in", async () => {
+    // **`elementAt` stops at the outermost box and that is right for focus.**
+    // A scroll owns one element per child and the element walk does not descend
+    // past it, so the deepest *element* under the pointer belongs to the outer
+    // box however deeply they nest — which made every wheel the outer's. The
+    // reader's hand was inside the inner box and the outer one moved.
+    const { graph } = await graphAt80();
+    const nested = graph.transcript.append(doc("/nested", [NESTED]) as never);
+    const lines = Array.from({ length: 60 }, (_, i) => `line ${String(i)}`).join("\n");
+    graph.transcript.append(doc("/filler", [{ kind: "raw", id: "f", text: lines }]) as never);
+    graph.viewport.scrollToTop();
+
+    // **Resolved, not raw** (C04 I97, F770): the store spells *past the end* as
+    // `TAIL = ∞` and clamps at read against the ceiling the caller measured.
+    const inner = (): number => Math.min(graph.scrollOffsets.get(nested, "inner"), INNER_CEILING);
+    const outer = (): number => Math.min(graph.scrollOffsets.get(nested, "outer"), OUTER_CEILING);
+    const top = (): number => graph.viewport.scroll.topRow;
+    // **All three counters after every step**, because a version that moved two
+    // of them passes any assertion written about one.
+    expect([inner(), outer(), top()]).toEqual([0, 0, 0]);
+
+    // Terminal row 3 is outer content row 1 — the inner box's first row.
+    expect(graph.router.dispatch(mouse(3, 2, { button: "wheelDown" })), "consumed").toBe(true);
+    expect([inner(), outer(), top()], "the inner moved and nothing else did").toEqual([
+      INNER_CEILING,
+      0,
+      0,
+    ]);
+
+    // **The control, and it is the row above.** Terminal row 2 is outer content
+    // row 0 — `o1`, the outer's own prose — so the wheel is the outer's.
+    expect(graph.router.dispatch(mouse(2, 2, { button: "wheelDown" })), "consumed").toBe(true);
+    expect([inner(), outer(), top()], "this time the outer, and only it").toEqual([
+      INNER_CEILING,
+      OUTER_CEILING,
+      0,
+    ]);
+  });
 });
 
 describe("C16 §4a — chrome, the release and the other buttons", () => {

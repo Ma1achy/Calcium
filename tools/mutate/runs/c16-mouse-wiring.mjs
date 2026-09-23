@@ -113,6 +113,40 @@ const results = runPass({
       to: "    const land = armActivation(armId(hit.id, address.blockId, address.elementId), at.at === \"prompt\" ? () => focus.enterLiveBlock(hit.id, address) : () => focus.focusRow(hit.id, address));\n",
       expect: "T4.62",
     },
+    // **M8's three, each against the row that claims it** (C16 I47, I48). All
+    // three leave a pointer that lands where it looks like it should: the
+    // dismissal is invisible unless something under the closing layer would
+    // have acted, and a wheel's depth is invisible unless two boxes are nested.
+    {
+      // I47 — the press closes and also acts. *The thing you meant to hit was
+      // covered a moment ago*, so this is the state the rule forbids and it
+      // reads as making a click do more rather than less.
+      name: "the dismissing click falls through and acts on what was underneath",
+      file: "src/interaction/router/router.ts",
+      from: '      stages.push("dismiss");\n      deps.popLayer();\n      return true;',
+      to: '      stages.push("dismiss");\n      deps.popLayer();',
+      expect: "T1.103",
+    },
+    {
+      // I48 — a panel routed to `overlay` by the pointer while the keyboard
+      // reaches it at `panel`: one seam answering two ways, which is what the
+      // layer order being the scroll order rules out.
+      name: "a covering panel routes to the overlay target, as it did before the kind existed",
+      file: "src/interaction/router/router.ts",
+      from: '          : covering.layer.kind === "panel"\n            ? "panel"\n            : "overlay",',
+      to: '          : "overlay",',
+      expect: "T1.104",
+    },
+    {
+      // I48's second clause — the descent removed, so every wheel is the
+      // outermost box's. The reader's hand is inside the inner box and the
+      // outer one moves.
+      name: "the wheel takes the outermost scrollable rather than the innermost",
+      file: "src/shell/construct.ts",
+      from: "      const box = innermostScrollUnder(hit.id, under);",
+      to: "      const box = under.block;",
+      expect: "T1.105",
+    },
     {
 // **Killed by T1.101b and not by T4.65, which is a fact about T4.65.**
       // The session's drag row extends a *selection*, and a selection never

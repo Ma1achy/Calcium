@@ -337,7 +337,15 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
     // `Esc` pops it, which is what makes C16 §4's coverage clause necessary: a
     // dismissable layer takes the permissive branch, and this one covers the
     // region.
-    dismissable: true,
+    // **`blocking: true`, and the mechanical mapping got this wrong** (C15 §2c,
+    // C16 I8). The old value was `dismissable: true` and the comment above says
+    // why that was not the whole answer: the layer was modal by `coversRegion`,
+    // the geometry standing in for a field that did not exist. Mapping the flag
+    // alone dropped the second half and the view stopped owning input. It is
+    // escapable **and** blocking, which is the combination the single flag could
+    // not hold and the pair exists for.
+    blocking: true,
+    dismissal: "escape",
   });
 
   const render = (at: State): void => {

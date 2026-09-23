@@ -56,21 +56,22 @@ export function anchored(
   id: string,
   height: number,
   at: Readonly<{ row: number; rows?: number; prefer: "above" | "below" }>,
-  opts: Readonly<{ width?: number; dismissable?: boolean }> = {},
+  opts: Readonly<{ width?: number; blocking?: boolean; dismissal?: Layer["dismissal"] }> = {},
 ): Layer {
   return {
     id,
     kind: "overlay",
     placement: { kind: "anchored", row: at.row, prefer: at.prefer, ...(at.rows !== undefined && { rows: at.rows }) },
     content: rows(height, id),
-    dismissable: opts.dismissable ?? true,
+    blocking: opts.blocking ?? false,
+    dismissal: opts.dismissal ?? (opts.blocking === true ? "answer" : "escape"),
     ...(opts.width !== undefined && { width: opts.width }),
   };
 }
 
 /**
  * A peek of `height` rows anchored at a span — the layer that takes no keys
- * (C15 §2a, I21). `dismissable` is carried because the type asks for it and
+ * (C15 §2a, I21). `blocking` and `dismissal` are carried because the type asks for them and
  * read by nothing: `pop` never reaches a peek.
  */
 export function peek(
@@ -83,7 +84,8 @@ export function peek(
     kind: "peek",
     placement: { kind: "anchored", row: at.row, prefer: at.prefer, ...(at.rows !== undefined && { rows: at.rows }) },
     content: rows(height, id),
-    dismissable: true,
+    blocking: false,
+    dismissal: "focus",
   };
 }
 
@@ -99,15 +101,42 @@ export function peek(
 export function centred(
   id: string,
   height: number,
-  opts: Readonly<{ width?: number; dismissable?: boolean }> = {},
+  opts: Readonly<{ width?: number; blocking?: boolean; dismissal?: Layer["dismissal"] }> = {},
 ): Layer {
   return {
     id,
     kind: "overlay",
     placement: { kind: "centred" },
     content: rows(height, id),
-    dismissable: opts.dismissable ?? true,
+    blocking: opts.blocking ?? false,
+    dismissal: opts.dismissal ?? (opts.blocking === true ? "answer" : "escape"),
     width: opts.width ?? REGION.width,
+  };
+}
+
+/**
+ * A panel of `n` rows anchored at a span — the layer that is a prompt substate
+ * (C15 §2c, I27).
+ *
+ * **`blocking` and `dismissal` are not parameters**, and that is the fixture
+ * carrying the invariant rather than repeating it: a panel is anchored,
+ * non-blocking and closed by `escape`, and a helper that let a row vary them
+ * would let a row construct the thing `push` refuses. The rows that mean to
+ * construct a refused panel build the object by hand, which is what makes them
+ * legible as refusals.
+ */
+export function panel(
+  id: string,
+  height: number,
+  at: Readonly<{ row: number; rows?: number; prefer: "above" | "below" }> = { row: 10, prefer: "above" },
+): Layer {
+  return {
+    id,
+    kind: "panel",
+    placement: { kind: "anchored", row: at.row, prefer: at.prefer, ...(at.rows !== undefined && { rows: at.rows }) },
+    content: rows(height, id),
+    blocking: false,
+    dismissal: "escape",
   };
 }
 
@@ -117,7 +146,8 @@ export function view(id: string, height = 3): Layer {
     kind: "view",
     placement: { kind: "fill" },
     content: rows(height, id),
-    dismissable: true,
+    blocking: false,
+    dismissal: "escape",
   };
 }
 
@@ -142,7 +172,8 @@ export function wrappingLayer(id: string, width: number): Layer {
           "a narrow confirm and occupies far fewer across the whole region",
       }),
     ],
-    dismissable: true,
+    blocking: false,
+    dismissal: "escape",
   };
 }
 

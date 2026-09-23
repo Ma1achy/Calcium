@@ -691,7 +691,8 @@ describe("C22 §4a — one overlay layout per frame, shared by the rows and the 
       kind: "overlay" as const,
       placement: { kind: "anchored" as const, row: 6, prefer: "above" as const },
       content: contentRows(1, id),
-      dismissable: true,
+      blocking: false,
+      dismissal: "escape" as const,
       width: 20,
       cursor: { row: 0, col: 5 },
     };

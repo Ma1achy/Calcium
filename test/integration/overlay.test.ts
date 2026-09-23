@@ -112,7 +112,7 @@ describe("C15 integration — against the viewport", () => {
     const rung = (): "dismissed" | "noop" | "fellThrough" => {
       const top = m.top;
       if (top === null) return "fellThrough";
-      if (!top.dismissable) return "noop";
+      if (top.dismissal !== "escape") return "noop";
       m.pop();
       return "dismissed";
     };
@@ -120,7 +120,7 @@ describe("C15 integration — against the viewport", () => {
     expect(rung()).toBe("fellThrough");
 
     m.push(view("dash"));
-    m.push(centred("confirm", 3, { dismissable: false }));
+    m.push(centred("confirm", 3, { blocking: true, dismissal: "answer" }));
     expect(rung()).toBe("noop");
     // The whole point: the dashboard is still there. The collapsed form —
     // `if (pop()) …` — falls to the next rung and pops it out from under an

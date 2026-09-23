@@ -142,20 +142,32 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // rather than at the keystroke — loud, but still the seam rewritten.
   { target: "prompt", key: chordOf("move.right"), action: "acceptGhostOrForward" },
 
-  { target: "overlay", key: chordOf("focus.next"), action: "menuNext" },
-  { target: "overlay", key: chordOf("move.down"), action: "menuNext" },
-  { target: "overlay", key: chordOf("move.up"), action: "menuPrev" },
-  { target: "overlay", key: chordOf("confirm"), action: "menuAccept" },
+  // **The menu's four rows are `panel`, not `overlay`** (C15 §2c, I27,
+  // R-BLK-109). The completion menu and reverse-i-search are panels — prompt
+  // substates — so the target they answer at moved with the kind. They cannot
+  // ride `pushedView`, which shares their rung: `escape` is `dismiss` here and
+  // `viewPop` there, and one `(target, key)` takes one binding.
+  { target: "panel", key: chordOf("focus.next"), action: "menuNext" },
+  { target: "panel", key: chordOf("move.down"), action: "menuNext" },
+  { target: "panel", key: chordOf("move.up"), action: "menuPrev" },
+  { target: "panel", key: chordOf("confirm"), action: "menuAccept" },
   //
   // Generic rather than C19's alone, landing now because C19 is the first
-  // dismissable overlay to arrive. It respects `dismissable`, so a confirm
+  // dismissable overlay to arrive. It respects `dismissal`, so a confirm
   // still refuses `Esc` — C15's `pop()` inspects only the top and returns the
   // layer rather than a boolean, which is what lets one row serve both.
+  //
+  // **Twice, because dismissal is not a property of the kind** (C15 I26). A
+  // panel is escapable by construction and an overlay is escapable when its
+  // `dismissal` says so, and both need the row: with the menu a panel, an
+  // `overlay`-only row would leave `esc` unbound over a completion, and a
+  // `panel`-only row would leave a dismissable confirm unclosable.
   { target: "overlay", key: chordOf("escape"), action: "dismiss" },
+  { target: "panel", key: chordOf("escape"), action: "dismiss" },
 
   // --- C20's three, and the fourth that is not here ----------------------
   //
-  // `↑`/`↓` are bound on the prompt only. The `overlay` target already has both
+  // `↑`/`↓` are bound on the prompt only. The `panel` target already has both
   // (C19's `menuPrev`/`menuNext`), and two bindings for one `(target, key)` is a
   // construction error rather than a last-wins — which is the table telling the
   // truth: while a menu is open the arrows belong to the menu, and C16 derives
@@ -165,12 +177,12 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   { target: "prompt", key: chordOf("move.down"), action: "historyNext" },
   { target: "prompt", key: { name: "r", ctrl: true }, action: "reverseSearch" },
   //
-  // A second `⌃r` steps to an older match, and it is an `overlay` row because
-  // by then the search *is* the overlay. `Tab`, `Enter` and `Esc` inside a
+  // A second `⌃r` steps to an older match, and it is a `panel` row because
+  // by then the search *is* the panel. `Tab`, `Enter` and `Esc` inside a
   // search are C19's three rows already in this table, dispatched to whichever
   // layer is on top — the handler reads `overlays.top`, which is L4's to do and
   // is why C20 adds no fourth row here.
-  { target: "overlay", key: { name: "r", ctrl: true }, action: "searchOlder" },
+  { target: "panel", key: { name: "r", ctrl: true }, action: "searchOlder" },
 
   // --- C17, readline's set and no more (I21, C16 §6) -----------------------
   //

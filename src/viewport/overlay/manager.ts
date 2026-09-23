@@ -86,6 +86,23 @@ class Manager implements OverlayManager {
     // is only ever pushed onto an empty stack — and a peek is the kind that
     // does not: it opens while a confirm or a menu may already be up, and it
     // belongs beneath them however late it arrives.
+    // **I28 — the panels close first, and the arriving layer is what closes
+    // them** (R-BLK-873). *A panel is a thing you opened; a question is a thing
+    // that arrived.* The arriving one cannot silently sit under something the
+    // reader was reading, and two layers differing on escapability make `esc`
+    // ambiguous. Each goes out as its own change (I25), so every owner runs its
+    // own teardown; the reason is `explicit`, because the referent has not gone.
+    if (layer.blocking) {
+      // **Panels, not every `escape` layer** (I28, R-BLK-873). The rule names
+      // both parties — *a panel is DISMISSABLE and a question is NOT*, *THE
+      // PANEL CLOSES FIRST* — and widening it to the `dismissal` field alone
+      // closes a **view**, so a confirm over a dashboard took the dashboard
+      // with it. A panel is a transient you opened above the prompt; a view is
+      // a region you are inside.
+      for (const open of [...this.#stack]) {
+        if (open.kind === "panel") this.dismiss(open.id);
+      }
+    }
     this.#stack = sortLayers([...this.#stack, layer]);
     this.#emit({ kind: "push", id: layer.id, layerKind: layer.kind });
 
@@ -104,7 +121,7 @@ class Manager implements OverlayManager {
 
   pop(): Layer | null {
     const top = this.top;
-    if (top === null || !top.dismissable) return null;
+    if (top === null || top.dismissal !== "escape") return null;
     this.#remove(top.id);
     this.#emit({ kind: "pop", id: top.id, layerKind: top.kind });
     return top;
@@ -194,6 +211,25 @@ function assertPlaceable(layer: Layer): void {
         `describes, and a centred or fill layer that takes no keys is a confirm or a view ` +
         `nothing can answer (I22)`,
     );
+  }
+  // **I27 — a panel is one triple and the kind is its name.** Anchored, because
+  // *floats above the prompt, between two rules* is a placement relative to
+  // something; non-blocking and `escape`, because a blocking panel is an overlay
+  // and a panel that outlives `esc` is a peek. A panel free to vary them would be
+  // a fourth kind wearing a third one's name.
+  if (layer.kind === "panel") {
+    if (layer.placement.kind !== "anchored") {
+      throw new OverlayError(
+        `panel ${layer.id} is ${layer.placement.kind}: a panel floats above the prompt between ` +
+          `two rules, which is a placement relative to something (I27)`,
+      );
+    }
+    if (layer.blocking || layer.dismissal !== "escape") {
+      throw new OverlayError(
+        `panel ${layer.id} declares blocking=${String(layer.blocking)} dismissal=${layer.dismissal}: ` +
+          `a blocking panel is an overlay and a panel that outlives esc is a peek (I27)`,
+      );
+    }
   }
   if (layer.placement.kind !== "centred" || layer.width !== undefined) return;
   throw new OverlayError(

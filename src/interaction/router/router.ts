@@ -28,7 +28,7 @@ const EXIT_ARM_MS = 500;
 
 
 export type Placed = Readonly<{
-  layer: Readonly<{ id: string; kind: "overlay" | "view"; dismissable: boolean }>;
+  layer: Readonly<{ id: string; kind: "overlay" | "view" | "panel"; blocking: boolean; dismissal: "escape" | "focus" | "answer" }>;
   top: number;
   left: number;
   height: number;
@@ -59,7 +59,7 @@ export type RouterDeps = Readonly<{
    * `handler`/`local` ruling, one layer up.
    */
   probe?: Probe;
-  overlayTop: () => Readonly<{ kind: "overlay" | "view"; id: string; dismissable: boolean }> | null;
+  overlayTop: () => Readonly<{ id: string; kind: "overlay" | "view" | "panel"; blocking: boolean; dismissal: "escape" | "focus" | "answer" }> | null;
   /**
    * The top layer's answer handler, or null — I25.
    *
@@ -370,13 +370,21 @@ export function createRouter(
       if (top === null) return false;
       // `top`, never `pop()`'s return: null covers both "nothing to close" and
       // "you may not close this", and those are a fall-through and a no-op.
-      if (!top.dismissable) return true; // consumed, and nothing happens (I8)
+      if (top.dismissal !== "escape") return true; // consumed, and nothing happens (I8)
       deps.popLayer();
       return true;
     });
     register("copyMode", (e) => {
       if (!isCtrlC(e)) return false;
       deps.exitCopyMode();
+      return true;
+    });
+    // **A panel's rung is `substate`, and so is a view's** (§2c, R-BLK-109).
+    // Two targets, one rung, and the registration is per target: a panel is
+    // escapable by construction, so `⌃c` closes it exactly as `esc` does.
+    register("panel", (e) => {
+      if (!isCtrlC(e)) return false;
+      deps.popLayer();
       return true;
     });
     register("pushedView", (e) => {
@@ -457,7 +465,47 @@ export function createRouter(
     const wheel = e.button.startsWith("wheel");
     if (covering !== undefined) {
       stages.push(`layer:${covering.layer.id}`);
-      return run(covering.layer.kind === "view" ? "pushedView" : "overlay", e);
+      // **Three kinds, three targets** (I48, C15 I23, R-BLK-779). *The layer
+      // order is the scroll order*, so a mouse event over a panel is the
+      // panel's exactly as a key is — and while a panel routed to `overlay`
+      // here, the handlers registered at `panel` were unreachable by the
+      // pointer while reachable by the keyboard, which is one seam answering
+      // two ways.
+      return run(
+        covering.layer.kind === "view"
+          ? "pushedView"
+          : covering.layer.kind === "panel"
+            ? "panel"
+            : "overlay",
+        e,
+      );
+    }
+
+    // **The click that dismisses does not also act** (I47, R-BLK-854,
+    // R-BLK-855). The point is not on the layer, and the topmost layer is one
+    // the reader can close — so the press closes it and stops there. *The thing
+    // you meant to hit was covered a moment ago*, so a press that closed the
+    // panel and activated what was underneath would act on something the reader
+    // could not see when they decided to press. One gesture, one effect: the
+    // same shape as `esc` popping one rung, on the pointer instead.
+    //
+    // The **press** and not the release, because closing is not an activation
+    // and nothing about it is taken back by moving the pointer; the arm a
+    // release would commit is cancelled by this press as by any other (I46).
+    // A wheel is carved out for I40's reason and a hover for §4a row t's: a
+    // hand resting on the mouse under mode 1003 would close every panel it
+    // reported over.
+    const escapable = deps.overlayTop();
+    if (
+      escapable !== null &&
+      escapable.dismissal === "escape" &&
+      e.press &&
+      !wheel &&
+      e.button !== "none"
+    ) {
+      stages.push("dismiss");
+      deps.popLayer();
+      return true;
     }
     // **A layer that must be answered takes the mouse as it takes the keys**
     // (I8). The point is not on the layer, so nothing beneath it may act — a
@@ -474,7 +522,7 @@ export function createRouter(
     // produced the defect I8 exists to prevent, one layer up: the layer blocked
     // comprehension of its own question. A click beside a confirm is still
     // consumed and still does nothing, which is what row k was measured on.
-    if (top !== null && !top.dismissable && !wheel) {
+    if (top !== null && top.blocking && !wheel) {
       stages.push("modal");
       return true;
     }
@@ -503,21 +551,16 @@ export function createRouter(
   }
 
   /**
-   * Does the layer `id` fill the region it was placed in?
+   * **`coversRegion` retired in M8** (C15 I26, R-QST-001, I8).
    *
-   * **The property, not a proxy for it** (I8). `kind === "view"` is the narrow
-   * test and it passes every case written about views while missing any other
-   * full-region layer — and a view whose box was clamped smaller would be
-   * treated as covering when it does not. C15 §4 commits a view to `top: 0`,
-   * `left: 0` and the region's full extent, so the box is where the answer is.
+   * It measured a layer's box because `dismissable` could not say *owns input*,
+   * and a full-region view had to be recognised by its geometry. That was right
+   * about the hazard and wrong about where the answer lives: *a question
+   * declares blocking and owner explicitly*, so the field says it. A proxy for
+   * a field that does not exist yet fails in both directions once the field
+   * does — a large layer blocking nothing would still be modal, and a one-row
+   * typed reply that blocks would not be.
    */
-  function coversRegion(id: string): boolean {
-    const region = deps.overlayRegion();
-    const box = deps.placed().find((p) => p.layer.id === id);
-    if (box === undefined) return false;
-    return box.top === 0 && box.left === 0 && box.height >= region.height && box.width >= region.width;
-  }
-
   /**
    * Every handler on a target, until one does not `pass` (R-OWN-001).
    *
@@ -906,7 +949,7 @@ export function createRouter(
     // be answered is modal, and a global shortcut firing beneath one acts on a
     // surface the user cannot see (I8).
     const top = deps.overlayTop();
-    if (top !== null && (!top.dismissable || coversRegion(top.id))) {
+    if (top !== null && top.blocking) {
       // **This is a REJECT and it used to be a silent drop** (§103, R-HON-004,
       // R-INT-009, C16 §3a W2). §103: *a blocking question handles its answer
       // actions and REJECTS unrelated typing; it never passes keys into the held

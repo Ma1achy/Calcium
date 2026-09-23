@@ -179,7 +179,8 @@ describe("C22 §3 — the fullscreen patch view", () => {
       // which is neither what a menu is nor a placeable layer.
       placement: { kind: "anchored" as const, row: 0, prefer: "below" as const },
       content: [],
-      dismissable: true,
+      blocking: false,
+      dismissal: "escape",
     });
 
     // **Both halves.** C15 throws on a view over a non-empty stack (C15 I1) and

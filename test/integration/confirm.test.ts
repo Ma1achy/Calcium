@@ -24,7 +24,7 @@
 //     only one of them reads as satisfied while the other is live. I25's first
 //     wording said "before the `⌃c` clause" and this mutation is what corrected
 //     it.
-//   - `dismissable: true` on the confirm layer (`confirm.ts`) → T4.1 and T4.9
+//   - `blocking: false, dismissal: "escape"` on the confirm layer (`confirm.ts`) → T4.1 and T4.9
 //     fail, and **the other seven pass**. A paste reaches `global` past a centred
 //     box satisfying neither clause of C16 I8's guard. That seven survive is the
 //     point: every key-path assertion is blind to the flag, because the answer
@@ -115,7 +115,7 @@ function world(
     keyReleasesReported: () => false,
     overlayTop: () => {
       const top = overlays.top;
-      return top === null ? null : { kind: top.kind, id: top.id, dismissable: top.dismissable };
+      return top === null ? null : { kind: top.kind, id: top.id, blocking: top.blocking, dismissal: top.dismissal };
     },
     placed: () => overlays.layout({ width: 80, height: 24 }),
     popLayer: () => void overlays.pop(),
@@ -192,7 +192,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
 
     // The layer is genuinely on C15's stack, and modal by its own flag.
     expect(w.overlays.top?.id).toBe("confirm");
-    expect(w.overlays.top?.dismissable).toBe(false);
+    expect(w.overlays.top?.dismissal).toBe("answer");
 
     // **Through the router.** This is the line the mutation removes.
     expect(w.router.dispatch(key("y"))).toBe(true);
@@ -358,7 +358,8 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
       // which is neither what a menu is nor a placeable layer.
       placement: { kind: "anchored" as const, row: 0, prefer: "below" as const },
       content: [],
-      dismissable: true,
+      blocking: false,
+      dismissal: "escape",
     });
 
     w.router.dispatch(key("y"));
@@ -377,7 +378,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     const answer = present(w, { question: "Stop api-gateway?", choices: YES_NO });
 
     // A paste is not a key, so the answer handler returns false and the event
-    // falls through rung 4 to step 3 — which is where `dismissable: false` earns
+    // falls through rung 4 to step 3 — which is where `blocking: true, dismissal: "answer"` earns
     // its place. With the flag `true` and a centred box this reaches `global`,
     // and that is the whole reason the ruling could not be built as written.
     w.router.dispatch({ kind: "paste", text: "xyz" });
@@ -542,14 +543,14 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
 
   it("T4.18 (entry 16 A6, C15 I14): the anchored question is still not escapable", () => {
     // **The pairing the walk's A6 names**, and the cell nothing in the tree
-    // produced until now: `dismissable: false` with `anchored`. Placement is a
+    // produced until now: `blocking: true, dismissal: "answer"` with `anchored`. Placement is a
     // live parameter and escapability is a construction one (C15 I14, and
     // `LayerUpdate` excludes it deliberately) — so moving the box must not
     // move the flag. The symptom of getting this wrong is "the shell froze",
     // three components from the cause.
     const w = world();
     const answer = present(w, { question: "q?", choices: YES_NO, placement: "anchored" });
-    expect(w.overlays.top?.dismissable).toBe(false);
+    expect(w.overlays.top?.dismissal).toBe("answer");
     expect(w.overlays.pop(), "the router cannot take it").toBeNull();
     expect(w.overlays.top?.id).toBe("confirm");
 

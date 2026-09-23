@@ -202,7 +202,8 @@ describe("C22 §6a — compositing", () => {
       kind: "overlay",
       placement: { kind: "anchored", row: 6, prefer: "above" },
       content: contentRows(3, "under"),
-      dismissable: true,
+      blocking: false,
+      dismissal: "escape" as const,
       width: 30,
     });
     overlays.push({
@@ -210,7 +211,8 @@ describe("C22 §6a — compositing", () => {
       kind: "overlay",
       placement: { kind: "anchored", row: 6, prefer: "above" },
       content: contentRows(1, "over"),
-      dismissable: true,
+      blocking: false,
+      dismissal: "escape" as const,
       width: 10,
     });
 
@@ -250,7 +252,8 @@ describe("C22 §6a — compositing", () => {
       // One short row in a box the width of the layer: the cells to the right
       // of the text are inside the box and produced by nothing.
       content: contentRows(1, "n"),
-      dismissable: true,
+      blocking: false,
+      dismissal: "escape" as const,
       width: 20,
     });
 
@@ -342,7 +345,8 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
       kind: "overlay" as const,
       placement: { kind: "anchored" as const, row: 6, prefer: "above" as const },
       content: contentRows(1, id),
-      dismissable: true,
+      blocking: false,
+      dismissal: "escape" as const,
       width: 20,
       ...(cursor !== undefined && { cursor }),
     };

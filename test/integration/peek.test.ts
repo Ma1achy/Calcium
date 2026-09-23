@@ -107,7 +107,8 @@ describe("C15 §2a — the peek beside the focused element", () => {
       kind: "overlay",
       placement: { kind: "anchored", row: 3, prefer: "below" },
       content: [],
-      dismissable: true,
+      blocking: false,
+      dismissal: "escape",
     });
     expect(s.graph.router.target).toBe("overlay");
     s.type(`${ESC}[A`); // ↑

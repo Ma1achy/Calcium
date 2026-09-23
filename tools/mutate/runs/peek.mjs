@@ -39,8 +39,8 @@ const results = runPass({
   // is not in doubt, not the cleverest change.
   control: {
     file: CONSTRUCT,
-    from: '      stores.overlays.push({ id: PEEK_ID, kind: "peek", placement, content, dismissable: true });',
-    to: '      stores.overlays.push({ id: PEEK_ID, kind: "overlay", placement, content, dismissable: true });',
+    from: '      stores.overlays.push({ id: PEEK_ID, kind: "peek", placement, content, blocking: false, dismissal: "focus" });',
+    to: '      stores.overlays.push({ id: PEEK_ID, kind: "overlay", placement, content, blocking: false, dismissal: "escape" });',
     why: "T4.10 asserts ↓ moves focus with the peek up; a peek pushed as an overlay steals the key (F780's measurement) — a run where this survives cannot see a kill",
   },
   mutations: [
@@ -60,13 +60,20 @@ const results = runPass({
       // why T1.24 exists beside T2.8.
       name: "peeks sort with the overlays rather than beneath them",
       file: PLACE,
+      // **Re-anchored in M8**: `panel` joined the partition between the peeks
+      // and the overlays (C15 I23, R-BLK-779), so the return line gained a
+      // band. The mutation is unchanged in what it says — the peek band
+      // collapses — and the panels stay where they are, which keeps the kill
+      // attributable to the peek rather than to the reorder.
       from:
         '  const peeks = stack.filter((l) => l.kind === "peek");\n' +
+        '  const panels = stack.filter((l) => l.kind === "panel");\n' +
         '  const overlays = stack.filter((l) => l.kind === "overlay");\n' +
-        "  return Object.freeze([...views, ...peeks, ...overlays]);",
+        "  return Object.freeze([...views, ...peeks, ...panels, ...overlays]);",
       to:
-        '  const overlays = stack.filter((l) => l.kind !== "view");\n' +
-        "  return Object.freeze([...views, ...overlays]);",
+        '  const panels = stack.filter((l) => l.kind === "panel");\n' +
+        '  const overlays = stack.filter((l) => l.kind === "peek" || l.kind === "overlay");\n' +
+        "  return Object.freeze([...views, ...panels, ...overlays]);",
       expect: "T1.24",
     },
     {
@@ -103,8 +110,8 @@ const results = runPass({
       // go to the layer.
       name: "the peek is pushed as an overlay and takes the keys",
       file: CONSTRUCT,
-      from: '      stores.overlays.push({ id: PEEK_ID, kind: "peek", placement, content, dismissable: true });',
-      to: '      stores.overlays.push({ id: PEEK_ID, kind: "overlay", placement, content, dismissable: true });',
+      from: '      stores.overlays.push({ id: PEEK_ID, kind: "peek", placement, content, blocking: false, dismissal: "focus" });',
+      to: '      stores.overlays.push({ id: PEEK_ID, kind: "overlay", placement, content, blocking: false, dismissal: "escape" });',
       expect: "T4.10",
     },
     {

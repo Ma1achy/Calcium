@@ -38,11 +38,11 @@ function routerDeps(overlays: OverlayManager): RouterDeps {
     overlayAnswerCallback: () => null,
     overlayTop: () => {
       const top = overlays.top;
-      return top === null ? null : { kind: top.kind, id: top.id, dismissable: top.dismissable };
+      return top === null ? null : { kind: top.kind, id: top.id, blocking: top.blocking, dismissal: top.dismissal };
     },
     placed: () =>
       overlays.layout({ width: 80, height: 24 }).filter(takesInput).map((p) => ({
-        layer: { id: p.layer.id, kind: p.layer.kind, dismissable: p.layer.dismissable },
+        layer: { id: p.layer.id, kind: p.layer.kind, blocking: p.layer.blocking, dismissal: p.layer.dismissal },
         top: p.top,
         left: p.left,
         height: p.height,
@@ -116,7 +116,10 @@ describe("C15 e2e — layers under real input", () => {
     });
 
     overlays.push(menuLayer([{ value: "--status" }, { value: "--since" }], 0, 0, { row: 20, rows: 1 }));
-    expect(router.target).toBe("overlay");
+    // **`panel`, because the menu is one** (C15 §2c, I27). The completion menu
+    // is a prompt substate rather than a question, so the target it answers at
+    // is the substate rung's.
+    expect(router.target).toBe("panel");
 
     const { store } = await openWith();
     for (const c of ["/ps --status=running", "/logs digit-42"]) store.append(c, 0);
@@ -140,9 +143,13 @@ describe("C15 e2e — layers under real input", () => {
     // from the keymap, and let the layer on top decide what it means. That is
     // the seam C20 §5 names when it says the bindings are C16's.
     const keymap = createKeymap(defaultKeymap);
-    router.register("overlay", (e) => {
+    // **`panel`, both times** (C15 I27, M8). The menu and the search are
+    // panels, so this is the target they answer at and the target the binding
+    // is declared on — `escape → dismiss` is bound at `overlay` as well, and a
+    // handler reading the wrong one of the two resolves nothing.
+    router.register("panel", (e) => {
       if (e.kind !== "key") return false;
-      const binding = keymap.resolve("overlay", e.key);
+      const binding = keymap.resolve("panel", e.key);
       if (binding?.action !== "dismiss") return false;
       if (overlays.top?.id === SEARCH_ID) store.searchEnd("cancel");
       overlays.pop();
@@ -151,7 +158,7 @@ describe("C15 e2e — layers under real input", () => {
 
     expect(router.dispatch(escape()), "consumed").toBe(true);
     expect(overlays.stack.map((l) => l.id)).toEqual([MENU_ID]);
-    expect(router.target, "the menu is still there, and still has the keys").toBe("overlay");
+    expect(router.target, "the menu is still there, and still has the keys").toBe("panel");
     expect(store.searchState).toBeNull();
   });
   // **T5.3 and T5.5 were deferred on a premise that was false when it was

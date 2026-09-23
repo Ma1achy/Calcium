@@ -60,7 +60,8 @@ describe("C15 contract — placement is a function", () => {
       // @ts-expect-error — I4: a layer carries blocks, so it is themed,
       // degradable and measurable like everything else in the transcript.
       content: [element],
-      dismissable: true,
+      blocking: false,
+      dismissal: "escape",
       // I20, so the row fails on I4 rather than on the placement.
       width: 20,
     };

@@ -51,6 +51,24 @@ export type FocusTarget =
   | "child"
   | "overlay"
   | "copyMode"
+  /**
+   * A panel — completion, reverse search, a command palette (C15 §2c, I27,
+   * R-BLK-109, R-BLK-866).
+   *
+   * **A ninth target at a rung that already had one, which is M5's point made
+   * concrete**: targets are not rungs, and the map is many-to-one. A panel and a
+   * view are both `substate` — *FIND and COMPLETION are PROMPT SUBSTATES, the
+   * prompt relabelled* — and they are two targets rather than one because they
+   * bind the same chords to different verbs: `escape` is `dismiss` on a panel
+   * and `viewPop` on a view, which is R-KEY-003's *unless the current owner
+   * explicitly captures the action* and is a collision on one target.
+   *
+   * Above `pushedView` because a panel opens over a live prompt while a view
+   * replaces the region, and `push` refuses a view onto a non-empty stack, so
+   * the two never coexist and the order between them is a formality that still
+   * has to be written down.
+   */
+  | "panel"
   | "pushedView"
   /**
    * C26 I2 — interaction mode, and it is **a target rather than a flag**.
@@ -120,6 +138,7 @@ export const RUNG_OF: Readonly<Record<Exclude<FocusTarget, "global">, OwnerRung>
   child: "child",
   overlay: "question",
   copyMode: "copy",
+  panel: "substate",
   pushedView: "substate",
   interaction: "inside",
   prompt: "scope",

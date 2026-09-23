@@ -44,11 +44,11 @@ function world() {
       const top = overlays.top;
       return top === null
         ? null
-        : { kind: top.kind, id: top.id, dismissable: top.dismissable };
+        : { kind: top.kind, id: top.id, blocking: top.blocking, dismissal: top.dismissal };
     },
     placed: () =>
       overlays.layout({ width: 80, height: 10 }).filter(takesInput).map((p) => ({
-        layer: { id: p.layer.id, kind: p.layer.kind, dismissable: p.layer.dismissable },
+        layer: { id: p.layer.id, kind: p.layer.kind, blocking: p.layer.blocking, dismissal: p.layer.dismissal },
         top: p.top,
         left: p.left,
         height: p.height,
@@ -94,7 +94,8 @@ describe("C16 integration", () => {
       // menu as a centred layer with no width, which is neither.
       placement: { kind: "anchored" as const, row: 0, prefer: "below" as const },
       content: rows(3, "m"),
-      dismissable: true,
+      blocking: false,
+      dismissal: "escape",
     });
 
     // No explicit focus call anywhere between those two lines.
@@ -108,14 +109,16 @@ describe("C16 integration", () => {
       kind: "view",
       placement: { kind: "fill" },
       content: rows(4, "d"),
-      dismissable: true,
+      blocking: false,
+      dismissal: "escape",
     });
     overlays.push({
       id: "confirm",
       kind: "overlay",
       placement: { kind: "centred" },
       content: rows(2, "c"),
-      dismissable: false,
+      blocking: true,
+      dismissal: "answer",
       // A centred layer declares its width (C15 I20), and a confirm is the
       // shape that field exists for.
       width: 20,
@@ -196,7 +199,8 @@ describe("C16 integration", () => {
       // menu as a centred layer with no width, which is neither.
       placement: { kind: "anchored" as const, row: 0, prefer: "below" as const },
       content: rows(2, "m"),
-      dismissable: true,
+      blocking: false,
+      dismissal: "escape",
     });
     router.dispatch(key("a"));
     router.dispatch(ctrlC);

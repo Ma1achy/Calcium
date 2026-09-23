@@ -231,7 +231,14 @@ export function menuLayer(
 ): Layer {
   return Object.freeze({
     id: MENU_ID,
-    kind: "overlay" as const,
+    // **A panel, and the kind is what it always was** (C15 §2c, I27,
+    // R-BLK-323, R-BLK-866). *completion — the prompt stays, the panel grows
+    // above it*, and *a command palette is a PANEL whose list is a LADDER*. It
+    // is anchored, non-blocking and closed by `esc`, which is the triple the
+    // kind names; as an `overlay` it answered C16's ladder at the **question**
+    // rung, where R-BLK-109 puts it at `substate` — *FIND and COMPLETION are
+    // PROMPT SUBSTATES, the prompt relabelled*.
+    kind: "panel" as const,
     placement: Object.freeze({
       kind: "anchored" as const,
       row: anchor.row,
@@ -239,7 +246,8 @@ export function menuLayer(
       prefer: "above" as const,
     }),
     content: menuBlocks(candidates, selected, remainder),
-    dismissable: true,
+    blocking: false,
+    dismissal: "escape",
     // **No `width`, which is how a layer says *the whole region* (C15 I16:
     // `min(layer.width ?? region.width, region.width)`).**
     //

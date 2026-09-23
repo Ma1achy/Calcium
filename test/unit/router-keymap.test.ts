@@ -318,15 +318,24 @@ describe("§6 — the default table (C17 I12)", () => {
       // sends, and a rule satisfied by only the normal form is satisfied on half
       // the terminals — which is exactly how Shift-Enter came to be unreachable.
       "prompt right": ["\u001b[C", "\u001bOC"],
-      "overlay tab": ["\t"],
-      "overlay down": ["\u001b[B", "\u001bOB"],
-      "overlay up": ["\u001b[A", "\u001bOA"],
-      "overlay enter": ["\r"],
+      // **`panel`, because the menu and the search are panels** (C15 §2c, I27).
+      // The four rows moved target with the kind; the bytes did not move,
+      // which is the point — a substate is reached by the same keys a question
+      // was, and only the owner changed.
+      "panel tab": ["\t"],
+      "panel down": ["\u001b[B", "\u001bOB"],
+      "panel up": ["\u001b[A", "\u001bOA"],
+      "panel enter": ["\r"],
       // **A lone `Esc` is the one form that needs time.** The same byte begins
       // every sequence above, so it is held for the disambiguation window and
       // the key arrives from `poll` once the window closes. A fixed clock cannot
       // express that, which is why the loop below steps one.
+      //
+      // Twice, because `dismiss` is bound at both an overlay and a panel: the
+      // kinds differ on how they come to be escapable and not on what closes
+      // them (C15 I26).
       "overlay escape": ["\u001b"],
+      "panel escape": ["\u001b"],
 
       // C20's four. The arrows carry both forms for the reason the `right`
       // row above gives — a rule satisfied by only the normal form is
@@ -335,7 +344,7 @@ describe("§6 — the default table (C17 I12)", () => {
       "prompt up": ["\u001b[A", "\u001bOA"],
       "prompt down": ["\u001b[B", "\u001bOB"],
       "prompt c+r": ["\u0012"],
-      "overlay c+r": ["\u0012"],
+      "panel c+r": ["\u0012"],
 
       // C17's editing set (I21). **This table is the check the ruling asked
       // for**, and it earned it: every meta form here is one a terminal has to
@@ -871,18 +880,22 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
   });
 
   it("T1.97 (I42): the table is the rows it was — generation moved where a chord is written and nothing else", () => {
-    // **The row that makes this MR a refactor rather than a change.** 121 rows,
-    // compared as a set of `(target, key, action, profile)`; 58 of them now take
+    // **The row that makes M6 a refactor rather than a change.** 122 rows,
+    // compared as a set of `(target, key, action, profile)`; 59 of them take
     // their chord from the registry through `chordOf`. If generation had altered
     // one chord, one target or one profile, this is where it shows.
+    //
+    // **121 until M8**, which moved six rows from `overlay` to `panel` and added
+    // the 122nd: `escape → dismiss` is bound at both, because a panel is
+    // escapable by its kind and an overlay by its `dismissal` (C15 I26, I27).
     //
     // The count is pinned as well as the set: a table that lost a row *and*
     // gained an equal one would satisfy a set comparison alone.
     const rows = defaultKeymap
       .map((b) => `${b.target}\t${keyText(b.key)}\t${b.action}\t${b.profile ?? "both"}`)
       .sort();
-    expect(rows).toHaveLength(121);
-    expect(new Set(rows).size, "no two rows are identical").toBe(121);
+    expect(rows).toHaveLength(122);
+    expect(new Set(rows).size, "no two rows are identical").toBe(122);
 
     // Every row whose chord the registry names resolves to the registry's key —
     // the join asserted from the table's side, so a `chordOf` call that silently
@@ -890,7 +903,7 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     const byAction = new Map(REGISTRY_BINDINGS.map((b) => [b.actionId, keyText(b.key)]));
     const registryChords = new Set(byAction.values());
     const fromRegistry = defaultKeymap.filter((b) => registryChords.has(keyText(b.key)));
-    expect(fromRegistry.length, "the rows the registry supplies a chord for").toBe(58);
+    expect(fromRegistry.length, "the rows the registry supplies a chord for").toBe(59);
   });
 
   it("T1.94 (I41): ⌘↑ and ⌥↑ are two actions under the enhanced profile and one under the base", () => {

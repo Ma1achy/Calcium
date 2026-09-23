@@ -24,6 +24,11 @@ const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/unit/overlay.test.ts test/integration/confirm.test.ts " +
   "test/integration/history.test.ts test/unit/profile-view.test.ts " +
+  // **`test/integration/router.test.ts` for M8's C15 I28 mutation**, whose subject
+  // is a view surviving a question — a fact about the stack that only a row
+  // holding both a view and a confirm can see, and C15's own file holds no
+  // view under a question because `push` refuses to build one that way.
+  "test/integration/router.test.ts " +
   "test/unit/layout-engine.test.ts";
 const MANAGER = "src/viewport/overlay/manager.ts";
 const CONFIRM = "src/shell/confirm.ts";
@@ -41,6 +46,38 @@ const run = () => {
 };
 
 const MUTATIONS = [
+  // **M8's three rulings, each mutated against the row that claims it**
+  // (C15 I26, C15 I27, C15 I28). Every one below leaves a stack that reads correctly in
+  // any session where the two fields happen to agree, which is the state the
+  // single `dismissable` flag was right in for as long as it lasted.
+  {
+    // I26 — the conflation restored, in the direction that reads as removing a
+    // redundant field. It is exactly T6.24's revert.
+    name: "blocking derived from dismissal rather than declared",
+    file: MANAGER,
+    from: "    if (layer.blocking) {",
+    to: '    if (layer.dismissal !== "escape") {',
+    expect: "T1.32",
+  },
+  {
+    // I27 — the triple stops being the kind's name and becomes a convention.
+    // A panel free to vary them is a fourth kind wearing a third one's name.
+    name: "a panel may declare any blocking and any dismissal",
+    file: MANAGER,
+    from: '    if (layer.blocking || layer.dismissal !== "escape") {',
+    to: "    if (false) {",
+    expect: "T1.31",
+  },
+  {
+    // I28 — widened back to every escapable layer, which is the draft this MR
+    // corrected. It closes a **view**: a confirm over a dashboard takes the
+    // dashboard with it, and every row about panels still passes.
+    name: "a blocking arrival closes every escape layer, views included",
+    file: MANAGER,
+    from: '        if (open.kind === "panel") this.dismiss(open.id);',
+    to: '        if (open.dismissal === "escape") this.dismiss(open.id);',
+    expect: "T4.2",
+  },
   {
     // C15 I25, T6.23 — the removal reaches the owner a turn late. `pop()` has
     // returned and the ladder has moved on while the view still answers `pane`;
@@ -121,11 +158,13 @@ const MUTATIONS = [
     name: "an anchored question becomes dismissable",
     file: CONFIRM,
     //
-    // **Re-anchored** (F1118): `selected` became a thunk read at render time,
-    // so the line above the one this mutation changes gained a call. The
-    // `dismissable` line is the subject and is untouched.
-    from: "        content: render(opts, selected()),\n        dismissable: false,",
-    to: "        content: render(opts, selected()),\n        dismissable: opts.placement === \"anchored\",",
+    // **Re-anchored twice.** F1118: `selected` became a thunk read at render
+    // time, so the line above gained a call. M8: `dismissable` split into
+    // `blocking` and `dismissal` (C15 I26), and escapability is the second of
+    // the two — which is the field this mutation moves, unchanged in what it
+    // means.
+    from: "        content: render(opts, selected()),\n        blocking: true,\n        dismissal: \"answer\",",
+    to: "        content: render(opts, selected()),\n        blocking: true,\n        dismissal: opts.placement === \"anchored\" ? \"escape\" : \"answer\",",
     expect: "T4.18",
   },
   {

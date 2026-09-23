@@ -305,7 +305,8 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
         kind: "overlay",
         ...placementOf(opts, deps),
         content: render(opts, selected()),
-        dismissable: false,
+        blocking: true,
+        dismissal: "answer",
         // **A question is not an advisory overlay, so the default fraction is
         // the wrong one** (C15 I18). Half the region is right for a peek, which
         // a reader dismisses; a confirm that does not fit loses its *answers*,

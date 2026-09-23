@@ -5,8 +5,8 @@
 import { describe, expect, it } from "vitest";
 
 import { createOverlayManager } from "../../src/viewport/overlay/index.js";
-import type { OverlayChange } from "../../src/viewport/overlay/index.js";
-import { REGION, anchored, centred, peek, placeIn, registry, rows, view } from "../support/overlay.js";
+import type { Layer, OverlayChange } from "../../src/viewport/overlay/index.js";
+import { REGION, anchored, centred, panel, peek, placeIn, registry, rows, view } from "../support/overlay.js";
 import { OverlayError } from "../../src/viewport/overlay/index.js";
 
 const manager = () => createOverlayManager({ registry });
@@ -72,10 +72,10 @@ describe("C15 unit — the stack", () => {
   it("T1.26 (I22): a centred or fill peek is refused at push, and at update the layer is left as it was", () => {
     const m = manager();
     expect(() =>
-      m.push({ id: "c", kind: "peek", placement: { kind: "centred" }, content: rows(1, "c"), dismissable: true, width: 20 }),
+      m.push({ id: "c", kind: "peek", placement: { kind: "centred" }, content: rows(1, "c"), blocking: false, dismissal: "focus", width: 20 }),
     ).toThrow(OverlayError);
     expect(() =>
-      m.push({ id: "f", kind: "peek", placement: { kind: "fill" }, content: rows(1, "f"), dismissable: true }),
+      m.push({ id: "f", kind: "peek", placement: { kind: "fill" }, content: rows(1, "f"), blocking: false, dismissal: "focus" }),
     ).toThrow(OverlayError);
     expect(m.stack, "neither landed").toEqual([]);
 
@@ -151,7 +151,7 @@ describe("C15 unit — the stack", () => {
   it("T1.9 (I3): pop on a non-dismissable top → null, stack unchanged", () => {
     const m = manager();
     m.push(centred("menu", 3));
-    m.push(centred("confirm", 3, { dismissable: false }));
+    m.push(centred("confirm", 3, { blocking: true, dismissal: "answer" }));
 
     expect(m.pop()).toBeNull();
     expect(m.stack.map((l) => l.id)).toEqual(["menu", "confirm"]);
@@ -163,7 +163,7 @@ describe("C15 unit — the stack", () => {
     // and the whole of T6.11.
     const m = manager();
     m.push(centred("menu", 3));
-    m.push(centred("confirm", 3, { dismissable: false }));
+    m.push(centred("confirm", 3, { blocking: true, dismissal: "answer" }));
 
     m.pop();
     expect(m.stack.map((l) => l.id)).toContain("menu");
@@ -171,7 +171,7 @@ describe("C15 unit — the stack", () => {
 
   it("T1.10: dismiss removes a non-dismissable layer — explicit resolution always works", () => {
     const m = manager();
-    m.push(centred("confirm", 3, { dismissable: false }));
+    m.push(centred("confirm", 3, { blocking: true, dismissal: "answer" }));
     m.dismiss("confirm");
     expect(m.stack).toEqual([]);
   });
@@ -203,13 +203,13 @@ describe("C15 unit — one layer's geometry", () => {
 
   it("T1.13 (I14): LayerUpdate cannot carry dismissable", () => {
     const m = manager();
-    m.push(centred("confirm", 3, { dismissable: false }));
+    m.push(centred("confirm", 3, { blocking: true, dismissal: "answer" }));
 
     // @ts-expect-error — I14: escapability does not change mid-life, and the
     // only form that restriction can take is the type rejecting the field.
-    m.update("confirm", { dismissable: true });
+    m.update("confirm", { dismissal: "escape" });
 
-    expect(m.stack[0]?.dismissable).toBe(false);
+    expect(m.stack[0]?.dismissal).toBe("answer");
   });
 
   it("T1.14 (I16): content is measured at the resolved width, not the region's", () => {
@@ -259,14 +259,15 @@ describe("C15 unit — one layer's geometry", () => {
         kind: "overlay",
         placement: { kind: "centred" },
         content: rows(3, "wide"),
-        dismissable: true,
+        blocking: false,
+        dismissal: "escape",
       }),
     ).toThrow(/declares no width/);
     expect(m.stack, "and nothing reached the stack").toEqual([]);
 
     const [declared] = placeIn([centred("c", 3, { width: 40 })]);
     const [filling] = placeIn([
-      { id: "f", kind: "overlay", placement: { kind: "fill" }, content: rows(3, "f"), dismissable: true },
+      { id: "f", kind: "overlay", placement: { kind: "fill" }, content: rows(3, "f"), blocking: false, dismissal: "escape" },
     ]);
     expect(declared?.left, "the state I20 forbids is this one").not.toBe(filling?.left);
     expect(filling?.left).toBe(0);
@@ -297,20 +298,171 @@ describe("C15 §2b — approval is a layer, owed at the spec commit", () => {
   );
 });
 
-describe("C15 §2c — blocking and dismissal are two fields, owed at the spec commit (M8)", () => {
-  it.todo(
-    "T1.29 (C15 I26, R-QST-001, R-BLK-822): blocking and dismissal are read from the layer and nowhere else — a fill-placed non-blocking layer is not modal and a one-row blocking layer is, and the typed reply's blocking-and-floating is the combination that proves them independent — not deferred on a component: the fields and C16's step 3 land together in this MR",
-  );
-  it.todo(
-    "T1.30 (C15 I3, I26): pop() removes an escape layer, leaves an answer layer and leaves a focus layer — three values, three answers, in one stack — not deferred on a component",
-  );
-  it.todo(
-    "T1.31 (C15 I27, R-BLK-779): push and update refuse a centred panel, a fill panel, a blocking panel and a panel whose dismissal is not escape; the control is the anchored non-blocking escape one — not deferred on a component",
-  );
-  it.todo(
-    "T1.32 (C15 I28, R-BLK-873): pushing a blocking layer dismisses every escape layer first, each with its own change carrying its id, before the push returns; the control is a non-blocking push, which leaves them — not deferred on a component",
-  );
-  it.todo(
-    "T1.33 (C15 I23, R-BLK-779): a stack pushed in every order sorts view · peek · panel · overlay bottom-first, asserted as the whole sequence of ids — not deferred on a component",
-  );
+describe("C15 §2c — blocking and dismissal are two fields (M8)", () => {
+  it("T1.29 (I26, R-QST-001, R-BLK-822): the two fields are the layer's, and neither is the other", () => {
+    // **The pair `dismissable` could not hold.** One flag answered *owns
+    // input*, *is closed by esc* and *takes the keys first* at once, and it was
+    // right only while those three agreed. These two layers are the case where
+    // they do not: a full-region layer that owns nothing, and a one-row typed
+    // reply that owns everything.
+    const m = manager();
+
+    const wide: Layer = {
+      id: "wide",
+      kind: "overlay",
+      placement: { kind: "fill" },
+      content: rows(3, "wide"),
+      blocking: false,
+      dismissal: "escape",
+    };
+    m.push(wide);
+    expect(m.top?.blocking, "large and owning nothing").toBe(false);
+
+    // §101's typed reply: it blocks, it floats above a live prompt, and it is
+    // still not escapable — the combination that proves the fields are two.
+    const reply: Layer = {
+      id: "reply",
+      kind: "overlay",
+      placement: { kind: "anchored", row: 20, rows: 1, prefer: "above" },
+      content: rows(1, "reply"),
+      blocking: true,
+      dismissal: "answer",
+    };
+    m.push(reply);
+    expect(m.top?.id).toBe("reply");
+    expect(m.top?.blocking, "one row and owning input").toBe(true);
+    expect(m.top?.dismissal).toBe("answer");
+    // Anchored, so it is above the prompt rather than over it — floating and
+    // blocking at once, which no single flag can say.
+    expect(m.top?.placement.kind).toBe("anchored");
+
+    // **Neither is derivable from the other, in both directions.** The routing
+    // half — that C16's step 3 reads `blocking` and measures no box — is
+    // T1.31 in `router-dispatch.test.ts`; this is the half about the record.
+    expect(
+      m.stack.map((l) => `${l.id}:${String(l.blocking)}:${l.dismissal}`),
+      "four combinations would be expressible and two are used here",
+    ).toEqual(["wide:false:escape", "reply:true:answer"]);
+  });
+
+  it("T1.30 (I3, I26): pop answers three ways, because dismissal has three values", () => {
+    // The old row asserted two of the three because only two existed.
+    const m = manager();
+    m.push(peek("beside", 2, { row: 5, prefer: "below" }));
+    m.push(centred("menu", 3));
+    expect(m.pop()?.id, "escape: removed").toBe("menu");
+
+    m.push(centred("question", 3, { blocking: true, dismissal: "answer" }));
+    expect(m.pop(), "answer: left where it is").toBeNull();
+    expect(m.stack.map((l) => l.id)).toEqual(["beside", "question"]);
+
+    // And `focus`, which `pop` never reaches at all — a peek is not `top`
+    // (I21), so the question above it is what `pop` inspected both times.
+    m.dismiss("question");
+    expect(m.top, "a peek is never top").toBeNull();
+    expect(m.pop(), "focus: nothing for esc to take").toBeNull();
+    expect(m.stack.map((l) => l.id)).toEqual(["beside"]);
+  });
+
+  it("T1.31 (I27, R-BLK-779): a panel is one triple, refused at both entry points", () => {
+    const base = panel("p", 2, { row: 10, prefer: "above" });
+    const m = manager();
+
+    // The control first, so the four refusals below are not satisfied by a
+    // guard that refuses every panel.
+    m.push(base);
+    expect(m.top?.id, "the anchored non-blocking escape one is accepted").toBe("p");
+    m.dismiss("p");
+
+    const refused: readonly Layer[] = [
+      { ...base, placement: { kind: "centred" }, width: 30 },
+      { ...base, placement: { kind: "fill" } },
+      { ...base, blocking: true },
+      { ...base, dismissal: "answer" },
+    ];
+    for (const layer of refused) {
+      expect(
+        () => m.push(layer),
+        `${layer.placement.kind}/${String(layer.blocking)}/${layer.dismissal} is not a panel`,
+      ).toThrow(OverlayError);
+      expect(m.stack, "and nothing is left behind").toEqual([]);
+    }
+
+    // **`update` too, because `LayerUpdate` admits `placement`** (I20's own
+    // argument, applied to the kind's triple). A panel pushed anchored and
+    // updated to centred reaches the refused state by a route the push-time
+    // check cannot see.
+    m.push(base);
+    expect(() => m.update("p", { placement: { kind: "centred" }, width: 30 })).toThrow(
+      OverlayError,
+    );
+    expect(m.top?.placement.kind, "unchanged, not half-updated").toBe("anchored");
+  });
+
+  it("T1.32 (I28, R-BLK-873): a blocking arrival closes the panels first, each on its own change", () => {
+    const m = manager();
+    const seen: OverlayChange[] = [];
+
+    m.push(peek("beside", 2, { row: 5, prefer: "below" }));
+    m.push(panel("menu", 3, { row: 20, prefer: "above" }));
+    using _sub = m.subscribe((c) => void seen.push(c));
+
+    m.push(centred("question", 3, { blocking: true, dismissal: "answer" }));
+    expect(m.stack.map((l) => l.id), "the peek stays; the panel is gone").toEqual([
+      "beside",
+      "question",
+    ]);
+    // **Before the push returned**, and each with its own id — an owner runs
+    // its own teardown, and one collective change would name none of them.
+    expect(seen).toEqual([
+      { kind: "dismiss", id: "menu", reason: "explicit" },
+      { kind: "push", id: "question", layerKind: "overlay" },
+    ]);
+
+    // **The control, and it is what scopes the rule.** A non-blocking arrival
+    // leaves the panel alone — so the subject is the arriving layer's
+    // `blocking`, not the presence of a panel.
+    m.dismiss("question");
+    seen.length = 0;
+    m.push(panel("menu2", 3, { row: 20, prefer: "above" }));
+    m.push(centred("advisory", 3));
+    expect(m.stack.map((l) => l.id)).toEqual(["beside", "menu2", "advisory"]);
+  });
+
+  it("T1.33 (I23, R-BLK-779): view · peek · panel · overlay, bottom-first, from every push order", () => {
+    // *overlay › panel › peek › base*, read from the other end. Asserted as the
+    // whole sequence rather than as a pair, because a partition that puts one
+    // band in the right place and another in the wrong one satisfies every
+    // pairwise check written about the band that moved.
+    const build = (): readonly Layer[] => [
+      view("dash", 3),
+      peek("beside", 2, { row: 5, prefer: "below" }),
+      panel("menu", 3, { row: 20, prefer: "above" }),
+      // **Non-blocking, because I28 makes the other pair unconstructible.** A
+      // blocking arrival closes the panels first, so *a panel beneath a
+      // question* is a stack this component will not hold — and a row that
+      // used one would be asserting the sort over three bands while claiming
+      // four. The overlay band is exercised by an escapable advisory instead.
+      centred("advisory", 3),
+    ];
+    const order: readonly (readonly number[])[] = [
+      [0, 1, 2, 3],
+      [0, 3, 2, 1],
+      [0, 2, 1, 3],
+      [0, 1, 3, 2],
+    ];
+    for (const seq of order) {
+      const m = manager();
+      const layers = build();
+      // The view is first in every sequence because `push` refuses one onto a
+      // non-empty stack (I1) — a constraint on the fixture, not on the sort.
+      for (const i of seq) m.push(layers[i] as Layer);
+      expect(m.stack.map((l) => l.id), `pushed ${seq.join("")}`).toEqual([
+        "dash",
+        "beside",
+        "menu",
+        "advisory",
+      ]);
+    }
+  });
 });

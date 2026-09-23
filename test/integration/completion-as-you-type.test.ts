@@ -365,7 +365,8 @@ describe("C22 I51 — a menu that opens by itself does not stop typing", () => {
       MENU_ID,
     );
     expect(graph.router.target, "and C16 routes to it, correctly").toBe(
-      "overlay",
+      // A panel, not a question — the menu relabels the prompt (C15 I27).
+      "panel",
     );
 
     // **The defect this row exists for is a dropped character**, so the control

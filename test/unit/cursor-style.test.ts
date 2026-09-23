@@ -105,7 +105,7 @@ describe("C22 §6f — the style resolves per focus target (C22 I63)", () => {
         `${target} is a key`,
       ).toEqual(BEAM);
     }
-    expect(FOCUS_ORDER, "and there are eight of them").toHaveLength(8);
+    expect(FOCUS_ORDER, "and there are nine of them").toHaveLength(9);
   });
 
   it("T1.22c (C22 I63): shape and blink are one wire parameter", () => {

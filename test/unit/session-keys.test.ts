@@ -68,7 +68,8 @@ function openView(graph: Graph): void {
     kind: "view",
     placement: { kind: "fill" },
     content: [],
-    dismissable: true,
+    blocking: false,
+    dismissal: "escape",
   });
 }
 
@@ -78,9 +79,26 @@ function openOverlay(graph: Graph): void {
     kind: "overlay",
     placement: { kind: "centred" },
     content: [],
-    dismissable: true,
+    blocking: false,
+    dismissal: "escape",
     // Declared, because a centred layer must be (C15 I20).
     width: 20,
+  });
+}
+
+/**
+ * A panel, which is anchored, non-blocking and closed by `escape` — and refused
+ * in any other combination (C15 I27). The menu's four rows and the search's one
+ * answer here rather than at `overlay` since M8.
+ */
+function openPanel(graph: Graph): void {
+  graph.overlays.push({
+    id: "probe-panel",
+    kind: "panel",
+    placement: { kind: "anchored", row: 20, rows: 1, prefer: "above" },
+    content: [],
+    blocking: false,
+    dismissal: "escape",
   });
 }
 
@@ -180,6 +198,7 @@ describe("C22 §3 step 11 — the effect table", () => {
 
     for (const b of base) {
       if (b.target === "overlay") openOverlay(graph);
+      if (b.target === "panel") openPanel(graph);
       // `liveBlock` needs both halves of what `activeTarget` reads: a live
       // entry in C13 and focus stored there (C16 §3).
       if (b.target === "liveBlock") enterLive(graph);

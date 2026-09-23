@@ -45,7 +45,7 @@ export type Layer = Readonly<{
    * move, `⏎` went to the layer, and `Esc` dismissed it instead of leaving the
    * block. A layer that is never `top` cannot reach the ladder at all.
    */
-  kind: "overlay" | "view" | "peek";
+  kind: "overlay" | "view" | "peek" | "panel";
   placement: Placement;
   /**
    * `Block[]`, never React (I4) — so a layer is themed, degrades to ASCII and
@@ -56,8 +56,37 @@ export type Layer = Readonly<{
    * field, and C15 sees the visible ones.
    */
   content: readonly Block[];
-  /** `false` = must be resolved, not escaped. Never changes (I14). */
-  dismissable: boolean;
+  /**
+   * Does this layer own input while it is up (I26, R-QST-001)?
+   *
+   * **One of the two fields `dismissable` was** (§2c). The flag answered *can
+   * `pop()` remove it*, *is it modal to the mouse* and *does it claim keys
+   * before the prompt* at once, and R-BLK-822 is the design's own construction
+   * of the case where those diverge: a typed reply **blocks** and **floats**
+   * above a live prompt and is still not escapable. R-QST-001 settles that it is
+   * declared rather than derived — *a question declares blocking and owner
+   * explicitly* — which is what retired C16's `coversRegion`, a measured box
+   * standing in for a field that did not exist yet.
+   *
+   * Never changes (I14): a layer that stopped blocking mid-answer would hand
+   * the keyboard back to a prompt an owner is still waiting on.
+   */
+  blocking: boolean;
+  /**
+   * What closes this layer (I26, R-BLK-779).
+   *
+   * - `escape` — the reader closes it: `pop()` reaches it, and a press outside
+   *   it closes it and is consumed there (C16 I47).
+   * - `focus` — focus leaving closes it. A peek's, because a peek is a
+   *   projection of focus and nothing else.
+   * - `answer` — only its own resolution closes it. *Clicking off it does
+   *   nothing, because an owner is waiting.*
+   *
+   * Never changes (I14), for the reason it never changed as `dismissable`:
+   * a layer whose escapability moved mid-life makes C16's ladder depend on
+   * when it looked.
+   */
+  dismissal: "escape" | "focus" | "answer";
   /**
    * Requested width in cells; absent means the region's.
    *
@@ -91,7 +120,7 @@ export type Layer = Readonly<{
  * `"overlay" | "view"`, so a `top` that could answer a peek would not compile
  * at the one seam that matters.
  */
-export type KeyedLayer = Layer & Readonly<{ kind: "overlay" | "view" }>;
+export type KeyedLayer = Layer & Readonly<{ kind: "overlay" | "view" | "panel" }>;
 
 /**
  * A placed layer that takes input — the ones C16 hit-tests a click against (I21).
@@ -135,18 +164,20 @@ export type DismissReason = "explicit" | "anchorEvicted";
 /**
  * What `update` may change.
  *
- * **`dismissable` is deliberately absent.** A layer that becomes escapable
- * partway through its life makes C16's Ctrl-C ladder depend on when it looked:
- * the same confirm answers "may I be dismissed?" differently on two consecutive
- * keystrokes. A layer that needs to change what `Esc` means to it is two
- * layers (I14).
+ * **`blocking` and `dismissal` are deliberately absent, both of them** (I14).
+ * A layer that becomes escapable partway through its life makes C16's Ctrl-C
+ * ladder depend on when it looked: the same confirm answers "may I be
+ * dismissed?" differently on two consecutive keystrokes. Ownership is the same
+ * fact twice over — a layer that stopped blocking mid-answer hands the keyboard
+ * back to a prompt an owner is still waiting on. A layer that needs to change
+ * either is two layers.
  */
 export type LayerUpdate = Partial<Pick<Layer, "content" | "placement" | "width" | "cursor">>;
 
 export type OverlayChange =
   | Readonly<{ kind: "push"; id: string; layerKind: Layer["kind"] }>
   /** A peek is never popped (I21), so `pop` names only the keyed kinds. */
-  | Readonly<{ kind: "pop"; id: string; layerKind: "overlay" | "view" }>
+  | Readonly<{ kind: "pop"; id: string; layerKind: "overlay" | "view" | "panel" }>
   | Readonly<{ kind: "content"; id: string }>
   | Readonly<{ kind: "dismiss"; id: string; reason: DismissReason }>;
 
@@ -155,17 +186,17 @@ export type Region = Readonly<{ width: number; height: number }>;
 export interface OverlayManager {
   push(layer: Layer): Disposable;
   /**
-   * The top layer, if it is dismissable.
+   * The top layer, if its `dismissal` is `escape` (I3, §2c).
    *
    * **Inspects only the top.** It does not search downwards for the first
-   * dismissable layer: under a confirm raised over a completion menu, the
+   * escapable layer: under a confirm raised over a completion menu, the
    * searching version pops the menu — answering nothing and closing something
    * the user was not looking at (I3).
    *
    * `null` covers two cases, and C16's Ctrl-C ladder needs them apart. It reads
-   * `top` first: `null` falls through to the next rung, `dismissable: false`
-   * is a no-op. Branching on this return value instead pops the pushed view
-   * beneath an unanswered confirm.
+   * `top` first: `null` falls through to the next rung, a layer closed by its
+   * answer is a no-op. Branching on this return value instead pops the pushed
+   * view beneath an unanswered confirm.
    */
   pop(): Layer | null;
   dismiss(id: string, reason?: DismissReason): void;

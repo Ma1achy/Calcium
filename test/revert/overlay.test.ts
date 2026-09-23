@@ -99,7 +99,7 @@ describe("C15 revert — the stack rules", () => {
 
   it("T6.4 (I3): letting Esc dismiss a confirm → T1.9 fails", () => {
     const m = createOverlayManager({ registry });
-    m.push(centred("confirm", 3, { dismissable: false }));
+    m.push(centred("confirm", 3, { blocking: true, dismissal: "answer" }));
     expect(m.pop()).toBeNull();
     expect(m.stack).toHaveLength(1);
   });
@@ -110,7 +110,7 @@ describe("C15 revert — the stack rules", () => {
     // the question stays open over a screen that changed underneath it.
     const m = createOverlayManager({ registry });
     m.push(centred("menu", 3));
-    m.push(centred("confirm", 3, { dismissable: false }));
+    m.push(centred("confirm", 3, { blocking: true, dismissal: "answer" }));
 
     m.pop();
     expect(m.stack.map((l) => l.id)).toEqual(["menu", "confirm"]);
@@ -118,10 +118,10 @@ describe("C15 revert — the stack rules", () => {
 
   it("T6.14 (I14): widening LayerUpdate to dismissable → T1.13 fails", () => {
     const m = createOverlayManager({ registry });
-    m.push(centred("confirm", 3, { dismissable: false }));
+    m.push(centred("confirm", 3, { blocking: true, dismissal: "answer" }));
     // @ts-expect-error — the restriction's only possible form.
-    m.update("confirm", { dismissable: true });
-    expect(m.stack[0]?.dismissable).toBe(false);
+    m.update("confirm", { dismissal: "escape" });
+    expect(m.stack[0]?.dismissal).toBe("answer");
   });
 
   it("T6.6 (I9): C15 writes no transcript trace — it emits and L4 composes", () => {
