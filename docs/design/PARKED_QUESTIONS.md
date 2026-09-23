@@ -116,11 +116,19 @@ FRAME takes its border*, and `smallmultiples` and `pairplot` have four. The
 design does not say which, and lighting four sub-frames at once is a visible
 choice.
 
+**15 · The chord glyphs have no ASCII rung.** The design draws eleven — `← ↑ →
+↓ ⇥ ⇧ ⌃ ⌘ ⌥ ⌫ ⏎` — throughout §019 and the binding registry, and **registers
+none of them in the glyph table**, so none has a declared fallback and the
+section shows them degrading nowhere. Inventing eleven spellings is a visible
+choice. **Done under assumption:** `chordText` answers the existing shorthand
+(`s+enter`, `m+C`) below the Unicode rung — the behaviour that already shipped,
+held as the arm to revisit rather than as an answer.
+
 ---
 
 ## Not yet recovered
 
-**Fourteen distinct questions are above, and the running count in the reports
+**Fifteen distinct questions are above, and the running count in the reports
 reached eighteen.** The gap was chased rather than left: the reports state a
 total at six, nine, twelve, fourteen, fifteen and eighteen, and the message
 ranges between *nine → twelve* and *twelve → fourteen* were read in full. **They

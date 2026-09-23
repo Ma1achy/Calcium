@@ -1405,6 +1405,28 @@ taken. A reserved name is every consumer's namespace.
 5. `docs/KEYS.md` is generated from the same source, with `Route`, `Profile` and
    `Condition` columns, and `npx tsx tools/keymap-table.mjs --check` gates it.
 
+6. **A chord's display text and its identity are two functions** (`R-KEY-005`,
+   §019). `keyText` was both: `slot` compares `"prompt s+enter"` for the
+   duplicate check, and `/help keys`, `docs/KEYS.md` and §019's census print the
+   same string. The design draws `⇧⏎`, `⌥⇧C`, `⌃⇧C` and `⌘1` where the tree
+   prints `s+enter`, `m+C`, `cs+c` and `u+1`, so the display has to move — and
+   moving it while the two are one function would silently move **collision
+   detection**, which is the one thing in this section that must not depend on
+   how a key is spelled for a reader.
+
+   So `keySlot` keeps the shorthand and is never shown; `chordText` is the
+   design's notation and is never compared. The shorthand's `u`-for-super
+   spelling (I34) is a property of the slot alone, which is what it was always
+   for.
+
+   **The ASCII rung is parked and the Unicode rung is not.** The design draws
+   eleven chord glyphs — `← ↑ → ↓ ⇥ ⇧ ⌃ ⌘ ⌥ ⌫ ⏎` — and **registers none of them
+   in the glyph table**, so none has a declared fallback and the section shows
+   them degrading nowhere. Inventing eleven spellings is a visible choice the
+   design does not settle. Until it is ruled, `chordText` answers the shorthand
+   below the Unicode rung — which is the behaviour that already shipped, not a
+   new invention, and is the arm to revisit rather than a decision taken here.
+
 ## 7. State machine
 
 Two small machines, both with an injected clock.
