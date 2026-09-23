@@ -240,6 +240,23 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.fmx.io/family: vola
 ........................................ + loss --------------------------------+
 ........................................ |4.0 ─ 0.0                             |
 ........................................ +--------------------------------------+
+── §44 · two selections, one clipboard — the four grounds R-SEL-006 names
+· r1 at rest · r2 focused and selected · r3 selected — selection wins the ground, the head keeps ▸
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   commit   run     state
+........................................   a3f9b21  digit~  runni~
+..BBBBBBBBBBBBBBBBBBBBBBB............... > 7c2d4e1  decod~  succe~
+..BBBBBBBBBBBBBBBBBBBBBBB...............   2e8a04c  graph~  failed
+  A = bg 48;2;34;34;34
+  B = bg 48;2;38;64;87
+
+· r1 focused alone — focusGround and the mark · r2 and r3 at rest
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   commit   run     state
+..BBBBBBBBBBBBBBBBBBBBBBB............... > a3f9b21  digit~  runni~
+........................................   7c2d4e1  decod~  succe~
+........................................   2e8a04c  graph~  failed
+  A = bg 48;2;34;34;34
+  B = bg 48;2;46;46;46
+
 ── §58 · what copy takes — the source beside the rendering
 a table row — values, not the padded cells
   drawn    name  size                            
@@ -652,6 +669,23 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ................................................................................ + loss ------------------------------------------------------------------------+
 ................................................................................ |4.0 ─ 0.0                                                                     |
 ................................................................................ +------------------------------------------------------------------------------+
+── §44 · two selections, one clipboard — the four grounds R-SEL-006 names
+· r1 at rest · r2 focused and selected · r3 selected — selection wins the ground, the head keeps ▸
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   commit   run     state
+................................................................................   a3f9b21  digit~  runni~
+..BBBBBBBBBBBBBBBBBBBBBBB....................................................... > 7c2d4e1  decod~  succe~
+..BBBBBBBBBBBBBBBBBBBBBBB.......................................................   2e8a04c  graph~  failed
+  A = bg 48;2;34;34;34
+  B = bg 48;2;38;64;87
+
+· r1 focused alone — focusGround and the mark · r2 and r3 at rest
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   commit   run     state
+..BBBBBBBBBBBBBBBBBBBBBBB....................................................... > a3f9b21  digit~  runni~
+................................................................................   7c2d4e1  decod~  succe~
+................................................................................   2e8a04c  graph~  failed
+  A = bg 48;2;34;34;34
+  B = bg 48;2;46;46;46
+
 ── §58 · what copy takes — the source beside the rendering
 a table row — values, not the padded cells
   drawn    name  size                                                
@@ -1057,6 +1091,19 @@ work          ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱
 ........................................ ┌ loss ────────────────────────────────┐
 ........................................ │4.0 ─ 0.0                             │
 ........................................ └──────────────────────────────────────┘
+── §44 · two selections, one clipboard — the four grounds R-SEL-006 names
+· r1 at rest · r2 focused and selected · r3 selected — selection wins the ground, the head keeps ▸
+........................................   commit   run     state
+........................................   a3f9b21  digit…  runni…
+........................................ ▸ 7c2d4e1  decod…  succe…
+........................................   2e8a04c  graph…  failed
+
+· r1 focused alone — focusGround and the mark · r2 and r3 at rest
+........................................   commit   run     state
+........................................ ▸ a3f9b21  digit…  runni…
+........................................   7c2d4e1  decod…  succe…
+........................................   2e8a04c  graph…  failed
+
 ── §58 · what copy takes — the source beside the rendering
 a table row — values, not the padded cells
   drawn    name  size
@@ -1462,6 +1509,19 @@ work                       ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰�
 ................................................................................ ┌ loss ────────────────────────────────────────────────────────────────────────┐
 ................................................................................ │4.0 ─ 0.0                                                                     │
 ................................................................................ └──────────────────────────────────────────────────────────────────────────────┘
+── §44 · two selections, one clipboard — the four grounds R-SEL-006 names
+· r1 at rest · r2 focused and selected · r3 selected — selection wins the ground, the head keeps ▸
+................................................................................   commit   run     state
+................................................................................   a3f9b21  digit…  runni…
+................................................................................ ▸ 7c2d4e1  decod…  succe…
+................................................................................   2e8a04c  graph…  failed
+
+· r1 focused alone — focusGround and the mark · r2 and r3 at rest
+................................................................................   commit   run     state
+................................................................................ ▸ a3f9b21  digit…  runni…
+................................................................................   7c2d4e1  decod…  succe…
+................................................................................   2e8a04c  graph…  failed
+
 ── §58 · what copy takes — the source beside the rendering
 a table row — values, not the padded cells
   drawn    name  size
@@ -1874,6 +1934,23 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.fmx.io/family: vola
 ........................................ ┌ loss ────────────────────────────────┐
 ........................................ │4.0 ─ 0.0                             │
 ........................................ └──────────────────────────────────────┘
+── §44 · two selections, one clipboard — the four grounds R-SEL-006 names
+· r1 at rest · r2 focused and selected · r3 selected — selection wins the ground, the head keeps ▸
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   commit   run     state
+........................................   a3f9b21  digit…  runni…
+..BBBBBBBBBBBBBBBBBBBBBBB............... ▸ 7c2d4e1  decod…  succe…
+..BBBBBBBBBBBBBBBBBBBBBBB...............   2e8a04c  graph…  failed
+  A = bg 48;2;34;34;34
+  B = bg 48;2;38;64;87
+
+· r1 focused alone — focusGround and the mark · r2 and r3 at rest
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   commit   run     state
+..BBBBBBBBBBBBBBBBBBBBBBB............... ▸ a3f9b21  digit…  runni…
+........................................   7c2d4e1  decod…  succe…
+........................................   2e8a04c  graph…  failed
+  A = bg 48;2;34;34;34
+  B = bg 48;2;46;46;46
+
 ── §58 · what copy takes — the source beside the rendering
 a table row — values, not the padded cells
   drawn    name  size                            
@@ -2286,6 +2363,23 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ................................................................................ ┌ loss ────────────────────────────────────────────────────────────────────────┐
 ................................................................................ │4.0 ─ 0.0                                                                     │
 ................................................................................ └──────────────────────────────────────────────────────────────────────────────┘
+── §44 · two selections, one clipboard — the four grounds R-SEL-006 names
+· r1 at rest · r2 focused and selected · r3 selected — selection wins the ground, the head keeps ▸
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   commit   run     state
+................................................................................   a3f9b21  digit…  runni…
+..BBBBBBBBBBBBBBBBBBBBBBB....................................................... ▸ 7c2d4e1  decod…  succe…
+..BBBBBBBBBBBBBBBBBBBBBBB.......................................................   2e8a04c  graph…  failed
+  A = bg 48;2;34;34;34
+  B = bg 48;2;38;64;87
+
+· r1 focused alone — focusGround and the mark · r2 and r3 at rest
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   commit   run     state
+..BBBBBBBBBBBBBBBBBBBBBBB....................................................... ▸ a3f9b21  digit…  runni…
+................................................................................   7c2d4e1  decod…  succe…
+................................................................................   2e8a04c  graph…  failed
+  A = bg 48;2;34;34;34
+  B = bg 48;2;46;46;46
+
 ── §58 · what copy takes — the source beside the rendering
 a table row — values, not the padded cells
   drawn    name  size                                                

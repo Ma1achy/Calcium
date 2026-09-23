@@ -668,6 +668,70 @@ const copyCensus = (width: number, caps: TerminalCapabilities, theme: ResolvedTh
   return out;
 };
 
+
+/**
+ * §044 — two selections, one clipboard, drawn as `R-SEL-006`'s four states.
+ *
+ * **The figure's `▌` is a ground and not a mark, which the registry settles and
+ * the fixture cannot.** §044 draws `▌` in the gutter of its selected rows and
+ * captions it *`▌` carries selected elements*, which reads as a third carrier
+ * beside the prompt's underline and focus's `▸`. `R-SEL-006` says otherwise in
+ * as many words — *selected takes selectionGround and **no mark**; focused and
+ * selected takes selectionGround and keeps the mark* — so the block is a
+ * plain-text depiction of a background a text fixture has no way to draw. Going
+ * to the normative source is what caught it: the picture alone would have bought
+ * a gutter column the design does not want.
+ *
+ * So the census reads the **ground**, through `styledScreenFrom`, because a
+ * stripped frame folds this channel away entirely and would show four identical
+ * rows under four different rules.
+ *
+ * The four states are one table under one focus, not four fixtures: the head,
+ * the extent and the row that is neither are resolved inside the definition
+ * from a single `FocusState`, which is where `R-SEL-006`'s *selection wins the
+ * ground where both hold* actually lives.
+ */
+/** §044's subject: three rows, so at-rest, selected, and focused-and-selected are one picture. */
+const SELECTION_TABLE = block({
+  kind: "table",
+  id: "ct",
+  columns: [
+    { key: "id", label: "commit", align: "left" as const, priority: 1, minWidth: 7, sortable: false },
+    { key: "name", label: "run", align: "left" as const, priority: 2, minWidth: 6, sortable: false },
+    { key: "state", label: "state", align: "left" as const, priority: 3, minWidth: 6, sortable: false },
+  ],
+  rows: [
+    { id: "r1", cells: { id: { text: "a3f9b21" }, name: { text: "digit-classifier" }, state: { text: "running" } } },
+    { id: "r2", cells: { id: { text: "7c2d4e1" }, name: { text: "decoder-zoom" }, state: { text: "succeeded" } } },
+    { id: "r3", cells: { id: { text: "2e8a04c" }, name: { text: "graphsage" }, state: { text: "failed" } } },
+  ],
+}) as unknown as Block;
+
+const selectionGrounds = (width: number, capabilities: TerminalCapabilities, theme: ResolvedTheme): readonly string[] => {
+  // **Two passes, because one figure has one head.** `R-SEL-006` names four
+  // states and a single focus can show three of them: a head that is also in
+  // the extent covers *focused and selected*, the rest of the extent covers
+  // *selected*, and anything outside covers *at rest*. **`focused` alone —
+  // `focusGround` and the mark — needs a head that the extent does not contain**,
+  // which is a second focus and not a fourth row. A census that drew one pass
+  // would be missing the state the two grounds are actually told apart by.
+  const pass = (rowId: string, selected: readonly string[], caption: string): readonly string[] => {
+    const kit = measurable({
+      theme,
+      capabilities,
+      focus: { blockId: "ct", rowId, selected: selected.map((r) => ({ blockId: "ct", rowId: r })) },
+      definitions: [tableDefinition] as never,
+    });
+    const lines = kit.renderToLines(SELECTION_TABLE, width);
+    const grid = styledScreenFrom([lines.join("\n")], { columns: width, rows: lines.length });
+    return [caption, ...maskOf(grid), ""];
+  };
+  return [
+    ...pass("r2", ["r2", "r3"], "· r1 at rest · r2 focused and selected · r3 selected — selection wins the ground, the head keeps ▸"),
+    ...pass("r1", [], "· r1 focused alone — focusGround and the mark · r2 and r3 at rest"),
+  ];
+};
+
 export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 95, name: "a tape, where a row of peers would shed", rows: draw(TAPE) },
   { section: 42, name: "widgets — a row of peers that sheds", rows: draw(PILLS) },
@@ -688,6 +752,7 @@ export const SURFACES: readonly Surface[] = Object.freeze([
     { name: "a posture, ex. 3 — TEXT, never a ground", block: POSTURES },
     { name: "a well — structural, never semantic", block: WELL },
   ]) },
+  { section: 44, name: "two selections, one clipboard — the four grounds R-SEL-006 names", rows: selectionGrounds },
   { section: 58, name: "what copy takes — the source beside the rendering", rows: copyCensus },
   { section: 19, name: "the resolved keymap, the reader's own rung first", rows: keymapCensus },
   { section: 21, name: "the scrollbar — the set, and the bar beside a box", rows: (w, c, t) => [

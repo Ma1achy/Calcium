@@ -47,7 +47,7 @@ M = {
  41:("prose","—","the spinner is chosen by the verb"),
  42:("frame","blocks.test.ts","widgets — and `design-surfaces.test.ts` draws it against §042 as well"),
  43:("prose","—","spans, as the substrate four things wait on"),
- 44:("owed","M10","two kinds of selection, one clipboard"),
+ 44:("frame","design-surfaces.test.ts","two selections, one clipboard — `R-SEL-006`'s four states as grounds, in two passes because one figure has one head. **The fixture's `▌` is a ground, not a mark**, which the registry settles and the picture cannot: `R-SEL-006` says *selected takes selectionGround and no mark; focused and selected keeps the mark*, so the gutter block is a plain-text depiction of a background. Read through `styledScreenFrom`, because a stripped frame folds the channel away and would draw four identical rows under four different rules"),
  45:("frame","blocks.test.ts","the live terminal block"),
  46:("frame","session-frame.test.ts","history, search and ghost text"),
  47:("frame","containment.test.ts","empty, too small, stale, interrupted, refused"),

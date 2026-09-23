@@ -133,7 +133,7 @@ most-drawn line in the application.
 | 41 | prose | — | — | the spinner is chosen by the verb |
 | 42 | surface | `kind: "pills"` | `blocks.test.ts` | widgets — and `design-surfaces.test.ts` draws it against §042 as well |
 | 43 | prose | — | — | spans, as the substrate four things wait on |
-| 44 | surface | `nativeSelection` | — | two kinds of selection, one clipboard |
+| 44 | surface | `nativeSelection` | `design-surfaces.test.ts` | two selections, one clipboard — `R-SEL-006`'s four states as grounds, in two passes because one figure has one head. **The fixture's `▌` is a ground, not a mark**, which the registry settles and the picture cannot: `R-SEL-006` says *selected takes selectionGround and no mark; focused and selected keeps the mark*, so the gutter block is a plain-text depiction of a background. Read through `styledScreenFrom`, because a stripped frame folds the channel away and would draw four identical rows under four different rules |
 | 45 | surface | `kind: "terminal"` | `blocks.test.ts` | the live terminal block |
 | 46 | surface | `searchOpen` | `session-frame.test.ts` | history, search and ghost text |
 | 47 | surface | `assertContainerPremise\|containment` | `containment.test.ts` | empty, too small, stale, interrupted, refused |
@@ -217,7 +217,7 @@ that is the reconciliation working, and it should be visible as a number moving 
 than inferred from a suite staying green.
 
     surface 66 · prose 37 · app 6 · total 109
-    of the surfaces: built 60 · unbuilt 6 · framed 54
+    of the surfaces: built 60 · unbuilt 6 · framed 55
 
 **`framed` is the figure this MR moves, and `built` is the one that went backwards.**
 Seven surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks
