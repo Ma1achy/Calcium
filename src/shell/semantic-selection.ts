@@ -18,6 +18,9 @@
  */
 
 import type { Block } from "../data/viewmodel/index.js";
+import { sliceCells } from "../presentation/text.js";
+import type { AmbiguousWidth } from "../presentation/text.js";
+import { sgrPattern } from "../terminal/escapes.js";
 
 /**
  * An entry plus a row within it (C14 I36, §6c).
@@ -274,4 +277,120 @@ export function copyTextOf(
     .map((e) => copySequence(e.blocks.filter((b) => selected.has(keyOf(e.id, b.id)))))
     .filter((t) => t !== "")
     .join("\n\n");
+}
+
+/**
+ * A cursor — a caret with a column (C14 §6e).
+ *
+ * The block selection needs no column: its unit is the block, and a block has
+ * no columns. The rectangle does, and it is a second shape rather than a field
+ * on {@link Caret} for the reason §6c gives about granularity — a caret that
+ * always carried a column would make *the selection's unit is the block* a
+ * sentence with a spare coordinate in it.
+ */
+export type Cursor = Readonly<{ entryId: string; row: number; column: number }>;
+
+/**
+ * A rectangular selection — cells inside **one** block (`R-SEL-007`, C14 I42).
+ *
+ * Rows are the entry's own, as {@link Caret}'s are, and both ends are inclusive:
+ * the reader put the head somewhere and the cell under it is theirs.
+ */
+export type CellRect = Readonly<{
+  /** The block it started in, and the only one it can ever cover. */
+  key: string;
+  fromRow: number;
+  toRow: number;
+  fromColumn: number;
+  toColumn: number;
+}>;
+
+/**
+ * The rectangle between an anchor and a head, **clipped** to the anchor's block
+ * (`R-SEL-007`, C14 I42).
+ *
+ * **A clip, not a containment test, and the two read as one sentence.** *Never
+ * crosses a block boundary* is satisfied by refusing — a head that has left the
+ * block gives no rectangle — and that behaves as the rule's opposite: the
+ * selection empties while the reader extends past the edge and returns when they
+ * come back. Clipping selects to the last row and stays there. The two differ on
+ * every extend that leaves, which is most of them.
+ *
+ * **A head in another entry has no row in this one's space**, so the direction
+ * comes from the transcript's order: later clamps to the block's last row,
+ * earlier to its first. An order resolving neither entry clamps to the anchor's
+ * own row — *clips to where it started* taken to its limit, and never a
+ * rectangle somewhere the reader has not been.
+ *
+ * `null` is the one refusal, and it is *the anchor is in no block*: with nothing
+ * to clip to there is no region it started in.
+ */
+export function rectBetween(
+  anchor: Cursor,
+  head: Cursor,
+  spans: readonly BlockSpan[],
+  order: readonly string[],
+): CellRect | null {
+  const span = spans.find(
+    (sp) => entryOf(sp.key) === anchor.entryId && sp.from <= anchor.row && anchor.row < sp.to,
+  );
+  if (span === undefined) return null;
+
+  const raw = rowOfHead(anchor, head, order);
+  const headRow = Math.min(Math.max(raw, span.from), span.to - 1);
+  const anchorRow = Math.min(Math.max(anchor.row, span.from), span.to - 1);
+
+  return Object.freeze({
+    key: span.key,
+    fromRow: Math.min(anchorRow, headRow),
+    toRow: Math.max(anchorRow, headRow),
+    fromColumn: Math.min(anchor.column, head.column),
+    toColumn: Math.max(anchor.column, head.column),
+  });
+}
+
+/** The head's row in the anchor's coordinate space, or the edge it lies past. */
+function rowOfHead(anchor: Cursor, head: Cursor, order: readonly string[]): number {
+  if (head.entryId === anchor.entryId) return head.row;
+  const a = order.indexOf(anchor.entryId);
+  const h = order.indexOf(head.entryId);
+  if (a === -1 || h === -1) return anchor.row;
+  return h > a ? Infinity : -Infinity;
+}
+
+/**
+ * What a rectangular copy takes — the rendered cells, with the ink off
+ * (`R-SEL-007`, C14 I43).
+ *
+ * `lines` are the **frame's** lines for the rectangle's entry, indexed
+ * entry-locally, which is what *cells, not source* means: this is the single
+ * exception `R-SEL-004` names to copy taking the source, and the rule requires
+ * it to be explicit rather than discovered in a paste.
+ *
+ * **The window is `sliceCells` and not a substring**, the same walk `paint`
+ * uses, so a cluster straddling either edge is blanked rather than halved (C09
+ * I9) — half a double-width glyph is a row one cell wide, and a copy is not the
+ * place to invent one. On a painted line the two are not close: three characters
+ * from column 2 of a line whose ink opens at column 0 are three bytes of the
+ * escape.
+ *
+ * **And the style comes off**, because a clipboard is text and an escape
+ * sequence in it is the rendering arriving where the content was asked for. The
+ * *order* of the slice and the strip is not a rule here and reads as though it
+ * were: `sliceCells` skips escapes when it counts cells, so both orders give the
+ * same string (C14 I43).
+ */
+export function cellTextOf(
+  rect: CellRect | null,
+  lines: readonly string[],
+  ambiguous: AmbiguousWidth = "narrow",
+): string {
+  if (rect === null) return "";
+  const sgr = sgrPattern();
+  const out: string[] = [];
+  for (let row = rect.fromRow; row <= rect.toRow; row += 1) {
+    const line = lines[row] ?? "";
+    out.push(sliceCells(line, rect.fromColumn, rect.toColumn + 1, ambiguous).replace(sgr, ""));
+  }
+  return out.join("\n");
 }

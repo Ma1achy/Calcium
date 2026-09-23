@@ -1643,6 +1643,36 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // --- C14 §6e's rectangle, groundwork ahead of a chord the registry has not
+  // --- named -----------------------------------------------------------------
+  //
+  // **The queued consumer is a chord, and its absence is the parked question**
+  // (C14 §6e). `R-SEL-007` gives the rule three claims; the registry names no
+  // rectangular action and no rectangular binding, so the way in is the one
+  // thing the design does not settle. Inventing a chord is what the goal parks,
+  // and the mode label is blocked on a seam §6a already parks.
+  //
+  // **What is built is the half a chord cannot decide.** A rectangle that
+  // crossed a block boundary would cross it whichever key opened it, and a copy
+  // that pasted its own SGR would paste it whichever key took it. So the model
+  // lands with its rows and its mutation run, and the verb is one line the day
+  // the chord is answered — at which point these four entries are themselves
+  // violations, because the rectangle's rows are exactly what the session reads
+  // to draw and to copy it.
+  "CellRect.fromRow":
+    "C14 §6e, I42 — the rectangle's rows, read by the session the day the chord lands. The "
+    + "chord is parked because the registry names no rectangular action and no rectangular "
+    + "binding (R-SEL-007 gives the rule and no way in). T1.42 asserts the clip is a clip and "
+    + "not a containment test, which is the claim the boundary rests on.",
+  "CellRect.toRow":
+    "C14 §6e, I42 — the rectangle's rows, read by the session the day the chord lands; parked "
+    + "with `CellRect.fromRow` on the same missing binding.",
+  "CellRect.fromColumn":
+    "C14 §6e, I42 — the rectangle's columns, which travel freely because the boundary rule is "
+    + "about blocks and a block has no columns. Parked with `CellRect.fromRow`.",
+  "CellRect.toColumn":
+    "C14 §6e, I42 — the rectangle's columns; parked with `CellRect.fromRow` on the same "
+    + "missing binding.",
   // --- C14 §6a's caret, groundwork ahead of the motions ---------------------
   //
   // **The queued consumer is named and is one MR away**, which is the scoped
@@ -3539,6 +3569,22 @@ export function checkExportedArguments(files, readFile = (f) => readFileSync(f, 
 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
+  // **`rectBetween` and `cellTextOf` are `R-SEL-007`'s mechanism with no door**
+  // (C14 §6e). The rule's two mechanical claims — the clip to the anchor's
+  // block, and cells rather than source — are settled completely by the design;
+  // its third, *says so in the mode label*, is blocked on the seam §6a parks,
+  // and the chord that opens the mode is named nowhere in the registry. Both go
+  // the day that chord is answered, and if it lands and nothing in `src/` calls
+  // them, these two entries are the violation.
+  rectBetween:
+    "C14 §6e, I42 — the rectangular selection's clip, called by the session the day the chord "
+    + "lands. Parked because the registry names no rectangular action and no rectangular "
+    + "binding; T1.42 holds the clip against a containment test, which is the pair that "
+    + "reads as one rule and behaves as opposites.",
+  cellTextOf:
+    "C14 §6e, I43 — what a rectangular copy takes, called by the session the day the chord "
+    + "lands. Parked with `rectBetween`; T1.43 carries the control that tells a window over "
+    + "the frame's line from one over its content.",
   // **`shadeRgb` is the reference the packed form is held against** (C10 I42).
   // The painter took `shadePacked` (C12 I132) and `shadeColour` deliberately
   // stays on `overChannels`, so the tuple form has no caller in `src/` — and
