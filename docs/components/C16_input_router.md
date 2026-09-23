@@ -1393,6 +1393,24 @@ taken. A reserved name is every consumer's namespace.
    because a reader who needs the map needs it while doing something else, and a
    layer that closes on the next key is not a reference.
 
+   **The remainder is in registry order, not alphabetical** (§022). The fixture
+   states it in prose — *the active scope is rendered first, then preserves
+   registry order for the remaining scopes* — and its picture is what settles it
+   against the alternative: it draws `global` before `transcript`, where
+   `FOCUS_ORDER` puts `global` **last**, so the ownership ladder is not the order
+   even though it is the one the `docs/KEYS.md` columns take. Alphabetical agreed
+   with the picture by coincidence, `g` before `t`, which is why the first
+   implementation looked right.
+
+   **The registry names three of the tree's eight scopes** — `global`, `prompt`,
+   `transcript` — so its order covers three and is silent on `child`,
+   `liveBlock`, `nativeSelection`, `overlay`, `panel` and `semanticSelection`.
+   Those follow, in `FOCUS_ORDER`: the design's order where the design has one,
+   and the tree's single declared order behind it. **Not alphabetical anywhere**,
+   which is the rule's actual content — an alphabetical list is an ordering of
+   the *spellings* and says nothing about ownership, and renaming a scope would
+   move it.
+
    **The ordering is the rule, so it has one owner and it is not the verb.**
    `scopesInReadingOrder` lives with the keymap (L3) and answers *which scopes,
    in what order* from the bindings and the reader's rung; `/help keys` composes
