@@ -2,108 +2,630 @@
 
 exports[`golden frames — one per design fixture > dark-ascii at 40 1`] = `
 "── §95 · a tape, where a row of peers would shed
-scout  planner  * builder .  2]
+scout  planner  * builder .  2]
 ── §42 · widgets — a row of peers that sheds
-auto  plan  manual  accept edits
+auto  plan  manual  accept edits
 ── §34 · active progress bars
-download      ###############....... 70%
+download      ###############------- 70%
 ── §96 · a status has three parts, and a frame is separate
 +--------------------------------------+
-| -------------- ERROR --------------- |
-| ! the manifest declares a tool the   |
-| registry has no handler for, so it   |
-| would classify as local and reach    |
-| the pipeline with nothing to run     |
+| -------------- ERROR --------------- |
+| ! the manifest declares a tool the   |
+| registry has no handler for, so it   |
+| would classify as local and reach    |
+| the pipeline with nothing to run     |
 | at seal(): \`prune\` is marked local ~ |
 +--------------------------------------+
 ── §97 · a transient panel floats, between two rules
-+ Confirm -----------------------------+
-|apply this change?                    |
-+--------------------------------------+
++ Confirm -----------------------------+
+|apply this change?                    |
++--------------------------------------+
 ── §48 · block states
-+ resolve  12 packages
-- fetch    3 remaining
-. link   
-x verify   checksum"
++ resolve  12 packages
+- fetch    3 remaining
+. link   
+x verify   checksum
+── §6 · the canonical marks, as a glyph census
+question        ?
+current         *
+ok              +
+warn            !
+error           x
+info            i
+pending         .
+working         %
+running         *
+queued          o
+cancelled       /
+expand          (
+collapse        v
+focus           >
+bullet          -
+quote           |
+nested          ~
+continuation    \`
+── §30 · the head mark's three rungs
+tone carries: false
+queued          o
+running         *
+succeeded       +
+failed          x
+cancelled       /
+(state glyph)   o * + x /
+── §31 · every reusable spinner set
+agent           . o O @ *
+braille         - \\ | /
+braille2        - \\ | /
+bounce          . o O @ *
+orbit           - \\ | /
+grow            . o O @ *
+bloom           . o O @ *
+starfield       . o O @ *
+fullramp        . o O @ *
+decimal         0 1 2 3 4 5 6 7 8 9
+hex             0 1 2 3 4 5 6 7 8 9 a b c d e f
+binary4         0 1 2 3 4 5 6 7 8 9
+toggle          + x
+line            - \\ | /
+balloon         . o O @ *
+circleQuarters  - \\ | /
+boxBounce       - \\ | /
+arc             - \\ | /
+growVertical    . o O @ *
+growHorizontal  . o O @ *
+noise           . o O @ *
+boxBounce2      - \\ | /
+triangle        - \\ | /
+circleHalves    - \\ | /
+pipe            - \\ | /
+arrow           - \\ | /
+pulse           . o O @ *
+── §33 · nine alphabets, and where each belongs
+block         ###############------- 70%
+halfblock     ###############------- 70%
+rectangle     ###############------- 70%
+beads         ###############------- 70%
+posts         ###############------- 70%
+slant         ###############------- 70%
+squares       ###############------- 70%
+braille       ###############------- 70%
+ascii         ###############------- 70%
+── §21 · the scrollbar — the set, and the bar beside a box
+track           |
+thumb           #
+thumbStart      #
+thumbEnd        #
+half            false
+line 1                                 #
+line 2                                 #
+line 3                                 |
+line 4                                 |
+line 5                                 |
+line 6                                 |
+... 0 above, 12 below"
 `;
 
 exports[`golden frames — one per design fixture > dark-ascii at 80 1`] = `
 "── §95 · a tape, where a row of peers would shed
-scout 4s  planner 1m12s  * builder . 8s  critic 2s o  scribe 0s o
+scout 4s  planner 1m12s  * builder . 8s  critic 2s o  scribe 0s o
 ── §42 · widgets — a row of peers that sheds
-auto  plan  manual  accept edits
+auto  plan  manual  accept edits
 ── §34 · active progress bars
-download                   ##################################............... 70%
+download                   ##################################--------------- 70%
 ── §96 · a status has three parts, and a frame is separate
 +------------------------------------------------------------------------------+
 |                                                                              |
-| ---------------------------------- ERROR ----------------------------------- |
-| ! the manifest declares a tool the registry has no handler for, so it would  |
-| classify as local and reach the pipeline with nothing to run                 |
+| ---------------------------------- ERROR ----------------------------------- |
+| ! the manifest declares a tool the registry has no handler for, so it would  |
+| classify as local and reach the pipeline with nothing to run                 |
 | at seal(): \`prune\` is marked local in the manifest and has no handler        |
 |                                                                              |
 +------------------------------------------------------------------------------+
 ── §97 · a transient panel floats, between two rules
-+ Confirm ---------------------------------------------------------------------+
-|apply this change?                                                            |
-+------------------------------------------------------------------------------+
++ Confirm ---------------------------------------------------------------------+
+|apply this change?                                                            |
++------------------------------------------------------------------------------+
 ── §48 · block states
-+ resolve  12 packages
-- fetch    3 remaining
-. link   
-x verify   checksum"
++ resolve  12 packages
+- fetch    3 remaining
+. link   
+x verify   checksum
+── §6 · the canonical marks, as a glyph census
+question        ?
+current         *
+ok              +
+warn            !
+error           x
+info            i
+pending         .
+working         %
+running         *
+queued          o
+cancelled       /
+expand          (
+collapse        v
+focus           >
+bullet          -
+quote           |
+nested          ~
+continuation    \`
+── §30 · the head mark's three rungs
+tone carries: false
+queued          o
+running         *
+succeeded       +
+failed          x
+cancelled       /
+(state glyph)   o * + x /
+── §31 · every reusable spinner set
+agent           . o O @ *
+braille         - \\ | /
+braille2        - \\ | /
+bounce          . o O @ *
+orbit           - \\ | /
+grow            . o O @ *
+bloom           . o O @ *
+starfield       . o O @ *
+fullramp        . o O @ *
+decimal         0 1 2 3 4 5 6 7 8 9
+hex             0 1 2 3 4 5 6 7 8 9 a b c d e f
+binary4         0 1 2 3 4 5 6 7 8 9
+toggle          + x
+line            - \\ | /
+balloon         . o O @ *
+circleQuarters  - \\ | /
+boxBounce       - \\ | /
+arc             - \\ | /
+growVertical    . o O @ *
+growHorizontal  . o O @ *
+noise           . o O @ *
+boxBounce2      - \\ | /
+triangle        - \\ | /
+circleHalves    - \\ | /
+pipe            - \\ | /
+arrow           - \\ | /
+pulse           . o O @ *
+── §33 · nine alphabets, and where each belongs
+block                      ##################################--------------- 70%
+halfblock                  ##################################--------------- 70%
+rectangle                  ##################################--------------- 70%
+beads                      ##################################--------------- 70%
+posts                      ##################################--------------- 70%
+slant                      ##################################--------------- 70%
+squares                    ##################################--------------- 70%
+braille                    ##################################--------------- 70%
+ascii                      ##################################--------------- 70%
+── §21 · the scrollbar — the set, and the bar beside a box
+track           |
+thumb           #
+thumbStart      #
+thumbEnd        #
+half            false
+line 1                                                                         #
+line 2                                                                         #
+line 3                                                                         |
+line 4                                                                         |
+line 5                                                                         |
+line 6                                                                         |
+... 0 above, 12 below"
 `;
 
-exports[`golden frames — one per design fixture > dark-unicode at 40 1`] = `
+exports[`golden frames — one per design fixture > dark-mono-unicode at 40 1`] = `
 "── §95 · a tape, where a row of peers would shed
-scout  planner  › builder ⋅  2»
+scout  planner  › builder ⋅  2»
 ── §42 · widgets — a row of peers that sheds
-auto  plan  manual  accept edits
+auto  plan  manual  accept edits
 ── §34 · active progress bars
-download      ███████████████░░░░░░░ 70%
+download      ███████████████░░░░░░░ 70%
 ── §96 · a status has three parts, and a frame is separate
 ┌──────────────────────────────────────┐
-│ ────────────── ERROR ─────────────── │
-│ ▲ the manifest declares a tool the   │
-│ registry has no handler for, so it   │
-│ would classify as local and reach    │
-│ the pipeline with nothing to run     │
+│ ────────────── ERROR ─────────────── │
+│ ▲ the manifest declares a tool the   │
+│ registry has no handler for, so it   │
+│ would classify as local and reach    │
+│ the pipeline with nothing to run     │
 │ at seal(): \`prune\` is marked local … │
 └──────────────────────────────────────┘
 ── §97 · a transient panel floats, between two rules
-┌ Confirm ─────────────────────────────┐
-│apply this change?                    │
-└──────────────────────────────────────┘
+┌ Confirm ─────────────────────────────┐
+│apply this change?                    │
+└──────────────────────────────────────┘
 ── §48 · block states
-✓ resolve  12 packages
-⠋ fetch    3 remaining
-◌ link   
-✗ verify   checksum"
+✓ resolve  12 packages
+⠋ fetch    3 remaining
+◌ link   
+✗ verify   checksum
+── §6 · the canonical marks, as a glyph census
+question        ⟩
+current         ›
+ok              ✓
+warn            ▲
+error           ✗
+info            ⓘ
+pending         ◌
+working         ◐
+running         ●
+queued          ○
+cancelled       ⊘
+expand          ▹
+collapse        ▿
+focus           ▸
+bullet          •
+quote           ⎸
+nested          ⁃
+continuation    ⎿
+── §30 · the head mark's three rungs
+tone carries: false
+queued          ○
+running         ●
+succeeded       ✓
+failed          ✗
+cancelled       ⊘
+(state glyph)   ○ ● ✓ ✗ ⊘
+── §31 · every reusable spinner set
+agent           ⋅ ∘ ◦ ✧ ✦ ✢ ✲ ✵ ✶ ✷ ✱ ✺ ✹ ✸ ✼ ✻ ❃ ❁ ✾ ❀ ✿ ❂ ✿ ❀ ✾ ❁ ❃ ✻ ✼ ✸ ✹ ✺ ✱ ✷ ✶ ✵ ✲ ✢ ✦ ✧ ◦ ∘ ✦ ✢ ✲ ✶ ✷ ✹ ✺ ✹ ✷ ✶ ✲ ✢ ⋅ ✧ ✦ ✢ ✻ ✾ ❀ ✿ ❀ ✾ ✻ ✢ ✦ ✧ ✶ ✷ ✸ ✹ ✺ ✹ ✸ ✷ ✢ ✲ ✱ ✻ ✱ ✲
+braille         ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏
+braille2        ⣾ ⣽ ⣻ ⢿ ⡿ ⣟ ⣯ ⣷
+bounce          ⠁ ⠂ ⠄ ⠂
+orbit           ⠁ ⠈ ⠐ ⠠ ⢀ ⡀ ⠄ ⠂
+grow            ✦ ✢ ✲ ✶ ✷ ✹ ✺ ✹ ✷ ✶ ✲ ✢
+bloom           ⋅ ✧ ✦ ✢ ✻ ✾ ❀ ✿ ❀ ✾ ✻ ✢ ✦ ✧
+starfield       ✶ ✷ ✸ ✹ ✺ ✹ ✸ ✷
+fullramp        ⋅ ∘ ◦ ✧ ✦ ✢ ✲ ✵ ✶ ✷ ✱ ✺ ✹ ✸ ✼ ✻ ❃ ❁ ✾ ❀ ✿ ❂ ✿ ❀ ✾ ❁ ❃ ✻ ✼ ✸ ✹ ✺ ✱ ✷ ✶ ✵ ✲ ✢ ✦ ✧ ◦ ∘
+decimal         0 1 2 3 4 5 6 7 8 9
+hex             0 1 2 3 4 5 6 7 8 9 a b c d e f
+binary4         ⠀ ⠁ ⠂ ⠃ ⠄ ⠅ ⠆ ⠇ ⠈ ⠉ ⠊ ⠋ ⠌ ⠍ ⠎ ⠏
+toggle          ⊶ ⊷
+line            - \\ | /
+balloon         . o O @ *
+circleQuarters  ◴ ◷ ◶ ◵
+boxBounce       ▖ ▘ ▝ ▗
+arc             ◜ ◠ ◝ ◞ ◡ ◟
+growVertical    ▁ ▃ ▄ ▅ ▆ ▇ ▆ ▅ ▄ ▃
+growHorizontal  ▏ ▎ ▍ ▌ ▋ ▊ ▉ ▊ ▋ ▌ ▍ ▎
+noise           ▓ ▒ ░
+boxBounce2      ▌ ▀ ▐ ▄
+triangle        ◢ ◣ ◤ ◥
+circleHalves    ◐ ◓ ◑ ◒
+pipe            ┤ ┘ ┴ └ ├ ┌ ┬ ┐
+arrow           ← ↑ → ↓
+pulse           ✢ ✲ ✱ ✻ ✱ ✲
+── §33 · nine alphabets, and where each belongs
+block         ███████████████░░░░░░░ 70%
+halfblock     ▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░ 70%
+rectangle     ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬░░░░░░░ 70%
+beads         •••••••••••••••◦◦◦◦◦◦◦ 70%
+posts         ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯ 70%
+slant         ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱ 70%
+squares       ■■■■■■■■■■■■■■■□□□□□□□ 70%
+braille       ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿        70%
+ascii         ###############------- 70%
+── §21 · the scrollbar — the set, and the bar beside a box
+track           │
+thumb           ┃
+thumbStart      ╽
+thumbEnd        ╿
+half            true
+line 1                                 ┃
+line 2                                 ┃
+line 3                                 │
+line 4                                 │
+line 5                                 │
+line 6                                 │
+⋯ 0 above, 12 below"
 `;
 
-exports[`golden frames — one per design fixture > dark-unicode at 80 1`] = `
+exports[`golden frames — one per design fixture > dark-mono-unicode at 80 1`] = `
 "── §95 · a tape, where a row of peers would shed
-scout 4s  planner 1m12s  › builder ⋅ 8s  critic 2s ○  scribe 0s ○
+scout 4s  planner 1m12s  › builder ⋅ 8s  critic 2s ○  scribe 0s ○
 ── §42 · widgets — a row of peers that sheds
-auto  plan  manual  accept edits
+auto  plan  manual  accept edits
 ── §34 · active progress bars
-download                   ██████████████████████████████████░░░░░░░░░░░░░░░ 70%
+download                   ██████████████████████████████████░░░░░░░░░░░░░░░ 70%
 ── §96 · a status has three parts, and a frame is separate
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                                                                              │
-│ ────────────────────────────────── ERROR ─────────────────────────────────── │
-│ ▲ the manifest declares a tool the registry has no handler for, so it would  │
-│ classify as local and reach the pipeline with nothing to run                 │
+│ ────────────────────────────────── ERROR ─────────────────────────────────── │
+│ ▲ the manifest declares a tool the registry has no handler for, so it would  │
+│ classify as local and reach the pipeline with nothing to run                 │
 │ at seal(): \`prune\` is marked local in the manifest and has no handler        │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 ── §97 · a transient panel floats, between two rules
-┌ Confirm ─────────────────────────────────────────────────────────────────────┐
-│apply this change?                                                            │
-└──────────────────────────────────────────────────────────────────────────────┘
+┌ Confirm ─────────────────────────────────────────────────────────────────────┐
+│apply this change?                                                            │
+└──────────────────────────────────────────────────────────────────────────────┘
 ── §48 · block states
-✓ resolve  12 packages
-⠋ fetch    3 remaining
-◌ link   
-✗ verify   checksum"
+✓ resolve  12 packages
+⠋ fetch    3 remaining
+◌ link   
+✗ verify   checksum
+── §6 · the canonical marks, as a glyph census
+question        ⟩
+current         ›
+ok              ✓
+warn            ▲
+error           ✗
+info            ⓘ
+pending         ◌
+working         ◐
+running         ●
+queued          ○
+cancelled       ⊘
+expand          ▹
+collapse        ▿
+focus           ▸
+bullet          •
+quote           ⎸
+nested          ⁃
+continuation    ⎿
+── §30 · the head mark's three rungs
+tone carries: false
+queued          ○
+running         ●
+succeeded       ✓
+failed          ✗
+cancelled       ⊘
+(state glyph)   ○ ● ✓ ✗ ⊘
+── §31 · every reusable spinner set
+agent           ⋅ ∘ ◦ ✧ ✦ ✢ ✲ ✵ ✶ ✷ ✱ ✺ ✹ ✸ ✼ ✻ ❃ ❁ ✾ ❀ ✿ ❂ ✿ ❀ ✾ ❁ ❃ ✻ ✼ ✸ ✹ ✺ ✱ ✷ ✶ ✵ ✲ ✢ ✦ ✧ ◦ ∘ ✦ ✢ ✲ ✶ ✷ ✹ ✺ ✹ ✷ ✶ ✲ ✢ ⋅ ✧ ✦ ✢ ✻ ✾ ❀ ✿ ❀ ✾ ✻ ✢ ✦ ✧ ✶ ✷ ✸ ✹ ✺ ✹ ✸ ✷ ✢ ✲ ✱ ✻ ✱ ✲
+braille         ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏
+braille2        ⣾ ⣽ ⣻ ⢿ ⡿ ⣟ ⣯ ⣷
+bounce          ⠁ ⠂ ⠄ ⠂
+orbit           ⠁ ⠈ ⠐ ⠠ ⢀ ⡀ ⠄ ⠂
+grow            ✦ ✢ ✲ ✶ ✷ ✹ ✺ ✹ ✷ ✶ ✲ ✢
+bloom           ⋅ ✧ ✦ ✢ ✻ ✾ ❀ ✿ ❀ ✾ ✻ ✢ ✦ ✧
+starfield       ✶ ✷ ✸ ✹ ✺ ✹ ✸ ✷
+fullramp        ⋅ ∘ ◦ ✧ ✦ ✢ ✲ ✵ ✶ ✷ ✱ ✺ ✹ ✸ ✼ ✻ ❃ ❁ ✾ ❀ ✿ ❂ ✿ ❀ ✾ ❁ ❃ ✻ ✼ ✸ ✹ ✺ ✱ ✷ ✶ ✵ ✲ ✢ ✦ ✧ ◦ ∘
+decimal         0 1 2 3 4 5 6 7 8 9
+hex             0 1 2 3 4 5 6 7 8 9 a b c d e f
+binary4         ⠀ ⠁ ⠂ ⠃ ⠄ ⠅ ⠆ ⠇ ⠈ ⠉ ⠊ ⠋ ⠌ ⠍ ⠎ ⠏
+toggle          ⊶ ⊷
+line            - \\ | /
+balloon         . o O @ *
+circleQuarters  ◴ ◷ ◶ ◵
+boxBounce       ▖ ▘ ▝ ▗
+arc             ◜ ◠ ◝ ◞ ◡ ◟
+growVertical    ▁ ▃ ▄ ▅ ▆ ▇ ▆ ▅ ▄ ▃
+growHorizontal  ▏ ▎ ▍ ▌ ▋ ▊ ▉ ▊ ▋ ▌ ▍ ▎
+noise           ▓ ▒ ░
+boxBounce2      ▌ ▀ ▐ ▄
+triangle        ◢ ◣ ◤ ◥
+circleHalves    ◐ ◓ ◑ ◒
+pipe            ┤ ┘ ┴ └ ├ ┌ ┬ ┐
+arrow           ← ↑ → ↓
+pulse           ✢ ✲ ✱ ✻ ✱ ✲
+── §33 · nine alphabets, and where each belongs
+block                      ██████████████████████████████████░░░░░░░░░░░░░░░ 70%
+halfblock                  ▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░░░░░░░░░ 70%
+rectangle                  ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬░░░░░░░░░░░░░░░ 70%
+beads                      ••••••••••••••••••••••••••••••••••◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦ 70%
+posts                      ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 70%
+slant                      ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 70%
+squares                    ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■□□□□□□□□□□□□□□□ 70%
+braille                    ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿                70%
+ascii                      ##################################--------------- 70%
+── §21 · the scrollbar — the set, and the bar beside a box
+track           │
+thumb           ┃
+thumbStart      ╽
+thumbEnd        ╿
+half            true
+line 1                                                                         ┃
+line 2                                                                         ┃
+line 3                                                                         │
+line 4                                                                         │
+line 5                                                                         │
+line 6                                                                         │
+⋯ 0 above, 12 below"
+`;
+
+exports[`golden frames — one per design fixture > dark-unicode at 40 1`] = `
+"── §95 · a tape, where a row of peers would shed
+scout  planner  › builder ⋅  2»
+── §42 · widgets — a row of peers that sheds
+auto  plan  manual  accept edits
+── §34 · active progress bars
+download      ███████████████░░░░░░░ 70%
+── §96 · a status has three parts, and a frame is separate
+┌──────────────────────────────────────┐
+│ ────────────── ERROR ─────────────── │
+│ ▲ the manifest declares a tool the   │
+│ registry has no handler for, so it   │
+│ would classify as local and reach    │
+│ the pipeline with nothing to run     │
+│ at seal(): \`prune\` is marked local … │
+└──────────────────────────────────────┘
+── §97 · a transient panel floats, between two rules
+┌ Confirm ─────────────────────────────┐
+│apply this change?                    │
+└──────────────────────────────────────┘
+── §48 · block states
+✓ resolve  12 packages
+⠋ fetch    3 remaining
+◌ link   
+✗ verify   checksum
+── §6 · the canonical marks, as a glyph census
+question        ⟩
+current         ›
+ok              ✓
+warn            ▲
+error           ✗
+info            ⓘ
+pending         ◌
+working         ◐
+running         ●
+queued          ○
+cancelled       ⊘
+expand          ▹
+collapse        ▿
+focus           ▸
+bullet          •
+quote           ⎸
+nested          ⁃
+continuation    ⎿
+── §30 · the head mark's three rungs
+tone carries: true
+queued          ●
+running         ●
+succeeded       ●
+failed          ●
+cancelled       ●
+(state glyph)   ○ ● ✓ ✗ ⊘
+── §31 · every reusable spinner set
+agent           ⋅ ∘ ◦ ✧ ✦ ✢ ✲ ✵ ✶ ✷ ✱ ✺ ✹ ✸ ✼ ✻ ❃ ❁ ✾ ❀ ✿ ❂ ✿ ❀ ✾ ❁ ❃ ✻ ✼ ✸ ✹ ✺ ✱ ✷ ✶ ✵ ✲ ✢ ✦ ✧ ◦ ∘ ✦ ✢ ✲ ✶ ✷ ✹ ✺ ✹ ✷ ✶ ✲ ✢ ⋅ ✧ ✦ ✢ ✻ ✾ ❀ ✿ ❀ ✾ ✻ ✢ ✦ ✧ ✶ ✷ ✸ ✹ ✺ ✹ ✸ ✷ ✢ ✲ ✱ ✻ ✱ ✲
+braille         ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏
+braille2        ⣾ ⣽ ⣻ ⢿ ⡿ ⣟ ⣯ ⣷
+bounce          ⠁ ⠂ ⠄ ⠂
+orbit           ⠁ ⠈ ⠐ ⠠ ⢀ ⡀ ⠄ ⠂
+grow            ✦ ✢ ✲ ✶ ✷ ✹ ✺ ✹ ✷ ✶ ✲ ✢
+bloom           ⋅ ✧ ✦ ✢ ✻ ✾ ❀ ✿ ❀ ✾ ✻ ✢ ✦ ✧
+starfield       ✶ ✷ ✸ ✹ ✺ ✹ ✸ ✷
+fullramp        ⋅ ∘ ◦ ✧ ✦ ✢ ✲ ✵ ✶ ✷ ✱ ✺ ✹ ✸ ✼ ✻ ❃ ❁ ✾ ❀ ✿ ❂ ✿ ❀ ✾ ❁ ❃ ✻ ✼ ✸ ✹ ✺ ✱ ✷ ✶ ✵ ✲ ✢ ✦ ✧ ◦ ∘
+decimal         0 1 2 3 4 5 6 7 8 9
+hex             0 1 2 3 4 5 6 7 8 9 a b c d e f
+binary4         ⠀ ⠁ ⠂ ⠃ ⠄ ⠅ ⠆ ⠇ ⠈ ⠉ ⠊ ⠋ ⠌ ⠍ ⠎ ⠏
+toggle          ⊶ ⊷
+line            - \\ | /
+balloon         . o O @ *
+circleQuarters  ◴ ◷ ◶ ◵
+boxBounce       ▖ ▘ ▝ ▗
+arc             ◜ ◠ ◝ ◞ ◡ ◟
+growVertical    ▁ ▃ ▄ ▅ ▆ ▇ ▆ ▅ ▄ ▃
+growHorizontal  ▏ ▎ ▍ ▌ ▋ ▊ ▉ ▊ ▋ ▌ ▍ ▎
+noise           ▓ ▒ ░
+boxBounce2      ▌ ▀ ▐ ▄
+triangle        ◢ ◣ ◤ ◥
+circleHalves    ◐ ◓ ◑ ◒
+pipe            ┤ ┘ ┴ └ ├ ┌ ┬ ┐
+arrow           ← ↑ → ↓
+pulse           ✢ ✲ ✱ ✻ ✱ ✲
+── §33 · nine alphabets, and where each belongs
+block         ███████████████░░░░░░░ 70%
+halfblock     ▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░ 70%
+rectangle     ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬░░░░░░░ 70%
+beads         •••••••••••••••◦◦◦◦◦◦◦ 70%
+posts         ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯ 70%
+slant         ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱ 70%
+squares       ■■■■■■■■■■■■■■■□□□□□□□ 70%
+braille       ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿        70%
+ascii         ###############------- 70%
+── §21 · the scrollbar — the set, and the bar beside a box
+track           │
+thumb           ┃
+thumbStart      ╽
+thumbEnd        ╿
+half            true
+line 1                                 ┃
+line 2                                 ┃
+line 3                                 │
+line 4                                 │
+line 5                                 │
+line 6                                 │
+⋯ 0 above, 12 below"
+`;
+
+exports[`golden frames — one per design fixture > dark-unicode at 80 1`] = `
+"── §95 · a tape, where a row of peers would shed
+scout 4s  planner 1m12s  › builder ⋅ 8s  critic 2s ○  scribe 0s ○
+── §42 · widgets — a row of peers that sheds
+auto  plan  manual  accept edits
+── §34 · active progress bars
+download                   ██████████████████████████████████░░░░░░░░░░░░░░░ 70%
+── §96 · a status has three parts, and a frame is separate
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│ ────────────────────────────────── ERROR ─────────────────────────────────── │
+│ ▲ the manifest declares a tool the registry has no handler for, so it would  │
+│ classify as local and reach the pipeline with nothing to run                 │
+│ at seal(): \`prune\` is marked local in the manifest and has no handler        │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+── §97 · a transient panel floats, between two rules
+┌ Confirm ─────────────────────────────────────────────────────────────────────┐
+│apply this change?                                                            │
+└──────────────────────────────────────────────────────────────────────────────┘
+── §48 · block states
+✓ resolve  12 packages
+⠋ fetch    3 remaining
+◌ link   
+✗ verify   checksum
+── §6 · the canonical marks, as a glyph census
+question        ⟩
+current         ›
+ok              ✓
+warn            ▲
+error           ✗
+info            ⓘ
+pending         ◌
+working         ◐
+running         ●
+queued          ○
+cancelled       ⊘
+expand          ▹
+collapse        ▿
+focus           ▸
+bullet          •
+quote           ⎸
+nested          ⁃
+continuation    ⎿
+── §30 · the head mark's three rungs
+tone carries: true
+queued          ●
+running         ●
+succeeded       ●
+failed          ●
+cancelled       ●
+(state glyph)   ○ ● ✓ ✗ ⊘
+── §31 · every reusable spinner set
+agent           ⋅ ∘ ◦ ✧ ✦ ✢ ✲ ✵ ✶ ✷ ✱ ✺ ✹ ✸ ✼ ✻ ❃ ❁ ✾ ❀ ✿ ❂ ✿ ❀ ✾ ❁ ❃ ✻ ✼ ✸ ✹ ✺ ✱ ✷ ✶ ✵ ✲ ✢ ✦ ✧ ◦ ∘ ✦ ✢ ✲ ✶ ✷ ✹ ✺ ✹ ✷ ✶ ✲ ✢ ⋅ ✧ ✦ ✢ ✻ ✾ ❀ ✿ ❀ ✾ ✻ ✢ ✦ ✧ ✶ ✷ ✸ ✹ ✺ ✹ ✸ ✷ ✢ ✲ ✱ ✻ ✱ ✲
+braille         ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏
+braille2        ⣾ ⣽ ⣻ ⢿ ⡿ ⣟ ⣯ ⣷
+bounce          ⠁ ⠂ ⠄ ⠂
+orbit           ⠁ ⠈ ⠐ ⠠ ⢀ ⡀ ⠄ ⠂
+grow            ✦ ✢ ✲ ✶ ✷ ✹ ✺ ✹ ✷ ✶ ✲ ✢
+bloom           ⋅ ✧ ✦ ✢ ✻ ✾ ❀ ✿ ❀ ✾ ✻ ✢ ✦ ✧
+starfield       ✶ ✷ ✸ ✹ ✺ ✹ ✸ ✷
+fullramp        ⋅ ∘ ◦ ✧ ✦ ✢ ✲ ✵ ✶ ✷ ✱ ✺ ✹ ✸ ✼ ✻ ❃ ❁ ✾ ❀ ✿ ❂ ✿ ❀ ✾ ❁ ❃ ✻ ✼ ✸ ✹ ✺ ✱ ✷ ✶ ✵ ✲ ✢ ✦ ✧ ◦ ∘
+decimal         0 1 2 3 4 5 6 7 8 9
+hex             0 1 2 3 4 5 6 7 8 9 a b c d e f
+binary4         ⠀ ⠁ ⠂ ⠃ ⠄ ⠅ ⠆ ⠇ ⠈ ⠉ ⠊ ⠋ ⠌ ⠍ ⠎ ⠏
+toggle          ⊶ ⊷
+line            - \\ | /
+balloon         . o O @ *
+circleQuarters  ◴ ◷ ◶ ◵
+boxBounce       ▖ ▘ ▝ ▗
+arc             ◜ ◠ ◝ ◞ ◡ ◟
+growVertical    ▁ ▃ ▄ ▅ ▆ ▇ ▆ ▅ ▄ ▃
+growHorizontal  ▏ ▎ ▍ ▌ ▋ ▊ ▉ ▊ ▋ ▌ ▍ ▎
+noise           ▓ ▒ ░
+boxBounce2      ▌ ▀ ▐ ▄
+triangle        ◢ ◣ ◤ ◥
+circleHalves    ◐ ◓ ◑ ◒
+pipe            ┤ ┘ ┴ └ ├ ┌ ┬ ┐
+arrow           ← ↑ → ↓
+pulse           ✢ ✲ ✱ ✻ ✱ ✲
+── §33 · nine alphabets, and where each belongs
+block                      ██████████████████████████████████░░░░░░░░░░░░░░░ 70%
+halfblock                  ▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░░░░░░░░░ 70%
+rectangle                  ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬░░░░░░░░░░░░░░░ 70%
+beads                      ••••••••••••••••••••••••••••••••••◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦ 70%
+posts                      ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 70%
+slant                      ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 70%
+squares                    ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■□□□□□□□□□□□□□□□ 70%
+braille                    ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿                70%
+ascii                      ##################################--------------- 70%
+── §21 · the scrollbar — the set, and the bar beside a box
+track           │
+thumb           ┃
+thumbStart      ╽
+thumbEnd        ╿
+half            true
+line 1                                                                         ┃
+line 2                                                                         ┃
+line 3                                                                         │
+line 4                                                                         │
+line 5                                                                         │
+line 6                                                                         │
+⋯ 0 above, 12 below"
 `;

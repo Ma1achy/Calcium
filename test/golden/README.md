@@ -21,7 +21,7 @@ now fails a row.
 | `compositions.test.ts` | lines | C10 §4k's compositions at 3 capability rungs — the frame **and** the ground and ink each run took, resolved back to token names | — |
 | `continuation.test.ts` | lines | the continuation mark under a command's first character, at 2 widths | `config.js` `documents.js` `paint.js` |
 | `corpus.test.ts` | census | this table against the directory — the row that fails when the description stops being true | — |
-| `design-surfaces.test.ts` | lines | one frame per **design fixture** — the third axis, indexed by the design's sections rather than by kind or state, at 2 widths × 2 rungs | — |
+| `design-surfaces.test.ts` | lines | one frame per **design fixture** — the third axis, indexed by the design's sections rather than by kind or state, at 2 widths × **3 rungs**: `mono-unicode` is where §030's head mark moves while the alphabet does not, and neither of the other two can show it | — |
 | `design-fixtures.test.ts` | census | `DESIGN_FIXTURES.md` against the design's 109 fixtures — M16's map, and the row that fails when a fixture is added and nobody classifies it | — |
 | `fallback-docker.test.ts` | lines | docker's real JSON through C07's fallback, unadapted | — |
 | `padding.test.ts` | lines | a block's own padding — alone, inset, in a row group and in a sequence, at 3 widths × 3 variants | `builders/index.js` |

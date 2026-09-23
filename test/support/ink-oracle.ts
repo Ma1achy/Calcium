@@ -66,6 +66,8 @@ const RESIDUE_ASCII =
 const SCROLLBAR =
   "C09 I92 and C09 I93 / §7f / §021 (M14): a scroll whose content overflows spends its last column on a bar, so its content is laid out one cell narrower and every interior row gains a track or thumb glyph";
 const RESIDUE_AND_SCROLLBAR = `${RESIDUE_ASCII} — and, at this rung too, ${SCROLLBAR}`;
+const BAR_EMPTY =
+  "C09 I94 / R-PRG-001 / §033 (M16): the ASCII bar's empty cell is the registry's `-` where Ink drew `.` — a track against an absence, and the pair shipped wrong from the day `BAR_STYLES` existed because every row over the table measured a width and none named an `off`";
 
 /**
  * Kinds that landed **after** Ink was removed, and why each is not a retirement.
@@ -93,6 +95,16 @@ export const POST_INK: ReadonlyMap<string, string> = new Map([
 
 /** Every width the two sweeps render at, so a rung-wide ruling is not a hand-copied list. */
 const ALL_WIDTHS = [2, 12, 24, 32, 40, 60, 80, 100, 120, 160, 200] as const;
+/**
+ * Every width a bar is drawn at — `ALL_WIDTHS` without 2.
+ *
+ * **Measured, not reasoned**: a sweep of the capture directory for a run of the
+ * empty cell returns exactly these ten widths under `ascii` and `mono`, for the
+ * two progress keys and no others. At two columns there is no run left to draw,
+ * so those captures are byte-identical and stay off the list — which is what
+ * makes it a driven exemption rather than a cross product.
+ */
+const BAR_WIDTHS = [12, 24, 32, 40, 60, 80, 100, 120, 160, 200] as const;
 
 const RETIRED: ReadonlyMap<string, string> = new Map(
   (
@@ -144,6 +156,13 @@ const RETIRED: ReadonlyMap<string, string> = new Map(
       // reason than the scrolls': at two columns the title is gone entirely, so
       // there is no mark to change.
       ["t2144-panel-p-live", [12, 24, 32, 40, 60, 80, 100, 120, 160, 200], LIVE_SPINNER],
+      // **The two progress keys, at the two rungs that take the ASCII pair.**
+      // The `full` arm is absent because it draws `█░` and never the ASCII
+      // pair, and `adv-zero-total` is on the list beside `prog-1` because a
+      // bar at 0% is all empty cells — the one capture where the changed
+      // character is the *whole* run rather than its tail.
+      ["t2143-progress-prog-1", BAR_WIDTHS, BAR_EMPTY, ["ascii", "mono"]],
+      ["t2143-progress-adv-zero-total", BAR_WIDTHS, BAR_EMPTY, ["ascii", "mono"]],
     ] as const
   ).flatMap(([key, widths, why, only]) =>
     widths.flatMap((width) =>

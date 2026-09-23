@@ -2002,45 +2002,45 @@
  ],
  "barStyles(ascii)": {
   "ascii": {
-   "off": ".",
+   "off": "-",
    "on": "#"
   },
   "beads": {
-   "off": ".",
+   "off": "-",
    "on": "#"
   },
   "block": {
-   "off": ".",
+   "off": "-",
    "on": "#"
   },
   "braille": {
-   "off": ".",
+   "off": "-",
    "on": "#"
   },
   "halfblock": {
-   "off": ".",
+   "off": "-",
    "on": "#"
   },
   "posts": {
-   "off": ".",
+   "off": "-",
    "on": "#"
   },
   "rectangle": {
-   "off": ".",
+   "off": "-",
    "on": "#"
   },
   "slant": {
-   "off": ".",
+   "off": "-",
    "on": "#"
   },
   "squares": {
-   "off": ".",
+   "off": "-",
    "on": "#"
   }
  },
  "barStyles(full)": {
   "ascii": {
-   "off": ".",
+   "off": "-",
    "on": "#"
   },
   "beads": {

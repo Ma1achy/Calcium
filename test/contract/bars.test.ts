@@ -6,9 +6,24 @@
 // spinner sets. A row reading `BAR_STYLES.halfblock.narrowOnly` asserts that
 // somebody wrote a flag; a row measuring `barStyle(wide).on` asserts that the
 // flag is consulted, and those differ exactly when the lookup is wrong.
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { barStyle, barStyleNames } from "../../src/presentation/blocks/glyphs.js";
+
+/**
+ * The registry's alphabets, read rather than copied.
+ *
+ * **A pair written here would be a second record of the design's**, and the two
+ * would drift exactly as the tree's did — which is the whole reason the row
+ * exists. `spinners.test.ts` reads `spinners` the same way for the same reason.
+ */
+const REGISTERED: readonly Readonly<{ id: string; filled: string; empty: string; status: string }>[] = (
+  JSON.parse(readFileSync("docs/design/language/calcium-registry.json", "utf8")) as {
+    bars: readonly Readonly<{ id: string; filled: string; empty: string; status: string }>[];
+  }
+).bars.filter((b) => b.status === "current");
 import { cells } from "../../src/presentation/text.js";
 import { ASCII_CAPS, FULL_CAPS } from "../support/render.js";
 
@@ -74,7 +89,46 @@ describe("roadmap 51 — bar styles, and ambiguous width is a tier", () => {
   // assertion is satisfied by any one-cell glyph, so `ascii` drew `#`/`.`
   // against the registry's `#`/`-` under a file whose whole subject is this
   // table. §033's fixture is what found it.
-  it.todo(
-    "T2.158 (C09 I94, R-PRG-001): the registry's bars are the tree's, by equality both ways, and `ascii` is `#`/`-` — not deferred on a component: the pair lands with this spec's own next commit, which is the one that changes `BAR_ASCII`",
-  );
+  it("T2.158 (C09 I94, R-PRG-001): the registry's bars are the tree's, by equality both ways", () => {
+    // **Equality on the names, not containment.** A subset check in either
+    // direction is satisfied by the failure it exists to catch: a style the
+    // registry does not register reads as covered, and a registered alphabet
+    // the tree never built reads as present.
+    expect([...barStyleNames()].sort(), "the names, both ways").toEqual(
+      REGISTERED.map((b) => b.id).sort(),
+    );
+
+    // **Then the characters, which is what nothing asserted.** `barStyle` is
+    // asked at the rung the registry's characters are drawn at — narrow and
+    // full Unicode — because the fallbacks are this terminal's business and
+    // not the design's.
+    const tree = Object.fromEntries(
+      barStyleNames().map((n) => [n, { filled: barStyle(NARROW, n).on, empty: barStyle(NARROW, n).off }]),
+    );
+    const design = Object.fromEntries(REGISTERED.map((b) => [b.id, { filled: b.filled, empty: b.empty }]));
+    expect(tree, "every pair, character for character").toEqual(design);
+
+    // **The pair that was wrong, named** — so a reader meeting this row knows
+    // what it was written against and a revert of `BAR_ASCII` fails here by
+    // name rather than inside a record comparison.
+    expect(barStyle(ASCII_CAPS, "block"), "the ASCII rung's pair").toEqual({ on: "#", off: "-" });
+    // And `braille`'s empty really is a space, drawn so in §033's own fixture:
+    // the row compares characters and does not require two visible ones.
+    expect(barStyle(NARROW, "braille").off, "braille's empty is the design's space").toBe(" ");
+
+    // **What this row does NOT cover, and it is a parked question rather than
+    // a divergence left standing.** `BAR_STYLES` is not the tree's only record
+    // of an ASCII bar pair: `pairFor` in `plot/ramp.ts` holds a second —
+    // `filled "#"`, `empty "."`, `absent "-"` — and it is what a `keyValue`
+    // row's `bar` draws through `valueBar`. Moving its `empty` to the
+    // registry's `-` would make empty and absent the same character at that
+    // rung, and §078's `R-TBL-003` is explicit that a missing number is `—`
+    // and never a blank: the two marks are distinct in the design and collide
+    // only because this tree degrades the em dash to a hyphen where
+    // `ambiguousWidth` forbids it. **The design names no ASCII absent mark**,
+    // so choosing one is a visible choice it does not specify. Until it is
+    // asked, the row covers `BAR_STYLES` — which is what `R-PRG-001` is about
+    // — and the second pair is named here rather than left for the next
+    // reader to rediscover.
+  });
 });

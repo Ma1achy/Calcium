@@ -29,6 +29,41 @@ import { describe, expect, it } from "vitest";
 
 const MAP = "test/golden/DESIGN_FIXTURES.md";
 
+/**
+ * A file's code, with its comments removed.
+ *
+ * **A probe that resolves only inside a comment is not evidence.** The column
+ * already warns that a probe says *a subject with this name is in the tree* and
+ * not that the subject matches the design; what it did not say is that prose
+ * counted as the tree.
+ *
+ * **What this does NOT catch, stated because the narrowing was written for a
+ * case it turned out not to reach.** §035 and §036 probed `granularity` and read
+ * as built for a whole MR while `Progress` has `style` and `ramp` and no third
+ * member — and `granularity` survives this strip, because five of its eight
+ * occurrences are `new Intl.Segmenter(undefined, { granularity: "grapheme" })`,
+ * which is code. An option key of an unrelated standard-library call is as good
+ * a resolution as a declaration to a substring search. **Reading the type is
+ * what found that one**, and nothing here or anywhere else would have; the two
+ * rows are `no` now because a person went and looked. The control below is
+ * therefore a separate word — a probe that really does live only in prose —
+ * rather than the case that motivated the reading.
+ */
+const code = (src: string): string =>
+  src.replaceAll(/\/\*[\s\S]*?\*\//gu, "").replaceAll(/(?<![:"'`])\/\/[^\n]*/gu, "");
+
+/**
+ * A rule id is a **citation**, and a citation belongs in a comment.
+ *
+ * The one exemption, named rather than left to a reader to infer: `R-KEY-005`
+ * is §022's probe and lives in prose, because a design rule is something the
+ * code is annotated *with*. Every other probe is a symbol and must be reachable
+ * by the compiler. **Its blind spot, stated**: a symbol whose only occurrence is
+ * in a string literal still counts, because the strip is lexical and does not
+ * parse — which is the direction that admits too much rather than too little.
+ */
+const CITATION = /^R-[A-Z]{3}-\d{3}$/u;
+
 /** Every `.ts` under `src/` and `test/` — what a probe is looked for in. */
 const FILES: readonly string[] = (function walk(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -121,12 +156,26 @@ describe("M16 — the design fixtures, mapped", () => {
     // symbol that lives in `test/`, two named block kinds the repo never had,
     // and §069's named a spelling that does not exist for a surface that is
     // built. Every one reads, from outside, exactly like an absence.
+    //
+    // **An eighth was wrong in the other direction**, and it is the worse
+    // failure of the two because nothing about it reads like an absence: §035
+    // and §036 probed `granularity` and answered *built* for a subject
+    // `Progress` does not have. The search runs over `code(src)` now, with the
+    // one citation-shaped probe exempted by name — but that narrowing does not
+    // reach `granularity`, which resolves inside `Intl.Segmenter`'s options.
+    // Those two rows read `no` because the type was read, not because a gate
+    // said so. The control for this arm is a word that lives only in prose:
+    // `unpatchable`, which occurs once, in a comment in `transcript.test.ts`,
+    // and which this row rejects.
     const dead: string[] = [];
     for (const r of rows()) {
       if (r.built === "—" || r.built === "no") continue;
       const symbols = r.built.replaceAll("`", "").split("\\|").map((x) => x.trim());
       const found = symbols.some((sym) =>
-        FILES.some((f) => readFileSync(f, "utf8").includes(sym)),
+        FILES.some((f) => {
+          const src = readFileSync(f, "utf8");
+          return CITATION.test(sym) ? src.includes(sym) : code(src).includes(sym);
+        }),
       );
       if (!found) dead.push(`§${String(r.section)} → ${r.built}`);
     }

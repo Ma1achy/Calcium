@@ -11,7 +11,7 @@ M = {
  3:("frame","session-frame.test.ts","the five regions with activity present"),
  4:("frame","session-frame.test.ts","idle — the activity region and its rule gone"),
  5:("frame","session-frame.test.ts","cancelled — the spinner stops, the region stays"),
- 6:("owed","M4","the twelve canonical marks, as a glyph census"),
+ 6:("frame","design-surfaces.test.ts","the canonical marks, as a glyph census"),
  7:("frame","states.test.ts","a subagent's nested calls"),
  8:("frame","blocks.test.ts","a message entry"),
  9:("frame","states.test.ts","queued, and what a queue draws"),
@@ -26,7 +26,7 @@ M = {
  18:("owed","M3","focus on things that are not rows"),
  19:("owed","M6","the keys — `docs/KEYS.md`, generated from the registry"),
  20:("prose","—","DAS and ARR as figures"),
- 21:("owed","M14","the scrollbar, absent from `src/` entirely"),
+ 21:("frame","design-surfaces.test.ts","the scrollbar — the set degrading whole, and the bar beside a box that overflows"),
  22:("owed","M9","the help view, which becomes a transcript entry"),
  23:("frame","blocks.test.ts","at 40 columns"),
  24:("frame","states.test.ts","reasoning"),
@@ -34,18 +34,18 @@ M = {
  27:("frame","plot-forms.test.ts","the context composition bar"),
  28:("frame","question-slot.test.ts","approval replaces the prompt — C23 I74"),
  29:("frame","session-frame.test.ts","completion expands the prompt"),
- 30:("owed","M4","the dot, the cursor and the running state — the head mark's three rungs"),
- 31:("owed","M4","every reusable spinner set at its own interval"),
+ 30:("frame","design-surfaces.test.ts","the dot, the cursor and the running state — the head mark's three rungs"),
+ 31:("frame","design-surfaces.test.ts","every reusable spinner set at its own interval"),
  32:("prose","—","the four spinner rules"),
- 33:("owed","M4","nine alphabets, and where each belongs"),
+ 33:("frame","design-surfaces.test.ts","nine alphabets, and where each belongs — where `ascii`'s empty was found to be `.`; `plot/ramp.ts` holds a second ASCII pair whose empty cannot follow without colliding with its absent mark, and that is a parked question"),
  34:("frame","design-surfaces.test.ts","active progress bars"),
- 35:("owed","M4","quantity, granularity and liveness as three axes"),
- 36:("owed","M4","the operation and budget presets"),
+ 35:("owed","M4","quantity, granularity and liveness as three axes — `Progress` has `style` and `ramp` and no third member, so this is genuinely unbuilt"),
+ 36:("owed","M4","the operation and budget presets — semantics on §035's members, which do not exist"),
  37:("owed","M2","every ink ramp, including the four one-shots"),
  38:("owed","M2","the agent's mark and the verb's ramp"),
  39:("prose","—","one interval, one family"),
  41:("prose","—","the spinner is chosen by the verb"),
- 42:("frame","blocks.test.ts","widgets"),
+ 42:("frame","blocks.test.ts","widgets — and `design-surfaces.test.ts` draws it against §042 as well"),
  43:("prose","—","spans, as the substrate four things wait on"),
  44:("owed","M10","two kinds of selection, one clipboard"),
  45:("frame","blocks.test.ts","the live terminal block"),
@@ -126,7 +126,7 @@ PROBE = {
  21:"scrollbar", 22:"R-KEY-005", 23:"displayRows", 24:"CALL_STATE_GLYPH",
  26:"hotEdge|hot-edge", 27:"barCells|BAR_STYLES", 28:"promptReplaced",
  29:"menuWindow", 30:"headMark", 31:"SPINNER_SETS", 33:"BAR_STYLES",
- 34:"BAR_STYLES", 35:"granularity", 36:"granularity", 37:"RampAnimation",
+ 34:"BAR_STYLES", 35:None, 36:None, 37:"RampAnimation",
  38:"RampAnimation", 42:"kind: \"pills\"", 45:"kind: \"terminal\"",
  44:"nativeSelection", 46:"searchOpen", 47:"assertContainerPremise|containment", 48:"CALL_STATE_GLYPH",
  49:"kind: \"panel\"", 50:"kind: \"panel\"", 51:"confirm-source", 52:"questionConsumer",
@@ -181,10 +181,20 @@ exactly what `dismissable` was doing before M8 split it, and the fix is the same
 | **target** | does a golden frame draw it, with the fixture as its target appearance | a path that must exist |
 
 **And a probe answers less than it looks like it does.** It says *a subject with this
-name is in the tree*; it does not say the subject matches the design. `granularity`
-resolving somewhere does not make §035's three axes independent. That is what the
+name is in the tree*; it does not say the subject matches the design. That is what the
 **target** column is for, and it is why raising `built` is not the remaining work of
 this MR — raising `target` is.
+
+**`granularity` was the example that sentence used, and it turned out to be an
+instance rather than an illustration.** §035 and §036 both probed it, and the probe
+resolved: eight times in `src/`, five of them inside `new Intl.Segmenter(undefined, {
+granularity: "grapheme" })`. `Progress` carries `style` and `ramp` and no third member,
+so the three independent axes §035 specifies are **unbuilt**, and the column said they
+were built for as long as it has existed. Both rows read `no` now. **Nothing caught
+it** — `design-fixtures.test.ts` now strips comments before searching, which is a real
+narrowing and does not reach this case, because an option key of a standard-library
+call is code. What found it was reading the type. So `unbuilt` goes from 2 to 4, and a
+figure moving the wrong way is the honest half of the same measurement.
 
 **Seven of sixty-five probes were wrong on their first run, and a probe that does not
 resolve indicts the probe before the tree.** `ONE_PER_KIND` lives in `test/` and the
@@ -258,11 +268,13 @@ than inferred from a suite staying green.
     surface {len(surfaces)} · prose {c['prose']} · app {c['app']} · total {sum(c.values())}
     of the surfaces: built {built_n} · unbuilt {len(surfaces) - built_n} · framed {framed_n}
 
-**`framed` is the figure this MR moves, and `built` is the one that was already
-nearly closed.** 64 of the 66 surface rows carry a probe that resolves; the two that do
-not are §054 and §055, which want OSC 8 hyperlinks nothing in the tree emits, and they
-are the only genuine absence the sweep found. Raising `built` is not the work — a probe says a
-subject exists and not that it matches the design. Raising `framed` is.
+**`framed` is the figure this MR moves, and `built` is the one that went backwards.**
+Four surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks
+nothing in the tree emits, and they were the only absence the first sweep found; §035
+and §036 join them because their probe answered from `Intl.Segmenter`'s options rather
+than from `Progress`, which has no member for either axis. Raising `built` is not the
+work — a probe says a subject exists and not that it matches the design. Raising
+`framed` is.
 """)
 open("test/golden/DESIGN_FIXTURES.md", "w").write(out.getvalue())
 print("frame", c["frame"], "owed", c["owed"], "prose", c["prose"], "app", c["app"], "total", sum(c.values()))

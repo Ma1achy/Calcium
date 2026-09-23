@@ -1030,7 +1030,12 @@ type BarStyle = Readonly<{
  * the code — and the golden frames are what said so, at the ASCII widths, after
  * the unicode ones had already gone green.
  */
-const BAR_ASCII: BarStyle = Object.freeze({ on: "#", off: "." });
+// **`-` and not `.`, and the registry is why** (C09 I94, `R-PRG-001`, §033).
+// The pair shipped as `#`/`.` from the day the table existed and no row could
+// see it: every assertion over `BAR_STYLES` measures a width or a fallback, and
+// a width row is satisfied by any one-cell glyph. `.` is an absence where `-` is
+// a track, which is what the fixture draws.
+const BAR_ASCII: BarStyle = Object.freeze({ on: "#", off: "-" });
 
 /**
  * The styles, and `ascii` is the floor every arm falls to.

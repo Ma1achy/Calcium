@@ -17,10 +17,21 @@
 // `STATES` chose, for its reason: adding one is three lines and the frame comes
 // free, so the cost of covering a surface never argues against covering it.
 import { block } from "../../src/data/viewmodel/index.js";
+import {
+  CALL_STATE_GLYPH,
+  GLYPH_TOKENS,
+  barStyleNames,
+  glyphFor,
+  headMark,
+  scrollbarSet,
+  spinnerFrames,
+  spinnerSetNames,
+  toneCarries,
+} from "../../src/presentation/blocks/glyphs.js";
 import { measurable } from "./render.js";
 import type { ResolvedTheme } from "../../src/presentation/theme/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/index.js";
-import type { Block } from "../../src/data/viewmodel/types.js";
+import type { Block, CallState } from "../../src/data/viewmodel/types.js";
 
 export type Surface = Readonly<{
   /** The fixture this is the target appearance for — `DESIGN_FIXTURES.md`'s key. */
@@ -111,6 +122,90 @@ const PILLS = block({
   ],
 });
 
+// --- the vocabulary surfaces ------------------------------------------------
+//
+// **Five fixtures whose subject is a table rather than a block**, and the
+// signature already allows them: a `Surface` is a § and a function returning
+// rows, so a census of the marks at a rung is as much a frame as a panel is.
+// Drawing them through a block would be the wrong picture — §006 specifies the
+// *vocabulary*, not one block that happens to use a member of it, and a frame
+// of one member says nothing about the other seventeen.
+//
+// **Every one of them reads the capabilities it is handed**, which is the
+// property that makes them worth snapshotting at three rungs rather than one:
+// a row that returned the same string at every rung would be a restatement of
+// the table it is drawn from.
+
+/** Two columns, so a reader can see the token beside the mark it resolves to. */
+// 16, because `circleQuarters` and `growHorizontal` are both 14 and a column
+// padded to its longest member leaves no gap at all where it matters most.
+const pair = (name: string, value: string): string => `${name.padEnd(16, " ")}${value}`;
+
+/** §006: every `Glyph` the vocabulary holds, resolved at this rung. */
+const glyphCensus = (
+  _width: number,
+  caps: TerminalCapabilities,
+): readonly string[] => GLYPH_TOKENS.map((t) => pair(t, glyphFor(t, caps)));
+
+/**
+ * §030: the head mark's three rungs, and **the rung is the frame's own axis**.
+ *
+ * With colour every state draws one mark and tone says which; at one bit and in
+ * ASCII tone is gone and the shape carries it. So the interesting property is
+ * *are these five distinct*, and it is only visible by drawing all five — which
+ * is why this row is the states and not one call head.
+ */
+const headMarks = (_width: number, caps: TerminalCapabilities): readonly string[] => {
+  const states: readonly CallState[] = ["queued", "running", "succeeded", "failed", "cancelled"];
+  return [
+    `tone carries: ${String(toneCarries(caps))}`,
+    ...states.map((st) => pair(st, glyphFor(headMark(st, caps), caps))),
+    pair("(state glyph)", states.map((st) => glyphFor(CALL_STATE_GLYPH[st], caps)).join(" ")),
+  ];
+};
+
+/** §031: every registered set at its own rung — the frames, in order. */
+const spinnerCensus = (_width: number, caps: TerminalCapabilities): readonly string[] =>
+  spinnerSetNames().map((n) => pair(n, spinnerFrames(caps, n).join(" ")));
+
+/** §021: the set degrades whole, so the frame is the set and not a member. */
+const scrollbarCensus = (_width: number, caps: TerminalCapabilities): readonly string[] => {
+  const set = scrollbarSet(caps);
+  return [
+    pair("track", set.track),
+    pair("thumb", set.thumb),
+    pair("thumbStart", set.thumbStart),
+    pair("thumbEnd", set.thumbEnd),
+    pair("half", String(set.half)),
+  ];
+};
+
+/**
+ * §021's other half: the bar drawn beside a box that overflows.
+ *
+ * The census above says which glyphs; this says where they land, and §021 draws
+ * a bar **and** a count together, which is what the residue row under it is.
+ */
+const SCROLLED = block({
+  kind: "scroll",
+  id: "scrolled",
+  height: 6,
+  children: Array.from({ length: 18 }, (_, i) =>
+    block({ kind: "raw", id: `line-${String(i)}`, text: `line ${String(i + 1)}` }),
+  ),
+});
+
+/** §033: one bar per alphabet, all at the same fraction, so the rows compare. */
+const barAlphabets =
+  () =>
+  (width: number, capabilities: TerminalCapabilities, theme: ResolvedTheme): readonly string[] =>
+    barStyleNames().flatMap((style) =>
+      measurable({ theme, capabilities }).renderToLines(
+        block({ kind: "progress", id: `bar-${style}`, label: style, current: 7, total: 10, style }),
+        width,
+      ),
+    );
+
 export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 95, name: "a tape, where a row of peers would shed", rows: draw(TAPE) },
   { section: 42, name: "widgets — a row of peers that sheds", rows: draw(PILLS) },
@@ -118,4 +213,12 @@ export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 96, name: "a status has three parts, and a frame is separate", rows: draw(STATUS) },
   { section: 97, name: "a transient panel floats, between two rules", rows: draw(PANEL) },
   { section: 48, name: "block states", rows: draw(STEPS) },
+  { section: 6, name: "the canonical marks, as a glyph census", rows: glyphCensus },
+  { section: 30, name: "the head mark's three rungs", rows: headMarks },
+  { section: 31, name: "every reusable spinner set", rows: spinnerCensus },
+  { section: 33, name: "nine alphabets, and where each belongs", rows: barAlphabets() },
+  { section: 21, name: "the scrollbar — the set, and the bar beside a box", rows: (w, c, t) => [
+    ...scrollbarCensus(w, c),
+    ...draw(SCROLLED)(w, c, t),
+  ] },
 ]);
