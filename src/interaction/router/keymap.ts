@@ -379,6 +379,22 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // the argument and the view was only its clearest instance.
   { target: "nativeSelection", key: chordOf("escape"), action: "exitNativeSelection" },
 
+  // --- semantic copy mode (C14 §6a, C16 §5d) ---------------------------------
+  //
+  // **`esc` is one row and two behaviours** (I51, §5d D1/D2). The keymap cannot
+  // express *clear if there is a selection, otherwise leave* and should not try:
+  // a second row keyed on the selection would be a condition the table has no
+  // column for, and `escapeSemanticSelection` is the verb that holds it. The
+  // reader presses one key twice; the footer says which press they are on.
+  { target: "semanticSelection", key: chordOf("escape"), action: "escapeSemanticSelection" },
+  // **Bare keycaps, and that is legible only because of the target** (`R-SEL-008`).
+  // `a` and `A` would be unbindable anywhere a reader might be typing; at this
+  // target nothing else can be active, which is what the rule is relying on when
+  // it names them without a modifier. `⌃a` is not bound: the rule says so, and
+  // the export path writes a file instead.
+  { target: "semanticSelection", key: { name: "a" }, action: "selectEntryUnderCaret" },
+  { target: "semanticSelection", key: { name: "A" }, action: "selectAllLoadedEntries" },
+
   { target: "global", key: { name: "pageup" }, action: "scrollPageUp" },
   { target: "global", key: { name: "pagedown" }, action: "scrollPageDown" },
   { target: "global", key: { name: "home", ctrl: true }, action: "scrollTop" },
@@ -813,6 +829,9 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
     valuesToggle: true,
     queueDrop: true,
     enterSemanticSelection: true,
+    escapeSemanticSelection: true,
+    selectEntryUnderCaret: true,
+    selectAllLoadedEntries: true,
   } satisfies Readonly<Record<KeyAction, true>>),
 );
 

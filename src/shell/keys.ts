@@ -114,6 +114,20 @@ export type KeyDeps = Readonly<{
   enterNativeSelection: () => void;
   exitNativeSelection: () => void;
   /**
+   * Semantic copy mode (C14 §6a, C16 §5d, I51).
+   *
+   * **The exit is here where the handoff's is not, and the difference is I51.**
+   * `⌃c` on the ladder's rung calls `exitSemanticSelection` directly, exactly as
+   * it calls `exitNativeSelection` — but `esc` needs a *different* verb, because
+   * it clears a selection first, and a verb a keymap row resolves has to live in
+   * this table. So the pair here is the entry and the `esc` verb; the ladder's
+   * exit is not a second way out of the same shape, it is the other one.
+   */
+  enterSemanticSelection: () => void;
+  escapeSemanticSelection: () => void;
+  selectEntryUnderCaret: () => void;
+  selectAllLoadedEntries: () => void;
+  /**
    * Every navigable element in the live entry, addressed and in reading order,
    * or empty (C16 I22, C26 §5).
    *
@@ -557,8 +571,11 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   /**
    * **A reserved chord with an explicit no-op** (C16 I38, §6a).
    *
-   * Fifteen of these: the nine agent slots, `agent.next`/`agent.previous`,
-   * `posture.cycle`, `values.toggle`, `queue.drop` and `selection.semantic`.
+   * Fourteen of these: the nine agent slots, `agent.next`/`agent.previous`,
+   * `posture.cycle`, `values.toggle` and `queue.drop`. **`selection.semantic`
+   * was the fifteenth and is built** (M10b, C14 §6a), which is what a
+   * reservation is for — it held the chord against an application taking it
+   * for the interval between the design naming it and the mode existing.
    * **`host.detach` is not among them** — it arrived with a chord in the same
    * shape and it is the one action whose reservation would be a defect, because
    * it is the only exit from a rung nothing else can leave (C16 I49).
@@ -592,7 +609,18 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     postureCycle: reserved,
     valuesToggle: reserved,
     queueDrop: reserved,
-    enterSemanticSelection: reserved,
+    // **No longer reserved** (M10b). The chord was held with an explicit no-op
+    // from M6 so an application could not take it; C14 §6a is the mode it was
+    // holding it for.
+    enterSemanticSelection: () => void deps.enterSemanticSelection(),
+    escapeSemanticSelection: () => void deps.escapeSemanticSelection(),
+    // **`exitSemanticSelection` is not in this table and that is I51.** The
+    // ladder's `⌃c` rung calls it on `RouterDeps`, and a row here would be a
+    // second way out with an order of its own — the shape the native handoff's
+    // exit is kept out of this table for. `esc` is here because it is a
+    // different verb, not a second spelling of the same one.
+    selectEntryUnderCaret: () => void deps.selectEntryUnderCaret(),
+    selectAllLoadedEntries: () => void deps.selectAllLoadedEntries(),
 
     // --- C17 ---------------------------------------------------------------
     insertNewline: () => void deps.editor.insert("\n"),

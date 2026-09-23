@@ -28,6 +28,18 @@ export type FocusInputs = Readonly<{
   overlayTop: Readonly<{ kind: "overlay" | "panel" }> | null;
   nativeSelection: boolean;
   /**
+   * Semantic copy mode is up (C14 §6a, I50).
+   *
+   * **Two booleans rather than one three-valued field**, and the reason is that
+   * they are two facts rather than one with three settings: the handoff is a
+   * statement about the terminal's mouse and this is a statement about the
+   * app's own selection. A terminal cannot be in both, but nothing here is what
+   * makes that true — the entry rows are, because neither resolves once
+   * `activeTarget` answers the other. A union here would encode the exclusion in
+   * the type and put the guard in two places.
+   */
+  semanticSelection: boolean;
+  /**
    * A child process holds the terminal (§103, R-OWN-002).
    *
    * Read from the same fact the Ctrl-C ladder reads — `inFlight() === "shell"` —
@@ -55,6 +67,10 @@ export const FOCUS_ORDER = Object.freeze([
   "child",
   "overlay",
   "nativeSelection",
+  // **The second target at `copy`** (I50, C14 §6a). Beside `nativeSelection`
+  // rather than at a rung of its own: `RUNG_OF` maps both here, and the pair
+  // differs only in what `escape` does.
+  "semanticSelection",
   // **A ninth target at an existing rung** (§2c, R-BLK-109). `RUNG_OF` maps it
   // to `substate`. It stood beside `pushedView`, which is what "targets are not
   // rungs" bought — two targets at one rung, separate because their `escape`
@@ -89,6 +105,12 @@ export function activeTarget(deps: FocusInputs): FocusTarget {
   if (deps.attachedChild) return "child";
   if (deps.overlayTop?.kind === "overlay") return "overlay";
   if (deps.nativeSelection) return "nativeSelection";
+  // **The same rung, and the order between them decides nothing** (I50). Both
+  // map to `copy`, and the two cannot be up at once because each mode's entry
+  // rows stop resolving once `activeTarget` answers the other. So this line's
+  // position relative to the one above is not a priority ruling — there is no
+  // state in which both are true for it to rule on.
+  if (deps.semanticSelection) return "semanticSelection";
   // **A panel is a SUBSTATE and not a question** (§2c, R-BLK-109, R-BLK-866).
   // *FIND and COMPLETION are PROMPT SUBSTATES — the prompt, relabelled*, and
   // *a command palette is a PANEL whose list is a ladder*. So a panel takes the

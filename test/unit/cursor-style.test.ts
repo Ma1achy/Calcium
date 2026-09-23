@@ -107,10 +107,12 @@ describe("C22 §6f — the style resolves per focus target (C22 I63)", () => {
         `${target} is a key`,
       ).toEqual(BEAM);
     }
-    // **Eight, where it was nine** (R-EXA-082, F1254): `pushedView` left the
-    // union with the kind. The figure is here for the reason it always was —
-    // the loop above is satisfied by a `FOCUS_ORDER` that lost a member.
-    expect(FOCUS_ORDER, "and there are eight of them").toHaveLength(8);
+    // **Nine, and it has been nine before.** `pushedView` left the union with
+    // the kind (R-EXA-082, F1254) taking it to eight, and M10b's
+    // `semanticSelection` brings it back — a different member at the same
+    // count, which is exactly why the figure is pinned as well as the loop:
+    // the loop above is satisfied by a `FOCUS_ORDER` that swapped a member.
+    expect(FOCUS_ORDER, "and there are nine of them").toHaveLength(9);
   });
 
   it("T1.22c (C22 I63): shape and blink are one wire parameter", () => {

@@ -62,6 +62,9 @@ function harness(over: Partial<RouterDeps> = {}, start = 1_000) {
     popLayer: () => void calls.push("pop"),
     nativeSelection: () => false,
     exitNativeSelection: () => void calls.push("exitCopy"),
+    semanticSelection: () => false,
+    escapeSemanticSelection: () => void calls.push("escapeSemantic"),
+    exitSemanticSelection: () => void calls.push("exitSemantic"),
     liveEntry: () => ({ id: "e1" }),
     entryAtRow: (row) => (row < 5 ? { id: `row${String(row)}`, rowOffset: row } : null),
     inFlight: () => null,
@@ -311,6 +314,29 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     ]);
     expect(calls, "an interrupt does not scroll").toEqual([]);
     expect(layer.top?.id, "and it did not dismiss the question either").toBe("confirm");
+  });
+
+  it("T1.41f (I51, §5d D5): ⌃c in semantic copy mode calls the exit, never the escape verb", () => {
+    // **The wiring, where T1.41c is the rule.** The model says the two exits
+    // differ; this says the ladder reaches the right one — a row that only
+    // called the verb would pass with the rung bound to the other.
+    const { router, calls } = harness({ semanticSelection: () => true });
+
+    expect(router.dispatch(key("c", { ctrl: true }))).toBe(true);
+    expect(calls, "leaves, and does not clear first").toEqual(["exitSemantic"]);
+  });
+
+  it("T1.41g (I50): the `copy` rung's intercepts answer for both modes, not just the handoff", () => {
+    // I50's point stated where it could fail: every rule written over the
+    // ladder reads `RUNG_OF`, so `page-scroll`'s `reject` at `copy` covers this
+    // mode without a second row. A target mapped to a rung of its own would
+    // fall through here and scroll a screen that is deliberately still.
+    const { router, calls } = harness({ semanticSelection: () => true });
+    router.register("global", () => (calls.push("scroll"), true));
+
+    expect(router.dispatch(key("up", { meta: true })), "consumed, not dropped").toBe(true);
+    expect(calls).toEqual([]);
+    expect(router.lastStages).toEqual(["arming", "intercept:page-scroll:copy:reject", "reject"]);
   });
 
   it("T1.40b (I40): ⌥↑ in native selection is rejected and the frozen screen does not move", () => {

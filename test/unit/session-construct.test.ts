@@ -57,6 +57,13 @@ function fakeFs(): FileSystem {
 
 const FRAME: FrameQueries = {
   nativeSelection: () => false,
+  semanticSelection: () => false,
+  semanticSelectionCount: () => 0,
+  enterSemanticSelection: () => undefined,
+  escapeSemanticSelection: () => undefined,
+  exitSemanticSelection: () => undefined,
+  selectEntryUnderCaret: () => undefined,
+  selectAllLoadedEntries: () => undefined,
   enterNativeSelection: () => undefined,
   exitNativeSelection: () => undefined,
   region: () => ({ top: 1, height: 20 }),

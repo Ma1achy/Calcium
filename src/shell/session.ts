@@ -25,6 +25,8 @@ import {
 } from "node:fs/promises";
 import { resolveConfig, type Ambient, type ResolvedConfig } from "./config.js";
 import { constructGraph, type FrameQueries, type Graph } from "./construct.js";
+import * as semantic from "./semantic-selection.js";
+import type { SemanticMode } from "./semantic-selection.js";
 import { drawFallback, tooSmall } from "./fallback.js";
 import { isUsable } from "../terminal/capabilities.js";
 import { usageText } from "./usage.js";
@@ -392,6 +394,24 @@ class Session implements TuiInstance {
   #profiler: Profiler | null = null;
 
   #nativeSelection = false;
+
+  /**
+   * Semantic copy mode's whole state, or `null` when the mode is not up
+   * (C14 §6a, C16 §5d, `R-SEL-005`, `R-SEL-008`).
+   *
+   * **One field rather than a boolean beside a selection**, and that is the
+   * choice `R-SEL-005` makes for us: *a selection is state within a rung rather
+   * than a rung of its own*. Two fields can say *not in the mode, three entries
+   * selected*, which is the state the two-press escape would then have to
+   * defend against; one field cannot express it.
+   *
+   * `caret` is an entry id and **not C26's focus**. The two hold the same shape
+   * and differ in what they may cross: `extendRow` refuses a changed entry
+   * because a focus that wandered between entries is F764, and a copy-mode
+   * selection crosses entries by construction — `A` takes all the loaded ones.
+   * So C26's focus is what the caret is seeded from, not where it lives.
+   */
+  #semantic: SemanticMode = null;
 
   /**
    * Where `ConstructDeps.debug` lands, and **it landed nowhere until now**
@@ -1361,9 +1381,71 @@ class Session implements TuiInstance {
     graph.scheduler.resume();
   }
 
+  /**
+   * Enter semantic copy mode, seeding the caret (C14 §6a, `R-SEL-008`).
+   *
+   * **The seed is C26's focus, falling back to the last loaded entry.** A caret
+   * that started nowhere would make `a` a no-op on the reader's first keystroke
+   * in a mode whose first keystroke is usually `a`, and *nothing happened* is
+   * the report an empty selection and a missing caret both produce.
+   */
+  #enterSemanticSelection(): void {
+    const graph = this.#graph;
+    if (graph === null || this.#semantic !== null) return;
+    const stored = graph.focus.current;
+    const caret =
+      stored.at === "liveBlock" ? stored.entryId : (graph.transcript.entries.at(-1)?.id ?? null);
+    this.#semantic = semantic.enter(this.#semantic, caret);
+    graph.scheduler.commit("input");
+  }
+
+  /**
+   * `esc` — clear, then leave (C16 I51, §5d D1/D2, `R-SEL-005`).
+   *
+   * The two presses are one verb asked twice rather than two verbs, because the
+   * reader presses the same key both times and the footer is what tells them
+   * which press they are on.
+   */
+  #escapeSemanticSelection(): void {
+    if (this.#semantic === null) return;
+    this.#semantic = semantic.escape(this.#semantic);
+    this.#graph?.scheduler.commit("input");
+  }
+
+  /** `⌃c` — leave, and **never clear first** (C16 I51, §5d D5). */
+  #exitSemanticSelection(): void {
+    if (this.#semantic === null) return;
+    this.#semantic = null;
+    this.#graph?.scheduler.commit("input");
+  }
+
+  /**
+   * `a` and `A` (`R-SEL-008`).
+   *
+   * A block is atomic in a selection (`R-SEL-003`), so an entry is in or out and
+   * there is no partial state for the count to report. `⌃A` is deliberately not
+   * bound: *a key that silently produces a clipboard of megabytes is a trap*.
+   */
+  #selectEntries(which: "caret" | "all"): void {
+    const graph = this.#graph;
+    if (graph === null || this.#semantic === null) return;
+    this.#semantic =
+      which === "all"
+        ? semantic.selectAll(this.#semantic, graph.transcript.entries.map((e) => e.id))
+        : semantic.selectCaret(this.#semantic);
+    graph.scheduler.commit("input");
+  }
+
   #frameQueries(): FrameQueries {
     return {
       nativeSelection: () => this.#nativeSelection,
+      semanticSelection: () => this.#semantic !== null,
+      semanticSelectionCount: () => semantic.count(this.#semantic),
+      enterSemanticSelection: () => this.#enterSemanticSelection(),
+      escapeSemanticSelection: () => this.#escapeSemanticSelection(),
+      exitSemanticSelection: () => this.#exitSemanticSelection(),
+      selectEntryUnderCaret: () => this.#selectEntries("caret"),
+      selectAllLoadedEntries: () => this.#selectEntries("all"),
       enterNativeSelection: () => this.#setNativeSelection(true),
       exitNativeSelection: () => this.#setNativeSelection(false),
       region: () => this.#composed().region,

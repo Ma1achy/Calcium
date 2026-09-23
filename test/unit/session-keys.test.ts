@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import { defaultKeymap } from "../../src/interaction/router/keymap.js";
 import { MENU_ID } from "../../src/interaction/completion/index.js";
 import { SEARCH_ID } from "../../src/interaction/history/index.js";
-import { buildGraph } from "../support/session.js";
+import { buildGraph, COPY_MODES } from "../support/session.js";
 import { createKeyEffects } from "../../src/shell/keys.js";
 import { createFocusStore } from "../../src/interaction/router/focus.js";
 import type { InputEvent, Key } from "../../src/interaction/router/types.js";
@@ -208,6 +208,14 @@ describe("C22 §3 step 11 — the effect table", () => {
       // `liveBlock` needs both halves of what `activeTarget` reads: a live
       // entry in C13 and focus stored there (C16 §3).
       if (b.target === "liveBlock") enterLive(graph);
+      // **The `copy` rung's two targets, and they were unreachable** (C16 I50).
+      // `FRAME` hard-wired both flags to `false`, so no row at either could
+      // resolve — and `nativeSelection`'s `escape` row passed anyway, consumed
+      // by whatever layer the previous iteration had left open. The second
+      // target arriving at the same rung is what made that visible, which is
+      // the argument for walking a table rather than listing it.
+      COPY_MODES.native = b.target === "nativeSelection";
+      COPY_MODES.semantic = b.target === "semanticSelection";
       const consumed = graph.router.dispatch(press(b.key));
       expect(consumed, `${b.target}:${b.key.name} -> ${b.action} reached no handler`).toBe(true);
       if (b.target === "overlay") graph.overlays.dismiss("probe");
@@ -219,6 +227,8 @@ describe("C22 §3 step 11 — the effect table", () => {
       // claimed to have reset, and the failure named the new binding rather
       // than the leak.
       while (graph.overlays.top !== null) graph.overlays.dismiss(graph.overlays.top.id);
+      COPY_MODES.native = false;
+      COPY_MODES.semantic = false;
       graph.editor.clear();
     }
   });
@@ -313,6 +323,10 @@ describe("C22 §3 step 11 — the effect table", () => {
       overlays: graph.overlays,
       history: graph.history,
     enterNativeSelection: () => undefined,
+    enterSemanticSelection: () => undefined,
+    escapeSemanticSelection: () => undefined,
+    selectEntryUnderCaret: () => undefined,
+    selectAllLoadedEntries: () => undefined,
     exitNativeSelection: () => undefined,
       manifest: null,
       viewport: recordingViewport().viewport,

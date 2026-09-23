@@ -77,6 +77,19 @@ export type RouterDeps = Readonly<{
   popLayer: () => void;
   nativeSelection: () => boolean;
   exitNativeSelection: () => void;
+  /**
+   * Semantic copy mode's state and its two exits (C14 §6a, C16 §5d, I51).
+   *
+   * **Two exits and not one, because they do different things.** `escape` clears
+   * a selection if there is one and leaves only when there is none; `exit`
+   * always leaves. The asymmetry is the ruling rather than an oversight — `esc`
+   * is the target's own way out and a selection is state within the rung, while
+   * the ladder's `⌃c` rung answers *cancel the innermost thing* and a rung that
+   * also tidied up would be answering two questions.
+   */
+  semanticSelection: () => boolean;
+  escapeSemanticSelection: () => void;
+  exitSemanticSelection: () => void;
   liveEntry: () => Readonly<{ id: string }> | null;
   entryAtRow: (row: number) => Readonly<{ id: string; rowOffset: number }> | null;
   /**
@@ -316,6 +329,7 @@ export function createRouter(
     return {
       overlayTop: deps.overlayTop(),
       nativeSelection: deps.nativeSelection(),
+      semanticSelection: deps.semanticSelection(),
       // **Two sources, one fact** (I49, R-BLK-711). A shell delegation and an
       // attached child surface are the same claim — the terminal's keys are not
       // the host's — and the rung has to answer for both or the second has a
@@ -393,6 +407,18 @@ export function createRouter(
     register("nativeSelection", (e) => {
       if (!isCtrlC(e)) return false;
       deps.exitNativeSelection();
+      return true;
+    });
+    // **The same rung and a different verb** (I51, §5d D5). `⌃c` leaves the mode
+    // and does **not** clear a selection first, where `esc` does — which is the
+    // one cell the two exits differ in and therefore the only one a row can be
+    // written against. Carrying `esc`'s clear step over here reads as
+    // consistency and is the defect: this rung answers *cancel the innermost
+    // thing you entered*, and a rung that also tidied up would be answering two
+    // questions (I23).
+    register("semanticSelection", (e) => {
+      if (!isCtrlC(e)) return false;
+      deps.exitSemanticSelection();
       return true;
     });
     // **A panel's rung is `substate`, and so is a view's** (§2c, R-BLK-109).

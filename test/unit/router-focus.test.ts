@@ -11,13 +11,14 @@ import {
   resolveFocus,
   type FocusInputs,
 } from "../../src/interaction/router/focus.js";
-import type { FocusTarget } from "../../src/interaction/router/types.js";
+import { RUNG_OF, type FocusTarget } from "../../src/interaction/router/types.js";
 import { readdirSync, readFileSync } from "node:fs";
 import { addr, placed } from "../support/focus.js";
 
 const base: FocusInputs = {
   overlayTop: null,
   nativeSelection: false,
+  semanticSelection: false,
   attachedChild: false,
   liveEntry: { id: "e1" },
   stored: { at: "prompt" },
@@ -198,6 +199,12 @@ describe("C16 §3 — activeTarget", () => {
       at({ attachedChild: true }),
       at({ overlayTop: { kind: "overlay" } }),
       at({ nativeSelection: true }),
+      // **The second target at `copy`, produced rather than named** (I50). The
+      // rule above applied to M10b's rung-sharing: a member added beside
+      // `nativeSelection` with no state that answers it would be the vacuity
+      // this row catches, and sharing a rung is exactly the shape in which that
+      // is easy to miss — `RUNG_OF` would agree and nothing would reach it.
+      at({ semanticSelection: true }),
       at({ overlayTop: { kind: "panel" } }),
       at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "interact" } }),
       at(),
@@ -361,13 +368,30 @@ describe("C16 §3 — the stored location", () => {
 });
 
 describe("C16 §5d — semantic copy mode is the second target at the `copy` rung (M10b)", () => {
-  it.todo(
-    "T1.41 (C16 I50, §5d): activeTarget with semanticSelection true and an empty stack answers semanticSelection, RUNG_OF puts it at copy beside nativeSelection, and the control is the same inputs with both flags false answering prompt — so the row is about the flag rather than about an empty stack — not deferred on a component: the target lands with the mode shell in this MR",
-  );
-  it.todo(
-    "T1.41b (C16 I51, §5d D1, D2): esc in semantic copy mode with a selection clears it, consumes the key and leaves the mode up; a second esc leaves; with no selection the first esc leaves — four assertions over two states, because a single-state row passes with the clear step missing — not deferred on a component: the exit lands with the mode shell in this MR",
-  );
-  it.todo(
-    "T1.41c (C16 I51, §5d D5): ctrl-C in semantic copy mode leaves it without clearing first, asserted with a selection open — the only state where the two exits differ and therefore the only one that can see the defect — not deferred on a component: the ladder rung lands with the mode shell in this MR",
-  );
+  it("T1.41 (I50, §5d): the mode is a target, and `copy` is the rung it and the handoff share", () => {
+    // **The control first.** With both flags false the same inputs answer
+    // `prompt`, so this row is about the flag rather than about an empty stack
+    // — which is what a target row passes without when the resolution it claims
+    // to exercise never ran.
+    expect(at()).toBe("prompt");
+
+    expect(at({ semanticSelection: true })).toBe("semanticSelection");
+    expect(at({ nativeSelection: true })).toBe("nativeSelection");
+
+    // **One rung, two targets** (I50). Every rule written over the ladder — a
+    // confirm dominating, an intercept's verdict, the footer's owner line —
+    // reads `RUNG_OF`, so it answers once for both and cannot drift between
+    // them.
+    expect(RUNG_OF.semanticSelection).toBe("copy");
+    expect(RUNG_OF.semanticSelection).toBe(RUNG_OF.nativeSelection);
+  });
+
+  it("a confirm over semantic copy mode resolves to the overlay, not to the mode", () => {
+    // The pair to `nativeSelection`'s row above: the `copy` rung sits below
+    // `question`, and a mode that takes every key still loses to a question
+    // raised over it (A02 §2). Asserted rather than inferred from the rung,
+    // because a target placed wrongly in `FOCUS_ORDER` satisfies `RUNG_OF` and
+    // fails this.
+    expect(at({ semanticSelection: true, overlayTop: { kind: "overlay" } })).toBe("overlay");
+  });
 });

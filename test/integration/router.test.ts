@@ -59,6 +59,9 @@ function world() {
       })),
     popLayer: () => void overlays.pop(),
     nativeSelection: () => false,
+    semanticSelection: () => false,
+    escapeSemanticSelection: () => undefined,
+    exitSemanticSelection: () => undefined,
     exitNativeSelection: () => undefined,
     liveEntry: () => {
       const id = store.liveId;

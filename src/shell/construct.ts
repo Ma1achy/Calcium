@@ -299,6 +299,44 @@ export type FrameQueries = Readonly<{
   exitNativeSelection: () => void;
   /** Enter it. The other half of B1's pair (C16 §5b). */
   enterNativeSelection: () => void;
+
+  /**
+   * Semantic copy mode — Calcium's own selection over the transcript
+   * (C14 §6a, C16 §5d, `R-SEL-005`, `R-SEL-008`, `R-SEL-009`).
+   *
+   * **Five members and not one boolean**, because the mode's whole visible state
+   * is what `R-SEL-009` says keeps redrawing while the frame is still: the mode
+   * label, the selection, and the count. A boolean would give the chrome the
+   * label and leave the other two with no source.
+   *
+   * `escape` and `exit` are two verbs deliberately (C16 I51): `escape` clears a
+   * selection if there is one and leaves only when there is none, and `exit`
+   * always leaves. `⌃c` takes the second, `esc` the first.
+   */
+  semanticSelection: () => boolean;
+  enterSemanticSelection: () => void;
+  escapeSemanticSelection: () => void;
+  exitSemanticSelection: () => void;
+  /**
+   * How many entries a copy would take right now (`R-SEL-015`).
+   *
+   * **The size of what a copy right now would take, not of what is highlighted**
+   * — the rule's own wording, and the two differ the moment a block is partly
+   * covered. A block is atomic (`R-SEL-003`), so they cannot differ here, and
+   * the count is stated in those terms rather than as a highlight total so that
+   * the motions landing later cannot quietly change what it means.
+   */
+  semanticSelectionCount: () => number;
+  // **No consumer in `src/` yet, and the consumer is named** (M10c). The footer
+  // label is what reads it, and the label is parked on a word the design does
+  // not supply: `owner` is the *rung*, both modes map to `copy`, and the design
+  // gives `COPY` to the semantic mode — *enter Calcium copy mode* — leaving the
+  // handoff needing a label this framework would have to invent. Shipping a
+  // second `COPY` beside the first would ship the collision, so the count lands
+  // on the seam and the label waits for the word.
+  /** `a` and `A` (`R-SEL-008`). `A` says what it did, because the window is not the record. */
+  selectEntryUnderCaret: () => void;
+  selectAllLoadedEntries: () => void;
   /**
    * Where the transcript sits, for mouse routing (C16 `RouterDeps.region`).
    *
@@ -2260,6 +2298,10 @@ export async function constructGraph(
     focus,
     // The entry half of B1's pair; the exit is already on the `⌃c` rung below.
     enterNativeSelection: deps.frame.enterNativeSelection,
+    enterSemanticSelection: deps.frame.enterSemanticSelection,
+    escapeSemanticSelection: deps.frame.escapeSemanticSelection,
+    selectEntryUnderCaret: deps.frame.selectEntryUnderCaret,
+    selectAllLoadedEntries: deps.frame.selectAllLoadedEntries,
     exitNativeSelection: deps.frame.exitNativeSelection,
     // **One walk, and it is the registry's** (C26 §5, §8b.4). This asked C11
     // directly and tested `block.kind === "table"`, which was one of *three*
@@ -2808,6 +2850,19 @@ export async function constructGraph(
       return true;
     });
 
+    // **Semantic copy mode's three** (C14 §6a, C16 §5d) — `esc` and
+    // `R-SEL-008`'s bare `a`/`A`. The same pairing as the target above and for
+    // the same reason: the router's own `semanticSelection` rung takes `⌃c`
+    // and nothing else, so without this handler every row at the target is
+    // bound and never consulted. Two targets at one rung need two of these,
+    // because `register` is per target (C16 I50).
+    router.register("semanticSelection", (e) => {
+      const effect = bound("semanticSelection", e);
+      if (effect === null) return false;
+      effect();
+      return true;
+    });
+
     // Scroll is Seam 4's C22 row: C14 moves and **C22 commits** (C14 I12). A
     // viewport that committed its own frame would be L2 reaching into L0.
     //
@@ -3184,6 +3239,9 @@ function routerDeps(
     popLayer: () => void stores.overlays.pop(),
     nativeSelection: frame.nativeSelection,
     exitNativeSelection: frame.exitNativeSelection,
+    semanticSelection: frame.semanticSelection,
+    escapeSemanticSelection: frame.escapeSemanticSelection,
+    exitSemanticSelection: frame.exitSemanticSelection,
     // `liveId`, not a `live` entry: C13 exposes the id and C16 only compares it.
     liveEntry: () => {
       const id = stores.transcript.liveId;

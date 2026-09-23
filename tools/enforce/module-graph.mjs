@@ -1643,6 +1643,26 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // --- C14 §6a's caret, groundwork ahead of the motions ---------------------
+  //
+  // **The queued consumer is named and is one MR away**, which is the scoped
+  // form of the rule rather than an exemption from it: `a` and `A` are the two
+  // verbs M10b binds, and neither reads the caret's *position* — `a` takes what
+  // it points at, and `A` ignores it. What reads it is word and line motion,
+  // `v`/`V`, and the extend that takes a block whole (`R-SEL-003`), all of which
+  // are M10c.
+  //
+  // **It is on the type rather than added later because the entry seeds it**
+  // (C14 §6a). A mode that entered without a caret would make `a` a no-op on the
+  // reader's first keystroke in a mode whose first keystroke is usually `a`, and
+  // *nothing happened* is the report an empty selection and a missing caret both
+  // produce. So the field is written the day the mode is, and the verb that
+  // moves it arrives next.
+  "SemanticSelection.caret":
+    "C14 §6a — the copy-mode caret, seeded on entry and read by the motions (M10c). `a` takes "
+    + "the entry it points at and `A` ignores it, so neither of M10b's two verbs reads the "
+    + "position; T1.41b asserts it survives a clear, which is the property the motions rest on. "
+    + "If the motions land and nothing in `src/` reads it, this entry is itself a violation.",
   // --- C16 I43's epoch, the observable of a counter nothing else reads -------
   //
   // **Published so the invariant can be asserted, and consumed by no other

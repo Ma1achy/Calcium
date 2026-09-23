@@ -52,6 +52,23 @@ export type FocusTarget =
   | "overlay"
   | "nativeSelection"
   /**
+   * Semantic copy mode — Calcium's own selection over the transcript (C14 §6a,
+   * C16 §5d, I50, `R-SEL-005`, `R-SEL-009`).
+   *
+   * **The second target at the `copy` rung, and the rung is not two.** `RUNG_OF`
+   * maps it and `nativeSelection` to `copy`, so every rule written over the
+   * ladder — a confirm dominating, an intercept's verdict, the footer's owner
+   * line — answers once for both. They are two *targets* because their `escape`
+   * rows disagree and for no other reason: the handoff leaves on one press, and
+   * this mode's first press clears a selection if there is one.
+   *
+   * That is M5's separation of rung from target at its second instance. The
+   * first was `panel` beside `pushedView`, and the view retiring (R-EXA-082,
+   * F1254) retired the illustration rather than the claim — which is exactly
+   * what a second instance is worth having for.
+   */
+  | "semanticSelection"
+  /**
    * A panel — completion, reverse search, a command palette (C15 §2c, I27,
    * R-BLK-109, R-BLK-866).
    *
@@ -136,6 +153,7 @@ export const RUNG_OF: Readonly<Record<Exclude<FocusTarget, "global">, OwnerRung>
   child: "child",
   overlay: "question",
   nativeSelection: "copy",
+  semanticSelection: "copy",
   panel: "substate",
   interaction: "inside",
   prompt: "scope",
@@ -536,7 +554,25 @@ export type KeyAction =
   // A mode with entry and no exit is B1; a mode with an exit and no entry is
   // the same defect inverted, and just as testable.
   | "enterNativeSelection"
-  | "exitNativeSelection";
+  | "exitNativeSelection"
+  // --- semantic copy mode (C14 §6a, C16 §5d) ---------------------------------
+  //
+  // **Two exits, and that is the one thing this mode does not share with the
+  // one above** (I51, §5d D1/D2/D5). `escapeSemanticSelection` clears a
+  // selection if there is one and leaves when there is none;
+  // `exitSemanticSelection` always leaves, and it is **not a `KeyAction`** — it
+  // sits on `RouterDeps` beside `popLayer`, because the `⌃c` rung is what calls
+  // it and no keymap row resolves to it. Folding the two into one action reads
+  // as tidier and would put the clear step on the ladder's cancel, which is the
+  // rung answering two questions.
+  //
+  // `a` and `A` are `R-SEL-008`'s and are bound at this target only: the rule
+  // gives them bare keycaps, which is legible exactly because no other target
+  // can be active while this one is. `⌃A` is deliberately not bound — *a key
+  // that silently produces a clipboard of megabytes is a trap.*
+  | "escapeSemanticSelection"
+  | "selectEntryUnderCaret"
+  | "selectAllLoadedEntries";
 
 export type Binding = Readonly<{
   target: FocusTarget;

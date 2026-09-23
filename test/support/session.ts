@@ -159,9 +159,28 @@ export function fakeFs(): FileSystem {
   };
 }
 
+/**
+ * The two copy modes, settable so a row can put the graph in one.
+ *
+ * **They were constants and one row was passing on a leak.** T1.4h walks every
+ * binding at its own target, and the `copy` rung's targets were unreachable with
+ * `() => false` hard-wired — so `nativeSelection`'s `escape` row was consumed by
+ * whatever layer the previous iteration had left open, which is the state leak
+ * the loop's own comment warns about at a different target. A second target at
+ * the same rung is what made it visible (M10b).
+ */
+export const COPY_MODES = { native: false, semantic: false };
+
 export const FRAME: FrameQueries = {
-  nativeSelection: () => false,
-    enterNativeSelection: () => undefined,
+  nativeSelection: () => COPY_MODES.native,
+  semanticSelection: () => COPY_MODES.semantic,
+  semanticSelectionCount: () => 0,
+  enterSemanticSelection: () => undefined,
+  escapeSemanticSelection: () => undefined,
+  exitSemanticSelection: () => undefined,
+  selectEntryUnderCaret: () => undefined,
+  selectAllLoadedEntries: () => undefined,
+  enterNativeSelection: () => undefined,
   exitNativeSelection: () => undefined,
   region: () => ({ top: 1, height: 20 }),
   overlayRegion: () => ({ width: 80, height: 24 }),

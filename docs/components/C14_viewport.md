@@ -477,6 +477,20 @@ block and continues past it, and this holds **continuously and not only at relea
 (`R-SEL-015`) — so the count is always the size of what a copy right now would take,
 and never a size no copy could produce.
 
+### The label is parked on a word the design does not supply
+
+`R-SEL-009` names *the mode label in the footer* and `R-SEL-007` has a rectangular
+selection *say so in the mode label*, so this mode's label is specified. The other
+one's is not, and the two now collide: `ChromeContext.owner` is the **rung**, both
+modes map to `copy`, and the repo's header draws `COPY` from it. The design gives
+`COPY` to this mode — `selection.semantic` is *enter Calcium copy mode* — which
+leaves the handoff needing a label the registry has no word for.
+
+So the count lands on the seam (`FrameQueries.semanticSelectionCount`) and **the
+label does not land here**. Drawing a second `COPY` beside the first would put two
+modes behind one word on the one surface whose job is saying which mode you are in,
+which is worse than the label arriving a commit later.
+
 ### Leaving
 
 `R-SEL-005`, and it is two presses rather than one: `esc` clears the selection if

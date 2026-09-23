@@ -511,6 +511,16 @@ describe("§6 — the default table (C17 I12)", () => {
       // Native selection's own dismissal (C16 §5c): the same lone byte, resolved when
       // `activeTarget` answers `nativeSelection`.
       "nativeSelection escape": ["\u001b"],
+      // Semantic copy mode's three (C14 §6a, C16 §5d). `esc` is the same lone
+      // byte at a third target — one key, and which verb it runs is the target's
+      // — and `a`/`A` are `R-SEL-008`'s bare keycaps, which are only bindable
+      // because nothing else can be active while this target is. The bytes are
+      // the characters themselves, which is what makes this row worth running
+      // rather than obvious: a rule that named them `m+a` would compile and be
+      // unpressable.
+      "semanticSelection escape": ["\u001b"],
+      "semanticSelection a": ["a"],
+      "semanticSelection A": ["A"],
 
       // Scrolling (I23). **This is the check the ruling asked for**, and it
       // came out positive: `⌃Home` and `⌃End` reach the decoder in both of the
@@ -899,13 +909,18 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     // The nine `view*` members left `KeyAction` with them, so a row that tried
     // to come back would not compile.
     //
+    // **116 from M10b** (C14 §6a, C16 §5d): semantic copy mode's three — `escape`
+    // at the new target, and `R-SEL-008`'s bare `a` and `A`. The bare keycaps
+    // are bindable only because nothing else can be active while this target
+    // is, which is what the rule relies on when it names them unmodified.
+    //
     // The count is pinned as well as the set: a table that lost a row *and*
     // gained an equal one would satisfy a set comparison alone.
     const rows = defaultKeymap
       .map((b) => `${b.target}\t${keyText(b.key)}\t${b.action}\t${b.profile ?? "both"}`)
       .sort();
-    expect(rows).toHaveLength(113);
-    expect(new Set(rows).size, "no two rows are identical").toBe(113);
+    expect(rows).toHaveLength(116);
+    expect(new Set(rows).size, "no two rows are identical").toBe(116);
 
     // Every row whose chord the registry names resolves to the registry's key —
     // the join asserted from the table's side, so a `chordOf` call that silently
@@ -925,8 +940,13 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
       // rows spelled chords the registry also names — `escape`, `tab`, `⇧tab`,
       // `pageup`, `pagedown` — so they were in this count, and the other six
       // (`n`, `p`, `g`, `G` and the two per-profile pairs) never were.
+      //
+      // **56 from M10b**: `escape` at `semanticSelection` spells a chord the
+      // registry names, so it joins that entry's rows. `a` and `A` are
+      // `R-SEL-008`'s prose rather than registry bindings, so neither is in
+      // this count — which is the distinction the figure is measuring.
       "the rows the registry supplies a chord for",
-    ).toBe(55);
+    ).toBe(56);
   });
 
   it("T1.94 (I41): ⌘↑ and ⌥↑ are two actions under the enhanced profile and one under the base", () => {
@@ -1169,7 +1189,11 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     const RESERVED = [
       "agentNext", "agentPrevious", "agent1", "agent2", "agent3", "agent4", "agent5",
       "agent6", "agent7", "agent8", "agent9", "postureCycle", "valuesToggle", "queueDrop",
-      "enterSemanticSelection",
+      // **`enterSemanticSelection` left this list in M10b** and that is what a
+      // reservation is for: it held the chord against an application taking it
+      // for the interval between the design naming the mode and the mode
+      // existing (C14 §6a). Fourteen now, and the list shrinking is the
+      // mechanism working rather than the rule weakening.
     ] as const;
     for (const action of RESERVED) {
       expect(
