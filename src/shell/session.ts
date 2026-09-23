@@ -51,7 +51,7 @@ import { framesOf, placesAtProtocol } from "../presentation/blocks/kinds/image.j
 import type { FocusState } from "../presentation/blocks/index.js";
 import type { RenderScratch } from "../presentation/blocks/types.js";
 import { contextAt } from "../interaction/completion/index.js";
-import { selectionSpans, type CellSpan } from "../interaction/editor/index.js";
+import { chipSpans, selectionSpans, type CellSpan } from "../interaction/editor/index.js";
 import { extentOf } from "../interaction/router/focus.js";
 import { PROMPT_GUTTER, regionWidth } from "./config.js";
 import { cursorStyleFor, steadyWhileTyping } from "./cursor-style.js";
@@ -1322,6 +1322,11 @@ class Session implements TuiInstance {
       // C16's derived focus, read rather than stored — the cursor belongs to
       // whatever holds the keys, and a second record of that would drift from
       // the display exactly as a stored focus does (C16 §3, C15 I19).
+      // **The fifth caller of the one walk** (C17 I18, I26, §5c). A chip's
+      // ground is measured where its label was drawn or it is somewhere else,
+      // which is the same argument `promptSelection` above rests on.
+      promptChips: () =>
+        chipSpans(graph.editor.text, width, PROMPT_GUTTER, graph.editor.drawAs),
       promptFocused: () =>
         graph.router.target === "prompt" || graph.promptUnderMenu(),
       // **Read at paint, not captured** (C22 I66). `/theme light --no-bg`

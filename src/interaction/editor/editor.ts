@@ -14,7 +14,7 @@
  */
 
 import { clamp, count, removeBetween, sliceBetween, splitAt, stripForBuffer } from "./graphemes.js";
-import { cursorCell, layout, type Cell, type Gutter } from "./layout.js";
+import { chipText, cursorCell, layout, type Cell, type Chip, type ChipLook, type Gutter } from "./layout.js";
 import { classify, wordLeft, wordRight } from "./words.js";
 import { History, type Snapshot } from "./undo.js";
 
@@ -28,8 +28,15 @@ export type Motion =
   | "bufferStart"
   | "bufferEnd";
 
-/** A pasted block, standing in the buffer as one grapheme (roadmap 30). */
-export type Chip = Readonly<{ label: string; content: string }>;
+/**
+ * A pasted or attached block, standing in the buffer as one grapheme.
+ *
+ * **Declared beside the walk rather than here** (I25, §5c): the label is
+ * composed from these parts and the walk is where a chip's width is decided, so
+ * the type lives with the function that reads it. Re-exported because `Chip` is
+ * C17's name for it and a consumer should not have to know which file it sits in.
+ */
+export type { Chip, ChipKind, ChipLook } from "./layout.js";
 
 export interface LineEditor {
   /**
@@ -179,6 +186,25 @@ export interface LineEditor {
 const CHIP_BASE = 0xe000;
 
 class Editor implements LineEditor {
+  /**
+   * How a chip is drawn (I25, §5c).
+   *
+   * **Injected, because both members are capabilities** — the separator is the
+   * glyph table's unicode rung and `painted` is *not 1-bit* — and a capability
+   * is read once and handed down. Defaulted so every existing construction and
+   * every test that does not care about chips is unchanged.
+   */
+  readonly #look: ChipLook;
+
+  constructor(look: ChipLook = { separator: "\u00b7", painted: true }) {
+    this.#look = look;
+    // **An inline reader rather than a published `chipAt`.** §101's preview
+    // needs the chip and not its label, so the table wants a second reader —
+    // and an export nothing consumes yet is what CLAUDE.md refuses. It arrives
+    // with the preview that reads it.
+    this.drawAs = chipText((cluster) => this.#chips.get(cluster), this.#look);
+  }
+
   #text = "";
   #cursor = 0;
   /** Sentinel → the block it stands for. Never pruned: see `drawAs`. */
@@ -206,8 +232,7 @@ class Editor implements LineEditor {
    * PUA box and resolves to itself on submission. It is bounded by the chips
    * pasted into one prompt, and the prompt is cleared on every submit.
    */
-  readonly drawAs = (cluster: string): string | undefined =>
-    this.#chips.get(cluster)?.label;
+  readonly drawAs: (cluster: string) => string | undefined;
 
   get cursor(): number {
     return this.#cursor;
@@ -609,8 +634,10 @@ class Editor implements LineEditor {
   }
 }
 
-export function createEditor(initial?: Readonly<{ text?: string; cursor?: number }>): LineEditor {
-  const editor = new Editor();
+export function createEditor(
+  initial?: Readonly<{ text?: string; cursor?: number; chips?: ChipLook }>,
+): LineEditor {
+  const editor = new Editor(initial?.chips);
   // **Seeded, not edited.** `setText` would record an undo unit, so a fresh
   // editor holding a history entry that restores the empty buffer — undoable
   // before the user has typed anything, which is not the `clean` row of §7's

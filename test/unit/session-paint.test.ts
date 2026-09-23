@@ -19,6 +19,7 @@ import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable } from "../support/render.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { patchDefinition } from "../../src/presentation/patch/definition.js";
+import { chipLabel, chipSpans, createEditor, selectionSpans } from "../../src/interaction/editor/index.js";
 import { SGR_RESET, sgr } from "../../src/terminal/escapes.js";
 import { resolveBase } from "../../src/presentation/theme/index.js";
 import type { SessionSnapshot } from "../../src/shell/types.js";
@@ -61,6 +62,7 @@ function deps(over: Partial<PaintDeps> = {}): PaintDeps {
     overlays: () => [],
     promptCursor: () => ({ row: 0, col: 2 }),
     promptSelection: () => [],
+    promptChips: () => [],
     suppressBackground: () => false,
     promptFocused: () => true,
     ...over,
@@ -1010,6 +1012,124 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
           /^[\x20-\x7e]*$/.test(chip.label),
           `the ${rung} rung is renderable in ASCII — \`${chip.label}\` is not`,
         ).toBe(true);
+      }
+    }
+  });
+});
+
+// C22 §6l.11 — the ground the prompt paints over a chip's cells.
+//
+// **Read off the emitted rows**, because the session's screen model folds SGR
+// away and a row asserting a ground against it can only say what a stripped
+// frame says — the same reason C22's label row reads bytes.
+describe("C22 §6l.11 — the chip's ground in the prompt", () => {
+  const SEP = "\u00b7";
+  const LOOK = { separator: SEP, painted: true } as const;
+  const PASTE = { ordinal: 1, kind: "paste", name: "json", lines: 47, content: "{}" } as const;
+  const GUTTER = { first: 2, cont: 2 } as const;
+
+  /**
+   * Every SGR parameter, read as **tokens** rather than as digits.
+   *
+   * `38` and `48` take their colour inline — `5;n` for an index, `2;r;g;b` for
+   * rgb — so a parameter list is not a set of independent numbers. Walking it
+   * is what tells a background token from a 256-colour foreground whose index
+   * spells the same two digits.
+   */
+  const sgrTokens = (bytes: string): readonly number[] => {
+    const out: number[] = [];
+    for (const m of bytes.matchAll(new RegExp(`${String.fromCharCode(27)}\\[([0-9;]*)m`, "gu"))) {
+      const params = (m[1] ?? "").split(";").map((q) => (q === "" ? 0 : Number(q)));
+      for (let i = 0; i < params.length; i += 1) {
+        const q = params[i] ?? 0;
+        out.push(q);
+        if (q === 38 || q === 48 || q === 58) i += params[i + 1] === 2 ? 4 : 2;
+      }
+    }
+    return out;
+  };
+  const grounds = (bytes: string): number =>
+    sgrTokens(bytes).filter((t) => t === 48 || (t >= 40 && t <= 47) || (t >= 100 && t <= 107)).length;
+
+  const promptRow = (chip: boolean, selection: { from: number; to: number } | null): string => {
+    const e = createEditor({ chips: LOOK });
+    e.insert("look at ");
+    if (chip) e.insertChip(PASTE);
+    else e.insert(chipLabel(PASTE, LOOK));
+    e.insert(" then");
+    const rows = e.layout(80, GUTTER);
+    const painted = paint(
+      frameAt(80, 30, rows.length),
+      deps({
+        promptRows: () => rows,
+        promptCursor: () => e.cursorCell(80, GUTTER),
+        promptChips: () => chipSpans(e.text, 80, GUTTER, e.drawAs),
+        promptSelection: () =>
+          selection === null
+            ? []
+            : selectionSpans(e.text, selection.from, selection.to, 80, GUTTER, e.drawAs),
+      }),
+    );
+    // **Found on the stripped text, not the painted bytes.** By its text rather
+    // than by an index, so the row survives a change to the header's height —
+    // but a selection puts SGR inside the word, so a raw `includes` finds
+    // nothing and the helper returns an empty row. That read as the painter
+    // drawing no ground at all.
+    const bare = (r: string): string => r.replaceAll(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "gu"), "");
+    return painted.find((r) => bare(r).includes("look at")) ?? "";
+  };
+
+  it("T1.67 (C22 I112, §6l.11, C17 §5c): a chip in the prompt paints a ground; the same text without one paints none", () => {
+    // **The control is the same characters with no chip behind them.** A row
+    // asserting only that a ground appears is satisfied by any theme that
+    // paints the prompt at all; here the label's text is identical in both
+    // arms, so the difference is the chip and nothing else.
+    expect(grounds(promptRow(false, null)), "the same text, no chip").toBe(0);
+    expect(grounds(promptRow(true, null)), "a chip is a ground").toBe(1);
+  });
+
+  it("T1.68 (C22 I112, §6l.11, R-STA-002): a selection over a chip leaves one ground, and it is the selection's", () => {
+    // **One ground per cell.** With the region covering the whole chip there is
+    // one painted range on the row and not two — the chip's has given way.
+    // Counted rather than named, so the row says *one ground* rather than
+    // pinning a theme's value.
+    expect(grounds(promptRow(true, { from: 0, to: 40 })), "the selection alone").toBe(1);
+
+    // **And a region that begins *at* the chip, which is the case the guard is
+    // for.** A mutation removing the overlap check survived every arm here
+    // until this one: where the region starts before the chip, `styled`'s own
+    // ordering already swallows the chip's range, so the guard looks
+    // redundant. Starting at the chip and running past it, the chip's ground
+    // would take its own cells and leave the wash one — two grounds, and a
+    // selected chip drawn as a chip.
+    //
+    // The buffer is `"look at "` (8), the chip (1) and `" then"` (5), so 8→10
+    // is the chip plus the space after it.
+    expect(grounds(promptRow(true, { from: 8, to: 10 })), "a region beginning at the chip").toBe(1);
+
+    // **And a region that stops short of the chip leaves both**, which is the
+    // control the arm above needs: without it, *one ground* is satisfied by a
+    // painter that has stopped drawing chips at all.
+    expect(grounds(promptRow(true, { from: 0, to: 4 })), "the selection and the chip, apart").toBe(2);
+
+    // **A region endpoint can never fall inside a chip, and that is what makes
+    // *the selection wins* a whole answer rather than a partial one.** A chip
+    // is one grapheme (C17 I25), so every region either contains it or does
+    // not — measured here across every endpoint in the buffer rather than
+    // argued, because the painter's simplification rests on it and a painter
+    // cannot check it.
+    const e = createEditor({ chips: LOOK });
+    e.insert("look at ");
+    e.insertChip(PASTE);
+    e.insert(" then");
+    const chip = chipSpans(e.text, 80, GUTTER, e.drawAs)[0];
+    expect(chip, "the fixture has a chip").toBeDefined();
+    for (let to = 1; to <= 14; to += 1) {
+      for (const span of selectionSpans(e.text, 0, to, 80, GUTTER, e.drawAs)) {
+        if (chip === undefined || span.row !== chip.row) continue;
+        const partial = span.from < chip.to && span.to > chip.from
+          && !(span.from <= chip.from && span.to >= chip.to);
+        expect(partial, `a region to ${String(to)} covers part of the chip: ${JSON.stringify(span)}`).toBe(false);
       }
     }
   });

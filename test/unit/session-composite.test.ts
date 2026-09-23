@@ -99,6 +99,7 @@ function deps(
     overlays,
     promptCursor: () => ({ row: 0, col: 2 }),
     promptSelection: () => [],
+    promptChips: () => [],
     promptFocused: () => true,
     suppressBackground: () => false,
   spinning: () => false,

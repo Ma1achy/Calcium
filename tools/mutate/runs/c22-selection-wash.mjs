@@ -63,8 +63,13 @@ const MUTATIONS = [
     // no padding yet, so `to: width` clamps to the text.
     name: "the wash is applied before the row is padded to width",
     file: PAINT,
-    from: "    const squared = exact(gutter + body, width);\n    const span = spans.get(i);\n    out.push(span === undefined ? squared : washed(squared, span, deps));",
-    to: "    const span = spans.get(i);\n    const inner = gutter + body;\n    out.push(exact(span === undefined ? inner : washed(inner, span, deps), width));",
+    //
+    // **Re-anchored when `washed` became `styled`** (C22 §6l.11, C17 §5c): the
+    // chip's ground made a second range and the row is cut once for both, so
+    // the single-span call this named is gone. The mutation is unchanged — pad
+    // after styling instead of before.
+    from: "    const squared = exact(gutter + body, width);",
+    to: "    const squared = gutter + body;",
     expect: "T4.23",
   },
   {
@@ -88,8 +93,12 @@ const MUTATIONS = [
     // sees a selection at all.
     name: "the wash lengthens the row instead of styling it",
     file: PAINT,
-    from: "  return `${before}${paintSpans([{ text: inside, style }])}${after}`;",
-    to: "  return `${before}${paintSpans([{ text: inside, style }])}${after} `;",
+    //
+    // **Re-anchored onto `styled`'s tail** (C22 §6l.11): `washed`'s three-slice
+    // return became a loop over ranges, and the row's remainder is what closes
+    // it. Appending there is the same defect from the same place.
+    from: "  return out + sliceCells(row, at, width);",
+    to: "  return `${out}${sliceCells(row, at, width)} `;",
     expect: "T4.22",
   },
   {

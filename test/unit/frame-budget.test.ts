@@ -88,6 +88,7 @@ function deps(over: Partial<PaintDeps> = {}): PaintDeps {
     overlays: () => [],
     promptCursor: () => ({ row: 0, col: 2 }),
     promptSelection: () => [],
+    promptChips: () => [],
     suppressBackground: () => false,
     promptFocused: () => true,
     ...over,

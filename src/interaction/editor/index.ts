@@ -10,3 +10,8 @@ export type { Cell, CellSpan, Gutter } from "./layout.js";
 // Entry 23 — the wash. L4 reads `editor.selection` and maps it through the
 // same walk `layout` returns rows from (I18).
 export { selectionSpans } from "./layout.js";
+// C17 §5c — the chip's ground, off the same walk (I26). L4 paints the cells;
+// the label they cover is composed here, so the design's form is not every
+// application's to spell (I25).
+export { chipLabel, chipSpans, chipText } from "./layout.js";
+export type { Chip, ChipKind, ChipLook } from "./layout.js";

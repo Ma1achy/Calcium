@@ -260,6 +260,21 @@ rather than a second way of styling the prompt.
 `cursorCell` and `selectionSpans`, so a chip's ground cannot land anywhere but
 where its label was measured.
 
+**And the span is recorded inside the walk rather than derived from `cells`
+afterwards, which the first draft did and got wrong.** The obvious reading is
+that a chip at position *p* covers `cells[p]` to `cells[p + 1]`, as a region
+covers its two endpoints — and it does not, because **the position before a
+chip is recorded before the wrap that moves the chip happens**. A 15-cell label
+after eight cells of text at width 19 has `cells[p] = {row: 0, col: 8}` and
+`cells[p + 1] = {row: 1, col: 15}`: the chip is drawn on row 1 from column 0,
+and every number in that pair is about somewhere else. The row came out empty,
+which is the benign failure; the same arithmetic one column narrower paints the
+prompt's own text.
+
+The walk knows the row, the column and the width at the moment it draws, and
+nothing else does — which is *measured as it is drawn* applied to the ground
+rather than to the label.
+
 ---
 
 ## 6. Undo
@@ -483,7 +498,7 @@ the space at index 77; `--seed=1234` does not fit and moves whole.
 - **I24** — **`layout` answers from a one-entry memo keyed on the buffer, the width and both gutter figures**, and `displayRows` reads that memo rather than walking again, so I18's *one walk* becomes one per distinct question instead of one per call — 4.97 calls a frame measured, against a buffer that had changed on none of them (F914). **The chip table is deliberately absent from the key.** `drawAs` resolves a sentinel through it, so the obvious reading is that it belongs there; it does not, because `insertChip` is the table's only writer and it mints a fresh sentinel and inserts it in the same call. A chip can therefore never be registered for a cluster already in the buffer, and the buffer moving is a strict precondition for the table moving. **That precondition is the memo's whole blind spot, and it is a property of the writer rather than of the key** — a second writer that registered a chip without inserting its sentinel would leave this memo stale, and nothing here would see it. T1.43 pins the precondition for the writer that exists and cannot watch one that does not; the limit is recorded rather than papered over with a key term that no input can make differ (A03 §2's vacuity class, arriving in a key).
 
 - **I25** — *(§5c, §099, §101, `R-COL-005`, `R-BLK-628`, `R-BLK-116`)* **A chip's label is composed from its parts by C17, never supplied as a string.** `ordinal`, `kind`, `name` and an optional `lines`; the separator is the glyph table's, so the ASCII tier is taken from the same place every other separator is. Two rungs and one form: with colour, the name on `surface.bgDeep` in `tone.meta` with one space either side; at 1-bit, the same text in brackets and no ground. **The bracket is the unpainted rung of a painted thing** — §099's own caption is *a chip is one word that happens to be painted* — and reading the fixtures' two spellings as two formats is what would make the design contradict itself.
-- **I26** — *(§5c, §099, I18, I20)* **A chip is one wrap unit and its ground comes off the same walk that measured it.** The atomicity is `walk`'s existing *a cluster that does not fit moves whole* and was satisfied before this section was written; `chipSpans` returns the cell ranges a chip occupies, as `selectionSpans` returns the region's, so nothing measures a chip twice and a ground cannot land where the label was not. A chip wider than the whole row still overflows rather than being dropped (I20) — an editor never alters what the user typed, and a chip is what the user pasted.
+- **I26** — *(§5c, §099, I18, I20)* **A chip is one wrap unit and its ground comes off the same walk that measured it.** The atomicity is `walk`'s existing *a cluster that does not fit moves whole* and was satisfied before this section was written; `chipSpans` returns the cell ranges a chip occupies, as `selectionSpans` returns the region's, so nothing measures a chip twice and a ground cannot land where the label was not — and the range is recorded **by the walk as it draws**, never derived from the position pair around the chip, which names the row the wrap moved it off. A chip wider than the whole row still overflows rather than being dropped (I20) — an editor never alters what the user typed, and a chip is what the user pasted.
 
 ---
 

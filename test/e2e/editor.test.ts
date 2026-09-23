@@ -89,7 +89,10 @@ describe("C17 tier 5 — at a real prompt", () => {
       // not consume the frame. The chip makes that stronger rather than weaker —
       // one row instead of twelve — and the property worth asserting is that the
       // **content survives**, which the submission below is what proves.
-      await pty.waitFor(/#1 pasted · 200 lines/, 15_000);
+      // The label is composed by C17 now (I25, §5c) and drawn at the painted
+      // rung on a colour terminal — `#N <name> · <n>L`, with the ground's own
+      // space either side where the bracket used to be.
+      await pty.waitFor(/#1 pasted · 200L/, 15_000);
       const screen = pty.frame;
       expect(screen, "still exactly the terminal's rows").toHaveLength(24);
       expect(

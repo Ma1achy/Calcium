@@ -2122,6 +2122,36 @@ I22): one value, computed in `compose`, read by everything that draws content. A
 
 ---
 
+### 6l.11 — a chip in the prompt is a ground (C17 §5c, `R-STA-002`)
+
+C17 composes the label and says which cells it covers; C22 paints them. The
+style is `tone.meta` on `surface.bgDeep` — `R-BLK-628` calls `bgDeep` *a well: a
+plot, a chip*, and `R-BLK-116` gives a paste chip the `meta` tone — resolved
+through `inkOn` against the ground it lands on rather than measured flat (C10
+I48).
+
+**The precedence is `R-STA-002`'s and it costs one test rather than a
+subtraction.** A copy selection outranks a structural surface and one ground
+goes on one cell, so a chip the wash reaches gives up its ground before either
+is drawn.
+
+**It gives it up entirely, and the first draft did not think so.** That draft
+subtracted the wash from the chip and emitted the pieces either side, on the
+reading that a chip could be half selected — and the row written to exercise it
+**could not construct the input**. A chip is one grapheme (C17 I25), so a region
+endpoint falls before it or after it and never inside; `selectionSpans` can only
+ever produce a wash covering the whole label or none of it. The two-piece branch
+was a rule with nothing to be wrong about, found by a row that failed asking for
+a case the model forbids. T1.68 asserts the property instead, over every region
+endpoint in the buffer, because the painter rests on it and cannot check it.
+
+**`washed` became `styled` and the reason is arithmetic, not tidiness.**
+`sliceCells` counts cells of a row, and a row that has been painted carries SGR
+bytes that are not cells. One span could be applied by slicing and re-joining; a
+second could not, and the failure is a range landing in the wrong place with a
+frame-read the only thing that would show it. So the row is cut once, at every
+boundary, from ranges the caller has already resolved.
+
 ### 6l.10 — the label on the prompt's rule (§069, `R-COL-003`)
 
 **The rules already exist, so a label in one costs no rows.** That is the
@@ -2446,6 +2476,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 
 - **I110** — **A child surface is an entry the host keeps writing, not a layer it pushes** (C16 I49, C24 §, R-BLK-645, R-BLK-711, R-BLK-312, R-BLK-314). `openSurface` appends the surface's blocks as an ordinary transcript entry and replaces its document on every invalidation and resize; it pushes no layer and takes no region. *A CAPTURED CHILD OWNER over its block. The border says your keys go to the child; the transcript stays* — so the three things a pushed view cost are all returned at once: the reader can scroll, what settled while the child was attached is in the record (R-BLK-314), and the entry is still there after the detach rather than being a hole where the work was.
 - **I111** — *(§6l.10, §069, `R-COL-003`, `R-BLK-175`)* **The prompt's upper rule carries the application's label inline-end, painted as a ground, and it is the first thing the frame sheds.** One trailing rule glyph after it; `bgElev`, because a name is a thing and things take a ground; the header's rule and the prompt's lower rule stay bare. **Dropped at `MIN_COLUMNS` and whenever it cannot fit leaving at least one rule glyph**, and the drop is the frame's rather than the caller's — an application supplies the string and has no say in whether it is drawn, which is what *the least load-bearing thing on the screen* means as a mechanism. With no label supplied — or a string that strips to nothing, which is the same thing said by a caller that computes it — the frame is the one that shipped, glyph for glyph.
+- **I112** — *(§6l.11, C17 §5c, `R-STA-002`, `R-BLK-628`, `R-BLK-116`)* **A chip in the prompt is painted as a ground, and the selection outranks it.** `promptChips` is C17's cell ranges mapped through the prompt's window as the selection's are; the style is `tone.meta` resolved on `surface.bgDeep` — *a well* — and where a region reaches a chip the chip's ground gives way **entirely**, which is a property rather than a simplification: a chip is one grapheme (C17 I25), so a region endpoint is either before it or after it and a wash can only cover the whole label or none of it. **One pass over the row**: `styled` replaces `washed` and cuts at every boundary, because `sliceCells` cannot read a row that has already been painted and applying the second ground by a second call would measure SGR bytes as cells.
 
   **The composition root owns both halves and they are separate.** *Where the blocks go* is this invariant; *who has the keyboard* is C16 I49, and the root wires the second by answering `attachedChild` from the attachment as well as from `inFlight() === "shell"`. Keeping them apart is what makes the child's ownership independent of where its output landed — which is the distinction the single `kind: "view"` flag could not hold, since a layer that filled the region carried both claims in one field and neither was declared.
 
@@ -2560,6 +2591,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 80. **The region owns the width the way it owns the height** (I109, F1227). One value from `compose` — the terminal's less one column — read by the transcript's resize, the prompt's body and the overlay placement; the three rule rows, the chrome's clusters and the fallback keep the terminal's, each by an invariant already written (I81, I86, I87).
 81. **A child surface is an entry, not a layer** (I110, R-BLK-645). Its blocks are appended and replaced in place, the transcript stays scrollable beneath the capture, and what settled while it was attached survives the detach. The keyboard half is C16 I49's and is wired separately, which is what the one `kind: "view"` flag could not express.
 82. **A label in a rule costs no rows** (I111, §6l.10, §069). The prompt's rules are drawn on every frame and their glyphs are the least load-bearing cells on the screen, so the design puts the application's identity in one rather than spending a region on it. Painted as a ground and not as text (`R-COL-003`), inline-end with one trailing glyph, on the upper rule alone, and shed first — `R-BLK-175` ranks it 1 of 4 in the frame's whole degradation order. I81's *never configurable* is amended to name the geometry it was always about.
+83. **A chip in the prompt is a ground and the selection outranks it** (I112, §6l.11). C17 says where the cells are and C22 paints them; where a region reaches a chip the region wins whole, because one cell takes one ground (`R-STA-002`) and a chip is one grapheme, so no region can cover part of one. The row is painted in one pass — a second pass would measure the first pass's escapes as cells.
 
 ---
 
@@ -2897,6 +2929,8 @@ PTY harness.
 - **T1.65b** (I111, §6l.10, `R-COL-003`): the label sets a **background** and the no-label frame sets none anywhere — read off the emitted bytes rather than off the folded screen, and as a difference rather than as a literal code, so the row is about the channel and not about the theme's value.
 - **T1.65c** (I111, §6l.10): the ground reader sees a background that is not the sequence's first parameter, and does not read a 256-colour or rgb *foreground* whose index spells `4x` or `10x` as one. The reader's own fabricated violation, and it earned its place: the first draft matched only at the head of the sequence, so a rule that was painting `38;5;188;48;5;235` was reported as painting nothing — a defect of the instrument that reads exactly like a defect of the code.
 - **T1.65d** (I111, §6l.10): a supplied string that strips to nothing — `""`, spaces, a tab — leaves the frame that shipped, and a padded name still draws. The narrowing belongs to the frame because an application computing its label may return a blank on some frames, and a one-cell ground floating in the rule is not a name.
+- **T1.67** (I112, §6l.11, C17 §5c): a prompt holding a chip paints a background over exactly the chip's cells and nothing else, and a prompt holding the same text without a chip paints none. Read off the emitted bytes, since the screen model folds SGR away.
+- **T1.68** (I112, §6l.11, `R-STA-002`): a selection over a chip leaves one ground on the row and it is the selection's; a region stopping short of the chip leaves two, which is the control — without it *one ground* is satisfied by a painter that has stopped drawing chips. Counted rather than named, so the row says *one ground per cell* rather than pinning a theme. Then the property the painter rests on and cannot check: **over every region endpoint in the buffer, no wash covers part of a chip.**
 - **T1.66** (I111, §6l.10, `R-BLK-175`): at 60 columns the frame draws its three rules **and** the label is gone; one column wider it is drawn. Gone too whenever it would leave no rule glyph, asserted at the measured boundary — 96 cells draw at a width of 100 and 97 shed — and the frame composes to the same height throughout, since a label costs no rows.
   **The first draft of this row was vacuous and a mutation said so.** It asserted 40 and 59 columns, where `fallback.ts` has replaced the whole frame with the *Needs 60x24* notice: two notices agree with each other whatever the label does. The floor could be set to zero and nothing failed. §069's sentence is *at* 60, not below it, and 60 is `MIN_COLUMNS` — the narrowest width the frame draws at at all, which is what *and the frame still works* is naming.
 - **T2.100** (I91): a `TuiConfig.pty` reaches `createProcessRunner`'s deps identically — asserted by object identity across `resolveConfig`, and by the consumer's own `spawn` being the one the graph's runner calls — and a source scan finds `config.pty` read at **two** sites in `src/shell/`, each of them the same spread with nothing between.

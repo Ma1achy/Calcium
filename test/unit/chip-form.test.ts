@@ -1,22 +1,124 @@
-// C17 §5c — the chip's label and its ground.
+// C17 §5c — the chip's label and the cells it covers.
 //
-// **Spec-first**: the rows are `it.todo` until the parts reach `Chip` and
-// `chipSpans` comes off the walk. Each names what it is waiting for (SP9), and
-// each title is one literal — a blocker clause split across a join is read by
-// nothing (TD5, A03 §9a).
-import { describe, it } from "vitest";
+// **The label is C17's** (I25): the parts arrive and the form is composed here,
+// so §099's spelling is not every application's to get right. **The ground comes
+// off the same walk that measured the label** (I26, I18) — a span right about the
+// row and wrong about the column paints the prompt's own text as a chip.
+import { describe, expect, it } from "vitest";
+
+import { chipLabel, chipSpans, createEditor, type Chip, type ChipLook } from "../../src/interaction/editor/index.js";
+import { layout } from "../../src/interaction/editor/layout.js";
+import { cells, sliceCells } from "../../src/presentation/text.js";
+
+const SEP = "·";
+const PAINTED: ChipLook = { separator: SEP, painted: true };
+const BARE: ChipLook = { separator: SEP, painted: false };
+const ASCII: ChipLook = { separator: "-", painted: true };
+const GUTTER = { first: 0, cont: 0 } as const;
+
+const PASTE: Chip = { ordinal: 1, kind: "paste", name: "json", lines: 47, content: "{}" };
+
+/** An editor holding one chip, with the rung stated rather than defaulted. */
+const withChip = (chip: Chip, look: ChipLook, before = "look at ", after = " then"): ReturnType<typeof createEditor> => {
+  const e = createEditor({ chips: look });
+  e.insert(before);
+  e.insertChip(chip);
+  e.insert(after);
+  return e;
+};
 
 describe("C17 §5c — the chip", () => {
-  it.todo(
-    "T1.44 (C17 I25, §5c): the label is composed from the parts, and the bracket is the 1-bit rung — not deferred on a component: `Chip` is `{label, content}` and carries no `ordinal`, `kind`, `name` or `lines` for a label to be composed from",
-  );
-  it.todo(
-    "T1.45 (C17 I26, §5c, §099): a chip moves whole and no row holds a prefix of its label — not deferred on a component: the property holds today and this row is its watch, so what is missing is the composed label — a row asserting the application's string measures the shell's label builder and not the editor's",
-  );
-  it.todo(
-    "T1.46 (C17 I26, §5c): `chipSpans` slices exactly the label out of the row `layout` returns — not deferred on a component: `chipSpans` does not exist; the walk returns rows and cells and nothing names the cells a chip occupies",
-  );
-  it.todo(
-    "T1.47 (C17 I25, §5c, I20): a chip wider than the row overflows and its span still names its cells — not deferred on a component: the same missing function T1.46 names, `chipSpans`, which is unwritten",
-  );
+  it("T1.44 (C17 I25, §5c): the label is composed from the parts, and the bracket is the 1-bit rung", () => {
+    // **Against literals, because this row is the form itself.** Everywhere
+    // else the label is obtained from `chipLabel`; here it is written out, or
+    // the row agrees with whatever the composer does.
+    expect(chipLabel(PASTE, PAINTED), "painted: the ground's own space either side").toBe(` #1 json ${SEP} 47L `);
+    expect(chipLabel(PASTE, BARE), "1-bit: the bracket says chip where nothing paints").toBe(`[#1 json ${SEP} 47L]`);
+
+    // **An image has no lines**, and the absence must take the separator with
+    // it — a bare `L` or a trailing separator is the shape this invites.
+    const image: Chip = { ordinal: 2, kind: "image", name: "loss-curve.png", content: "…" };
+    expect(chipLabel(image, PAINTED), "no size, no separator").toBe(" #2 loss-curve.png ");
+    expect(chipLabel(image, BARE)).toBe("[#2 loss-curve.png]");
+
+    // **The separator is the glyph table's**, so the ASCII tier is taken from
+    // the same place every other separator in the frame is. Asserted by
+    // substituting one rather than by naming `-`, because the point is that the
+    // composer uses what it is handed and holds no copy.
+    expect(chipLabel(PASTE, ASCII), "the tier's separator, whatever it is").toBe(" #1 json - 47L ");
+  });
+
+  it("T1.45 (C17 I26, §5c, §099): a chip moves whole, and no row holds a prefix of its label", () => {
+    // **A watch on a property that already held**, which is why it is written
+    // over the whole label rather than at one width: *a half-painted chip is
+    // not a chip with a line break in it — it is two things that look like
+    // chips*, and a row checking the first cell cannot tell them apart.
+    const label = chipLabel(PASTE, PAINTED);
+    const width = cells("look at ") + cells(label) - 2; // one short of fitting
+    const rows = layout(withChip(PASTE, PAINTED).text, width, GUTTER, withChip(PASTE, PAINTED).drawAs);
+
+    expect(rows.filter((r) => r.includes(label)).length, "drawn whole, exactly once").toBe(1);
+    for (const row of rows) {
+      // Every row either holds the whole label or none of it. A prefix of two
+      // or more cells is the defect; one cell is a coincidence of the alphabet.
+      for (let n = 2; n < cells(label); n += 1) {
+        const head = sliceCells(label, 0, n);
+        if (row.includes(head) && !row.includes(label)) {
+          expect.fail(`a row holds ${JSON.stringify(head)} without the whole label: ${JSON.stringify(row)}`);
+        }
+      }
+    }
+
+    // The fixture responds to the thing under test: wide enough, it is one row.
+    expect(layout(withChip(PASTE, PAINTED).text, 200, GUTTER, withChip(PASTE, PAINTED).drawAs).length).toBe(1);
+  });
+
+  it("T1.46 (C17 I26, §5c): `chipSpans` slices exactly the label out of the row `layout` returns", () => {
+    const label = chipLabel(PASTE, PAINTED);
+    // **Across a wrap, not at one width**, because a span that is right on a
+    // first row and off by the gutter on a later one is the defect this seam
+    // exists to prevent, and one width cannot see it.
+    for (const width of [200, 60, cells("look at ") + cells(label) + 1, cells(label) + 4]) {
+      const e = withChip(PASTE, PAINTED);
+      const rows = layout(e.text, width, GUTTER, e.drawAs);
+      const spans = chipSpans(e.text, width, GUTTER, e.drawAs);
+      expect(spans.length, `one chip, one span at ${String(width)}`).toBe(1);
+      const span = spans[0];
+      if (span === undefined) continue;
+      const row = rows[span.row] ?? "";
+      expect(sliceCells(row, span.from, span.to), `the span is the label at ${String(width)}`).toBe(label);
+    }
+
+    // **A prompt with no chip has no spans**, which is the control: a function
+    // returning every cell would satisfy every row above at width 200.
+    const plain = createEditor({ chips: PAINTED });
+    plain.insert("look at parse.ts then");
+    expect(chipSpans(plain.text, 60, GUTTER, plain.drawAs), "no chip, no ground").toEqual([]);
+
+    // And two chips are two spans, so the walk is not answering about the first
+    // one it finds.
+    const two = withChip(PASTE, PAINTED, "a ", " b ");
+    two.insertChip({ ordinal: 2, kind: "file", name: "notes.md", lines: 12, content: "x" });
+    expect(chipSpans(two.text, 200, GUTTER, two.drawAs).length, "two chips, two spans").toBe(2);
+  });
+
+  it("T1.47 (C17 I25, §5c, I20): a chip wider than the row overflows, and its span still names its cells", () => {
+    // **An editor never alters what the user typed**, and a chip is what the
+    // user pasted (I20). A label wider than the whole row goes on one row and
+    // overflows it rather than being dropped or cut.
+    const long: Chip = { ordinal: 1, kind: "paste", name: "a-very-long-detected-kind-name", lines: 4096, content: "x" };
+    const label = chipLabel(long, PAINTED);
+    const width = 12;
+    expect(cells(label) > width, "the fixture is wider than the row").toBe(true);
+
+    const e = withChip(long, PAINTED);
+    const rows = layout(e.text, width, GUTTER, e.drawAs);
+    expect(rows.some((r) => r.includes(label)), "drawn whole, overflowing").toBe(true);
+
+    const spans = chipSpans(e.text, width, GUTTER, e.drawAs);
+    expect(spans.length, "and it still has a ground").toBe(1);
+    // The span stops at the row's width — the same rule `selectionSpans` uses
+    // for a row a region passes through. Beyond it there are no cells to paint.
+    expect(spans[0]?.to, "the span stops at the row").toBe(width);
+  });
 });

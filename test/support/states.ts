@@ -348,9 +348,14 @@ export const STATES: readonly StateFixture[] = Object.freeze([
       "a chip is ONE grapheme to the editor and N cells to the terminal, so every index assertion " +
       "passes at any label width — only a frame measures the difference (roadmap 30)",
     rows: (w) => {
+      // **The painted rung, fixed here.** This fixture takes a width and not a
+      // capability record, so it cannot draw the bracket rung the 1-bit and
+      // ASCII variants would use — C17 T1.44 owns both rungs, and these frames
+      // show the one a coloured terminal gets. A snapshot records; it does not
+      // check (C17 §5c).
       const e = createEditor();
       e.insert("read ");
-      e.insertChip({ label: "[#1 pasted · 184 lines]", content: "line one\nline two" });
+      e.insertChip({ ordinal: 1, kind: "paste", name: "pasted", lines: 184, content: "line one\nline two" });
       e.insert(" and summarise it");
       return e.layout(w, PROMPT_GUTTER);
     },

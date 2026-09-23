@@ -99,6 +99,17 @@ export type PaintDeps = Readonly<{
    * Empty when there is no region, so the common case costs one array.
    */
   promptSelection: () => readonly CellSpan[];
+  /**
+   * Which cells of the prompt are a chip's (C17 I26, §5c).
+   *
+   * **Off the same walk the rows came from**, like the selection above and for
+   * the same reason: a ground measured anywhere else parts company with the
+   * drawn row at exactly the boundaries the seam exists for. Geometry is
+   * untouched — cells to style, never cells to add.
+   *
+   * Empty when the prompt holds no chip, so the common case costs one array.
+   */
+  promptChips: () => readonly CellSpan[];
   /** Whether the prompt is where keys are going — C16's derived focus. */
   promptFocused: () => boolean;
   /**
@@ -437,8 +448,12 @@ function shows(window: PromptWindow, row: number): boolean {
   return row >= window.first && row < window.first + window.count;
 }
 
+/** A cell range of a squared-off row and the style it takes. */
+type StyledRange = Readonly<{ from: number; to: number; style: Style }>;
+
 /**
- * The selection wash, applied to a squared-off row (entry 23).
+ * A squared-off row with its grounds applied, in one pass (entry 23, C17 §5c,
+ * `R-STA-002`).
  *
  * **After `exact`, and that is where the full-row half comes from.** The row is
  * already padded to `width`, so a span running to `width` washes the padding
@@ -446,19 +461,67 @@ function shows(window: PromptWindow, row: number): boolean {
  * stop at the last cluster, pass every assertion about which characters are in
  * the region, and only be visible in a frame-read.
  *
- * **Reverse video is the 1-bit rung and it is here rather than in the theme.**
- * `resolveBackground` answers `NO_STYLE` where there is no colour, so a wash
- * alone would fall straight from a background to nothing. `inverse` needs no
- * colour at all and is supported essentially everywhere, which is what stops the
- * ladder having a hole in the middle.
+ * **Reverse video is the 1-bit rung and it is in `selectionStyle` rather than in
+ * the theme.** `resolveBackground` answers `NO_STYLE` where there is no colour,
+ * so a wash alone would fall straight from a background to nothing. `inverse`
+ * needs no colour at all and is supported essentially everywhere, which is what
+ * stops the ladder having a hole in the middle.
+ *
+ * **One pass, because `sliceCells` cannot read a row it has already painted.**
+ * This was `washed` and took a single span; the chip's ground made a second,
+ * and applying it by calling the old function twice would have measured SGR
+ * bytes as cells the second time round — the later range landing in the wrong
+ * place, with a frame-read the only thing that would show it. So the row is cut
+ * once at every boundary.
+ *
+ * **The ranges arrive resolved, not overlapping**, and resolving them is the
+ * caller's because the precedence is `R-STA-002`'s and belongs where the facts
+ * are known: a copy selection outranks a structural surface, so a chip under a
+ * selection is washed and not double-painted.
  */
-function washed(row: string, span: CellSpan, deps: PaintDeps): string {
-  // L1's ladder, not a private copy: the wash, else `inverse` (C11 I14; F769).
-  const style = selectionStyle(deps.theme, deps.capabilities);
-  const before = sliceCells(row, 0, span.from);
-  const inside = sliceCells(row, span.from, span.to);
-  const after = sliceCells(row, span.to, cells(row, deps.capabilities.ambiguousWidth));
-  return `${before}${paintSpans([{ text: inside, style }])}${after}`;
+function styled(row: string, ranges: readonly StyledRange[], deps: PaintDeps): string {
+  if (ranges.length === 0) return row;
+  const width = cells(row, deps.capabilities.ambiguousWidth);
+  const order = [...ranges].sort((a, b) => a.from - b.from);
+  let out = "";
+  let at = 0;
+  for (const range of order) {
+    const from = Math.max(at, range.from);
+    if (range.to <= from) continue;
+    out += sliceCells(row, at, from);
+    out += paintSpans([{ text: sliceCells(row, from, range.to), style: range.style }]);
+    at = range.to;
+  }
+  return out + sliceCells(row, at, width);
+}
+
+/**
+ * The chip grounds a row takes, minus any the selection has claimed (`R-STA-002`).
+ *
+ * **The precedence is the design's: a copy selection outranks a structural
+ * surface, and one cell takes one ground.** So a chip the wash reaches gives up
+ * its ground entirely.
+ *
+ * **Entirely, and that is a property rather than a simplification.** The first
+ * version subtracted the wash from the chip and emitted the pieces either side,
+ * on the reading that a chip could be half selected. It cannot: **a chip is one
+ * grapheme** (C17 I25), so a region endpoint is either before it or after it and
+ * `selectionSpans` can only ever produce a wash that covers the whole label or
+ * none of it. The two-piece branch was a rule with nothing to be wrong about,
+ * and the row that was written to exercise it could not construct the input.
+ * T1.68 asserts the property the simplification rests on instead.
+ */
+function chipRanges(
+  spans: readonly CellSpan[],
+  wash: CellSpan | undefined,
+  style: Style,
+): readonly StyledRange[] {
+  const out: StyledRange[] = [];
+  for (const span of spans) {
+    const overlaps = wash !== undefined && wash.from < span.to && wash.to > span.from;
+    if (!overlaps) out.push({ from: span.from, to: span.to, style });
+  }
+  return out;
 }
 
 /**
@@ -566,13 +629,43 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
     if (shows(window, span.row)) spans.set(span.row - window.first + window.offset, span);
   }
 
+  // **The chips, mapped through the same window** (I62) — a ground on a row the
+  // window does not show is a ground on someone else's row.
+  const chips = new Map<number, CellSpan[]>();
+  for (const span of deps.promptChips()) {
+    if (!shows(window, span.row)) continue;
+    const at = span.row - window.first + window.offset;
+    (chips.get(at) ?? chips.set(at, []).get(at) ?? []).push(span);
+  }
+  // A chip is a well (`R-BLK-628`) in the meta tone (`R-BLK-116`), resolved
+  // against the ground it lands on (C10 I48) rather than measured flat.
+  const chipStyle = chips.size === 0
+    ? undefined
+    : withBackground(
+        tone("meta", deps.theme, deps.capabilities, "bgDeep"),
+        background("surface.bgDeep", deps.theme, deps.capabilities),
+      );
+
   const out: string[] = [];
   for (let i = 0; i < cap; i += 1) {
     const body = windowed[i] ?? "";
     const gutter = i === 0 ? promptFor(deps.capabilities) : " ".repeat(PROMPT_GUTTER.cont);
     const squared = exact(gutter + body, width);
     const span = spans.get(i);
-    out.push(span === undefined ? squared : washed(squared, span, deps));
+    const onRow = chips.get(i);
+    if (span === undefined && onRow === undefined) {
+      out.push(squared);
+      continue;
+    }
+    // **One pass over the row, because the two grounds meet on it.** Painting
+    // the wash and then the chips would measure SGR bytes as cells the second
+    // time round; `styled` cuts the row once at every boundary, and
+    // `chipRanges` has already given the selection its cells (`R-STA-002`).
+    const ranges = [
+      ...(onRow === undefined || chipStyle === undefined ? [] : chipRanges(onRow, span, chipStyle)),
+      ...(span === undefined ? [] : [{ from: span.from, to: span.to, style: selectionStyle(deps.theme, deps.capabilities) }]),
+    ];
+    out.push(styled(squared, ranges, deps));
   }
 
   // **The spinner is appearance and never geometry** (I38, C19 §7). It goes on

@@ -70,14 +70,95 @@ function usableAt(row: number, width: number, gutter: Gutter): number {
  */
 export type ClusterText = (cluster: string) => string | undefined;
 
+/**
+ * What a chip **is** — the parts its label is composed from (C17 I25, §5c).
+ *
+ * **The label is C17's and not the application's.** `construct.ts` used to hand
+ * over a finished string, which put §099's form in every application separately
+ * and is the opposite of the design's *a kind shortens itself, given the width
+ * it got*: the engine hands a box its solved width and the kind decides what
+ * goes in it.
+ *
+ * `kind` decides the preview and nothing about the label; `name` is what a
+ * reader calls it — a paste's detected content kind, a file's basename;
+ * `target` is what the preview opens when that is not the content, and C17
+ * never reads it.
+ */
+export type ChipKind = "paste" | "file" | "image";
+
+/** A pasted or attached block, standing in the buffer as one grapheme (roadmap 30, I25). */
+export type Chip = Readonly<{
+  ordinal: number;
+  kind: ChipKind;
+  name: string;
+  /** Drawn `47L`. Absent for an image, which is not measured in lines. */
+  lines?: number;
+  content: string;
+  target?: string;
+}>;
+
+/**
+ * The rung a chip is drawn at (C17 I25, §5c).
+ *
+ * **Two rungs and one form.** §099 and §101 draw ` #1 json · 47L ` with a space
+ * either side; `R-BLK-078` and `R-BLK-336` draw `[#1 json · 47L]`. Read as two
+ * formats the design contradicts itself; §099's own caption settles it — *a
+ * chip is one word that happens to be painted* — so a plain-text fixture shows
+ * the ground's own padding where it cannot show a ground, and **the bracket is
+ * what says *chip* where there is nothing to paint with**.
+ *
+ * Both members come from capabilities, which are read once and handed down, so
+ * this is settled when the editor is built and never per frame.
+ */
+export type ChipLook = Readonly<{ separator: string; painted: boolean }>;
+
+/** A chip's label, composed (C17 I25, §5c, §099). */
+export function chipLabel(chip: Chip, look: ChipLook): string {
+  const size = chip.lines === undefined ? "" : ` ${look.separator} ${String(chip.lines)}L`;
+  const text = `#${String(chip.ordinal)} ${chip.name}${size}`;
+  // The space either side is the ground's, so it belongs to the painted rung
+  // alone — a bracketed label padded as well would be a chip inside a chip.
+  return look.painted ? ` ${text} ` : `[${text}]`;
+}
+
+/** A `ClusterText` that resolves a sentinel through a table and composes its label. */
+export function chipText(
+  chipAt: (cluster: string) => Chip | undefined,
+  look: ChipLook,
+): ClusterText {
+  return (cluster) => {
+    const chip = chipAt(cluster);
+    return chip === undefined ? undefined : chipLabel(chip, look);
+  };
+}
+
+/** One frozen empty array, because most prompts hold no chip (I24). */
+const EMPTY_SPANS: readonly CellSpan[] = Object.freeze([]);
+
 export function walk(
   text: string,
   width: number,
   gutter: Gutter,
   drawAs?: ClusterText,
-): Readonly<{ rows: readonly string[]; cells: readonly Cell[] }> {
+): Readonly<{ rows: readonly string[]; cells: readonly Cell[]; chips: readonly CellSpan[] }> {
   const rows: string[] = [];
   const cells: Cell[] = [];
+  /**
+   * The cells each substituted cluster covers (I26, §5c).
+   *
+   * **Recorded here rather than derived from `cells` afterwards**, and the
+   * first draft did derive it and was wrong. The position *before* a chip is
+   * recorded before the wrap that moves the chip happens, so it names the end
+   * of the previous row — a span built from it is empty or on the wrong row,
+   * which is exactly the *right about the row, wrong about the column* defect
+   * this seam exists to prevent. The walk knows the row, the column and the
+   * width at the moment it draws, and nothing else does.
+   *
+   * **Lazy, because most prompts hold no chip** and the walk is asked about
+   * five times a frame (I24): a null here costs nothing and the array is made
+   * by the first substitution.
+   */
+  let chips: CellSpan[] | null = null;
 
   let row = "";
   let used = 0;
@@ -126,6 +207,15 @@ export function walk(
       // overflows rather than being dropped or substituted (I20).
       if (used > 0 && used + w > limit) open();
 
+      // **Where the substitution landed, taken as it lands.** Clamped to the
+      // row, because a cluster wider than the row overflows it and there are no
+      // cells past the width to paint — the same rule `selectionSpans` uses for
+      // a row a region passes through.
+      if (shown !== cluster) {
+        const from = gutterAt(at(), gutter) + used;
+        (chips ??= []).push(Object.freeze({ row: at(), from, to: Math.min(from + w, width) }));
+      }
+
       row += shown;
       used += w;
 
@@ -147,7 +237,7 @@ export function walk(
   // The position before a `\n` is pushed by the line's last cluster and the one
   // after it by the next line's first push, so the count is exact; the slice is
   // a guard on that arithmetic rather than a trim.
-  return { rows, cells: cells.slice(0, cellCount(text)) }; // graphemes-ok
+  return { rows, cells: cells.slice(0, cellCount(text)), chips: chips ?? EMPTY_SPANS }; // graphemes-ok
 }
 
 function gutterAt(row: number, gutter: Gutter): number {
@@ -242,4 +332,29 @@ export function selectionSpans(
     if (last > first) out.push(Object.freeze({ row, from: first, to: last }));
   }
   return Object.freeze(out);
+}
+
+/**
+ * Which cells each chip covers, per display row (C17 I26, §5c).
+ *
+ * **`selectionSpans`' sibling, off the same walk** (I18) — a ground measured by
+ * re-wrapping here would part company with the drawn rows at exactly the
+ * boundaries this component exists for, and a span right about the row and
+ * wrong about the column paints the prompt's own text as a chip.
+ *
+ * **A chip is one wrap unit** (I26), so a span never crosses a row: the walk
+ * moves a cluster whole when it does not fit. The one case where the position
+ * after a chip is on the next row is the chip that filled or overflowed its
+ * own — I20's *overflows rather than being dropped* — and there the span runs
+ * to the row's width, which is the same rule `selectionSpans` uses for a row a
+ * region passes through.
+ */
+export function chipSpans(
+  text: string,
+  width: number,
+  gutter: Gutter,
+  drawAs?: ClusterText,
+): readonly CellSpan[] {
+  if (drawAs === undefined) return EMPTY_SPANS;
+  return walk(text, width, gutter, drawAs).chips;
 }

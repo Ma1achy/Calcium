@@ -1095,7 +1095,16 @@ export async function constructGraph(
     });
     // The later half of C19 I26's seam — see `recency` above.
     historyStore = history;
-    const editor = createEditor();
+    // **The chip's rung, settled once from capabilities** (C17 I25, §5c). Both
+    // members are capabilities — the separator is the glyph table's unicode
+    // rung, `painted` is *not 1-bit* — and a capability is read once and handed
+    // down, so this is the session's answer rather than a per-frame one.
+    const editor = createEditor({
+      chips: {
+        separator: glyphs(detection.capabilities).separator,
+        painted: detection.capabilities.colourDepth > 1,
+      },
+    });
     const themed = loadTheme(config.theme);
     if (!themed.ok) throw new ConstructionError("stores", themed.error);
 
@@ -3019,8 +3028,15 @@ export async function constructGraph(
         const lines = e.text.split("\n").length;
         if (lines >= CHIP_LINES) {
           chipCount += 1;
+          // **The parts, not a label** (C17 I25, §5c). The form is C17's, so a
+          // second application does not get to spell it differently — and the
+          // separator and the bracket rung are settled where the editor is
+          // built, from the same capability record this line used to read.
           stores.editor.insertChip({
-            label: `[#${String(chipCount)} pasted ${glyphs(detection.capabilities).separator} ${String(lines)} lines]`,
+            ordinal: chipCount,
+            kind: "paste",
+            name: "pasted",
+            lines,
             content: e.text,
           });
         } else {

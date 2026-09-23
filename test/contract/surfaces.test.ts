@@ -194,6 +194,7 @@ describe("the S-series' illustrated heights", () => {
       overlays: () => [],
       promptCursor: () => ({ row: 0, col: 2 }),
       promptSelection: () => [],
+    promptChips: () => [],
       promptFocused: () => true,
     spinning: () => false,
     // C22 I50 — the ghost is a paint-time read like the spinner beside it.

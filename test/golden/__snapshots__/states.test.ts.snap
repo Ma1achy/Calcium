@@ -60,8 +60,8 @@ PIDS  12
   lazy dog and keeps running past the
   wrap
 ── prompt · prompt-paste-chip
-read [#1 pasted · 184 lines] and summa
-rise it"
+read  #1 pasted · 184L  and summarise 
+it"
 `;
 
 exports[`golden frames — one per state > dark-ascii at 80 1`] = `
@@ -120,7 +120,7 @@ PIDS  12
 + the quick brown fox jumps over the lazy dog and keeps running past the wrap
 + the quick brown fox jumps over the lazy dog and keeps running past the wrap
 ── prompt · prompt-paste-chip
-read [#1 pasted · 184 lines] and summarise it"
+read  #1 pasted · 184L  and summarise it"
 `;
 
 exports[`golden frames — one per state > dark-unicode at 40 1`] = `
@@ -183,8 +183,8 @@ PIDS  12
   lazy dog and keeps running past the
   wrap
 ── prompt · prompt-paste-chip
-read [#1 pasted · 184 lines] and summa
-rise it"
+read  #1 pasted · 184L  and summarise 
+it"
 `;
 
 exports[`golden frames — one per state > dark-unicode at 80 1`] = `
@@ -243,7 +243,7 @@ PIDS  12
 ✓ the quick brown fox jumps over the lazy dog and keeps running past the wrap
 ✓ the quick brown fox jumps over the lazy dog and keeps running past the wrap
 ── prompt · prompt-paste-chip
-read [#1 pasted · 184 lines] and summarise it"
+read  #1 pasted · 184L  and summarise it"
 `;
 
 exports[`golden frames — one per state > dark-wide at 40 1`] = `
@@ -306,8 +306,8 @@ PIDS  12
   lazy dog and keeps running past the
   wrap
 ── prompt · prompt-paste-chip
-read [#1 pasted · 184 lines] and summa
-rise it"
+read  #1 pasted · 184L  and summarise 
+it"
 `;
 
 exports[`golden frames — one per state > dark-wide at 80 1`] = `
@@ -366,7 +366,7 @@ PIDS  12
 ✓ the quick brown fox jumps over the lazy dog and keeps running past the wrap
 ✓ the quick brown fox jumps over the lazy dog and keeps running past the wrap
 ── prompt · prompt-paste-chip
-read [#1 pasted · 184 lines] and summarise it"
+read  #1 pasted · 184L  and summarise it"
 `;
 
 exports[`golden frames — one per state > light-unicode at 40 1`] = `
@@ -429,8 +429,8 @@ PIDS  12
   lazy dog and keeps running past the
   wrap
 ── prompt · prompt-paste-chip
-read [#1 pasted · 184 lines] and summa
-rise it"
+read  #1 pasted · 184L  and summarise 
+it"
 `;
 
 exports[`golden frames — one per state > light-unicode at 80 1`] = `
@@ -489,7 +489,7 @@ PIDS  12
 ✓ the quick brown fox jumps over the lazy dog and keeps running past the wrap
 ✓ the quick brown fox jumps over the lazy dog and keeps running past the wrap
 ── prompt · prompt-paste-chip
-read [#1 pasted · 184 lines] and summarise it"
+read  #1 pasted · 184L  and summarise it"
 `;
 
 exports[`golden frames — one per state > mono-unicode at 40 1`] = `
@@ -552,8 +552,8 @@ PIDS  12
   lazy dog and keeps running past the
   wrap
 ── prompt · prompt-paste-chip
-read [#1 pasted · 184 lines] and summa
-rise it"
+read  #1 pasted · 184L  and summarise 
+it"
 `;
 
 exports[`golden frames — one per state > mono-unicode at 80 1`] = `
@@ -612,5 +612,5 @@ PIDS  12
 ✓ the quick brown fox jumps over the lazy dog and keeps running past the wrap
 ✓ the quick brown fox jumps over the lazy dog and keeps running past the wrap
 ── prompt · prompt-paste-chip
-read [#1 pasted · 184 lines] and summarise it"
+read  #1 pasted · 184L  and summarise it"
 `;

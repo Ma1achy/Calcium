@@ -36,9 +36,13 @@ const results = runPass({
   run,
   control: {
     file: EDITOR,
-    from: "    this.#chips.get(cluster)?.label;",
-    to: "    undefined;",
-    why: "with no label the frame draws the sentinel; a run where this survives cannot see a kill",
+    // **Re-aimed when the label became composed** (C17 I25, §5c): the table's
+    // value is a `Chip` now, not a string, and the reader is the arrow handed
+    // to `chipText`. The control is the same one — no substitution, so the
+    // frame draws the sentinel.
+    from: "chipText((cluster) => this.#chips.get(cluster), this.#look)",
+    to: "chipText(() => undefined, this.#look)",
+    why: "with no chip resolved the frame draws the sentinel; a run where this survives cannot see a kill",
   },
   mutations: [
     {
@@ -93,12 +97,17 @@ const results = runPass({
       expect: "T2.47",
     },
     {
-      // A chip that is not atomic to the buffer: inserted as its label, so it is
-      // twenty characters to motion and deletion.
-      name: "the chip is inserted as its label rather than as one grapheme",
+      // A chip that is not atomic to the buffer: inserted as its own text, so
+      // it is N characters to motion and deletion rather than one.
+      //
+      // **`chip.name` rather than the label**, since the label is composed now
+      // and `chipLabel` is not in this file's imports — a mutation that fails
+      // to build is killed by the compiler, which is a kill the run did not
+      // earn (F1254's shape: the change must be one the corpus can see).
+      name: "the chip is inserted as its own text rather than as one grapheme",
       file: EDITOR,
       from: "    this.insert(sentinel, { atomic: true });",
-      to: "    this.insert(chip.label, { atomic: true });",
+      to: "    this.insert(chip.name, { atomic: true });",
       expect: "T2.41",
     },
   ],

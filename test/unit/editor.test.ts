@@ -8,7 +8,7 @@
 // text (§2, I1, I4).
 import { describe, expect, it } from "vitest";
 
-import { createEditor } from "../../src/interaction/editor/index.js";
+import { chipLabel, createEditor } from "../../src/interaction/editor/index.js";
 import { selectionSpans } from "../../src/interaction/editor/index.js";
 import { UNDO_LIMIT } from "../../src/interaction/editor/undo.js";
 import type { LineEditor } from "../../src/interaction/editor/index.js";
@@ -19,7 +19,17 @@ const G = { first: 2, cont: 2 } as const;
 const FAMILY = "👨‍👩‍👧";
 
 describe("roadmap 30 — a paste chip is one grapheme to the editor", () => {
-  const CHIP = { label: "[#1 parse.ts · 184L]", content: "line one\nline two" } as const;
+  const CHIP = { ordinal: 1, kind: "file", name: "parse.ts", lines: 184, content: "line one\nline two" } as const;
+  /**
+   * The rung these rows draw at, stated rather than defaulted (C17 I25, §5c).
+   *
+   * **The label is composed now**, so a row asserting a literal would be
+   * asserting `construct.ts`'s old string. These rows are about the *width* and
+   * the atomicity, so they ask the composer what it drew; the form itself is
+   * T1.44's subject and is pinned against literals there.
+   */
+  const LOOK = { separator: "\u00b7", painted: true } as const;
+  const CHIP_LABEL = chipLabel(CHIP, LOOK);
   const GUTTER = { first: 0, cont: 0 } as const;
 
   const withChip = (): LineEditor => {
@@ -42,11 +52,11 @@ describe("roadmap 30 — a paste chip is one grapheme to the editor", () => {
     expect(e.cursor, "one position past the chip").toBe(6);
 
     const rows = e.layout(200, GUTTER);
-    expect(rows.join(""), "the label is drawn").toContain(CHIP.label);
+    expect(rows.join(""), "the label is drawn").toContain(CHIP_LABEL);
     expect(rows.join(""), "and the sentinel is not").not.toMatch(/[\u{e000}-\u{f8ff}]/u);
 
     // **The cursor sits past the label, not past one cell.**
-    expect(e.cursorCell(200, GUTTER).col).toBe("read ".length + cells(CHIP.label));
+    expect(e.cursorCell(200, GUTTER).col).toBe("read ".length + cells(CHIP_LABEL));
   });
 
   it("T2.41 (roadmap 30): a chip is one character to motion and to deletion", () => {
@@ -107,7 +117,7 @@ describe("roadmap 30 — a paste chip is one grapheme to the editor", () => {
     // sentinel — which is U+FFFC's shape, and the reason the PUA is allocated
     // per chip rather than a single OBJECT REPLACEMENT CHARACTER used twice.
     // With one chip the side map cannot be observed to be a map at all.
-    const second = { label: "[#2 notes.md · 12L]", content: "second" } as const;
+    const second = { ordinal: 2, kind: "file", name: "notes.md", lines: 12, content: "second" } as const;
     const e = withChip();
     e.insert(" and ");
     e.insertChip(second);
@@ -116,8 +126,8 @@ describe("roadmap 30 — a paste chip is one grapheme to the editor", () => {
       `read ${CHIP.content} and ${second.content}`,
     );
     const drawn = e.layout(400, GUTTER).join("");
-    expect(drawn, "and each draws its own label").toContain(CHIP.label);
-    expect(drawn).toContain(second.label);
+    expect(drawn, "and each draws its own label").toContain(CHIP_LABEL);
+    expect(drawn).toContain(chipLabel(second, LOOK));
   });
 
   it("T2.45 (roadmap 30): the wash is measured on what is drawn", () => {
@@ -138,7 +148,7 @@ describe("roadmap 30 — a paste chip is one grapheme to the editor", () => {
       e.drawAs,
     );
     expect(spans[0]?.to, "to the end of the label, not of the sentinel").toBe(
-      "read ".length + cells(CHIP.label),
+      "read ".length + cells(CHIP_LABEL),
     );
   });
 
@@ -148,15 +158,15 @@ describe("roadmap 30 — a paste chip is one grapheme to the editor", () => {
     // alone. The chip does not fit beside `read `, so it moves whole — and
     // `cursorCell` has to agree with the row the label was actually drawn on.
     const e = withChip();
-    const width = "read ".length + cells(CHIP.label) - 2;
+    const width = "read ".length + cells(CHIP_LABEL) - 2;
 
     const rows = e.layout(width, GUTTER);
     expect(rows.length, "the chip moved to its own row").toBe(2);
-    expect(rows[1], "whole, not split").toContain(CHIP.label);
+    expect(rows[1], "whole, not split").toContain(CHIP_LABEL);
 
     const at = e.cursorCell(width, GUTTER);
     expect(at.row, "and the cursor is on the row the label is on").toBe(1);
-    expect(at.col, "past the whole label").toBe(cells(CHIP.label));
+    expect(at.col, "past the whole label").toBe(cells(CHIP_LABEL));
   });
 });
 
@@ -996,7 +1006,7 @@ describe("C17 §5b — the region's cells (roadmap entry 23)", () => {
     const chipped = createEditor();
     chipped.insert("read ");
     const beforeChip = chipped.text;
-    chipped.insertChip({ label: "[#1 parse.ts \u00b7 184L]", content: "line one" });
+    chipped.insertChip({ ordinal: 1, kind: "file", name: "parse.ts", lines: 184, content: "line one" });
     expect(chipped.text, "insertChip moves the buffer in the same call").not.toBe(beforeChip);
   });
 });
