@@ -9,6 +9,10 @@ import { describe, expect, it } from "vitest";
 import { block } from "../../src/data/viewmodel/index.js";
 import { doc } from "../support/blocks.js";
 import { buildGraph } from "../support/session.js";
+import { washedRowsOf, washRow, washSelectedRows } from "../../src/shell/paint.js";
+import { FULL_CAPS, themeFor } from "../support/render.js";
+
+const THEME = themeFor("dark");
 import {
   blocksTouched,
   copyTextOf,
@@ -259,12 +263,77 @@ describe("C14 §6c — the caret and the anchor", () => {
 });
 
 // C14 §6d — the selection's ground.
-// Spec-first: the rows land with the code in this MR's second commit.
+//
+// **Here and not at the session**, because the harness's screen model replays
+// the frame into a grid and drops every SGR: a read one layer up can see a row
+// move and cannot see a ground. `session-paint.test.ts` reads `paint()`'s return
+// for the same reason.
 describe("C14 §6d — the selection's ground", () => {
-  it.todo(
-    "T1.40 (C14 I39, I40): one row per selected block carries the ground, at its first row, and the cache holds the unwashed lines — not deferred on a component: the wash lands in this MR's code commit",
-  );
-  it.todo(
-    "T1.40b (C14 I41): selected wins the ground and focus keeps its mark, read as frames at colour and at 1-bit — not deferred on a component: the wash lands in this MR's code commit",
-  );
+  // **Two entries in the spans, and the second is not decoration.** With only
+  // one entry's blocks here, `selected.has(sp.key)` is false for everything and
+  // the entry filter is never reached — the mutation that drops it survived
+  // against exactly that fixture.
+  const spans = [
+    { key: keyOf("e1", "l"), from: 0, to: 3 },
+    { key: keyOf("e1", "m"), from: 3, to: 6 },
+    { key: keyOf("e2", "l"), from: 0, to: 3 },
+  ].map((sp) => Object.freeze(sp));
+  const both = new Set([keyOf("e1", "l"), keyOf("e1", "m")]);
+
+  it("T1.40 (C14 I39): the rows taking the ground are the blocks' first rows and no others", () => {
+    // **The set, not a count.** A body-wide wash and a first-row wash are both
+    // *some rows are styled*; only the set tells them apart, and the third
+    // clause is *never on every cell of its body*.
+    expect([...washedRowsOf(spans, both, "e1", 0, 6)].sort((a, b) => a - b)).toEqual([0, 3]);
+
+    // One block selected, and it is the second — so the answer is not *the
+    // first row of the entry*, which every one-block fixture would accept.
+    expect([...washedRowsOf(spans, new Set([keyOf("e1", "m")]), "e1", 0, 6)]).toEqual([3]);
+
+    // A window beginning below a block's first row shows its body, and a body
+    // takes no ground.
+    expect([...washedRowsOf(spans, both, "e1", 4, 2)]).toEqual([]);
+
+    // **Another entry's selection is not this entry's**, and the spans hold both
+    // so the filter is actually reached: `e2`'s block is selected and `e1` is
+    // being drawn, and `e2`'s block starts at row 0 — the same row `e1`'s does,
+    // which is what makes a dropped filter invisible without this.
+    expect([...washedRowsOf(spans, new Set([keyOf("e2", "l")]), "e1", 0, 6)]).toEqual([]);
+    expect([...washedRowsOf(spans, new Set([keyOf("e2", "l")]), "e2", 0, 6)]).toEqual([0]);
+  });
+
+
+  it("T1.40c (C14 I40): the wash is a new array, and the lines the cache holds are untouched", () => {
+    // **The stored copy, by identity and by content.** The caller has already
+    // written `lines` into the render cache, whose nine axes do not include the
+    // selection — so a wash that reached them would serve a selected frame to a
+    // later unselected read, which is a *correct* frame and the symptom whose
+    // report says *it froze*.
+    const lines = Object.freeze(["one", "two", "three"]);
+    const before = [...lines];
+    const shown = washSelectedRows(lines, new Set([1]), THEME, FULL_CAPS, 6);
+
+    expect([...lines], "the stored copy is byte-for-byte what it was").toEqual(before);
+    expect(shown, "and the frame's copy is a different array").not.toBe(lines);
+    expect(shown[1]).not.toBe(lines[1]);
+    expect(shown[0], "rows nothing selected are the same strings").toBe(lines[0]);
+
+    // Nothing selected is the identity, which is every frame outside the mode.
+    expect(washSelectedRows(lines, new Set(), THEME, FULL_CAPS, 6)).toBe(lines);
+  });
+
+  it("T1.40b (C14 I41): the mark survives the wash, and 1-bit is reverse video", () => {
+    const marked = "▸ x";
+    const colour = washRow(marked, THEME, FULL_CAPS, 6);
+    // The mark is still in the text — the wash changed the ground under it,
+    // which is the precedence as an order rather than as a case in a table.
+    expect(colour).toContain("▸ x");
+    expect(colour, "a ground, at colour").toMatch(/\[4[0-9;]/u);
+
+    // 1-bit: `selectionStyle` answers `inverse`, so the row is SGR 7 and the
+    // mark is still there — neither fact rests on colour alone.
+    const mono = washRow(marked, THEME, { ...FULL_CAPS, colourDepth: 1 }, 6);
+    expect(mono, "SGR 7").toContain("[7m");
+    expect(mono).toContain("▸ x");
+  });
 });

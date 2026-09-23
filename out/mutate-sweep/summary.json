@@ -1,9 +1,9 @@
 {
   "label": "all",
-  "only": "c14-caret",
+  "only": "c14-selection-ground",
   "rows": [
     {
-      "run": "c14-caret.mjs",
+      "run": "c14-selection-ground.mjs",
       "exit": 0,
       "seconds": 15,
       "state": "green",

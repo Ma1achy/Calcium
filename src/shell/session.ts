@@ -42,6 +42,7 @@ import { reserveNeeded } from "./block-faults.js";
 import { descendants } from "../data/viewmodel/index.js";
 import type { Block, Image, Plot } from "../data/viewmodel/index.js";
 import { elementsOfEntry, entryLayout, renderEntryPieces, windowEntry } from "./entry-layout.js";
+import { washedRowsOf, washSelectedRows } from "./paint.js";
 import { animationIntervalOf } from "../presentation/blocks/index.js";
 import type { EntryParts } from "./render-cache.js";
 import type { EntryPiece } from "./entry-layout.js";
@@ -1284,6 +1285,12 @@ class Session implements TuiInstance {
           // renderer has one, so publishing it at L0 would be a member nothing
           // below `src/shell/` could ever call.
           this.#profiler,
+          // **The selection and the spans it was taken over** (C14 I39). Null
+          // outside the mode, which is every frame the reader is not copying —
+          // so the wash costs one comparison and the render path is unchanged.
+          this.#semantic === null
+            ? null
+            : { blocks: this.#semantic.blocks, spans: this.#selectionSpans(width) },
         ),
       promptRows: () => graph.editor.layout(width, PROMPT_GUTTER),
       promptCursor: () => graph.editor.cursorCell(width, PROMPT_GUTTER),
@@ -1428,11 +1435,20 @@ class Session implements TuiInstance {
   #spans: Readonly<{ at: readonly unknown[]; width: number; spans: readonly semantic.BlockSpan[] }> | null =
     null;
 
-  #selectionSpans(): readonly semantic.BlockSpan[] {
+  /**
+   * `at` is the frame's own width where the caller has one.
+   *
+   * **The render path passes it and never lets this reach `#composed()`**: the
+   * spans are read from inside the composition, so a call that composed a frame
+   * to find a width would compose one from inside one. The key handlers have no
+   * frame in hand and ask for the last one's region, which is the same number a
+   * keystroke later.
+   */
+  #selectionSpans(at?: number): readonly semantic.BlockSpan[] {
     const graph = this.#graph;
     if (graph === null) return [];
     const entries = graph.documentEntries;
-    const width = this.#composed().region.width;
+    const width = at ?? this.#composed().region.width;
     const held = this.#spans;
     if (held !== null && held.at === entries && held.width === width) return held.spans;
 
@@ -1724,12 +1740,40 @@ function entryById(entries: readonly Entry[], id: string): Entry | undefined {
  * divergence in the place that moves the whole frame — the two would agree on
  * ordinary output and part company at a wrap boundary.
  */
+/**
+ * One row per selected block, at the block's first row (C14 I39).
+ *
+ * **The spans are the caret's own** (I36), so what is washed and what an extend
+ * took cannot disagree — a second walk over the blocks would be a second answer
+ * to *where does this block start*. A block whose first row is outside the
+ * window contributes nothing here, which is right: the ground goes on the first
+ * row and a window that begins below it is showing the body.
+ */
+function washSelected(
+  graph: Graph,
+  lines: readonly string[],
+  entryId: string,
+  from: number,
+  width: number,
+  selection: SelectionWash,
+): readonly string[] {
+  const rows = washedRowsOf(selection.spans, selection.blocks, entryId, from, lines.length);
+  return washSelectedRows(lines, rows, graph.theme.current, graph.capabilities, width);
+}
+
+/** What the wash needs: the selection and the spans it was taken over (I39). */
+type SelectionWash = Readonly<{
+  blocks: ReadonlySet<string>;
+  spans: readonly semantic.BlockSpan[];
+}>;
+
 function visibleRows(
   graph: Graph,
   width: number,
   tick: number,
   onAnimation: (animated: Animated) => void,
   profiler: Profiler | null,
+  selection: SelectionWash | null,
 ): readonly string[] {
   const out: string[] = [];
   // **The cadence anything visible wants, reported once per frame.** The session
@@ -2007,7 +2051,14 @@ function visibleRows(
     // The pieces are already the window's rows (`windowEntry` took `[from, to)`),
     // so only the chrome is sliced here.
     const keptChrome = chrome.slice(Math.min(ve.skipRows, chrome.length));
-    out.push(...[...keptChrome, ...lines].slice(0, ve.takeRows));
+    // **The selection's ground, after the cache was written** (C14 I39, I40).
+    // The slot above already holds `lines`; this washes a copy, so nothing
+    // selection-dependent can be served to a later unselected read — which is
+    // C22 I71's *correct frame, previous state*, the symptom whose report says
+    // *it froze*. A tenth cache axis would be correct and would bust an entry's
+    // whole slot on every keystroke in the mode.
+    const shown = selection === null ? lines : washSelected(graph, lines, entry.id, from, width, selection);
+    out.push(...[...keptChrome, ...shown].slice(0, ve.takeRows));
   }
   onAnimation(
     fastest === null && orbits.length === 0 && frames.length === 0

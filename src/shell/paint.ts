@@ -381,6 +381,87 @@ function washed(row: string, span: CellSpan, deps: PaintDeps): string {
   return `${before}${paintSpans([{ text: inside, style }])}${after}`;
 }
 
+/**
+ * Which rendered rows take the selection ground (C14 I39).
+ *
+ * **One row per selected block, at the block's first row** — `R-SEL-003`'s
+ * third clause, *never on every cell of its body*. Pure and here rather than
+ * inside the render loop so the claim has an artefact: the session's screen
+ * model drops SGR, so a frame read one layer up can see a row move and cannot
+ * see a ground, which is why `session-paint.test.ts` reads `paint()`'s return
+ * rather than the modelled screen.
+ *
+ * `from` is the window's first row in the entry's own space, so a block whose
+ * first row is above the window contributes nothing: the ground goes on the
+ * first row, and a window beginning below it is showing the body.
+ */
+export function washedRowsOf(
+  spans: readonly Readonly<{ key: string; from: number; to: number }>[],
+  selected: ReadonlySet<string>,
+  entryId: string,
+  from: number,
+  lineCount: number,
+): ReadonlySet<number> {
+  const rows = new Set<number>();
+  for (const sp of spans) {
+    if (!selected.has(sp.key)) continue;
+    if (sp.key.slice(0, sp.key.indexOf("\u0000")) !== entryId) continue;
+    const at = sp.from - from;
+    if (at >= 0 && at < lineCount) rows.add(at);
+  }
+  return rows;
+}
+
+/**
+ * The frame's copy of an entry's lines, with the selected rows grounded
+ * (C14 I40).
+ *
+ * **Returns a new array and never touches the one it was given**, which is the
+ * whole of I40: the caller has already written `lines` into the render cache,
+ * and the cache keys on nine axes of which the selection is none. A wash baked
+ * into the stored lines would serve a selected frame to a later unselected
+ * read — C22 I71's *correct frame, previous state*, the symptom whose report
+ * says *it froze*.
+ *
+ * A tenth cache axis would also be correct, and would bust an entry's whole
+ * slot on every keystroke in the mode: one rung coarser than the cost C22 I103
+ * split `tick` out to avoid.
+ */
+export function washSelectedRows(
+  lines: readonly string[],
+  rows: ReadonlySet<number>,
+  theme: ResolvedTheme,
+  capabilities: TerminalCapabilities,
+  width: number,
+): readonly string[] {
+  if (rows.size === 0) return lines;
+  return lines.map((row, i) => (rows.has(i) ? washRow(row, theme, capabilities, width) : row));
+}
+
+/**
+ * A whole row under the selection ground (C14 I39, I41, `R-SEL-003`,
+ * `R-SEL-006`).
+ *
+ * **Over the finished line, which is what makes the precedence an order.** The
+ * focus mark and a patch's own inks are already in the text; this changes the
+ * ground under them, so *selection wins the ground while focus keeps its mark*
+ * is the sequence of two operations rather than a case in a table.
+ *
+ * L1's ladder, not a private copy: the wash, else `inverse` where there is no
+ * colour (C09 §paint) — so 1-bit needs no rung of its own here either.
+ */
+export function washRow(
+  row: string,
+  theme: ResolvedTheme,
+  capabilities: TerminalCapabilities,
+  width: number,
+): string {
+  const style = selectionStyle(theme, capabilities);
+  const text = sliceCells(row, 0, width);
+  const pad = Math.max(0, width - cells(text, capabilities.ambiguousWidth));
+  return paintSpans([{ text: text + " ".repeat(pad), style }]);
+}
+
 /** The wash, or reverse video where there is no colour to wash with (§4b). */
 function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly string[] {
   // **Inside `body`, and separate from it** (C28 §2). `deps.promptRows()` and
