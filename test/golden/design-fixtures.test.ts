@@ -22,24 +22,48 @@
  * their own: membership by equality in both directions, targets that exist, and
  * a census compared against the figure the document prints.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 const MAP = "test/golden/DESIGN_FIXTURES.md";
+
+/** Every `.ts` under `src/` and `test/` — what a probe is looked for in. */
+const FILES: readonly string[] = (function walk(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const full = join(dir, e.name);
+    if (e.isDirectory()) return e.name === "node_modules" ? [] : walk(full);
+    return e.name.endsWith(".ts") ? [full] : [];
+  });
+})("src").concat(
+  (function walk(dir: string): string[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) return e.name === "node_modules" ? [] : walk(full);
+      return e.name.endsWith(".ts") ? [full] : [];
+    });
+  })("test"),
+);
 const FIXTURES = "docs/design/language/fixtures";
 
-type Row = Readonly<{ section: number; cls: string; target: string }>;
+type Row = Readonly<{ section: number; cls: string; built: string; target: string }>;
 
 /** The table, parsed — `| § | class | target | why |`. */
 function rows(): readonly Row[] {
   const doc = readFileSync(MAP, "utf8");
   const body = doc.slice(doc.indexOf("## The table"), doc.indexOf("## The two with no fixture"));
-  return [...body.matchAll(/^\| (\d+) \| (\w+) \| `([^`]+)` \|/gmu)].map((m) => ({
+  // **A cell may hold an escaped pipe**, because a probe is an alternation and
+  // the `built` column carries it. `[^|]+` stops at the byte whatever markdown
+  // means by the backslash, and it silently dropped the two rows whose probe
+  // had one — caught by the membership row, which is what it is for.
+  const cell = String.raw`(?:[^|\\]|\\.)+`;
+  const re = new RegExp(String.raw`^\| (\d+) \| (\w+) \| (${cell}) \| (${cell}) \|`, "gmu");
+  return [...body.matchAll(re)].map((m) => ({
     section: Number(m[1]),
     cls: m[2]!,
-    target: m[3]!,
+    built: m[3]!.trim(),
+    target: m[4]!.trim(),
   }));
 }
 
@@ -78,10 +102,35 @@ describe("M16 — the design fixtures, mapped", () => {
 
   it("T1.3 (M16): every mapped target exists, so a renamed golden leaves no dangling row", () => {
     const dangling = rows()
-      .filter((r) => r.cls === "frame")
-      .filter((r) => !existsSync(join("test/golden", r.target)) && !existsSync(join("test/integration", r.target)))
-      .map((r) => `§${String(r.section)} → ${r.target}`);
+      .filter((r) => r.target !== "—" && !r.target.includes("examples/"))
+      .map((r) => ({ r, t: r.target.replaceAll("`", "") }))
+      .filter(({ t }) => !existsSync(join("test/golden", t)) && !existsSync(join("test/integration", t)))
+      .map(({ r, t }) => `§${String(r.section)} → ${t}`);
     expect(dangling, "frame rows whose target is not in the tree").toEqual([]);
+  });
+
+  it("T1.5 (M16): every probe in the `built` column resolves in the tree", () => {
+    // **The column is evidence or it is nothing.** Its first draft answered
+    // *is this built* from the plan rather than from HEAD and was wrong for
+    // most of the corpus — `focusGround`, `dismissal`, `nativeSelection`,
+    // `scrollbar.ts`, `tape.ts`, `headMark` and `REGISTRY_THEMES` were all
+    // already in the tree while the table called them outstanding.
+    //
+    // **And a probe that does not resolve indicts the probe first** (F277).
+    // Seven of the first sixty-five were wrong: one searched `src/` for a
+    // symbol that lives in `test/`, two named block kinds the repo never had,
+    // and §069's named a spelling that does not exist for a surface that is
+    // built. Every one reads, from outside, exactly like an absence.
+    const dead: string[] = [];
+    for (const r of rows()) {
+      if (r.built === "—" || r.built === "no") continue;
+      const symbols = r.built.replaceAll("`", "").split("\\|").map((x) => x.trim());
+      const found = symbols.some((sym) =>
+        FILES.some((f) => readFileSync(f, "utf8").includes(sym)),
+      );
+      if (!found) dead.push(`§${String(r.section)} → ${r.built}`);
+    }
+    expect(dead, "probes naming nothing in the tree").toEqual([]);
   });
 
   it("T1.4 (M16): the census in the document is the census of the table", () => {
@@ -90,15 +139,29 @@ describe("M16 — the design fixtures, mapped", () => {
     // reader watches rather than something inferred from a green suite.
     const counted = new Map<string, number>();
     for (const r of rows()) counted.set(r.cls, (counted.get(r.cls) ?? 0) + 1);
-    const line = /frame (\d+) · owed (\d+) · prose (\d+) · app (\d+) · total (\d+)/u.exec(
-      readFileSync(MAP, "utf8"),
-    );
+    const doc = readFileSync(MAP, "utf8");
+    const line = /surface (\d+) · prose (\d+) · app (\d+) · total (\d+)/u.exec(doc);
     expect(line, "the census line").not.toBeNull();
-    const [frame, owed, prose, app, total] = (line ?? []).slice(1).map(Number);
+    const [surface, prose, app, total] = (line ?? []).slice(1).map(Number);
     expect(
-      { frame: counted.get("frame"), owed: counted.get("owed"), prose: counted.get("prose"), app: counted.get("app") },
+      { surface: counted.get("surface"), prose: counted.get("prose"), app: counted.get("app") },
       "the document's census against the table's",
-    ).toEqual({ frame, owed, prose, app });
+    ).toEqual({ surface, prose, app });
     expect(total, "and the total is the corpus").toBe(fixtures().length);
+
+    // **`built` and `framed` are counted too**, because they are the figures
+    // the reconciliation moves and the ones that would drift silently.
+    const inner = /built (\d+) · unbuilt (\d+) · framed (\d+)/u.exec(doc);
+    expect(inner, "the surface census").not.toBeNull();
+    const [built, unbuilt, framed] = (inner ?? []).slice(1).map(Number);
+    const surfaces = rows().filter((r) => r.cls === "surface");
+    expect(
+      {
+        built: surfaces.filter((r) => r.built !== "no").length,
+        unbuilt: surfaces.filter((r) => r.built === "no").length,
+        framed: surfaces.filter((r) => r.target !== "—").length,
+      },
+      "built, unbuilt and framed",
+    ).toEqual({ built, unbuilt, framed });
   });
 });
