@@ -84,3 +84,12 @@ describe("C14 §6a — the selection verbs", () => {
     expect(enter(one, "e9"), "the same state, by identity").toBe(one);
   });
 });
+
+describe("C09 §7a — a kind declares its copy text (M10c)", () => {
+  it.todo(
+    "T1.41h (C09 I86, §7a, R-SEL-004): every registered kind either declares `copy` or is absent from the join, and none joins as the empty string — the five kinds R-SEL-004 names that copied blank before the seam (table as TSV with its header, patch as unified diff, plot as its data view, keyValue, image as alt text and path) each answer their source, and a `scroll` holding a table copies the table rather than nothing — not deferred on a component: the seam lands with the copy in this MR",
+  );
+  it.todo(
+    "T1.41i (C14 §6a, R-SEL-004): `y` over a three-entry selection yields the entries in document order separated by one blank line each, with no block inside an entry producing a blank line of its own — the property the omission default exists for — not deferred on a component: the join lands with the copy in this MR",
+  );
+});

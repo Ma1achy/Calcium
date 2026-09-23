@@ -477,6 +477,31 @@ block and continues past it, and this holds **continuously and not only at relea
 (`R-SEL-015`) — so the count is always the size of what a copy right now would take,
 and never a size no copy could produce.
 
+### What `y` takes, and where it lands
+
+`R-SEL-004` gives the join: **document order, entries separated by a blank line**,
+each block its own source through C09 §7a's `copy`, and *a block's content is not
+re-indented to match its rendered inset — the inset is rendering*. That last clause
+is why the join reads `copy` rather than composing painted rows: the inset, the
+gutter, the rail and the residue marks are all things this component drew, and none
+of them was typed by anyone.
+
+**The blank line is the entry separator and nothing else may produce one**, which is
+what makes C09 I86's default omission rather than `""`. A selection of three entries
+has two blank lines in it, and a reader pasting it can tell where one command's
+output ended — a property that survives only if no block inside an entry can forge
+the same mark.
+
+**One clipboard** (`R-SEL-011`, C17 §5a). `y` fills the same buffer `⌃k` fills and
+`⌃y` yanks, which is the reduction §1 of `CALCIUM_SELECTION_DESIGN.md` argued for
+from the other side. The system clipboard and OSC 52 are the rule's two mechanisms
+and neither is built; what **is** owed here is the rule's last sentence — *if
+neither is available the mode states it and offers a file instead*, because *a copy
+that appears to work and does not is the worst outcome available here.* So the
+refusal is the part that ships with the copy, not after it: the kill buffer always
+succeeds, so the statement is about the **system** clipboard and it is made once,
+when a copy is taken and cannot leave the process.
+
 ### The label is parked on a word the design does not supply
 
 `R-SEL-009` names *the mode label in the footer* and `R-SEL-007` has a rectangular

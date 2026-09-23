@@ -2629,6 +2629,45 @@ the same overrun in smaller form.
 - **I83** — *(R-SEL-006, C10 I47)* **A notice takes the focus ground and no column; the focus mark is not this library's.** A focused `notice` that stands in the focus ring (I47) is painted on `surface.focusGround` and keeps its own tone — *colour is declared, not inherited* — and nothing about its geometry moves, so `measure` still sees no focus and needs no capability. **The first form of this invariant reserved a gutter column here and was wrong**, measured rather than argued: the implementation shifted a `step` head two cells and left the `⎿` body under it where it was (T1.48), and four fixtures put the mark in the gutter of the **block with addressable rows** — §044's three adjacent rows reserve two columns and spend none, one and both with the content edge fixed, while §012, §081 and §003 all draw an unfocused call head at its own edge with nothing reserved. The mark's column is C11's (I15, §5). **What a focused notice keeps at 1-bit**: the ground answers `NO_STYLE` there, so the carrier is the tone's own mono class — which is why the tone is kept rather than replaced by `accent`, the mechanism this replaces (→ I47, C10 I47, C11 I15).
 - **I84** — *(§096, §3a-ter, F239, F230)* **A status has three parts and the cap is on the box, not on the message.** The **banner** never truncates, the **message** wraps, and the **detail** truncates and is bounded with a residue row. `CONTENT_LINE_CAP = 7` bounds the rows a box **requests** — 4 for the worst measured message and 3 for the detail, both measured at the top rung's content width — and `DETAIL_LINE_CAP = 3` bounds the detail. Inside a granted interior the allocation is three clauses: a present, non-empty detail reserves **one row**; the message wraps into what remains and truncates with its existing mark; the detail expands into what the message did not take, its last row a residue when it was cut. **With no detail the block draws exactly what it drew before**, and the only figure that moves is the request, upward, for a message over four rows. F239's argument is unchanged and only its subject is: it was always about the box's over-draw inside a bounded container, and capping the message was one way to bound the box (→ I34, I31, C04 I49).
 - **I85** — *(§047, §048, §096)* **`empty` is a fourth status state, and it is not an error.** No banner, no mark, no error tone, and its content **centred on both axes**. The vertical half is inherited rather than added: `render` already centres the whole group in the interior, on a ruling taken about a tall error box, so what this invariant contributes is the **horizontal** centring — every other state's rows go through a left-aligned `fit` — and the three absences. A refusal states its reason; it is not an error and never red (→ I84, I31).
+- **I86** — *(§7a, `R-SEL-004`)* **A kind declares its copy text, and a kind that declines is absent from the join rather than empty in it.** `BlockDefinition.copy` is the block-level pair of `NavElement.copy` and carries the same rule — the **source**, never the rendering — so a `table` copies as TSV with its header including the columns this width dropped, a `patch` as unified diff rather than the rendered two-column view, an `image` as its alt text and its path. The default is **omission, not the empty string**: a blank line is `R-SEL-004`'s entry separator, so a kind joining as `""` forges an entry boundary inside one. Measured before the seam existed: `copyTextOf` answered six kinds and `""` for the rest, so five of the seven kinds the rule names by name copied blank — and a `scroll` holding a table produced a copy that succeeded and was empty.
+## 7a. `copy` — a kind's source, one level up from an element's
+
+`R-SEL-004` is a per-kind rule and it is written about **blocks**: *prose copies as
+text, unwrapped, with soft wraps removed; code with its original indentation; a
+patch as unified diff rather than the rendered two-column view; a table as TSV with
+its header; a plot as its data view; an image as its alt text and its path; a live
+terminal as its scrollback at the moment of the copy.*
+
+**Half of it is built and the half that is built is the harder half.** `NavElement.copy`
+(§2) is the same rule at element granularity, and it already carries the part that
+is easy to get wrong — *the element's **source**, never its rendering*, so a table
+row copies every declared column including the ones this width dropped. What is
+missing is the block, and it is missing in a way that reads as present.
+
+**The measured state.** `copyTextOf` in `kinds/containers.ts` is a private switch
+over six kinds — `raw`, `notice`, `tip`, `code`, `logs`, `scroll` — with `default:
+return ""` for the rest. Five of the seven kinds `R-SEL-004` names by name fall to
+that default: `table`, `patch`, `plot`, `keyValue` and `image` copy as the empty
+string. A `scroll` holding a table is the case that shows the shape, because the
+container recurses into a child that answers nothing and the result is a copy that
+**succeeded** and is blank.
+
+So `BlockDefinition` gains `copy?`, beside `elements?` and `width?` and optional on
+the same argument: an absent member cannot be deleted by a later edit while a branch
+returning `""` can, and a kind that is genuinely uncopyable — a `rule`, a
+`spacer` — omits it and contributes nothing rather than an empty line.
+
+**The default is not `""` and that is the ruling.** A kind with no `copy` is taken
+out of the join entirely; it does not join as an empty string, because an empty
+string between two blocks is a blank line, and a blank line is `R-SEL-004`'s
+**entry** separator. A kind that declined would otherwise forge an entry boundary
+in the middle of one — which is a rendering decision leaking into a source copy,
+and the exact class `NavElement.copy`'s prose is about.
+
+**`copyTextOf` becomes the registry's, and its six kinds become six declarations.**
+The private switch is then the thing it always looked like from outside: a table of
+which kinds answer, kept in one file, disagreeing with the registry by construction.
+
 ## 8. Commitments
 
 1. C09 owns the registry; C04 owns the schema and the measurement contract (I13).
