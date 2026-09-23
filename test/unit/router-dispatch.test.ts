@@ -60,8 +60,8 @@ function harness(over: Partial<RouterDeps> = {}, start = 1_000) {
     overlayRegion: () => ({ width: 80, height: 24 }),
     placed: () => layer.placed,
     popLayer: () => void calls.push("pop"),
-    copyMode: () => false,
-    exitCopyMode: () => void calls.push("exitCopy"),
+    nativeSelection: () => false,
+    exitNativeSelection: () => void calls.push("exitCopy"),
     liveEntry: () => ({ id: "e1" }),
     entryAtRow: (row) => (row < 5 ? { id: `row${String(row)}`, rowOffset: row } : null),
     inFlight: () => null,
@@ -183,7 +183,7 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     };
 
     // **Below the layer rungs**: a modal over a running stream still takes the
-    // key, which is the copy-mode ordering applied to the new rung.
+    // key, which is the native-selection ordering applied to the new rung.
     const modal = harness({ ...stream, promptHasText: () => true });
     modal.layer.top = { id: "confirm", kind: "overlay", blocking: true, dismissal: "answer" };
     expect(modal.router.dispatch(ctrlC)).toBe(true);
@@ -236,11 +236,11 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
   });
 
   it("T1.12, T1.12b (I8): a confirm is a no-op, and nothing beneath it moves", () => {
-    const { router, calls, layer } = harness({ copyMode: () => true });
+    const { router, calls, layer } = harness({ nativeSelection: () => true });
     layer.top = { id: "confirm", kind: "overlay", blocking: true, dismissal: "answer" };
 
     expect(router.dispatch(ctrlC), "consumed").toBe(true);
-    expect(calls, "copy mode is untouched and no layer popped").toEqual([]);
+    expect(calls, "native selection is untouched and no layer popped").toEqual([]);
   });
 
   it("T1.39 (I39): every intercept declares a verdict at every rung, by equality", () => {
@@ -313,8 +313,8 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     expect(layer.top?.id, "and it did not dismiss the question either").toBe("confirm");
   });
 
-  it("T1.40b (I40): ⌥↑ in copy mode is rejected and the frozen screen does not move", () => {
-    const { router, calls } = harness({ copyMode: () => true });
+  it("T1.40b (I40): ⌥↑ in native selection is rejected and the frozen screen does not move", () => {
+    const { router, calls } = harness({ nativeSelection: () => true });
     router.register("global", () => (calls.push("scroll"), true));
 
     expect(router.dispatch(key("up", { meta: true })), "consumed, not dropped").toBe(true);
@@ -444,11 +444,11 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
 
   it("the ladder's order is FOCUS_ORDER's, asserted where two rungs are both live", () => {
     // The pairwise form again: each rung firing in isolation is true under any
-    // permutation. A confirm over copy mode is the pair the reorder turned on.
-    const { router, calls, layer } = harness({ copyMode: () => true });
+    // permutation. A confirm over native selection is the pair the reorder turned on.
+    const { router, calls, layer } = harness({ nativeSelection: () => true });
     layer.top = { id: "menu", kind: "overlay", blocking: false, dismissal: "escape" };
     router.dispatch(ctrlC);
-    expect(calls, "overlay beats copy mode").toEqual(["pop"]);
+    expect(calls, "overlay beats native selection").toEqual(["pop"]);
   });
 });
 
@@ -1008,7 +1008,7 @@ describe("C16 §3a — the global-intercept table and the child rung (M5)", () =
       rung === "child"
         ? { inFlight: () => "shell" }
         : rung === "copy"
-          ? { copyMode: () => true }
+          ? { nativeSelection: () => true }
           : // A question is an overlay *awaiting an answer*, which is the line §5
             // draws and the target name does not.
             rung === "question"

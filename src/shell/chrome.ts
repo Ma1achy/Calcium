@@ -88,7 +88,7 @@ const header =
       [
         { label: name, tone: "default" },
         { label: binary, tone: "muted" },
-        // **Not optional, and not a footer hint.** Copy mode is the one mode
+        // **Not optional, and not a footer hint.** Native selection is the one mode
         // whose whole effect is that things stop responding — the mouse goes
         // dead and the screen stops moving — so a reader with nothing on screen
         // saying why has been handed a bug rather than a feature. It sits in
@@ -161,7 +161,7 @@ export function formatFrameCost(ms: number): string {
  * specimens are examples, not binding projections.* What it concluded from it
  * was *verbs and facts, never key names*, and that closes the rung rather than
  * the hazard. The design's answer is narrower and holds: the line names the
- * **owner**, and the owner is the framework's own — a question, copy mode, an
+ * **owner**, and the owner is the framework's own — a question, native selection, an
  * attached child and a block's interior are rungs Calcium raises, not actions
  * an app rebinds. `scope`'s line is the one made of ordinary editing verbs, and
  * it is the one an app can replace by supplying its own chrome (I82).

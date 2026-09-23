@@ -160,9 +160,9 @@ export function fakeFs(): FileSystem {
 }
 
 export const FRAME: FrameQueries = {
-  copyMode: () => false,
-    enterCopyMode: () => undefined,
-  exitCopyMode: () => undefined,
+  nativeSelection: () => false,
+    enterNativeSelection: () => undefined,
+  exitNativeSelection: () => undefined,
   region: () => ({ top: 1, height: 20 }),
   overlayRegion: () => ({ width: 80, height: 24 }),
   promptAnchor: () => ({ row: 21, rows: 1 }),

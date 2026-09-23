@@ -12,8 +12,8 @@
  * this key*; the table answers *what happens to this key at every rung*, which is
  * the question §103 asks and the one a branch cannot be read for. The
  * owner-applicability is the whole content: `interrupt` is not *the child's*, it
- * is the child's **and** a rejection at a question **and** a rejection in copy
- * mode **and** silence when idle, and those four live in four places until they
+ * is the child's **and** a rejection at a question **and** a rejection in
+ * native selection **and** silence when idle, and those four live in four places until they
  * live in one.
  */
 
@@ -108,7 +108,7 @@ export const INTERCEPTS: Readonly<Record<InterceptId, OwnerApplicability>> = Obj
     inside: "handle",
     scope: "handle",
     idle: "handle",
-    why: "tracking-off is a terminal fact and handled before decode; in copy mode the wheel would move a screen that is deliberately still",
+    why: "tracking-off is a terminal fact and handled before decode; in native selection the wheel would move a screen that is deliberately still",
   },
 });
 

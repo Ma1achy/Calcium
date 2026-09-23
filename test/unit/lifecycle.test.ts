@@ -450,7 +450,7 @@ describe("C01 raw input delivery", () => {
   });
 });
 
-describe("C01 mouse tracking, toggled (copy mode)", () => {
+describe("C01 mouse tracking, toggled (native selection)", () => {
   it("T1.20 (I6): setMouseTracking(false) emits the leave pair; (true) emits it back", () => {
     // **Here because nowhere else may write an escape sequence.** The mode is
     // C01's from `acquire()` to `release()`, and a second writer of it is the
@@ -568,7 +568,7 @@ describe("C01 hover — 1003 in 1002's slot, never both (I21)", () => {
     expect(off.indexOf(MODES.mouseSgrOff), "1006l first, then 1003l — I6 inside the key").toBeLessThan(off.indexOf(MODES.hoverOff));
   });
 
-  it("T1.29 (cont., I6): the copy-mode toggle leaves and re-takes the pair that was chosen", () => {
+  it("T1.29 (cont., I6): the native-selection toggle leaves and re-takes the pair that was chosen", () => {
     const { lifecycle, stdout } = hovering();
     lifecycle.acquire();
     const before = stdout.output;

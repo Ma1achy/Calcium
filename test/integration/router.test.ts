@@ -58,8 +58,8 @@ function world() {
         width: p.width,
       })),
     popLayer: () => void overlays.pop(),
-    copyMode: () => false,
-    exitCopyMode: () => undefined,
+    nativeSelection: () => false,
+    exitNativeSelection: () => undefined,
     liveEntry: () => {
       const id = store.liveId;
       return id === null ? null : { id };

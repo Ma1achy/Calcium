@@ -4,7 +4,7 @@
  * C16 §4, §5, §7 — see spec.
  *
  * **The ladder is not a list here.** Rungs 3 to 7 are handlers registered on
- * `overlay`, `copyMode`, `panel` and `liveBlock`, so their order *is*
+ * `overlay`, `nativeSelection`, `panel` and `liveBlock`, so their order *is*
  * `FOCUS_ORDER`'s and the two cannot disagree. Only rungs 1 and 2 sit outside
  * dispatch, because a verb in flight and a shell child are not focus targets and
  * have no target to register on. C16 §5's table documents what falls out of this;
@@ -75,8 +75,8 @@ export type RouterDeps = Readonly<{
   overlayAnswerCallback: () => ((e: InputEvent) => boolean) | null;
   placed: () => readonly Placed[];
   popLayer: () => void;
-  copyMode: () => boolean;
-  exitCopyMode: () => void;
+  nativeSelection: () => boolean;
+  exitNativeSelection: () => void;
   liveEntry: () => Readonly<{ id: string }> | null;
   entryAtRow: (row: number) => Readonly<{ id: string; rowOffset: number }> | null;
   /**
@@ -315,7 +315,7 @@ export function createRouter(
   function inputs(): FocusInputs {
     return {
       overlayTop: deps.overlayTop(),
-      copyMode: deps.copyMode(),
+      nativeSelection: deps.nativeSelection(),
       // **Two sources, one fact** (I49, R-BLK-711). A shell delegation and an
       // attached child surface are the same claim — the terminal's keys are not
       // the host's — and the rung has to answer for both or the second has a
@@ -390,9 +390,9 @@ export function createRouter(
       deps.popLayer();
       return true;
     });
-    register("copyMode", (e) => {
+    register("nativeSelection", (e) => {
       if (!isCtrlC(e)) return false;
-      deps.exitCopyMode();
+      deps.exitNativeSelection();
       return true;
     });
     // **A panel's rung is `substate`, and so is a view's** (§2c, R-BLK-109).
@@ -428,7 +428,7 @@ export function createRouter(
 
       // **The subscription rung, above the prompt's own and below every layer's**
       // (§5). Its position needs no ordering of its own: `activeTarget` has
-      // already chosen `prompt`, so an overlay, copy mode, a pushed view or the
+      // already chosen `prompt`, so an overlay, native selection, a pushed view or the
       // live block took the key before this ran — and it sits ahead of clearing
       // the input because a running stream outranks a half-typed line.
       //
@@ -543,7 +543,7 @@ export function createRouter(
       stages.push(hit === null ? "viewport:wheel" : `viewport:${hit.id}`);
       if (hit !== null && run("liveBlock", e)) return true;
       if (hit !== null) stages.push("viewport:wheel");
-      return run("copyMode", e) || run("global", e);
+      return run("nativeSelection", e) || run("global", e);
     }
 
     if (inRegion) {
@@ -804,7 +804,7 @@ export function createRouter(
       // not that nothing runs. The owning rung is given its turn first, because
       // the rejection is a thing an owner *does*: a question's `⌃c` is its deny
       // path (§5 ruling A — declining and cancelling produce the same outcome, and
-      // the one that leaves a record wins), and copy mode's is its own refusal.
+      // the one that leaves a record wins), and native selection's is its own refusal.
       // Short-circuiting before the rung skipped exactly that, which is a table
       // overruling the ladder rather than declaring an override for it.
       //

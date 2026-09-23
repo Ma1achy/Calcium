@@ -85,10 +85,10 @@ export type ChromeContext = Readonly<{
   now: number;
   columns: number;
   /**
-   * Copy mode is up (C16 §5b).
+   * Native selection is up (C16 §5b).
    *
    * **Handed down rather than left to the default header**, because an app that
-   * supplies its own chrome supplies all of it — and copy mode is the one mode
+   * supplies its own chrome supplies all of it — and native selection is the one mode
    * whose entire effect is that things stop responding. A reader whose mouse
    * has gone dead with nothing on screen saying why has been given a bug.
    *

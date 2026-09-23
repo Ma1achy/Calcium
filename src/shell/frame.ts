@@ -94,11 +94,11 @@ export type ComposeDeps = Readonly<{
    * Who owns the keyboard, for the chrome's owner line (§103, R-KEY-004). A
    * frame property, like `size` (C16 §5b).
    *
-   * **This was `copyMode: () => boolean` and the widening is the ladder
+   * **This was `nativeSelection: () => boolean` and the widening is the ladder
    * arriving.** That member's own argument — *a reader whose mouse has gone
    * dead with nothing on screen saying why has been given a bug* — is §103's
    * *AN OWNER YOU CANNOT SEE IS AN OWNER YOU WILL FIGHT*, stated for one rung
-   * of six. Copy mode was not the special case; it was the only rung anyone
+   * of six. Native selection was not the special case; it was the only rung anyone
    * had reached the end of that argument for.
    */
   owner: () => OwnerRung | null;

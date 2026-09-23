@@ -320,7 +320,7 @@ const KNOWN_STALE = {
   // loop under C22 I27 — one commit per decoded batch, the handler's return not
   // gating it — so the mutation is `deliver`'s. The pass was run.
   // `c22-frame-session.mjs` was 2 and is gone (F1118): the `ctx` literal was
-  // reflowed when `copyMode` and `lastFrame` joined it, and the overlay region's
+  // reflowed when `nativeSelection` and `lastFrame` joined it, and the overlay region's
   // height became the transcript's (I28) rather than the terminal's. Both are
   // re-anchored onto what the mutation is actually about. The pass was run.
   // `c22-selection-wash.mjs` was 1 and is gone (F1118): the local was inlined

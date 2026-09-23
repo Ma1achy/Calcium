@@ -9,7 +9,7 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 
 **Every `m+` route needs the terminal to send Option as Meta** — ESC-prefixing rather than composing a character, which on macOS means *Use Option as Meta Key* in Terminal.app and `Esc+` in iTerm2. Not a new assumption: every `m+` row in this table has always required it.
 
-| key | profile | child | overlay | copyMode | panel | interaction | prompt | liveBlock | global |
+| key | profile | child | overlay | nativeSelection | panel | interaction | prompt | liveBlock | global |
 |---|---|---|---|---|---|---|---|---|---|
 | `+` | both |  |  |  |  |  |  | dollyIn |  |
 | `m+,` | both |  |  |  |  |  |  |  | agentPrevious |
@@ -35,7 +35,7 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `u+9` | enhanced-terminal |  |  |  |  |  |  |  | agent9 |
 | `=` | both |  |  |  |  |  |  | dollyIn |  |
 | `?` | both |  |  |  |  |  |  | helpKeymap |  |
-| `m+C` † | both |  |  |  |  |  | enterCopyMode | enterCopyMode |  |
+| `m+C` † | both |  |  |  |  |  | enterNativeSelection | enterNativeSelection |  |
 | `m+V` † | both |  |  |  |  |  | enterSemanticSelection | enterSemanticSelection |  |
 | `[` | both |  |  |  |  |  |  | orbitLeft |  |
 | `]` | both |  |  |  |  |  |  | orbitRight |  |
@@ -59,7 +59,7 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `enter` † | both |  |  |  | menuAccept |  |  | rowActivate |  |
 | `m+enter` † | both |  |  |  |  |  | insertNewline | rerunEntry |  |
 | `s+enter` † | both |  |  |  |  |  | insertNewline | rerunEntry |  |
-| `escape` † | both |  | dismiss | exitCopyMode | dismiss |  |  | focusPrompt |  |
+| `escape` † | both |  | dismiss | exitNativeSelection | dismiss |  |  | focusPrompt |  |
 | `m+escape` | enhanced-terminal | hostDetach |  |  |  |  |  |  |  |
 | `m+f` | both |  |  |  |  |  | wordRight |  |  |
 | `f1` | both |  |  |  |  |  |  |  | helpKeymap |

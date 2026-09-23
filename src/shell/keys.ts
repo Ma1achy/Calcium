@@ -103,16 +103,16 @@ export type KeyDeps = Readonly<{
   /** C16's stored focus — the one piece of it in the system (C16 §3). */
   focus: FocusStore;
   /**
-   * Enter copy mode (C16 §5b, C03 §4a).
+   * Enter native selection (C16 §5b, C03 §4a).
    *
    * **The entry half only, and the exit is deliberately not here.** Leaving is
-   * `⌃c` on the ladder's copy-mode rung, which already calls `exitCopyMode` —
+   * `⌃c` on the ladder's native-selection rung, which already calls `exitNativeSelection` —
    * so a matching effect in this table would be a second exit with an order of
    * its own. The pair still ships together; they just do not ship *here*
    * together.
    */
-  enterCopyMode: () => void;
-  exitCopyMode: () => void;
+  enterNativeSelection: () => void;
+  exitNativeSelection: () => void;
   /**
    * Every navigable element in the live entry, addressed and in reading order,
    * or empty (C16 I22, C26 §5).
@@ -1106,24 +1106,24 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       deps.focus.extendRow(entry, addressOf(last));
     },
 
-    // --- copy mode (C16 §5b) -----------------------------------------------
+    // --- native selection (C16 §5b) -----------------------------------------------
     //
     // **Entry only. The exit is the `⌃c` rung**, which is the ladder's and not
-    // this table's — a second way out here would give copy mode an order of its
+    // this table's — a second way out here would give native selection an order of its
     // own, which is exactly what makes it a target rather than a mode.
     //
-    // **The prompt's region goes first** (C17 I23; F765). Copy mode hands the
+    // **The prompt's region goes first** (C17 I23; F765). Native selection hands the
     // screen to the terminal's own selection, and a prompt still washing a
     // region under it is two selections at once. `collapse()` rather than a
     // motion, because the caret must stay where the reader left it — and here
-    // rather than in `#setCopyMode`, because this effect is the only way in
-    // (`⌥v` at the prompt and in the block) and T2.14 asks that every C17
+    // rather than in `#setNativeSelection`, because this effect is the only way in
+    // (`⌥⇧C` at the prompt and in the block) and T2.14 asks that every C17
     // operation be reachable from a key.
-    enterCopyMode: () => {
+    enterNativeSelection: () => {
       deps.editor.collapse();
-      deps.enterCopyMode();
+      deps.enterNativeSelection();
     },
-    exitCopyMode: () => void deps.exitCopyMode(),
+    exitNativeSelection: () => void deps.exitNativeSelection(),
   });
 
   /**

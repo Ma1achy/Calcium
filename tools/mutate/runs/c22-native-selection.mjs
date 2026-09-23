@@ -1,10 +1,10 @@
-// Copy mode — the producer, the exit, the hold and the toggle, mutated.
+// Native selection — the producer, the exit, the hold and the toggle, mutated.
 //
 // **Every mutation here leaves a mode that still works from the outside.** The
 // key is still bound, the flag still moves, the header still says COPY. What
 // changes is whether the mode can be *left*, whether the hold lets a resize
 // through, and whether resuming abandons the diff — none of which a row about
-// "does ⌥v enter copy mode" can see.
+// "does ⌥⇧C enter native selection" can see.
 //
 // The fourth thing worth mutating is not here, and that is the finding rather
 // than a gap: **a second writer of the mouse escape is caught by `make
@@ -44,10 +44,10 @@ const MUTATIONS = [
     // ⌃c rung resolves, consumes the key and calls something that does nothing.
     // Entering still works, the indicator still appears, and the reader is
     // stuck — which is why the entry and the exit ship in one commit.
-    name: "the exit is a stub again — copy mode can be entered and not left",
+    name: "the exit is a stub again — native selection can be entered and not left",
     file: SESSION,
-    from: "      exitCopyMode: () => this.#setCopyMode(false),",
-    to: "      exitCopyMode: () => undefined,",
+    from: "      exitNativeSelection: () => this.#setNativeSelection(false),",
+    to: "      exitNativeSelection: () => undefined,",
     expect: "T4.31",
   },
   {

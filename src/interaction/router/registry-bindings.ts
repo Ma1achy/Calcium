@@ -7,8 +7,8 @@
  * end, and T1.95 fails when it happens.
  *
  * `actionId` is the design's verb, not a `KeyAction`. Nine of these are one
- * verb several owners spell differently — `escape` is `dismiss`, `viewPop`,
- * `exitCopyMode` and `focusPrompt` — so the join to a handler is
+ * verb several owners spell differently — `escape` is `dismiss`,
+ * `exitNativeSelection` and `focusPrompt` — so the join to a handler is
  * `OWNER_ACTIONS` in `keymap.ts`, keyed by `(actionId, target)`. That is
  * R-KEY-003's *unless the current owner explicitly captures the action*, and
  * `when: "focused"` is the design saying so.

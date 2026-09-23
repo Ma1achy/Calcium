@@ -700,7 +700,7 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'import type { TerminalSize } from "../../terminal/lifecycle.js";',
   },
   {
-    // SS13. Copied from the shape copy mode reaches for: yank has to put text
+    // SS13. Copied from the shape native selection reaches for: yank has to put text
     // somewhere and `pbcopy` is one line away. C14 §6 injects the writer for
     // exactly that reason — a component that shells out cannot be unit-tested.
     rule: "SS13",

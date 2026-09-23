@@ -374,11 +374,11 @@ class Session implements TuiInstance {
   /** The armed tick, disposed and re-armed on every frame. */
   #spinner: Disposable | null = null;
   /**
-   * Copy mode: the reader has asked the app to step back (C16 §5b, C03 §4a).
+   * Native selection: the reader has asked the app to step back (C16 §5b, C03 §4a).
    *
    * **Real state owned here, beside the other frame queries**, because the two
    * things it drives are both this file's: the scheduler it suspends and the
-   * mouse tracking it turns off. `FocusInputs.copyMode` reads it and
+   * mouse tracking it turns off. `FocusInputs.nativeSelection` reads it and
    * `activeTarget` does the rest — it is a *target*, not a third mode beside
    * navigate and interact (roadmap 15's ruling, C26 I2's argument unchanged).
    */
@@ -391,7 +391,7 @@ class Session implements TuiInstance {
    */
   #profiler: Profiler | null = null;
 
-  #copyMode = false;
+  #nativeSelection = false;
 
   /**
    * Where `ConstructDeps.debug` lands, and **it landed nowhere until now**
@@ -1327,7 +1327,7 @@ class Session implements TuiInstance {
   }
 
   /**
-   * Both halves of copy mode, in one place because they are one transition.
+   * Both halves of native selection, in one place because they are one transition.
    *
    * **Three effects and the order is not arbitrary.** The flag moves first, so
    * anything that reads it during the rest of this sees the new value. Then the
@@ -1340,10 +1340,10 @@ class Session implements TuiInstance {
    * terminal's own selection is what the reader is about to use, and it should
    * not become available before the screen has stopped moving.
    */
-  #setCopyMode(on: boolean): void {
+  #setNativeSelection(on: boolean): void {
     const graph = this.#graph;
-    if (graph === null || this.#copyMode === on) return;
-    this.#copyMode = on;
+    if (graph === null || this.#nativeSelection === on) return;
+    this.#nativeSelection = on;
 
     if (on) {
       // The indicator's frame, then the hold. `flush` rather than a bare commit
@@ -1363,9 +1363,9 @@ class Session implements TuiInstance {
 
   #frameQueries(): FrameQueries {
     return {
-      copyMode: () => this.#copyMode,
-      enterCopyMode: () => this.#setCopyMode(true),
-      exitCopyMode: () => this.#setCopyMode(false),
+      nativeSelection: () => this.#nativeSelection,
+      enterNativeSelection: () => this.#setNativeSelection(true),
+      exitNativeSelection: () => this.#setNativeSelection(false),
       region: () => this.#composed().region,
       overlayRegion: () => this.#composed().overlayRegion,
       // From the composed frame, both numbers: the prompt starts where the

@@ -145,8 +145,10 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // **The menu's four rows are `panel`, not `overlay`** (C15 §2c, I27,
   // R-BLK-109). The completion menu and reverse-i-search are panels — prompt
   // substates — so the target they answer at moved with the kind. They cannot
-  // ride `pushedView`, which shares their rung: `escape` is `dismiss` here and
-  // `viewPop` there, and one `(target, key)` takes one binding.
+  // ride `nativeSelection`, which shares their rung: `escape` is `dismiss` here
+  // and `exitNativeSelection` there, and one `(target, key)` takes one binding.
+  // It was `pushedView` and `viewPop` until the view kind was deleted
+  // (R-EXA-082, F1254) — the same collision, one rung over.
   { target: "panel", key: chordOf("focus.next"), action: "menuNext" },
   { target: "panel", key: chordOf("move.down"), action: "menuNext" },
   { target: "panel", key: chordOf("move.up"), action: "menuPrev" },
@@ -339,14 +341,14 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // T2.13 already walks for `prompt c+a`.
   { target: "liveBlock", key: { name: "a", ctrl: true }, action: "selectAllElements" },
 
-  // --- copy mode (C16 §5b, entry 15 step 1) --------------------------------
+  // --- native selection (C16 §5b, entry 15 step 1) --------------------------------
   //
-  // **`⌥v` is PROVISIONAL and the word is load-bearing.** Which key enters copy
-  // mode is a question for the rebindable-keys row and is deliberately still
-  // open; shipping the mode with no way in is B1's failure inverted — a mode
-  // that can be left and never entered — so a default is picked and labelled
-  // rather than deferred. `v` for *visual*, on the meta path `⌥b`/`⌥d`/`⌥f`
-  // already use, and free in this table.
+  // **The chord is the registry's and was once this table's own guess.** `⌥v`
+  // was picked here as provisional — `v` for *visual*, on the meta path
+  // `⌥b`/`⌥d`/`⌥f` already use — against a rebindable-keys row that was
+  // deliberately still open. It is not open any more: `selection.native` names
+  // `⌥⇧C` and `selection.semantic` names `⌥⇧V`, so the entry is read from the
+  // registry rather than chosen, and `⌥v` went back to `values.toggle`.
   //
   // **Checked through the real decoder before being written down** (T2.13,
   // T2.14): `ESC v` decodes as `{name: "v", meta: true}`.
@@ -360,19 +362,22 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // capital. Pressed through the real decoder before being written down, which
   // is what T2.13b refused the first spelling on.
   //
-  // **`⌥v` left `enterCopyMode` in M6, and the design supplied the replacement
-  // itself** (§6a): the registry gives `⌥v` to `values.toggle` and copy mode its
-  // own two chords — `⌥⇧C` native handoff, `⌥⇧V` semantic. So nothing is
-  // invented and no chord is chosen here. M10 finishes the rename.
-  { target: "prompt", key: chordOf("selection.native"), action: "enterCopyMode" },
-  { target: "liveBlock", key: chordOf("selection.native"), action: "enterCopyMode" },
+  // **Two chords, and the repo's `copyMode` is the first of them.** §6a gives
+  // `selection.native` — *hand the mouse to the terminal* — and
+  // `selection.semantic` — *enter Calcium copy mode*. What this tree built and
+  // called copy mode is the native handoff, so it takes `⌥⇧C`; the semantic
+  // mode is `reserved` until M10b builds it.
+  { target: "prompt", key: chordOf("selection.native"), action: "enterNativeSelection" },
+  { target: "liveBlock", key: chordOf("selection.native"), action: "enterNativeSelection" },
   { target: "prompt", key: chordOf("values.toggle"), action: "valuesToggle" },
   { target: "liveBlock", key: chordOf("values.toggle"), action: "valuesToggle" },
   { target: "prompt", key: chordOf("selection.semantic"), action: "enterSemanticSelection" },
   { target: "liveBlock", key: chordOf("selection.semantic"), action: "enterSemanticSelection" },
-  // The target's own dismissal, as `viewPop` is the view's (C16 §5c). `⌃c` stays
-  // the ladder's; both exist for `pushedView` too, and I24 defends the pair.
-  { target: "copyMode", key: chordOf("escape"), action: "exitCopyMode" },
+  // The target's own dismissal, as `dismiss` is an overlay's (C16 §5c). `⌃c`
+  // stays the ladder's, and I24 defends the pair. It read `as \`viewPop\` is the
+  // view's` until the view kind was deleted (R-EXA-082, F1254); the pattern is
+  // the argument and the view was only its clearest instance.
+  { target: "nativeSelection", key: chordOf("escape"), action: "exitNativeSelection" },
 
   { target: "global", key: { name: "pageup" }, action: "scrollPageUp" },
   { target: "global", key: { name: "pagedown" }, action: "scrollPageDown" },
@@ -673,8 +678,8 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
  *
  * **The `target` and the action stay on the row, because the registry does not
  * hold them.** Nine of its bindings are one verb several owners spell
- * differently — `escape` is `dismiss` at an overlay, `viewPop` in a view,
- * `exitCopyMode` while frozen and `focusPrompt` in the transcript — so
+ * differently — `escape` is `dismiss` at an overlay or a panel,
+ * `exitNativeSelection` while frozen and `focusPrompt` in the transcript — so
  * `actionId` does not select a handler. That is R-KEY-003's *unless the current
  * owner explicitly captures the action*, and the registry's `when: "focused"` is
  * the design saying the owner decides. The join is the row: this supplies the
@@ -787,8 +792,8 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
     scrollPageDown: true,
     scrollTop: true,
     scrollBottom: true,
-    enterCopyMode: true,
-    exitCopyMode: true,
+    enterNativeSelection: true,
+    exitNativeSelection: true,
     // --- §6a, M6 ------------------------------------------------------------
     helpKeymap: true,
     focusTranscript: true,

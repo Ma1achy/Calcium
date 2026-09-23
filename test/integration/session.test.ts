@@ -1076,14 +1076,14 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
   });
 });
 
-describe("C22 — copy mode, entered and left (C16 §5b, C03 §4a)", () => {
+describe("C22 — native selection, entered and left (C16 §5b, C03 §4a)", () => {
   it("T4.30 (C16 §5b B1): ⌥⇧C enters, the header says COPY, mouse tracking goes off", async () => {
     // **`⌥⇧C`, not `⌥v`, since M6** (C16 §6a): the registry gives `⌥v` to
-    // `values.toggle` and copy mode its own two chords — `⌥⇧C` native handoff,
+    // `values.toggle` and native selection its own two chords — `⌥⇧C` native handoff,
     // `⌥⇧V` semantic. Nothing was invented for this; the design supplied both.
     // The wire form is `ESC C`, which names the capital and sets no shift bit.
     //
-    // **B1 is the row this file owes.** `copyMode` and `exitCopyMode` were both
+    // **B1 is the row this file owes.** `nativeSelection` and `exitNativeSelection` were both
     // stubs for the length of C26 — routed, ordered, unreachable — and the
     // producer landing alone would have given a mode the ⌃c rung consumes and
     // does not end. The pair is asserted as a pair for that reason.
@@ -1134,7 +1134,7 @@ describe("C22 — copy mode, entered and left (C16 §5b, C03 §4a)", () => {
     expect(stdout.output.slice(before.length), "tracking back on").toContain("[?1002h");
   });
 
-  it("T4.32 (C03 I13): while copy mode is up, output does not move the screen", async () => {
+  it("T4.32 (C03 I13): while native selection is up, output does not move the screen", async () => {
     // The whole point of the suspension, at the level where it is visible:
     // a selection the reader is taking must not come to mean other text.
     const stdin = fakeStdin();
@@ -1146,7 +1146,7 @@ describe("C22 — copy mode, entered and left (C16 §5b, C03 §4a)", () => {
       await Promise.resolve();
     };
 
-    // A control first: typing moves the screen when copy mode is NOT up, so the
+    // A control first: typing moves the screen when native selection is NOT up, so the
     // assertion after it is about the mode and not about typing being invisible.
     const base = screen().rows.join("\n");
     await type("abc");
@@ -1171,7 +1171,7 @@ describe("C22 — copy mode, entered and left (C16 §5b, C03 §4a)", () => {
   });
 });
 
-describe("C22 — copy mode: the order inside the exit, and the far side under the hold (C16 §5b, §5c)", () => {
+describe("C22 — native selection: the order inside the exit, and the far side under the hold (C16 §5b, §5c)", () => {
   // Four microtasks rather than two: a settle runs through C23's continuation
   // before the store moves, and a row reading `stdout` one tick early would
   // report "nothing written" for a frame that had not been composed yet.
@@ -1190,7 +1190,7 @@ describe("C22 — copy mode: the order inside the exit, and the far side under t
     const type = typer(stdin);
 
     await type("\u001bC");
-    expect(screen().rows[0], "in copy mode").toContain("COPY");
+    expect(screen().rows[0], "in native selection").toContain("COPY");
 
     const before = stdout.output.length;
     await type("\u0003");
@@ -1211,7 +1211,7 @@ describe("C22 — copy mode: the order inside the exit, and the far side under t
     ).toBe(true);
   });
 
-  it("T4.32b (C03 I13, C16 §5b B4): a verb settling during copy mode writes nothing; the exit's one frame carries it", async () => {
+  it("T4.32b (C03 I13, C16 §5b B4): a verb settling during native selection writes nothing; the exit's one frame carries it", async () => {
     const stdin = fakeStdin();
     let settle: ((doc: unknown) => void) | null = null;
     const { stdout, screen } = await buildSession({
@@ -1254,7 +1254,7 @@ describe("C22 — copy mode: the order inside the exit, and the far side under t
     expect(screen().text.join("\n"), "and it carries what settled under the hold").toContain(TEXT);
   });
 
-  it("T4.32c (C16 §5c C5): ⌥⇧C a second time in copy mode writes nothing — one 1002l, not two", async () => {
+  it("T4.32c (C16 §5c C5): ⌥⇧C a second time in native selection writes nothing — one 1002l, not two", async () => {
     const stdin = fakeStdin();
     const { stdout, screen } = await buildSession({ stdin: stdin as never });
     const type = typer(stdin);
@@ -1269,14 +1269,14 @@ describe("C22 — copy mode: the order inside the exit, and the far side under t
   });
 
   // **RED UNTIL LANE S LANDS THE ROW — and `it.fails` is how it says so.** The
-  // ruling is C16 §5c: `Esc` leaves copy mode. It needs a `copyMode`/`escape`
-  // row in `keymap.ts`, `"exitCopyMode"` in `KeyAction`, and one effect line in
+  // ruling is C16 §5c: `Esc` leaves native selection. It needs a `nativeSelection`/`escape`
+  // row in `keymap.ts`, `"exitNativeSelection"` in `KeyAction`, and one effect line in
   // `keys.ts`, none of which this lane owns. The body asserts the *ruling*; the
   // wrapper asserts that the tree does not yet satisfy it. The day the three
   // lines land this row goes red, which is the signal to flip it to `it` — a
   // deferral that expires on the change it waits for, where an `it.todo` would
   // not (`todo-expiry` is indexed by component, and every component here exists).
-  it("T4.68 (C16 §5c C1): Esc leaves copy mode — the tracking pair is the first bytes written, then the frame", async () => {
+  it("T4.68 (C16 §5c C1): Esc leaves native selection — the tracking pair is the first bytes written, then the frame", async () => {
     const stdin = fakeStdin();
     const { stdout, screen, clock } = await buildSession({ stdin: stdin as never });
     const type = typer(stdin);

@@ -93,7 +93,7 @@ export interface TerminalLifecycle {
    */
   size(): TerminalSize;
   /**
-   * Mouse tracking on or off, while acquired (C22's copy mode).
+   * Mouse tracking on or off, while acquired (C22's native selection).
    *
    * **Here because nowhere else may write an escape sequence.** `MOUSE` is a
    * mode this component takes at `acquire()` and restores at `release()`, and a
@@ -250,7 +250,7 @@ export function terminalSize(stream: Readonly<{ columns: number; rows: number }>
 export function createTerminalLifecycle(opts: TerminalLifecycleOptions): TerminalLifecycle {
   const { stdout, stdin, capabilities, onFatal } = opts;
   const debug = opts.debug ?? ((): void => {});
-  // **One pair, chosen once** (I21). Acquisition, release and the copy-mode
+  // **One pair, chosen once** (I21). Acquisition, release and the native-selection
   // toggle all read this binding, so the mode that leaves is the mode that was
   // entered — a toggle reading `MOUSE` while acquisition took `MOUSE_ANY` would
   // emit `1002l` for a 1003 the terminal still holds.

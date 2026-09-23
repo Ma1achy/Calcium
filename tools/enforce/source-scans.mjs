@@ -63,7 +63,7 @@ export const SCANS = [
   // that L2 has no such exception and never acquires one.
   // C14 T2.4's other half. The clock is SS4's; this is `fs` and the clipboard
   // shell-out, which are the two side effects a viewport plausibly reaches for —
-  // copy mode has to put text somewhere, and `pbcopy` is one line away. C14 §6
+  // native selection has to put text somewhere, and `pbcopy` is one line away. C14 §6
   // injects the writer for exactly that reason: a component that shells out
   // cannot be unit-tested.
   { id: "SS13", spec: "C14 I11 · C14 T2.4",

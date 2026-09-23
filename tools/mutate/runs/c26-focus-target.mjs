@@ -47,20 +47,20 @@ const MUTATIONS = [
     expect: "T2.5",
   },
   {
-    // The copy-mode-above-overlay contradiction with a different subject: a
+    // The native-selection-above-overlay contradiction with a different subject: a
     // block being interacted with taking keys from a confirm that must be
     // answered. T2.5 compares FOCUS_ORDER to the reached set — which this
     // satisfies, both being the same nine — and then pins the first and last
     // positions, which is what catches it.
     //
-    // **Re-anchored in M8**: `"panel"` joined the array between `copyMode` and
+    // **Re-anchored in M8**: `"panel"` joined the array between `nativeSelection` and
     // `pushedView`, and the anchor reached across the pair. It anchors on the
     // two rows that bracket the insertion point instead, which is the least
     // context that stays unique.
     name: "interaction placed above every layer",
     file: FOCUS,
-    from: '  "child",\n  "overlay",\n  "copyMode",',
-    to: '  "child",\n  "interaction",\n  "overlay",\n  "copyMode",',
+    from: '  "child",\n  "overlay",\n  "nativeSelection",',
+    to: '  "child",\n  "interaction",\n  "overlay",\n  "nativeSelection",',
     expect: "T2.5",
   },
   {
@@ -68,10 +68,10 @@ const MUTATIONS = [
     // disagree, which is why T1.3d asserts the comparison rather than the slot.
     name: "activeTarget answers interaction before it consults the layers",
     file: FOCUS,
-    from: '  if (deps.overlayTop?.kind === "overlay") return "overlay";\n  if (deps.copyMode) return "copyMode";',
+    from: '  if (deps.overlayTop?.kind === "overlay") return "overlay";\n  if (deps.nativeSelection) return "nativeSelection";',
     to:
       '  if (deps.stored.at === "liveBlock" && deps.stored.mode === "interact") return "interaction";\n' +
-      '  if (deps.overlayTop?.kind === "overlay") return "overlay";\n  if (deps.copyMode) return "copyMode";',
+      '  if (deps.overlayTop?.kind === "overlay") return "overlay";\n  if (deps.nativeSelection) return "nativeSelection";',
     expect: "T1.3d",
   },
   {

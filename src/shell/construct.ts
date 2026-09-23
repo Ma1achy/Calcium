@@ -277,7 +277,7 @@ export type Step = (typeof STEPS)[number];
  * The five router pulls that are the **frame's** and not any store's.
  *
  * C16 asks where the transcript region sits, which entry is at a screen row,
- * and whether copy mode is on — and none of those is on `Viewport`, because
+ * and whether native selection is on — and none of those is on `Viewport`, because
  * none is a property of the scrolled document. They are properties of the
  * composed frame, which is C22's and lives in `frame.ts`.
  *
@@ -287,18 +287,18 @@ export type Step = (typeof STEPS)[number];
  * giving C14 a dependency on where things are drawn.
  */
 export type FrameQueries = Readonly<{
-  copyMode: () => boolean;
+  nativeSelection: () => boolean;
   /**
-   * Leave copy mode (C16 §5b B1).
+   * Leave native selection (C16 §5b B1).
    *
-   * **Ships with `copyMode` and with `enterCopyMode`, never after them.** The
+   * **Ships with `nativeSelection` and with `enterNativeSelection`, never after them.** The
    * `⌃c` rung already calls this, so a producer landing alone gives a mode that
    * consumes the key and does nothing — entered and not leavable, which is
    * worse than unreachable. Both stubs were in the tree for the length of C26.
    */
-  exitCopyMode: () => void;
+  exitNativeSelection: () => void;
   /** Enter it. The other half of B1's pair (C16 §5b). */
-  enterCopyMode: () => void;
+  enterNativeSelection: () => void;
   /**
    * Where the transcript sits, for mouse routing (C16 `RouterDeps.region`).
    *
@@ -2259,8 +2259,8 @@ export async function constructGraph(
     overlayRegion: deps.frame.overlayRegion,
     focus,
     // The entry half of B1's pair; the exit is already on the `⌃c` rung below.
-    enterCopyMode: deps.frame.enterCopyMode,
-    exitCopyMode: deps.frame.exitCopyMode,
+    enterNativeSelection: deps.frame.enterNativeSelection,
+    exitNativeSelection: deps.frame.exitNativeSelection,
     // **One walk, and it is the registry's** (C26 §5, §8b.4). This asked C11
     // directly and tested `block.kind === "table"`, which was one of *three*
     // such walks — the two below and `focusFor` in `session.ts`. Each was a
@@ -2793,16 +2793,16 @@ export async function constructGraph(
     // key fell through to step 3 and a `PgUp` over a view scrolled the
     // transcript underneath it — vacuous while nothing pushed a view, answered
     // when three surfaces did, and vacuous again with none. The rule it leaves
-    // is `copyMode`'s below: **a target's table row is bound and never consulted
+    // is `nativeSelection`'s below: **a target's table row is bound and never consulted
     // unless something registers the handler that reads it.**
-    // **Copy mode's keys resolve through the keymap too** (C16 §5c, I24). The
-    // router registers its own `copyMode` rung for `⌃c`; this handler is the
-    // target's table row — today exactly one, `Esc → exitCopyMode` — and without
-    // it the row is bound and never consulted: `run("copyMode")` walked the
+    // **Native selection's keys resolve through the keymap too** (C16 §5c, I24). The
+    // router registers its own `nativeSelection` rung for `⌃c`; this handler is the
+    // target's table row — today exactly one, `Esc → exitNativeSelection` — and without
+    // it the row is bound and never consulted: `run("nativeSelection")` walked the
     // rung alone, declined, and a lone `Esc` was dropped on a frozen screen
     // (F765). `pushedView` had the same pair for as long as it existed.
-    router.register("copyMode", (e) => {
-      const effect = bound("copyMode", e);
+    router.register("nativeSelection", (e) => {
+      const effect = bound("nativeSelection", e);
       if (effect === null) return false;
       effect();
       return true;
@@ -3182,8 +3182,8 @@ function routerDeps(
     // A peek is not hit-tested (C15 I21): a click on it reaches the row beneath.
     placed: () => stores.overlays.layout(frame.overlayRegion()).filter(takesInput),
     popLayer: () => void stores.overlays.pop(),
-    copyMode: frame.copyMode,
-    exitCopyMode: frame.exitCopyMode,
+    nativeSelection: frame.nativeSelection,
+    exitNativeSelection: frame.exitNativeSelection,
     // `liveId`, not a `live` entry: C13 exposes the id and C16 only compares it.
     liveEntry: () => {
       const id = stores.transcript.liveId;

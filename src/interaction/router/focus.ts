@@ -7,7 +7,7 @@
  * ladder is documentation of behaviour derived from it, not a second list: its
  * rungs are handlers registered on these targets, so the ladder cannot hold an
  * order of its own to disagree with. The disagreement C16's spec pass found —
- * copy mode above both overlay rungs, against A02 §2 — was possible only because
+ * native selection above both overlay rungs, against A02 §2 — was possible only because
  * the ladder existed as a separate artefact, and the moment for it to reappear is
  * the commit where both files exist. `FOCUS_ORDER` below is that single artefact.
  */
@@ -26,7 +26,7 @@ import type { ElementAddress, FocusTarget, StoredFocus } from "./types.js";
 export type FocusInputs = Readonly<{
   /** C15's `top`. `null` when the stack is empty. */
   overlayTop: Readonly<{ kind: "overlay" | "panel" }> | null;
-  copyMode: boolean;
+  nativeSelection: boolean;
   /**
    * A child process holds the terminal (§103, R-OWN-002).
    *
@@ -54,7 +54,7 @@ export const FOCUS_ORDER = Object.freeze([
   // host drew over it.
   "child",
   "overlay",
-  "copyMode",
+  "nativeSelection",
   // **A ninth target at an existing rung** (§2c, R-BLK-109). `RUNG_OF` maps it
   // to `substate`. It stood beside `pushedView`, which is what "targets are not
   // rungs" bought — two targets at one rung, separate because their `escape`
@@ -63,7 +63,7 @@ export const FOCUS_ORDER = Object.freeze([
   "panel",
   // **Above `prompt` and below every layer** (C26 I2). A block being interacted
   // with outranks the prompt, which is the whole of the navigation/interaction
-  // split; it does not outrank an overlay that must be answered, or copy mode,
+  // split; it does not outrank an overlay that must be answered, or native selection,
   // which takes every key.
   //
   // Its position needs no argument of its own beyond that, and that is the
@@ -88,13 +88,13 @@ export const FOCUS_ORDER = Object.freeze([
 export function activeTarget(deps: FocusInputs): FocusTarget {
   if (deps.attachedChild) return "child";
   if (deps.overlayTop?.kind === "overlay") return "overlay";
-  if (deps.copyMode) return "copyMode";
+  if (deps.nativeSelection) return "nativeSelection";
   // **A panel is a SUBSTATE and not a question** (§2c, R-BLK-109, R-BLK-866).
   // *FIND and COMPLETION are PROMPT SUBSTATES — the prompt, relabelled*, and
   // *a command palette is a PANEL whose list is a ladder*. So a panel takes the
   // `substate` rung: the mapping M5 wrote down and could not express while a
   // completion menu was an `overlay` and therefore a question. It sits below
-  // `copyMode` because a frozen screen outranks a thing you opened on top of a
+  // `nativeSelection` because a frozen screen outranks a thing you opened on top of a
   // live one.
   if (deps.overlayTop?.kind === "panel") return "panel";
   // **Before the `prompt` row, and gated on the live entry** (C26 I2). The mode

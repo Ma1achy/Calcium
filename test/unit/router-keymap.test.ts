@@ -246,10 +246,10 @@ describe("§6 — the default table (C17 I12)", () => {
     // `global` is included: it earned its rows when scrolling was bound (I23),
     // and exempting it would be the exception that hides the next one.
     //
-    // **`copyMode` is exempt, and this test is what made the exemption
+    // **`nativeSelection` is exempt, and this test is what made the exemption
     // explicit.** The invariant was first written as "every target", and this
-    // row failed on `copyMode` as well as on the target it was written for.
-    // That one is legitimate: copy mode's only key is Ctrl-C, which §5's ladder
+    // row failed on `nativeSelection` as well as on the target it was written for.
+    // That one is legitimate: native selection's only key is Ctrl-C, which §5's ladder
     // owns by construction and the keymap deliberately does not, so a binding
     // there would be the second mechanism I23 objects to. Named here with its
     // reason rather than dropped from the list — an unrecorded exemption reads
@@ -264,7 +264,7 @@ describe("§6 — the default table (C17 I12)", () => {
     for (const t of TARGETS) {
       expect(bound.has(t), `${t} has no binding — a name in the union and nothing else`).toBe(true);
     }
-    expect(bound.has("copyMode"), "copyMode binds exactly its own dismissal, `Esc` (C16 §5c, I24)").toBe(true);
+    expect(bound.has("nativeSelection"), "nativeSelection binds exactly its own dismissal, `Esc` (C16 §5c, I24)").toBe(true);
   });
 
   // **T1.33 is struck with the target** (R-EXA-082, F1254). It resolved the
@@ -431,8 +431,8 @@ describe("§6 — the default table (C17 I12)", () => {
       "liveBlock r": ["r"],
       "liveBlock o": ["o"],
 
-      // Copy mode's entry, at both targets it is bound to (C16 §5b). The key is
-      // provisional — which key enters copy mode is the rebindable-keys row's
+      // Native selection's entry, at both targets it is bound to (C16 §5b). The key is
+      // provisional — which key enters native selection is the rebindable-keys row's
       // question — and its *wire form* is not: this check fired on the binding
       // the moment it was added, before the mode had a producer, which is what
       // it is for.
@@ -508,9 +508,9 @@ describe("§6 — the default table (C17 I12)", () => {
       "pushedView tab": ["\t"],
       "pushedView s+tab": ["\u001b[Z"],
       "pushedView escape": ["\u001b"],
-      // Copy mode's own dismissal (C16 §5c): the same lone byte, resolved when
-      // `activeTarget` answers `copyMode`.
-      "copyMode escape": ["\u001b"],
+      // Native selection's own dismissal (C16 §5c): the same lone byte, resolved when
+      // `activeTarget` answers `nativeSelection`.
+      "nativeSelection escape": ["\u001b"],
 
       // Scrolling (I23). **This is the check the ruling asked for**, and it
       // came out positive: `⌃Home` and `⌃End` reach the decoder in both of the
@@ -1074,7 +1074,7 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     const ELSEWHERE: Readonly<Record<string, string>> = Object.freeze({
       // Handled outside the keymap, by a named site.
       confirm: "src/shell/construct.ts — the prompt's submit row; `overlay enter` and `liveBlock enter` are this table's",
-      escape: "src/interaction/router/router.ts — the ladder's rungs; `overlay`, `copyMode`, `pushedView` and `child` each have one",
+      escape: "src/interaction/router/router.ts — the ladder's rungs; `overlay`, `nativeSelection`, `pushedView` and `child` each have one",
       interrupt: "src/interaction/router/intercepts.ts — a reserved route read before the ladder (§103)",
       "help.command": "src/data/manifest/framework.ts — `/help` is a verb, and `/help keys` is what `?` and F1 submit",
       // Owner captures, under R-KEY-003's own *unless the current owner
@@ -1119,7 +1119,7 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
       "posture.cycle": "postureCycle",
       "values.toggle": "valuesToggle",
       "queue.drop": "queueDrop",
-      "selection.native": "enterCopyMode",
+      "selection.native": "enterNativeSelection",
       "selection.semantic": "enterSemanticSelection",
       // M9 — the captured child's one key (C16 I49, R-BLK-908). Two registry
       // bindings, one action: `⌃]` base and `⌥esc` enhanced.

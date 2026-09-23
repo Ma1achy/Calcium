@@ -50,7 +50,7 @@ export type FocusTarget =
    */
   | "child"
   | "overlay"
-  | "copyMode"
+  | "nativeSelection"
   /**
    * A panel — completion, reverse search, a command palette (C15 §2c, I27,
    * R-BLK-109, R-BLK-866).
@@ -79,7 +79,7 @@ export type FocusTarget =
    * their order *is* `FOCUS_ORDER`'s and the two cannot disagree. A mode
    * consulted *before* dispatch would be a second priority list, and the ladder
    * would acquire an order of its own again — which is the artefact whose
-   * existence produced the copy-mode-above-overlay contradiction against
+   * existence produced the native-selection-above-overlay contradiction against
    * A02 §2. C26 §8a trace 5 is where that was found, and it is the strongest
    * constraint the walk placed on this component's shape.
    */
@@ -94,7 +94,7 @@ export type FocusTarget =
  *
  * `FocusTarget` above is *where* a key goes; this is *who is answering*. They
  * were one union while the tree had four special cases where the design has one
- * ladder — a question, copy mode, an attached PTY and a block's interior — and
+ * ladder — a question, native selection, an attached PTY and a block's interior — and
  * §103 opens by naming exactly that: *"§15 listed SCOPES and never said what a
  * scope competes with."*
  *
@@ -135,7 +135,7 @@ export const OWNER_RUNGS: readonly OwnerRung[] = Object.freeze([
 export const RUNG_OF: Readonly<Record<Exclude<FocusTarget, "global">, OwnerRung>> = Object.freeze({
   child: "child",
   overlay: "question",
-  copyMode: "copy",
+  nativeSelection: "copy",
   panel: "substate",
   interaction: "inside",
   prompt: "scope",
@@ -521,21 +521,22 @@ export type KeyAction =
   // required on every owner rather than optional, because an owner that answers
   // nothing is indistinguishable from a view with one section.* That is a rule
   // about interfaces with several implementers, and it applies to the next one.
-  // --- copy mode (C16 §5b) -------------------------------------------------
+  // --- native selection (C16 §5b) -------------------------------------------------
   //
   // **Entry and exit, and the exit is the target's own dismissal** (C16 §5c,
   // 2026-09-05). This read *the exit is §5's rung and not an action* for as long
-  // as `⌃c` was the only way out — and measured, `Esc` in copy mode was dropped
-  // silently on a frozen screen. A `copyMode`-target row has no order of its own:
-  // it resolves at the moment `activeTarget` answers `copyMode`, exactly as the
+  // as `⌃c` was the only way out — and measured, `Esc` in native selection was dropped
+  // silently on a frozen screen. A `nativeSelection`-target row has no order of its own:
+  // it resolves at the moment `activeTarget` answers `nativeSelection`, exactly as the
   // rung does, so I24's objection to a *second mechanism* was true of a `global`
-  // row and not of this one. `⌃c` stays the ladder's; `pushedView` has the same
-  // pair (`viewPop` and the rung).
+  // row and not of this one. `⌃c` stays the ladder's; an overlay has the same
+  // pair (`dismiss` and the rung). `pushedView` was the instance cited here and
+  // the kind is deleted (R-EXA-082, F1254).
   //
   // A mode with entry and no exit is B1; a mode with an exit and no entry is
   // the same defect inverted, and just as testable.
-  | "enterCopyMode"
-  | "exitCopyMode";
+  | "enterNativeSelection"
+  | "exitNativeSelection";
 
 export type Binding = Readonly<{
   target: FocusTarget;

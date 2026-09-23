@@ -95,8 +95,8 @@ export interface LineEditor {
    *
    * **The one collapse that is neither a motion nor an edit.** Every other
    * collapse happens because something moved — `move` collapses by moving the
-   * caret, an edit by replacing the region, `undo` by restoring text. Copy mode
-   * needs the region gone with the caret where it is (F765: `#setCopyMode(true)`
+   * caret, an edit by replacing the region, `undo` by restoring text. Native selection
+   * needs the region gone with the caret where it is (F765: `#setNativeSelection(true)`
    * left `selection` standing and nothing here could clear it), so this drops
    * the anchor and touches nothing else — not the text, not the history, not
    * the kill run. A version written as `move("charLeft")` is right about the
@@ -418,7 +418,7 @@ class Editor implements LineEditor {
   collapse(): void {
     // **No `close()`, no `endKill()`, no snapshot** (I23). Nothing moved and
     // nothing changed, so there is no boundary to draw: closing the open unit
-    // here would make the first keystroke after copy mode a new undo unit for
+    // here would make the first keystroke after native selection a new undo unit for
     // no edit the reader made.
     this.#anchor = null;
   }

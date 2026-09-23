@@ -17,7 +17,7 @@ import { addr, placed } from "../support/focus.js";
 
 const base: FocusInputs = {
   overlayTop: null,
-  copyMode: false,
+  nativeSelection: false,
   attachedChild: false,
   liveEntry: { id: "e1" },
   stored: { at: "prompt" },
@@ -29,7 +29,7 @@ const at = (over: Partial<FocusInputs> = {}): FocusTarget =>
 describe("C16 §3 — activeTarget", () => {
   it("T1.3 (I15, R-COR-002): each condition resolves to its documented target", () => {
     expect(at({ overlayTop: { kind: "overlay" } })).toBe("overlay");
-    expect(at({ copyMode: true })).toBe("copyMode");
+    expect(at({ nativeSelection: true })).toBe("nativeSelection");
     // **The `pushedView` row is gone with the target** (R-EXA-082, F1254);
     // `panel` is the only other layer kind that takes keys and it holds
     // `substate` alone.
@@ -77,7 +77,7 @@ describe("C16 §3 — activeTarget", () => {
       at({ stored: interacting, overlayTop: { kind: "overlay" } }),
       "under an overlay that must be answered",
     ).toBe("overlay");
-    expect(at({ stored: interacting, copyMode: true }), "under copy mode").toBe("copyMode");
+    expect(at({ stored: interacting, nativeSelection: true }), "under native selection").toBe("nativeSelection");
     expect(
       at({ stored: interacting, overlayTop: { kind: "panel" } }),
       "under a panel, which is the prompt's substate",
@@ -136,25 +136,25 @@ describe("C16 §3 — activeTarget", () => {
     // Each row of A02 §2 beating the one below it, which is the only thing
     // "first match wins" actually claims. Asserting the six conditions
     // separately, as T1.3 does, cannot see an order at all.
-    expect(at({ overlayTop: { kind: "overlay" }, copyMode: true }), "overlay over copy").toBe(
+    expect(at({ overlayTop: { kind: "overlay" }, nativeSelection: true }), "overlay over copy").toBe(
       "overlay",
     );
     expect(
-      at({ copyMode: true, overlayTop: { kind: "panel" } }),
-      "copy mode over a panel",
-    ).toBe("copyMode");
+      at({ nativeSelection: true, overlayTop: { kind: "panel" } }),
+      "native selection over a panel",
+    ).toBe("nativeSelection");
     expect(
       at({ overlayTop: { kind: "panel" }, stored: { at: "prompt" } }),
       "a panel over the prompt",
     ).toBe("panel");
   });
 
-  it("a confirm over copy mode resolves to the overlay, not to copy mode", () => {
+  it("a confirm over native selection resolves to the overlay, not to native selection", () => {
     // The pair C16 §5's reorder turns on: with the ladder's rungs registered on
     // these targets, this single result is what makes both overlay rungs sit
-    // above copy mode. If this flips, the ladder flips with it — which is the
+    // above native selection. If this flips, the ladder flips with it — which is the
     // point of there being one ordering.
-    expect(at({ overlayTop: { kind: "overlay" }, copyMode: true })).toBe("overlay");
+    expect(at({ overlayTop: { kind: "overlay" }, nativeSelection: true })).toBe("overlay");
   });
 
   it("T2.2 (I15): pure and total — same inputs, same answer, no I/O", () => {
@@ -197,7 +197,7 @@ describe("C16 §3 — activeTarget", () => {
       // exists to catch.
       at({ attachedChild: true }),
       at({ overlayTop: { kind: "overlay" } }),
-      at({ copyMode: true }),
+      at({ nativeSelection: true }),
       at({ overlayTop: { kind: "panel" } }),
       at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "interact" } }),
       at(),

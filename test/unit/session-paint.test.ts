@@ -829,7 +829,7 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
   /**
    * Every chip the default chrome emits, with all three conditional ones up.
    *
-   * **`copyMode`, `stopping` and `lastFrame` are all set** because each gates a
+   * **`nativeSelection`, `stopping` and `lastFrame` are all set** because each gates a
    * chip, and a corpus assembled from the quiet session is three chips short —
    * two of which are the only two in the file whose tone is not the default, so
    * a walk over the quiet session would be a walk over the inert ones alone.
@@ -938,8 +938,8 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
   it("T1.46e (R-KEY-004, R-OWN-001, §103): every raised owner says so, and the idle ladder says nothing", () => {
     // **§103: *EVERY OWNER SAYS SO, in the footer's last line*, and *AN OWNER
     // YOU CANNOT SEE IS AN OWNER YOU WILL FIGHT*.** The rule is over the rung
-    // set, not over one rung, which is what the tree had: `copyMode` was the
-    // only owner with a cell, because copy mode is the only one anyone had
+    // set, not over one rung, which is what the tree had: `nativeSelection` was the
+    // only owner with a cell, because native selection is the only one anyone had
     // followed the argument to the end for.
     const ALL_RUNGS = ["child", "copy", "question", "substate", "inside", "scope"] as const;
     const OWNER_WORD: Readonly<Record<Exclude<OwnerRung, "scope">, string>> = {
