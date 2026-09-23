@@ -770,7 +770,12 @@ const scanIds = SCANS.map((s) => s.id);
 // reported for exactly as long as it was red, because a gate red on its first
 // run is a gate somebody switches off, and the three characters it found were
 // ruled rather than exempted.
-const STANDALONE_SCANS = ["SS47", "SS52", "SS53", "SS54", "SS57", "SS63", "SS64"];
+// **SS65 is the third of that family and it is an absence rule, not a
+// comparison.** SS64 pairs the marks appearing on both sides, so a registry
+// glyph with no character in `glyphs.ts` never enters a pair and passes in the
+// same green as one that was checked — which is why the two cannot share a row.
+// Its fabrication lives with C09's own suite, and the arm below reads that file.
+const STANDALONE_SCANS = ["SS47", "SS52", "SS53", "SS54", "SS57", "SS63", "SS64", "SS65"];
 
 const implemented = [
   ...scanIds,
@@ -879,6 +884,11 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // sources through the readers their signatures take. Their rows are below.
       "SS63",
       "SS64",
+      // SS65 reads the same two documents and its fabrication is C09's spec
+      // row, in `glyph-presence.test.ts`. Listed here for the SP family's
+      // reason, and the arm below is what stops the listing being the whole
+      // of the claim.
+      "SS65",
     ]);
     expect([...implemented].sort()).toEqual([...covered].sort());
   });
@@ -2202,6 +2212,19 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
         `${rule} has no test asserting it fires`,
       ).toBe(true);
     }
+  });
+
+  it("SS65 has a fabrication in the file that owns it", () => {
+    // The SP row's mechanism, for the same reason: naming SS65 in `covered`
+    // above would otherwise satisfy commitment 14 by being named in a set.
+    // The title is asserted rather than the behaviour, because the behaviour
+    // is asserted there — what this stops is the row being deleted.
+    const suite = readFileSync("test/unit/glyph-presence.test.ts", "utf8");
+    const titles = [...suite.matchAll(/\bit\("([^"]+)"/g)].map((m) => m[1] ?? "");
+    expect(
+      titles.some((t) => t.includes("SS65") && /\bfails\b|\bfires\b/.test(t)),
+      "SS65 has no test asserting it fires",
+    ).toBe(true);
   });
 
   it("every workflow rule has a fabrication in the file that owns the readers", () => {

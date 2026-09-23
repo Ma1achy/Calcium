@@ -985,6 +985,15 @@ export function spinnerIntervalMs(name: string = DEFAULT_SET): number {
  */
 const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: string]>> =
   Object.freeze({
+    // **`⟩` U+27E9 and `›` U+203A, and they are not the same mark** (C09 I88,
+    // `R-GLY-003`). The first leads a question, the second marks the current
+    // item in a row you navigate — a chooser row or a tape, never a transcript
+    // gutter, which is `focus`'s `▸`. Both were `current` and canonical in the
+    // registry with no character here, and `SS64` could not see either: it
+    // compares the marks on both sides, and a mark absent from one side never
+    // enters a pair.
+    question: ["\u27e9", "?"],
+    current: ["\u203a", "*"],
     ok: ["✓", "+"],
     warn: ["▲", "!"],
     error: ["✗", "x"],
@@ -1070,6 +1079,12 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
  * rather than being covered by a default nobody wrote down.
  */
 export const GLYPH_DOMAINS: Readonly<Record<Glyph, readonly string[]>> = {
+  question: ["row-lead"],
+  // **Not `row-lead`, and the registry's own record is the measurement**: over
+  // every `›` in the design not one is a transcript gutter. Recording it here
+  // would spend `*` against the running head mark for a position `›` never
+  // occupies.
+  current: ["chooser-row", "tape"],
   ok: ["row-lead"],
   warn: ["row-lead"],
   error: ["row-lead"],

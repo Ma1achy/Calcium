@@ -538,7 +538,11 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
     // broke it at `wide` while it was green (F825). The two named sets are
     // compared by equality so a member moving between them fails the row.
     const AMBIGUOUS = new Set(["warn", "info", "pending", "working", "running", "queued", "cancelled", "expand", "collapse", "focus", "bullet"]);
-    const NEUTRAL = new Set(["ok", "error", "quote", "nested", "continuation"]);
+    // `question` `⟩` and `current` `›` join NEUTRAL, measured rather than
+    // assumed: both are one cell at either convention, so neither takes a wide
+    // fallback and both are `steady`. They arrived with M11's carrier matrix —
+    // two marks the registry names and this tree could not draw (C09 I88).
+    const NEUTRAL = new Set(["ok", "error", "quote", "nested", "continuation", "question", "current"]);
     expect(new Set([...AMBIGUOUS, ...NEUTRAL])).toEqual(new Set(GLYPH_TOKENS));
     const tiered: string[] = [];
     const steady: string[] = [];

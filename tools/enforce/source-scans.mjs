@@ -1632,6 +1632,138 @@ export function parseRangeTable(textSource, name) {
  * The ranges come from `text.ts`'s own tables, so there is one authority and not
  * a second copy to fall behind (C09 I48, F1246).
  */
+/**
+ * SS65 — every `current` registry glyph resolves to a mark this tree can draw
+ * (C09 I88, `R-GLY-003`, `R-TAB-001`).
+ *
+ * **The absence `SS64` cannot see, and the reason is structural.** `SS64` is a
+ * *collision* rule: it reads the registry and `glyphs.ts`, pairs the marks that
+ * appear on **both** sides, and refuses a shared ASCII half. A glyph with no
+ * character in the tree never enters a pair, so it passes every run. Measured on
+ * this rule's first: `question` `⟩` was in no file in `src/` at all while both
+ * question components name it as their first carrier, `current` `›` existed only
+ * in `overlay/place.ts` under another meaning, and `reader` `❯` lives in the
+ * shell's config. F161's shape with the consumers actually present.
+ *
+ * The vocabulary is the whole of `glyphs.ts` rather than the three parsed
+ * tables, and that is deliberate: `▰` is `BAR_STYLES`', `⋯` and `─` are drawn
+ * from other structures in the same file, and a rule that demanded a
+ * `GLYPH_TABLE` row for each would refuse nine marks the tree draws perfectly
+ * well. The question is *can this tree draw it*, not *is it in one table*.
+ *
+ * **Comments are stripped before the vocabulary is read**, and the rule's own
+ * first row is why: `question`'s `\u27e9` appears in `glyphs.ts` exactly once, in a
+ * comment distinguishing it from `\u203a`. A whole-file `includes` reads that as the
+ * mark being drawable, so the scan passed on the very absence it was written
+ * about — prose inflating a textual signal, with the prose *about* the defect.
+ * A mark in a comment is a mark nothing can draw.
+ *
+ * `GLYPH_HOMES` is the allow-list and it carries the premise, as
+ * `MARK_EXEMPTIONS` does: where the mark lives, and why it lives there. The
+ * bidirectional arm is the same as MG24's — an entry whose glyph has arrived in
+ * `glyphs.ts` is a violation, because an exemption that outlives its reason is
+ * how the list stops being read.
+ */
+export const GLYPH_HOMES = Object.freeze({
+  reader:
+    "`❯` is the prompt's mark and lives in `src/shell/config.ts` beside `PROMPT_GUTTER`, "
+    + "whose `[unicode, ascii]` pair `frame.ts` already asserts is `PROMPT_GUTTER.first` cells "
+    + "wide (C22 I52). It is chrome the shell draws, not a block's vocabulary, and moving it "
+    + "into `glyphs.ts` would put a prompt token in the block library.",
+  "tape-left":
+    "`«` is the tape's left residue mark and the tape is unbuilt — M14 builds it as a "
+    + "framework primitive with its own window arithmetic. This entry is itself a violation "
+    + "the day that MR lands.",
+  "tape-right":
+    "`»` is the tape's right residue mark; parked with `tape-left` on the same MR.",
+});
+
+export function checkGlyphPresence(
+  registrySource = readFileSync("docs/design/language/calcium-registry.json", "utf8"),
+  glyphSource = readFileSync("src/presentation/blocks/glyphs.ts", "utf8"),
+  homes = GLYPH_HOMES,
+) {
+  const violations = [];
+  const registry = JSON.parse(registrySource);
+  const at = (file, needle) => {
+    const i = file.indexOf(needle);
+    return i < 0 ? 1 : file.slice(0, i).split("\n").length;
+  };
+  // **Whole comment lines are dropped, and nothing is parsed out of a code
+  // line.** The first draft ran two regexes over the source and ate three live
+  // slots — `question`, `current` and `ellipsis` — because a `/*` or a `//`
+  // inside a string literal opens nothing and the pattern cannot tell. Dropping
+  // lines whose first non-space character begins a comment is the part that is
+  // certain, and it is the whole of the hazard: the mark this rule was written
+  // about sits on a `// **...` line of its own.
+  // **And `\\uXXXX` is decoded before the search, because a slot may be written
+  // either way and the scan must not care.** `question: ["\\u27e9", "?"]` is the
+  // mark, present and drawable, and a raw-text match calls it absent — a matcher
+  // that sees one encoding. The two defects cancelled on the first run: the
+  // escape hid the slot while the comment supplied the character, so the rule
+  // was green about a file it had read wrongly in both directions.
+  const code = glyphSource
+    .split("\n")
+    .filter((line) => !/^\s*(?:\/\/|\/\*|\*)/u.test(line))
+    .join("\n")
+    .replace(/\\u\{([0-9a-fA-F]+)\}/gu, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/\\u([0-9a-fA-F]{4})/gu, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+
+  // **The control, and it is SS64's** (F1246): a vocabulary that read as empty
+  // would report every glyph missing, which is loud, and one that read as
+  // everything would report none, which is silent. The second is the danger, so
+  // the file is checked for the marks it certainly holds before it is trusted.
+  for (const certain of ["\u2713", "\u25b8"]) {
+    if (code.includes(certain)) continue;
+    violations.push({
+      rule: "SS65", file: "src/presentation/blocks/glyphs.ts", line: 1,
+      message:
+        `the vocabulary does not contain ${JSON.stringify(certain)}, which `
+        + "`GLYPH_TABLE` declares — the source did not parse as expected, and a vocabulary "
+        + "read wrongly wide passes every glyph in silence",
+      spec: "C09 I88",
+    });
+    return violations;
+  }
+
+  const excused = new Set(Object.keys(homes));
+  const present = new Set();
+  for (const g of [...registry.glyphs, ...registry.delimiters]) {
+    if (g.status !== "current") continue;
+    const has = typeof g.unicode === "string" && code.includes(g.unicode);
+    if (has) {
+      present.add(g.id);
+      continue;
+    }
+    if (excused.has(g.id)) continue;
+    violations.push({
+      rule: "SS65",
+      file: "docs/design/language/calcium-registry.json",
+      line: at(registrySource, `"${g.id}"`),
+      message:
+        `${g.id} is a current glyph and ${JSON.stringify(g.unicode)} appears nowhere in `
+        + "`glyphs.ts` — a carrier is made of marks, and a mark with no character is one "
+        + "`SS64` can never see, because a collision rule pairs the marks on both sides "
+        + "(C09 I88). Give it a slot, or name it in GLYPH_HOMES with its home and its reason",
+      spec: "C09 I88",
+    });
+  }
+
+  for (const id of excused) {
+    if (!present.has(id)) continue;
+    violations.push({
+      rule: "SS65",
+      file: "tools/enforce/source-scans.mjs",
+      line: 1,
+      message:
+        `GLYPH_HOMES names ${id}, whose mark is now in \`glyphs.ts\` — remove the entry: an `
+        + "exemption that outlives its reason is how the list stops being read",
+      spec: "C09 I88",
+    });
+  }
+  return violations;
+}
+
 export function checkGlyphWidthClass(
   registrySource = readFileSync("docs/design/language/calcium-registry.json", "utf8"),
   textSource = readFileSync("src/presentation/text.ts", "utf8"),

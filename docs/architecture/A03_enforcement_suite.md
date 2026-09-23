@@ -392,6 +392,7 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 | SS57 | **A glyph with an emoji presentation form** — a non-ASCII code point inside a string literal that is a base of an emoji variation sequence, against `text.ts`'s `EMOJI_VARIATION_BASES` (derived from `emoji-variation-sequences.txt` 17.0.0), comments blanked. Found eleven on its first run — `⏺` U+23FA, `ℹ` U+2139, the `arrow` spinner's four diagonals, `▪ ▫ ◼ ◻` in two bar styles, a `⚠` in the fixtures report (F823, F832, F833); no allow-list | `src/` | C09 I45, T2.112 |
 | SS63 | **A glyph's recorded width class is the one `cells()` measures** — every `widthClass` on `calcium-registry.json`'s glyphs and delimiters against `text.ts`'s own `AMBIGUOUS_RANGES` and `DRAWN_AS_GEOMETRY`, which is the pair `cells()` consults. Found four on its first run: `focus ▸` and `disclosure ▾` recorded `narrow` and measuring 1 cell narrow / 2 wide, `meter-fill ▰` and `rule —` carrying no class at all (F1246); no allow-list | `docs/design/language/calcium-registry.json` | C09 I48, R-GLY-003 |
 | SS64 | **A mark is unique inside the domains it appears in, across every structure that paints one.** Three structures draw ASCII marks — the registry's `glyphs`/`delimiters`, `GLYPH_TABLE` and `GlyphSet` — and the registry's own check sees the first, which is how `:` was chosen for collapsed disclosure and passed while being `GlyphSet.separator` and `dashedVertical` (F1246). Domains come from the registry's `collisionDomains` table with containment, so two marks clash when their domain **closures** intersect: `row-lead` and `inline` are inside `content-row`, which fails a lead mark against a field separator, while the sort pair on a table header may take `v` beside disclosure's. Fires on a shared ASCII half with a **different** Unicode half — two records of one mark (`GLYPH_TABLE.ok` and `GlyphSet.tick`, both `✓`) are not two marks. `border` and `plot` are **figure** domains and exempt: ASCII has no box drawing, every corner and tee *is* `+`, and position carries the meaning — the first run said so 45 times of 59. Two controls: an empty parse of `glyphs.ts` is a violation rather than a pass, and a mark with no domain is reported rather than exempted | `docs/design/language/calcium-registry.json`, `src/presentation/blocks/glyphs.ts`; no allow-list | C09 I48, R-GLY-003, R-GLY-002 |
+| SS65 | **Every `current` registry glyph resolves to a mark `glyphs.ts` can draw**, or is named in `GLYPH_HOMES` with its home and its reason. SS64 is a *collision* rule: it pairs the marks appearing on **both** sides, so a glyph with no character in the tree never enters a pair and passes every run — an absence is the one defect a collision rule is structurally blind to. Found three on its first run: `question` `⟩` in no file in `src/` while both question components name it as their first carrier, `current` `›` only in `overlay/place.ts` under another meaning, and `reader` `❯` in the shell's config (F161's shape, with the consumers present). Bidirectional — an entry whose mark has arrived is itself a violation | `docs/design/language/calcium-registry.json` × `src/presentation/blocks/glyphs.ts` | C09 §7c · C09 I88 |
 | SS56 | **A hand-composed notice** — `kind: "notice"` as an object-literal value — anywhere the L4 family (`documents.ts`'s `noticeDoc`, `builders/`' `b.notice`) is meant to be called instead. Sixteen files carried the literal at landing and every one was allowed **by name with its reason in the rule's comment**: two are the family, two are the kind's declaration and definition (`viewmodel/types.ts`, `blocks/kinds/simple.ts`), eight are below L4 where the family is unreachable (A02 — four adapters, markdown, the cap marker, the history layer, `art.ts`), and **four were L4 surfaces that owed a migration** — fourteen sites, allowed so that SS53 would retire each entry when its last literal went. **It did** (2026-09-05, F777): every site calls `b.notice`, SS53 failed four times with the entries still present, the entries left, and `test/contract/notice-family.test.ts` holds the frames the literals drew and asserts the family draws the same bytes. Twelve entries remain. *Stated blind spots*: a notice built through a helper the rule does not know, the kind held in a constant, or a spread from elsewhere all pass; it is per line and cannot tell a composition from an object-literal type guard; it does not say which member of the family a site should call | `src/`, allowing by name — the family `src/shell/documents.ts` and `src/shell/builders/`; the kind `src/data/viewmodel/types.ts` and `src/presentation/blocks/kinds/simple.ts`; below L4 `src/data/adapters/fallback.ts`, `src/data/adapters/mapping.ts`, `src/data/adapters/overflow.ts`, `src/data/adapters/registry.ts`, `src/data/viewmodel/markdown.ts`, `src/viewport/transcript/cap.ts`, `src/interaction/history/layers.ts`, `src/presentation/art.ts` | C22 T2.40 · C24 I5 · C23 I61 |
 | SS36 | A string literal assigned to a `colour` field | `src/` | C10 I24, T2.19 |
 | SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I15, T2.17 |
@@ -1078,6 +1079,53 @@ transcript gutter, which is a coarseness the domain table can be refined to answ
 been. And it compares the declared domains, not the drawn ones: a mark painted somewhere its
 record does not name is a defect no scan here reaches.
 
+
+### SS65 — a mark with no character is one SS64 can never see
+
+**A collision rule is blind to an absence, and the blindness is structural rather than a gap
+in its corpus.** SS64 pairs the marks that appear on both sides and refuses a shared ASCII
+half; a registry glyph with no character anywhere in `glyphs.ts` never enters a pair, so it
+is not merely unchecked — it passes, in the same green as a mark that was checked and found
+unique. Three did: `question` `⟩` was in no file in `src/` at all while both question
+components name it as their first carrier, `current` `›` existed only in `overlay/place.ts`
+under an unrelated meaning, and `reader` `❯` lives in the shell's config. That is F161's
+shape — a mark cited by name with consumers that cannot take it — with the consumers real.
+
+**The vocabulary is the whole of `glyphs.ts`, not the three parsed tables.** `▰` is
+`BAR_STYLES`', `⋯` and `─` are drawn from other structures in the same file, and a rule
+demanding a `GLYPH_TABLE` row for each would refuse nine marks the tree draws perfectly well.
+The question is *can this tree draw it*, not *is it in one table*.
+
+**`GLYPH_HOMES` is the allow-list and it carries the premise**, as `MARK_EXEMPTIONS` does:
+where the mark lives and why it lives there. The bidirectional arm is MG24's — an entry whose
+glyph has arrived in `glyphs.ts` is itself a violation, because an exemption that outlives its
+reason is how a list stops being read. `tape-left` `«` and `tape-right` `»` are parked on
+M14 and each entry says so, which is a deferral that expires by itself rather than one whose
+condition nothing watches.
+
+**Two readings of the same file cancelled, and the rule was green about both.** This is the
+finding the row was landed for. `question`'s slot is written `question: ["\\u27e9", "?"]` — the
+escaped form — which a raw-text match calls **absent**; and the character `⟩` appears once
+in `glyphs.ts`, in a comment distinguishing it from `›`, which a whole-file match calls
+**present**. Each defect alone flips the verdict. Together they produced exactly the output of
+a satisfied rule, on the very glyph the rule was written about, which is A03 §2's vacuity
+class reached by two errors rather than by an empty corpus. So the scan drops whole comment
+lines before it reads, and decodes `\\uXXXX` and `\\u{XXXXX}` before it searches.
+
+**Comment lines, not comments.** The first draft ran two regexes over the source and ate three
+live slots, because a `/*` or a `//` inside a string literal opens nothing and a pattern cannot
+tell. Dropping lines whose first non-space character begins a comment is the part that is
+certain, and it covers the whole hazard: the mark this rule was written about sits on a `//`
+line of its own. *Stated blind spot:* a mark appearing only in a trailing comment on a code
+line counts as present.
+
+**The control is the dangerous direction.** A vocabulary read wrongly *empty* reports every
+glyph and is loud; one read wrongly *wide* reports none and is silent. So the scan checks
+`glyphs.ts` for `✓` and `▸`, which `GLYPH_TABLE` certainly declares, and reports the
+failure to find them rather than proceeding — the same control SS64 carries, aimed at the
+opposite failure. Fabricated violation: T2.155 removes the `question` slot and asserts the
+rule fires, asserts the mark still stands in prose, and asserts the live slot is escaped, so
+neither reading can quietly come back.
 
 ### SS56, widened — the builder call is the composition
 

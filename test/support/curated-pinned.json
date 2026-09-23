@@ -779,6 +779,10 @@
   "continuation": [
    "row-lead"
   ],
+  "current": [
+   "chooser-row",
+   "tape"
+  ],
   "error": [
    "row-lead"
   ],
@@ -798,6 +802,9 @@
    "row-lead"
   ],
   "pending": [
+   "row-lead"
+  ],
+  "question": [
    "row-lead"
   ],
   "queued": [
@@ -942,6 +949,14 @@
  },
  "GLYPH_SUBSTITUTIONS": [
   [
+   "⟩",
+   "?"
+  ],
+  [
+   "›",
+   "*"
+  ],
+  [
    "✓",
    "+"
   ],
@@ -1007,6 +1022,8 @@
   ]
  ],
  "GLYPH_TOKENS": [
+  "question",
+  "current",
   "ok",
   "warn",
   "error",

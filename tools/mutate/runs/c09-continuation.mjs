@@ -53,11 +53,20 @@ const results = runPass({
       // state the tree was actually in.
       name: "THE DEFECT: the validator's vocabulary is a Set literal again, and the token is missing from it",
       file: VALIDATE,
-      // Re-anchored 2026-09-05: `step` joined the row (C09 §4), applied by hand
-      // and T3.18 died. Re-anchored again 2026-09-22: `step` left it, the head
-      // mark having become a resolution rather than a slot (C09 I45).
-      from: "  continuation: true,\n} satisfies Record<Glyph, true>;",
-      to: "} as Record<string, true>;",
+      // **Re-anchored three times at the same line end, and the third is why
+      // the shape changed.** 2026-09-05 `step` joined the row, 2026-09-22 it
+      // left again, 2026-09-23 `question` and `current` arrived — none of them
+      // anything to do with `continuation`. An anchor that reaches a record's
+      // closing line rots every time the record gains a member, so it takes
+      // the token and the least context that makes it unique instead.
+      //
+      // **And the `satisfies` clause was never part of the kill.** It was in
+      // the pattern because the measured defect was a `Set` literal, but the
+      // runtime strips types: what T3.18 sees is the token missing from the
+      // vocabulary, which is the whole of the mutation and all of it that
+      // could ever have fired.
+      from: "\n  continuation: true,",
+      to: "",
       expect: "T3.18",
     },
     {

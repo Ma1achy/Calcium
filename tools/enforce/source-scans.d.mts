@@ -102,6 +102,24 @@ export declare function checkMarks(
   exemptions?: Readonly<Record<string, string>>,
 ): (Violation & { line: number })[];
 
+/**
+ * SS65 — where a registry glyph lives when it is not in `glyphs.ts`, and why.
+ * The premise is recorded so it can be re-checked rather than inherited, and an
+ * entry whose mark has arrived is itself a violation (C09 I88).
+ */
+export declare const GLYPH_HOMES: Readonly<Record<string, string>>;
+
+/**
+ * SS65 — every `current` registry glyph resolves to a mark `glyphs.ts` can draw,
+ * or is named in `GLYPH_HOMES`. SS64 is a collision rule and cannot see a mark
+ * with no character at all (C09 I88, R-TAB-001, R-COR-003).
+ */
+export declare function checkGlyphPresence(
+  registrySource?: string,
+  glyphSource?: string,
+  homes?: Readonly<Record<string, string>>,
+): Violation[];
+
 /** SS63 — the hex ranges of a named table in `text.ts`, parsed out of its source (C09 I48). */
 export declare function parseRangeTable(textSource: string, name: string): number[];
 

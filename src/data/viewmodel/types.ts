@@ -185,6 +185,28 @@ export type Tone =
  * with an "or any string" arm is not a vocabulary.
  */
 export type Glyph =
+  /**
+   * The question mark a question leads with — `⟩` U+27E9 / `?` (`R-GLY-003`,
+   * `R-TAB-001`).
+   *
+   * **Named by both question components as their first carrier and in no file
+   * in `src/` until now** (C09 I88). The registry has declared it `current` and
+   * canonical throughout; `SS64` never saw it because a collision rule compares
+   * the marks on both sides and a mark with no character never enters a pair.
+   * Its consumer is M15's questions.
+   */
+  | "question"
+  /**
+   * The current item in a row you navigate — `›` U+203A / `*` (`R-GLY-003`).
+   *
+   * **`row-lead` is the one domain it does not have**, and the registry says so
+   * in its own record: measured over every `›` in the design, not one is a
+   * transcript gutter — the agent tape, a question's choice row, a form's
+   * button row, the completion menu, history search, the mentions picker, a
+   * notification's buttons. `▸` is the gutter's mark. Its consumers are M14's
+   * tape and M15's choice rows.
+   */
+  | "current"
   | "ok"
   | "warn"
   | "error"
