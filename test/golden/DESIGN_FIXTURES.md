@@ -165,7 +165,7 @@ most-drawn line in the application.
 | 73 | surface | `bgElev` | — | painted chrome — the table header is built and framed (C11 I24); buttons, titles and widgets want kinds the tree has none of: no `button`, `slider`, `toggle`, `checkbox` or `radio` among the thirty-six |
 | 74 | surface | `weight` | `theme-tokens.test.ts` | weight, and why it is not free — the 1-bit rung of the same table, where `identifier` was off the ladder |
 | 75 | surface | `kind: "table"` | `blocks.test.ts` | /config, and where a value came from |
-| 76 | surface | no | — | per-token values — a VALUED span over the model's own output, which the fixture itself calls reserved; not a theme token, and the probe said otherwise |
+| 76 | surface | no | `design-surfaces.test.ts` | per-token values — the valued run, `design-surfaces` §076, two passes. **Two of the section's three needs are built**: *a per-token VALUE driving a ground* is `TextSpan.value` through the block's `colormap` — **not a theme token**, which is this row's standing correction — and *tokens survive wrapping* is `atomsOf`, which emits a wrap atom for every valued run. The second pass uses `notice` and not `raw` because `raw` clips rather than wraps, so a caption about a token moving down whole was claiming what the picture did not show. **The remainder, named**: the reader's side. §076 says *⌥v toggles it on the entry under the cursor*; `valuesToggle` is a reserved chord with an explicit no-op (C16 I38), the shape `selection.semantic` held before M10b built it, and a producer that declares a colormap paints today with no reader axis to suppress it per entry |
 | 77 | surface | `registerGrammar` | `blocks.test.ts` | syntax highlighting |
 | 78 | surface | `kind: "table"` | `table.test.ts` | tables |
 | 79 | surface | `REGISTRY_THEMES` | `theme-tokens.test.ts` | tones and surfaces, across ten themes — the corpus's first frame of colour |
@@ -217,7 +217,7 @@ that is the reconciliation working, and it should be visible as a number moving 
 than inferred from a suite staying green.
 
     surface 66 · prose 37 · app 6 · total 109
-    of the surfaces: built 60 · unbuilt 6 · framed 57
+    of the surfaces: built 60 · unbuilt 6 · framed 58
 
 **`framed` is the figure this MR moves, and `built` is the one that went backwards.**
 Seven surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks

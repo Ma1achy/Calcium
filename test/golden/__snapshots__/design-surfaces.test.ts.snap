@@ -333,6 +333,24 @@ raw             0     — atomic: nothing to focus
 
 · 23 kinds · 6 publish a focusable element · 6 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
+── §76 · per-token values — the valued run, and the token that wraps whole
+· room to spare — one ground per valued token, and none on the words between them
+....AAAAAA.BBBBBB.CCCCCC........DDDDDDD. The parser tracks quotes with a boolean~
+  A = bg 48;2;188;223;39
+  B = bg 48;2;65;68;135
+  C = bg 48;2;93;200;99
+  D = bg 48;2;72;37;118
+
+· squeezed — a valued token that cannot fit moves down WHOLE, its ground unbroken across no line: \`atomsOf\` emits an atom per valued run
+....AAAAAA.......... The parser tracks
+.................... quotes with a
+BBBBBBB............. boolean, so a nested
+.................... quote flips it
+..CCCCC............. back early.
+  A = bg 48;2;188;223;39
+  B = bg 48;2;72;37;118
+  C = bg 48;2;222;227;24
+
 ── §19 · the resolved keymap, the reader's own rung first
 -- prompt — where you are               
 s+enter      insertNewline
@@ -809,6 +827,22 @@ raw             0     — atomic: nothing to focus
 
 · 23 kinds · 6 publish a focusable element · 6 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
+── §76 · per-token values — the valued run, and the token that wraps whole
+· room to spare — one ground per valued token, and none on the words between them
+....AAAAAA.BBBBBB.CCCCCC........DDDDDDD...EEEEEE................................ The parser tracks quotes with a boolean, so a nested quote flips it back.
+  A = bg 48;2;188;223;39
+  B = bg 48;2;65;68;135
+  C = bg 48;2;93;200;99
+  D = bg 48;2;72;37;118
+  E = bg 48;2;222;227;24
+
+· squeezed — a valued token that cannot fit moves down WHOLE, its ground unbroken across no line: \`atomsOf\` emits an atom per valued run
+....AAAAAA......................BBBBBBB. The parser tracks quotes with a boolean,
+.............................CCCCC...... so a nested quote flips it back early.
+  A = bg 48;2;188;223;39
+  B = bg 48;2;72;37;118
+  C = bg 48;2;222;227;24
+
 ── §19 · the resolved keymap, the reader's own rung first
 -- prompt — where you are                                                       
 s+enter      insertNewline
@@ -1273,6 +1307,17 @@ raw             0     — atomic: nothing to focus
 
 · 23 kinds · 6 publish a focusable element · 5 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
+── §76 · per-token values — the valued run, and the token that wraps whole
+· room to spare — one ground per valued token, and none on the words between them
+........................................ The parser tracks quotes with a boolean…
+
+· squeezed — a valued token that cannot fit moves down WHOLE, its ground unbroken across no line: \`atomsOf\` emits an atom per valued run
+.................... The parser tracks
+.................... quotes with a
+.................... boolean, so a nested
+.................... quote flips it
+.................... back early.
+
 ── §19 · the resolved keymap, the reader's own rung first
 ── prompt — where you are               
 ⇧⏎      insertNewline
@@ -1735,6 +1780,14 @@ raw             0     — atomic: nothing to focus
 
 · 23 kinds · 6 publish a focusable element · 5 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
+── §76 · per-token values — the valued run, and the token that wraps whole
+· room to spare — one ground per valued token, and none on the words between them
+................................................................................ The parser tracks quotes with a boolean, so a nested quote flips it back.
+
+· squeezed — a valued token that cannot fit moves down WHOLE, its ground unbroken across no line: \`atomsOf\` emits an atom per valued run
+........................................ The parser tracks quotes with a boolean,
+........................................ so a nested quote flips it back early.
+
 ── §19 · the resolved keymap, the reader's own rung first
 ── prompt — where you are                                                       
 ⇧⏎      insertNewline
@@ -2213,6 +2266,24 @@ raw             0     — atomic: nothing to focus
 
 · 23 kinds · 6 publish a focusable element · 6 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
+── §76 · per-token values — the valued run, and the token that wraps whole
+· room to spare — one ground per valued token, and none on the words between them
+....AAAAAA.BBBBBB.CCCCCC........DDDDDDD. The parser tracks quotes with a boolean…
+  A = bg 48;2;188;223;39
+  B = bg 48;2;65;68;135
+  C = bg 48;2;93;200;99
+  D = bg 48;2;72;37;118
+
+· squeezed — a valued token that cannot fit moves down WHOLE, its ground unbroken across no line: \`atomsOf\` emits an atom per valued run
+....AAAAAA.......... The parser tracks
+.................... quotes with a
+BBBBBBB............. boolean, so a nested
+.................... quote flips it
+..CCCCC............. back early.
+  A = bg 48;2;188;223;39
+  B = bg 48;2;72;37;118
+  C = bg 48;2;222;227;24
+
 ── §19 · the resolved keymap, the reader's own rung first
 ── prompt — where you are               
 ⇧⏎      insertNewline
@@ -2689,6 +2760,22 @@ raw             0     — atomic: nothing to focus
 
 · 23 kinds · 6 publish a focusable element · 6 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
+── §76 · per-token values — the valued run, and the token that wraps whole
+· room to spare — one ground per valued token, and none on the words between them
+....AAAAAA.BBBBBB.CCCCCC........DDDDDDD...EEEEEE................................ The parser tracks quotes with a boolean, so a nested quote flips it back.
+  A = bg 48;2;188;223;39
+  B = bg 48;2;65;68;135
+  C = bg 48;2;93;200;99
+  D = bg 48;2;72;37;118
+  E = bg 48;2;222;227;24
+
+· squeezed — a valued token that cannot fit moves down WHOLE, its ground unbroken across no line: \`atomsOf\` emits an atom per valued run
+....AAAAAA......................BBBBBBB. The parser tracks quotes with a boolean,
+.............................CCCCC...... so a nested quote flips it back early.
+  A = bg 48;2;188;223;39
+  B = bg 48;2;72;37;118
+  C = bg 48;2;222;227;24
+
 ── §19 · the resolved keymap, the reader's own rung first
 ── prompt — where you are                                                       
 ⇧⏎      insertNewline

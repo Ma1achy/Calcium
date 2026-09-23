@@ -79,7 +79,7 @@ M = {
  73:("owed","M3","painted chrome — the table header is built and framed (C11 I24); buttons, titles and widgets want kinds the tree has none of: no `button`, `slider`, `toggle`, `checkbox` or `radio` among the thirty-six"),
  74:("frame","theme-tokens.test.ts","weight, and why it is not free — the 1-bit rung of the same table, where `identifier` was off the ladder"),
  75:("frame","blocks.test.ts","/config, and where a value came from"),
- 76:("owed","M13","per-token values — a VALUED span over the model's own output, which the fixture itself calls reserved; not a theme token, and the probe said otherwise"),
+ 76:("frame","design-surfaces.test.ts","per-token values — the valued run, `design-surfaces` §076, two passes. **Two of the section\'s three needs are built**: *a per-token VALUE driving a ground* is `TextSpan.value` through the block\'s `colormap` — **not a theme token**, which is this row\'s standing correction — and *tokens survive wrapping* is `atomsOf`, which emits a wrap atom for every valued run. The second pass uses `notice` and not `raw` because `raw` clips rather than wraps, so a caption about a token moving down whole was claiming what the picture did not show. **The remainder, named**: the reader\'s side. §076 says *⌥v toggles it on the entry under the cursor*; `valuesToggle` is a reserved chord with an explicit no-op (C16 I38), the shape `selection.semantic` held before M10b built it, and a producer that declares a colormap paints today with no reader axis to suppress it per entry"),
  77:("frame","blocks.test.ts","syntax highlighting"),
  78:("frame","table.test.ts","tables"),
  79:("frame","theme-tokens.test.ts","tones and surfaces, across ten themes — the corpus's first frame of colour"),

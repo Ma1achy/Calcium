@@ -872,6 +872,82 @@ const focusByShape = (width: number, capabilities: TerminalCapabilities, theme: 
   return rows;
 };
 
+/**
+ * §076 — **per-token values over the model's own output**: the VALUED run.
+ *
+ * The section names three things it needs and the tree has two of them, which
+ * is what this frame is for — a *per-token VALUE driving a ground* is
+ * `TextSpan.value` mapped through the block's `colormap` (**not a theme token**,
+ * which is the correction the map row already carried), and *tokens survive
+ * wrapping* is `atomsOf`, which emits a wrap atom for **every valued run**, so a
+ * valued token near a line end moves down whole rather than splitting.
+ *
+ * **Two passes, because the two claims fail in different frames.** The first
+ * lays the prose out with room to spare, where the grounds are the whole of
+ * what there is to read; the second squeezes the width so the last valued token
+ * cannot fit, which is the only frame that can tell *wraps whole* from *wraps*.
+ *
+ * Read as a mask, because a value's carrier is a background: at 24-bit the
+ * distinct grounds are the reading, and at the rungs where `continuousColour`
+ * answers nothing the prose is the prose — which is the honest degradation and
+ * not a loss, the section's own *off by default … a diagnostic rather than a
+ * reading*.
+ *
+ * **What this does NOT show, named rather than implied**: the reader's side.
+ * §076 says *⌥v toggles it on the entry under the cursor*, and `valuesToggle` is
+ * a reserved chord with an explicit no-op (C16 I38) — the shape `selection.semantic`
+ * held before M10b built it. A producer that declares a colormap paints today;
+ * there is no reader axis to suppress it per entry, and that is §076's remainder.
+ */
+const VALUED_PROSE = block({
+  kind: "raw",
+  id: "vp",
+  colormap: "viridis",
+  text: "The parser tracks quotes with a boolean, so a nested quote flips it back.",
+  spans: [
+    { from: 4, to: 10, value: 0.9 },
+    { from: 11, to: 17, value: 0.2 },
+    { from: 18, to: 24, value: 0.75 },
+    { from: 32, to: 39, value: 0.1 },
+    { from: 42, to: 48, value: 0.95 },
+  ],
+}) as unknown as Block;
+
+const VALUED_WRAP = block({
+  kind: "notice",
+  id: "vw",
+  tone: "default",
+  colormap: "viridis",
+  text: "The parser tracks quotes with a boolean, so a nested quote flips it back early.",
+  spans: [
+    { from: 4, to: 10, value: 0.9 },
+    { from: 32, to: 39, value: 0.1 },
+    { from: 70, to: 75, value: 0.95 },
+  ],
+}) as unknown as Block;
+
+const valuedTokens = (width: number, capabilities: TerminalCapabilities, theme: ResolvedTheme): readonly string[] => {
+  const pass = (at: number, caption: string): readonly string[] => {
+    const kit = measurable({ theme, capabilities });
+    const lines = kit.renderToLines(VALUED_PROSE, at);
+    const grid = styledScreenFrom([lines.join("\n")], { columns: at, rows: lines.length });
+    return [caption, ...maskOf(grid), ""];
+  };
+  const wrapPass = (at: number, caption: string): readonly string[] => {
+    const kit = measurable({ theme, capabilities });
+    const lines = kit.renderToLines(VALUED_WRAP, at);
+    const grid = styledScreenFrom([lines.join("\n")], { columns: at, rows: lines.length });
+    return [caption, ...maskOf(grid), ""];
+  };
+  return [
+    ...pass(width, "· room to spare — one ground per valued token, and none on the words between them"),
+    // **`notice` and not `raw` for this pass, and the frame is why.** `raw`
+    // does not wrap: squeezed, it clips and draws `~`, so a caption about a
+    // token moving down whole was claiming what the picture did not show.
+    ...wrapPass(Math.max(16, Math.floor(width / 2)), "· squeezed — a valued token that cannot fit moves down WHOLE, its ground unbroken across no line: `atomsOf` emits an atom per valued run"),
+  ];
+};
+
 export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 95, name: "a tape, where a row of peers would shed", rows: draw(TAPE) },
   { section: 42, name: "widgets — a row of peers that sheds", rows: draw(PILLS) },
@@ -896,6 +972,7 @@ export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 58, name: "what copy takes — the source beside the rendering", rows: copyCensus },
   { section: 82, name: "no pushed views — a row expanded in place, and the rows below carrying on", rows: expansionGrounds },
   { section: 17, name: "focus treatment follows the shape — what each kind publishes against what it draws", rows: focusByShape },
+  { section: 76, name: "per-token values — the valued run, and the token that wraps whole", rows: valuedTokens },
   { section: 19, name: "the resolved keymap, the reader's own rung first", rows: keymapCensus },
   { section: 21, name: "the scrollbar — the set, and the bar beside a box", rows: (w, c, t) => [
     ...scrollbarCensus(w, c),
