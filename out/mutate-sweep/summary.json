@@ -1,9 +1,9 @@
 {
   "label": "all",
-  "only": "c14-rect",
+  "only": "c14-drag",
   "rows": [
     {
-      "run": "c14-rect.mjs",
+      "run": "c14-drag.mjs",
       "exit": 0,
       "seconds": 4,
       "state": "green",

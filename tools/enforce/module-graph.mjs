@@ -1643,6 +1643,30 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // --- C14 §6f's drag, one commit ahead of its wiring ------------------------
+  //
+  // **The consumer is this MR's next commit and the reason it is not this one
+  // is a coordinate translation that deserves its own diff.** `rowOffset` is in
+  // `chrome ++ blocks` (C14 I20) and the selection's spans are in block rows,
+  // so the press's row has to have the chrome taken off it before it is a
+  // caret — and a translation done wrong here selects the wrong block while
+  // every assertion about the drag passes. The model is the arithmetic and the
+  // wiring is that translation plus the ticker, and they are two reviews.
+  "AutoscrollStep.rows":
+    "C14 §6f, I45 — the direction of one autoscroll tick, read by the ticker in this MR's "
+    + "next commit. T1.45 pins it against the band, which is the pair a ticker reads "
+    + "together. If the wiring lands and nothing in `src/` reads it, this entry is the violation.",
+  "AutoscrollStep.afterMs":
+    "C14 §6f, I45 — when the next tick is due; parked with `AutoscrollStep.rows` on the same "
+    + "commit.",
+  "Drag.container":
+    "C14 §6f, I44 — the container the gesture bound to at the press, read by the pointer "
+    + "handler and the ticker in this MR's next commit. It is a *field* rather than a "
+    + "re-derivation because that is the rule, so nothing can consume it until something "
+    + "holds a `Drag` across events; parked with `autoscrollFor`.",
+  "AutoscrollStep.container":
+    "C14 §6f, I44 — which scrollable the tick moves, and the whole of R-SEL-012 at the place "
+    + "it could go wrong; parked with `AutoscrollStep.rows`.",
   // --- C14 §6e's rectangle, groundwork ahead of a chord the registry has not
   // --- named -----------------------------------------------------------------
   //
@@ -3569,6 +3593,19 @@ export function checkExportedArguments(files, readFile = (f) => readFileSync(f, 
 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
+  // **`autoscrollFor` and `beginDrag` are C14 §6f's model, wired next commit.**
+  // Held back one commit because the wiring is a coordinate translation — the
+  // press's `rowOffset` is in `chrome ++ blocks` and a caret's row is in block
+  // rows (C14 I20) — plus a second ticker beside the one I35 stops, and that is
+  // a different review from the arithmetic. Both go the day it lands, and if it
+  // lands with nothing in `src/` calling them these entries are the violation.
+  autoscrollFor:
+    "C14 §6f, I45 — one autoscroll tick's decision, called by the ticker in this MR's next "
+    + "commit. T1.45 holds the continuation against a motion-driven implementation, which is "
+    + "the claim no band table can make.",
+  beginDrag:
+    "C14 §6f, I44 — binds a gesture to the anchor's container, called by the pointer handler "
+    + "in this MR's next commit; parked with `autoscrollFor`.",
   // **`rectBetween` and `cellTextOf` are `R-SEL-007`'s mechanism with no door**
   // (C14 §6e). The rule's two mechanical claims — the clip to the anchor's
   // block, and cells rather than source — are settled completely by the design;
