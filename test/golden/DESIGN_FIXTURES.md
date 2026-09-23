@@ -103,7 +103,7 @@ most-drawn line in the application.
 | 31 | surface | `SPINNER_SETS` | — | every reusable spinner set at its own interval |
 | 32 | prose | — | — | the four spinner rules |
 | 33 | surface | `BAR_STYLES` | — | nine alphabets, and where each belongs |
-| 34 | surface | `BAR_STYLES` | — | active progress bars |
+| 34 | surface | `BAR_STYLES` | `design-surfaces.test.ts` | active progress bars |
 | 35 | surface | `granularity` | — | quantity, granularity and liveness as three axes |
 | 36 | surface | `granularity` | — | the operation and budget presets |
 | 37 | surface | `RampAnimation` | — | every ink ramp, including the four one-shots |
@@ -116,7 +116,7 @@ most-drawn line in the application.
 | 45 | surface | `kind: "terminal"` | `blocks.test.ts` | the live terminal block |
 | 46 | surface | `searchOpen` | `session-frame.test.ts` | history, search and ghost text |
 | 47 | surface | `assertContainerPremise\|containment` | `containment.test.ts` | empty, too small, stale, interrupted, refused |
-| 48 | surface | `CALL_STATE_GLYPH` | — | block states, including the `empty` form the repo has no shape for |
+| 48 | surface | `CALL_STATE_GLYPH` | `design-surfaces.test.ts` | block states, including the `empty` form |
 | 49 | surface | `kind: "panel"` | `blocks.test.ts` | one block of every kind |
 | 50 | surface | `kind: "panel"` | `blocks.test.ts` | the tool-result gallery |
 | 51 | surface | `confirm-source` | `question-slot.test.ts` | approval overflow — the inspection (C23 I75) |
@@ -137,7 +137,7 @@ most-drawn line in the application.
 | 66 | surface | `FAILURE_WORDS` | `states.test.ts` | tool failures against model failures |
 | 67 | surface | `viewport` | `session-frame.test.ts` | scrolled back while a turn runs |
 | 68 | surface | `degradesTo1Bit` | `compositions.test.ts` | one exchange at three capability rungs |
-| 69 | surface | `labelSpansOf` | — | the labelled rule — the prompt's top rule, unlabelled today |
+| 69 | surface | `labelSpansOf` | — | the prompt's upper rule, labelled — built and wired through `frame.label`, and no golden sets one: every rule in the frame corpus is bare |
 | 70 | surface | `REGISTRY_THEMES` | — | /colour, tinting the chrome |
 | 71 | prose | — | — | the five permission postures |
 | 72 | surface | `resolveBackground` | — | the background as a second channel |
@@ -163,9 +163,9 @@ most-drawn line in the application.
 | 92 | prose | — | — | state tables — six more |
 | 93 | prose | — | — | three major rules it broke in its own examples |
 | 94 | prose | — | — | three tiers — content, representation, decoration |
-| 95 | surface | `tapeStart` | — | a tape, where a row of peers would shed |
-| 96 | surface | `MESSAGE_LINE_CAP\|widthRung` | — | a status has three parts, and the frame is separate |
-| 97 | surface | `kind: "panel"` | — | a transient panel floats, between two rules |
+| 95 | surface | `tapeStart` | `design-surfaces.test.ts` | a tape, where a row of peers would shed |
+| 96 | surface | `MESSAGE_LINE_CAP\|widthRung` | `design-surfaces.test.ts` | a status has three parts, and the frame is separate |
+| 97 | surface | `kind: "panel"` | `design-surfaces.test.ts` | a transient panel floats, between two rules |
 | 98 | prose | — | — | input ownership — what was in flight |
 | 99 | surface | `chipSpans` | — | wrapping, truncation and the atomic chip |
 | 100 | surface | `kind: "table"` | `table.test.ts` | a table that cannot shed, and two columns |
@@ -196,7 +196,7 @@ that is the reconciliation working, and it should be visible as a number moving 
 than inferred from a suite staying green.
 
     surface 66 · prose 37 · app 6 · total 109
-    of the surfaces: built 64 · unbuilt 2 · framed 35
+    of the surfaces: built 64 · unbuilt 2 · framed 40
 
 **`framed` is the figure this MR moves, and `built` is the one that was already
 nearly closed.** 64 of the 66 surface rows carry a probe that resolves; the two that do

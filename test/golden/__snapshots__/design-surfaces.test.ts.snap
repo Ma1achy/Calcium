@@ -1,0 +1,109 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`golden frames — one per design fixture > dark-ascii at 40 1`] = `
+"── §95 · a tape, where a row of peers would shed
+scout  planner  * builder .  2]
+── §42 · widgets — a row of peers that sheds
+auto  plan  manual  accept edits
+── §34 · active progress bars
+download      ###############....... 70%
+── §96 · a status has three parts, and a frame is separate
++--------------------------------------+
+| -------------- ERROR --------------- |
+| ! the manifest declares a tool the   |
+| registry has no handler for, so it   |
+| would classify as local and reach    |
+| the pipeline with nothing to run     |
+| at seal(): \`prune\` is marked local ~ |
++--------------------------------------+
+── §97 · a transient panel floats, between two rules
++ Confirm -----------------------------+
+|apply this change?                    |
++--------------------------------------+
+── §48 · block states
++ resolve  12 packages
+- fetch    3 remaining
+. link   
+x verify   checksum"
+`;
+
+exports[`golden frames — one per design fixture > dark-ascii at 80 1`] = `
+"── §95 · a tape, where a row of peers would shed
+scout 4s  planner 1m12s  * builder . 8s  critic 2s o  scribe 0s o
+── §42 · widgets — a row of peers that sheds
+auto  plan  manual  accept edits
+── §34 · active progress bars
+download                   ##################################............... 70%
+── §96 · a status has three parts, and a frame is separate
++------------------------------------------------------------------------------+
+|                                                                              |
+| ---------------------------------- ERROR ----------------------------------- |
+| ! the manifest declares a tool the registry has no handler for, so it would  |
+| classify as local and reach the pipeline with nothing to run                 |
+| at seal(): \`prune\` is marked local in the manifest and has no handler        |
+|                                                                              |
++------------------------------------------------------------------------------+
+── §97 · a transient panel floats, between two rules
++ Confirm ---------------------------------------------------------------------+
+|apply this change?                                                            |
++------------------------------------------------------------------------------+
+── §48 · block states
++ resolve  12 packages
+- fetch    3 remaining
+. link   
+x verify   checksum"
+`;
+
+exports[`golden frames — one per design fixture > dark-unicode at 40 1`] = `
+"── §95 · a tape, where a row of peers would shed
+scout  planner  › builder ⋅  2»
+── §42 · widgets — a row of peers that sheds
+auto  plan  manual  accept edits
+── §34 · active progress bars
+download      ███████████████░░░░░░░ 70%
+── §96 · a status has three parts, and a frame is separate
+┌──────────────────────────────────────┐
+│ ────────────── ERROR ─────────────── │
+│ ▲ the manifest declares a tool the   │
+│ registry has no handler for, so it   │
+│ would classify as local and reach    │
+│ the pipeline with nothing to run     │
+│ at seal(): \`prune\` is marked local … │
+└──────────────────────────────────────┘
+── §97 · a transient panel floats, between two rules
+┌ Confirm ─────────────────────────────┐
+│apply this change?                    │
+└──────────────────────────────────────┘
+── §48 · block states
+✓ resolve  12 packages
+⠋ fetch    3 remaining
+◌ link   
+✗ verify   checksum"
+`;
+
+exports[`golden frames — one per design fixture > dark-unicode at 80 1`] = `
+"── §95 · a tape, where a row of peers would shed
+scout 4s  planner 1m12s  › builder ⋅ 8s  critic 2s ○  scribe 0s ○
+── §42 · widgets — a row of peers that sheds
+auto  plan  manual  accept edits
+── §34 · active progress bars
+download                   ██████████████████████████████████░░░░░░░░░░░░░░░ 70%
+── §96 · a status has three parts, and a frame is separate
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│ ────────────────────────────────── ERROR ─────────────────────────────────── │
+│ ▲ the manifest declares a tool the registry has no handler for, so it would  │
+│ classify as local and reach the pipeline with nothing to run                 │
+│ at seal(): \`prune\` is marked local in the manifest and has no handler        │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+── §97 · a transient panel floats, between two rules
+┌ Confirm ─────────────────────────────────────────────────────────────────────┐
+│apply this change?                                                            │
+└──────────────────────────────────────────────────────────────────────────────┘
+── §48 · block states
+✓ resolve  12 packages
+⠋ fetch    3 remaining
+◌ link   
+✗ verify   checksum"
+`;
