@@ -185,6 +185,83 @@ So `collapse()` drops the anchor and touches **nothing** else: the caret stays, 
 
 ---
 
+## 5c. The chip — a word that happens to be painted (§099, §101, `R-COL-005`)
+
+**Two halves were built and one fact was never written down.** The buffer half
+is `insertChip` and `CHIP_BASE`: a chip is one code point, so `count`, `splitAt`,
+`wordLeft` and every other grapheme-indexed operation treats it as a character
+and none has to learn what a chip is. The drawing half is `ClusterText` and the
+walk, where the sentinel is measured **as it is drawn**. §099's *a chip is
+atomic — it never breaks across a wrap* is that walk's `if (used > 0 && used + w
+> limit) open()`, and it has held since the seam landed.
+
+**Measured before this section was written, not assumed.** A 22-cell label
+inserted after eight cells of text in a 24-cell prompt wraps whole:
+
+```
+["look at ", "[#1 pasted · 47 lines] then go"]
+```
+
+So the atomicity clause is **already satisfied** and is recorded here with a row
+watching it rather than rebuilt. What is not built is everything else §099 and
+§101 say about a chip, and two of those are the same sentence read twice.
+
+### The label is the framework's, composed from the chip's parts
+
+Today the caller hands over a finished string — `construct.ts` builds `[#1 pasted
+· 47 lines]` and the editor stores it. That makes the design's form the
+application's to get right, in every application, and §099's rule is the
+opposite: **a kind shortens itself, given the width it got**. The engine hands a
+box its solved width and the kind decides what goes in it.
+
+So `Chip` carries parts and the label is derived:
+
+| part | what it is |
+|---|---|
+| `ordinal` | `#1`, `#2` — per session and never reset. A paste has no name, so the ordinal is its identity; `[#2]` after `[#1]` was deleted is a reader seeing that something else was there, which is true |
+| `kind` | `"paste"`, `"file"` or `"image"` — what the chip *is*, which decides the preview and nothing about the label |
+| `name` | what a reader calls it: a paste's detected content kind (`json`), a file's basename (`package.json`) |
+| `lines` | the size, drawn `47L`. Absent for an image, which is not measured in lines |
+| `content` | what the chip stands for, and what `resolved` substitutes — unchanged |
+| `target` | what the preview opens, when that is not the content: a path for a file. Opaque here; C17 never reads it |
+
+### Brackets are the unpainted rung of a painted thing
+
+**The fixtures show two forms and the difference is the paint.** §099 draws
+`#1 json · 47L` with a space either side and §101 draws `#1 package.json`
+the same way; `R-BLK-078` and `R-BLK-336` draw `[parse.ts · 184L]` and
+`[#1 json · 47L]`. Read as two label formats that would be the design
+contradicting itself, and it is not: §099's own caption is *a chip is one word
+that happens to be **painted***, and a plain-text fixture cannot show a ground,
+so it shows the ground's own leading and trailing space instead. The bracket is
+what says *chip* where there is no ground to say it — the same ladder the head
+mark takes, and the same one `selectionStyle` takes from a wash to `inverse`.
+
+So one form, two rungs:
+
+| rung | drawn |
+|---|---|
+| with colour | `␠#1 json · 47L␠` on `surface.bgDeep`, in `tone.meta` (`R-BLK-628`, `R-BLK-116`) |
+| 1-bit | `[#1 json · 47L]`, no ground |
+
+The separator is `glyphs(caps).separator`, so the ASCII tier takes `·` → `-`
+from the same place every other separator in the frame does.
+
+### The ground comes off the walk, as the selection's does
+
+A chip is painted and the walk returns strings, so the cells it occupies have to
+reach the painter. **That mechanism exists**: `selectionSpans` already returns
+`CellSpan`s off this same walk and `washed()` applies a style to a cell range of
+a painted row. `chipSpans` is that function's sibling, and painting is `washed`'s
+shape with a different style — which is why this costs a seam already argued for
+rather than a second way of styling the prompt.
+
+**One walk still** (I18): `chipSpans` shares `walk` with `layout`, `displayRows`,
+`cursorCell` and `selectionSpans`, so a chip's ground cannot land anywhere but
+where its label was measured.
+
+---
+
 ## 6. Undo
 
 Required, not optional: C16 commits that a paste is undoable as one edit (C16 T4.6), which is only meaningful if undo exists.
@@ -405,6 +482,9 @@ the space at index 77; `--seed=1234` does not fit and moves whole.
 - **I23** — **`collapse()` leaves the caret where it is, the text unchanged and the undo history untouched; only the region goes.** Not a motion and not an edit, so it takes neither's bookkeeping. The distinction from `move` is the caret: a collapse implemented as a motion is right about the region and wrong about where the caret is, which a test reading `selection` alone cannot see.
 - **I24** — **`layout` answers from a one-entry memo keyed on the buffer, the width and both gutter figures**, and `displayRows` reads that memo rather than walking again, so I18's *one walk* becomes one per distinct question instead of one per call — 4.97 calls a frame measured, against a buffer that had changed on none of them (F914). **The chip table is deliberately absent from the key.** `drawAs` resolves a sentinel through it, so the obvious reading is that it belongs there; it does not, because `insertChip` is the table's only writer and it mints a fresh sentinel and inserts it in the same call. A chip can therefore never be registered for a cluster already in the buffer, and the buffer moving is a strict precondition for the table moving. **That precondition is the memo's whole blind spot, and it is a property of the writer rather than of the key** — a second writer that registered a chip without inserting its sentinel would leave this memo stale, and nothing here would see it. T1.43 pins the precondition for the writer that exists and cannot watch one that does not; the limit is recorded rather than papered over with a key term that no input can make differ (A03 §2's vacuity class, arriving in a key).
 
+- **I25** — *(§5c, §099, §101, `R-COL-005`, `R-BLK-628`, `R-BLK-116`)* **A chip's label is composed from its parts by C17, never supplied as a string.** `ordinal`, `kind`, `name` and an optional `lines`; the separator is the glyph table's, so the ASCII tier is taken from the same place every other separator is. Two rungs and one form: with colour, the name on `surface.bgDeep` in `tone.meta` with one space either side; at 1-bit, the same text in brackets and no ground. **The bracket is the unpainted rung of a painted thing** — §099's own caption is *a chip is one word that happens to be painted* — and reading the fixtures' two spellings as two formats is what would make the design contradict itself.
+- **I26** — *(§5c, §099, I18, I20)* **A chip is one wrap unit and its ground comes off the same walk that measured it.** The atomicity is `walk`'s existing *a cluster that does not fit moves whole* and was satisfied before this section was written; `chipSpans` returns the cell ranges a chip occupies, as `selectionSpans` returns the region's, so nothing measures a chip twice and a ground cannot land where the label was not. A chip wider than the whole row still overflows rather than being dropped (I20) — an editor never alters what the user typed, and a chip is what the user pasted.
+
 ---
 
 ## 9. Commitments
@@ -432,6 +512,9 @@ the space at index 77; `--seed=1234` does not fit and moves whole.
 21. An edit over a region replaces it in one undo unit; `killTo` collapses rather than cutting; and a region does not survive an undo (I22).
 22. `collapse()` drops the region without moving the caret, changing the text or touching the undo history — the one collapse that is neither a motion nor an edit, for native selection (I23).
 23. `layout` memoises its last answer on buffer, width and gutter, and `displayRows` reads it, so a frame that asks five times walks the prompt once. The chip table is out of the key because its only writer moves the buffer in the same call, and that is a blind spot rather than a proof (I24).
+
+24. A chip's label is C17's, composed from `ordinal`, `kind`, `name` and `lines` — not a string the application assembles, which would put §099's form in every application separately (I25).
+25. A chip is painted, and the bracket is the rung where there is no ground to paint with. One form, two rungs, and the fixtures' two spellings are the two rungs rather than two formats (I25, I26).
 
 ---
 
@@ -486,6 +569,10 @@ test rather than as its steps: the sequence is what the invariants do not constr
 - **T1.42** (I23): a region open, `collapse()` → `selection === null`, the cursor **where the head was** (not where `charLeft` would put it — the control that tells a collapse from a motion), the text unchanged, `undoDepth` unchanged; and on a bare caret it is a no-op.
 - **T1.43** (I24): the memo agrees with a fresh walk — §7b's buffer at a spread of widths and both gutters, each answer equal to a freshly constructed editor's first, `displayRows` equal to `layout().length` on both, and the rows **frozen**, which is the hazard the memo creates rather than one it inherits. Then the four invalidations, one key term each, because a memo that serves a stale answer passes every agreement row: an edit, a second width, and the gutter's two figures **moved one at a time and each from a fresh editor**. Both of those clauses were learnt from survivors. Written as `{2,2}` against `{0,0}` the gutter row moved both figures, so `cont` caught the mutation and `first` was never the deciding term; written against one editor, the second call missed on `first` before `cont` could decide, so `cont` survived a row that read as covering it. And the `cont` half needs a buffer whose continuation rows are *full* — §7b's carry eleven cells and eight and fit whatever `cont` is. Last, the precondition I24 rests on rather than the key term it rejected: **`insertChip` moves the buffer**, so a chip can never be registered behind a buffer the memo has already answered for. That row watches the writer that exists and is silent about one that does not — the blind spot stated, not closed.
 - **T1.31** (I22): a region open, `undo` → no region afterwards. The control is the kill buffer in the same row, which **does** survive — I16 and I22 in opposite directions, asserted together so neither can be satisfied by a rule that collapses everything or nothing.
+- **T1.44** (I25, §5c): the label is composed, not carried — a chip minted with `{ordinal: 1, kind: "paste", name: "json", lines: 47}` draws `#1 json · 47L` between two spaces with colour and `[#1 json · 47L]` at 1-bit, and an image chip with no `lines` draws neither a separator nor a bare `L`. The ASCII tier takes the glyph table's separator, asserted against `glyphs()` rather than against a literal, so the row cannot pass by agreeing with a copy.
+- **T1.45** (I26, §5c, §099): a chip moves whole — a label that does not fit the cells left on a row appears in full on the next, and no row holds a prefix of it. Asserted over the whole label rather than at one width, because a half-painted chip is *two things that look like chips* and a row checking only the first cell cannot tell them apart. **This was already true when the section was written**, so the row is a watch on a built property, and its fabricated violation is the walk's atomicity removed.
+- **T1.46** (I26, §5c): `chipSpans` agrees with the walk that drew the label — every span's cells slice exactly the chip's label out of the row `layout` returns, at a spread of widths and on both sides of a wrap. A span that is right about the row and wrong about the column paints the prompt's own text as a chip, and no assertion about the presence of a ground would see it.
+- **T1.47** (I25, §5c, I20): a chip wider than the whole row overflows rather than being dropped, and its span still names the cells it took. The editor never alters what the user typed, and a chip is what the user pasted.
 
 ### Tier 2 — contract / interface
 
