@@ -2632,6 +2632,8 @@ the same overrun in smaller form.
 - **I86** — *(§7a, `R-SEL-004`)* **A kind declares its copy text, and a kind that declines is absent from the join rather than empty in it.** `BlockDefinition.copy` is the block-level pair of `NavElement.copy` and carries the same rule — the **source**, never the rendering — so a `table` copies as TSV with its header including the columns this width dropped, a `patch` as unified diff rather than the rendered two-column view, an `image` as its alt text and its path. The default is **omission, not the empty string**: a blank line is `R-SEL-004`'s entry separator, so a kind joining as `""` forges an entry boundary inside one. Measured before the seam existed: `copyTextOf` answered six kinds and `""` for the rest, so five of the seven kinds the rule names by name copied blank — and a `scroll` holding a table produced a copy that succeeded and was empty.
 - **I87** — *(§7b, `R-SEL-002`)* **Nothing is drawn to the left of a block's *head*, on any row.** `R-SEL-002`'s *a wrapped line's continuation carries no decoration in the gutter*, generalised past `notice`: the gutter is the columns before content begins, and anything put there on a continuation row is picked up by a naive drag as though it were text. **The rail is not a carve-out** (I41) — it fills columns **at** the head's own first column and never before it — so the property is one sentence over every kind rather than a list with an exception, and a kind joins the check by being in the registry. The reference is the **head** — the block's first drawn row — and taking the *minimum over its rows* instead is a **tautology**: nothing can be left of the minimum over the same rows, so the property would be satisfied by every input including the defect it names. That was written first and caught by the row's own control rather than by review, which is A03 §2's class arriving in a checker. The constraint is on **layout**, which is `R-SEL-002`'s own last sentence and the reason this is a row over the whole corpus rather than a comment in one kind (→ I41, C04 I95).
 
+- **I88** — *(§7c, `R-TAB-001`, `R-COR-003`, `R-GLY-003`)* **Every `current` registry glyph resolves to a mark this tree can draw, and a carrier is made of marks.** The carrier matrix is `stateTableGroups` and it is already normative — fourteen components, seven facts each, every one naming at least two carriers — so what this repository owes is not a second copy of it but the marks it is written in. **Measured when the rule was written: three are absent** — `question` `⟩` is in no file in `src/` while both question components name it as their first carrier, `current` `›` exists only in `overlay/place.ts` under another meaning, and `reader` `❯` lives in the shell's config. `SS64` cannot see any of them, and the reason is structural rather than an oversight: it is a **collision** rule, so it compares marks appearing on both sides and a mark with no character never enters a pair. A glyph living outside `glyphs.ts` is named with where and why; a glyph whose subject is unbuilt names the MR, and that entry is itself a violation the day the MR lands (→ I45, C10 I26).
+
 ## 7a. `copy` — a kind's source, one level up from an element's
 
 `R-SEL-004` is a per-kind rule and it is written about **blocks**: *prose copies as
@@ -2717,6 +2719,62 @@ found it — not review, which read the first phrasing as correct.
 phrasing: `quote` draws on every row *at* the head's first column, so it satisfies
 the property unchanged, and a carve-out for it would have been a hole the next
 decoration could walk through.
+
+---
+
+## 7c. The carrier matrix, and the marks it is made of
+
+`R-TAB-001`: *every registered component declares entry, carriers, actions,
+escape, motion-off form, one-bit form, and residue; state tables are generated
+from those records.* `R-COR-003`: *every actionable, status, and interaction
+distinction has two independent carriers and survives without colour.*
+
+**The matrix is not authored here. It is already in the registry** —
+`stateTableGroups`, fourteen components, each with those seven facts — and
+nothing in this repository reads it. That is the gap: a matrix that specifies
+and an implementation that was never held to it.
+
+### What the records already satisfy, measured
+
+All fourteen `current` components declare all seven facts, non-empty, and every
+one names **at least two** carriers: five for a call, four for a choice, a patch
+and a plot, three for eight more, two for the rest. So `R-TAB-001`'s completeness
+and `R-COR-003`'s *two* are green against the registry today, and the gate for
+them is a **guard** — what it stops is the fifteenth component arriving with a
+`carriers` line and no `one-bit` one.
+
+### What they do not satisfy, and it is the tree's half
+
+**A carrier is made of marks, and three of the marks these records name do not
+exist here.** Read out of `stateTableGroups` and matched against the tree's glyph
+vocabulary:
+
+| The registry's glyph | Named by | In the tree |
+|---|---|---|
+| `question` `⟩` / `?` | `a-question-choice`, `a-question-text` — both as their **first** carrier | **in no file in `src/`** |
+| `current` `›` / `*` | `a-question-choice`'s one-bit form — *`›` on the focused choice* | only in `overlay/place.ts`, in no glyph table |
+| `reader` `❯` / `$` | the prompt | in `shell/config.ts`, in no glyph table |
+
+**This is F161's shape with the consumers actually present.** That finding was a
+shared mark with four named consumers and no character in the repository; here
+the character is the one missing and the consumers are real — every question this
+framework draws. And `›` is worse than absent: it is present under a different
+meaning, in the layer that places overlays.
+
+**Why no existing gate catches it.** `SS64` reads the registry and `glyphs.ts`
+and compares the marks that appear **on both sides** — it is a collision rule, so
+a glyph that is absent from one side simply never enters a pair. A rule about two
+marks sharing a character cannot see a mark with no character, and nothing else
+was looking.
+
+### The rule
+
+- Every `current` registry glyph resolves to a mark this tree can draw.
+- A glyph whose home is outside `glyphs.ts` is named with **where** and **why**,
+  as `MARK_EXEMPTIONS` names its sites — an exemption records the premise so the
+  premise can be re-checked rather than inherited.
+- A glyph whose subject is unbuilt names the MR that builds it, and the entry is
+  itself a violation the day that MR lands.
 
 ---
 
@@ -3097,6 +3155,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.45** (I32): `FULL_CAPS` and `WIDE_CAPS` give the default the same frames, and a `narrowOnly` set gives its ASCII pair at `wide`. **Both routes to the ASCII pair, because a set can reach it by width or by `unicode: "ascii"`** and one assertion cannot tell which fired.
 - **T3.46** (I31, §3a): the tag is the only painted run — **exactly one** background introducer in the whole frame at 24-, 8- and 4-bit — and the pair moves together at every rung, so a ground with no ink and an ink with no ground are both failures. At 1-bit neither arrives and the `▲` and the word are what carry it. **The depths are asserted apart and were not**: one arm covering 4 and 1 together stated a forced absence at a rung that has a ground (F240).
 - **T3.47** (I31, §3a): the ASCII arm draws `+ - |` and `!`, and **no box-drawing codepoint appears in the frame** — asserted over the whole frame rather than over the corners, because a border is four glyphs and a mistake is usually one of them.
+- **T2.155** (I88, §7c, `R-GLY-003`): every `current` glyph and delimiter in the registry × the tree's glyph vocabulary → each resolves to a mark, or is named in the scan's own exemption list with its home and its reason. **The control is the rule's own first run**: it named `question`, `current` and `reader`, which is three glyphs `SS64` has read past on every commit since it landed — a collision rule compares the marks on both sides and a mark with no character never enters a pair.
 - **T2.154** (I87, §7b, `R-SEL-002`): over the whole corpus × the wrapping widths → no row of any block begins left of that block's **head**. Stated over columns rather than over tokens, so a kind joins by being in the registry; the rail needs no carve-out, because it draws at the head's own column and not before it. **The control is a fabricated block that fails it** — two rows, the second beginning one column left of the first — so the row is known to be able to see the defect rather than assumed to be. It earned its place immediately: the first phrasing took the minimum over the block's own rows and was green against that control, and nothing but the control would have said so.
 - **T2.10a** (I34, I11): **golden frames for the contained failure**, three messages × three widths × three variants, both frames of the two-frame path. **There were none**, through three commits about this path: nothing in `test/golden/` rendered a definition that throws, so golden passed each time on the absence of a subject rather than the absence of a change. Frame 1 is recorded too, because F230's ruling makes the short box a specified state rather than a transient.
 - **T3.48** (I31): `status` declares no `window`, and `windowSequence` keeps it whole and pays for it out of `skipRows` — `plot`'s and `scroll`'s case, and the same assertion.
