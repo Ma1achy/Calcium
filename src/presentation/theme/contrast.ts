@@ -222,21 +222,17 @@ const DIFF_SLOTS: Readonly<Record<string, readonly string[]>> = Object.freeze({
 });
 
 /**
- * §4b — the selection wash, and exactly one slot lands on it.
+ * §4b — the selection wash, and the floor it always had.
  *
- * **`tone.default` alone, and the narrowness is the same decision `DIFF_SLOTS`
- * makes rather than a smaller version of it.** The prompt's text is `default`;
- * ghost text is `muted` and is drawn *after* the buffer's last cluster, so it is
- * adjacent to a selection and never inside one.
+ * **`tone.default` is the pairing every theme has whether it says so or not.**
+ * The prompt's text is `default` and no theme composes it away, so it is the one
+ * ref that cannot be derived from a theme's own declarations — a pairing read
+ * only off `composed` would be empty for a theme that composes nothing, which is
+ * a scope that shrinks to nothing exactly where a theme is plainest.
  *
- * **The measured figures, because they are what would tempt a widening.** On the
- * light theme `muted` is 2.14–2.42 : 1 against every candidate wash, under its own
- * 2.5 floor — so pairing it would reject a theme for a failure nobody can see, and
- * the fix would look like weakening the check. That is C10 §4's argument for
- * excluding `bgDeep`, in the mirror: do not validate a slot against a surface that
- * slot never lands on.
+ * Everything else on this ground is derived: see `selectionPairs` (C10 I49).
  */
-const SELECTION_SLOTS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+const SELECTION_BASE: Readonly<Record<string, readonly string[]>> = Object.freeze({
   tone: Object.freeze(["default"]),
 });
 
@@ -322,13 +318,36 @@ export function selectionPairs(
   const hex = tokens.surfaces.selection;
   if (!isHex(hex)) return Object.freeze([]);
 
+  // **The pairing is derived from the theme's own compositions** (C10 I49,
+  // §4b.1). A composed `(ground, ref)` value is the design saying *this ref
+  // lands on this ground* — nobody repaints a slot for a surface it never
+  // meets — so the scope rule is unchanged and its premise is read off the
+  // design instead of off this tree's prompt.
+  //
+  // **It had to be derived rather than widened by hand, and the reason is what
+  // this closes.** The list was `tone.default` alone on an argument that was
+  // right about the prompt and not about the transcript; meanwhile the
+  // generator's `^`-anchored selector match dropped seven declared values,
+  // every one of them on this ground and six of them `muted`. A list nobody
+  // edits cannot notice a value nobody delivered. Derived, the two move
+  // together: a composition that arrives enters the check on the same commit,
+  // and one that stops being declared leaves it.
+  const refs = new Set<string>();
+  for (const [palette, slots] of Object.entries(SELECTION_BASE)) {
+    for (const slot of slots) refs.add(`${palette}.${slot}`);
+  }
+  for (const ref of Object.keys(tokens.composed?.["surface.selection"] ?? {})) refs.add(ref);
+
   const out: (readonly [string, string, string, string])[] = [];
-  for (const [palette, slots] of Object.entries(SELECTION_SLOTS)) {
-    for (const slot of slots) {
-      const value = tokens.palettes[palette]?.slots[slot];
-      if (value === undefined || !isHex(value)) continue;
-      out.push([palette, slot, "selection", hex]);
-    }
+  for (const ref of [...refs].sort()) {
+    const [palette, slot] = ref.split(".");
+    if (palette === undefined || slot === undefined) continue;
+    // **The flat slot must exist, and a composition for a slot the palette does
+    // not carry is not a pairing.** `inkOn` would answer with the composed value
+    // and the pair would read as measured, on a ref no palette can resolve.
+    const value = tokens.palettes[palette]?.slots[slot];
+    if (value === undefined || !isHex(value)) continue;
+    out.push([palette, slot, "selection", hex]);
   }
   return Object.freeze(out);
 }

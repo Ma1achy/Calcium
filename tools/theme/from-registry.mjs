@@ -148,16 +148,31 @@ function tokensFor(themeId) {
   for (const rule of registry.themeRules) {
     if (SKIP_SELECTORS.test(rule.selector)) continue;
     // **Ink ON a ground** — `.bg-X .c-Y`, which the registry writes twice in one
-    // selector (descendant and same-element) for the HTML's sake. One pairing.
-    const pair = rule.selector.match(
-      /^\[data-theme="([a-zA-Z]+)"\] \.bg-([a-zA-Z-]+) \.c-([a-zA-Z-]+)/);
-    if (pair !== null) {
-      if (pair[1] !== themeId) continue;
+    // selector (descendant and same-element) for the HTML's sake.
+    //
+    // **That was read as *one pairing per rule*, and the first half of the
+    // sentence is what made the second look checked** (C10 §4b.1). Both forms
+    // of one pairing is true of every rule; it does not follow that a rule
+    // carries one pairing. Six registry rules name several tones in one
+    // selector list — `.bg-selection .c-dim, …, .bg-selection .c-muted, …,
+    // .bg-selection .c-meta, …` is three — and an anchored match took the
+    // first and `continue`d past the rest. **Seven declared values never
+    // reached the token set**, all on `selection`, six of them `muted`, and
+    // no floor could see the loss because `SELECTION_SLOTS` excluded exactly
+    // those tones. So the selector list is split and every member is read.
+    const pairs = rule.selector
+      .split(",")
+      .map((sel) => sel.trim().match(/^\[data-theme="([a-zA-Z]+)"\] \.bg-([a-zA-Z-]+) \.c-([a-zA-Z-]+)$/))
+      .filter((m) => m !== null);
+    if (pairs.length > 0) {
       const colour = rule.declarations.match(/(?:^|;)color:(#[0-9a-fA-F]{3,8})/);
-      if (colour === null || HUE.test(pair[2]) || HUE.test(pair[3])) continue;
-      const ground = `surface.${pair[2]}`;
-      composed[ground] ??= {};
-      composed[ground][`tone.${pair[3]}`] = norm(colour[1]);
+      for (const pair of pairs) {
+        if (pair[1] !== themeId) continue;
+        if (colour === null || HUE.test(pair[2]) || HUE.test(pair[3])) continue;
+        const ground = `surface.${pair[2]}`;
+        composed[ground] ??= {};
+        composed[ground][`tone.${pair[3]}`] = norm(colour[1]);
+      }
       continue;
     }
     const match = rule.selector.match(/^\[data-theme="([a-zA-Z]+)"\] (\.[a-zA-Z-]+)$/);

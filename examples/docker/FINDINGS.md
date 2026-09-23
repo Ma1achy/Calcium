@@ -56136,3 +56136,38 @@ partition, a `hasView` accessor, an overlay push refusal, a `RefreshHost` arm
 with its two driver seams, `disposingOnRelease`, and 491 lines of owner. Six
 invariants retire (C15 I1's nesting clause, C16 I33, C28 I49–I51) and C28 I52
 keeps its figure with a different reason.
+
+## F1255 — a guard whose mutation survives because nothing ships its case ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | `selectionPairs`' check that a composed ref resolves to a flat palette slot (C10 I49, §4b.1). |
+| **Reached for** | the mutation pass on the derived selection pairing, M11. |
+| **Verdict** | **The survivor was about the corpus, not the tests and not the code — the guard is necessary and no shipped theme can exercise it.** |
+
+Deleting the guard changed nothing any row could observe, so the mutation lived
+and the run went red. The reflex reading is *the tests are weak*; the reading
+before that one is F277's — **ask why the mutation cannot reach the test**. It
+could not, because every composed `(ground, ref)` in the shipped token set names
+a slot its palette carries. There is no theme in the tree with the state the
+guard exists for.
+
+**Unnecessary and untested look identical from a green run**, which is the whole
+difficulty. The guard is necessary: `inkOn` answers with a composed value whether
+or not a flat slot exists, so without it the pairing reports a measured floor for
+a ref the palette cannot resolve — a check green because it is asking about
+nothing, which is A03 §2 one level down from where the section already found it.
+
+**The remedy is a constructed state, not a rewritten mutation.** T1.45 builds a
+theme carrying `composed["surface.selection"]["tone.nosuch"]`, asserts `inkOn`
+answers for it — which is what makes the guard load-bearing — and asserts no pair
+is formed. The mutation then dies on that row. A mutation that a corpus cannot
+reach is a finding about the corpus, and the cheapest fix is to give the corpus
+the case rather than to weaken the claim.
+
+**The third disposition for a survivor, in its rarest form.** The usual two are
+*the test is weak* and *the sentence cannot be violated*. This is neither: the
+code is right, the sentence is violable, and the tree has no instance. The tell
+is a mutation whose removal leaves every assertion's *value* unchanged — not a
+failing comparison anywhere, just nothing different to compare.
+

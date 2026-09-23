@@ -1002,23 +1002,37 @@ describe("C10 contract", () => {
     }
   });
 
-  it("T2.14d (§4b): the selection pairing is `tone.default` alone, and is not the diff one", () => {
+  it("T2.14d (§4b, §4b.1, I49): the selection pairing is derived from the theme's own compositions, and is not the diff one", () => {
     // **Written because widening `diffPairs` was the first attempt and four
     // rows refused it** — T2.14b above states outright that `tone.default`
     // must not be in the diff pairing, and it was right: a function whose name
     // says one thing and whose contents say two stops being readable. The
     // sibling is asserted here so the split cannot quietly become a merge.
+    //
+    // **The row asserted `tone.default` alone, and that clause is retired**
+    // (C10 §4b.1). It was right about the prompt — ghost text is `muted` and is
+    // drawn after the buffer's last cluster — and the design's selection is the
+    // transcript's too: the registry repaints nine tones on this ground across
+    // nine themes, `muted` among them in six. A composed value *is* the design
+    // saying the ref lands here, so the scope rule is unchanged and only its
+    // premise moved. What stays asserted is the split from `diffPairs` and the
+    // one pairing every theme has whether or not it composes anything.
     for (const [variant, tokens] of SHIPPED) {
       const pairs = selectionPairs(tokens);
-      expect(pairs.map(([palette, slot]) => palette + "." + slot), variant).toEqual([
-        "tone.default",
-      ]);
+      const refs = pairs.map(([palette, slot]) => palette + "." + slot);
+      expect(refs, variant).toContain("tone.default");
       expect([...new Set(pairs.map(([, , surface]) => surface))]).toEqual(["selection"]);
-      // `muted` is deliberately not paired, and C10 §4b carries the measured
-      // reason: on light it sits under its own floor against every candidate
-      // wash. Ghost text is muted and is drawn after the buffer's last
-      // cluster, so it is adjacent to a selection and never inside one.
-      expect(pairs.map(([, slot]) => slot), variant).not.toContain("muted");
+      // **Derived, so it is exactly the theme's compositions plus the base.** An
+      // equality rather than a membership test: a derivation that quietly
+      // returned every slot in the palette would satisfy `toContain` on all of
+      // them, which is the shape this row's first version was guarding against
+      // from the other side.
+      const composed = Object.keys(tokens.composed?.["surface.selection"] ?? {})
+        .filter((ref) => {
+          const [family, slot] = ref.split(".");
+          return tokens.palettes[family ?? ""]?.slots[slot ?? ""] !== undefined;
+        });
+      expect(refs.slice().sort(), variant).toEqual([...new Set(["tone.default", ...composed])].sort());
     }
   });
 
@@ -1310,12 +1324,21 @@ describe("C10 I48 — the ink a slot takes on the ground it lands on", () => {
     expect(pairs, "the sweep's own size").toBe(380);
     // **And the sweep is not vacuous**, which is the half a pass cannot report:
     // an equality that held because nothing composes is A03 §2's vacuity class
-    // wearing this row's name. **166 of the 380 pairs move**, pinned rather than
+    // wearing this row's name. **178 of the 380 pairs move**, pinned rather than
     // bounded — 72 of them are the two banded themes, where every slot takes the
-    // band's single ink, and the other 94 are per-slot compositions across
+    // band's single ink, and the other 106 are per-slot compositions across
     // `dark`, `light`, `ink`, `warm`, `nord`, `viol`, `mono` and `paper`. A
     // theme that stops composing for a ground is what this catches, and a bound
     // would let the last one go quietly.
-    expect(composed, "pairs where the ground moves the ink").toBe(166);
+    //
+    // **166 until the generator read every selector in a rule** (C10 §4b.1). It
+    // took one pairing per registry rule under a comment that was true about the
+    // two selector forms and wrong about the rule, and dropped seven declared
+    // values — which `withDerived` then failed to propagate, so thirteen token
+    // entries were missing. Twelve of the thirteen are meaning slots and land in
+    // this figure; `mono`'s `categorical.c4` is decoration and outside the
+    // nineteen. The figure moving is the fix arriving, and it moves by exactly
+    // what the loss was.
+    expect(composed, "pairs where the ground moves the ink").toBe(178);
   });
 });

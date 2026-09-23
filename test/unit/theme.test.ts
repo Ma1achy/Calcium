@@ -24,7 +24,11 @@ import {
   VISIONS,
 } from "../../src/presentation/theme/index.js";
 import { floorFor } from "../../src/presentation/theme/index.js";
-import { REQUIRED_SLOTS } from "../../src/presentation/theme/contrast.js";
+import { inkOn, REQUIRED_SLOTS, selectionPairs } from "../../src/presentation/theme/contrast.js";
+import type { ThemeTokens } from "../../src/presentation/theme/types.js";
+
+/** The registry's theme-independent hue vocabulary, which is not a tone. */
+const HUE = /^h-|^hi-/;
 import { computeQuantisation, cubeHexOf, quantisationKey, quantiseSet } from "../../src/presentation/theme/quantise.js";
 import { QUANTISED } from "../../src/presentation/theme/quantised.generated.js";
 import { caps, DEPTHS, store, SURFACES, TONES, withTone } from "../support/theme.js";
@@ -888,10 +892,119 @@ describe("C10 I48 — the ground down the degradation ladder", () => {
 });
 
 describe("C10 §4b.1 — the pairing the registry declares", () => {
-  it.todo(
-    "T1.44 (C10 I49, §4b.1): every registry composition is carried by tokens.generated.ts at the design's value, read per selector and not per rule, the control being a rule naming three tones in one selector list — not deferred on a component: the generator's fix lands in this MR",
-  );
-  it.todo(
-    "T1.45 (C10 I49, §4b.1): SELECTION_SLOTS is derived from the registry's compositions so it holds muted and meta, and every derived pairing clears its floor through inkOn — not deferred on a component: red today at mono meta on selection 3.86 against 4.5, closed by the design's own value in this MR",
-  );
+  /** `.c-` compositions the registry declares, read per **selector**. */
+  const declared = (): Map<string, string> => {
+    const registry = JSON.parse(
+      readFileSync("docs/design/language/calcium-registry.json", "utf8"),
+    ) as { themeRules: { selector: string; declarations: string }[] };
+    const out = new Map<string, string>();
+    for (const rule of registry.themeRules) {
+      const colour = /(?:^|;)color:(#[0-9a-fA-F]{3,8})/.exec(rule.declarations);
+      if (colour === null) continue;
+      for (const sel of rule.selector.split(",")) {
+        const m = /^\[data-theme="([a-zA-Z]+)"\] \.bg-([a-zA-Z-]+) \.c-([a-zA-Z-]+)$/.exec(sel.trim());
+        if (m === null || HUE.test(m[2] ?? "") || HUE.test(m[3] ?? "")) continue;
+        out.set(`${m[1] ?? ""}|${m[2] ?? ""}|${m[3] ?? ""}`, (colour[1] ?? "").toLowerCase());
+      }
+    }
+    return out;
+  };
+
+  it("T1.44 (C10 I49, §4b.1): every registry composition reaches the token set at the value it declares", () => {
+    // **The only row in this tree that can see a value go missing** (§4b.1).
+    // T1.45 derives its pairing from `composed`, so a composition the generator
+    // drops takes its own pair with it and the scope is green about the loss.
+    // This reads the design instead, which is the corpus the loss is absent from.
+    const want = declared();
+
+    // The control, and it is the defect restated: the reading that shipped took
+    // one pairing per rule, anchored at the selector's start. Six registry rules
+    // name several tones in one selector list, so an anchored reading is strictly
+    // smaller — and if it is not, this row is comparing the design with itself.
+    const firstOnly = new Set<string>();
+    const registry = JSON.parse(
+      readFileSync("docs/design/language/calcium-registry.json", "utf8"),
+    ) as { themeRules: { selector: string; declarations: string }[] };
+    for (const rule of registry.themeRules) {
+      const m = /^\[data-theme="([a-zA-Z]+)"\] \.bg-([a-zA-Z-]+) \.c-([a-zA-Z-]+)/.exec(rule.selector);
+      if (m === null || HUE.test(m[2] ?? "") || HUE.test(m[3] ?? "")) continue;
+      if (/(?:^|;)color:#/.test(rule.declarations)) firstOnly.add(`${m[1] ?? ""}|${m[2] ?? ""}|${m[3] ?? ""}`);
+    }
+    expect(want.size, "reading every selector finds more than reading the first").toBeGreaterThan(firstOnly.size);
+    expect(
+      [...want.keys()].filter((k) => !firstOnly.has(k)).sort(),
+      "and the seven the anchored reading dropped are the ones this row exists for",
+    ).toEqual([
+      "dark|selection|muted",
+      "ink|selection|muted",
+      "light|selection|muted",
+      "mono|selection|meta",
+      "mono|selection|muted",
+      "nord|selection|muted",
+      "warm|selection|muted",
+    ]);
+
+    const missing: string[] = [];
+    for (const [key, hex] of want) {
+      const [theme = "", ground = "", tone = ""] = key.split("|");
+      const tokens = (defaultTheme as Record<string, ThemeTokens | undefined>)[theme];
+      if (tokens === undefined) continue;
+      const got = inkOn(tokens, `tone.${tone}`, ground).toLowerCase();
+      if (got !== hex) missing.push(`${key} · design ${hex} · tree ${got || "(none)"}`);
+    }
+    expect(missing, "every declared composition, at the value declared").toEqual([]);
+  });
+
+  it("T1.45 (C10 I49, §4b.1): the selection pairing is derived, and every pair clears its floor", () => {
+    // **Green before the seven values landed and green after, and that is the
+    // row's stated limit** (§4b.1). What it buys is the next failure: a composed
+    // ref arriving below its floor is caught on the commit that adds it, where
+    // before, nothing but `tone.default` was measured on this ground at all.
+    for (const [name, tokens] of Object.entries(defaultTheme)) {
+      const pairs = selectionPairs(tokens);
+      const refs = pairs.map(([p, sl]) => `${p}.${sl}`);
+      expect(refs, `${name} keeps the pairing every theme has`).toContain("tone.default");
+      for (const [palette, slot, surface, hex] of pairs) {
+        const ink = inkOn(tokens, `${palette}.${slot}`, surface);
+        expect(ratio(ink, hex), `${name} ${palette}.${slot} on ${surface}`).toBeGreaterThanOrEqual(floorFor(slot));
+      }
+    }
+
+    // **The scope actually widened**, asserted per theme so a derivation that
+    // silently returned the base list could not pass: `muted` and `meta` are the
+    // two the old list excluded and the design repaints.
+    const mono = (defaultTheme as Record<string, ThemeTokens | undefined>)["mono"];
+    expect(mono, "mono ships").toBeDefined();
+    const monoRefs = selectionPairs(mono as ThemeTokens).map(([p, sl]) => `${p}.${sl}`);
+    expect(monoRefs).toContain("tone.muted");
+    expect(monoRefs).toContain("tone.meta");
+    expect(selectionPairs(mono as ThemeTokens).length, "and it is not one pair").toBeGreaterThan(1);
+
+    // **A composition for a slot no palette carries forms no pair, and the state
+    // is constructed because nothing ships it.** The guard reads as defensive
+    // and its mutation survived the pass — every composed ref in the shipped
+    // token set resolves, so removing the check changed nothing observable, and
+    // a green run said the guard was untested rather than unnecessary. It is
+    // necessary: `inkOn` answers with the composed value whether or not a flat
+    // slot exists, so an unguarded pairing would report a measured floor for a
+    // ref the palette cannot resolve — a check green because it asks nothing.
+    const fabricated = {
+      ...(mono as ThemeTokens),
+      composed: {
+        ...(mono as ThemeTokens).composed,
+        "surface.selection": {
+          ...((mono as ThemeTokens).composed?.["surface.selection"] ?? {}),
+          "tone.nosuch": "#b8b8b8",
+        },
+      },
+    } as ThemeTokens;
+    expect(
+      inkOn(fabricated, "tone.nosuch", "selection"),
+      "inkOn answers for it, which is what makes the guard necessary",
+    ).toBe("#b8b8b8");
+    expect(
+      selectionPairs(fabricated).map(([p, sl]) => `${p}.${sl}`),
+      "and no pair is formed for it",
+    ).not.toContain("tone.nosuch");
+  });
 });

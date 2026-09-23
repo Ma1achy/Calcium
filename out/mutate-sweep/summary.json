@@ -1,15 +1,15 @@
 {
   "label": "all",
-  "only": "c09-continuation",
+  "only": "c10-selection-pairing",
   "rows": [
     {
-      "run": "c09-continuation.mjs",
+      "run": "c10-selection-pairing.mjs",
       "exit": 0,
-      "seconds": 549,
+      "seconds": 28,
       "state": "green",
       "restored": 0,
-      "caught": 8,
-      "elsewhere": 0,
+      "caught": 4,
+      "elsewhere": 1,
       "survived": 0,
       "anchorMissed": 0,
       "unbuilt": 0,
