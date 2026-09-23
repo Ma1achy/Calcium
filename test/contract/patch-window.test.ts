@@ -7,19 +7,16 @@
 // offset asked for. So every test here measures, and the property test measures
 // at every offset rather than at the three anyone would pick by hand.
 //
-// The pairing row (I19) is the reason this file exists. §3c records the
+// The pairing row (I19a) is the reason this file exists. §3c records the
 // measurement: the illustration's hunk is seven rows split, and cut between its
 // removed line and its two added ones the halves come to eight. Any window that
 // cuts at an arbitrary line offset can invent a row, and the common case — a
 // window landing in context — passes either way.
 import { describe, expect, it } from "vitest";
-import { block, changedRuns } from "../../src/data/viewmodel/index.js";
+import { block } from "../../src/data/viewmodel/index.js";
 import type { Hunk, Patch } from "../../src/data/viewmodel/index.js";
 import {
-  clampOffset,
-  hunkHeaderRows,
   totalRows,
-  windowPatch,
   windowPlan,
   windowRows,
   type WindowPlan,
@@ -74,74 +71,51 @@ const THREE = patchOf(
   170,
 );
 
-describe("C25 §3c — windowing", () => {
-  it("T1.20b (C25 I19b): a window's cuts fall on `changedRuns`' boundaries, over the whole corpus", () => {
-    // **The characterisation this file owes the de-duplication (F595/P2).** The
-    // row above states the cut rule with a predicate of its own — changed, and
-    // changed before it — which is a *fourth* spelling of the grouping, on one
-    // fixture. This one states it against the single implementation: a window may
-    // begin and end only where `changedRuns` closes a group, and the boundaries
-    // are derived from that function rather than restated here.
-    //
-    // **What it covers, and what it cannot** (the blind spot, stated because an
-    // unrecorded one reads as strength). It fails the moment a *fourth* copy of
-    // the grouping appears in `window.ts` and drifts: reading a run's span as
-    // `max(removes, adds)` — its rows — rather than their sum fails this row and
-    // two others. It does **not** catch a change to `changedRuns` itself, because
-    // the expectation is derived from the same function the code now calls, so a
-    // mutation moves both together. Measured: dropping `changedRuns`' flush at a
-    // context line leaves this row green and fails the two rows below, whose
-    // predicate is independent of it. That is the reason the row below stays —
-    // the two are complementary, one stating the rule and one the agreement, and
-    // deleting either on grounds of duplication loses a mutation.
-    //
-    // Split only, and **`layoutFor` decides that rather than the width** — the
-    // corpus holds `patch-forced-unified`, whose `layout` field wins over a split
-    // width (C25 §3), and reading the layout off the width alone charges a
-    // unified window with a split boundary set. The first run of this row failed
-    // on exactly that fixture and the code was right.
-    //
-    // Unified is not asserted because it gives every line its own unit, so every
-    // index is a boundary and the row would be vacuous there.
-    const boundaries = (lines: Hunk["lines"]): ReadonlySet<number> => {
-      const out = new Set<number>([0]);
-      let at = 0;
-      for (const group of changedRuns(lines)) {
-        at += "kind" in group ? 1 : group.removes.length + group.adds.length; // cells-ok — line counts
-        out.add(at);
-      }
-      return out;
-    };
+/**
+ * A window as a rebuilt `Patch`, over the surviving seam (C25 I18, §3b).
+ *
+ * **`windowPatch` was deleted with the pushed view** (R-EXA-082), and it was
+ * the one caller that took an *offset and a height*. The transcript route takes
+ * a row **range** — `BlockDefinition.window` is asked for `[from, to)` by C14,
+ * which derives them from the viewport — so this names the range the old
+ * signature implied and reads the block out.
+ *
+ * **It does not clamp, and that is the difference rather than an omission.**
+ * `clampOffset` was the caller's snap and retired with the caller (F1251); `windowRows` clamps its own indices into the row array, which
+ * is what a range seam owes. A row that relied on the ceiling is asserting
+ * about a rule that no longer has a subject, and there is one — the struck
+ * T2.12 and T2.13, which went with it.
+ */
+/**
+ * The header rows of a patch's full rendering (C25 I18).
+ *
+ * `hunkHeaderRows` was `planOf(...).headers` and was reachable only from the
+ * pushed view's seek; the plan still carries the list, so this reads it where
+ * the function used to.
+ */
+const hunkHeaderRows = (patch: Patch, width: number, plan?: WindowPlan): readonly number[] =>
+  (plan ?? windowPlan(patch, width)).rows.flatMap((row, i) => (row.kind === "header" ? [i] : []));
 
-    let cuts = 0; // cells-ok — a count of assertions made, not a width
-    for (const candidate of PATCH_CORPUS) {
-      if (candidate.kind !== "patch") continue;
-      const patch = candidate;
-      if (layoutFor(patch, SPLIT) !== "split") continue;
-      const total = totalRows(patch, SPLIT);
-      for (let height = 3; height <= 9; height += 1) {
-        for (let offset = 0; offset <= total; offset += 1) {
-          for (const win of windowPatch(patch, SPLIT, offset, height).hunks) {
-            if (win.lines.length === 0) continue;
-            // The window slices the source array, so the lines are the same
-            // objects — an exact index rather than a match on text.
-            const source = patch.hunks.find((h) => h.lines.includes(win.lines[0] as never));
-            if (source === undefined) continue;
-            const from = source.lines.indexOf(win.lines[0] as never);
-            const to = from + win.lines.length; // cells-ok — a line count
-            const bounds = boundaries(source.lines);
-            const where = `${patch.id} h${String(height)} o${String(offset)}`;
-            expect(bounds.has(from), `${where}: opens at line ${String(from)}`).toBe(true);
-            expect(bounds.has(to), `${where}: closes at line ${String(to)}`).toBe(true);
-            if (from > 0) cuts += 1;
-          }
-        }
-      }
-    }
-    // The control: with no window opening past line 0 this asserts only that 0 is
-    // a boundary, which it is by construction.
-    expect(cuts).toBeGreaterThan(0);
-  });
+/**
+ * The last offset worth sweeping from, for a row that sweeps every offset.
+ *
+ * `clampOffset` was the pushed view's snap and retired with it (F1251). What the rows below need from it is only a **bound on the sweep**,
+ * and the honest bound over a range seam is the total: an offset past the end
+ * yields the last window, so sweeping to `totalRows` costs repeats and misses
+ * nothing. Named rather than inlined so it does not read as the retired rule
+ * surviving under another name.
+ */
+const sweepTo = (patch: Patch, width: number): number => totalRows(patch, width);
+
+const windowPatch = (
+  patch: Patch,
+  width: number,
+  offset: number,
+  height: number,
+  plan?: WindowPlan,
+): Patch => windowRows(patch, width, offset, offset + height, plan).block;
+
+describe("C25 §3c — windowing", () => {
 
   it("T1.20c (C25 I1, I19b): the window's row model and `measure` agree, row for row", () => {
     // **Containment is not correctness, and this row is what measured that.** Every
@@ -178,54 +152,49 @@ describe("C25 §3c — windowing", () => {
     }
   });
 
-  it("T1.20 (I19): a window never measures taller than its region, at any offset or width", () => {
+  // ~~**T1.20b**: a window's cuts fall on `changedRuns`' boundaries~~
+  // ~~**T1.20**: in split layout a window's lines never begin inside a run~~
+  // ~~**T1.20**: an offset inside a run opens at the run, not past it~~
+  //
+  // **All three struck with the pushed view** (C25 §3b, R-EXA-082, F1251). The
+  // snap was `clampOffset`'s and `clampOffset` had one caller. The retired
+  // rule was about cutting the *line array*, which is what a caller holding an
+  // offset did; the transcript route cuts **row-wise**, and I19a says that
+  // a row-wise cut is additive and therefore needs no snap — asserted over every
+  // run up to 4×4 at every cut point by T2.11, which is the surviving form.
+  //
+  // Kept as a comment rather than deleted because *what the old rows covered*
+  // is how the next reader checks that I19a really does cover it.
+
+  it("T1.20 (C25 I18): a window's rows account for exactly its range, at any offset or width", () => {
     // **The property, asserted over every offset rather than three.** A window
-    // that cut inside a changed run would exceed the region exactly where the
-    // run straddles the boundary, which is one offset out of twelve in this
-    // fixture — and the eleven others pass under both implementations.
+    // that cut inside a changed run would not account for its range exactly
+    // where the run straddles the boundary, which is one offset out of twelve
+    // in this fixture — and the eleven others pass under both implementations.
+    //
+    // **It read *never taller than its region* until M9b** (C25 §3b). A region
+    // budget is a property of a caller that has one, and that caller was the
+    // pushed view: `windowPatch` subtracted the sticky headers from the height
+    // it was given. The transcript route is handed a row **range** and reports
+    // what it re-added — `skipRows` at the top, `dropRows` at the bottom — so
+    // the same rule reads as an accounting identity rather than a bound, and it
+    // is the stronger form: a bound is satisfied by a window that draws less.
     for (const width of [UNIFIED, SPLIT]) {
       const total = totalRows(THREE, width);
       for (let height = 3; height <= 12; height += 1) {
-        for (let offset = 0; offset <= total; offset += 1) {
-          const win = windowPatch(THREE, width, offset, height);
+        for (let offset = 0; offset + height <= total; offset += 1) {
+          const w = windowRows(THREE, width, offset, offset + height);
           expect(
-            totalRows(win, width),
+            totalRows(w.block, width) - w.skipRows - w.dropRows,
             `width ${width}, height ${height}, offset ${offset}`,
-          ).toBeLessThanOrEqual(height);
+          ).toBe(height);
         }
       }
     }
   });
 
-  it("T1.20 (I19): in split layout a window's lines never begin inside a changed run", () => {
-    // The direct statement of the cut rule. A line is inside a run when it is
-    // changed and the line before it is changed too — cutting there is what
-    // makes the two halves measure more than the whole.
-    const hunk = THREE.hunks[0];
-    if (hunk === undefined) throw new Error("fixture");
 
-    const starts = new Set<number>();
-    const total = totalRows(THREE, SPLIT);
-    for (let offset = 0; offset <= total; offset += 1) {
-      const win = windowPatch(THREE, SPLIT, offset, 6);
-      const first = win.hunks[0];
-      if (first === undefined || first.lines.length === 0) continue;
-      const text = first.lines[0]?.text;
-      const idx = hunk.lines.findIndex((l) => l.text === text && l.kind === first.lines[0]?.kind);
-      if (idx > 0) starts.add(idx);
-    }
-
-    for (const idx of starts) {
-      const here = hunk.lines[idx];
-      const before = hunk.lines[idx - 1];
-      const insideRun = here?.kind !== "context" && before?.kind !== "context";
-      expect(insideRun, `line ${String(idx)} begins a window inside a changed run`).toBe(false);
-    }
-    // The control: without at least one non-zero start this asserts nothing.
-    expect(starts.size).toBeGreaterThan(0);
-  });
-
-  it("T1.20 (I19): every line is reachable from some offset — snapping down, never up", () => {
+  it("T1.20 (C25 I19a): every line is reachable from some offset, over the whole sweep", () => {
     // **Added because a mutation failed nothing.** Disabling the snap left all
     // nine tests green, and the reason is that the walk skips interior rows of a
     // unit anyway — so without the snap an offset landing inside a run *skips
@@ -237,7 +206,7 @@ describe("C25 §3c — windowing", () => {
     // every offset and every line must appear somewhere.
     for (const width of [UNIFIED, SPLIT]) {
       const seen = new Set<string>();
-      const ceiling = clampOffset(THREE, width, 6, 10_000);
+      const ceiling = sweepTo(THREE, width);
       for (let offset = 0; offset <= ceiling; offset += 1) {
         for (const hunk of windowPatch(THREE, width, offset, 6).hunks) {
           for (const l of hunk.lines) seen.add(`${hunk.header}|${l.kind}|${l.text}`);
@@ -251,48 +220,28 @@ describe("C25 §3c — windowing", () => {
     }
   });
 
-  it("T1.20 (I19): an offset inside a run opens at the run, not past it", () => {
-    // **The assertion two mutations asked for, and the second attempt at it.**
-    // The first compared `windowPatch(offset)` with `windowPatch(clamped)` and
-    // was self-referential — `windowPatch` clamps its own argument, so both
-    // sides took the same path and every mutation passed.
-    //
-    // So the row map is computed here by hand instead. A single-hunk patch at a
-    // split width lays out as:
-    //
-    //   0 path · 1 marker · 2 header · 3,4,5 context · 6,7 the run · 8,9 context
-    //
-    // Row 7 is the interior of the two-row run, and it is the only offset in
-    // this fixture that can distinguish the three rulings: snapping down opens
-    // at `r1`, snapping up steps over the run to `c4`, and no snap at all does
-    // the same as snapping up.
-    const one = patchOf([ILLUSTRATION], 170);
-    const INSIDE_RUN = 7;
 
-    const win = windowPatch(one, SPLIT, INSIDE_RUN, 6);
-    expect(win.hunks[0]?.lines[0]?.text).toBe("      app: volatility-estimator");
-    expect(win.hunks[0]?.lines[0]?.kind).toBe("remove");
-    expect(clampOffset(one, SPLIT, 6, INSIDE_RUN)).toBe(6);
-
-    // The control: the row above is already a valid start, and clamping leaves
-    // it alone. Without this the assertion above passes for an implementation
-    // that snaps every offset to 6.
-    expect(clampOffset(one, SPLIT, 6, 5)).toBe(5);
-  });
-
-  it("T1.21 (I18): the path header and a touched hunk's header are sticky and cost rows", () => {
-    // A window opening inside the first hunk's body. Two rows are gone before a
-    // single line of diff appears, and a budget computed as `height` rather than
-    // `height - 2` produces a window C15 reports as truncated.
+  it("T1.21 (I18): the path header and a touched hunk's header are sticky, and are reported rather than charged", () => {
+    // A window opening inside the first hunk's body. Two rows are drawn before
+    // a single line of diff appears, and the question is who pays for them.
+    //
+    // **It was the caller, and now it is reported** (C25 §3b, M9b). The pushed
+    // view was handed a *height* and `windowPatch` subtracted the headers from
+    // it — six rows meant four lines. The transcript route is handed a row
+    // **range** and re-adds the headers on top, saying so through `skipRows`:
+    // six rows means six lines, and C14 skips what the window tells it to. The
+    // sticky rule is unchanged; the budget belonged to a caller that had one.
     const headers = hunkHeaderRows(THREE, UNIFIED);
     const firstHeader = headers[0];
     if (firstHeader === undefined) throw new Error("fixture");
 
-    const win = windowPatch(THREE, UNIFIED, firstHeader + 3, 6);
-    expect(win.path).toBe(THREE.path);
-    expect(win.hunks).toHaveLength(1);
-    expect(win.hunks[0]?.lines.length).toBe(4); // 6 rows − path header − hunk header
-    expect(totalRows(win, UNIFIED)).toBe(6);
+    const from = firstHeader + 3;
+    const w = windowRows(THREE, UNIFIED, from, from + 6);
+    expect(w.block.path).toBe(THREE.path);
+    expect(w.block.hunks).toHaveLength(1);
+    expect(w.block.hunks[0]?.lines.length, "six rows of range, six lines").toBe(6);
+    expect(w.skipRows, "the path header and the hunk header, re-added and declared").toBe(2);
+    expect(totalRows(w.block, UNIFIED) - w.skipRows - w.dropRows, "and they account exactly").toBe(6);
   });
 
   it("T1.22 (I20): a collapse marker appears only on the window containing its row", () => {
@@ -310,9 +259,12 @@ describe("C25 §3c — windowing", () => {
     expect(middle.hunks[0]?.collapsedBefore).toBeUndefined();
     expect(middle.collapsedAfter).toBeUndefined();
 
-    // Bottom: the tail marker is the last row of the last window.
+    // Bottom: the tail marker is the last row of the last window. **Named as a
+    // range rather than reached by over-scrolling** (C25 §3b): the row asked for
+    // offset `total` and let `clampOffset` bring it back to the ceiling, which
+    // was the pushed view's snap. A range caller asks for the last rows.
     const total = totalRows(THREE, UNIFIED);
-    const bottom = windowPatch(THREE, UNIFIED, total, 6);
+    const bottom = windowPatch(THREE, UNIFIED, total - 6, 6);
     expect(bottom.collapsedAfter).toBe(170);
   });
 
@@ -329,32 +281,9 @@ describe("C25 §3c — windowing", () => {
   });
 
   // **C25 T2.12's row, and it was already here.** The rule the spec names as
-  // I20a's whole content — property asserted rather than number — under a title
+  // The retired ceiling rule's whole content — property asserted rather than number — under a title
   // naming only the function. Third instance in one pass of a row that checks an
   // invariant perfectly and answers *no* to the question SP9 asks.
-  it("T2.12 (C25 I20a): clampOffset stops at the first offset that reaches the end, not at total − height", () => {
-    // **`total - height` was the first ceiling and it was wrong, and this test
-    // is what said so.** That figure is arithmetic over the full rendering, and
-    // a window is a slice plus sticky headers (I18) — so a window opened there
-    // stops short and `collapsedAfter`, the row that says how much file is
-    // below, is unreachable. A reader would press `G` and not see the bottom.
-    //
-    // Asserted as the property rather than as the number: the ceiling's window
-    // reaches the last row, and one row above it does not.
-    const total = totalRows(THREE, UNIFIED);
-    const height = 10;
-    const ceiling = clampOffset(THREE, UNIFIED, height, 10_000);
-
-    expect(ceiling).toBeGreaterThan(total - height);
-    expect(windowPatch(THREE, UNIFIED, ceiling, height).collapsedAfter).toBe(170);
-    expect(windowPatch(THREE, UNIFIED, ceiling - 1, height).collapsedAfter).toBeUndefined();
-
-    expect(clampOffset(THREE, UNIFIED, height, -5)).toBe(0);
-    expect(clampOffset(THREE, UNIFIED, height, Number.NaN)).toBe(0);
-    // A region taller than the document pins the offset at the top rather than
-    // going negative, which is what a short diff in a tall terminal is.
-    expect(clampOffset(THREE, UNIFIED, total + 20, 5)).toBe(0);
-  });
 
   it("hunkHeaderRows names a row per hunk, in order, and each one is a header", () => {
     const rows = hunkHeaderRows(THREE, UNIFIED);
@@ -368,10 +297,14 @@ describe("C25 §3c — windowing", () => {
     }
   });
 
-  it("a one-row region is the path header alone, and does not throw", () => {
-    const win = windowPatch(THREE, UNIFIED, 4, 1);
-    expect(win.hunks).toHaveLength(0);
-    expect(totalRows(win, UNIFIED)).toBe(1);
+  it("a one-row range is one row of content plus its sticky headers, and does not throw", () => {
+    // **It read *the path header alone*** until the budget moved (C25 §3b). A
+    // one-row *region* was entirely spent on the sticky path header and there
+    // was nothing left; a one-row *range* is one row of content, with the
+    // headers re-added above it and declared.
+    const w = windowRows(THREE, UNIFIED, 4, 5);
+    expect(totalRows(w.block, UNIFIED) - w.skipRows - w.dropRows).toBe(1);
+    expect(w.skipRows, "the headers are above it").toBeGreaterThan(0);
   });
 
   it("a patch with no hunks windows to itself", () => {
@@ -456,6 +389,41 @@ describe("C25 §7 — the invariants that had no row", () => {
     ]);
   });
 
+  it("T2.12 (C25 I17, R-EXA-082): the deletion is pure — a patch renders every hunk it carries, and the pushed view showed no more", () => {
+    // **Measured before the code was written, and it is why no expand arm was
+    // added for a patch.** §82 says a run's detail expands in place, and the
+    // obvious reading is that `⏎` unfolds something. A patch has nothing to
+    // unfold: `collapsedBefore` and `collapsedAfter` are *counts of context the
+    // block does not carry* (§3b), and the hunk **cap** that I14 specifies —
+    // the only thing that ever dropped a hunk — is unbuilt, which T2.9 asserts
+    // over `src/` beside this.
+    //
+    // So the pushed view's *every hunk, uncollapsed* was every hunk the block
+    // already renders in the transcript, at the same width. The surface added a
+    // hole and nothing else, which is R-EXA-082 exactly.
+    for (const width of [UNIFIED, SPLIT]) {
+      const drawn = windowRows(THREE, width, 0, totalRows(THREE, width));
+      expect(
+        drawn.block.hunks.map((h) => h.header),
+        `every hunk at ${String(width)}`,
+      ).toEqual(THREE.hunks.map((h) => h.header));
+      expect(
+        drawn.block.hunks.map((h) => h.lines.length),
+        "and every line of each",
+      ).toEqual(THREE.hunks.map((h) => h.lines.length));
+    }
+
+    // **The control**: the elision counts are carried, not resolved — without
+    // it the row above passes for a block that had nothing elided to begin
+    // with, and *there is nothing to expand* would be a statement about the
+    // fixture rather than about the kind.
+    expect(THREE.hunks[0]?.collapsedBefore, "context is elided").toBeGreaterThan(0);
+    expect(
+      THREE.hunks[0]?.lines.some((l) => l.kind === "context" && l.oldNo === 1),
+      "and the elided lines are not in the block",
+    ).toBe(false);
+  });
+
   it("T2.11 (C25 I19a): a row-wise cut of a run is additive, over every run up to 4×4 at every cut point", () => {
     /**
      * **Asserted against `pairedRows` itself**, not against a restatement of it.
@@ -463,7 +431,7 @@ describe("C25 §7 — the invariants that had no row", () => {
      * model, so a second copy of the arithmetic here would be the drift I1
      * exists to prevent — and it would agree with itself whatever either did.
      *
-     * I19's non-additivity is about cutting the *line array*: one removed and
+     * The retired snap rule's non-additivity is about cutting the *line array*: one removed and
      * two added lines are two rows whole and three rows cut between them. A
      * row-wise cut takes the first `min(k, removes)` removes beside the first
      * `min(k, adds)` adds, and that is exactly `k`.
@@ -495,53 +463,6 @@ describe("C25 §7 — the invariants that had no row", () => {
     expect(cases, "every run up to 4×4, at every cut point").toBe(94);
   });
 
-  it("T2.13 (C25 I20b): a clamped offset is one a window may begin at, and the caller and the window agree", () => {
-    for (const width of [UNIFIED, SPLIT]) {
-      const height = 6;
-      const ceiling = clampOffset(THREE, width, height, 10_000);
-
-      /**
-       * **Idempotent, which is what makes the returned value usable.** Snapping
-       * inside the builder instead leaves the caller's offset and the window it
-       * produces disagreeing: the caller stores 7, the window opened at 4, and
-       * the next motion computes from 7.
-       */
-      const valid: number[] = [];
-      for (let offset = 0; offset <= ceiling; offset += 1) {
-        const clamped = clampOffset(THREE, width, height, offset);
-        expect(clampOffset(THREE, width, height, clamped), `${String(width)}: ${String(offset)} settles`).toBe(clamped);
-        if (clamped === offset) valid.push(offset);
-
-        // And the two routes agree: a caller holding the clamped value receives
-        // the window the raw offset would have produced.
-        expect(
-          JSON.stringify(windowPatch(THREE, width, clamped, height)),
-          `${String(width)}: the clamped offset gives the raw offset's window`,
-        ).toBe(JSON.stringify(windowPatch(THREE, width, offset, height)));
-      }
-
-      expect(valid.length, `${String(width)}: there are offsets to move between`).toBeGreaterThan(2);
-
-      /**
-       * **A limit, measured and recorded rather than asserted away.** Two
-       * adjacent valid offsets can produce the *same* window: offsets 0 and 1
-       * of `THREE` at width 80 both draw the first three context lines, because
-       * the row they differ by is the sticky path header (I18), which a window
-       * re-adds whether or not it was skipped. That is the shape I20b's second
-       * clause names — a keystroke that redraws what is already on screen —
-       * arriving through the sticky rule rather than through where the snapping
-       * happens.
-       *
-       * **It is unreachable today, which is why this is a note and not a
-       * failure**: `PatchViewMotion` is `nextHunk`, `prevHunk`, `top`, `bottom`,
-       * `pageUp`, `pageDown`, and none of them steps by one row. T2.14 checks
-       * the motions that exist. A line-wise motion added here would need this
-       * measured again, and this comment is where the next reader finds that.
-       */
-      const drawn = valid.map((o) => JSON.stringify(windowPatch(THREE, width, o, height)));
-      expect(new Set(drawn).size, `${String(width)}: the offsets do reach distinct windows`).toBeGreaterThan(1);
-    }
-  });
 });
 
 describe("C25 I22 — a window is built over a plan", () => {
@@ -567,23 +488,18 @@ describe("C25 I22 — a window is built over a plan", () => {
         const total = totalRows(patch, width);
 
         expect(plan.rows.length, "one record per row of the full rendering").toBe(total);  // cells-ok — a row count, not a width
-        expect([...plan.headers], "the header rows").toEqual([...hunkHeaderRows(patch, width)]);
         expect(plan.numberWidth, "the pinned gutter (I21a)").toBe(numberWidth(patch));
         expect(plan.layout).toBe(layoutFor(patch, width));
         expect(Object.isFrozen(plan) && Object.isFrozen(plan.starts) && Object.isFrozen(plan.rows), "a frozen value").toBe(true);
         expect("height" in plan, "no reference to a height").toBe(false);
         interior += plan.rows.length - plan.starts.length;  // cells-ok — row counts, not widths
-        // Every header is a row a window may begin at, and the starts are exactly
-        // the offsets the clamp leaves where they are, up to the ceiling.
-        for (const h of plan.headers) expect(plan.starts).toContain(h);
+        // Every header is a row a window may begin at. **The second half — *and
+        // the starts are exactly the offsets the clamp leaves where they are* —
+        // went with the clamp** (C25 §3b, F1251): it compared the plan against a
+        // caller's snap, and there is no caller holding an offset now.
+        for (const h of hunkHeaderRows(patch, width, plan)) expect(plan.starts).toContain(h);
         for (const height of HEIGHTS) {
-          const bottom = clampOffset(patch, width, height, Number.MAX_SAFE_INTEGER);
-          const fixed: number[] = [];
-          for (let o = 0; o <= bottom; o += 1) if (clampOffset(patch, width, height, o) === o) fixed.push(o);
-          expect(plan.starts.filter((s) => s <= bottom), `start rows up to the ceiling at h=${String(height)}`).toEqual(fixed);
-
           for (let o = 0; o < total + 2; o += 1) {
-            expect(clampOffset(patch, width, height, o, plan)).toBe(clampOffset(patch, width, height, o));
             expect(windowPatch(patch, width, o, height, plan)).toEqual(windowPatch(patch, width, o, height));
             compared += 1;
           }
@@ -605,9 +521,6 @@ describe("C25 I22 — a window is built over a plan", () => {
     if (a?.kind !== "patch" || b?.kind !== "patch") throw new Error("the corpus has two patches");
     const planA = windowPlan(a, UNIFIED);
     expect(() => windowPatch(b, UNIFIED, 0, 10, planA)).toThrow(/I22/u);
-    expect(() => clampOffset(a, SPLIT, 10, 0, planA)).not.toThrow(); // offset 0 returns before the plan is read
-    expect(() => clampOffset(a, SPLIT, 10, 1, planA)).toThrow(/I22/u);
-    expect(() => hunkHeaderRows(a, SPLIT, planA)).toThrow(/I22/u);
     expect(() => windowRows(a, SPLIT, 0, 5, planA)).toThrow(/I22/u);
   });
 });

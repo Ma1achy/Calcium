@@ -20,7 +20,6 @@ import type { Action, Block, ViewDocument } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
 import type { OwnerRung } from "../interaction/router/types.js";
 import type { DocumentView } from "./document-view.js";
-import type { PatchView } from "./patch-view.js";
 import type { ProfileView } from "./profile-view.js";
 import type { RefreshHost } from "./refresh.js";
 import type { CompletionSource } from "../interaction/completion/index.js";
@@ -403,7 +402,6 @@ export type PipelineDeps = Readonly<{
    * refusal it returns is C23's to patch into the source entry and the stack
    * check that produces it is the view owner's (C23 I31).
    */
-  patchView: PatchView;
   /** C22 §13a — raised when a verb's declaration says its result is a view. */
   documentView: DocumentView;
   /**

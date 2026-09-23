@@ -1926,10 +1926,10 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "C25 I22 — each hunk's first body row, read by windowRows inside window.ts so a planned window " +
     "walks the window's rows only (F1191); held to a full scan by T1.25",
   "Unit.lineFrom":
-    "C25 I19 — a unit's first line, read by the builder and windowRows inside window.ts; the " +
+    "C25 I19a — a unit's first line, read by the builder and windowRows inside window.ts; the " +
     "type is published only because WindowPlan.rows names it (C25 I22)",
   "Unit.lineTo":
-    "C25 I19 — a unit's end line, read by the builder and windowRows inside window.ts; the " +
+    "C25 I19a — a unit's end line, read by the builder and windowRows inside window.ts; the " +
     "type is published only because WindowPlan.rows names it (C25 I22)",
   "Lanes.pos":
     "C12 I139 — the position lane: read by the cull, the projection and the span inside " +

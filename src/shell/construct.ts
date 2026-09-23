@@ -76,7 +76,6 @@ import { createConfirmHost, type ConfirmHost } from "./confirm.js";
 import { createDecoder } from "../interaction/router/decode.js";
 import { createKeyEffects } from "./keys.js";
 import { createDocumentView } from "./document-view.js";
-import { createPatchView } from "./patch-view.js";
 import { createProfileView } from "./profile-view.js";
 import type { ProfileView } from "./profile-view.js";
 import type { FocusTarget, InputEvent, Key, KeyAction } from "../interaction/router/types.js";
@@ -1471,23 +1470,14 @@ export async function constructGraph(
   // Takes the router, because C23's submit row ends `resetFocus()` (Seam 4).
   // Seals its own registry here, which is I3's fifth.
   /**
-   * The fullscreen patch view — the first producer of a `kind: "view"` layer.
+   * The document view — C22 §13a's producer.
    *
-   * Built before the pipeline because C23's action dispatcher calls into it and
-   * the pipeline closes over that dispatcher; the same ordering argument step
-   * 11 makes about the router, one dependency earlier.
-   */
-  const patchView = createPatchView({
-    overlays: stores.overlays,
-    transcript: stores.transcript,
-    region: deps.frame.overlayRegion,
-    redraw: () => void scheduler.commit("input"),
-    // C22 I41 — the plan's misses reach the deck (C28 I30).
-    ...(deps.profiler === undefined ? {} : { probe: deps.profiler.asProbe() }),
-  });
-
-  /**
-   * The document view — C22 §13a's producer, and `patchView`'s sibling.
+   * **It had a sibling built two lines above it**, the fullscreen patch view,
+   * which was the first producer of a `kind: "view"` layer in the tree. The
+   * design deletes that surface (C25 §3b, R-EXA-082) and M9b deleted the file:
+   * a run's detail expands in place, and a patch's hunks are all in the block
+   * already, so the view showed what the transcript shows and took the
+   * transcript away to do it.
    *
    * Built here for the same reason and one line later: C23 raises it when a
    * verb's declaration says its result is a view (C05 I20), so it must exist
@@ -1607,7 +1597,6 @@ export async function constructGraph(
       region: deps.frame.overlayRegion,
       editor: stores.editor,
       overlays: stores.overlays,
-      patchView,
       documentView,
       // C28 §3c — for `/profile`'s handler, the way `stop` reaches `/exit`.
       // Read by `execution.ts` when it hands `shippedHandlers` the view; until
@@ -2350,7 +2339,6 @@ export async function constructGraph(
     schedule: config.schedule,
     anchor: deps.frame.promptAnchor,
     overlayRegion: deps.frame.overlayRegion,
-    patchView,
     documentView,
     profileView,
     releaseView: () => void pipeline.releaseView(),

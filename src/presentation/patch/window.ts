@@ -143,8 +143,6 @@ export type WindowPlan = Readonly<{
   rows: readonly Row[];
   /** The rows a window may begin at — every row but a unit's interior ones. */
   starts: readonly number[];
-  /** The row each hunk's header occupies. */
-  headers: readonly number[];
   /** Each hunk's first body row, `-1` for a hunk with no body — what `windowRows` found by a second walk (F1191). */
   bodyStarts: readonly number[];
   /** The pinned gutter width (I21a). */
@@ -155,10 +153,8 @@ export function windowPlan(patch: Patch, width: number): WindowPlan {
   const layout = layoutFor(patch, width);
   const rows = rowsOf(patch, layout);
   const starts: number[] = [];
-  const headers: number[] = [];
   const bodyStarts: number[] = patch.hunks.map(() => -1);
   rows.forEach((row, i) => {
-    if (row.kind === "header") headers.push(i);
     if (row.kind !== "body" || row.first) starts.push(i);
     if (row.kind === "body" && bodyStarts[row.hunk] === -1) bodyStarts[row.hunk] = i;
   });
@@ -168,7 +164,6 @@ export function windowPlan(patch: Patch, width: number): WindowPlan {
     layout,
     rows: Object.freeze(rows),
     starts: Object.freeze(starts),
-    headers: Object.freeze(headers),
     bodyStarts: Object.freeze(bodyStarts),
     numberWidth: numberWidth(patch),
   });
@@ -224,87 +219,6 @@ function planOf(patch: Patch, width: number, plan: WindowPlan | undefined): Wind
  */
 export function totalRows(patch: Patch, width: number): number {
   return patchHeight(patch, width);
-}
-
-/**
- * The row each hunk's header occupies in the full rendering — what `n` and `p`
- * move between (C22 I41).
- *
- * Returned as rows rather than as hunk indices because **the view holds one
- * piece of state and it is an offset** (§3c A4). A hunk index beside it is a
- * second cursor, and `G` leaves it pointing at the hunk the reader scrolled away
- * from.
- */
-export function hunkHeaderRows(patch: Patch, width: number, plan?: WindowPlan): readonly number[] {
-  return planOf(patch, width, plan).headers;
-}
-
-/**
- * The last offset worth sitting at — the first one whose window reaches the end.
- *
- * **`total - height` is wrong, and the suite found it rather than the walk.**
- * That figure is arithmetic over the *full* rendering, and a window is a slice
- * plus sticky headers (I18): the headers cost rows the full rendering already
- * counted once, so a window opened at `total - height` stops short and the last
- * rows of the diff — including `collapsedAfter`, which says how much file is
- * below — are unreachable. A reader would press `G` and not see the bottom.
- *
- * Reaching the end is monotone in the offset, so this is a binary search over
- * the same builder rather than a second arithmetic that could disagree with it.
- */
-function bottomOffset(plan: WindowPlan, height: number): number {
-  // Searched over the rows a window may *begin* at, so the answer is itself a
-  // valid offset and needs no snapping afterwards.
-  const starts = plan.starts;
-  if (starts.length === 0) return 0;  // cells-ok — a row count, not a width
-  let lo = 0;
-  let hi = starts.length - 1;  // cells-ok — a row count, not a width
-  while (lo < hi) {
-    const mid = Math.floor((lo + hi) / 2);
-    if (build(plan, starts[mid] ?? 0, height).reachedEnd) hi = mid;
-    else lo = mid + 1;
-  }
-  return starts[lo] ?? 0;
-}
-
-/**
- * The offset a window will actually sit at: inside the document, and at a row a
- * window may **begin** at.
- *
- * **The snap belongs here rather than inside the builder, and a mutation is what
- * said so.** Disabling a snap that lived in the builder failed every test,
- * including a reachability sweep — because the builder skips interior rows of a
- * unit anyway, so the only difference was whether a mid-unit offset showed its
- * run or stepped over it, and both leave every line reachable from *some*
- * offset.
- *
- * Asking which of the two was right showed the question was wrong. Snapping down
- * in the builder means `↓` from the row before a two-row run redraws the same
- * window — a dead keystroke. Snapping up means the offset the caller holds and
- * the window it produces disagree, so `PgDn` twice does not move two pages.
- * **The offset should never be mid-unit at all**: a valid offset is a row a
- * window may begin at, every motion lands on one, and one press moves one unit.
- * That is what `less` does with a wrapped line, and it makes the builder's input
- * a precondition rather than something it repairs.
- */
-export function clampOffset(
-  patch: Patch,
-  width: number,
-  height: number,
-  offset: number,
-  plan?: WindowPlan,
-): number {
-  if (!Number.isFinite(offset)) return 0;
-  const wanted = Math.max(0, Math.trunc(offset));
-  if (wanted === 0) return 0;
-  const p = planOf(patch, width, plan);
-  const rows = p.rows;
-  const bottom = bottomOffset(p, height);
-  // Snap first, then bound. Bounding first and snapping after can move the
-  // ceiling *below* the offset that reaches the end, which puts the bottom of
-  // the document out of reach again — the same defect this ceiling was written
-  // to fix, arriving through the repair for a different one.
-  return Math.min(bottom, snapDown(rows, wanted));
 }
 
 /**
@@ -488,135 +402,3 @@ function rowSlice(lines: Hunk["lines"], p: number, q: number): Hunk["lines"][num
   return out;
 }
 
-export function windowPatch(
-  patch: Patch,
-  width: number,
-  offset: number,
-  height: number,
-  plan?: WindowPlan,
-): Patch {
-  const p = planOf(patch, width, plan);
-  return build(p, clampOffset(patch, width, height, offset, p), height).patch;
-}
-
-
-/**
- * The builder both `windowPatch` and `bottomOffset` use.
- *
- * `reachedEnd` is why it is shared: the ceiling on an offset is "the window
- * shows the last row", and computing that from anything but the builder itself
- * is how two answers about the same window come to disagree.
- */
-function build(
-  plan: WindowPlan,
-  rawOffset: number,
-  height: number,
-): Readonly<{ patch: Patch; reachedEnd: boolean }> {
-  const patch = plan.patch;
-  const rows = plan.rows;
-  // A precondition, not a repair: `clampOffset` owns the snap (see above).
-  const start = Math.max(0, Math.min(rawOffset, Math.max(0, rows.length - 1)));  // cells-ok — a row count, not a width
-
-  // The path header is sticky and comes out of the budget before anything else
-  // (I18). A region with one row can show it and nothing more, which is a
-  // legitimate window rather than an error.
-  let budget = Math.max(1, height) - 1;
-
-  const kept = new Map<number, { lineFrom: number; lineTo: number; marker: boolean }>();
-  let tail = false;
-  let consumed = start;
-
-  for (let i = start; i < rows.length && budget > 0; i += 1) {  // cells-ok — a row count, not a width
-    consumed = i;
-    const row = rows[i];
-    if (row === undefined) break;
-
-    if (row.kind === "tail") {
-      tail = true;
-      budget -= 1;
-      continue;
-    }
-    if (row.kind === "path") continue;
-
-    const entry = kept.get(row.hunk);
-    if (entry === undefined) {
-      // First row of this hunk in the window. Its header is sticky too, and it
-      // is paid for here whether or not the header's own row is in range —
-      // which is what makes a window that opens mid-hunk cost two rows before
-      // it shows a line of the diff.
-      if (budget < 1) break;
-      budget -= 1;
-      kept.set(row.hunk, { lineFrom: -1, lineTo: -1, marker: false });
-    }
-    const cur = kept.get(row.hunk);
-    if (cur === undefined) break;
-
-    if (row.kind === "marker") {
-      // Only when the window actually reaches the marker's row (I20). A marker
-      // carried onto every window claims the elision sits at the top of each.
-      if (budget < 1) break;
-      cur.marker = true;
-      budget -= 1;
-      continue;
-    }
-    if (row.kind === "header") continue; // already paid for above
-
-    if (!row.first) continue; // interior row of a unit already taken, or skipped
-    if (row.unit.rows > budget) break; // whole units only (I19)
-    budget -= row.unit.rows;
-    if (cur.lineFrom < 0) cur.lineFrom = row.unit.lineFrom;
-    cur.lineTo = row.unit.lineTo;
-  }
-
-  const hunks: Hunk[] = [];
-  for (const [h, cur] of kept) {
-    const source = patch.hunks[h];
-    if (source === undefined) continue;
-    const from = cur.lineFrom < 0 ? 0 : cur.lineFrom;
-    const to = cur.lineTo < 0 ? 0 : cur.lineTo;
-    hunks.push({
-      // Verbatim (I21). Rewriting the counts to describe the slice would make
-      // C25 compute from the one field §4 says it never reads.
-      header: source.header,
-      lines: source.lines.slice(from, to),
-      ...(cur.marker && source.collapsedBefore !== undefined
-        ? { collapsedBefore: source.collapsedBefore }
-        : {}),
-    });
-  }
-
-  const windowed = block({
-    kind: "patch",
-    id: patch.id,
-    path: patch.path,
-    language: patch.language,
-    hunks,
-    ...(tail && patch.collapsedAfter !== undefined ? { collapsedAfter: patch.collapsedAfter } : {}),
-    ...(patch.layout !== undefined ? { layout: patch.layout } : {}),
-    // **C25 I21a — the gutter is the parent's, pinned.** Exactly `Hunk.header`'s
-    // rule one field along (I21): a window describes the block it came from, not
-    // the slice it shows. Derived again inside the window it shrinks whenever the
-    // slice's widest line number is narrower, and every row of text steps
-    // sideways as the reader scrolls — 4 cells whole against 1 at offset 0 on the
-    // patch that measured it.
-    //
-    // Taken from `patch` and never from `hunks`, which is the whole point, and
-    // read through `numberWidth` so a parent that is *itself* a window passes its
-    // pin down rather than re-deriving from a slice of a slice. Held on the
-    // plan (I22), which took it from `patch` once.
-    numberWidth: plan.numberWidth,
-  } as Patch);
-
-  return { patch: windowed, reachedEnd: consumed >= rows.length - 1 };  // cells-ok — a row count, not a width
-}
-
-/** Back to the first row of whatever unit `offset` landed in. */
-function snapDown(rows: readonly Row[], offset: number): number {
-  let i = Math.min(offset, Math.max(0, rows.length - 1));  // cells-ok — a row count, not a width
-  while (i > 0) {
-    const row = rows[i];
-    if (row === undefined || row.kind !== "body" || row.first) break;
-    i -= 1;
-  }
-  return i;
-}

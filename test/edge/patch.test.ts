@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
 import { numberWidth } from "../../src/presentation/patch/layout.js";
 import type { Patch } from "../../src/data/viewmodel/index.js";
-import { clampOffset, totalRows, windowPatch } from "../../src/presentation/patch/window.js";
+import { totalRows, windowRows } from "../../src/presentation/patch/window.js";
 import { hunkOf, patchOf } from "../support/blocks.js";
 import { ASCII_CAPS, FULL_CAPS, measurable, visible } from "../support/render.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
@@ -13,6 +13,16 @@ const kit = (caps = FULL_CAPS): ReturnType<typeof measurable> =>
 
 const drawn = (block: Parameters<ReturnType<typeof measurable>["measure"]>[0], width = 80): readonly string[] =>
   kit().renderToLines(block, width).map(visible);
+
+/**
+ * A window as a rebuilt `Patch`, over the surviving seam (C25 I18, §3b).
+ *
+ * `windowPatch` was deleted with the pushed view (R-EXA-082); the transcript
+ * route takes a row **range**, which is what this names. It does not clamp —
+ * `clampOffset` was the caller's snap and retired with the caller (F1251).
+ */
+const windowPatch = (patch: Patch, width: number, offset: number, height: number): Patch =>
+  windowRows(patch, width, offset, offset + height).block;
 
 describe("C25 edge", () => {
   it("T3.1: zero hunks is the file header alone, one row, no throw", () => {
@@ -153,8 +163,7 @@ describe("C25 I21a — a window's gutter is the block's (F134)", () => {
     const total = totalRows(whole, width);
     const seen = new Set<number>();
     for (let offset = 0; offset < total; offset += 1) {
-      const snapped = clampOffset(whole, width, height, offset);
-      seen.add(numberWidth(windowPatch(whole, width, snapped, height)));
+      seen.add(numberWidth(windowPatch(whole, width, offset, height)));
     }
 
     // **The sweep, not one offset.** The drift is a *difference between* windows:

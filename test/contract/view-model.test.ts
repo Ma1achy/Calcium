@@ -98,7 +98,7 @@ describe("C04 contract", () => {
     // compile. This test asserts the half a type cannot: that the check runs at
     // all. Until it existed, actions were never validated — an adapter could
     // emit any object at all and every check passed.
-    expect([...ACTION_KINDS].sort()).toEqual(["exec", "expand", "fill", "open", "view"]);
+    expect([...ACTION_KINDS].sort()).toEqual(["exec", "expand", "fill", "open"]);
 
     const patchWith = (actions: readonly unknown[]): unknown => ({
       kind: "patch",
@@ -109,7 +109,7 @@ describe("C04 contract", () => {
       actions,
     });
 
-    const good: Action = { kind: "view", label: "fullscreen", target: "p1" };
+    const good: Action = { kind: "expand", label: "expand", target: "p1" };
     expect(validateBlock(patchWith([good])).ok).toBe(true);
 
     // The failing directions, one per way an action can be wrong. Asserted
@@ -123,19 +123,30 @@ describe("C04 contract", () => {
     expect(unknownKind.ok).toBe(false);
     expect(unknownKind.ok ? [] : unknownKind.error.join(" ")).toMatch(/"kind" must be one of/);
 
-    const noTarget = validateBlock(patchWith([{ kind: "view", label: "fullscreen" }]));
+    const noTarget = validateBlock(patchWith([{ kind: "expand", label: "expand" }]));
     expect(noTarget.ok).toBe(false);
     expect(noTarget.ok ? [] : noTarget.error.join(" ")).toMatch(/"target" is required and absent — supply a string/u);
 
-    const noLabel = validateBlock(patchWith([{ kind: "view", target: "p1" }]));
+    const noLabel = validateBlock(patchWith([{ kind: "expand", target: "p1" }]));
     expect(noLabel.ok).toBe(false);
     expect(noLabel.ok ? [] : noLabel.error.join(" ")).toMatch(/"label" is required and absent — supply a string/u);
 
     // `open` carries `url` and not `target` — the row that shows the field is
-    // the kind's rather than one name shared by all five.
+    // the kind's rather than one name shared by all four.
     const openWrongField = validateBlock(patchWith([{ kind: "open", label: "docs", target: "p1" }]));
     expect(openWrongField.ok).toBe(false);
     expect(openWrongField.ok ? [] : openWrongField.error.join(" ")).toMatch(/"url" is required and absent — supply a string/u);
+
+    // **T2.13 (C04 I34, C23 I31) — the retired kind, refused where a far side
+    // could reintroduce it.** `view` filled the screen with one block until the
+    // design deleted that surface (C25 §3b, R-EXA-082); `ACTION_KINDS` is four
+    // now. The union type is erased at runtime, so this validator is the only
+    // thing between an adapter and a kind nothing dispatches — and an action
+    // admitted but never dispatched is the key that does nothing and says
+    // nothing C04 § rules out.
+    const retired = validateBlock(patchWith([{ kind: "view", label: "fullscreen", target: "p1" }]));
+    expect(retired.ok, "the retired kind is refused").toBe(false);
+    expect(retired.ok ? [] : retired.error.join(" ")).toMatch(/"kind" must be one of/);
 
     // Absent is legal, which is the control: without it every assertion above
     // passes for a validator that rejects any patch carrying the field.

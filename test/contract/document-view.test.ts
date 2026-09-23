@@ -142,7 +142,7 @@ describe("C22 §13a — the document view", () => {
     expect(overlays.stack, "and the first view is untouched").toHaveLength(1);
   });
 
-  it("T4.69 (C22 I46): the window falls on block boundaries and move walks it", () => {
+  it("T4.69 (C22 I41, I46): one piece of state — the window falls on block boundaries and move walks it", () => {
     view.open("/watch api");
     view.fill(docOf([chunk("a", "one"), chunk("b", "two"), chunk("c", "three")]));
 
@@ -164,7 +164,7 @@ describe("C22 §13a — the document view", () => {
     expect(ids(), "and nothing was written").toEqual(["a"]);
   });
 
-  it("T4.71 (C22 §13a): a block scrolled out of the window is still there to be patched", () => {
+  it("T4.71 (C22 I42, §13a): rewindowed from the live document — a block scrolled out of the window is still there to be patched", () => {
     // **The interaction this file exists for**, and it exists only because
     // block-boundary windowing and the refresh driver were put together. The
     // layer holds a window; the owner holds the document. A part scrolled out of

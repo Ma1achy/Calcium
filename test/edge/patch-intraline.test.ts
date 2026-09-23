@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { b } from "../../src/index.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
-import { windowPatch, windowRows } from "../../src/presentation/patch/window.js";
+import { windowRows } from "../../src/presentation/patch/window.js";
 import { ASCII_CAPS, FULL_CAPS, measurable, visible } from "../support/render.js";
 import { foregroundAt, underlinedRuns } from "../support/underline.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
@@ -27,6 +27,16 @@ const pair = (removed: string, added: string, language = ""): Patch =>
     layout: "unified",
     hunks: [{ header: "@@", lines: [{ kind: "remove", text: removed, oldNo: 1 }, { kind: "add", text: added, newNo: 1 }] }],
   });
+
+/**
+ * A window as a rebuilt `Patch`, over the surviving seam (C25 I18, §3b).
+ *
+ * `windowPatch` was deleted with the pushed view (R-EXA-082); the transcript
+ * route takes a row **range**, which is what this names. It does not clamp —
+ * `clampOffset` was the caller's snap and retired with the caller (F1251).
+ */
+const windowPatch = (patch: Patch, width: number, offset: number, height: number): Patch =>
+  windowRows(patch, width, offset, offset + height).block;
 
 describe("C25 I10 edge — the span stream against the line's other rules", () => {
   it("T3.17 (C25 I10): a span straddling the truncation cut is cut with the text, and the marker is never underlined", () => {
@@ -101,7 +111,7 @@ describe("C25 I10 edge — the span stream against the line's other rules", () =
     ).toBe(true);
   });
 
-  it("T3.19 (C25 I10): windowPatch — the fullscreen view's slice — shows the same underline as the whole", () => {
+  it("T3.19 (C25 I10): a window's slice shows the same underline as the whole", () => {
     const lines: Line[] = [
       { kind: "context", text: "ctx", oldNo: 1, newNo: 1 },
       { kind: "remove", text: "a common b0", oldNo: 2 },
@@ -110,14 +120,22 @@ describe("C25 I10 edge — the span stream against the line's other rules", () =
     ];
     const whole = b.patch({ gapBefore: false, id: "v", path: "x", language: "", hunks: [{ header: "@@", lines }] });
     const k = kit();
-    // Offset 2 is the first context line. The path header and the hunk header are
-    // sticky and come out of the budget (I18), so four rows reach the removed line
-    // — at three the window is the two headers and the context line, which is the
-    // fixture this row was first written against, and it asserted nothing.
+    // Row 2 is the first context line, and the range runs to the removed one.
+    // **The headers are re-added on top and declared rather than charged**
+    // (C25 §3b, M9b): the pushed view took them out of a height budget, so four
+    // rows reached the removed line; a range caller asks for the rows it wants
+    // and the window says how many it put above them.
     const view = windowPatch(whole, 80, 2, 4);
     const rows = k.renderToLines(view, 80);
-    expect(rows.map(visible).map((r) => r.trimEnd())).toEqual(["── x " + "─".repeat(75), "@@", "1 1   ctx", "2   - a common b0"]);
-    expect(rows.map(underlinedRuns)).toEqual([[], [], [], ["b0"]]);
+    expect(rows.map(visible).map((r) => r.trimEnd())).toEqual([
+      "── x " + "─".repeat(75),
+      "@@",
+      "1 1   ctx",
+      "2   - a common b0",
+      "  2 + a common c0",
+      "3 3   ctx",
+    ]);
+    expect(rows.map(underlinedRuns)).toEqual([[], [], [], ["b0"], ["c0"], []]);
   });
 
   it("T3.21 (C25 I10): a span the writer opens inside a grapheme cluster is snapped outward, so the cluster paints whole", () => {

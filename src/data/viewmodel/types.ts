@@ -274,27 +274,31 @@ export type Action =
   | Readonly<{ kind: "fill"; label: string; command: string }>
   | Readonly<{ kind: "exec"; label: string; command: string }>
   | Readonly<{ kind: "open"; label: string; url: string }>
-  | Readonly<{ kind: "expand"; label: string; target: string }>
   /**
-   * Fill the screen with one block — C25 §3b's fullscreen patch is the first
-   * producer (I34).
+   * Unfold something on this entry, in place (I34, C25 §3b, R-EXA-082).
    *
-   * `target` names a block id **within the document the action fired from**, and
-   * denotes nothing else. Unlike `expand`, which toggles a row on an entry the
-   * dispatcher already holds, this is the first kind whose target the dispatcher
-   * has to *find* — and it is a free string an adapter supplies. Resolved
-   * against the whole transcript it would let one entry's action draw another
-   * entry's data; C23 I31 owns the refusal when it does not resolve.
+   * `target` names a **row or a block id within the document the action fired
+   * from**, and denotes nothing else: a table row, a folded `scroll`, or a
+   * `patch`. Rows are looked for first, so a row id equal to a block id has a
+   * known answer. Resolved against the whole transcript it would let one
+   * entry's action act on another entry's data; C23 I31 owns the refusal when
+   * it does not resolve.
+   *
+   * **This kind absorbed `view`, which filled the screen with one block.** The
+   * design deletes the pushed view — *a run's detail EXPANDS IN PLACE* — and
+   * the two were one kind wearing two names: C04's own section introducing
+   * `view` called it *the same category as `expand`: an affordance on a block
+   * that the reader invokes*. What went with it is the screen; what stayed is
+   * the resolution, which was always the half that could be wrong.
    */
-  | Readonly<{ kind: "view"; label: string; target: string }>;
+  | Readonly<{ kind: "expand"; label: string; target: string }>;
 
-/** The five, for a validator that cannot silently take a sixth (T2.11). */
+/** The four, for a validator that cannot silently take a fifth (T2.11). */
 export const ACTION_KINDS: ReadonlySet<Action["kind"]> = new Set<Action["kind"]>([
   "fill",
   "exec",
   "open",
   "expand",
-  "view",
 ]);
 
 // --- spans ----------------------------------------------------------------

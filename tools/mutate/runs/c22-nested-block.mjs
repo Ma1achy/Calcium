@@ -14,6 +14,11 @@
 // *shallower*, and the sentence I31 used to carry — *the entry's blocks* — is
 // satisfied by both. This run holds one mutation for each.
 //
+// **C23's half moved out of the patch view in M9b** (C25 §3b, R-EXA-082). The
+// view is deleted and `expand` took the `view` kind's subject, so the walk the
+// rule is about is `actions.ts`' `reachable` — the same two directions over the
+// same entry, read by T3.83. The mutations moved; the rule did not.
+//
 // **The control is the third row and it is not a resolution at all.** A run
 // whose every mutation is *stop recursing* cannot tell a suite that sees the
 // nesting from one that sees nothing: `pageBlock`'s direction is what T4.41
@@ -24,9 +29,9 @@ import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const CMD =
-  "npx vitest run test/contract/patch-view.test.ts test/integration/scroll-wiring.test.ts";
+  "npx vitest run test/edge/view-model.test.ts test/integration/scroll-wiring.test.ts";
 const CONSTRUCT = "src/shell/construct.ts";
-const PATCHVIEW = "src/shell/patch-view.ts";
+const ACTIONS = "src/shell/actions.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -64,38 +69,52 @@ const results = await runPass({
       expect: "T4.59",
     },
     {
-      // **C23's half, at the open.** The refusal it produces is *false* rather
-      // than absent — `no block \`p1\` in this entry` about a block that is in
-      // the entry — which is what makes this worse than a silent no-op.
-      name: "the view's target is resolved with a top-level find",
-      file: PATCHVIEW,
-      from: "      const found = blockIn(from, blockId);",
-      to: "      const found = entry.doc.blocks.find((b: Block) => b.id === blockId) ?? null;",
-      expect: "T3.60",
+      // **C23's half, shallower.** The message it produces is *false* rather
+      // than absent — `nothing to expand — no row or folded block` about a row
+      // that is in the entry — which is what makes this worse than a no-op.
+      name: "the action's target is resolved with a top-level find",
+      file: ACTIONS,
+      from: "          ...entry.doc.blocks.flatMap((b) => [...descendants(b)]),\n",
+      to: "",
+      expect: "T3.83",
     },
     {
-      // **C23's half, at the live re-read, and it is the one a partial fix
-      // leaves behind.** `move` calls `live` on every motion, so the view opens
-      // and then dismisses itself as `anchorEvicted` on the first keypress —
-      // blaming an eviction that did not happen, which is the same false
-      // sentence one layer along.
-      name: "the live re-read is resolved with a top-level find",
-      file: PATCHVIEW,
-      from: "    const found = blockIn(at.entry, at.blockId);",
+      // **The other direction, and it took two goes to make it observable** —
+      // which is the finding rather than a detail of the run (F1252). Widening
+      // the *search* alone survives: the write names `from`, so a row found in
+      // another entry is still patched into this one and the frame is right by
+      // accident of where the patch is addressed. **C04 I34's *never wider* is
+      // enforced by the write, not by the search**, and a mutation that only
+      // widens the search is asserting about a line that cannot be wrong.
+      //
+      // So this widens both, which is the defect the invariant actually forbids:
+      // the entry the block was found in becomes the entry patched.
+      name: "the action's target is resolved against the whole transcript, and patched there",
+      file: ACTIONS,
+      from:
+        "        const reachable: readonly Block[] = [\n" +
+        "          ...entry.doc.blocks,\n" +
+        "          ...entry.doc.blocks.flatMap((b) => [...descendants(b)]),\n" +
+        "        ];\n\n" +
+        "        for (const b of reachable) {\n" +
+        "          if (b.kind !== \"table\") continue;\n" +
+        "          const row = b.rows.find((r) => r.id === action.target);\n" +
+        "          if (row === undefined) continue;\n\n" +
+        "          const outcome = deps.transcript.patch(\n" +
+        "            from,\n",
       to:
-        "    const entry = deps.transcript.entries.find((e) => e.id === at.entry);\n" +
-        "    const found = entry?.doc.blocks.find((b: Block) => b.id === at.blockId) ?? null;",
-      expect: "T3.60",
-    },
-    {
-      // **The other direction, and it is T6.21's.** Deeper and wider are not the
-      // same generalisation: this one resolves against every entry, which is
-      // what lets one entry's action fill the screen with another's data.
-      name: "the view's target is resolved against the whole transcript",
-      file: PATCHVIEW,
-      from: "    const entry = deps.transcript.entries.find((e) => e.id === entryId);\n    if (entry === undefined) return null;\n    for (const top of entry.doc.blocks) {",
-      to: "    for (const top of deps.transcript.entries.flatMap((e) => e.doc.blocks)) {",
-      expect: "T3.20",
+        "        const every = deps.transcript.entries.flatMap((e) =>\n" +
+        "          [...e.doc.blocks, ...e.doc.blocks.flatMap((c) => [...descendants(c)])].map(\n" +
+        "            (c) => [e.id, c] as const,\n" +
+        "          ),\n" +
+        "        );\n\n" +
+        "        for (const [owner, b] of every) {\n" +
+        "          if (b.kind !== \"table\") continue;\n" +
+        "          const row = b.rows.find((r) => r.id === action.target);\n" +
+        "          if (row === undefined) continue;\n\n" +
+        "          const outcome = deps.transcript.patch(\n" +
+        "            owner,\n",
+      expect: "T3.83",
     },
   ],
 });

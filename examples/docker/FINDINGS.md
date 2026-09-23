@@ -56015,3 +56015,36 @@ rows, because a row citing a retired invariant reads exactly like coverage.
 return value retires with its callers, not with its function.** Both of these could be
 restated about `clampOffset` alone and would then be vacuously true, since the function
 would have nobody to be wrong for.
+
+---
+
+## F1252 — an invariant enforced by the write, while the rule names the search ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | C04 I34 / C23 I31 — *an action's target denotes something within the document the action fired from, and nothing else*. |
+| **Reached for** | A mutation resolving the target against the whole transcript. |
+| **Verdict** | **The rule is right and it is not the search that keeps it.** |
+
+M9b re-homed C23 I31's mutation from the deleted patch view onto `actions.ts`'
+`reachable` walk. The *shallower* direction was caught at once. The *wider* one —
+`entry.doc.blocks` → every entry's blocks — **survived twice**: once against a
+single-entry fixture, which is an ordinary weak-fixture finding, and again after
+a second entry carrying the same row ids was added, which is not.
+
+**The write is what anchors it.** The arm patches `from` — the entry the action
+fired from — with `blockId: b.id`, so a row found in another entry is still
+patched into this one. Widening the search changes which block object is read
+and changes nothing that reaches a document. There is no frame in which the
+mutation is visible, so a row asserting against it is asserting about a line
+that cannot be wrong: A03 §2's vacuity class, in a mutation rather than a rule.
+
+The mutation that can be wrong widens **both** — the entry the block was found
+in becomes the entry patched — and it is caught. That is also the honest reading
+of the invariant: *never wider* is a property of where the patch is addressed,
+and the search's width is a performance question standing next to it.
+
+**The tell: when a mutation survives a fixture built specifically to catch it,
+ask what the code does with the mutated value before strengthening the fixture
+again.** The second fixture here was correct, necessary and insufficient, and
+looked exactly like the fix.

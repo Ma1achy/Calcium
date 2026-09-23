@@ -18,12 +18,19 @@
 // fails nothing — byte-identical, and about fifteen times the walks — which is
 // the bench's to see (`tools/bench/patch-window.mjs`, `out/probe-f1187-view.mjs`)
 // and not a row's. T6.30 says so.
+//
+// **Three mutations went in M9b** (C25 §3b, R-EXA-082, F1251): the ceiling
+// search, the header-row list and the builder's gutter-from-slice. Each named a
+// line of the offset half of `window.ts` — `bottomOffset`, `WindowPlan.headers`,
+// `build` — and that half had one caller, the pushed patch view, which is
+// deleted. What survives is the transcript route: the plan, `windowRows`, and
+// the pin, which are the mutations left here.
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/contract/patch-window.test.ts test/contract/patch-view.test.ts test/edge/patch.test.ts";
+const CMD = "npx vitest run test/contract/patch-window.test.ts test/edge/patch.test.ts";
 const W = "src/presentation/patch/window.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -61,16 +68,6 @@ const results = runPass({
       expect: "T1.24",
     },
     {
-      // **The bottom search probes the row after the start.** Both paths read
-      // the plan, so T1.24's equality holds; T2.12's property — the first offset
-      // whose window reaches the last row — does not.
-      name: "BOTTOM-PROBES-NEXT: the ceiling search builds from one row past each start",
-      file: W,
-      from: "    if (build(plan, starts[mid] ?? 0, height).reachedEnd) hi = mid;",
-      to: "    if (build(plan, (starts[mid] ?? 0) + 1, height).reachedEnd) hi = mid;",
-      expect: "T2.12",
-    },
-    {
       // **The gutter not derived.** Every window's pin is one cell; T1.24's
       // numberWidth arm and the view's pin row (T3.20) both see it.
       name: "GUTTER-CONSTANT: the plan's pinned gutter is a constant, not the block's",
@@ -78,16 +75,6 @@ const results = runPass({
       from: "    numberWidth: numberWidth(patch),\n  });\n}",
       to: "    numberWidth: 1,\n  });\n}",
       expect: "T1.24",
-    },
-    {
-      // **Markers counted as headers.** `n` lands on the elision row above a
-      // collapsed hunk rather than on its header; the header-rows row and the
-      // view's hunk motions see it.
-      name: "MARKER-AS-HEADER: a collapsed hunk's marker row is listed as its header row",
-      file: W,
-      from: "    if (row.kind === \"header\") headers.push(i);",
-      to: "    if (row.kind === \"header\" || row.kind === \"marker\") headers.push(i);",
-      expect: "hunkHeaderRows names a row per hunk",
     },
     {
       // **The refusal weakened to both axes.** A plan for the same block at the
@@ -99,16 +86,7 @@ const results = runPass({
       expect: "T1.24",
     },
     {
-      // **The builder's gutter from the slice.** C25 I21a's defect back: the
-      // gutter shrinks with the window's widest line number. T3.20 measured it.
-      name: "GUTTER-FROM-SLICE: the window's gutter is derived from the lines it shows",
-      file: W,
-      from: "    numberWidth: plan.numberWidth,\n  } as Patch);\n\n  return { patch: windowed",
-      to: "    numberWidth: numberWidth({ ...patch, hunks, numberWidth: undefined } as unknown as Patch),\n  } as Patch);\n\n  return { patch: windowed",
-      expect: "T3.20",
-    },
-    {
-      // **Every row walked again** (I22, F1191). The bytes are the same and
+      // **Every row walked again** (C25 I22, F1191). The bytes are the same and
       // the cost is the patch's; T1.25's recording proxy sees the indices
       // outside the window.
       name: "WALK-EVERY-ROW: windowRows walks the plan's rows from the first to the last",
@@ -127,7 +105,7 @@ const results = runPass({
       expect: "T1.25",
     },
     {
-      // **The held plan read without the block check** (I22). A twin sharing
+      // **The held plan read without the block check** (C25 I22). A twin sharing
       // the hunks array is windowed by the other patch's plan — the path and
       // the header rows are the wrong block's. T1.26's shared-array arm.
       name: "PLAN-UNCHECKED: a held plan is read for any block sharing the hunks array",

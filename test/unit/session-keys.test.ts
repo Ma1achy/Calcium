@@ -338,20 +338,6 @@ describe("C22 §3 step 11 — the effect table", () => {
       completion: graph.completion,
       overlays: graph.overlays,
       history: graph.history,
-      // A stand-in: this suite drives the editing bindings, and the view's own
-      // seven have their own file. A double rather than the real one because
-      // `createPatchView` subscribes to a transcript, and a suite about `⌃w`
-      // should not be constructing one.
-      patchView: {
-        open: () => null,
-        move: () => false,
-        // The section gesture (C16 I33). `false` is the patch view's real
-        // answer — one file, one section — so the double is not weaker than its
-        // subject here.
-        sectionNext: () => false,
-        sectionPrev: () => false,
-        pop: () => false,
-      },
       // The same stand-in reason, and `openFor: null` is load-bearing rather
       // than filler: it is what `onView` reads to decide which view owns a
       // motion, so a double reporting a view open would silently route this
@@ -771,14 +757,6 @@ describe("C22 §3 step 12 — the read loop", () => {
       completion: {},
       overlays: {},
       history: { entries: [], append: () => undefined },
-      patchView: {
-        open: () => null,
-        move: () => false,
-        pop: () => {
-          order.push("patch-pop");
-          return false;
-        },
-      },
       documentView: {
         open: () => null,
         fill: () => false,
@@ -821,7 +799,6 @@ describe("C22 §3 step 12 — the read loop", () => {
 
     effects.table["viewPop"]?.();
     expect(order, "released at the pop, and before it").toEqual(["release", "dismiss"]);
-    expect(order, "and the patch view was not the one popped").not.toContain("patch-pop");
   });
 
   it("T1.14 (C22 I32): a lone Esc reaches the router without a second keystroke", async () => {
@@ -907,7 +884,6 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
       completion: {},
       overlays: {},
       history: { entries: [], append: () => undefined, next: () => null },
-      patchView: { open: () => null, move: () => false, pop: () => false },
       documentView: {
         open: () => null,
         fill: () => false,
@@ -1066,7 +1042,6 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
       completion: {},
       overlays: {},
       history: { entries: [], append: () => undefined, next: () => null },
-      patchView: { open: () => null, move: () => false, pop: () => false },
       documentView: {
         open: () => null,
         fill: () => false,
@@ -1184,7 +1159,7 @@ describe("C16 I33 — the section gesture, at one target and three owners", () =
    * rather than defaulted: a double reporting no view open routes the gesture
    * to the patch view and the row passes while asserting nothing.
    */
-  const owners = (up: "profile" | "document" | "patch") => {
+  const owners = (up: "profile" | "document" | "none") => {
     const calls: string[] = [];
     const answer = (who: string, verdict: boolean) => () => {
       calls.push(who);
@@ -1215,13 +1190,6 @@ describe("C16 I33 — the section gesture, at one target and three owners", () =
         sectionNext: answer("document:next", false),
         sectionPrev: answer("document:prev", false),
         openFor: up === "document" ? "/ps --watch" : null,
-      },
-      patchView: {
-        open: () => null,
-        move: () => false,
-        pop: () => false,
-        sectionNext: answer("patch:next", false),
-        sectionPrev: answer("patch:prev", false),
       },
       releaseView: () => undefined,
       visibilityChanged: () => undefined,
@@ -1266,14 +1234,17 @@ describe("C16 I33 — the section gesture, at one target and three owners", () =
     );
 
     // **The ladder half — each owner, and only that owner.** The profile view
-    // wins when a section is open; the document view when it has an `openFor`;
-    // the patch view otherwise. Asserted as the *set* of calls, because an
-    // effect that asked every owner and returned the first `true` would answer
-    // correctly for the profiler and wrongly for the other two.
+    // wins when a section is open; the document view when it has an `openFor`.
+    // Asserted as the *set* of calls, because an effect that asked every owner
+    // and returned the first `true` would answer correctly for the profiler and
+    // wrongly for the other.
+    //
+    // **There was a third rung and it was the patch view's** (C25 §3b,
+    // R-EXA-082). It is deleted, and the ladder's bottom is now *nobody*, which
+    // the row below asserts rather than leaving as a fall-through.
     for (const [up, next, prev] of [
       ["profile", "profile:next", "profile:prev"],
       ["document", "document:next", "document:prev"],
-      ["patch", "patch:next", "patch:prev"],
     ] as const) {
       const { effects, calls } = owners(up);
       effects.table["viewNextSection"]?.();
@@ -1285,23 +1256,20 @@ describe("C16 I33 — the section gesture, at one target and three owners", () =
     // that says why.** An owner with one section and an owner at its last
     // section both answer `false`, so the return value cannot tell *no further
     // section* from *no sections at all* — and an optional member would add a
-    // third silence indistinguishable from both. The patch view's `false` is a
-    // real answer (one file is one section) and the profile view's `true` is
-    // the same call on the same gesture; nothing in the return separates a
-    // refusal from an absence, which is the whole of C16 I33's argument.
+    // third silence indistinguishable from both. Nothing in the return
+    // separates a refusal from an absence, which is the whole of C16 I33's
+    // argument.
     //
     // What is assertable here is the consequence: the effect discards the
-    // verdict, so **a refusal is not retried at another owner**. The patch view
-    // refuses every time, and the gesture stops there rather than walking down
-    // the ladder looking for an owner that says yes — which is what a `false`
-    // read as *not mine* would do, and is the defect this shape prevents.
-    const refusing = owners("patch");
+    // verdict, so **a refusal is not retried at another owner**, and with no
+    // owner up the gesture reaches nobody rather than walking the ladder
+    // looking for one that says yes. The patch view used to be that bottom
+    // rung and refused every time, which made the row read as *the last owner
+    // declines*; with it deleted the row reads what it always meant.
+    const refusing = owners("none");
     refusing.effects.table["viewNextSection"]?.();
     refusing.effects.table["viewNextSection"]?.();
-    expect(refusing.calls, "asked twice, and no other owner consulted").toEqual([
-      "patch:next",
-      "patch:next",
-    ]);
+    expect(refusing.calls, "asked twice, and no owner was consulted").toEqual([]);
   });
 });
 

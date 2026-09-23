@@ -48,7 +48,6 @@ import type { Manifest } from "../data/manifest/index.js";
 import type { OverlayManager } from "../viewport/overlay/index.js";
 import type { FocusStore } from "../interaction/router/focus.js";
 import type { DocumentView, DocumentViewMotion } from "./document-view.js";
-import type { PatchView, PatchViewMotion } from "./patch-view.js";
 import type { ProfileView, ProfileViewMotion } from "./profile-view.js";
 
 /** The prompt's own extent, for anchoring (C19 §6, C20 §5). */
@@ -124,7 +123,6 @@ export type KeyDeps = Readonly<{
    * (I19). The seven `view*` entries below are what makes `pushedView` a target
    * with a vocabulary rather than a name in a union.
    */
-  patchView: PatchView;
   /**
    * C22 §13a's view. One target, two owners — C15 I1 allows one view at a time,
    * so at most one of these is open and the keymap needs no third target.
@@ -1010,12 +1008,12 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // which is S3's footer read literally: *n/p scroll*. The two are the same
     // gesture over each view's own unit, which is what makes one binding right
     // rather than a compromise.
-    viewNextHunk: () => void onView("nextHunk", "down", 1),
-    viewPrevHunk: () => void onView("prevHunk", "up", -1),
-    viewTop: () => void onView("top", "top", "top"),
-    viewBottom: () => void onView("bottom", "bottom", "bottom"),
-    viewPageUp: () => void onView("pageUp", "pageUp", "pageUp"),
-    viewPageDown: () => void onView("pageDown", "pageDown", "pageDown"),
+    viewNextHunk: () => void onView("down", 1),
+    viewPrevHunk: () => void onView("up", -1),
+    viewTop: () => void onView("top", "top"),
+    viewBottom: () => void onView("bottom", "bottom"),
+    viewPageUp: () => void onView("pageUp", "pageUp"),
+    viewPageDown: () => void onView("pageDown", "pageDown"),
     // **The section gesture, and it is one call to whichever owner is up**
     // (C16 I33). `n`/`p` above move the view's own *unit*; these move its
     // *section* — a file on a patch, a heading on a document, a group on the
@@ -1042,7 +1040,6 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         void deps.documentView.pop();
         return;
       }
-      void deps.patchView.pop();
     },
 
     reverseSearch: () => {
@@ -1205,14 +1202,19 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
    * Send a motion to whichever view is open (C22 §13a).
    *
    * Two motions per binding because the vocabularies differ where the units
-   * differ: a patch moves by hunk, a document by block. Anything the two share
-   * — `top`, `bottom`, the pages — passes the same name twice, and that
+   * differ: a document moves by block, the profiler by card. Anything they
+   * share — `top`, `bottom`, the pages — passes the same name twice, and that
    * repetition is deliberate: it keeps the mapping visible at the call site
    * rather than hidden in a table that would have to be read to know whether a
    * key does the same thing in both.
+   *
+   * **There were three and a patch was the first.** A patch moved by hunk, and
+   * `n`/`p` were the one motion a diff has that a list does not — reachable
+   * only at the `pushedView` target, over a surface the design deletes (C25
+   * §3b, R-EXA-082). An expanded patch is scrolled the way everything else in
+   * the transcript is scrolled.
    */
   const onView = (
-    patch: PatchViewMotion,
     document: DocumentViewMotion,
     // The profiler view's reading of the same key: a card step for `n`/`p`,
     // a window motion for the rest (C28 §3c).
@@ -1224,9 +1226,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         ? profileView.nextCard(profile)
         : profileView.move(profile);
     }
-    return deps.documentView.openFor !== null
-      ? deps.documentView.move(document)
-      : deps.patchView.move(patch);
+    return deps.documentView.openFor !== null ? deps.documentView.move(document) : false;
   };
 
   /**
@@ -1243,7 +1243,8 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         ? profileView
         : deps.documentView.openFor !== null
           ? deps.documentView
-          : deps.patchView;
+          : null;
+    if (owner === null) return false;
     return direction === 1 ? owner.sectionNext() : owner.sectionPrev();
   };
 
