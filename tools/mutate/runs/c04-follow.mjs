@@ -29,6 +29,12 @@ const run = () => {
   }
 };
 
+// **Three anchors moved with C26 §7a's pull** and none changed meaning: `nudge`
+// now resolves the held value through `resolved()` and writes through `#place()`
+// so the pull's absolute `set()` cannot round the follow box differently. The
+// mutations are the same three facts — the landing read from the wrong end, an
+// untouched follow box starting at the top, and the landing written as a number
+// — asked of the two methods that now hold them.
 const MUTATIONS = [
   // **Dropped with the document view** (C22 §13a, R-EXA-082, F1253). The brief's
   // own mutation asked `wasAtBottom` of the *grown* list, where every reader is
@@ -44,8 +50,8 @@ const MUTATIONS = [
     // `TAIL` — the follow cannot be left.
     name: "the store derives the follow from where the reader was, not where they landed",
     file: OFFSETS,
-    from: "      held.set(blockId, atTail(next, box.ceiling) ? TAIL : next);",
-    to: "      held.set(blockId, atTail(from, box.ceiling) ? TAIL : next);",
+    from: "    held.set(blockId, box !== undefined && atTail(next, box.ceiling) ? TAIL : next);",
+    to: "    held.set(blockId, box !== undefined && atTail(at, box.ceiling) ? TAIL : next);",
     expect: "T2.39",
   },
   {
@@ -55,8 +61,8 @@ const MUTATIONS = [
     // a mutation so it cannot come back quietly.
     name: "a page from an untouched follow box starts at the top",
     file: OFFSETS,
-    from: "      const current = held.get(blockId) ?? (box.follow === true ? TAIL : 0);",
-    to: "      const current = held.get(blockId) ?? 0;",
+    from: "    const current = held ?? (box.follow === true ? TAIL : 0);",
+    to: "    const current = held ?? 0;",
     expect: "T2.39",
   },
   {
@@ -64,8 +70,8 @@ const MUTATIONS = [
     // its content grows past the value the reader left.
     name: "landing at the bottom is written as a position rather than as TAIL",
     file: OFFSETS,
-    from: "      held.set(blockId, atTail(next, box.ceiling) ? TAIL : next);",
-    to: "      held.set(blockId, next);",
+    from: "    held.set(blockId, box !== undefined && atTail(next, box.ceiling) ? TAIL : next);",
+    to: "    held.set(blockId, next);",
     expect: "T2.39",
   },
   {

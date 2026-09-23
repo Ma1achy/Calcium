@@ -93,7 +93,12 @@ function widthsOf(
  * member for a clock, which is what rule 1 forbids and what keeps the ladder
  * monotonic.
  */
-function layout(block: Tape, width: number, ctx: Pick<RenderContext, "capabilities" | "tick">) {
+function layout(
+  block: Tape,
+  width: number,
+  ctx: Pick<RenderContext, "capabilities" | "tick">,
+  held: number,
+) {
   const room = normaliseWidth(width);
   const n = block.members.length; // cells-ok — a count of members
   const current = block.members.findIndex((m) => m.id === block.current);
@@ -117,8 +122,32 @@ function layout(block: Tape, width: number, ctx: Pick<RenderContext, "capabiliti
   const window =
     n === 0
       ? { from: 0, to: 0, before: 0, after: 0 }
-      : tapeWindow(widthsOf(list, current, caps), room, at, 0, marks, measure);
+      : tapeWindow(widthsOf(list, current, caps), room, at, held, marks, measure);
   return { room, list, window, current, marks, measure };
+}
+
+/**
+ * The start the window settles on, for the shell to persist (C26 I25, §7a).
+ *
+ * **The same `layout` the renderer runs, so there is one window and not two.**
+ * A renderer cannot write view state, so the answer has to be asked for from
+ * outside — and asking for it by recomputing the ladder in the shell would be
+ * the second rounding C26 §7a exists to prevent.
+ *
+ * **The tick is not an input to the width**, which is why one is not taken: a
+ * spinner's frames are a single cell each at every rung (C09 I44), so the
+ * running member's text is the same width whichever frame is showing. T1.50
+ * asserts that rather than leaving it to be assumed, because a set with a wide
+ * frame in it would make the persisted start disagree with the drawn one on
+ * exactly the frames nobody looks at.
+ */
+export function tapeStart(
+  block: Tape,
+  width: number,
+  capabilities: RenderContext["capabilities"],
+  held: number,
+): number {
+  return layout(block, width, { capabilities, tick: 0 }, held).window.from;
 }
 
 function tapeElements(block: Tape, width: number): readonly NavElement[] {
@@ -166,7 +195,17 @@ export const tapeDefinition: BlockDefinition<Tape> = {
 
   render(block: Tape, ctx: RenderContext): Rendered {
     ctx.probe?.gauge("tape.members", block.members.length); // cells-ok — a count of members
-    const { room, list, window, current } = layout(block, ctx.width, ctx);
+    // **The held start, clamped at read** (C26 I25, C04 I48). The store keeps a
+    // member index here where a scroll box keeps a row, because the unit is *how
+    // far this container is scrolled* and the container is what knows what that
+    // means; `tapeWindow` bounds it into the members, as `offsetOf` bounds a
+    // box's against its ceiling.
+    const { room, list, window, current } = layout(
+      block,
+      ctx.width,
+      ctx,
+      ctx.scrollOffsets?.[block.id] ?? 0,
+    );
     const set = glyphs(ctx.capabilities);
     const held = ctx.focus !== null && ctx.focus.blockId === block.id ? ctx.focus.rowId : null;
     const selected = new Set(

@@ -13,6 +13,7 @@ export { DEFAULT_DEFINITIONS } from "./defaults.js";
 export { ANIMATES, animationIntervalOf, tickIntervalOf } from "./animation.js";
 // The floor the shell reserves for a contained failure (C22 I69, C04 I67).
 export { countdown, elapsed, statusDetailRows, statusRowsFor } from "./kinds/status.js";
+export { tapeStart } from "./kinds/tape.js";
 export {
   glyphs,
   type GlyphCaps,

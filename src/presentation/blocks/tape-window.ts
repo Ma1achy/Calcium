@@ -75,7 +75,29 @@ export function tapeWindow(
   };
 
   const at = Math.min(Math.max(0, Math.trunc(current)), n - 1); // cells-ok — a member index
-  const held = Math.min(Math.max(0, Math.trunc(from)), n - 1); // cells-ok — a member index
+  // **The ceiling, clamped at read** (C04 I125, C04 I48). `0..n-1` bounds the
+  // index and says nothing about the room, so a start written when the terminal
+  // was narrow survived a widening: the reader got `«5` beside a row's worth of
+  // empty space, because *the window moves only when the current leaves it* is
+  // true of a start too far along as well as one too far back. This is
+  // `offsetOf`'s `content − interior` in the tape's unit — the smallest start
+  // whose window still reaches the last member — and it is taken here for the
+  // same reason: the store does not know the width.
+  //
+  // **A minimum over candidates, not a walk back**, which is the end bound's
+  // non-monotonicity arriving at this end: backing up past the first member
+  // removes the `«n` the later starts were paying for, so a start that does not
+  // fit sits between two that do. Widths `1 3 9 5` in a room of 24 from a held
+  // start of 2 — `«1` costs four cells, so a window from 1 needs 25 and one
+  // from 0 needs exactly 24, and a loop stopping at the first failure keeps a
+  // `«2` where the whole tape fits.
+  let held = Math.min(Math.max(0, Math.trunc(from)), n - 1); // cells-ok — a member index
+  for (let c = 0; c <= held; c += 1) {
+    if (cost(c, n) <= room) {
+      held = c;
+      break;
+    }
+  }
 
   let lo = held;
   let hi = endFrom(held);

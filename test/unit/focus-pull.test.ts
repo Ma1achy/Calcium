@@ -87,7 +87,15 @@ describe("C26 §7a — the pull", () => {
         for (let from = 0; from < n; from += 1) {
           for (let at = 0; at < n; at += 1) {
             const tape = tapeWindow(widths, room, at, from, MARKS, free);
-            const box = pullIntoView(from, at, at + 1, Math.min(room, n));
+            // **The box's ceiling is applied outside `pullIntoView`** — by
+            // `offsetOf` at read and by `ScrollOffsets.resolved` before the
+            // move — where the tape's is inside `tapeWindow`, because the
+            // tape's window size is not a number anyone can hand the store.
+            // Applying it here is what makes the two comparable rather than
+            // what makes them agree: it is the same clamp, `content − interior`
+            // against `n − room`, in the two units.
+            const clamped = Math.min(from, Math.max(0, n - room));
+            const box = pullIntoView(clamped, at, at + 1, Math.min(room, n));
             expect(
               tape.from,
               `n=${String(n)} room=${String(room)} from=${String(from)} at=${String(at)}`,

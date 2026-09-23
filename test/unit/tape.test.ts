@@ -48,8 +48,23 @@ const exhaustive = (widths: readonly number[], room: number, current: number, fr
     for (let h = lo + 1; h <= n; h += 1) if (cost(lo, h) <= room) best = Math.max(best, h);
     return best;
   };
-  let lo = from;
-  let hi = endFrom(from);
+  // **The ceiling, asked as a minimum over candidates rather than as a walk**
+  // (C04 I125). The held start is clamped down to the smallest one whose window
+  // still reaches the last member, and *whose window still reaches* is not
+  // monotone in the start for the reason the end bound is not monotone in its
+  // end: backing up past the first member removes the `«n` the earlier starts
+  // were paying for, so a start that does not fit can sit between two that do.
+  // A loop that stops at the first failure is the same defect as `grow while it
+  // fits`, one bound over.
+  let start = from;
+  for (let c = 0; c <= from; c += 1) {
+    if (cost(c, n) <= room) {
+      start = c;
+      break;
+    }
+  }
+  let lo = start;
+  let hi = endFrom(start);
   if (current < lo) {
     lo = current;
     hi = endFrom(lo);

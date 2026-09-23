@@ -62,6 +62,7 @@ import { VisibleIds } from "./visible-ids.js";
 import { pacedSchedule } from "./paced-schedule.js";
 import { RenderScratchStore } from "./render-scratch.js";
 import type { BoxSpan, DragContainer } from "./drag-selection.js";
+import { pullIntoView } from "./pull.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
 import { createOverlayManager, takesInput } from "../viewport/overlay/index.js";
 import { chipLabel, createEditor } from "../interaction/editor/index.js";
@@ -81,7 +82,7 @@ import { createKeyEffects } from "./keys.js";
 import type { FocusTarget, InputEvent, Key, KeyAction } from "../interaction/router/types.js";
 import { openHistory, SEARCH_ID } from "../interaction/history/index.js";
 import { detectCapabilities, type TerminalCapabilities } from "../terminal/capabilities.js";
-import { glyphs } from "../presentation/blocks/index.js";
+import { glyphs, tapeStart } from "../presentation/blocks/index.js";
 import { createFrameScheduler, type CommitReason } from "../terminal/frame-scheduler.js";
 import type { CaptureResult, Profiler, ProfileReport, TraceFn } from "./profiling/types.js";
 import { instrumentRegistry, type ProbeableRegistry } from "./profiling/registry-probe.js";
@@ -2175,6 +2176,102 @@ export async function constructGraph(
   };
 
   /**
+   * The pull — focus moves a container's window by the minimum (C26 I24, I25,
+   * §7a, §021, §095).
+   *
+   * **A projection of focus, like the peek above and for the peek's reason.**
+   * Focus is a pull (C16 I11) with no change stream, so this re-derives the
+   * whole answer after every delivered input and on every viewport change
+   * rather than being driven from a move.
+   *
+   * **Which makes *scrolling never moves focus* a property of the wiring and
+   * not a clause anywhere.** This reads focus and writes an offset; nothing
+   * reads an offset and writes focus, so there is no edge in the other
+   * direction to forbid. A reader who scrolls away keeps the element, and the
+   * next key that moves focus brings the window back to it.
+   *
+   * **Two containers, two units, one distance** (C26 I25). A scroll box's
+   * offset is rows and its window is the height it was given, so the distance
+   * is `pullIntoView`'s. A tape's is members and its window is a function of
+   * its own contents, so the distance is `tapeWindow`'s with the mark priced in
+   * (C04 I125) — and what the shell owes there is not a second calculation but
+   * the **persistence** of the first: without it the held start is zero every
+   * frame and the window snaps back the moment the current comes near it.
+   *
+   * **Below `scrollBox` and `blockIn` because it uses both**, which is also
+   * what keeps the box's ceiling one number: the pager and the pull cannot
+   * disagree about where the bottom is.
+   */
+  /**
+   * **The focus the box was last pulled to**, and this is the half of §7a that
+   * is a refusal. A pull re-derived on every viewport change undoes a scroll a
+   * frame after it happens — the reader pages the box, the projection sees the
+   * focused row outside the window and drags it straight back, and the key is
+   * dead while focus is in a container. *Scrolling never moves focus* is then
+   * satisfied and useless, because scrolling does not move anything.
+   *
+   * So the pull is driven by focus **changing**, not by focus existing. A
+   * resize does not re-pull either, which is the same ruling seen from the
+   * other side: a reader who put the window somewhere keeps it until they move
+   * focus, and the move is what brings it back.
+   */
+  let pulledTo: string | null = null;
+  const pullScroll = (entry: TranscriptEntry, width: number): void => {
+    const at = focus.current;
+    if (at.at !== "liveBlock" || at.entryId !== entry.id) return;
+    const where = `${entry.id}/${at.element?.blockId ?? ""}/${at.element?.elementId ?? ""}`;
+    if (where === pulledTo) return;
+    pulledTo = where;
+    const placed = elementsOf(entry.id);
+    const index = resolveFocus(at.element, placed);
+    if (index === null) return;
+    const found = placed[index];
+    if (found === undefined) return;
+    // The box the focused element belongs to, if it is in one. A `scroll`
+    // declares one element per child and owns them (C26 §4b cell 3), so the
+    // element's `blockId` names the box itself rather than the child.
+    const box = blockIn(entry, found.blockId);
+    if (box === null || box.kind !== "scroll") return;
+    const geometry = scrollBox(box);
+    if (geometry === undefined) return;
+    const interior = box.collapsed === true ? 0 : box.height; // cells-ok — a row count
+    // **The box's own coordinates.** The placed element's rows are in entry
+    // space and the offset is in the box's content, so the rows are re-asked of
+    // the box alone at the width the frame laid it out at.
+    const local = built.blocks.elementsOf(box, width).find((e) => e.id === found.element.id);
+    if (local === undefined) return;
+    const held = stores.scrollOffsets.resolved(entry.id, box.id, geometry);
+    const next = pullIntoView(held, local.rows.from, local.rows.to, interior);
+    if (next !== held) stores.scrollOffsets.set(entry.id, box.id, next, geometry);
+  };
+  const pullTapes = (entry: TranscriptEntry, width: number): void => {
+    for (const top of entry.doc.blocks) {
+      for (const block of [top, ...descendants(top)]) {
+        if (block.kind !== "tape") continue;
+        const held = stores.scrollOffsets.get(entry.id, block.id);
+        const next = tapeStart(block, width, detection.capabilities, held);
+        // **No `box`**, because a tape has no ceiling to follow: `TAIL` on this
+        // axis would mean *the last member*, and the window that reaches it is
+        // the one `tapeWindow` already computed. The store holds the number.
+        if (next !== held) stores.scrollOffsets.set(entry.id, block.id, next);
+      }
+    }
+  };
+  const syncPull = (): void => {
+    const width = deps.frame.overlayRegion().width;
+    // **The entries the frame is showing**, which is the peek's own bound: a
+    // container nobody can see has no window to pull, and walking the whole
+    // transcript would make one key cost the scrollback.
+    for (const ve of stores.viewport.visible().entries) {
+      const entry = stores.transcript.entries.find((e) => e.id === ve.id);
+      if (entry === undefined) continue;
+      pullScroll(entry, width);
+      pullTapes(entry, width);
+    }
+  };
+  stores.viewport.subscribe(() => syncPull());
+
+  /**
    * Move the box under the pointer (C04 I48, C16 §4a). The store clamps at read.
    *
    * **Takes the entry and the block rather than reading focus**: `pageBlock`
@@ -3367,6 +3464,8 @@ export async function constructGraph(
         // keys just moved (C15 §2a), and the chip preview the caret (I113).
         syncPeek();
         syncChipPreview();
+        // And the window follows the focus the keys just moved (C26 I24, §7a).
+        syncPull();
         stampInput();
         scheduler.commit("input");
       }
