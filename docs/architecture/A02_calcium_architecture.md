@@ -150,7 +150,7 @@ All three implementations are fully substitutable in every test that does not co
 
 ```typescript
 type FocusTarget =
-  | "child" | "overlay" | "copyMode" | "pushedView"
+  | "child" | "overlay" | "nativeSelection" | "pushedView"
   | "interaction" | "prompt" | "liveBlock" | "global";
 ```
 
@@ -446,7 +446,7 @@ Those entries **say which category they are in and name the structure that carri
 1. Six layers; imports strictly downward; lint-enforced.
 2. L0's two halves — terminal and data — do not import each other.
 3. A02 declares seams; the component specs are authoritative for signatures. The architecture doc never restates a component's full interface.
-4. Focus priority is overlay → copy mode → pushed view → prompt → live block → global; first consumer wins.
+4. Focus priority is overlay → native selection → pushed view → prompt → live block → global; first consumer wins.
 5. `createTui` requires four fields; every other field has a working default.
 6. Startup order 6→7→8 is not reorderable: handlers, then acquire, then paint.
 7. One shutdown function, five callers; release precedes printing.

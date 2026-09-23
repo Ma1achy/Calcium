@@ -28,7 +28,7 @@ C26 replaces the flat target with **a scope stack plus a mode**, and makes what 
 offers a **declaration** rather than a set of keys.
 
 **It subsumes rather than sits beside.** Block-to-block movement, column and cell movement,
-the focusable-block concept, clickable rows and links, `copyMode`'s missing producer,
+the focusable-block concept, clickable rows and links, `nativeSelection`'s missing producer,
 semantic copy and the question/menu primitive all fall out of this. Every one of them built
 first is built twice — §11 lists them.
 
@@ -45,7 +45,7 @@ on 2026-08-13:
 | `overlay` | 6 | — |
 | `liveBlock` | 4 | `escape` · `up` · `down` · `enter` → `rowActivate` |
 | `global` | 4 | — |
-| `copyMode` | **0** | a focus target with no keys |
+| `nativeSelection` | **0** | a focus target with no keys |
 
 **The premise survives on different evidence.** *Zero bindings* was false; *nowhere for a
 richer set to live* is not.
@@ -75,8 +75,8 @@ non-frustrating: the reader is never one keypress from losing their position.
 
 **C16 §5's Ctrl-C ladder has no order of its own.** Its rungs 3–7 are handlers registered on
 focus targets, so their order *is* `FOCUS_ORDER`'s, and the two cannot disagree. C16's own
-spec pass found the defect that arises when the ladder exists as a second artefact — copy
-mode above both overlay rungs, against A02 §2 — and `FOCUS_ORDER` is the single artefact that
+spec pass found the defect that arises when the ladder exists as a second artefact — native
+selection above both overlay rungs, against A02 §2 — and `FOCUS_ORDER` is the single artefact that
 prevents it.
 
 So **interaction mode must be expressible as a focus target**, not as a flag consulted inside
@@ -432,7 +432,7 @@ out is the one with a value that looks obviously right.
 | `overlay` | `dismiss` — and it **respects `dismissable`**, so a confirm refuses it (`src/viewport/overlay/types.ts`, `dismissable: boolean`) | **`modal`, and it is already built somewhere else.** The value's one inhabitant is a field on C15's layer, so adopting it would be two sources for one fact — C11's `copy` argument exactly (C04 I50) |
 | `pushedView` | `viewPop` | none. It pops one scope; *bubble* is not what it does and *auto*'s two levels are not there |
 | `liveBlock` | `focusPrompt` — out of the block, one level | none. `auto` is *two-level*, and this is one |
-| `copyMode` | **nothing.** The exit is `⌃c` on the ladder, deliberately (`interaction/router/types.ts`: *entry only; the exit is §5's rung and not an action*) | the question does not arise — `Esc` is not this scope's exit at all |
+| `nativeSelection` | **nothing.** The exit is `⌃c` on the ladder, deliberately (`interaction/router/types.ts`: *entry only; the exit is §5's rung and not an action*) | the question does not arise — `Esc` is not this scope's exit at all |
 | `interaction` | **nothing is bound.** Commitment 3's *leave interaction, then leave the scope* is the one two-level escape in the design and it is unimplemented (§8b.8) | `auto` would name it, and it has no subject until the mode has bindings |
 
 ### The outcome — the same axis error, at the other half
@@ -491,7 +491,7 @@ structure, and the structural half is where it comes apart.
 | # | the two rules that meet | ruling |
 |---|---|---|
 | 1 | *a block's keys merge into `liveBlock`* (A01 D4) × *interaction is the mode that hands the block its keys* (§2, commitment 3) | **FINDING, and it is the walk's first output.** D4 is explicit — *a live block may bind letters, but only once focus has been moved into it (`↓`), and C16 merges those bindings into the `liveBlock` target.* So `Keymap.mergeBlock`, the seam that reads like interact's producer, supplies **a different rung by architectural decision**. §8b.8 measured *no caller*; this measures *no target*. **Interaction mode has no candidate producer**, which is a stronger and much cheaper thing to know. **→ §4f revises this**: D4 stands, and the mode's subject turns out to be the keys `mergeBlock` **refuses** — so the producer's shape is known (the same seam, a different target, colliding keys only) and it is still absent |
-| 2 | *`activeTarget` returns `pushedView` whenever a view is open* × *an element inside that view could declare bindings* | **The collision (b) describes cannot occur.** `activeTarget` checks the layer before anything else — `overlay`, `copyMode`, `pushedView`, and only then `interaction` — so while a view is open **no key reaches a block inside it at all**. It is not two scopes binding the same keys; it is one scope taking every key. What (b) needs is a **rung above `pushedView` for an element inside the top layer**, and there is none. **A rung, not a binding** |
+| 2 | *`activeTarget` returns `pushedView` whenever a view is open* × *an element inside that view could declare bindings* | **The collision (b) describes cannot occur.** `activeTarget` checks the layer before anything else — `overlay`, `nativeSelection`, `pushedView`, and only then `interaction` — so while a view is open **no key reaches a block inside it at all**. It is not two scopes binding the same keys; it is one scope taking every key. What (b) needs is a **rung above `pushedView` for an element inside the top layer**, and there is none. **A rung, not a binding** |
 | 3 | *`Esc` pops the view* × *`Esc` returns from the live block* × *commitment 3's `Esc` leaves interaction first* | **Two levels, one key, and the ladder already resolves it** — `FOCUS_ORDER` holds `interaction` above `prompt`, and `⌃c` at that rung calls `setMode("navigate")` and stops there, deliberately. So the two-level escape is **expressible today and unimplemented**, which is a different state from unexpressible and is what row 1 blocks |
 | 4 | *`n`/`p` step hunks at `pushedView`* × *a table's elements are rows* | **Not a collision — dead keys.** `n`/`p` step **hunks**, which only `patch` has, so a view holding a table binds two letters that do nothing. **Dead is worse than conflicting**: a key that does nothing reads as a key that is not bound, and the reader cannot tell which |
 | 5 | *`interaction` is a rung* × *nothing sets `mode: "interact"`* | **The rung is unreachable, measured rather than inferred.** `setMode` has exactly one caller in `src/` — the `⌃c` handler — and it passes `"navigate"`. So `activeTarget`'s interaction branch cannot be true, and the mode indicator's second value has nothing to display. Already recorded in roadmap 29 from the other direction |
@@ -502,7 +502,7 @@ structure, and the structural half is where it comes apart.
 |---|---|---|
 | 1 | enter interact on a block inside a view, then `Esc` | **The sequence cannot start** (table row 2), so this answers nothing rather than answering it one way. Recorded as unreachable, because a trace row that cannot run reads exactly like one that passes |
 | 2 | the view's document is replaced under a focused element (`fill`, `putBlock`) | I10's fall-forward re-resolves against **the live entry's** list, and a view's elements are in no list — `elementsIn` has one caller and it reads `stores.transcript.liveId` (**superseded by §4g** on the measurement, not the conclusion: `elementsOf(entryId)` has three callers and every one takes a transcript entry; a view's document is still in no list). **The re-resolution has no subject at this scope**: table row 2 arriving through an event |
-| 3 | `⌃c` at each rung with interact open | measured, and each rung undoes the innermost thing entered: `copyMode` → `exitCopyMode`; `overlay` → pop if `dismissable`; `pushedView` → `popLayer`; `interaction` → `setMode("navigate")`, staying on the row; `liveBlock` → `toPrompt`. **The ladder is right and its interaction rung is dead** for row 5's reason |
+| 3 | `⌃c` at each rung with interact open | measured, and each rung undoes the innermost thing entered: `nativeSelection` → `exitNativeSelection`; `overlay` → pop if `dismissable`; `pushedView` → `popLayer`; `interaction` → `setMode("navigate")`, staying on the row; `liveBlock` → `toPrompt`. **The ladder is right and its interaction rung is dead** for row 5's reason |
 | 4 | the view pops while focus is inside a block in it | same as 2 — there is no *inside* to be in. Named because it is the sequence an implementation would reach for first when wiring a second caller of `elementsIn`, and it would produce a stored address into a document nothing displays. **§4g wrote that second caller** — `elementsOf(entryId)` — and it takes entries, not views, so the address it stores is into a displayed document and this row's hazard was not met |
 
 ### What (b) is actually blocked on, in order
@@ -587,7 +587,7 @@ about collisions and untrue as a reason for *this* mechanism.
 
 Checked against `global` **and** against an existing `liveBlock` binding. So a block that wants
 a key the framework already owns has **no way to ask for it**: the ten rows bound at
-`liveBlock` — `↑ ↓ ⇧↑ ⇧↓ ⏎ Esc PgUp PgDn y ⌥v` — and the four at `global`, `PgUp`, `PgDn`,
+`liveBlock` — `↑ ↓ ⇧↑ ⇧↓ ⏎ Esc PgUp PgDn y ⌥⇧C` — and the four at `global`, `PgUp`, `PgDn`,
 `⌃Home`, `⌃End`, are closed to every adapter, permanently and by construction.
 
 **Interaction mode is the rung where they are not.** A mode that takes every key is precisely
@@ -895,7 +895,7 @@ which is two keys with one rule each: `tab`, then `⌃a`.
 
 **Reversible the day a consumer wants it, and the consumer is named**: a transcript **export** — the
 whole session's tables as text — is the only surface that has asked for more than one entry's data,
-and it belongs to copy mode (`⌥v`, C16 §5b), which copies the screen, or to a `/export` verb; neither
+and it belongs to native selection (`⌥⇧C`, C16 §5b), which copies the screen, or to a `/export` verb; neither
 is a selection. If one of them turns out to need element sources across entries, this section is where
 the anchor gains an entry of its own.
 
@@ -1645,8 +1645,8 @@ listed so the Order list can point here instead of carrying a duplicate:
 
 - **10** question / menu primitive — `ctx.ask` exists with `choices`
   (`shell/local/registry.ts:59`); the in-transcript menu block is an interactive element.
-- **15** text selection, copy and semantic copy — BUILT. `copyMode` has a producer
-  (`enterCopyMode` in `src/shell/session.ts`) and two bindings (`⌥v` at `prompt` and
+- **15** text selection, copy and semantic copy — BUILT. `nativeSelection` has a producer
+  (`enterNativeSelection` in `src/shell/session.ts`) and two bindings (`⌥⇧C` at `prompt` and
   `liveBlock`, `src/interaction/router/keymap.ts`). This bullet said *zero bindings and no
   producer* until 2026-09-03. Semantic copy is *copy the focused element*, which needs §5 and nothing else.
 - **16** one popup — the confirm and the completion menu are two mechanisms today; whichever

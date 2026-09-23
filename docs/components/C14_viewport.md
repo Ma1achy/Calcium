@@ -83,7 +83,7 @@ It was specified nowhere until C16's spec pass, while C16's dependency line alre
 
 `null` for a row outside the viewport's occupied rows. **The rows are the viewport's own, addressed from its top; a short transcript leaves unoccupied rows, and the frame draws them *above* the content** — `paint.ts` bottom-aligns the transcript so it grows towards the prompt, and L4's `entryAtRegionRow` subtracts that alignment from the region row before asking here, reading it from the one exported function the composer paints with (`blankRowsAbove(regionHeight, rows)`, C22). The blank rows are the region's and not the transcript's: a click on them is a click on nothing, and `entryAtRow` never learns how the region was aligned. This sentence said *below* for as long as it existed while the frame said above (F755); the two agree exactly when the transcript fills the region, which is every long session and no short one.
 
-**Pure, and no cursor of its own.** `entryAtRow` reads the index and the current scroll, and stores nothing. Copy mode's row cursor is §6's; this is a query.
+**Pure, and no cursor of its own.** `entryAtRow` reads the index and the current scroll, and stores nothing. Native selection's row cursor is §6's; this is a query.
 
 ---
 
@@ -382,15 +382,15 @@ Dragging an edge continuously must produce continuously correct frames, never a 
 
 ---
 
-## 6. Copy mode
+## 6. Native selection
 
 > **Unbuilt as of 2026-07-31, and this note exists because nothing else recorded that.** C14 landed with §6 specified and no implementation: `Viewport` carries no `enterCopy`/`exitCopy`, no clipboard injection, and **T1.13, T1.14, T1.15, T3.14 and T5.6 are absent from the suite rather than deferred**. Absent is not deferred — a deferral is tracked and expires (`tools/enforce/todo-expiry.mjs`), while an absent test is indistinguishable from a component that had nothing to say. The five now exist as deferrals against the file that will hold this section, so they fail the moment it is written.
 >
-> Until then, C16 takes `copyMode` as a boolean input and `exitCopyMode` as an injected call. That is a seam standing in for something **unbuilt**, which is legitimate, as distinct from a seam standing in for something unspecified — the distinction that put `entryAtRow` in §2 rather than in C16's constructor.
+> Until then, C16 takes `nativeSelection` as a boolean input and `exitNativeSelection` as an injected call. That is a seam standing in for something **unbuilt**, which is legitimate, as distinct from a seam standing in for something unspecified — the distinction that put `entryAtRow` in §2 rather than in C16's constructor.
 
-Mouse is on by default (D34), which takes the terminal's own text selection — the way people copy a UUID today. While the app captures the mouse, the terminal's native selection needs the emulator's modifier — shift-drag on most, option-drag on iTerm2 — and which modifier is the emulator's to say, not this framework's. Copy mode is therefore not optional (A01 S30): it is the framework's answer rather than a documented bypass, and C16 owns its entry and its exit.
+Mouse is on by default (D34), which takes the terminal's own text selection — the way people copy a UUID today. While the app captures the mouse, the terminal's native selection needs the emulator's modifier — shift-drag on most, option-drag on iTerm2 — and which modifier is the emulator's to say, not this framework's. Native selection is therefore not optional (A01 S30): it is the framework's answer rather than a documented bypass, and C16 owns its entry and its exit.
 
-- Entry is by a key binding C16 owns. Copy mode is its own **focus target**, sitting above `pushedView` and below `overlay` in A02's priority order — it takes every key, including inside the dashboard, but a confirm raised over it still wins.
+- Entry is by a key binding C16 owns. Native selection is its own **focus target**, sitting above `pushedView` and below `overlay` in A02's priority order — it takes every key, including inside the dashboard, but a confirm raised over it still wins.
 - Entering freezes the viewport and shows a row cursor.
 - Movement keys extend a row-range selection.
 - Yank writes the selected rows' **text** — glyphs and content, no escape sequences, no gutter markers — through an injected `clipboard` writer.
@@ -409,7 +409,7 @@ The clipboard writer is injected because C14 must stay pure and testable; a comp
 | **detached** | → detached (T1.5) | → following (T1.7) | → copying (T1.13) | — |
 | **copying** | moves the cursor, not the view (T3.14) | — | no-op | → previous mode (T1.14) |
 
-Copy mode remembers whether it was following, so leaving it resumes the tail rather than stranding the user.
+Native selection remembers whether it was following, so leaving it resumes the tail rather than stranding the user.
 
 ---
 
@@ -428,7 +428,7 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 - **I11** — C14 reads no clock and performs no I/O; the clipboard writer is injected.
 - **I12** — C14 imports nothing from `terminal/`; dimensions arrive as data, and C14 never calls the frame scheduler. L4 orchestrates.
 - **I13** — The eviction marker is an ordinary entry (C13 I14); C14 holds no special case for it.
-- **I14** — Copy mode restores the prior follow state on exit.
+- **I14** — Native selection restores the prior follow state on exit.
 - **I15** — Cache invalidation is incremental, driven by C13's granular `Change`. An append invalidates nothing already measured; a patch invalidates one entry through its `rev`. Dropping the cache on every change would make the Fenwick tree pointless.
 - **I16** — There is no overscan in v1. Rows outside the viewport are not measured or rendered ahead, and adding it is a measurable change against M-T3's baseline rather than a default nobody chose.
 - **I17** — A page movement is exactly `viewportHeight − 1` rows, in both directions. The overlap is the point: a full-height page turn leaves a reader with no anchor in what they just read, and the off-by-one is the difference between the two.
@@ -461,7 +461,7 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 9. Width changes drop the cache; height changes do not (I8).
 10. The anchor is captured before remeasure and clamps within its entry (I7).
 11. No overscan in v1; it is a measurable addition, not a default (I16).
-12. Copy mode is mandatory because mouse is on by default; the clipboard writer is injected (I11).
+12. Native selection is mandatory because mouse is on by default; the clipboard writer is injected (I11).
 13. Summed visible rows equal the viewport height exactly (I10).
 14. C14 never calls C03; scrolling reports a change and L4 commits (I12).
 15. The eviction marker is an ordinary entry and needs no special handling (I13).
@@ -507,7 +507,7 @@ Fake heights, no rendering.
 - **T1.12** (I3): a theme change → zero cache entries invalidated.
 - **T1.13**: `enterCopy` from following and from detached → both enter copying.
 - **T1.14** (I14): `exitCopy` restores the prior follow state, both ways.
-- **T1.15**: copy mode entered from inside a pushed view → keys route to copy mode, not the view.
+- **T1.15**: native selection entered from inside a pushed view → keys route to native selection, not the view.
 - **T1.16** (I18): exactly one visible entry reports `live: true`, and it is C13's `liveId`; a transcript with no live entry reports none.
 - **T1.17** (I18): measured heights are identical with and without the **live gutter** — it costs no rows. *Not the eviction marker, which is an ordinary entry and costs exactly the rows it measures (I13, C13 I14). Two different things were called "the marker" in one spec, and only the citation distinguished them.*
 - **T1.18** (I23): a 2 000-line `code` block and a 2 000-line `raw` block, windowed at `[0, 40)` through `windowSequence` → each windowed block measures at most `40 + skipRows + dropRows`, and the painted rows are the same forty the whole rendering would have put there (C09 I25). A block comment opening above the window and closing inside it → the rows inside are still drawn in the comment slot (the `lineRange` pin).
@@ -556,7 +556,7 @@ Fake heights, no rendering.
 - **T3.12c** (§5 step 6): a viewport **following the tail**, resized shorter → it is still at the tail, and the transcript's last row is still the last visible row. Step 6 was written in §5 and had no mechanism: `resize` went to `#restoreFromAnchor`, which for a follower (`anchor === null`) only clamps `topRow` into the new bounds, so shrinking the region slid the tail off the bottom one row per row lost. Invisible while `resize` fired only on `SIGWINCH` — one event deep, and it reads as the terminal's doing.
 - **T3.12b** (I21): a resize to the width and height already held → **no `Change` is emitted**, and `scroll`, `anchor` and `stats` are identical afterwards. Asserted from a *detached* viewport with a captured anchor, because from a tail-following one at the top of a short transcript the capture-and-restore is a round trip to the same value and the row passes with the guard removed — the state that distinguishes the two readings is the one that has something to lose.
 - **T3.13**: a patch that shrinks an entry below the current `topRow`'s dependence → `topRow` clamps rather than exceeding `totalRows`.
-- **T3.14**: movement in copy mode moves the cursor and scrolls only when the cursor reaches an edge.
+- **T3.14**: movement in native selection moves the cursor and scrolls only when the cursor reaches an edge.
 - **T3.15**: yank with an empty selection → clipboard untouched, no throw.
 - **T3.16**: yank of rows containing tone spans and gutter markers → clipboard receives plain text only.
 - **T3.17**: 100,000 entries, scroll from top to bottom by page → every query within budget, no leak.
@@ -587,7 +587,7 @@ Fake heights, no rendering.
 - **T5.3**: a live `--logs` tail at 1,000 lines/s while scrolled up reading → the view does not move.
 - **T5.4**: the same, then `End` → snaps to the bottom and resumes following.
 - **T5.5**: dragging the terminal edge from 160 to 60 and back while scrolled to the middle → the same content is on screen at both ends, no blank frames.
-- **T5.6**: copy mode selecting forty rows across three entries and yanking → the clipboard holds exactly those rows as plain text.
+- **T5.6**: native selection selecting forty rows across three entries and yanking → the clipboard holds exactly those rows as plain text.
 
 - **T4.11** (I24, with C13 and C09): a viewport over a transcript whose entry holds a 25-line `logs` block under `maxBlockRows: 10` → `totalRows` is `chrome + 11`, `visible()` at the foot selects the marker row, and the frame's last block row reads `… 10 of 25 rows`.
 
@@ -609,7 +609,7 @@ Fake heights, no rendering.
 - **T6.7** (I8): invalidating on height-only resizes → T3.12 fails and resizing becomes needlessly expensive.
 - **T6.8** (C13 I12): treating every `Change` as a full invalidation → T4.3 fails and T5.3 misses its budget.
 - **T6.9** (I10): an off-by-one in the visible range → T2.1 fails across the corpus.
-- **T6.10** (I14): dropping the prior follow state on copy-mode exit → T1.14 fails and users are stranded detached.
+- **T6.10** (I14): dropping the prior follow state on native-selection exit → T1.14 fails and users are stranded detached.
 - **T6.11** (I11): shelling out to a clipboard binary → T2.4 fails.
 - **T6.13** (§4): restoring `settle` to "invalidates nothing" → T4.10 fails, and the app route's entry has zero height for the rest of the session: appended with no blocks, measured at zero, settled with the real document, never remeasured. The screen is blank with the entry in the store, and every assertion about anchors, clamping and the cache passes.
 - **T6.12** (I12): C14 calling `commit` directly → T4.8's spy fails, and L2 gains a dependency on L0-terminal.
@@ -630,10 +630,10 @@ Fake heights, no rendering.
 
 | Not here | Where |
 |---|---|
-| Which keys scroll, and copy-mode bindings | C16 |
+| Which keys scroll, and native-selection bindings | C16 |
 | Measuring a block | C09 |
 | Holding entries, eviction policy, `rev` | C13 |
 | Overlays above the viewport | C15 |
 | When a frame is written | C03 |
-| Column selection in copy mode | Phase 1B |
+| Column selection in native selection | Phase 1B |
 | Overscan | Measurable addition; not in v1 |

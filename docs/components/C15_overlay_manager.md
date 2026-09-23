@@ -175,7 +175,7 @@ row is on screen. All three, and a peek is on the stack anchored at that row wit
 any fewer, and there is none. So `↓` onto an element with a detail opens it, `↓` onto one
 without closes it, `⏎` activates the element (the peek has no `⏎`), and `Esc` at `liveBlock` is
 `focusPrompt` as it is today — the peek closes *because focus left*, not because `Esc` reached
-it. Copy mode freezes the screen and takes every key; the target is `copyMode`, so the peek is
+it. Native selection freezes the screen and takes every key; the target is `nativeSelection`, so the peek is
 dismissed for the same reason. An anchored width is the region's, on the confirm's argument
 (`confirm.ts`, `placementOf`): a narrower layer leaves the rows behind it visible on the same
 line. `maxHeightFraction` is the default half, which is the fraction the confirm's own comment

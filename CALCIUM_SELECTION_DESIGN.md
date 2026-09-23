@@ -4,8 +4,18 @@ Roadmap entry 15. The artefacts are `C16 §5a` (classification table), `C16 §5b
 (sequence trace) and `C17 §5a` (the clipboard ruling); this document does not
 restate them, it builds on what they settled.
 
-**Status: designed, not built.** Four steps, and step 0 exists because a
-measurement taken during this design found a defect in shipped code.
+**Status: steps 0-4 are built; OSC 52 is not.** The line above said *designed,
+not built* for longer than it was true — roadmap entry 15 is BUILT
+(`CALCIUM_ROADMAP.md:4518`), and the native handoff, the prompt's character
+range, the transcript's element selection and the one clipboard all ship. Step 0
+exists because a measurement taken during this design found a defect in shipped
+code.
+
+**And the design language is above this document now.** `docs/design/language/`
+carries fifteen `R-SEL-*` rules, and where they and this document disagree the
+rules win and this document is amended — which is what §1's third bullet and §8's
+first entry below are. What is still owed against them is OSC 52 (`R-SEL-011`)
+and the semantic mode this document never had a step for.
 
 ---
 
@@ -17,12 +27,30 @@ three at rest against one key and the count was wrong:
 - **The prompt** has a selection: a character range over C17's buffer.
 - **The transcript** has a selection: a set of elements, which C26's `elements`
   already addresses.
-- **Copy mode has none, deliberately.** It is the mode in which the app stops
-  reading the selection because the terminal is doing it. That is not a third
-  scope to build — it is a scope removed.
+- **Native selection has none, deliberately.** It is the mode in which the app
+  stops reading the selection because the terminal is doing it — `⌥⇧C`,
+  `R-SEL-001`'s *mouse selection belongs to the terminal*. That is not a third
+  scope to build, it is a scope removed.
+
+  **This bullet used to be headed *copy mode*, and the rename is not cosmetic.**
+  The design's copy mode is the other one — `⌥⇧V`, the semantic keyboard-driven
+  mode — and it **does** have a selection: a caret and an anchor over the
+  transcript, with `a` taking the entry under the caret (`R-SEL-008`) and a block
+  atomic in it (`R-SEL-003`). So the two names had swapped subjects, and the one
+  sentence that carried the whole reduction was reading as an argument against
+  the mode the design asks for.
 
 **So the shared mechanism is not the region. It is where the text lands**, and
-that is one clipboard: C17's kill buffer, ruled in C17 §5a.
+that is one clipboard: C17's kill buffer, ruled in C17 §5a — which is
+`R-SEL-011`'s *one clipboard with two mechanisms* arriving at the same answer
+from the other side.
+
+**The count survives the semantic mode, and that is the check worth stating.**
+`⌥⇧V` does not add a third selection type: what it drives is the second one, the
+transcript's set of element addresses, with a caret saying where an extend starts
+from. A mode is not a scope — it is a way of reaching one — which is why the
+reduction holds even though the thing that prompted it turned out to be the wrong
+mode.
 
 This is what reduces the entry. There is no abstract `Selection` type spanning
 three consumers, because the two real ones have nothing in common but their
@@ -75,7 +103,7 @@ running it against keys that did not exist yet.
 
 ---
 
-## 3. Step 1 — copy mode reachable and leavable · **LANDED 2026-08-13**
+## 3. Step 1 — native selection reachable and leavable · **LANDED 2026-08-13**
 
 **One commit, and B1 is why the parts cannot be split.** `session.ts:547–548`
 holds two stubs. A producer without an exit gives the reader a mode that consumes
@@ -84,13 +112,15 @@ already calls the stub.
 
 Four pieces, together:
 
-- **The producer.** Real state behind `copyMode: () => boolean`, owned by L4
+- **The producer.** Real state behind `nativeSelection: () => boolean`, owned by L4
   beside the other frame queries.
-- **The exit.** `exitCopyMode` clears it. The `⌃c` rung needs no change.
-- **A binding to enter — `⌥v`, and it is PROVISIONAL.** Which key enters copy
-  mode is still the rebindable-keys row's question; shipping the mode with no
-  way in is B1's failure inverted, so a default is picked and labelled rather
-  than deferred. Bound at `prompt` and `liveBlock`, **not** `global` (which
+- **The exit.** `exitNativeSelection` clears it. The `⌃c` rung needs no change.
+- **A binding to enter — `⌥⇧C`, and it was PROVISIONAL.** `⌥v` was picked
+  here as a labelled default against a rebindable-keys row that was still open,
+  because shipping the mode with no way in is B1's failure inverted. It is not
+  open any more: `selection.native` names `⌥⇧C`, M6 reads the row from the
+  registry, and `⌥v` went back to `values.toggle`. Bound at `prompt` and
+  `liveBlock`, **not** `global` (which
   `activeTarget` almost never answers) and **not** `interaction` (C16 §5a A4 —
   a block's declared keys are an open set). T2.13 fired on the row the moment it
   was added, before the mode had a producer, which is what that check is for.
@@ -101,23 +131,23 @@ Four pieces, together:
 ### The mouse toggle is added here, with its own reason
 
 `MOUSE` is a single mode string (`escapes.ts:37`) and `mouseEnabled()` reads
-capabilities. Copy mode does not inherit a toggle; it **adds** one, and the
+capabilities. Native selection does not inherit a toggle; it **adds** one, and the
 reason is the whole feature: with tracking on, the terminal's native selection is
 unavailable in the alternate screen.
 
 The toggle is `terminal/escapes.ts`'s to express and `terminal/lifecycle.ts`'s to
 apply — nowhere else writes an escape sequence. `mouseEnabled()` keeps reading
-capabilities and gains no copy-mode arm: **a capability and a mode are different
+capabilities and gains no native-selection arm: **a capability and a mode are different
 questions**, and folding them would make one predicate answer both.
 
 ### B4's ruling — output arriving under a native selection
 
-**The trace's open question, ruled here rather than left.** In copy mode the
+**The trace's open question, ruled here rather than left.** In native selection the
 terminal owns a selection over painted cells. If the app keeps painting, the
 selection silently comes to cover different text — the exact failure the feature
 exists to prevent.
 
-**Ruling: copy mode suspends frame commits. It does not pause data.**
+**Ruling: native selection suspends frame commits. It does not pause data.**
 
 Nothing is dropped and nothing accumulates unboundedly: C13 keeps appending under
 its own eviction rules, and exiting composes one frame that catches up. The
@@ -127,7 +157,7 @@ taken against.
 **Why not I46's pause**, which was the obvious reuse. C23 I46 pauses *sources*
 when no visible host refers to them, and its semantics fit — *paused means no
 fetch, no derivation, no render and no patch, and on return the source is due
-immediately.* But its predicate is per-host visibility, and copy mode is global;
+immediately.* But its predicate is per-host visibility, and native selection is global;
 more importantly **it reaches polled parts and not a live stream.** A verb
 streaming output is C23's transport pushing patches, not a poller, and that is
 precisely the case a reader most wants to copy from. A pause that covers half the
@@ -143,7 +173,7 @@ and no way to be suspended. Two candidates:
 
 1. **`suspend()` / `resume()` on `FrameScheduler`.** A new member on an L0
    published interface, and freeze-relevant.
-2. **A no-op `render` callback** while copy mode is up — zero new surface, since
+2. **A no-op `render` callback** while native selection is up — zero new surface, since
    `render` is injected by L4 already.
 
 **(1), and the argument against (2) is that it lies to the scheduler.** A `render`
@@ -225,6 +255,13 @@ about where the text lands inside the process. It can land in this step or later
 without changing anything above it, which is what makes it a different axis
 rather than a part of this one.
 
+**Later turned out to be still owed, and `R-SEL-011` is what watches it.** The
+rule requires the system clipboard on the same machine and OSC 52 when Calcium is
+not, with a named refusal when neither is available — *a copy that appears to work
+and does not is the worst outcome available here*. That last clause is the part
+this section never had: the axis is separate, and being separate is not the same
+as being allowed to fail silently.
+
 ---
 
 ## 6. Step 4 — the transcript's element selection
@@ -257,8 +294,10 @@ bound inside `mode: "interact"`, because a block's declared keys are an open set
 
 ## 8. What this design does not answer
 
-- **The key that enters copy mode.** Left open deliberately; it wants the
-  rebindable-keys row.
+- ~~**The key that enters native selection.**~~ **Answered by the design, not by
+  the rebindable-keys row.** `selection.native` is `⌥⇧C` and `selection.semantic`
+  is `⌥⇧V`; the keymap reads both from the registry and the provisional `⌥v` went
+  back to `values.toggle`.
 - **`flush()` and resize under a suspended scheduler.** Named in §3, owed before
   step 1's code.
 - **Whether a transcript selection may span the boundary of a scrolled inner

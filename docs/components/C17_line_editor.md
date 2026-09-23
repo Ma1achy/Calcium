@@ -169,9 +169,9 @@ Each shifted form is *move, and leave the anchor where it is*. There is no secon
 
 ### `collapse()` — the region goes and nothing else moves
 
-**A collapse that is not a motion** (I23). Every collapse above happens *because* something else moved — `move` collapses by moving the caret, an edit by replacing the region, `undo` by restoring text. Copy mode (C16 §5b) needs the region gone with the caret **where it is**: the terminal's own selection is about to take over the screen, and a prompt still washing a region under it shows two selections at once. Measured (F765): `#setCopyMode(true)` did not clear `Editor.selection`, and C17 exposed no member that could — the only collapsing operations all move or edit.
+**A collapse that is not a motion** (I23). Every collapse above happens *because* something else moved — `move` collapses by moving the caret, an edit by replacing the region, `undo` by restoring text. Native selection (C16 §5b) needs the region gone with the caret **where it is**: the terminal's own selection is about to take over the screen, and a prompt still washing a region under it shows two selections at once. Measured (F765): `#setNativeSelection(true)` did not clear `Editor.selection`, and C17 exposed no member that could — the only collapsing operations all move or edit.
 
-So `collapse()` drops the anchor and touches **nothing** else: the caret stays, the text is unchanged, and the undo history is untouched — no unit recorded, no open unit closed, the kill run left as it was. It is not an edit (nothing to restore) and not a motion (nothing moved), so it takes neither's bookkeeping; a version that closed the open unit would make the next keystroke after copy mode a new undo unit for no edit the reader made. `anchor === head` already reads as no region, so on a bare caret it is a no-op with nothing to observe.
+So `collapse()` drops the anchor and touches **nothing** else: the caret stays, the text is unchanged, and the undo history is untouched — no unit recorded, no open unit closed, the kill run left as it was. It is not an edit (nothing to restore) and not a motion (nothing moved), so it takes neither's bookkeeping; a version that closed the open unit would make the next keystroke after native selection a new undo unit for no edit the reader made. `anchor === head` already reads as no region, so on a bare caret it is a no-op with nothing to observe.
 
 ### An edit replaces the region, as one unit
 
@@ -430,7 +430,7 @@ the space at index 77; `--seed=1234` does not fit and moves whole.
 19. A cluster that cannot fit moves whole and one wider than the row overflows rather than being dropped: an editor never alters what the user typed (I20).
 20. Selection is one anchor plus the cursor, and an extending motion never moves the anchor. The defect that does is right on the first keystroke and wrong on the second (I21).
 21. An edit over a region replaces it in one undo unit; `killTo` collapses rather than cutting; and a region does not survive an undo (I22).
-22. `collapse()` drops the region without moving the caret, changing the text or touching the undo history — the one collapse that is neither a motion nor an edit, for copy mode (I23).
+22. `collapse()` drops the region without moving the caret, changing the text or touching the undo history — the one collapse that is neither a motion nor an edit, for native selection (I23).
 23. `layout` memoises its last answer on buffer, width and gutter, and `displayRows` reads it, so a frame that asks five times walks the prompt once. The chip table is out of the key because its only writer moves the buffer in the same call, and that is a blind spot rather than a proof (I24).
 
 ---
