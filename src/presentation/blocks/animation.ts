@@ -16,7 +16,7 @@
  */
 import { spinnerIntervalMs } from "./glyphs.js";
 import { animatesByContent, rampCadenceMs } from "./ramp.js";
-import type { Block, BlockKind, KnownBlockKind, Status } from "../../data/viewmodel/index.js";
+import type { Block, BlockKind, KnownBlockKind, Notice, Status } from "../../data/viewmodel/index.js";
 
 // **`KnownBlockKind` and not `BlockKind`** (C04 I119): the union is open and
 // this table is the framework's own. Keyed on the open union it would demand
@@ -77,6 +77,12 @@ export function tickIntervalOf(block: Block): number | null {
   if ((ANIMATES as Readonly<Partial<Record<BlockKind, boolean>>>)[block.kind] === true) {
     return block.kind === "status" ? spinnerIntervalMs((block as Status).spinner) : spinnerIntervalMs();
   }
+  // **A streaming notice animates by nature too, and did not** (C09 I101,
+  // §026). `ANIMATES` says `notice: false` and `animatesByContent` reads a
+  // *span's* ramp — the trail's is derived at render from `streaming` and never
+  // reaches a span — so neither carrier has ever asked C03 for a tick. The set
+  // is named, because the cadence has to be the mark's own.
+  if (block.kind === "notice" && (block as Notice).streaming === true) return spinnerIntervalMs("agent");
   // By content (C09 I54): a moving ramp asks for the default set's cadence
   // through the lookup the kinds use; its periods are counted in the ticks C03
   // then delivers.

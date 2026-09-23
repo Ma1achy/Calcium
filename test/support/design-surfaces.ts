@@ -948,6 +948,86 @@ const valuedTokens = (width: number, capabilities: TerminalCapabilities, theme: 
   ];
 };
 
+// --- §026, the trail and the mark ------------------------------------------
+
+/**
+ * One character per cell keyed on the **foreground**, which is `maskOf`'s
+ * mirror and the channel §026 lives in.
+ *
+ * **A ground mask cannot see this surface at all.** §026's two carriers are a
+ * cooling ramp over the last three cells and a mark in `accent` — both are ink,
+ * and every cell here has the same background, so `maskOf` draws the whole block
+ * as one letter. The band is a *gradient*, so the letters change cell by cell
+ * along it: a trail that cooled in one step and a trail that cooled over three
+ * are two different pictures here and one picture under any assertion that asks
+ * only whether a ramp is present.
+ */
+function inkOf(
+  grid: readonly (readonly { ch: string; style: { fg: string } }[])[],
+): readonly string[] {
+  const seen = new Map<string, string>();
+  const letter = (fg: string): string => {
+    if (fg === "") return ".";
+    const held = seen.get(fg);
+    if (held !== undefined) return held;
+    const next = String.fromCharCode(97 + seen.size);
+    seen.set(fg, next);
+    return next;
+  };
+  const body = grid.map((row) => {
+    const mask = row.map((c) => letter(c.style.fg)).join("");
+    return `${mask} ${row.map((c) => c.ch).join("").replace(/\s+$/u, "")}`;
+  });
+  return seen.size === 0 ? body : [...body, ...[...seen].map(([fg, l]) => `  ${l} = fg ${fg}`)];
+}
+
+const STREAM_TEXT = "The parser tracks quotes with a single boolean, which is why";
+
+/** The width where the mark's two cells move a word (see `streamHead`). */
+const RESERVATION_WIDTH = 48;
+
+/**
+ * §026 — *the TRAIL says what just arrived, the MARK says more is coming*.
+ *
+ * **Two carriers, and the frame's job is to show they are independent.** The
+ * registry draws the mark as an empty `sp-agent` span, so the plain-text fixture
+ * holds one frame of a spinner and the rule's own text lost it; here the set is
+ * asked for the frame the tick names, and the column it lands in is read rather
+ * than searched for.
+ *
+ * The 1-bit pass is what separates them: the trail is colour and dies (C09 I91),
+ * the mark is shape and does not (C09 I101). A surface showing only the coloured
+ * rung would draw two carriers that could be one fact twice over.
+ */
+const streamHead = (
+  width: number,
+  capabilities: TerminalCapabilities,
+  theme: ResolvedTheme,
+): readonly string[] => {
+  const pass = (b: Block, caps: TerminalCapabilities, caption: string, at = width): readonly string[] => {
+    const kit = measurable({ theme, capabilities: caps });
+    const lines = kit.renderToLines(b, at);
+    const grid = styledScreenFrom([lines.join("\n")], { columns: at, rows: lines.length });
+    return [caption, ...inkOf(grid), ""];
+  };
+  const streaming = block({ kind: "notice", id: "sh", tone: "default", text: STREAM_TEXT, streaming: true }) as unknown as Block;
+  const settled = block({ kind: "notice", id: "sh", tone: "default", text: STREAM_TEXT }) as unknown as Block;
+  const mono = { ...capabilities, colourDepth: 1 } as TerminalCapabilities;
+  return [
+    ...pass(streaming, capabilities, "· streaming, hot edge — the band cools over the last three CELLS toward the run's own ink, and the mark sits one space past the head in accent"),
+    ...pass(settled, capabilities, "· settled — no band and no mark: nothing replaces the mark and nothing is left behind (R-BLK-188)"),
+    ...pass(streaming, mono, "· streaming at 1-bit — the trail is gone and the mark is not: colour dies, shape does not, which is what makes them two carriers and not one fact twice"),
+    // **At a width of the frame's own choosing, because the reservation is
+    // invisible at most of them.** A caption saying *the settled block wraps two
+    // cells wider* is false at 40 and at 80 — both wrap at the same word — and a
+    // caption claiming what the picture does not show is the defect §076 found.
+    // 48 is where the last word crosses: settled takes `boolean,` onto the first
+    // row and streaming, two cells short, does not.
+    ...pass(streaming, capabilities, "· the reservation, at the width where it shows — 48 columns, streaming: the mark's two cells come off the wrap, so `boolean,` moves down", RESERVATION_WIDTH),
+    ...pass(settled, capabilities, "· and the same block settled at 48 — `boolean,` stays up, which is the two cells, and it is the whole of what `measure` has to agree with", RESERVATION_WIDTH),
+  ];
+};
+
 export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 95, name: "a tape, where a row of peers would shed", rows: draw(TAPE) },
   { section: 42, name: "widgets — a row of peers that sheds", rows: draw(PILLS) },
@@ -973,6 +1053,7 @@ export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 82, name: "no pushed views — a row expanded in place, and the rows below carrying on", rows: expansionGrounds },
   { section: 17, name: "focus treatment follows the shape — what each kind publishes against what it draws", rows: focusByShape },
   { section: 76, name: "per-token values — the valued run, and the token that wraps whole", rows: valuedTokens },
+  { section: 26, name: "the trail and the mark at the head — two carriers, and what each survives", rows: streamHead },
   { section: 19, name: "the resolved keymap, the reader's own rung first", rows: keymapCensus },
   { section: 21, name: "the scrollbar — the set, and the bar beside a box", rows: (w, c, t) => [
     ...scrollbarCensus(w, c),

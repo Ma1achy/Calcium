@@ -15,6 +15,7 @@ import { fsIo, report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const SIMPLE = "src/presentation/blocks/kinds/simple.ts";
 const VALIDATE = "src/data/viewmodel/validate.ts";
+const ANIMATION = "src/presentation/blocks/animation.ts";
 const FILES = "test/unit/stream-trail.test.ts";
 
 const { read, write } = fsIo(ROOT);
@@ -112,6 +113,62 @@ const results = runPass({
       from: "  const text = runsText(line);",
       to: "  const text = \" \".repeat(prefixCells(block.glyph)) + runsText(line);",
       expect: "T1.55",
+    },
+    {
+      // **The mark drawn but never reserved** (C09 I101). Every row about the
+      // *mark* passes — it is in the same place, in the same tone, a frame of
+      // the same set — and the last row is two cells wider than the frame, which
+      // the compositor wraps into a row `measure` never counted. This is the
+      // divergence the reservation exists to prevent, and it is invisible to
+      // anything that reads the mark.
+      name: "the mark is drawn without reserving its cells",
+      file: SIMPLE,
+      from: "  const budget = proseWidth(width, prefixCells(block.glyph) + markCells(block));",
+      to: "  const budget = proseWidth(width, prefixCells(block.glyph));",
+      expect: "T1.64",
+    },
+    {
+      // **The other direction: reserved and never spent.** The wrap is exactly
+      // the one `measure` counted, so T1.64 is green throughout, and two cells
+      // at the head of the stream are blank forever. A block that says *more is
+      // coming* and draws nothing saying so.
+      name: "the cells are reserved and the mark is never drawn",
+      file: SIMPLE,
+      from: "  if (markCells(block) === 0) return wrapped;\n  const frames = spinnerFrames(ctx.capabilities, \"agent\");",
+      to: "  return wrapped;\n  const frames = spinnerFrames(ctx.capabilities, \"agent\");",
+      expect: "T1.63",
+    },
+    {
+      // **The mark takes the block's ink rather than `accent`.** Same glyph,
+      // same column, same set, same tick — one channel of colour, which is what
+      // a string assertion cannot see and why T1.63 reads the grid by cell.
+      name: "the mark takes the block's tone rather than accent",
+      file: SIMPLE,
+      from: "{ text: \" \" }, { text: frame, tone: \"accent\" }",
+      to: "{ text: \" \" }, { text: frame }",
+      expect: "T1.63",
+    },
+    {
+      // **The mark frozen at frame zero.** The column is right, the tone is
+      // right, the character is a legal member of the set — and it never moves,
+      // which is a spinner that reads as a hang. T1.63's second tick is the only
+      // thing that asks.
+      name: "the mark is frozen at the set's first frame",
+      file: SIMPLE,
+      from: "  const frame = frames[glyphTick(ctx.tick, ctx.motion) % frames.length]; // cells-ok — a frame index",
+      to: "  const frame = frames[0]; // cells-ok — a frame index",
+      expect: "T1.63",
+    },
+    {
+      // **The tick clause removed** (C09 I101). Nothing on screen is wrong in
+      // any single frame: the mark is in place, in accent, at the frame the tick
+      // names — and no tick ever arrives, so it is frame zero forever and the
+      // `ripple` trail is still with it. The state this repaired, reinstated.
+      name: "a streaming notice asks for no tick",
+      file: ANIMATION,
+      from: "  if (block.kind === \"notice\" && (block as Notice).streaming === true) return spinnerIntervalMs(\"agent\");",
+      to: "",
+      expect: "T1.65",
     },
   ],
 });

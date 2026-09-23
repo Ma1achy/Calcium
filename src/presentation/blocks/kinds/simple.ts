@@ -13,8 +13,8 @@ import { cells, stripControl, truncate, truncateParts, wrapCells } from "../../t
 import type { Run } from "../../runs.js";
 import { runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../runs.js";
 import { NO_STYLE, rampStyle } from "../../theme/index.js";
-import { animateT, effectiveAnimation, effectiveTick, extentT } from "../ramp.js";
-import { barStyle, glyphFor, glyphCells, glyphs, headMark } from "../glyphs.js";
+import { animateT, effectiveAnimation, effectiveTick, extentT, glyphTick } from "../ramp.js";
+import { barStyle, glyphFor, glyphCells, glyphs, headMark, spinnerFrames } from "../glyphs.js";
 import { background, clampSpans, focusStyle, pad, paint, paintRuns, rows, selectionStyle, tone, withBackground, type Span } from "../paint.js";
 import type { BlockDefinition, NavElement, RenderContext, Windowed, Rendered } from "../types.js";
 
@@ -235,13 +235,30 @@ export const ruleDefinition: BlockDefinition<Rule> = {
  * `wrapCells`, or the two halves would disagree by a row exactly where a token
  * moved.
  */
+/**
+ * The head mark's two cells — a space and one spinner frame (C09 I101, §026).
+ *
+ * **Reserved rather than appended**, and that is the whole of why it is here:
+ * a mark added past the wrap pushes the last row over the width, the compositor
+ * wraps it, and the frame gains a row `measure` never counted. So the cells come
+ * off the prose budget, where both halves already meet.
+ *
+ * **Two at every rung, because a frame is one cell at every rung** (T2.75,
+ * T2.70) — which is what keeps the tick out of the geometry. Not streaming is
+ * no reservation at all (`R-BLK-188`), so a settled notice wraps exactly as it
+ * did before this existed.
+ */
+const MARK_CELLS = 2;
+
+const markCells = (block: Notice): number => (block.streaming === true ? MARK_CELLS : 0);
+
 function noticeRows(
   block: Notice,
   width: number,
   caps?: RenderContext["capabilities"],
 ): readonly (readonly Run[])[] {
   const runs = runsOf(block.text, block.spans);
-  const budget = proseWidth(width, prefixCells(block.glyph));
+  const budget = proseWidth(width, prefixCells(block.glyph) + markCells(block));
   if (isCallHead(block)) {
     // One row by construction (I46). Without capabilities — the measurer's
     // call — the runs are returned unfitted: a row count of one is the whole of
@@ -408,6 +425,42 @@ function withTrail(
   return out;
 }
 
+/**
+ * The agent's mark, one space past the last character that has arrived (C09
+ * I101, §026, `R-BLK-182`, `R-MOT-008`).
+ *
+ * **After the trail and not inside it**, which is `withTrail`'s own note: the
+ * band is laid over the *text*, and a mark inside it would be a cell of chrome
+ * the ramp had to be told to skip. Two carriers, two passes.
+ *
+ * **The `agent` spinner and not a static glyph**, because the registry draws it
+ * as an empty `sp-agent` span — a set rendered by CSS — and the plain-text
+ * fixture holds one frame of it. `accent` is the class that span carries.
+ *
+ * **It spends the cells `noticeRows` reserved**, so the wrap the reader sees is
+ * the one `measure` counted; not streaming, there is neither mark nor
+ * reservation (`R-BLK-188`).
+ */
+function headMarked(
+  wrapped: readonly (readonly Run[])[],
+  block: Notice,
+  ctx: RenderContext,
+): readonly (readonly Run[])[] {
+  // **One predicate for both halves.** The mark is drawn exactly when its cells
+  // were reserved, so a change to `markCells` moves the reservation and the draw
+  // together — they cannot disagree about which blocks have a head.
+  if (markCells(block) === 0) return wrapped;
+  const frames = spinnerFrames(ctx.capabilities, "agent");
+  const frame = frames[glyphTick(ctx.tick, ctx.motion) % frames.length]; // cells-ok — a frame index
+  if (frame === undefined) return wrapped;
+  const last = wrapped.length - 1; // cells-ok — an array index
+  const line = wrapped[last];
+  if (line === undefined) return wrapped;
+  const out = [...wrapped];
+  out[last] = [...line, { text: " " }, { text: frame, tone: "accent" }];
+  return out;
+}
+
 export const noticeDefinition: BlockDefinition<Notice> = {
   kind: "notice",
 
@@ -423,7 +476,10 @@ export const noticeDefinition: BlockDefinition<Notice> = {
     const w = normaliseWidth(width);
     let longest = 0;
     for (const row of noticeRows(block, w)) longest = Math.max(longest, cells(runsText(row))); // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
-    return Math.max(1, Math.min(w, prefixCells(block.glyph) + longest));
+    // **Plus the mark's cells**, which `noticeRows` took off the budget (I101):
+    // the natural width is what the block would like, and it would like room for
+    // its head.
+    return Math.max(1, Math.min(w, prefixCells(block.glyph) + markCells(block) + longest));
   },
 
   elements: noticeElements,
@@ -454,11 +510,15 @@ export const noticeDefinition: BlockDefinition<Notice> = {
     // **The band, over the wrapped text and before the glyph is added** (I90,
     // §7e): chrome is composed whole, and putting the derivation here is what
     // makes that structural rather than a rule the row below has to remember.
-    const wrapped = withTrail(
-      noticeRows(block, ctx.width, ctx.capabilities),
+    const wrapped = headMarked(
+      withTrail(
+        noticeRows(block, ctx.width, ctx.capabilities),
+        block,
+        ctx.capabilities.ambiguousWidth,
+        ctx.capabilities.colourDepth,
+      ),
       block,
-      ctx.capabilities.ambiguousWidth,
-      ctx.capabilities.colourDepth,
+      ctx,
     );
     // **The wrapped rows, not the text's length** (C28 I45). `noticeRows` is
     // what the cost is in and `wrapped` is already here, so the gauge is free —

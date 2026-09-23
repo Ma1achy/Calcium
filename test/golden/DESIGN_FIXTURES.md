@@ -116,7 +116,7 @@ most-drawn line in the application.
 | 22 | surface | `R-KEY-005` | `design-surfaces.test.ts` | the help view as an entry — the same listing §019 frames, and the section that settles its order: *the active scope is rendered first, then preserves registry order for the remaining scopes*, which the tree had as alphabetical and §022's own picture could not discriminate (`global` before `transcript` satisfies both). C16 §6a clause 4, T1.100 |
 | 23 | surface | `displayRows` | `blocks.test.ts` | at 40 columns |
 | 24 | surface | `CALL_STATE_GLYPH` | `states.test.ts` | reasoning |
-| 26 | surface | `hotEdge\|hot-edge` | — | the trail and the mark at the head — §025's live specimen |
+| 26 | surface | `hotEdge\|hot-edge` | `design-surfaces.test.ts` | the trail and the mark at the head — `design-surfaces` §026, four passes read on the FOREGROUND, which is the channel this section lives in: a ground mask draws the whole block as one letter. **Two carriers with two jobs** — *the TRAIL says what just arrived, the MARK says more is coming* — and the trail was built (C09 I90/I91) while the mark was not. **What settled the mark is the registry's projection and not the plain-text fixture**: `sectionBlocks[181]` draws it as `[c-accent sp sp-agent]''` — an **empty span**, a CSS-rendered spinner — so `R-BLK-183`'s text lost the glyph entirely and a reader going to the picture would have drawn a static `✦`. C09 I101: the `agent` set at `glyphTick`, in `accent`, one space past the head, with its two cells **reserved in `noticeRows`' budget** so `measure` and the render see one wrap. The 1-bit pass is what makes the pair two carriers rather than one fact twice — colour dies, shape does not — and the 48-column pass is the reservation, at the one width where it moves a word; at 40 and at 80 both wrap identically, so a caption claiming it there would be §076's defect again. It also repaired a carrier that had never moved: `ANIMATES.notice` is `false` and the trail's ramp is derived at render rather than sitting on a span, so **neither the mark nor `ripple` had ever asked C03 for a tick** |
 | 27 | surface | `barCells\|BAR_STYLES` | `plot-forms.test.ts` | the context composition bar |
 | 28 | surface | `promptReplaced` | `question-slot.test.ts` | approval replaces the prompt — C23 I74 |
 | 29 | surface | `menuWindow` | `session-frame.test.ts` | completion expands the prompt |
@@ -217,7 +217,7 @@ that is the reconciliation working, and it should be visible as a number moving 
 than inferred from a suite staying green.
 
     surface 66 · prose 37 · app 6 · total 109
-    of the surfaces: built 60 · unbuilt 6 · framed 58
+    of the surfaces: built 60 · unbuilt 6 · framed 59
 
 **`framed` is the figure this MR moves, and `built` is the one that went backwards.**
 Seven surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks

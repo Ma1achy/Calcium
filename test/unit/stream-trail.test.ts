@@ -10,6 +10,9 @@ import type { Notice } from "../../src/data/viewmodel/index.js";
 import { measurable, visible, FULL_CAPS } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";
 import { capabilities } from "../support/fake-terminal.js";
+import { spinnerFrames } from "../../src/presentation/blocks/glyphs.js";
+import { tickIntervalOf } from "../../src/presentation/blocks/index.js";
+import { styledScreenFrom } from "../support/styled-screen.js";
 
 const ESC = String.fromCharCode(27);
 
@@ -62,6 +65,22 @@ const bytesOf = (b: Notice, width = 40, caps = FULL_CAPS): string =>
   measurable({ capabilities: caps }).renderToLines(b as never, width).join("\n");
 const plainOf = (b: Notice, width = 40, caps = FULL_CAPS): string =>
   visible(bytesOf(b, width, caps));
+
+/**
+ * A visible line with the agent's head mark taken off the end (C09 I101).
+ *
+ * **The rows below compare a streaming block against a settled one**, and the
+ * mark is a second difference between the two — so without this they fail for
+ * the mark rather than for the band, which is a different claim. Stripping it
+ * keeps each row on its own subject. It refuses to strip anything that is not a
+ * frame of the set, so a row cannot quietly lose a character of text.
+ */
+const withoutMark = (line: string, caps = FULL_CAPS): string => {
+  const trimmed = line.replace(/\s+$/u, "");
+  const tail = trimmed.slice(-1);
+  if (!spinnerFrames(caps, "agent").includes(tail)) return line;
+  return trimmed.slice(0, -1).replace(/\s+$/u, ""); // cells-ok — a code-unit slice
+};
 
 describe("C04 §5c — the fact on the block", () => {
   it("T1.46 (C04 I122, §5c): `streaming` and `trail` pass the gate, and a wrong type does not", () => {
@@ -123,7 +142,10 @@ describe("C09 §7e — the band", () => {
 
     // A text shorter than the band takes all of it and reaches no further.
     const tiny = notice({ text: "ab", streaming: true });
-    expect(plainOf(tiny), "the text is intact").toBe(plainOf(notice({ text: "ab" })));
+    // **The mark is stripped, not ignored** (C09 I101): a streaming block carries
+    // one and this row is about the band, so the difference is removed by name
+    // rather than by loosening the comparison.
+    expect(withoutMark(plainOf(tiny)), "the text is intact").toBe(plainOf(notice({ text: "ab" })).trimEnd());
     expect(untrailed(tiny), "the whole text is the band").toBe("");
   });
 
@@ -140,7 +162,7 @@ describe("C09 §7e — the band", () => {
       const bare = notice({ glyph: "running", state: "running", text });
       const a = bytesOf(marked, width);
       const b = bytesOf(bare, width);
-      expect(visible(a), `the text at ${String(width)} is unchanged`).toBe(visible(b));
+      expect(withoutMark(visible(a)), `the text at ${String(width)} is unchanged`).toBe(visible(b).trimEnd());
       // The mark is drawn, or the row is asserting nothing about it.
       expect(visible(b).trimStart().length, `the mark exists at ${String(width)}`).toBeGreaterThan(0);
       // **The agreed prefix covers the mark.** Where the styling first diverges
@@ -184,39 +206,148 @@ describe("C09 §7e — the band", () => {
     );
   });
 
-  it("T1.57 (C09 I90, §7e): a trail costs no rows", () => {
-    // **The measurement invariant is the one carve-out the design does not
-    // override**, so it is asserted rather than argued: appearance animates,
-    // geometry never does.
+  it("T1.57 (C09 I90, I101, §7e): a trail costs no rows, and the render is what measure said", () => {
+    // **The settled block is no longer the control, and I101 is why.** A
+    // streaming block reserves the mark's two cells, so it wraps where a settled
+    // one does not — the old row compared two different wraps and the *no cell
+    // moves* half would now be asserting that the reservation did not happen.
+    //
+    // What it was holding is the measurement invariant, the one carve-out the
+    // design does not override, and that is asserted directly against the
+    // render. *The trail costs nothing* is the five forms agreeing with each
+    // other, which is the claim I90 actually makes.
     const kit = measurable();
+    const text = "the parser tracks quotes with a single boolean";
     for (const width of [60, 40, 20, 10]) {
-      for (const form of TRAIL_FORMS) {
-        const b = notice({ text: "the parser tracks quotes with a single boolean", streaming: true, trail: form });
-        const bare = notice({ text: "the parser tracks quotes with a single boolean" });
-        expect(kit.measure(b as never, width), `${form} at ${String(width)} costs no rows`).toBe(
-          kit.measure(bare as never, width),
+      const counts = TRAIL_FORMS.map((form) => {
+        const b = notice({ text, streaming: true, trail: form });
+        const drawn = kit.renderToLines(b as never, width);
+        // Geometry never moves with appearance: what `measure` promised is what
+        // the frame took.
+        expect(kit.measure(b as never, width), `${form} at ${String(width)}: measure is the render`).toBe(
+          drawn.length,
         );
-        expect(visible(kit.renderToLines(b as never, width).join("\n")), "and no cell moves").toBe(
-          visible(kit.renderToLines(bare as never, width).join("\n")),
-        );
-      }
+        return kit.measure(b as never, width);
+      });
+      expect(new Set(counts).size, `at ${String(width)} the five forms cost the same`).toBe(1);
     }
   });
 
-  it("T1.58 (C09 I91, §7e): at 1-bit `weight` is bold and the other four draw nothing at all", () => {
+  it("T1.58 (C09 I91, I101, §7e): at 1-bit `weight` is bold, the other four draw nothing, and the mark survives", () => {
     const mono = capabilities({ colourDepth: 1 });
-    const bare = bytesOf(notice({ text: "the parser tracks quotes" }), 40, mono);
-    for (const form of TRAIL_FORMS) {
-      const drawn = bytesOf(notice({ text: "the parser tracks quotes", streaming: true, trail: form }), 40, mono);
-      if (form === "weight") {
-        // Bold is SGR 1, and it is the only thing a 1-bit terminal has.
-        expect(drawn, "weight is bold").toContain(`${ESC}[1m`);
-        expect(drawn, "and it is a change").not.toBe(bare);
-      } else {
-        // **Byte-identical, which is what *nothing* means.** A row asserting
-        // only "no colour" passes for a form that drew a mark instead.
-        expect(drawn, `${form} draws nothing at 1-bit`).toBe(bare);
-      }
+    const text = "the parser tracks quotes";
+    const drawn = new Map(
+      TRAIL_FORMS.map((form) => [form, bytesOf(notice({ text, streaming: true, trail: form }), 40, mono)]),
+    );
+
+    // **The four compared to each other, which is what *nothing* means here.**
+    // The settled block stopped being the reference when the mark landed — it
+    // survives 1-bit (C09 I101) and so does its reservation — so a row against it
+    // would fail for the mark rather than for the trail.
+    const quiet = TRAIL_FORMS.filter((f) => f !== "weight");
+    const first = drawn.get(quiet[0]!);
+    for (const form of quiet) {
+      expect(drawn.get(form), `${form} draws nothing at 1-bit`).toBe(first);
     }
+    // Bold is SGR 1, and it is the only thing a 1-bit terminal has.
+    expect(drawn.get("weight"), "weight is bold").toContain(`${ESC}[1m`);
+    expect(drawn.get("weight"), "and it is a change").not.toBe(first);
+
+    // **The other half, separated rather than standing in for the first**: at
+    // 1-bit a streaming block differs from a settled one, and it differs by the
+    // mark. Both halves would be one assertion under the old reference.
+    const bare = bytesOf(notice({ text }), 40, mono);
+    expect(first, "the mark survives 1-bit").not.toBe(bare);
+    const marks = spinnerFrames(mono, "agent");
+    expect(marks.includes(visible(first ?? "").trimEnd().slice(-1)), "and the difference is a frame of it").toBe(true);
+  });
+});
+
+describe("C09 §7e / §026 — the mark at the head", () => {
+  const MARK_TEXT = "the parser tracks quotes with a single boolean, which is why";
+
+  /**
+   * The rendered rows as a styled grid, so a cell can be asked for its colour.
+   *
+   * **A substring search answers neither half of the claim.** The mark is a
+   * colour at a position, and `indexOf` gives a code-unit offset into a string
+   * that is mostly escapes — it says nothing about which column the frame
+   * landed in and nothing about the tone it took.
+   */
+  const gridOf = (b: Notice, width = 40, caps = FULL_CAPS, tick?: number) => {
+    const kit = measurable({ capabilities: caps, ...(tick === undefined ? {} : { tick }) });
+    const lines = kit.renderToLines(b as never, width);
+    return styledScreenFrom(lines.map((l, i) => (i === 0 ? l : `\r\n${l}`)), {
+      columns: width,
+      rows: lines.length,
+    });
+  };
+
+  it("T1.63 (C09 I101, §026 R-BLK-182): the mark is a frame of the agent set, one space past the head, in accent", () => {
+    const b = notice({ text: MARK_TEXT, streaming: true });
+    const grid = gridOf(b);
+    const last = grid[grid.length - 1]!;
+    const plain = last.map((c) => c.ch).join("");
+    const head = plain.trimEnd().length - 1; // cells-ok — a column index
+
+    const frames = spinnerFrames(FULL_CAPS, "agent");
+    const mark = last[head]!;
+    expect(frames.includes(mark.ch), `cell ${String(head)} holds ${JSON.stringify(mark.ch)}, an agent frame`).toBe(
+      true,
+    );
+    // **One space, not zero and not two**: the cell before the mark is blank and
+    // the one before that is the last character that arrived.
+    expect(last[head - 1]!.ch, "one space between the text and the mark").toBe(" ");
+    expect(last[head - 2]!.ch, "and the character before it is the head of the stream").not.toBe(" ");
+
+    // **The tone, read against a reference rather than against a literal.** An
+    // `accent` notice's own text is what accent looks like in this theme, so a
+    // theme change moves both sides together.
+    const ref = gridOf(notice({ text: "x", tone: "accent" }));
+    expect(mark.style.fg, "the mark is accent").toBe(ref[0]![0]!.style.fg);
+
+    // The control: settled, and the cell holds nothing.
+    const settled = gridOf(notice({ text: MARK_TEXT }));
+    const tail = settled[settled.length - 1]!.map((c) => c.ch).join("").trimEnd();
+    expect(frames.includes(tail.slice(-1)), "a settled notice draws no mark").toBe(false);
+
+    // **The frame advances and the column does not** — which is the whole of
+    // *appearance animates, geometry never does* at this seam.
+    const moved = gridOf(b, 40, FULL_CAPS, 7);
+    const movedLast = moved[moved.length - 1]!;
+    expect(movedLast[head]!.ch, "the tick moved the frame").not.toBe(mark.ch);
+    expect(frames.includes(movedLast[head]!.ch), "and it is still a frame of the same set").toBe(true);
+    expect(movedLast[head - 1]!.ch, "and the column did not move").toBe(" ");
+  });
+
+  it("T1.64 (C09 I101, C04 I122, R-BLK-188): the cells are reserved, and a settled notice reserves nothing", () => {
+    const kit = measurable();
+    for (let width = 8; width <= 60; width += 1) { // cells-ok — a width sweep
+      const b = notice({ text: MARK_TEXT, streaming: true });
+      const drawn = kit.renderToLines(b as never, width);
+      expect(kit.measure(b as never, width), `streaming at ${String(width)}: measure is the render`).toBe(
+        drawn.length,
+      );
+      // **The width is the half that fires first**, because a row over the frame
+      // is what the compositor wraps and the row count is what `measure` then
+      // gets wrong. Asserted per row, not on the total.
+      for (const line of drawn) {
+        expect(cells(visible(line)), `no row overruns ${String(width)}`).toBeLessThanOrEqual(width);
+      }
+      const settled = notice({ text: MARK_TEXT });
+      expect(kit.measure(settled as never, width), `settled at ${String(width)}: measure is the render`).toBe(
+        kit.renderToLines(settled as never, width).length,
+      );
+    }
+  });
+
+  it("T1.65 (C09 I101, C03 I8): a streaming notice asks for the agent set's cadence, and a settled one for nothing", () => {
+    const b = notice({ text: MARK_TEXT, streaming: true });
+    const settled = notice({ text: MARK_TEXT });
+    // **The premise, asserted rather than assumed.** `notice` is `false` in
+    // `ANIMATES`, so a row checking only *some interval* would have passed on
+    // the day neither carrier ticked — which is the day this clause repaired.
+    expect(tickIntervalOf(settled as never), "a settled notice does not animate").toBeNull();
+    expect(tickIntervalOf(b as never), "a streaming one does").not.toBeNull();
   });
 });
