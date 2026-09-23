@@ -16,7 +16,7 @@
 
 Twenty-three components, and an ordinary document consumer touches five things:
 `createTui`, block builders, an adapter signature, a manifest, and theme tokens.
-An interactive application may additionally open one bounded `PushedSurface`.
+An interactive application may additionally attach one bounded `ChildSurface`.
 **Eleven of the twenty-three remain invisible** — terminal, transcript,
 viewport, overlays, input, editor, parser, completion, history, process runner,
 and frame scheduler. The surface composes those owners; it does not expose them.
@@ -59,7 +59,7 @@ export function createTui(config: TuiConfig): TuiInstance;
 export type { TuiConfig, TuiInstance, SessionSnapshot, ChromeFn, StopReason };
 export { SurfaceError };
 export type {
-  PushedSurface, PushedSurfaceHandle, SurfaceContext, SurfaceActionEvent,
+  ChildSurface, ChildSurfaceHandle, SurfaceContext, SurfaceActionEvent,
   SurfaceInputPhase, SurfaceInputFidelity, SurfaceCloseOutcome,
   SurfaceFault, SurfaceKeyBinding, SurfaceKeyChord,
 };
@@ -105,7 +105,12 @@ export type { WorldDriver };
 export { cells, truncate, planColumns };
 ```
 
-`TuiInstance.openSurface()` opens one application-owned full-region view. Its
+`TuiInstance.openSurface()` attaches one application-owned **captured child over
+its own block** (C16 I49, R-BLK-645, R-BLK-711). **It was a full-region view and
+that is what changed in M9**: *a pushed view takes the screen, you do something,
+you come back — and the transcript has a HOLE where that work was.* The child
+owns the keyboard and owns nothing else; its blocks are an entry, the transcript
+stays, and what settled while it was attached is there when it detaches. Its
 render callback receives a fresh producer context on every invalidation and
 resize, plus the currently observed input-fidelity mode. Its keymap is data and
 its actions are delivered serially with monotonic timestamps and ordinals.
@@ -115,8 +120,24 @@ origin so an application can schedule frames without opening a competing clock.
 A second surface, duplicate binding, malformed surface,
 or failed initial render is a typed `SurfaceError`. Later render/action failures
 close the surface and resolve `closed` with a typed fault. Close is idempotent,
-restores enhanced keyboard mode, and removes the pushed view before the session
-releases the terminal.
+restores enhanced keyboard mode, and returns ownership to the host before the
+session releases the terminal.
+
+**The renames are 0.x and carry no deprecation cycle** (`00-AUTHORITY.md`).
+`PushedSurface` → `ChildSurface`, `PushedSurfaceHandle` → `ChildSurfaceHandle`,
+and the schema string `"calcium.pushed-surface/1"` → `"calcium.child-surface/1"`,
+because a schema that still says *pushed* is a record of the model this MR
+retired. The rest of the family keeps its names — `SurfaceContext`,
+`SurfaceKeyBinding`, `SurfaceError` and the others never claimed a push, and
+renaming them would be churn dressed as consistency. `openSurface` likewise: the
+verb is what an application calls, the design constrains what the thing *is*,
+and there is no rule here to follow into a second name.
+
+**The attach can be refused for a reason that is new** (C16 I49, R-BLK-908). A
+captured child reserves one `host.detach` action, and an attach whose reserved
+chord is not reachable is a `SurfaceError` beside the existing four — *may never
+leave capture without a visible, reachable host escape* is a precondition, and a
+precondition nobody can fail is a sentence rather than a guarantee.
 
 **`greeting` is how the session's first entry gets there** (C22 I44). S02 specifies
 that entry — *"an ordinary `ViewDocument`, not a screen … appended to the

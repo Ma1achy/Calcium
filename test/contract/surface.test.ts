@@ -154,3 +154,12 @@ describe("PushedSurface public contract", () => {
     h.graph.lifecycle.release();
   });
 });
+
+describe("C22 §13a — the child surface is an entry, owed at the spec commit (M9)", () => {
+  it.todo(
+    "T4.94 (C22 I110, R-BLK-645, R-BLK-314): openSurface appends an entry and pushes no layer — the overlay stack is empty across attach, two invalidations and the detach — the entry survives the detach holding the last blocks rendered, and a command that settled while attached is in the record — not deferred on a component: the entry route replaces the layer push in this MR",
+  );
+  it.todo(
+    "T4.94b (C22 I110, C16 I49): while attached the router's target is child, the footer's owner line carries attached and the host escape's chord, and the entry's block border names ctrl-] — both carriers, because either alone leaves a reader with no way out — not deferred on a component",
+  );
+});
