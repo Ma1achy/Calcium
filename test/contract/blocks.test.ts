@@ -1002,4 +1002,80 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
     const below = seen.length - row - 2;
     expect(Math.abs(above - below), "and vertically, odd row below").toBeLessThanOrEqual(1);
   });
+  it("T2.159 (C09 I95, §072, `R-COL-004`, `R-BLK-569`): three kinds paint a ground and the rest are text", () => {
+    // **A background is for an EXTENT; a foreground is for a MARK.** The census
+    // is over the whole kind corpus rather than over the three, which is the
+    // half that can fail: a row naming the painters and checking they paint is
+    // satisfied by every kind painting. Compared by equality both ways.
+    //
+    // **`design-surfaces.test.ts` cannot hold this.** It strips SGR, so a
+    // washed row and a bare one fold to the same picture — §072's frame is a
+    // mask for that reason, and this is the gate beside it, because a snapshot
+    // records and does not check.
+    const kit = measurable({
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      definitions: [patchDefinition, tableDefinition, plotDefinition] as never,
+    });
+    const painted = Object.entries(ONE_PER_KIND)
+      .filter(([, sample]) => {
+        const lines = kit.renderToLines(sample, 80);
+        const grid = styledScreenFrom([lines.join("\n")], { columns: 80, rows: lines.length });
+        return grid.flat().some((c) => c.style.bg !== "");
+      })
+      .map(([kind]) => kind);
+    expect([...painted].sort(), "the kinds that paint a ground").toEqual([
+      // a half-block cell carries two full colours — the one place a ground
+      // doubles the resolution rather than decorating it
+      "image",
+      // a changed LINE is an extent, and the ground runs to the block's edge
+      "patch",
+      // ` ERROR ` — the one painted label in the system
+      "status",
+    ]);
+
+    // **The extent, which is the claim a mask makes and a count cannot.** A
+    // patch row that carries a ground carries it in every cell of the row: a
+    // ground stopping at the last character says a *word* changed, and that is
+    // a different claim (C25 T4.9, and this is the same property read as a
+    // shape rather than as a width).
+    const patchLines = kit.renderToLines(ONE_PER_KIND.patch, 80);
+    const patchGrid = styledScreenFrom([patchLines.join("\n")], {
+      columns: 80,
+      rows: patchLines.length,
+    });
+    const ragged = patchGrid
+      .map((row, i) => ({ i, on: row.filter((c) => c.style.bg !== "").length }))
+      .filter(({ on }) => on > 0 && on < 80);
+    expect(ragged, "a grounded row is grounded to the block's edge").toEqual([]);
+    expect(
+      patchGrid.filter((row) => row.every((c) => c.style.bg !== "")).length,
+      "and the illustration has grounded rows to be ragged about",
+    ).toBeGreaterThan(0); // cells-ok — a count
+
+    // **The second rule: a ground is never the only carrier.** At one bit every
+    // ground is gone, so the census is empty — and the marks are still drawn,
+    // which is what makes losing it lossless (C25 I13, T4.7).
+    const mono = measurable({
+      theme: DARK_THEME,
+      capabilities: MONO_UNICODE_CAPS,
+      definitions: [patchDefinition, tableDefinition, plotDefinition] as never,
+    });
+    for (const kind of ["image", "patch", "status"] as const) {
+      const lines = mono.renderToLines(ONE_PER_KIND[kind], 80);
+      const grid = styledScreenFrom([lines.join("\n")], { columns: 80, rows: lines.length });
+      expect(
+        grid.flat().filter((c) => c.style.bg !== "").length,
+        `${kind} paints nothing at one bit`,
+      ).toBe(0); // cells-ok — a count
+    }
+    // **Through `visible`, and the first draft was not.** At one bit the tone
+    // collapse is typographic, so the marker arrives as `+\u001b[22m ` — the
+    // colour is gone and the attribute reset is not, and a raw match on `+ `
+    // failed against a frame that draws the marker perfectly well.
+    expect(
+      mono.renderToLines(ONE_PER_KIND.patch, 80).map(visible).join("\n"),
+      "and the marker carries it",
+    ).toMatch(/[-+] /u);
+  });
 });

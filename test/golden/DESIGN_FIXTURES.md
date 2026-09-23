@@ -1,4 +1,4 @@
-frame 48 owed 18 prose 37 app 6 total 109
+frame 49 owed 17 prose 37 app 6 total 109
 missing: [25, 40]
 unclassified: []
 rows naming no fixture: []
@@ -163,7 +163,7 @@ most-drawn line in the application.
 | 69 | surface | `labelSpansOf` | `session-frame.test.ts` | the prompt's upper rule, labelled — three scenes, and the 1-bit one needed a capability override because no environment reaches the rung |
 | 70 | surface | `REGISTRY_THEMES` | — | /colour, tinting the chrome |
 | 71 | prose | — | — | the five permission postures |
-| 72 | surface | `resolveBackground` | — | the background as a second channel |
+| 72 | surface | `resolveBackground` | `design-surfaces.test.ts` | the background as a second channel — a ground census, one mask character per cell, because a stripped read calls a washed row and a bare one the same picture; three kinds paint and `meterFill` has no reader |
 | 73 | surface | `bgElev` | — | painted chrome — buttons, titles, widgets, headers |
 | 74 | surface | `weight` | `theme-tokens.test.ts` | weight, and why it is not free — the 1-bit rung of the same table, where `identifier` was off the ladder |
 | 75 | surface | `kind: "table"` | `blocks.test.ts` | /config, and where a value came from |
@@ -219,7 +219,7 @@ that is the reconciliation working, and it should be visible as a number moving 
 than inferred from a suite staying green.
 
     surface 66 · prose 37 · app 6 · total 109
-    of the surfaces: built 59 · unbuilt 7 · framed 48
+    of the surfaces: built 59 · unbuilt 7 · framed 49
 
 **`framed` is the figure this MR moves, and `built` is the one that went backwards.**
 Seven surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks

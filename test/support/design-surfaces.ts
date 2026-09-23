@@ -28,7 +28,11 @@ import {
   spinnerSetNames,
   toneCarries,
 } from "../../src/presentation/blocks/glyphs.js";
+import { patchDefinition } from "../../src/presentation/patch/index.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
+import { patchOf } from "./blocks.js";
 import { measurable } from "./render.js";
+import { styledScreenFrom } from "./styled-screen.js";
 import type { ResolvedTheme } from "../../src/presentation/theme/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 import type { Block, CallState } from "../../src/data/viewmodel/types.js";
@@ -206,6 +210,71 @@ const barAlphabets =
       ),
     );
 
+// --- §072, the ground census ------------------------------------------------
+
+/**
+ * **A background is for an EXTENT; a foreground is for a MARK** (§072).
+ *
+ * Every other surface in this file is read with its SGR stripped, which is
+ * `design-surfaces.test.ts`'s own ruling and right for a fixture about shape.
+ * §072 is about the channel that ruling throws away: its whole subject is
+ * *which cells carry a ground and how far the ground runs*, and a stripped
+ * read calls a washed row and a bare one the same picture.
+ *
+ * So the rows are a **mask** — one character per cell, `#` where the cell
+ * carries a background and `.` where it does not — computed here and emitted
+ * as text, which passes through the strip unharmed because it never was an
+ * escape. The text follows it, so a reader sees the extent against what is
+ * written in it.
+ *
+ * **Three of §072's nine examples have no subject in this tree**, and saying
+ * which is the honest half of the frame: the context bar (4) and the half-block
+ * image (8) are not block kinds, and the painted magnitude in a table cell (7)
+ * wants `meterFill`, a surface every one of the ten themes carries and **no
+ * renderer reads** — its only occurrences in `src/` are the quantised table's
+ * generated keys. The focused row (6) is the session's, not a block's:
+ * `focus-shapes.test.ts` measures that `plot` and `scroll` are the only kinds
+ * answering focus at all.
+ */
+const groundCensus =
+  (subjects: readonly Readonly<{ name: string; block: Block }>[]) =>
+  (width: number, capabilities: TerminalCapabilities, theme: ResolvedTheme): readonly string[] => {
+    const kit = measurable({
+      theme,
+      capabilities,
+      definitions: [patchDefinition, tableDefinition] as never,
+    });
+    return subjects.flatMap(({ name, block: b }) => {
+      const lines = kit.renderToLines(b, width);
+      const grid = styledScreenFrom([lines.join("\n")], { columns: width, rows: lines.length });
+      return [
+        `· ${name}`,
+        ...grid.map((row) => {
+          const mask = row.map((c) => (c.style.bg === "" ? "." : "#")).join("");
+          return `${mask} ${row.map((c) => c.ch).join("").replace(/\s+$/u, "")}`;
+        }),
+      ];
+    });
+  };
+
+/** §072 ex. 1: the line changed, so the LINE is painted — to the block's edge. */
+const DIFF = patchOf({ id: "diff" });
+
+/** §072 ex. 3: a posture is TEXT, so a posture can never be read as an error. */
+const POSTURES = block({
+  kind: "pills",
+  id: "postures",
+  chips: [{ label: "auto", active: true }, { label: "plan" }, { label: "manual" }],
+});
+
+/** §072's well: structural, never semantic — `bgDeep` says CONTENT INSIDE. */
+const WELL = block({
+  kind: "panel",
+  id: "well",
+  title: "loss",
+  children: [block({ kind: "raw", id: "w1", text: "4.0 ─ 0.0" })],
+});
+
 export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 95, name: "a tape, where a row of peers would shed", rows: draw(TAPE) },
   { section: 42, name: "widgets — a row of peers that sheds", rows: draw(PILLS) },
@@ -217,6 +286,12 @@ export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 30, name: "the head mark's three rungs", rows: headMarks },
   { section: 31, name: "every reusable spinner set", rows: spinnerCensus },
   { section: 33, name: "nine alphabets, and where each belongs", rows: barAlphabets() },
+  { section: 72, name: "the background is a second channel — the ground census", rows: groundCensus([
+    { name: "a changed line, ex. 1 — the ground runs to the block's edge", block: DIFF },
+    { name: "a tag with extent, ex. 3 — and the error tag is the only one", block: STATUS },
+    { name: "a posture, ex. 3 — TEXT, never a ground", block: POSTURES },
+    { name: "a well — structural, never semantic", block: WELL },
+  ]) },
   { section: 21, name: "the scrollbar — the set, and the bar beside a box", rows: (w, c, t) => [
     ...scrollbarCensus(w, c),
     ...draw(SCROLLED)(w, c, t),

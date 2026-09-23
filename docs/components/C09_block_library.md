@@ -3023,6 +3023,51 @@ questions and the design puts them on one box deliberately.
 
 ---
 
+## 7g. Which kinds paint a ground, and the three that do (§072, `R-COL-004`)
+
+**A background is for an EXTENT; a foreground is for a MARK.** §072 states the test as a
+question a renderer can be asked — *am I painting a THING (a button, a track, a header) or a
+FACT about a thing (its status, its mode, its outcome)?* — and the answer decides the channel:
+things take a ground, facts take a tone.
+
+Measured over `ONE_PER_KIND` at 24 bits, **three of the thirty-six kinds carry a background
+cell**, and the count is the interesting part rather than the membership:
+
+| kind | cells | why it earns a ground |
+|---|---|---|
+| `patch` | 160 | a changed **line** is an extent, and the ground runs to the block's edge — a ground stopping at the last character says a *word* changed, which is a different claim (C25 I13, T4.9) |
+| `status` | 7 | ` ERROR ` — the **one painted label in the system**, which is what lets a red posture (`!! skip`) be drawn in text and never be mistaken for a failure |
+| `image` | 18 | a half-block cell carries **two full colours**, the one place a ground doubles the resolution rather than decorating it |
+
+Everything else is text. A pill is a posture and never a ground; a panel's title is a label; a
+bar's fill is glyphs. **The set is declared rather than derived**, and it moves on purpose:
+§073's painted chrome adds to it, and a kind that begins painting while I95 stands still is
+exactly the drift the row exists to catch.
+
+**Two rules come with it**, both §072's own. Structural and semantic grounds never mix — a
+panel takes `bgElev`, never `diffAdd`; a well is `bgDeep` and a selection is not. And **a
+ground is never the only carrier**: the `+`/`−` carries the diff, the `▸` carries the focus,
+the glyph carries the bar. The second is already C25 I13 for the patch, walked by T4.7 down
+the depth ladder, and §072's frame is what shows it for the rest — at one bit every mask in
+the census is empty and every mark is still drawn.
+
+**The channel is invisible to the corpus that would otherwise cover it.**
+`design-surfaces.test.ts` strips SGR, which is right for a fixture about shape and blind to
+one whose whole subject is the other channel: a washed row and a bare one fold to the same
+picture. So §072's frame is a **mask** — one character per cell, `#` where the cell carries a
+background — computed from the styled screen and emitted as text, which survives the strip
+because it never was an escape.
+
+**What the measurement found that no assertion could**: `meterFill` is carried by all ten
+themes and projected by the registry, and **no renderer reads it**; its only occurrences in
+`src/` are the generated keys of the quantised table. §034's closing line — *the same, painted
+rather than drawn in glyphs; the ground is the extent and the glyphs are the 1-bit rung* — and
+§072's seventh example — *a cell's magnitude: the ground IS the number* — are one unbuilt
+subject, and the surface has no consumer until it lands.
+
+---
+
+
 ## 8. Commitments
 
 1. C09 owns the registry; C04 owns the schema and the measurement contract (I13).
@@ -3113,6 +3158,7 @@ questions and the design puts them on one box deliberately.
 - **I92** — *(§7f, §021)* **A scrollbar is one column of `│ ┃ ╽ ╿` at half-row precision, and there is none where the content fits.** `positions` is twice the gutter's rows at the Unicode rung and its rows at the ASCII one; the thumb is `max(1, floor(positions × viewport ÷ content))` half-rows and starts at `floor(offset ÷ maxOffset × (positions − thumb))`, so the last offset lands at the end rather than being clamped there. A row takes `┃` where both halves are inside the thumb, `╽` where the lower half alone is, `╿` where the upper half alone is, and `│` otherwise — the track runs through the half-row forms. **The column is drawn in `accent` while focus is inside the box and in `muted` otherwise** (§021, C26 §7) — the same rule the residue row already takes, and the tone is the whole column's rather than the thumb's alone: §021 draws the two states as the same glyphs at two tones, so a reader tells them apart by colour and never by shape. **Content that fits its viewport draws nothing**: a bar that cannot move is decoration, and one that is always full says *there is more* to a reader who glances at it.
 - **I93** — *(§7f, §021, C02 I9)* **The scrollbar's glyphs are a set and degrade as one.** Every member is two cells at `ambiguousWidth: "wide"` in this tree — `DRAWN_AS_GEOMETRY` widens the box-drawing block entire, which is a deliberate one-directional deviation from the property (F665) and a superset of §021's own reason, that `│` and `┃` are Ambiguous where `╽` and `╿` are Narrow — so the whole set takes the ASCII rung, where the track is `|`, the thumb is `#` and there is **no half-row form at all**, which is why this is a set rather than four `GlyphSet` slots: a pair would have to carry a duplicate `#` and break T2.5's 1:1 property to say *this rung has none*. **A collapsed box reserves nothing**: it has no interior for a bar to sit in (C04 I98), and the column would be taken out of the residue row — the fold's one line, and the only thing a collapsed box draws. The column it takes is reserved by measuring the content at the full width and re-measuring one cell narrower **only if it overflowed** — narrowing never shortens content, so the decision is reached once and cannot oscillate.
 - **I94** — *(§7f, §033, `R-PRG-001`, `R-PRG-002`)* **The bar alphabets are the registry's `bars`, by equality in both directions, and the `ascii` pair is `#` and `-`.** Nine names — `block halfblock rectangle beads posts slant squares braille ascii` — each with a `filled` and an `empty` character taken from `calcium-registry.json` and not restated here except for the one that was wrong: `ascii` drew `#`/`.` until this row, against the registry's `#`/`-`, and `.` is an absence where `-` is a track. **The rows that existed could not have caught it**: a bar's `off` character is named by no assertion in the tree, and a width row is satisfied by any one-cell glyph. **`braille`'s empty is a space and that is the design's own**, drawn so in §033's fixture, which is why the row compares characters rather than asserting every alphabet has two visible ones. The comparison is by equality both ways on the *names* and on the *pairs*: a name in the tree that the registry does not register is as much a divergence as one the registry registers and the tree lacks, and a subset check in either direction is satisfied by the failure it exists to catch. `narrowOnly` stays the tree's, because it is a property of this terminal's width tables and not of the design (C02 I9) — the registry records what a bar is drawn with and the tree records where that is safe.
+- **I95** — *(§7g, §072, `R-COL-004`, `R-BLK-569`, `R-BLK-570`)* **Three block kinds paint a ground and the rest are text, and each of the three paints for a declared reason.** §072's test is *am I painting a THING or a FACT about a thing* — a background is for an **extent**, a foreground for a **mark** — and measured over `ONE_PER_KIND` at 24 bits exactly three kinds carry a background cell: `patch`, where a changed line is an extent and the ground runs to the **block's edge** rather than the text's (C25 I13, T4.9); `status`, whose error tag is the **one painted label in the system**, which is what lets a red posture be drawn in text and never be read as an error; and `image`, the one place a ground doubles the resolution rather than decorating it, since a half-block cell carries two full colours. Everything else — a pill, a panel, a table, a bar — is a mark or a label, and takes a tone. **The set is declared and moves on purpose**: §073's painted chrome will add to it, and a kind that starts painting without the invariant moving is the failure this row exists to catch. **A stripped read cannot see any of it** — `design-surfaces.test.ts` folds SGR away, which is right for a fixture about shape and blind to one about the channel — so §072's frame is a *mask*, one character per cell, computed from the styled screen and emitted as text. **What the measurement also found**: `meterFill` is carried by all ten themes, projected by the registry, and read by **no renderer** — §034's *the same, painted rather than drawn in glyphs* and §072's *a cell's magnitude — the ground IS the number* are one unbuilt subject, and the surface has no consumer until it lands.
 
 
 ## 8b. The glyph axis — a classification table, and why it is not a trace
