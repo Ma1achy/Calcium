@@ -585,6 +585,12 @@ describe("C11 tier 1 — planColumns", () => {
     }
   });
 
+  // **Spec-first: §5c and I25 land as rows before the renderer moves.** Both
+  // assert a ground's *extent*, which is a thing a frame shows and a count does
+  // not, so each carries its control in the spec text rather than here.
+  it.todo("T1.29 (I14, §5c): a focused row's ground opens at the block's edge and covers the focus mark's cell — not deferred on a component; the spec landed this commit and the renderer follows in the next");
+  it.todo("T1.30 (I25): an expanded row's detail carries `bgElev` the block's whole width, and the row beneath it carries none — not deferred on a component; the spec landed this commit and the renderer follows in the next");
+
   it("T1.25 (I22): `maxWidth` on a column with no `flex` cannot change a plan, at any width", () => {
     const drop = (c: ColumnDef): ColumnDef => {
       const { maxWidth: _capped, ...rest } = c;
