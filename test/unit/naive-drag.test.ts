@@ -82,9 +82,3 @@ describe("C09 §7b — surviving a naive drag", () => {
     }
   });
 });
-
-describe("C09 §7d — the trust boundary", () => {
-  it.todo(
-    "T2.156 (C09 I89, §7d, R-TRU-001): every registered kind renders no control byte from its fields, with the payload's printable residue as the control — not deferred on a component: the sweep lands in this MR",
-  );
-});
