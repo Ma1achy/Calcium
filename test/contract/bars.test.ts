@@ -67,4 +67,14 @@ describe("roadmap 51 — bar styles, and ambiguous width is a tier", () => {
     expect(barStyle(ASCII_CAPS, "braille").on, "ASCII takes even the stable one").toBe("#");
     expect(barStyle(WIDE, "braille").on, "and width alone does not").toBe("⣿");
   });
+
+  // **The four rows above are all about width and fallback, and that is the
+  // gap.** Three characters appear in this file and all three are an `on`; no
+  // row here or anywhere else in the tree has ever named an `off`. A width
+  // assertion is satisfied by any one-cell glyph, so `ascii` drew `#`/`.`
+  // against the registry's `#`/`-` under a file whose whole subject is this
+  // table. §033's fixture is what found it.
+  it.todo(
+    "T2.158 (C09 I94, R-PRG-001): the registry's bars are the tree's, by equality both ways, and `ascii` is `#`/`-` — not deferred on a component: the pair lands with this spec's own next commit, which is the one that changes `BAR_ASCII`",
+  );
 });
