@@ -105,12 +105,18 @@ function world(
   // behaviour): T1.69 asserts the text the reply carries, so the harness must
   // hold one the row can set and watch cleared.
   let draft = "";
+  let held = "";
   const confirm = createConfirmHost({
     overlays,
     anchor: () => anchorAt,
     draft: () => draft,
-    clearDraft: () => {
+    holdDraft: () => {
+      held = draft;
       draft = "";
+    },
+    restoreDraft: () => {
+      draft = held;
+      held = "";
     },
     overlayRegion: () => overlayRegion,
     invalidate,

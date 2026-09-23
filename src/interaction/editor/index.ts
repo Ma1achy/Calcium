@@ -5,7 +5,7 @@
  * rendering, no geometry held, no clock read.
  */
 
-export { createEditor, type LineEditor, type Motion } from "./editor.js";
+export { createEditor, type LineEditor, type LineState, type Motion } from "./editor.js";
 export type { Cell, CellSpan, Gutter } from "./layout.js";
 // Entry 23 — the wash. L4 reads `editor.selection` and maps it through the
 // same walk `layout` returns rows from (I18).

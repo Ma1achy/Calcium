@@ -209,7 +209,7 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
   const timers: { fn: () => void; at: number; live: boolean }[] = [];
 
   const harnessOverlays = createOverlayManager({ registry: overlayRegistry });
-  const harnessConfirm = createConfirmHost({ overlays: harnessOverlays, anchor: () => ({ row: 0, rows: 1 }), draft: () => "", clearDraft: () => undefined, overlayRegion: () => ({ width: 80, height: 24 }), invalidate: () => undefined });
+  const harnessConfirm = createConfirmHost({ overlays: harnessOverlays, anchor: () => ({ row: 0, rows: 1 }), draft: () => "", holdDraft: () => undefined, restoreDraft: () => undefined, overlayRegion: () => ({ width: 80, height: 24 }), invalidate: () => undefined });
   const deps = {
     session: () => session.snapshot,
     writes: session.execution,

@@ -38,6 +38,23 @@ export type Motion =
  */
 export type { Chip, ChipKind, ChipLook } from "./layout.js";
 
+/**
+ * A line held whole — text, caret and region (I28, §101, C23 I28).
+ *
+ * **A different type from the undo history's `Snapshot`, deliberately.** That
+ * one is `{text, cursor}` and drops the region on purpose (I22: a region does
+ * not survive an undo), and history's own stash holds text alone for its own
+ * reason (C20 §4) — a history walk restores a *draft*, a line the reader has
+ * not finished, where this restores a *state* they were in the middle of. One
+ * type would have to be the widest of the three and would make the other two's
+ * exclusions unstateable.
+ */
+export type LineState = Readonly<{
+  text: string;
+  cursor: number;
+  selection: Readonly<{ anchor: number; head: number }> | null;
+}>;
+
 export interface LineEditor {
   /**
    * The buffer **as it is**, sentinels and all.
@@ -160,6 +177,24 @@ export interface LineEditor {
   yank(): void;
   setText(text: string, cursor?: number): void;
   clear(): void;
+  /**
+   * The whole of what the reader can see of their line (I28, §101).
+   *
+   * **All three fields, because *restored exactly* is a claim about a state.**
+   * §101 hands one editor to two owners in sequence — a question taking a typed
+   * reply borrows the prompt and hands it back — and a reader who had selected
+   * a phrase and comes back to find the selection gone has been told their line
+   * survived and can see that something did not.
+   */
+  snapshot(): LineState;
+  /**
+   * Put a snapshot back, as though the line had never been taken (I28).
+   *
+   * **Not an edit**, so nothing is recorded and `undo()` afterwards does not
+   * walk backwards into whatever was in the buffer in between — which would be
+   * the other owner's composition, one `⌃z` from the reader.
+   */
+  restore(state: LineState): void;
 
   undo(): boolean;
   redo(): boolean;
@@ -563,6 +598,27 @@ class Editor implements LineEditor {
 
   clear(): void {
     this.setText("", 0);
+  }
+
+  snapshot(): LineState {
+    // `this.selection` rather than `#anchor`, so the "empty region" state I21
+    // makes unconstructable stays unconstructable in the record as well.
+    return Object.freeze({ text: this.#text, cursor: this.#cursor, selection: this.selection });
+  }
+
+  restore(state: LineState): void {
+    // **No `#history.edit`** (I28). A restore that recorded a unit would leave
+    // the reader one `⌃z` from the text the other owner composed, which is
+    // exactly the thing the borrow is supposed to have taken away.
+    //
+    // The kill run ends, because it was interrupted by another owner and a run
+    // that reached across the borrow would append this line's kill to theirs
+    // (I16: the run and the buffer never describe different amounts of text).
+    this.#history.endKill();
+    const n = count(state.text); // cells-ok — a grapheme count
+    this.#text = state.text;
+    this.#cursor = clamp(state.cursor, n);
+    this.#anchor = state.selection === null ? null : clamp(state.selection.anchor, n);
   }
 
   undo(): boolean {

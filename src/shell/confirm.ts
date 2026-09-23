@@ -68,13 +68,18 @@ export type ConfirmDeps = Readonly<{
    * floating reply means *answer with what I typed*, and a submit path that
    * knew that would hold half a rule whose other half lives here.
    *
-   * `clearDraft` is C23 I28 arriving at the third state: the reply **became**
-   * the line, so the prompt clears exactly as it does for a submitted one. The
-   * draft that was there before the question is a separate fact and is not
-   * this seam's.
+   * `holdDraft` and `restoreDraft` are the borrow (C17 I28, C23 I28). The
+   * reader's line is taken whole on entering the reply state and given back
+   * exactly on settling, whichever way the question was answered — it was
+   * never submitted, so C23 I28's *the prompt clears whatever becomes of the
+   * line* does not reach it. What that rule does reach is the reply's own
+   * line, which **became** the line and clears like a submitted one; the
+   * restore does both at once, because putting the held state back is what
+   * removes the reply.
    */
   draft: () => string;
-  clearDraft: () => void;
+  holdDraft: () => void;
+  restoreDraft: () => void;
   /**
    * The region C15 places against, for the truncation pass (entry 16 R2).
    *
@@ -408,6 +413,10 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
           replying = choice;
           consumer = questionConsumer(opts.choices, true);
           routing = routingFor(consumer);
+          // **Taken before the prompt comes live**, so the reader composes
+          // into an empty line rather than on top of whatever they had typed
+          // when the question arrived.
+          deps.holdDraft();
           const at = deps.anchor();
           deps.overlays.update(CONFIRM_LAYER_ID, {
             content: render(opts, selected()),
@@ -460,6 +469,12 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
                 // escape from the reply state is still an escape: the reader
                 // declined, and a `text` of `""` would say they replied with
                 // nothing.
+                //
+                // **And the line comes back on this path too** (C17 I28). The
+                // borrow is what has to be undone, not the answer — a restore
+                // on the `⏎` arm alone loses the reader's draft on exactly the
+                // path where they changed their mind about typing.
+                if (replying !== null) deps.restoreDraft();
                 return settle(defaultChoice(opts.choices).key);
               }
               if (replying !== null) {
@@ -469,7 +484,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
                 // record and a copy taken earlier is a second one.
                 const text = deps.draft();
                 const key = replying.key;
-                deps.clearDraft();
+                deps.restoreDraft();
                 return settle(key, text);
               }
               {

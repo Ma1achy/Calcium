@@ -81,6 +81,7 @@ describe("C23 §7f — replace or float", () => {
       confirm: ReturnType<typeof createConfirmHost>;
       overlays: ReturnType<typeof createOverlayManager>;
       type: (text: string) => void;
+      line: () => string;
       drafted: () => string;
       press: (name: string) => boolean;
     }> => {
@@ -88,12 +89,18 @@ describe("C23 §7f — replace or float", () => {
         registry: { measureSequence: (b) => b.length }, // cells-ok — a row count
       });
       let draft = "";
+      let held = "";
       const confirm = createConfirmHost({
         overlays,
         anchor: () => ({ row: 20, rows: 1 }),
         draft: () => draft,
-        clearDraft: () => {
+        holdDraft: () => {
+          held = draft;
           draft = "";
+        },
+        restoreDraft: () => {
+          draft = held;
+          held = "";
         },
         overlayRegion: () => ({ width: 80, height: 24 }),
         invalidate: () => undefined,
@@ -104,6 +111,7 @@ describe("C23 §7f — replace or float", () => {
         type: (text) => {
           draft = text;
         },
+        line: () => draft,
         drafted: () => draft,
         press: (name) => confirm.answerHandler()?.({ kind: "key", key: { name } } as InputEvent) ?? false,
       };
@@ -117,6 +125,11 @@ describe("C23 §7f — replace or float", () => {
 
     // ---- the transition -----------------------------------------------------
     const w = world();
+    // **A draft the reader had already typed when the question arrived.** An
+    // approval can be raised by a verb that is still running, so the prompt is
+    // not reliably empty — and this is the line the borrow has to give back
+    // (C17 I28, C23 I28).
+    w.type("git push --force");
     const answer = w.confirm.ask({ question: "may I?", choices: CHOICES });
 
     const opened = w.overlays.stack.find((l) => l.id === "confirm");
@@ -124,6 +137,10 @@ describe("C23 §7f — replace or float", () => {
     expect(w.confirm.replacing, "and it replaces the prompt").not.toBeNull();
 
     expect(w.press("r"), "reply… is consumed").toBe(true);
+    // **Taken, so the reply is composed into an empty line** rather than on
+    // top of what the reader had. A build that left the draft standing makes
+    // the reply's first keystroke an edit of somebody else's sentence.
+    expect(w.line(), "the borrow starts empty").toBe("");
 
     // **The identity, which is the discriminator.** A build that popped the
     // layer and pushed a second one draws the same picture and leaves the
@@ -144,7 +161,11 @@ describe("C23 §7f — replace or float", () => {
       key: "r",
       text: "because the tests say so",
     });
-    expect(w.drafted(), "and the prompt clears, as it does for a submitted line").toBe("");
+    // **Given back exactly, on the answering path** (C17 I28). The reply's own
+    // line clears because it *became* the line, and the reader's comes back
+    // because it never did — one restore does both, which is why C23 I28 is
+    // not weakened by the borrow.
+    expect(w.line(), "the reader's line is back").toBe("git push --force");
 
     // **The assertion that catches a pop-and-push, and the first three did
     // not.** A transition that disposed the layer and pushed a replacement
@@ -161,12 +182,17 @@ describe("C23 §7f — replace or float", () => {
     // escape out of the reply state is still an escape: `""` would say the
     // reader replied with nothing.
     const e = world();
+    e.type("git push --force");
     const escaped = e.confirm.ask({ question: "may I?", choices: CHOICES });
     expect(e.press("r")).toBe(true);
     e.type("half a thought");
     expect(e.press("escape")).toBe(true);
     await expect(escaped, "the default's key and no text").resolves.toEqual({ key: "d" });
     expect(e.overlays.stack, "and the escape takes it down too").toHaveLength(0);
+    // **The borrow is undone on this path too**, and it is the path where a
+    // restore written on the `⏎` arm alone loses the draft: the reader changed
+    // their mind about typing, which is exactly when they still want their line.
+    expect(e.line(), "the reader's line survives the escape").toBe("git push --force");
   });
 
 });

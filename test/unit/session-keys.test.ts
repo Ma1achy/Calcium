@@ -271,6 +271,15 @@ describe("C22 §3 step 11 — the effect table", () => {
       "insert",
       "setText",
       "clear",
+      // **The borrow, and it is excluded on the invariant's own words** (C17
+      // I28, §101). `snapshot` is a read like `selection`; `restore` is
+      // explicitly *not an edit* — that is the half of I28 T1.50 asserts, and
+      // a key that could reach it would put the reader's held line back
+      // whenever they pressed it, which is not an editing operation but a
+      // second owner's undo. The driver is the question (C23 I73), and the
+      // question is not a binding at this target.
+      "snapshot",
+      "restore",
       // **Roadmap 30's two, and each is excluded for its own reason.**
       // `resolved` is a *read* like `text` — the buffer with chips expanded, for
       // the submission site — and not an editing operation at all. `insertChip`

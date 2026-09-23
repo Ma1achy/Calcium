@@ -24,9 +24,11 @@ const SESSION = "src/shell/session.ts";
 const PAINT = "src/shell/paint.ts";
 const ROUTING = "src/shell/question-routing.ts";
 const CONFIRM = "src/shell/confirm.ts";
+const EDITOR = "src/interaction/editor/editor.ts";
 const FILES =
   "test/integration/question-slot.test.ts test/unit/question-routing.test.ts " +
-  "test/integration/confirm.test.ts test/unit/session-paint.test.ts";
+  "test/integration/confirm.test.ts test/unit/session-paint.test.ts " +
+  "test/unit/draft-hold.test.ts";
 
 const { read, write } = fsIo(ROOT);
 const run = () => {
@@ -184,6 +186,56 @@ const results = runPass({
       from: "                const key = replying.key;",
       to: "                const key = opts.choices[selected()]?.key ?? replying.key;",
       expect: "T1.69",
+    },
+    {
+      // **The reply composes on top of the reader's line.** Every assertion
+      // about the transition passes and the first keystroke of the reply is an
+      // edit of somebody else's sentence — which reads, on screen, as the
+      // reader having typed it.
+      name: "the reply is composed on top of whatever the reader had typed",
+      file: CONFIRM,
+      from: "          deps.holdDraft();",
+      to: "          void deps;",
+      expect: "T1.69",
+    },
+    {
+      // **The line comes back only when the question was answered.** The
+      // escaping path is where the reader *changed their mind about typing*,
+      // which is exactly when they still want what they had.
+      name: "escaping out of a reply keeps the reply's empty line",
+      file: CONFIRM,
+      from: "                if (replying !== null) deps.restoreDraft();",
+      to: "                if (false) deps.restoreDraft();",
+      expect: "T1.69",
+    },
+    {
+      // **The snapshot drops the region** — the field that makes *restored
+      // exactly* a claim rather than a pair of `setText` calls, and the one a
+      // build that never knew about it passes every other assertion without.
+      name: "the held line carries text and caret and not the region",
+      file: EDITOR,
+      from: "    return Object.freeze({ text: this.#text, cursor: this.#cursor, selection: this.selection });",
+      to: "    return Object.freeze({ text: this.#text, cursor: this.#cursor, selection: null });",
+      expect: "T1.49",
+    },
+    {
+      // **A restore that leaves a region standing.** It reads as an
+      // optimisation — why clear what may already be right — and it makes the
+      // restore depend on what the *other* owner left behind.
+      name: "a restore with no region leaves whatever the editor had",
+      file: EDITOR,
+      from: "    this.#anchor = state.selection === null ? null : clamp(state.selection.anchor, n);",
+      to: "    if (state.selection !== null) this.#anchor = clamp(state.selection.anchor, n);",
+      expect: "T1.49",
+    },
+    {
+      // **A restore recorded as an edit**, which is the one that leaves the
+      // reader a single `⌃z` from the text the question composed.
+      name: "the restore is recorded in the undo history",
+      file: EDITOR,
+      from: "    this.#history.endKill();\n    const n = count(state.text); // cells-ok — a grapheme count",
+      to: "    this.#history.endKill();\n    this.#history.edit({ text: this.#text, cursor: this.#cursor }, \"structural\");\n    const n = count(state.text); // cells-ok — a grapheme count",
+      expect: "T1.50",
     },
     {
       // **A replaced prompt keeps its caret.** The rows on screen are the

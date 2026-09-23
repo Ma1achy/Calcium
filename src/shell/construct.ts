@@ -66,7 +66,10 @@ import { pullIntoView } from "./pull.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
 import { createOverlayManager, takesInput } from "../viewport/overlay/index.js";
 import { chipLabel, createEditor } from "../interaction/editor/index.js";
-import type { Chip, ChipLook } from "../interaction/editor/index.js";
+import type { Chip, ChipLook, LineState } from "../interaction/editor/index.js";
+
+/** An empty line, for a restore with nothing held (C17 I28). */
+const EMPTY_LINE: LineState = Object.freeze({ text: "", cursor: 0, selection: null });
 import {
   createEngine,
   createSourceErrorSink,
@@ -1596,6 +1599,8 @@ export async function constructGraph(
    * reads it on every keystroke at an open question. A thunk here would buy
    * nothing and add a nullable to the one path that must not answer quietly.
    */
+  // §101's borrow: the reader's line while a typed reply owns the prompt.
+  let heldDraft: LineState | null = null;
   const confirm = createConfirmHost({
     overlays: stores.overlays,
     // The same anchor C19's menu takes, read at `ask` time (C15 I17).
@@ -1604,8 +1609,20 @@ export async function constructGraph(
     // The one editor, which is §101's whole point about a typed reply: the
     // same history, the same chips, the same `⇧⏎`.
     draft: () => stores.editor.text,
-    clearDraft: () => {
+    // **One `LineState`, held here rather than inside the host** (C17 I28).
+    // The host is where the question's rules live and this is where the editor
+    // is; a copy of the line inside `confirm.ts` would be a second record of
+    // the prompt, which is the thing C22 I80 exists to refuse one file over.
+    holdDraft: () => {
+      heldDraft = stores.editor.snapshot();
       stores.editor.setText("");
+    },
+    restoreDraft: () => {
+      // `?? EMPTY_LINE` rather than a no-op: a restore with nothing held would
+      // leave the reply's own text at the prompt, which is the one line C23
+      // I28 does clear.
+      stores.editor.restore(heldDraft ?? EMPTY_LINE);
+      heldDraft = null;
     },
     invalidate: () => void scheduler.commit("input"),
   });
