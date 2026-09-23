@@ -1185,6 +1185,51 @@ Per submission.
 - **I70** — **A refused patch stops the part and never the host, and a refusal the host still holds the block for is recorded as a fault.** `PatchOutcome`'s arms answer two different questions — *is the host gone* and *was the patch refused* — and a driver reading `outcome.ok` answers only the first, so the shell building a patch C04 cannot take took the same silent teardown as an evicted entry: every sibling part on that host and the entry's elapsed readout (I53) stopped with it, and the exact diagnosis was discarded at the one place that could report it (§8h, F1002). A refused part is given the dead source I43 already defines, so it stops **without a second teardown path** (I32) and the host is released by the sweep once nothing on it still polls. **The report is a fault and not the part's own panel**, which is §5a's first sentence one component along — the reporting path is the path that failed, and I43's refusal can draw in the panel only because it is refused *before* a patch is needed.
 - **I71** — **The emulator is loaded by the shell route, on demand, and never by the package's import.** `@xterm/headless` is 35 ms of a cold start on a native filesystem and no first frame draws a terminal (F1164); the route is `async` before it spawns, so the module arrives through a dynamic import awaited where `createEmulator` was called, and a session that never runs a shell command never loads it. **Behaviour is unchanged by construction**: the block, its snapshots, its resize and its disposal are the same code reached one microtask later on the first shell command of a session, and T5.21 is the row that shows the terminal still streams. The observable is the module graph, not a timing: a child process that imports `dist/index.js` and lists what it loaded holds nothing from the emulator's package, and a test that read a duration instead would pass on a fast machine with the import back on the barrel. C24 T5.8 runs the same child through the bundled entry, where the dynamic import is its own chunk (F1193).
 - **I72** — **A source's next deadline is one interval after the last deadline, not one interval after the fetch that settled.** `settleSource` dates `dueAt` from the deadline the poll was woken for, and from the settle only when the settle is more than one **declared** interval past it — a far side slower than its own cadence, which must not build a backlog of overdue polls and so restarts from where it finished. **The bound is `intervalMs` and the step is the backoff**, and the two must not be the same number: the step is `backoffOf` (§7's one rule), so a failing source waits its doubled interval from the deadline it already had; but a source woken a full interval late has not been keeping up, and measuring its lateness against a backoff that has already doubled would call it current and retry it early — half the doubled interval after a failure, on the first failure of every source declared before anyone ticked. **This is C22 I105's rule at the other cadence and it was written the other way**: the wake fires late by the timer's granularity and the fetch takes what it takes, so dating the next deadline from the settle adds both to every period and never recovers them — a part declared `every: 16` polled every 18 ms and a screen of them drew 55 frames a second against the sixty A02 §7 budgets (F1206). The observable is the deadline sequence under a fast source: ten polls woken late leave the tenth deadline exactly ten intervals after the first, and a poll a full interval behind is dated from its settle (T2.48).
+- **I73** — *(§7f, §101, `R-QST-001`)* **Whether a question replaces the prompt is derived from whether its answer needs one, and never declared by its caller.** A question with choices alone replaces the prompt, because there is nothing to type and a prompt with no job is a row spent on nothing; a question taking a typed reply floats above a live prompt, because the answer is composed there. **The two are one question in two states**, not two kinds: choosing `reply…` moves the question up and brings the prompt live beneath it, so a caller that declared the placement would be declaring it for a state the question has not reached yet. A peek, a completion menu and a search float and do not block; a typed reply floats **and** blocks, which is the combination that shows the two axes are independent — and it never becomes dismissable, because an owner is still waiting.
+- **I74** — *(§7f, C22 I80, §101)* **Replacing is the prompt's rows answered by something else, not a second layout.** The frame's height identity is `header + rule + region + rule + prompt + footer`, and the prompt's rows are read by the measurer and by the paint from one function; a replacing question answers that function instead of the editor, so the region does not move and the transcript does not reflow when a question opens. The alternative — a placement mode that takes the prompt's space — is a second layout for the same rows, and C22 I80 records what two records of that number already cost.
+
+
+## 7f. Replace or float — does the answer need the prompt? (§101)
+
+**One rule for every popup consumer, and it settles what the dismissable axis
+could not.** §101 gives the table:
+
+| consumer | the prompt | so it |
+|---|---|---|
+| an approval | not needed | **replaces** · blocks |
+| a choice | not needed | **replaces** · blocks |
+| a typed reply | **needed** | **floats** · blocks |
+| a peek | needed | floats · does not block |
+| completion | needed | floats · does not block |
+| find | needed | floats · does not block |
+
+**Blocking and replacing are independent, and the typed reply is what proves
+it.** It blocks and floats, which no ordering of one axis produces — and it
+never becomes dismissable, because an owner is still waiting. The repo had
+neither axis until C15's `blocking`/`dismissal` split, and it still has no
+answer to *replace*: every question is a centred overlay that floats.
+
+**Replacing is one seam and not a placement mode.** The frame's rows are
+`header + rule + region + rule + prompt + footer` and the prompt's height is
+`editor.layout(width, gutter).length`, read in two places that must agree
+(C22 I80). A question that replaces the prompt is one whose **rows are the
+prompt's rows** — the same number, reported by the same function, drawn by the
+same paint — so the region does not move, the transcript does not reflow, and
+the frame's own height identity is untouched. A placement mode would have been a
+second layout; this is one number answered by whoever owns the rows this frame.
+
+**A choice-only question replaces because the prompt has no job**: there is
+nothing to type. The moment `reply…` is chosen the prompt *has* one, so the
+question moves up and the prompt goes live beneath it — which is a transition
+between the two rows of the table rather than two kinds of question, and it is
+why `replaces` is derived from the question's state rather than declared by its
+caller.
+
+**`promptUnderMenu` is this rule with one consumer** (I51, C19 I20). It asks
+*is the prompt still answering keys under the top layer*, which is *does the
+top layer need the prompt* with the answer hardcoded to two layer ids. A
+question that replaces the prompt is the case it has no arm for, and a question
+that floats is the case it answers by name.
 
 
 ## 8. Commitments
@@ -1252,6 +1297,8 @@ Per submission.
 60. **A refused patch stops the part, not the host, and says what was refused** (I70). Three arms, two questions: the host is released when C13 has dropped the entry, and the part alone when the document refuses what the shell built — with `applyPatch`'s message on §5a's two channels.
 61. **The shell route imports the emulator when it runs, not when the package loads** (I71). `test/support/import-trace.mjs` is the instrument: a `--import` hook that lists every module a child resolved, so T5.22 reads the startup graph as a corpus rather than timing it.
 62. **A poll's cadence is the interval, not the interval plus the work** (I72, F1206). The next deadline was dated from the fetch that had just settled, so the timer's lateness and the fetch's duration joined every period and a 16 ms part polled every 18 — 55 frames a second on a screen of live parts. The deadline chain is now the spinner's, which C22 I105 takes from the stamp and never from the paint, with the settle taken only when the far side is slower than its declared cadence.
+63. **A question replaces the prompt when its answer does not need one, and floats when it does** (I73, §7f, §101). One rule for every popup consumer, derived from the question rather than declared with it — because a choice-only question that gains a `reply…` has changed state, not kind. `promptUnderMenu`'s two hardcoded layer ids are this rule with one consumer and no arm for the replacing case.
+64. **The replacing question answers the prompt's row count, and nothing else in the layout moves** (I74, → C22 I80, §7f). The region keeps its height, the transcript does not reflow, and the frame's own identity is untouched — which is what makes *replace* one seam rather than a placement mode.
 
 ---
 
@@ -2386,6 +2433,10 @@ Fake transport, fake stores.
 - **T6.97** (I63): falling back to the pipe arm when `spawnPty` throws → T3.63 fails and a configuration error becomes a child that quietly lost its colours.
 
 ---
+
+- **T1.68** (I73, §7f, §101): the routing is a function of the question and it is total — an approval and a choice replace and block, a typed reply floats and blocks, and a peek, a completion and a search float and do not block. Asserted as the table rather than as six cases, because *blocking and replacing are independent* is a claim about the product of two axes and a build that tied them would satisfy any four of the six cells.
+- **T1.69** (I73, §7f): choosing `reply…` moves the same question from replacing to floating, with its id and its owner unchanged. The discriminator is the **identity**: a build that closed one layer and opened another would pass every assertion about what is on the screen and drop the handler that is awaiting the answer.
+- **T4.70** (I74, → C22 I80, §7f): a replacing question in a session leaves the region's height and the transcript's rows exactly where they were — read off two frames, because *the question is drawn* is satisfied by a build that pushed the transcript up to make room for it.
 
 ## 10. Out of scope
 
