@@ -131,22 +131,36 @@ figure's spelling, it is every key name the design prints. **Done under assumpti
 (`s+enter`, `m+C`) below the Unicode rung — the behaviour that already shipped,
 held as the arm to revisit rather than as an answer.
 
-**16 · §070's ten hues have no values.** `/colour` and `/label` are unbuilt end
-to end, and the section's mechanism is specified in detail — chrome only, per
-directory in `.calcium/config.toml`, a name resolved per theme against a hex
-taken literally, the hex gated by a choice-only contrast question with the safe
-answer focused and `esc` resolving to it, animation as an explicit decoration
-exception suppressed under `reduced` and `off`. What it does not give is **the
-ten hues**: *blue orange cyan pink lime violet yellow green red purple*, named
-and described only as *VIVID*, with no values in the section and **no palette
-anywhere in the registry** (searched for a record carrying all ten; there is
-none).
+**16 · RETRACTED — §070's ten hues have values, and the search that said
+otherwise looked for the wrong shape.** The question read *no palette anywhere in
+the registry*, and its own parenthesis is the tell: *searched for a record
+carrying all ten; there is none*. It looked for a **record**. The registry stores
+them as **theme rules** — one CSS rule per hue, per tier, per theme:
 
-Ten vivid colour values is the park list's own example of a visible choice.
-**Held whole rather than part-built**: the hex arm alone needs no new values,
-but a `/colour` that accepts a literal and refuses `blue`, `blue..pink` and the
-picker — three of the six forms its own help text lists — is not a smaller
-version of this feature. `viridis` would work, since the colormaps ship.
+    300 hue tokens · c-h 100 · bg-h 100 · c-hi 100 · ten hues × ten themes
+
+    blue   #3b82f6      violet  #d946ef
+    orange #ff8c1a      yellow  #ffd21f
+    cyan   #22d3ee      green   #22c55e
+    pink   #ec4899      red     #ff4d4d
+    lime   #a3e635      purple  #a855f7
+
+Every theme carries all ten, including `mono` and the two high-contrast pairs.
+**A matcher that sees one encoding reports absence when the value changes form**,
+and M2's own plan text names the thing it missed — *10 `h-*`/`hi-*` hue pairs*.
+
+**And §093 settles the order, which this question never knew was in doubt.** The
+hues are listed *blue orange cyan pink lime violet yellow green red purple*, and
+§093 says why: the first assignment was **spectral** — red, orange, yellow, lime,
+green — *five identities a deuteranope cannot separate*, so the order is by
+**perceptual separation** and *the first four are separable under every common
+deficiency, which is where a session with three subagents lands*.
+
+**So nothing about §070 is a visible choice any more.** Values: in the registry.
+Order: ruled by §093 with its argument. What is actually missing is the **port** —
+the hexes appear nowhere in `src/`, `test/` or `docs/components/`, and
+`categorical` is a separate eight-slot cycle (C10 I37), not these. That is M2's
+work left undone, not a question, and §070's census row says so.
 
 **17 · `↺` is an affordance the design draws and the registry does not record.**
 It is `↺ redo` on a reverted entry (§064), `↺ revert` on a stopped one (§005),
