@@ -80,7 +80,7 @@ have their subject in the scrollbar; clause 1 is unambiguous and gated.
 would close `hcDark`'s `selection` are specified nowhere. Raising a tone to a
 floor is arithmetic; choosing the ten is a visible colour decision.
 
-> **Ruled 2026-09-24.** Measured from the design's own figure. The streaming demo (`<pre id="live">`) is driven by a script, not a CSS animation, and it sets **`const trail=14`**. **Owed:** 14 replaces the assumed 3.
+> **Ruled 2026-09-24.** Measured from the design's own figure. The streaming demo (`<pre id="live">`) is driven by a script, not a CSS animation, and it sets **`const trail=14`**. **Owed:** 14 replaces the assumed 3. **Built 2026-09-25, with a finding:** the demo counts back through the whole stream, and C09 I90 already said *the last `TRAIL_CELLS` cells of the text* — but `withTrail` banded the last wrapped row only. Latent at 3, visible at 14 on every short last row, so the band now crosses rows (T1.76).
 
 **8 · RULED — §026 gives no band width for the streaming trail.** Its own cost example
 is worked at one cell and at three. **Done under assumption: 3.**

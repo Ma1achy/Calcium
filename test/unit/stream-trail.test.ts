@@ -155,6 +155,8 @@ describe("C09 §7e — the band", () => {
     expect(untrailed(tiny), "the whole text is the band").toBe("");
   });
 
+  it.todo("T1.76 (C09 I90, §7e): a band longer than the last wrapped row continues on the row above — not deferred on a component: specified before the band crosses rows");
+
   it("T1.55 (C09 I90, §7e, R-BLK-198): chrome is never in the band, at any width", () => {
     // **A header has no position in the stream, so it exists complete or not at
     // all.** The band is derived over the wrapped *text* and the glyph is
