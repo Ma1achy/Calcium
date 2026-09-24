@@ -1028,6 +1028,76 @@ const streamHead = (
   ];
 };
 
+// --- §073, painted chrome -------------------------------------------------
+
+/**
+ * §073's own test, run over the tree: *am I painting a THING or a FACT about a
+ * thing?*
+ *
+ * **A classification table, not four examples.** §072 takes four hand-picked
+ * subjects and asks how far each ground runs; this asks **every kind** whether it
+ * paints at all, which is the only shape that can answer a rule quantified over
+ * all of them. Two correct statements overlap in every cell here — *this kind
+ * grounds something* and *what it grounded is a thing* — and a census indexed by
+ * examples tests each against itself.
+ *
+ * Measured: four of twenty-three paint anything, and each is a THING (the table
+ * header, C11 I24), the one FACT the section sanctions (`status`'s error tag),
+ * `patch`'s changed lines (§072 ex. 1) or pixels (`image`). Nineteen paint
+ * nothing, and none of §073's four never-paint cases is violated.
+ */
+const paintedChrome = (
+  width: number,
+  capabilities: TerminalCapabilities,
+  theme: ResolvedTheme,
+): readonly string[] => {
+  const out: string[] = ["· every kind, and what it grounds — §073's test: a THING takes a ground, a FACT takes a tone"];
+  for (const kind of ALL_KINDS) {
+    const kit = measurable({
+      theme,
+      capabilities,
+      definitions: [patchDefinition, tableDefinition, plotDefinition] as never,
+    });
+    const lines = kit.renderToLines(ONE_PER_KIND[kind] as never, width);
+    const grid = styledScreenFrom([lines.join("\n")], { columns: width, rows: lines.length });
+    const runs: string[] = [];
+    for (const row of grid) {
+      let run = "";
+      let bg = "";
+      const flush = (): void => { if (bg !== "" && run.trim() !== "") runs.push(run); };
+      for (const c of row) {
+        if (c.style.bg === bg) { run += c.ch; continue; }
+        flush();
+        bg = c.style.bg;
+        run = c.ch;
+      }
+      flush();
+    }
+    out.push(runs.length === 0 ? `  ${kind.padEnd(12)} — no ground` : `  ${kind.padEnd(12)} ${JSON.stringify(runs.slice(0, 2))}`);
+  }
+  return [...out, ""];
+};
+
+/** §073's buttons — the four states, and the rung where the ground is gone. */
+const buttonRungs = (
+  width: number,
+  capabilities: TerminalCapabilities,
+  theme: ResolvedTheme,
+): readonly string[] => {
+  const btn = (id: string, tone: string) =>
+    ({ kind: "notice", id, tone, text: "Approve", action: { kind: "activate", id: "a" } }) as unknown as Block;
+  const pass = (focus: unknown, caption: string): readonly string[] => {
+    const kit = measurable({ theme, capabilities, ...(focus === undefined ? {} : { focus }) } as never);
+    const lines = kit.renderToLines(btn("b", "default"), width);
+    const grid = styledScreenFrom([lines.join("\n")], { columns: width, rows: lines.length });
+    return [caption, ...maskOf(grid), ""];
+  };
+  return [
+    ...pass(undefined, "· resting — the ground IS the affordance, and it is the label plus one cell either side"),
+    ...pass({ blockId: "b", rowId: "b" }, "· focused — the chosen pair, and `›` INSIDE the ground rather than before it"),
+  ];
+};
+
 export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 95, name: "a tape, where a row of peers would shed", rows: draw(TAPE) },
   { section: 42, name: "widgets — a row of peers that sheds", rows: draw(PILLS) },
@@ -1054,6 +1124,10 @@ export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 17, name: "focus treatment follows the shape — what each kind publishes against what it draws", rows: focusByShape },
   { section: 76, name: "per-token values — the valued run, and the token that wraps whole", rows: valuedTokens },
   { section: 26, name: "the trail and the mark at the head — two carriers, and what each survives", rows: streamHead },
+  { section: 73, name: "painted chrome — every kind against §073's test, and the button's rungs", rows: (w, c, t) => [
+    ...paintedChrome(w, c, t),
+    ...buttonRungs(w, c, t),
+  ] },
   { section: 19, name: "the resolved keymap, the reader's own rung first", rows: keymapCensus },
   { section: 21, name: "the scrollbar — the set, and the bar beside a box", rows: (w, c, t) => [
     ...scrollbarCensus(w, c),

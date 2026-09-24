@@ -173,6 +173,69 @@ const results = runPass({
       to: "",
       expect: "T1.65",
     },
+    {
+      // **§073, and the defect is what the tree drew.** No ground at rest, so a
+      // button is bare text and an action is invisible until you focus it —
+      // which is the state this section was opened on. Every assertion about the
+      // *focused* button passes.
+      name: "a resting button takes no ground",
+      file: SIMPLE,
+      from: "  const ref = focused ? \"surface.pick\" : \"surface.bgElev\";",
+      to: "  const ref = focused ? \"surface.pick\" : \"surface.nothing\";",
+      expect: "T1.66",
+    },
+    {
+      // **The focused button on `focusGround` again**, which is I83's arm and
+      // the mechanism this MR moved it off. The button is painted, it is
+      // focused, and it takes the region's ground rather than the chooser's —
+      // a row asserting only *focused is painted* accepts it.
+      name: "a focused button takes the focus ground rather than the chosen pair",
+      file: SIMPLE,
+      from: "  const ref = focused ? \"surface.pick\" : \"surface.bgElev\";",
+      to: "  const ref = focused ? \"surface.focusGround\" : \"surface.bgElev\";",
+      expect: "T1.66",
+    },
+    {
+      // **The mark outside the wash.** Same glyph, same column, same ground —
+      // one cell of background, which is what says where the affordance begins.
+      // §082's `▸` is the same claim one component over.
+      name: "the chooser's mark sits outside the button's ground",
+      file: SIMPLE,
+      from: "    { text: ` ${mark}`, style },",
+      to: "    { text: mark, style: base }, { text: \" \", style },",
+      expect: "T1.66",
+    },
+    {
+      // **The brackets gone at the rung that has nothing else.** A button at one
+      // bit is then bare text with zero carriers, which is the state M11's
+      // matrix forbids and the reason this rung exists at all.
+      name: "no brackets where the ground is gone",
+      file: SIMPLE,
+      from: "      { text: \"[ \", style: base },",
+      to: "      { text: \"\", style: base },",
+      expect: "T1.66",
+    },
+    {
+      // **A call head painted as a button.** The predicate drops its second
+      // half, every call header in the tree gains a cell of padding, and the
+      // frame still reads as a call head at a glance. This shipped for one
+      // build and T2.48 is what caught it.
+      name: "a call head is painted as a button",
+      file: SIMPLE,
+      from: "  block.action === undefined || isCallHead(block) ? 0 : BUTTON_CELLS;",
+      to: "  block.action === undefined ? 0 : BUTTON_CELLS;",
+      expect: "T1.68",
+    },
+    {
+      // **The reservation varying with the rung** — the shape I102's first
+      // draft asked for and `measure` cannot express. Geometry then disagrees
+      // with the frame at exactly the widths where a button wraps.
+      name: "the button's chrome is reserved at the padded rung's width",
+      file: SIMPLE,
+      from: "const BUTTON_CELLS = 4;",
+      to: "const BUTTON_CELLS = 2;",
+      expect: "T1.67",
+    },
   ],
 });
 

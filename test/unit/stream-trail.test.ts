@@ -7,10 +7,16 @@ import { describe, expect, it } from "vitest";
 
 import { validateDocument, TRAIL_FORMS } from "../../src/data/viewmodel/index.js";
 import type { Notice } from "../../src/data/viewmodel/index.js";
-import { measurable, visible, FULL_CAPS } from "../support/render.js";
+import { measurable, visible, FULL_CAPS, DARK_THEME } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";
 import { capabilities } from "../support/fake-terminal.js";
 import { spinnerFrames } from "../../src/presentation/blocks/glyphs.js";
+import { background, slot } from "../../src/presentation/blocks/paint.js";
+import { sgr } from "../../src/terminal/escapes.js";
+
+/** The SGR parameters a style resolves to, as `styled-screen` records them. */
+const sgrParams = (style: Parameters<typeof sgr>[0]): string =>
+  sgr(style).replace(/^\u001b\[/u, "").replace(/m$/u, "");
 import { tickIntervalOf } from "../../src/presentation/blocks/index.js";
 import { styledScreenFrom } from "../support/styled-screen.js";
 
@@ -386,10 +392,21 @@ describe("C09 §073 — the button's three rungs", () => {
     const focused = runOf(gridOf(button(), FULL_CAPS, FOCUS));
     expect(focused.painted, "› is INSIDE the ground, not before it").toBe(" › Approve ");
     expect(focused.bold, "the chosen pair is bold").toBe(true);
-    expect(focused.bg, "focused takes `pick`, not `focusGround`").not.toBe(resting.bg);
-    // **The ink is the pair's own**, which is the whole reason `pickInk` exists:
-    // asserted as a change from the resting ink rather than as a hex here.
-    expect(focused.fg, "and `pickInk` rather than the block's tone").not.toBe(resting.fg);
+    // **Absolutely, not relatively** — and the mutation pass is what said so.
+    // The first form of these two asserted only *not the resting ground* and
+    // *not the resting ink*, which `focusGround` satisfies exactly: the mutation
+    // putting the focused button back on the region's ground **survived**. Not-X
+    // is met by every wrong answer. So the values come from the theme, which
+    // also means a theme change moves both sides together rather than a hex here.
+    expect(focused.bg, "focused takes `pick`").toBe(
+      sgrParams(background("surface.pick", DARK_THEME, FULL_CAPS)),
+    );
+    expect(focused.fg, "with `pickInk`, which is why the slot exists").toBe(
+      sgrParams(slot("surface.pickInk", DARK_THEME, FULL_CAPS)),
+    );
+    expect(resting.bg, "and resting is `bgElev`").toBe(
+      sgrParams(background("surface.bgElev", DARK_THEME, FULL_CAPS)),
+    );
 
     for (const [caps, why] of [[MONO, "1-bit"], [ASCII, "ascii"]] as const) {
       const b = runOf(gridOf(button(), caps));
@@ -428,9 +445,16 @@ describe("C09 §073 — the button's three rungs", () => {
   it("T1.68 (C09 I102, C09 I47, §073): a call head is not a button", () => {
     // `declaresElement` is true for both, so this is the row that says the
     // predicate is `action` — a head stands in the ring without being pressed.
-    // **`glyph: "step"` is gone** — M4 retired the slot and the renderer resolves
-    // a head's mark from `state` (I45), so the fixture carries the state alone.
-    const head = button({ action: undefined, state: "running" });
+    // **It carries BOTH, and that is the whole row** — the mutation pass is what
+    // said so. The first fixture here had `state` and no `action`, so the
+    // mutation that drops the predicate's `isCallHead` half could not reach it
+    // and **survived**: a block with no action is not a button either way. A
+    // tool-call header is the real subject — it heads a call *and* offers a
+    // retry — and it is the only shape that tells the two halves apart.
+    //
+    // `glyph: "step"` is gone: M4 retired the slot and a head's mark resolves
+    // from `state` (I45).
+    const head = button({ state: "running" });
     const grid = gridOf(head as Notice);
     expect(grid[0]!.some((c) => c.style.bg !== ""), "a call head takes no ground").toBe(false);
     expect(runOf(gridOf(button())).painted, "and the same notice with an action does").not.toBe("");
