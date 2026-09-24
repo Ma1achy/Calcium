@@ -41,7 +41,7 @@ import { focusKey } from "./render-cache.js";
 import { reserveNeeded } from "./block-faults.js";
 import { descendants } from "../data/viewmodel/index.js";
 import type { Block, Image, Plot } from "../data/viewmodel/index.js";
-import { elementsOfEntry, entryLayout, renderEntryPieces, windowEntry } from "./entry-layout.js";
+import { blockSpansOfEntry, elementsOfEntry, entryLayout, renderEntryPieces, windowEntry } from "./entry-layout.js";
 import { washedRowsOf, washSelectedRows } from "./paint.js";
 import { animationIntervalOf } from "../presentation/blocks/index.js";
 import type { EntryParts } from "./render-cache.js";
@@ -1528,6 +1528,17 @@ class Session implements TuiInstance {
             to: element.rows.to,
           }),
         );
+      }
+      // **And every block that offers no element** (C14 I51, `R-SEL-003`). Prose
+      // is not focusable and is still a block: `R-SEL-004` says how it copies,
+      // and without a span it could never be reached. Only where no element's
+      // rows meet the block's, so a block already reachable keeps its key and a
+      // container's children are not taken twice.
+      const own = spans.filter((sp) => semantic.entryOf(sp.key) === entry.id);
+      for (const b of blockSpansOfEntry(graph.blocks, entry.doc.blocks, width)) {
+        if (b.to <= b.from) continue;
+        if (own.some((sp) => sp.from < b.to && sp.to > b.from)) continue;
+        spans.push(Object.freeze({ key: semantic.keyOf(entry.id, b.blockId), from: b.from, to: b.to }));
       }
     }
     const frozen = Object.freeze(spans);

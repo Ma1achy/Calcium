@@ -68,6 +68,22 @@ const results = runPass({
       to: "    const caret = graph.semanticCaretAt(rows > 0 ? rect.from : rect.to - 1, width);\n",
       expect: "T4.37c",
     },
+    {
+      // C14 I50 — the session stops clamping; the pure function is still right.
+      name: "the drag extends to the raw caret",
+      file: SESSION,
+      from: "        clampToContainer(caret, this.#drag, graph.scrollBoxSpans(), order),\n",
+      to: "        caret,\n",
+      expect: "T4.37d",
+    },
+    {
+      // C14 I51 — the element-less blocks lose their spans: prose unreachable.
+      name: "a block with no element has no span",
+      file: SESSION,
+      from: "        spans.push(Object.freeze({ key: semantic.keyOf(entry.id, b.blockId), from: b.from, to: b.to }));\n",
+      to: "",
+      expect: "T4.37e",
+    },
   ],
 });
 

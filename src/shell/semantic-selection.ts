@@ -152,8 +152,12 @@ export function blocksTouched(
   const a = order.indexOf(from.entryId);
   const b = order.indexOf(to.entryId);
   if (a === -1 || b === -1) return new Set<string>();
-  const [lo, hi] = a <= b ? [from, to] : [to, from];
-  const [loI, hiI] = a <= b ? [a, b] : [b, a];
+  // **Ordered by row inside one entry, not only by entry** (C14 I51). With
+  // both ends in one entry the pair kept press-then-pointer order, so an upward
+  // drag clipped low at the press and high at the pointer and took nothing.
+  const forward = a < b || (a === b && from.row <= to.row);
+  const [lo, hi] = forward ? [from, to] : [to, from];
+  const [loI, hiI] = forward ? [a, b] : [b, a];
 
   const out = new Set<string>();
   for (const sp of spans) {

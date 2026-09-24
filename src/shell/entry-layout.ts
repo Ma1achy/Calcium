@@ -18,7 +18,7 @@
  */
 
 import type { Block, Group } from "../data/viewmodel/index.js";
-import { block as rebuild } from "../data/viewmodel/index.js";
+import { block as rebuild, paddingOf } from "../data/viewmodel/index.js";
 import { glyphFor } from "../presentation/blocks/index.js";
 import type { BlockRegistry, NavElement } from "../presentation/blocks/index.js";
 import type { RenderScratch } from "../presentation/blocks/types.js";
@@ -304,6 +304,32 @@ export function elementsOfEntry(
           }),
         }),
       });
+    }
+    top += runRows(registry.measureSequence, run);
+  }
+  return Object.freeze(out);
+}
+
+/**
+ * Each top-level block's **content** rows in entry space (C14 I51) — the runs
+ * and the row cursor `elementsOfEntry` uses, so the two cannot disagree about
+ * where a block is. Padding is trimmed from both ends: the selection's ground
+ * goes on a block's first row (C14 I39), and a `gapBefore` row is blank.
+ */
+export function blockSpansOfEntry(
+  registry: Pick<BlockRegistry, "measure" | "measureSequence">,
+  blocks: readonly Block[],
+  width: number,
+): readonly Readonly<{ blockId: string; from: number; to: number }>[] {
+  const out: Readonly<{ blockId: string; from: number; to: number }>[] = [];
+  let top = 0;
+  for (const run of entryLayout(blocks, width)) {
+    let row = top; // cells-ok — a row cursor, not a width
+    for (const block of run.blocks) {
+      const height = registry.measure(block, run.width);
+      const pad = paddingOf(block);
+      out.push(Object.freeze({ blockId: block.id, from: row + pad.t, to: row + height - pad.b }));
+      row += height;
     }
     top += runRows(registry.measureSequence, run);
   }

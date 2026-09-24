@@ -109,6 +109,14 @@ const MUTATIONS = [
     to: "",
     expect: "T1.48",
   },
+  {
+    // C14 I51 — the ends ordered by entry only, as shipped.
+    name: "an upward drag inside one entry keeps press-then-pointer order",
+    file: "src/shell/semantic-selection.ts",
+    from: "  const forward = a < b || (a === b && from.row <= to.row);\n",
+    to: "  const forward = a <= b;\n",
+    expect: "T1.49",
+  },
 ];
 
 const results = await runPass({

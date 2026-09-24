@@ -50,6 +50,83 @@ const SAYS: NonNullable<TuiConfig["localHandlers"]> = {
   }),
 };
 
+/**
+ * One copy from a fresh session over prose, a scroll box and prose (C14 I50,
+ * I51). **One per session**: the kill buffer is shared by `y`, `⌃U` and every
+ * kill, and `copyText("")` leaves it alone, so a second copy in the same
+ * session reads the first whenever it copies nothing — measured, a subject and
+ * its control both read the box that way.
+ */
+async function copiedFromBoxed(
+  from: (rowOf: (text: string) => number) => number,
+  to: (rowOf: (text: string) => number) => number,
+): Promise<string> {
+  const stdin = fakeStdin();
+  const { screen, clock } = await buildSession({
+    manifest: {
+      ...(MANIFEST as Exclude<typeof MANIFEST, string>),
+      tools: [
+        ...(MANIFEST as Exclude<typeof MANIFEST, string>).tools,
+        { name: "boxed", local: true, summary: "a box between prose", args: [], flags: [] },
+      ],
+    },
+    localHandlers: {
+      ...SAYS,
+      boxed: () =>
+        ({
+          schema: "tui.view/1",
+          command: "boxed",
+          status: "ok",
+          blocks: [
+            { kind: "code", id: "lede", language: "text", text: "LEDEPROSE" },
+            {
+              kind: "scroll",
+              id: "box",
+              height: 2,
+              children: [
+                { kind: "raw", id: "r1", text: "ALPHA" },
+                { kind: "raw", id: "r2", text: "BRAVO" },
+                { kind: "raw", id: "r3", text: "CHARLIE" },
+              ],
+            },
+            { kind: "raw", id: "tail", text: "TAILPROSE" },
+          ],
+        }) as never,
+    },
+    stdin: stdin as never,
+  });
+  const step = async (ms: number): Promise<void> => {
+    clock.advance(ms);
+    await vi.advanceTimersByTimeAsync(ms);
+    await settle();
+  };
+  await step(0);
+  stdin.emit("/boxed\r");
+  await step(0);
+  const rowOf = (text: string): number => screen().rows.findIndex((r) => r.includes(text)) + 1;
+  const a = from(rowOf);
+  const b = to(rowOf);
+  expect(a > 0 && b > 0, "the fixture drew both ends").toBe(true);
+  stdin.emit("\u001bV");
+  await step(0);
+  stdin.emit(press(6, a));
+  await step(0);
+  stdin.emit(moveTo(6, b));
+  await step(0);
+  stdin.emit(release(6, b));
+  await step(0);
+  stdin.emit("y");
+  await step(0);
+  stdin.emit("\u0003");
+  await step(0);
+  stdin.emit("\u0019");
+  await step(0);
+  const rows = screen().rows;
+  const rules = rows.flatMap((r, i) => (/^─+$/u.test(r.trim()) ? [i] : []));
+  const [x, y] = rules.slice(-2);
+  return rows.slice((x ?? 0) + 1, y).join("\n");
+}
+
 /** SGR 1006 — `Cb` 0 is button 1 down, 32 the same button reported moving. */
 const press = (col: number, row: number): string =>
   `[<0;${String(col)};${String(row)}M`;
@@ -176,6 +253,15 @@ describe("C14 §6f — the drag in a real session", () => {
         return rows.slice((a ?? 0) + 1, b).map((r) => r.trimEnd()).join("\n").replace(/^❯ ?/u, "");
       };
 
+      /** The entry a screen row (1-based) shows, from its `eN-line-` text. */
+      const entryOnRow = (row: number): string | null => /e(\d+)-line-/u.exec(screen().rows[row - 1] ?? "")?.[1] ?? null;
+      /** The entry on the transcript's last drawn row. */
+      const lastEntryOnScreen = (): string | null => {
+        const ids = screen().rows.flatMap((r) => /e(\d+)-line-/u.exec(r)?.[1] ?? []);
+        return ids.at(-1) ?? null;
+      };
+      const edges: { pressed: string | null; bottom: string | null }[] = [];
+
       /** Enter, drag from `(4,4)` to `row`, hold, release, `y`, leave, yank. */
       const copied = async (row: number, holdMs: number): Promise<string> => {
         for (let i = 0; i < 3; i += 1) {
@@ -186,8 +272,10 @@ describe("C14 §6f — the drag in a real session", () => {
         await step(0);
         stdin.emit(press(4, 4));
         await step(0);
+        const pressed = entryOnRow(4);
         stdin.emit(moveTo(4, row));
         await step(holdMs);
+        edges.push({ pressed, bottom: lastEntryOnScreen() });
         stdin.emit(release(4, row));
         await step(0);
         stdin.emit("y");
@@ -208,7 +296,16 @@ describe("C14 §6f — the drag in a real session", () => {
       // row passed against the unfixed tick in that order.
       //
       // Below the transcript and held still: only the ticks can select anything.
-      expect((await copied(99, 400)).trim(), "the ticks extended the selection").not.toBe("");
+      const ticked = await copied(99, 400);
+      expect(ticked.trim(), "the ticks extended the selection").not.toBe("");
+      // **And to the edge they scrolled toward.** Not-empty alone is passed by a
+      // tick extending to the top edge once prose is selectable (C14 I51) — the
+      // mutation pass measured exactly that survivor. The bottom row's entry
+      // after the ticks is what the correct edge takes, and it must differ from
+      // the press's or the assertion is about nothing.
+      const [edge] = edges;
+      expect(edge?.bottom != null && edge.bottom !== edge.pressed, "the ticks scrolled past the press's entry").toBe(true);
+      expect(ticked, "the entry at the bottom edge was taken").toContain(`e${String(edge?.bottom)}-line-`);
 
       // **The control: a drag inside the transcript copies through these keys**,
       // so an empty prompt above would be the selection's and not the instrument's.
@@ -218,9 +315,38 @@ describe("C14 §6f — the drag in a real session", () => {
     }
   });
 
-  it.todo("T4.37d (C14 I50, R-SEL-013): a drag begun in a box does not select the prose below — not deferred on a component: measured 2026-09-24, a session drag selects only the card header and scroll boxes (lede→tail copied the box alone, tail→lede copied nothing), so no prose can be shown absent until the drag path's rows are diagnosed (R-SEL-015's ledger row)");
+  it("T4.37d (C14 I50, R-SEL-013): a drag begun in a box does not select the prose below", async () => {
+    vi.useFakeTimers();
+    try {
+      // **The control: a viewport drag from the lede to the tail copies the
+      // tail** (T4.37e), so its absence below is the clamp's.
+      const whole = await copiedFromBoxed((r) => r("LEDEPROSE"), (r) => r("TAILPROSE"));
+      expect(whole, "viewport drag: the tail is copied").toContain("TAILPROSE");
 
-  it.todo("T4.37e (C14 I51, R-SEL-003): prose joins a drag, in either direction — not deferred on a component: the spans land in the next commit of this MR");
+      const fromBox = await copiedFromBoxed((r) => r("ALPHA"), (r) => r("TAILPROSE"));
+      expect(fromBox, "the box was copied").toContain("ALPHA");
+      expect(fromBox, "and the prose below it was not").not.toContain("TAILPROSE");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("T4.37e (C14 I51, R-SEL-003, R-SEL-004): prose joins a drag, in either direction", async () => {
+    vi.useFakeTimers();
+    try {
+      // **The control: the card head was selectable before either repair**, so
+      // the instrument can show a copy and the rows below are about the prose.
+      const head = await copiedFromBoxed((r) => r("● boxed"), (r) => r("ALPHA"));
+      expect(head, "head to box: the box is copied").toContain("ALPHA");
+
+      const down = await copiedFromBoxed((r) => r("LEDEPROSE"), (r) => r("TAILPROSE"));
+      for (const text of ["LEDEPROSE", "ALPHA", "TAILPROSE"]) expect(down, `downward: ${text}`).toContain(text);
+      const up = await copiedFromBoxed((r) => r("TAILPROSE"), (r) => r("LEDEPROSE"));
+      for (const text of ["LEDEPROSE", "ALPHA", "TAILPROSE"]) expect(up, `upward: ${text}`).toContain(text);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it("T4.37b (C14 I48, R-SEL-013): esc and ⌃c end the drag and its autoscroll", async () => {
     vi.useFakeTimers();

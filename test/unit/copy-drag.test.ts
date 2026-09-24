@@ -101,7 +101,18 @@ describe("C14 §6f — three bands, and a scroll nobody is driving", () => {
 });
 
 describe("C14 §6f — a container passed through", () => {
-  it.todo("T1.49 (C14 I51, R-SEL-015): an upward drag inside one entry takes the blocks between — not deferred on a component: the row order lands in the next commit of this MR");
+  it("T1.49 (C14 I51, R-SEL-015): an upward drag inside one entry takes the blocks between", () => {
+    const down = [...blocksTouched(at(1), at(11), SPANS, ORDER)].sort();
+    expect(down, "downward: lede, box, tail").toEqual([keyOf("e1", "box"), keyOf("e1", "lede"), keyOf("e1", "tail")].sort());
+    // **The same pair, reversed** — the press below and the pointer above.
+    expect([...blocksTouched(at(11), at(1), SPANS, ORDER)].sort(), "upward: the same set").toEqual(down);
+
+    // The control: across two entries the ends were already ordered, so the
+    // row above is about the one-entry arm and not about direction in general.
+    const two = Object.freeze(["e0", "e1"]);
+    const spans2 = [...SPANS, { key: keyOf("e0", "p"), from: 0, to: 3 }];
+    expect([...blocksTouched(at(11), { entryId: "e0", row: 1 }, spans2, two)]).toHaveLength(4);
+  });
 
   it("T1.48 (C14 I50, R-SEL-013): a caret is clamped into the drag's box", () => {
     const drag = beginDrag(at(3), BOXES);
