@@ -50,8 +50,8 @@ const results = runPass({
       // every arithmetic check agrees.
       name: "the fallback is taken per cell rather than per column",
       file: FILE,
-      from: "    if (int + frac > room) continue;\n    points.set(column.key, int);",
-      to: "    points.set(column.key, int);",
+      from: "    if (int + frac > room) continue;\n    points.set(column.key, { point: int, end: int + frac });",
+      to: "    points.set(column.key, { point: int, end: int + frac });",
       expect: "T2.15",
     },
     {

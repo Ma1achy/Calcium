@@ -23,7 +23,8 @@ const drawnOrder = (block: Table, width = 160): readonly string[] =>
   tableElements(block, width, registry.measure).map((e) => e.id);
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { psColumns, psTable } from "../support/blocks.js";
-import { DARK_THEME, FULL_CAPS, MONO_UNICODE_CAPS, measurable, visible } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, DITHER_CAPS, FULL_CAPS, MONO_UNICODE_CAPS, measurable, visible } from "../support/render.js";
+import { tone } from "../../src/presentation/blocks/paint.js";
 import { styledScreenFrom } from "../support/styled-screen.js";
 import { background, focusStyle } from "../../src/presentation/blocks/paint.js";
 import { sgr } from "../../src/terminal/escapes.js";
@@ -1224,6 +1225,53 @@ describe("thousands grouping (I28)", () => {
 });
 
 describe("the missing number and the trend (I29, I30)", () => {
-  it.todo("T1.38 (C11 I29, R-TBL-003): a missing number draws the absent mark, muted, at the inline end — not deferred on a component: specified before the table draws it");
+  it("T1.38 (C11 I29, R-TBL-003): a missing number draws the absent mark, muted, at the inline end, and a text column's stays blank", () => {
+    // §078's own rows: a decimal column, a duration column, a text column.
+    const block: Table = {
+      kind: "table",
+      id: "missing",
+      columns: [
+        { key: "name", label: "name", priority: 1, minWidth: 10, sortable: false },
+        { key: "metric", label: "metric", priority: 2, minWidth: 8, sortable: false },
+        { key: "age", label: "age", priority: 3, minWidth: 5, sortable: false },
+      ],
+      rows: [
+        { id: "a", cells: { name: { text: "parse.ts" }, metric: { text: "0.0372" }, age: { text: "2m" } } },
+        { id: "b", cells: { metric: { text: "" } } },
+        // A glyph is content, so a cell carrying one is not missing.
+        { id: "c", cells: { name: { text: "lexer.ts" }, metric: { text: "", glyph: "warn" }, age: { text: "1h" } } },
+      ],
+      showHeader: false,
+    };
+    const kit = (caps: TerminalCapabilities) => measurable({ capabilities: caps, definitions: [tableDefinition] });
+    const [full, missing] = kit(FULL_CAPS).renderToLines(block, atContent(40));
+    if (full === undefined || missing === undefined) throw new Error("two rows");
+    const [shown, gone] = [body(visible(full)), body(visible(missing))];
+
+    // **The control first**: a row with values draws no dash.
+    expect(shown).not.toContain("—");
+    // Two marks — the number and the duration — and none in the name column.
+    expect([...gone].filter((c) => c === "—")).toHaveLength(2);
+    expect(gone.slice(0, 10).trim(), "a text column's empty cell stays blank").toBe("");
+    // **At the inline end**: each dash sits where its column's last character does.
+    expect(gone.indexOf("—"), "under the metric's last digit").toBe(shown.indexOf("0.0372") + 5);
+    expect(gone.lastIndexOf("—"), "under the age's last character").toBe(shown.indexOf("2m") + 1);
+
+    // **Muted**: the sequence opening the dash is the muted tone's.
+    const at = missing.indexOf("—");
+    const opener = missing.slice(0, at).match(/\x1b\[[0-9;]*m(?=[^\x1b]*$)/u)?.[0];
+    expect(opener).toBe(sgr(tone("muted", DARK_THEME, FULL_CAPS)));
+
+    const glyphRow = body(visible(kit(FULL_CAPS).renderToLines(block, atContent(40))[2] ?? ""));
+    expect(glyphRow, "a glyph-only cell keeps its glyph").toContain(glyphFor("warn", FULL_CAPS));
+    expect(glyphRow).not.toContain("—");
+
+    // At ASCII and at `wide` the mark is `-`, a dash and never a zero.
+    for (const caps of [ASCII_CAPS, DITHER_CAPS]) {
+      const row = body(visible(kit(caps).renderToLines(block, atContent(40))[1] ?? ""));
+      expect([...row].filter((c) => c === "-"), `${caps.unicode}/${caps.ambiguousWidth}`).toHaveLength(2);
+      expect(row).not.toContain("—");
+    }
+  });
   it.todo("T1.39 (C11 I30, R-COL-006): a trend cell's arrow takes its tone from the column's polarity — not deferred on a component: parked as 38, the down arrow has no ASCII half (docs/design/PARKED_QUESTIONS.md)");
 });

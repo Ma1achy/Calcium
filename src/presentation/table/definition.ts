@@ -27,8 +27,8 @@ import { fitRow, rowCells } from "../rows.js";
 import { glyphCells, glyphFor } from "../blocks/glyphs.js";
 import { background, based, clampSpans, focusStyle, groundSequence, paint, selectionStyle, tone, withBackground, type Span } from "../blocks/paint.js";
 import type { BlockDefinition, NavElement, Rendered, RenderContext, Windowed } from "../blocks/types.js";
-import { decimalPoints, emptySpans, headerSpans, markedSeriesColumns, rowSpans } from "./cells.js";
-import { columnAlignments, groupingColumns } from "./kind.js";
+import { decimalEnds, decimalPoints, emptySpans, headerSpans, markedSeriesColumns, rowSpans } from "./cells.js";
+import { columnAlignments, groupingColumns, unknownColumns } from "./kind.js";
 import { detailBlocks, isExpandable } from "./detail.js";
 import { planColumns } from "./plan.js";
 import { sortedRows } from "./sort.js";
@@ -479,6 +479,10 @@ export const tableDefinition: BlockDefinition<Table> = {
       (text) => cells(text, ctx.capabilities.ambiguousWidth),
     );
     const points = decimalPoints(block, plan, ctx.capabilities.ambiguousWidth, aligns, grouping);
+    // The columns a missing cell draws `—` in, and where a decimal column's
+    // values end (I29), once per block.
+    const unknown = unknownColumns(block);
+    const ends = decimalEnds(block, plan, ctx.capabilities.ambiguousWidth, aligns, grouping);
     for (const row of sortedRows(block)) {
       const expandable = isExpandable(row, plan);
       const isHead = focused !== null && focused === row.id;
@@ -501,7 +505,7 @@ export const tableDefinition: BlockDefinition<Table> = {
         : isHead
           ? "focusGround"
           : undefined;
-      const spans = rowSpans(block, row, plan, ctx, { expandable, on, marked, points, aligns, grouping });
+      const spans = rowSpans(block, row, plan, ctx, { expandable, on, marked, points, aligns, grouping, unknown, ends });
       // **The ground goes to `emit`, not to the spans** (§5c). Applied here it
       // stopped at the gutter, which is the divergence: the reserved column is
       // part of the row it leads, so the ground has to be put on where the

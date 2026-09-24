@@ -12,14 +12,14 @@
 import { glyphFor, glyphs } from "../blocks/glyphs.js";
 import { pad, padStart, paintRuns, tone, type Span } from "../blocks/paint.js";
 import { runsOf, runsText, sliceRuns } from "../runs.js";
-import { sparkline, valueBar } from "../plot/index.js";
+import { pairFor, sparkline, valueBar } from "../plot/index.js";
 import { cells, stripControl, truncate, truncateParts } from "../text.js";
 import type { AmbiguousWidth } from "../text.js";
 import type { Cell, ColumnDef, Table, TableRow } from "../../data/viewmodel/index.js";
 import type { RenderContext } from "../blocks/types.js";
 import type { PlannedColumns } from "./plan.js";
 import type { Alignment } from "./kind.js";
-import { displayText } from "./kind.js";
+import { displayText, isMissing } from "./kind.js";
 
 /** The gap between columns, as a span. */
 function gapSpan(gap: number): Span {
@@ -114,7 +114,34 @@ export function decimalPoints(
   /** The columns that group their thousands (I28), from `groupingColumns`. */
   grouping: ReadonlySet<string>,
 ): ReadonlyMap<string, number> {
-  const points = new Map<string, number>();
+  return new Map([...decimalColumns(block, plan, ambiguous, aligns, grouping)].map(([k, c]) => [k, c.point]));
+}
+
+/**
+ * Where each aligned decimal column's values **end** — its point plus its widest
+ * fraction (C11 I29). A missing number's dash sits there, under the last digit,
+ * which is where §078 draws it; the column's edge is further right whenever the
+ * column is wider than its values.
+ */
+export function decimalEnds(
+  block: Table,
+  plan: PlannedColumns,
+  ambiguous: AmbiguousWidth,
+  aligns: ReadonlyMap<string, Alignment>,
+  grouping: ReadonlySet<string>,
+): ReadonlyMap<string, number> {
+  return new Map([...decimalColumns(block, plan, ambiguous, aligns, grouping)].map(([k, c]) => [k, c.end]));
+}
+
+/** The one walk `decimalPoints` and `decimalEnds` read: each aligned column's point and end. */
+function decimalColumns(
+  block: Table,
+  plan: PlannedColumns,
+  ambiguous: AmbiguousWidth,
+  aligns: ReadonlyMap<string, Alignment>,
+  grouping: ReadonlySet<string>,
+): ReadonlyMap<string, Readonly<{ point: number; end: number }>> {
+  const points = new Map<string, Readonly<{ point: number; end: number }>>();
   const widthOf = new Map(plan.visible.map((c) => [c.key, c.width]));
   for (const column of block.columns) {
     // **The resolved alignment, not the declared one** (I27). A numeric column
@@ -145,7 +172,7 @@ export function decimalPoints(
     // which reads as a defect rather than as a degradation, and is worse than
     // either alignment. Found by reading the frame; the counts were all correct.
     if (int + frac > room) continue;
-    points.set(column.key, int);
+    points.set(column.key, { point: int, end: int + frac });
   }
   return points;
 }
@@ -305,6 +332,10 @@ export function rowSpans(
     aligns: ReadonlyMap<string, Alignment>;
     /** The columns that group their thousands (I28), from `groupingColumns`. */
     grouping: ReadonlySet<string>;
+    /** The columns whose missing cells draw the absent mark (I29), from `unknownColumns`. */
+    unknown?: ReadonlySet<string>;
+    /** Where each aligned decimal column's values end (I29), from `decimalEnds`. */
+    ends?: ReadonlyMap<string, number> | undefined;
   }>,
 ): readonly Span[] {
   const byKey = new Map<string, ColumnDef>(block.columns.map((c) => [c.key, c]));
@@ -373,6 +404,25 @@ export function rowSpans(
       const style = tone(cell.tone ?? "accent", ctx.theme, ctx.capabilities, options.on);
       if (lead !== "") spans.push({ text: lead, style });
       spans.push({ text: valueBar(cell.bar, room, ctx.capabilities), style });
+      return;
+    }
+
+    // **A missing number is the absent mark** (I29, §078 `R-TBL-003`): *0 is a
+    // measurement; blank is a rendering failure*. Muted, at the inline end,
+    // which is where §078 draws it in both its decimal and its duration column —
+    // and the mark `pairFor` gives a bar's missing value, so one fact keeps one
+    // character. A cell with a glyph is not missing: the glyph is its content.
+    if (
+      options.unknown?.has(planned.key) === true &&
+      (cell === undefined || (isMissing(cell.text) && cell.glyph === undefined))
+    ) {
+      // In an aligned decimal column the values end short of the column's edge,
+      // and the dash ends where they do; everywhere else, at the edge.
+      const end = Math.min(planned.width, options.ends?.get(planned.key) ?? planned.width);
+      spans.push({
+        text: pad(padStart(pairFor(ctx.capabilities).absent, end), planned.width),
+        style: tone("muted", ctx.theme, ctx.capabilities, options.on),
+      });
       return;
     }
 

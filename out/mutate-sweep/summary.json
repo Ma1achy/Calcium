@@ -1,14 +1,14 @@
 {
   "label": "all",
-  "only": "c09-block-copy",
+  "only": "c11-decimal-point",
   "rows": [
     {
-      "run": "c09-block-copy.mjs",
+      "run": "c11-decimal-point.mjs",
       "exit": 0,
-      "seconds": 15,
+      "seconds": 11,
       "state": "green",
       "restored": 0,
-      "caught": 4,
+      "caught": 3,
       "elsewhere": 1,
       "survived": 0,
       "anchorMissed": 0,

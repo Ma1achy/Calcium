@@ -130,6 +130,22 @@ export function columnKind(rows: readonly TableRow[], key: string): ColumnKind {
   return numeric ? "numeric" : duration ? "duration" : "text";
 }
 
+/**
+ * The columns whose missing cells draw the absent mark (I29, §078 `R-TBL-003`):
+ * those whose values are numbers or durations.
+ *
+ * **By the values, never by the declared alignment**: a text column declared
+ * `right` holds names, and a dash in it would be a value. Computed once per
+ * block for I26's reason.
+ */
+export function unknownColumns(block: Table): ReadonlySet<string> {
+  const out = new Set<string>();
+  for (const column of block.columns) {
+    if (columnKind(block.rows, column.key) !== "text") out.add(column.key);
+  }
+  return out;
+}
+
 /** A resolved alignment: what a column declared, or what its values imply. */
 export type Alignment = NonNullable<ColumnDef["align"]>;
 
