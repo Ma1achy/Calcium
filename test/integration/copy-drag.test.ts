@@ -146,6 +146,8 @@ describe("C14 §6f — the drag in a real session", () => {
     }
   });
 
+  it.todo("T4.37c (C14 I49, R-SEL-013): a tick extends the selection to the container's edge — not deferred on a component: the tick's extend lands in the next commit of this MR");
+
   it("T4.37b (C14 I48, R-SEL-013): esc and ⌃c end the drag and its autoscroll", async () => {
     vi.useFakeTimers();
     try {
