@@ -71,4 +71,7 @@ describe("C17 §101 — the held draft", () => {
     }
     expect(walked, `undo walked into ${walked.join(" → ")}`).not.toContain("theirs");
   });
+
+  it.todo("T1.51 (C17 I29, §052): the borrow starts with an empty undo stack, so ⌃z inside it never produces the held line — not deferred on a component: hold and resume land on the editor in the next commit of this MR");
+  it.todo("T1.52 (C17 I29, §052): a borrower that types in several units leaves none of them in the owner's undo walk — not deferred on a component: hold and resume land on the editor in the next commit of this MR");
 });
