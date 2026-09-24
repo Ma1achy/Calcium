@@ -228,6 +228,8 @@ describe("C10 contract", () => {
    */
   it.todo("T2.59 (C10 I60, R-THM-004): textGrounds is the page, the diff grounds and bgDeep — not deferred on a component: specified before textGrounds exists");
   it.todo("T2.60 (C10 I60, R-THM-002): the high-contrast floor holds over textGrounds — not deferred on a component: specified before the compositions land");
+  it.todo("T2.61 (C10 I60, SS67): SURFACE_ROLES' text entries are textGrounds' names — not deferred on a component: specified before SS67 exists");
+  it.todo("T2.62 (C10 I60, SS67): SS67 fires on an undispositioned ground, a dead entry and an unread corpus — not deferred on a component: specified before SS67 exists");
 
   /**
    * **T2.44 (C10 I46, R-THM-004) — the scope, asserted as a membership rather than
