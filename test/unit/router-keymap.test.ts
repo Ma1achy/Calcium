@@ -545,6 +545,7 @@ describe("§6 — the default table (C17 I12)", () => {
       "semanticSelection a": ["a"],
       "semanticSelection A": ["A"],
       "semanticSelection y": ["y"],
+      "semanticSelection enter": ["\r"],
       "semanticSelection up": ["\u001b[A"],
       "semanticSelection down": ["\u001b[B"],
       "semanticSelection s+up": ["\u001b[1;2A"],
@@ -1107,8 +1108,12 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     const rows = defaultKeymap
       .map((b) => `${b.target}\t${keySlot(b.key)}\t${b.action}\t${b.profile ?? "both"}`)
       .sort();
-    expect(rows).toHaveLength(122);
-    expect(new Set(rows).size, "no two rows are identical").toBe(122);
+    //
+    // **123 from C14 I47** (R-SEL-015, §103): `⏎` joined `semanticSelection` as
+    // `y`'s copy, one row in and none out — the footer had advertised it with
+    // nothing bound.
+    expect(rows).toHaveLength(123);
+    expect(new Set(rows).size, "no two rows are identical").toBe(123);
 
     // Every row whose chord the registry names resolves to the registry's key —
     // the join asserted from the table's side, so a `chordOf` call that silently
@@ -1145,8 +1150,11 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
       // not join — so the three new entries are `↑`, `↓` and `escape`. The
       // retired `[` `]` `{` `}` were never in this count: the registry names no
       // chord spelled that way, which is itself the finding §102 settled.
+      //
+      // **64 from C14 I47** (R-SEL-015): `⏎` at `semanticSelection` is spelled
+      // `chordOf("confirm")`, the registry's return, so the new row joins.
       "the rows the registry supplies a chord for",
-    ).toBe(63);
+    ).toBe(64);
   });
 
   it("T1.94 (I41): ⌘↑ and ⌥↑ are two actions under the enhanced profile and one under the base", () => {
@@ -1465,7 +1473,17 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
 });
 
 describe("C16 §8 I53 — key repeat is declared per binding", () => {
-  it.todo("T1.47 (C14 I47, R-SEL-015): ⏎ at semanticSelection is y's copySelectedEntries — not deferred on a component: the binding lands in the next commit of this MR");
+  it("T1.47 (C14 I47, R-SEL-015): ⏎ at semanticSelection is y's copySelectedEntries", () => {
+    const map = createKeymap(defaultKeymap);
+    const enter: Key = { name: "enter", ctrl: false, meta: false, shift: false, sequence: "\r" };
+    const y: Key = { name: "y", ctrl: false, meta: false, shift: false, sequence: "y" };
+    // The control: `y` is the copy key here, so the row below compares against
+    // a binding that exists rather than against two absences.
+    expect(map.resolve("semanticSelection", y)?.action).toBe("copySelectedEntries");
+    expect(map.resolve("semanticSelection", enter)?.action, "⏎ is the same action").toBe("copySelectedEntries");
+    // Native handoff copies through the terminal, and ⏎ is not bound there.
+    expect(map.resolve("nativeSelection", enter) ?? null, "and nothing at native handoff").toBeNull();
+  });
 
   it("T1.159 (I53, R-KEY-002): §020's four rows with a subject are the declared numbers, by equality", () => {
     // **By equality both ways, not a subset.** A subset check lets a row drift

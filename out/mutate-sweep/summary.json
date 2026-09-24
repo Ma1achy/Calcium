@@ -1,14 +1,14 @@
 {
   "label": "all",
-  "only": "c16-key-repeat",
+  "only": "c14-semantic-selection",
   "rows": [
     {
-      "run": "c16-key-repeat.mjs",
+      "run": "c14-semantic-selection.mjs",
       "exit": 0,
-      "seconds": 10,
+      "seconds": 24,
       "state": "green",
       "restored": 0,
-      "caught": 3,
+      "caught": 6,
       "elsewhere": 0,
       "survived": 0,
       "anchorMissed": 0,

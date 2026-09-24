@@ -20,7 +20,7 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/unit/semantic-selection.test.ts test/unit/router-focus.test.ts " +
-  "test/unit/router-dispatch.test.ts test/unit/session-keys.test.ts";
+  "test/unit/router-dispatch.test.ts test/unit/session-keys.test.ts test/unit/router-keymap.test.ts";
 const MODEL = "src/shell/semantic-selection.ts";
 const TYPES = "src/interaction/router/types.ts";
 const ROUTER = "src/interaction/router/router.ts";
@@ -89,6 +89,14 @@ const MUTATIONS = [
     from: '  semanticSelection: "copy",',
     to: '  semanticSelection: "substate",',
     expect: "T1.41g",
+  },
+  {
+    // C14 I47 — the footer's `⏎ copy` with nothing bound, as it shipped.
+    name: "⏎ is unbound at semanticSelection",
+    file: "src/interaction/router/keymap.ts",
+    from: '  { target: "semanticSelection", key: chordOf("confirm"), action: "copySelectedEntries" },\n',
+    to: "",
+    expect: "T1.47",
   },
 ];
 

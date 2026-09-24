@@ -481,6 +481,10 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // than per target, so reusing the name would give this key the editor's
   // region copy and a mode that selects entries would paste the prompt.
   { target: "semanticSelection", key: { name: "y" }, action: "copySelectedEntries" },
+  // **`⏎` is the same copy** (C14 I47, R-SEL-015, §103): the footer has said
+  // `⏎ copy` since the mode landed, and the count is defined as *what return
+  // would copy*. `y`'s action, not a second one, so it reads the held view (A6).
+  { target: "semanticSelection", key: chordOf("confirm"), action: "copySelectedEntries" },
   // **The caret moves, and the shifted pair extends** (C14 I37, §6c). `⇧←` and
   // `⇧→` are deliberately absent: `selection.left`/`selection.right` are
   // horizontal, and at block granularity there is no horizontal extent — the

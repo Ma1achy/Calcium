@@ -627,6 +627,7 @@ escape  escapeSemanticSelection
 a       selectEntryUnderCaret
 A       selectAllLoadedEntries
 y       copySelectedEntries
+enter   copySelectedEntries
 up      moveSemanticCaretUp
 down    moveSemanticCaretDown
 s+up    extendSemanticSelectionUp
@@ -1303,6 +1304,7 @@ escape  escapeSemanticSelection
 a       selectEntryUnderCaret
 A       selectAllLoadedEntries
 y       copySelectedEntries
+enter   copySelectedEntries
 up      moveSemanticCaretUp
 down    moveSemanticCaretDown
 s+up    extendSemanticSelectionUp
@@ -1952,6 +1954,7 @@ esc  escapeSemanticSelection
 a    selectEntryUnderCaret
 ⇧A   selectAllLoadedEntries
 y    copySelectedEntries
+⏎    copySelectedEntries
 ↑    moveSemanticCaretUp
 ↓    moveSemanticCaretDown
 ⇧↑   extendSemanticSelectionUp
@@ -2593,6 +2596,7 @@ esc  escapeSemanticSelection
 a    selectEntryUnderCaret
 ⇧A   selectAllLoadedEntries
 y    copySelectedEntries
+⏎    copySelectedEntries
 ↑    moveSemanticCaretUp
 ↓    moveSemanticCaretDown
 ⇧↑   extendSemanticSelectionUp
@@ -3277,6 +3281,7 @@ esc  escapeSemanticSelection
 a    selectEntryUnderCaret
 ⇧A   selectAllLoadedEntries
 y    copySelectedEntries
+⏎    copySelectedEntries
 ↑    moveSemanticCaretUp
 ↓    moveSemanticCaretDown
 ⇧↑   extendSemanticSelectionUp
@@ -3954,6 +3959,7 @@ esc  escapeSemanticSelection
 a    selectEntryUnderCaret
 ⇧A   selectAllLoadedEntries
 y    copySelectedEntries
+⏎    copySelectedEntries
 ↑    moveSemanticCaretUp
 ↓    moveSemanticCaretDown
 ⇧↑   extendSemanticSelectionUp
