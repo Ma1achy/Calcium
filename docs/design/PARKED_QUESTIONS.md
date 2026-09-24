@@ -310,6 +310,55 @@ binding for both, or neither.
 
 ---
 
+**22 · Which box draws the bar when two scrollables nest.** M14's plan says
+*two bars for one document is a layout error and is asserted as one*, from
+`R-BLK-165`: *two bars is legal when they are two documents. Two bars for one
+document is a layout error.* Its catalogue is `["first-document",
+"second-document"]`, so the legal case is one bar each in two documents.
+
+**The broad reading was built and measured, and the measurement refused it.**
+A document-wide count of `scroll` boxes went into `validateDocument` beside
+C04 I14's id-uniqueness walk, which is the same shape — accumulate over the tree,
+refuse at the document. Run against the full suite it failed **once in 7493**:
+
+    FAIL test/unit/session-mouse.test.ts
+      × T1.105 (C16 I48, R-SEL-012): a scroll inside a scroll takes the wheel
+        at the depth the pointer is in
+      TranscriptError: transcript.append: invalid document (C13 I10) —
+        blocks: 2 "scroll" boxes in one document — "outer", "inner"
+
+One failure, and it is the one that decides the reading. `R-SEL-012` is
+**`status: "current"`** — *the wheel takes the **innermost** scrollable under
+the pointer* — and the word *innermost* has no referent unless scrollables
+nest. `R-BLK-165` is **`status: "example"`**, a §021 section-block specimen.
+`AUTHORITY.md`'s precedence names `status: current` as the normative tier and
+nothing below it, so the count over boxes is refused by the design's own ladder
+rather than by the repository.
+
+**What survives the ladder is not vacuous, and it is not buildable without a
+choice.** Nesting is legal and the inner box takes the wheel; that leaves the
+bar. `barOf` (`containers.ts:333`) decides per box from its own overflow, so a
+nested pair that both overflow draws two — which is the picture `R-BLK-165`
+calls a layout error, arriving through a layout `R-SEL-012` requires. The
+reconciliation is available and the design does not make it:
+
+- **the innermost box containing focus draws, the outer draws none** — §021
+  already gives focus a rôle on the bar (*the thumb takes the accent when its
+  container has focus*), so the reader's box is the one answering *where am I*;
+- **the outermost draws and the inner declines** — the bar describes the
+  larger extent, which is the one a reader is lost in;
+- **both draw and the sentence is about the transcript's bar meeting a block's
+  bar over the same rows** — a case the framework cannot construct, which
+  makes the rule A03 §2's vacuity class rather than a gate.
+
+Each is a **visible** difference — which bar is on screen — and §021 settles
+none of the three. Taking one would be inventing the picture, so it is parked
+rather than ruled. **Nothing is asserted in the meantime**, because the only
+assertion available without the answer is the count the measurement just
+refused.
+
+---
+
 ## Not yet recovered
 
 **Sixteen distinct questions are above, and the running count in the reports
