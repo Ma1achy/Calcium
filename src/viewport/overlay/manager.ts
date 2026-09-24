@@ -184,8 +184,8 @@ class Manager implements OverlayManager {
  *
  * The state it forbids reads as correct at every width, which is why this is a
  * throw rather than a default: I16 resolves an absent width to the region's,
- * and a centred layer that inherits it is placed at `left = 0` and is
- * indistinguishable from `fill`. Defaulting to something narrower would invent
+ * and a centred layer that inherits it is placed at `left = 0` — centred on
+ * neither axis a reader can see. Defaulting to something narrower would invent
  * a number this component has no basis for — C15 knows the region and nothing
  * else (I16), and the owner is the only one that can measure its content.
  *
@@ -194,12 +194,12 @@ class Manager implements OverlayManager {
  * the tree and declared no width at all.
  */
 function assertPlaceable(layer: Layer): void {
-  // I22 — a peek is beside the thing it describes, or it is a confirm or a
-  // view wearing the wrong kind. Both entry points, on I20's argument.
+  // I22 — a peek is beside the thing it describes, or it is a confirm
+  // wearing the wrong kind. Both entry points, on I20's argument.
   if (layer.kind === "peek" && layer.placement.kind !== "anchored") {
     throw new OverlayError(
       `peek ${layer.id} is ${layer.placement.kind}: a peek is anchored to the element it ` +
-        `describes, and a centred or fill layer that takes no keys is a confirm or a view ` +
+        `describes, and a centred layer that takes no keys is a confirm ` +
         `nothing can answer (I22)`,
     );
   }
@@ -225,7 +225,7 @@ function assertPlaceable(layer: Layer): void {
   if (layer.placement.kind !== "centred" || layer.width !== undefined) return;
   throw new OverlayError(
     `centred layer ${layer.id} declares no width: it would be placed at left 0 ` +
-      `across the whole region, which is \`fill\` and not \`centred\` (I20)`,
+      `across the whole region, which is centred on neither axis (I20)`,
   );
 }
 

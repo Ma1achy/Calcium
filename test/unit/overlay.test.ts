@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { createOverlayManager } from "../../src/viewport/overlay/index.js";
 import type { Layer, OverlayChange } from "../../src/viewport/overlay/index.js";
-import { REGION, anchored, centred, filling, panel, peek, placeIn, registry, rows } from "../support/overlay.js";
+import { REGION, anchored, centred, covering, panel, peek, placeIn, registry, rows } from "../support/overlay.js";
 import { OverlayError } from "../../src/viewport/overlay/index.js";
 
 const manager = () => createOverlayManager({ registry });
@@ -71,35 +71,32 @@ describe("C15 unit — the stack", () => {
     expect(changes.at(-1)).toEqual({ kind: "dismiss", id: "p", reason: "explicit" });
   });
 
-  it("T1.26 (I22): a centred or fill peek is refused at push, and at update the layer is left as it was", () => {
+  it("T1.26 (I22): a centred peek is refused at push, and at update the layer is left as it was", () => {
     const m = manager();
     expect(() =>
       m.push({ id: "c", kind: "peek", placement: { kind: "centred" }, content: rows(1, "c"), blocking: false, dismissal: "focus", width: 20 }),
     ).toThrow(OverlayError);
-    expect(() =>
-      m.push({ id: "f", kind: "peek", placement: { kind: "fill" }, content: rows(1, "f"), blocking: false, dismissal: "focus" }),
-    ).toThrow(OverlayError);
-    expect(m.stack, "neither landed").toEqual([]);
+    expect(m.stack, "it did not land").toEqual([]);
 
     const ok = peek("p", 1, { row: 5, prefer: "below" });
     m.push(ok);
-    expect(() => m.update("p", { placement: { kind: "fill" } })).toThrow(OverlayError);
+    // With a width, so the refusal is I22's and not I20's.
+    expect(() => m.update("p", { placement: { kind: "centred" }, width: 20 })).toThrow(OverlayError);
     expect(m.stack[0], "the survivor is exactly the pushed layer").toEqual(ok);
     // The control: the same update on an overlay is legal, so the refusal is the peek's.
     const o = manager();
     o.push(anchored("a", 1, { row: 5, prefer: "below" }));
-    expect(o.update("a", { placement: { kind: "fill" } })).toBe(true);
+    expect(o.update("a", { placement: { kind: "centred" }, width: 20 })).toBe(true);
   });
 
-  it("T1.2: a fill-placed overlay on empty → one layer, it is top, and it takes the whole region", () => {
-    // **Re-aimed off `hasView`** (R-EXA-082, F1254). The member went with the
-    // kind; what is left to assert about a region-filling layer is the
-    // placement, which `fill` still names and nothing in `src/` produces.
+  it("T1.2: an overlay on empty → one layer, it is top, and layout places it", () => {
+    // **Re-aimed off `hasView`** (R-EXA-082, F1254), **then off `fill`**
+    // (parked 3): what is left is the stack holding and exposing one layer.
     const m = manager();
-    m.push(filling("dash"));
+    m.push(anchored("dash", 3, { row: 5, prefer: "below" }));
     expect(m.stack.map((l) => l.id)).toEqual(["dash"]);
     expect(m.top?.id).toBe("dash");
-    expect(m.layout(REGION)[0]).toMatchObject({ top: 0, left: 0, height: REGION.height, width: REGION.width });
+    expect(m.layout(REGION)[0]).toMatchObject({ top: 6, left: 0, height: 3, width: REGION.width });
   });
 
   it("T1.3: two overlays → LIFO, the second is top", () => {
@@ -126,9 +123,9 @@ describe("C15 unit — the stack", () => {
     expect(m.stack.map((l) => l.id)).toEqual(["a"]);
   });
 
-  it("T1.6: pop with only a fill-placed overlay → empty", () => {
+  it("T1.6: pop with only one overlay → empty", () => {
     const m = manager();
-    m.push(filling("dash"));
+    m.push(covering("dash"));
     expect(m.pop()?.id).toBe("dash");
     expect(m.stack).toEqual([]);
   });
@@ -184,11 +181,6 @@ describe("C15 unit — the stack", () => {
 });
 
 describe("C15 unit — one layer's geometry", () => {
-  it("T1.11: a fill-placed layer takes the whole region", () => {
-    const [p] = placeIn([filling("dash")]);
-    expect(p).toMatchObject({ top: 0, left: 0, height: REGION.height, width: REGION.width });
-  });
-
   it("T1.12 (I14): update changes a layer and nothing about the stack", () => {
     const m = manager();
     m.push(panel("menu", 3, { row: 20, prefer: "above" }));
@@ -254,9 +246,10 @@ describe("C15 unit — one layer's geometry", () => {
     // **The throw and the state it prevents, in one row.** A row asserting only
     // the throw says nothing about why the state is wrong, and the reason is
     // not arithmetic — an absent width resolves to the region's (I16), so the
-    // layer is placed at `left` 0 across the whole region and is `fill` wearing
-    // `centred`'s name. The control is the same layer with a width, read for a
-    // `left` that differs from a filling layer's.
+    // layer is placed at `left` 0 across the whole region and is an anchored
+    // layer's column span wearing `centred`'s name. The control is the same
+    // layer with a width, read for a `left` that differs from a region-width
+    // anchored layer's.
     const m = manager();
     expect(() =>
       m.push({
@@ -271,11 +264,9 @@ describe("C15 unit — one layer's geometry", () => {
     expect(m.stack, "and nothing reached the stack").toEqual([]);
 
     const [declared] = placeIn([centred("c", 3, { width: 40 })]);
-    const [filling] = placeIn([
-      { id: "f", kind: "overlay", placement: { kind: "fill" }, content: rows(3, "f"), blocking: false, dismissal: "escape" },
-    ]);
-    expect(declared?.left, "the state I20 forbids is this one").not.toBe(filling?.left);
-    expect(filling?.left).toBe(0);
+    const [spanning] = placeIn([anchored("f", 3, { row: 5, prefer: "below" })]);
+    expect(declared?.left, "the state I20 forbids is this one").not.toBe(spanning?.left);
+    expect(spanning?.left).toBe(0);
   });
 
   it("T1.22 (I20): an update to centred without a width is refused, and the layer survives", () => {
@@ -312,14 +303,7 @@ describe("C15 §2c — blocking and dismissal are two fields (M8)", () => {
     // reply that owns everything.
     const m = manager();
 
-    const wide: Layer = {
-      id: "wide",
-      kind: "overlay",
-      placement: { kind: "fill" },
-      content: rows(3, "wide"),
-      blocking: false,
-      dismissal: "escape",
-    };
+    const wide: Layer = covering("wide", REGION.height);
     m.push(wide);
     expect(m.top?.blocking, "large and owning nothing").toBe(false);
 
@@ -373,7 +357,7 @@ describe("C15 §2c — blocking and dismissal are two fields (M8)", () => {
     const base = panel("p", 2, { row: 10, prefer: "above" });
     const m = manager();
 
-    // The control first, so the four refusals below are not satisfied by a
+    // The control first, so the three refusals below are not satisfied by a
     // guard that refuses every panel.
     m.push(base);
     expect(m.top?.id, "the anchored non-blocking escape one is accepted").toBe("p");
@@ -381,7 +365,6 @@ describe("C15 §2c — blocking and dismissal are two fields (M8)", () => {
 
     const refused: readonly Layer[] = [
       { ...base, placement: { kind: "centred" }, width: 30 },
-      { ...base, placement: { kind: "fill" } },
       { ...base, blocking: true },
       { ...base, dismissal: "answer" },
     ];

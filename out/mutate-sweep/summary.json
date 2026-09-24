@@ -1,20 +1,20 @@
 {
   "label": "all",
-  "only": "c11-number-whole",
+  "only": "c15-centred-width",
   "rows": [
     {
-      "run": "c11-number-whole.mjs",
+      "run": "c15-centred-width.mjs",
       "exit": 0,
-      "seconds": 11,
+      "seconds": 39,
       "state": "green",
       "restored": 0,
-      "caught": 4,
+      "caught": 15,
       "elsewhere": 0,
-      "survived": 0,
+      "survived": 1,
       "anchorMissed": 0,
       "unbuilt": 0,
       "noSummary": 0,
-      "expected": 0,
+      "expected": 1,
       "staleExemption": 0
     }
   ]

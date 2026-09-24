@@ -31,8 +31,7 @@ export type Placement =
       rows?: number;
       prefer: "above" | "below";
     }>
-  | Readonly<{ kind: "centred" }>
-  | Readonly<{ kind: "fill" }>;
+  | Readonly<{ kind: "centred" }>;
 
 export type Layer = Readonly<{
   id: string;

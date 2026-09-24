@@ -11,7 +11,7 @@ import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createViewport } from "../../src/viewport/viewport/index.js";
 import { measurable, FULL_CAPS, ASCII_CAPS } from "../support/render.js";
 import { measureSequence, rowsDoc } from "../support/viewport.js";
-import { REGION, anchored, centred, filling, placeIn, registry, rows } from "../support/overlay.js";
+import { REGION, anchored, centred, covering, placeIn, registry, rows } from "../support/overlay.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 
@@ -56,18 +56,6 @@ describe("C15 integration — measurement", () => {
 });
 
 describe("C15 integration — against the viewport", () => {
-  it("T4.4 (with C14): a `fill` layer occupies exactly the region the viewport reports", () => {
-    const store = createTranscriptStore();
-    for (let i = 0; i < 5; i += 1) store.append(rowsDoc(4, `e${i}`));
-    const viewport = createViewport(store, { width: 60, height: 14, measureSequence });
-
-    const region = { width: 60, height: viewport.scroll.viewportHeight };
-    const [p] = placeIn([filling("dash")], region);
-
-    expect(p).toMatchObject({ top: 0, left: 0, height: region.height, width: region.width });
-    viewport.dispose();
-  });
-
   it("T4.5 (with C14, I14): an anchored layer follows a scrolling row through update", () => {
     // C15 is *driven* here, not subscribed. The owner translates a transcript
     // row into a region row and calls `update`; C15 learns nothing about C13.
@@ -175,7 +163,7 @@ describe("C15 integration — against its consumers", () => {
     // remedy is the owner replacing the content, not C15 growing a scroll.
     const hunk = (n: number): readonly Block[] => rows(n, "patch");
     const m = createOverlayManager({ registry });
-    m.push({ ...filling("patch"), content: hunk(40) });
+    m.push({ ...covering("patch"), content: hunk(40) });
 
     const first = m.layout(REGION)[0];
     expect(first?.height).toBe(REGION.height);

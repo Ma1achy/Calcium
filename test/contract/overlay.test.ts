@@ -10,7 +10,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { createOverlayManager, place, sortLayers } from "../../src/viewport/overlay/index.js";
 import type { Layer, Region } from "../../src/viewport/overlay/index.js";
-import { REGION, anchored, centred, filling, panel, peek, placeIn, registry, rows } from "../support/overlay.js";
+import { REGION, anchored, centred, covering, panel, peek, placeIn, registry, rows } from "../support/overlay.js";
 
 const manager = () => createOverlayManager({ registry });
 
@@ -26,7 +26,7 @@ function lcg(seed: number): () => number {
 describe("C15 contract — placement is a function", () => {
   it("T2.1 (I5): a hundred calls on one stack and region are deeply equal", () => {
     const m = manager();
-    m.push(filling("dash"));
+    m.push(covering("dash"));
     m.push(anchored("menu", 5, { row: 10, prefer: "below" }));
     m.push(centred("confirm", 3, { width: 30 }));
 
@@ -77,7 +77,7 @@ describe("C15 contract — placement is a function", () => {
         height: 1 + Math.floor(rand() * 200),
       };
       const stack: Layer[] = [];
-      if (rand() < 0.4) stack.push(filling("dash"));
+      if (rand() < 0.4) stack.push(covering("dash"));
       const count = Math.floor(rand() * 4);
       for (let i = 0; i < count; i += 1) {
         const height = 1 + Math.floor(rand() * 30);

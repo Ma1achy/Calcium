@@ -141,33 +141,28 @@ export function panel(
 }
 
 /**
- * A region-filling overlay — the placement `fill` still names and nothing in
- * `src/` produces.
+ * A layer as large as the region — a centred overlay declaring the region's
+ * width and `maxHeightFraction: 1`.
  *
- * **It was `view(id)` and there is no view kind** (R-EXA-082, F1254). What the
- * rows built with it were about splits in two: the ones about the *stack* —
- * ordering, `pop`, the top — are about an `overlay`, which is the kind that now
- * carries them; the ones about `fill` are I20's, I22's and I27's refusals,
- * which name a placement and need one constructible to be about anything. So
- * the fixture keeps the placement and drops the kind, and its name says which
- * of the two it is for.
+ * **It was `filling`, over the `fill` placement, and the placement is deleted**
+ * (C15 §4, parked 3). The rows that used it were about the stack, about
+ * truncation being reported rather than clipped, and about a large layer that
+ * owns nothing; none of them was about `fill` itself, so each keeps its subject
+ * on a placement that exists.
  */
-export function filling(id: string, height = 3): Layer {
+export function covering(id: string, height = 3): Layer {
   return {
     id,
     kind: "overlay",
-    placement: { kind: "fill" },
+    placement: { kind: "centred" },
     content: rows(height, id),
     blocking: false,
     dismissal: "escape",
+    width: REGION.width,
+    maxHeightFraction: 1,
   };
 }
 
-/**
- * A layer whose measured height genuinely depends on its width — the subject of
- * I16, and inert if built from `raw`, which carries its text verbatim and
- * measures one row at every width.
- */
 export function wrappingLayer(id: string, width: number): Layer {
   return {
     id,

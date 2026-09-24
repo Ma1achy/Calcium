@@ -120,24 +120,6 @@ export function place(
   const out: Placed[] = [];
 
   for (const layer of sortLayers(stack)) {
-    if (layer.placement.kind === "fill") {
-      const measured = registry.measureSequence(layer.content, region.width);
-      out.push(
-        Object.freeze({
-          layer,
-          top: 0,
-          left: 0,
-          height: region.height,
-          width: region.width,
-          // The owner windows a view's content (§4). Reported rather than
-          // clipped, because C15 has no scroll and should not grow one.
-          truncated: measured > region.height,
-          ...(layer.cursor !== undefined && { cursor: layer.cursor }),
-        }),
-      );
-      continue;
-    }
-
     const width = resolveWidth(layer, region);
     const desired = registry.measureSequence(layer.content, width);
     if (desired <= 0) continue;

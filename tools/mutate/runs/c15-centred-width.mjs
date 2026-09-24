@@ -8,8 +8,8 @@
 //
 // The state it forbids reads as correct at every width. An absent width resolves
 // to the region's (C15 I16), so a centred layer is placed at `left` 0 across the
-// whole region: `fill` wearing `centred`'s name, self-consistent in every number
-// C15 reports about it.
+// whole region: centred on neither axis, and self-consistent in every number C15
+// reports about it.
 //
 // The rest attack the two joints step 2 created — the update route, and the
 // pairing that must not move with the placement.
@@ -206,6 +206,26 @@ const MUTATIONS = [
     from: "    left = Math.max(0, Math.min(left, Math.max(0, region.width - width)));\n",
     to: "",
     expect: null,
+  },
+  {
+    // **C15 I22 — a peek may be centred.** Its meaning is *beside the thing it
+    // describes*; centred it is a confirm nothing can answer. `fill` was the
+    // other placement this refused, and it is deleted (parked 3), so T1.26 now
+    // carries the whole refusal on `centred`.
+    name: "a peek may take any placement",
+    file: MANAGER,
+    from: '  if (layer.kind === "peek" && layer.placement.kind !== "anchored") {',
+    to: "  if (false) {",
+    expect: "T1.26",
+  },
+  {
+    // **C15 I27's placement clause**, apart from the triple mutated above: a
+    // centred panel is a confirm's placement with a panel's kind.
+    name: "a panel may be centred",
+    file: MANAGER,
+    from: '    if (layer.placement.kind !== "anchored") {\n      throw new OverlayError(\n        `panel ${layer.id}',
+    to: '    if (false) {\n      throw new OverlayError(\n        `panel ${layer.id}',
+    expect: "T1.31",
   },
 ];
 
