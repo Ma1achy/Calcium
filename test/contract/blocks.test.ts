@@ -1262,5 +1262,5 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
 });
 
 describe("C09 I111 — the trend arrows", () => {
-  it.todo("T2.174 (C09 I111, R-COL-006): trendUp and trendDown resolve to ↑ ↓ and ^ v — not deferred on a component: specified before the slots exist");
+  it.todo("T2.174 (C09 I111, R-COL-006): trendUp and trendDown resolve to ↑ ↓ and ^ v — not deferred on a component: parked as 38, the down arrow has no ASCII half (docs/design/PARKED_QUESTIONS.md)");
 });

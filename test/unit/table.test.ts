@@ -1225,5 +1225,5 @@ describe("thousands grouping (I28)", () => {
 
 describe("the missing number and the trend (I29, I30)", () => {
   it.todo("T1.38 (C11 I29, R-TBL-003): a missing number draws the absent mark, muted, at the inline end — not deferred on a component: specified before the table draws it");
-  it.todo("T1.39 (C11 I30, R-COL-006): a trend cell's arrow takes its tone from the column's polarity — not deferred on a component: specified before Cell.trend exists");
+  it.todo("T1.39 (C11 I30, R-COL-006): a trend cell's arrow takes its tone from the column's polarity — not deferred on a component: parked as 38, the down arrow has no ASCII half (docs/design/PARKED_QUESTIONS.md)");
 });

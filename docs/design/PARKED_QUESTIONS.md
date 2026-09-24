@@ -20,7 +20,7 @@ held at the point where a choice would be mine to invent.
 
 ## Entries
 
-**Open: 18, 23, 32, 36, 37.** Every other entry is ruled or retracted. A ruled entry keeps its body, with the ruling directly above it and a premise note wherever the ruling rested on something the entry or the design contradicts.
+**Open: 18, 23, 32, 36, 37, 38.** Every other entry is ruled or retracted. A ruled entry keeps its body, with the ruling directly above it and a premise note wherever the ruling rested on something the entry or the design contradicts.
 
 > **Ruled 2026-09-24.** Already answered, by the chain rule. The repo-side spec (C09 §4, I5) carries the narrowed rule and the registry does not. That assumption stands as the answer.
 
@@ -798,6 +798,25 @@ that held. **Taken unless you say otherwise** (C11 I30): no arrow, the text alon
 (`from 0.41`), in the default tone, since a flat reading has no direction to be
 good or bad about. The alternative is a third mark (`→`, or `=` at ASCII), which
 is a glyph the registry does not record.
+
+**38 · OPEN — Ruling 26's `v` collides with disclosure's `v` in a content row.**
+Ruling 26 gave the trend `^`/`v` in the `inline` domain, on the premise that the
+domain model separates it from sort's `^`/`v` in `table-header` — which it does.
+**It does not separate it from `collapse`'s `v`**: the registry's
+`collisionDomains` puts `row-lead` and `inline` both inside `content-row`, and a
+table row can hold an expanded row's marker (`v`, the expand column) and a falling
+trend in the same row. SS64 refuses exactly that pair (F1246). `^` is free in the
+content row and stays. **Proposed, (a) recommended**:
+
+- **(a) `trendDown` takes `V` at ASCII** — the same shape, a different character,
+  free in every domain. The cost is that `v` and `V` differ by case alone, which is
+  weaker than `^`/`v` differ.
+- **(b) `collapse` moves off `v`** and the trend keeps ruling 26's pair. `v` has been
+  disclosure's since before M4, and every ASCII golden with an expanded row moves.
+- **(c) `trendDown` takes `_`** — free, and reads as *low* rather than *down*.
+
+The rest of `R-COL-006` is specified (C04 I128, C09 I111, C11 I30) and waits on this
+alone, because a glyph slot is a pair and has no ASCII half to ship without.
 
 ---
 
