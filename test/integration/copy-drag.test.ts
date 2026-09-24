@@ -146,5 +146,79 @@ describe("C14 §6f — the drag in a real session", () => {
     }
   });
 
-  it.todo("T4.37b (C14 I48, R-SEL-013): esc and ⌃c end the drag and its autoscroll — not deferred on a component: the gesture's end lands in the next commit of this MR");
+  it("T4.37b (C14 I48, R-SEL-013): esc and ⌃c end the drag and its autoscroll", async () => {
+    vi.useFakeTimers();
+    try {
+      const stdin = fakeStdin();
+      const { screen, clock } = await buildSession({
+        manifest: MANIFEST,
+        localHandlers: SAYS,
+        stdin: stdin as never,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      await settle();
+      const step = async (ms: number): Promise<void> => {
+        clock.advance(ms);
+        await vi.advanceTimersByTimeAsync(ms);
+        await settle();
+      };
+      for (let i = 0; i < 6; i += 1) {
+        said = i;
+        stdin.emit("/say\r");
+        await step(0);
+      }
+      const view = (): string =>
+        screen()
+          .rows.map((r) => r.trim())
+          .filter((r) => /-line-/u.test(r))
+          .slice(0, 2)
+          .join(" | ");
+      // Detached with room below, as T4.37 — at the tail nothing could move.
+      for (let i = 0; i < 3; i += 1) {
+        stdin.emit("\u001b[5~");
+        await step(0);
+      }
+
+      /** Enter the mode, drag below the container, and see it scroll. */
+      const armedAndScrolling = async (why: string): Promise<void> => {
+        stdin.emit("\u001bV");
+        await step(0);
+        stdin.emit(press(4, 4));
+        await step(0);
+        stdin.emit(moveTo(4, 99));
+        await step(0);
+        const armed = view();
+        // **The control, each time**: with no key, the held pointer scrolls.
+        await step(200);
+        expect(view(), `${why}: the drag is scrolling before the key`).not.toBe(armed);
+      };
+
+      // `esc` — the lone byte, past C16's disambiguation window.
+      await armedAndScrolling("esc");
+      stdin.emit("\u001b");
+      await step(100);
+      const afterEsc = view();
+      await step(600);
+      expect(view(), "esc stopped the autoscroll").toBe(afterEsc);
+      stdin.emit(release(4, 99));
+      await step(0);
+      // Out of the mode before the second arm: esc once more leaves it.
+      stdin.emit("\u001b");
+      await step(100);
+      for (let i = 0; i < 3; i += 1) {
+        stdin.emit("\u001b[5~");
+        await step(0);
+      }
+
+      // `⌃c` — leaves the mode, and the transcript it hands back holds still.
+      await armedAndScrolling("⌃c");
+      stdin.emit("\u0003");
+      await step(0);
+      const afterExit = view();
+      await step(600);
+      expect(view(), "⌃c stopped the autoscroll").toBe(afterExit);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

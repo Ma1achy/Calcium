@@ -1,14 +1,14 @@
 {
   "label": "all",
-  "only": "c14-semantic-selection",
+  "only": "c14-drag-gesture",
   "rows": [
     {
-      "run": "c14-semantic-selection.mjs",
+      "run": "c14-drag-gesture.mjs",
       "exit": 0,
-      "seconds": 24,
+      "seconds": 12,
       "state": "green",
       "restored": 0,
-      "caught": 6,
+      "caught": 2,
       "elsewhere": 0,
       "survived": 0,
       "anchorMissed": 0,

@@ -1562,8 +1562,7 @@ class Session implements TuiInstance {
     if (phase === "release") {
       // `R-SEL-013`'s *stops on release*. The selection stays — a release ends
       // the gesture and not the mode.
-      this.#drag = null;
-      this.#stopAutoscroll();
+      this.#endDrag();
       return true;
     }
     const width = this.#composed().region.width;
@@ -1635,6 +1634,12 @@ class Session implements TuiInstance {
     this.#autoscroll = null;
   }
 
+  /** The gesture and its ticker, together — a release, an `esc`, a `⌃c` (C14 I48). */
+  #endDrag(): void {
+    this.#drag = null;
+    this.#stopAutoscroll();
+  }
+
   /** The held document's entry ids, in document order — the extend's axis. */
   #selectionOrder(): readonly string[] {
     return this.#graph?.documentEntries.map((e) => e.id) ?? [];
@@ -1661,6 +1666,10 @@ class Session implements TuiInstance {
    */
   #escapeSemanticSelection(): void {
     if (this.#semantic === null) return;
+    // **Every `esc` ends the gesture** (C14 I48, `R-SEL-013`): *stops on esc*
+    // names the key, not the outcome, so the press that only clears stops the
+    // ticker as surely as the press that leaves.
+    this.#endDrag();
     this.#semantic = semantic.escape(this.#semantic);
     // Only the press that *leaves* drops the hold — a clear is state within the
     // rung and the frame stays held (C14 I34, `R-SEL-005`).
@@ -1674,6 +1683,9 @@ class Session implements TuiInstance {
   /** `⌃c` — leave, and **never clear first** (C16 I51, §5d D5). */
   #exitSemanticSelection(): void {
     if (this.#semantic === null) return;
+    // Leaving the mode ends the gesture (C14 I48) — a ticker outliving it would
+    // scroll the live transcript the mode just handed back.
+    this.#endDrag();
     this.#semantic = null;
     this.#spans = null;
     // One ordinary commit draws the record, and never a repaint: nothing on the
