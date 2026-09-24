@@ -460,6 +460,8 @@ const STATED_CYCLES: Readonly<Record<string, number>> = Object.freeze(
     );
   });
 
+  it.todo("T2.169 (C09 I107, R-MOT-005): a set takes its ASCII rung whole, asserted on the mixed sets the existing rows cannot see — not deferred on a component, the row lands with I107's code half");
+
   it("T2.74 (C02 I9): a narrow-only set degrades on a wide terminal, and the default does not", () => {
     // The tier, asserted from both sides. Before the capability these sets were
     // a refusal list; the field is what turns a refusal into an arm.
