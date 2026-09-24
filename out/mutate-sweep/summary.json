@@ -1,14 +1,14 @@
 {
   "label": "all",
-  "only": "c15-centred-width",
+  "only": "c09-stream-trail",
   "rows": [
     {
-      "run": "c15-centred-width.mjs",
+      "run": "c09-stream-trail.mjs",
       "exit": 0,
-      "seconds": 39,
+      "seconds": 41,
       "state": "green",
       "restored": 0,
-      "caught": 15,
+      "caught": 23,
       "elsewhere": 0,
       "survived": 1,
       "anchorMissed": 0,

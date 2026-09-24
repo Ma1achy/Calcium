@@ -439,12 +439,24 @@ BBBBBBB............. boolean, so a nested
   C = bg 48;2;222;227;24
 
 ── §26 · the trail and the mark at the head — two carriers, and what each survives
-· streaming, hot edge — the band cools over the last three CELLS toward the run's own ink, and the mark sits one space past the head in accent
+· streaming, hot edge — the head arrives in accent and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.. The parser tracks quotes with a single
-aaaaaaaaaaaaaaaaaabcaab................. boolean, which is why .
+aaaaaaabcdefghijklmnoao................. boolean, which is why .
   a = fg 38;2;212;212;212
-  b = fg 38;2;232;168;124
-  c = fg 38;2;222;190;168
+  b = fg 38;2;213;209;206
+  c = fg 38;2;215;206;199
+  d = fg 38;2;216;203;193
+  e = fg 38;2;218;199;187
+  f = fg 38;2;219;196;181
+  g = fg 38;2;221;193;174
+  h = fg 38;2;222;190;168
+  i = fg 38;2;223;187;162
+  j = fg 38;2;225;184;155
+  k = fg 38;2;226;181;149
+  l = fg 38;2;228;177;143
+  m = fg 38;2;229;174;137
+  n = fg 38;2;231;171;130
+  o = fg 38;2;232;168;124
 
 · settled — no band and no mark: nothing replaces the mark and nothing is left behind (R-BLK-188)
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.. The parser tracks quotes with a single
@@ -457,10 +469,22 @@ aaaaaaaaaaaaaaaaaaaaa................... boolean, which is why
 
 · the reservation, at the width where it shows — 48 columns, streaming: the mark's two cells come off the wrap, so \`boolean,\` moves down
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.......... The parser tracks quotes with a single
-aaaaaaaaaaaaaaaaaabcaab......................... boolean, which is why .
+aaaaaaabcdefghijklmnoao......................... boolean, which is why .
   a = fg 38;2;212;212;212
-  b = fg 38;2;232;168;124
-  c = fg 38;2;222;190;168
+  b = fg 38;2;213;209;206
+  c = fg 38;2;215;206;199
+  d = fg 38;2;216;203;193
+  e = fg 38;2;218;199;187
+  f = fg 38;2;219;196;181
+  g = fg 38;2;221;193;174
+  h = fg 38;2;222;190;168
+  i = fg 38;2;223;187;162
+  j = fg 38;2;225;184;155
+  k = fg 38;2;226;181;149
+  l = fg 38;2;228;177;143
+  m = fg 38;2;229;174;137
+  n = fg 38;2;231;171;130
+  o = fg 38;2;232;168;124
 
 · and the same block settled at 48 — \`boolean,\` stays up, which is the two cells, and it is the whole of what \`measure\` has to agree with
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa. The parser tracks quotes with a single boolean,
@@ -1119,11 +1143,23 @@ raw             0     — atomic: nothing to focus
   C = bg 48;2;222;227;24
 
 ── §26 · the trail and the mark at the head — two carriers, and what each survives
-· streaming, hot edge — the band cools over the last three CELLS toward the run's own ink, and the mark sits one space past the head in accent
-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabcaab.................. The parser tracks quotes with a single boolean, which is why .
+· streaming, hot edge — the head arrives in accent and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabcdefghijklmnoao.................. The parser tracks quotes with a single boolean, which is why .
   a = fg 38;2;212;212;212
-  b = fg 38;2;232;168;124
-  c = fg 38;2;222;190;168
+  b = fg 38;2;213;209;206
+  c = fg 38;2;215;206;199
+  d = fg 38;2;216;203;193
+  e = fg 38;2;218;199;187
+  f = fg 38;2;219;196;181
+  g = fg 38;2;221;193;174
+  h = fg 38;2;222;190;168
+  i = fg 38;2;223;187;162
+  j = fg 38;2;225;184;155
+  k = fg 38;2;226;181;149
+  l = fg 38;2;228;177;143
+  m = fg 38;2;229;174;137
+  n = fg 38;2;231;171;130
+  o = fg 38;2;232;168;124
 
 · settled — no band and no mark: nothing replaces the mark and nothing is left behind (R-BLK-188)
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.................... The parser tracks quotes with a single boolean, which is why
@@ -1134,10 +1170,22 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa....................
 
 · the reservation, at the width where it shows — 48 columns, streaming: the mark's two cells come off the wrap, so \`boolean,\` moves down
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.......... The parser tracks quotes with a single
-aaaaaaaaaaaaaaaaaabcaab......................... boolean, which is why .
+aaaaaaabcdefghijklmnoao......................... boolean, which is why .
   a = fg 38;2;212;212;212
-  b = fg 38;2;232;168;124
-  c = fg 38;2;222;190;168
+  b = fg 38;2;213;209;206
+  c = fg 38;2;215;206;199
+  d = fg 38;2;216;203;193
+  e = fg 38;2;218;199;187
+  f = fg 38;2;219;196;181
+  g = fg 38;2;221;193;174
+  h = fg 38;2;222;190;168
+  i = fg 38;2;223;187;162
+  j = fg 38;2;225;184;155
+  k = fg 38;2;226;181;149
+  l = fg 38;2;228;177;143
+  m = fg 38;2;229;174;137
+  n = fg 38;2;231;171;130
+  o = fg 38;2;232;168;124
 
 · and the same block settled at 48 — \`boolean,\` stays up, which is the two cells, and it is the whole of what \`measure\` has to agree with
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa. The parser tracks quotes with a single boolean,
@@ -1775,7 +1823,7 @@ raw             0     — atomic: nothing to focus
 .................... back early.
 
 ── §26 · the trail and the mark at the head — two carriers, and what each survives
-· streaming, hot edge — the band cools over the last three CELLS toward the run's own ink, and the mark sits one space past the head in accent
+· streaming, hot edge — the head arrives in accent and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent
 ........................................ The parser tracks quotes with a single
 ........................................ boolean, which is why ⋅
 
@@ -2420,7 +2468,7 @@ raw             0     — atomic: nothing to focus
 ........................................ so a nested quote flips it back early.
 
 ── §26 · the trail and the mark at the head — two carriers, and what each survives
-· streaming, hot edge — the band cools over the last three CELLS toward the run's own ink, and the mark sits one space past the head in accent
+· streaming, hot edge — the head arrives in accent and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent
 ................................................................................ The parser tracks quotes with a single boolean, which is why ⋅
 
 · settled — no band and no mark: nothing replaces the mark and nothing is left behind (R-BLK-188)
@@ -3092,12 +3140,24 @@ BBBBBBB............. boolean, so a nested
   C = bg 48;2;222;227;24
 
 ── §26 · the trail and the mark at the head — two carriers, and what each survives
-· streaming, hot edge — the band cools over the last three CELLS toward the run's own ink, and the mark sits one space past the head in accent
+· streaming, hot edge — the head arrives in accent and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.. The parser tracks quotes with a single
-aaaaaaaaaaaaaaaaaabcaab................. boolean, which is why ⋅
+aaaaaaabcdefghijklmnoao................. boolean, which is why ⋅
   a = fg 38;2;212;212;212
-  b = fg 38;2;232;168;124
-  c = fg 38;2;222;190;168
+  b = fg 38;2;213;209;206
+  c = fg 38;2;215;206;199
+  d = fg 38;2;216;203;193
+  e = fg 38;2;218;199;187
+  f = fg 38;2;219;196;181
+  g = fg 38;2;221;193;174
+  h = fg 38;2;222;190;168
+  i = fg 38;2;223;187;162
+  j = fg 38;2;225;184;155
+  k = fg 38;2;226;181;149
+  l = fg 38;2;228;177;143
+  m = fg 38;2;229;174;137
+  n = fg 38;2;231;171;130
+  o = fg 38;2;232;168;124
 
 · settled — no band and no mark: nothing replaces the mark and nothing is left behind (R-BLK-188)
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.. The parser tracks quotes with a single
@@ -3110,10 +3170,22 @@ aaaaaaaaaaaaaaaaaaaaa................... boolean, which is why
 
 · the reservation, at the width where it shows — 48 columns, streaming: the mark's two cells come off the wrap, so \`boolean,\` moves down
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.......... The parser tracks quotes with a single
-aaaaaaaaaaaaaaaaaabcaab......................... boolean, which is why ⋅
+aaaaaaabcdefghijklmnoao......................... boolean, which is why ⋅
   a = fg 38;2;212;212;212
-  b = fg 38;2;232;168;124
-  c = fg 38;2;222;190;168
+  b = fg 38;2;213;209;206
+  c = fg 38;2;215;206;199
+  d = fg 38;2;216;203;193
+  e = fg 38;2;218;199;187
+  f = fg 38;2;219;196;181
+  g = fg 38;2;221;193;174
+  h = fg 38;2;222;190;168
+  i = fg 38;2;223;187;162
+  j = fg 38;2;225;184;155
+  k = fg 38;2;226;181;149
+  l = fg 38;2;228;177;143
+  m = fg 38;2;229;174;137
+  n = fg 38;2;231;171;130
+  o = fg 38;2;232;168;124
 
 · and the same block settled at 48 — \`boolean,\` stays up, which is the two cells, and it is the whole of what \`measure\` has to agree with
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa. The parser tracks quotes with a single boolean,
@@ -3773,11 +3845,23 @@ raw             0     — atomic: nothing to focus
   C = bg 48;2;222;227;24
 
 ── §26 · the trail and the mark at the head — two carriers, and what each survives
-· streaming, hot edge — the band cools over the last three CELLS toward the run's own ink, and the mark sits one space past the head in accent
-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabcaab.................. The parser tracks quotes with a single boolean, which is why ⋅
+· streaming, hot edge — the head arrives in accent and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabcdefghijklmnoao.................. The parser tracks quotes with a single boolean, which is why ⋅
   a = fg 38;2;212;212;212
-  b = fg 38;2;232;168;124
-  c = fg 38;2;222;190;168
+  b = fg 38;2;213;209;206
+  c = fg 38;2;215;206;199
+  d = fg 38;2;216;203;193
+  e = fg 38;2;218;199;187
+  f = fg 38;2;219;196;181
+  g = fg 38;2;221;193;174
+  h = fg 38;2;222;190;168
+  i = fg 38;2;223;187;162
+  j = fg 38;2;225;184;155
+  k = fg 38;2;226;181;149
+  l = fg 38;2;228;177;143
+  m = fg 38;2;229;174;137
+  n = fg 38;2;231;171;130
+  o = fg 38;2;232;168;124
 
 · settled — no band and no mark: nothing replaces the mark and nothing is left behind (R-BLK-188)
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.................... The parser tracks quotes with a single boolean, which is why
@@ -3788,10 +3872,22 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa....................
 
 · the reservation, at the width where it shows — 48 columns, streaming: the mark's two cells come off the wrap, so \`boolean,\` moves down
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.......... The parser tracks quotes with a single
-aaaaaaaaaaaaaaaaaabcaab......................... boolean, which is why ⋅
+aaaaaaabcdefghijklmnoao......................... boolean, which is why ⋅
   a = fg 38;2;212;212;212
-  b = fg 38;2;232;168;124
-  c = fg 38;2;222;190;168
+  b = fg 38;2;213;209;206
+  c = fg 38;2;215;206;199
+  d = fg 38;2;216;203;193
+  e = fg 38;2;218;199;187
+  f = fg 38;2;219;196;181
+  g = fg 38;2;221;193;174
+  h = fg 38;2;222;190;168
+  i = fg 38;2;223;187;162
+  j = fg 38;2;225;184;155
+  k = fg 38;2;226;181;149
+  l = fg 38;2;228;177;143
+  m = fg 38;2;229;174;137
+  n = fg 38;2;231;171;130
+  o = fg 38;2;232;168;124
 
 · and the same block settled at 48 — \`boolean,\` stays up, which is the two cells, and it is the whole of what \`measure\` has to agree with
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa. The parser tracks quotes with a single boolean,

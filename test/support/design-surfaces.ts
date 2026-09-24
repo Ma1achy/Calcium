@@ -1019,7 +1019,7 @@ const streamHead = (
   const settled = block({ kind: "notice", id: "sh", tone: "default", text: STREAM_TEXT }) as unknown as Block;
   const mono = { ...capabilities, colourDepth: 1 } as TerminalCapabilities;
   return [
-    ...pass(streaming, capabilities, "· streaming, hot edge — the band cools over the last three CELLS toward the run's own ink, and the mark sits one space past the head in accent"),
+    ...pass(streaming, capabilities, "· streaming, hot edge — the head arrives in accent and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent"),
     ...pass(settled, capabilities, "· settled — no band and no mark: nothing replaces the mark and nothing is left behind (R-BLK-188)"),
     ...pass(streaming, mono, "· streaming at 1-bit — the trail is gone and the mark is not: colour dies, shape does not, which is what makes them two carriers and not one fact twice"),
     // **At a width of the frame's own choosing, because the reservation is

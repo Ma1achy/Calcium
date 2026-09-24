@@ -351,22 +351,22 @@ function noticeElements(block: Notice, width: number): readonly NavElement[] {
 /**
  * How many cells of the head a trail covers (C09 I90, §7e).
  *
- * **Three, and the design names no number.** §026 costs its own example at one
- * cell and at three — *about two repaints per cell at a one-cell band, four at
- * three* — so three is the wider of the two figures the design itself works
- * with. Decided rather than specified, and recorded as such.
+ * **Fourteen, from the design's own figure** (parked 8). §026's prose names no
+ * band; its streaming demo sets `const trail=14`, over narrow text where a
+ * character is a cell. It was three while the prose was the only source.
  */
-const TRAIL_CELLS = 3;
+const TRAIL_CELLS = 14;
 
 /**
  * The head colour each form arrives in (C04 §5c, C04 I123).
  *
- * **`fade`'s head is a decided value.** §026 says *the newest character IS the
- * ground and emerges toward the ink*, and a `Ramp` is closed to `Tone` so no
- * member can hold a colour value (C10 I16) — there is no tone that names the
- * surface. `muted` is the dimmest legal head and is what *emerges toward the
- * ink* reads as through this mechanism; the design's own word is *the ground*,
- * and the gap is parked rather than papered over.
+ * **`fade`'s head is `muted`, below the text floor, and that is ruled** (parked
+ * 34, tie-break 4). §026 says *the newest character IS the ground and emerges
+ * toward the ink*, and `R-MOT-004` forbids a frame that is the sole carrier of
+ * meaningful text below the floor. A streaming head is not that: the stream is
+ * carried by the head's spinner and the elapsed count, so the trail may be
+ * ground-only. `muted` rather than the ground itself because a `Ramp` is closed
+ * to `Tone` (C10 I16) and no tone names the surface — the dimmest legal head.
  */
 const TRAIL_HEAD: Readonly<Record<"hotEdge" | "fade" | "hue" | "ripple", Tone>> = Object.freeze({
   hotEdge: "accent",
@@ -408,46 +408,69 @@ function withTrail(
   // substituting bold for every form would make four names one.
   if (colourDepth === 1 && form !== "weight") return wrapped;
 
-  const last = wrapped.length - 1; // cells-ok — an array index
-  const line = wrapped[last];
-  if (line === undefined) return wrapped;
-  const text = runsText(line);
-  const total = cells(text, ambiguous);
-  if (total === 0) return wrapped;
-
-  // Where the band starts, in code units: walk back from the end until the tail
-  // is `TRAIL_CELLS` wide. A whole band on a short line is the whole line —
-  // "never reaching further than the text" (I90).
-  let start = text.length; // cells-ok — a code-unit cursor
-  while (start > 0 && cells(text.slice(start - 1), ambiguous) <= TRAIL_CELLS) start -= 1; // cells-ok — a code-unit cursor
-  if (start >= text.length) return wrapped; // cells-ok — a code-unit comparison
-
-  const head = sliceRuns(line, 0, start);
-  const band = sliceRuns(line, start, text.length - start); // cells-ok — a code-unit length
-  if (band.length === 0) return wrapped; // cells-ok — a run count
-
-  const banded: Run[] = [];
-  let at = 0; // graphemes-ok — the run's place in its ramped span
-  const of = band.reduce((n, r) => n + [...r.text].length, 0); // cells-ok — a cluster count
-  for (const run of band) {
-    if (form === "weight") {
-      banded.push({ ...run, attrs: { ...run.attrs, bold: true } });
-      continue;
+  // Where the band starts: walk back from the end of the text, **across wrapped
+  // rows**, until the tail is `TRAIL_CELLS` wide (I90, parked 8). The design's
+  // demo indexes the whole stream, and *the last cells of the text* says the
+  // same; stopping at the last row was invisible at three cells and is on every
+  // short last row at fourteen. A row wholly inside the band passes the walk to
+  // the one above; a row it enters part-way ends it. The cells a break
+  // consumed are not in any row and so not in the band. A whole band on a short
+  // text is the whole text — "never reaching further than the text".
+  const cuts: { row: number; start: number }[] = [];
+  let left = TRAIL_CELLS;
+  for (let row = wrapped.length - 1; row >= 0 && left > 0; row -= 1) { // cells-ok — an array index
+    const text = runsText(wrapped[row] ?? []);
+    let start = text.length; // cells-ok — a code-unit cursor
+    while (start > 0 && cells(text.slice(start - 1), ambiguous) <= left) start -= 1; // cells-ok — a code-unit cursor
+    if (start < text.length) { // cells-ok — a code-unit comparison
+      cuts.unshift({ row, start });
+      left -= cells(text.slice(start), ambiguous);
     }
-    const target = form === "hue" ? block.tone : (run.tone ?? block.tone);
-    const ramp = {
-      fill: "gradient" as const,
-      from: TRAIL_HEAD[form],
-      to: target,
-      ...(form === "ripple" ? { animate: "ripple" as const } : {}),
-    };
-    const count = [...run.text].length; // cells-ok — a cluster count
-    banded.push({ ...run, ramp: { ramp, at, of, ordinal: 0 } });
-    at += count; // graphemes-ok — a cluster cursor
+    if (start > 0) break;
   }
+  if (cuts.length === 0) return wrapped; // cells-ok — a row count
 
+  // One ramp over the whole band, so a band crossing a break is one gradient
+  // and not two: `at` and `of` count clusters from the band's first cell.
+  const bands = cuts.map(({ row, start }) => {
+    const line = wrapped[row] ?? [];
+    const length = runsText(line).length - start; // cells-ok — a code-unit length
+    return { row, head: sliceRuns(line, 0, start), band: sliceRuns(line, start, length) };
+  });
+  const of = bands.reduce(
+    (n, b) => n + b.band.reduce((m, r) => m + [...r.text].length, 0), // cells-ok — a cluster count
+    0,
+  );
   const out = [...wrapped];
-  out[last] = [...head, ...banded];
+  let at = 0; // graphemes-ok — the run's place in its ramped span
+  for (const { row, head, band } of bands) {
+    const banded: Run[] = [];
+    for (const run of band) {
+      if (form === "weight") {
+        banded.push({ ...run, attrs: { ...run.attrs, bold: true } });
+        continue;
+      }
+      const target = form === "hue" ? block.tone : (run.tone ?? block.tone);
+      // **The head colour at `to`**, because a gradient's `to` sits at `t = 1`
+      // and the band's last cluster is the newest (I90, §026's `d = (head − i)
+      // / trail`). It was `from`, which put the accent on the oldest cell.
+      const ramp = {
+        fill: "gradient" as const,
+        from: target,
+        to: TRAIL_HEAD[form],
+        ...(form === "ripple" ? { animate: "ripple" as const } : {}),
+      };
+      const count = [...run.text].length; // cells-ok — a cluster count
+      // **Over `of + 1` positions, with the band at the top `of`**, so the
+      // oldest cell is one step off the ink and not on it: `d = (head − i) /
+      // trail` tints all fourteen and leaves the fifteenth plain. At `of`
+      // positions the oldest sat at `t = 0`, exactly the ink, and the band
+      // showed thirteen.
+      banded.push({ ...run, ramp: { ramp, at: at + 1, of: of + 1, ordinal: 0 } });
+      at += count; // graphemes-ok — a cluster cursor
+    }
+    out[row] = [...head, ...banded];
+  }
   return out;
 }
 

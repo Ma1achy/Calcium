@@ -23,7 +23,7 @@ import { styledScreenFrom } from "../support/styled-screen.js";
 const ESC = String.fromCharCode(27);
 
 /** C09 §7e's band width, restated here so the row reads without the source. */
-const TRAIL_CELLS = 3;
+const TRAIL_CELLS = 14;
 
 /**
  * The visible text of `bytes[0, i)`, with an incomplete escape trimmed off.
@@ -88,6 +88,23 @@ const withoutMark = (line: string, caps = FULL_CAPS): string => {
   return trimmed.slice(0, -1).replace(/\s+$/u, ""); // cells-ok — a code-unit slice
 };
 
+/**
+ * The rendered rows as a styled grid, so a cell can be asked for its colour.
+ *
+ * **A substring search answers neither half of the claim.** The mark is a
+ * colour at a position, and `indexOf` gives a code-unit offset into a string
+ * that is mostly escapes — it says nothing about which column the frame
+ * landed in and nothing about the tone it took.
+ */
+const gridOf = (b: Notice, width = 40, caps = FULL_CAPS, tick?: number) => {
+  const kit = measurable({ capabilities: caps, ...(tick === undefined ? {} : { tick }) });
+  const lines = kit.renderToLines(b as never, width);
+  return styledScreenFrom(lines.map((l, i) => (i === 0 ? l : `\r\n${l}`)), {
+    columns: width,
+    rows: lines.length,
+  });
+};
+
 describe("C04 §5c — the fact on the block", () => {
   it("T1.46 (C04 I122, §5c): `streaming` and `trail` pass the gate, and a wrong type does not", () => {
     expect(errorsOf(notice()), "the envelope itself is complete").toEqual([]);
@@ -135,16 +152,19 @@ describe("C09 §7e — the band", () => {
     return safePrefix(a, i);
   };
 
-  it("T1.54 (C09 I90, §7e): the band is the last three cells, not the last three characters", () => {
-    // **A line ending in wide clusters is what separates the two units**: three
-    // cells reaches one `字` and a bit, so the band is the last cluster alone;
-    // three *characters* would take all three and six cells with them.
-    expect(untrailed(notice({ text: "ab 字字字", streaming: true })), "three cells, one wide cluster").toBe("ab 字字");
+  it("T1.54 (C09 I90, §7e): the band is the last fourteen cells, not the last fourteen characters", () => {
+    // **A line ending in wide clusters is what separates the two units**:
+    // fourteen cells is the seven `字`, and fourteen *characters* would take the
+    // seven, the space and six letters before them.
+    expect(
+      untrailed(notice({ text: "abcdefghij 字字字字字字字", streaming: true })),
+      "fourteen cells, seven wide clusters",
+    ).toBe("abcdefghij ");
 
     // And on a narrow alphabet the two units coincide, which is why the row
-    // above needs the wide one — this arm only shows the band is three of
+    // above needs the wide one — this arm only shows the band is fourteen of
     // something.
-    expect(untrailed(notice({ text: "abcdefgh", streaming: true })), "three cells of narrow text").toBe("abcde");
+    expect(untrailed(notice({ text: "abcdefghijklmnopqrstu", streaming: true })), "fourteen cells of narrow text").toBe("abcdefg");
 
     // A text shorter than the band takes all of it and reaches no further.
     const tiny = notice({ text: "ab", streaming: true });
@@ -155,9 +175,41 @@ describe("C09 §7e — the band", () => {
     expect(untrailed(tiny), "the whole text is the band").toBe("");
   });
 
-  it.todo("T1.76 (C09 I90, §7e): a band longer than the last wrapped row continues on the row above — not deferred on a component: specified before the band crosses rows");
+  it("T1.76 (C09 I90, §7e): a band longer than the last wrapped row continues on the row above", () => {
+    // Seventeen cells and nine at width 20, and the same with or without the
+    // mark's two reserved cells — so the two arms `untrailed` compares wrap
+    // alike and differ only in style.
+    const b = notice({ text: "aaa bbb ccc ddddd eeeee fff", streaming: true });
+    const rows = withoutMark(plainOf(b, 20)).split("\n").map((r) => r.trimEnd());
+    expect(rows, "the fixture wraps where the row says").toEqual(["aaa bbb ccc ddddd", "eeeee fff"]);
 
-  it.todo("T1.77 (C09 I90, §7e, §026): the head is the hot end of the band — not deferred on a component: specified before the gradient is turned round");
+    // **The nine of the last row and the last five of the row above.** A band
+    // stopping at the last row leaves `aaa bbb ccc ddddd` untouched, which is
+    // the derivation this replaced.
+    expect(untrailed(b, 20)).toBe("aaa bbb ccc ");
+
+    // **One gradient across the break, not one per row**: the newest character
+    // is accent on the second row, which a ramp restarted at the break would
+    // leave short of its end.
+    const grid = gridOf(b, 20);
+    const newest = grid[1]!.filter((c) => c.ch === "f").at(-1)!;
+    const accent = gridOf(notice({ text: "x", tone: "accent" }))[0]![0]!.style.fg;
+    expect(newest.style.fg, "the head across a wrap is accent").toBe(accent);
+  });
+
+  it("T1.77 (C09 I90, §7e, §026): the head is the hot end of the band", () => {
+    // §026's figure: `d = (head − i) / trail`, accent where the text arrives
+    // and cooling behind it. Twenty-one narrow cells, so the band is the last
+    // fourteen — `h` its oldest and `u` its newest.
+    const row = gridOf(notice({ text: "abcdefghijklmnopqrstu", streaming: true, trail: "hotEdge" }))[0]!;
+    const at = (ch: string) => row.find((c) => c.ch === ch)!;
+    const accent = gridOf(notice({ text: "x", tone: "accent" }))[0]![0]!.style.fg;
+    expect(at("u").style.fg, "the newest character is accent").toBe(accent);
+    expect(at("h").style.fg, "and the band's oldest is not").not.toBe(accent);
+    // **The control: outside the band the text is its own ink**, so the two
+    // reads above are about the band and not about the whole row being accent.
+    expect(at("a").style.fg, "a cell before the band").not.toBe(accent);
+  });
 
   it("T1.55 (C09 I90, §7e, R-BLK-198): chrome is never in the band, at any width", () => {
     // **A header has no position in the stream, so it exists complete or not at
@@ -276,22 +328,6 @@ describe("C09 §7e — the band", () => {
 describe("C09 §7e / §026 — the mark at the head", () => {
   const MARK_TEXT = "the parser tracks quotes with a single boolean, which is why";
 
-  /**
-   * The rendered rows as a styled grid, so a cell can be asked for its colour.
-   *
-   * **A substring search answers neither half of the claim.** The mark is a
-   * colour at a position, and `indexOf` gives a code-unit offset into a string
-   * that is mostly escapes — it says nothing about which column the frame
-   * landed in and nothing about the tone it took.
-   */
-  const gridOf = (b: Notice, width = 40, caps = FULL_CAPS, tick?: number) => {
-    const kit = measurable({ capabilities: caps, ...(tick === undefined ? {} : { tick }) });
-    const lines = kit.renderToLines(b as never, width);
-    return styledScreenFrom(lines.map((l, i) => (i === 0 ? l : `\r\n${l}`)), {
-      columns: width,
-      rows: lines.length,
-    });
-  };
 
   it("T1.63 (C09 I101, §026 R-BLK-182): the mark is a frame of the agent set, one space past the head, in accent", () => {
     const b = notice({ text: MARK_TEXT, streaming: true });

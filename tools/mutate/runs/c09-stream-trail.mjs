@@ -74,22 +74,68 @@ const results = runPass({
       // **The band counted in characters rather than cells.** Right for ASCII
       // and wrong for every wide cluster — a three-character band on `字字字` is
       // six cells, and nothing about the row's text moves.
-      name: "the band is three characters rather than three cells",
+      name: "the band is fourteen characters rather than fourteen cells",
       file: SIMPLE,
-      from: "  while (start > 0 && cells(text.slice(start - 1), ambiguous) <= TRAIL_CELLS) start -= 1; // cells-ok — a code-unit cursor",
-      to: "  while (start > 0 && text.length - (start - 1) <= TRAIL_CELLS) start -= 1; // cells-ok — a code-unit cursor",
+      from: "    while (start > 0 && cells(text.slice(start - 1), ambiguous) <= left) start -= 1; // cells-ok — a code-unit cursor",
+      to: "    while (start > 0 && text.length - (start - 1) <= left) start -= 1; // cells-ok — a code-unit cursor",
       expect: "T1.54",
     },
     {
-      // **The colour forms survive 1-bit** (I91). `rampStyle` at one bit
-      // resolves to nothing much, so this reads as harmless — and it is the
-      // difference between *nothing* and *something smaller*, which is what
-      // T1.58 asserts byte-identically for.
+      // **As it shipped**: the band stops at the last wrapped row, so a short
+      // last row carries a short band (parked 8).
+      name: "the band stops at the last row",
+      file: SIMPLE,
+      from: "    if (start > 0) break;",
+      to: "    break;",
+      expect: "T1.76",
+    },
+    {
+      // **As it shipped**: the head colour on the band's oldest cell, and the
+      // character that just arrived in the run's plain ink.
+      name: "the gradient runs from the head colour at the oldest cell",
+      file: SIMPLE,
+      from: "        from: target,\n        to: TRAIL_HEAD[form],",
+      to: "        from: TRAIL_HEAD[form],\n        to: target,",
+      expect: "T1.77",
+    },
+    {
+      // **Thirteen cells shown of fourteen**: over `of` positions the oldest
+      // cell sits at `t = 0`, which is the ink exactly.
+      name: "the extent ends on the band's oldest cell",
+      file: SIMPLE,
+      from: "ramp: { ramp, at: at + 1, of: of + 1, ordinal: 0 }",
+      to: "ramp: { ramp, at, of, ordinal: 0 }",
+      expect: "T1.55",
+    },
+    {
+      // **Two gradients for one band**: each row restarts, so the head on the
+      // last row stops short of accent.
+      name: "the ramp restarts at the break",
+      file: SIMPLE,
+      from: "  for (const { row, head, band } of bands) {\n    const banded: Run[] = [];",
+      to: "  for (const { row, head, band } of bands) {\n    at = 0;\n    const banded: Run[] = [];",
+      expect: "T1.76",
+    },
+    {
+      // **The colour forms survive 1-bit** (I91). **A survivor, and it indicts
+      // the subject rather than T1.58.** Below 4-bit `rampStyle` answers
+      // `resolveTone(ramp.from)`, and since the gradient was turned round
+      // (C09 I90, 2026-09-25) `from` is the run's own ink — so an unguarded
+      // colour form at 1-bit draws the run's own style, which is *nothing*,
+      // exactly what C09 I91 asks. The guard and the resolution now agree and
+      // the guard is unobservable. It stays, because it states C09 I91 at the
+      // site that owns it and costs a comparison; while `from` was the head
+      // colour, `fade`'s `muted` drew dim over half the band and this was
+      // caught. The first `to` here, `form === "nosuch"`, stopped type-checking
+      // when `trail` became a closed union (F1106), which hid that the row had
+      // stopped running at all.
       name: "the four colour forms are not held back at 1-bit",
       file: SIMPLE,
       from: "  if (colourDepth === 1 && form !== \"weight\") return wrapped;",
-      to: "  if (colourDepth === 1 && form === \"nosuch\") return wrapped;",
-      expect: "T1.58",
+      // **Keyed on a depth no terminal reports**, since `form === "nosuch"`
+      // stopped type-checking once `trail` was a closed union (F1106).
+      to: "  if (colourDepth === 0 && form !== \"weight\") return wrapped;",
+      expect: null,
     },
     {
       // **A misspelled form defaults instead of being refused** (C04 I123).
@@ -114,8 +160,8 @@ const results = runPass({
       // arithmetic instead of at the row, which is where the clause lives.
       name: "the band is measured over the glyph lead as well as the text",
       file: SIMPLE,
-      from: "  const text = runsText(line);",
-      to: "  const text = \" \".repeat(prefixCells(block.glyph)) + runsText(line);",
+      from: "    const text = runsText(wrapped[row] ?? []);",
+      to: "    const text = \" \".repeat(prefixCells(block.glyph)) + runsText(wrapped[row] ?? []);",
       expect: "T1.55",
     },
     {
@@ -275,4 +321,30 @@ const results = runPass({
 });
 
 console.log(report(results));
-process.exit(results.some((r) => !r.killed) ? 1 : 0);
+
+// **Named rather than excused**: each entry says why the mutation cannot fail
+// anything, and the day it starts being caught the pass fails as a stale
+// exemption, which is the notice that the reason no longer holds.
+const EXPECTED_SURVIVORS = new Map([
+  [
+    "the four colour forms are not held back at 1-bit",
+    "**the guard is unobservable, and this entry is the watch on that** (C09 I91, I90). Below " +
+      "4-bit `rampStyle` answers `resolveTone(ramp.from)`, and `from` is the run's own ink since " +
+      "the gradient was turned round — so an unguarded colour form draws the run's own style, " +
+      "which is the nothing C09 I91 asks for. The day a 1-bit ramp resolves to anything but " +
+      "`from`, or `from` stops being the target, this is caught and the pass fails as stale",
+  ],
+]);
+for (const r of results) {
+  const why = EXPECTED_SURVIVORS.get(r.name);
+  if (why === undefined) continue;
+  console.log(
+    r.killed
+      ? `\nEXEMPTION IS STALE  ${r.name}\n  now caught — remove it from EXPECTED_SURVIVORS`
+      : `\nEXPECTED SURVIVOR   ${r.name}\n  ${why}`,
+  );
+}
+
+const unexpected = results.filter((r) => !r.killed && !EXPECTED_SURVIVORS.has(r.name));
+const stale = results.filter((r) => r.killed && EXPECTED_SURVIVORS.has(r.name));
+process.exit(unexpected.length + stale.length > 0 ? 1 : 0);
