@@ -595,6 +595,51 @@ already exists, which is squarely appearance.
 five are capability detection. A row reading them as one question would be the
 homonym this ledger has now hit four times.)*
 
+
+**29 · `R-ACC-001` — §107 fixes the semantic node's fields and neither its role
+vocabulary nor a line of linear output.** Nothing of §107 exists in the tree: the
+element record is `{id, level, rows, cols}` plus `activate` and `viewState`, so one
+of the nine fields is built, and there is no linear renderer, no mode selection,
+no announcement policy and no `/capabilities` for the route to appear in.
+
+**What the design settles, and would be built unasked:** the nine fields (*id,
+role, name, description, value + valueText, state, position, actions,
+relations*), that **everything drawn** has a node rather than only what focus
+reaches, that linear mode uses no alternate screen, mouse tracking, repaint or
+animation and never rewrites an emitted event, and that announcements come from
+semantic events with `none · polite · assertive`, deduplication and rate limits.
+
+**What it does not, which is why the item is here — two wording gaps:**
+
+- **Roles for the kinds §107 does not name.** It lists *entry · question · button
+  · link · table · row · figure…* and the tree has twenty-five kinds. The
+  proposal is **ARIA's vocabulary wherever §107 is silent**, because §107's own
+  list is already mostly ARIA and a screen reader speaks those names: `progress →
+  progressbar`, `status → status`, `rule → separator`, `logs → log`, `pills` and
+  `steps → list`, `choice → radiogroup`, `control → slider`, `tape → tablist`,
+  `notice → note` (`alert` when its tone is `error`), `plot`/`mosaic`/`image` →
+  §107's own `figure`, `panel`/`scroll`/`group → group`, `code`/`raw`/`terminal →
+  document`. One word — *yes* — adopts the table; anything else is a list to
+  correct.
+- **The text of a linear event.** §107 says what an event carries — numbered
+  choices, a labelled line editor, start / milestones / blockage / completion,
+  coherent batches of prose — and never how a line reads. The proposal is the
+  node's own fields in a fixed order, no glyph and no colour: `entry 3 of 18:
+  pytest tests/unit — running`, then `entry 3: pytest tests/unit — failed, 4s`;
+  `question: which branch? 1 feat/c26, 2 main, 3 type a name`. §107's *name
+  without colour, position or punctuation* is why the position is a separate
+  clause rather than part of the name.
+
+**And it inherits question 28.** §107 selects linear mode by `--linear`,
+`CALCIUM_RENDER_MODE=linear` or persistent config, and the tree parses no flags
+and reads no config file. The environment half is buildable today —
+`src/terminal/capabilities.ts` is where A02 allows `process.env` — so if 28 is
+answered *where a provenance exists*, linear mode is selectable by the
+environment and by `auto`, and the flag and the file wait with 28.
+
+**Held entirely rather than half-built.** A semantic tree with roles for five
+kinds of twenty-five, or a linear stream with no settled line, is the frame with
+nothing in it — and it would be read as coverage.
 ---
 
 ## Not yet recovered
