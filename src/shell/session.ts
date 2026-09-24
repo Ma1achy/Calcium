@@ -1625,8 +1625,30 @@ class Session implements TuiInstance {
       // nothing moved means there is nowhere left, so the ticker stops rather
       // than waking forever against a clamp.
       if (!graph.scrollContainerBy(step.container, step.rows)) return;
+      this.#extendToEdge(rect, step.rows);
       this.#armAutoscroll();
     }, step.afterMs);
+  }
+
+  /**
+   * A tick's extend (C14 I49, `R-SEL-013`): *the selection extends to the
+   * container's end*. The pointer is outside and still, so no report moves the
+   * caret — the row the scroll brought in is at the container's edge, and it
+   * joins as though the pointer had moved onto it, through `extendTo`.
+   */
+  #extendToEdge(rect: Readonly<{ from: number; to: number }>, rows: number): void {
+    const graph = this.#graph;
+    if (graph === null || this.#semantic === null) return;
+    const width = this.#composed().region.width;
+    const caret = graph.semanticCaretAt(rows > 0 ? rect.to - 1 : rect.from, width);
+    if (caret === null) return;
+    this.#semantic = semantic.extendTo(
+      this.#semantic,
+      caret,
+      this.#selectionSpans(width),
+      this.#selectionOrder(),
+    );
+    graph.scheduler.commit("input");
   }
 
   #stopAutoscroll(): void {

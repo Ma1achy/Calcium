@@ -5,10 +5,10 @@
     {
       "run": "c14-drag-gesture.mjs",
       "exit": 0,
-      "seconds": 12,
+      "seconds": 17,
       "state": "green",
       "restored": 0,
-      "caught": 2,
+      "caught": 4,
       "elsewhere": 0,
       "survived": 0,
       "anchorMissed": 0,

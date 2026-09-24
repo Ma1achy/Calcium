@@ -52,6 +52,22 @@ const results = runPass({
       to: "      // the gesture and not the mode.\n",
       expect: "T4.37",
     },
+    {
+      // C14 I49 — the tick scrolls and selects nothing, as it shipped.
+      name: "a tick scrolls without extending",
+      file: SESSION,
+      from: "      this.#extendToEdge(rect, step.rows);\n",
+      to: "",
+      expect: "T4.37c",
+    },
+    {
+      // The wrong edge: scrolling down, the caret goes to the container's top.
+      name: "a tick extends to the edge it is scrolling away from",
+      file: SESSION,
+      from: "    const caret = graph.semanticCaretAt(rows > 0 ? rect.to - 1 : rect.from, width);\n",
+      to: "    const caret = graph.semanticCaretAt(rows > 0 ? rect.from : rect.to - 1, width);\n",
+      expect: "T4.37c",
+    },
   ],
 });
 

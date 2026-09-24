@@ -146,7 +146,77 @@ describe("C14 §6f — the drag in a real session", () => {
     }
   });
 
-  it.todo("T4.37c (C14 I49, R-SEL-013): a tick extends the selection to the container's edge — not deferred on a component: the tick's extend lands in the next commit of this MR");
+  it("T4.37c (C14 I49, R-SEL-013): a tick extends the selection to the container's edge", async () => {
+    vi.useFakeTimers();
+    try {
+      const stdin = fakeStdin();
+      const { screen, clock } = await buildSession({
+        manifest: MANIFEST,
+        localHandlers: SAYS,
+        stdin: stdin as never,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      await settle();
+      const step = async (ms: number): Promise<void> => {
+        clock.advance(ms);
+        await vi.advanceTimersByTimeAsync(ms);
+        await settle();
+      };
+      for (let i = 0; i < 6; i += 1) {
+        said = i;
+        stdin.emit("/say\r");
+        await step(0);
+      }
+
+      /** The prompt's rows: between the last two full-width rules. */
+      const prompt = (): string => {
+        const rows = screen().rows;
+        const rules = rows.flatMap((r, i) => (/^─+$/u.test(r.trim()) ? [i] : []));
+        const [a, b] = rules.slice(-2);
+        return rows.slice((a ?? 0) + 1, b).map((r) => r.trimEnd()).join("\n").replace(/^❯ ?/u, "");
+      };
+
+      /** Enter, drag from `(4,4)` to `row`, hold, release, `y`, leave, yank. */
+      const copied = async (row: number, holdMs: number): Promise<string> => {
+        for (let i = 0; i < 3; i += 1) {
+          stdin.emit("\u001b[5~");
+          await step(0);
+        }
+        stdin.emit("\u001bV");
+        await step(0);
+        stdin.emit(press(4, 4));
+        await step(0);
+        stdin.emit(moveTo(4, row));
+        await step(holdMs);
+        stdin.emit(release(4, row));
+        await step(0);
+        stdin.emit("y");
+        await step(0);
+        stdin.emit("\u0003");
+        await step(0);
+        stdin.emit("\u0019");
+        await step(0);
+        const text = prompt();
+        stdin.emit("\u0015"); // ⌃U — the next arm starts from an empty line
+        await step(0);
+        return text;
+      };
+
+      // **The subject first, on an empty kill buffer.** `copyText("")` leaves
+      // the buffer alone on purpose, so a control run first would leave its own
+      // copy there and an empty selection here would yank it — measured: the
+      // row passed against the unfixed tick in that order.
+      //
+      // Below the transcript and held still: only the ticks can select anything.
+      expect((await copied(99, 400)).trim(), "the ticks extended the selection").not.toBe("");
+
+      // **The control: a drag inside the transcript copies through these keys**,
+      // so an empty prompt above would be the selection's and not the instrument's.
+      expect((await copied(20, 0)).trim(), "in-container: the copy reaches the prompt").not.toBe("");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it("T4.37b (C14 I48, R-SEL-013): esc and ⌃c end the drag and its autoscroll", async () => {
     vi.useFakeTimers();
