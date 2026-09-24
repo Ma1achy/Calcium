@@ -120,7 +120,14 @@ choice.
 ↓ ⇥ ⇧ ⌃ ⌘ ⌥ ⌫ ⏎` — throughout §019 and the binding registry, and **registers
 none of them in the glyph table**, so none has a declared fallback and the
 section shows them degrading nowhere. Inventing eleven spellings is a visible
-choice. **Done under assumption:** `chordText` answers the existing shorthand
+choice.
+
+**Measured rather than asserted**, by sweeping every code point above U+2000 in
+`fixtures/*.txt` against every `unicode`/`ascii` field of the registry's glyph,
+spinner and bar records. Seven of the eleven are drawn **402 times** between them
+and none is registered: `⏎` 102, `⌃` 74, `⇧` 71, `⌥` 53, `⌘` 47, `⇥` 46,
+`⌫` 9. The sweep is the argument for the question's size: this is not one
+figure's spelling, it is every key name the design prints. **Done under assumption:** `chordText` answers the existing shorthand
 (`s+enter`, `m+C`) below the Unicode rung — the behaviour that already shipped,
 held as the arm to revisit rather than as an answer.
 
@@ -140,6 +147,24 @@ Ten vivid colour values is the park list's own example of a visible choice.
 but a `/colour` that accepts a literal and refuses `blue`, `blue..pink` and the
 picker — three of the six forms its own help text lists — is not a smaller
 version of this feature. `viridis` would work, since the colormaps ship.
+
+**17 · `↺` is an affordance the design draws and the registry does not record.**
+It is `↺ redo` on a reverted entry (§064), `↺ revert` on a stopped one (§005),
+`↺ revert all` on a review row (§013), and `↺ on an entry` in §092's state table
+— **22 occurrences in `calcium-registry.json`**, every one inside `sectionBlocks`
+text or the projected HTML, painted `c-accent` beside a `c-muted` label, and
+**none in a glyph record**. It is in no file in `src/` or `test/` either.
+
+**This is F161's shape inverted, and that is why it survived.** F161 was a shared
+mark with four named consumers whose character was in no file; here the character
+is everywhere and the **record** is missing — so a reader going to the registry
+for the mark finds it in the prose, which reads exactly like being registered.
+Nothing could catch it: SS64's collision domains are built from glyph records, so
+a mark with no record is in no domain and contests nothing.
+
+Registering it needs an ASCII rung, which is a visible choice — the same choice
+as 15 and reached by a different road. **Held.** The finding is the absence, and
+it is recorded here rather than left to the next sweep.
 
 ---
 
