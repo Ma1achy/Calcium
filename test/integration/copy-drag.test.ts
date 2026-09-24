@@ -145,4 +145,6 @@ describe("C14 §6f — the drag in a real session", () => {
       vi.useRealTimers();
     }
   });
+
+  it.todo("T4.37b (C14 I48, R-SEL-013): esc and ⌃c end the drag and its autoscroll — not deferred on a component: the gesture's end lands in the next commit of this MR");
 });
