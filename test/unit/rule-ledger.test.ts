@@ -20,12 +20,13 @@ const LEDGER = "docs/design/language/RULE_LEDGER.md";
 const text = (): string => readFileSync(LEDGER, "utf8");
 
 /** The tool against a mutated ledger — `{ code, out }`, because the code is the verdict. */
-function run(ledger: string): Readonly<{ code: number; out: string }> {
+function run(ledger: string, scope?: string): Readonly<{ code: number; out: string }> {
   const dir = mkdtempSync(join(tmpdir(), "ledger-"));
   const path = join(dir, "LEDGER.md");
   writeFileSync(path, ledger);
+  const args = scope === undefined ? [] : ["--scope", scope];
   try {
-    const out = execFileSync("node", ["tools/rule-status.mjs", "--file", path], {
+    const out = execFileSync("node", ["tools/rule-status.mjs", "--file", path, ...args], {
       encoding: "utf8",
     });
     return { code: 0, out };
@@ -57,10 +58,10 @@ function row(id: string): string {
 const LEDGER_BUDGET_MS = 120_000;
 
 describe("A03 SS66 — the rule ledger resolves against the tree", () => {
-  it("T1.154 (SS66, R-SPC-001): the live ledger is green, and its three states partition the registry", { timeout: LEDGER_BUDGET_MS }, () => {
+  it("T1.154 (SS66, R-SPC-001): the live ledger is green, and its five states partition the registry", { timeout: LEDGER_BUDGET_MS }, () => {
     const { code, out } = run(text());
     expect(out, "the counts are reported rather than left to a reader").toMatch(
-      /^\d+ current rules — \d+ cited, \d+ covered, \d+ owed$/mu,
+      /^\d+ current rules — \d+ cited, \d+ covered, \d+ unmet, \d+ parked, \d+ owed$/mu,
     );
     expect(out).toContain("every claim resolves");
     expect(code, "and it is green").toBe(0);
@@ -103,10 +104,41 @@ describe("A03 SS66 — the rule ledger resolves against the tree", () => {
     expect(bare.code).toBe(1);
   });
 
-  it.todo(
-    "T1.154b (SS66): a `parked` row names an open question, and a retracted one fails it — not deferred on a component: the two states land in rule-status.mjs in the next commit of this MR",
-  );
-  it.todo(
-    "T1.154c (SS66): an `unmet` row is cited and anchors its reason — not deferred on a component: the two states land in rule-status.mjs in the next commit of this MR",
-  );
+  it("T1.154b (SS66): a `parked` row names an open question, and a retracted one fails it", { timeout: LEDGER_BUDGET_MS }, () => {
+    const before = row("R-SEL-012");
+    const as = (by: string): string => text().replace(before, `| **R-SEL-012** — x | \`parked\` | ${by} |`);
+    // Open, so green: the control that shows the arm reads the file at all.
+    expect(run(as("parked as 18, the postures")).code, "an open question").toBe(0);
+    // **16 is retracted** — the entry exists, and a check that only asked
+    // whether the number appeared would pass it.
+    const retracted = run(as("parked as 16"));
+    expect(retracted.out).toContain("R-SEL-012: parked as 16, which is not an open entry");
+    expect(retracted.code).toBe(1);
+    const bare = run(as("waiting on a question"));
+    expect(bare.out).toContain("R-SEL-012: marked `parked` and names no question");
+  });
+
+  it("T1.154c (SS66): an `unmet` row is cited and anchors its reason", { timeout: LEDGER_BUDGET_MS }, () => {
+    const before = row("R-SEL-012");
+    const as = (by: string): string => text().replace(before, `| **R-SEL-012** — x | \`unmet\` | ${by} |`);
+    expect(run(as("C10 §4k: no painter")).code, "cited, and anchored to a section").toBe(0);
+    const loose = run(as("it does not hold"));
+    expect(loose.out).toContain("R-SEL-012: marked `unmet` and anchors its reason to no path, section or invariant");
+    expect(loose.code).toBe(1);
+    // **The path arm, which the section anchor above never takes.** A path is an
+    // anchor only if it exists — otherwise *unmet* can be written against a file
+    // that was renamed away, which names no place at all.
+    expect(run(as("`src/shell/confirm.ts` draws none")).code, "a path that exists").toBe(0);
+    const gone = run(as("`src/shell/nowhere.ts` draws none"));
+    expect(gone.out).toContain("R-SEL-012: marked `unmet` and anchors its reason to no path");
+    // **The other half: an unmet rule nothing cites is owed.** An empty corpus
+    // makes every rule uncited, so the arm is taken on the same row — rather
+    // than on whichever rule happens to be uncited, a population the audit
+    // exists to empty. The anchored control above is what shows the empty
+    // scope is the only thing that changed.
+    const empty = mkdtempSync(join(tmpdir(), "ledger-scope-"));
+    const uncited = run(as("C10 §4k: no painter"), empty);
+    expect(uncited.out).toContain("R-SEL-012: marked `unmet` and cited nowhere");
+    expect(uncited.code).toBe(1);
+  });
 });

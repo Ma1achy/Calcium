@@ -21,6 +21,17 @@
 // every backticked identifier appears in at least one file the row cites — the
 // check that caught a roadmap row naming a real mechanism in the wrong file.
 //
+// **5. A `parked` row names an open question** — `parked as N`, and entry N in
+// `docs/design/PARKED_QUESTIONS.md` exists and is not retracted, so a row cannot
+// outlive the question it waits on.
+//
+// **6. An `unmet` row is cited and says where.** Uncited, it is `owed`; and its
+// reason carries a path that exists, a section or an invariant, so *unmet* cannot
+// be written without naming the place the rule fails.
+//
+// (Five states since SS66's amendment: `cited` now means *not yet audited*, and
+// `unmet` and `parked` came out of it.)
+//
 // **4. An `owed` row's R-ID does NOT appear outside the registry.** This is the
 // direction a snapshot cannot hold. Without it, a rule that gets built and cited
 // leaves its `owed` row behind and the remainder reads larger than it is, for
@@ -33,10 +44,16 @@ const LEDGER = "docs/design/language/RULE_LEDGER.md";
 const REGISTRY = "docs/design/language/calcium-registry.json";
 // The corpus a citation may live in — everything but the registry's own home,
 // because a rule citing itself is not a reference to it.
-const SCOPE = [
+const argScope = process.argv.indexOf("--scope");
+/**
+ * `--scope <dir>` replaces the corpus, and it exists for one control: an
+ * `unmet` row that nothing cites. Once `owed` emptied, no real rule was
+ * reliably uncited, so the control could not take that arm on the live tree.
+ */
+const SCOPE = argScope === -1 ? [
   "src", "test", "tools", "docs/components", "docs/architecture",
   "docs/design/layout", "docs/design/PARKED_QUESTIONS.md", "CALCIUM_ROADMAP.md",
-];
+] : [process.argv[argScope + 1]];
 
 const argFile = process.argv.indexOf("--file");
 const ledgerPath = argFile === -1 ? LEDGER : process.argv[argFile + 1];
@@ -58,7 +75,7 @@ function citedIds() {
   }
 }
 
-const ROW = /^\| \*\*(R-[A-Z]{3}-\d{3})\*\* — (.*?) \| `(cited|covered|owed)` \| (.*?) \|$/u;
+const ROW = /^\| \*\*(R-[A-Z]{3}-\d{3})\*\* — (.*?) \| `(cited|covered|unmet|parked|owed)` \| (.*?) \|$/u;
 const rows = [];
 for (const line of readFileSync(ledgerPath, "utf8").split("\n")) {
   const m = ROW.exec(line);
@@ -82,6 +99,12 @@ for (const id of current) {
 
 const cited = citedIds();
 
+/** The open entries of the parked file, by number — a retracted one is not open. */
+const PARKED = "docs/design/PARKED_QUESTIONS.md";
+const openQuestions = new Set(
+  [...readFileSync(PARKED, "utf8").matchAll(/^\*\*(\d+) · (?!RETRACTED)/gmu)].map((m) => m[1]),
+);
+
 for (const r of rows) {
   // 2 — a citation claim is a claim about the corpus.
   if (r.state === "cited" && !cited.has(r.id)) {
@@ -93,6 +116,25 @@ for (const r of rows) {
       `${r.id}: marked \`owed\` and now cited — move the row rather than leaving it, ` +
         `or the remainder reads larger than it is`,
     );
+  }
+  // 5 — a parked row waits on a question that is still asked.
+  if (r.state === "parked") {
+    const n = /parked as (\d+)/iu.exec(r.by)?.[1];
+    if (n === undefined) problems.push(`${r.id}: marked \`parked\` and names no question — write \`parked as N\``);
+    else if (!openQuestions.has(n)) {
+      problems.push(`${r.id}: parked as ${n}, which is not an open entry in ${PARKED}`);
+    }
+  }
+  // 6 — an unmet row was looked at, and says where it fails.
+  if (r.state === "unmet") {
+    if (!cited.has(r.id)) {
+      problems.push(`${r.id}: marked \`unmet\` and cited nowhere — an unaudited absence is \`owed\``);
+    }
+    const anchored = [...r.by.matchAll(/`([^`]*\/[^`]*\.[a-z]+)[^`]*`/gu)].some((m) => existsSync(m[1])) ||
+      /§\d|\b[CA]\d{2} [IT§]|\bI\d+/u.test(r.by);
+    if (!anchored) {
+      problems.push(`${r.id}: marked \`unmet\` and anchors its reason to no path, section or invariant`);
+    }
   }
   // 3 — a covered row's subject resolves.
   if (r.state === "covered") {
@@ -133,10 +175,10 @@ const count = (s) => rows.filter((r) => r.state === s).length;
 console.log(
   `${String(rows.length)} current rules — ` +
     `${String(count("cited"))} cited, ${String(count("covered"))} covered, ` +
-    `${String(count("owed"))} owed`,
+    `${String(count("unmet"))} unmet, ${String(count("parked"))} parked, ${String(count("owed"))} owed`,
 );
 if (problems.length === 0) {
-  console.log("every claim resolves, and the three sets partition the population");
+  console.log("every claim resolves, and the five sets partition the population");
   process.exit(0);
 }
 for (const p of problems) console.log(`  ${p}`);
