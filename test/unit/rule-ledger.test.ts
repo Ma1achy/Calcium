@@ -102,4 +102,11 @@ describe("A03 SS66 — the rule ledger resolves against the tree", () => {
     expect(bare.out).toContain("names a path with no identifier in it");
     expect(bare.code).toBe(1);
   });
+
+  it.todo(
+    "T1.154b (SS66): a `parked` row names an open question, and a retracted one fails it — not deferred on a component: the two states land in rule-status.mjs in the next commit of this MR",
+  );
+  it.todo(
+    "T1.154c (SS66): an `unmet` row is cited and anchors its reason — not deferred on a component: the two states land in rule-status.mjs in the next commit of this MR",
+  );
 });

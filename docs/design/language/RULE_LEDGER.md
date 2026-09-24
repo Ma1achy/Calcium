@@ -17,7 +17,22 @@ were. Measured:
 argument for `tools/rule-status.mjs` rather than for this table alone. The tool
 re-derives all four figures and fails when any row's claim stops holding.
 
-## The three states, and why `covered` is separate from `cited`
+## The five states — `cited` was carrying three, so two came out of it
+
+**Amended 2026-09-24.** A parked rule, an audited-and-unmet rule and a rule
+nobody had checked all read `cited`, because each names its R-ID somewhere. A
+sample of five found one whose only citation is a spec row reading *No field, no
+painter* (R-HON-002). So `cited` now means **not yet audited**, and the audit's
+measure is that count reaching zero. The remainder is `unmet + parked + owed`.
+
+- **`unmet`** — cited, audited, and **not satisfied**. It must be cited (an
+  uncited unmet rule is `owed`), and its reason must be anchored to a path, a
+  section or an invariant, so *unmet* cannot be written without saying where.
+- **`parked`** — the row says `parked as N`, and N is an **open** entry in
+  `docs/design/PARKED_QUESTIONS.md`: a question retracted or removed fails the
+  row, so a row cannot outlive its question.
+
+The original three follow.
 
 - **`cited`** — the rule's `R-XXX-NNN` appears in `src/`, `test/`, `tools/`,
   `docs/components/`, `docs/architecture/`, `docs/design/layout/`,
