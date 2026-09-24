@@ -558,6 +558,43 @@ So three answers are needed before this can land: which earning table binds and
 whether *the model failed* survives; what declares the rungs and their wording;
 and whether the watch itself is mine to build.
 
+**28 · `R-HON-008`'s display is fully specified and three of its four sources do
+not exist.** §075 — *`/config` — and the third column is the one that matters* —
+draws the whole surface: a three-column table `key · value · source`, four
+sources on a tone ladder (`default` muted *nobody chose it*, `config` meta, `env`
+warn, `flag` error, ordered because *the later it is applied, the louder it is*),
+per-directory precedence with the checkout's file winning, and the argument for
+the column at all — *a config view without a source column is one you cannot
+debug: the commonest question is not what is it, it is WHY is it that.*
+
+**Nothing about the appearance is open.** The table, the ladder, the tones and
+the wording are all drawn. What is missing is the subject: `src/shell/config.ts`
+resolves a caller's value against a framework constant at a `??` that keeps
+neither, the tree **reads no config file**, **parses no flags**, and reads
+`process.env` only inside `src/terminal/capabilities.ts` because A02 forbids it
+anywhere else. So three of the four sources have no producer, and the fourth —
+`default` — is the only one a `/config` view could truthfully print today.
+
+**This is the scope question, and it is why the item is here rather than
+built.** Building config-file loading, environment reading and flag parsing is
+configuration plumbing; the brief puts appearance, interaction and navigation in
+scope and *transport, manifest, adapters, process, history and the profiler*
+out, and this is not on either list. It is closest to the second.
+
+**The two shapes it could take, so the answer is one word.** Either the four
+sources are built and `/config` draws them — which is a real feature in a part
+of the tree this work has not touched — or the rule is read as binding **where a
+provenance exists**, in which case its capability half is the live subject:
+`CapabilitySource` is `declared | stated | inferred | assumed | unreachable`,
+`Answer<T>` returns a value with its source, all ten capability fields carry
+one, and **nothing reads them** — `Detection` is unexported and `.sources` has
+two test files as its only consumers. That half is a display over a record that
+already exists, which is squarely appearance.
+
+*(Not the same provenance. §075's four are configuration layering; the tree's
+five are capability detection. A row reading them as one question would be the
+homonym this ledger has now hit four times.)*
+
 ---
 
 ## Not yet recovered
