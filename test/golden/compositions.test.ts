@@ -310,7 +310,7 @@ describe("C10 §4k — the compositions, as frames", () => {
     // `docs/design/language/MILESTONES.md`, so this row going red is scheduled
     // work rather than a surprise at the end of an unrelated change.
     const owed = [
-      "2 · hover beside focus     no producer — mouse mode 1002 sends no motion, so the fact cannot arise (M7)",
+      "2 · hover beside focus     no block declares `hovered`; the router discards a hover by rule (M7)",
       "3 · selection over a diff  both facts ship; `patch` declares no elements and reads ctx.focus nowhere (M9)",
       "5 · disabled + error       `disabled` is an availability fact and no block carries the field (M4)",
       "6 · stale + running        `stale` is a freshness fact and no block carries the field (M4)",
