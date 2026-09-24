@@ -1606,6 +1606,16 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
   **Measured on the table, it holds today**: `child`, `global`, `overlay`, `panel` and `prompt` carry **zero** bare single keys between them across 83 rows, and the nine on `liveBlock` (`y [ ] { + = - r o`) and three on `semanticSelection` (`a A y`) are the rule being followed rather than broken — `R-SEL-008` names `a` and `A` for one of them on purpose. **So the exemption is compared by equality, not by subset**, for the reason C10's 4-bit skip list is: a subset check lets a scope that stopped being a typing scope keep an exemption nobody re-read, and the day `panel` moves the other way is the day this must go red.
 
   **A rule that is satisfied on the day it is written is the case for writing it**, not against: nothing in the tree prevented a bare `y` on `prompt`, and `liveBlock` shows exactly what a scope looks like when the constraint does not apply, so the shape was one row away the whole time.
+- **I53** — **Key repeat is declared per binding, and only the protocol's own repeats are acted on** (`R-KEY-002`, `R-DEG-002`). §020 gives two numbers and insists they are two questions — **DAS**, the delay before auto-shift, and **ARR**, the rate once running — *and both are per-BINDING*: `↑↓` in a list 170/25, `⌥↑`/`⌥↓` by the page 250/90, a 3D orbit 0/16 because it is analogue, a slider 200/40, and `⌫` in the prompt 300/30 because a mis-hold there is expensive.
+
+  Under `keyboardProtocol: "kitty"` a held key arrives as a stream of `event: "repeat"` events, and the policy decides what each one is **worth** rather than when it happens: one step while the key has been held under a second, four to three seconds, sixteen beyond — so a ten-thousand-row table is crossable by holding an arrow and a two-row one is not overshot.
+
+  **Nothing is ever synthesised**, and that is the half a timer makes easy to get wrong. The repeats are the terminal's; the policy only rate-limits and weights them. A reader who has disabled key repeat sends none and therefore gets none, which is why this cannot be a timer that fires on its own. Without the protocol the operating system's repeat stands unchanged, with no acceleration and no per-binding rate, and the capability row says so rather than the application pretending — `R-DEG-002`'s ladder, where a capability makes things better and never possible.
+
+  **This does not contradict §4a W9's refusal of a clock**, and the two are worth reading together because they look alike. That refusal is about the ambiguous-activation boundary, where *a held key is precisely the thing that produces no event for a timer to be right about* — a timer waiting for silence. Here the premise is inverted: under the protocol a held key is the thing that produces events, and the clock is used to weigh a stream that already exists rather than to guess at one that does not.
+
+  Text entry and destructive actions do not inherit navigation's repeat: a binding with no declaration of its own repeats at the terminal's rate and is worth one step, never four or sixteen.
+
 ## 9. Commitments
 
 1. C01 sets raw mode; C16 decodes the bytes (I13).
@@ -1648,6 +1658,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 36. `overlay › panel › peek › base` decides which viewport a wheel moves as it decides which layer a key reaches, and beneath the layers the wheel takes the innermost scrollable under the pointer (I48, C15 I23, R-SEL-012).
 37. The `child` rung has a subject — a shell delegation or an attached child surface — and takes every key but `host.detach`, consuming what it does not bind; the escape is reserved at attach time or the attach is refused, and it is on screen in the border and on the owner line (I49, R-BLK-908, R-INT-007).
 38. A scope in which a line is being composed binds no bare single key, and which scopes those are is a list compared by equality rather than a predicate (I52, `R-INT-002`, `R-CAP-001`). → T1.158
+39. A repeating binding declares its own delay and rate and what a repeat is worth at each hold duration; a binding that declares nothing is worth one step at the terminal's own rate, and no repeat is ever synthesised (I53, `R-KEY-002`, `R-DEG-002`). → T1.159
 
 ---
 

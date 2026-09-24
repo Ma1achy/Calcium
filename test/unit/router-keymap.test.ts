@@ -1420,3 +1420,10 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     expect(/\n\s*insertNewline: reserved,/u.test(effects), "an acting effect is not reserved").toBe(false);
   });
 });
+
+describe("C16 §8 I53 — key repeat is declared per binding", () => {
+  // **Spec-alone commit.** I53 and commitment 39 land first so the invariant
+  // has a subject before the policy exists; SP9 requires every invariant be
+  // named by a test row, and a `todo` is the row a spec-first commit carries.
+  it.todo("T1.159 (I53, R-KEY-002, R-DEG-002): a binding's DAS and ARR gate its repeats, and nothing is synthesised — not deferred on a component: the policy lands in this round's code commit, which replaces this row");
+});
