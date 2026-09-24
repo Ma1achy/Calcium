@@ -713,6 +713,8 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
   const noticeAt = (b: typeof NOTICE, focus: FocusState | null, depth: 24 | 1 = 24) =>
     renderToLines(registry, b, 40, { theme, capabilities: capabilities({ colourDepth: depth }), focus });
 
+  it.todo("T1.75 (C09 I45, C10 I45, R-THM-003): a focused call head on a band takes the state's own mark — not deferred on a component: specified before headMark is changed");
+
   it("T1.29 (C26 §7, C04 §3, C09 I83): a focused notice keeps its own tone over the focus ground — glyph and text; one without an action declares nothing and cannot move", () => {
     const caps = capabilities({ colourDepth: 24 });
     const error = params(tone("error", theme, caps));
