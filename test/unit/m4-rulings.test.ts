@@ -20,10 +20,22 @@ import { FULL_CAPS } from "../support/render.js";
 
 const REGISTRY = JSON.parse(
   readFileSync("docs/design/language/calcium-registry.json", "utf8"),
-) as { glyphs: readonly Record<string, unknown>[] };
+) as {
+  glyphs: readonly Record<string, unknown>[];
+  delimiters: readonly Record<string, unknown>[];
+};
 
 const glyph = (id: string): Record<string, unknown> | undefined =>
   REGISTRY.glyphs.find((g) => g["id"] === id);
+
+/**
+ * **`»` is a delimiter record, not a glyph one**, and that is why it needs its
+ * own accessor. Every sweep that looked for it among `glyphs` came back empty
+ * and read as *the ruling was never applied* — a matcher that sees one shape
+ * reporting absence when the value lives in another.
+ */
+const delimiter = (id: string): Record<string, unknown> | undefined =>
+  REGISTRY.delimiters.find((d) => d["id"] === id);
 
 const CAPS = { unicode: "full", ambiguousWidth: "narrow" } as const;
 const ASCII = { unicode: "ascii", ambiguousWidth: "narrow" } as const;
@@ -112,6 +124,21 @@ describe("M4 — the six rulings, against the tree", () => {
     const source = readFileSync("src/presentation/blocks/glyphs.ts", "utf8");
     expect(source, "the second rôle is recorded beside the slot").toContain("mode line");
     expect(source, "and so is the refusal to share the mark").toMatch(/its own mark rather than\s+\*?\s*reusing this one/u);
+
+    // **And on the record, which is the half the ruling names and which
+    // nothing watched.** The row above asserts the note beside the *slot*;
+    // *note its mode-line rôle on the record for its first renderer* is about
+    // the registry, and `»` lives in `delimiters` rather than `glyphs` — so a
+    // sweep of the glyph records comes back empty and reads as the ruling
+    // never having been applied. Asserted here so the record cannot be
+    // emptied without a red.
+    const tape = delimiter("tape-right");
+    expect(tape?.["unicode"], "the registry's own record").toBe("»");
+    expect(tape?.["status"]).toBe("current");
+    expect(String(tape?.["secondRoleNote"] ?? ""), "the mode-line rôle").toContain("mode line");
+    expect(String(tape?.["secondRoleNote"] ?? ""), "and its first renderer").toContain(
+      "first renderer",
+    );
   });
 
   it("M4.6: SS59 is a gate, not an inventory row", () => {
