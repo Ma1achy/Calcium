@@ -37,9 +37,28 @@ describe("C17 §5c — the chip", () => {
 
     // **An image has no lines**, and the absence must take the separator with
     // it — a bare `L` or a trailing separator is the shape this invites.
+    //
+    // **And no ordinal, which is the discriminator and not a second rule** (C17 I25,
+    // §011, §101). A paste's name is its *detected kind* — `json` twice is one
+    // word twice, and the number is all that separates them — where a filename
+    // identifies itself and `#2` in front of it says nothing the reader did not
+    // already have. §101 draws `[#1 json · 47L]` and §011 draws
+    // `[parse.ts · 184L]`; both are this composer, and the number is what the
+    // two figures differ by.
     const image: Chip = { ordinal: 2, kind: "image", name: "loss-curve.png", content: "…" };
-    expect(chipLabel(image, PAINTED), "no size, no separator").toBe(" #2 loss-curve.png ");
-    expect(chipLabel(image, BARE)).toBe("[#2 loss-curve.png]");
+    expect(chipLabel(image, PAINTED), "no size, no separator, and no number").toBe(" loss-curve.png ");
+    expect(chipLabel(image, BARE)).toBe("[loss-curve.png]");
+
+    // A file, which is §011's own figure and the row the design settles.
+    const file: Chip = { ordinal: 3, kind: "file", name: "parse.ts", lines: 184, content: "…" };
+    expect(chipLabel(file, BARE), "§011's label exactly").toBe(`[parse.ts ${SEP} 184L]`);
+
+    // **The control is the paste**, which keeps its number — without it, *the
+    // ordinal is drawn where the name does not identify the chip* is satisfied
+    // by a composer that never draws one.
+    expect(chipLabel(PASTE, BARE), "a paste is told apart by its number alone").toBe(
+      `[#1 json ${SEP} 47L]`,
+    );
 
     // **The separator is the glyph table's**, so the ASCII tier is taken from
     // the same place every other separator in the frame is. Asserted by
@@ -98,7 +117,7 @@ describe("C17 §5c — the chip", () => {
     // And two chips are two spans, so the walk is not answering about the first
     // one it finds.
     const two = withChip(PASTE, PAINTED, "a ", " b ");
-    two.insertChip({ ordinal: 2, kind: "file", name: "notes.md", lines: 12, content: "x" });
+    two.insertChip({ kind: "file", name: "notes.md", lines: 12, content: "x" });
     expect(chipSpans(two.text, 200, GUTTER, two.drawAs).length, "two chips, two spans").toBe(2);
   });
 

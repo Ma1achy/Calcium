@@ -102,7 +102,7 @@ most-drawn line in the application.
 | 8 | surface | `questionNotice` | `blocks.test.ts` | a message entry |
 | 9 | surface | `CALL_STATE_GLYPH` | `states.test.ts` | queued, and what a queue draws |
 | 10 | surface | `emptySnapshot` | `session-frame.test.ts` | startup and resume |
-| 11 | surface | `insertChip` | — | @ mentions are chips, and the chip's halves have never met |
+| 11 | surface | `insertChip` | `design-surfaces.test.ts` | a mention is a chip — `design-surfaces` §11, drawn because the whole claim is a **form**: what crosses the seam are the parts, and the label is C17's composer's (C17 I25, C19 I28). An assertion on the string is satisfied by a source that handed one over; only a picture shows it did not. **Both halves shipped and had never met** — C17 has minted chips since roadmap 30 and the only caller was a large paste, while every candidate this engine produced accepted as a string, so a mention was expressible in neither direction. **The census settled a form the repository had wrong**: §011 draws `[parse.ts · 184L]` and §101 draws `[#1 json · 47L]`, and the composer wrote the ordinal in both. The discriminator is the name — a paste's is its *detected kind*, so two pastes of JSON are one word twice and the number is all that tells them apart; a file and an image name themselves. C17 I25 amended, and minting untouched, since the number is still the map's key. **And the build was wrong about the undo unit in a way the frame could not see**: the delimiter went in a second `insert`, so `⌘_` took back the space and left the chip — caught by reading the whole buffer back, and the delimiter now travels inside the one edit (`ChipInsert`). **The remainders, named**: the `@` trigger and the file source are the application's, not the framework's; the size warning past a threshold is M15's question work; §101's preview panel is M13's |
 | 12 | surface | `questionNotice` | `blocks.test.ts` | multi-line and transient feedback |
 | 13 | surface | `CALL_STATE_GLYPH` | `states.test.ts` | reviewing what auto wrote |
 | 14 | surface | `emptySnapshot` | `session-frame.test.ts` | away, and what the frame says while you are |
@@ -217,7 +217,7 @@ that is the reconciliation working, and it should be visible as a number moving 
 than inferred from a suite staying green.
 
     surface 66 · prose 37 · app 6 · total 109
-    of the surfaces: built 60 · unbuilt 6 · framed 63
+    of the surfaces: built 60 · unbuilt 6 · framed 64
 
 **`framed` is the figure this MR moves, and `built` is the one that went backwards.**
 Seven surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks

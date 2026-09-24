@@ -1,7 +1,23 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`golden frames — one per design fixture > dark-ascii at 40 1`] = `
-"── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
+"── §11 · a mention is a chip — the parts cross the seam and the label does not
+· painted — the ground says chip
+   40 │summarise  parse.ts : 184L  for me│
+   20 │summarise │
+      │ parse.ts : 184L  fo│
+      │r me│
+
+· 1-bit — the bracket says it instead
+   40 │summarise [parse.ts : 184L] for me│
+   20 │summarise │
+      │[parse.ts : 184L] fo│
+      │r me│
+
+· and what leaves the prompt is the content, never the label
+  │<the file>│
+
+── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
 · a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
   at rest
     ........................................ scale  o linear  * log  o log2
@@ -655,7 +671,23 @@ line 6                                 |
 `;
 
 exports[`golden frames — one per design fixture > dark-ascii at 80 1`] = `
-"── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
+"── §11 · a mention is a chip — the parts cross the seam and the label does not
+· painted — the ground says chip
+   80 │summarise  parse.ts : 184L  for me│
+   20 │summarise │
+      │ parse.ts : 184L  fo│
+      │r me│
+
+· 1-bit — the bracket says it instead
+   80 │summarise [parse.ts : 184L] for me│
+   20 │summarise │
+      │[parse.ts : 184L] fo│
+      │r me│
+
+· and what leaves the prompt is the content, never the label
+  │<the file>│
+
+── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
 · a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
   at rest
     .................................................... scale  o linear  * log  o log2
@@ -1302,7 +1334,23 @@ line 6                                                                         |
 `;
 
 exports[`golden frames — one per design fixture > dark-mono-unicode at 40 1`] = `
-"── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
+"── §11 · a mention is a chip — the parts cross the seam and the label does not
+· painted — the ground says chip
+   40 │summarise  parse.ts · 184L  for me│
+   20 │summarise │
+      │ parse.ts · 184L  fo│
+      │r me│
+
+· 1-bit — the bracket says it instead
+   40 │summarise [parse.ts · 184L] for me│
+   20 │summarise │
+      │[parse.ts · 184L] fo│
+      │r me│
+
+· and what leaves the prompt is the content, never the label
+  │<the file>│
+
+── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
 · a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
   at rest
     ........................................ scale  ○ linear  ● log  ○ log2
@@ -1922,7 +1970,23 @@ line 6                                 │
 `;
 
 exports[`golden frames — one per design fixture > dark-mono-unicode at 80 1`] = `
-"── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
+"── §11 · a mention is a chip — the parts cross the seam and the label does not
+· painted — the ground says chip
+   80 │summarise  parse.ts · 184L  for me│
+   20 │summarise │
+      │ parse.ts · 184L  fo│
+      │r me│
+
+· 1-bit — the bracket says it instead
+   80 │summarise [parse.ts · 184L] for me│
+   20 │summarise │
+      │[parse.ts · 184L] fo│
+      │r me│
+
+· and what leaves the prompt is the content, never the label
+  │<the file>│
+
+── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
 · a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
   at rest
     .................................................... scale  ○ linear  ● log  ○ log2
@@ -2534,7 +2598,23 @@ line 6                                                                         �
 `;
 
 exports[`golden frames — one per design fixture > dark-unicode at 40 1`] = `
-"── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
+"── §11 · a mention is a chip — the parts cross the seam and the label does not
+· painted — the ground says chip
+   40 │summarise  parse.ts · 184L  for me│
+   20 │summarise │
+      │ parse.ts · 184L  fo│
+      │r me│
+
+· 1-bit — the bracket says it instead
+   40 │summarise [parse.ts · 184L] for me│
+   20 │summarise │
+      │[parse.ts · 184L] fo│
+      │r me│
+
+· and what leaves the prompt is the content, never the label
+  │<the file>│
+
+── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
 · a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
   at rest
     ........................................ scale  ○ linear  ● log  ○ log2
@@ -3189,7 +3269,23 @@ line 6                                 │
 `;
 
 exports[`golden frames — one per design fixture > dark-unicode at 80 1`] = `
-"── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
+"── §11 · a mention is a chip — the parts cross the seam and the label does not
+· painted — the ground says chip
+   80 │summarise  parse.ts · 184L  for me│
+   20 │summarise │
+      │ parse.ts · 184L  fo│
+      │r me│
+
+· 1-bit — the bracket says it instead
+   80 │summarise [parse.ts · 184L] for me│
+   20 │summarise │
+      │[parse.ts · 184L] fo│
+      │r me│
+
+· and what leaves the prompt is the content, never the label
+  │<the file>│
+
+── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
 · a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
   at rest
     .................................................... scale  ○ linear  ● log  ○ log2

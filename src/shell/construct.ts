@@ -908,7 +908,6 @@ export async function constructGraph(
   // file and neither invariant has to give.
   const size = terminalSize(config.stdout);
   /** Roadmap 30 — the chip's display number, per session. */
-  let chipCount = 0;
 
   /**
    * The rows the composer draws above an entry's blocks (C14 I20, C22 I33).
@@ -3269,13 +3268,12 @@ export async function constructGraph(
         // string rather than a mechanism.
         const lines = e.text.split("\n").length;
         if (lines >= CHIP_LINES) {
-          chipCount += 1;
+
           // **The parts, not a label** (C17 I25, §5c). The form is C17's, so a
           // second application does not get to spell it differently — and the
           // separator and the bracket rung are settled where the editor is
           // built, from the same capability record this line used to read.
           stores.editor.insertChip({
-            ordinal: chipCount,
             kind: "paste",
             name: "pasted",
             lines,

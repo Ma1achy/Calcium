@@ -87,6 +87,31 @@ export type ClusterText = (cluster: string) => string | undefined;
 export type ChipKind = "paste" | "file" | "image";
 
 /** A pasted or attached block, standing in the buffer as one grapheme (roadmap 30, I25). */
+/**
+ * A chip as a **producer** supplies it — everything but the ordinal (C17 I25,
+ * C19 I28).
+ *
+ * The ordinal is numbered per session and never reset, which is a fact about a
+ * buffer's whole life; no caller holds it, and two callers each keeping a
+ * counter is one prompt with two `#1`s.
+ */
+export type ChipParts = Omit<Chip, "ordinal">;
+
+/**
+ * Where a chip goes and what closes it (C19 I28, I16).
+ *
+ * **Both members belong to one edit**, which is why they arrive together rather
+ * than as a span argument and a second `insert` call: the region the chip stands
+ * in for and the delimiter that closes its token are one undo unit, and either
+ * one taken separately is a `⌃_` that does half the job.
+ */
+export type ChipInsert = Readonly<{
+  /** A span of the buffer in **code units** — the shape `accept` produces. */
+  replace?: Readonly<{ start: number; end: number }>;
+  /** Appended inside the same edit; `" "` for a unique match. */
+  delimiter?: string;
+}>;
+
 export type Chip = Readonly<{
   ordinal: number;
   kind: ChipKind;
@@ -115,7 +140,14 @@ export type ChipLook = Readonly<{ separator: string; painted: boolean }>;
 /** A chip's label, composed (C17 I25, §5c, §099). */
 export function chipLabel(chip: Chip, look: ChipLook): string {
   const size = chip.lines === undefined ? "" : ` ${look.separator} ${String(chip.lines)}L`;
-  const text = `#${String(chip.ordinal)} ${chip.name}${size}`;
+  // **The ordinal is drawn only where the name does not identify the chip**
+  // (I25, §011, §101). A paste's `name` is its detected kind, so two pastes of
+  // JSON are one word twice and the number is what tells them apart; a file and
+  // an image name themselves, and `#1` in front of `parse.ts` says nothing the
+  // reader did not have. Minting is untouched — the number is still the map's
+  // key — and this is only whether the label spends cells on it.
+  const mark = chip.kind === "paste" ? `#${String(chip.ordinal)} ` : "";
+  const text = `${mark}${chip.name}${size}`;
   // The space either side is the ground's, so it belongs to the painted rung
   // alone — a bracketed label padded as well would be a chip inside a chip.
   return look.painted ? ` ${text} ` : `[${text}]`;

@@ -14,7 +14,7 @@
  */
 
 import { clamp, count, removeBetween, sliceBetween, splitAt, stripForBuffer } from "./graphemes.js";
-import { chipText, cursorCell, layout, type Cell, type Chip, type ChipLook, type Gutter } from "./layout.js";
+import { chipText, cursorCell, layout, type Cell, type Chip, type ChipInsert, type ChipLook, type ChipParts, type Gutter } from "./layout.js";
 import { classify, wordLeft, wordRight } from "./words.js";
 import { History, type Snapshot } from "./undo.js";
 
@@ -36,7 +36,7 @@ export type Motion =
  * the type lives with the function that reads it. Re-exported because `Chip` is
  * C17's name for it and a consumer should not have to know which file it sits in.
  */
-export type { Chip, ChipKind, ChipLook } from "./layout.js";
+export type { Chip, ChipInsert, ChipKind, ChipLook, ChipParts } from "./layout.js";
 
 /**
  * A line held whole — text, caret and region (I28, §101, C23 I28).
@@ -98,7 +98,24 @@ export interface LineEditor {
    * as they do for typing — the sentinel is a character to every one of them,
    * which is the whole of what *one grapheme to the editor* buys.
    */
-  insertChip(chip: Chip): void;
+  /**
+   * `replace` is a span of the buffer, in **code units**, that the chip stands
+   * in for — the shape `accept` produces and `setText` already takes (C19 I28).
+   *
+   * **Given, it is one edit and one undo unit.** A mention is a candidate
+   * accepted over the token the caret is in, and the obvious build — delete the
+   * token, then insert the chip — is two units: `⌃_` puts the reader back to a
+   * buffer with the token already gone, which draws as an undo that did half
+   * the job. The span goes through `insert`'s region arm, which takes its
+   * snapshot before the region goes and once (I22).
+   *
+   * **`delimiter` travels with the chip for the same reason** (C19 I16, I28). A
+   * chip closes its token as a unique match does, and a separate `insert` for
+   * the space is a second unit — so `⌃_` takes back the space and leaves the
+   * chip, which is the half-undo the region arm exists to prevent, one keystroke
+   * further on.
+   */
+  insertChip(chip: ChipParts, opts?: ChipInsert): void;
   /**
    * The chip the caret is on, for §101's preview (I27, §5d).
    *
@@ -352,13 +369,30 @@ class Editor implements LineEditor {
     this.#cursor += count(clean);
   }
 
-  insertChip(chip: Chip): void {
+  insertChip(chip: ChipParts, opts?: ChipInsert): void {
+    const replace = opts?.replace;
     const sentinel = String.fromCodePoint(CHIP_BASE + this.#nextChip);
     this.#nextChip += 1;
-    this.#chips.set(sentinel, chip);
+    // **The ordinal is the editor's, and a producer must not choose it** (C17
+    // I25, C19 I28). It is numbered per session and never reset — `[#2]` after
+    // `[#1]` was deleted is a reader seeing that something else was there,
+    // which is true — and that is a fact about this buffer's whole life, which
+    // no caller holds. Two callers each keeping a counter is one prompt with
+    // two `#1`s, which is what the second producer would have made.
+    this.#chips.set(sentinel, { ...chip, ordinal: this.#nextChip });
+    // **The span becomes the region, and `insert` does the rest** (C19 I28).
+    // Code units in, graphemes inside: the caret is grapheme-indexed here and
+    // `accept` measures the buffer as a string, and the two disagree the moment
+    // a mention follows an emoji. Converting at the boundary is the same rule
+    // `cells()` follows one axis over — one place that knows both.
+    if (replace !== undefined) {
+      this.#anchor = count(this.#text.slice(0, replace.start)); // graphemes-ok — a code-unit span, converted here
+      this.#cursor = count(this.#text.slice(0, replace.end)); // graphemes-ok — a code-unit span, converted here
+    }
     // `atomic`, because a chip is its own unit of undo — the argument `undo.ts`
-    // makes for a paste, which is what this is.
-    this.insert(sentinel, { atomic: true });
+    // makes for a paste, which is what this is. With a region, `insert` takes
+    // the `structural` arm instead and the unit covers both halves.
+    this.insert(`${sentinel}${opts?.delimiter ?? ""}`, { atomic: true });
   }
 
   chipAt(): Chip | null {

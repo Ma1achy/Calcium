@@ -499,6 +499,27 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   function applyEdit(ctx: CompletionContext, candidate: Candidate, whole: boolean): void {
     const edit = accept(ctx, candidate, whole);
     const before = deps.editor.text;
+    // **A candidate may accept into a chip** (C19 I28, §011). The span the
+    // engine computed is what the chip stands in for, so this is the same one
+    // edit the text arm is — not a delete and an insert, which is two undo
+    // units and puts `⌃_` back to a buffer with the token already gone.
+    //
+    // **The ordinal and the label are C17's** (C17 I25). What comes across the
+    // seam are the parts; a source that spelled its own label would put §011's
+    // form in every application separately, which is what I25 exists to stop.
+    const chip = candidate.chip;
+    if (chip !== undefined) {
+      // **The delimiter still closes the token, and goes in the same edit**
+      // (C19 I16, I28). A chip is a unique match like any other, so the next
+      // keystroke belongs in the next slot rather than inside the chip's name —
+      // and a second `insert` for the space would be a second undo unit, so
+      // `⌃_` would take the space back and leave the chip.
+      deps.editor.insertChip(chip, {
+        replace: { start: edit.start, end: edit.end },
+        ...(whole ? { delimiter: candidate.delimiter ?? " " } : {}),
+      });
+      return;
+    }
     deps.editor.setText(
       before.slice(0, edit.start) + edit.text + before.slice(edit.end),
       edit.start + edit.text.length,

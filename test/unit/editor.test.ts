@@ -1006,7 +1006,7 @@ describe("C17 §5b — the region's cells (roadmap entry 23)", () => {
     const chipped = createEditor();
     chipped.insert("read ");
     const beforeChip = chipped.text;
-    chipped.insertChip({ ordinal: 1, kind: "file", name: "parse.ts", lines: 184, content: "line one" });
+    chipped.insertChip({ kind: "file", name: "parse.ts", lines: 184, content: "line one" });
     expect(chipped.text, "insertChip moves the buffer in the same call").not.toBe(beforeChip);
   });
 });

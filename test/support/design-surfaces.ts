@@ -23,6 +23,7 @@ import {
   GLYPH_TOKENS,
   barStyleNames,
   glyphFor,
+  glyphs,
   headMark,
   scrollbarSet,
   spinnerFrames,
@@ -37,6 +38,7 @@ import { patchOf } from "./blocks.js";
 import { measurable, registry } from "./render.js";
 import { ALL_KINDS, ONE_PER_KIND } from "./blocks.js";
 import { cells, truncate } from "../../src/presentation/text.js";
+import { createEditor } from "../../src/interaction/editor/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { styledScreenFrom } from "./styled-screen.js";
 import type { ResolvedTheme } from "../../src/presentation/theme/index.js";
@@ -1136,6 +1138,51 @@ const middleCut = (_width: number, capabilities: TerminalCapabilities): readonly
 };
 
 /**
+ * §011 — *@ pulls a file into the turn, and it is a chip like a paste*.
+ *
+ * **Drawn rather than asserted, because the seam's whole claim is a form.** What
+ * crosses it are the parts — a kind, a name, a line count — and the label is
+ * C17's composer's (C17 I25, C19 I28). A picture is the only reading that shows
+ * the source never spelled `[parse.ts · 184L]`: an assertion on the string is
+ * satisfied by a source that handed one over.
+ *
+ * **Both chip rungs, because the bracket is the 1-bit carrier.** Painted, the
+ * ground says *chip* and the label carries no brackets; where nothing paints,
+ * the bracket is what is left, and drawing only the painted rung would show a
+ * label indistinguishable from the prose either side of it.
+ *
+ * **And a width that wraps**, which is §099's rule arriving at §011's subject: a
+ * chip is one wrap unit, so the row either holds the whole label or none of it.
+ */
+const mentionChip = (width: number, capabilities: TerminalCapabilities): readonly string[] => {
+  const sep = glyphs(capabilities).separator;
+  const out: string[] = [];
+  for (const painted of [true, false]) {
+    const e = createEditor({ chips: { separator: sep, painted } });
+    e.insert("summarise ");
+    e.insertChip({ kind: "file", name: "parse.ts", lines: 184, content: "…" }, { delimiter: " " });
+    e.insert("for me");
+    out.push(`· ${painted ? "painted — the ground says chip" : "1-bit — the bracket says it instead"}`);
+    // The second width is narrower than `summarise ` plus the label, so the
+    // chip has to move — which is the only pass where *one wrap unit* has a
+    // subject. At any width the label fits, a half-painted build draws the same
+    // row as a correct one.
+    for (const at of [width, 20]) {
+      if (at > width) continue;
+      const rows = e.layout(at, { first: 0, cont: 0 });
+      out.push(`  ${String(at).padStart(3)} │${rows.join("│\n      │")}│`);
+    }
+    out.push("");
+  }
+  // **The resolved line is what leaves the prompt**, and it is not what is drawn:
+  // the label never reaches the far side, the content does.
+  const e = createEditor({ chips: { separator: sep, painted: true } });
+  e.insertChip({ kind: "file", name: "parse.ts", lines: 184, content: "<the file>" });
+  out.push("· and what leaves the prompt is the content, never the label", `  │${e.resolved}│`, "");
+  return out;
+};
+
+/**
  * §099, the section's second rule — *a column declares where the POINT sits, and
  * an integer aligns where its point would be*.
  *
@@ -1311,6 +1358,7 @@ const focusShapes = (
 };
 
 export const SURFACES: readonly Surface[] = Object.freeze([
+  { section: 11, name: "a mention is a chip — the parts cross the seam and the label does not", rows: mentionChip },
   { section: 18, name: "focus on things that are not rows — a choice's two channels, and a control's three states", rows: focusShapes },
   { section: 36, name: "the operation surface — the aside, the flattening, and the bar that goes", rows: operationSurface },
   { section: 95, name: "a tape, where a row of peers would shed", rows: draw(TAPE) },

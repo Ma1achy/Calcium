@@ -106,8 +106,8 @@ const results = runPass({
       // earn (F1254's shape: the change must be one the corpus can see).
       name: "the chip is inserted as its own text rather than as one grapheme",
       file: EDITOR,
-      from: "    this.insert(sentinel, { atomic: true });",
-      to: "    this.insert(chip.name, { atomic: true });",
+      from: "    this.insert(`${sentinel}${opts?.delimiter ?? \"\"}`, { atomic: true });",
+      to: "    this.insert(`${chip.name}${opts?.delimiter ?? \"\"}`, { atomic: true });",
       expect: "T2.41",
     },
   ],

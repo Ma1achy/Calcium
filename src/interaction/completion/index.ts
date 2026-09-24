@@ -37,6 +37,7 @@ export {
   SLOT_KINDS,
   type Acceptance,
   type Candidate,
+  type CandidateChip,
   type CompletionContext,
   type CompletionResult,
   type CompletionSource,

@@ -87,6 +87,44 @@ export type Candidate = Readonly<{
    * *without* one (§5).
    */
   delimiter?: string;
+  /**
+   * Accept into a **chip** rather than into text (C19 I28, §011, C17 I25).
+   *
+   * *@ pulls a file into the turn, and it is a chip like a paste* — and both
+   * halves of that shipped without ever meeting: C17 has minted chips since
+   * roadmap 30 and the only caller is a large paste, while every candidate this
+   * engine has produced accepts as a string.
+   *
+   * **The parts, never the label.** `kind`, `name`, `lines` and `content` are
+   * the source's — a file's basename, its line count, what it stands for — and
+   * the ordinal and the form stay C17's, which is C17 I25's rule reaching a
+   * second producer rather than being restated by it. A source handing over a
+   * finished string would put §011's label in every application separately.
+   *
+   * **Not `detail`, and the two are two strings.** §011's menu draws
+   * `184 lines · 6.2 KB` and the chip draws `184L`: the first is free text only
+   * the source can compose, because only it knows bytes; the second is
+   * `lines` through C17's composer. One field for both would make this engine
+   * format a file size.
+   */
+  chip?: CandidateChip;
+}>;
+
+/**
+ * A chip's parts as a source supplies them — {@link Candidate.chip}.
+ *
+ * `Chip` minus the ordinal, which is the editor's: it is numbered per session
+ * and never reset, so a producer cannot know it and must not choose it (C17
+ * I25).
+ */
+export type CandidateChip = Readonly<{
+  kind: "paste" | "file" | "image";
+  name: string;
+  /** Drawn `184L`. Absent for an image, which is not measured in lines. */
+  lines?: number;
+  content: string;
+  /** What a preview opens when that is not the content. C17 never reads it. */
+  target?: string;
 }>;
 
 export interface CompletionSource {

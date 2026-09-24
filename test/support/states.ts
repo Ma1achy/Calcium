@@ -355,7 +355,7 @@ export const STATES: readonly StateFixture[] = Object.freeze([
       // check (C17 §5c).
       const e = createEditor();
       e.insert("read ");
-      e.insertChip({ ordinal: 1, kind: "paste", name: "pasted", lines: 184, content: "line one\nline two" });
+      e.insertChip({ kind: "paste", name: "pasted", lines: 184, content: "line one\nline two" });
       e.insert(" and summarise it");
       return e.layout(w, PROMPT_GUTTER);
     },
