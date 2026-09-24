@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { chordText, createKeymap, KeymapError, defaultKeymap, keySlot, scopesInReadingOrder } from "../../src/interaction/router/keymap.js";
 import { createDecoder } from "../../src/interaction/router/decode.js";
 import { REGISTRY_BINDINGS } from "../../src/interaction/router/registry-bindings.js";
+import { ACCELERATION, DEFAULT_REPEAT, REPEAT_POLICIES, repeatFor, repeatSteps } from "../../src/interaction/router/repeat.js";
 import type { Binding, FocusTarget, Key } from "../../src/interaction/router/types.js";
 
 const k = (name: string, mods: Partial<Key> = {}): Key => ({
@@ -1422,8 +1423,95 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
 });
 
 describe("C16 §8 I53 — key repeat is declared per binding", () => {
-  // **Spec-alone commit.** I53 and commitment 39 land first so the invariant
-  // has a subject before the policy exists; SP9 requires every invariant be
-  // named by a test row, and a `todo` is the row a spec-first commit carries.
-  it.todo("T1.159 (I53, R-KEY-002, R-DEG-002): a binding's DAS and ARR gate its repeats, and nothing is synthesised — not deferred on a component: the policy lands in this round's code commit, which replaces this row");
+  it("T1.159 (I53, R-KEY-002): §020's four rows with a subject are the declared numbers, by equality", () => {
+    // **By equality both ways, not a subset.** A subset check lets a row drift
+    // off the table without failing, and the whole point of declaring a rate is
+    // that it is the design's and not the machine's.
+    expect(Object.fromEntries(REPEAT_POLICIES)).toEqual({
+      rowUp: { das: 170, arr: 25, accelerate: true },
+      rowDown: { das: 170, arr: 25, accelerate: true },
+      menuNext: { das: 170, arr: 25, accelerate: true },
+      menuPrev: { das: 170, arr: 25, accelerate: true },
+      scrollPageUp: { das: 250, arr: 90, accelerate: false },
+      scrollPageDown: { das: 250, arr: 90, accelerate: false },
+      orbitLeft: { das: 0, arr: 16, accelerate: false },
+      orbitRight: { das: 0, arr: 16, accelerate: false },
+      backspace: { das: 300, arr: 30, accelerate: false },
+    });
+    // §020's fifth row is a slider at 200/40 and the keymap has no slider
+    // action, so no policy names one. The assertion is the absence, because a
+    // policy for a consumer that does not exist is F161's shape.
+    expect([...REPEAT_POLICIES.keys()].filter((k) => /slider/iu.test(k))).toEqual([]);
+  });
+
+  it("T1.159b (I53, R-KEY-002): DAS is the pause before it runs, and ARR the floor once running", () => {
+    const list = repeatFor("rowDown");
+    // Inside the delay, whatever the gap since the press.
+    expect(repeatSteps(list, 169, 1000), "one ms short of DAS").toBe(0);
+    expect(repeatSteps(list, 170, 1000), "at DAS it runs").toBe(1);
+    // Past the delay but sooner than the rate.
+    expect(repeatSteps(list, 500, 24), "one ms short of ARR").toBe(0);
+    expect(repeatSteps(list, 500, 25), "at ARR it acts").toBe(1);
+
+    // The orbit is the control for DAS: 0 means there is no pause at all, so a
+    // repeat one millisecond after the press is acted on if the rate allows.
+    const orbit = repeatFor("orbitLeft");
+    expect(repeatSteps(orbit, 1, 16), "no delay, 60fps — it is analogue").toBe(1);
+    expect(repeatSteps(orbit, 1, 15), "and the rate still holds").toBe(0);
+  });
+
+  it("T1.159c (I53, R-KEY-002): acceleration is 1, 4 and 16 by hold, and only where it is declared", () => {
+    const list = repeatFor("rowUp");
+    expect(repeatSteps(list, 999, 100), "held under a second").toBe(1);
+    expect(repeatSteps(list, 1000, 100), "the first band's ceiling is exclusive").toBe(4);
+    expect(repeatSteps(list, 2999, 100)).toBe(4);
+    expect(repeatSteps(list, 3000, 100), "and beyond three seconds").toBe(16);
+    expect(repeatSteps(list, 60_000, 100), "the last band has no ceiling").toBe(16);
+
+    // **The three that do not accelerate, at the same durations.** Each is
+    // refused by the sentence that set its numbers: a page is a whole screen, an
+    // orbit is analogue, and a mis-held ⌫ is expensive.
+    for (const action of ["scrollPageDown", "orbitRight", "backspace"]) {
+      const flat = repeatFor(action);
+      expect(
+        [repeatSteps(flat, 500, 1000), repeatSteps(flat, 2000, 1000), repeatSteps(flat, 10_000, 1000)],
+        `${action} is worth one step however long it is held`,
+      ).toEqual([1, 1, 1]);
+    }
+
+    // The ladder is data, so its boundaries are asserted as data too.
+    expect(ACCELERATION.map((b) => [b.untilMs, b.steps])).toEqual([
+      [1000, 1],
+      [3000, 4],
+      [null, 16],
+    ]);
+  });
+
+  it("T1.159d (I53, R-KEY-002): an undeclared binding inherits nothing and is worth one step", () => {
+    // *Text entry and destructive actions do not inherit navigation repeat.*
+    expect(repeatFor("insertNewline")).toEqual(DEFAULT_REPEAT);
+    expect(repeatFor("interrupt")).toEqual(DEFAULT_REPEAT);
+    expect(repeatSteps(DEFAULT_REPEAT, 0, 0), "no delay of ours and no rate of ours").toBe(1);
+    expect(repeatSteps(DEFAULT_REPEAT, 10_000, 0), "and holding earns nothing").toBe(1);
+  });
+
+  it("T1.159e (I53, R-DEG-002): nothing is synthesised — the module schedules nothing", () => {
+    // **The invariant's other half, and the one no rate assertion can see.** A
+    // reader who disabled key repeat sends none; a policy that fired on its own
+    // would hand them repeats they turned off, and every assertion above would
+    // still pass. So the property is structural: this module has no scheduler.
+    const src = readFileSync(
+      new URL("../../src/interaction/router/repeat.ts", import.meta.url),
+      "utf8",
+    );
+    // **Comments stripped first.** The prose above deliberately discusses timers
+    // and a raw scan would match its own explanation — prose inflates textual
+    // signals, and this file is mostly prose by line count.
+    const code = src.replace(/\/\*[\s\S]*?\*\//gu, "").replace(/\/\/.*$/gmu, "");
+    for (const scheduler of ["setTimeout", "setInterval", "queueMicrotask", "requestAnimationFrame", "Date.now", "performance.now"]) {
+      expect(code.includes(scheduler), `${scheduler} has no place in a policy that only weighs events`).toBe(false);
+    }
+    // The control: the stripper did not empty the corpus.
+    expect(code.includes("export function repeatSteps"), "the stripped source still holds the policy").toBe(true);
+  });
 });

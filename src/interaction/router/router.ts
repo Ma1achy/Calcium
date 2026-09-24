@@ -23,6 +23,7 @@ import {
   type Verdict,
 } from "./types.js";
 import { interceptOf, interceptVerdict } from "./intercepts.js";
+import { repeatFor, repeatSteps } from "./repeat.js";
 
 const EXIT_ARM_MS = 500;
 
@@ -305,7 +306,16 @@ export function createRouter(
    * and the reader's first press answers it. Where the terminal is silent about
    * releases this stays empty and the conservative arm applies.
    */
-  const held = new Set<string>();
+  /**
+   * Which keys are down, and since when (C16 I44, I53).
+   *
+   * **A map rather than a set, and the stamps are what I53 needs.** The set
+   * answered *is anything held*, which is all the question guard asks. A
+   * repeat policy asks two more — how long this key has been down, and when
+   * it was last acted on — and neither can be recovered from membership.
+   * `size` and `delete` read the same either way, so the guard is untouched.
+   */
+  const held = new Map<string, { pressedAt: number; lastActedAt: number }>();
 
   function register(
     target: FocusTarget,
@@ -787,13 +797,43 @@ export function createRouter(
     // which is the conservative arm arriving where the design asked for the
     // precise one.
     syncOwner();
+    let steps = 1;
     if (e.kind === "key") {
       if (e.event === "release") held.delete(e.key.name);
-      else held.add(e.key.name);
+      else {
+        const t = now();
+        const was = held.get(e.key.name);
+        if (e.event === "repeat" && was !== undefined) {
+          // **The degradation rung is structural** (I53, `R-DEG-002`).
+          // Without the kitty protocol no event carries `repeat` at all, so
+          // this arm is unreachable and the operating system’s own repeat
+          // stands unchanged — no capability check, because the absence of
+          // the field *is* the absence of the capability.
+          const action = keymap.resolve(activeTarget(inputs()), e.key)?.action;
+          steps = repeatSteps(repeatFor(action ?? ""), t - was.pressedAt, t - was.lastActedAt);
+          // Absorbed rather than passed on: the policy decided about this
+          // event, so letting it fall through would hand a repeat this
+          // component has just refused to whoever is beneath it.
+          if (steps === 0) return true;
+          held.set(e.key.name, { pressedAt: was.pressedAt, lastActedAt: t });
+        } else {
+          // **A repeat with no press behind it starts its own delay.** The
+          // protocol can be negotiated mid-hold, and inheriting a hold this
+          // router never observed would grant acceleration for time it
+          // cannot account for.
+          held.set(e.key.name, { pressedAt: t, lastActedAt: t });
+        }
+      }
     }
     cancelArmOnPress(e);
     try {
-      return dispatchInner(e);
+      // **The first result is the verdict** (I53). A repeat worth four steps
+      // is four moves of one list, not four chances to be consumed by four
+      // different owners: a later step finding no handler does not retract
+      // the first one that acted.
+      const first = dispatchInner(e);
+      for (let i = 1; i < steps; i += 1) dispatchInner(e);
+      return first;
     } finally {
       syncOwner();
       // **A release ends the arm whatever became of it** (I46). The commit is
