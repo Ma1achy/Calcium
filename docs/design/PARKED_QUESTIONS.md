@@ -229,6 +229,33 @@ reservation correct and no longer load-bearing, where `⋯` keeps it so.
 
 ---
 
+**20 · Whether this reconciliation builds §105's five primitives.** §105 draws a
+tree, a form, a split, a command palette and a toast, and says *each is built
+from what already exists* and *the framework already had every part — what it
+lacked was the name*. **Checked part by part, the claim holds.** The tree's
+guides are `decoration` and its twisty is `content`, which is `shed.ts`'s `Tier`;
+the form's error uses the registry's `failure` mark and C10's tone, introducing
+no visual idea; the split's divider is drawn `│` with `┃`, which is the
+**scrollbar's own `track`/`thumb` pair**, `| #` at the ASCII rung, degrading
+whole by §021's rule already; the palette's parts are a panel, a ladder and a
+residue, all shipped, and its `+58 more` is the container residue row the tree
+already draws; the toast's rule is §13's argument about notifications restated.
+
+**So nothing here is blocked on a missing part, and none of the five is a kind.**
+The question is scope, not feasibility. The sixteen-MR plan names none of them,
+and §105's own opening is that *a general app wants these and the agent surface
+does not, so they were missing rather than refused* — which reads as a proposal
+for a general application, not as a divergence this repository has. Five new
+block kinds is the largest single piece left in the census and it is not on the
+plan, so it is asked rather than taken.
+
+**One thing the answer would settle either way**: §105 gives the divider
+`⌥←→ from either side` and calls it *the SCROLLBAR's rule on the other axis* —
+and the scrollbar has no such chord in the tree either. A split would land a
+binding for both, or neither.
+
+---
+
 ## Not yet recovered
 
 **Sixteen distinct questions are above, and the running count in the reports
