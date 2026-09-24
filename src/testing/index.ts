@@ -43,6 +43,12 @@ export { expectDocument, type DocumentAssertions, type RenderOpts } from "./expe
 export { liveParts, type LivePart } from "./live-parts.js";
 
 /**
+ * The regional tone budget (C10 I58, `R-COL-002`, §090) — a conformance suite
+ * because *five is a smell* is a judgement about a design rather than an error.
+ */
+export { toneBudgetSuite, TONE_BUDGET, TONE_SMELL } from "./tone-conformance.js";
+
+/**
  * A `ProducerContext` a consumer can build (C24 §7).
  *
  * The same argument as `createAdapterRegistry` and `contextAt`: a producer the

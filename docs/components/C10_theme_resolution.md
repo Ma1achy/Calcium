@@ -1631,10 +1631,19 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 46. **A hue is reachable through `resolve`** (I55, §070). The ink tier is a palette named `hue`, so a block names `hue.blue` and C10 answers — the rule the whole tree is built on, applied to the one palette that was landed beside the palettes instead of in them.
 47. **Every state axis has a carrier row, and `tone` with `ground` is one carrier** (I56, §4k.5, `R-COR-003`, M11). The rows are equal to the registry's axes as sets, each traced to a field and a renderer or marked `no subject` with its reason, and a single-carrier axis cites the file that declares it rather than being granted the exception here.
 48. **Each MR's seam has a row that goes red when it is reverted** (I57, `MILESTONES.md`). A symbol and a file, asserted to resolve — a revert detector, not a completeness proof, and the limit is stated on the row rather than left to be assumed.
+49. **The tone budget is counted, per entry, with the three named regions excluded whole** (I58, `R-COL-002`, §090). The rule is a count and nothing counted: two-thirds of it shipped as `PaletteSpec.carries` and the four adjacent palettes, and the missing third was the budget. Three is the budget and five is the gate, both stated by §090 and kept as separate numbers. Per entry and never per frame, because §090 says a twelve-tone frame breaks nothing. `code`, `plot` and `patch` are skipped whole, since their palettes live inside them; the count reaches a cell's and a row's `tone` as well as a block's. Green on the tree at three of five, with a fabricated six-tone entry proving it can fire.
+
 
 ---
 
 ## 9. Tests
+
+### Tier 1 — the tone budget (I58)
+
+- **T1.46** (I58, `R-COL-002`, §090): `TONE_BUDGET` is 3 and `TONE_SMELL` is 5, and the two are asserted **separately** — a single constant would have quietly chosen one reading of §090's *three semantic tones. Five is a smell*, and the two numbers do different jobs.
+- **T1.47** (I58): the whole of `ONE_PER_KIND` taken as one entry spends exactly `info ok muted`, three of the five allowed. **The fabricated violation is in the same row**: six notices on six tones, which the gate refuses — without it this row is green against a counter that returns an empty set, which is A03 §2's vacuity class exactly.
+- **T1.48** (I58): a `code` block holding a toned child charges the entry **nothing**, because its palette lives inside it. The control is the same child under a `group`, which **is** charged: without it the row passes against a counter that never descends at all, and the exclusion would be indistinguishable from a walk that stops at the top.
+- **T1.49** (I58): a table's cells carry tones without being blocks, and the count reaches them — `muted ok` from the corpus's own table. A walk over block kinds alone counts none of them and reads green over an entry spending ten.
 
 Six tiers. Every cell of the §6 transition table is covered.
 
@@ -1850,6 +1859,19 @@ Six tiers. Every cell of the §6 transition table is covered.
 ---
 
 - **T6.106** (I48, F1240): dropping the `on` argument from `runStyle`'s `resolveTone` call — the one line that carries a ground from the painter into the resolver — → **T2.49 still passes** and C11 T2.13 fails. The pairing is the row: T2.49 measures the resolver and cannot see a painter that never asks, which is the shape of F1240 itself, so the fail-on-revert names the row that sits on the other side of the seam.
+
+
+- **I58** — *(`R-COL-002`, §090, §079, C04 I6)* **The tone budget is counted, it is counted per entry, and the regions the rule names are excluded whole.** `R-COL-002` is a **count** — *the tone budget is regional: an entry has three tones, while code, plots, and patches carry their own adjacent palettes* — and until this invariant nothing counted anything: `tone` offers ten slots and no site limited what one entry spent of them. Two-thirds of the rule was already built under another name, which is why the missing third was easy to miss: `PaletteSpec.carries: "meaning" | "decoration"` is the regional mechanism, and four palettes ship beside each other — `tone` (10, meaning), `syntax` (9, meaning), `categorical` (8, decoration), `spectrum` (9, decoration). *Code carries its own adjacent palette* is `syntax`; *plots* is `categorical`. **The clause with no subject was the budget itself.**
+
+  **Two numbers, and they are different on purpose.** §090 states both in one line — *an ordinary entry: three semantic tones. Five is a smell* — so the **budget is three** and the **gate is five**. A gate at three would fail entries the design does not object to; a budget of five would lose the figure the design states. `TONE_BUDGET` and `TONE_SMELL` are both named for that reason rather than one being derived from the other.
+
+  **Per entry, never per frame, and §090 says why in its own words**: *a full frame counting twelve tones is not breaking the rule — the rule was about one ENTRY, and it was stated globally.* So the count takes a block list and not a document, and a gate that summed a screen would fail on correct output — which is the shape the rule was in before it was scoped.
+
+  **A region is excluded whole rather than at its root.** A code block's syntax palette lives *inside* it, so counting its children would charge the entry for exactly the palette the rule says it carries separately. The excluded kinds are **`code`, `plot` and `patch`** — precisely the three `R-COL-002` names. §090 lists a fourth, *identity chrome: its own ten hues*, and the rule's text does not; it is left out because a hue is not a `Tone` and never enters this count anyway, and widening an exemption on the strength of a neighbouring sentence is how an exemption stops being checkable.
+
+  **The count reaches nested records, not only blocks.** A table row's cell, a `keyValue` row and a step each carry a `tone` without being a `Block`, so a walk over block kinds alone would count none of them and the gate would read green over an entry spending ten. **Measured on the tree as it stands**: the whole of `ONE_PER_KIND` taken as one entry spends **three** — `info ok muted` — and the largest single block spends **two**. So the gate is green today, and it is green because the tree is inside the budget rather than because nothing is counted: `test/unit/tone-budget.test.ts` includes a fabricated violation, an entry built to spend six, which the gate refuses.
+
+  **Stated blind spot, and it is larger than it first read.** The corpus is the repository's own fixtures and the `docker` example's documents, and **neither has ever put an entry near the threshold**: the fixtures spend three between all of them, and the example's 38 documents are **none above three**, with **nine spending none at all** — those nine are `raw` blocks, the adapter's passthrough rather than the parsed table `ps.ts` tones by container state. So the gate has counted and found nothing over, which is a measurement rather than a vindication, and the only thing showing it can fire is T1.47's fabricated six-tone entry. An entry a consumer builds is not reached by anything here, and cannot be — this is a conformance helper rather than a constructor check, because *five is a smell* is a judgement about a design and C04 I6's kind of refusal would turn it into an error. A surface that wants the check runs it; `R-COL-002` is satisfied by the count existing and being run over everything this repository ships.
 
 ## 10. Out of scope
 

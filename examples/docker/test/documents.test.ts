@@ -34,6 +34,7 @@ import { describe, expect, it } from "vitest";
 // F36: no public validator. Resolved through the package — see `deep.ts`,
 // which is also the reason `make proof` was red for two PRs.
 import { expectDocument, localContext, producerContext } from "@fmx/calcium/testing";
+import { toneBudgetSuite, TONE_BUDGET, TONE_SMELL } from "@fmx/calcium/testing";
 import type { ViewDocument } from "@fmx/calcium";
 import { createCompareHandler, createDriftHandler } from "../src/drift.ts";
 import { createPsAdapter } from "../src/ps.ts";
@@ -234,5 +235,46 @@ describe("F35: every document this app produces is one C13 will accept", () => {
       () => expectDocument(stripped as never).isValid(),
       "C04 I3 is what makes this file necessary",
     ).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The regional tone budget over real documents — C10 I58, `R-COL-002`, §090.
+// ---------------------------------------------------------------------------
+
+describe("R-COL-002: every document this app produces is inside the tone budget", () => {
+  // **The second corpus, and the honest reading of it is that it is not much
+  // stronger than the first.** The framework's own rows count fixtures, which
+  // spend almost nothing; these are entries an application builds. Measured:
+  // **38 entries, none above three**, and **nine spend none at all** — those
+  // nine are `raw` blocks, the adapter's passthrough rather than the parsed
+  // table `ps.ts` tones by container state. So the gate has counted and found
+  // nothing over, which is a measurement rather than a vindication: neither
+  // corpus in this repository has ever put an entry near §090's threshold, and
+  // the row that proves the gate can fire is the framework's fabricated one.
+  it("no entry spends more than five semantic tones, and the counts are reported", async () => {
+    const entries = [];
+    for (const [name, make] of DOCUMENTS) {
+      const doc = complete(await (make as () => Promise<LocalDocument | ViewDocument>)());
+      entries.push({ name, blocks: doc.blocks });
+    }
+
+    const findings = toneBudgetSuite(entries);
+    const over = findings.filter((f) => f.over);
+    const above = findings.filter((f) => f.above && !f.over);
+
+    // Reported rather than only asserted: the count is the useful output even
+    // where nothing is over, and a suite that printed only failures could not
+    // tell *inside the budget* from *not counted* — which is the distinction
+    // this rule was missing before it had a counter at all.
+    console.log(
+      `tone budget · ${String(findings.length)} entries · ` +
+        `${String(above.length)} above ${String(TONE_BUDGET)} · ${String(over.length)} over ${String(TONE_SMELL)}\n` +
+        findings
+          .map((f) => `  ${String(f.tones.length)}  ${f.name}  [${f.tones.join(" ")}]`)
+          .join("\n"),
+    );
+
+    expect(over.map((f) => `${f.name}: ${f.tones.join(" ")}`), "over the smell").toEqual([]);
   });
 });
