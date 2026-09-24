@@ -166,6 +166,33 @@ Registering it needs an ASCII rung, which is a visible choice — the same choic
 as 15 and reached by a different road. **Held.** The finding is the absence, and
 it is recorded here rather than left to the next sweep.
 
+**18 · The two normative sources disagree about the five permission postures,
+and about the one that matters.** §071 measures five — `manual`,
+`accept-edits`, `plan`, `auto`, **`skip`** — each with a symbol chosen against a
+stated trap (`❯ ? ❙❙ » !!`, with `⏸` rejected because *it IS an emoji — the `⏺`
+trap again*, `‼` and `⚡` likewise). The registry's `permissionPostures` carries
+five ids and they are **`ask`, `auto`, `accept-edits`, `plan`, `manual`**. Four
+agree; the registry has `ask` where §071 has `skip`.
+
+**`skip` is in `calcium-registry.json` only inside `sectionBlocks` text**, never
+as a record — which is `↺`'s shape again (question 17), and here it hides a
+disagreement rather than an omission. The member they differ on is the one that
+means *no permission check at all*, and §092 rules on it separately: *the skip
+posture was error — it is a mode, not a failure*. A set of five where the
+dangerous member exists in one source and not the other is not a gap to fill by
+picking a side.
+
+**And even the four they agree on have no symbol or tone in the registry.** The
+`permissionPostures` records carry `id`, `status` and `ruleIds` and nothing else,
+where §071 assigns five symbols and five tones (grey, purple, blue, yellow, red)
+and rules that **none is painted** — *the distinction is the CHANNEL, not the hue*,
+because the error tag is the only painted label that means a status.
+
+**Held**, and §071's census row with it. Two questions in one and they resolve
+differently: whether the fifth posture is `ask` or `skip` is the design
+contradicting itself, and whether the symbols and tones belong on the records is
+a question about the registry's completeness.
+
 ---
 
 ## Not yet recovered
