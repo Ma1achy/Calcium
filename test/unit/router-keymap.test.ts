@@ -1344,6 +1344,47 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     expect(rich.entries().length).toBeGreaterThan(80);
   });
 
+  it("T1.158 (I52, R-INT-002, R-CAP-001): no scope where a line is being composed binds a bare single key", () => {
+    // **The exemption is compared by equality**, for C10's 4-bit reason: a
+    // subset check lets a scope that stopped being a typing scope keep an
+    // exemption nobody re-read, and the day `panel` moves the other way is the
+    // day this must go red rather than quietly pass.
+    // **Eight, and a regex over the source said five.** `child`,
+    // `nativeSelection` and `overlay` carry one, one and two rows, and the
+    // pattern walked past all three — which is why the classification is
+    // asserted against `defaultKeymap` and not against a count taken by hand.
+    const TYPING = ["child", "global", "overlay", "panel", "prompt"];
+    const NOT_TYPING = ["liveBlock", "nativeSelection", "semanticSelection"];
+
+    const targets = [...new Set(defaultKeymap.map((b) => b.target))].sort();
+    expect(targets, "every target is classified — a new one fails here first")
+      .toEqual([...TYPING, ...NOT_TYPING].sort());
+
+    /** A printable character with no modifier: the keystroke a line claims. */
+    // Typed against the **table's** key, which is a partial: a builtin binding
+    // names only the modifiers it needs, so `ctrl` is absent rather than false.
+    // That is why every test below is `!== true` and not `=== false`.
+    const bare = (b: Readonly<{ key: Partial<Key> & Readonly<{ name: string }> }>): boolean =>
+      [...b.key.name].length === 1
+      && b.key.ctrl !== true && b.key.meta !== true
+      && b.key.shift !== true && b.key.super !== true;
+
+    const offenders = defaultKeymap
+      .filter((b) => TYPING.includes(b.target) && bare(b))
+      .map((b) => `${b.target}: ${b.key.name}`);
+    expect(offenders, "a typing scope binds no bare single key").toEqual([]);
+
+    // **The control is on the other side of the split**, and it is what stops
+    // this being a rule with nothing to be wrong about: the non-typing scopes
+    // DO carry bare single keys, so the predicate demonstrably fires on real
+    // rows and the green above is the constraint holding rather than the
+    // filter finding nothing.
+    const allowed = defaultKeymap
+      .filter((b) => NOT_TYPING.includes(b.target) && bare(b));
+    expect(allowed.length, "and the non-typing scopes show what the predicate sees")
+      .toBeGreaterThan(0);
+  });
+
   it("T1.38 (I38): every reserved chord carries an explicit no-op, and none of them acts", () => {
     // §6's closed set makes an action with no executor uncompilable, so the
     // alternative to a declared no-op is leaving the chord unbound — and an

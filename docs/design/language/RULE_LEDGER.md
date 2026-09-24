@@ -96,7 +96,7 @@ mutation runs — this one asks the prior question, which nothing asked before.
 | **R-MOT-007** — Duration-independent shape | `covered` | C09 I8 · `src/presentation/blocks/kinds/containers.ts:135` — *`measure` never sees the tick*, so a block's geometry cannot vary with elapsed time. The call's shape is its measured rows, and the duration reaches only the spinner and the tone |
 | **R-MOT-008** — Agent bloom ownership | `cited` | the R-ID is named outside `docs/design/language/` |
 | **R-INT-001** — Scopes are visible | `cited` | the R-ID is named outside `docs/design/language/` |
-| **R-INT-002** — No typing-scope single keys | `owed` | nothing in the tree names it |
+| **R-INT-002** — No typing-scope single keys | `cited` | the R-ID is named outside `docs/design/language/` |
 | **R-INT-003** — Scroll is not focus | `covered` | C26 §7a · `src/shell/construct.ts` `ScrollOffsets` — the offset is view state of its own, so a scroll writes `ScrollOffsets` and never the focus address; §7a carries the sentence in its heading |
 | **R-INT-004** — Minimum focus reveal | `covered` | C26 §7a · `src/shell/pull.ts` `pullIntoView` — the file's own opening line is *FOCUS PULLS THE VIEWPORT, BY THE MINIMUM, one row for one row*, and `pullIntoView(held, from, to, window)` is the minimum computed as one number |
 | **R-INT-005** — Continuous control commit | `owed` | nothing in the tree names it |

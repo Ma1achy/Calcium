@@ -1598,6 +1598,14 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 
 ---
 
+
+- **I52** — **No scope in which typing is possible binds a bare single key** (`R-INT-002`, `R-CAP-001`). A printable character with no modifier belongs to the line being composed, and a scope that also read it as a command would make the two meanings race on a keystroke the reader cannot disambiguate. **The population is the keymap's eight targets, split by whether a line is being composed**: `child`, `global`, `overlay`, `panel` and `prompt` are typing scopes — a global binding applies while the prompt is live, a panel is the completion menu, the chip preview or the search, an overlay is a question which in its typed-reply state has the prompt live beneath it (C23 I73), and a child holds a PTY someone is typing into (`R-INT-007`) — while `liveBlock`, `nativeSelection` and `semanticSelection` are not, because a focused transcript block has no line and both copy rungs have frozen the frame.
+
+  **The split was measured twice and the first measurement was wrong**, which is worth recording because the instrument was the obvious one. A regular expression over `keymap.ts` found **five** targets; the table has **eight** — `child`, `nativeSelection` and `overlay` carry one, one and two rows and the pattern walked past them. A text search answers about the prose; the gate reads `defaultKeymap`, and it failed on its first run for exactly this, before any claim reached a commit.
+
+  **Measured on the table, it holds today**: `child`, `global`, `overlay`, `panel` and `prompt` carry **zero** bare single keys between them across 83 rows, and the nine on `liveBlock` (`y [ ] { + = - r o`) and three on `semanticSelection` (`a A y`) are the rule being followed rather than broken — `R-SEL-008` names `a` and `A` for one of them on purpose. **So the exemption is compared by equality, not by subset**, for the reason C10's 4-bit skip list is: a subset check lets a scope that stopped being a typing scope keep an exemption nobody re-read, and the day `panel` moves the other way is the day this must go red.
+
+  **A rule that is satisfied on the day it is written is the case for writing it**, not against: nothing in the tree prevented a bare `y` on `prompt`, and `liveBlock` shows exactly what a scope looks like when the constraint does not apply, so the shape was one row away the whole time.
 ## 9. Commitments
 
 1. C01 sets raw mode; C16 decodes the bytes (I13).
@@ -1639,6 +1647,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 35. A press outside the topmost escapable layer closes it and is consumed there — one gesture, one effect — while a blocking top layer keeps I8's answer, which is that the click does nothing (I47, R-BLK-854).
 36. `overlay › panel › peek › base` decides which viewport a wheel moves as it decides which layer a key reaches, and beneath the layers the wheel takes the innermost scrollable under the pointer (I48, C15 I23, R-SEL-012).
 37. The `child` rung has a subject — a shell delegation or an attached child surface — and takes every key but `host.detach`, consuming what it does not bind; the escape is reserved at attach time or the attach is refused, and it is on screen in the border and on the owner line (I49, R-BLK-908, R-INT-007).
+38. A scope in which a line is being composed binds no bare single key, and which scopes those are is a list compared by equality rather than a predicate (I52, `R-INT-002`, `R-CAP-001`). → T1.158
 
 ---
 
