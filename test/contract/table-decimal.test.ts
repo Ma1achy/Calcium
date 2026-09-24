@@ -106,5 +106,39 @@ describe("C11 I26 — a column aligns on its decimal point", () => {
 });
 
 describe("C11 I31 — the window pins the number column's width", () => {
-  it.todo("T2.16 (C11 I31, I19, I27): a window plans a number column at the table's widest value — not deferred on a component: specified before the window pins it");
+  it("T2.16 (C11 I31, C11 I19, C11 I27): a window plans a number column at the table's widest value", () => {
+    // A number column between two text columns, so a narrower plan for it
+    // would move every cell of the column after it.
+    const block = {
+      kind: "table",
+      id: "pin",
+      columns: [
+        { key: "a", label: "a", priority: 3, minWidth: 4, sortable: false },
+        { key: "n", label: "n", priority: 2, minWidth: 2, sortable: false },
+        { key: "z", label: "z", priority: 1, minWidth: 4, sortable: false },
+      ],
+      rows: [
+        { id: "r0", cells: { a: { text: "left" }, n: { text: "7" }, z: { text: "tail" } } },
+        { id: "r1", cells: { a: { text: "left" }, n: { text: "41208" }, z: { text: "tail" } } },
+      ],
+      showHeader: false,
+    } as unknown as Table;
+    const width = 30;
+    const whole = linesOf(block, width);
+
+    // **The fixture responds first**: the first row alone, as its own table,
+    // plans `n` at one cell and puts `tail` somewhere else. Without this the
+    // assertion below could pass because the two never differed.
+    const alone = linesOf({ ...block, rows: [block.rows[0]] } as unknown as Table, width);
+    expect(startOf(alone[0]!, "tail"), "the slice's own plan differs").not.toBe(startOf(whole[0]!, "tail"));
+
+    // **The window over that same row carries the table's figure**, so the
+    // column after the number starts at the cell it starts at in the whole.
+    const win = tableDefinition.window?.(block as never, width, 0, 1, kit().measure);
+    expect(win, "the definition windows").not.toBeUndefined();
+    const sliced = linesOf(win!.block as unknown as Table, width);
+    expect(startOf(sliced[0]!, "tail")).toBe(startOf(whole[0]!, "tail"));
+    const n = (win!.block as unknown as Table).columns.find((c) => c.key === "n");
+    expect(n?.minWidth, "the declaration carries the whole table's widest value").toBe(5);
+  });
 });

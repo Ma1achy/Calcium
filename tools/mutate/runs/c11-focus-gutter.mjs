@@ -177,8 +177,8 @@ const results = runPass({
       // a plan two cells narrower than the one on screen.
       name: "the detail's height is taken at the outer width",
       file: TABLE,
-      from: "  const inner = bodyWidth(width);\n  const plan = planColumns(block.columns, inner);",
-      to: "  const inner = width;\n  const plan = planColumns(block.columns, inner);",
+      from: "  const inner = bodyWidth(width);\n  const plan = plannedColumns(block, inner);",
+      to: "  const inner = width;\n  const plan = plannedColumns(block, inner);",
       expect: "T2.3",
     },
     {

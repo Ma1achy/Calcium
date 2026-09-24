@@ -30,8 +30,56 @@ import type { BlockDefinition, NavElement, Rendered, RenderContext, Windowed } f
 import { decimalEnds, decimalPoints, emptySpans, headerSpans, markedSeriesColumns, rowSpans } from "./cells.js";
 import { columnAlignments, groupingColumns, unknownColumns } from "./kind.js";
 import { detailBlocks, isExpandable } from "./detail.js";
-import { planColumns } from "./plan.js";
+import { planColumns, type PlannedColumns } from "./plan.js";
 import { sortedRows } from "./sort.js";
+
+/**
+ * The columns the plan is made from: the declarations, with every number or
+ * duration column's `minWidth` raised to its widest bare value (C11 I31,
+ * `R-TBL-005`).
+ *
+ * **The planner stays pure** (I7) and I10 does the work: a column whose
+ * `minWidth` equals its longest value is shown whole or dropped, never cut —
+ * *half a number is a different number*. Bare and not grouped, because I28
+ * decides grouping from the plan. A cell's glyph lead counts, since it is
+ * drawn inside the planned width (I23).
+ *
+ * **Memoised on the block**, which is immutable: `measure`, `width`, `render`
+ * and the row detail each plan, and four walks of every cell for one answer is
+ * the cost this avoids. A window's block is a new object whose declarations
+ * already carry the table's figure (`window` pins it), so its own walk can only
+ * agree.
+ */
+const EFFECTIVE = new WeakMap<Table, Table["columns"]>();
+
+function effectiveColumns(block: Table): Table["columns"] {
+  const known = EFFECTIVE.get(block);
+  if (known !== undefined) return known;
+  const numbers = unknownColumns(block);
+  // **Under `wide`**, since `measure` receives no capabilities and every reader
+  // must plan the same columns. For a minimum that is the safe direction:
+  // over-counting drops the column one width early, and under-counting cuts a
+  // number, which is the defect itself.
+  const ambiguous = "wide";
+  const columns = block.columns.map((c) => {
+    if (!numbers.has(c.key)) return c;
+    let widest = 0;
+    for (const row of block.rows) {
+      const cell = row.cells[c.key];
+      if (cell === undefined || cell.text.trim() === "") continue;
+      const lead = cell.glyph === undefined ? 0 : glyphCells(cell.glyph) + 1;
+      widest = Math.max(widest, lead + cells(cell.text.trim(), ambiguous));
+    }
+    return widest > c.minWidth ? { ...c, minWidth: widest } : c;
+  });
+  EFFECTIVE.set(block, columns);
+  return columns;
+}
+
+/** The one plan every reader takes (I31): `measure`, `width`, `render`, `window` and the row detail. */
+function plannedColumns(block: Table, width: number): PlannedColumns {
+  return planColumns(effectiveColumns(block), width);
+}
 
 /**
  * Whether the action bar is drawn (I17).
@@ -82,7 +130,7 @@ function detailHeight(
   // is the disagreement `measure(block, width) == rows rendered` forbids. It was
   // three of four for one commit, and `window-height` caught it at 353 of 42.
   const inner = bodyWidth(width);
-  const plan = planColumns(block.columns, inner);
+  const plan = plannedColumns(block, inner);
   // A sequence, so a detail block declaring `gapBefore` contributes its blank row
   // here exactly as it would at a document's top level (C04 §3a).
   return sequenceHeight(detailBlocks(block, row, plan), insetWidth(inner), measureChild);
@@ -179,7 +227,7 @@ export const tableDefinition: BlockDefinition<Table> = {
   width(block: Table, width: number): number {
     const w = normaliseWidth(width);
     if (!hasBody(block) || hasActionBar(block) || block.rows.some((row) => row.expanded === true)) return w;
-    const plan = planColumns(block.columns, bodyWidth(w));
+    const plan = plannedColumns(block, bodyWidth(w));
     if (plan.overflowed) return w;
     // **The gutter is part of the answer** (I15): it is drawn on every row, so a
     // width that left it out would be narrower than what `render` emits.
@@ -307,7 +355,11 @@ export const tableDefinition: BlockDefinition<Table> = {
         // of one argument rather than a new mechanism. A resolved alignment is
         // an ordinary declaration by the time the renderer sees it, so no field
         // is added to `Table`.
-        columns: block.columns.map((c) => {
+        // **And each number column's effective minimum** (I31), for the same
+        // reason: resolved over the slice, a window whose rows are narrower
+        // than the table's widest number would plan the column narrower and
+        // start every column after it at a different cell on scroll.
+        columns: effectiveColumns(block).map((c) => {
           if (c.align !== undefined) return c;
           const align = wholeAligns.get(c.key);
           // Every column key is in the map by construction; the guard is what
@@ -339,7 +391,7 @@ export const tableDefinition: BlockDefinition<Table> = {
     let plan;
     {
       using _p = probe?.span("table.plan") ?? NO_SPAN;
-      plan = planColumns(block.columns, inner);
+      plan = plannedColumns(block, inner);
     }
     const focused = ctx.focus !== null && ctx.focus.blockId === block.id ? ctx.focus.rowId : null;
     // **The extent is the entry's, kept to this block** (I14). The pairs are
@@ -654,7 +706,7 @@ function rowDetail(block: Table, r: TableRow, width: number): Block | null {
   // **The same plan the render draws** (I15): the gutter comes off here too, or
   // this answers *what was lost* against a plan two cells wider than the one on
   // screen, and a row that fits would declare a detail for a column it shows.
-  const plan = planColumns(block.columns, bodyWidth(width));
+  const plan = plannedColumns(block, bodyWidth(width));
   const planned = new Map(plan.visible.map((v) => [v.key, v.width]));
   const dropped = new Set(plan.dropped);
   const rows: { label: string; value: string }[] = [];

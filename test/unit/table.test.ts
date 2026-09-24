@@ -1277,5 +1277,42 @@ describe("the missing number and the trend (I29, I30)", () => {
 });
 
 describe("a number column is planned at its widest value (I31)", () => {
-  it.todo("T1.40 (C11 I31, R-TBL-005): a number column is shown whole or dropped, never cut — not deferred on a component: specified before the definition raises the minimum");
+  /** A text column that outranks a number column, both declared four cells wide. */
+  const ranked = (values: readonly string[]): Table => ({
+    kind: "table",
+    id: "whole",
+    columns: [
+      { key: "name", label: "name", priority: 2, minWidth: 4, sortable: false },
+      { key: "n", label: "n", priority: 1, minWidth: 4, sortable: false },
+    ],
+    rows: values.map((text, i) => ({ id: `r${String(i)}`, cells: { name: { text: "abcdefgh" }, n: { text } } })),
+    showHeader: false,
+  });
+  const rowsAt = (block: Table, width: number): readonly string[] =>
+    registry.renderToLines(block, atContent(width)).map((l) => body(visible(l)));
+
+  it("T1.40 (C11 I31, C11 I10, R-TBL-005): a number column is shown whole or dropped, never cut", () => {
+    const block = ranked(["41208", "88"]);
+
+    // **Room for five**: the column is planned at its widest value and `41208`
+    // is drawn whole. Bare, since five cells cannot afford the separator (I28).
+    const roomy = rowsAt(block, 4 + COLUMN_GAP + 5);
+    expect(roomy[0], "drawn whole").toContain("41208");
+    expect(roomy[0]).not.toContain("4120…");
+    // **The control is the text column beside it**: same `minWidth`, and it
+    // still truncates, which says the raise is by kind and not for every column.
+    expect(roomy[0], "a text column is cut as before").toContain("abc…");
+
+    // **Room for four**: the declaration fits and the value does not. Before
+    // I31 this drew `4120…` — a different number. Now the column is dropped.
+    const tight = rowsAt(block, 4 + COLUMN_GAP + 4);
+    expect(tight[0], "no digit survives: dropped, not cut").not.toMatch(/\d/u);
+    expect(tight[1]).not.toMatch(/\d/u);
+
+    // **A duration is a number by I27** and plans at its widest value too:
+    // `1h 12m` is six cells in a four-cell column.
+    const durations = ranked(["1h 12m", "3m"]);
+    expect(rowsAt(durations, 4 + COLUMN_GAP + 6)[0]).toContain("1h 12m");
+    expect(rowsAt(durations, 4 + COLUMN_GAP + 5)[0]).not.toMatch(/\d/u);
+  });
 });
