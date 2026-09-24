@@ -20,7 +20,7 @@ held at the point where a choice would be mine to invent.
 
 ## Entries
 
-**Open: 18, 23, 32, 36, 37, 38, 39.** Every other entry is ruled or retracted. A ruled entry keeps its body, with the ruling directly above it and a premise note wherever the ruling rested on something the entry or the design contradicts.
+**Open: 18, 23, 32, 36, 37, 38, 39, 40.** Every other entry is ruled or retracted. A ruled entry keeps its body, with the ruling directly above it and a premise note wherever the ruling rested on something the entry or the design contradicts.
 
 > **Ruled 2026-09-24.** Already answered, by the chain rule. The repo-side spec (C09 §4, I5) carries the narrowed rule and the registry does not. That assumption stands as the answer.
 
@@ -66,7 +66,7 @@ rule and no chord: no rectangular action, no binding, and no wording in the
 repo's prose either. The rule's two mechanical clauses — the clip and the cells
 — are built; *says so in the mode label* is blocked on 4.
 
-> **Ruled 2026-09-24.** Keep the design's bordered blocks. `R-SEL-002` clause 2 is superseded: semantic copy is the clean path, and a naive drag that includes the border is accepted. **Owed:** the registry supersession.
+> **Ruled 2026-09-24.** Keep the design's bordered blocks. `R-SEL-002` clause 2 is superseded: semantic copy is the clean path, and a naive drag that includes the border is accepted. **Owed:** the registry supersession. **Built 2026-09-25:** `R-SEL-002` → `R-SEL-016` (`tools/design/supersede-rulings.mjs`).
 
 **6 · RULED — `R-SEL-002` clause 2 contradicts the design's own fixtures.** *A bounded
 block's content does not sit inside vertical rules*, read literally, forbids the
@@ -93,7 +93,7 @@ composes none.** A search composes; a completion menu and a chip preview do not.
 gives that field no name. Adding one is a visible mechanism the design does not
 specify.
 
-> **Ruled 2026-09-24.** **Tie-break 1: data beats prose.** The registry's `#`/`-` stands, which is what the tree already does. **Owed:** §035's `[#][#][.]` specimen is superseded in the registry.
+> **Ruled 2026-09-24.** **Tie-break 1: data beats prose.** The registry's `#`/`-` stands, which is what the tree already does. **Owed:** §035's `[#][#][.]` specimen is superseded in the registry. **Premise note, 2026-09-25:** the registry cannot supersede a specimen — the builder requires every section block to carry `example` status — and it never bound anything, since R-REG-002 makes an example block non-normative. The ruling lands as **`R-PRG-003`**, a current rule §035's section cites. **Built.**
 
 **10 · RULED — §035's ASCII bar granularity contradicts the registry** — the first real
 conflict between two normative sources rather than a gap. §035's degradation
@@ -512,7 +512,7 @@ C11's rather than the sort's, and the default following the kind.
 
 ---
 
-> **Ruled 2026-09-24.** **Tie-break 2.** The premise holds: 28 figures draw two columns and none draw three. `R-STR-003` is superseded to **two**. **Owed:** the registry edit. No golden moves, because the tree already draws two.
+> **Ruled 2026-09-24.** **Tie-break 2.** The premise holds: 28 figures draw two columns and none draw three. `R-STR-003` is superseded to **two**. **Owed:** the registry edit. No golden moves, because the tree already draws two. **Built 2026-09-25:** `R-STR-003` → `R-STR-005`; nine citations moved with it.
 
 **25 · RULED — The design's own figures draw two columns where `R-STR-003` says
 three.** The rule is `status: current` — *every nested level costs three
@@ -694,7 +694,7 @@ kinds of twenty-five, or a linear stream with no settled line, is the frame with
 nothing in it — and it would be read as coverage.
 ---
 
-> **Ruled 2026-09-24.** `R-MOT-011` applies **per rung**: sets that collapse to one ASCII alphabet share an interval at that rung. **Owed.**
+> **Ruled 2026-09-24.** `R-MOT-011` applies **per rung**: sets that collapse to one ASCII alphabet share an interval at that rung. **Owed.** **Premise note, 2026-09-25:** the ruling says the sets share an interval and not which, and the registry records none — `|/-\` is at 80, 90, 100, 110, 120, 120, 130, 140 and 140 ms across nine sets. Choosing one is a visible timing value, so the choice is parked as **40**.
 
 **30 · RULED — The registry gives one ASCII alphabet to sets at different intervals, and
 `R-MOT-011` says a shared alphabet shares an interval.** §039: *SETS THAT SHARE
@@ -841,6 +841,26 @@ Measured with a probe over `SPINNER_SETS` at HEAD. **Proposed, (a) recommended**
 
 C09 I99 records the first clause, and SS64 reads no frame until this is answered,
 because a set compared with nothing is a rule with nothing to be wrong about.
+
+---
+
+**40 · OPEN — Which interval a shared ASCII alphabet takes.** Ruling 30 applies
+`R-MOT-011` per rung — sets that collapse to one ASCII alphabet share an interval at
+that rung — and the registry records no ASCII interval to share. Measured from its
+spinner records: `|/-\` is nine sets at 80, 90, 100, 110, 120, 120, 130, 140 and
+140 ms; `.oO@Oo` is six, five at 120 and `growVertical` at 100; `0–f` is `hex` at 110
+and `binary4` at 120. The number is visible — it is how fast the ASCII rung turns.
+**Proposed, (a) recommended**:
+
+- **(a) 120 ms for all three** — the mode of `.oO@Oo`, the median of `|/-\`, and one
+  of the two members of `0–f`. One cadence for the ASCII rung, which is §039's
+  *nothing varies its rate*.
+- **(b) The alphabet's most common member**: 120 for `.oO@Oo`, 120 or 140 for
+  `|/-\` (a tie), 110 or 120 for `0–f` (a tie) — which needs (a)'s rule to break
+  both ties anyway.
+- **(c) The slowest member's interval** — 140, 120, 120 — on the argument that an
+  ASCII frame changes more of the character than a braille dot does, so it reads
+  as busier at the same rate.
 
 ---
 

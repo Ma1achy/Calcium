@@ -1,4 +1,4 @@
-// C09 §7b — `R-SEL-002`'s gutter clause, over the whole registry.
+// C09 §7b — `R-SEL-016`'s gutter clause, over the whole registry.
 //
 // **Stated over columns rather than over tokens**, which is what makes it one
 // sentence for every kind: the gutter is `notice`'s word for the hazard and the
@@ -49,7 +49,7 @@ describe("C09 §7b — surviving a naive drag", () => {
 
     // **The control first, and it is a fabricated violation.** A notice whose
     // continuation rows carry a mark one column left of the head is exactly the
-    // defect `R-SEL-002` names, and if the checker cannot see it here then a
+    // defect `R-SEL-016` names, and if the checker cannot see it here then a
     // green run below is the corpus agreeing with nothing.
     const fabricated = ["  ⎿ a wrapped line", " ⋯ the continuation"];
     const seen = drawsLeftOfItself(fabricated);

@@ -643,7 +643,7 @@
       "id": "R-STR-003",
       "title": "Width-bounded nesting",
       "text": "Every nested level costs three columns, and nesting is limited by width while the deepest child still clears its own minimum width.",
-      "status": "current",
+      "status": "superseded",
       "sectionKey": "current-contract",
       "tags": [
         "contract"
@@ -653,10 +653,27 @@
         "R-SEC-060",
         "R-SEC-100"
       ],
-      "supersededBy": null,
+      "supersededBy": "R-STR-005",
       "condensedGroup": "STRUCTURE",
       "legacyIds": [],
       "contentDigest": "30978e878c8000d145804e6f77713ee2b5137687cb46151a9beb94de61f583cb"
+    },
+    {
+      "id": "R-STR-005",
+      "title": "Width-bounded nesting",
+      "text": "Every nested level costs two columns, and nesting is limited by width while the deepest child still clears its own minimum width.",
+      "status": "current",
+      "sectionKey": "current-contract",
+      "tags": [
+        "contract"
+      ],
+      "supersedes": [
+        "R-STR-003"
+      ],
+      "supersededBy": null,
+      "condensedGroup": "STRUCTURE",
+      "legacyIds": [],
+      "contentDigest": "2c5c4ec4a4d0fff6bd763014047f0a38cc0312e104606172776b0e5f0cb5ec14"
     },
     {
       "id": "R-STR-004",
@@ -4363,6 +4380,20 @@
       "supersededBy": null,
       "legacyIds": [],
       "contentDigest": "d2da4cd0226939ed9ca10740fe9ca9612c64590ed028381b55d2adcacced7ece"
+    },
+    {
+      "id": "R-PRG-003",
+      "title": "The ASCII bar rung is one pair",
+      "text": "At the ASCII rung every bar draws the registry's one pair, `#` filled and `-` empty, one character per cell, whatever its granularity. Granularity is carried above the ASCII rung; a spinner or text status independently carries active or stalled liveness.",
+      "status": "current",
+      "sectionKey": "current-contract",
+      "tags": [
+        "atomic"
+      ],
+      "supersedes": [],
+      "supersededBy": null,
+      "legacyIds": [],
+      "contentDigest": "79c696b5a75de5748c0dee3def7049eac9004c25e460cdf6a5daff61b9c84648"
     },
     {
       "id": "R-MOT-012",
@@ -18462,15 +18493,31 @@
       "id": "R-SEL-002",
       "title": "The render must survive a naive drag",
       "text": "A wrapped line's continuation carries no decoration in the gutter; a bounded block's content does not sit inside vertical rules; the scrollbar is the last column, so a drag that stops short of it is clean; nothing meaningful is drawn in a column a reader would not drag through. This is a constraint on layout, not a note.",
-      "status": "current",
+      "status": "superseded",
       "sectionKey": "current-contract",
       "tags": [
         "measurement"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-SEL-016",
       "legacyIds": [],
       "contentDigest": "806f7d7e32499b42e8e28551542c72a127763a4b490954a1b32d5ee28dce1fb4"
+    },
+    {
+      "id": "R-SEL-016",
+      "title": "The render must survive a naive drag",
+      "text": "A wrapped line's continuation carries no decoration in the gutter; the scrollbar is the last column, so a drag that stops short of it is clean; nothing meaningful is drawn in a column a reader would not drag through. A bounded block keeps its vertical rules: semantic copy is the clean path through a box, and a naive drag that takes the border with the content is accepted. This is a constraint on layout, not a note.",
+      "status": "current",
+      "sectionKey": "current-contract",
+      "tags": [
+        "measurement"
+      ],
+      "supersedes": [
+        "R-SEL-002"
+      ],
+      "supersededBy": null,
+      "legacyIds": [],
+      "contentDigest": "a65247ea1aab8e7cbf4ad2a2261921617056a0a724443bb32f5f5914b8e68641"
     },
     {
       "id": "R-SEL-003",
@@ -19487,7 +19534,7 @@
       "status": "example",
       "renderer": null,
       "ruleIds": [
-        "R-STR-003",
+        "R-STR-005",
         "R-STR-004",
         "R-CAP-001"
       ],
@@ -19766,7 +19813,8 @@
       "status": "example",
       "renderer": null,
       "ruleIds": [
-        "R-PRG-001"
+        "R-PRG-001",
+        "R-PRG-003"
       ],
       "blockIds": [
         "R-BLK-235",
@@ -20119,7 +20167,7 @@
       "ruleIds": [
         "R-STR-001",
         "R-STR-002",
-        "R-STR-003"
+        "R-STR-005"
       ],
       "blockIds": [
         "R-BLK-334",
@@ -20414,7 +20462,7 @@
       "status": "example",
       "renderer": null,
       "ruleIds": [
-        "R-STR-003",
+        "R-STR-005",
         "R-HON-003"
       ],
       "blockIds": [
@@ -21392,7 +21440,7 @@
       "renderer": null,
       "ruleIds": [
         "R-HON-003",
-        "R-STR-003"
+        "R-STR-005"
       ],
       "blockIds": [
         "R-BLK-758",
@@ -21504,7 +21552,7 @@
       "renderer": null,
       "ruleIds": [
         "R-TXT-001",
-        "R-STR-003",
+        "R-STR-005",
         "R-STR-004"
       ],
       "blockIds": [
@@ -21534,7 +21582,7 @@
       "status": "example",
       "renderer": null,
       "ruleIds": [
-        "R-STR-003",
+        "R-STR-005",
         "R-TXT-001",
         "R-HON-003"
       ],
@@ -21802,7 +21850,7 @@
       "ruleIds": [
         "R-TXT-001",
         "R-CAP-001",
-        "R-STR-003"
+        "R-STR-005"
       ],
       "blockIds": [
         "R-BLK-910",
@@ -33898,7 +33946,7 @@
       "collection": "catalogues.tapeSheddingRules",
       "ruleIds": [
         "R-HON-003",
-        "R-STR-003"
+        "R-STR-005"
       ]
     },
     "statusContainers": {
@@ -33953,7 +34001,7 @@
     "unyieldingTableColumns": {
       "collection": "catalogues.unyieldingTableColumns",
       "ruleIds": [
-        "R-STR-003"
+        "R-STR-005"
       ]
     },
     "coincidentRenderRules": {
