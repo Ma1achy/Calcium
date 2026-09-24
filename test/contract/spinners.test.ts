@@ -460,7 +460,59 @@ const STATED_CYCLES: Readonly<Record<string, number>> = Object.freeze(
     );
   });
 
-  it.todo("T2.169 (C09 I107, R-MOT-005): a set takes its ASCII rung whole, asserted on the mixed sets the existing rows cannot see — not deferred on a component, the row lands with I107's code half");
+  it("T2.169 (C09 I107, R-MOT-005, C02 I9): a set takes its ASCII rung whole, and the mixed sets are what can see it", () => {
+    // **§032's first rule has two clauses and the tree read one**: *if any
+    // primary frame is not exactly one cell, the WHOLE set takes its semantic
+    // ASCII fallback — never frame by frame.* The code composes nothing, so
+    // this row records a property that holds; what it adds is the ability to
+    // notice if it stops.
+    //
+    // **Why it needed adding, given three rows above look like coverage.**
+    // `T2.70` asserts each returned frame is one cell — satisfied exactly by a
+    // per-frame substitution, because the substitutes are one cell too. `T2.74`
+    // and `T3.45` assert whole-array equality and both name `boxBounce`, all
+    // four of whose frames are Ambiguous, so the two mechanisms return the same
+    // array there. **A property asserted only on members that cannot express it
+    // is not asserted.**
+    for (const name of NAMES) {
+      const set = SPINNER_SETS[name];
+      if (set === undefined) continue;
+      for (const caps of [FULL_CAPS, WIDE_CAPS, ASCII_CAPS]) {
+        const got = spinnerFrames(caps, name);
+        const whole = got.length === set.frames.length && got.every((f, i) => f === set.frames[i]);
+        const fallen = got.length === set.ascii.length && got.every((f, i) => f === set.ascii[i]);
+        expect(
+          whole || fallen,
+          `${name} at ${caps.unicode}/${caps.ambiguousWidth}: ${got.join("")} is neither alphabet whole`,
+        ).toBe(true);
+      }
+    }
+
+    // **The fixture responds to the thing under test**, which is the whole
+    // reason the row above is written over every set rather than over one.
+    // These three hold frames of BOTH widths, so a per-frame fallback returns a
+    // mixture here and an identical array everywhere else — they are the only
+    // members that can fail the assertion.
+    const mixed = NAMES.filter((name) => {
+      const set = SPINNER_SETS[name];
+      if (set === undefined || set.narrowOnly !== true) return false;
+      const wide = set.frames.filter((f) => cells(f, "wide") !== 1).length;
+      return wide > 0 && wide < set.frames.length;
+    });
+    expect(mixed.sort(), "the sets where whole-set and per-frame differ").toEqual(
+      ["agent", "bloom", "fullramp"],
+    );
+
+    // And the counts, because *some frames are wide* is the premise and a set
+    // that drifted to all-or-none would make this row vacuous without failing
+    // it (A03 §2). `agent` is the strongest case: 76 of its 82 frames would
+    // stay in the Unicode bloom under a per-frame build.
+    for (const [name, wide, total] of [["agent", 6, 82], ["fullramp", 5, 42], ["bloom", 1, 14]] as const) {
+      const frames = SPINNER_SETS[name]?.frames ?? [];
+      expect(frames.length, `${name}'s frame count`).toBe(total);
+      expect(frames.filter((f) => cells(f, "wide") !== 1).length, `${name}'s two-cell frames`).toBe(wide);
+    }
+  });
 
   it("T2.74 (C02 I9): a narrow-only set degrades on a wide terminal, and the default does not", () => {
     // The tier, asserted from both sides. Before the capability these sets were
