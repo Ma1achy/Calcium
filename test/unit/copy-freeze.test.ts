@@ -338,6 +338,8 @@ describe("C14 §6d — the selection's ground", () => {
     expect(mono).toContain("▸ x");
   });
 
+  it.todo("T1.40e (C14 I53, R-THM-003): on a banded theme the wash carries the band's ink — not deferred on a component: specified before the wash is changed");
+
   it("T1.40d (C14 I52, R-SEL-003): a styled row is grounded to its end, and an inner ground does not displace the wash", () => {
     // Every printed cell, paired with the SGR sequence most recently written
     // before it. A wash opened once lasts to the first inner reset; this asks
