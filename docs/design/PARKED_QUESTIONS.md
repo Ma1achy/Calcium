@@ -20,7 +20,7 @@ held at the point where a choice would be mine to invent.
 
 ## Entries
 
-**Open: 18, 23, 32, 36.** Every other entry is ruled or retracted. A ruled entry keeps its body, with the ruling directly above it and a premise note wherever the ruling rested on something the entry or the design contradicts.
+**Open: 18, 23, 32, 36, 37.** Every other entry is ruled or retracted. A ruled entry keeps its body, with the ruling directly above it and a premise note wherever the ruling rested on something the entry or the design contradicts.
 
 > **Ruled 2026-09-24.** Already answered, by the chain rule. The repo-side spec (C09 §4, I5) carries the narrowed rule and the registry does not. That assumption stands as the answer.
 
@@ -790,6 +790,14 @@ make. **Proposed, (a) recommended**:
 - **(b) `⌃v` in semantic copy mode toggles a rectangle**, vim's block-visual,
   beside the `v`/`V` the mode already takes. One new chord, delivered as `0x16` on
   every terminal, and free in the registry and the repo at that rung.
+
+**37 · OPEN — A trend with no movement.** §088 §4 draws a trend going down and a
+trend going up, and `R-COL-006` gives each a tone from the metric's polarity. It
+draws no reading that did not move, and `from === to` is ordinary data — a metric
+that held. **Taken unless you say otherwise** (C11 I30): no arrow, the text alone
+(`from 0.41`), in the default tone, since a flat reading has no direction to be
+good or bad about. The alternative is a third mark (`→`, or `=` at ASCII), which
+is a glyph the registry does not record.
 
 ---
 

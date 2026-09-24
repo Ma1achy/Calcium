@@ -1059,3 +1059,7 @@ describe("C04 §7 — the update model and the view state, checked rather than c
     expect(doc({ sizes: [1, null] }), "and a null is a sample with no size").toEqual([]);
   });
 });
+
+describe("C04 I128 — a trend cell", () => {
+  it.todo("T2.133 (C04 I128, R-COL-006): block() refuses a trend cell carrying glyph, tone, spark or bar — not deferred on a component: specified before Cell.trend exists");
+});
