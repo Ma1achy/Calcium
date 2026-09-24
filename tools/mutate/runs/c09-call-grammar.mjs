@@ -49,7 +49,7 @@ const results = runPass({
       // because tone prevents.
       name: "tone is assumed to carry at every rung, so five states share one mark",
       file: GLYPHS,
-      from: '  return caps.colourDepth > 1 && caps.unicode !== "ascii";',
+      from: '  return caps.colourDepth > 1 && caps.unicode !== "ascii" && !onBand;',
       to: "  return true;",
       expect: "T2.45"
     },

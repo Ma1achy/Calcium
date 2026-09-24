@@ -413,9 +413,14 @@ export const CALL_STATE_GLYPH: Readonly<Record<CallState, Glyph>> = Object.freez
  * ASCII rung is a whole alphabet stepping down together, and a `*` head with
  * five meanings distinguished only by colour is the collapse §030 accepts
  * because it has `●` to fall back on, which ASCII does not.
+ *
+ * **And per cell, on a band** (C10 I45, R-THM-003). A band's ink is total, so a
+ * cell on one has spent its tone exactly as a 1-bit terminal has. `onBand` is
+ * the ground's answer and the capability record cannot give it: in `hcDark` a
+ * focused head is on a band and every other head on the page is not.
  */
-export function toneCarries(caps: GlyphCaps & Pick<TerminalCapabilities, "colourDepth">): boolean {
-  return caps.colourDepth > 1 && caps.unicode !== "ascii";
+export function toneCarries(caps: GlyphCaps & Pick<TerminalCapabilities, "colourDepth">, onBand = false): boolean {
+  return caps.colourDepth > 1 && caps.unicode !== "ascii" && !onBand;
 }
 
 /**
@@ -425,8 +430,8 @@ export function toneCarries(caps: GlyphCaps & Pick<TerminalCapabilities, "colour
  * capability-free while the character moves: `GLYPH_INDENT` holds one entry and
  * it is not one of these, so resolving by capability moves no geometry.
  */
-export function headMark(state: CallState, caps: Parameters<typeof toneCarries>[0]): Glyph {
-  return toneCarries(caps) ? "running" : CALL_STATE_GLYPH[state];
+export function headMark(state: CallState, caps: Parameters<typeof toneCarries>[0], onBand = false): Glyph {
+  return toneCarries(caps, onBand) ? "running" : CALL_STATE_GLYPH[state];
 }
 
 /** The pairs, for the test that asserts each is 1:1 (T2.5). */

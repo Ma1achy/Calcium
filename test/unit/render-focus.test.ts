@@ -21,7 +21,7 @@ import { rowContaining, styleAt, styledScreenFrom, textOf, type CellStyle } from
 import { measurable, visible } from "../support/render.js";
 import type { FocusState } from "../../src/presentation/blocks/index.js";
 import { glyphFor, headMark } from "../../src/presentation/blocks/glyphs.js";
-import { background, focusStyle, selectionStyle, tone } from "../../src/presentation/blocks/paint.js";
+import { background, focusStyle, isBand, selectionStyle, tone } from "../../src/presentation/blocks/paint.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
@@ -713,7 +713,38 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
   const noticeAt = (b: typeof NOTICE, focus: FocusState | null, depth: 24 | 1 = 24) =>
     renderToLines(registry, b, 40, { theme, capabilities: capabilities({ colourDepth: depth }), focus });
 
-  it.todo("T1.75 (C09 I45, C10 I45, R-THM-003): a focused call head on a band takes the state's own mark — not deferred on a component: specified before headMark is changed");
+  it("T1.75 (C09 I45, C10 I45, R-THM-003): a focused call head on a band takes the state's own mark, and the page keeps ●", () => {
+    const STATES = ["queued", "running", "succeeded", "failed", "cancelled"] as const;
+    const caps = capabilities({ colourDepth: 24 });
+    const headOf = (t: typeof theme, state: (typeof STATES)[number], focus: FocusState | null): string => {
+      const b = block({ kind: "notice", id: "n", tone: "info", glyph: "running", text: "x", state } as never);
+      const [first] = renderToLines(registry, b, 20, { theme: t, capabilities: caps, focus });
+      return [...(first ?? "").replace(SGR, "")][0] ?? "";
+    };
+    const FOCUS = { blockId: "n", rowId: "n" };
+    const running = glyphFor("running", caps);
+    for (const variant of ["hcDark", "hcLight"] as const) {
+      const loaded = loadTheme(defaultTheme, variant);
+      if (!loaded.ok) throw new Error(`${variant} must load`);
+      const hc = loaded.value.current;
+      // Every state's own mark, and five of them: the band spends the tone,
+      // so shape is the carrier left — the 1-bit rung, asked of the cell.
+      const focused = STATES.map((s) => headOf(hc, s, FOCUS));
+      expect(focused, `${variant}: the state's own mark on the band`).toEqual(
+        STATES.map((s) => glyphFor(headMark(s, capabilities({ colourDepth: 1 })), caps)),
+      );
+      expect(new Set(focused).size, `${variant}: five states, five marks`).toBe(5);
+      // **The band is found by its name** (C10 I45): the theme having bands is
+      // not every ground being one. `bgElev` is where the page's heads sit in a
+      // card, and it is no band in either theme.
+      expect(isBand(hc, "focusGround"), `${variant}: focus is a band`).toBe(true);
+      expect(isBand(hc, "bgElev"), `${variant}: the elevated page is not`).toBe(false);
+      // Off the band the same theme keeps the collapse: tone still carries.
+      expect(STATES.map((s) => headOf(hc, s, null)), `${variant}: the page keeps ●`).toEqual(STATES.map(() => running));
+    }
+    // The control: `dark`'s focus ground is not a band, so focus moves nothing.
+    expect(STATES.map((s) => headOf(theme, s, FOCUS)), "dark: focused, still ●").toEqual(STATES.map(() => running));
+  });
 
   it("T1.29 (C26 §7, C04 §3, C09 I83): a focused notice keeps its own tone over the focus ground — glyph and text; one without an action declares nothing and cannot move", () => {
     const caps = capabilities({ colourDepth: 24 });

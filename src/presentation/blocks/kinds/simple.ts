@@ -15,7 +15,7 @@ import { runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../runs.js";
 import { NO_STYLE, rampStyle } from "../../theme/index.js";
 import { animateT, effectiveAnimation, effectiveTick, extentT, glyphTick } from "../ramp.js";
 import { barStyle, glyphFor, glyphCells, glyphs, headMark, spinnerFrames } from "../glyphs.js";
-import { background, clampSpans, focusStyle, pad, paint, paintRuns, rows, selectionStyle, slot as surface, tone, withBackground, type Span } from "../paint.js";
+import { background, clampSpans, focusStyle, isBand, pad, paint, paintRuns, rows, selectionStyle, slot as surface, tone, withBackground, type Span } from "../paint.js";
 import type { BlockDefinition, NavElement, RenderContext, Windowed, Rendered } from "../types.js";
 
 /** Chips in a `pills` row are separated by two spaces — one is too close to read. */
@@ -636,7 +636,11 @@ export const noticeDefinition: BlockDefinition<Notice> = {
                     // the block carries the call's state and the character is a
                     // function of whether tone can carry it. Geometry is
                     // untouched — every candidate is one cell with no indent.
-                    block.state !== undefined ? headMark(block.state, ctx.capabilities) : block.glyph,
+                    // On a band the tone is spent per cell (C10 I45), so a focused
+                    // head in a high-contrast theme takes the 1-bit rung's mark.
+                    block.state !== undefined
+                      ? headMark(block.state, ctx.capabilities, focused && isBand(ctx.theme, "focusGround"))
+                      : block.glyph,
                     ctx.capabilities,
                   )
                 : " ".repeat(prefix),

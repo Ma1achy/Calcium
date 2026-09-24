@@ -257,6 +257,14 @@ export function focusStyle(theme: ResolvedTheme, caps: TerminalCapabilities): St
   return resolveBackground("surface.focusGround", theme, caps);
 }
 
+/**
+ * Whether `surface` is a band in this theme (C10 I45): a ground whose one ink
+ * answers for every slot drawn on it, so tone carries nothing there.
+ */
+export function isBand(theme: ResolvedTheme, surface: string): boolean {
+  return theme.tokens.bandInk?.[surface] !== undefined;
+}
+
 export function selectionStyle(theme: ResolvedTheme, caps: TerminalCapabilities): Style {
   const bg = background("surface.selection", theme, caps);
   return bg.background === undefined ? { inverse: true } : bg;
