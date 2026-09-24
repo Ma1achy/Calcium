@@ -24,12 +24,25 @@ ROOT = "docs/design/language"
 # named rather than filtered by class, because a range would quietly swallow the
 # next real one.
 IGNORE = set("’‘“”–—…·×→←↑↓ ")
+# Below U+2000, named one at a time for the same reason. `§` is the fixtures'
+# own section reference and the commonest character here at 87; `Δ`, `°` and `÷`
+# are data inside a figure — a delta, a temperature, a division — and `é` is a
+# letter. None is an affordance, which is the line this tool draws.
+IGNORE |= set("§Δ°÷é")
 
 
 def recorded() -> set[str]:
     r = json.load(open(f"{ROOT}/calcium-registry.json", encoding="utf-8"))
     out: set[str] = set()
-    for g in r.get("glyphs", []):
+    # **`delimiters` as well as `glyphs`, and the omission was invisible.** The
+    # registry keeps `«` and `»` in a second array of the same shape — `unicode`,
+    # `ascii`, `reservedCells`, `collisionDomains`, `ruleIds` — and reading only
+    # `glyphs` left both unrecorded here. It manufactured no false positive
+    # because the scan below cut at U+2000 and both marks are Latin-1: **the two
+    # shortfalls concealed each other exactly.** Measured 2026-09-24 — lowering
+    # the cut with this loop unfixed reports `«` 4x and `»` 23x as unregistered,
+    # and `»`'s record is the one carrying M4's own `secondRoleNote`.
+    for g in r.get("glyphs", []) + r.get("delimiters", []):
         for k in ("unicode", "ascii"):
             if isinstance(g.get(k), str):
                 out.update(g[k])
@@ -50,10 +63,21 @@ def main() -> int:
     where: dict[str, set[str]] = collections.defaultdict(set)
     for path in sorted(glob.glob(f"{ROOT}/fixtures/*.txt")):
         for ch in open(path, encoding="utf-8").read():
-            if ord(ch) > 0x2000 and ch not in known:
+            # **ASCII, not U+2000.** The old cut excluded the whole Latin-1
+            # supplement, where `« » ° ·` live — a mark drawn with no record is
+            # as much a gap at U+00BB as at U+2500, and the cut is here to
+            # skip letters and punctuation a keyboard types, which is ASCII.
+            if ord(ch) > 0x7F and ch not in known:
                 seen[ch] += 1
                 where[ch].add(path.split("/")[-1][:3])
-    print(f"{len(seen)} marks drawn in the fixtures with no glyph, spinner or bar record")
+    print(f"{len(seen)} marks drawn in the fixtures with no glyph, delimiter, spinner or bar record")
+    # **The total did not move when the population was corrected, and that is
+    # the residue worth stating rather than a sign nothing happened** (F1152's
+    # shape). Two changes landed together: the cut dropped from U+2000 to
+    # ASCII, which exposed five Latin-1 marks — `§ Δ ° ÷ é`, every one prose or
+    # data and every one now in IGNORE by name — and `delimiters` joined the
+    # recorded set, which took `«` and `»` out of the exposure. 63 before and
+    # 63 after, over a population that is no longer short at either end.
     # **A count, not a list of defects, and the difference is the mark's job.**
     # Box drawing (`│ ━ ┃ ╽ ╿`) is structural furniture the tree carries in
     # `GlyphSet` and the registry deliberately does not — it records the design's
