@@ -12,6 +12,7 @@ import { buildGraph } from "../support/session.js";
 import { washedRowsOf, washRow, washSelectedRows } from "../../src/shell/paint.js";
 import { FULL_CAPS, themeFor } from "../support/render.js";
 import { paint, tone } from "../../src/presentation/blocks/paint.js";
+import { defaultTheme, loadTheme, ratio } from "../../src/presentation/theme/index.js";
 
 const THEME = themeFor("dark");
 import {
@@ -338,7 +339,61 @@ describe("C14 §6d — the selection's ground", () => {
     expect(mono).toContain("▸ x");
   });
 
-  it.todo("T1.40e (C14 I53, R-THM-003): on a banded theme the wash carries the band's ink — not deferred on a component: specified before the wash is changed");
+  it("T1.40e (C14 I53, R-THM-003): on a banded theme the wash carries the band's ink, and every cell takes it", () => {
+    const SGR = /\x1b\[[0-9;]*m/uy;
+    const lastBefore = (out: string): string[] => {
+      const seen: string[] = [];
+      let last = "";
+      for (let i = 0; i < out.length; ) {
+        SGR.lastIndex = i;
+        const m = SGR.exec(out);
+        if (m !== null) {
+          last = m[0];
+          i += m[0].length;
+          continue;
+        }
+        const ch = String.fromCodePoint(out.codePointAt(i)!);
+        seen.push(last);
+        i += ch.length;
+      }
+      return seen;
+    };
+    const rgbOf = (hex: string): string =>
+      [1, 3, 5].map((k) => parseInt(hex.slice(k, k + 2), 16)).join(";");
+    for (const variant of ["hcDark", "hcLight"] as const) {
+      const loaded = loadTheme(defaultTheme, variant);
+      if (!loaded.ok) throw new Error(`${variant} must load`);
+      const hc = loaded.value.current;
+      const band = hc.tokens.bandInk?.["selection"];
+      if (band === undefined) throw new Error(`${variant} bands its selection`);
+      const styled = paint([
+        { text: "● ", style: tone("error", hc, FULL_CAPS) },
+        { text: "pytest", style: { ...tone("accent", hc, FULL_CAPS), bold: true } },
+      ]);
+      const governing = lastBefore(washRow(styled, hc, FULL_CAPS, 12));
+      const opening = governing[0] ?? "";
+      expect(opening, `${variant}: the wash opens with the band ink`).toContain(`38;2;${rgbOf(band)}`);
+      expect(new Set(governing), `${variant}: every cell under that one sequence`).toEqual(new Set([opening]));
+      // The ink the cells take clears the theme's own promise on that ground.
+      expect(ratio(band, hc.tokens.surfaces["selection"]!), `${variant}: the floor`).toBeGreaterThanOrEqual(hc.tokens.floor ?? 7);
+    }
+    // The control: `dark` has no band, so its wash is a ground and no ink.
+    // Parameters walked rather than matched: `/38;/` finds the red component
+    // of `48;2;38;64;87`, which is a ground with no ink in it.
+    const channels = (seq: string): string[] => {
+      const p = seq.slice(2, -1).split(";");
+      const out: string[] = [];
+      for (let i = 0; i < p.length; i++) {
+        if (p[i] === "38" || p[i] === "48") {
+          out.push(p[i] === "38" ? "ink" : "ground");
+          i += p[i + 1] === "2" ? 4 : 2;
+        }
+      }
+      return out;
+    };
+    const plain = lastBefore(washRow("x", THEME, FULL_CAPS, 2))[0] ?? "";
+    expect(channels(plain), "dark: a ground and no ink").toEqual(["ground"]);
+  });
 
   it("T1.40d (C14 I52, R-SEL-003): a styled row is grounded to its end, and an inner ground does not displace the wash", () => {
     // Every printed cell, paired with the SGR sequence most recently written

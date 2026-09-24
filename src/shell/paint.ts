@@ -36,6 +36,7 @@ import {
   background,
   based,
   paint as paintSpans,
+  isBand,
   selectionStyle,
   tone,
   withBackground,
@@ -625,7 +626,12 @@ export function washRow(
   capabilities: TerminalCapabilities,
   width: number,
 ): string {
-  const wash = sgr(selectionStyle(theme, capabilities));
+  // **A band's ink is total** (C14 I53, C10 I45): on a theme that bands its
+  // selection, the wash carries the band's ink as well as its ground, so a
+  // page ink never lands on the band. `tone(…, "selection")` is the one path
+  // to that ink — `inkOn` answers the band before any slot.
+  const band = isBand(theme, "selection") ? tone("default", theme, capabilities, "selection") : {};
+  const wash = sgr({ ...selectionStyle(theme, capabilities), ...band });
   // **Fitted by display cells, escapes whole** (C09 I63). `cells` counts an
   // escape's bytes, so a styled row measured wider than it was and got no pad —
   // the ground stopped at the text on every row that carried a colour.

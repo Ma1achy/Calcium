@@ -109,6 +109,26 @@ const MUTATIONS = [
     to: '  const fitted = sliceCells(row, 0, width) + " ".repeat(Math.max(0, width - cells(row)));',
     expect: "T1.40d",
   },
+  {
+    // **The ground without its ink** (C14 I53), as it shipped: the band's
+    // ground under the page's inks, 1.25–1.68 : 1 in both high-contrast
+    // themes. Every theme without a band reads identically.
+    name: "the wash lays the band's ground and not its ink",
+    file: PAINT,
+    from: '  const band = isBand(theme, "selection") ? tone("default", theme, capabilities, "selection") : {};',
+    to: "  const band = {};",
+    expect: "T1.40e",
+  },
+  {
+    // **The ink resolved on the wrong band.** Both high-contrast themes band
+    // focus too, so the lookup succeeds and returns focus's ink — the page's
+    // colour in `hcDark`, on the selection's bright ground.
+    name: "the wash's ink is resolved against the focus band",
+    file: PAINT,
+    from: '  const band = isBand(theme, "selection") ? tone("default", theme, capabilities, "selection") : {};',
+    to: '  const band = isBand(theme, "selection") ? tone("default", theme, capabilities, "focusGround") : {};',
+    expect: "T1.40e",
+  },
 ];
 
 const results = await runPass({
