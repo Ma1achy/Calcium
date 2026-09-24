@@ -2222,6 +2222,51 @@ other chips` needs nothing: they are the caret's own motion, and a caret moving
 between chips moves the preview with it, which is the legend satisfied by the
 projection rather than by a binding.
 
+### 6l.9b — the classification table: where a printable key goes, and whether the prompt is drawn under
+
+**Three sites ask *who owns the keystroke* by comparing a layer id**, and a
+comment on one of them has said so for some time: *named rather than derived
+because no field distinguishes them from a search — which is a gap worth
+closing and not a rule to guess at.* The sites are `promptUnderMenu`, the
+menu's forward (`construct.ts:3328`) and the search's own arm (`:3336`).
+
+**The walk is a table and not a trace**, because the interaction is
+structural: these rules meet at rest, with nothing happening between them
+(C18 §8a's shape, and C19's own lesson that a trace indexed by events cannot
+reach a structural cell however many rows it has).
+
+| layer on top | a printable key goes to | the prompt drawn under it | why |
+|---|---|---|---|
+| chip preview | the editor | **yes** | a projection of the caret; it has no selection to hold, and a projection that owned the caret's keys would be closed by nothing (I51) |
+| completion menu, no selection | the editor | **yes** | *a display of what is available rather than a choice being made* (C19 I20) |
+| **completion menu, holding a selection** | **the editor** | **no** | **the one cell where the two disagree** |
+| reverse search | **the search** (`searchTyped`) | yes | it is composing its **own** query (C20 §7), so the keystrokes are its |
+| question, replacing | the question | no | there is no prompt underneath a question that replaced it (C23 I73, I74) |
+| question, typed reply floating | the editor | yes | it is the **one** editor — §101's whole point — so this is the prompt, not a second one |
+
+**The one cell is the finding, and it is what refutes the obvious fix.** A
+single declared `composes` — the shape an earlier reading reached for — would
+merge the two columns, and they differ exactly once: a menu holding a
+selection still forwards printable keys to the editor, and the prompt is
+**not** drawn under it. Merging them draws the prompt under a menu the reader
+is choosing from, or drops the keystroke that would narrow it. Either is a
+defect no assertion about *the menu is up* can see, because both readings are
+true of every other row.
+
+**So the axis is two properties and not one**, and that is why three id
+comparisons read as one rule while resisting every attempt to write the rule
+down. They agree in five cells of six, which is precisely the condition under
+which two facts get mistaken for one — and the sixth is not an edge case but
+the ordinary act of choosing a completion.
+
+**Neither column is derivable from the layer's kind**, which is the other half
+of why the ids are still there: `panel` carries the chip preview, the menu and
+the search alike. The declaration belongs to the layer, and it is two fields
+rather than one — *where its printable keys go*, and *whether it leaves the
+prompt composing*. Naming that is this section; landing it is a change to
+C15's `Layer` and to the three sites, and it is deliberately not bundled with
+the walk that found it.
+
 ### 6l.10 — the label on the prompt's rule (§069, `R-COL-003`)
 
 **The rules already exist, so a label in one costs no rows.** That is the

@@ -359,6 +359,59 @@ refused.
 
 ---
 
+**23 · Does §101's `completion` row answer twice?** M15's last deliverable is
+`promptUnderMenu`'s hardcoded exemption, whose comment has long said what it
+needed: *named rather than derived because no field distinguishes them from a
+search — which is a gap worth closing and not a rule to guess at.* The walk is
+now done and written as C22 §6l.9b, and it found the cell.
+
+**Three sites ask *who owns the keystroke* by comparing a layer id** —
+`promptUnderMenu`, the menu's forward (`construct.ts:3328`) and the search's
+own arm (`:3336`) — and the kind cannot stand in for them, because `panel`
+carries the chip preview, the menu and the search alike. So far this reads as
+one rule with three instances.
+
+**It is two properties, and they part in exactly one cell.** *Where a printable
+key goes* and *whether the prompt is drawn underneath* agree on five of the six
+layers. They disagree on the **completion menu holding a selection**, which
+still forwards printable keys to the editor — C19 §8's keystroke cell narrows
+it in place — and is nonetheless *a choice being made* rather than *a display
+of what is available* (C19 I20), so the prompt is not drawn under it. A single
+merged field either draws the prompt under a menu the reader is choosing from
+or drops the keystroke that would narrow it, and no assertion about *the menu
+is up* can tell either from correct.
+
+**The build was started and stopped at the design's own table.**
+`src/shell/question-routing.ts` is §101's six consumers — `approval`, `choice`,
+`reply`, `peek`, `completion`, `find` — already answering `replaces`,
+`blocking` and `dismissal` as a table rather than six decisions, and it is
+plainly where two more columns belong. But `completion` must then answer
+*prompt composing* **two ways**, by its selection. The file's own precedent
+says how that is resolved — *`approval` and `choice` are kept apart because the
+design names them apart*, and `questionConsumer` derives the consumer from
+state — so the shape is a **seventh consumer**, split out of `completion`.
+
+**§101's table has six rows, and adding a seventh is writing a row into the
+design.** That is the question. Three answers, and the middle is the one I
+would take:
+
+- **split `completion`** into the available and the choosing states, as a
+  seventh consumer the registry gains;
+- **keep six rows and put the second property on the layer**, carried by
+  `update` alongside `content` and `placement` when the selection moves — which
+  works, and means one of the two properties lives outside the table that owns
+  the other;
+- **leave the three id comparisons**, on the grounds that five-of-six agreement
+  is not shared shape enough to be one rule.
+
+A field that is static where the menu's answer is not would read correct and be
+stale the moment `↓` is pressed, which is worse than the ids — so nothing was
+wired. The type change was written, compiled against the tree to find all six
+construction sites, and reverted; C22 §6l.9b keeps the table that found the
+cell.
+
+---
+
 ## Not yet recovered
 
 **Sixteen distinct questions are above, and the running count in the reports
