@@ -745,11 +745,12 @@ The rule has three claims and they do not have the same standing in the registry
 | it **says so in the mode label** | the requirement, and no words | **parked**, with §6a's |
 | the **way in** — a chord, a verb, a binding | **nothing.** The registry names no rectangular action and no rectangular binding | **parked** |
 
-**The label is not a second parked question.** §6a already records that there is
-no mode-label seam at all — `ChromeContext.owner` is the *rung*, both copy modes
-map to `copy`, and the header draws `COPY` from that rather than from anything a
-mode supplies. So *say so in the mode label* is blocked on the surface rather than
-on the wording, and it lands the day that surface does, with the handoff's word.
+**The label is not a second parked question.** §6a recorded that there was no
+mode-label seam at all — `ChromeContext.owner` is the *rung*, and both copy modes
+map to `copy`. **Amended 2026-09-24**: the seam is `ChromeContext.copy` (I55) and
+question 5 ruled the word, `RECT 12×4 · cells, not source`; what remains is the
+**way in**, parked as 36, because a label with no state to be drawn in is drawn by
+nothing.
 
 **And the chord being absent is a fact about the registry, not an omission here.**
 `R-SEL-008` gives `a` and `A` in prose; `R-SEL-007` gives nothing of the kind, and
