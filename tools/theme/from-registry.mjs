@@ -136,15 +136,54 @@ const FLOOR = { comment: 3 };
 const floorOf = (slot) => FLOOR[slot] ?? 4.5;
 
 const HUE = /^h-|^hi-/;
-/** Theme-independent, so collected once across every theme and asserted equal. */
-const hues = {};
-const hueGrounds = {};
+/**
+ * The ten agent hues, **per theme and in three tiers** (C10 I53, §070, §093).
+ *
+ * **This was two module-level records keyed by hue name, under a comment saying
+ * the hues are theme-independent and land once as `HUES`.** Both halves were
+ * wrong. There is no `HUES` — nothing read either record, so nothing shipped —
+ * and the premise does not survive measurement over the registry's 300 tokens:
+ *
+ *     c-h-*   the hue's ink      `#3b82f6` in eight themes, `#4e8ef6` in light
+ *                                and `#4e8df5` in paper, where a mid blue needs
+ *                                lifting off a light ground
+ *     bg-h-*  the hue's ground   nine distinct values across ten themes
+ *     c-hi-*  the ink ON it      `#000000` or `#ffffff`, by theme
+ *
+ * Keyed by hue alone, ten themes overwrite each other and the last read wins.
+ * So the tiers are collected inside `tokensFor` with everything else that is a
+ * theme's own, and the name `hue` is the lookup rather than the value.
+ */
+const hueName = (slot) => slot.replace(/^h-|^hi-/, "");
+
+/**
+ * The hue order, taken once from the registry's document order (§093).
+ *
+ * **A sequence and not a set**, because the ordering is §093's whole argument:
+ * the first assignment ran the spectrum and gave *five identities a deuteranope
+ * cannot separate*, and the replacement interleaves by perceptual distance —
+ * blue orange cyan pink lime violet yellow green red purple. A set comparison
+ * passes the arrangement this one exists to retire.
+ *
+ * Read from the selectors rather than written down here, so the projection has
+ * one source; T2.53 is what holds the two together.
+ */
+const HUE_ORDER = (() => {
+  const out = [];
+  for (const rule of registry.themeRules) {
+    for (const m of rule.selector.matchAll(/\.c-h-([a-z0-9]+)\b/g)) {
+      if (!out.includes(m[1])) out.push(m[1]);
+    }
+  }
+  return out;
+})();
 
 function tokensFor(themeId) {
   const tone = {};
   const surfaces = {};
   const composed = {};
   const bandInk = {};
+  const hues = {};
   for (const rule of registry.themeRules) {
     if (SKIP_SELECTORS.test(rule.selector)) continue;
     // **Ink ON a ground** — `.bg-X .c-Y`, which the registry writes twice in one
@@ -182,10 +221,14 @@ function tokensFor(themeId) {
     const ground = rule.declarations.match(/(?:^|;)background:(#[0-9a-fA-F]{3,8})/);
     if (slot.startsWith(".c-") && colour !== null) {
       const name = slot.slice(3);
-      // **The hues are theme-INDEPENDENT and are not a theme's tokens.** Every
-      // theme declares the same `h-blue`, so emitting them per theme would write
-      // one vocabulary out ten times. They land once, as `HUES`.
-      if (HUE.test(name)) hues[name] = norm(colour[1]);
+      // The hue's two ink tiers, per theme — see `HUE_ORDER` for why this is
+      // not the `HUES` the sentence that stood here promised.
+      if (HUE.test(name)) {
+        const hue = hueName(name);
+        hues[hue] ??= {};
+        // `hi-` is the ink drawn ON the hue's ground; `h-` is the hue's own ink.
+        hues[hue][name.startsWith("hi-") ? "on" : "ink"] = norm(colour[1]);
+      }
       // **An ink is paired with a ground, so it is a surface** — the placement
       // `errorInk` already has. Put in `tone` it would be measured against `bg`,
       // where a black ink for a yellow ground fails every floor for a pairing
@@ -196,7 +239,11 @@ function tokensFor(themeId) {
       const value = ground?.[1] ?? colour?.[1];
       if (value === undefined) continue;
       const name = slot.slice(4);
-      if (HUE.test(name)) hueGrounds[name] = norm(value);
+      if (HUE.test(name)) {
+        const hue = hueName(name);
+        hues[hue] ??= {};
+        hues[hue].ground = norm(value);
+      }
       else surfaces[name] = norm(value);
       // **A band declares its ground and its one ink together** (R-THM-003).
       // Before this arm existed the `color:` on such a rule was read, found to be
@@ -225,7 +272,7 @@ function tokensFor(themeId) {
     delete surfaces["error"];
   }
 
-  return { tone, surfaces, composed, bandInk };
+  return { tone, surfaces, composed, bandInk, hues };
 }
 
 /**
@@ -423,6 +470,32 @@ function derived(themeId, tone, lender) {
     one("categorical", CATEGORICAL_FROM_TONE) + "\n" + one("syntax", SYNTAX_FROM_TONE);
 }
 
+/**
+ * The ten hues in §093's order, three tiers each (C10 I53).
+ *
+ * **Thrown on rather than defaulted**, in both directions: a hue the registry
+ * orders but this theme does not carry, and a tier missing from one it does.
+ * A hue with two of its three tiers is the failure the ink-on-band rule exists
+ * to prevent — a band painted with a guessed ink — and it would project as a
+ * `hues` record that looks complete to every reader but the one that needs the
+ * missing tier.
+ */
+function huesBlock(themeId, hues) {
+  const names = Object.keys(hues);
+  const missing = HUE_ORDER.filter((h) => !names.includes(h));
+  const extra = names.filter((h) => !HUE_ORDER.includes(h));
+  if (missing.length > 0 || extra.length > 0) {
+    throw new Error(`${themeId}: hues ${JSON.stringify(missing)} missing, ${JSON.stringify(extra)} unordered`);
+  }
+  const body = HUE_ORDER.map((h) => {
+    for (const tier of ["ink", "ground", "on"]) {
+      if (typeof hues[h][tier] !== "string") throw new Error(`${themeId}: hue ${h} has no ${tier}`);
+    }
+    return `      ${JSON.stringify(h)}: Object.freeze({ ink: ${lit(hues[h].ink)}, ground: ${lit(hues[h].ground)}, on: ${lit(hues[h].on)} }),`;
+  }).join("\n");
+  return `\n    hues: Object.freeze({\n${body}\n    }),`;
+}
+
 const slots = (record) => Object.entries(record)
   .map(([k, v]) => `      ${JSON.stringify(k)}: ${lit(v)},`).join("\n");
 
@@ -452,7 +525,7 @@ ${slots(tone).replace(/^ {6}/gm, "          ")}
 ${derived(theme.id, tone, lender)}
       spectrum: lend(${lender}, "spectrum"),
     }),
-    fourBit: ${fourBitLender(theme.id, variant)}.fourBit,${bandInkBlock(collected.get(theme.id).bandInk)}${composedBlock(solveDiffGrounds(theme.id, tone, surfaces, withDerived(theme.id, collected.get(theme.id).composed)), MEASURED.get(theme.id))}
+    fourBit: ${fourBitLender(theme.id, variant)}.fourBit,${bandInkBlock(collected.get(theme.id).bandInk)}${composedBlock(solveDiffGrounds(theme.id, tone, surfaces, withDerived(theme.id, collected.get(theme.id).composed)), MEASURED.get(theme.id))}${huesBlock(theme.id, collected.get(theme.id).hues)}
   }),`;
 }).join("\n");
 

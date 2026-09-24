@@ -159,6 +159,31 @@ export type Surfaces = Readonly<{
   errorInk: string;
 }>;
 
+/**
+ * One agent hue, in the three tiers the design draws it at (C10 I53, §070).
+ *
+ * **Three values and not one, because they are three jobs.** `ink` is the hue as
+ * text — an agent's name in the strip; `ground` is the hue as a band; and `on` is
+ * whichever of black or white reads **on** that band, which is a property of the
+ * band and not of the hue. A single colour per hue cannot express the third, and
+ * a band whose ink is guessed is the failure R-THM-003 exists to prevent.
+ *
+ * **Per theme, all three.** Measured over the registry's 300 tokens: `ground`
+ * takes nine distinct values across the ten themes, `on` is black in some and
+ * white in others, and even `ink` moves — `#3b82f6` in eight themes against
+ * `#4e8ef6` in `light` and `#4e8df5` in `paper`, where a mid blue needs lifting
+ * off a light ground. The generator that collected these called them
+ * theme-independent and keyed them by hue name alone.
+ */
+export type Hue = Readonly<{
+  /** The hue as text. */
+  ink: string;
+  /** The hue as a band. */
+  ground: string;
+  /** The ink that reads on that band (`R-THM-003`). */
+  on: string;
+}>;
+
 export type ThemeTokens = Readonly<{
   name: string;
   /**
@@ -193,6 +218,21 @@ export type ThemeTokens = Readonly<{
    */
   background: "terminal" | "surface";
   palettes: Readonly<Record<string, PaletteSpec>>;
+  /**
+   * The ten agent hues, by name (C10 I53, §070, §093).
+   *
+   * **Not a palette**, which is an indexed cycle a reader walks; this is a
+   * lookup — `/colour` resolves the name a reader typed. §093 orders them
+   * *blue orange cyan pink lime violet yellow green red purple*, by perceptual
+   * separation rather than spectrally, because the first assignment was *five
+   * identities a deuteranope cannot separate*.
+   *
+   * **Optional so the three hand-written lenders need not carry it**, and every
+   * generated theme does; T2.53 compares all ten against the registry by
+   * equality in both directions, which is what an optional member needs in
+   * place of the type system.
+   */
+  hues?: Readonly<Record<string, Hue>>;
   surfaces: Surfaces;
   fourBit: FourBitMap;
 

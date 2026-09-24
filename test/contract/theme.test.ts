@@ -1301,7 +1301,90 @@ describe("C10 §4k — focus, selection and the facts that contest a ground", ()
  * twelve names would be a third record to drift (F1240's shape).
  */
 describe("C10 I52 — the registry's state axes and the spec's declarations", () => {
-  it.todo("T2.53 (C10 I53, §070, §093): the ten hues, three tiers, per theme, against the registry — not deferred on a component, the row lands with I53's code half");
+  it("T2.53 (C10 I53, §070, §093): the ten hues are three tiers per theme, and the order is a sequence", () => {
+    const registry = JSON.parse(
+      readFileSync(new URL("../../docs/design/language/calcium-registry.json", import.meta.url), "utf8"),
+    ) as { themes: readonly { id: string }[]; themeRules: readonly { selector: string; declarations: string }[] };
+
+    // The registry side, read out of the 300 tokens rather than written down here.
+    // `c-h-X` is the hue's ink, `bg-h-X` its ground, `c-hi-X` the ink ON that ground.
+    const expected = new Map<string, Map<string, Record<string, string>>>();
+    const order: string[] = [];
+    for (const rule of registry.themeRules) {
+      const colour = /(?:^|[;{\s])color:\s*(#[0-9a-fA-F]{3,8})/u.exec(rule.declarations);
+      const ground = /background(?:-color)?:\s*(#[0-9a-fA-F]{3,8})/u.exec(rule.declarations);
+      // The theme is in the selector and not a field — `[data-theme="dark"] .c-h-blue`.
+      const themeOf = /^\[data-theme="([a-zA-Z]+)"\]/u.exec(rule.selector);
+      if (themeOf === null) continue;
+      for (const m of rule.selector.matchAll(/\.(c-h|bg-h|c-hi)-([a-z0-9]+)\b/gu)) {
+        const [, kind, hue] = m as unknown as [string, string, string];
+        if (kind === "c-h" && !order.includes(hue)) order.push(hue);
+        const perTheme = expected.get(themeOf[1]!) ?? new Map<string, Record<string, string>>();
+        expected.set(themeOf[1]!, perTheme);
+        const rec = perTheme.get(hue) ?? {};
+        perTheme.set(hue, rec);
+        if (kind === "c-h" && colour !== null) rec["ink"] = colour[1]!.toLowerCase();
+        if (kind === "c-hi" && colour !== null) rec["on"] = colour[1]!.toLowerCase();
+        if (kind === "bg-h" && ground !== null) rec["ground"] = ground[1]!.toLowerCase();
+      }
+    }
+
+    // The population is measured, not quoted — ten hues over ten themes, three
+    // tiers each, which is the 300 the generator called theme-independent.
+    expect(order.length, "hues").toBe(10);
+    expect(expected.size, "themes carrying hues").toBe(registry.themes.length);
+
+    const THEMES = defaultTheme as unknown as Readonly<Record<string, ThemeTokens>>;
+    expect(Object.keys(THEMES).length, "themes shipped").toBe(registry.themes.length);
+
+    for (const [themeId, perTheme] of expected) {
+      const hues = THEMES[themeId]?.hues;
+      expect(hues, `${themeId}: the projection carries its hues`).toBeDefined();
+
+      // **A sequence and not a set.** §093 replaced a spectral assignment whose
+      // failure was that five identities a deuteranope cannot separate sat next
+      // to each other; a set comparison passes the arrangement it retired.
+      expect(Object.keys(hues!), `${themeId}: §093's order`).toEqual(order);
+
+      // Equality in BOTH directions: no hue in the registry that the projection
+      // lacks, and no hue in the projection the registry does not hold.
+      expect(new Set(Object.keys(hues!)), `${themeId}: no hue either side invented`).toEqual(new Set(perTheme.keys()));
+
+      for (const [hue, rec] of perTheme) {
+        for (const tier of ["ink", "ground", "on"] as const) {
+          expect(rec[tier], `${themeId} ${hue}: the registry records its ${tier}`).toBeDefined();
+          expect(hues![hue]?.[tier].toLowerCase(), `${themeId} ${hue}: ${tier}`).toBe(rec[tier]);
+        }
+      }
+    }
+
+    // **The control: the pair of themes that lift the ink, and the nine grounds.**
+    // Without these the row passes against a projection that collected the hues
+    // once and wrote one theme's vocabulary out ten times — which is exactly what
+    // the generator's own comment said it did. Both figures are what makes the
+    // per-theme claim have something to be wrong about (A03 §2).
+    const blueInks = new Set(Object.values(THEMES).map((t) => t.hues!["blue"]!.ink.toLowerCase()));
+    expect(blueInks.size, "blue's ink takes three values across the ten themes").toBe(3);
+    expect(THEMES["light"]!.hues!["blue"]!.ink.toLowerCase(), "light lifts a mid blue off a light ground").toBe("#4e8ef6");
+    expect(THEMES["paper"]!.hues!["blue"]!.ink.toLowerCase(), "paper does the same, and not identically").toBe("#4e8df5");
+    const blueGrounds = new Set(Object.values(THEMES).map((t) => t.hues!["blue"]!.ground.toLowerCase()));
+    expect(blueGrounds.size, "blue's ground is nine distinct values across ten themes").toBe(9);
+
+    // **`mono` keeps its hues chromatic, and it is the row worth naming.** Every
+    // tone and every surface it carries is grey — measured below — and its ten
+    // hues are the registry's saturated ones, blue's ink identical to `dark`'s.
+    // Ten identities cannot degrade to one grey, so identity is the single axis
+    // the greyscale theme does not flatten.
+    const grey = (hex: string): boolean => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+      return r === g && g === b;
+    };
+    const mono = THEMES["mono"]!;
+    expect(Object.values(mono.surfaces).every(grey), "mono's surfaces are grey").toBe(true);
+    expect(Object.values(mono.palettes["tone"]!.slots).every(grey), "mono's tones are grey").toBe(true);
+    expect(Object.values(mono.hues!).some((h) => grey(h.ink)), "and not one of its hues is").toBe(false);
+    expect(mono.hues!["blue"]!.ink, "mono's blue ink is dark's").toBe(THEMES["dark"]!.hues!["blue"]!.ink);
+  });
 
   it("T2.52 (I52, §4k.4, M11, R-STA-001): the axes and the declarations are equal as sets", () => {
     const registry = JSON.parse(
