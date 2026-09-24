@@ -1541,6 +1541,45 @@ describe("C10 I52 — the registry's state axes and the spec's declarations", ()
   });
 
 
+  it("T2.172 (C10 I57, MILESTONES): every recorded deliverable still resolves — the sweep, made a command", () => {
+    const md = readFileSync(new URL("../../docs/design/language/MILESTONES.md", import.meta.url), "utf8");
+    // **The whole heading line**, for T2.58's reason two sections up: a prefix
+    // anchor let a rename survive the control twice, in two different gates,
+    // an hour apart.
+    const HEADING = "## The deliverable record \u2014 the named deliverables, not the seam\n";
+    const at = md.indexOf(HEADING);
+    const section = at < 0 ? "" : md.slice(at, md.indexOf("\n## ", at + HEADING.length));
+    expect(section, "the deliverable record exists").not.toBe("");
+
+    // Five cells: MR, the plan's words, the tree's answer, symbol, file. The
+    // two prose cells are not parsed — a row is a claim about a symbol in a
+    // file, and reading its wording would make the gate sensitive to prose.
+    const rows = [...section.matchAll(/^\|\s*\*\*(M\d+[a-z]?)\*\*\s*\|[^|]*\|[^|]*\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|/gmu)]
+      .map((m) => ({ mr: m[1]!, symbol: m[2]!, file: m[3]! }));
+
+    // **A floor would be useless here exactly as it was for T2.58**, and the
+    // shape of the claim differs: an MR may record several deliverables, so
+    // the population is the MRs that carry one rather than a fixed span. What
+    // must not happen is the table quietly emptying, so the set is compared.
+    expect(new Set(rows.map((r) => r.mr)), "the MRs whose deliverables are recorded")
+      .toEqual(new Set(["M5", "M6", "M8", "M9", "M14", "M15"]));
+    expect(rows.length, "and every row of the table parsed").toBe(10);
+
+    const root = new URL("../../", import.meta.url);
+    const missing: string[] = [];
+    for (const row of rows) {
+      let text = "";
+      try {
+        text = readFileSync(new URL(row.file, root), "utf8");
+      } catch {
+        missing.push(`${row.mr}: ${row.file} does not exist`);
+        continue;
+      }
+      if (!text.includes(row.symbol)) missing.push(`${row.mr}: ${row.symbol} is no longer in ${row.file}`);
+    }
+    expect(missing, "every recorded deliverable resolves against the tree").toEqual([]);
+  });
+
   it("T2.58 (C10 I57, MILESTONES): every MR's seam still resolves — the revert detector", () => {
     const md = readFileSync(new URL("../../docs/design/language/MILESTONES.md", import.meta.url), "utf8");
     // **The WHOLE heading line, and this is the second time.** §4k.5's gate was

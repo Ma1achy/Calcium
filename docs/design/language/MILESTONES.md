@@ -59,6 +59,31 @@ the named file. A row naming a file that does not exist, or a symbol that is no
 longer in it, fails — and the control is a fabricated row, because a table of
 sixteen true statements passes exactly like a checker that reads nothing.
 
+## The deliverable record — the named deliverables, not the seam
+
+**One symbol per MR answers *did it land*, never *are its deliverables built*.**
+That distinction cost four separate by-hand sweeps before it was written down,
+and each sweep found something the seam symbol could not: M11's carrier half,
+M14's accent-on-focus taken at the consumer rather than the primitive, M15's
+`LineState`. A sweep that has to be redone is a memory, so these are symbols
+too, resolved against the tree by the same gate.
+
+**Three deliverables landed differently from the plan and better**, which is
+why the row names the tree's answer rather than the plan's words:
+
+| MR | the deliverable, in the plan's words | how the tree answers it | symbol | file |
+|---|---|---|---|---|
+| **M5** | *`FOCUS_ORDER` becomes the design's rungs* | the design's six are the **published** vocabulary and what the footer draws; `FOCUS_ORDER` keeps finer internal targets that map onto them — `nativeSelection` and `semanticSelection` are both `copy` | `OWNER_RUNGS` | `src/interaction/router/types.ts` |
+| **M5** | *verdicts become explicit* (`R-OWN-001`) | the four, as a union | `Verdict` | `src/interaction/router/types.ts` |
+| **M6** | *`defaultKeymap` becomes generated data* | generated, and `super` canonicalises as `u` so two chords cannot share a slot | `REGISTRY_BINDINGS` | `src/interaction/router/keymap.ts` |
+| **M8** | *split into `blocking` and `dismissal`* | `dismissal` is **three-valued**, not the plan's boolean — `escape`, `focus`, `answer` | `dismissal` | `src/viewport/overlay/types.ts` |
+| **M8** | *the innermost-scrollable walk is built here* | and it is what R-SEL-012's *innermost* needs to have a referent | `innermostScrollUnder` | `src/shell/construct.ts` |
+| **M9** | *`kind: "view"` is deleted* | retired by `R-EXA-082`, with the note kept in place rather than the line deleted | `R-EXA-082` | `src/viewport/overlay/types.ts` |
+| **M9** | *`PushedSurface` → `ChildSurface`* | with the handle renamed to match; 0.x, no deprecation cycle | `ChildSurfaceHandle` | `src/shell/surface.ts` |
+| **M14** | *the thumb takes `accent` when its container has focus* | at the **consumer**, not the primitive — which is why a grep of `scrollbar.ts` alone reports it missing | `scrollbarSet` | `src/presentation/blocks/kinds/containers.ts` |
+| **M15** | *`Snapshot` widens past `{text, cursor}`* | **three types, not one widened** — one type would have to be the widest of the three and would make the other two's exclusions unstateable (C17 I22 drops the region on purpose, C20 §4 holds text alone) | `LineState` | `src/interaction/editor/editor.ts` |
+| **M15** | *the overflow path replaces eliding the evidence* | the `...` arm is the **entry** to a suspended state that bounds the payload with C04 I49's residue row, rather than the whole answer | `inspection` | `src/shell/confirm.ts` |
+
 **M15's remainder is a row rather than a comment, because it was a comment.**
 Seven of M15's eight deliverables resolve; the eighth is `promptUnderMenu`'s
 hardcoded exemption, which the plan says is *subsumed — it was this rule with
