@@ -351,3 +351,19 @@ describe("C09 §7e / §026 — the mark at the head", () => {
     expect(tickIntervalOf(b as never), "a streaming one does").not.toBeNull();
   });
 });
+
+describe("C09 §073 — the button's three rungs", () => {
+  // **Spec-first, so these are `it.todo` and carry the reason** (TD6). The
+  // invariants land this commit and the renderer follows in the next; a row
+  // that ran today would be asserting against a button that draws bare text,
+  // which is the measurement I102 is written from rather than a test.
+  it.todo(
+    "T1.66 (C09 I102, §073, C10 I51): resting takes bgElev padded, focused takes pick/pickInk bold with › inside the ground, and no ground resolving gives brackets — not deferred on a component; the spec landed this commit and the renderer follows in the next",
+  );
+  it.todo(
+    "T1.67 (C09 I102, C04 I122, §073): the chrome is reserved at every width, and the two rungs' widths differ — two cells of padding against four of brackets — not deferred on a component; the spec landed this commit and the renderer follows in the next",
+  );
+  it.todo(
+    "T1.68 (C09 I102, I47, §073): a call head is not a button — `declaresElement` is true for both, so the predicate is `action` — not deferred on a component; the spec landed this commit and the renderer follows in the next",
+  );
+});

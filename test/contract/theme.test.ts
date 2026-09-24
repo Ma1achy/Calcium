@@ -1383,3 +1383,12 @@ describe("C10 I48 — the ink a slot takes on the ground it lands on", () => {
     }
   });
 });
+
+describe("C10 §073 — the chosen pair", () => {
+  // **Spec-first** (TD6): I51's values already ship in `tokens.generated.ts`
+  // and `ThemeTokens` declares neither, so a row written today would read a
+  // slot the type cannot name. The declaration and the pair check land next.
+  it.todo(
+    "T2.51 (C10 I51, §073, R-THM-001): `pick` and `pickInk` resolve in all ten themes, clear the meaning floor, and the pairing is in `themePairs`' output rather than merely computable — not deferred on a component; the spec landed this commit and the declaration follows in the next",
+  );
+});
