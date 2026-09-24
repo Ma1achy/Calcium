@@ -478,6 +478,32 @@ is unaffected either way and stays owed on its own account.
 
 ---
 
+**26 · The trend arrow has no glyph record, and the sort marks are not it.**
+§088 §4 draws a metric's trend as `↓ from 0.41` and `↑ from 0.62`, and
+`R-COL-006` makes the arrow's **tone** carry the polarity. Everything else
+about the rule is settled — §086 puts the metric in a table cell, so the
+declaration belongs on the column, and the tone follows from the delta's sign
+against the declared direction with nothing left to choose.
+
+**The arrow is what has no record.** Searched every `glyphs` and `delimiters`
+entry in the registry: **no record carries `↑` or `↓`.** The nearest pair is
+`sort-asc` / `sort-desc`, which are `▴` / `▾` with `collisionDomains:
+["table-header"]` — a different mark in a different domain, and substituting
+them would be drawing a character the design did not draw, which is the thing
+this reconciliation exists to stop.
+
+**So the ASCII rung is the open choice**, and it is not free: `R-DEG-001` says
+every distinction survives to one-bit, so the direction needs a carrier at the
+ASCII rung whatever it is. `^`/`v` are taken by `sort-asc`/`sort-desc`'s ASCII,
+which is the collision the domains exist to prevent — unless a table cell and a
+table header are ruled to be one domain, which is itself the question.
+
+I can build the polarity field and the tone resolution without it, but the row
+cannot be drawn, so the rule would not be satisfied by what landed. Better to
+ask than to mint a mark.
+
+---
+
 ## Not yet recovered
 
 **Sixteen distinct questions are above, and the running count in the reports
