@@ -1076,7 +1076,7 @@ subject and a table that did not say so would be read as six frames' worth of co
 | a diff ground | `patch/lines.ts:62` — `surface.diffAdd` / `diffRemove` as a row's background, `+` / `−` as the marks, `ok` / `error` as the tones | the same, displaced by selection, with `+` / `−` carrying it (R-SEL-006) — **already matches**, and the marks the displacement depends on already ship |
 | failed | `step.state === "failed"` → a glyph and a tone (`structured.ts:917`), plus the outcome word (`FAILURE_WORDS`) | a mark and a word — **already matches**, and it is R-COR-003's two carriers |
 | disabled | **nothing.** No field on any block; in no registry rule | a **WELL** (§017), and `⇥` skips it |
-| stale | **nothing.** No field, no painter | the content dims, the chrome does not (§047); a stale reading says when it was taken (R-HON-002) |
+| stale | **the title, and only the title** — corrected: this row read *No field, no painter*, and C23's driver had been appending `· 240s ago` to a refreshed part's title since I35. That is a painter, in accent, with the content untouched and the age frozen at the moment it was first written | the content dims, the chrome does not (§047); a stale reading says when it was taken (R-HON-002) — now C04 I127, C09 I109, C09 I110 and I59 below |
 | running | the spinner in the duration slot (`documents.ts`, `toolCallHeader`) | the same — **already matches** |
 
 **Three facts of nine have no subject in this tree**: hover, disabled and stale. That is the
@@ -1644,6 +1644,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 - **T1.47** (I58): the whole of `ONE_PER_KIND` taken as one entry spends exactly `info ok muted`, three of the five allowed. **The fabricated violation is in the same row**: six notices on six tones, which the gate refuses — without it this row is green against a counter that returns an empty set, which is A03 §2's vacuity class exactly.
 - **T1.48** (I58): a `code` block holding a toned child charges the entry **nothing**, because its palette lives inside it. The control is the same child under a `group`, which **is** charged: without it the row passes against a counter that never descends at all, and the exclusion would be indistinguishable from a walk that stops at the top.
 - **T1.49** (I58): a table's cells carry tones without being blocks, and the count reaches them — `muted ok` from the corpus's own table. A walk over block kinds alone counts none of them and reads green over an entry spending ten.
+- **T1.50** (I59): over every shipped theme × every depth, each `tone.*` and `syntax.*` slot of `recede(theme)` resolves to the `Style` `tone.dim` resolves to in `theme`; `surface.*` resolves unchanged; the name differs.
 
 Six tiers. Every cell of the §6 transition table is covered.
 
@@ -1862,6 +1863,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 
 
 - **I58** — *(`R-COL-002`, §090, §079, C04 I6)* **The tone budget is counted, it is counted per entry, and the regions the rule names are excluded whole.** `R-COL-002` is a **count** — *the tone budget is regional: an entry has three tones, while code, plots, and patches carry their own adjacent palettes* — and until this invariant nothing counted anything: `tone` offers ten slots and no site limited what one entry spent of them. Two-thirds of the rule was already built under another name, which is why the missing third was easy to miss: `PaletteSpec.carries: "meaning" | "decoration"` is the regional mechanism, and four palettes ship beside each other — `tone` (10, meaning), `syntax` (9, meaning), `categorical` (8, decoration), `spectrum` (9, decoration). *Code carries its own adjacent palette* is `syntax`; *plots* is `categorical`. **The clause with no subject was the budget itself.**
+- **I59** — *(§047, C09 I110)* **`recede(theme)` is the theme a stale reading is drawn in: every palette slot resolves as `tone.dim` does, at every depth.** At 24- and 8-bit the slot takes `dim`'s hex, at 4-bit its curated index, at 1-bit the `deemphasised` class, and a composition on a ground takes the composition `tone.dim` has there. Surfaces are untouched — a ground is not content — and so is a band's ink, which already answers for every ref (R-THM-003). **Its own name**, `<name>/receded`, because `resolve` memoises on the name and a receded theme sharing one would be served the live theme's styles. One object per theme, so the frame path allocates it once.
 
   **Two numbers, and they are different on purpose.** §090 states both in one line — *an ordinary entry: three semantic tones. Five is a smell* — so the **budget is three** and the **gate is five**. A gate at three would fail entries the design does not object to; a budget of five would lose the figure the design states. `TONE_BUDGET` and `TONE_SMELL` are both named for that reason rather than one being derived from the other.
 

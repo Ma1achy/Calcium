@@ -1936,4 +1936,7 @@ describe("C23 I70 — a refused patch stops the part, not the host", () => {
     );
     expect(asFarSide.ok === false && asFarSide.reason, "and only the far side is refused").toBe("settled");
   });
+
+  it.todo("T1.73 (C23 I78): a part whose second fetch never settles goes stale at staleAfter — not deferred on a component: the sweep's in-flight skip is amended in the next commit of this MR");
+  it.todo("T1.74 (C23 I78): a stale part's staleForMs advances, and no write lands between two instants that draw the same figure — not deferred on a component: the rewrite lands in the next commit of this MR");
 });
