@@ -1967,6 +1967,8 @@ So the footer carries a **second row, last**, naming the owner and its routes �
 
 **Amended in M7 (C16 I44, R-BLK-786, R-BLK-788, R-INT-008): the line says when a question is *guarded*.** A newly presented question requires a fresh, deliberate activation — so a key already in flight when it arrived is refused, and R-BLK-788 says the refusal *names why*. The naming is here rather than in a notice, because the owner line is already the row that answers *who has your keys*, and *and not from that keystroke* is the same question one moment earlier. The mark is drawn while the guard is live and gone when the guard ends, so the refused key **changes the frame** — which is the whole difference between a key refused and a key swallowed, and the only part of it a frame-read can see. A **cancelled pointer arm draws nothing**: R-INT-008's other half is that passive untargeted pointer events may stay silent, and a press taken back is not a command.
 
+**Amended 2026-09-24 (C14 I55, questions 4 and 35): the copy rung's line is read by mode.** Both copy modes raise one rung, so the rung cannot say which — `ChromeContext.copy` does. Semantic mode's line carries the selection's size and says whether the next `esc` clears or leaves; native mode's names the terminal as the mouse's owner. The header's `COPY` becomes `NATIVE` in the handoff by the same field.
+
 ### 6l.5 — what this moves, counted before it is regenerated
 
 Every golden frame with a prompt moves by two rows, and every settled tool-call frame gains a

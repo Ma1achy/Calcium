@@ -215,3 +215,8 @@ describe("C09 §7a — a kind declares its copy text (M10c)", () => {
     expect(copyTextOf(null, loaded, registry.copySequence)).toBe("");
   });
 });
+
+describe("C14 I55 — the copy rung's footer", () => {
+  it.todo("T1.50 (I55, R-SEL-005, R-SEL-009): the copy rung's owner line reads by mode, esc clears before it leaves, and the count is three chips — not deferred on a component: specified before CopyState exists");
+  it.todo("T1.51 (I38, I55, R-SEL-015): sizeOf counts the copy text — chars, rows, contributing entries — not deferred on a component: specified before sizeOf exists");
+});

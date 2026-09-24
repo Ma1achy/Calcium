@@ -102,3 +102,7 @@ describe("C14 §6b — the freeze in a real session", () => {
     }
   });
 });
+
+describe("C14 I55 — the footer in a real session", () => {
+  it.todo("T4.37g (I55, R-SEL-005, R-SEL-009): a selection draws its count and esc clear; esc clears, esc again leaves — not deferred on a component: specified before the session supplies CopyState");
+});

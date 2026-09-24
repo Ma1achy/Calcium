@@ -20,7 +20,7 @@ held at the point where a choice would be mine to invent.
 
 ## Entries
 
-**Open: 18, 23, 32.** Every other entry is ruled or retracted. A ruled entry keeps its body, with the ruling directly above it and a premise note wherever the ruling rested on something the entry or the design contradicts.
+**Open: 18, 23, 32, 36.** Every other entry is ruled or retracted. A ruled entry keeps its body, with the ruling directly above it and a premise note wherever the ruling rested on something the entry or the design contradicts.
 
 > **Ruled 2026-09-24.** Already answered, by the chain rule. The repo-side spec (C09 §4, I5) carries the narrowed rule and the registry does not. That assumption stands as the answer.
 
@@ -772,6 +772,24 @@ and §044 marks selected elements with `▌` and no total. The number exists
 the footer, beside `copy`, or in the prompt rule's label) are both visible
 choices. Question 4's shared chip is adjacent and separate: that one is which
 mode's label the rung shows, this one is what the count says and where.
+
+**36 · OPEN — `R-SEL-007`'s rectangular selection has a label and no way in.** Ruling
+5 gave the mode label, `RECT 12×4 · cells, not source`, and the clip and the
+escape-free cells are built (`rectBetween`, `cellTextOf`, C14 I42, I43). But the
+registry holds no rectangular action and no binding, and neither the HTML nor any
+fixture names a chord for it, so the label has no state to be drawn in and the two
+built functions have no caller. A chord is a visible choice the design does not
+make. **Proposed, (a) recommended**:
+
+- **(a) `⇧←` / `⇧→` in semantic copy mode begin a rectangle.** No new chord: the
+  registry already binds `selection.left` and `selection.right` (binding.012,
+  binding.013), and at block granularity they have nothing to extend. §103 draws
+  the copy footer as `copy ←→↑↓ extend`, so the design's own footer gives the mode
+  a horizontal axis the block selection cannot use. `⇧↑` / `⇧↓` stay block-wise
+  until a horizontal key is pressed. ASCII: `S-left` / `S-right`, per ruling 15.
+- **(b) `⌃v` in semantic copy mode toggles a rectangle**, vim's block-visual,
+  beside the `v`/`V` the mode already takes. One new chord, delivered as `0x16` on
+  every terminal, and free in the registry and the repo at that rung.
 
 ---
 

@@ -505,19 +505,23 @@ presses most. Until then the text reaches the kill buffer and nothing claims it
 reached the system clipboard — `⌃y` yanks it back, which is a true statement
 about where it went.
 
-### The label is parked on a word the design does not supply
+### The label, the count and the next press
 
-`R-SEL-009` names *the mode label in the footer* and `R-SEL-007` has a rectangular
-selection *say so in the mode label*, so this mode's label is specified. The other
-one's is not, and the two now collide: `ChromeContext.owner` is the **rung**, both
-modes map to `copy`, and the repo's header draws `COPY` from it. The design gives
-`COPY` to this mode — `selection.semantic` is *enter Calcium copy mode* — which
-leaves the handoff needing a label the registry has no word for.
+**Amended 2026-09-24 (questions 4 and 35 ruled).** This section parked the label
+on a word the design did not supply, and the ruling supplied it: **semantic copy
+mode reads `copy`, native handoff reads `native`** — fixture 044's own word for
+`⌥⇧C`. `ChromeContext.copy` carries the mode (`CopyState`), so the owner line and
+the header read the same fact rather than the rung, which both modes share: the
+header draws `COPY` or `NATIVE`, and native's owner line is fixture 044's
+`mouse tracking off · the terminal owns the mouse` rather than the semantic
+mode's `↑↓ extend`, which in native mode names keys that reach nothing.
 
-So the count lands on the seam (`FrameQueries.semanticSelectionCount`) and **the
-label does not land here**. Drawing a second `COPY` beside the first would put two
-modes behind one word on the one surface whose job is saying which mode you are in,
-which is worse than the label arriving a commit later.
+**The count is drawn, and its form is ruled**: `418 chars · 9 rows · 2 entries`,
+three chips, taken over **the copy text** — what `⏎` would put on the clipboard
+right now — rather than over the block set (I38). `chars` counts code points of
+that text including its line breaks, the `wc -m` reading of a paste; `rows` its
+lines; `entries` the entries contributing text. One is singular. No selection is
+no count, rather than a count of zero on the frames that are most of them.
 
 ### Leaving
 
@@ -955,7 +959,7 @@ than stranding the user.
 
 - **I36** — **The caret is an entry plus an entry-local display row, and the selection's unit is the block.** The split is what makes `R-SEL-003` a rule rather than a property of the type: a selection whose unit is already the block satisfies *all of it or none of it* by construction, and nothing can be written that violates it (A03 §2). An extend maps a row range to a block set by **intersection** — every block whose entry-local rows meet the range, taken whole — so a range covering one row of a table and a range covering all of them give the same answer, and the caret continues past the block it took. The row is the entry's own and never the viewport's, for the reason I6 gives about the anchor: a viewport row moves when anything above it changes height, and an entry-local row survives a resize, which the mode must, because a resize re-lays the held document (I31).
 - **I37** — **The anchor is a second caret, planted where the extend began, and the range is re-derived from the pair on every step.** With no extend in flight there is no anchor; an extend that over-shoots and comes back gives the selection that going there directly would have given, which is `R-SEL-015`'s *the count is always the size of what return would copy right now* stated for a keyboard. A plain arrow moves the caret and touches neither the anchor nor the selection — without that pair the caret cannot be placed anywhere without selecting on the way.
-- **I38** — **The count is blocks.** `R-SEL-015` counts what a copy would take, and an entry-level count reports a half-taken entry as a whole one — the number wrong in exactly the direction the rule exists to prevent. `a` and `A` are unchanged in meaning and changed in unit: they put every block of their entries into the set, and `R-SEL-008`'s sentence is untouched.
+- **I38** — **The selection's unit is blocks, and the count is taken over what they copy.** `R-SEL-015` counts what a copy would take, and an entry-level count reports a half-taken entry as a whole one — the number wrong in exactly the direction the rule exists to prevent. **Amended 2026-09-24 (question 35)**: the *drawn* count is not the block count but the size of `copyTextOf` over the held view — chars, rows, entries (I55) — so a block that copies nothing adds nothing, and the number is the size of the paste rather than of a set the reader never sees. `a` and `A` are unchanged in meaning and changed in unit: they put every block of their entries into the set, and `R-SEL-008`'s sentence is untouched.
 
 - **I39** — **The selection's ground is painted by the shell, one row per selected block, at the block's first row and across the full width.** A kind washing its own body is what `R-SEL-003`'s third clause forbids, and a rule delegated to twenty-six kinds is a rule enforced twenty-six times. *Frame or first row* is one arm rather than two: a bordered block's first row **is** its frame, so no kind is consulted about which it has. The spans are the ones the caret moves over (I36), so what is washed and what an extend took cannot disagree.
 - **I40** — **Nothing selection-dependent is ever written into a render-cache slot.** The cache keys on nine axes and the selection is none of them; a wash baked into the stored lines would serve a selected frame to a later unselected read, which is C22 I71's *correct frame, previous state* — the symptom whose report says *it froze*. A tenth axis would be correct and would bust an entry's whole slot on every keystroke in the mode, one rung coarser than the cost C22 I103 split `tick` out to avoid. So the wash is a transformation of the finished lines, applied to the copy that goes on screen and never to the copy that is stored.
@@ -975,6 +979,7 @@ than stranding the user.
 - **I52** — **The wash is re-opened after every SGR sequence in the row, not laid once under it** (`R-SEL-003`, `R-STA-002`). A finished line is a run of styled spans each closed by `SGR_RESET`, so a wash opened once before the line lasted to the first inner reset and no further — measured on 2026-09-24 over a muted border, a plain run and a bold toned word: the ground covered the border and stopped, at colour and at 1-bit alike, leaving the rest of the row and its pad on the terminal default. And a span that opens a ground of its own (a focused row's `focusGround`, a surface) displaced the wash over its cells, which is the precedence inverted: copy selection sits above focus and above a structural surface. So the selection's opening sequence follows **every** SGR sequence in the row — a reset or an opening — and the row's text, marks, inks and weights are left as they were. At 1-bit the re-opened sequence is SGR 7, so inverse is not lost at an inner reset either. This is `based`'s mechanism with the precedence reversed: a base re-asserts only after a return to the terminal default because anything above it may displace it; the selection is the top ground and re-asserts after everything. → T1.40d
 - **I53** — **On a banded theme the wash carries the band's ink as well as its ground** (`R-THM-003`, C10 I45). A band's ink is total: everything drawn on it takes that one ink, whatever slot it names. The wash laid the ground and left the row's page inks in place. Measured on 2026-09-24: every page tone sat on the selection band at **1.25–1.68 : 1** in both high-contrast themes (`hcDark` `#efc51c` under `default #ffffff` 1.66; `hcLight` `#46176d` under `accent #5b00a8` 1.25), where the theme promises 7 : 1. The wash's opening sequence now carries the band's ink, resolved through the one path every renderer uses (`tone(…, "selection")`, which `inkOn` answers from `bandInk` first). Because I52 re-opens the wash after every sequence, no inner ink survives to a printed cell on the band. A theme with no selection band is untouched: its rows keep their inks and take the ground alone, as before. → T1.40e
 - **I54** — **Under a banded selection, a call head draws its state's own mark** (`R-THM-003`, C09 I45, C14 I53). The band's ink is total, so a head under it has spent its tone exactly as a focused one has (C09 I45's per-cell rule). The head is resolved at render, though, and the wash is laid after the cache (I40), so the renderer never learned that the head was washed: it drew `●` in the band's one ink for every state. **`RenderContext.washed`** carries the ids of the entry's blocks under the selection, **and only on a theme that bands its selection**. It keys the cache slot as an axis only when present, so a theme without a band pays nothing and keeps I40's reasoning intact: the tenth axis I40 refused is taken on exactly the themes where the picture depends on it. The wash itself stays outside the cache; only the resolution of the head's glyph moves inside. → T1.75b, T4.37f
+- **I55** — **The copy rung's footer says which mode, how much, and what the next `esc` does** (`R-SEL-005`, `R-SEL-009`, `R-SEL-015`, questions 4 and 35). `ChromeContext.copy` is `{ mode: "native" }` or `{ mode: "semantic", size }`, where `size` is `null` with nothing selected and otherwise `{ chars, rows, entries }` over the copy text (I38). Semantic mode's owner line is `copy`, `↑↓ extend`, `⏎ copy`, then **`esc clear` while a selection exists and `esc out` when none does** — the first press clears and the second leaves (C16 I51), and a footer saying `esc out` over a selection labels the clearing press as the leaving one — then the count as three chips, then `the screen is frozen` and `N waiting`. Native mode's is `native`, `mouse tracking off`, `the terminal owns the mouse`, `esc out`, `the screen is frozen`. The header draws `COPY` or `NATIVE` by the same field. Absent `copy`, a `copy` rung reads as semantic mode with no selection, which is what a chrome composed without a session graph can know. → T1.50, T1.51, T4.37g
 
 ---
 
@@ -1096,6 +1101,9 @@ Fake heights, no rendering.
 - **T1.40d** (I52, R-SEL-003): `washRow` over a row of three spans — a toned border, a plain run, a bold toned word — and an inner span carrying its own ground → every visible cell and the pad sit under the selection's ground: the wash's opening sequence follows each SGR sequence in the row, and no inner ground sequence is the last one before a printed cell. The same at 1-bit with SGR 7. The control is an unstyled row, which one opening already covers.
 - **T1.40e** (I53, R-THM-003): `washRow` over a toned row in `hcDark` and `hcLight` → the wash's opening sequence carries the band ink, and every printed cell is governed by it; the ink clears the theme's declared floor against the selection band. The control is `dark`, which has no band: the opening carries a ground and no ink.
 - **T4.37f** (I54, R-THM-003): a session on `hcDark` with a failed call head → selected in semantic copy mode, the head's first cell is the state's own mark; after esc it is `●` again, so the axis responds both ways. The control is `dark`: selected or not, `●`.
+- **T1.50** (I55, R-SEL-005, R-SEL-009): `ownerLine` on the copy rung — semantic with no size reads `esc out` and no count; with a size, `esc clear` and the three count chips in order; native reads `native` and `the terminal owns the mouse` and neither `↑↓ extend` nor a count. The header reads `COPY` or `NATIVE` by the same field. At ASCII every chip is ASCII.
+- **T1.51** (I38, I55, R-SEL-015): `sizeOf` over a held view — two entries, one selecting a block that copies nothing — counts code points of the copy text with its line breaks, its lines, and only the entries contributing text; one of each is singular; an empty selection is `null`.
+- **T4.37g** (I55, R-SEL-005, R-SEL-009): a session in semantic copy mode, `a` pressed → the footer carries the count and `esc clear`; `esc` → the count is gone and it reads `esc out`, still in the mode; `esc` again → the mode is left. The control is the frame before `a`, which reads `esc out` and no count.
 
 ### Tier 2 — contract / interface
 
