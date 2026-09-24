@@ -1383,6 +1383,39 @@ about the interaction and wrong about the mechanism it assumed — C23 §8a A4's
 assumed a mechanism was *missing* that is present and unused, which is the same error with
 the sign flipped, and it is cheaper to find at the call site than at the cache.
 
+### 2b. The chain is three links, and every one of them is unbuilt — measured 2026-09-24
+
+Ruling 1 above says `rowActivate` enters interaction when the focused element declares one.
+Going to build the render half of that found the whole chain open, and the count is the part
+worth recording, because each link on its own reads like a small gap.
+
+| link | what it would do | the tree |
+|---|---|---|
+| the declaration | an element says it has an inside | no field anywhere — `PlacedElement` is `{id, level, rows, cols}` |
+| the entry | `rowActivate` calls `setMode("interact")` | **nothing in `src/` ever calls it** — the one caller is `router.ts`'s `⌃c`, with `"navigate"` |
+| the bridge | `focusFor` reflects the mode into `FocusState.inside` | `inside` is read by `isInside` in `blocks/kinds/controls.ts` and **written by nothing**; the only constructions anywhere are two test files |
+
+**So §018's third state — *INSIDE is weight plus a painted handle* — is drawn, specified and
+has never appeared in a frame**, and `isInside` has been constant `false` for the whole life
+of the component. §8a row g called the mode *reachable* and vacuous; it is not reachable
+either, and that is a stronger statement than the one recorded.
+
+**The bridge alone was written and then reverted, which is the finding about the order.** It
+is one expression and it is correct, and with the two links above it missing there is no
+route by which any test could reach the state it writes — the only way to set the mode is a
+store call no code in the tree makes. Landing it would have added a second half to a seam
+whose first half is absent, and asserted it through a backdoor: *a test must construct the
+state it claims*, and a harness that constructs one nothing else can is the form that reads
+as coverage. The links go in from the declaration outwards, or not at all.
+
+**And the refusal above needs narrowing rather than standing.** §8b.8's ground for not
+entering — *the second absence is structural: no block declares any keys* — is true of blocks
+in general and false of the one the design is about. §018 gives interaction its subject: a
+continuous control is a block that has something to do inside, and `←→` is what does it. So
+the amendment is to enter on a block that declares an inside rather than on any focused
+element, which is what ruling 1's *declares one* already says and what the missing field
+would express.
+
 ### 3. `elements` cannot compute its own positions — the signature is wrong
 
 §5 declares `elements?(block, width)`. **A table's row offsets are not a function of those
