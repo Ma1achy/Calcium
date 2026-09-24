@@ -120,6 +120,26 @@ export declare function checkGlyphPresence(
   homes?: Readonly<Record<string, string>>,
 ): Violation[];
 
+/** SS67 — one surface's disposition against the floor's table (C10 I60). */
+export interface SurfaceRole {
+  readonly role: "text" | "gated" | "ink" | "excluded";
+  readonly gate?: string;
+  readonly why?: string;
+}
+
+/** SS67 — every surface a renderer names, and what the floor does about it (C10 I60, R-THM-004). */
+export declare const SURFACE_ROLES: Readonly<Record<string, SurfaceRole>>;
+
+/**
+ * SS67 — every `"surface.X"` a renderer names outside `theme/` has a disposition
+ * in `SURFACE_ROLES`, and every entry is named by some renderer (C10 I60).
+ */
+export declare function checkTextGrounds(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+  roles?: Readonly<Record<string, SurfaceRole>>,
+): (Violation & { line: number })[];
+
 /** SS63 — the hex ranges of a named table in `text.ts`, parsed out of its source (C09 I48). */
 export declare function parseRangeTable(textSource: string, name: string): number[];
 

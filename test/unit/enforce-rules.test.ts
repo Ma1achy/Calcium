@@ -775,7 +775,10 @@ const scanIds = SCANS.map((s) => s.id);
 // glyph with no character in `glyphs.ts` never enters a pair and passes in the
 // same green as one that was checked — which is why the two cannot share a row.
 // Its fabrication lives with C09's own suite, and the arm below reads that file.
-const STANDALONE_SCANS = ["SS47", "SS52", "SS53", "SS54", "SS57", "SS63", "SS64", "SS65"];
+// **SS67 is a membership with a bidirectional arm** — every surface a renderer
+// names against `SURFACE_ROLES` — so it is SS65's shape and not a `SCANS` row.
+// Its fabrication is C10's T2.62, in `theme.test.ts`.
+const STANDALONE_SCANS = ["SS47", "SS52", "SS53", "SS54", "SS57", "SS63", "SS64", "SS65", "SS67"];
 
 const implemented = [
   ...scanIds,
@@ -889,6 +892,9 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // reason, and the arm below is what stops the listing being the whole
       // of the claim.
       "SS65",
+      // SS67's fabrication is C10's T2.62, in `theme.test.ts`, and the arm
+      // below reads it for SS65's reason.
+      "SS67",
     ]);
     expect([...implemented].sort()).toEqual([...covered].sort());
   });
@@ -2224,6 +2230,17 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     expect(
       titles.some((t) => t.includes("SS65") && /\bfails\b|\bfires\b/.test(t)),
       "SS65 has no test asserting it fires",
+    ).toBe(true);
+  });
+
+  it("SS67 has a fabrication in the file that owns it", () => {
+    // SS65's arm, for SS65's reason: naming SS67 in `covered` above would
+    // otherwise satisfy commitment 14 by being named in a set.
+    const suite = readFileSync("test/contract/theme.test.ts", "utf8");
+    const titles = [...suite.matchAll(/\bit\("([^"]+)"/g)].map((m) => m[1] ?? "");
+    expect(
+      titles.some((t) => t.includes("SS67") && /\bfails\b|\bfires\b/.test(t)),
+      "SS67 has no test asserting it fires",
     ).toBe(true);
   });
 

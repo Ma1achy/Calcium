@@ -144,8 +144,10 @@ const results = runPass({
       // carries them, the gate accepts them, the frame shows nothing.
       name: "SPANS-DROPPED-UNIFIED: unifiedRow does not pass the line's spans",
       file: DEF,
-      from: "    [...gutterSpans(item, layout, ctx), ...textSpans(item.text, block.language, layout.text, ctx, item.spans)],",
-      to: "    [...gutterSpans(item, layout, ctx), ...textSpans(item.text, block.language, layout.text, ctx)],",
+      // Re-anchored 2026-09-24 on the argument alone: the row's kind follows
+      // the spans since C25 I23, and dropping the spans must not drop it too.
+      from: "layout.text, ctx, item.spans, item.kind)",
+      to: "layout.text, ctx, undefined, item.kind)",
       expect: "T4.12",
     },
     {
@@ -154,8 +156,9 @@ const results = runPass({
       // passes; T2.7 asserts one run per half.
       name: "SPANS-DROPPED-SPLIT-LEFT: the removed side of a split row loses its spans",
       file: DEF,
-      from: "        : [...gutterSpans(left, layout, ctx, \"old\"), ...textSpans(left.text, block.language, layout.text, ctx, left.spans)];",
-      to: "        : [...gutterSpans(left, layout, ctx, \"old\"), ...textSpans(left.text, block.language, layout.text, ctx)];",
+      // Re-anchored 2026-09-24 on the argument alone (C25 I23's kind follows).
+      from: "layout.text, ctx, left.spans, left.kind)",
+      to: "layout.text, ctx, undefined, left.kind)",
       expect: "T2.7",
     },
     {

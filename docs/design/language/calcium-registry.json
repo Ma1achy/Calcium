@@ -28160,6 +28160,118 @@
       "ruleIds": [
         "R-THM-001"
       ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffAdd .c-ok,[data-theme=\"hcDark\"] .c-ok.bg-diffAdd",
+      "declarations": "color:#2fdd4c",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffAdd .c-error,[data-theme=\"hcDark\"] .c-error.bg-diffAdd",
+      "declarations": "color:#ffaaaa",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffAdd .c-muted,[data-theme=\"hcDark\"] .c-muted.bg-diffAdd",
+      "declarations": "color:#c0c0c0",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffRemove .c-ok,[data-theme=\"hcDark\"] .c-ok.bg-diffRemove",
+      "declarations": "color:#17c534",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffRemove .c-error,[data-theme=\"hcDark\"] .c-error.bg-diffRemove",
+      "declarations": "color:#ff8787",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffRemove .c-muted,[data-theme=\"hcDark\"] .c-muted.bg-diffRemove",
+      "declarations": "color:#aaaaaa",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-bgDeep .c-meta,[data-theme=\"hcDark\"] .c-meta.bg-bgDeep",
+      "declarations": "color:#f471ff",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcLight\"] .bg-diffAdd .c-ok,[data-theme=\"hcLight\"] .c-ok.bg-diffAdd",
+      "declarations": "color:#005800",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcLight\"] .bg-diffAdd .c-error,[data-theme=\"hcLight\"] .c-error.bg-diffAdd",
+      "declarations": "color:#9b0000",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcLight\"] .bg-diffAdd .c-muted,[data-theme=\"hcLight\"] .c-muted.bg-diffAdd",
+      "declarations": "color:#4a4a4a",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcLight\"] .bg-diffRemove .c-ok,[data-theme=\"hcLight\"] .c-ok.bg-diffRemove",
+      "declarations": "color:#005100",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcLight\"] .bg-diffRemove .c-error,[data-theme=\"hcLight\"] .c-error.bg-diffRemove",
+      "declarations": "color:#900000",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcLight\"] .bg-diffRemove .c-muted,[data-theme=\"hcLight\"] .c-muted.bg-diffRemove",
+      "declarations": "color:#454545",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcLight\"] .bg-bgDeep .c-meta,[data-theme=\"hcLight\"] .c-meta.bg-bgDeep",
+      "declarations": "color:#820066",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
     }
   ],
   "glyphs": [

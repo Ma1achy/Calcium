@@ -240,5 +240,36 @@ export const HIGH_CONTRAST: ThemeTokens = Object.freeze({
     }),
   }),
 
+  /**
+   * **The syntax palette, composed for the diff grounds** (R-THM-002, C10 I60).
+   *
+   * `hcDark` lends its syntax from here and the registry holds none, so the
+   * composition that keeps 7 : 1 on a diff row is authored beside the values it
+   * replaces (I46). Measured before: 4.78–4.80 on `diffAdd`, 6.09–6.12 on
+   * `diffRemove`. Written by `tools/theme/hc-text-grounds.mjs`, the least that clears.
+   */
+  composed: Object.freeze({
+    "surface.diffAdd": Object.freeze({
+      "syntax.keyword": "#ff9eff", // 7.038 : 1, floor 7
+      "syntax.string": "#34dd34", // 7.008 : 1, floor 7
+      "syntax.comment": "#c0c0c0", // 7.011 : 1, floor 7
+      "syntax.number": "#ffb135", // 7.041 : 1, floor 7
+      "syntax.key": "#ffa8bf", // 7.049 : 1, floor 7
+      "syntax.type": "#debf23", // 7.035 : 1, floor 7
+      "syntax.function": "#86c7ff", // 7.062 : 1, floor 7
+      "syntax.operator": "#2ed3e2", // 7.005 : 1, floor 7
+    }),
+    "surface.diffRemove": Object.freeze({
+      "syntax.keyword": "#f27bff", // 7.011 : 1, floor 7
+      "syntax.string": "#1cc51c", // 7.011 : 1, floor 7
+      "syntax.comment": "#aaaaaa", // 7.001 : 1, floor 7
+      "syntax.number": "#ff8d11", // 7.025 : 1, floor 7
+      "syntax.key": "#ff859c", // 7.038 : 1, floor 7
+      "syntax.type": "#c8a90d", // 7.076 : 1, floor 7
+      "syntax.function": "#6cadff", // 7.016 : 1, floor 7
+      "syntax.operator": "#17bccb", // 7.042 : 1, floor 7
+    }),
+  }),
+
   fourBit: HIGH_CONTRAST_FOUR_BIT,
 });

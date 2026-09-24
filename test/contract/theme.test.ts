@@ -20,6 +20,7 @@ import {
   resolve,
   resolveBackground,
   resolveTone,
+  textGrounds,
   textSurfaces,
   collisions,
   OKABE_ITO_CANONICAL,
@@ -30,7 +31,8 @@ import { BAND_VS_BAND, BAND_VS_PAGE, FOCUS_VS_PAGE, validateBands } from "../../
 import { OKABE_ITO } from "../../src/data/colormaps/qualitative/okabe-ito.js";
 import { plotToSvg } from "../../src/presentation/plot/svg.js";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
-import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
+import { checkSourceScans, checkTextGrounds, SCANS, SURFACE_ROLES } from "../../tools/enforce/source-scans.mjs";
+import * as contrastModule from "../../src/presentation/theme/contrast.js";
 import { caps, DEPTHS, store, SURFACES, SYNTAX_SLOTS, TONES } from "../support/theme.js";
 
 // This file walks `src/`; `budget.ts` carries the measurement and why the 5 s
@@ -226,10 +228,112 @@ describe("C10 contract", () => {
    * and asserts that the failure names the *path* that has to move — which is what
    * makes the message the reason rather than the number.
    */
-  it.todo("T2.59 (C10 I60, R-THM-004): textGrounds is the page, the diff grounds and bgDeep — not deferred on a component: specified before textGrounds exists");
-  it.todo("T2.60 (C10 I60, R-THM-002): the high-contrast floor holds over textGrounds — not deferred on a component: specified before the compositions land");
-  it.todo("T2.61 (C10 I60, SS67): SURFACE_ROLES' text entries are textGrounds' names — not deferred on a component: specified before SS67 exists");
-  it.todo("T2.62 (C10 I60, SS67): SS67 fires on an undispositioned ground, a dead entry and an unread corpus — not deferred on a component: specified before SS67 exists");
+  it("T2.59 (C10 I60, R-THM-004): textGrounds is the page, the diff grounds and bgDeep, each with the refs that land on it", () => {
+    for (const [variant, tokens] of SHIPPED) {
+      const rows = textGrounds(tokens);
+      const names = rows.map(([n]) => n);
+      expect(names, `${variant}: every ground this theme paints text on`).toEqual([
+        ...textSurfaces(tokens).map(([n]) => n),
+        ...(["diffAdd", "diffRemove", "bgDeep"] as const).filter((n) => tokens.surfaces[n] !== undefined),
+      ]);
+      const refs = new Map(rows.map(([n, , r]) => [n, r]));
+      // The chip's well carries one ink, and a diff row the gutter's tones and the text's syntax.
+      if (refs.has("bgDeep")) expect(refs.get("bgDeep"), `${variant}: the chip's ink on its well`).toEqual(["tone.meta"]);
+      const diff = refs.get("diffAdd");
+      if (diff !== undefined) {
+        expect(diff, `${variant}: the gutter's three tones`).toEqual(expect.arrayContaining(["tone.ok", "tone.error", "tone.muted"]));
+        expect(diff.filter((r) => r.startsWith("syntax.")).length, `${variant}: the text's syntax`).toBeGreaterThan(0);
+      }
+    }
+    // **Every theme has all three** — a row that silently drops a ground when a
+    // theme lacks it would pass for a theme that forgot one.
+    for (const [variant, tokens] of SHIPPED) {
+      expect(textGrounds(tokens).length, variant).toBe(textSurfaces(tokens).length + 3);
+    }
+  });
+
+  /**
+   * **T2.60 (C10 I60, R-THM-002) — the promise over the whole table, and the
+   * gate's reason for each ground.** Measured before the compositions landed:
+   * hcDark 4.77–4.82 on `diffAdd`, both themes 6.38/6.51 for `tone.meta` on
+   * `bgDeep`. Each composition removed must be named by path and ground.
+   */
+  it("T2.60 (C10 I60, R-THM-002): a theme that declares a floor keeps it over textGrounds, and removing a composition names its path and ground", () => {
+    let promised = 0; // cells-ok — a theme count
+    for (const [variant, tokens] of SHIPPED) {
+      if (tokens.floor === undefined) continue;
+      promised += 1;
+      for (const [surface, ground, refs] of textGrounds(tokens)) {
+        for (const ref of refs) {
+          const need = Math.max(tokens.floor, floorFor(ref.split(".")[1]!));
+          expect(ratio(inkOn(tokens, ref, surface), ground), `${variant} ${ref} on ${surface}`).toBeGreaterThanOrEqual(need);
+        }
+      }
+      expect(validateTokens(tokens), `${variant} validates`).toEqual([]);
+    }
+    expect(promised, "both high-contrast themes declare a floor").toBe(2);
+
+    const without = (tokens: ThemeTokens, ground: string, ref: string): ThemeTokens => ({
+      ...tokens,
+      composed: Object.freeze({
+        ...tokens.composed,
+        [`surface.${ground}`]: Object.freeze(
+          Object.fromEntries(Object.entries(tokens.composed?.[`surface.${ground}`] ?? {}).filter(([r]) => r !== ref)),
+        ),
+      }),
+    });
+    const hc = defaultTheme["hcDark"]!;
+    for (const [ground, ref] of [["diffAdd", "tone.ok"], ["diffAdd", "syntax.keyword"], ["bgDeep", "tone.meta"]] as const) {
+      expect(hc.composed?.[`surface.${ground}`]?.[ref], `hcDark composes ${ref} on ${ground}`).toBeDefined();
+      const errors = validateTokens(without(hc, ground, ref));
+      const [palette, slot] = ref.split(".");
+      expect(
+        errors.some((e) => e.path === `palettes.${palette}.${slot}` && e.message.includes(`against ${ground}`)),
+        `removing ${ref} on ${ground} is reported: ${JSON.stringify(errors)}`,
+      ).toBe(true);
+    }
+  });
+
+  it("T2.61 (C10 I60, SS67): SURFACE_ROLES' text entries are textGrounds' names, and every gate it names is a contrast.ts export", () => {
+    const text = Object.entries(SURFACE_ROLES).filter(([, r]) => r.role === "text").map(([n]) => n).sort();
+    const grounds = new Set<string>();
+    for (const [, tokens] of SHIPPED) for (const [n] of textGrounds(tokens)) grounds.add(n);
+    expect(text, "the scan's copy of the table, by equality").toEqual([...grounds].sort());
+    const exported = contrastModule as unknown as Readonly<Record<string, unknown>>;
+    for (const [name, r] of Object.entries(SURFACE_ROLES)) {
+      if (r.role === "gated") expect(typeof exported[r.gate ?? ""], `${name}'s gate ${String(r.gate)}`).toBe("function");
+      if (r.role !== "text") expect(r.why ?? "", `${name} says why`).not.toBe("");
+    }
+  });
+
+  /**
+   * **T2.62 (C10 I60, SS67) — the scan, asserted by breaking it.** Four states:
+   * the tree, an undispositioned ground, a dead entry, and a corpus that did not
+   * read. The fabricated renderer names `surface.chosen`, a registry surface no
+   * renderer paints today — the next ground a renderer would reach for.
+   */
+  it("T2.62 (C10 I60, SS67): SS67 is clean on the tree, and fires on an undispositioned ground, a dead entry and an unread corpus", () => {
+    const files = sourceFiles();
+    expect(checkTextGrounds(files), "the tree as it stands").toEqual([]);
+
+    const FAKE = "src/presentation/blocks/kinds/fabricated.ts";
+    const withFake = (text: string) => (f: string): string => (f === FAKE ? text : readFileSync(f, "utf8"));
+    const fired = checkTextGrounds([...files, FAKE], withFake('const x = 1;\nconst g = background("surface.chosen", t, c);\n'));
+    expect(fired.map((v) => [v.rule, v.file, v.line])).toEqual([["SS67", FAKE, 2]]);
+    expect(fired[0]!.message).toContain("surface.chosen");
+    // A comment line names nothing.
+    expect(checkTextGrounds([...files, FAKE], withFake('// background("surface.chosen")\n'))).toEqual([]);
+
+    const dead = checkTextGrounds(files, undefined, { ...SURFACE_ROLES, chosen: { role: "excluded", why: "never drawn" } });
+    expect(dead.map((v) => v.message.slice(0, 33))).toEqual(["SURFACE_ROLES names chosen, which"]);
+
+    const { meterFill: _meter, ...withoutMeter } = SURFACE_ROLES;
+    expect(checkTextGrounds(files, undefined, withoutMeter).map((v) => v.file), "a ground whose entry is removed")
+      .toEqual(["src/presentation/blocks/kinds/simple.ts"]);
+
+    const unread = checkTextGrounds(files, () => "");
+    expect(unread.map((v) => v.message.slice(0, 30)), "the control, alone").toEqual(["the corpus names no `surface.d"]);
+  });
 
   /**
    * **T2.44 (C10 I46, R-THM-004) — the scope, asserted as a membership rather than
@@ -244,9 +348,10 @@ describe("C10 contract", () => {
     for (const [variant, tokens] of SHIPPED) {
       const names = textSurfaces(tokens).map(([n]) => n);
       expect(names, `${variant}: every ground this theme paints text on`).toEqual(["bg", "bgElev", "focusGround"]);
-      // `bgDeep` is excluded because no text lands on it, and that exclusion has
-      // fired once already with the answer *the surface was wrong* (I34, §4f).
-      expect(names, `${variant}: bgDeep carries no text`).not.toContain("bgDeep");
+      // `bgDeep` is not a *page*: the prompt chip's ink lands on it, and that
+      // pairing is measured by `textGrounds` (C10 I60, T2.59) rather than by
+      // sweeping every meaning slot over a ground only one of them meets.
+      expect(names, `${variant}: bgDeep is not a page`).not.toContain("bgDeep");
     }
     // **`spectrum` is outside the scope, and the design is why** (R-FOC-004): a
     // plot, picture or image takes focus on its border or axes rather than

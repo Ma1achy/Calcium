@@ -353,7 +353,22 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
     }),
     composed: Object.freeze({
       ...(HIGH_CONTRAST.composed ?? {}),
-
+      "surface.bgDeep": Object.freeze({
+        ...(HIGH_CONTRAST.composed?.["surface.bgDeep"] ?? {}),
+        "tone.meta": "#f471ff",
+      }),
+      "surface.diffAdd": Object.freeze({
+        ...(HIGH_CONTRAST.composed?.["surface.diffAdd"] ?? {}),
+        "tone.error": "#ffaaaa",
+        "tone.muted": "#c0c0c0",
+        "tone.ok": "#2fdd4c",
+      }),
+      "surface.diffRemove": Object.freeze({
+        ...(HIGH_CONTRAST.composed?.["surface.diffRemove"] ?? {}),
+        "tone.error": "#ff8787",
+        "tone.muted": "#aaaaaa",
+        "tone.ok": "#17c534",
+      }),
     }),
     hues: Object.freeze({
       "blue": Object.freeze({ ink: "#3b82f6", ground: "#3472d8", on: "#ffffff" }),
@@ -476,6 +491,11 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
       "selection": "#ffffff",
     }),
     composed: Object.freeze({
+      "surface.bgDeep": Object.freeze({
+        "categorical.c4": "#820066",
+        "syntax.keyword": "#820066",
+        "tone.meta": "#820066",
+      }),
       "surface.bgElev": Object.freeze({
         "categorical.c2": "#005b00",
         "categorical.c5": "#00575b",
@@ -488,6 +508,30 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
         "tone.identifier": "#00575b",
         "tone.muted": "#4d4d4d",
         "tone.ok": "#005b00",
+      }),
+      "surface.diffAdd": Object.freeze({
+        "categorical.c2": "#005800",
+        "categorical.c7": "#9b0000",
+        "syntax.comment": "#4a4a4a",
+        "syntax.key": "#9b0000",
+        "syntax.operator": "#005358",
+        "syntax.string": "#005800",
+        "tone.error": "#9b0000",
+        "tone.muted": "#4a4a4a",
+        "tone.ok": "#005800",
+      }),
+      "surface.diffRemove": Object.freeze({
+        "categorical.c2": "#005100",
+        "categorical.c7": "#900000",
+        "syntax.comment": "#454545",
+        "syntax.key": "#900000",
+        "syntax.keyword": "#840068",
+        "syntax.number": "#653c00",
+        "syntax.operator": "#004d52",
+        "syntax.string": "#005100",
+        "tone.error": "#900000",
+        "tone.muted": "#454545",
+        "tone.ok": "#005100",
       }),
     }),
     hues: Object.freeze({

@@ -26,7 +26,10 @@ import type { RenderScratch } from "../../src/presentation/blocks/types.js";
 import { numberWidth } from "../../src/presentation/patch/layout.js";
 import { hunkRows, isCollapsed, layoutFor, pairedRows } from "../../src/presentation/patch/height.js";
 import { globSync, readFileSync } from "node:fs";
-import { PATCH_CORPUS } from "../support/blocks.js";
+import { hunkOf as corpusHunk, PATCH_CORPUS, patchOf as corpusPatch } from "../support/blocks.js";
+import { measurable } from "../support/render.js";
+import { defaultTheme, loadTheme } from "../../src/presentation/theme/index.js";
+import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 
 const UNIFIED = 80;
 const SPLIT = 120;
@@ -564,7 +567,56 @@ describe("C25 I22 — the plan travels through the seam, and a planned window co
     expect(windows, "the sweep ran").toBeGreaterThan(50);
   });
 
-  it.todo("T1.27 (C25 I23, C10 I48): a diff row's inks resolve against its row's ground — not deferred on a component: specified before the patch passes its ground");
+  /**
+   * **T1.27 (C25 I23, C10 I48) — a diff row's inks are the ones its ground was
+   * measured for.** Read off the frame: the foregrounds an added row paints are
+   * the theme's compositions for `diffAdd`, and never the flat slot a
+   * composition replaced. Before the patch passed its ground, hcDark's gutter
+   * drew `#0ab827` on `diffAdd` at 4.80 : 1 against a declared 7.
+   */
+  it("T1.27 (C25 I23, C10 I48): a diff row's gutter tone and syntax resolve against the row's own ground", () => {
+    const foregrounds = (row: string): readonly string[] => {
+      const out: string[] = [];
+      for (const m of row.matchAll(/\x1b\[([0-9;]*)m/gu)) {
+        const ps = m[1]!.split(";").map(Number);
+        for (let i = 0; i < ps.length; i += 1) {
+          if ((ps[i] === 38 || ps[i] === 48) && ps[i + 1] === 2) {
+            if (ps[i] === 38) out.push(`#${ps.slice(i + 2, i + 5).map((n) => n.toString(16).padStart(2, "0")).join("")}`);
+            i += 4;
+          } else if ((ps[i] === 38 || ps[i] === 48) && ps[i + 1] === 5) i += 2;
+        }
+      }
+      return out;
+    };
+    const patch = corpusPatch({ language: "typescript", layout: "unified", hunks: [corpusHunk(["-const a = 1", "+const b = 2"])] });
+    let checked = 0; // cells-ok — a pairing count
+    for (const id of ["nord", "hcDark", "hcLight"]) {
+      const loaded = loadTheme(defaultTheme, id);
+      if (!loaded.ok) throw new Error(`${id} loads`);
+      const theme = loaded.value.current;
+      const rows = measurable({ theme, definitions: [patchDefinition as unknown as BlockDefinition<never>] }).renderToLines(patch, 80);
+      for (const [ground, text] of [["diffAdd", "const b"], ["diffRemove", "const a"]] as const) {
+        const row = rows.find((r) => r.replace(/\x1b\[[0-9;]*m/gu, "").includes(text));
+        if (row === undefined) throw new Error(`${id}: a row holding ${text}`);
+        const drawn = foregrounds(row);
+        for (const ref of ["tone.ok", "tone.error", "syntax.keyword"]) {
+          if (ground === "diffAdd" && ref === "tone.error") continue;
+          if (ground === "diffRemove" && ref === "tone.ok") continue;
+          const composed = theme.tokens.composed?.[`surface.${ground}`]?.[ref];
+          if (composed === undefined) continue;
+          const [family, slot] = ref.split(".") as [string, string];
+          const flat = theme.tokens.palettes[family]!.slots[slot]!;
+          expect(drawn, `${id} ${ref} on ${ground}: the composed ink`).toContain(composed.toLowerCase());
+          if (flat.toLowerCase() !== composed.toLowerCase()) {
+            expect(drawn, `${id} ${ref} on ${ground}: not the flat slot`).not.toContain(flat.toLowerCase());
+          }
+          checked += 1;
+        }
+      }
+    }
+    // nord keyword on diffAdd; hcDark all four; hcLight tone.ok, tone.error, keyword on diffRemove.
+    expect(checked, "the pairings the three themes compose").toBe(8);
+  });
 
   it("T1.26 (C25 I22, F1191): the definition's window through a caller's scratch derives one plan per patch and width — set once, read back after, the block equal to a scratch-less call — and rebuilds for another width or another patch sharing the hunks array; with no scratch, as before", () => {
     // A stand-in with the seam's shape (C12 I107): one slot per owner.

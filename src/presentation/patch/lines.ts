@@ -37,7 +37,6 @@ import {
 } from "../blocks/paint.js";
 import { truncateParts } from "../text.js";
 import type { Hunk, TextSpan, Tone } from "../../data/viewmodel/index.js";
-import type { ColourRef } from "../theme/index.js";
 import type { RenderContext } from "../blocks/types.js";
 import type { PatchLayout } from "./layout.js";
 
@@ -57,12 +56,29 @@ const TONES: Readonly<Record<Kind, Tone>> = Object.freeze({
   context: "muted",
 });
 
-/** The surface a row's background comes from, or none for an unchanged line. */
-const SURFACES: Readonly<Record<Kind, string | null>> = Object.freeze({
-  add: "surface.diffAdd",
-  remove: "surface.diffRemove",
-  context: null,
-});
+/**
+ * The ground a row of `kind` lands on, named as `on` takes it (C25 I23, C10
+ * I48), or none for a context row, which sits on the page.
+ */
+const GROUNDS = Object.freeze({ add: "diffAdd", remove: "diffRemove", context: undefined } as const);
+
+/**
+ * The surface a row's background comes from, or none for an unchanged line.
+ * **Typed from `GROUNDS`**, so the ground behind a row and the ground its inks
+ * resolve on cannot differ — and **written as literals**, because A03 SS67 reads
+ * a renderer's grounds from its `"surface.X"` literals and a template literal is
+ * invisible to it (its control fired when this was one).
+ */
+const SURFACES: { readonly [K in Kind]: (typeof GROUNDS)[K] extends string ? `surface.${(typeof GROUNDS)[K]}` : null } =
+  Object.freeze({
+    add: "surface.diffAdd",
+    remove: "surface.diffRemove",
+    context: null,
+  });
+
+function groundOf(kind: Kind): string | undefined {
+  return GROUNDS[kind];
+}
 
 /**
  * The one exit from this module.
@@ -99,7 +115,7 @@ export function dress(spans: readonly Span[], kind: Kind, ctx: RenderContext): r
   const surface = SURFACES[kind];
   if (surface === null) return spans;
 
-  const behind = background(surface as ColourRef, ctx.theme, ctx.capabilities);
+  const behind = background(surface, ctx.theme, ctx.capabilities);
   if (behind.background === undefined) return spans;
 
   return spans.map((span) => ({ text: span.text, style: withBackground(span.style, behind) }));
@@ -122,7 +138,9 @@ export function gutterSpans(
   ctx: RenderContext,
   side?: "old" | "new",
 ): readonly Span[] {
-  const style = tone(TONES[line.kind], ctx.theme, ctx.capabilities);
+  // **Resolved on the row's ground** (C25 I23): the theme's composition for
+  // `diffAdd`/`diffRemove` is the ink that ground was measured for.
+  const style = tone(TONES[line.kind], ctx.theme, ctx.capabilities, groundOf(line.kind));
   const spans: Span[] = [];
 
   if (layout.numbers > 0) {
@@ -163,8 +181,11 @@ export function textSpans(
   budget: number,
   ctx: RenderContext,
   lineSpans?: readonly TextSpan[],
+  kind?: Kind,
 ): readonly Span[] {
   if (budget <= 0) return [];
+  // The row's ground, so a composed diff ink reaches the frame (C25 I23).
+  const on = kind === undefined ? undefined : groundOf(kind);
 
   // **`truncateParts` rather than `truncate`**, and the difference was visible only
   // in a golden. `truncate` returns the marker *inside* the string, so slicing the
@@ -179,12 +200,12 @@ export function textSpans(
     0,
     kept.length, // cells-ok
   );
-  const fallback = tone("default", ctx.theme, ctx.capabilities);
+  const fallback = tone("default", ctx.theme, ctx.capabilities, on);
 
   const styled = (token: Token): Span => ({
     text: token.text,
     style:
-      token.slot === null ? fallback : slot(`syntax.${token.slot}`, ctx.theme, ctx.capabilities),
+      token.slot === null ? fallback : slot(`syntax.${token.slot}`, ctx.theme, ctx.capabilities, on),
   });
 
   const spans: Span[] = [];

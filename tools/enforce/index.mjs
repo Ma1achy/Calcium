@@ -16,7 +16,7 @@ import {
   nameExactnessSignal,
   publicSurfaceUseSignal,
 } from "./module-graph.mjs";
-import { checkSourceScans, checkMarks, checkControlBytes, checkAllowLists, checkEmojiBases, checkGlyphWidthClass, checkMarkDomains, checkGlyphPresence } from "./source-scans.mjs";
+import { checkSourceScans, checkMarks, checkControlBytes, checkAllowLists, checkEmojiBases, checkGlyphWidthClass, checkMarkDomains, checkGlyphPresence, checkTextGrounds } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
 import { checkWorkflows } from "./workflows.mjs";
 import { checkRefusals, REFUSALS, unverifiableRefusals } from "./refusals.mjs";
@@ -206,6 +206,10 @@ const violations = [
   ...checkEmojiBases(files),
   ...checkGlyphWidthClass(),
   ...checkGlyphPresence(),
+  // SS67 — every ground a renderer names has a disposition against the floor's
+  // table. Its own function for SS65's reason: the subject is a membership with
+  // a bidirectional arm, not a line against a regex.
+  ...checkTextGrounds(files),
   ...checkDependencies(),
   ...checkPhantomImports(files),
   // SS62 — the workflows against their record. Its own function rather than a

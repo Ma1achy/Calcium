@@ -65,7 +65,7 @@ function header(block: Patch, layout: PatchLayout, ctx: RenderContext): string {
 /** Unified: both number columns, then the marker, then the text. */
 function unifiedRow(item: Line, block: Patch, layout: PatchLayout, ctx: RenderContext): string {
   return line(
-    [...gutterSpans(item, layout, ctx), ...textSpans(item.text, block.language, layout.text, ctx, item.spans)],
+    [...gutterSpans(item, layout, ctx), ...textSpans(item.text, block.language, layout.text, ctx, item.spans, item.kind)],
     item.kind,
     layout,
     ctx,
@@ -91,11 +91,11 @@ function splitRows(run: Run, block: Patch, layout: PatchLayout, ctx: RenderConte
     const leftSpans =
       left === undefined
         ? blankSide(layout)
-        : [...gutterSpans(left, layout, ctx, "old"), ...textSpans(left.text, block.language, layout.text, ctx, left.spans)];
+        : [...gutterSpans(left, layout, ctx, "old"), ...textSpans(left.text, block.language, layout.text, ctx, left.spans, left.kind)];
     const rightSpans =
       right === undefined
         ? blankSide(layout)
-        : [...gutterSpans(right, layout, ctx, "new"), ...textSpans(right.text, block.language, layout.text, ctx, right.spans)];
+        : [...gutterSpans(right, layout, ctx, "new"), ...textSpans(right.text, block.language, layout.text, ctx, right.spans, right.kind)];
 
     // **Each side carries its own background**, and the row carries none. A paired
     // row changed on both sides in different directions, so one colour across it

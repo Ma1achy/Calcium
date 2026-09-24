@@ -1760,6 +1760,101 @@ export function checkGlyphPresence(
   return violations;
 }
 
+/**
+ * **SS67 — every ground a renderer names is a ground the floor measures, or it
+ * says why not** (C10 I60, R-THM-004).
+ *
+ * The floor's scope was a list, and it was wrong three times: `bgElev` then
+ * `focusGround` joined `textSurfaces` only when a frame showed text on them,
+ * and `bgDeep` was excluded "because no text lands on it" while the prompt chip
+ * painted `tone.meta` there at 6.38 : 1 under a declared 7. Each time the
+ * renderer moved and the list did not. So the list is now checked against the
+ * renderers: every `"surface.X"` literal outside `theme/` must have a
+ * disposition here.
+ *
+ * - **`text`** — a ground in `textGrounds` (`contrast.ts`), measured at every
+ *   theme's floor. C10 T2.61 holds this set **equal** to the function's names,
+ *   since this file cannot import TypeScript and a copy nobody compares drifts.
+ * - **`gated`** — a ground with its own pairs and its own check, named.
+ * - **`ink`** — a surface token drawn as a foreground or a mark, not a ground.
+ * - **`excluded`** — a ground that carries no ink, and the reason.
+ *
+ * **Driven in both directions**: a literal with no entry fails, and so does an
+ * entry no literal names — an exemption outliving its subject is how the list
+ * stops being read (MG24's arm).
+ *
+ * **Stated blind spot.** It dispositions a *surface*, not a *(site, use)* pair:
+ * the plot draws `surface.bgDeep` as a box **ink** and `tone.default` on it as
+ * a median mark, and both pass because `bgDeep` is `text` — the mark is not in
+ * `bgDeep`'s refs, and nothing measures it. A ground reached by
+ * `tokens.surfaces[name]` rather than a `"surface.X"` literal is not seen at
+ * all; the corpus has none outside `theme/` today.
+ */
+export const SURFACE_ROLES = Object.freeze({
+  bg: { role: "text" },
+  bgElev: { role: "text" },
+  focusGround: { role: "text" },
+  diffAdd: { role: "text" },
+  diffRemove: { role: "text" },
+  bgDeep: { role: "text" },
+  selection: { role: "gated", gate: "validateBands", why: "a band's ink answers for every ref on it (`bandInk`, R-THM-003), and `validateBands` measures it; a theme without a band paints no ink change on it" },
+  pick: { role: "gated", gate: "pickPairs", why: "the focused chip's ink is `surface.pickInk`, one pair, measured by `pickPairs`" },
+  errorGround: { role: "gated", gate: "errorTagPairs", why: "the error tag's ink is `surface.errorInk`, one pair, measured by `errorTagPairs`" },
+  errorInk: { role: "ink", why: "the error tag's foreground, on `errorGround`" },
+  pickInk: { role: "ink", why: "the focused chip's foreground, on `pick`" },
+  border: { role: "ink", why: "a rule and a plot axis are drawn in it; it is never behind anything" },
+  meterFill: { role: "excluded", why: "the painted meter fills with spaces (`simple.ts`, C09 I97) — its ground is the whole of what it shows, and no ink lands on it" },
+});
+
+export function checkTextGrounds(files, readFile = (f) => readFileSync(f, "utf8"), roles = SURFACE_ROLES) {
+  const violations = [];
+  const named = new Set();
+  const corpus = files.filter(
+    (f) => (f.startsWith("src/presentation/") || f.startsWith("src/shell/"))
+      && !f.startsWith("src/presentation/theme/") && f.endsWith(".ts"),
+  );
+  for (const file of corpus) {
+    const lines = readFile(file).split("\n");
+    lines.forEach((line, i) => {
+      // Whole comment lines only, for SS65's reason: a `//` inside a string opens nothing.
+      if (/^\s*(?:\/\/|\/\*|\*)/u.test(line)) return;
+      for (const m of line.matchAll(/"surface\.([A-Za-z]+)"/gu)) {
+        const name = m[1];
+        named.add(name);
+        if (Object.hasOwn(roles, name)) continue;
+        violations.push({
+          rule: "SS67", file, line: i + 1,
+          message:
+            `\`surface.${name}\` is named by a renderer and has no disposition in SURFACE_ROLES — `
+            + "if text lands on it, add it to `textGrounds` (C10 I60) and mark it `text`; if it has "
+            + "its own pairs, `gated` with the gate; if it is drawn as a foreground, `ink`; otherwise "
+            + "`excluded` with the reason no ink lands on it",
+          spec: "C10 I60",
+        });
+      }
+    });
+  }
+  // **The control** (F1246's): a corpus read as empty would pass every entry
+  // as dead, loudly; one that names the diff grounds is being read.
+  if (!named.has("diffAdd")) {
+    violations.push({
+      rule: "SS67", file: "src/presentation/patch/lines.ts", line: 1,
+      message: "the corpus names no `surface.diffAdd`, which `lines.ts` paints — the renderers did not read as expected",
+      spec: "C10 I60",
+    });
+    return violations;
+  }
+  for (const name of Object.keys(roles)) {
+    if (named.has(name)) continue;
+    violations.push({
+      rule: "SS67", file: "tools/enforce/source-scans.mjs", line: 1,
+      message: `SURFACE_ROLES names ${name}, which no renderer names — remove the entry: an exemption that outlives its subject is how the list stops being read`,
+      spec: "C10 I60",
+    });
+  }
+  return violations;
+}
+
 export function checkGlyphWidthClass(
   registrySource = readFileSync("docs/design/language/calcium-registry.json", "utf8"),
   textSource = readFileSync("src/presentation/text.ts", "utf8"),

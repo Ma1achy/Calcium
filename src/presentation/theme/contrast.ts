@@ -188,6 +188,39 @@ export function textSurfaces(tokens: ThemeTokens): readonly (readonly [string, s
 }
 
 /**
+ * Every ground a renderer paints text on, with the refs that land on it (C10
+ * I60, R-THM-004) — the floor's whole scope, as one table.
+ *
+ * `textSurfaces`' three page grounds take every meaning slot; the diff grounds
+ * take §4a's twelve (`DIFF_SLOTS`); `bgDeep` takes the prompt chip's `tone.meta`
+ * (`R-BLK-628`). **`bgDeep` was excluded on the premise that no text lands on it**,
+ * and the chip had been painting there the whole time: 6.38 and 6.51 : 1 against
+ * the high-contrast themes' 7, reported by nothing, because the scope was a list.
+ * A03 SS67 now requires every ground a renderer names beside text to be a ground
+ * here or an entry on its exclusion list, so the next one fails the build.
+ */
+export function textGrounds(
+  tokens: ThemeTokens,
+): readonly (readonly [surface: string, ground: string, refs: readonly string[]])[] {
+  const meaning = Object.entries(tokens.palettes)
+    .filter(([, palette]) => palette.carries === "meaning")
+    .flatMap(([name, palette]) => Object.keys(palette.slots).map((slot) => `${name}.${slot}`));
+  const flatten = (slots: Readonly<Record<string, readonly string[]>>): readonly string[] =>
+    Object.entries(slots).flatMap(([palette, names]) => names.map((slot) => `${palette}.${slot}`));
+  const surfaces = tokens.surfaces as Readonly<Record<string, string | undefined>>;
+  const rows: (readonly [string, string, readonly string[]])[] = textSurfaces(tokens).map(
+    ([name, hex]) => [name, hex, meaning] as const,
+  );
+  for (const name of DIFF_SURFACES) {
+    const hex = surfaces[name];
+    if (hex !== undefined) rows.push([name, hex, flatten(DIFF_SLOTS)]);
+  }
+  const deep = surfaces["bgDeep"];
+  if (deep !== undefined) rows.push(["bgDeep", deep, flatten(CHIP_SLOTS)]);
+  return Object.freeze(rows);
+}
+
+/**
  * §4a — the two diff surfaces, and the twelve slots that land on them.
  *
  * **A separate pairing rather than two more entries in `textSurfaces`.**
@@ -213,6 +246,11 @@ export function textSurfaces(tokens: ThemeTokens): readonly (readonly [string, s
  * which is C10 T2.14b's other direction.
  */
 const DIFF_SURFACES = Object.freeze(["diffAdd", "diffRemove"]);
+
+/** The prompt chip's ink on its well (`R-BLK-628`, `R-BLK-116`) — `bgDeep`'s one text slot. */
+const CHIP_SLOTS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  tone: Object.freeze(["meta"]),
+});
 
 const DIFF_SLOTS: Readonly<Record<string, readonly string[]>> = Object.freeze({
   syntax: Object.freeze([
@@ -638,32 +676,6 @@ export function validateTokens(tokens: ThemeTokens): readonly ThemeError[] {
 }
 
 /**
- * **R-THM-002 — a theme that promises more than the floor is held to what it
- * promised.**
- *
- * The high-contrast themes are named for a ratio and shipped without one. 7 : 1
- * lived in a roadmap entry and in a single contract row, which is a claim about
- * the tokens as they stood rather than a constraint on the ones that follow —
- * and it went stale the way that shape always does: porting the themes to the
- * registry left `hcLight` at 6.55 : 1 on `bgElev` for eight refs, below a
- * promise nothing could read.
- *
- * **A separate function rather than a term inside `floorFor`, because it is a
- * different kind of claim.** `FLOORS` is per slot and says what a *slot* needs;
- * this is per theme and says what a *theme* undertakes, over every meaning ink
- * it has and every surface it paints text on. Folding one into the other would
- * make `floorFor(slot)` answer differently depending on a theme it is not given,
- * and four call sites would have to start passing one.
- *
- * **The greater of the two, so a declared floor can only raise.** A theme
- * declaring `2` would otherwise weaken `muted`'s own 2.5 — a promise that
- * promises less is not a promise, and the shape A03 §2 calls vacuous.
- *
- * **Composition is honoured**, as everywhere else: a floor is a claim about the
- * pair that lands, and `hcLight` keeps this promise precisely *by* composing
- * four darker inks for its elevated ground rather than moving the ground.
- */
-/**
  * **The four contrasts a band declares, checked as stated** (R-THM-003).
  *
  * Not one rule with four consequences but four separate claims, because they bind
@@ -756,26 +768,55 @@ export function validateBands(tokens: ThemeTokens): readonly ThemeError[] {
   return Object.freeze(errors);
 }
 
+/**
+ * **R-THM-002 — a theme that promises more than the floor is held to what it
+ * promised.**
+ *
+ * The high-contrast themes are named for a ratio and shipped without one. 7 : 1
+ * lived in a roadmap entry and in a single contract row, which is a claim about
+ * the tokens as they stood rather than a constraint on the ones that follow —
+ * and it went stale the way that shape always does: porting the themes to the
+ * registry left `hcLight` at 6.55 : 1 on `bgElev` for eight refs, below a
+ * promise nothing could read.
+ *
+ * **A separate function rather than a term inside `floorFor`, because it is a
+ * different kind of claim.** `FLOORS` is per slot and says what a *slot* needs;
+ * this is per theme and says what a *theme* undertakes, over every pair in
+ * `textGrounds` — every ground it paints text on and the inks that land there
+ * (C10 I60). Folding one into the other would
+ * make `floorFor(slot)` answer differently depending on a theme it is not given,
+ * and four call sites would have to start passing one.
+ *
+ * **The greater of the two, so a declared floor can only raise.** A theme
+ * declaring `2` would otherwise weaken `muted`'s own 2.5 — a promise that
+ * promises less is not a promise, and the shape A03 §2 calls vacuous.
+ *
+ * **Composition is honoured**, as everywhere else: a floor is a claim about the
+ * pair that lands, and `hcLight` keeps this promise precisely *by* composing
+ * four darker inks for its elevated ground rather than moving the ground.
+ */
 export function validateHighContrast(tokens: ThemeTokens): readonly ThemeError[] {
   const promised = tokens.floor;
   if (promised === undefined) return Object.freeze([]);
   if (!isHex(tokens.surfaces.bg) || !isHex(tokens.surfaces.bgElev)) return Object.freeze([]);
 
   const errors: ThemeError[] = [];
-  for (const [paletteName, palette] of Object.entries(tokens.palettes)) {
-    if (palette.carries !== "meaning") continue;
-    for (const slot of Object.keys(palette.slots)) {
+  // **Over the whole table** (C10 I60): the diff grounds and the chip's well are
+  // grounds this theme paints text on, and a promise kept only on the page is
+  // the promise the scope-as-a-list broke three times.
+  for (const [surface, ground, refs] of textGrounds(tokens)) {
+    if (!isHex(ground)) continue;
+    for (const ref of refs) {
+      const [paletteName, slot] = ref.split(".") as [string, string];
       const need = Math.max(promised, floorFor(slot));
-      for (const [surface, ground] of textSurfaces(tokens)) {
-        const ink = inkOn(tokens, `${paletteName}.${slot}`, surface);
-        if (!isHex(ink)) continue;
-        const measured = ratio(ink, ground);
-        if (measured < need) {
-          errors.push({
-            path: `palettes.${paletteName}.${slot}`,
-            message: `"${slot}" is ${measured.toFixed(2)} : 1 against ${surface} (${ground}), below the ${need} : 1 this theme declares — a theme named for a ratio keeps it on every surface it paints, or it composes an ink for that ground`,
-          });
-        }
+      const ink = inkOn(tokens, ref, surface);
+      if (!isHex(ink)) continue;
+      const measured = ratio(ink, ground);
+      if (measured < need) {
+        errors.push({
+          path: `palettes.${paletteName}.${slot}`,
+          message: `"${slot}" is ${measured.toFixed(2)} : 1 against ${surface} (${ground}), below the ${need} : 1 this theme declares — a theme named for a ratio keeps it on every surface it paints, or it composes an ink for that ground`,
+        });
       }
     }
   }
