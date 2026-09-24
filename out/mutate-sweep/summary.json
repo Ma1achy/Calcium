@@ -1,14 +1,14 @@
 {
   "label": "all",
-  "only": "c16-scope-order",
+  "only": "c17-reply-isolation",
   "rows": [
     {
-      "run": "c16-scope-order.mjs",
+      "run": "c17-reply-isolation.mjs",
       "exit": 0,
-      "seconds": 8,
+      "seconds": 27,
       "state": "green",
       "restored": 0,
-      "caught": 4,
+      "caught": 9,
       "elsewhere": 0,
       "survived": 0,
       "anchorMissed": 0,

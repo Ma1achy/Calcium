@@ -561,8 +561,10 @@ c+e          end
 end          end
 m+b          wordLeft
 c+left       wordLeft
+m+left       wordLeft
 m+f          wordRight
 c+right      wordRight
+m+right      wordRight
 left         left
 c+z          undo
 m+z          redo
@@ -1235,8 +1237,10 @@ c+e          end
 end          end
 m+b          wordLeft
 c+left       wordLeft
+m+left       wordLeft
 m+f          wordRight
 c+right      wordRight
+m+right      wordRight
 left         left
 c+z          undo
 m+z          redo
@@ -1882,8 +1886,10 @@ home    home
 end     end
 ⌥b      wordLeft
 ⌃←      wordLeft
+⌥←      wordLeft
 ⌥f      wordRight
 ⌃→      wordRight
+⌥→      wordRight
 ←       left
 ⌃Z      undo
 ⌥z      redo
@@ -2521,8 +2527,10 @@ home    home
 end     end
 ⌥b      wordLeft
 ⌃←      wordLeft
+⌥←      wordLeft
 ⌥f      wordRight
 ⌃→      wordRight
+⌥→      wordRight
 ←       left
 ⌃Z      undo
 ⌥z      redo
@@ -3203,8 +3211,10 @@ home    home
 end     end
 ⌥b      wordLeft
 ⌃←      wordLeft
+⌥←      wordLeft
 ⌥f      wordRight
 ⌃→      wordRight
+⌥→      wordRight
 ←       left
 ⌃Z      undo
 ⌥z      redo
@@ -3878,8 +3888,10 @@ home    home
 end     end
 ⌥b      wordLeft
 ⌃←      wordLeft
+⌥←      wordLeft
 ⌥f      wordRight
 ⌃→      wordRight
+⌥→      wordRight
 ←       left
 ⌃Z      undo
 ⌥z      redo

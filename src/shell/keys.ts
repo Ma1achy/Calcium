@@ -38,7 +38,7 @@ import type {
   CompletionEngine,
 } from "../interaction/completion/index.js";
 import type { LineEditor } from "../interaction/editor/index.js";
-import type { HistoryStore } from "../interaction/history/index.js";
+import type { HistoryStore, Navigator } from "../interaction/history/index.js";
 import type { ElementAddress, KeyAction } from "../interaction/router/types.js";
 import { extentOf, resolveFocus } from "../interaction/router/focus.js";
 import type { Action } from "../data/viewmodel/index.js";
@@ -56,6 +56,17 @@ export type KeyDeps = Readonly<{
   completion: CompletionEngine;
   overlays: OverlayManager;
   history: HistoryStore;
+  /**
+   * The history of a typed reply while one owns the line, else `null` (C23 I77,
+   * §052, `R-QST-003`).
+   *
+   * **The owner's, never the prompt's.** §052 gives a borrowing question *its
+   * OWN buffer, selection, history and undo*; `↑` in a commit-message reply
+   * walking the prompt's commands is the leak. And the prompt's walk has a
+   * floor that enters the live block, which from under an unanswered question
+   * is a focus move I8 forbids — so the reply's walk ends at its floor.
+   */
+  reply: () => Pick<Navigator, "previous" | "next"> | null;
   /**
    * C14, for the four scroll actions (C16 I23).
    *
@@ -747,6 +758,13 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // **One action, not two** (C16 §6). Two bindings for one `(target, key)` is
     // a construction error, so the fallback is here rather than in the table.
     acceptGhostOrForward: () => {
+      // **A reply's `→` is a motion and nothing more** (C16 I54). The ghost is
+      // C19's completion of a *command*, and completion is the prompt's, not the
+      // borrowed editor's — accepting one would put a verb into a sentence.
+      if (deps.reply() !== null) {
+        deps.editor.move("charRight");
+        return;
+      }
       const ctx = contextAt(deps.editor.text, deps.editor.cursor, deps.manifest);
       const ghost = deps.completion.ghost(ctx);
       if (ghost === null || ghost === "") {
@@ -796,7 +814,8 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
 
     // --- C20 ---------------------------------------------------------------
     historyPrev: () => {
-      const entry = deps.history.previous(deps.editor.text);
+      // The owner's walk (C23 I77): a reply's, or the prompt's.
+      const entry = (deps.reply() ?? deps.history).previous(deps.editor.text);
       if (entry !== null) deps.editor.setText(entry);
     },
     // **One binding, two effects, in order** (C16 I22). C20's walk has a defined
@@ -805,6 +824,15 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // case competing with history. `next()` answering `null` is precisely
     // "navigation is inactive or already finished".
     historyNext: () => {
+      // **A reply's walk ends at its floor** (C23 I77, C16 I8). The live-block
+      // entry below is the prompt's `↓`, and from a reply it would move focus
+      // out from under a question that must still be answered.
+      const own = deps.reply();
+      if (own !== null) {
+        const entry = own.next();
+        if (entry !== null) deps.editor.setText(entry);
+        return;
+      }
       const entry = deps.history.next();
       if (entry !== null) {
         deps.editor.setText(entry);

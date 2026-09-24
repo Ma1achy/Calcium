@@ -71,6 +71,7 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⌃K` | both |  |  |  |  |  |  | killToEnd |  |  |
 | `⌃←` | both |  |  |  |  |  |  | wordLeft |  |  |
 | `←` † | both |  |  |  |  |  | insideLeft | left |  |  |
+| `⌥←` | both |  |  |  |  |  |  | wordLeft |  |  |
 | `⌥⇧←` | both |  |  |  |  |  |  | extendWordLeft |  |  |
 | `⇧←` | both |  |  |  |  |  |  | extendCharLeft |  |  |
 | `o` | both |  |  |  |  |  | orbitToggle |  |  |  |
@@ -80,6 +81,7 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⌃R` † | both |  |  |  |  | searchOlder |  | reverseSearch |  |  |
 | `r` | both |  |  |  |  |  | cameraReset |  |  |  |
 | `⌃→` | both |  |  |  |  |  |  | wordRight |  |  |
+| `⌥→` | both |  |  |  |  |  |  | wordRight |  |  |
 | `⌥⇧→` | both |  |  |  |  |  |  | extendWordRight |  |  |
 | `→` † | both |  |  |  |  |  | insideRight | acceptGhostOrForward |  |  |
 | `⇧→` | both |  |  |  |  |  |  | extendCharRight |  |  |
@@ -101,4 +103,4 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⌃Z` | both |  |  |  |  |  |  | undo |  |  |
 | `⌥z` | both |  |  |  |  |  |  | redo |  |  |
 
-120 bindings · 89 keys · 20 resolved by the ladder (†).
+122 bindings · 91 keys · 20 resolved by the ladder (†).

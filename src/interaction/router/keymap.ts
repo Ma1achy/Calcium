@@ -302,8 +302,13 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
 
   { target: "prompt", key: { name: "b", meta: true }, action: "wordLeft" },
   { target: "prompt", key: { name: "left", ctrl: true }, action: "wordLeft" },
+  // **`⌥←`/`⌥→` are word motion** (§019, §063, §052, C17 I30). `⌥⇧←`/`⌥⇧→`
+  // below extended by a word for as long as these were unbound, so the
+  // anchor-held form existed and the motion did not.
+  { target: "prompt", key: { name: "left", meta: true }, action: "wordLeft" },
   { target: "prompt", key: { name: "f", meta: true }, action: "wordRight" },
   { target: "prompt", key: { name: "right", ctrl: true }, action: "wordRight" },
+  { target: "prompt", key: { name: "right", meta: true }, action: "wordRight" },
   { target: "prompt", key: chordOf("move.left"), action: "left" },
 
   // **Not readline's, and confirmed twice before being written.** `⌃z` is the

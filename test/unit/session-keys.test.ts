@@ -323,6 +323,11 @@ describe("C22 §3 step 11 — the effect table", () => {
       // question is not a binding at this target.
       "snapshot",
       "restore",
+      // **The rest of the borrow, excluded for the same reason** (C17 I29,
+      // §052). `hold` and `resume` swap the owner's undo stack with the line;
+      // a key reaching either would hand one owner's history to the other.
+      "hold",
+      "resume",
       // **Roadmap 30's two, and each is excluded for its own reason.**
       // `resolved` is a *read* like `text` — the buffer with chips expanded, for
       // the submission site — and not an editing operation at all. `insertChip`
@@ -363,6 +368,8 @@ describe("C22 §3 step 11 — the effect table", () => {
     }) as typeof real;
 
     const effects = createKeyEffects({
+      // No reply holds the line in this harness (C23 I77).
+      reply: () => null,
       submit: () => undefined,
       focusTranscript: () => undefined,
       // C16 I49 — the child's one exit. Counted here rather than stubbed
@@ -856,6 +863,8 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
       completion: {},
       overlays: {},
       history: { entries: [], append: () => undefined, next: () => null },
+      // No reply holds the line (C23 I77).
+      reply: () => null,
       visibilityChanged: () => undefined,
       resized: () => undefined,
       manifest: null,
@@ -1002,6 +1011,8 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
       completion: {},
       overlays: {},
       history: { entries: [], append: () => undefined, next: () => null },
+      // No reply holds the line (C23 I77).
+      reply: () => null,
       visibilityChanged: () => undefined,
       resized: () => undefined,
       manifest: null,
@@ -1189,6 +1200,8 @@ describe("the inside (C26 I26, I27, §102)", () => {
       completion: {},
       overlays: {},
       history: { entries: [], append: () => undefined, next: () => null },
+      // No reply holds the line (C23 I77).
+      reply: () => null,
       visibilityChanged: () => undefined,
       resized: () => undefined,
       manifest: null,

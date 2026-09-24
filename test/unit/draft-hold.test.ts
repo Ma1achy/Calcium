@@ -72,6 +72,71 @@ describe("C17 §101 — the held draft", () => {
     expect(walked, `undo walked into ${walked.join(" → ")}`).not.toContain("theirs");
   });
 
-  it.todo("T1.51 (C17 I29, §052): the borrow starts with an empty undo stack, so ⌃z inside it never produces the held line — not deferred on a component: hold and resume land on the editor in the next commit of this MR");
-  it.todo("T1.52 (C17 I29, §052): a borrower that types in several units leaves none of them in the owner's undo walk — not deferred on a component: hold and resume land on the editor in the next commit of this MR");
+  it("T1.51 (C17 I29, §052): the borrow starts with an empty undo stack, so ⌃z inside it never produces the held line", () => {
+    const e = createEditor({ chips: LOOK });
+    e.insert("mine");
+    e.move("wordLeft");
+    e.insert("all ");
+    expect(e.undoDepth, "the owner has history to lose").toBeGreaterThan(0);
+
+    const held = e.hold();
+    expect(e.text, "the borrow starts empty").toBe("");
+    expect(e.selection, "with no region").toBeNull();
+    // **The discriminator is the entry.** A `hold` written as `snapshot` then
+    // `setText("")` passes the two assertions above and records the owner's
+    // line as the borrower's first unit — one `⌃z` from the held draft.
+    expect(e.undoDepth, "and no undo depth, not even the entry").toBe(0);
+    expect(e.redoDepth, "nor any redo").toBe(0);
+
+    e.insert("a reply");
+    const walked: string[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      if (!e.undo()) break;
+      walked.push(e.text);
+    }
+    expect(walked.filter((t) => t.includes("mine")), `undo inside the borrow walked ${walked.join(" → ")}`).toEqual([]);
+
+    e.resume(held);
+    expect(e.text, "given back").toBe("all mine");
+  });
+
+  it("T1.52 (C17 I29, §052): a borrower that types in several units leaves none of them in the owner's undo walk", () => {
+    const e = createEditor({ chips: LOOK });
+    e.insert("mine");
+    const ownerDepth = e.undoDepth;
+    const held = e.hold();
+
+    // **Several units, which is what T1.50's fixture could not construct.** A
+    // motion ends the coalescing run, so each word is its own unit with the
+    // previous word as its pre-state — the borrower's text, not the owner's.
+    e.insert("the");
+    e.move("charLeft");
+    e.move("charRight");
+    e.insert("irs");
+    e.move("charLeft");
+    e.move("charRight");
+    e.insert(" reply");
+    expect(e.undoDepth, "the borrower made more than one unit").toBeGreaterThan(1);
+    const theirs = ["the", "theirs", "theirs reply"];
+
+    e.resume(held);
+    expect(e.text, "the owner's line").toBe("mine");
+    expect(e.undoDepth, "and the owner's stack, exactly").toBe(ownerDepth);
+
+    const walked: string[] = [];
+    for (let i = 0; i < 8; i += 1) {
+      if (!e.undo()) break;
+      walked.push(e.text);
+    }
+    expect(walked.filter((t) => theirs.includes(t)), `undo walked ${walked.join(" → ")}`).toEqual([]);
+    // **Redo is the owner's too.** A stack that kept the borrower's redo would
+    // put the reply back after the owner's own undo.
+    const redone: string[] = [];
+    for (let i = 0; i < 8; i += 1) {
+      if (!e.redo()) break;
+      redone.push(e.text);
+    }
+    expect(redone.filter((t) => theirs.includes(t)), `redo walked ${redone.join(" → ")}`).toEqual([]);
+    expect(e.text, "and redo ends on the owner's line").toBe("mine");
+  });
 });

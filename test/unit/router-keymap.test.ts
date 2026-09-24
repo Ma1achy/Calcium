@@ -412,6 +412,10 @@ describe("§6 — the default table (C17 I12)", () => {
       "prompt s+right": ["\u001b[1;2C"],
       "prompt ms+left": ["\u001b[1;4D", "\u001b[1;10D"],
       "prompt ms+right": ["\u001b[1;4C", "\u001b[1;10C"],
+      // `⌥←`/`⌥→` (C17 I30, §019): xterm's Alt (3) and Meta (9) forms, the
+      // same pair the extend rows above carry with Shift added.
+      "prompt m+left": ["\u001b[1;3D", "\u001b[1;9D"],
+      "prompt m+right": ["\u001b[1;3C", "\u001b[1;9C"],
       "prompt s+home": ["\u001b[1;2H"],
       "prompt s+end": ["\u001b[1;2F"],
       "prompt m+a": ["\u001ba"],
@@ -1094,13 +1098,17 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     // §102's *esc out*. Net one fewer, and the count is what says the four
     // retirements are four and not three.
     //
+    // **122 from C17 I30** (§019, §063, §052). `⌥←` and `⌥→` joined `prompt` as
+    // word motion — two rows in, none out — because their anchor-held forms
+    // `⌥⇧←`/`⌥⇧→` had been bound alone. T1.53 is what found them.
+    //
     // The count is pinned as well as the set: a table that lost a row *and*
     // gained an equal one would satisfy a set comparison alone.
     const rows = defaultKeymap
       .map((b) => `${b.target}\t${keySlot(b.key)}\t${b.action}\t${b.profile ?? "both"}`)
       .sort();
-    expect(rows).toHaveLength(120);
-    expect(new Set(rows).size, "no two rows are identical").toBe(120);
+    expect(rows).toHaveLength(122);
+    expect(new Set(rows).size, "no two rows are identical").toBe(122);
 
     // Every row whose chord the registry names resolves to the registry's key —
     // the join asserted from the table's side, so a `chordOf` call that silently
@@ -1626,7 +1634,37 @@ describe("a block key with nowhere to be placed (C16 I27, C26 I26)", () => {
 });
 
 describe("C17 §5b — every motion twice, at the binding", () => {
-  it.todo(
-    "T1.53 (C17 I30, §5b, §019, §063): every extend chord at prompt has its unshifted chord bound to the motion it extends — not deferred on a component: ⌥← and ⌥→ are bound in the next commit of this MR",
-  );
+  it("T1.53 (C17 I30, §5b, §019, §063): every extend chord at prompt has its unshifted chord bound to the motion it extends", () => {
+    // **Actions paired, not keys listed** — so a rebinding moves the pair, and
+    // an extend chord added without its motion fails here. `→`'s motion is
+    // `acceptGhostOrForward`, which is the forward motion when there is no
+    // ghost; the pairing says so rather than exempting the row.
+    const MOTION_OF: Readonly<Record<string, readonly string[]>> = {
+      extendCharLeft: ["left"],
+      extendCharRight: ["acceptGhostOrForward"],
+      extendWordLeft: ["wordLeft"],
+      extendWordRight: ["wordRight"],
+      extendLineStart: ["home"],
+      extendLineEnd: ["end"],
+    };
+    const km = createKeymap(defaultKeymap);
+    const extends_ = defaultKeymap.filter((b) => b.target === "prompt" && b.action.startsWith("extend"));
+    expect(extends_.length, "the prompt has extend chords to pair").toBeGreaterThanOrEqual(6);
+
+    const unpaired: string[] = [];
+    for (const b of extends_) {
+      const motions = MOTION_OF[b.action];
+      // An extend action with no entry here is a new one nobody paired.
+      if (motions === undefined) {
+        unpaired.push(`${b.action}: no motion is paired with it`);
+        continue;
+      }
+      const bare: Key = { ...b.key, shift: false } as Key;
+      const found = km.resolve("prompt", bare)?.action ?? null;
+      if (found === null || !motions.includes(found)) {
+        unpaired.push(`${chordText(b.key)} extends, and ${chordText(bare)} is ${found ?? "unbound"}`);
+      }
+    }
+    expect(unpaired, "every anchor-held chord has its motion").toEqual([]);
+  });
 });

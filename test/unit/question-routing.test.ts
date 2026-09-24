@@ -196,7 +196,10 @@ describe("C23 §7f — replace or float", () => {
     expect(w.confirm.replacing, "it floats now, and the prompt is live beneath").toBeNull();
 
     // **Not consumed while composing** — which is what *float* means to a key.
-    // C16 hands a false back down the ladder to the prompt (router.ts:395).
+    // What happens next is the shell's forward (C16 I54), which this world
+    // cannot see: it hands keys to the editor by hand. That is why this row was
+    // green while a built session rejected every letter — C23 T4.71 and C16
+    // T4.80 drive the same transitions through the router.
     expect(w.press("y"), "a letter belongs to the prompt, not to the question").toBe(false);
     expect(w.press("down"), "and so does a motion in the line").toBe(false);
 

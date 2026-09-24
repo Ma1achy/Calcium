@@ -9,6 +9,8 @@
  */
 
 export { openHistory } from "./store.js";
+// For an owner whose history is not the prompt's — a typed reply (C23 I77, §052).
+export { createNavigator, type Navigator } from "./navigate.js";
 export { redact, entropy, isExempt, REDACTED, type Fired, type Redaction, type Rule } from "./redact.js";
 export { escape, unescape, load, collapse } from "./codec.js";
 export {

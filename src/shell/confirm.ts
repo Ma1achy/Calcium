@@ -115,6 +115,14 @@ export interface ConfirmHost {
   /** Whether a question is open — C22 refuses a submission while one is. */
   readonly open: boolean;
   /**
+   * Whether the open question is composing a typed reply (C16 I54, §052).
+   *
+   * **Read off the question's own state, never off a layer id** — it is what
+   * `reply…` moved (I73). The shell forwards the editor's keys to the borrowed
+   * line while this holds, and nothing else at the prompt.
+   */
+  readonly composing: boolean;
+  /**
    * The open question's layer while it **replaces** the prompt, else `null`
    * (C23 I73, I74, §7f, §101).
    *
@@ -357,6 +365,10 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
       return handler !== null;
     },
 
+    get composing() {
+      return handler !== null && replying !== null;
+    },
+
     get replacing() {
       if (consumer === null || !routingFor(consumer).replaces) return null;
       return deps.overlays.stack.find((l) => l.id === CONFIRM_LAYER_ID) ?? null;
@@ -514,7 +526,11 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
           // reading the evidence rather than choosing between answers.
           if (suspended) return name === "escape" || (ctrl && name === "c") ? "leave" : "none";
           if (name === "escape" || (ctrl && name === "c")) return "resolve";
-          if (name === "return" || name === "enter") return "resolve";
+          // **A bare `⏎` answers a reply; a modified one is the line's** (§052:
+          // *⏎ submit   ⇧⏎ newline*, C16 I54). Before `reply…` there is no line,
+          // so every `enter` still answers.
+          const bare = !e.key.shift && !e.key.meta && !ctrl;
+          if ((name === "return" || name === "enter") && (bare || replying === null)) return "resolve";
           // **A floating reply owns two keys and no others** (I73). The reader
           // is composing text, so `y` is a letter and `↓` is a motion in the
           // line — an accelerator arm here would make a question whose choices
@@ -574,9 +590,13 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
             case "leave":
               return leaveInspection();
             case "compose":
-              // **Not consumed.** C16 hands a `false` back down the ladder to
-              // the prompt beneath, which is what makes the layer *float*
-              // rather than merely draw in a different place (router.ts:395).
+              // **Not consumed, and passed to the shell's forward** (C16 I54).
+              // This comment said C16 handed the `false` down the ladder to the
+              // prompt; dispatch never falls between rungs, so for as long as
+              // that was believed every letter met the modal reject. What makes
+              // the layer *float* is `construct.ts` registering a second handler
+              // on this rung that forwards to the prompt's keys while
+              // `composing` holds.
               return false;
             case "move":
               if (name === "up" || name === "left") selection.prev();

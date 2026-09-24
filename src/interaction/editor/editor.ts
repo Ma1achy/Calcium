@@ -49,6 +49,20 @@ export type { Chip, ChipInsert, ChipKind, ChipLook, ChipParts } from "./layout.j
  * type would have to be the widest of the three and would make the other two's
  * exclusions unstateable.
  */
+/**
+ * An owner's line, taken for the length of a borrow (I29, §052, `R-QST-003`).
+ *
+ * **The visible line is on the record and the undo stack is not.** `line` is
+ * what `snapshot()` returns, and the stack travels beside it in a map only this
+ * module reads — so a caller holding one can show what was held and cannot
+ * reach into the owner's history, which is the thing §052 says the borrower
+ * does not get.
+ */
+export type HeldLine = Readonly<{ line: LineState }>;
+
+/** The owner's stack, keyed by the record `hold()` handed out (I29). */
+const heldStacks = new WeakMap<HeldLine, History>();
+
 export type LineState = Readonly<{
   text: string;
   cursor: number;
@@ -212,6 +226,18 @@ export interface LineEditor {
    * the other owner's composition, one `⌃z` from the reader.
    */
   restore(state: LineState): void;
+  /**
+   * Take the owner's line **and its undo stack**, and leave an empty line with
+   * an empty stack for the borrower (I29, §052).
+   *
+   * §052 gives a borrowing question *its OWN buffer, selection, history and
+   * undo*. `snapshot()` alone is the visible three; the stack is the fourth, and
+   * one shared stack leaks at both ends — the entry recorded as the borrower's
+   * first unit, and the borrower's units outliving the restore.
+   */
+  hold(): HeldLine;
+  /** Give the line and its stack back, discarding the borrower's (I29). Not an edit. */
+  resume(held: HeldLine): void;
 
   undo(): boolean;
   redo(): boolean;
@@ -274,7 +300,7 @@ class Editor implements LineEditor {
   /** §5b — the only new state; the head is `#cursor` itself (I21). */
   #anchor: number | null = null;
   #kill = "";
-  readonly #history = new History();
+  #history = new History();
 
   get text(): string {
     return this.#text;
@@ -653,6 +679,34 @@ class Editor implements LineEditor {
     this.#text = state.text;
     this.#cursor = clamp(state.cursor, n);
     this.#anchor = state.selection === null ? null : clamp(state.selection.anchor, n);
+  }
+
+  hold(): HeldLine {
+    // The owner's kill run ends here, for I28's reason on the way back: a run
+    // that reached across the borrow would join two owners' kills (I16).
+    this.#history.endKill();
+    const held: HeldLine = Object.freeze({ line: this.snapshot() });
+    heldStacks.set(held, this.#history);
+    // **No `edit` call** — not `setText("")`, which records the owner's line as
+    // the borrower's first unit and leaves it one `⌃z` away (T1.51). The
+    // borrower gets a stack of its own and an empty line with nothing to undo.
+    this.#history = new History();
+    this.#text = "";
+    this.#cursor = 0;
+    this.#anchor = null;
+    return held;
+  }
+
+  resume(held: HeldLine): void {
+    const stack = heldStacks.get(held);
+    // **A record `hold()` did not hand out is refused, not restored with a
+    // guess** — restoring its line over the borrower's stack is the shared-stack
+    // leak this pair exists to close, arriving through the one path that looks
+    // like it worked.
+    if (stack === undefined) throw new Error("resume: this line was not taken by hold()");
+    heldStacks.delete(held);
+    this.#history = stack;
+    this.restore(held.line);
   }
 
   undo(): boolean {

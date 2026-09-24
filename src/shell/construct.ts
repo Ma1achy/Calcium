@@ -66,10 +66,35 @@ import { pullIntoView } from "./pull.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
 import { createOverlayManager, takesInput } from "../viewport/overlay/index.js";
 import { chipLabel, createEditor } from "../interaction/editor/index.js";
-import type { Chip, ChipLook, LineState } from "../interaction/editor/index.js";
+import type { Chip, ChipLook, HeldLine, LineState } from "../interaction/editor/index.js";
 
 /** An empty line, for a restore with nothing held (C17 I28). */
 const EMPTY_LINE: LineState = Object.freeze({ text: "", cursor: 0, selection: null });
+/**
+ * What a typed reply takes from the prompt's bindings (C16 I54, §052, §103).
+ *
+ * **The borrowed editor's actions, and its own history walk.** §052: the
+ * question *borrows the editor implementation* — C17's edits, motions,
+ * selection, kill and yank, undo and redo, newline — and owns its history (C23
+ * I77). Everything else bound at `prompt` is the prompt's and meets I8's reject
+ * from a reply: completion, the reverse search, the transcript, the two
+ * selection modes, the queue and the values toggle.
+ *
+ * **Listed by action, compared against the keymap, never by key** — so a
+ * rebinding moves with it, and an action added at `prompt` is refused here
+ * until someone decides it is the editor's (`allow-list rather than narrow
+ * scope`).
+ */
+const REPLY_ACTIONS: ReadonlySet<KeyAction> = new Set<KeyAction>([
+  "backspace", "delete", "left", "acceptGhostOrForward", "home", "end", "wordLeft", "wordRight",
+  "extendCharLeft", "extendCharRight", "extendWordLeft", "extendWordRight", "extendLineStart", "extendLineEnd",
+  "selectAll", "copySelection",
+  "killToEnd", "killToStart", "killWordLeft", "killWordRight", "yank",
+  "undo", "redo", "insertNewline",
+  "historyPrev", "historyNext",
+]);
+/** What a question asked once has submitted through its own line (C23 I77). */
+const NO_REPLIES: readonly HistoryEntry[] = Object.freeze([]);
 import {
   createEngine,
   createSourceErrorSink,
@@ -83,7 +108,8 @@ import { createConfirmHost, type ConfirmHost } from "./confirm.js";
 import { createDecoder } from "../interaction/router/decode.js";
 import { createKeyEffects } from "./keys.js";
 import type { FocusTarget, InputEvent, Key, KeyAction } from "../interaction/router/types.js";
-import { openHistory, SEARCH_ID } from "../interaction/history/index.js";
+import { createNavigator, openHistory, SEARCH_ID } from "../interaction/history/index.js";
+import type { HistoryEntry, Navigator } from "../interaction/history/index.js";
 import { detectCapabilities, type TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Motion } from "../presentation/blocks/index.js";
 import { glyphs, tapeStart } from "../presentation/blocks/index.js";
@@ -1610,30 +1636,42 @@ export async function constructGraph(
    * reads it on every keystroke at an open question. A thunk here would buy
    * nothing and add a nullable to the one path that must not answer quietly.
    */
-  // §101's borrow: the reader's line while a typed reply owns the prompt.
-  let heldDraft: LineState | null = null;
+  // §052's borrow: the reader's line **and its undo stack** while a typed reply
+  // owns the editor (C17 I29).
+  let heldDraft: HeldLine | null = null;
+  // **And the reply's own history** (C23 I77). Taken with the borrow and let go
+  // with it, so each question starts its walk where §052 says it should: with
+  // what was submitted through it, which for a question asked once is nothing.
+  let replyHistory: Navigator | null = null;
   const confirm = createConfirmHost({
     overlays: stores.overlays,
     // The same anchor C19's menu takes, read at `ask` time (C15 I17).
     anchor: deps.frame.promptAnchor,
     overlayRegion: deps.frame.overlayRegion,
-    // The one editor, which is §101's whole point about a typed reply: the
-    // same history, the same chips, the same `⇧⏎`.
+    // **The one editor, and not one owner.** §052: *no second implementation*
+    // — the reply borrows the editor's code, so paste rules, `⇧⏎` and word
+    // motion are shared — and *the question gets its OWN buffer, selection,
+    // history and undo*. This comment used to say *the same history*, which no
+    // design file says (C23 I77, C17 I29).
     draft: () => stores.editor.text,
     // **One `LineState`, held here rather than inside the host** (C17 I28).
     // The host is where the question's rules live and this is where the editor
     // is; a copy of the line inside `confirm.ts` would be a second record of
     // the prompt, which is the thing C22 I80 exists to refuse one file over.
     holdDraft: () => {
-      heldDraft = stores.editor.snapshot();
-      stores.editor.setText("");
+      // `hold` and not `snapshot` + `setText("")`: the second records the
+      // reader's line as the reply's first undo unit (C17 I29, T1.51).
+      heldDraft = stores.editor.hold();
+      replyHistory = createNavigator(() => NO_REPLIES);
     },
     restoreDraft: () => {
       // `?? EMPTY_LINE` rather than a no-op: a restore with nothing held would
       // leave the reply's own text at the prompt, which is the one line C23
       // I28 does clear.
-      stores.editor.restore(heldDraft ?? EMPTY_LINE);
+      if (heldDraft === null) stores.editor.restore(EMPTY_LINE);
+      else stores.editor.resume(heldDraft);
       heldDraft = null;
+      replyHistory = null;
     },
     invalidate: () => void scheduler.commit("input"),
   });
@@ -2789,6 +2827,8 @@ export async function constructGraph(
   };
 
   const keys = createKeyEffects({
+    // The owner's history while a typed reply holds the line (C23 I77).
+    reply: () => replyHistory,
     // **`?` and `F1` submit the line `/help keys` runs** (R-KEY-005, C16 §6a),
     // rather than rendering a second listing: help renders from the table
     // dispatch uses, and a key with its own renderer is that claim undone.
@@ -3215,6 +3255,17 @@ export async function constructGraph(
      * type (C19 I19) makes it typing stopping the moment it appears.
      */
     const promptKeys = (e: InputEvent): boolean => {
+      // **While a reply composes, the editor's keys and nothing else** (C16 I54,
+      // §052, §103). Read once, here, because every arm below asks it.
+      const composing = confirm.composing;
+      if (composing && e.kind === "key") {
+        const binding = keymap.resolve("prompt", e.key);
+        // A key the reply does not own passes, and I8's reject answers it.
+        if (binding !== null && !REPLY_ACTIONS.has(binding.action as KeyAction)) return false;
+        // ⏎ belongs to the question (C23 I73): it answers before this runs, so
+        // reaching the submit arm below from a reply would be a second owner.
+        if (binding === null && e.key.name === "enter") return false;
+      }
       const effect = bound("prompt", e);
       if (effect !== null) {
         effect();
@@ -3282,7 +3333,8 @@ export async function constructGraph(
         } else {
           stores.editor.insert(e.text, { atomic: true });
         }
-        keys.afterEdit();
+        // Completion is the prompt's, not the borrowed editor's (C16 I54).
+        if (!composing) keys.afterEdit();
         return true;
       }
 
@@ -3293,7 +3345,8 @@ export async function constructGraph(
         // synchronous, so this is a filter over an array and not a source call
         // — the half of C19 I3 that has to survive the menu learning to open
         // itself, and the one no assertion about candidates would notice.
-        keys.afterEdit();
+        // Not in a reply: a command menu over a sentence (C16 I54).
+        if (!composing) keys.afterEdit();
         return true;
       }
 
@@ -3301,6 +3354,16 @@ export async function constructGraph(
     };
 
     router.register("prompt", promptKeys);
+
+    // **The question's rung forwards a composing reply's keys to the prompt's
+    // handler** (C16 I54, §052). The ladder's own handler runs first, so `⏎`
+    // answers and `esc` cancels; what it passes arrives here. The comment in
+    // `confirm.ts` said C16 did this, and dispatch has never fallen between
+    // rungs — so until this line every letter typed into a reply met I8's
+    // reject. The same forward the `panel` rung makes below, for the same
+    // reason: a precedence between two targets, not a second walk of the
+    // ladder.
+    router.register("overlay", (e) => confirm.composing && promptKeys(e));
 
     // **The menu and the search answer at `panel`** (C15 §2c, I27). Both are
     // panels now — prompt substates rather than questions — and a handler left
