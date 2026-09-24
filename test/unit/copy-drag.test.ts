@@ -101,6 +101,8 @@ describe("C14 §6f — three bands, and a scroll nobody is driving", () => {
 });
 
 describe("C14 §6f — a container passed through", () => {
+  it.todo("T1.49 (C14 I51, R-SEL-015): an upward drag inside one entry takes the blocks between — not deferred on a component: the row order lands in the next commit of this MR");
+
   it("T1.48 (C14 I50, R-SEL-013): a caret is clamped into the drag's box", () => {
     const drag = beginDrag(at(3), BOXES);
     expect(drag.container, "anchored in the outer box").toEqual({ kind: "box", entryId: "e1", blockId: "box" });
