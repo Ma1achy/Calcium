@@ -504,6 +504,43 @@ ask than to mint a mark.
 
 ---
 
+**27 · `R-NTF-001` says *the declared completion notification* and nothing
+declares one.** The rule is `status: current` and it is the **only** current
+rule in the registry about watching. Everything that would give it a subject is
+`status: example`, which `AUTHORITY.md` says does not bind — and the two
+examples disagree.
+
+**The earning table, twice.** §014 lists four rows: a waiting question always,
+a turn ended if it ran over ~30 s, **the model failed always**, a tool call
+never. §088 §3 revises it to five — it adds *a WATCHED RUN ended* and *a
+watched run FAILED*, both marked **new**, keeps the question, the turn and the
+tool call — and **drops *the model failed* without saying so**. A later section
+revising an earlier one is ordinary; a row vanishing silently in the revision is
+not, and I cannot tell a decision from an omission.
+
+**The rungs have no record either.** §014's three — the bell `␇` on turn end
+when the window is unfocused, OSC 9 / OSC 777 where the terminal has it, OSC 2
+for the title — are `example` text. There is no glyph, delimiter, capability or
+catalogue record for any of them, so *which* terminals get OSC 9 against
+OSC 777 is undeclared, as is the notification's wording. `escapes.ts` emits none
+of the three today, so nothing in the tree contradicts the design; there is
+simply nothing to build **to**.
+
+**And the subject itself may be out of scope.** A *watched run* is a run the
+reader has asked to be told about, and the tree has no such thing: the
+`watch(id)` in `src/shell/refresh.ts` is the **stall detector's** map of
+streaming entries watched for silence — a homonym, F161's shape a third time.
+Building the reader-declared watch means building a run-lifecycle affordance,
+and the brief puts process outside this work. The notification and the *without
+moving the reader* clause are squarely interaction; the watch that earns one may
+not be.
+
+So three answers are needed before this can land: which earning table binds and
+whether *the model failed* survives; what declares the rungs and their wording;
+and whether the watch itself is mine to build.
+
+---
+
 ## Not yet recovered
 
 **Sixteen distinct questions are above, and the running count in the reports
