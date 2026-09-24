@@ -14,7 +14,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { GLYPH_DOMAINS, glyphFor, glyphs } from "../../src/presentation/blocks/glyphs.js";
+import { GLYPH_DOMAINS, glyphFor, glyphs, headMark, spinnerFrames } from "../../src/presentation/blocks/glyphs.js";
+import { ownerLine } from "../../src/shell/chrome.js";
+import { FULL_CAPS } from "../support/render.js";
 
 const REGISTRY = JSON.parse(
   readFileSync("docs/design/language/calcium-registry.json", "utf8"),
@@ -41,6 +43,42 @@ describe("M4 — the six rulings, against the tree", () => {
     // gone, which is what this row is trying to distinguish.
     expect(glyphFor("quote", CAPS), "the quote rail").toBe("⎸");
     expect(glyphFor("quote", ASCII), "and `|` is its ASCII rung, which `live` used to hold").toBe("|");
+  });
+
+  /**
+   * **Retiring a slot is half a ruling, and the comment above used to be the
+   * other half.** M4.1 asserted that `live` is gone and that `|` moved, and
+   * named both replacements in prose — *still updating* and *my keys go here* —
+   * with nothing checking that either arrived. A retirement whose replacements
+   * are described and not asserted is a slot deleted and two facts dropped, and
+   * every one of those assertions passes.
+   */
+  it("M4.1b: `live`'s two facts arrived where the ruling sent them", () => {
+    // **Fact one — *still updating*.** It goes to the running head-mark state
+    // and the duration spinner beside it, which is two carriers rather than
+    // one: above 1-bit the mark is the constant and tone says the state, and
+    // below it the mark is the state (C09 I45, SS64).
+    expect(headMark("running", { ...FULL_CAPS }), "coloured: the constant mark").toBe("running");
+    expect(
+      headMark("running", { ...FULL_CAPS, colourDepth: 1 }),
+      "1-bit: the mark is the state, which is what survives when tone is gone",
+    ).toBe("running");
+    expect(
+      headMark("queued", { ...FULL_CAPS, colourDepth: 1 }),
+      "and a different state is a different mark, or the carrier is not one",
+    ).not.toBe(headMark("running", { ...FULL_CAPS, colourDepth: 1 }));
+    // The motion half, which is the fact `live` actually carried: something is
+    // still happening. A set with one frame animates nothing.
+    expect(spinnerFrames(CAPS, "agent").length, "the duration slot turns").toBeGreaterThan(1);
+
+    // **Fact two — *my keys go here*.** It goes to the footer's owner line
+    // (R-KEY-004) and to `▸` on the focused row. `ownerLine(null)` is the
+    // control: no owner raised is no row, so a line that always drew something
+    // would satisfy the first assertion alone.
+    expect(ownerLine("child", FULL_CAPS).length, "an owner names itself in the footer").toBeGreaterThan(0);
+    expect(ownerLine(null, FULL_CAPS), "and nothing owning is no row").toEqual([]);
+    expect(glyphFor("focus", CAPS), "and the focused row keeps `▸`").toBe("▸");
+    expect(glyphFor("focus", ASCII), "at every rung").toBe(">");
   });
 
   it("M4.2: `current` is the chooser row and the tape", () => {
