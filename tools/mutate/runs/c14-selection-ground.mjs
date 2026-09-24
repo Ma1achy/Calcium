@@ -74,9 +74,40 @@ const MUTATIONS = [
     // *underlies*, and it takes the focus mark with it (C14 I41).
     name: "the wash paints blanks instead of the rendered row",
     file: PAINT,
-    from: "  const text = sliceCells(row, 0, width);",
-    to: '  const text = "";',
+    from: "  const fitted = fitStyled(row, width, SGR_RESET, capabilities.ambiguousWidth);",
+    to: '  const fitted = " ".repeat(width);',
     expect: "T1.40b",
+  },
+  {
+    // **Laid once under the row** (C14 I52). The wash as it shipped: one
+    // opening before the line, so the ground lasted to the first inner reset.
+    // T1.40b's row is unstyled and has no inner reset, which is why it passed.
+    name: "the wash opens once and is not re-opened after an inner sequence",
+    file: PAINT,
+    from: "  return `${wash}${fitted.replace(sgrPattern(), (seq) => `${seq}${wash}`)}${SGR_RESET}`;",
+    to: "  return `${wash}${fitted}${SGR_RESET}`;",
+    expect: "T1.40d",
+  },
+  {
+    // **`based`'s rule rather than the top ground's** (C14 I52). Re-opening
+    // only after a return to the default covers every reset and yields to an
+    // inner ground — a focused row's — which is the precedence inverted and
+    // reads as the helper already in the file.
+    name: "the wash re-opens only after a reset, so an inner ground displaces it",
+    file: PAINT,
+    from: "  return `${wash}${fitted.replace(sgrPattern(), (seq) => `${seq}${wash}`)}${SGR_RESET}`;",
+    to: "  return `${wash}${fitted.replace(/\\x1b\\[(?:0|49)m/gu, (seq) => `${seq}${wash}`)}${SGR_RESET}`;",
+    expect: "T1.40d",
+  },
+  {
+    // **Measured by `cells`** (C09 I63). A styled row counts its escapes'
+    // bytes, measures wider than it is, and gets no pad: the ground stops at
+    // the text on every row that carried a colour.
+    name: "the row is fitted by a count that includes its escapes",
+    file: PAINT,
+    from: "  const fitted = fitStyled(row, width, SGR_RESET, capabilities.ambiguousWidth);",
+    to: '  const fitted = sliceCells(row, 0, width) + " ".repeat(Math.max(0, width - cells(row)));',
+    expect: "T1.40d",
   },
 ];
 

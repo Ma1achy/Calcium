@@ -31,7 +31,7 @@
 
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import type { Motion, RenderScratch } from "../presentation/blocks/types.js";
-import { cells, hardWrapCells, sliceCells } from "../presentation/text.js";
+import { cells, fitStyled, hardWrapCells, sliceCells } from "../presentation/text.js";
 import {
   background,
   based,
@@ -41,7 +41,7 @@ import {
   withBackground,
   type Span,
 } from "../presentation/blocks/paint.js";
-import { sgr } from "../terminal/escapes.js";
+import { SGR_RESET, sgr, sgrPattern } from "../terminal/escapes.js";
 import { HEADER_ROWS, HEADER_RULE_ROWS, MIN_COLUMNS, promptFor, PROMPT_GUTTER } from "./config.js";
 import { glyphs } from "../presentation/blocks/index.js";
 import { composite } from "./composite.js";
@@ -625,10 +625,19 @@ export function washRow(
   capabilities: TerminalCapabilities,
   width: number,
 ): string {
-  const style = selectionStyle(theme, capabilities);
-  const text = sliceCells(row, 0, width);
-  const pad = Math.max(0, width - cells(text, capabilities.ambiguousWidth));
-  return paintSpans([{ text: text + " ".repeat(pad), style }]);
+  const wash = sgr(selectionStyle(theme, capabilities));
+  // **Fitted by display cells, escapes whole** (C09 I63). `cells` counts an
+  // escape's bytes, so a styled row measured wider than it was and got no pad —
+  // the ground stopped at the text on every row that carried a colour.
+  const fitted = fitStyled(row, width, SGR_RESET, capabilities.ambiguousWidth);
+  if (wash === "") return fitted;
+  // **Re-opened after every sequence, not laid once under the row** (C14 I52).
+  // Each span of a finished line closes with a reset, so one opening lasted to
+  // the first of them; and a span opening its own ground — a focused row's —
+  // displaced the wash, which is the precedence inverted. `based` re-asserts
+  // only after a reset because what sits above a base may displace it; the
+  // selection is the top ground, so nothing may.
+  return `${wash}${fitted.replace(sgrPattern(), (seq) => `${seq}${wash}`)}${SGR_RESET}`;
 }
 
 /** The wash, or reverse video where there is no colour to wash with (§4b). */

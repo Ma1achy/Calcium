@@ -11,6 +11,7 @@ import { doc } from "../support/blocks.js";
 import { buildGraph } from "../support/session.js";
 import { washedRowsOf, washRow, washSelectedRows } from "../../src/shell/paint.js";
 import { FULL_CAPS, themeFor } from "../support/render.js";
+import { paint, tone } from "../../src/presentation/blocks/paint.js";
 
 const THEME = themeFor("dark");
 import {
@@ -337,5 +338,48 @@ describe("C14 §6d — the selection's ground", () => {
     expect(mono).toContain("▸ x");
   });
 
-  it.todo("T1.40d (C14 I52): the wash re-opens after every SGR sequence, so a styled row is grounded to its end — not deferred on a component: specified before the wash is changed");
+  it("T1.40d (C14 I52, R-SEL-003): a styled row is grounded to its end, and an inner ground does not displace the wash", () => {
+    // Every printed cell, paired with the SGR sequence most recently written
+    // before it. A wash opened once lasts to the first inner reset; this asks
+    // the row cell by cell rather than asking whether a ground appears at all,
+    // which T1.40b already answers and which a one-cell wash satisfies.
+    const SGR = /\x1b\[[0-9;]*m/uy;
+    const governed = (out: string): { text: string; last: string }[] => {
+      const cellsOut: { text: string; last: string }[] = [];
+      let last = "";
+      for (let i = 0; i < out.length; ) {
+        SGR.lastIndex = i;
+        const m = SGR.exec(out);
+        if (m !== null) {
+          last = m[0];
+          i += m[0].length;
+          continue;
+        }
+        const ch = String.fromCodePoint(out.codePointAt(i)!);
+        cellsOut.push({ text: ch, last });
+        i += ch.length;
+      }
+      return cellsOut;
+    };
+    for (const caps of [FULL_CAPS, { ...FULL_CAPS, colourDepth: 1 as const }]) {
+      // The control: an unstyled row, which one opening already covers.
+      const plain = governed(washRow("plain", THEME, caps, 8));
+      const opening = plain[0]!.last;
+      expect(opening, "the wash opens with a sequence").not.toBe("");
+      expect(plain.every((c) => c.last === opening), "control: an unstyled row").toBe(true);
+
+      // A toned border, a plain run, a bold toned word and a span with its own
+      // ground — the focused row's case, which sits below the selection.
+      const styled =
+        paint([
+          { text: "╭─", style: tone("muted", THEME, caps) },
+          { text: " x " },
+          { text: "ok", style: { ...tone("ok", THEME, caps), bold: true } },
+        ]) + "\x1b[48;2;1;2;3mG\x1b[49m";
+      const out = governed(washRow(styled, THEME, caps, 12));
+      expect(out.map((c) => c.text).join(""), "the row's text is untouched").toBe("╭─ x okG    ");
+      const bare = out.filter((c) => c.last !== opening).map((c) => c.text);
+      expect(bare, `cells not under the wash at colourDepth ${caps.colourDepth}`).toEqual([]);
+    }
+  });
 });

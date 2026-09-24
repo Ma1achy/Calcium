@@ -357,7 +357,7 @@ describe("roadmap-status — the Order column's verifier", () => {
     const [anchored, total] = anchorage(run().out);
 
     // Entry 25's cell is the live instance: it writes `ghost()` and cites
-    // `paint.ts:444`, where `deps.ghost()` is read. **The bare form must change
+    // the `paint.ts` line where `deps.ghost()` is read. **The bare form must change
     // neither number** — one symbol, two spellings.
     const bare = run(mutate("reads `ghost()` fresh per paint", "reads `ghost` fresh per paint"));
     expect(anchorage(bare.out), "the two spellings are one symbol").toEqual([anchored, total]);

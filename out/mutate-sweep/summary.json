@@ -1,14 +1,14 @@
 {
   "label": "all",
-  "only": "c14-drag-gesture",
+  "only": "c14-selection-ground",
   "rows": [
     {
-      "run": "c14-drag-gesture.mjs",
+      "run": "c14-selection-ground.mjs",
       "exit": 0,
-      "seconds": 28,
+      "seconds": 32,
       "state": "green",
       "restored": 0,
-      "caught": 6,
+      "caught": 8,
       "elsewhere": 0,
       "survived": 0,
       "anchorMissed": 0,
