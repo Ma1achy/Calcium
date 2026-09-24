@@ -1133,6 +1133,73 @@ const middleCut = (_width: number, capabilities: TerminalCapabilities): readonly
   return [...out, ""];
 };
 
+/**
+ * §099, the section's second rule — *a column declares where the POINT sits, and
+ * an integer aligns where its point would be*.
+ *
+ * **The control is the whole finding.** `align: "right"` lines up the last
+ * character, so `0.0372` and `0.941` put their points in different columns and
+ * the reader scans a ragged edge — which is what the section complains about by
+ * name. Drawn beside each other, the two columns are the before and the after,
+ * and neither is legible as a defect on its own.
+ *
+ * **And the third pass is the one the frame earned.** A column with no room for
+ * `int + frac` falls back **as a column**, to `right`. The first implementation
+ * clamped each cell's lead to its own slack instead: every count agreed and
+ * `0.0372` and `0.941` came out one cell apart — a half-alignment that reads as
+ * a defect rather than as a degradation. So the narrow pass is drawn too, and
+ * what it must show is a column that agrees with itself.
+ */
+const DECIMAL_ROWS: readonly (readonly [string, string])[] = [
+  ["val loss", "0.0372"],
+  ["accuracy", "0.941"],
+  ["lr", "3e-4"],
+  ["steps", "1284"],
+];
+
+const decimalTable = (align: string, minWidth: number): Block =>
+  block({
+    kind: "table",
+    id: "dt",
+    columns: [
+      { key: "k", label: "metric", align: "left" as const, priority: 10, minWidth: 8, sortable: false },
+      { key: "v", label: "value", align: align as "left", priority: 9, minWidth, sortable: false },
+    ],
+    rows: DECIMAL_ROWS.map(([k, v]) => ({ id: k, cells: { k: { text: k }, v: { text: v } } })),
+  }) as unknown as Block;
+
+const decimalColumn = (
+  width: number,
+  capabilities: TerminalCapabilities,
+  theme: ResolvedTheme,
+): readonly string[] => {
+  const kit = measurable({ theme, capabilities, definitions: [tableDefinition] as never });
+  const pass = (minWidth: number, caption: string): readonly string[] => {
+    const at = Math.min(width, 34);
+    // **Stripped, because this pass is about geometry.** The lines come back
+    // styled, and `cells()` would count the SGR bytes as printable — which put
+    // the two columns at different offsets on the first draw and made the
+    // frame unreadable as a comparison, the thing it exists to be.
+    const plain = (b: Block): readonly string[] =>
+      kit.renderToLines(b, at).map((l) => l.replace(/\u001b?\[[0-9;]*m/gu, ""));
+    const left = plain(decimalTable("decimal", minWidth));
+    const right = plain(decimalTable("right", minWidth));
+    const rows = Math.max(left.length, right.length);
+    const out: string[] = [caption];
+    for (let i = 0; i < rows; i += 1) {
+      const l = left[i] ?? "";
+      const r = right[i] ?? "";
+      out.push(`  ${l}${" ".repeat(Math.max(0, at - cells(l, capabilities.ambiguousWidth)))}   ${r}`);
+    }
+    return [...out, ""];
+  };
+  return [
+    "· decimal (left) beside right (right) — §099's four values, and the points",
+    ...pass(10, "· room for the point: every point in ONE cell, and `1284` ends where it sits"),
+    ...pass(8, "· no room for it: the column falls back to `right` WHOLE — the two sides are identical"),
+  ];
+};
+
 export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 95, name: "a tape, where a row of peers would shed", rows: draw(TAPE) },
   { section: 42, name: "widgets — a row of peers that sheds", rows: draw(PILLS) },
@@ -1159,7 +1226,10 @@ export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 17, name: "focus treatment follows the shape — what each kind publishes against what it draws", rows: focusByShape },
   { section: 76, name: "per-token values — the valued run, and the token that wraps whole", rows: valuedTokens },
   { section: 26, name: "the trail and the mark at the head — two carriers, and what each survives", rows: streamHead },
-  { section: 99, name: "the middle cut — a path narrowing, beside the end cut it replaced", rows: (w, c) => middleCut(w, c) },
+  { section: 99, name: "the middle cut — a path narrowing, beside the end cut it replaced", rows: (w, c, t) => [
+    ...middleCut(w, c),
+    ...decimalColumn(w, c, t),
+  ] },
   { section: 73, name: "painted chrome — every kind against §073's test, and the button's rungs", rows: (w, c, t) => [
     ...paintedChrome(w, c, t),
     ...buttonRungs(w, c, t),

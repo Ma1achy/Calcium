@@ -579,7 +579,21 @@ export type BarSpec = Readonly<{
 export type ColumnDef = Readonly<{
   key: string;
   label: string;
-  align: "left" | "right";
+  /**
+   * Where the cell sits in its solved width (C11 I26, §099).
+   *
+   * **`"decimal"` is the third arm and §099 is why**: *align: r lines up the
+   * LAST character, which puts `0.0372` and `3e-4` in different places*. It
+   * splits each value at its point, right-aligns the integer part to the
+   * column's point and left-aligns the rest — so a value with no point is all
+   * integer part and **ends** where the point sits, which is what puts `1284`
+   * under `0.941`'s point.
+   *
+   * The point itself is **derived** from the column's own cells and never
+   * authored: a declared one is a number the planner can contradict when a
+   * column yields width, with nothing to report the disagreement.
+   */
+  align: "left" | "right" | "decimal";
   priority: number;
   minWidth: number;
   maxWidth?: number;

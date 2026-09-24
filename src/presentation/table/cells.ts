@@ -14,6 +14,7 @@ import { pad, padStart, paintRuns, tone, type Span } from "../blocks/paint.js";
 import { runsOf, runsText, sliceRuns } from "../runs.js";
 import { sparkline, valueBar } from "../plot/index.js";
 import { cells, stripControl, truncate, truncateParts } from "../text.js";
+import type { AmbiguousWidth } from "../text.js";
 import type { Cell, ColumnDef, Table, TableRow } from "../../data/viewmodel/index.js";
 import type { RenderContext } from "../blocks/types.js";
 import type { PlannedColumns } from "./plan.js";
@@ -89,6 +90,63 @@ function seriesLead(
  * per-row scan over `block.rows` would be quadratic, and a memo would be state
  * C11 is not allowed to hold (I11).
  */
+/**
+ * Where each `align: "decimal"` column's point sits, in cells (C11 I26, §099).
+ *
+ * **Derived rather than authored**, which is I26's ruling: a declared point is a
+ * number the planner can contradict when a column yields width under
+ * `R-TBL-005`, with nothing able to report the disagreement. The column's point
+ * is the widest **integer part** among its own cells, so it is a property the
+ * column has rather than one it is told.
+ *
+ * **Computed once per block, beside `markedSeriesColumns`.** `rowSpans` holds
+ * the whole table and could take this every time it draws a row, which is the
+ * same walk once per row — the reason the marked set is already hoisted.
+ */
+export function decimalPoints(
+  block: Table,
+  plan: PlannedColumns,
+  ambiguous: AmbiguousWidth,
+): ReadonlyMap<string, number> {
+  const points = new Map<string, number>();
+  const widthOf = new Map(plan.visible.map((c) => [c.key, c.width]));
+  for (const column of block.columns) {
+    if (column.align !== "decimal") continue;
+    const room = widthOf.get(column.key);
+    if (room === undefined) continue;
+    let int = 0;
+    let frac = 0;
+    for (const row of block.rows) {
+      const cell = row.cells[column.key];
+      if (cell === undefined) continue;
+      const whole = integerPart(cell.text);
+      int = Math.max(int, cells(whole, ambiguous));
+      frac = Math.max(frac, cells(cell.text.slice(whole.length), ambiguous)); // cells-ok — a code-unit offset
+    }
+    // **A column too narrow to hold the alignment falls back as a COLUMN**
+    // (I26). Clamping each cell's lead to its own slack instead produced a
+    // column whose points drift by one — `0.0372` and `0.941` a cell apart,
+    // which reads as a defect rather than as a degradation, and is worse than
+    // either alignment. Found by reading the frame; the counts were all correct.
+    if (int + frac > room) continue;
+    points.set(column.key, int);
+  }
+  return points;
+}
+
+/**
+ * The part of a value before its point — the whole of it when there is none.
+ *
+ * **No point is all integer part**, and that is what makes §099's figure come
+ * out without a case for each shape: `1284` ends where the point sits because
+ * its integer part is four cells, and `3e-4` does the same for the same reason
+ * rather than for a rule of its own.
+ */
+function integerPart(text: string): string {
+  const at = text.indexOf(".");
+  return at < 0 ? text : text.slice(0, at); // cells-ok — a code-unit offset
+}
+
 export function markedSeriesColumns(block: Table): ReadonlySet<string> {
   const marked = new Set<string>();
   for (const row of block.rows) {
@@ -208,6 +266,8 @@ export function rowSpans(
     on?: string | undefined;
     /** The columns reserving a glyph slot (I23), from `markedSeriesColumns`. */
     marked: ReadonlySet<string>;
+    /** Where each decimal column's point sits (I26), from `decimalPoints`. */
+    points?: ReadonlyMap<string, number> | undefined;
   }>,
 ): readonly Span[] {
   const byKey = new Map<string, ColumnDef>(block.columns.map((c) => [c.key, c]));
@@ -330,12 +390,28 @@ export function rowSpans(
     const parts = truncateParts(body, planned.width, ctx.capabilities, from);
     const cut = parts.prefix + parts.kept + parts.suffix;
     const short = Math.max(0, planned.width - cells(cut, ctx.capabilities.ambiguousWidth));
+    // **The decimal arm splits the padding rather than putting it at one end**
+    // (I26, §099). The integer part is right-aligned to the column's point and
+    // everything from the point on is left-aligned after it; a value with no
+    // point is all integer part and so **ends** at the point, which is what puts
+    // `1284` under `0.941`'s point with no case of its own. The lead is clamped
+    // to what the cell actually has, so a cut cell cannot push itself past its
+    // own width.
+    const point = column?.align === "decimal" ? options.points?.get(planned.key) : undefined;
+    // **A decimal column that could not align falls back to `right`, not left**
+    // — the convention for numbers, and §099's complaint about `right` is that
+    // it misaligns *points*, which a column with no room for them has anyway.
+    const rightish = column?.align === "right" || column?.align === "decimal";
+    const pointLead =
+      point === undefined
+        ? undefined
+        : Math.max(0, Math.min(short, point - cells(integerPart(cut), ctx.capabilities.ambiguousWidth))); // cells-ok — a cell budget
     const pieces = [
-      { text: column?.align === "right" ? " ".repeat(short) : "" },
+      { text: pointLead !== undefined ? " ".repeat(pointLead) : rightish ? " ".repeat(short) : "" },
       { text: parts.prefix },
       ...sliceRuns(bodyRuns, parts.start, parts.kept.length), // cells-ok — a code-unit length
       { text: parts.suffix },
-      { text: column?.align === "right" ? "" : " ".repeat(short) },
+      { text: pointLead !== undefined ? " ".repeat(short - pointLead) : rightish ? "" : " ".repeat(short) },
     ];
 
     spans.push(...paintRuns(pieces, style, { ...ctx, on: options.on }));

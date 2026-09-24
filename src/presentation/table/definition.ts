@@ -27,7 +27,7 @@ import { fitRow, rowCells } from "../rows.js";
 import { glyphCells, glyphFor } from "../blocks/glyphs.js";
 import { background, based, clampSpans, focusStyle, groundSequence, paint, selectionStyle, tone, withBackground, type Span } from "../blocks/paint.js";
 import type { BlockDefinition, NavElement, Rendered, RenderContext, Windowed } from "../blocks/types.js";
-import { emptySpans, headerSpans, markedSeriesColumns, rowSpans } from "./cells.js";
+import { decimalPoints, emptySpans, headerSpans, markedSeriesColumns, rowSpans } from "./cells.js";
 import { detailBlocks, isExpandable } from "./detail.js";
 import { planColumns } from "./plan.js";
 import { sortedRows } from "./sort.js";
@@ -437,6 +437,10 @@ export const tableDefinition: BlockDefinition<Table> = {
     // column's allowance, so the answer is a property of the block; deriving it
     // inside the loop would be quadratic and memoising it would be state (I11).
     const marked = markedSeriesColumns(block);
+    // **Once per block, not once per row** (I26): `rowSpans` holds the whole
+    // table, so taking the decimal points there would walk every cell for every
+    // row — the same reason the marked set is hoisted here.
+    const points = decimalPoints(block, plan, ctx.capabilities.ambiguousWidth);
     for (const row of sortedRows(block)) {
       const expandable = isExpandable(row, plan);
       const isHead = focused !== null && focused === row.id;
@@ -459,7 +463,7 @@ export const tableDefinition: BlockDefinition<Table> = {
         : isHead
           ? "focusGround"
           : undefined;
-      const spans = rowSpans(block, row, plan, ctx, { expandable, on, marked });
+      const spans = rowSpans(block, row, plan, ctx, { expandable, on, marked, points });
       // **The ground goes to `emit`, not to the spans** (§5c). Applied here it
       // stopped at the gutter, which is the divergence: the reserved column is
       // part of the row it leads, so the ground has to be put on where the
