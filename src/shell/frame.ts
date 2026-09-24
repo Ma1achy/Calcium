@@ -42,7 +42,7 @@ import {
 import type { TerminalSize } from "../terminal/lifecycle.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Block } from "../data/viewmodel/index.js";
-import type { Chrome, SessionSnapshot } from "./types.js";
+import type { Chrome, Label, SessionSnapshot } from "./types.js";
 import type { OwnerRung } from "../interaction/router/types.js";
 
 /** What the frame is, before anything paints it. */
@@ -59,7 +59,7 @@ export type Composed = Readonly<{
    * once. A label computed at paint time would be a second call into the
    * application from a place that is meant to be pure drawing.
    */
-  label: string | null;
+  label: Label | null;
   /**
    * Rows the footer occupies — its blocks' measured height, clamped to
    * `MAX_FOOTER_ROWS`, zero for `[]` (I82). Carried so `heightsSum` and the
@@ -157,7 +157,7 @@ export type ComposeDeps = Readonly<{
 function chromeOf(
   deps: ComposeDeps,
   ctx: Parameters<Chrome["header"]>[0],
-): { header: readonly Block[]; footer: readonly Block[]; label: string | null } {
+): { header: readonly Block[]; footer: readonly Block[]; label: Label | null } {
   using _s = deps.probe?.span("chrome") ?? NO_SPAN;
   // **The label is under the same span and for the same reason** (C28 I39):
   // the question is *how much of this frame is the application's chrome*, and a
@@ -166,7 +166,14 @@ function chromeOf(
   // A string that strips to nothing is no label — the caller supplying `""` or
   // a line of control characters means the same thing as supplying nothing, and
   // two spellings of absence is how a slot acquires a blank it draws.
-  const label = raw === null ? null : (stripControl(raw).trim() || null);
+  //
+  // **Normalised to one shape here** (I114): a caller may return the bare string
+  // that shipped or a record naming a hue, and the painter reads one thing. The
+  // stripping is the text's either way — a hue name is not drawn, so it is not
+  // a channel a control character could travel on.
+  const text = raw === null ? null : stripControl(typeof raw === "string" ? raw : raw.text).trim() || null;
+  const hue = raw === null || typeof raw === "string" ? undefined : raw.hue;
+  const label: Label | null = text === null ? null : hue === undefined ? { text } : { text, hue };
   return { header: deps.chrome.header(ctx), footer: deps.chrome.footer(ctx), label };
 }
 

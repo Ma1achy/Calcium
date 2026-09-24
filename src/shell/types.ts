@@ -178,7 +178,22 @@ export type ChromeFn = (ctx: ChromeContext) => readonly Block[];
  * and whenever it would leave no rule glyph, which is what *the least
  * load-bearing thing on the screen* means once it is a mechanism.
  */
-export type LabelFn = (ctx: ChromeContext) => string | null;
+/**
+ * The label, with the hue the application chose to paint it (C22 I114, §070).
+ *
+ * **A NAME and never a colour**, which is §070's own first line — `/colour`
+ * *takes a COLOUR NAME — not a tone*. C10 resolves it per theme, so the label follows
+ * a theme change; a hex could not, and everywhere else in this system a hex is
+ * refused for exactly that reason.
+ *
+ * An unknown name paints `bgElev`, the untinted ground — the name arrives from
+ * a config file where a person typed it, so the reachable wrong input is a
+ * misspelling, and a label that vanishes is a worse answer to a typo than one
+ * that is simply not tinted.
+ */
+export type Label = Readonly<{ text: string; hue?: string }>;
+
+export type LabelFn = (ctx: ChromeContext) => string | Label | null;
 
 /**
  * §6l — the chrome's three members. `label` is optional and absent is the frame

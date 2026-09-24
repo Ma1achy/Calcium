@@ -214,6 +214,62 @@ function surface(ref: ColourRef, slot: string, theme: ResolvedTheme, depth: Dept
  * does (I8) — and at that rung no foreground is coloured either, so the frame is
  * the terminal's own pair and the failure this closes cannot arise.
  */
+/**
+ * A hue as a BAND — its ground and the ink that reads on it (C10 I53, I55,
+ * C22 I114, §070).
+ *
+ * **Not `resolve("hue.<name>")`, and the difference is which tier is wanted.**
+ * The palette carries the hue's *ink*, for a hue used as text; this answers the
+ * other two tiers, for a hue used as a painted label. Both come from the one
+ * `hues` record, and the ink on a band comes with the band because it is a
+ * property of the band — a caller choosing its own ink over a hue is the
+ * failure `R-THM-003` exists to prevent.
+ *
+ * `null` for a name the theme does not carry, and `null` at the two rungs that
+ * cannot serve it: at 1-bit no colour is emitted at all (I2), and at 4-bit
+ * there is no curated hue map — PARKED 21, because quantising the ten inks
+ * mechanically returns six distinct indices and destroys the identities. A
+ * caller falling back to its untinted ground is the honest answer at both.
+ */
+export function resolveHueBand(
+  theme: ResolvedTheme,
+  name: string,
+  caps: Caps,
+): Readonly<{ ground: Style; ink: Style }> | null {
+  const hue = theme.tokens.hues?.[name];
+  if (hue === undefined) return null;
+  if (caps.colourDepth === 1 || caps.colourDepth === 4) return null;
+  // **The ground is returned on the `background` channel, not the `colour` one.**
+  // `withBackground` reads `surface.background` — a ground handed back as a
+  // foreground is silently dropped, which is what the first draft did: the ink
+  // arrived correct and the band did not, so the label was a contrast ink on no
+  // band and the frame read as *the hue is not wired* rather than *one channel
+  // is wrong*.
+  if (caps.colourDepth === 24) {
+    return Object.freeze({
+      ground: Object.freeze({ background: { kind: "rgb", hex: hue.ground } as const }),
+      ink: styleOf({ kind: "rgb", hex: hue.on }),
+    });
+  }
+  // **Quantised as a SET, over the ten grounds together** (§3). Rank order and
+  // distinctness are properties a set has and a per-slot neighbour cannot see,
+  // and it is what keeps the ten identities ten at 8-bit where 4-bit cannot.
+  const hues = theme.tokens.hues!;
+  const grounds: Record<string, string> = {};
+  const inks: Record<string, string> = {};
+  for (const [k, v] of Object.entries(hues)) {
+    grounds[k] = v.ground;
+    inks[k] = v.on;
+  }
+  const g = quantisedFor(theme, "hueGround", grounds)[name];
+  const i = quantisedFor(theme, "hueOn", inks)[name];
+  if (g === undefined || i === undefined) return null;
+  return Object.freeze({
+    ground: Object.freeze({ background: { kind: "ansi256", index: g } as const }),
+    ink: styleOf({ kind: "ansi256", index: i }),
+  });
+}
+
 export function resolveBase(theme: ResolvedTheme, caps: Caps): Style {
   if (theme.tokens.background !== "surface") return NO_STYLE;
   return resolveBackground("surface.bg", theme, caps);

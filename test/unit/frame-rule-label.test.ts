@@ -41,7 +41,7 @@ const MANIFEST: NonNullable<TuiConfig["manifest"]> = {
  */
 const sessionAt = async (
   columns: number,
-  label: string | null,
+  label: string | Readonly<{ text: string; hue?: string }> | null,
 ): Promise<{ rows: readonly string[]; bytes: string }> => {
   const stdin = fakeStdin();
   const { screen, stdout } = await buildSession(
@@ -60,8 +60,26 @@ const sessionAt = async (
   return { rows: screen().rows, bytes: stdout.chunks.join("") };
 };
 
-const framesAt = async (columns: number, label: string | null): Promise<readonly string[]> =>
-  (await sessionAt(columns, label)).rows;
+const framesAt = async (
+  columns: number,
+  label: string | Readonly<{ text: string; hue?: string }> | null,
+): Promise<readonly string[]> => (await sessionAt(columns, label)).rows;
+
+/**
+ * The SGR run the label's own text is drawn in.
+ *
+ * **Read from the bytes immediately before ` <label> `**, because that is where
+ * the ground arrives — as the second half of `38;5;16;48;5;33`, not as a
+ * sequence of its own. T1.65c's reader answers *is there a ground anywhere*;
+ * this one answers *which*, which is what a hue needs.
+ */
+const labelRun = (bytes: string, text: string): string => {
+  const at = bytes.indexOf(` ${text} `);
+  if (at < 0) return "";
+  const before = bytes.slice(0, at);
+  const runs = [...before.matchAll(new RegExp(`${ESC}\\[([0-9;]*)m`, "gu"))];
+  return runs.length === 0 ? "" : (runs[runs.length - 1]?.[1] ?? "");
+};
 
 /**
  * Every SGR parameter, read as *tokens* rather than as digits.
@@ -135,6 +153,72 @@ describe("C22 §6l.10 — the labelled rule", () => {
     const named = await sessionAt(100, "calcium");
     expect(paintsGround(bare.bytes), "the bare frame paints no ground").toBe(false);
     expect(paintsGround(named.bytes), "the label is a ground").toBe(true);
+  });
+
+
+  it("T1.71 (C22 I114, §070, C10 I55, R-COL-003): the label takes the hue's ground and the hue's ink", async () => {
+    const HUES = ["blue", "orange", "cyan", "pink", "lime", "violet", "yellow", "green", "red", "purple"];
+
+    // **The control first, and it is the amendment's whole claim**: a label
+    // that names no hue is the frame that shipped, glyph for glyph and byte
+    // for byte. Without it the row passes against a build that tints every
+    // label, which is the change nobody asked for.
+    const plain = await sessionAt(100, "calcium");
+    const asRecord = await sessionAt(100, { text: "calcium" });
+    expect(asRecord.bytes, "a record with no hue is the bare string").toBe(plain.bytes);
+    const untinted = labelRun(plain.bytes, "calcium");
+    expect(untinted, "and the untinted label is painted at all").not.toBe("");
+
+    // Each hue paints its own band — ten distinct runs, none of them the
+    // untinted one. Asserted as distinctness rather than as ten literals: the
+    // values are C10's and pinning them here would be a second copy of the
+    // registry in a shell test.
+    const runs = new Map<string, string>();
+    for (const hue of HUES) {
+      const s = await sessionAt(100, { text: "calcium", hue });
+      const run = labelRun(s.bytes, "calcium");
+      expect(run, `${hue}: the label is painted`).not.toBe("");
+      expect(run, `${hue}: and not with the untinted ground`).not.toBe(untinted);
+      runs.set(hue, run);
+      // The ink comes WITH the band — `R-THM-003`, and it is why the third tier
+      // exists. Both channels are in the one run, which is what says the ink was
+      // not left behind on the ground's arrival (the first build's defect: the
+      // ground was handed back on the `colour` channel and silently dropped).
+      expect(paintsGround(`${ESC}[${run}m x ${ESC}[0m`), `${hue}: a ground`).toBe(true);
+      expect(run.startsWith("38;"), `${hue}: and an ink, in the same run`).toBe(true);
+    }
+    expect(new Set(runs.values()).size, "ten hues, ten bands").toBe(10);
+
+    // **The ink is the BAND's and not the hue's, and this is the assertion the
+    // row was missing.** A mutation taking the ink from the hue's own colour
+    // survived every check above: ten runs still distinct, a ground still
+    // painted, an ink still in the run. All of them are true of a hue drawn on
+    // itself, which is `R-THM-003`'s failure exactly — an ink chosen by whoever
+    // was nearest rather than by the band it lands on.
+    //
+    // What separates them is the shape of the tier rather than any value: the
+    // `on` ink is the higher-contrast of black and white (C10 I54, 100 of 100),
+    // so across ten hues the grounds take **ten** values and the inks take at
+    // most **two**. A hue drawn on itself gives ten.
+    const inkOf = (run: string): string => /^38;5;(\d+)/u.exec(run)?.[1] ?? /^38;2;([0-9;]+?);48/u.exec(run)?.[1] ?? "";
+    const inks = new Set([...runs.values()].map(inkOf));
+    expect(inks.has(""), "every run's ink parses").toBe(false);
+    expect(inks.size, `the band's ink is black or white, and ${String(inks.size)} values appeared`)
+      .toBeLessThanOrEqual(2);
+
+    // **A name no theme carries paints the untinted ground, not nothing.** The
+    // name arrives from a config file where a person typed it, so the reachable
+    // wrong input is a misspelling — and a label that vanishes is a worse answer
+    // to a typo than one that is simply not tinted.
+    const typo = await sessionAt(100, { text: "calcium", hue: "bleu" });
+    expect(labelRun(typo.bytes, "calcium"), "an unknown hue falls back rather than out")
+      .toBe(untinted);
+
+    // And the shedding is the hue's business in no way: below 60 columns the
+    // label is gone whatever it is painted with.
+    const narrow = await framesAt(50, { text: "calcium", hue: "blue" });
+    const narrowBare = await framesAt(50, null);
+    expect(narrow, "a hue changes what is painted, never whether").toEqual(narrowBare);
   });
 
   it("T1.65c (C22 I111, §6l.10): the ground reader can see one, and does not see a tone as one", () => {

@@ -22,6 +22,7 @@ export {
   resolve,
   resolveBackground,
   resolveBase,
+  resolveHueBand,
   resolveTone,
   validatePaintedFloors,
 } from "./resolve.js";

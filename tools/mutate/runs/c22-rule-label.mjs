@@ -130,10 +130,15 @@ const results = runPass({
       // a supplied string to `null` when it is blank, so `" "` is *no label*
       // rather than a one-cell ground floating in the rule. Nothing about the
       // geometry changes, which is why it needs its own row.
+      //
+      // **Re-anchored when the label became a record** (C22 I114): the narrowing
+      // moved onto `text`, because a caller may now return a string or a record
+      // naming a hue and the stripping is the text's either way — a hue name is
+      // not drawn, so it is not a channel a control character could travel on.
       name: "a blank label is drawn rather than narrowed away",
       file: FRAME,
-      from: "  const label = raw === null ? null : (stripControl(raw).trim() || null);",
-      to: "  const label = raw === null ? null : stripControl(raw);",
+      from: '  const text = raw === null ? null : stripControl(typeof raw === "string" ? raw : raw.text).trim() || null;',
+      to: '  const text = raw === null ? null : stripControl(typeof raw === "string" ? raw : raw.text);',
       expect: "T1.65d",
     },
   ],

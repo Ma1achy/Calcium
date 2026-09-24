@@ -48,11 +48,12 @@ import { composite } from "./composite.js";
 import type { ChromeCache, ChromeRole } from "./chrome-cache.js";
 import { exact, FrameError } from "./frame-error.js";
 import { gutterMatchesPrompt, heightsSum, promptTop, type Composed } from "./frame.js";
+import type { Label } from "./types.js";
 import type { Block } from "../data/viewmodel/index.js";
 import type { Placed } from "../viewport/overlay/index.js";
 import type { Cell, CellSpan } from "../interaction/editor/index.js";
 import type { BlockRegistry } from "../presentation/blocks/index.js";
-import { resolveBase } from "../presentation/theme/index.js";
+import { resolveBase, resolveHueBand } from "../presentation/theme/index.js";
 import type { ResolvedTheme } from "../presentation/theme/index.js";
 import type { Style } from "../presentation/theme/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
@@ -201,7 +202,7 @@ function spinnerGlyph(caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWid
  * comes from C09's table so the ASCII tier gets `-` from the same place every
  * other rule in the frame does.
  */
-function rule(width: number, deps: PaintDeps, label: string | null = null): string {
+function rule(width: number, deps: PaintDeps, label: Label | null = null): string {
   const glyph = glyphs(deps.capabilities).horizontal;
   const mark = labelSpansOf(label, width, deps);
   if (mark === null) {
@@ -245,7 +246,7 @@ function rule(width: number, deps: PaintDeps, label: string | null = null): stri
  * own voice, which is the one thing `R-COL-003` separates.
  */
 function labelSpansOf(
-  label: string | null,
+  label: Label | null,
   width: number,
   deps: PaintDeps,
 ): readonly Span[] | null {
@@ -258,17 +259,26 @@ function labelSpansOf(
 
   // ` <label> ` between the rule and its one trailing glyph — the fixture's
   // `──── calcium ─`, whose two spaces are what keep the name off the dashes.
-  const text = ` ${label} `;
+  const text = ` ${label.text} `;
   const used = cells(text, ambiguous) + glyphCells;
   const left = width - used;
   if (left < glyphCells) return null;
 
   const muted = tone("muted", deps.theme, deps.capabilities);
+  // **The hue the application named, or `bgElev` when it named none** (I114,
+  // §070, C10 I55). Both the band and its ink come from the hue, because the
+  // ink on a band is a property of the band — a label whose ink is guessed is
+  // the failure `R-THM-003` exists to prevent. A name no theme carries paints
+  // the untinted ground rather than nothing: the name arrives from a config
+  // file where a person typed it, so the reachable wrong input is a misspelling.
+  const band = label.hue === undefined ? null : resolveHueBand(deps.theme, label.hue, deps.capabilities);
   // **The ink is resolved against the ground it lands on** (C10 I48): `tone`'s
   // fourth argument is the composition step, so a theme that repaints `default`
   // on `bgElev` is honoured here rather than measured elsewhere and drawn flat.
-  const ink = tone("default", deps.theme, deps.capabilities, "bgElev");
-  const ground = withBackground(ink, background("surface.bgElev", deps.theme, deps.capabilities));
+  const ink = band === null ? tone("default", deps.theme, deps.capabilities, "bgElev") : band.ink;
+  const ground = withBackground(ink, band === null
+    ? background("surface.bgElev", deps.theme, deps.capabilities)
+    : band.ground);
   const lead = glyph.repeat(Math.floor(left / glyphCells));
   // The remainder when the glyph is two cells wide — spaces rather than a
   // half glyph, and on the left where the rule is, not against the label.
