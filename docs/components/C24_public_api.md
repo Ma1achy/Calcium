@@ -711,10 +711,12 @@ half-way through. C23 I34 is the ruling and it is the one `settle(id, doc)` alre
 took: name the operation for the shape that exists. A part wanting several blocks
 returns a `group`, which is one block with children.
 
-*A `panel`, because `Panel` is the only kind with a `title`* — and the title is
-where a live part says what state it is in. `· 14s ago` when stale, `· unavailable`
-when failing, both drawn that way by S13 §3 and §4 already. A part rendering a bare
-`table` has nowhere to put either, so the guarantee below would hold for some
+*A `panel`, because `Panel` is the only kind with a frame* — and the frame is
+where a live part says what state it is in: `updated 4m ago` at the top border's
+inline end when stale (C04 I127, §047). *Amended with R-HON-002: this read `· 14s
+ago` in the title and `· unavailable` when failing — the first moved to the notice,
+and the second was never written by anything; a failing part is the framework's
+error box.* A part rendering a bare `table` has nowhere to put the notice, so the guarantee below would hold for some
 consumers and not others, which is not a guarantee. Hence `title` on the spec: the
 framework owns that row, the consumer owns the children.
 

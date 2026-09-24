@@ -724,9 +724,9 @@ store arriving by design rather than by accident.
 
 **That ruling was under-determined, and staleness is what determined it.** It said a
 part is one block and not *which*; `Panel` is the only kind carrying a `title`
-(C04 §3), and every state a live part must announce is announced there —
-S13 §3's `· 14s ago`, S13 §4's `┌ activity · unavailable ─┐`. A part rendering a
-bare `table` has nowhere to put either. So a part is a **`panel`**, its `children`
+(C04 §3), and every state a live part must announce is announced in its frame —
+§047's `┌ workers ── updated 4m ago ─┐` (C04 I127; *amended with R-HON-002, which
+moved it out of the title*). A part rendering a bare `table` has nowhere to put it. So a part is a **`panel`**, its `children`
 are what the consumer rendered, and the framework owns the title. A part wanting
 several blocks returns a `group`, which is one block with children — the same
 answer, one level down.
@@ -745,8 +745,9 @@ looks identical to a quiet cluster.* The citation was not a leftover; the featur
 was, and it lands here because this section owns the mechanism.
 
 Past `staleAfter` — default twice the interval — the driver **replaces the part's
-panel with the same panel, its title suffixed `· 14s ago`.** No new operation and
-no new field: `replace` exists, `Panel.title` exists, and the last successful
+panel with the same panel carrying `staleForMs`** (I78, C04 I127) — *amended: this
+read "its title suffixed `· 14s ago`", and I78 moved the age to the border's inline
+end and made it advance.* No new operation: `replace` exists, and the last successful
 render is already held for the backoff. It is a `replace` rather than a removal for
 §3b's standing reason — `ViewPatch` has no delete, and a transcript is a record.
 
@@ -1894,9 +1895,9 @@ The two halves were one word in I21 because until now a part and a poll were the
 ### D10 — the axis I44 does not check, and it is left owed
 
 **I44 guarantees the data and says nothing about the moment.** Two parts on one
-`sourceVersion` hold one sample — and their *titles* can still disagree, because staleness is
+`sourceVersion` hold one sample — and their *stale notices* can still disagree, because staleness is
 measured per part from its own `lastOk` (I35). A part that was paused and has just returned
-carries `· 14s ago` beside a sibling reading the same version with no marker at all.
+carries `updated 14s ago` beside a sibling reading the same version with no notice at all.
 
 That is the same shape as row 1's window property, which held exactly while every row moved
 sideways: **an invariant satisfied on the axis it names, and silent on the one the reader
