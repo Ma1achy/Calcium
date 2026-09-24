@@ -100,6 +100,8 @@ describe("C14 §6f — three bands, and a scroll nobody is driving", () => {
 });
 
 describe("C14 §6f — a container passed through", () => {
+  it.todo("T1.48 (C14 I50, R-SEL-013): a caret is clamped into the drag's box — not deferred on a component: clampToContainer lands in the next commit of this MR");
+
   it("T1.46 (C14 I46): taken whole, and it does not scroll", () => {
     // Anchored in the prose above the box, extended to the prose below it.
     const drag = beginDrag(at(0), BOXES);

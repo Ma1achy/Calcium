@@ -218,6 +218,8 @@ describe("C14 §6f — the drag in a real session", () => {
     }
   });
 
+  it.todo("T4.37d (C14 I50, R-SEL-013): a drag begun in a box does not select the prose below — not deferred on a component: the clamp lands in the next commit of this MR");
+
   it("T4.37b (C14 I48, R-SEL-013): esc and ⌃c end the drag and its autoscroll", async () => {
     vi.useFakeTimers();
     try {
