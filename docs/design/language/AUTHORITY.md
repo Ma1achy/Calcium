@@ -24,6 +24,25 @@ T00). The generated `calcium-design-language.html` is its projection. Rule IDs
 manifest, adapters, process runner, history, profiler — C04–C08, C18, C20, C21, C23,
 C28 — keep their current authority.
 
+## When the design contradicts itself — four tie-breaks
+
+Ruled 2026-09-24. **These close a contradiction on the spot, without parking it.**
+Each one supersedes the loser in the registry, or amends the C-spec that carried it,
+and the entry that applied it names which tie-break it used.
+
+1. **A structured registry record beats prose describing it.** Data outranks a
+   sentence about the data, so the prose is superseded.
+2. **A consistent picture beats a single rule that contradicts it.** When every
+   fixture draws a thing the same way, the rule is superseded to match the figures.
+3. **Where the repository ships something the registry does not record, record what
+   ships.** This follows the six-spinners precedent.
+4. **Carrier rules count carriers per FACT, not per effect.** This covers `R-COR-003`
+   and `R-MOT-004`: an effect may sit on a single carrier when the fact it decorates
+   has two elsewhere.
+
+What stays with the person is anything these four do not decide, and any case where
+two of them point opposite ways.
+
 ## The repository's own rule still governs HOW
 
 CLAUDE.md: *"If the spec is wrong, change the spec first."* That is exactly the

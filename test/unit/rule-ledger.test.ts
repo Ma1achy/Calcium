@@ -109,7 +109,7 @@ describe("A03 SS66 — the rule ledger resolves against the tree", () => {
     expect(bare.code).toBe(1);
   });
 
-  it("T1.154b (SS66): a `parked` row names an open question, and a retracted one fails it", { timeout: LEDGER_BUDGET_MS }, () => {
+  it("T1.154b (SS66): a `parked` row names an open question, and a retracted or ruled one fails it", { timeout: LEDGER_BUDGET_MS }, () => {
     const before = row("R-SEL-012");
     const as = (by: string): string => text().replace(before, `| **R-SEL-012** — x | \`parked\` | ${by} |`);
     // Open, so green: the control that shows the arm reads the file at all.
@@ -119,6 +119,12 @@ describe("A03 SS66 — the rule ledger resolves against the tree", () => {
     const retracted = run(as("parked as 16"));
     expect(retracted.out).toContain("R-SEL-012: parked as 16, which is not an open entry");
     expect(retracted.code).toBe(1);
+    // **And 25 is ruled** — its heading reads `RULED`, and a row still waiting
+    // on it is waiting on nothing: the ruling says what is owed, so the row
+    // moves to `unmet`. Without this arm a ruled question held its rows parked.
+    const ruled = run(as("parked as 25"));
+    expect(ruled.out).toContain("R-SEL-012: parked as 25, which is not an open entry");
+    expect(ruled.code).toBe(1);
     const bare = run(as("waiting on a question"));
     expect(bare.out).toContain("R-SEL-012: marked `parked` and names no question");
   });

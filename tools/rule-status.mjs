@@ -99,10 +99,10 @@ for (const id of current) {
 
 const cited = citedIds();
 
-/** The open entries of the parked file, by number — a retracted one is not open. */
+/** The open entries of the parked file, by number — a retracted or ruled one is not open. */
 const PARKED = "docs/design/PARKED_QUESTIONS.md";
 const openQuestions = new Set(
-  [...readFileSync(PARKED, "utf8").matchAll(/^\*\*(\d+) · (?!RETRACTED)/gmu)].map((m) => m[1]),
+  [...readFileSync(PARKED, "utf8").matchAll(/^\*\*(\d+) · (?!RETRACTED|RULED)/gmu)].map((m) => m[1]),
 );
 
 for (const r of rows) {

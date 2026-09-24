@@ -18,9 +18,13 @@ held at the point where a choice would be mine to invent.
 
 ---
 
-## Open
+## Entries
 
-**1 · `R-GLY-001` cannot carry the fixed-column restriction.** The rule is
+**Open: 18, 23, 32.** Every other entry is ruled or retracted. A ruled entry keeps its body, with the ruling directly above it and a premise note wherever the ruling rested on something the entry or the design contradicts.
+
+> **Ruled 2026-09-24.** Already answered, by the chain rule. The repo-side spec (C09 §4, I5) carries the narrowed rule and the registry does not. That assumption stands as the answer.
+
+**1 · RULED — `R-GLY-001` cannot carry the fixed-column restriction.** The rule is
 released: its text is sealed by the baseline anchor, and it cannot be superseded
 either, because three released history rules name it as their successor and a
 successor must be `current` — a link the immutability lint forbids redirecting.
@@ -28,7 +32,9 @@ Adding a bare new `current` rule would leave two `current` rules contradicting
 each other, which is worse. **Done under assumption:** the repo-side spec
 (C09 §4, I5) carries the narrowed rule and the registry does not.
 
-**2 · The Unicode residue lead diverges from the design's own fixtures.** The
+> **Ruled 2026-09-24.** Each rung takes its **natural width**. The fixture's `⋯ 5 more` is exact at two cells, and the no-column-moves guarantee is given up. **Owed:** the three-cell slot is retired, and the plot legend and residue goldens move.
+
+**2 · RULED — The Unicode residue lead diverges from the design's own fixtures.** The
 three-cell slot at every rung draws `⋯   5 more`; the fixtures draw `⋯ 5 more`,
 two cells (§095, `R-BLK-867`). The design never shows an ASCII residue row, so
 it does not contradict itself — it does not settle this. The visible cost is the
@@ -39,41 +45,57 @@ three-cell slot. One word flips it. *(This is also what a §016 fixture
 comparison reads as a mismatch on every Unicode residue row — one question, two
 arrivals.)*
 
-**3 · `Placement.kind: "fill"` has no producer in `src/`.** Deleting it is the
+> **Ruled 2026-09-24.** Delete `Placement.kind: "fill"` unless the design uses it. **Checked: it does not.** The registry's only `placement` fields are on bar records, where they mean something else. **Owed:** the deletion. C15 I20, I22 and I27 are retired as refusals of a thing that no longer exists, rather than left standing with no subject.
+
+**3 · RULED — `Placement.kind: "fill"` has no producer in `src/`.** Deleting it is the
 tail of deleting the pushed view, but C15 I20, I22 and I27 are each written as a
 *refusal* of a `fill` layer, so removing it **empties three refusals rather than
 amending them** — which is the one shape the standing instruction says to stop
 on. **Held.**
 
-**4 · The copy-mode chrome label's wording.** Both modes now read
+> **Ruled 2026-09-24.** Semantic mode reads **`copy`** and native handoff reads **`native`**. **Checked:** fixture 044 draws `⌥⇧C native`, and §103's footer opens `copy ←→↑↓`. **Owed:** the label.
+
+**4 · RULED — The copy-mode chrome label's wording.** Both modes now read
 `owner === "copy"`, so shipping a second `COPY` would ship a collision. The
 seam is built and the label waits on the word.
 
-**5 · `R-SEL-007`'s rectangular-selection mode label.** The registry gives the
+> **Ruled 2026-09-24.** The label is **`RECT 12×4 · cells, not source`**. **Premise note:** no fixture or HTML page draws this. `cells, not source` is `R-SEL-007`'s own rule text, and `RECT 12×4` appears nowhere in the kit. It was not already answered; it is answered now, and the wording is yours. **Owed.**
+
+**5 · RULED — `R-SEL-007`'s rectangular-selection mode label.** The registry gives the
 rule and no chord: no rectangular action, no binding, and no wording in the
 repo's prose either. The rule's two mechanical clauses — the clip and the cells
 — are built; *says so in the mode label* is blocked on 4.
 
-**6 · `R-SEL-002` clause 2 contradicts the design's own fixtures.** *A bounded
+> **Ruled 2026-09-24.** Keep the design's bordered blocks. `R-SEL-002` clause 2 is superseded: semantic copy is the clean path, and a naive drag that includes the border is accepted. **Owed:** the registry supersession.
+
+**6 · RULED — `R-SEL-002` clause 2 contradicts the design's own fixtures.** *A bounded
 block's content does not sit inside vertical rules*, read literally, forbids the
 box drawn in §021, §045, §047, §048 and §096 — all five put content between two
 `│`. The reading that survives is narrower than the sentence. Clauses 3 and 4
 have their subject in the scrollbar; clause 1 is unambiguous and gated.
 
-**7 · `hcDark` has no overrides and `hcLight` has four.** The ten values that
+> **Ruled 2026-09-24.** Closed: the contrast gate is green on both themes (`validateHighContrast`, `validateBands`). The band ink (C10 I45) replaced the ten-overrides framing. **Not closed with it:** a renderer defect measured the same day. The semantic-selection wash lays the band's ground without its ink, which puts page inks at 1.25–1.68 : 1. That is `R-THM-003`'s selection half and is owed in the ledger. The tokens are correct; the renderer does not apply them.
+
+**7 · RULED — `hcDark` has no overrides and `hcLight` has four.** The ten values that
 would close `hcDark`'s `selection` are specified nowhere. Raising a tone to a
 floor is arithmetic; choosing the ten is a visible colour decision.
 
-**8 · §026 gives no band width for the streaming trail.** Its own cost example
+> **Ruled 2026-09-24.** Measured from the design's own figure. The streaming demo (`<pre id="live">`) is driven by a script, not a CSS animation, and it sets **`const trail=14`**. **Owed:** 14 replaces the assumed 3.
+
+**8 · RULED — §026 gives no band width for the streaming trail.** Its own cost example
 is worked at one cell and at three. **Done under assumption: 3.**
 
-**9 · Nothing distinguishes a layer that composes its own text from one that
+> **Ruled 2026-09-24.** My call, recorded as a ruling. **A layer declares whether it composes its own text**, and `promptUnderMenu`'s id list becomes a read of that declaration. It is built with 23's answer, because the completion menu is the one layer whose answer changes while it is up.
+
+**9 · RULED — Nothing distinguishes a layer that composes its own text from one that
 composes none.** A search composes; a completion menu and a chip preview do not.
 `promptUnderMenu` therefore names two ids rather than reading a field, and §101
 gives that field no name. Adding one is a visible mechanism the design does not
 specify.
 
-**10 · §035's ASCII bar granularity contradicts the registry** — the first real
+> **Ruled 2026-09-24.** **Tie-break 1: data beats prose.** The registry's `#`/`-` stands, which is what the tree already does. **Owed:** §035's `[#][#][.]` specimen is superseded in the registry.
+
+**10 · RULED — §035's ASCII bar granularity contradicts the registry** — the first real
 conflict between two normative sources rather than a gap. §035's degradation
 block draws the segmented ASCII rung as `[#][#][#][.][.]`, three cells per
 segment, under the sentence *the ASCII rung preserves granularity*. The
@@ -82,7 +104,9 @@ the registry), and C09's substitution rule is 1:1 by column count. **Done under
 assumption:** the tree collapses both granularities to `#-`, and the frame
 records that.
 
-**11 · Whether spinner frames belong in a collision domain.** `|` is now a
+> **Ruled 2026-09-24.** Spinner frames get **their own domain, the duration slot**, and collisions are checked only within a set. **Owed:** the domain in SS64 and in C09 I99.
+
+**11 · RULED — Whether spinner frames belong in a collision domain.** `|` is now a
 rotation frame, `quote`'s ASCII rail and `vertical`'s border. `SS64` cannot see
 it — spinner frames are in neither `GLYPH_DOMAINS` nor `GLYPH_SET_DOMAINS`, so
 they never enter a pair — while the collision model's own test, *does this pair
@@ -93,7 +117,9 @@ an asymmetry that may make it legible rather than a rule that excuses it. The
 design registers `|/-\` for rotation, draws `|` borders in its own fixtures, and
 remarks on neither. (C09 I99 records this limit in place.)
 
-**12 · §038's verb → ramp table has no key.** The section pairs ten verbs with
+> **Ruled 2026-09-24.** The verb → ramp key is to be proposed as one table, together with 31, for approval in a batch.
+
+**12 · RULED — §038's verb → ramp table has no key.** The section pairs ten verbs with
 ten ramps in prose — *a search sweeps, a write advances, a wait on YOU breathes
 where a wait on the NETWORK drifts* — and supplies no field by which a producer
 names one. The registry's `semantic` reads like the mechanism and is not one: it
@@ -103,7 +129,9 @@ English lexicon, which nothing else in the tree does. **Held** — it is the onl
 part of §038 still owed; the agent's mark is C09 I98 and the degradation table
 is C09 I99.
 
-**13 · A second ASCII bar pair, and the design names no ASCII *absent* mark.**
+> **Ruled 2026-09-24.** ASCII *absent* is **`-`**, because a dash is not a zero. The second bar pair is to be proposed from the free set. **Premise note:** the registry's own bar pair already uses `-` as the ASCII **empty** cell (`#`/`-`, C09 I94). So *absent* `-` and *empty* `-` are one character wherever a bar and a missing value share a row, such as a `keyValue` row or a table cell. Either the proposed second pair replaces the registry pair's empty wherever both can meet, or the two are separated by domain. Proposed in the batch.
+
+**13 · RULED — A second ASCII bar pair, and the design names no ASCII *absent* mark.**
 `plot/ramp.ts`'s `pairFor` is a second pair — `#` / `.` / absent `-` — and it is
 what a `keyValue` row's bar draws through `valueBar`. Its `empty` cannot take
 the registry's `-` without becoming its own `absent`, and §078's `R-TBL-003`
@@ -111,12 +139,16 @@ keeps *missing* and *empty* distinct on purpose. The two collide only because
 this tree degrades the em dash where `ambiguousWidth` forbids it. A glyph
 choice, not a divergence left standing.
 
-**14 · Whether a sub-panel's border is the block's enclosure.** §017 says *a
+> **Ruled 2026-09-24.** Already answered: **the frame is the container's.** A sub-panel's border is not the block's enclosure, and focus lights the container's frame.
+
+**14 · RULED — Whether a sub-panel's border is the block's enclosure.** §017 says *a
 FRAME takes its border*, and `smallmultiples` and `pairplot` have four. The
 design does not say which, and lighting four sub-frames at once is a visible
 choice.
 
-**15 · The chord glyphs have no ASCII rung.** The design draws eleven — `← ↑ →
+> **Ruled 2026-09-24.** Chord glyphs fall back to **text names**, free-width, in help and footer only: `C-`, `M-`, `S-`, `Enter`, `Esc`, `Tab`, `Up`, `Down`, `Left`, `Right`. **Premise note:** that list covers nine of the eleven. It leaves out `⌘` (Super) and `⌫` (Backspace). The proposal, in Emacs's spelling to match the rest, is `s-` and `Backspace`, in the batch. **Owed:** `chordText`'s shorthand (`s+enter`, `m+C`) is replaced.
+
+**15 · RULED — The chord glyphs have no ASCII rung.** The design draws eleven — `← ↑ →
 ↓ ⇥ ⇧ ⌃ ⌘ ⌥ ⌫ ⏎` — throughout §019 and the binding registry, and **registers
 none of them in the glyph table**, so none has a declared fallback and the
 section shows them degrading nowhere. Inventing eleven spellings is a visible
@@ -162,7 +194,9 @@ the hexes appear nowhere in `src/`, `test/` or `docs/components/`, and
 `categorical` is a separate eight-slot cycle (C10 I37), not these. That is M2's
 work left undone, not a question, and §070's census row says so.
 
-**17 · `↺` is an affordance the design draws and the registry does not record.**
+> **Ruled 2026-09-24.** Register `↺` with a proposed ASCII fallback, which is in the batch. **Owed:** the glyph record.
+
+**17 · RULED — `↺` is an affordance the design draws and the registry does not record.**
 It is `↺ redo` on a reverted entry (§064), `↺ revert` on a stopped one (§005),
 `↺ revert all` on a review row (§013), and `↺ on an entry` in §092's state table
 — **22 occurrences in `calcium-registry.json`**, every one inside `sectionBlocks`
@@ -209,7 +243,9 @@ a question about the registry's completeness.
 
 ---
 
-**19 · What a framework kind draws when it sheds a part from a row.** `shedRow`
+> **Ruled 2026-09-24.** Already answered: **`+n`**, and the mark is itself a target (focusable; `⏎` expands what it stands for). **Premise note:** the entry records that §104's row is classified `app`. The ruling adopts `+n` as the framework's mark regardless, and that is recorded here so it isn't later read as inferred. **Owed:** `ShedResult.mark` gains an id; C09 I108's reservation goes, because `+` is ASCII at both rungs.
+
+**19 · RULED — What a framework kind draws when it sheds a part from a row.** `shedRow`
 composes a bare `⋯n` — the `residue` lead and a count — for the four kinds that
 shed: `keyValue`, `events`, `comparison`, `steps`. **The design draws that form
 nowhere.** Every `⋯` in the fixtures carries a count *and* a noun (`⋯ 40
@@ -243,7 +279,9 @@ reservation correct and no longer load-bearing, where `⋯` keeps it so.
 
 ---
 
-**21 · The ten hues at 4-bit — ten ANSI slots the registry does not record.**
+> **Ruled 2026-09-24.** Record the 4-bit slots from the repo's pinned maps. **Premise contradicted:** the pinned maps (`four-bit.ts`) hold **no hue entries**. `resolve` answers `NO_STYLE` for a hue at 4-bit (T2.56), and the mechanical map collapses ten hues to six. There is nothing pinned to record, so ten curated slots have to be chosen. A proposal for each theme variant is in the batch.
+
+**21 · RULED — The ten hues at 4-bit — ten ANSI slots the registry does not record.**
 C10 I55 landed the hue palette so a block can name `hue.blue` and C10 answers.
 At 24-bit that is the registry's hex; at 1-bit it is nothing, which §070 settles
 (*the tones mean something; this is you choosing what your terminal looks like*,
@@ -283,7 +321,9 @@ would own it, or in `four-bit.ts` beside the curated maps the repository already
 holds? Both are defensible and the first is the one this reconciliation's
 authority points at, which is why it is asked rather than taken.
 
-**20 · Whether this reconciliation builds §105's five primitives.** §105 draws a
+> **Ruled 2026-09-24.** **Yes**: build §105's five primitives, together with the divider's chord and the scrollbar's. **Owed.**
+
+**20 · RULED — Whether this reconciliation builds §105's five primitives.** §105 draws a
 tree, a form, a split, a command palette and a toast, and says *each is built
 from what already exists* and *the framework already had every part — what it
 lacked was the name*. **Checked part by part, the claim holds.** The tree's
@@ -310,7 +350,9 @@ binding for both, or neither.
 
 ---
 
-**22 · Which box draws the bar when two scrollables nest.** M14's plan says
+> **Ruled 2026-09-24.** Each scrollable box draws **its own bar in its own last column**. **Premise note:** `R-BLK-165` (`example`) calls two bars for one document a layout error. The ruling overrides an example, which does not bind, so no `current` rule is contradicted. **Owed.**
+
+**22 · RULED — Which box draws the bar when two scrollables nest.** M14's plan says
 *two bars for one document is a layout error and is asserted as one*, from
 `R-BLK-165`: *two bars is legal when they are two documents. Two bars for one
 document is a layout error.* Its catalogue is `["first-document",
@@ -470,7 +512,9 @@ C11's rather than the sort's, and the default following the kind.
 
 ---
 
-**25 · The design's own figures draw two columns where `R-STR-003` says
+> **Ruled 2026-09-24.** **Tie-break 2.** The premise holds: 28 figures draw two columns and none draw three. `R-STR-003` is superseded to **two**. **Owed:** the registry edit. No golden moves, because the tree already draws two.
+
+**25 · RULED — The design's own figures draw two columns where `R-STR-003` says
 three.** The rule is `status: current` — *every nested level costs three
 columns* — and it is the only place in the kit that says three.
 
@@ -497,7 +541,9 @@ is unaffected either way and stays owed on its own account.
 
 ---
 
-**26 · The trend arrow has no glyph record, and the sort marks are not it.**
+> **Ruled 2026-09-24.** Register trend `↑`/`↓` with ASCII `^`/`v` in the **inline** domain. **Premise note:** `↑`/`↓` were never sort's. Sort is `▴`/`▾`, with ASCII `^`/`v` in `table-header`. What is freed is sort's *ASCII*: trend takes `^`/`v` in a different domain, which the domain model allows even though a trend cell and a sorted header sit in one table. **Owed.**
+
+**26 · RULED — The trend arrow has no glyph record, and the sort marks are not it.**
 §088 §4 draws a metric's trend as `↓ from 0.41` and `↑ from 0.62`, and
 `R-COL-006` makes the arrow's **tone** carry the polarity. Everything else
 about the rule is settled — §086 puts the metric in a table cell, so the
@@ -523,7 +569,9 @@ ask than to mint a mark.
 
 ---
 
-**27 · `R-NTF-001` says *the declared completion notification* and nothing
+> **Ruled 2026-09-24.** Build the mechanism and the display now; the missing sources arrive with their producers. **Premise note: this doesn't answer the entry's first sub-question.** Both earning tables are `example` prose, so no tie-break decides between them. Taken unless you say otherwise: §088 §3's five rows **plus** §014's *the model failed*, because a silent drop is not a decision. The rungs are §014's as drawn (bell, OSC 9 / OSC 777, OSC 2). The reader-declared watch is built as a declaration that producers fill. **Owed.**
+
+**27 · RULED — `R-NTF-001` says *the declared completion notification* and nothing
 declares one.** The rule is `status: current` and it is the **only** current
 rule in the registry about watching. Everything that would give it a subject is
 `status: example`, which `AUTHORITY.md` says does not bind — and the two
@@ -558,7 +606,9 @@ So three answers are needed before this can land: which earning table binds and
 whether *the model failed* survives; what declares the rungs and their wording;
 and whether the watch itself is mine to build.
 
-**28 · `R-HON-008`'s display is fully specified and three of its four sources do
+> **Ruled 2026-09-24.** Build the mechanism and the display now. `default` shows today; `config`, `env` and `flag` rows arrive with their producers. **Owed.**
+
+**28 · RULED — `R-HON-008`'s display is fully specified and three of its four sources do
 not exist.** §075 — *`/config` — and the third column is the one that matters* —
 draws the whole surface: a three-column table `key · value · source`, four
 sources on a tone ladder (`default` muted *nobody chose it*, `config` meta, `env`
@@ -596,7 +646,9 @@ five are capability detection. A row reading them as one question would be the
 homonym this ledger has now hit four times.)*
 
 
-**29 · `R-ACC-001` — §107 fixes the semantic node's fields and neither its role
+> **Ruled 2026-09-24.** An ARIA-derived role vocabulary, with linear output per the access spec in M12. **Premise contradicted:** the plan's M12 is **the trust boundary** (escaping untrusted text), not access. The access spec is §107. Taken as: the ARIA table proposed in this entry, and the linear line form it proposes, both under §107. **Owed.**
+
+**29 · RULED — `R-ACC-001` — §107 fixes the semantic node's fields and neither its role
 vocabulary nor a line of linear output.** Nothing of §107 exists in the tree: the
 element record is `{id, level, rows, cols}` plus `activate` and `viewState`, so one
 of the nine fields is built, and there is no linear renderer, no mode selection,
@@ -642,7 +694,9 @@ kinds of twenty-five, or a linear stream with no settled line, is the frame with
 nothing in it — and it would be read as coverage.
 ---
 
-**30 · The registry gives one ASCII alphabet to sets at different intervals, and
+> **Ruled 2026-09-24.** `R-MOT-011` applies **per rung**: sets that collapse to one ASCII alphabet share an interval at that rung. **Owed.**
+
+**30 · RULED — The registry gives one ASCII alphabet to sets at different intervals, and
 `R-MOT-011` says a shared alphabet shares an interval.** §039: *SETS THAT SHARE
 GLYPHS SHARE AN INTERVAL* and *NOTHING varies its rate at runtime*. The registry's
 own `asciiPattern` records give `|/-\` to nine sets between 80 and 140 ms
@@ -657,7 +711,9 @@ at 400 ms steps at 80) is a defect either way and is built regardless.
 
 ---
 
-**31 · Thirteen ramps declare `attentionGroup: "unclassified"`.** `R-MOT-012`
+> **Ruled 2026-09-24.** To be proposed with 12 as one table, for approval in a batch.
+
+**31 · RULED — Thirteen ramps declare `attentionGroup: "unclassified"`.** `R-MOT-012`
 says every ramp declares its attention group, and the group is what decides what
 `reduced` stops (C09 I99). `rampPolicy.attentionGroups` lists fifteen; the other
 thirteen — eight of them animated: sweepbar, converge, heartbeat, typewriter,
@@ -678,7 +734,9 @@ and the sub-cell braille ramp.
 
 ---
 
-**33 · `R-THM-003` says the ground is selection's only carrier; `R-COR-003` and
+> **Ruled 2026-09-24.** Selection's second carrier is **the `▌` selection rail** (§017). `R-THM-003`'s *only carrier* is superseded to *only ground-level carrier*, and the rail is asserted. **Note:** `▌` is also the prompt's caret (the `bar` slot). The two are in different domains (the transcript's gutter and the prompt), so this is not a collision, but the rail's domain has to say so. **Owed.**
+
+**33 · RULED — `R-THM-003` says the ground is selection's only carrier; `R-COR-003` and
 `R-COL-004` say no interaction distinction has one.** R-THM-003: *the selection
 band keeps 3 : 1 against the page, because the ground is selection's only
 carrier*. R-COR-003: *every actionable, status, and interaction distinction has
@@ -691,7 +749,9 @@ the same carrier rather than a second carrier. **Does selection owe a mark** —
 
 ---
 
-**34 · §026's `fade` trail draws the sole carrier at the ground, and `R-MOT-004`
+> **Ruled 2026-09-24.** **Tie-break 4.** Streaming is carried by the head spinner and the elapsed count, so the trail may be ground-only. **Owed:** `TRAIL_HEAD`'s *the gap is parked* comment is replaced with this ruling.
+
+**34 · RULED — §026's `fade` trail draws the sole carrier at the ground, and `R-MOT-004`
 forbids exactly that.** §026: *the newest character IS the ground and emerges
 toward the ink*. R-MOT-004: an animated frame on meaningful text is contrast-safe
 in every frame and never the sole semantic carrier. `TRAIL_HEAD` gives `fade` a
@@ -700,7 +760,9 @@ is parked* — **and it was not**: no entry here named it until this one. Does
 `fade`'s head clear the text floor (and so not reach the ground), or is a
 streaming head exempt because the text is still arriving?
 
-**35 · Semantic copy mode's count has no drawn form.** `R-SEL-009` names *the
+> **Ruled 2026-09-24.** The count reads **`418 chars · 9 rows · 2 entries`**, in the footer. **Premise note:** no fixture draws a count. §103's footer has none, which is why this was parked. The wording is new and yours. **And the mechanism differs:** `semanticSelectionCount` counts blocks, while the ruled form counts the copy text's characters and rows and its entries. **Owed.**
+
+**35 · RULED — Semantic copy mode's count has no drawn form.** `R-SEL-009` names *the
 count* among the three things that redraw while frozen, and `R-SEL-015` defines
 it — *the size of what return would copy right now* — but no fixture draws it:
 §103's copy footer is `copy ←→↑↓ extend ⏎ copy esc out · the screen is frozen`,
@@ -715,23 +777,4 @@ mode's label the rung shows, this one is what the count says and where.
 
 ## Not yet recovered
 
-**Sixteen distinct questions are above, and the running count in the reports
-reached eighteen.** The gap was chased rather than left: the reports state a
-total at six, nine, twelve, fourteen, fifteen and eighteen, and the message
-ranges between *nine → twelve* and *twelve → fourteen* were read in full. **They
-name no new question.** So the discrepancy is in the counting, not in the
-record: the residue question was reported twice — once as a divergence from the
-fixtures and once as the diff a fixture comparison would read — and counted
-twice, and the same is true of at least one M13 item reported as still-open and
-as parked.
-
-The right reading is that the **list** is the number, never a figure carried
-alongside it. That paragraph said *fourteen* and was true the day it was
-written; 15 and 16 were parked afterwards, and the sentence stating the total
-did not move — which is this file's own subject arriving inside it, a correction
-that stopped at its own sentence. **Sixteen headings are above**, and the way to
-count them is to count them: `grep -cE '^\*\*[0-9]+ ·' docs/design/PARKED_QUESTIONS.md`.
-
-**So no total is stated here as prose again.** A figure that no longer resolves
-against a list is the thing this file was written to stop, and a figure kept
-beside the list is one more place for it to go stale.
+The gap between the entries and the running count in the per-MR reports was chased and closed: some questions had been counted twice. The list is the count. **No total is stated here in prose**, because the one that used to be here said *sixteen* long after that stopped being true — this file's own subject, arriving inside it.
