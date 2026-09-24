@@ -1668,3 +1668,9 @@ describe("C17 §5b — every motion twice, at the binding", () => {
     expect(unpaired, "every anchor-held chord has its motion").toEqual([]);
   });
 });
+
+describe("C16 I55 — the platform keeps its chords", () => {
+  it.todo(
+    "T1.108 (C16 I55, §063, §019, R-REF-002): no binding takes a chord the platform owns, and ⌥←/⌥→ mean word motion — not deferred on a component: the sweep lands in the next commit of this MR",
+  );
+});
