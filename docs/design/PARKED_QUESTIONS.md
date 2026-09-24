@@ -700,6 +700,17 @@ is parked* — **and it was not**: no entry here named it until this one. Does
 `fade`'s head clear the text floor (and so not reach the ground), or is a
 streaming head exempt because the text is still arriving?
 
+**35 · Semantic copy mode's count has no drawn form.** `R-SEL-009` names *the
+count* among the three things that redraw while frozen, and `R-SEL-015` defines
+it — *the size of what return would copy right now* — but no fixture draws it:
+§103's copy footer is `copy ←→↑↓ extend ⏎ copy esc out · the screen is frozen`,
+and §044 marks selected elements with `▌` and no total. The number exists
+(`semanticSelectionCount`, `src/shell/session.ts`) and nothing reads it. Its
+**wording** (`3 blocks`? `3 selected`? a bare `3`?) and its **place** (a chip in
+the footer, beside `copy`, or in the prompt rule's label) are both visible
+choices. Question 4's shared chip is adjacent and separate: that one is which
+mode's label the rung shows, this one is what the count says and where.
+
 ---
 
 ## Not yet recovered
