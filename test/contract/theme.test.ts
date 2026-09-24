@@ -226,6 +226,9 @@ describe("C10 contract", () => {
    * and asserts that the failure names the *path* that has to move — which is what
    * makes the message the reason rather than the number.
    */
+  it.todo("T2.59 (C10 I60, R-THM-004): textGrounds is the page, the diff grounds and bgDeep — not deferred on a component: specified before textGrounds exists");
+  it.todo("T2.60 (C10 I60, R-THM-002): the high-contrast floor holds over textGrounds — not deferred on a component: specified before the compositions land");
+
   /**
    * **T2.44 (C10 I46, R-THM-004) — the scope, asserted as a membership rather than
    * as a sweep.**

@@ -564,6 +564,8 @@ describe("C25 I22 — the plan travels through the seam, and a planned window co
     expect(windows, "the sweep ran").toBeGreaterThan(50);
   });
 
+  it.todo("T1.27 (C25 I23, C10 I48): a diff row's inks resolve against its row's ground — not deferred on a component: specified before the patch passes its ground");
+
   it("T1.26 (C25 I22, F1191): the definition's window through a caller's scratch derives one plan per patch and width — set once, read back after, the block equal to a scratch-less call — and rebuilds for another width or another patch sharing the hunks array; with no scratch, as before", () => {
     // A stand-in with the seam's shape (C12 I107): one slot per owner.
     const slots = new Map<object, { key: string; value: unknown }>();
