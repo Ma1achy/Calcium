@@ -51,12 +51,34 @@ claimed more would be the kind of green that reads as thoroughness.
 | **M14** | the scrollbar, drawing nothing where it cannot move | `scrollbarColumn` | `src/presentation/blocks/scrollbar.ts` |
 | **M14b** | the pull — focus moves the window by the minimum | `pull` | `src/shell/pull.ts` |
 | **M15** | the typed reply, over the one editor | `AskOptions` | `src/shell/local/registry.ts` |
+| **M15's remainder** | *who owns the keystroke* asked by id at three sites | `CHIP_PREVIEW_ID` | `src/shell/construct.ts` |
 | **M16** | the design fixtures, by equality against the corpus | `design-fixtures` | `test/golden/DESIGN_FIXTURES.md` |
 
 **Gated by C10 T2.58**, which reads this table and resolves every symbol against
 the named file. A row naming a file that does not exist, or a symbol that is no
 longer in it, fails — and the control is a fabricated row, because a table of
 sixteen true statements passes exactly like a checker that reads nothing.
+
+**M15's remainder is a row rather than a comment, because it was a comment.**
+Seven of M15's eight deliverables resolve; the eighth is `promptUnderMenu`'s
+hardcoded exemption, which the plan says is *subsumed — it was this rule with
+one consumer*. Half of it was: `confirm.replacing !== null` landed and is
+§101's table. The other half names two ids, under a comment saying they are
+*named rather than derived because no field distinguishes them from a search —
+which is a gap worth closing and not a rule to guess at*.
+
+**The search is the third instance, and it is what makes the axis findable.**
+`construct.ts:3336` asks the same question of `SEARCH_ID`, so three sites now
+answer *who owns the keystroke* by comparing an id. Two instances would have
+been a coincidence; the third is this repository's own stopping point — and it
+is also what refutes the obvious fix. A boolean `composes` cannot carry all
+three: the search's answer is unconditional, the chip preview's is
+unconditional the other way, and the completion menu's is conditional on
+`keys.selected` (C19 I20). The distinction wants a **declaration the layer
+makes**, and choosing its shape is a walk, not an edit.
+
+So it is named here, with its symbol, where `C10 T2.58` resolves it against
+HEAD — rather than living in the comment that already knew.
 
 **And its population is this plan, which is not the registry** — so there is a
 second record beside it, and the pair is the point. `AUTHORITY.md` puts
