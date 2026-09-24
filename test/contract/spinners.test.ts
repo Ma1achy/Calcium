@@ -528,6 +528,8 @@ const STATED_CYCLES: Readonly<Record<string, number>> = Object.freeze(
     );
   });
 
+  it.todo("T2.171 (C09 I48, §093): the mark vocabulary takes its ASCII rung whole at wide — not deferred on a component, the row lands with I48's code half");
+
   it("T2.75 (C02 I9): the glyph set falls to ASCII on a wide terminal", () => {
     // **`▌` is the framework's own instance of the finding.** Box drawing is
     // ambiguous throughout, so on a wide terminal a panel border, a rule and a
