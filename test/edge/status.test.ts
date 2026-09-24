@@ -274,6 +274,8 @@ describe("C09 §3a — the spinner", () => {
     expect(unknown.some((r) => r.includes(frames[0] ?? "\u0000")), "unknown falls back").toBe(true);
   });
 
+  it.todo("T2.170 (C09 I108, I81): a shed row keeps its mark whole at both rungs — not deferred on a component, the row lands with I108's code half");
+
   it("T3.45 (C09 I32): the default is width-stable, and a narrow-only set takes its ASCII pair", () => {
     // **Both routes to the ASCII pair**, because a set reaches it by width or by
     // `unicode: "ascii"` and one assertion cannot tell which fired.
