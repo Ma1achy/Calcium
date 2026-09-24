@@ -649,3 +649,14 @@ describe("C26 §7 — the scope stack, the one resolver, and the vocabulary with
     expect(decl, "no escape field").not.toMatch(/^\s+escape\??:/mu);
   });
 });
+
+// C26 I27, C16 I27/I28 — the inside's arrows and the block-keymap refusal.
+// Spec-alone commit; the rows land with the code in the next commit of this MR.
+describe("the inside's arrows resolve by declaration (C26 I27, C16 I28, §102)", () => {
+  it.todo(
+    "T2.172 (C26 I27, C16 I28, §102): ← orbits a plot with a camera, steps the sample of a plot with a cursor, and does nothing on a kind with neither; ↑ tilts the first and is a no-op on the second — not deferred on a component: the four arrows move to interaction and gain the declaration-resolved effect in the next commit of this MR",
+  );
+  it.todo(
+    "T2.173 (C26 I27, C16 I27): a block keymap on a block declaring viewState that binds one of the inside's own keys is a construction error, and one on a block declaring none is merged at interaction as before — not deferred on a component: mergeBlock's narrow refusal lands with the declaration in the next commit of this MR",
+  );
+});

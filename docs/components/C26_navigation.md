@@ -660,7 +660,7 @@ for a word. The name is recorded as historical here rather than corrected in the
 | **a** | *the sequence is the entry's* (I19) meets *focus can be in any entry* | **The sequence stays the entry's.** `↓`/`↑` step within the focused entry; a block's edge is not a boundary and an entry's edge is. One flat list over the whole transcript was the alternative and it puts the prompt nowhere: `↓` from the prompt would enter at the **oldest** entry's first element, or the live entry's head would need two neighbours — the prompt (I22) and the settled entry above — and one key would mean two things at one target, which is §4b's shape |
 | **b** | *the prompt neighbours the head* (I19) meets *a settled entry has a head too* | **Only the live entry's head neighbours the prompt.** `↑` at a settled entry's first element **stops**; `Esc` is the way out from every entry, as §4c already says it is for the tail. The neighbour rule is unchanged and asymmetric neighbours are still what it is over |
 | **c** | *entries are the outer scope* meets *no key moves between scopes* | **`tab` and `⇧tab` move between entries** — `⇧tab` to the previous (older, above) entry's first element, `tab` to the next (newer). An entry with no elements is skipped, because entering it would be I22's third clause inverted: a block with nothing focusable is not entered. At the live entry `tab` stops; at the oldest entry with elements `⇧tab` stops. Both keys were free at `liveBlock`, and `⇧tab`'s wire form `CSI Z` was not decoded — added, and pressed through the decoder (→ C16 §2, I17) |
-| **d** | *interaction is the block's own keys* (§4f, A01 D4) meets *D4 withdraws them on freeze* | **Interaction is reachable only in the live entry.** `activeTarget` answers `interaction` when the stored entry **is** the live one; a settled entry with `mode: "interact"` stored answers `liveBlock`. The gate used to be *is there a live entry*, which was the same test while focus could only be in the live one, and is narrower now |
+| **d** | *interaction is the block's own keys* (§4f, A01 D4) meets *D4 withdraws them on freeze* | **Superseded by §8b.9 (`R-INT-005`, §102).** The row ruled *interaction is reachable only in the live entry*, and it is the reading §102 exists to refuse: *VIEW STATE IS NOT LIVENESS*. The mistake is legible in the row's own two clauses — D4 withdraws the block's **bindings**, and the row concluded that the block's **camera** goes with them. `activeTarget` answers `interaction` for the focused entry whatever its liveness; a settled plot still orbits. What D4 withdraws is unchanged |
 | **e** | *`⏎` dispatches the element's `activate`* (I14) meets *an action from a frozen entry is refused* (C23 I18) | **The refusal is reached for the first time from a keyboard**, and the ruling in C23 I18 is what it says. `rowActivate`'s origin is the **focused** entry, never `liveId` — with the old origin a settled row's action would have fired against the live entry's document, which is the wrong-entry defect §8b.6 was about one level up |
 | **f** | *the render key carries focus* (C22 I58) meets *focus is now per entry* | Nothing changes: `focusFor(graph, entryId)` already answers per entry and `focusKey` keys on what it returns. The row is here because it was the one to check — a settled entry gaining a highlight is a new cell in a cache that never had one, and it is invalidated by the same axis the live entry's always was |
 
@@ -696,7 +696,7 @@ would survive that too, which is the second reason the widening is safe.
   entries, and the sequence stays the entry's.
 - I22 (§8) — resolution honours the entry while it exists and falls to the live one when it
   does not.
-- **I2's gate narrows**: interaction is reachable in the live entry only (table row d).
+- **I2's gate narrows**: interaction is reachable in the live entry only (table row d). **Withdrawn in §8b.9** — the ruling was right that D4 withdraws a settled block's bindings and wrong that its view state goes with them (`R-INT-005`, §102).
 - **C04 §3c cell 6 and C04 I48's clause are withdrawn**, and roadmap 46's *permanently until
   block-to-block focus lands* has landed — both recorded in `SCRATCH` requests rather than
   edited here, because neither file is this section's.
@@ -1154,10 +1154,16 @@ the behaviour §095's first paragraph exists to separate a tape from.
   targets map onto six rungs through `RUNG_OF` (C16 §3), many-to-one — `prompt` and
   `liveBlock` are two positions of one `scope` owner — so the ladder still holds no order
   of its own, it holds a **projection** of this one. The shape the invariant forbids is
-  unchanged: a second list beside `FOCUS_ORDER` that dispatch consults. **And it is reachable in the live entry only** (§4g row d): the
-  stored location names an entry, and `activeTarget` answers `interaction` when that entry is
-  the live one — A01 D4 withdraws a block's keys on freeze, so a settled entry has nothing to
-  interact with.
+  unchanged: a second list beside `FOCUS_ORDER` that dispatch consults. **The liveness gate is
+  withdrawn** (§8b.9, `R-INT-005`, §102): `activeTarget` answers `interaction` for the focused
+  entry whether or not it is the live one. §102's heading is *VIEW STATE IS NOT LIVENESS*, and
+  its starred line — *A 3D PLOT IS INTERACTIVE BECAUSE IT HAS A CAMERA, not because it is live.
+  Settled an hour ago, from a call that finished — it STILL ORBITS* — is the direct opposite of
+  §4g row d's ruling, which read A01 D4's withdrawal of a block's **bindings** as a withdrawal
+  of its **view state**. Those are the two questions §102 says *live* was conflating: whether
+  the content changes, and whether the block has something to look at from more than one angle.
+  D4 still holds on its own subject — a settled entry's adapter-supplied `BlockKeymap` is gone —
+  and the camera the block declared is not a binding.
 - **I3** — `elements` is pure in `(block, width)`. Focus is not a parameter, so a
   focus-dependent geometry is unrepresentable rather than forbidden.
 - **I4** — Every element's rows lie within `[0, measure(block, width))` and its columns within
@@ -1269,6 +1275,8 @@ the behaviour §095's first paragraph exists to separate a tape from.
   entry, whose `y` copies the invocation, and `⇧⏎`/`⌥⏎` remain the only re-run** (§5c, →
   C09 I47, C22 I90, C23 I18). A head with no body has no `activate` and `⏎` is silent there; a
   subagent's head pushes a view rather than expanding (→ C15 §2b).
+- **I26** — *(§8b.9, §102, §018, `R-INT-005`, `R-FOC-002`)* **An inside is declared, entered and reflected, and all three are one chain.** `NavElement.viewState` says the element has one; `⏎` on an element that declares it stores `mode: "interact"` and `Esc` there stores `"navigate"`; `focusFor` reflects the stored mode into `FocusState.inside`, which is what a kind's renderer reads. **The declaration is per element**, because §018's three sliders in one document are three insides in one block, and a kind whose figure fills its block declares it on the element it produces — which recovers §102's per-kind table without a second field to disagree with this one. An element that declares `viewState` and an `activate` is a construction error: §018 rules that *direct-action toggles and choices act without an inside state*, so the two are disjoint and `⏎` never has to choose.
+- **I27** — *(§8b.9, §018, §102, `R-INT-005`)* **A continuous control's domain value is committed only from inside it.** Every binding that moves a camera, a cursor or a handle sits at the `interaction` target and nowhere else, so arrowing down a document past three sliders moves no slider. A pointer readout **may** preview from outside where the element declares one, because a preview commits nothing — §102's *KEYBOARD CONTROLS APPEAR ONLY INSIDE; POINTER READOUT MAY PREVIEW OUTSIDE*. The rule was satisfied by vacuity until I26's chain existed: with `FocusState.inside` constant `false` there was no inside for a commit to be outside of, and the camera family committed from `liveBlock` with nothing able to report it.
 
 ---
 
@@ -1615,6 +1623,91 @@ an action would have entered a keyless mode and the prompt would have stopped re
 dispatches the element's own `activate` — so this entry changes a commitment and no code, which
 is the shape a spec commit should have.
 
+### 9. The chain closes, and the design withdraws the liveness gate it ran into (`R-INT-005`)
+
+§8b.2b measured three open links and said they go in from the declaration outwards. This is
+that, and going to build them found the fourth thing: **the chain's last link is blocked by an
+invariant of this component**, and the design overrules it.
+
+#### The three links, as §102 settles them
+
+§102 names all three in four lines, so none of them is a choice this spec makes:
+
+| link | §102 | what lands |
+|---|---|---|
+| the **declaration** | *a block declares whether it has VIEW STATE* | `NavElement.viewState?: boolean` — the element has an inside |
+| the **entry** | *focused — the way IN — ⏎ enter* … *esc out* | `rowActivate` calls `setMode("interact")` on an element that declares view state; `Esc` at `interaction` calls `setMode("navigate")` |
+| the **bridge** | — | `focusFor` reflects `mode === "interact"` into `FocusState.inside`, which `isInside` has been reading as constant `false` since it was written |
+
+**The declaration is per element and not per kind, and §102's own table is why it reads as
+per kind.** Every row of it — *a 3D plot · a camera*, *a table · sort + scroll* — is a figure
+that fills its block, so kind and element coincide there. §018's row 2 does not: *arrowing
+down a document past three sliders* is three elements in a page, each with its own inside. The
+element is the granularity at which one is entered, so it is where the declaration sits, and
+the per-kind reading is recoverable from it because a kind that has view state declares it on
+the element it produces.
+
+**And the entry needs no precedence rule, which is the part worth checking rather than
+assuming.** `⏎` already dispatches `activate` (I14), so an element that both declared view
+state and carried an `activate` would be one key with two meanings. §018 settles it as a fact
+about the controls rather than as an ordering: *direct-action toggles and choices act without
+an inside state*. A control either has an inside or acts; the two sets are disjoint, so there
+is nothing to order. An element declaring both is the block author contradicting the design,
+and it is a construction error for I15's reason.
+
+#### The gate this makes falsifiable — and what it found
+
+`R-INT-005` reads *an inside-bearing continuous control cannot commit its domain value from
+outside*. Before the chain, the repo satisfied it by committing from **nowhere**: `isInside`
+was constant `false`, so the rule had nothing to be wrong about — A03 §2's vacuity class, and
+what the ledger row recorded.
+
+It is not vacuous now, and the tree violates it. The camera family is bound at **`liveBlock`**
+— `keymap.ts`'s nine rows, `[` `]` orbit, `{` `}` tilt, `+` `=` `-` dolly, `r` reset, `o`
+auto — which is *outside*, by §102's own reading of the word: at rest, hovered and focused are
+all outside, and only *inside* has the keyboard controls. `orbitLeft` reaches `orbitBlock`,
+which nudges `stores.cameras` off `focusedPlot()`. **That is a domain value committed from
+outside, on the one subject the rule has.** It moves to `interaction`.
+
+#### The chords, which §102 draws rather than leaves open
+
+§102's control row is `←→ orbit   ↑↓ tilt   o auto   r reset   esc out`, sitting *DIRECTLY
+UNDER THE PLOT*. So the arrows carry orbit and tilt and `[` `]` `{` `}` retire — and the
+reason they existed dissolves with the target rather than being overruled. C22 I75 chose the
+brackets because *`↑` and `↓` are `rowUp` and `rowDown` two rows up and the duplicate check
+refuses them*: a statement about **`liveBlock`**, where the arrows step elements. At
+`interaction` they step nothing, which is §018's *entering narrows it, and the arrows change
+what they drive* — the same sentence from the other end. The brackets were the cost of binding
+the camera at a target that had the arrows spoken for, and the inside state is what pays it
+back.
+
+`+` `=` `-` keep the dolly. The control row **sheds descriptions and then becomes `?` keys**,
+so its not naming a dolly key is a fact about the row's width and not a retirement; reading an
+absence there as a ruling would be reading a shed form as a complete one.
+
+#### What it costs this component — I2's liveness gate, withdrawn
+
+`activeTarget` answers `interaction` only when the focused entry is the **live** one (§4g row
+d), and I2 recorded that as settled: *A01 D4 withdraws a block's keys on freeze, so a settled
+entry has nothing to interact with*. §102's heading is *VIEW STATE IS NOT LIVENESS* and it
+answers that sentence directly — *Settled an hour ago, from a call that finished — it STILL
+ORBITS.* The design is the source of truth here, so the gate goes rather than the design.
+
+**The row was not wrong about D4; it was wrong about what D4 withdraws.** A01 D4 takes back
+the *adapter-supplied bindings* a live block contributed — `s` stops sorting a `/ps` table
+once a newer entry arrives — and the row read that as the block having nothing left to be
+inside of. A camera is not a binding. It is declared by the block, stored per entry and per
+block in `Cameras` (C22 §6i row 11), and survives the freeze exactly as the sort order does;
+what the freeze removes is the adapter's keys, which is what C16 I27 places at `interaction`
+in the first place. So the two clauses of the row are both true and the conclusion between
+them is the one §102 refuses.
+
+**And it costs nothing at the rung below.** A settled entry answering `interaction` needs the
+mode stored on a settled entry, which needs it to have been entered there — and `focusRow`
+already clears the mode on every move between rows, so the mode cannot arrive anywhere by
+drift. The one path in is `⏎` on an element that declares view state, which is the link this
+section builds.
+
 ---
 
 ## 9. Commitments
@@ -1638,6 +1731,8 @@ is the shape a spec commit should have.
 17. **`⏎` on a head is a toggle and `y` on it is the invocation** — re-run stays on its own key, because a key with two meanings by count is an arming machine (I23, §5c).
 18. **Focus pulls the viewport and scrolling does not move focus, as one mechanism with two callers** (I24, §7a, §021, §095). The design states the sentence twice — once of a box's rows and once of a tape's members — and writing it twice in the tree would be two chances to round differently. What the two share is a distance; what differs is the unit, and the unit belongs to the container.
 19. **A tape's window is persisted, not recomputed from the head** (I25, → C04 I124). *The window moves only when the current leaves it* is a statement about the previous window, so there has to be one; without it the arithmetic is still correct and the behaviour is a cursor dragging the row along.
+20. **An inside is declared on the element, entered with `⏎` and left with `Esc`, and reflected into `FocusState.inside`** (I26, §102, §018). Three links, landed together, because each alone is a half-seam a test can only reach through a backdoor (§8b.2b).
+21. **The camera family binds at `interaction` and at no other target, and its chords are the arrows** (I27, §102, → C16 I28). `[` `]` `{` `}` retire: they were chosen because `liveBlock`'s arrows step elements, and inside an element there is nothing to step.
 
 **The four-kind validation of §4 is not here, and SP1 is why.** *If it is none of those, it
 is a § detail rather than a commitment* — it is a step the implementation takes, and no
@@ -1664,6 +1759,11 @@ Named against the invariants; the tiers are the six.
 - **T1.48** (I24, §7a, §021): the pull as a distance, from both sides and at the boundary — a target already inside moves nothing, one before the window moves it exactly to the target's start, one after moves it exactly to the target's end, and a target taller than the window shows its **head** rather than its tail. The last is the arm that separates the two orderings, and both orderings are self-consistent.
 - **T1.49** (I24, §7a, C04 I125): the two windows are one rule — over a tape whose members are uniform and whose marks cost nothing, `tapeWindow`'s start and `pullIntoView`'s agree at every held start and every current. The tape's window is a function of its own contents and the box's is a number it is told, so this is the row that says the two sizes did not become two rules; without it, *one mechanism with two callers* is a claim about the prose.
 - **T1.50** (I25, §7a, C04 I124): a tape's window is held, given a held start — the start `tapeStart` answers is a fixed point, so feeding it back changes nothing; it differs from the from-the-head answer once the window has slid; and it does not depend on the tick, which is the assumption that lets the shell ask for it outside a frame.
+- **T1.160, T1.161** (I26, §8b.9, §102): the chain end to end, as a store walk — `⏎` on an element declaring `viewState` stores `mode: "interact"` and `focusFor` answers `inside: true`; `Esc` there stores `"navigate"` and `inside` goes false; `⏎` on an element that declares **no** `viewState` stores no mode and dispatches its `activate` instead. **The third arm is the control**: without it the pair passes against a build that enters on every element, which is the *arrowing down a document past three sliders* case from the entry side.
+- **T1.162** (I26, §8b.9): a settled entry's element with `viewState` is entered and `activeTarget` answers `interaction` — the liveness gate withdrawn, asserted on the state that used to be unreachable. The block is frozen and its adapter keymap is gone, which is the half A01 D4 keeps; the camera is not.
+- **T1.163** (I27, §8b.9, §018): the commit gate, over the **table** rather than over one key — every binding whose action moves a camera, a cursor or a handle resolves at `interaction` and at no other target. A sweep, because a row asserting `orbitLeft` alone passes against a build that left the other eight where they were.
+- **T2.172** (I27, C16 I28, §102): the inside's arrows resolve by declaration — `←` orbits a plot with a camera, steps the sample of a plot with a cursor, and does nothing on a kind with neither; `↑` tilts the first and is a no-op on the second. The vertical arm is what says the resolution is by declaration and not by key.
+- **T2.173** (I27, C16 I27): a block keymap that declares `viewState` and binds one of the inside's own keys is a construction error; one that declares no view state and binds the same key is merged at `interaction` as before. The second arm is the control — without it the row passes against a build that refuses every block key.
 - **T4.31** (I24, §7a, §021): the wiring, in a real session — scrolling a box does not move focus, and the next focus move pulls the window back to the focused element. Asserted as a pair, because *focus is unchanged* is satisfied by a build where scrolling does nothing at all; and read off the screen rather than off the store, because a test that calls the mechanism misses the wiring.
 - **T4.33** (I24, §7a, C04 I97): a **following** box is pulled from where it is drawn, not from where the store is empty. An untouched follow box opens at its tail and the store holds nothing, so reading the stored number gives `0` — the top — and the pull then computes no move, writes nothing, and leaves the box at its tail with focus on its first row. The two readings differ only in this state and no row in the tree constructed it: the mutation that swaps them survived a pass whose every other arm died, which is what a state a test never builds looks like from outside.
 - **T4.32** (I25, §7a, C04 I125): a tape in a session keeps its window across a resize and gives it back when the room returns — narrow the terminal with the current at the far end and the row carries `«n`; widen it and the whole tape is there. **Stated blind spot, because the row reads as more than it measures.** The held start and a start recomputed from the head differ only where the current moves *backwards*, and in this build a tape's `current` is producer data that changes by a far-side patch alone — no key moves it — so a session cannot construct the case. That difference is measured at T1.50, against `tapeStart` directly; what this row covers is the path, the resize and the ceiling, which is what the from-the-head build would also pass and the no-ceiling build would not.

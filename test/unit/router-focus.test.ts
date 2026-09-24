@@ -395,3 +395,20 @@ describe("C16 §5d — semantic copy mode is the second target at the `copy` run
     expect(at({ semanticSelection: true, overlayTop: { kind: "overlay" } })).toBe("overlay");
   });
 });
+
+// C26 I26, I27 — §102's inside chain and the commit gate. Spec-alone commit;
+// the code lands next and these rows go with it.
+describe("the inside — declared, entered, reflected (C26 I26, I27, §102, §018)", () => {
+  it.todo(
+    "T1.160 (C26 I26, §8b.9, §102): ⏎ on an element declaring viewState stores mode interact and focusFor answers inside true; Esc there stores navigate and inside goes false — not deferred on a component: NavElement.viewState, rowActivate's setMode call and focusFor's reflection land together in the next commit of this MR",
+  );
+  it.todo(
+    "T1.161 (C26 I26, §8b.9): ⏎ on an element that declares no viewState stores no mode and dispatches its activate — the control, without which the pair passes against a build that enters on every element — not deferred on a component: same commit as T1.160",
+  );
+  it.todo(
+    "T1.162 (C26 I26, §8b.9): a settled entry's element with viewState is entered and activeTarget answers interaction — I2's liveness gate withdrawn — not deferred on a component: same commit as T1.160",
+  );
+  it.todo(
+    "T1.163 (C26 I27, §8b.9, §018): every binding whose action moves a camera, a cursor or a handle resolves at interaction and at no other target, swept over the whole table — not deferred on a component: the nine camera rows move target in the next commit of this MR",
+  );
+});
