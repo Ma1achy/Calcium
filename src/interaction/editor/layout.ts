@@ -140,13 +140,21 @@ export type ChipLook = Readonly<{ separator: string; painted: boolean }>;
 /** A chip's label, composed (C17 I25, §5c, §099). */
 export function chipLabel(chip: Chip, look: ChipLook): string {
   const size = chip.lines === undefined ? "" : ` ${look.separator} ${String(chip.lines)}L`;
-  // **The ordinal is drawn only where the name does not identify the chip**
-  // (I25, §011, §101). A paste's `name` is its detected kind, so two pastes of
-  // JSON are one word twice and the number is what tells them apart; a file and
-  // an image name themselves, and `#1` in front of `parse.ts` says nothing the
-  // reader did not have. Minting is untouched — the number is still the map's
-  // key — and this is only whether the label spends cells on it.
-  const mark = chip.kind === "paste" ? `#${String(chip.ordinal)} ` : "";
+  // **A `file` drops the ordinal and every other kind keeps it** (I25, §011,
+  // §099, §101). A paste's `name` is its detected kind, so two pastes of JSON
+  // are one word twice and the number is what tells them apart; a file's name
+  // is its own, and `#1` in front of `parse.ts` says nothing the reader did not
+  // have. §099 draws both in one row — `look at  parse.ts  and  #1 json · 47L
+  // then` — which is the contrast, and §011 confirms it.
+  //
+  // **`image` is on the keeping side, and the first ruling put it on the other
+  // by inference.** *A filename identifies itself whatever it holds* reads like
+  // the same rule and is a step past the evidence: §101's `#2 loss-curve.png`
+  // is the only image chip label the design draws, and it is numbered.
+  //
+  // Minting is untouched — the number is still the map's key — and this is only
+  // whether the label spends cells on it.
+  const mark = chip.kind === "file" ? "" : `#${String(chip.ordinal)} `;
   const text = `${mark}${chip.name}${size}`;
   // The space either side is the ground's, so it belongs to the painted rung
   // alone — a bracketed label padded as well would be a chip inside a chip.
