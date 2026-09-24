@@ -91,6 +91,11 @@ export type KeyDeps = Readonly<{
    * reintroduce exactly the drift the module note forbids.
    */
   submit: (line: string) => void;
+  /**
+   * Runs a `local` verb's handler and appends its entry **without submitting**
+   * (C16 I57, C23 I79) — no clear, no history, no queue. `?` and `F1`.
+   */
+  emit: (line: string) => void;
   /** Move focus into the transcript, for `⇧⇥` (`focus.previous`, §6a). */
   focusTranscript: () => void;
   /**
@@ -635,7 +640,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
 
   const raw: Readonly<Record<KeyAction, KeyEffect>> = Object.freeze({
     // --- §6a, M6 ------------------------------------------------------------
-    helpKeymap: () => void deps.submit("/help keys"),
+    helpKeymap: () => void deps.emit("/help keys"),
     focusTranscript: () => void deps.focusTranscript(),
     agentNext: reserved,
     agentPrevious: reserved,

@@ -322,6 +322,7 @@ describe("C22 §3 — construction order", () => {
       let sealed = false;
       return {
         submit: () => undefined,
+        emitLocal: async () => undefined,
         seal: () => void (sealed = true),
         // C16's new low rung reads these (C23 §8a, the subscription rung).
         liveStreams: 0,
@@ -494,6 +495,7 @@ describe("C22 §3 — construction order", () => {
           seen = deps;
           return {
             submit: () => undefined,
+            emitLocal: async () => undefined,
             seal: () => undefined,
             sealed: true,
             liveStreams: 0,
@@ -731,6 +733,7 @@ describe("C22 §3 — construction order", () => {
     const graph = await build({
       pipeline: () => ({
         submit: () => undefined,
+        emitLocal: async () => undefined,
         seal: () => undefined,
         sealed: true,
         liveStreams: 0,

@@ -2829,10 +2829,13 @@ export async function constructGraph(
   const keys = createKeyEffects({
     // The owner's history while a typed reply holds the line (C23 I77).
     reply: () => replyHistory,
-    // **`?` and `F1` submit the line `/help keys` runs** (R-KEY-005, C16 §6a),
+    // **`?` and `F1` reach the handler `/help keys` runs** (R-KEY-005, C16 §6a),
     // rather than rendering a second listing: help renders from the table
     // dispatch uses, and a key with its own renderer is that claim undone.
     submit: (line) => void pipeline?.submit(line),
+    // **An emission, not a submission** (C16 I57, C23 I79): the draft stands,
+    // history is untouched, and a running verb does not queue it.
+    emit: (line) => void pipeline?.emitLocal(line),
     // **The one exit from the `child` rung** (C16 I49, R-BLK-908). Late for the
     // same reason `submit` is: the host is built below, and this is only ever
     // called from a keystroke.

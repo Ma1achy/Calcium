@@ -370,6 +370,7 @@ describe("C22 §3 step 11 — the effect table", () => {
     const effects = createKeyEffects({
       // No reply holds the line in this harness (C23 I77).
       reply: () => null,
+      emit: () => undefined,
       submit: () => undefined,
       focusTranscript: () => undefined,
       // C16 I49 — the child's one exit. Counted here rather than stubbed
@@ -704,6 +705,7 @@ describe("C22 §3 step 11 — the effect table", () => {
     const { graph } = await buildGraph({
       pipeline: () => ({
         submit: (line: string) => void submitted.push(line),
+        emitLocal: async () => undefined,
         seal: () => undefined,
         sealed: true,
         liveStreams: 0,

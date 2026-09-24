@@ -1,14 +1,14 @@
 {
   "label": "all",
-  "only": "c16-captured-child",
+  "only": "c16-help-emission",
   "rows": [
     {
-      "run": "c16-captured-child.mjs",
+      "run": "c16-help-emission.mjs",
       "exit": 0,
-      "seconds": 129,
+      "seconds": 23,
       "state": "green",
       "restored": 0,
-      "caught": 8,
+      "caught": 3,
       "elsewhere": 0,
       "survived": 0,
       "anchorMissed": 0,

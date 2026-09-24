@@ -246,6 +246,11 @@ export interface FileSystem {
 export interface Pipeline {
   submit(line: string): void;
   /**
+   * A `local` verb's entry appended **without submitting** (C23 I79, C16 I57):
+   * no clear, no history, no queue. The help action's route.
+   */
+  emitLocal(line: string): Promise<void>;
+  /**
    * What the pipeline's bare catches swallowed (C23 I48, F15).
    *
    * **Returned, never emitted** — C02's ruling taken a third time, after C20.

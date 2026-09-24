@@ -1972,8 +1972,49 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     visible: deps.visible,
   });
 
+  /**
+   * **A key's emission is not a submission** (C23 I79, C16 I57, R-KEY-005).
+   *
+   * `?` and `F1` went through `submit("/help keys")`, which is three things
+   * besides an append: the prompt cleared (I28), the line recorded (I29), and
+   * the line queued behind a running verb (I5). So `F1` mid-sentence lost the
+   * draft, left a line in history nobody typed, and during a run drew nothing.
+   * This runs the **same handler** — one renderer, so the key and the typed verb
+   * cannot disagree — and appends with no settle, which is the path that
+   * records nothing. No guard is taken, so nothing queues it.
+   */
+  const emitLocal = async (line: string): Promise<void> => {
+    if (deps.session().stopping) return;
+    const result = classify(line);
+    if (result.kind !== "local") return;
+    const verb = result.tool.name;
+    const argv = result.argv.slice(verb.split(" ").length);
+    const handler = local.get(verb);
+    if (handler === undefined) return;
+    const startedAt = deps.elapsed();
+    const call = { name: verb, args: argv.join(" ") };
+    const carded = (doc: ViewDocument): ViewDocument => cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities);
+    // The context `runLocal` hands a handler, so the listing is the typed verb's.
+    const context = {
+      ...producerContext(null),
+      command: line,
+      ask: deps.confirm.ask,
+      ...(deps.profile === undefined ? {} : { profile: deps.profile }),
+      args: result.validation.ok ? result.validation.args : EMPTY_ARGS,
+    };
+    try {
+      const produced = await handler(argv, context);
+      appendAndCommit(carded(completeLocal(produced, { command: line, verb, argv, durationMs: deps.elapsed() - startedAt })));
+    } catch (cause) {
+      appendAndCommit(
+        carded(errorDoc(line, { message: `\`${verb}\` failed: ${String(cause)}`, stage: "local" }, { origin: "user" })),
+      );
+    }
+  };
+
   return {
     submit,
+    emitLocal,
     onAction,
     /**
      * C23 I48 — read by C22 §8 step 3, on the restored primary screen.

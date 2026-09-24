@@ -2283,7 +2283,9 @@ describe("C23 §2, §3 — what the pipeline may not do", () => {
     // about which words appear somewhere in the file.
     const tally: Record<string, number> = {};
     for (const c of calls) tally[c] = (tally[c] ?? 0) + 1;
-    expect(tally, "one answer, and the count of the sites giving it").toEqual({ null: 5 });
+    // Six since C23 I79: the key's emission is a transcript entry like every
+    // other route's, classified `null` deliberately rather than by default.
+    expect(tally, "one answer, and the count of the sites giving it").toEqual({ null: 6 });
 
     // **And the height is read nowhere in the file**, which is the half a tally
     // over `producerContext(…)` cannot see: a route computing the region's

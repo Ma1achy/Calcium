@@ -255,7 +255,51 @@ describe("C16 §5 — the captured child owns the keyboard (M9)", () => {
     await handle.close();
   });
 
-  it.todo("T1.109 (C16 I57, C23 I79, R-KEY-005): F1 and ? append the keymap entry and keep the draft and history — not deferred on a component: emitLocal lands in the next commit of this MR");
+  it("T1.109 (C16 I57, C23 I79, R-KEY-005): F1 and ? append the keymap entry and keep the draft and history", async () => {
+    const h = await buildGraph();
+    h.graph.lifecycle.acquire();
+    const lastEntryLead = (): string => {
+      const doc = h.graph.transcript.entries.at(-1)?.doc;
+      const rule = doc?.blocks.find((b) => b.kind === "rule");
+      return rule !== undefined && "label" in rule ? String(rule.label) : "";
+    };
+
+    // **The control: a typed verb is a submission** (C23 I28, I29) — the line
+    // clears and history records it. Without this the rows below are passed by
+    // a history that records nothing at all. **`/help`, not `/help keys`**: C20
+    // I4 collapses a line equal to the last one, so a control typing the same
+    // line would hide an emission that recorded it — the mutation pass measured
+    // exactly that survivor.
+    h.stdin.emit("/help\r");
+    await tick();
+    expect(h.graph.editor.text, "typed: the line clears").toBe("");
+    expect(h.graph.history.entries.map((e) => e.command), "typed: and is recorded").toEqual(["/help"]);
+    const helpKeysRecorded = (): number => h.graph.history.entries.filter((e) => e.command === "/help keys").length;
+
+    // **F1 with a draft in the line** — the draft stands and nothing is recorded.
+    h.stdin.emit("git st");
+    const before = h.graph.transcript.entries.length;
+    h.stdin.emit("\u001bOP");
+    await tick();
+    expect(h.graph.transcript.entries.length, "F1 appends one entry").toBe(before + 1);
+    expect(lastEntryLead(), "leading with the reader's scope").toBe("prompt — where you are");
+    expect(h.graph.editor.text, "the draft stands").toBe("git st");
+    expect(helpKeysRecorded(), "and history holds no line the reader never typed").toBe(0);
+
+    // **`?` from a focused entry** — the ordering driven from a rung other than
+    // `prompt`, which every harness stubbed.
+    h.graph.editor.clear();
+    h.stdin.emit("\u001b[Z");
+    await tick();
+    expect(h.graph.router.target, "the transcript has focus").toBe("liveBlock");
+    const count = h.graph.transcript.entries.length;
+    h.stdin.emit("?");
+    await tick();
+    expect(h.graph.transcript.entries.length, "? appends one entry").toBe(count + 1);
+    expect(lastEntryLead(), "leading with liveBlock").toBe("liveBlock — where you are");
+    expect(helpKeysRecorded(), "and records nothing").toBe(0);
+    await h.graph.lifecycle.release();
+  });
 
   it("T1.106b (C16 I49, R-BLK-908): ⌃] is the one key the child does not get", async () => {
     const h = await buildGraph();
