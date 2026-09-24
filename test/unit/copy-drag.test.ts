@@ -6,6 +6,7 @@ import {
   autoscrollFor,
   beginDrag,
   cellsPast,
+  clampToContainer,
   containerAt,
   VIEWPORT,
 } from "../../src/shell/drag-selection.js";
@@ -100,7 +101,32 @@ describe("C14 §6f — three bands, and a scroll nobody is driving", () => {
 });
 
 describe("C14 §6f — a container passed through", () => {
-  it.todo("T1.48 (C14 I50, R-SEL-013): a caret is clamped into the drag's box — not deferred on a component: clampToContainer lands in the next commit of this MR");
+  it("T1.48 (C14 I50, R-SEL-013): a caret is clamped into the drag's box", () => {
+    const drag = beginDrag(at(3), BOXES);
+    expect(drag.container, "anchored in the outer box").toEqual({ kind: "box", entryId: "e1", blockId: "box" });
+    const order = ["e0", "e1", "e2"];
+
+    // **The control: unclamped, the prose below is reached.** Without this the
+    // rows below are passed by an extend that never reaches anything.
+    expect([...blocksTouched(at(3), at(11), SPANS, ORDER)], "unclamped: the tail joins").toContain(keyOf("e1", "tail"));
+
+    expect(clampToContainer(at(6), drag, BOXES, order), "inside: unchanged").toEqual(at(6));
+    expect(clampToContainer(at(11), drag, BOXES, order), "below: the last row").toEqual(at(9));
+    // The boundary itself: row 10 is the box's exclusive end and already outside
+    // — the mutation pass found `> to` passing every row above.
+    expect(clampToContainer(at(10), drag, BOXES, order), "the first row past the end").toEqual(at(9));
+    expect(clampToContainer(at(0), drag, BOXES, order), "above: the first row").toEqual(at(2));
+    expect(clampToContainer({ entryId: "e2", row: 0 }, drag, BOXES, order), "a later entry: the last row").toEqual(at(9));
+    expect(clampToContainer({ entryId: "e0", row: 5 }, drag, BOXES, order), "an earlier entry: the first row").toEqual(at(2));
+    expect(
+      [...blocksTouched(at(3), clampToContainer(at(11), drag, BOXES, order), SPANS, ORDER)],
+      "clamped: the box and nothing else",
+    ).toEqual([keyOf("e1", "box")]);
+
+    // A viewport drag is never clamped — C14 I46's *passed through, taken whole*.
+    const loose = beginDrag(at(0), BOXES);
+    expect(clampToContainer(at(11), loose, BOXES, order)).toEqual(at(11));
+  });
 
   it("T1.46 (C14 I46): taken whole, and it does not scroll", () => {
     // Anchored in the prose above the box, extended to the prose below it.

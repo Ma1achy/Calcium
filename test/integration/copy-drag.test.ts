@@ -218,7 +218,7 @@ describe("C14 §6f — the drag in a real session", () => {
     }
   });
 
-  it.todo("T4.37d (C14 I50, R-SEL-013): a drag begun in a box does not select the prose below — not deferred on a component: the clamp lands in the next commit of this MR");
+  it.todo("T4.37d (C14 I50, R-SEL-013): a drag begun in a box does not select the prose below — not deferred on a component: measured 2026-09-24, a session drag selects only the card header and scroll boxes (lede→tail copied the box alone, tail→lede copied nothing), so no prose can be shown absent until the drag path's rows are diagnosed (R-SEL-015's ledger row)");
 
   it("T4.37b (C14 I48, R-SEL-013): esc and ⌃c end the drag and its autoscroll", async () => {
     vi.useFakeTimers();

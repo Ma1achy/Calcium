@@ -56,7 +56,7 @@ import { extentOf } from "../interaction/router/focus.js";
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import { PROMPT_GUTTER, regionWidth } from "./config.js";
 import { cursorStyleFor, steadyWhileTyping } from "./cursor-style.js";
-import { autoscrollFor, beginDrag, type Drag } from "./drag-selection.js";
+import { autoscrollFor, beginDrag, clampToContainer, type Drag } from "./drag-selection.js";
 import { createIdentityLoop } from "./identity.js";
 import {
   SessionStateError,
@@ -1584,11 +1584,15 @@ class Session implements TuiInstance {
       this.#semantic = semantic.placeCaret(this.#semantic, caret);
     } else {
       if (this.#drag === null) return false;
+      // **Clamped into the drag's container first** (C14 I50, `R-SEL-013`):
+      // a drag begun in a box extends to the box's end and not into the prose
+      // around it. A viewport drag is unclamped (I46).
+      const order = this.#selectionOrder();
       this.#semantic = semantic.extendTo(
         this.#semantic,
-        caret,
+        clampToContainer(caret, this.#drag, graph.scrollBoxSpans(), order),
         this.#selectionSpans(width),
-        this.#selectionOrder(),
+        order,
       );
     }
     this.#armAutoscroll();

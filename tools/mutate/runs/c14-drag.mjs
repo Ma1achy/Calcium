@@ -85,6 +85,30 @@ const MUTATIONS = [
     to: "  const _unused = afterMs;",
     expect: "T1.46",
   },
+  {
+    // C14 I50 — across entries the edges swap: a later entry clamps to the top.
+    name: "an earlier entry clamps to the box's last row",
+    file: "src/shell/drag-selection.ts",
+    from: "    return order.indexOf(caret.entryId) < order.indexOf(box.entryId) ? first : last;\n",
+    to: "    return order.indexOf(caret.entryId) < order.indexOf(box.entryId) ? last : first;\n",
+    expect: "T1.48",
+  },
+  {
+    // C14 I50 — one row past the box's end is let through.
+    name: "the box's end is inclusive",
+    file: "src/shell/drag-selection.ts",
+    from: "  if (caret.row >= box.to) return last;\n",
+    to: "  if (caret.row > box.to) return last;\n",
+    expect: "T1.48",
+  },
+  {
+    // C14 I50 — the clamp withdrawn inside the entry: the prose below is reached.
+    name: "a caret below the box is not clamped",
+    file: "src/shell/drag-selection.ts",
+    from: "  if (caret.row >= box.to) return last;\n",
+    to: "",
+    expect: "T1.48",
+  },
 ];
 
 const results = await runPass({

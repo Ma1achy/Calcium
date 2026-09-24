@@ -75,6 +75,36 @@ export function containerAt(caret: Caret, boxes: readonly BoxSpan[]): DragContai
 }
 
 /**
+ * The caret a drag may extend to (C14 I50, `R-SEL-013`): *the selection extends
+ * to the container's end and does not spill into the parent*.
+ *
+ * A viewport drag is unclamped — passing through a box takes it whole (I46). A
+ * box drag's caret is held inside the box's rows: above it or in an earlier
+ * entry goes to its first row, below it or in a later entry to its last.
+ * `order` is the entries' document order, which is what *earlier* means when
+ * the pointer has crossed into another entry.
+ */
+export function clampToContainer(
+  caret: Caret,
+  drag: Drag,
+  boxes: readonly BoxSpan[],
+  order: readonly string[],
+): Caret {
+  const c = drag.container;
+  if (c.kind === "viewport") return caret;
+  const box = boxes.find((b) => b.entryId === c.entryId && b.blockId === c.blockId);
+  if (box === undefined) return caret;
+  const first = Object.freeze({ entryId: box.entryId, row: box.from });
+  const last = Object.freeze({ entryId: box.entryId, row: box.to - 1 });
+  if (caret.entryId !== box.entryId) {
+    return order.indexOf(caret.entryId) < order.indexOf(box.entryId) ? first : last;
+  }
+  if (caret.row < box.from) return first;
+  if (caret.row >= box.to) return last;
+  return caret;
+}
+
+/**
  * Begin a gesture — bind it to the anchor's container, once (C14 I44).
  *
  * This is `R-PTR-005`'s mechanism on a container instead of an element: an
