@@ -42,7 +42,6 @@ watcher here is the row, and this file is what the watcher points back to.
 
 | Owed by | Item | What goes red when it lands |
 |---|---|---|
-| C10 §4k.4 | **Five of the twelve state axes have no precedence rung**, and each carries by something else — mark, word, weight (§4k.4's carrier table). None is without a carrier, so none is an open-set item; what the matrix owes is the *declaration*, since a fact with no declared carrier is a build failure under M11's gate. | M11's own gate, on the day a fact arrives with no declaration |
 | C10 §4k.4 | **`semantic extent` is a single rung for two axes** — outcome and validity — so a pair drawn from those two is ranked against everything else and against nothing else. Whether choice and disclosure ever contest a ground is unasked. | nothing yet; it is a gap of the same shape as the one that produced R-STA-004 |
 
 ---

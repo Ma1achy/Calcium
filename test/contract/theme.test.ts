@@ -1284,6 +1284,60 @@ describe("C10 §4k — focus, selection and the facts that contest a ground", ()
 });
 
 /**
+ * C10 I52 — every state axis the registry carries is declared here.
+ *
+ * **The gate two records named as their watcher and neither could see.** §4k.4
+ * says *what M11 owes them is the declaration, since a fact with no declared
+ * carrier is a build failure under M11's gate*, and `MILESTONES.md`'s M11 row
+ * gives *M11's own gate, on the day a fact arrives with no declaration* as what
+ * goes red. Measured before this row existed: **nothing in `src/`, `tools/` or
+ * `test/` read `stateAxes` at all**, so the population was never enumerated and
+ * neither watcher existed. A deferral whose watcher is imaginary is the
+ * strongest form of the class this repository names about itself, because the
+ * citation reads as coverage.
+ *
+ * **Both sides are read, so neither is a transcription.** The registry is the
+ * population and the spec is the declaration; a row holding its own copy of
+ * twelve names would be a third record to drift (F1240's shape).
+ */
+describe("C10 I52 — the registry's state axes and the spec's declarations", () => {
+  it("T2.52 (I52, §4k.4, M11, R-STA-001): the axes and the declarations are equal as sets", () => {
+    const registry = JSON.parse(
+      readFileSync(new URL("../../docs/design/language/calcium-registry.json", import.meta.url), "utf8"),
+    ) as { stateAxes: readonly { id: string }[] };
+    const axes = registry.stateAxes.map((a) => a.id).sort();
+    expect(axes.length, "the population is the registry's, counted not quoted").toBeGreaterThan(0);
+
+    const spec = readFileSync(new URL("../../docs/components/C10_theme_resolution.md", import.meta.url), "utf8");
+
+    // §4k.3's partition — three rows, each a comma-separated list of axes.
+    const partition = ["ranked by name", "reaching a ground only through `semantic extent`", "no rung at all"].map(
+      (label) => {
+        const row = new RegExp(`^\\s*\\|\\s*\\*\\*${label.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}\\*\\*\\s*\\|([^|]*)\\|`, "mu").exec(spec);
+        expect(row, `§4k.3 has a row for ${label}`).not.toBeNull();
+        return (row?.[1] ?? "").split(",").map((n) => n.trim()).filter((n) => n !== "");
+      },
+    );
+    const ranked = [...new Set(partition.flat())].sort();
+
+    // **Equality, not containment** (F1113's discipline): a subset test passes
+    // an axis dropped from the registry while a declaration for it lives on,
+    // which is a declaration for a fact that no longer exists and reads exactly
+    // like coverage.
+    expect(ranked, "§4k.3 partitions exactly the registry's axes").toEqual(axes);
+
+    // §4k.4's carrier table — one row per axis with no rung, and it must be
+    // exactly the partition's third row rather than a superset of it.
+    const carriers = [...spec.matchAll(/^\s*\|\s*\*\*([a-z]+)\*\*\s*\|\s*\*\*(?:mark|weight|word)/gmu)].map(
+      (m) => m[1] as string,
+    );
+    expect([...new Set(carriers)].sort(), "§4k.4 declares a carrier for exactly the axes with no rung").toEqual(
+      [...(partition[2] ?? [])].sort(),
+    );
+  });
+});
+
+/**
  * C10 I48 — the resolver takes the ground, owed at the spec commit.
  *
  * **The row is an equality between two functions and not a table of hexes**,
