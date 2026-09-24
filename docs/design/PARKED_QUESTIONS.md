@@ -243,6 +243,46 @@ reservation correct and no longer load-bearing, where `⋯` keeps it so.
 
 ---
 
+**21 · The ten hues at 4-bit — ten ANSI slots the registry does not record.**
+C10 I55 landed the hue palette so a block can name `hue.blue` and C10 answers.
+At 24-bit that is the registry's hex; at 1-bit it is nothing, which §070 settles
+(*the tones mean something; this is you choosing what your terminal looks like*,
+and *chrome only — a painted label is furniture*, so a hue is decoration and may
+degrade to nothing). **The 4-bit rung is the one the design does not answer.**
+
+**A mechanical map was measured and it is worse than the gap.** `nearestAnsi16`
+over the ten inks:
+
+    dark    blue 6  orange 11  cyan 14  pink 8  lime 11  violet 13
+            yellow 11  green 6  red 9  purple 13        6 distinct
+    light   7 distinct
+
+`blue` and `green` both land on 6; `orange`, `lime` and `yellow` all on 11. Ten
+identities become six, which is the failure §093 reordered the hues to prevent,
+arriving at a different rung. **That is why `DARK_FOUR_BIT` is curated** rather
+than quantised, and a curated hue map is the same kind of work: ten choices, of
+which at least five have no ANSI name to fall back on — `orange`, `pink`, `lime`,
+`violet`, `purple`.
+
+**And 4-bit is the only rung that loses them.** At 8-bit the ten resolve to
+**ten distinct `ansi256` indices in every one of the ten themes**, because
+`quantiseSet` quantises a palette **as a set** and so can hold distinctness,
+where a per-slot neighbour cannot. Sixteen colours leave no room for a set to
+spread into; 256 do. So this is a question about one rung rather than about
+degradation in general.
+
+**What is in place meanwhile, so nothing is silent.** `resolve` answers
+`NO_STYLE` at 4-bit and T2.56 asserts that rather than leaving it to be found;
+the 4-bit gate's skip list is compared **by equality** against the palettes each
+theme carries, so `hue` cannot be joined by a third in silence; and C10 I55
+carries the measurement above.
+
+**The question.** Is a curated ten-entry 4-bit hue map wanted — and if so, does
+it belong in the registry beside the other 300 hue tokens, where the design
+would own it, or in `four-bit.ts` beside the curated maps the repository already
+holds? Both are defensible and the first is the one this reconciliation's
+authority points at, which is why it is asked rather than taken.
+
 **20 · Whether this reconciliation builds §105's five primitives.** §105 draws a
 tree, a form, a split, a command palette and a toast, and says *each is built
 from what already exists* and *the framework already had every part — what it

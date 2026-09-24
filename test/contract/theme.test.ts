@@ -253,6 +253,65 @@ describe("C10 contract", () => {
     expect(pairs.some(([, , surface]) => surface === "focusGround"), "and it meets the focus ground").toBe(true);
   });
 
+  it("T2.56 (C10 I55, §070, R-THM-001): a hue resolves through `resolve`, and the palette is the `hues` record", () => {
+    const THEMES = defaultTheme as unknown as Readonly<Record<string, ThemeTokens>>;
+    const HUES = ["blue", "orange", "cyan", "pink", "lime", "violet", "yellow", "green", "red", "purple"];
+
+    let resolved = 0;
+    for (const [themeId, tokens] of Object.entries(THEMES)) {
+      const theme = { name: themeId, variant: tokens.variant, tokens } as unknown as Parameters<typeof resolve>[1];
+      const palette = tokens.palettes["hue"];
+      expect(palette, `${themeId}: the ink tier is a palette`).toBeDefined();
+
+      // §070's own first line settles both: *the tones mean something; this is
+      // you choosing what your terminal looks like*, and *chrome only — a
+      // painted label is furniture*.
+      expect(palette!.carries, `${themeId}: a hue is not meaning`).toBe("decoration");
+      expect(palette!.monochrome, `${themeId}: and so it may degrade to nothing`).toBe("foreground");
+
+      // **Equal in both directions.** The palette and `hues` are one fact written
+      // twice, and only the generator knows they share a source — which is I53's
+      // lesson applied to the projection rather than to the collector.
+      expect(Object.keys(palette!.slots), `${themeId}: §093's order, in the palette too`)
+        .toEqual(Object.keys(tokens.hues!));
+
+      for (const name of HUES) {
+        expect(palette!.slots[name], `${themeId} ${name}: the palette carries the ink tier`)
+          .toBe(tokens.hues![name]!.ink);
+
+        // Through the PUBLIC resolver, not a field read: the defect I55 exists
+        // about was values present and `resolve` answering `{}`.
+        const style = resolve(`hue.${name}`, theme, { colourDepth: 24 });
+        expect(style.colour, `${themeId} ${name}: resolves at 24-bit`)
+          .toEqual({ kind: "rgb", hex: tokens.hues![name]!.ink });
+        resolved += 1;
+
+        // Decoration collapses to the default foreground at 1-bit and there is
+        // no 4-bit entry for a hue — both asserted rather than assumed, because
+        // "it degrades" and "it was never wired" read the same from outside.
+        expect(resolve(`hue.${name}`, theme, { colourDepth: 1 }), `${themeId} ${name}: 1-bit`).toEqual({});
+        expect(resolve(`hue.${name}`, theme, { colourDepth: 4 }), `${themeId} ${name}: 4-bit`).toEqual({});
+      }
+
+      // **At 8-bit all ten survive as ten, and the reason is the mechanism.**
+      // `quantiseSet` quantises a palette as a SET (§3), so rank order and
+      // distinctness are properties it can hold; a per-slot neighbour can see
+      // neither. This is what makes 4-bit the only rung where the identities
+      // collapse — sixteen colours leave no room for a set to spread into —
+      // and it is why PARKED 21 is about one rung rather than about low depth.
+      const eightBit = HUES.map((n) => {
+        const c = resolve(`hue.${n}`, theme, { colourDepth: 8 }).colour;
+        return c !== undefined && c.kind === "ansi256" ? c.index : -1;
+      });
+      expect(new Set(eightBit).size, `${themeId}: ten hues, ten 8-bit indices`).toBe(10);
+
+      // The control: a name the palette does not carry resolves to nothing
+      // rather than to a neighbour.
+      expect(resolve("hue.chartreuse", theme, { colourDepth: 24 }), `${themeId}: an unknown hue`).toEqual({});
+    }
+    expect(resolved, "ten hues through the resolver in ten themes").toBe(100);
+  });
+
   it("T2.55 (C10 I45, R-THM-003): a third band is measured against ITS OWN ground, not selection's", () => {
     const hc = defaultTheme["hcDark"]!;
     expect(validateBands(hc), "the shipped band clears every constraint").toEqual([]);
@@ -739,8 +798,25 @@ describe("C10 contract", () => {
 
   it("every slot and surface has a 4-bit entry, so nothing silently loses colour at depth 4", () => {
     for (const [variant, tokens] of SHIPPED) {
+      // **The exemptions, compared by equality rather than tested by membership**
+      // — a `continue` per name lets a dead entry outlive its subject, and a
+      // silent exemption is the failure this gate is named after.
+      //
+      //   spectrum  decoration; the art is not themed at 4-bit
+      //   hue       PARKED 21. Not *no answer needed* but *no answer the design
+      //             records*: `nearestAnsi16` over the ten inks returns six
+      //             distinct indices in `dark` and seven in `light`, with `blue`
+      //             and `green` both landing on 6 and `orange`, `lime` and
+      //             `yellow` all on 11. A mechanical map satisfies this gate and
+      //             destroys the identities it exists to keep, and a curated one
+      //             is ten visible choices the registry does not carry. Nothing
+      //             is silent: C10 I55 records the measurement and T2.56 asserts
+      //             the 4-bit answer is `NO_STYLE` rather than a wrong colour.
+      const EXEMPT = ["hue", "spectrum"];
+      expect(Object.keys(tokens.palettes).filter((n) => EXEMPT.includes(n)).sort(),
+        `${variant}: every exemption still names a palette this theme carries`).toEqual(EXEMPT);
       for (const [name, palette] of Object.entries(tokens.palettes)) {
-        if (name === "spectrum") continue; // decoration; the art is not themed at 4-bit
+        if (EXEMPT.includes(name)) continue;
         for (const slot of Object.keys(palette.slots)) {
           expect(tokens.fourBit[`${name}.${slot}`], `${variant} ${name}.${slot}`).toBeTypeOf("number");
         }

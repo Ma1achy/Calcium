@@ -496,6 +496,30 @@ function huesBlock(themeId, hues) {
   return `\n    hues: Object.freeze({\n${body}\n    }),`;
 }
 
+/**
+ * The hue's INK tier as a palette, so the one resolver every block goes through
+ * can name a hue (C10 I55, §070).
+ *
+ * **Emitted from the same `hues` record rather than collected a second time**,
+ * which is the whole lesson of I53: two collectors for one fact is how the fact
+ * ends up with two values. T2.56 asserts the two agree in the shipped file, so
+ * the single source survives a hand edit as well as a regeneration.
+ *
+ * **`decoration`, and §070 settles it in its own first line**: *the tones mean
+ * something; this is you choosing what your terminal looks like*, and *chrome
+ * only — a painted label is furniture*. So the palette carries no meaning, and
+ * `monochrome: "foreground"` is the honest 1-bit answer: decoration may degrade
+ * to nothing, where a meaning palette would owe a typographic class per slot.
+ */
+function huePalette(hues) {
+  const body = HUE_ORDER.map((h) => `          ${JSON.stringify(h)}: ${lit(hues[h].ink)},`).join("\n");
+  return `\n      hue: Object.freeze({\n` +
+    `        carries: "decoration",\n` +
+    `        monochrome: "foreground",\n` +
+    `        slots: Object.freeze({\n${body}\n        }),\n` +
+    `      }),`;
+}
+
 const slots = (record) => Object.entries(record)
   .map(([k, v]) => `      ${JSON.stringify(k)}: ${lit(v)},`).join("\n");
 
@@ -523,7 +547,7 @@ ${slots(tone).replace(/^ {6}/gm, "          ")}
         classes: classesOf(${lender}, "tone"),
       }),
 ${derived(theme.id, tone, lender)}
-      spectrum: lend(${lender}, "spectrum"),
+      spectrum: lend(${lender}, "spectrum"),${huePalette(collected.get(theme.id).hues)}
     }),
     fourBit: ${fourBitLender(theme.id, variant)}.fourBit,${bandInkBlock(collected.get(theme.id).bandInk)}${composedBlock(solveDiffGrounds(theme.id, tone, surfaces, withDerived(theme.id, collected.get(theme.id).composed)), MEASURED.get(theme.id))}${huesBlock(theme.id, collected.get(theme.id).hues)}
   }),`;

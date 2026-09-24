@@ -103,6 +103,30 @@ const results = runPass({
       to: '        hues[hue][name.startsWith("hi-") ? "on" : "ink"] = name.startsWith("hi-") ? "#000000" : norm(colour[1]);',
       expect: "T2.54",
     },
+    {
+      // A hue classified as **meaning**, which is the reading §070 opens by
+      // refusing: *the tones mean something; this is you choosing what your
+      // terminal looks like*. It reads well — an agent's identity feels like
+      // meaning — and it would oblige the palette to carry a typographic class
+      // per slot, which ten identities have no four classes to fall to.
+      name: "a hue classified as meaning — the reading §070 opens by refusing",
+      file: G,
+      from: '        carries: "decoration",\\n',
+      to: '        carries: "meaning",\\n',
+      expect: "T2.56",
+    },
+    {
+      // The palette collected from the first theme instead of projected from
+      // this theme's own `hues`. The record and the palette then disagree in
+      // nine themes of ten, which is the defect T2.56's both-ways equality is
+      // for: one fact written twice, and only the generator knows they share a
+      // source.
+      name: "the hue palette taken from the first theme — the record and the palette disagree",
+      file: G,
+      from: "${huePalette(collected.get(theme.id).hues)}",
+      to: "${huePalette(collected.get(themes[0].id).hues)}",
+      expect: "T2.56",
+    },
   ],
 });
 
