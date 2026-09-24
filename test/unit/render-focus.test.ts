@@ -1005,9 +1005,3 @@ describe("C11 I14 — the ink a focused or selected row takes", () => {
     );
   });
 });
-
-describe("C22 I115 — the store's mode reaches the renderer", () => {
-  // **Spec-alone commit.** I115 and commitment 86 land ahead of the bridge so
-  // the invariant has a subject; SP9 wants every invariant named by a row.
-  it.todo("T1.160 (C22 I115, R-INT-005): focusFor writes `inside` from the store's mode, and leaves it absent otherwise — not deferred on a component: the bridge lands in this round's code commit, which replaces this row");
-});
