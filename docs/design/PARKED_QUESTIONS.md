@@ -155,6 +155,13 @@ fixtures and once as the diff a fixture comparison would read — and counted
 twice, and the same is true of at least one M13 item reported as still-open and
 as parked.
 
-The right reading is that **fourteen is the number**, and it is the one to
-work from. The count is not repeated anywhere as a figure, because a total that
-no longer resolves against a list is the thing this file was written to stop.
+The right reading is that the **list** is the number, never a figure carried
+alongside it. That paragraph said *fourteen* and was true the day it was
+written; 15 and 16 were parked afterwards, and the sentence stating the total
+did not move — which is this file's own subject arriving inside it, a correction
+that stopped at its own sentence. **Sixteen headings are above**, and the way to
+count them is to count them: `grep -cE '^\*\*[0-9]+ ·' docs/design/PARKED_QUESTIONS.md`.
+
+**So no total is stated here as prose again.** A figure that no longer resolves
+against a list is the thing this file was written to stop, and a figure kept
+beside the list is one more place for it to go stale.
