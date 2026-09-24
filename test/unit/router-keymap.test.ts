@@ -1624,3 +1624,9 @@ describe("a block key with nowhere to be placed (C16 I27, C26 I26)", () => {
     withdraw();
   });
 });
+
+describe("C17 §5b — every motion twice, at the binding", () => {
+  it.todo(
+    "T1.53 (C17 I30, §5b, §019, §063): every extend chord at prompt has its unshifted chord bound to the motion it extends — not deferred on a component: ⌥← and ⌥→ are bound in the next commit of this MR",
+  );
+});
