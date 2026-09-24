@@ -20,7 +20,7 @@ held at the point where a choice would be mine to invent.
 
 ## Entries
 
-**Open: 18, 23, 32, 36, 37, 38.** Every other entry is ruled or retracted. A ruled entry keeps its body, with the ruling directly above it and a premise note wherever the ruling rested on something the entry or the design contradicts.
+**Open: 18, 23, 32, 36, 37, 38, 39.** Every other entry is ruled or retracted. A ruled entry keeps its body, with the ruling directly above it and a premise note wherever the ruling rested on something the entry or the design contradicts.
 
 > **Ruled 2026-09-24.** Already answered, by the chain rule. The repo-side spec (C09 §4, I5) carries the narrowed rule and the registry does not. That assumption stands as the answer.
 
@@ -104,7 +104,7 @@ the registry), and C09's substitution rule is 1:1 by column count. **Done under
 assumption:** the tree collapses both granularities to `#-`, and the frame
 records that.
 
-> **Ruled 2026-09-24.** Spinner frames get **their own domain, the duration slot**, and collisions are checked only within a set. **Owed:** the domain in SS64 and in C09 I99.
+> **Ruled 2026-09-24.** Spinner frames get **their own domain, the duration slot**, and collisions are checked only within a set. **Owed:** the domain in SS64 and in C09 I99. **Premise note, 2026-09-25:** the first clause is recorded in C09 I99. The second has no subject the static test can take — it fires on 12 of 27 sets, every one a downsampling — so it is parked as **39**, and SS64 reads no frame until it is answered.
 
 **11 · RULED — Whether spinner frames belong in a collision domain.** `|` is now a
 rotation frame, `quote`'s ASCII rail and `vertical`'s border. `SS64` cannot see
@@ -749,7 +749,7 @@ the same carrier rather than a second carrier. **Does selection owe a mark** —
 
 ---
 
-> **Ruled 2026-09-24.** **Tie-break 4.** Streaming is carried by the head spinner and the elapsed count, so the trail may be ground-only. **Owed:** `TRAIL_HEAD`'s *the gap is parked* comment is replaced with this ruling.
+> **Ruled 2026-09-24.** **Tie-break 4.** Streaming is carried by the head spinner and the elapsed count, so the trail may be ground-only. **Owed:** `TRAIL_HEAD`'s *the gap is parked* comment is replaced with this ruling. **Built 2026-09-25** (d3f03faf).
 
 **34 · RULED — §026's `fade` trail draws the sole carrier at the ground, and `R-MOT-004`
 forbids exactly that.** §026: *the newest character IS the ground and emerges
@@ -817,6 +817,30 @@ content row and stays. **Proposed, (a) recommended**:
 
 The rest of `R-COL-006` is specified (C04 I128, C09 I111, C11 I30) and waits on this
 alone, because a glyph slot is a pair and has no ASCII half to ship without.
+
+---
+
+**39 · OPEN — What a collision inside a spinner set is.** Ruling 11 put spinner frames
+in their own domain, the duration slot, and said collisions are checked only within a
+set. **The premise that the static test applies inside a set does not hold.** Every
+set's `ascii` aligns with its `frames` index for index (27 of 27), and SS64's test — one
+ASCII character painted by two different Unicode marks — fires on **12 of 27**:
+`agent`, `braille`, `braille2`, `orbit`, `grow`, `bloom`, `starfield`, `fullramp`, `arc`,
+`growVertical`, `growHorizontal` and `pipe`. Every hit is the ASCII rung
+downsampling on purpose — `braille`'s ten dots onto the four rotation frames,
+`arc`'s `◜ ◠` held as `| |` — and none is a frame a reader mistakes for another mark.
+Measured with a probe over `SPINNER_SETS` at HEAD. **Proposed, (a) recommended**:
+
+- **(a) Within a set, the ASCII rung must move**: no set's ASCII frames are all one
+  character, so a fallback cannot freeze an animation into a still mark. Nothing
+  fires today, and a set added with a constant ASCII half would.
+- **(b) Within a set, nothing is compared** — the domain is the whole ruling, and
+  SS64 records the frames as classified so a new set cannot enter a static domain.
+- **(c) Within a set, consecutive frames differ** at ASCII — which refuses the holds
+  `arc` and `growVertical` draw on purpose, and so moves eleven fallbacks.
+
+C09 I99 records the first clause, and SS64 reads no frame until this is answered,
+because a set compared with nothing is a rule with nothing to be wrong about.
 
 ---
 
