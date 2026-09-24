@@ -39,6 +39,9 @@ export const RAMP_EXTENT: Readonly<Record<KnownBlockKind, RampExtent>> = Object.
   panel: "none",
   patch: "none",
   pills: "none",
+  // A choice and a control take grounds, never inks over an axis (C09 I105, I106).
+  choice: "none",
+  control: "none",
   plot: "none",
   progress: "axis",
   raw: "clusters",

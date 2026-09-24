@@ -147,6 +147,33 @@ export const ONE_PER_KIND: Readonly<Record<KnownBlockKind, Block>> = Object.free
     ],
   }),
 
+  // §018 — **a radio group, and the second option chosen rather than the
+  // first** (C09 I105). Element zero is the degenerate one: with `linear`
+  // chosen, *focused* and *chosen* land on the same option in every corpus
+  // frame, and the cell the invariant is about — focused and NOT chosen —
+  // would be unreachable from this representative.
+  choice: block({
+    kind: "choice",
+    id: "choice-1",
+    label: "scale",
+    exclusive: true,
+    options: [
+      { id: "linear", label: "linear" },
+      { id: "log", label: "log", chosen: true },
+      { id: "log2", label: "log2" },
+    ],
+  }),
+
+  // §018 — a slider with its handle off centre, so the two halves of the track
+  // are different lengths and a frame that drew them equal would say so.
+  control: block({
+    kind: "control",
+    id: "control-1",
+    label: "learning rate",
+    at: 0.42,
+    value: "3e-4",
+  }),
+
   // C04 §3ao — the tape. **Five members, one running and one settled**, so
   // the representative reaches both orderings of the state part (§030) and is
   // wide enough that the corpus's narrow widths slide the window rather than

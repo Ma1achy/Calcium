@@ -859,6 +859,11 @@ function requireArray(b: Record<string, unknown>, key: string, e: string[], at: 
   requireField(b, key, isArray, "an array", e, `${at}: "${key}"`);
 }
 
+/** A finite number — not clamped here, because clamping is the renderer's (C09 I28). */
+function requireNumber(b: Record<string, unknown>, key: string, e: string[], at: string): void {
+  requireField(b, key, (v) => typeof v === "number" && Number.isFinite(v), "a finite number", e, `${at}: "${key}"`);
+}
+
 /**
  * A numeric array's **elements** (C04 I46, §5a).
  *
@@ -1782,6 +1787,16 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
     }
   },
   pills: (b, e, at) => requireArray(b, "chips", e, at),
+  // **`chosen` is not required and is not checked against the set** (C09 I105).
+  // A radio group with nothing chosen is the state a producer is in before the
+  // reader has picked, and a checkbox row with two things on is the ordinary
+  // case — exclusivity is what the marks say, not what the block promises.
+  choice: (b, e, at) => requireArray(b, "options", e, at),
+  control: (b, e, at) => {
+    requireString(b, "label", e, at);
+    requireString(b, "value", e, at);
+    requireNumber(b, "at", e, at);
+  },
   // **`current` is not required and is not checked against the members**
   // (C04 I124). A tape nobody is in is still a tape, and a `current` naming no
   // member is the state a producer is in between rebuilding the row and

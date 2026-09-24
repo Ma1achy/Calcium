@@ -43,15 +43,29 @@ import { DARK_THEME, FULL_CAPS, measurable } from "../support/render.js";
  * unfocused one, in **both** forms: a `raw` run does not invert, a `pills` box
  * does not, a `panel` frame does not take its border, and `steps`, `table`,
  * `progress`, `code`, `status`, `notice` and the rest do nothing at all. So
- * §017's four rows are unbuilt for the RUN, the BOX and the FRAME alike, and
- * the CONTROL row has no shape in the tree to be unbuilt for — there is no
- * `button`, `slider`, `toggle`, `checkbox` or `radio` kind.
+ * §017's four rows are unbuilt for the RUN, the BOX and the FRAME alike.
+ *
+ * **The CONTROL row is built, and the sentence that stood here is now false**
+ * (C09 I105, I106, §018). It read *there is no `button`, `slider`, `toggle`,
+ * `checkbox` or `radio` kind*, which was a record of the day it was written
+ * rather than a watch on the condition — the class this repository keeps
+ * finding. `control` is §018's slider and it answers in both forms; the button
+ * is a `notice` with an action and lands on the RUN row rather than here.
+ *
+ * **`choice` is absent from both sets and that is the instrument, not the
+ * kind.** The sweep rewrites every sample's id to one name and focuses
+ * `FOCUSED` — which reaches a kind whose rows are positional and cannot reach
+ * one whose rows are named by its own data, because a choice's elements are its
+ * options' ids. So a choice renders identically under a focus pointed at a row
+ * it does not have, correctly. What covers it is C09 T1.72, which focuses each
+ * option by name and reads the four cells; naming the hole here is what keeps
+ * this row from being read as coverage it does not have.
  */
 const ANSWERS: Readonly<Record<"self" | "block", readonly string[]>> = Object.freeze({
   /** `rowId === block.id` — the form a session writes. */
-  self: Object.freeze(["plot", "scroll"]),
+  self: Object.freeze(["control", "plot", "scroll"]),
   /** `rowId === null` — the form the plot deliberately ignores (F802). */
-  block: Object.freeze(["scroll"]),
+  block: Object.freeze(["control", "scroll"]),
 });
 
 describe("§017, §018 — which shapes answer focus", () => {

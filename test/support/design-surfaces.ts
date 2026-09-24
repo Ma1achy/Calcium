@@ -1258,7 +1258,60 @@ const operationSurface = (
   return [...out, ""];
 };
 
+/**
+ * §018 — focus on things that are not rows.
+ *
+ * **Two tables, because both subjects fail structurally.** A choice's cells
+ * differ by *which channel moved* and a control's by *which mechanism* — and in
+ * both the wrong build is at rest in every frame a trace would produce. The
+ * cell that matters is **focused and NOT chosen**: a wash read off `chosen`
+ * draws three of four correctly, and only a table puts the fourth beside them.
+ *
+ * **Both rungs, because the carriers are declared and not discovered.** A
+ * choice's mark survives ASCII and its wash does not; a control's weight
+ * survives and its handle does not. Each claim is a pair of lines here rather
+ * than a sentence in a spec.
+ */
+const focusShapes = (
+  width: number,
+  capabilities: TerminalCapabilities,
+  theme: ResolvedTheme,
+): readonly string[] => {
+  const radio = block({
+    kind: "choice", id: "c", label: "scale", exclusive: true,
+    options: [{ id: "lin", label: "linear" }, { id: "log", label: "log", chosen: true }, { id: "l2", label: "log2" }],
+  }) as unknown as Block;
+  const check = (on: boolean): Block =>
+    block({ kind: "choice", id: "k", options: [{ id: "s", label: "run the suite after each edit", chosen: on }] }) as unknown as Block;
+  const slider = block({ kind: "control", id: "s", label: "learning rate", at: 0.42, value: "3e-4" }) as unknown as Block;
+
+  const at = Math.min(width, 52);
+  const pass = (caption: string, b: Block, focus: Readonly<{ blockId: string; rowId: string | null; inside?: boolean }> | null): readonly string[] => {
+    const kit = measurable({ theme, capabilities, ...(focus === null ? {} : { focus: focus as never }) });
+    const lines = kit.renderToLines(b, at);
+    const grid = styledScreenFrom([lines.join("\n")], { columns: at, rows: lines.length });
+    // `maskOf` already writes the text beside its mask, so the plain line would
+    // be the same row twice.
+    return [`  ${caption}`, ...maskOf(grid).map((l) => `    ${l}`)];
+  };
+  return [
+    "· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape",
+    ...pass("at rest", radio, null),
+    ...pass("focused on `linear` — NOT chosen: the mark did not move", radio, { blockId: "c", rowId: "lin" }),
+    ...pass("focused on `log` — chosen: the same wash, the same mark", radio, { blockId: "c", rowId: "log" }),
+    ...pass("a checkbox, on", check(true), null),
+    ...pass("a checkbox, off — ⏎ toggled it", check(false), null),
+    "",
+    "· a control — three states, three mechanisms, and the VALUE is none of them",
+    ...pass("at rest", slider, null),
+    ...pass("focused — the wash covers label, track and value as one control", slider, { blockId: "s", rowId: null }),
+    ...pass("inside — weight and a painted handle, and the row is the same width", slider, { blockId: "s", rowId: null, inside: true }),
+    "",
+  ];
+};
+
 export const SURFACES: readonly Surface[] = Object.freeze([
+  { section: 18, name: "focus on things that are not rows — a choice's two channels, and a control's three states", rows: focusShapes },
   { section: 36, name: "the operation surface — the aside, the flattening, and the bar that goes", rows: operationSurface },
   { section: 95, name: "a tape, where a row of peers would shed", rows: draw(TAPE) },
   { section: 42, name: "widgets — a row of peers that sheds", rows: draw(PILLS) },

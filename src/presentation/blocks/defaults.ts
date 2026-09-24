@@ -37,6 +37,7 @@ import {
   ruleDefinition,
   tipDefinition,
 } from "./kinds/simple.js";
+import { choiceDefinition, controlDefinition } from "./kinds/controls.js";
 import { tapeDefinition } from "./kinds/tape.js";
 import type { AnyBlockDefinition } from "./types.js";
 
@@ -55,6 +56,8 @@ export const DEFAULT_DEFINITIONS: readonly AnyBlockDefinition[] = Object.freeze(
   codeDefinition,
   comparisonDefinition,
   pillsDefinition,
+  choiceDefinition,
+  controlDefinition,
   tapeDefinition,
   tipDefinition,
   panelDefinition,

@@ -135,6 +135,19 @@ export type GlyphSet = Readonly<{
    * *different* from `-` and `|`.
    */
   heavyHorizontal: string;
+  /**
+   * A continuous control's handle while the reader is **inside** it (C09 I106,
+   * §018) — `\u25c9` against `filled`'s `\u25cf`.
+   *
+   * **Its ASCII arm is `filled`'s, deliberately.** §018 draws the inside handle
+   * as a ring because a plain-text fixture cannot show a ground, and *INSIDE is
+   * weight plus a painted handle* names the weight first: the track carries
+   * inside at every rung — `\u2500` against `\u2501`, `-` against `=` — where the
+   * handle carries it only where the two characters differ. One carrier that
+   * dies and one that does not is the declaration C09 I106 makes rather than a
+   * collision nobody noticed (F161's hazard, answered by naming it).
+   */
+  handleInside: string;
   heavyVertical: string;
   diamond: string;
   /** Mean and median in one cell, so *they coincide* never reads as *it is missing* (C12 I33). */
@@ -245,6 +258,7 @@ const UNICODE: GlyphSet = Object.freeze({
   candleCross: "┿",
   crossing: "┼",
   heavyHorizontal: "━",
+  handleInside: "◉",
   heavyVertical: "┃",
   diamond: "◆",
   diamondTee: "◈",
@@ -312,6 +326,7 @@ const ASCII: GlyphSet = Object.freeze({
   candleHollow: "=",
   candleFilled: "#",
   heavyHorizontal: "=",
+  handleInside: "*",
   heavyVertical: "H",
   candleCross: "+",
   crossing: "+",
@@ -1365,6 +1380,7 @@ export const GLYPH_SET_DOMAINS: Readonly<Record<keyof GlyphSet, readonly string[
   stubRight: ["border"],
   crossing: ["border"],
   heavyHorizontal: ["border"],
+  handleInside: ["control"],
   heavyVertical: ["border"],
   calloutTee: ["border"],
 

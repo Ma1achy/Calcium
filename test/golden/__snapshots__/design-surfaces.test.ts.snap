@@ -1,7 +1,32 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`golden frames — one per design fixture > dark-ascii at 40 1`] = `
-"── §36 · the operation surface — the aside, the flattening, and the bar that goes
+"── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
+· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
+  at rest
+    ........................................ scale  o linear  * log  o log2
+  focused on \`linear\` — NOT chosen: the mark did not move
+    .......AAAAAAAA......................... scale  o linear  * log  o log2
+      A = bg 48;2;46;46;46
+  focused on \`log\` — chosen: the same wash, the same mark
+    .................AAAAA.................. scale  o linear  * log  o log2
+      A = bg 48;2;46;46;46
+  a checkbox, on
+    ........................................ + run the suite after each edit
+  a checkbox, off — ⏎ toggled it
+    ........................................ x run the suite after each edit
+
+· a control — three states, three mechanisms, and the VALUE is none of them
+  at rest
+    ........................................ learning rate  +-------*---------+  3e-4
+  focused — the wash covers label, track and value as one control
+    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA learning rate  +-------*---------+  3e-4
+      A = bg 48;2;46;46;46
+  inside — weight and a painted handle, and the row is the same width
+    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA learning rate  +=======*=========+  3e-4
+      A = bg 48;2;46;46;46
+
+── §36 · the operation surface — the aside, the flattening, and the bar that goes
 · the head brackets while it runs and flattens when it stops — and the bar goes with the motion
   running · elapsed and delta
     . Compacting conversation… (5m 38s : ↓ ~
@@ -354,6 +379,8 @@ code            0     — atomic: nothing to focus
 comparison      0     — atomic: nothing to focus
 patch           0     — atomic: nothing to focus
 pills           2     chip-0 chip-1
+choice          3     linear log log2
+control         1     control-1
 tape            5     seams arm count probe
 tip             0     — atomic: nothing to focus
 panel           0     — atomic: nothing to focus
@@ -364,7 +391,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 23 kinds · 6 publish a focusable element · 6 draw a treatment
+· 25 kinds · 8 publish a focusable element · 8 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them
@@ -463,6 +490,8 @@ aaaaaaaaaaaa.................................... which is why
   comparison   — no ground
   patch        ["   19 + app.use(helmet());              ","19    - app.use(cors());                "]
   pills        — no ground
+  choice       — no ground
+  control      — no ground
   tape         — no ground
   tip          — no ground
   panel        — no ground
@@ -626,7 +655,32 @@ line 6                                 |
 `;
 
 exports[`golden frames — one per design fixture > dark-ascii at 80 1`] = `
-"── §36 · the operation surface — the aside, the flattening, and the bar that goes
+"── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
+· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
+  at rest
+    .................................................... scale  o linear  * log  o log2
+  focused on \`linear\` — NOT chosen: the mark did not move
+    .......AAAAAAAA..................................... scale  o linear  * log  o log2
+      A = bg 48;2;46;46;46
+  focused on \`log\` — chosen: the same wash, the same mark
+    .................AAAAA.............................. scale  o linear  * log  o log2
+      A = bg 48;2;46;46;46
+  a checkbox, on
+    .................................................... + run the suite after each edit
+  a checkbox, off — ⏎ toggled it
+    .................................................... x run the suite after each edit
+
+· a control — three states, three mechanisms, and the VALUE is none of them
+  at rest
+    .................................................... learning rate  +------------*----------------+  3e-4
+  focused — the wash covers label, track and value as one control
+    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA learning rate  +------------*----------------+  3e-4
+      A = bg 48;2;46;46;46
+  inside — weight and a painted handle, and the row is the same width
+    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA learning rate  +============*================+  3e-4
+      A = bg 48;2;46;46;46
+
+── §36 · the operation surface — the aside, the flattening, and the bar that goes
 · the head brackets while it runs and flattens when it stops — and the bar goes with the motion
   running · elapsed and delta
     . Compacting conversation… (5m 38s : ↓ 8.0k tokens)
@@ -977,6 +1031,8 @@ code            0     — atomic: nothing to focus
 comparison      0     — atomic: nothing to focus
 patch           0     — atomic: nothing to focus
 pills           2     chip-0 chip-1
+choice          3     linear log log2
+control         1     control-1
 tape            5     seams arm count probe trace
 tip             0     — atomic: nothing to focus
 panel           0     — atomic: nothing to focus
@@ -987,7 +1043,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 23 kinds · 6 publish a focusable element · 6 draw a treatment
+· 25 kinds · 8 publish a focusable element · 8 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them
@@ -1081,6 +1137,8 @@ aaaaaaaaaaaa.................................... which is why
   comparison   — no ground
   patch        ["   19 + app.use(helmet());                                                      ","19    - app.use(cors());                                                        "]
   pills        — no ground
+  choice       — no ground
+  control      — no ground
   tape         — no ground
   tip          — no ground
   panel        — no ground
@@ -1244,7 +1302,28 @@ line 6                                                                         |
 `;
 
 exports[`golden frames — one per design fixture > dark-mono-unicode at 40 1`] = `
-"── §36 · the operation surface — the aside, the flattening, and the bar that goes
+"── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
+· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
+  at rest
+    ........................................ scale  ○ linear  ● log  ○ log2
+  focused on \`linear\` — NOT chosen: the mark did not move
+    ........................................ scale  ○ linear  ● log  ○ log2
+  focused on \`log\` — chosen: the same wash, the same mark
+    ........................................ scale  ○ linear  ● log  ○ log2
+  a checkbox, on
+    ........................................ ✓ run the suite after each edit
+  a checkbox, off — ⏎ toggled it
+    ........................................ ✗ run the suite after each edit
+
+· a control — three states, three mechanisms, and the VALUE is none of them
+  at rest
+    ........................................ learning rate  ├───────●─────────┤  3e-4
+  focused — the wash covers label, track and value as one control
+    ........................................ learning rate  ├───────●─────────┤  3e-4
+  inside — weight and a painted handle, and the row is the same width
+    ........................................ learning rate  ├━━━━━━━◉━━━━━━━━━┤  3e-4
+
+── §36 · the operation surface — the aside, the flattening, and the bar that goes
 · the head brackets while it runs and flattens when it stops — and the bar goes with the motion
   running · elapsed and delta
     ✦ Compacting conversation… (5m 38s · ↓ …
@@ -1583,6 +1662,8 @@ code            0     — atomic: nothing to focus
 comparison      0     — atomic: nothing to focus
 patch           0     — atomic: nothing to focus
 pills           2     chip-1
+choice          3     ** 3 focusable, NONE drawn **
+control         1     ** 1 focusable, NONE drawn **
 tape            5     seams arm probe
 tip             0     — atomic: nothing to focus
 panel           0     — atomic: nothing to focus
@@ -1593,7 +1674,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 23 kinds · 6 publish a focusable element · 5 draw a treatment
+· 25 kinds · 8 publish a focusable element · 5 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them
@@ -1677,6 +1758,8 @@ raw             0     — atomic: nothing to focus
   comparison   — no ground
   patch        — no ground
   pills        — no ground
+  choice       — no ground
+  control      — no ground
   tape         — no ground
   tip          — no ground
   panel        — no ground
@@ -1839,7 +1922,28 @@ line 6                                 │
 `;
 
 exports[`golden frames — one per design fixture > dark-mono-unicode at 80 1`] = `
-"── §36 · the operation surface — the aside, the flattening, and the bar that goes
+"── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
+· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
+  at rest
+    .................................................... scale  ○ linear  ● log  ○ log2
+  focused on \`linear\` — NOT chosen: the mark did not move
+    .................................................... scale  ○ linear  ● log  ○ log2
+  focused on \`log\` — chosen: the same wash, the same mark
+    .................................................... scale  ○ linear  ● log  ○ log2
+  a checkbox, on
+    .................................................... ✓ run the suite after each edit
+  a checkbox, off — ⏎ toggled it
+    .................................................... ✗ run the suite after each edit
+
+· a control — three states, three mechanisms, and the VALUE is none of them
+  at rest
+    .................................................... learning rate  ├────────────●────────────────┤  3e-4
+  focused — the wash covers label, track and value as one control
+    .................................................... learning rate  ├────────────●────────────────┤  3e-4
+  inside — weight and a painted handle, and the row is the same width
+    .................................................... learning rate  ├━━━━━━━━━━━━◉━━━━━━━━━━━━━━━━┤  3e-4
+
+── §36 · the operation surface — the aside, the flattening, and the bar that goes
 · the head brackets while it runs and flattens when it stops — and the bar goes with the motion
   running · elapsed and delta
     ✦ Compacting conversation… (5m 38s · ↓ 8.0k tokens)
@@ -2176,6 +2280,8 @@ code            0     — atomic: nothing to focus
 comparison      0     — atomic: nothing to focus
 patch           0     — atomic: nothing to focus
 pills           2     chip-1
+choice          3     ** 3 focusable, NONE drawn **
+control         1     ** 1 focusable, NONE drawn **
 tape            5     seams arm probe trace
 tip             0     — atomic: nothing to focus
 panel           0     — atomic: nothing to focus
@@ -2186,7 +2292,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 23 kinds · 6 publish a focusable element · 5 draw a treatment
+· 25 kinds · 8 publish a focusable element · 5 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them
@@ -2264,6 +2370,8 @@ raw             0     — atomic: nothing to focus
   comparison   — no ground
   patch        — no ground
   pills        — no ground
+  choice       — no ground
+  control      — no ground
   tape         — no ground
   tip          — no ground
   panel        — no ground
@@ -2426,7 +2534,32 @@ line 6                                                                         �
 `;
 
 exports[`golden frames — one per design fixture > dark-unicode at 40 1`] = `
-"── §36 · the operation surface — the aside, the flattening, and the bar that goes
+"── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
+· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
+  at rest
+    ........................................ scale  ○ linear  ● log  ○ log2
+  focused on \`linear\` — NOT chosen: the mark did not move
+    .......AAAAAAAA......................... scale  ○ linear  ● log  ○ log2
+      A = bg 48;2;46;46;46
+  focused on \`log\` — chosen: the same wash, the same mark
+    .................AAAAA.................. scale  ○ linear  ● log  ○ log2
+      A = bg 48;2;46;46;46
+  a checkbox, on
+    ........................................ ✓ run the suite after each edit
+  a checkbox, off — ⏎ toggled it
+    ........................................ ✗ run the suite after each edit
+
+· a control — three states, three mechanisms, and the VALUE is none of them
+  at rest
+    ........................................ learning rate  ├───────●─────────┤  3e-4
+  focused — the wash covers label, track and value as one control
+    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA learning rate  ├───────●─────────┤  3e-4
+      A = bg 48;2;46;46;46
+  inside — weight and a painted handle, and the row is the same width
+    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA learning rate  ├━━━━━━━◉━━━━━━━━━┤  3e-4
+      A = bg 48;2;46;46;46
+
+── §36 · the operation surface — the aside, the flattening, and the bar that goes
 · the head brackets while it runs and flattens when it stops — and the bar goes with the motion
   running · elapsed and delta
     ✦ Compacting conversation… (5m 38s · ↓ …
@@ -2779,6 +2912,8 @@ code            0     — atomic: nothing to focus
 comparison      0     — atomic: nothing to focus
 patch           0     — atomic: nothing to focus
 pills           2     chip-0 chip-1
+choice          3     linear log log2
+control         1     control-1
 tape            5     seams arm count probe
 tip             0     — atomic: nothing to focus
 panel           0     — atomic: nothing to focus
@@ -2789,7 +2924,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 23 kinds · 6 publish a focusable element · 6 draw a treatment
+· 25 kinds · 8 publish a focusable element · 8 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them
@@ -2888,6 +3023,8 @@ aaaaaaaaaaaa.................................... which is why
   comparison   — no ground
   patch        ["   19 + app.use(helmet());              ","19    - app.use(cors());                "]
   pills        — no ground
+  choice       — no ground
+  control      — no ground
   tape         — no ground
   tip          — no ground
   panel        — no ground
@@ -3052,7 +3189,32 @@ line 6                                 │
 `;
 
 exports[`golden frames — one per design fixture > dark-unicode at 80 1`] = `
-"── §36 · the operation surface — the aside, the flattening, and the bar that goes
+"── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
+· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
+  at rest
+    .................................................... scale  ○ linear  ● log  ○ log2
+  focused on \`linear\` — NOT chosen: the mark did not move
+    .......AAAAAAAA..................................... scale  ○ linear  ● log  ○ log2
+      A = bg 48;2;46;46;46
+  focused on \`log\` — chosen: the same wash, the same mark
+    .................AAAAA.............................. scale  ○ linear  ● log  ○ log2
+      A = bg 48;2;46;46;46
+  a checkbox, on
+    .................................................... ✓ run the suite after each edit
+  a checkbox, off — ⏎ toggled it
+    .................................................... ✗ run the suite after each edit
+
+· a control — three states, three mechanisms, and the VALUE is none of them
+  at rest
+    .................................................... learning rate  ├────────────●────────────────┤  3e-4
+  focused — the wash covers label, track and value as one control
+    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA learning rate  ├────────────●────────────────┤  3e-4
+      A = bg 48;2;46;46;46
+  inside — weight and a painted handle, and the row is the same width
+    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA learning rate  ├━━━━━━━━━━━━◉━━━━━━━━━━━━━━━━┤  3e-4
+      A = bg 48;2;46;46;46
+
+── §36 · the operation surface — the aside, the flattening, and the bar that goes
 · the head brackets while it runs and flattens when it stops — and the bar goes with the motion
   running · elapsed and delta
     ✦ Compacting conversation… (5m 38s · ↓ 8.0k tokens)
@@ -3403,6 +3565,8 @@ code            0     — atomic: nothing to focus
 comparison      0     — atomic: nothing to focus
 patch           0     — atomic: nothing to focus
 pills           2     chip-0 chip-1
+choice          3     linear log log2
+control         1     control-1
 tape            5     seams arm count probe trace
 tip             0     — atomic: nothing to focus
 panel           0     — atomic: nothing to focus
@@ -3413,7 +3577,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 23 kinds · 6 publish a focusable element · 6 draw a treatment
+· 25 kinds · 8 publish a focusable element · 8 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them
@@ -3507,6 +3671,8 @@ aaaaaaaaaaaa.................................... which is why
   comparison   — no ground
   patch        ["   19 + app.use(helmet());                                                      ","19    - app.use(cors());                                                        "]
   pills        — no ground
+  choice       — no ground
+  control      — no ground
   tape         — no ground
   tip          — no ground
   panel        — no ground

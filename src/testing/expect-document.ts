@@ -113,6 +113,26 @@ const KINDS_WITH_NOTHING_TO_CHECK: ReadonlyMap<BlockKind, Exemption> = new Map<
   ["code", { premise: "no-field", why: "syntax is its own palette, not the tone one" }],
   ["patch", { premise: "no-field", why: "the +/- marker carries the change axis (C04 I35)" }],
   ["tip", { premise: "no-field", why: "text only" }],
+  [
+    "choice",
+    {
+      premise: "by-rendering",
+      why:
+        "the two facts are on two channels and neither is colour (C09 I105, \u00a7018): `chosen` is " +
+        "the mark \u2014 `\u2713`/`\u2717`, `\u25cf`/`\u25cb` \u2014 and focus is a ground that falls back to inverse at one " +
+        "bit, so both survive with no colour at all",
+    },
+  ],
+  [
+    "control",
+    {
+      premise: "by-rendering",
+      why:
+        "the three states are two glyph substitutions and an attribute (C09 I106, \u00a7018): inside " +
+        "takes the heavy track and the painted handle, focus takes a ground that falls back to " +
+        "inverse, and the value is `info` at all three because it is data rather than a state",
+    },
+  ],
   ["raw", { premise: "no-field", why: "opaque by definition; the app owns what it renders" }],
   [
     "status",

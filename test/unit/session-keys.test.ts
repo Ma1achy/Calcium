@@ -400,7 +400,7 @@ describe("C22 §3 step 11 — the effect table", () => {
     expect(unreached, "a C17 editing method no key can reach").toEqual([]);
   });
 
-  it("T1.4l (C09 I13): a constructed graph can render all twenty-three kinds", async () => {
+  it("T1.4l (C09 I13): a constructed graph can render all twenty-five kinds", async () => {
     // **`table`, `plot` and `patch` register through the public mechanism, and
     // nobody called it.** `defaults: true` ships C09's sixteen; the other
     // three came from C11, C12 and C25 and no composition root registered them,
@@ -425,7 +425,7 @@ describe("C22 §3 step 11 — the effect table", () => {
     // C04 T2.10 holds the derivable half -- a literal list checked against
     // `BlockKind` at compile time, where adding a kind is a type error. This row
     // is the runtime half and it can only count.
-    expect(graph.blocks.kinds.length, "C09's twenty and the three registered").toBe(23);
+    expect(graph.blocks.kinds.length, "C09's twenty-two and the three registered").toBe(25);
   });
 
   it("T2.15 (C16 I22): ↓ into the live block, ↑ and Esc back out — as one sequence", async () => {

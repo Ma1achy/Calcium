@@ -3069,6 +3069,68 @@ export type Patch = Readonly<{
   numberWidth?: number;
 }> & Padded & Floor;
 
+/**
+ * A choice — a checkbox, or one option of a radio group (C09 I105, §018,
+ * `R-FOC-003`).
+ *
+ * **One kind for both, because §018 draws them as one shape**: *a CHECKBOX and
+ * a RADIO are the same shape — the label is part of it*. What differs is the
+ * pair of marks, and that is `exclusive`: `✓`/`✗` for a thing you turn on and
+ * off, `●`/`○` for one you pick out of a set. The shape, the wash and the two
+ * channels are identical, so a second kind would be one table of marks wearing
+ * a block schema.
+ *
+ * **`chosen` and focus are independent and must stay so.** The mark carries
+ * chosen and the wash carries focus — *so you can be on an option you have not
+ * chosen, which is the whole point of a radio group* — and neither is derivable
+ * from the other. Focus is not on the block at all: it arrives in
+ * `RenderContext`, per frame, which is what keeps a producer from ever writing
+ * one (C09 I45's argument, one shape along).
+ */
+export type Choice = Readonly<{
+  kind: "choice";
+  id: string;
+  options: readonly Readonly<{
+    id: string;
+    label: string;
+    chosen?: boolean;
+  }>[];
+  /**
+   * One of the set rather than a row of switches — `●`/`○` against `✓`/`✗`.
+   *
+   * It picks the marks and nothing else: the shape, the wash and the focus
+   * treatment do not know which it is, which is §018's *the same shape*.
+   */
+  exclusive?: boolean;
+  /** The group's own name, drawn before the options — §018's `scale`. */
+  label?: string;
+}> & Padded & Floor;
+
+/**
+ * A continuous control — §018's slider (C09 I106, `R-FOC-002`).
+ *
+ * **Three states and three mechanisms, and the value is none of them.** *The
+ * VALUE is INFO and it never changes; FOCUS is the wash; INSIDE is weight plus
+ * a painted handle.* So this block carries the label, the domain and where the
+ * handle sits, and nothing about how any of the three is drawn.
+ *
+ * **`value` is the caller's string, not a formatting of `at`.** §018 draws
+ * `3e-4` against a handle a little left of centre, which no format of a
+ * fraction produces: the domain the reader is choosing in and the position on
+ * the track are two different quantities, and a control that derived one from
+ * the other would be a linear slider with a lie on the end of it.
+ */
+export type Control = Readonly<{
+  kind: "control";
+  id: string;
+  /** The control's name, first on the row and inside the wash. */
+  label: string;
+  /** Where the handle sits, 0 to 1. Clamped, on `Progress`' rule (C09 I28). */
+  at: number;
+  /** The reading, drawn last and inside the wash — `info` at every state. */
+  value: string;
+}> & Padded & Floor;
+
 export type Pills = Readonly<{
   kind: "pills";
   id: string;
@@ -3774,6 +3836,8 @@ export type KnownBlockKinds = {
   comparison: Comparison;
   patch: Patch;
   pills: Pills;
+  choice: Choice;
+  control: Control;
   tape: Tape;
   tip: Tip;
   panel: Panel;

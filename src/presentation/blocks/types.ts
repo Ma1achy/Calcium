@@ -90,6 +90,24 @@ export type FocusState = Readonly<{
    * `anchor: null`; this is the render side of the same measurement (C26 §5c).
    */
   selected?: readonly Readonly<{ blockId: string; rowId: string }>[];
+  /**
+   * The reader is **inside** the focused element rather than beside it (C09
+   * I106, §018, C16's `inside` rung).
+   *
+   * **The rung has existed since the ladder landed and the renderer could not
+   * see it.** `interaction` answers for `inside` in `RUNG_OF`, so the router has
+   * always known; this is the render side, and without it §018's third state —
+   * *weight plus a painted handle* — had no way to be drawn. A flag rather than
+   * a target, because a renderer that knows *which* owner is inside knows more
+   * than it can use: the only question a kind asks is *am I the one being
+   * driven*, and `blockId` and `rowId` already answer *which*.
+   *
+   * Read only by kinds that have an inside to be in. For every other kind it is
+   * absent and means nothing, which is why it is not a third value of a state
+   * enum: *at rest*, *focused* and *inside* is a ladder for a control and a
+   * category error for a table row.
+   */
+  inside?: boolean;
 }>;
 
 /**

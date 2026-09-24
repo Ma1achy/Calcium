@@ -264,6 +264,8 @@ describe("C09 §6 — the registry's transition table", () => {
       comparison: 2, // rows + header
       pills: 1, // one logical row
       tape: 1, // one row at every width — the window is what changes
+      choice: 1, // a checkbox or a radio group, on one row (C09 I105)
+      control: 1, // label, track and value, on one row (C09 I106)
       tip: 1, // ceil(cells / w)
       panel: 4, // children + 2
       group: 1, // row: max of children
@@ -354,6 +356,10 @@ describe("C09 §6 — the registry's transition table", () => {
     // formula collapsing to one, is a finding rather than a smaller loop.
     const literal = registered.filter((k) => /^\d+$/.test(table.get(k) ?? ""));
     expect(literal.slice().sort(), "the §3 rows whose measure is a bare integer").toEqual([
+      // §018's two shapes are one row each at every width, so both are inside
+      // the arm this row can actually check rather than beside it (C09 I105, I106).
+      "choice",
+      "control",
       "progress",
       "rule",
     ]);

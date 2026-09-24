@@ -234,6 +234,8 @@ const DIVIDES: Readonly<Record<string, string>> = {
  * the cost being invisible until someone measures a frame.
  */
 const KEPT_WHOLE: Readonly<Record<string, string>> = {
+  choice: "one row at every width (C09 I105): a choice is its mark and its label as one shape, and half a shape is not a smaller choice",
+  control: "one row at every width (C09 I106): label, track and value are one control, and a track cut in two is a different reading",
   comparison: "`rows + 1`, so it divides in principle and does not — an unmeasured F424 candidate, kept named rather than kept quiet",
   events: "one row per event, `logs`' shape exactly, so it divides in principle and does not — an unmeasured F424 candidate",
   image: "one picture — `imageCells` derives the rows from the whole image at the width, so fewer rows is a different picture and not less of one",
@@ -631,7 +633,10 @@ describe("C09 §2a — a block reduced to a valid smaller block", () => {
 
 describe("C09 §2c width — the registry's answer (I42, I44)", () => {
   const FILLING = ["rule", "progress", "plot", "image", "scroll", "mosaic"] as const;
-  const DECLARING = ["notice", "raw", "pills", "tape", "keyValue", "code", "table", "group", "panel"];
+  // `choice` declares one — its natural width is where the last option ends
+  // (C09 I105). `control` declares none: §018's track takes the residual, so a
+  // control fills and the registry's default already says that.
+  const DECLARING = ["notice", "raw", "pills", "tape", "choice", "keyValue", "code", "table", "group", "panel"];
 
   it("T2.110 (C09 I42): a kind declaring no width answers the width, and an answer outside the range is clamped and reported", () => {
     const kit = measurable({ definitions: [plotDefinition as never, tableDefinition as never] });

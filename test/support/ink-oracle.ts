@@ -95,6 +95,18 @@ export const POST_INK: ReadonlyMap<string, string> = new Map([
     + "drew — it was registered after the producer was deleted, so no capture of it "
     + "exists and none can be made",
   ],
+  [
+    "choice",
+    "C09 I105 / R-FOC-003 / \u00a7018 (M3): a checkbox or radio group \u2014 a kind \u00a7018 asks for "
+    + "and Ink never drew, registered after the producer was deleted, so no capture of "
+    + "it exists and none can be made",
+  ],
+  [
+    "control",
+    "C09 I106 / R-FOC-002 / \u00a7018 (M3): a continuous control \u2014 a kind \u00a7018 asks for and "
+    + "Ink never drew, registered after the producer was deleted, so no capture of it "
+    + "exists and none can be made",
+  ],
 ]);
 
 /** Every width the two sweeps render at, so a rung-wide ruling is not a hand-copied list. */

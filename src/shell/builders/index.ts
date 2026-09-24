@@ -72,6 +72,8 @@ import type {
   Scroll,
   Patch,
   Pills,
+  Choice,
+  Control,
   Tape,
   Plot,
   Progress,
@@ -1165,6 +1167,44 @@ function pills(chips: readonly ChipInput[], opts?: BlockOpts): Pills {
 }
 
 /**
+ * A checkbox, or one radio group — §018's two forms of one shape (C09 I105).
+ *
+ * `exclusive` picks the marks and nothing else: `●`/`○` for one of a set,
+ * `✓`/`✗` for a thing you turn on and off. **Focus is not a parameter** — it
+ * arrives in the render context, per frame, which is what keeps a producer
+ * from ever writing one; `chosen` is the datum and the wash is not.
+ */
+function choice(
+  options: readonly Readonly<{ id: string; label: string; chosen?: boolean }>[],
+  opts?: BlockOpts & { exclusive?: boolean; label?: string },
+): Choice {
+  return finish<Choice>(
+    {
+      kind: "choice",
+      id: idOf(opts, "choice"),
+      options,
+      ...(opts?.exclusive === undefined ? {} : { exclusive: opts.exclusive }),
+      ...(opts?.label === undefined ? {} : { label: opts.label }),
+    } as Choice,
+    opts,
+    false,
+  );
+}
+
+/**
+ * A continuous control — §018's slider (C09 I106).
+ *
+ * **`value` is a string and not a formatting of `at`.** The domain the reader
+ * is choosing in and the position on the track are two quantities: §018 draws
+ * `3e-4` against a handle a little left of centre, which no format of a
+ * fraction produces, and deriving one from the other would be a linear slider
+ * with a lie on the end of it.
+ */
+function control(label: string, at: number, value: string, opts?: BlockOpts): Control {
+  return finish<Control>({ kind: "control", id: idOf(opts, "control"), label, at, value } as Control, opts, false);
+}
+
+/**
  * A row of peers you navigate, which slides rather than sheds (C04 §3ao, §095).
  *
  * `current` is a member's **id** and not an index (C04 I124): a tape's members
@@ -1918,6 +1958,8 @@ export const b = {
   comparison,
   patch,
   pills,
+  choice,
+  control,
   tape,
   tip,
   panel,

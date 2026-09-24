@@ -404,7 +404,7 @@ The registry's `width(block, w)` clamps whatever a definition returns into `[1, 
 and reports a value outside it through `onError` (I8's shape): a definition that answers wider than
 its cell has described a block the cell cannot hold.
 
-## 3. The twenty-three kinds — twenty registered here, three delegated
+## 3. The twenty-five kinds — twenty-two registered here, three delegated
 
 Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an obligation on the implementation.
 
@@ -425,6 +425,8 @@ Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an
 | `patch` | delegated to C25 | Registered by C25, not here |
 | `pills` | `ceil(totalCells / w)` | One logical row that may wrap |
 | `tape` | `1` | One row at every width — the window is what changes (C04 I124) |
+| `choice` | 1 | A checkbox or a radio group, on one row (I105, §018). The **mark** carries chosen and the **wash** carries focus, over the mark and the label as one shape — two channels that never substitute, which is what lets a reader be on an option they have not chosen |
+| `control` | 1 | A continuous control (I106, §018): label, track and value, washed as one when focused; heavy track and a painted handle when the reader is inside it. **The value's tone is `info` at all three states** — it is data, and the control is what has states. The track does not change width on entry, for the reason §018's case 4 refuses a border |
 | `tip` | `ceil(cells(text) / w)` | Dim, with fill actions |
 | `panel` | children + 2 | Border, title and footer; children measured at `w - 2` |
 | `scroll` | `height`, plus one residue row when the content overflows | A bounded box: `height` rows of content, and the marker is chrome the container adds on top (C04 I47, C04 I49). **Declares `elements` at block level and no `window`** — a region whose height is declared cannot measure less without becoming a different box |
@@ -3429,6 +3431,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **I106** — *(§018, `R-FOC-002`, `R-FOC-004`, C16 `inside`, C09 I96, §034)* **A continuous control has three states and three mechanisms, and the value is not one of them.** §018: *the VALUE is INFO and it never changes; FOCUS is the wash; INSIDE is weight plus a painted handle.* So the wash covers **label, track and value as one control** — a wash over the track alone is a control drawn as three things — and the value's tone is `info` at rest, focused and inside alike. **That last clause is the one a plausible build loses**: toning the value with focus draws something that reads well and says the reading is chrome, and a row asserting only *focused differs from at rest* passes against it. The value is data; the control is what has states.
 
   **`inside` reaches the renderer as a third state, and it had no way to.** The rung exists — C16's ladder puts `interaction` on `inside` — and `FocusState` carries `blockId`, `rowId` and the extent, so a renderer could tell *focused* from *at rest* and nothing else. `inside` joins it as a flag, read only where a kind has an inside to be in. **This is what makes §018's ★ hold at the renderer as well as at the router**: *an inside-bearing continuous control cannot commit its domain value from outside*, and *arrowing down a document past three sliders must not move three sliders* — the ladder already refuses the key, and without this the frame could not say so.
+
+  **The track does not change width when the reader enters it**, and §018's own case 4 is why. The section draws the inside track as `├━━━━━━ ◉ ━━━━━━━┤`, two cells wider than the two lines above it, and case 4 refuses exactly that on the other axis: *drawing a border on focus is REFUSED: it changes the height, and measure already committed to one.* A handle that gained a space either side would move every cell of the track as the reader stepped in, on a row whose width the layout has already committed to — so the spaces are the fixture showing emphasis in plain text, as its indentation of a focused option is, and the drawn track keeps its cells. The state is carried by the weight and the handle, both of which are substitutions rather than insertions.
 
   **The inside handle is one carrier and the track's weight is the other.** `◉` against `●` is the design's drawing of *a painted handle* in a fixture that cannot show a ground (§034's argument, one shape along: *the ground is the extent and the glyphs are the 1-bit rung*), and at ASCII the handle's two arms are the same character. That is declared rather than discovered: the track carries inside at every rung — `─` against `━`, `-` against `=` — and §018 names the weight first for that reason. A carrier matrix reading the handle alone would find one carrier and be right.
 

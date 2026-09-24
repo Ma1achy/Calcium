@@ -37,6 +37,10 @@ export const ANIMATES: Readonly<Record<KnownBlockKind, boolean>> = Object.freeze
   panel: false,
   patch: false,
   pills: false,
+  // §018's shapes animate nothing: chosen is a mark and focus is a ground,
+  // and neither is a thing that moves (C09 I105, I106).
+  choice: false,
+  control: false,
   plot: false,
   progress: false,
   raw: false,

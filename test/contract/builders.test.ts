@@ -143,6 +143,10 @@ const BUILDERS: readonly Readonly<{
   // **`gaps: false`, like `pills`.** A row of peers takes no leading space;
   // a tape is that row with a window over it (C04 §3ao).
   { name: "tape", gaps: false, kind: "tape", make: (o) => b.tape([{ id: "a", label: "seams" }], "a", o) },
+  // **`gaps: false`**, as `pills` and `tape` are: §018's two shapes are rows of
+  // their own and a leading space would put the mark off the gutter it belongs in.
+  { name: "choice", gaps: false, kind: "choice", make: (o) => b.choice([{ id: "a", label: "linear" }], o) },
+  { name: "control", gaps: false, kind: "control", make: (o) => b.control("learning rate", 0.42, "3e-4", o) },
   { name: "tip", gaps: true, kind: "tip", make: (o) => b.tip("press ? for help", undefined, o) },
   { name: "panel", gaps: true, kind: "panel", make: (o) => b.panel("details", [b.raw("x")], o) },
   { name: "group", gaps: false, kind: "group", make: (o) => b.group("column", [b.raw("x")], o) },
@@ -213,7 +217,7 @@ const BUILDERS: readonly Readonly<{
   },
 ];
 
-describe("C24 §4 — the twenty-five builders", () => {
+describe("C24 §4 — the twenty-seven builders", () => {
   it("T2.9: the enumeration covers every block-returning builder, and twenty-five is the count", () => {
     // The count is asserted so that adding a builder without a row fails here
     // rather than silently going untested — which is exactly how §4's paragraph
