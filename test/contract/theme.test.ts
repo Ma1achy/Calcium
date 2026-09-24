@@ -1301,6 +1301,8 @@ describe("C10 §4k — focus, selection and the facts that contest a ground", ()
  * twelve names would be a third record to drift (F1240's shape).
  */
 describe("C10 I52 — the registry's state axes and the spec's declarations", () => {
+  it.todo("T2.53 (C10 I53, §070, §093): the ten hues, three tiers, per theme, against the registry — not deferred on a component, the row lands with I53's code half");
+
   it("T2.52 (I52, §4k.4, M11, R-STA-001): the axes and the declarations are equal as sets", () => {
     const registry = JSON.parse(
       readFileSync(new URL("../../docs/design/language/calcium-registry.json", import.meta.url), "utf8"),
