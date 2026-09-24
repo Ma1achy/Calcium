@@ -83,6 +83,26 @@ const results = runPass({
       to: '        hues[hue][name.startsWith("hi-") ? "ink" : "on"] = norm(colour[1]);',
       expect: "T2.53",
     },
+    {
+      // The band ink hard-coded to black — which is **93 of the registry's 100
+      // answers**, and the shape a build takes when nobody notices the tier is
+      // derived. Caught by T2.54's count of seven white answers as much as by
+      // T2.53's equality, and the count is why it is here.
+      //
+      // **T2.54 has no mutation of its own, and that is a property of its
+      // subject rather than a gap.** It asserts that the REGISTRY satisfies
+      // §070's rule — `on` is the higher-contrast of black and white against
+      // the hue's ground, 100 of 100 — and the registry is immutable here
+      // (`lint-immutable.mjs`), so there is no change to the tree that could
+      // make it false while leaving the projection faithful. Its control is
+      // inside the row: the seven white answers, and §070's own example read
+      // both ways. A claim the corpus cannot hold is not a row to strengthen.
+      name: "the band ink hard-coded to black — right 93 times of 100",
+      file: G,
+      from: '        hues[hue][name.startsWith("hi-") ? "on" : "ink"] = norm(colour[1]);',
+      to: '        hues[hue][name.startsWith("hi-") ? "on" : "ink"] = name.startsWith("hi-") ? "#000000" : norm(colour[1]);',
+      expect: "T2.54",
+    },
   ],
 });
 

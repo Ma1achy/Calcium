@@ -1386,6 +1386,50 @@ describe("C10 I52 — the registry's state axes and the spec's declarations", ()
     expect(mono.hues!["blue"]!.ink, "mono's blue ink is dark's").toBe(THEMES["dark"]!.hues!["blue"]!.ink);
   });
 
+  it("T2.54 (C10 I54, §070): the ink on a hue's band is DERIVED — the higher-contrast of black and white", () => {
+    const THEMES = defaultTheme as unknown as Readonly<Record<string, ThemeTokens>>;
+
+    // §070's own rule, in its own words: *the ink on each is chosen by CONTRAST
+    // against that hue, so yellow takes black and blue takes white without
+    // anyone deciding per theme*. It is a computation, so it is checkable — and
+    // a tier that is checkable should not be asserted by copying the registry.
+    let pairs = 0;
+    let worst = Infinity;
+    let white = 0;
+    for (const [themeId, tokens] of Object.entries(THEMES)) {
+      for (const [hue, rec] of Object.entries(tokens.hues ?? {})) {
+        pairs += 1;
+        const onBlack = ratio(rec.ground, "#000000");
+        const onWhite = ratio(rec.ground, "#ffffff");
+        const want = onBlack >= onWhite ? "#000000" : "#ffffff";
+        expect(rec.on.toLowerCase(), `${themeId} ${hue}: ${onBlack.toFixed(2)} on black vs ${onWhite.toFixed(2)} on white`)
+          .toBe(want);
+        if (want === "#ffffff") white += 1;
+        worst = Math.min(worst, Math.max(onBlack, onWhite));
+      }
+    }
+    expect(pairs, "ten hues over ten themes").toBe(100);
+
+    // **The floor holds BY the derivation, not beside it** (measured 2026-09-24):
+    // the winning ink clears 4.5:1 in all 100, and the worst is 4.62 — `purple`
+    // on `nord` and `blue` on `hcDark`, where the two inks are within 2% of each
+    // other and the rule is a tie-break. So the assertion is on the *minimum*
+    // rather than on a count: a hue whose ground drifted darker would lose the
+    // floor before it lost the tie, and only this figure would say so.
+    expect(worst, "the winning ink's contrast, at its worst").toBeGreaterThanOrEqual(DEFAULT_FLOOR);
+
+    // **The control, and it is the sentence §070 got wrong.** White wins seven
+    // times of a hundred — `purple` in six themes and `blue` in `hcDark` alone.
+    // §070 illustrates its rule with *blue takes white*, which is true in one
+    // theme of ten and reads as a general claim; the rule it illustrates holds
+    // 100 of 100. Without this figure the row passes against a build that
+    // hard-coded black, which is 93 of the 100 answers.
+    expect(white, "white wins seven times — purple six, blue once").toBe(7);
+    expect(THEMES["hcDark"]!.hues!["blue"]!.on.toLowerCase(), "§070's own example, where it is true").toBe("#ffffff");
+    expect(THEMES["dark"]!.hues!["blue"]!.on.toLowerCase(), "and where it is not").toBe("#000000");
+  });
+
+
   it("T2.52 (I52, §4k.4, M11, R-STA-001): the axes and the declarations are equal as sets", () => {
     const registry = JSON.parse(
       readFileSync(new URL("../../docs/design/language/calcium-registry.json", import.meta.url), "utf8"),
