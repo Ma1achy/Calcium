@@ -1465,6 +1465,8 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
 });
 
 describe("C16 §8 I53 — key repeat is declared per binding", () => {
+  it.todo("T1.47 (C14 I47, R-SEL-015): ⏎ at semanticSelection is y's copySelectedEntries — not deferred on a component: the binding lands in the next commit of this MR");
+
   it("T1.159 (I53, R-KEY-002): §020's four rows with a subject are the declared numbers, by equality", () => {
     // **By equality both ways, not a subset.** A subset check lets a row drift
     // off the table without failing, and the whole point of declaring a rate is
