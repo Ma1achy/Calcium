@@ -18,6 +18,48 @@ watcher here is the row, and this file is what the watcher points back to.
 
 ---
 
+## The landing record — one row per MR, and the symbol that proves it
+
+**Why this table exists, and what it is not.** Everything above is *owed by an
+earlier MR to a later one*. Nothing recorded whether an MR **landed**, so the
+question *is M5 finished?* was answerable only by reading the tree again, and a
+survey that has to be redone is a belief rather than a record. Asked eight times
+across one session, it was re-derived eight times.
+
+**What each row asserts is the seam's existence and nothing more.** A symbol
+resolving does not mean the MR is correct — that is what its own invariants and
+rows are for, and they number in the hundreds. What it means is that the seam the
+MR introduced is **still there**, so a revert, a rename or a merge that quietly
+drops it goes red here rather than being discovered by a survey. The limit is the
+point: this is a **revert detector**, not a completeness proof, and a row that
+claimed more would be the kind of green that reads as thoroughness.
+
+| MR | the seam it landed | symbol | file |
+|---|---|---|---|
+| **M4** | the spinner sets, whole at every rung | `SPINNER_SETS` | `src/presentation/blocks/glyphs.ts` |
+| **M5** | one ownership ladder, with explicit verdicts | `Verdict` | `src/interaction/router/types.ts` |
+| **M6** | the keymap checked against the registry | `REGISTRY_BINDINGS` | `src/interaction/router/keymap.ts` |
+| **M7** | arming and pointer commit on one epoch | `ownerEpoch` | `src/interaction/router/router.ts` |
+| **M8** | `blocking` and `dismissal` made independent | `dismissal` | `src/viewport/overlay/types.ts` |
+| **M8b** | the wheel takes the innermost scrollable | `innermostScrollUnder` | `src/shell/construct.ts` |
+| **M9** | no pushed views — the surface re-homed onto `child` | `ChildSurface` | `src/shell/surface.ts` |
+| **M10** | copy mode renamed to native selection | `nativeSelection` | `src/shell/frame.ts` |
+| **M11** | the carrier table, one row per state axis | `4k.5` | `docs/components/C10_theme_resolution.md` |
+| **M12** | the trust boundary, over every escape class | `R-TRU-001` | `test/unit/trust-boundary.test.ts` |
+| **M13** | the chip, minted as one undo unit | `ChipInsert` | `src/interaction/editor/editor.ts` |
+| **M13b** | the prompt's labelled rule | `labelSpansOf` | `src/shell/paint.ts` |
+| **M14** | the scrollbar, drawing nothing where it cannot move | `scrollbarColumn` | `src/presentation/blocks/scrollbar.ts` |
+| **M14b** | the pull — focus moves the window by the minimum | `pull` | `src/shell/pull.ts` |
+| **M15** | the typed reply, over the one editor | `AskOptions` | `src/shell/local/registry.ts` |
+| **M16** | the design fixtures, by equality against the corpus | `design-fixtures` | `test/golden/DESIGN_FIXTURES.md` |
+
+**Gated by C10 T2.58**, which reads this table and resolves every symbol against
+the named file. A row naming a file that does not exist, or a symbol that is no
+longer in it, fails — and the control is a fabricated row, because a table of
+sixteen true statements passes exactly like a checker that reads nothing.
+
+---
+
 ## M4 · Glyphs — the head mark, `agent`, reservations
 
 | Owed by | Item | What goes red when it lands |

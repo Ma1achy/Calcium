@@ -1541,6 +1541,75 @@ describe("C10 I52 — the registry's state axes and the spec's declarations", ()
   });
 
 
+  it("T2.58 (C10 I57, MILESTONES): every MR's seam still resolves — the revert detector", () => {
+    const md = readFileSync(new URL("../../docs/design/language/MILESTONES.md", import.meta.url), "utf8");
+    // **The WHOLE heading line, and this is the second time.** §4k.5's gate was
+    // anchored on `### 4k.5` and matched `### 4k.5x`, so its control — rename
+    // the heading — survived; the lesson was written into §4k.5 and then the
+    // same unanchored prefix was written here an hour later, where the control
+    // survived again for the identical reason. **A correction stops at its own
+    // sentence unless the next instance is looked for.** Matching the heading
+    // through to its newline is what makes a rename unfindable.
+    const HEADING = "## The landing record \u2014 one row per MR, and the symbol that proves it\n";
+    const at = md.indexOf(HEADING);
+    const section = at < 0 ? "" : md.slice(at, md.indexOf("\n**Gated by", at));
+    expect(section, "the landing record exists").not.toBe("");
+
+    /**
+     * `| **M5** | the seam | `symbol` | `file` |` — the last two cells only.
+     * The prose cells are deliberately not parsed: a row is a claim about a
+     * symbol in a file, and reading its description would make the gate
+     * sensitive to wording.
+     */
+    const rows = [...section.matchAll(/^\|\s*\*\*(M\d+[a-z]?)\*\*\s*\|[^|]*\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|/gmu)]
+      .map((m) => ({ mr: m[1]!, symbol: m[2]!, file: m[3]! }));
+
+    // **The population is the sixteen-MR plan, not a row count — and the first
+    // draft was a floor.** `toBeGreaterThanOrEqual(15)` over sixteen rows let a
+    // row be deleted and the mutation survived: every row that remained still
+    // resolved, which is true and useless. A count is not a population. The
+    // claim is that **every MR from 4 to 16 has a seam recorded**, so losing
+    // one is losing an MR rather than losing a row.
+    const covered = new Set(rows.map((r) => Number(/\d+/u.exec(r.mr)?.[0])));
+    expect([...covered].sort((a, b) => a - b), "every MR of the plan has a seam")
+      .toEqual([4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+    expect(new Set(rows.map((r) => r.mr)).size, "no row claimed twice").toBe(rows.length);
+
+    const root = new URL("../../", import.meta.url);
+    const missing: string[] = [];
+    for (const row of rows) {
+      let text = "";
+      try {
+        text = readFileSync(new URL(row.file, root), "utf8");
+      } catch {
+        missing.push(`${row.mr}: ${row.file} does not exist`);
+        continue;
+      }
+      if (!text.includes(row.symbol)) missing.push(`${row.mr}: ${row.symbol} is no longer in ${row.file}`);
+    }
+
+    // **What this asserts and what it does not.** A symbol resolving does not
+    // mean the MR is correct — that is what its own invariants and rows are
+    // for. It means the seam is still there, so a revert, a rename or a merge
+    // that drops it goes red here rather than being found by a survey. The
+    // limit is the point: a revert detector, not a completeness proof.
+    expect(missing, missing.join("\n")).toEqual([]);
+
+    // **The control, because sixteen true statements pass exactly like a
+    // checker that reads nothing.** A fabricated row must be reported, in both
+    // of the ways a row can be wrong.
+    const check = (symbol: string, file: string): boolean => {
+      try {
+        return readFileSync(new URL(file, root), "utf8").includes(symbol);
+      } catch {
+        return false;
+      }
+    };
+    expect(check("ChildSurface", "src/shell/surface.ts"), "a true row").toBe(true);
+    expect(check("ChildSurface", "src/shell/nowhere.ts"), "a row naming no file").toBe(false);
+    expect(check("PushedSurface", "src/shell/surface.ts"), "a row naming the name M9 retired").toBe(false);
+  });
+
   it("T2.57 (C10 I56, §4k.5, R-COR-003, M11): every axis has a carrier row, and tone with ground is one carrier", () => {
     const registry = JSON.parse(
       readFileSync(new URL("../../docs/design/language/calcium-registry.json", import.meta.url), "utf8"),
