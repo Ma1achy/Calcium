@@ -353,17 +353,86 @@ describe("C09 §7e / §026 — the mark at the head", () => {
 });
 
 describe("C09 §073 — the button's three rungs", () => {
-  // **Spec-first, so these are `it.todo` and carry the reason** (TD6). The
-  // invariants land this commit and the renderer follows in the next; a row
-  // that ran today would be asserting against a button that draws bare text,
-  // which is the measurement I102 is written from rather than a test.
-  it.todo(
-    "T1.66 (C09 I102, §073, C10 I51): resting takes bgElev padded, focused takes pick/pickInk bold with › inside the ground, and no ground resolving gives brackets — not deferred on a component; the spec landed this commit and the renderer follows in the next",
-  );
-  it.todo(
-    "T1.67 (C09 I102, C04 I122, §073): the chrome is reserved at every width, and the two rungs' widths differ — two cells of padding against four of brackets — not deferred on a component; the spec landed this commit and the renderer follows in the next",
-  );
-  it.todo(
-    "T1.68 (C09 I102, I47, §073): a call head is not a button — `declaresElement` is true for both, so the predicate is `action` — not deferred on a component; the spec landed this commit and the renderer follows in the next",
-  );
+  const BTN = { kind: "notice", id: "btn", tone: "default", text: "Approve", action: { kind: "activate", id: "a" } };
+  const button = (over: object = {}) => ({ ...BTN, ...over }) as unknown as Notice;
+  const FOCUS = { blockId: "btn", rowId: "btn" };
+  const MONO = capabilities({ colourDepth: 1 });
+  const ASCII = capabilities({ unicode: "ascii" });
+
+  const gridOf = (b: Notice, caps = FULL_CAPS, focus?: unknown, width = 40) => {
+    const kit = measurable({ capabilities: caps, ...(focus === undefined ? {} : { focus }) } as never);
+    const lines = kit.renderToLines(b as never, width);
+    return styledScreenFrom(lines.map((l, i) => (i === 0 ? l : `\r\n${l}`)), { columns: width, rows: lines.length });
+  };
+  /** The first row's painted run: its text, its ink and its attributes. */
+  const runOf = (grid: readonly (readonly { ch: string; style: { fg: string; bg: string; attrs: readonly number[] } }[])[]) => {
+    const row = grid[0]!;
+    const cellsOn = row.filter((c) => c.style.bg !== "");
+    return {
+      text: row.map((c) => c.ch).join("").replace(/\s+$/u, ""),
+      painted: cellsOn.map((c) => c.ch).join(""),
+      fg: cellsOn[0]?.style.fg ?? "",
+      bg: cellsOn[0]?.style.bg ?? "",
+      bold: cellsOn[0]?.style.attrs.includes(1) ?? false,
+    };
+  };
+
+  it("T1.66 (C09 I102, §073, C10 I51): resting is bgElev padded, focused is pick/pickInk bold with › inside, and no ground gives brackets", () => {
+    const resting = runOf(gridOf(button()));
+    // **Two cells wider than the label, one either side** — a ground flush to
+    // the glyphs says *these letters* are the surface, not the button.
+    expect(resting.painted, "the ground is the label plus one cell either side").toBe(" Approve ");
+
+    const focused = runOf(gridOf(button(), FULL_CAPS, FOCUS));
+    expect(focused.painted, "› is INSIDE the ground, not before it").toBe(" › Approve ");
+    expect(focused.bold, "the chosen pair is bold").toBe(true);
+    expect(focused.bg, "focused takes `pick`, not `focusGround`").not.toBe(resting.bg);
+    // **The ink is the pair's own**, which is the whole reason `pickInk` exists:
+    // asserted as a change from the resting ink rather than as a hex here.
+    expect(focused.fg, "and `pickInk` rather than the block's tone").not.toBe(resting.fg);
+
+    for (const [caps, why] of [[MONO, "1-bit"], [ASCII, "ascii"]] as const) {
+      const b = runOf(gridOf(button(), caps));
+      expect(b.text, `${why} draws brackets`).toBe("[ Approve ]");
+      expect(b.painted, `${why} paints no cell`).toBe("");
+    }
+
+    // **The control, and it is what makes every line above mean something**: the
+    // same notice with no `action` draws bare text at every rung, so a renderer
+    // that painted every notice would fail here rather than pass the assertions.
+    for (const caps of [FULL_CAPS, MONO, ASCII]) {
+      const plain = runOf(gridOf(button({ action: undefined }), caps));
+      expect(plain.text, "a notice with no action is bare text").toBe("Approve");
+      expect(plain.painted, "and takes no ground").toBe("");
+    }
+  });
+
+  it("T1.67 (C09 I102, C09 I2, C04 I122, §073): the chrome is reserved, and the reservation is the same at every rung", () => {
+    const kit = measurable();
+    const b = button({ text: "Approve this change to the parser" });
+    for (let width = 8; width <= 60; width += 1) { // cells-ok — a width sweep
+      // **One `measure` answers for every rung, which is the assertion.** A
+      // budget that varied with the rung would be `measure` reading a theme,
+      // and `measure(block, width)` cannot see one (I2).
+      const promised = kit.measure(b as never, width);
+      for (const caps of [FULL_CAPS, MONO, ASCII]) {
+        const drawn = measurable({ capabilities: caps }).renderToLines(b as never, width);
+        expect(drawn.length, `rows at ${String(width)} match the one measure`).toBe(promised);
+        for (const line of drawn) {
+          expect(cells(visible(line)), `no row overruns ${String(width)}`).toBeLessThanOrEqual(width);
+        }
+      }
+    }
+  });
+
+  it("T1.68 (C09 I102, C09 I47, §073): a call head is not a button", () => {
+    // `declaresElement` is true for both, so this is the row that says the
+    // predicate is `action` — a head stands in the ring without being pressed.
+    // **`glyph: "step"` is gone** — M4 retired the slot and the renderer resolves
+    // a head's mark from `state` (I45), so the fixture carries the state alone.
+    const head = button({ action: undefined, state: "running" });
+    const grid = gridOf(head as Notice);
+    expect(grid[0]!.some((c) => c.style.bg !== ""), "a call head takes no ground").toBe(false);
+    expect(runOf(gridOf(button())).painted, "and the same notice with an action does").not.toBe("");
+  });
 });

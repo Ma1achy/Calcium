@@ -121,10 +121,13 @@ const results = runPass({
       // the compositor wraps into a row `measure` never counted. This is the
       // divergence the reservation exists to prevent, and it is invisible to
       // anything that reads the mark.
+      // **Re-anchored when the button took its own cells** (I102): the budget
+      // now subtracts three terms, so the anchor is the tail that names the
+      // mark's and drops it, leaving the button's in place.
       name: "the mark is drawn without reserving its cells",
       file: SIMPLE,
-      from: "  const budget = proseWidth(width, prefixCells(block.glyph) + markCells(block));",
-      to: "  const budget = proseWidth(width, prefixCells(block.glyph));",
+      from: "prefixCells(block.glyph) + markCells(block) + buttonCells(block));",
+      to: "prefixCells(block.glyph) + buttonCells(block));",
       expect: "T1.64",
     },
     {

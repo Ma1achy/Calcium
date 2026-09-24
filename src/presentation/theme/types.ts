@@ -84,6 +84,31 @@ export type Surfaces = Readonly<{
    */
   meterFill?: string;
   /**
+   * **The chosen affordance's ground and its matched ink — one pair, checked
+   * together** (§073, C10 I51 · C09 I102).
+   *
+   * A focused button takes these rather than `focusGround`: the design gives the
+   * chooser's pair to a *choice about to be taken*, which is why `pickInk`
+   * exists as a ground-specific ink at all. It has no slot it could borrow —
+   * the registry authors it `#000000` on a light ground in some themes and
+   * `#ffffff` on a dark one in others, a value chosen **for** the ground and
+   * meaningless away from it.
+   *
+   * **Declared here because both have shipped undeclared since the port.** The
+   * registry assigns `bg-pick` and `c-pickInk` in all ten themes and
+   * `from-registry.mjs` collects every `.bg-` slot and every `.c-*Ink`
+   * generically, so the values reached `tokens.generated.ts` with this type
+   * naming neither and no renderer able to read them. `focusGround` and
+   * `meterFill` were each found the same way; I51 states the shape rather than
+   * fixing a third in silence.
+   *
+   * **Optional, and absent means this theme paints no chosen ground** — the
+   * button then takes its bracket rung, which is the carrier that survives one
+   * bit anyway. All ten shipped themes declare both.
+   */
+  pick?: string;
+  pickInk?: string;
+  /**
    * The selection wash (C17 §5b, roadmap entry 23).
    *
    * **A surface rather than a palette entry, and the entry said otherwise.**

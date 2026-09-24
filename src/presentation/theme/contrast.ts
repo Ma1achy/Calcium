@@ -249,6 +249,32 @@ const SELECTION_BASE: Readonly<Record<string, readonly string[]>> = Object.freez
  * land together and are checked together. At the meaning floor, because a tag
  * reading *this failed* is meaning rather than decoration.
  */
+/**
+ * §073's chosen pair, and it is `errorTagPairs`' shape exactly (C10 I51).
+ *
+ * **Both sides come from `surfaces`, so both are read from `surfaces`.**
+ * `validateDiffSurfaces` takes its foreground from
+ * `tokens.palettes[palette].slots[slot]` and `continue`s when it finds nothing,
+ * so a pair whose ink lives in `surfaces` would be skipped **in silence** — a
+ * check that cannot fire dressed as one that passes (A03 §2). The error tag was
+ * written that way once and caught; this one is written from the correction.
+ *
+ * At the meaning floor, because a chosen affordance reads *this is the one*.
+ */
+export function pickPairs(
+  tokens: ThemeTokens,
+): readonly (readonly [string, string, string, string])[] {
+  const ground = tokens.surfaces.pick;
+  const ink = tokens.surfaces.pickInk;
+  // **Absent is a rung, not a defect** — a theme with no chosen ground sends the
+  // button to its brackets (C09 I102), which is the carrier that survives one
+  // bit anyway. Both halves are asked, because half a pair is the state this
+  // invariant exists to refuse.
+  if (ground === undefined || ink === undefined) return Object.freeze([]);
+  if (!isHex(ground) || !isHex(ink)) return Object.freeze([]);
+  return Object.freeze([["pickInk", ink, "pick", ground] as const]);
+}
+
 export function errorTagPairs(
   tokens: ThemeTokens,
 ): readonly (readonly [string, string, string, string])[] {
@@ -267,21 +293,43 @@ export function errorTagPairs(
  * dressed as one that passes (A03 §2). Written the first way and caught here:
  * both sides come from `surfaces`, so both are read from `surfaces`.
  */
-function validateErrorTag(tokens: ThemeTokens): readonly ThemeError[] {
+function validateSurfacePair(
+  pairs: readonly (readonly [string, string, string, string])[],
+  why: string,
+): readonly ThemeError[] {
   const errors: ThemeError[] = [];
-  for (const [inkName, ink, groundName, ground] of errorTagPairs(tokens)) {
+  for (const [inkName, ink, groundName, ground] of pairs) {
     const measured = ratio(ink, ground);
     if (measured >= DEFAULT_FLOOR) continue;
     errors.push({
       path: `surfaces.${inkName}`,
       message:
         `"${inkName}" (${ink}) is ${measured.toFixed(2)} : 1 against ${groundName} ` +
-        `(${ground}), below the ${DEFAULT_FLOOR} : 1 meaning floor — the tag says ` +
-        `something failed, so it carries meaning rather than decoration, and the ` +
+        `(${ground}), below the ${DEFAULT_FLOOR} : 1 meaning floor — ${why}, and the ` +
         `pair moves together because neither half is measured without the other`,
     });
   }
   return errors;
+}
+
+/**
+ * **Two pairs, one walk** (C10 I51). `pick`/`pickInk` arrived with exactly
+ * `errorGround`/`errorInk`'s shape — a ground with its own ink, neither half
+ * borrowable — so a second copy of this loop would be a second place for the
+ * floor to drift. The message's middle clause is what differs and it is the
+ * argument for the floor, which is the part worth keeping per pair.
+ */
+function validateSurfacePairs(tokens: ThemeTokens): readonly ThemeError[] {
+  return [
+    ...validateSurfacePair(
+      errorTagPairs(tokens),
+      "the tag says something failed, so it carries meaning rather than decoration",
+    ),
+    ...validateSurfacePair(
+      pickPairs(tokens),
+      "a chosen affordance reads *this is the one*, which is meaning rather than decoration",
+    ),
+  ];
 }
 
 /** The pairing, exposed so the suite can assert its shape rather than its results. */
@@ -580,7 +628,7 @@ export function validateTokens(tokens: ThemeTokens): readonly ThemeError[] {
 
   errors.push(...validateRequiredSlots(tokens));
   errors.push(...validateDiffSurfaces(tokens));
-  errors.push(...validateErrorTag(tokens));
+  errors.push(...validateSurfacePairs(tokens));
   errors.push(...validateDecorationText(tokens));
   errors.push(...validateBands(tokens));
   errors.push(...validateHighContrast(tokens));

@@ -20,6 +20,7 @@ import { fakeStdin, capabilities } from "../support/fake-terminal.js";
 import { rowContaining, styleAt, styledScreenFrom, textOf, type CellStyle } from "../support/styled-screen.js";
 import { measurable, visible } from "../support/render.js";
 import type { FocusState } from "../../src/presentation/blocks/index.js";
+import { glyphFor, headMark } from "../../src/presentation/blocks/glyphs.js";
 import { background, focusStyle, selectionStyle, tone } from "../../src/presentation/blocks/paint.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
@@ -700,7 +701,14 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
 
   // --- notice — with an action it is a button, and a focused button is painted (C26 §7, C04 §3) ---
   const RETRY = { kind: "fill", label: "retry", command: "pull" } as const;
-  const NOTICE = block({ kind: "notice", id: "n", tone: "error", glyph: "error", text: "pull failed", action: RETRY } as never);
+  // **A call head and not a button** (C09 I83 as I102 amends it). This fixture
+  // carried `action: RETRY`, which makes it a *button* — and a focused button
+  // takes the chosen pair, not `focusGround`. The two members of the focus ring
+  // were one when this row was written, so it was reading the call head's rule
+  // off the button's only instance. `state` is the other member, and it is the
+  // one this invariant governs.
+  const NOTICE = block({ kind: "notice", id: "n", tone: "error", glyph: "error", text: "pull failed", state: "failed" } as never);
+  const BUTTON = block({ kind: "notice", id: "n", tone: "error", glyph: "error", text: "pull failed", action: RETRY } as never);
   const PLAIN = block({ kind: "notice", id: "n", tone: "error", glyph: "error", text: "pull failed" } as never);
   const noticeAt = (b: typeof NOTICE, focus: FocusState | null, depth: 24 | 1 = 24) =>
     renderToLines(registry, b, 40, { theme, capabilities: capabilities({ colourDepth: depth }), focus });
@@ -714,6 +722,9 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
     // row is the rule and not this theme's numbers.
     const errorOnFocus = params(tone("error", theme, caps, "focusGround"));
     const focusBg = params(focusStyle(theme, caps));
+    // **The head's mark is resolved from its state** (I45), so the character
+    // this row looks for is `headMark`'s answer and not the `error` glyph's `✗` — and above one bit every state collapses onto `●`, the `running` slot, which is the M4 rung.
+    const mark = glyphFor(headMark("failed", caps), caps);
     const none = noticeAt(NOTICE, null);
     const focused = noticeAt(NOTICE, { blockId: "n", rowId: "n" });
     expect(focused.map((l) => l.replace(SGR, ""))).toEqual(none.map((l) => l.replace(SGR, "")));
@@ -733,14 +744,16 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
     // **And it is resolved against the ground** (C10 I48): the notice's own
     // tone is the slot, and which hex that slot takes is the ground's answer.
     expect(at(focused, "pull failed"), "focused: its own tone over the focus ground").toEqual({ fg: errorOnFocus, bg: focusBg, attrs: [] });
-    expect(at(focused, "✗"), "the glyph keeps its character and takes the same paint").toEqual({ fg: errorOnFocus, bg: focusBg, attrs: [] });
+    expect(at(focused, mark), "the head mark keeps its character and takes the same paint").toEqual({ fg: errorOnFocus, bg: focusBg, attrs: [] });
     // And the two are not one value, so the row is not satisfied by a painter
     // that never asks which ground it is on (F1240).
     expect(errorOnFocus, "the ground moves the ink").not.toBe(error);
-    expect(at(none, "✗").fg).toBe(error);
+    expect(at(none, mark).fg).toBe(error);
 
     // **The element, as a count** (C09): one with an action, none without.
-    const withAction = registry.elementsIn([NOTICE], 40);
+    // **The element half is the BUTTON's**, and it is the half that made this
+    // fixture a button in the first place.
+    const withAction = registry.elementsIn([BUTTON], 40);
     expect(withAction).toHaveLength(1);
     expect(withAction[0]?.element).toMatchObject({ id: "n", level: "block", activate: RETRY, copy: "pull failed" });
     expect(withAction[0]?.element.rows).toEqual({ from: 0, to: 1 });

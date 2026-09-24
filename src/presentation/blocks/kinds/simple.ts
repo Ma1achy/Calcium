@@ -15,7 +15,7 @@ import { runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../runs.js";
 import { NO_STYLE, rampStyle } from "../../theme/index.js";
 import { animateT, effectiveAnimation, effectiveTick, extentT, glyphTick } from "../ramp.js";
 import { barStyle, glyphFor, glyphCells, glyphs, headMark, spinnerFrames } from "../glyphs.js";
-import { background, clampSpans, focusStyle, pad, paint, paintRuns, rows, selectionStyle, tone, withBackground, type Span } from "../paint.js";
+import { background, clampSpans, focusStyle, pad, paint, paintRuns, rows, selectionStyle, slot as surface, tone, withBackground, type Span } from "../paint.js";
 import type { BlockDefinition, NavElement, RenderContext, Windowed, Rendered } from "../types.js";
 
 /** Chips in a `pills` row are separated by two spaces — one is too close to read. */
@@ -252,13 +252,35 @@ const MARK_CELLS = 2;
 
 const markCells = (block: Notice): number => (block.streaming === true ? MARK_CELLS : 0);
 
+/**
+ * A button's chrome, in cells (C09 I102, §073).
+ *
+ * **Four at every rung, and the measurement invariant is why.** The drawn chrome
+ * differs — ` Approve ` is two cells, `[ Approve ]` is four — and `measure` is a
+ * function of `(block, width)` alone (I2), so it cannot see which rung applies:
+ * the rung is the theme's and the terminal's. A budget that varied with it would
+ * be `measure` reading a capability, which is the one carve-out the design does
+ * not override. So the budget takes the maximum and the ground rungs carry two
+ * cells of slack — a wrap two cells early, never an overflow, which is the safe
+ * direction of a width disagreement.
+ */
+const BUTTON_CELLS = 4;
+
+// **A call head is never a button, even carrying an action** (I102, I47). A
+// tool-call header does both — it heads a call *and* offers a retry — and
+// painting it would put a second affordance in a gutter that already has a mark.
+// The first draft asked `action !== undefined` alone and put a cell of padding
+// into every call header in the tree; T2.48 read it as `●  run_command`.
+const buttonCells = (block: Notice): number =>
+  block.action === undefined || isCallHead(block) ? 0 : BUTTON_CELLS;
+
 function noticeRows(
   block: Notice,
   width: number,
   caps?: RenderContext["capabilities"],
 ): readonly (readonly Run[])[] {
   const runs = runsOf(block.text, block.spans);
-  const budget = proseWidth(width, prefixCells(block.glyph) + markCells(block));
+  const budget = proseWidth(width, prefixCells(block.glyph) + markCells(block) + buttonCells(block));
   if (isCallHead(block)) {
     // One row by construction (I46). Without capabilities — the measurer's
     // call — the runs are returned unfitted: a row count of one is the whole of
@@ -461,6 +483,65 @@ function headMarked(
   return out;
 }
 
+/**
+ * A button's three rungs (C09 I102, §073 `R-BLK-730`, C10 I51).
+ *
+ * **The predicate is `action`, not `declaresElement`** (I47): a call head stands
+ * in the ring without being something you press, and painting it would put a
+ * second affordance in a gutter that already has a mark.
+ *
+ * **One question chooses the rung** — does a ground resolve — so a theme that
+ * declares no `pick` and a one-bit terminal take the same path, which is C09
+ * I96's shape. The brackets are the carrier that survives there; without them a
+ * button at one bit carries none, which is what this tree drew.
+ *
+ * **The mark and the padding sit inside the wash**, as §082's `▸` does: outside
+ * it, the ground would appear to begin after the affordance. `›` is within its
+ * recorded domains (`chooser-row`, `tape`), so no glyph is chosen here.
+ *
+ * **Both halves of the pair are resolved together**, exactly as C10 checks them
+ * and as `status`'s error tag already does: a ground taken without its matched
+ * ink borrows a foreground nothing measured against it.
+ */
+function buttonSpans(
+  line: readonly Run[],
+  block: Notice,
+  ctx: RenderContext,
+  focused: boolean,
+  base: NonNullable<Span["style"]>,
+  paintCtx: Parameters<typeof paintRuns>[2],
+): readonly Span[] | null {
+  if (buttonCells(block) === 0) return null;
+  const ref = focused ? "surface.pick" : "surface.bgElev";
+  const ground = background(ref, ctx.theme, ctx.capabilities);
+  // **The ground OR the alphabet**, and §073 says both in its own words —
+  // *1-bit and ascii — brackets carry it*. A painted button at `ascii` would be
+  // legible and is not what the design draws: `›` has no ASCII form that reads
+  // as a chooser (`*`, which is the running head mark), so the mark and the
+  // ground go together rather than the ground outliving the mark.
+  if (ground.background === undefined || ctx.capabilities.unicode === "ascii") {
+    // **The bracket rung**, and the brackets are plain: a tone on them would be
+    // a second fact in a place that already carries one.
+    return [
+      { text: "[ ", style: base },
+      ...paintRuns(line, base, paintCtx),
+      { text: " ]", style: base },
+    ];
+  }
+  const style: NonNullable<Span["style"]> = focused
+    ? {
+        ...withBackground(surface("surface.pickInk", ctx.theme, ctx.capabilities), ground),
+        bold: true,
+      }
+    : withBackground(tone(block.tone, ctx.theme, ctx.capabilities, "bgElev"), ground);
+  const mark = focused ? `${glyphFor("current", ctx.capabilities)} ` : "";
+  return [
+    { text: ` ${mark}`, style },
+    ...paintRuns(line, style, paintCtx).map((sp) => ({ ...sp, style })),
+    { text: " ", style },
+  ];
+}
+
 export const noticeDefinition: BlockDefinition<Notice> = {
   kind: "notice",
 
@@ -479,7 +560,7 @@ export const noticeDefinition: BlockDefinition<Notice> = {
     // **Plus the mark's cells**, which `noticeRows` took off the budget (I101):
     // the natural width is what the block would like, and it would like room for
     // its head.
-    return Math.max(1, Math.min(w, prefixCells(block.glyph) + markCells(block) + longest));
+    return Math.max(1, Math.min(w, prefixCells(block.glyph) + markCells(block) + buttonCells(block) + longest));
   },
 
   elements: noticeElements,
@@ -557,7 +638,7 @@ export const noticeDefinition: BlockDefinition<Notice> = {
                 : " ".repeat(prefix),
             style,
           },
-          ...paintRuns(line, style, paintCtx),
+          ...(index === 0 ? (buttonSpans(line, block, ctx, focused, style, paintCtx) ?? paintRuns(line, style, paintCtx)) : paintRuns(line, style, paintCtx)),
         ]),
       ),
     );

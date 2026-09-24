@@ -9,7 +9,9 @@ import {
   loadTheme,
   decorationTextPairs,
   diffPairs,
+  DEFAULT_FLOOR,
   errorTagPairs,
+  pickPairs,
   validateTokens,
   selectionPairs,
   floorFor,
@@ -22,6 +24,7 @@ import {
   collisions,
   OKABE_ITO_CANONICAL,
   type ColourRef,
+  type ThemeTokens,
 } from "../../src/presentation/theme/index.js";
 import { BAND_VS_BAND, BAND_VS_PAGE, FOCUS_VS_PAGE, validateBands } from "../../src/presentation/theme/contrast.js";
 import { OKABE_ITO } from "../../src/data/colormaps/qualitative/okabe-ito.js";
@@ -1385,10 +1388,43 @@ describe("C10 I48 — the ink a slot takes on the ground it lands on", () => {
 });
 
 describe("C10 §073 — the chosen pair", () => {
-  // **Spec-first** (TD6): I51's values already ship in `tokens.generated.ts`
-  // and `ThemeTokens` declares neither, so a row written today would read a
-  // slot the type cannot name. The declaration and the pair check land next.
-  it.todo(
-    "T2.51 (C10 I51, §073, R-THM-001): `pick` and `pickInk` resolve in all ten themes, clear the meaning floor, and the pairing is in `themePairs`' output rather than merely computable — not deferred on a component; the spec landed this commit and the declaration follows in the next",
-  );
+  it("T2.51 (C10 I51, §073, R-THM-001): `pick` and `pickInk` resolve in every theme, clear the meaning floor, and the check can fire", () => {
+    const THEMES = defaultTheme as unknown as Readonly<Record<string, ThemeTokens>>;
+    const names = Object.keys(THEMES);
+    // **The premise, asserted first.** A theme losing the pair must fail as a
+    // missing value rather than pass as a pair nobody measured — which is the
+    // state all ten were in before I51, with the values shipping undeclared.
+    expect(names.length, "ten themes").toBe(10);
+    for (const name of names) {
+      const tokens = THEMES[name]!;
+      const pairs = pickPairs(tokens);
+      expect(pairs.length, `${String(name)} declares the pair`).toBe(1);
+      const [inkName, ink, groundName, ground] = pairs[0]!;
+      expect(inkName).toBe("pickInk");
+      expect(groundName).toBe("pick");
+      expect(
+        ratio(ink, ground),
+        `${String(name)}: ${ink} on ${ground}`,
+      ).toBeGreaterThanOrEqual(DEFAULT_FLOOR);
+    }
+  });
+
+  it("T2.51b (C10 I51, A03 §2): the pair reaches `validateTokens`, not merely `pickPairs`", () => {
+    // **`errorTagPairs`' sibling defect was a check that could not fire** — its
+    // ink lives in `surfaces` and the diff walk reads `palettes`, so the pair
+    // was skipped in silence. A row calling `pickPairs` directly passes under
+    // exactly that, so this one drives the validator instead.
+    const base = (defaultTheme as unknown as Readonly<Record<string, ThemeTokens>>)["dark"]!;
+    const broken = {
+      ...base,
+      surfaces: { ...base.surfaces, pickInk: base.surfaces.pick },
+    };
+    const errors = validateTokens(broken as never);
+    expect(
+      errors.some((e) => e.path === "surfaces.pickInk"),
+      `an ink equal to its own ground must fail; got ${JSON.stringify(errors.map((e) => e.path))}`,
+    ).toBe(true);
+    // And the tree's own themes are clean through the same door.
+    expect(validateTokens(base as never).filter((e) => e.path === "surfaces.pickInk")).toEqual([]);
+  });
 });

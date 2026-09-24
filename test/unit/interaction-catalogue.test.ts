@@ -9,7 +9,7 @@
 // is the row that would have said so.
 import { describe, expect, it } from "vitest";
 
-import { tone, focusStyle, selectionStyle } from "../../src/presentation/blocks/paint.js";
+import { tone, focusStyle, selectionStyle, background, slot as surfaceOf } from "../../src/presentation/blocks/paint.js";
 import { defaultTheme, loadTheme } from "../../src/presentation/theme/index.js";
 import { sgr } from "../../src/terminal/escapes.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -198,13 +198,19 @@ describe("interaction-catalogue — the corpus renders", () => {
     const c = capsNamed("24bit");
     const info = params(tone("info", theme, c));
     const lines = frameFor(scene("notice-action-focus"), c);
-    // **Its own tone over the focus ground** (C09 I83): a notice keeps the tone
-    // it declared, which the shared-ground mechanism could not express.
-    // The slot is the notice's and the hex is the ground's answer (C10 I48).
-    const errorOnFocus = params(tone("error", theme, c, "focusGround"));
-    expect(cellOf(lines, "image pull failed"), "the button, focused").toEqual({ fg: errorOnFocus, bg: params(focusStyle(theme, c)), attrs: [] });
-    expect(cellOf(lines, "✗"), "its glyph too").toEqual({ fg: errorOnFocus, bg: params(focusStyle(theme, c)), attrs: [] });
-    expect(errorOnFocus, "the ground moves the ink").not.toBe(params(tone("error", theme, c)));
+    // **The chosen pair, because this scene's notice is a BUTTON** (C09 I102,
+    // §073). The row asserted `focusGround` and the notice's own tone, which is
+    // I83's rule — and I83 is the *call head's* arm: a focused button is a
+    // choice about to be taken and takes `pick` with `pickInk`, bold. The row's
+    // own label already said *the button*; only the mechanism under it was the
+    // other member's.
+    const pickOn = params(surfaceOf("surface.pickInk", theme, c));
+    const pickBg = params(background("surface.pick", theme, c));
+    const cell = cellOf(lines, "image pull failed");
+    expect(cell?.fg, "the button, focused: pickInk").toBe(pickOn);
+    expect(cell?.bg, "on pick, not focusGround").toBe(pickBg);
+    expect(cell?.attrs, "and bold").toContain(1);
+    expect(cell?.bg, "the chosen ground is not the focus ground").not.toBe(params(focusStyle(theme, c)));
     expect(cellOf(lines, "no containers"), "the plain notice: its tone, no ground").toEqual({ fg: info, bg: "", attrs: [] });
     const mono = frameFor(scene("notice-action-focus"), capsNamed("1bit"));
     // **No ground and no inverse at 1-bit** (C09 I83): the notice keeps its own

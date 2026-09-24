@@ -38,6 +38,9 @@ install:            ## npm ci, no install scripts, then the one named build (A04
 hooks:              ## point git at .githooks — pre-commit runs `make enforce` (A04 §5)
 	git config core.hooksPath .githooks
 
+themes:             ## C10 §4b — the ten themes, projected from the design registry (R-THM-001)
+	node tools/theme/from-registry.mjs
+
 quantised:          ## C10 I41 — the shipped themes' quantisations, regenerated from dist/ (T3.73 holds it to the code)
 	npm run build
 	node tools/theme/quantised.mjs
