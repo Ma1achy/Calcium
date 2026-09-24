@@ -62,6 +62,7 @@ import { createIdentityLoop } from "./identity.js";
 import {
   SessionStateError,
   UnusableTerminalError,
+  type CopyState,
   type FileSystem,
   type SessionSnapshot,
   type SessionState,
@@ -1796,6 +1797,21 @@ class Session implements TuiInstance {
     graph.scheduler.commit("input");
   }
 
+  /** C14 I55 — the copy rung's mode and, in semantic mode, the selection's size. */
+  #copyState(): CopyState | undefined {
+    if (this.#nativeSelection) return { mode: "native" };
+    const graph = this.#graph;
+    if (this.#semantic === null || graph === null) return undefined;
+    return {
+      mode: "semantic",
+      size: semantic.sizeOf(
+        this.#semantic,
+        graph.documentEntries.map((e) => ({ id: e.id, blocks: e.doc.blocks })),
+        graph.blocks.copySequence,
+      ),
+    };
+  }
+
   #frameQueries(): FrameQueries {
     return {
       nativeSelection: () => this.#nativeSelection,
@@ -1880,6 +1896,9 @@ class Session implements TuiInstance {
       // C14 I34 — the hold's only observable, read per frame from the graph
       // where the subtraction lives. Zero on every frame outside the mode.
       bufferedEntries: () => this.#graph?.bufferedEntries ?? 0,
+      // C14 I55 — which copy mode, and how much `⏎` would take. Over the held
+      // view, as the copy itself is (A6), so the count is the paste.
+      copy: () => this.#copyState(),
       // A03 SS47 — the owner line draws chords, so the chrome resolves them.
       capabilities: () => graph?.capabilities ?? null,
       // C24 I32 — read per frame from the recorder rather than kept here. A

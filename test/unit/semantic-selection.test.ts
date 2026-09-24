@@ -1,19 +1,22 @@
 // C14 §6a / C16 §5d tier 1 — semantic copy mode's model.
 //
-// **The footer's mode label is parked** (C14 §6a), so the transition is where
-// C16 I51's asymmetry is observable at all. That is the reason this file exists as
-// well as the reason the model is a pure function: a rule whose only observation
-// point is unbuilt cannot be written against, which is A03 §2's class arriving
-// by scheduling rather than by wording.
+// **The model is a pure function** so C16 I51's asymmetry is observable without a
+// session. It was written while the footer's label was parked (C14 §6a), when the
+// transition was the only observation point; I55 has since given the footer the
+// mode, the count and which `esc` is next, and its rows are at the end.
 import { describe, expect, it } from "vitest";
 
-import { measurable, FULL_CAPS } from "../support/render.js";
+import { measurable, ASCII_CAPS, FULL_CAPS } from "../support/render.js";
+import { makeDefaultChrome, ownerLine } from "../../src/shell/chrome.js";
+import type { CopyState } from "../../src/shell/types.js";
+import type { Block } from "../../src/data/viewmodel/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
 import {
   copyTextOf,
   count,
+  sizeOf,
   enter,
   escape,
   keyOf,
@@ -217,6 +220,85 @@ describe("C09 §7a — a kind declares its copy text (M10c)", () => {
 });
 
 describe("C14 I55 — the copy rung's footer", () => {
-  it.todo("T1.50 (I55, R-SEL-005, R-SEL-009): the copy rung's owner line reads by mode, esc clears before it leaves, and the count is three chips — not deferred on a component: specified before CopyState exists");
-  it.todo("T1.51 (I38, I55, R-SEL-015): sizeOf counts the copy text — chars, rows, contributing entries — not deferred on a component: specified before sizeOf exists");
+  const labels = (copy?: CopyState, caps = FULL_CAPS): readonly string[] =>
+    ownerLine("copy", caps, false, 0, copy).map((c) => c.label);
+
+  it("T1.50 (C14 I55, R-SEL-005, R-SEL-009): the copy rung's owner line reads by mode, esc clears before it leaves, and the count is three chips", () => {
+    // **The control: nothing selected** — `esc out`, and no count at all
+    // rather than a zero, which is what absent `copy` also reads as.
+    const idle = ["copy", "↑↓ extend", "⏎ copy", "esc out", "the screen is frozen"];
+    expect(labels({ mode: "semantic", size: null })).toEqual(idle);
+    expect(labels(undefined), "no copy state is semantic mode with nothing selected").toEqual(idle);
+
+    // Over a selection the first esc clears, and the count follows it in order.
+    expect(labels({ mode: "semantic", size: { chars: 418, rows: 9, entries: 2 } })).toEqual([
+      "copy", "↑↓ extend", "⏎ copy", "esc clear", "418 chars · 9 rows · 2 entries", "the screen is frozen",
+    ]);
+    const one = labels({ mode: "semantic", size: { chars: 1, rows: 1, entries: 1 } });
+    expect(one[4], "one of each is singular").toBe("1 char · 1 row · 1 entry");
+
+    // **Native handoff names none of the semantic mode's keys**: they reach
+    // nothing while the terminal owns the mouse (fixture 044).
+    const native = labels({ mode: "native" });
+    expect(native).toEqual(["native", "mouse tracking off", "the terminal owns the mouse", "esc out", "the screen is frozen"]);
+    expect(native.some((l) => l.includes("extend") || /\d+ chars?/u.test(l))).toBe(false);
+
+    // The header by the same field.
+    const chrome = makeDefaultChrome("calcium", "calcium");
+    const header = (copy?: CopyState): readonly string[] => {
+      const out: string[] = [];
+      const walk = (b: Block): void => {
+        if (b.kind === "pills") out.push(...b.chips.map((c) => c.label));
+        if (b.kind === "group") b.children.forEach(walk);
+      };
+      chrome.header({
+        session: { cwd: "/", env: {}, lastUuid: null, identity: null, cluster: "c", health: "live", version: "1", retained: null, stopping: false },
+        now: 0,
+        columns: 80,
+        owner: "copy",
+        capabilities: FULL_CAPS,
+        ...(copy === undefined ? {} : { copy }),
+      }).forEach(walk);
+      return out;
+    };
+    expect(header({ mode: "native" })).toContain("NATIVE");
+    expect(header({ mode: "native" })).not.toContain("COPY");
+    expect(header({ mode: "semantic", size: null })).toContain("COPY");
+
+    // At ASCII the separator is the glyph table's, not a literal middle dot.
+    expect(labels({ mode: "semantic", size: { chars: 3, rows: 1, entries: 1 } }, ASCII_CAPS)).toContain("3 chars : 1 row : 1 entry");
+    // Every chip is drawable at the ASCII rung (A03 SS47).
+    for (const copy of [{ mode: "native" } as const, { mode: "semantic", size: { chars: 3, rows: 1, entries: 1 } } as const]) {
+      for (const label of labels(copy, ASCII_CAPS)) expect(label, label).toMatch(/^[\x20-\x7e]*$/u);
+    }
+  });
+
+  it("T1.51 (C14 I38, C14 I55, R-SEL-015): sizeOf counts the copy text — chars, rows, contributing entries", () => {
+    // A stand-in `copySequence` over known texts, so the arithmetic is the
+    // subject: `rule` blocks copy nothing, which is the case the block count
+    // gets wrong.
+    const TEXT: Readonly<Record<string, string>> = { a: "héllo\nwörld", b: "日本𝄞" };
+    const sequence = (blocks: readonly Block[]): string =>
+      blocks.map((b) => TEXT[b.id] ?? "").filter((t) => t !== "").join("\n");
+    const loaded = [
+      { id: "e1", blocks: [{ kind: "text", id: "a", text: "" }, { kind: "rule", id: "r1" }] as unknown as Block[] },
+      { id: "e2", blocks: [{ kind: "text", id: "b", text: "" }] as unknown as Block[] },
+      { id: "e3", blocks: [{ kind: "rule", id: "r2" }] as unknown as Block[] },
+    ];
+    const pick = (...keys: string[]): SemanticMode =>
+      Object.freeze({ caret: null, anchor: null, blocks: new Set(keys) });
+    const all = pick(keyOf("e1", "a"), keyOf("e1", "r1"), keyOf("e2", "b"), keyOf("e3", "r2"));
+
+    // `héllo\nwörld\n\n日本𝄞` — 5 + 1 + 5 + 2 + 3 code points, four lines, two
+    // entries; the third entry selected only a rule and is not counted. `𝄞` is
+    // one code point and two UTF-16 units, so `.length` would say 17.
+    expect(copyTextOf(all, loaded, sequence)).toBe("héllo\nwörld\n\n日本𝄞");
+    expect(sizeOf(all, loaded, sequence)).toEqual({ chars: 16, rows: 4, entries: 2 });
+    expect(count(all), "the block count, which is not what is drawn").toBe(4);
+
+    expect(sizeOf(pick(keyOf("e2", "b")), loaded, sequence)).toEqual({ chars: 3, rows: 1, entries: 1 });
+    expect(sizeOf(pick(keyOf("e3", "r2")), loaded, sequence), "a selection that copies nothing").toBeNull();
+    expect(sizeOf(pick(), loaded, sequence), "nothing selected").toBeNull();
+    expect(sizeOf(null, loaded, sequence), "outside the mode").toBeNull();
+  });
 });

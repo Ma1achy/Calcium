@@ -73,8 +73,8 @@ const MUTATIONS = [
     // copy pastes as one.
     name: "entries are separated by a single newline",
     file: MODEL,
-    from: '    .join("\\n\\n");',
-    to: '    .join("\\n");',
+    from: 'copyParts(mode, loaded, copySequence).join("\\n\\n");',
+    to: 'copyParts(mode, loaded, copySequence).join("\\n");',
     expect: "T1.41i",
   },
   {

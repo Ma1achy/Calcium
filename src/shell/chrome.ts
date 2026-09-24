@@ -18,7 +18,7 @@ import { block } from "../data/viewmodel/index.js";
 import type { Block, Pills } from "../data/viewmodel/index.js";
 import { glyphs } from "../presentation/blocks/index.js";
 import { cells } from "../presentation/text.js";
-import type { ChromeContext, ChromeFn } from "./types.js";
+import type { ChromeContext, ChromeFn, CopyState } from "./types.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import type { OwnerRung } from "../interaction/router/types.js";
 
@@ -94,7 +94,11 @@ const header =
         // saying why has been handed a bug rather than a feature. It sits in
         // the header because the header is the row that is always drawn, and in
         // the left cluster because it is a fact about the session's posture.
-        ...(ctx.owner === "copy" ? [{ label: "COPY", tone: "warn" as const }] : []),
+        // **By mode, not by rung** (C14 I55): both copy modes raise one rung,
+        // and the handoff is the one whose mouse has gone dead.
+        ...(ctx.owner === "copy"
+          ? [{ label: ctx.copy?.mode === "native" ? "NATIVE" : "COPY", tone: "warn" as const }]
+          : []),
       ],
       // The clock is the right cluster on its own: it is the fact that changes,
       // and its last cell is the frame's last column (I86).
@@ -276,8 +280,9 @@ export function ownerLine(
   caps: TerminalCapabilities,
   armed = false,
   buffered = 0,
+  copy?: CopyState,
 ): readonly Chip[] {
-  const chips = ownerChips(rung, caps, buffered);
+  const chips = ownerChips(rung, caps, buffered, copy);
   // **The armed mark, and it is a chip rather than a decoration** (C16 I44,
   // C22 §6, R-INT-008). A newly raised owner refuses one activation so a key
   // already in flight cannot answer a question that arrived under it, and a
@@ -291,10 +296,14 @@ export function ownerLine(
   return [...chips, { label: "ready in a moment", tone: "muted" }];
 }
 
+/** `1 row`, `9 rows` — the count's three nouns (C14 I55). */
+const counted = (n: number, one: string, many: string): string => `${String(n)} ${n === 1 ? one : many}`;
+
 function ownerChips(
   rung: OwnerRung | null,
   caps: TerminalCapabilities,
   buffered: number,
+  copy?: CopyState,
 ): readonly Chip[] {
   switch (rung) {
     case "child":
@@ -303,7 +312,19 @@ function ownerChips(
         { label: mark(["keys → child", "keys -> child"], caps), tone: "muted" },
         { label: mark(["⌃] host escape", "C-] host escape"], caps), tone: "muted" },
       ];
-    case "copy":
+    case "copy": {
+      // **Native handoff** (C14 I55, fixture 044): the terminal owns the mouse,
+      // so no key of the semantic mode's reaches anything and none is named.
+      if (copy?.mode === "native") {
+        return [
+          { label: "native", tone: "warn" },
+          { label: "mouse tracking off", tone: "muted" },
+          { label: "the terminal owns the mouse", tone: "muted" },
+          { label: "esc out", tone: "muted" },
+          { label: "the screen is frozen", tone: "muted" },
+        ];
+      }
+      const size = copy?.mode === "semantic" ? copy.size : null;
       // The frozen screen is the fact, not a hint: it is why nothing responds.
       return [
         { label: "copy", tone: "warn" },
@@ -317,7 +338,27 @@ function ownerChips(
         // **Two chips, not one label with a `·` in it.** The separator is the
         // cluster's to draw (C09 I49) — a literal one in a string is the head's
         // unresolved join F828 found, and T2.116 is right to refuse it here too.
-        { label: "esc out", tone: "muted" },
+        // **Which press is next** (`R-SEL-005`, C16 I51): over a selection the
+        // first `esc` clears it, and a footer saying `out` labels that press as
+        // the leaving one.
+        { label: size === null ? "esc out" : "esc clear", tone: "muted" },
+        // **The count, over the copy text** (C14 I38, I55, `R-SEL-015`): what
+        // `⏎` would put on the clipboard now, as question 35 ruled it —
+        // `418 chars · 9 rows · 2 entries`. **One chip**, because the pill's gap
+        // is two spaces and would draw three facts where the ruling draws one;
+        // the separator is resolved per rung (C09 I49), as `childBorderLegend`'s is.
+        ...(size === null
+          ? []
+          : [
+              {
+                label: [
+                  counted(size.chars, "char", "chars"),
+                  counted(size.rows, "row", "rows"),
+                  counted(size.entries, "entry", "entries"),
+                ].join(` ${glyphs(caps).separator} `),
+                tone: "default" as const,
+              },
+            ]),
         { label: "the screen is frozen", tone: "muted" },
         // **`R-SEL-010`'s half of the freeze** (C14 I34): the rule says the
         // footer says so *while it is still frozen*, so the chip is on the line
@@ -328,6 +369,7 @@ function ownerChips(
           ? [{ label: `${String(buffered)} waiting`, tone: "muted" as const }]
           : []),
       ];
+    }
     case "question":
       // Owner plus the safe path. The declared actions are the question's own
       // and the shell cannot name them without holding a second copy of them.
@@ -404,6 +446,7 @@ const footer = (ctx: ChromeContext): readonly Block[] => [
               ctx.capabilities,
               ctx.ownerArmed === true,
               ctx.bufferedEntries ?? 0,
+              ctx.copy,
             ),
             ctx.columns,
             ctx.capabilities,

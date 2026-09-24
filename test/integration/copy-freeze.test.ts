@@ -104,5 +104,61 @@ describe("C14 §6b — the freeze in a real session", () => {
 });
 
 describe("C14 I55 — the footer in a real session", () => {
-  it.todo("T4.37g (I55, R-SEL-005, R-SEL-009): a selection draws its count and esc clear; esc clears, esc again leaves — not deferred on a component: specified before the session supplies CopyState");
+  it("T4.37g (I55, R-SEL-005, R-SEL-009): a selection draws its count and esc clear; esc clears, esc again leaves", async () => {
+    vi.useFakeTimers();
+    try {
+      const stdin = fakeStdin();
+      const { screen, clock } = await buildSession({
+        manifest: { ...MANIFEST, tools: [{ name: "note", local: true, summary: "a note", args: [], flags: [] }] },
+        localHandlers: {
+          note: () => ({
+            schema: "tui.view/1",
+            command: "note",
+            status: "ok",
+            blocks: [{ kind: "text", id: "t", text: "two words" } as never],
+          }),
+        },
+        stdin: stdin as never,
+      });
+      const step = async (ms: number): Promise<void> => {
+        clock.advance(ms);
+        await vi.advanceTimersByTimeAsync(ms);
+        await settle();
+      };
+      await step(0);
+      stdin.emit("/note\r");
+      await step(0);
+
+      const footer = (): string => screen().rows.find((r) => r.includes("the screen is frozen")) ?? "<no owner line>";
+      const header = (): string => screen().rows[0] ?? "";
+
+      stdin.emit("\u001bV");
+      await step(0);
+      // **The control: the mode is up and nothing is selected** — so the count
+      // and `esc clear` below are the selection's doing.
+      expect(footer()).toContain("esc out");
+      expect(footer()).not.toMatch(/\d+ chars?/u);
+      expect(header()).toContain("COPY");
+
+      stdin.emit("a");
+      await step(0);
+      const selected = footer();
+      expect(selected, "the first esc is labelled as the clearing one").toContain("esc clear");
+      expect(selected).not.toContain("esc out");
+      expect(selected, "the count is drawn").toMatch(/\d+ chars? · \d+ rows? · 1 entry/u);
+
+      // First esc clears and stays; the footer says the next one leaves.
+      stdin.emit("\u001b");
+      await step(100);
+      expect(footer(), "cleared, still in the mode").toContain("esc out");
+      expect(footer()).not.toMatch(/\d+ chars?/u);
+
+      stdin.emit("\u001b");
+      await step(100);
+      expect(screen().rows.some((r) => r.includes("the screen is frozen")), "the second esc leaves").toBe(false);
+      expect(header()).not.toContain("COPY");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

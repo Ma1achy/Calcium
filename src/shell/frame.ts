@@ -42,7 +42,7 @@ import {
 import type { TerminalSize } from "../terminal/lifecycle.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Block } from "../data/viewmodel/index.js";
-import type { Chrome, Label, SessionSnapshot } from "./types.js";
+import type { Chrome, CopyState, Label, SessionSnapshot } from "./types.js";
 import type { OwnerRung } from "../interaction/router/types.js";
 
 /** What the frame is, before anything paints it. */
@@ -122,6 +122,11 @@ export type ComposeDeps = Readonly<{
    * frame declare a zero it cannot be wrong about.
    */
   bufferedEntries?: () => number;
+  /**
+   * The copy rung's mode and size (C14 I55). Optional for `bufferedEntries`'
+   * reason: a composition with no session graph has no mode to report.
+   */
+  copy?: () => CopyState | undefined;
   /** C02's resolved record, for the chrome's marks (A03 SS47). `null` before
    * the session graph exists, which is also when there is no owner. */
   capabilities: () => TerminalCapabilities | null;
@@ -184,6 +189,7 @@ export function compose(deps: ComposeDeps): Composed {
   const session = deps.session();
   const lastFrame = deps.lastFrame?.();
   const capabilities = deps.capabilities();
+  const copy = deps.copy?.();
   const ctx = {
     session,
     now,
@@ -196,6 +202,7 @@ export function compose(deps: ComposeDeps): Composed {
     // `"lastFrame" in ctx` gets the same answer as one doing `!== undefined`.
     ...(lastFrame === undefined ? {} : { lastFrame }),
     ...(capabilities === null ? {} : { capabilities }),
+    ...(copy === undefined ? {} : { copy }),
   };
 
   const { header, footer, label } = chromeOf(deps, ctx);

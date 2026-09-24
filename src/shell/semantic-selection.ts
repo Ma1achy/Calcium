@@ -308,12 +308,44 @@ export function copyTextOf(
   loaded: readonly Readonly<{ id: string; blocks: readonly Block[] }>[],
   copySequence: (blocks: readonly Block[]) => string,
 ): string {
-  if (mode === null) return "";
+  return copyParts(mode, loaded, copySequence).join("\n\n");
+}
+
+/** Each contributing entry's text, in document order — the one walk `copyTextOf` and `sizeOf` share. */
+function copyParts(
+  mode: SemanticMode,
+  loaded: readonly Readonly<{ id: string; blocks: readonly Block[] }>[],
+  copySequence: (blocks: readonly Block[]) => string,
+): readonly string[] {
+  if (mode === null) return [];
   const selected = mode.blocks;
   return loaded
     .map((e) => copySequence(e.blocks.filter((b) => selected.has(keyOf(e.id, b.id)))))
-    .filter((t) => t !== "")
-    .join("\n\n");
+    .filter((t) => t !== "");
+}
+
+/**
+ * How much `⏎` would copy right now — the count the footer draws (C14 I38,
+ * I55, `R-SEL-015`).
+ *
+ * **Over the copy text, not the block set**: a block that copies nothing adds
+ * nothing, and an entry whose blocks all decline is not counted, so the number
+ * is the size of the paste. `chars` is code points including line breaks — the
+ * `wc -m` reading of what lands on the clipboard; `rows` its lines. `null` when
+ * nothing is selected, or when what is selected copies nothing.
+ */
+export function sizeOf(
+  mode: SemanticMode,
+  loaded: readonly Readonly<{ id: string; blocks: readonly Block[] }>[],
+  copySequence: (blocks: readonly Block[]) => string,
+): Readonly<{ chars: number; rows: number; entries: number }> | null {
+  if (mode === null || mode.blocks.size === 0) return null;
+  const parts = copyParts(mode, loaded, copySequence);
+  if (parts.length === 0) return null; // cells-ok — an entry count
+  const text = parts.join("\n\n");
+  let chars = 0;
+  for (const _ of text) chars += 1;
+  return Object.freeze({ chars, rows: text.split("\n").length, entries: parts.length }); // cells-ok — counts, not widths
 }
 
 /**

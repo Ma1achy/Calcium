@@ -1082,7 +1082,7 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
 });
 
 describe("C22 — native selection, entered and left (C16 §5b, C03 §4a)", () => {
-  it("T4.30 (C16 §5b B1): ⌥⇧C enters, the header says COPY, mouse tracking goes off", async () => {
+  it("T4.30 (C16 §5b B1): ⌥⇧C enters, the header says NATIVE, mouse tracking goes off", async () => {
     // **`⌥⇧C`, not `⌥v`, since M6** (C16 §6a): the registry gives `⌥v` to
     // `values.toggle` and native selection its own two chords — `⌥⇧C` native handoff,
     // `⌥⇧V` semantic. Nothing was invented for this; the design supplied both.
@@ -1102,13 +1102,13 @@ describe("C22 — native selection, entered and left (C16 §5b, C03 §4a)", () =
     };
 
     // The control: the indicator is not there before the key, so the assertion
-    // below is about the key rather than about the header always saying COPY.
-    expect(screen().rows[0], "no indicator before entry").not.toContain("COPY");
+    // below is about the key rather than about the header always saying NATIVE.
+    expect(screen().rows[0], "no indicator before entry").not.toContain("NATIVE");
 
     const before = stdout.output;
     await type("\u001bC");
 
-    expect(screen().rows[0], "the mode is on screen, in the row always drawn").toContain("COPY");
+    expect(screen().rows[0], "the mode is on screen, in the row always drawn").toContain("NATIVE");
     expect(
       stdout.output.slice(before.length),
       "tracking off, so the terminal's own selection works",
@@ -1116,7 +1116,7 @@ describe("C22 — native selection, entered and left (C16 §5b, C03 §4a)", () =
 
     // **The indicator's frame is up before the hold takes effect** — otherwise
     // the reader is told nothing and simply finds the mouse dead.
-    expect(screen().rows[0]).toContain("COPY");
+    expect(screen().rows[0]).toContain("NATIVE");
   });
 
   it("T4.31 (C16 §5b B1): ⌃c leaves it, and the screen comes back", async () => {
@@ -1130,12 +1130,12 @@ describe("C22 — native selection, entered and left (C16 §5b, C03 §4a)", () =
     };
 
     await type("\u001bC");
-    expect(screen().rows[0]).toContain("COPY");
+    expect(screen().rows[0]).toContain("NATIVE");
 
     const before = stdout.output;
     await type("\u0003");
 
-    expect(screen().rows[0], "the indicator goes with the mode").not.toContain("COPY");
+    expect(screen().rows[0], "the indicator goes with the mode").not.toContain("NATIVE");
     expect(stdout.output.slice(before.length), "tracking back on").toContain("[?1002h");
   });
 
@@ -1170,9 +1170,9 @@ describe("C22 — native selection, entered and left (C16 §5b, C03 §4a)", () =
     // **The length is a proxy and the tracking pair satisfies it.** Measured
     // 2026-09-05 with `resume()` deleted from the exit: `1002h 1006h` still
     // arrives, the length grows, and the assertion above passed while the
-    // screen stayed frozen with `COPY` in the header. The frame is the subject,
+    // screen stayed frozen with `NATIVE` in the header. The frame is the subject,
     // so the frame is what is read.
-    expect(screen().rows[0], "the catching-up frame took the indicator down").not.toContain("COPY");
+    expect(screen().rows[0], "the catching-up frame took the indicator down").not.toContain("NATIVE");
   });
 });
 
@@ -1195,7 +1195,7 @@ describe("C22 — native selection: the order inside the exit, and the far side 
     const type = typer(stdin);
 
     await type("\u001bC");
-    expect(screen().rows[0], "in native selection").toContain("COPY");
+    expect(screen().rows[0], "in native selection").toContain("NATIVE");
 
     const before = stdout.output.length;
     await type("\u0003");
@@ -1205,7 +1205,7 @@ describe("C22 — native selection: the order inside the exit, and the far side 
     // "starts with the pair" is satisfied by a session that wrote the pair and
     // then nothing — which is exactly what dropping `resume()` produces.
     expect(after.length, "a catching-up frame followed").toBeGreaterThan(MOUSE.enter.length);
-    expect(screen().rows[0], "and it removed the indicator").not.toContain("COPY");
+    expect(screen().rows[0], "and it removed the indicator").not.toContain("NATIVE");
 
     // The reader has finished selecting; the app takes the mouse back before it
     // takes the screen. T4.31 asserts both bytes arrived and cannot see which
@@ -1242,7 +1242,7 @@ describe("C22 — native selection: the order inside the exit, and the far side 
     expect(screen().text.join("\n"), "and has not settled").not.toContain(TEXT);
 
     await type("\u001bC");
-    expect(screen().rows[0]).toContain("COPY");
+    expect(screen().rows[0]).toContain("NATIVE");
     const held = stdout.output;
 
     // **The far side is not frozen.** The store moves; the screen does not.
@@ -1265,7 +1265,7 @@ describe("C22 — native selection: the order inside the exit, and the far side 
     const type = typer(stdin);
 
     await type("\u001bC");
-    expect(screen().rows[0]).toContain("COPY");
+    expect(screen().rows[0]).toContain("NATIVE");
     const once = stdout.output;
     expect(count(once, MOUSE.leave), "the leave pair, once").toBe(1);
 
@@ -1287,7 +1287,7 @@ describe("C22 — native selection: the order inside the exit, and the far side 
     const type = typer(stdin);
 
     await type("\u001bC");
-    expect(screen().rows[0]).toContain("COPY");
+    expect(screen().rows[0]).toContain("NATIVE");
     const before = stdout.output.length;
 
     // A lone `Esc` waits C16 §2's 50 ms to be told apart from a sequence
@@ -1298,7 +1298,7 @@ describe("C22 — native selection: the order inside the exit, and the far side 
     for (let i = 0; i < 4; i += 1) await Promise.resolve();
 
     expect(stdout.output.slice(before), "tracking back on Esc").toContain(MOUSE.enter);
-    expect(screen().rows[0], "the indicator goes with the mode").not.toContain("COPY");
+    expect(screen().rows[0], "the indicator goes with the mode").not.toContain("NATIVE");
   });
 });
 

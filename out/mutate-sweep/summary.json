@@ -1,14 +1,14 @@
 {
   "label": "all",
-  "only": "c10-text-grounds",
+  "only": "c09-block-copy",
   "rows": [
     {
-      "run": "c10-text-grounds.mjs",
+      "run": "c09-block-copy.mjs",
       "exit": 0,
-      "seconds": 49,
+      "seconds": 15,
       "state": "green",
       "restored": 0,
-      "caught": 8,
+      "caught": 4,
       "elsewhere": 1,
       "survived": 0,
       "anchorMissed": 0,

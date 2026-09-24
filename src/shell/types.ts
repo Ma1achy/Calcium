@@ -80,6 +80,19 @@ export type SessionSnapshot = Readonly<{
  * field changes on an event, and I11 would then be satisfied by a writer firing
  * sixty times a second. `columns` is C01's to hand down (C01 I13).
  */
+/**
+ * Which copy mode holds the copy rung, and in semantic mode how much a copy
+ * would take right now (C14 I55, questions 4 and 35).
+ *
+ * **Both modes raise one rung**, so `owner` cannot say which — and they want
+ * different footers: the semantic mode's keys extend a selection, and the
+ * handoff's reach nothing, because the terminal owns the mouse. `size` is
+ * `null` with nothing selected, which is no count rather than a count of zero.
+ */
+export type CopyState =
+  | Readonly<{ mode: "native" }>
+  | Readonly<{ mode: "semantic"; size: Readonly<{ chars: number; rows: number; entries: number }> | null }>;
+
 export type ChromeContext = Readonly<{
   session: SessionSnapshot;
   now: number;
@@ -125,6 +138,13 @@ export type ChromeContext = Readonly<{
    * graph exists, and absent is *nothing held*.
    */
   bufferedEntries?: number;
+  /**
+   * The copy rung's mode and, in semantic mode, the selection's size
+   * (C14 I55). Absent when no copy mode is up, and absent on the same terms as
+   * `owner` before the session graph exists — a `copy` rung with no `copy`
+   * reads as semantic mode with nothing selected.
+   */
+  copy?: CopyState;
   /**
    * C02's resolved record, because **the chrome draws marks and a mark needs a
    * rung** (A03 SS47, C09 I22). The owner line's chords are `⏎ ⇧ ⇥ ⌃] ←→ ↑↓`,
