@@ -61,6 +61,7 @@ content — the five extension hooks of A02 §6.
 |---|---|
 | [`design/language/calcium-registry.json`](design/language/calcium-registry.json) | **Normative.** Rules with permanent `R-XXX-NNN` ids; only `status: current` binds. Also the themes, glyphs, spinners, bars, ramps, actions and bindings |
 | [`design/language/AUTHORITY.md`](design/language/AUTHORITY.md) | What the registry overrides, and the three things it does not |
+| [`design/language/RULE_LEDGER.md`](design/language/RULE_LEDGER.md) | Every `current` rule in one of three states — `cited`, `covered` with its subject, or `owed`. The reconciliation was checked MR by MR against **the plan**, and the plan is not the registry; this is the population the per-MR reports could not see. `node tools/rule-status.mjs` re-derives it and gates under `make design-check` (A03 SS66) |
 | `design/language/fixtures/` | The design's panels, as plain text — the target appearance a golden frame is read against |
 | `design/language/build-calcium.mjs` | The projector. `make design` runs it |
 | `design/language/check-calcium.mjs` | Holds the projection to the registry, by rebuilding it in memory |

@@ -2905,6 +2905,12 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     MG7: "test/contract/adapters.test.ts",
     MG8: "test/contract/fixtures.test.ts",
     MG9: "test/contract/blocks.test.ts",
+    // **SS66 is a gate in `make enforce` rather than a scan in `tools/enforce/`**,
+    // because its corpus is the registry against a ledger and not `src/`. It runs
+    // under `design-check`, which `enforce` depends on, and its four checks are
+    // held by the controls in the file named here — so the row is enforced, and
+    // this entry is what stops it reading as implemented when it is not.
+    SS66: "test/unit/rule-ledger.test.ts",
   };
 
   /**

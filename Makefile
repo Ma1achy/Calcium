@@ -96,9 +96,13 @@ check:              ## type-check and lint, including the examples
 # graph and the source scans and this is neither — it is the design's own record checking
 # itself. The pre-commit hook runs `make enforce`, so the dependency is what makes the
 # rule *regenerate the HTML in the same commit* enforced instead of remembered.
-design-check:       ## the registry ↔ HTML projection, and released-rule immutability
+design-check:       ## the registry ↔ HTML projection, released-rule immutability, the ledger
 	node docs/design/language/check-calcium.mjs
 	node docs/design/language/lint-immutable.mjs
+	@# **The ledger belongs here and not in `roadmap`**, which reports and never
+	@# fails. Its fourth check is a claim about the tree that goes stale the
+	@# moment a rule lands, so it has to gate rather than report.
+	node tools/rule-status.mjs
 
 design:             ## regenerate the HTML and KEYS.md from the registry
 	node docs/design/language/build-calcium.mjs

@@ -58,6 +58,17 @@ the named file. A row naming a file that does not exist, or a symbol that is no
 longer in it, fails — and the control is a fabricated row, because a table of
 sixteen true statements passes exactly like a checker that reads nothing.
 
+**And its population is this plan, which is not the registry** — so there is a
+second record beside it, and the pair is the point. `AUTHORITY.md` puts
+`status: current` at the top of the precedence ladder and this document nowhere
+on it, so a rule the plan never named is invisible here however green the table
+is: the landing record can only answer *did the MR land*, never *is the rule
+answered by anything*. `RULE_LEDGER.md` holds the other population — all 118
+`current` rules, `cited`, `covered` or `owed` — and `tools/rule-status.mjs`
+gates it under `make design-check` (A03 SS66). The first run of that instrument
+read **70 cited, 7 covered, 41 owed** against a landing record that was
+complete, which is the measurement that argues for keeping both.
+
 ---
 
 ## M4 · Glyphs — the head mark, `agent`, reservations
