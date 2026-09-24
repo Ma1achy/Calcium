@@ -83,7 +83,7 @@ assumption:** the tree collapses both granularities to `#-`, and the frame
 records that.
 
 **11 · Whether spinner frames belong in a collision domain.** `|` is now a
-rotation frame, `quote`'s ASCII rail and `vertical`'s border. `SS59` cannot see
+rotation frame, `quote`'s ASCII rail and `vertical`'s border. `SS64` cannot see
 it — spinner frames are in neither `GLYPH_DOMAINS` nor `GLYPH_SET_DOMAINS`, so
 they never enter a pair — while the collision model's own test, *does this pair
 share a row*, says they do: a boxed status draws `| | retrying in 8s`, border
