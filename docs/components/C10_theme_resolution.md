@@ -1162,6 +1162,31 @@ does not apply. A table of four would have read as *the list always decides*.
 
 ### 4k.4 — what the rulings leave behind
 
+- **`R-COR-003` is enumerated over no population, and that is M11's remaining half.**
+  The rule is `current` in the registry and reads *every actionable, status, and interaction
+  distinction has two independent carriers and survives without colour*. What exists here is the
+  **axis** half: I52 and T2.52 compare the registry's twelve `stateAxes` against §4k.3's partition
+  by equality both ways, so no axis can be added to the design or dropped from it in silence. What
+  does **not** exist is the **carrier** half — there is no table declaring, per axis, which two
+  carriers hold it, and so nothing can be wrong about *tone and ground are not two carriers,
+  because both die at 1-bit*. A rule enumerated over no population passes exactly like one that is
+  satisfied, which is A03 §2's class arriving at the largest rule in the contract.
+
+  **The instrument it needs, stated because the obvious one is wrong.** Grepping `src/` for each
+  axis value and reading the hit count measures nothing: `readonly` returns 330 because it is a
+  TypeScript keyword, `live` 119 and `open` 85 because they are ordinary English in comments, and
+  `unchosen` 0 although `choice` is a shipped axis with a built renderer (C09 I105). **A word count
+  over a corpus that is mostly prose is a measurement of the prose** — the *prose inflates textual
+  signals* rule, arriving on an axis rather than on a rule. What the table needs is, per axis, the
+  **field** that expresses it and the **renderer** that reads that field, which is twelve small
+  traces and not one sweep; §4k.4 already holds three of the answers, and they are the three that
+  say *no subject*: `hovered`, `disabled` and `stale` are fields no block carries.
+
+  **So the gate lands with its population measured rather than with its rule written**, and the
+  order matters: a carrier declared from this section's prose rather than from the renderer is a
+  claim with no source, which is the failure mode this component has already met twice — row 1's
+  third clause (F1240) and I48's 74 of 100 pairs the gate checked and the painter never emitted.
+
 - **Three of the six frames cannot be drawn, and the three reasons are not one reason.**
   *Hover* has no **consumer** — no block declares `hovered`, and the router discards a hover by
   rule (`router.ts:377`, `:525`, `:766`; §4a row t, *a hover is not a gesture and clears nothing*).
