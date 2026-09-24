@@ -1,14 +1,14 @@
 {
   "label": "all",
-  "only": "c14-selection-ground",
+  "only": "c09-gif",
   "rows": [
     {
-      "run": "c14-selection-ground.mjs",
+      "run": "c09-gif.mjs",
       "exit": 0,
-      "seconds": 34,
+      "seconds": 62,
       "state": "green",
       "restored": 0,
-      "caught": 10,
+      "caught": 16,
       "elsewhere": 0,
       "survived": 0,
       "anchorMissed": 0,

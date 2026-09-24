@@ -44,8 +44,8 @@ const MUTATIONS = [
     // harmless-looking and moves `dark`'s focused head off the design's `●`.
     name: "every focused head takes the state's mark, banded theme or not",
     file: NOTICE,
-    from: '                      ? headMark(block.state, ctx.capabilities, focused && isBand(ctx.theme, "focusGround"))',
-    to: "                      ? headMark(block.state, ctx.capabilities, focused)",
+    from: '                          (focused && isBand(ctx.theme, "focusGround")) ||',
+    to: "                          focused ||",
     expect: "T1.75",
   },
   {
@@ -54,8 +54,8 @@ const MUTATIONS = [
     // ones included, which are on the page and whose tone still carries.
     name: "the page's heads are taken as banded",
     file: NOTICE,
-    from: '                      ? headMark(block.state, ctx.capabilities, focused && isBand(ctx.theme, "focusGround"))',
-    to: '                      ? headMark(block.state, ctx.capabilities, isBand(ctx.theme, "focusGround"))',
+    from: '                          (focused && isBand(ctx.theme, "focusGround")) ||',
+    to: '                          isBand(ctx.theme, "focusGround") ||',
     expect: "T1.75",
   },
   {

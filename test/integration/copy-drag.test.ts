@@ -136,7 +136,79 @@ const release = (col: number, row: number): string =>
   `[<0;${String(col)};${String(row)}m`;
 
 describe("C14 §6f — the drag in a real session", () => {
-  it.todo("T4.37f (C14 I54, R-THM-003): in hcDark a selected failed head draws its own mark and esc restores ● — not deferred on a component: specified before the axis exists");
+  it("T4.37f (C14 I54, R-THM-003): in hcDark a selected failed head draws its own mark, and esc restores ●", async () => {
+    vi.useFakeTimers();
+    try {
+      // The head's first cell, read off the screen: the glyph lead is the mark
+      // and one space, immediately before the text.
+      const headIn = async (variant: "hcDark" | "dark"): Promise<{ before: string; selected: string; after: string }> => {
+        const stdin = fakeStdin();
+        const { screen, clock } = await buildSession({
+          manifest: {
+            ...(MANIFEST as Exclude<typeof MANIFEST, string>),
+            tools: [
+              ...(MANIFEST as Exclude<typeof MANIFEST, string>).tools,
+              { name: "heads", local: true, summary: "one failed call head", args: [], flags: [] },
+            ],
+          },
+          localHandlers: {
+            ...SAYS,
+            heads: () =>
+              ({
+                schema: "tui.view/1",
+                command: "heads",
+                status: "ok",
+                blocks: [{ kind: "notice", id: "h", tone: "error", glyph: "running", text: "HEADTEXT", state: "failed" }],
+              }) as never,
+          },
+          stdin: stdin as never,
+        });
+        const step = async (ms = 0): Promise<void> => {
+          clock.advance(ms);
+          await vi.advanceTimersByTimeAsync(ms);
+          await settle();
+        };
+        const mark = (): string => {
+          const row = screen().rows.find((r) => r.includes("HEADTEXT")) ?? "";
+          return [...row.slice(0, row.indexOf("HEADTEXT"))].at(-2) ?? "";
+        };
+        await step();
+        if (variant === "hcDark") {
+          stdin.emit("/theme hcDark\r");
+          await step();
+        }
+        stdin.emit("/heads\r");
+        await step();
+        const before = mark();
+        const at = screen().rows.findIndex((r) => r.includes("HEADTEXT")) + 1;
+        stdin.emit("\u001bV");
+        await step();
+        stdin.emit(press(6, at));
+        await step();
+        stdin.emit(moveTo(7, at));
+        await step();
+        stdin.emit(release(7, at));
+        await step();
+        const selected = mark();
+        // The lone byte, past C16's disambiguation window: the first clears
+        // the selection and the second leaves (C14 I48).
+        stdin.emit("\u001b");
+        await step(100);
+        stdin.emit("\u001b");
+        await step(100);
+        return { before, selected, after: mark() };
+      };
+      const hc = await headIn("hcDark");
+      expect(hc.before, "hcDark, not selected: the page's ●").toBe("●");
+      expect(hc.selected, "hcDark, selected: the state's own mark").toBe("✗");
+      expect(hc.after, "hcDark, after esc: ● again — the axis responds both ways").toBe("●");
+      // The control: `dark` does not band its selection.
+      const dark = await headIn("dark");
+      expect([dark.before, dark.selected, dark.after], "dark: ● throughout").toEqual(["●", "●", "●"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it("T4.37 (C14 I44, I45): a drag past the region autoscrolls, and keeps going with the pointer still", async () => {
     vi.useFakeTimers();

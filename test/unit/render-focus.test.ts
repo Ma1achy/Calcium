@@ -713,7 +713,29 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
   const noticeAt = (b: typeof NOTICE, focus: FocusState | null, depth: 24 | 1 = 24) =>
     renderToLines(registry, b, 40, { theme, capabilities: capabilities({ colourDepth: depth }), focus });
 
-  it.todo("T1.75b (C09 I45, C14 I54, R-THM-003): a washed call head on the selection band takes the state's own mark — not deferred on a component: specified before RenderContext.washed exists");
+  it("T1.75b (C09 I45, C14 I54, R-THM-003): a washed call head on the selection band takes the state's own mark", () => {
+    const STATES = ["queued", "running", "succeeded", "failed", "cancelled"] as const;
+    const caps = capabilities({ colourDepth: 24 });
+    const WASHED: ReadonlySet<string> = new Set(["n"]);
+    const headOf = (t: typeof theme, state: (typeof STATES)[number], washed?: ReadonlySet<string>): string => {
+      const b = block({ kind: "notice", id: "n", tone: "info", glyph: "running", text: "x", state } as never);
+      const [first] = renderToLines(registry, b, 20, { theme: t, capabilities: caps, focus: null, ...(washed === undefined ? {} : { washed }) });
+      return [...(first ?? "").replace(SGR, "")][0] ?? "";
+    };
+    const running = glyphFor("running", caps);
+    const own = STATES.map((s) => glyphFor(headMark(s, capabilities({ colourDepth: 1 })), caps));
+    for (const variant of ["hcDark", "hcLight"] as const) {
+      const loaded = loadTheme(defaultTheme, variant);
+      if (!loaded.ok) throw new Error(`${variant} must load`);
+      const hc = loaded.value.current;
+      expect(STATES.map((s) => headOf(hc, s, WASHED)), `${variant}: washed, the state's own mark`).toEqual(own);
+      expect(STATES.map((s) => headOf(hc, s)), `${variant}: not washed, ●`).toEqual(STATES.map(() => running));
+      // A washed set naming another block leaves this head alone.
+      expect(headOf(hc, "failed", new Set(["other"])), `${variant}: another block's wash`).toBe(running);
+    }
+    // The control: `dark` does not band its selection, so `washed` moves nothing.
+    expect(STATES.map((s) => headOf(theme, s, WASHED)), "dark: washed, still ●").toEqual(STATES.map(() => running));
+  });
 
   it("T1.75 (C09 I45, C10 I45, R-THM-003): a focused call head on a band takes the state's own mark, and the page keeps ●", () => {
     const STATES = ["queued", "running", "succeeded", "failed", "cancelled"] as const;

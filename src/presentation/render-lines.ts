@@ -38,6 +38,8 @@ export type RenderOptions = Readonly<{
   motion?: Motion;
   tick?: number;
   focus?: RenderContext["focus"];
+  /** Blocks under a banded selection (C14 I54). Absent is none, and is the only value off a band. */
+  washed?: RenderContext["washed"];
   /** Per-container scroll offsets, in rows (C04 I48). Absent is none. */
   scrollOffsets?: RenderContext["scrollOffsets"];
   /** Per-plot cursor positions, in sample indices. Absent is no cursor. */
@@ -84,6 +86,7 @@ export function renderToLines(
     capabilities: options.capabilities,
     ...(options.motion === undefined ? {} : { motion: options.motion }),
     focus: options.focus ?? null,
+    ...(options.washed === undefined ? {} : { washed: options.washed }),
     ...(options.scrollOffsets === undefined ? {} : { scrollOffsets: options.scrollOffsets }),
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
     ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
@@ -139,6 +142,7 @@ export function renderSequenceToLines(
     capabilities: options.capabilities,
     ...(options.motion === undefined ? {} : { motion: options.motion }),
     focus: options.focus ?? null,
+    ...(options.washed === undefined ? {} : { washed: options.washed }),
     ...(options.scrollOffsets === undefined ? {} : { scrollOffsets: options.scrollOffsets }),
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
     ...(options.cameras === undefined ? {} : { cameras: options.cameras }),

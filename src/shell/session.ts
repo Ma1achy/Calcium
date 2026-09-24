@@ -44,6 +44,7 @@ import type { Block, Image, Plot } from "../data/viewmodel/index.js";
 import { blockSpansOfEntry, elementsOfEntry, entryLayout, renderEntryPieces, windowEntry } from "./entry-layout.js";
 import { washedRowsOf, washSelectedRows } from "./paint.js";
 import { animationIntervalOf } from "../presentation/blocks/index.js";
+import { isBand } from "../presentation/blocks/paint.js";
 import type { EntryParts } from "./render-cache.js";
 import type { EntryPiece } from "./entry-layout.js";
 import type { Group } from "../data/viewmodel/index.js";
@@ -1973,6 +1974,21 @@ function washSelected(
   return washSelectedRows(lines, rows, graph.theme.current, graph.capabilities, width);
 }
 
+/**
+ * The entry's blocks under a **banded** selection (C14 I54), or `undefined`.
+ *
+ * Undefined on a theme without a selection band and for an entry with nothing
+ * selected, so both key and render exactly as they did before the field.
+ */
+function washedBlocksOf(graph: Graph, entryId: string, selection: SelectionWash | null): ReadonlySet<string> | undefined {
+  if (selection === null || !isBand(graph.theme.current, "selection")) return undefined;
+  const ids = new Set<string>();
+  for (const key of selection.blocks) {
+    if (semantic.entryOf(key) === entryId) ids.add(key.slice(key.indexOf("\u0000") + 1));
+  }
+  return ids.size === 0 ? undefined : ids;
+}
+
 /** What the wash needs: the selection and the spans it was taken over (I39). */
 type SelectionWash = Readonly<{
   blocks: ReadonlySet<string>;
@@ -2182,7 +2198,14 @@ function visibleRows(
     const tickKey = cadence === null ? "" : String(tick);
     // **The range is its own axis, beside the stable key** (C22 I101): a miss
     // on it alone keeps the parts, and the render below assembles from them.
-    const slot = `${key}\u0000${offsets}\u0000${orbitKey}\u0000${cursorKey}\u0000${framesKey}\u0000${seriesKey}`;
+    // **The tenth axis, and only where the picture depends on it** (C14 I54).
+    // On a theme that bands its selection a washed call head draws its state's
+    // own mark, so the selection changes what is rendered there — and only
+    // there. Everywhere else it is absent and keys nothing, which keeps I40's
+    // reason for refusing the axis true on every theme it was written about.
+    const washed = washedBlocksOf(graph, entry.id, selection);
+    const washedKey = washed === undefined ? "" : `\u0000${[...washed].sort().join("\u0001")}`;
+    const slot = `${key}\u0000${offsets}\u0000${orbitKey}\u0000${cursorKey}\u0000${framesKey}\u0000${seriesKey}${washedKey}`;
     const held = graph.rendered.get(entry.id, entry.rev, width, slot, theme, range, tickKey);
     // **An animating block is never taken from the parts** (C22 I103): on a
     // tick miss its held rows are the last tick's, and on a range miss the
@@ -2208,6 +2231,7 @@ function visibleRows(
         // still broken — a partially-populated context, which counting
         // references cannot see.
         focus,
+        ...(washed === undefined ? {} : { washed }),
         // **The counter, and it was `?? 0` for the life of every session**
         // (F227). `RenderContext.tick` is documented as advanced by C03's
         // spinner commit; nothing raised one and nothing passed one, and the

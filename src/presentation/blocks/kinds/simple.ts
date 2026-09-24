@@ -639,7 +639,12 @@ export const noticeDefinition: BlockDefinition<Notice> = {
                     // On a band the tone is spent per cell (C10 I45), so a focused
                     // head in a high-contrast theme takes the 1-bit rung's mark.
                     block.state !== undefined
-                      ? headMark(block.state, ctx.capabilities, focused && isBand(ctx.theme, "focusGround"))
+                      ? headMark(
+                          block.state,
+                          ctx.capabilities,
+                          (focused && isBand(ctx.theme, "focusGround")) ||
+                            (ctx.washed?.has(block.id) === true && isBand(ctx.theme, "selection")),
+                        )
                       : block.glyph,
                     ctx.capabilities,
                   )

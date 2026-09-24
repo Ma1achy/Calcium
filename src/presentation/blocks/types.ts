@@ -291,6 +291,15 @@ export type RenderContext = Readonly<{
   scratch?: RenderScratch;
   focus: FocusState | null;
   /**
+   * The ids of this entry's blocks under the selection band (C14 I54,
+   * R-THM-003). **Present only on a theme that bands its selection**: there the
+   * band spends every cell's tone, so a call head under it takes its state's
+   * own mark (C09 I45), and the renderer cannot learn that from the wash, which
+   * is laid after the cache (C14 I40). Absent everywhere else, and absent keys
+   * nothing, so a theme without a band renders and caches exactly as before.
+   */
+  washed?: ReadonlySet<string>;
+  /**
    * A monotonic counter, incremented by C03's spinner commit. A renderer
    * computes `frames[tick % frames.length]`; nothing else reads it, and
    * `measure` never receives it at all (I8) — animation changes appearance,
