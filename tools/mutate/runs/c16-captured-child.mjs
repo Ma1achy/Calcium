@@ -72,6 +72,16 @@ const results = runPass({
       to: "    for (const chord of options.reservedChords()) {\n      if (!bindings.has(chordKey(chord))) continue;\n      if (chord.name !== \"\\u0000\") continue;\n",
       expect: "T1.107",
     },
+    {
+      // C16 I56 — the exit arm reads the same fact the rung does. Without the
+      // clause a surface leaves focus at an empty prompt, so the second `⌃c`
+      // inside the window raises the host's confirm and the child never sees it.
+      name: "the exit arm ignores an attached child",
+      file: "src/interaction/router/router.ts",
+      from: "      deps.liveStreams() === 0 &&\n      !deps.childAttached()\n",
+      to: "      deps.liveStreams() === 0\n",
+      expect: "T1.106c",
+    },
     // **C22 I110's three, and the first is what the earlier take of this run
     // could not reach.** The wrapper's mutation survived until the layer went:
     // `blocking: true` on the pushed view was consuming every unbound key at

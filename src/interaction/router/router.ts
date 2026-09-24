@@ -375,7 +375,20 @@ export function createRouter(
     // stops a runaway `--watch` is also the key that arms the session's exit,
     // which is the wrong pair to make adjacent — two presses to stop two
     // streams would arm and then raise the confirm.
-    if (isExitKey && atEmptyPrompt && deps.inFlight() === null && deps.liveStreams() === 0) {
+    //
+    // **Nor does an attached child** (I56, R-OWN-002). A surface leaves focus at
+    // the prompt with the line empty, so without this the second `⌃c` inside
+    // the window raised the host's confirm and never reached the child — the
+    // key a full-screen program most needs twice. `childAttached` is the fact
+    // the `child` rung reads, so the arm and the ladder cannot disagree about
+    // who holds the keys; a shell delegation is already `inFlight`.
+    if (
+      isExitKey &&
+      atEmptyPrompt &&
+      deps.inFlight() === null &&
+      deps.liveStreams() === 0 &&
+      !deps.childAttached()
+    ) {
       if (armedAt !== null) {
         armedAt = null;
         return "raise";

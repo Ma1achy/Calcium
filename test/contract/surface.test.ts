@@ -226,7 +226,34 @@ describe("C16 §5 — the captured child owns the keyboard (M9)", () => {
     await h.graph.lifecycle.release();
   });
 
-  it.todo("T1.106c (C16 I56, R-OWN-002): two ⌃c at an attached child reach the child twice and raise no exit confirm — not deferred on a component: the arming condition is amended in the next commit of this MR");
+  it("T1.106c (C16 I56, R-OWN-002): two ⌃c at an attached child reach the child twice and raise no exit confirm", async () => {
+    const h = await buildGraph();
+    h.graph.lifecycle.acquire();
+
+    // **The control first**: with nothing attached, the second ⌃c inside the
+    // window is the raise — `["arming"]` and nothing after it. Without this the
+    // row below is passed by a router whose arm never fires at all.
+    h.stdin.emit("\x03");
+    h.stdin.emit("\x03");
+    expect(h.graph.router.lastStages, "unattached: the second ⌃c raises the confirm").toEqual(["arming"]);
+    h.stdin.emit("z");
+    h.graph.editor.clear();
+
+    const seen: string[] = [];
+    const handle = h.graph.surface.open({
+      ...child(seen),
+      keymap: [{ key: { name: "c", ctrl: true }, action: "interrupt" }],
+    });
+    h.stdin.emit("\x03");
+    await tick();
+    h.stdin.emit("\x03");
+    await tick();
+    expect(h.graph.router.lastStages, "attached: the second ⌃c is not the raise").not.toEqual(["arming"]);
+    // The action, not the phase: a second legacy press inside the hold window
+    // is C24's deterministic `repeat` (C24 §3), which is the surface's to infer.
+    expect(seen.map((s) => s.split(":")[0]), "and the child was handed both").toEqual(["interrupt", "interrupt"]);
+    await handle.close();
+  });
 
   it("T1.106b (C16 I49, R-BLK-908): ⌃] is the one key the child does not get", async () => {
     const h = await buildGraph();
