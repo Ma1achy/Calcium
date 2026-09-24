@@ -1092,3 +1092,19 @@ describe("derived alignment (I27)", () => {
     expect(sliced.map((r) => r.search(/\S/u))).toEqual([0, 0, 0]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// C11 §3 — I28, a numeric column groups its thousands.
+// ---------------------------------------------------------------------------
+
+describe("thousands grouping (I28)", () => {
+  it.todo(
+    "T1.35 (I28, §078, R-TBL-004): a numeric column of 1204/41208/88/10000 renders 1,204/41,208/88/10,000; the same values beside one `timeout` render bare because the column is text by I27; and the control, one cell too narrow for its separators, draws bare rather than truncating — not deferred on a component: groupingColumns lands in this same MR",
+  );
+  it.todo(
+    "T1.36 (I28, C04 I86): a numeric column whose cells carry spans draws ungrouped and its run boundaries still address the characters they named, with the spans removed as the control — not deferred on a component: clause 2 lands in this same MR",
+  );
+  it.todo(
+    "T1.37 (I28, I26): a decimal column of 1204.5 and 88.25 puts its point where the grouped integer part ends, with grouping suppressed as the control where the point moves left by one cell — not deferred on a component: the points are taken over the grouped text in this same MR",
+  );
+});
