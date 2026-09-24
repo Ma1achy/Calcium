@@ -642,6 +642,66 @@ kinds of twenty-five, or a linear stream with no settled line, is the frame with
 nothing in it — and it would be read as coverage.
 ---
 
+**30 · The registry gives one ASCII alphabet to sets at different intervals, and
+`R-MOT-011` says a shared alphabet shares an interval.** §039: *SETS THAT SHARE
+GLYPHS SHARE AN INTERVAL* and *NOTHING varies its rate at runtime*. The registry's
+own `asciiPattern` records give `|/-\` to nine sets between 80 and 140 ms
+(braille, orbit, circleQuarters, boxBounce, boxBounce2, circleHalves, pipe,
+braille2, arc), `.oO@Oo` to six (growVertical at 100, the rest at 120), and `0-f`
+to hex at 110 and binary4 at 120. In the primary frames hex and decimal share
+digits. `R-MOT-010`'s *fit-cycle* keeps each set's own cycle, which pulls against
+one cadence per alphabet. **Which is it** — does the ASCII rung take one
+interval per alphabet (and which), or are ASCII rungs outside the rule's domain?
+The tree's own strobe (one tick at the fastest on-screen interval, so `toggle`
+at 400 ms steps at 80) is a defect either way and is built regardless.
+
+---
+
+**31 · Thirteen ramps declare `attentionGroup: "unclassified"`.** `R-MOT-012`
+says every ramp declares its attention group, and the group is what decides what
+`reduced` stops (C09 I99). `rampPolicy.attentionGroups` lists fifteen; the other
+thirteen — eight of them animated: sweepbar, converge, heartbeat, typewriter,
+marquee, ripple, neon, bookend, scatter — carry `unclassified`. Classifying them
+is a visible choice (what still moves under `reduced`) the design has not made.
+The direction clause of the same rule is built and checked separately.
+
+---
+
+**32 · Posts or slant for counted work, and no glyphs for a sub-cell braille
+bar.** `R-PRG-002` says *discrete steps use posts* and *sub-cell progress uses
+braille*. §033 draws `▮▮▮▮▮▯▯▯ discrete steps — five of eight` in posts; §035 and
+§036 draw counted work in slant — *compacting ▰▰… 3 of 5 turns*, *indexing …
+412 of 1,847 files*. The tree maps `granularity: "segmented"` to slant. And the
+registry's braille bar is whole-cell `⣿` or space, with no sequence for *eight
+positions per column*. Two visible choices: which alphabet counted work takes,
+and the sub-cell braille ramp.
+
+---
+
+**33 · `R-THM-003` says the ground is selection's only carrier; `R-COR-003` and
+`R-COL-004` say no interaction distinction has one.** R-THM-003: *the selection
+band keeps 3 : 1 against the page, because the ground is selection's only
+carrier*. R-COR-003: *every actionable, status, and interaction distinction has
+two independent carriers*; R-COL-004: *an interaction ground is never the only
+carrier*. C10 §4k.5's carrier table records selection as *ground alone*. At 1-bit
+the tree answers with inverse (`selectionStyle`), which is a second rendering of
+the same carrier rather than a second carrier. **Does selection owe a mark** —
+§017's `▌` gutter is the candidate — **or is selection the named exception**, as
+`linear` is for R-COR-003's matrix?
+
+---
+
+**34 · §026's `fade` trail draws the sole carrier at the ground, and `R-MOT-004`
+forbids exactly that.** §026: *the newest character IS the ground and emerges
+toward the ink*. R-MOT-004: an animated frame on meaningful text is contrast-safe
+in every frame and never the sole semantic carrier. `TRAIL_HEAD` gives `fade` a
+`muted` head (floor 2.5, below the 4.5 text floor) and its comment says *the gap
+is parked* — **and it was not**: no entry here named it until this one. Does
+`fade`'s head clear the text floor (and so not reach the ground), or is a
+streaming head exempt because the text is still arriving?
+
+---
+
 ## Not yet recovered
 
 **Sixteen distinct questions are above, and the running count in the reports
