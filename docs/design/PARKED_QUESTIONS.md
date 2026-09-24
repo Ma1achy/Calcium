@@ -412,6 +412,45 @@ cell.
 
 ---
 
+**24 · An appearance rule whose only violator is an adapter.** `R-TBL-001` is
+`status: current` — *text aligns to inline-start and numeric values align to
+inline-end* — and it is stated as a fact about what happens, not as a default a
+caller may override.
+
+**The mechanism to implement it is already in C11 and carries its own
+argument.** `src/presentation/table/cells.ts`'s `decimalPoints` derives a
+column's point **from the column's own cells and never authored**, because *a
+declared one is a number the planner can contradict when a column yields width,
+with nothing to report the disagreement*. Alignment is the same sentence one
+level up: a declared `left` on a column of numbers is a claim the data
+falsifies, and nothing reports it.
+
+**The obstacle is where the violation lives.** `src/data/adapters/fallback.ts`
+`columnsFor` — the one place the framework itself builds columns out of data —
+sets `align: "left"` for every field while already holding the rows, so every
+numeric column of a far side's JSON is left-aligned. That file is **C07**, and
+`AUTHORITY.md` names adapters among the components the kit leaves untouched:
+*outside those three domains the repository is untouched by this kit.*
+
+**So the two readings are both defensible and they lead opposite ways:**
+
+- the rule is about **appearance**, which is the kit's, so C11 derives the
+  default from the cells and an adapter's `left` on a numeric column stops
+  meaning anything — which reaches into C07's authority by another route, and
+  moves every table the `docker` example draws;
+- the rule binds only where the kit binds, so `fallback.ts` keeps its
+  declaration and `R-TBL-001` is satisfied for hand-authored columns and
+  violated for derived ones — which is a rule that holds where nobody was going
+  to break it.
+
+`ColumnDef.align` is **required** today, so there is also a third shape: make it
+optional, derive when absent, and leave an explicit declaration alone. That
+satisfies neither reading cleanly — the adapter declares `left` explicitly, so
+nothing would change — but it is the one that moves no golden, and it is worth
+naming because it is what a smaller change would look like.
+
+---
+
 ## Not yet recovered
 
 **Sixteen distinct questions are above, and the running count in the reports
