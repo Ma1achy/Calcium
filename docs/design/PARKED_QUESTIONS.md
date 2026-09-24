@@ -45,7 +45,7 @@ three-cell slot. One word flips it. *(This is also what a §016 fixture
 comparison reads as a mismatch on every Unicode residue row — one question, two
 arrivals.)*
 
-> **Ruled 2026-09-24.** Delete `Placement.kind: "fill"` unless the design uses it. **Checked: it does not.** The registry's only `placement` fields are on bar records, where they mean something else. **Owed:** the deletion. C15 I20, I22 and I27 are retired as refusals of a thing that no longer exists, rather than left standing with no subject.
+> **Ruled 2026-09-24.** Delete `Placement.kind: "fill"` unless the design uses it. **Checked: it does not.** The registry's only `placement` fields are on bar records, where they mean something else. **Owed:** the deletion. C15 I20, I22 and I27 are retired as refusals of a thing that no longer exists, rather than left standing with no subject. **Premise note, 2026-09-25:** only the `fill` clause of each is a refusal of a thing that no longer exists. I20 still refuses a centred layer with no width, I22 a centred peek, I27 a centred, blocking or non-`escape` panel — all constructible. Retiring them would drop three live gates, so each is **amended** to lose its `fill` clause and keeps the rest; the ruling's aim, no refusal standing with no subject, holds. T1.11 and T4.4 had only `fill` for a subject and retire. **Built.**
 
 **3 · RULED — `Placement.kind: "fill"` has no producer in `src/`.** Deleting it is the
 tail of deleting the pushed view, but C15 I20, I22 and I27 are each written as a
