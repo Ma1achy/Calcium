@@ -336,4 +336,6 @@ describe("C14 §6d — the selection's ground", () => {
     expect(mono, "SGR 7").toContain("[7m");
     expect(mono).toContain("▸ x");
   });
+
+  it.todo("T1.40d (C14 I52): the wash re-opens after every SGR sequence, so a styled row is grounded to its end — not deferred on a component: specified before the wash is changed");
 });
