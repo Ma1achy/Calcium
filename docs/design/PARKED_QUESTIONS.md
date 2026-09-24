@@ -195,6 +195,40 @@ a question about the registry's completeness.
 
 ---
 
+**19 · What a framework kind draws when it sheds a part from a row.** `shedRow`
+composes a bare `⋯n` — the `residue` lead and a count — for the four kinds that
+shed: `keyValue`, `events`, `comparison`, `steps`. **The design draws that form
+nowhere.** Every `⋯` in the fixtures carries a count *and* a noun (`⋯ 40
+unchanged lines`, `⋯ 3 agents`, `⋯ 0 above, 1 below`), and the repo's container
+residue row already draws exactly that — so the two agree and this question is
+not about them.
+
+What the design does draw, and why none of it settles the row:
+
+- **`+n`** — §104's metric row, `val loss  0.0372  +1`, where `↓ from 0.41` was
+  shed. The same row is §085's, and §085 is classified `app`: the application
+  composes it, so `+1` may be the application's mark rather than the framework's.
+- **`+N more`** — §049's table, §050's output with `⏎ expand`, §021's scrollback.
+  All three close a **truncated vertical list**, which in the tree is the
+  container residue row, not `shedRow`.
+- **nothing at all** — §023, *at 40 columns the drill survives*, is the design's
+  own narrow-width section and it declares a shed **order** with no mark: the
+  label, the endpoint, the path row and the bar segments simply go.
+
+So the three answers the design gives are for three other subjects, and the one
+this row needs is in no fixture. **An earlier pass read §104's `+1` as settling
+it and said so**; going to look for where the design draws `events` or
+`comparison` shedding is what showed it does not, which is the difference
+between a mark the design chose and a mark inferred from a neighbouring figure.
+
+**Two things ride on the answer and are held with it.** §104 also says the shed
+count is **focusable** and that `⏎` expands what it stands for — `ShedResult.mark`
+is a bare string with no id, so neither is built — and the mark's width tier is
+whatever the answer is: `+` is ASCII at both rungs, which would make C09 I108's
+reservation correct and no longer load-bearing, where `⋯` keeps it so.
+
+---
+
 ## Not yet recovered
 
 **Sixteen distinct questions are above, and the running count in the reports
