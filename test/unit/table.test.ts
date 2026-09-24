@@ -943,3 +943,19 @@ describe("C11 §5a — the window", () => {
     expect((bar.block as Table).showHeader, "the header is out of range").toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// C11 §3 — I27, a column's alignment derived from its own values.
+// ---------------------------------------------------------------------------
+
+describe("derived alignment (I27)", () => {
+  it.todo(
+    "T1.31 (I27, §078, R-TBL-001): four columns declaring no alignment — integers, decimals, durations and a mixed column of 200/404/timeout — resolve to decimal, decimal, right and left, with a fifth column declaring left over the same integers keeping left as the control — not deferred on a component: ColumnDef.align becomes optional and the derivation lands in this same MR",
+  );
+  it.todo(
+    "T1.32 (I27, I26): a table of integer columns declaring no alignment renders byte-identical to the same table declaring align right, at every width from 20 to 120, with one fractional value added as the control where the two must differ — not deferred on a component: the derivation lands in this same MR",
+  );
+  it.todo(
+    "T1.33 (I27, I19, F429): a status column of 200/404/503/timeout windowed to its first three rows renders at the whole table's alignment and not the slice's, with the unwindowed table as the control — not deferred on a component: window resolves the alignment before slicing, in this same MR",
+  );
+});
