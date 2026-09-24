@@ -99,6 +99,14 @@ function styleOf(colour: ColourValue | undefined): Style {
  * missing slot must not be the thing that takes a session down mid-render.
  */
 export function resolve(ref: ColourRef, theme: ResolvedTheme, caps: Caps, on?: string): Style {
+  // **A receded theme answers every ink as `dim`, and it asks the theme it came
+  // from** (I59). Here and not in the tokens: rewriting every slot to one hex
+  // would quantise a set of identical values at 8-bit, which need not land on
+  // the index `tone.dim` takes in its own set — so the redirection is exact at
+  // every depth only by being a redirection. A surface is not content.
+  if (theme.recedes !== undefined && split(ref)[0] !== "surface") {
+    return resolve("tone.dim", theme.recedes, caps, on);
+  }
   const key = `${ref}|${theme.name}|${caps.colourDepth}|${on ?? ""}`;
   const held = styles.get(key);
   if (held !== undefined) return held;
@@ -367,4 +375,28 @@ export function resolveBackground(ref: ColourRef, theme: ResolvedTheme, caps: Ca
 
   const asForeground = resolve(ref, theme, caps);
   return asForeground.colour === undefined ? NO_STYLE : { background: asForeground.colour };
+}
+
+const receded = new WeakMap<ResolvedTheme, ResolvedTheme>();
+
+/**
+ * The theme a stale reading is drawn in (I59, §047, `R-HON-002`): every palette
+ * slot resolves as `tone.dim`, at every depth, and every surface as it did.
+ *
+ * **Its own name**, because `resolve` memoises on the name, and one object per
+ * theme so the frame path allocates it once. Receding a receded theme is the
+ * same theme.
+ *
+ * **The blind spot, stated**: a painter reading `theme.tokens` without going
+ * through `resolve` — a colormap's stops, a ramp's mix — is not receded, so a
+ * stale heatmap keeps its colours. Every tone and slot a block names passes
+ * through here; a figure's own gradient does not.
+ */
+export function recede(theme: ResolvedTheme): ResolvedTheme {
+  if (theme.recedes !== undefined) return theme;
+  const held = receded.get(theme);
+  if (held !== undefined) return held;
+  const made: ResolvedTheme = Object.freeze({ ...theme, name: `${theme.name}/receded`, recedes: theme });
+  receded.set(theme, made);
+  return made;
 }

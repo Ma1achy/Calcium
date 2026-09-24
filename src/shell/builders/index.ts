@@ -1856,11 +1856,12 @@ export type {
  * `rev`s for one logical refresh, and a frame composable half-way through
  * (C23 I34). A part wanting several returns a `group`.
  *
- * *A `panel`*, because `Panel` is the only kind with a `title` — and the title is
- * where a live part says what state it is in: `· 14s ago` stale, `· unavailable`
- * failing, both drawn that way by S13 §3 and §4 already. A part rendering a bare
- * `table` has nowhere to put either, so the guarantees would hold for some
- * consumers and not others, which is not a guarantee.
+ * *A `panel`*, because `Panel` is the only kind with a frame — and the frame is
+ * where a live part says what state it is in: `updated 4m ago` at the top
+ * border's inline end when stale (C04 I127, §047). A failing part is the
+ * framework's error box inside it, not a title suffix; this said `· unavailable`
+ * and nothing ever wrote it. A part rendering a bare `table` has nowhere to put
+ * the notice, so the guarantee would hold for some consumers and not others.
  *
  * **What this returns is the loading state**, and that is why C23 has no
  * `renderLoading`: the first block exists before the driver runs. C23 renders the

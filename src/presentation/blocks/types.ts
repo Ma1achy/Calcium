@@ -311,8 +311,15 @@ export type RenderContext = Readonly<{
   measureChild: MeasureFn;
   /** The registry's `width` (§2c) — a container asks a child's content width through this and never imports the registry. */
   widthChild: WidthFn;
-  /** The registry's `render` of a child (I72): rows, or an element — `elementOf` lifts either into a container's tree. */
-  renderChild: (block: Block, width: number) => Rendered;
+  /**
+   * The registry's `render` of a child (I72): rows, or an element — `elementOf`
+   * lifts either into a container's tree.
+   *
+   * **`theme` draws the subtree in another theme** (I110): a stale panel hands
+   * its children `recede(ctx.theme)` so their content dims while its own chrome
+   * does not. Absent is the caller's theme, which is every other caller.
+   */
+  renderChild: (block: Block, width: number, theme?: ResolvedTheme) => Rendered;
   /**
    * The registry's slice of a child, or `null` when it cannot take one (I58, §6b).
    *

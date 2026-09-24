@@ -26,7 +26,7 @@
 
 import { block, hasChildren } from "../data/viewmodel/index.js";
 import type { Block, ErrorLike, Panel, Status } from "../data/viewmodel/index.js";
-import { countdown, elapsed, glyphs } from "../presentation/blocks/index.js";
+import { age, countdown, elapsed } from "../presentation/blocks/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import { b, framedStatus } from "./builders/index.js";
 import type { ProducerContext } from "../data/adapters/types.js";
@@ -246,11 +246,14 @@ const defaultErrorBlock = (
 ): ((err: ErrorLike, retryInMs: number | null, attempt: number) => Block) =>
   (err, retryInMs, attempt) => framedStatus(err, retryInMs, attempt, true, { id: `${id}-error` });
 
-export function livePanel(id: string, title: string, child: Block): Panel {
+export function livePanel(id: string, title: string, child: Block, staleForMs?: number): Panel {
   // `live` is what makes the panel say so (C04 I39, F18). Two surfaces draw the
   // `▌` rail and the slot existed unreachable: this is the only place in the
   // tree that knows a region refreshes, so it is the only place that can name it.
-  return block({ kind: "panel", id, title, live: true, children: [child] } as Panel);
+  // `staleForMs` is the same argument for §047's notice (C04 I127, C23 I78).
+  return block({
+    kind: "panel", id, title, live: true, ...(staleForMs === undefined ? {} : { staleForMs }), children: [child],
+  } as Panel);
 }
 
 /**
@@ -512,6 +515,11 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     readonly startedAt: number;
     lastOk: number | null;
     stale: boolean;
+    /**
+     * The age this part's panel last drew, as `age` draws it (C23 I78) — so the
+     * sweep writes when the **figure** moves and not when the clock does.
+     */
+    staleFigure: string | null;
   };
 
   /**
@@ -671,7 +679,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
 
   const put = (host: RefreshHost, part: Part, child: Block): PutResult => {
     const existing = currentPanel(host, part);
-    const base = livePanel(part.spec.id, titleOf(part), child);
+    const base = livePanel(part.spec.id, part.spec.title, child, staleAge(part));
     const panel: Block =
       existing?.padding === undefined ? base : ({ ...base, padding: existing.padding } as Block);
     const outcome = deps.transcript.patch(
@@ -756,19 +764,19 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
   const write = (part: Part, child: Block): boolean => landed(part, put(part.host, part, child));
 
   /**
-   * C23 I35 — the age lives in the title, and nowhere else does it fit.
+   * C23 I35, I78 — how old the reading is, or `undefined` while it is fresh.
    *
-   * **One guard, not two.** This read `!part.stale || part.lastOk === null`, and
-   * the second arm cannot fire: `stale` is only ever set where `lastOk` is
-   * already non-null. It read as care and was the vacuity class — a condition
-   * with nothing to be wrong about passes exactly like one that is satisfied,
-   * and the mutation pass found it by producing a mutant nothing could kill.
+   * **A number on the panel, and the title stays the declared one** (C04 I127).
+   * This was `titleOf`, which appended `· 240s ago` to the title in accent:
+   * §047 draws `updated 4m ago` at the border's inline end in warn, with the
+   * content dimmed, and only C09 can draw that from a fact.
+   *
+   * **One guard, not two.** `stale` is only ever set where `lastOk` is already
+   * non-null, so the `?? 0` is for the type rather than a case — the mutation
+   * pass once found a second arm here that nothing could kill.
    */
-  const titleOf = (part: Part): string => {
-    if (!part.stale) return part.spec.title;
-    const secs = Math.max(0, Math.round((deps.elapsed() - (part.lastOk ?? 0)) / 1000));
-    return `${part.spec.title} ${glyphs(deps.capabilities).separator} ${String(secs)}s ago`;
-  };
+  const staleAge = (part: Part): number | undefined =>
+    part.stale ? Math.max(0, deps.elapsed() - (part.lastOk ?? 0)) : undefined;
 
   /**
    * C23 I72 — the next deadline is one interval after the **last deadline**,
@@ -878,6 +886,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     }
     part.lastOk = deps.elapsed();
     part.stale = false;
+    part.staleFigure = null;
     return write(part, child);
   };
 
@@ -987,21 +996,38 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       }
     }
 
+    // **Staleness never stops a refresh** (C23 I35) — and it does not run for a
+    // host nobody is looking at, because I46's pause is *no patch* and a
+    // re-dating is a patch.
+    //
+    // **Its own loop, and not the sources' one below** (C23 I78). That loop
+    // skips a source with a fetch in flight, which is right for starting a
+    // fetch and wrong here: a hung fetch is the stale reading §047 draws — the
+    // last good content standing while nothing replaces it — and it was the one
+    // case this could not reach. **And it rewrites when the figure moves**: the
+    // age used to be written once, at onset, so an hour-old reading said
+    // `120s ago` for the whole hour.
+    let dated = false;
     for (const src of sources.values()) {
-      if (src.done || src.inFlight) continue;
-
-      // **Staleness never stops a refresh** (C23 I35) — and it does not run for a
-      // host nobody is looking at, because I46's pause is *no patch* and a
-      // re-title is a patch.
+      if (src.done) continue;
       for (const part of src.parts) {
         if (!deps.visible(part.host)) continue;
-        if (part.stale || part.lastOk === null) continue;
-        if (mono - part.lastOk < part.spec.staleAfterMs) continue;
+        if (part.lastOk === null) continue;
+        if (!part.stale && mono - part.lastOk < part.spec.staleAfterMs) continue;
         part.stale = true;
+        const figure = age(mono - part.lastOk);
+        if (figure === part.staleFigure) continue;
         const current = currentChild(part.host, part);
-        if (current !== null && write(part, current)) deps.commit("stream");
+        if (current !== null && write(part, current)) {
+          part.staleFigure = figure;
+          dated = true;
+        }
       }
+    }
+    if (dated) deps.commit("stream");
 
+    for (const src of sources.values()) {
+      if (src.done || src.inFlight) continue;
       if (now >= src.dueAt && anyoneLooking(src)) runSource(src);
     }
 
@@ -1299,6 +1325,21 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     );
     if (counting) soonest = Math.min(soonest, now + ELAPSED_TICK_MS);
 
+    // **A reading about to go stale, or already stale, wakes the sweep** (C23
+    // I78). Nothing else would: the `dueAt` loop skips a fetch in flight, and a
+    // hung fetch is the case the notice exists for. Stale, it wakes once a
+    // tick so the figure can move; fresh, it wakes at the moment it turns.
+    // Gated on visibility the way the write is.
+    const mono = deps.elapsed();
+    for (const src of sources.values()) {
+      if (src.done) continue;
+      for (const p of src.parts) {
+        if (p.lastOk === null || !deps.visible(p.host)) continue;
+        const turns = p.stale ? ELAPSED_TICK_MS : Math.max(0, p.lastOk + p.spec.staleAfterMs - mono);
+        soonest = Math.min(soonest, now + turns);
+      }
+    }
+
     // **A running card wakes the sweep too, once for all of them** (C23 I53).
     // Gated the way its write is: a card nobody is looking at arms no timer, and
     // `visibilityChanged` re-arms it when it is back on screen (I46).
@@ -1508,6 +1549,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
             startedAt: deps.elapsed(),
             lastOk: null,
             stale: false,
+            staleFigure: null,
           };
           made.push(part);
           drawn.push({ part, message: why });
@@ -1548,6 +1590,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
           startedAt: deps.elapsed(),
           lastOk: null,
           stale: false,
+          staleFigure: null,
         };
         src.parts.add(part);
         made.push(part);

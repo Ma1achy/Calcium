@@ -1810,6 +1810,12 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
   panel: (b, e, at) => {
     requireString(b, "title", e, at);
     requireArray(b, "children", e, at);
+    // **A notice about nothing is refused** (I127): `NaN ago` and `-1s ago` are
+    // sentences with no reading behind them.
+    const stale = b["staleForMs"];
+    if (stale !== undefined && (typeof stale !== "number" || !Number.isFinite(stale) || stale < 0)) {
+      e.push(`${at}: "staleForMs" is a non-negative finite number of milliseconds`);
+    }
   },
   group: (b, e, at) => {
     requireArray(b, "children", e, at);

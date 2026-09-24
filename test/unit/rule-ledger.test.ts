@@ -74,7 +74,12 @@ describe("A03 SS66 — the rule ledger resolves against the tree", () => {
     // arm that fired on SS66's own landing — the A03 row cites `R-SPC-001` and
     // `R-REG-002`, and both were still marked `owed` when it was written.
     const before = row("R-SEL-012");
-    const { code, out } = run(text().replace(before, before.replace("`cited`", "`owed`")));
+    // **Anchored on the state cell, whatever it holds.** This replaced
+    // `` `cited` `` and went vacuous the day the audit moved R-SEL-012 to
+    // `unmet` — the control was drawn from a population the audit exists to empty.
+    const owed = before.replace(/\| `(?:cited|covered|unmet|parked)` \|/u, "| `owed` |");
+    expect(owed, "the row changed, or this control proves nothing").not.toBe(before);
+    const { code, out } = run(text().replace(before, owed));
     expect(out).toContain("R-SEL-012: marked `owed` and now cited");
     expect(code).toBe(1);
   });

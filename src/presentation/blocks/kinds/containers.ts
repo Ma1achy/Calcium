@@ -31,6 +31,7 @@ import { based, clampSpans, groundSequence, paint, rows, tone } from "../paint.j
 import { composeRow, fitRow, placeRows, rowCells, type Placed } from "../../rows.js";
 import { layout, measure as solveHeight, type Box, type Size } from "../../layout/index.js";
 import type { BlockDefinition, Rendered, RenderContext, Windowed } from "../types.js";
+import { recede } from "../../theme/index.js";
 import { glyphTick } from "../ramp.js";
 
 // **`rowsOfAll` stood here and is gone with the arm it gated.** It answered
@@ -48,6 +49,31 @@ import { glyphTick } from "../ramp.js";
 // loop over it are both C29 I2's *max across the axis*.
 
 // --- panel -----------------------------------------------------------------
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+/**
+ * How old a reading is, in the units the design's own figures use (C09 I109):
+ * `45s`, `4m`, `1h12m`, `2d 4h` — §047's `updated 4m ago`, §081's `23m` and
+ * `1h12m`, §047's `2d 4h`.
+ *
+ * **Coarser than `elapsed` on purpose.** A stale notice is read at a glance and
+ * a second-by-second count past a minute is motion in chrome that must stay
+ * legible. Exported so C23's driver can ask *would the figure change* before it
+ * writes (C23 I78), which only the function that draws it can answer.
+ */
+export function age(ms: number): string {
+  const t = Math.max(0, ms);
+  if (t < MINUTE) return `${String(Math.floor(t / 1000))}s`;
+  if (t < HOUR) return `${String(Math.floor(t / MINUTE))}m`;
+  if (t < DAY) return `${String(Math.floor(t / HOUR))}h${String(Math.floor((t % HOUR) / MINUTE))}m`;
+  return `${String(Math.floor(t / DAY))}d ${String(Math.floor((t % DAY) / HOUR))}h`;
+}
+
+/** §047's notice, from C04 I127's figure. */
+const staleNotice = (ms: number): string => `updated ${age(ms)} ago`;
 
 export const panelDefinition: BlockDefinition<Panel> = {
   kind: "panel",
@@ -95,9 +121,12 @@ export const panelDefinition: BlockDefinition<Panel> = {
       // read `glyphCells("live") + 1` while a static rail held the slot.
       return cells(shown) + (live ? SPINNER_CELLS + 1 : 0) + 5; // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
     };
+    // **The notice is furniture beside the title** (I109): a space each side and
+    // the one horizontal before the corner — `─ updated 4m ago ─┐`.
+    const notice = block.staleForMs === undefined ? 0 : cells(staleNotice(block.staleForMs)) + 3; // narrow-ok — as above
     return Math.max(
       1,
-      Math.min(w, Math.max(framed, rail(block.title, block.live === true), rail(block.footer, false))),
+      Math.min(w, Math.max(framed, rail(block.title, block.live === true) + notice, rail(block.footer, false))),
     );
   },
 
@@ -116,10 +145,20 @@ export const panelDefinition: BlockDefinition<Panel> = {
     // One helper for both rails, because they are the same construction
     // mirrored — and two copies would be two places for the fill arithmetic to
     // drift, which is the arithmetic a border that does not close reports.
-    const railPart = (text: string | undefined): string => {
-      const shown = truncate(stripControl(text ?? ""), Math.max(0, inner - 3), ctx.capabilities);
+    const railPart = (text: string | undefined, room = inner): string => {
+      const shown = truncate(stripControl(text ?? ""), Math.max(0, room - 3), ctx.capabilities);
       return shown === "" ? "" : ` ${shown} `;
     };
+
+    // **The stale notice takes its room first** (I109) — `updated 4m ago` at the
+    // inline end, one horizontal before the corner — because it is the one
+    // thing in the frame that must stay legible (§047). The title gets what is
+    // left, and only once the title is gone does the notice truncate.
+    const noticePart = block.staleForMs === undefined
+      ? ""
+      : railPart(staleNotice(block.staleForMs));
+    const noticeCells = cells(noticePart, ctx.capabilities.ambiguousWidth);
+    const noticeRoom = noticeCells === 0 ? 0 : noticeCells + 1;
 
     // **A live region is marked by a spinner frame, not by a static rail**
     // (C04 I39, F18, R-GLY-003). It was `Glyph.live`'s `▌`, and M4 retires that
@@ -138,8 +177,9 @@ export const panelDefinition: BlockDefinition<Panel> = {
       block.live === true
         ? `${frames[glyphTick(ctx.tick, ctx.motion) % frames.length] ?? g.dotted} ${stripControl(block.title)}`.trimEnd() // cells-ok — a frame index
         : block.title,
+      inner - noticeRoom,
     );
-    const fill = Math.max(0, inner - cells(titlePart, ctx.capabilities.ambiguousWidth));
+    const fill = Math.max(0, inner - cells(titlePart, ctx.capabilities.ambiguousWidth) - noticeRoom);
 
     const top = paint(
       clampSpans(
@@ -147,6 +187,10 @@ export const panelDefinition: BlockDefinition<Panel> = {
           { text: g.topLeft, style: dim },
           { text: titlePart, style: tone("accent", ctx.theme, ctx.capabilities) },
           { text: g.horizontal.repeat(fill), style: dim },
+          ...(noticeRoom === 0 ? [] : [
+            { text: noticePart, style: tone("warn", ctx.theme, ctx.capabilities) },
+            { text: g.horizontal, style: dim },
+          ]),
           { text: g.topRight, style: dim },
         ],
         width,
@@ -177,7 +221,11 @@ export const panelDefinition: BlockDefinition<Panel> = {
     // be drawn, or a panel with nothing in it renders shorter than it measures
     // — which is the empty-container case arriving through the one kind that
     // is *not* an empty container.
-    const rendered = block.children.map((child) => ctx.renderChild(child, inner));
+    // **The content dims and the chrome does not** (I110, §047): the children
+    // draw under the receded theme, and everything above is this panel's own
+    // paint under the theme it was handed.
+    const childTheme = block.staleForMs === undefined ? undefined : recede(ctx.theme);
+    const rendered = block.children.map((child) => ctx.renderChild(child, inner, childTheme));
     const total = sequenceHeight(block.children, inner, ctx.measureChild);
     const side = paint([
       { text: Array.from({ length: Math.max(1, total) }, () => g.vertical).join("\n"), style: dim },

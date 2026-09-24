@@ -3227,6 +3227,18 @@ export type Panel = Readonly<{
    * either way.
    */
   live?: boolean;
+  /**
+   * The age of the reading the children show, when it is stale (I127, §047,
+   * `R-HON-002`). Absent is fresh.
+   *
+   * **A number and not words**, on I38's rule and `Status.elapsedMs`'s
+   * precedent: C09 draws `updated 4m ago` from it at the top border's inline
+   * end, and dims the children while the chrome stays legible. A producer that
+   * formatted the duration would be formatting it a second time.
+   *
+   * It changes no measurement: the notice rides in the top border.
+   */
+  staleForMs?: number;
   children: readonly Block[];
 }> & Padded & Floor;
 

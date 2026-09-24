@@ -254,11 +254,15 @@ describe("walk C: the nesting boundaries", () => {
     expect(text).toContain("CPU ");
   });
 
-  it("C2: the live title leaves room for the suffix the framework appends", () => {
-    // C23 I34/I35 say staleness and failure are said *in the title* — the driver
-    // appends `· 14s ago` or `· unavailable` to a title this app has already
-    // filled. The app cannot see that suffix, so it must leave room for it.
-    expect(cells(LIVE_TITLE) + " · unavailable".length).toBeLessThan(40);
+  it("C2: the live title leaves room for the stale notice the framework draws beside it", () => {
+    // C04 I127 and C23 I78: a stale part says `updated 4m ago` at the top
+    // border's inline end, in the same row as this title, and the title yields
+    // first when the row is short. The app cannot see the notice, so it leaves
+    // room for the widest one under an hour — `updated 59m ago` — plus the
+    // border's furniture: two corners, a space each side of both, and one
+    // horizontal before the corner and at least one between.
+    const notice = cells("updated 59m ago");
+    expect(cells(LIVE_TITLE) + notice + 8).toBeLessThanOrEqual(40);
   });
 
   it("C3: the NAME cell fits the longest name AND the glyph beside it", () => {

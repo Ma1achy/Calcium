@@ -404,6 +404,11 @@ export type ResolvedTheme = Readonly<{
   name: string;
   variant: "dark" | "light";
   tokens: ThemeTokens;
+  /**
+   * The theme this one recedes, when it is `recede`'s (I59, §047). Every ref
+   * but a surface resolves as `tone.dim` resolves in it.
+   */
+  recedes?: ResolvedTheme;
 }>;
 
 /** A contrast or structural failure, named rather than counted (I3). */

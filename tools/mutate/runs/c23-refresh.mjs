@@ -96,8 +96,9 @@ const results = runPass({
     // (false)` leaves the patch landing, so T1.35's content and `rev`
     // assertions both still pass and only a commit-counting row could see it. A
     // control has to be a mutation whose kill is not in doubt.
-    from: "    part.lastOk = deps.elapsed();\n    part.stale = false;\n    return write(part, child);",
-    to: "    part.lastOk = deps.elapsed();\n    part.stale = false;\n    return true;",
+    // Re-anchored with C23 I78: the success path clears `staleFigure` too.
+    from: "    part.lastOk = deps.elapsed();\n    part.stale = false;\n    part.staleFigure = null;\n    return write(part, child);",
+    to: "    part.lastOk = deps.elapsed();\n    part.stale = false;\n    part.staleFigure = null;\n    return true;",
     why: "T1.35 asserts a successful fetch replaces the part's child",
   },
   mutations: [
@@ -236,10 +237,12 @@ const results = runPass({
     },
     // --- staleness (C23 I35) -----------------------------------------------------
     {
+      // **Re-anchored with C23 I78**: the marker is `staleForMs` on the panel,
+      // not a suffix on the title, so dropping it is `staleAge` answering fresh.
       name: "staleness: drop the marker",
       file: "src/shell/refresh.ts",
-      from: "    if (!part.stale) return part.spec.title;",
-      to: "    return part.spec.title;",
+      from: "    part.stale ? Math.max(0, deps.elapsed() - (part.lastOk ?? 0)) : undefined;",
+      to: "    undefined;",
       expect: "T1.36",
     },
     {
@@ -257,8 +260,12 @@ const results = runPass({
       // does not build is measured by nothing (`DID NOT BUILD`).
       name: "staleness: call a part that has never succeeded stale",
       file: "src/shell/refresh.ts",
-      from: "        if (part.stale || part.lastOk === null) continue;\n        if (mono - part.lastOk < part.spec.staleAfterMs) continue;",
-      to: "        if (part.stale) continue;\n        if (mono - (part.lastOk ?? 0) < part.spec.staleAfterMs) continue;",
+      //
+      // **Re-anchored again with C23 I78**: the loop now keeps visiting a stale
+      // part so its figure can move, and the age it draws reads `lastOk` a
+      // second time — so the `?? 0` goes on both reads, for the same reason.
+      from: "        if (part.lastOk === null) continue;\n        if (!part.stale && mono - part.lastOk < part.spec.staleAfterMs) continue;\n        part.stale = true;\n        const figure = age(mono - part.lastOk);",
+      to: "        if (!part.stale && mono - (part.lastOk ?? 0) < part.spec.staleAfterMs) continue;\n        part.stale = true;\n        const figure = age(mono - (part.lastOk ?? 0));",
       expect: "T1.36b",
     },
     {
@@ -288,7 +295,7 @@ const results = runPass({
     {
       name: "atomicity: patch the child directly instead of the panel",
       file: "src/shell/refresh.ts",
-      from: "    const base = livePanel(part.spec.id, titleOf(part), child);",
+      from: "    const base = livePanel(part.spec.id, part.spec.title, child, staleAge(part));",
       to: "    const base = child as Panel;",
       expect: "T1.35",
     },

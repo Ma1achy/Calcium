@@ -650,6 +650,7 @@ export const BUILDER_OMISSIONS = Object.freeze({
   // pickers are the registry and the refresh driver, both inside the framework, and a builder
   // would hand the number to someone with no way to know what will be drawn in it.
   "status.elapsedMs": "C09 I32, C23 I52 — supplied by whoever holds the clock, which is the refresh driver and never a builder",
+  "panel.staleForMs": "C04 I127, C23 I78 — `status.elapsedMs`'s argument: the age of a reading is known only to the refresh driver, which holds the clock and the last success; a builder setting it would assert a staleness nothing measured",
   "status.spinner": "C09 I32 — the frame set is the renderer's, chosen per capability set; a consumer owning a `status` (C24 I30) is handed no frames to name",
 
   "keyValue.keyWidth":

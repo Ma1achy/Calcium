@@ -23,6 +23,7 @@ import type { Block, ViewDocument } from "../../src/data/viewmodel/index.js";
 import { producerContext } from "../support/producer-context.js";
 import { callHead } from "../../src/shell/documents.js";
 import { spinnerFrames } from "../../src/presentation/blocks/glyphs.js";
+import { age } from "../../src/presentation/blocks/index.js";
 import { FULL_CAPS } from "../support/render.js";
 const SWEEP = STALL_MS / 4;
 
@@ -180,6 +181,13 @@ const titleOf = (h: ReturnType<typeof harness>, entry: string, id: string): stri
   const e = h.transcript.entries.find((x) => x.id === entry);
   const p = e?.doc.blocks.find((b) => b.id === id);
   return p !== undefined && p.kind === "panel" ? p.title : null;
+};
+
+/** The panel's stale figure (C04 I127), or `null` while it is fresh. */
+const staleOf = (h: ReturnType<typeof harness>, entry: string, id: string): number | null => {
+  const e = h.transcript.entries.find((x) => x.id === entry);
+  const p = e?.doc.blocks.find((b) => b.id === id);
+  return p !== undefined && p.kind === "panel" ? (p.staleForMs ?? null) : null;
 };
 
 describe("C23 §3b — part refresh", () => {
@@ -489,7 +497,7 @@ describe("C23 §3b — part refresh", () => {
     expect(settled, "the settled one stopped").toBe(1);
   });
 
-  it("T1.36 (I35): staleness shows in the title and never stops the refresh", async () => {
+  it("T1.36 (I35): staleness shows on the panel, the title stays the declared one, and the refresh never stops", async () => {
     let ok = true;
     let calls = 0;
     const h = harness();
@@ -510,19 +518,22 @@ describe("C23 §3b — part refresh", () => {
     ]);
 
     await h.tick();
-    expect(titleOf(h, id, "a"), "fresh data says nothing about age").toBe("activity");
+    expect(staleOf(h, id, "a"), "fresh data says nothing about age").toBeNull();
 
     ok = false;
     const callsAtFailure = calls;
     // Past twice the interval with nothing succeeding.
     await h.tick(60_000);
     await h.tick(60_000);
-    expect(titleOf(h, id, "a"), "the age is in the title").toMatch(/^activity · \d+s ago$/u);
+    expect(staleOf(h, id, "a"), "the age is on the panel").toBeGreaterThanOrEqual(60_000);
+    // **The title is the declarer's** (C04 I127): it read `activity · 120s ago`,
+    // and §047 puts the age at the border's inline end instead.
+    expect(titleOf(h, id, "a"), "and the title is untouched").toBe("activity");
     expect(calls, "and it never stopped trying").toBeGreaterThan(callsAtFailure);
 
     ok = true;
     await h.tick(300_000);
-    expect(titleOf(h, id, "a"), "success clears it").toBe("activity");
+    expect(staleOf(h, id, "a"), "success clears it").toBeNull();
   });
 
   it("T1.36b (I35): a part that has never succeeded is loading, not stale", async () => {
@@ -537,7 +548,7 @@ describe("C23 §3b — part refresh", () => {
     ]);
 
     for (let i = 0; i < 5; i += 1) await h.tick(60_000);
-    expect(titleOf(h, id, "a"), "no age, because there is no last-good").toBe("activity");
+    expect(staleOf(h, id, "a"), "no age, because there is no last-good").toBeNull();
   });
 
   it("T1.31 (I20): declared parts are staggered, and the first tick spends the stagger", async () => {
@@ -1937,6 +1948,72 @@ describe("C23 I70 — a refused patch stops the part, not the host", () => {
     expect(asFarSide.ok === false && asFarSide.reason, "and only the far side is refused").toBe("settled");
   });
 
-  it.todo("T1.73 (C23 I78): a part whose second fetch never settles goes stale at staleAfter — not deferred on a component: the sweep's in-flight skip is amended in the next commit of this MR");
-  it.todo("T1.74 (C23 I78): a stale part's staleForMs advances, and no write lands between two instants that draw the same figure — not deferred on a component: the rewrite lands in the next commit of this MR");
+  it("T1.73 (I78): a part whose second fetch never settles goes stale — a fetch in flight is not skipped", async () => {
+    // **The case §047 draws**: the last good reading standing while nothing
+    // replaces it. The sweep skipped every source with a fetch in flight, so a
+    // hung fetch — the commonest stale reading there is — never said so.
+    let calls = 0;
+    const h = harness();
+    const id = h.transcript.append(docWith([panel("a", "workers", raw("a-c", "…"))]), { streaming: true });
+    h.driver.declare({ kind: "entry", id }, [
+      part({
+        id: "a",
+        intervalMs: 30_000,
+        staleAfterMs: 60_000,
+        fetch: () => {
+          calls += 1;
+          return calls === 1 ? Promise.resolve("build running") : new Promise<never>(() => undefined);
+        },
+      }),
+    ]);
+    await h.tick();
+    expect(shown(h, id, "a"), "the first reading landed").toBe("build running");
+    for (let i = 0; i < 4; i += 1) await h.tick(30_000);
+    expect(calls, "the second fetch is the one in flight, and it is the only one").toBe(2);
+    expect(staleOf(h, id, "a"), "and the reading says it is stale").not.toBeNull();
+    expect(shown(h, id, "a"), "with the last good content still standing").toBe("build running");
+  });
+
+  it("T1.74 (I78): a stale part's age advances with the clock, and writes only when the figure moves", async () => {
+    let calls = 0;
+    const h = harness();
+    const id = h.transcript.append(docWith([panel("a", "workers", raw("a-c", "…"))]), { streaming: true });
+    h.driver.declare({ kind: "entry", id }, [
+      part({
+        id: "a",
+        intervalMs: 30_000,
+        staleAfterMs: 60_000,
+        fetch: () => {
+          calls += 1;
+          return calls === 1 ? Promise.resolve("up") : new Promise<never>(() => undefined);
+        },
+      }),
+    ]);
+    await h.tick();
+    // Walk to one minute stale, then past it a second at a time: **the arming
+    // is what is measured** — `nextTimer` says the sweep was scheduled, which a
+    // row that only advanced the clock could not tell from a sweep that ran
+    // because something else woke it.
+    // **Bounded**: a build in which the part never turns stale must fail this
+    // row, not spin it — the first mutation pass hung here for 44 minutes on
+    // exactly that, with the wake re-arming at zero delay.
+    for (let i = 0; i < 20 && staleOf(h, id, "a") === null; i += 1) {
+      const next = h.nextTimer();
+      expect(next, "a fresh reading arms the moment it turns").not.toBeNull();
+      await h.tick(Math.max(1, (next as number) - h.at()));
+    }
+    expect(staleOf(h, id, "a"), "and it turned").not.toBeNull();
+    expect(age(staleOf(h, id, "a") as number)).toBe("1m");
+
+    const revAt = (): number => h.transcript.entries.find((e) => e.id === id)?.rev ?? -1;
+    const before = revAt();
+    for (let i = 0; i < 30; i += 1) await h.tick(1_000);
+    expect(age(staleOf(h, id, "a") as number), "thirty seconds on, the same minute").toBe("1m");
+    expect(revAt(), "and no write for a figure that did not move").toBe(before);
+
+    // One minute at onset, thirty seconds, then 150 more: four minutes.
+    for (let i = 0; i < 150; i += 1) await h.tick(1_000);
+    expect(age(staleOf(h, id, "a") as number), "the figure moves with the clock").toBe("4m");
+    expect(h.nextTimer(), "and a stale part keeps its sweep armed").not.toBeNull();
+  });
 });

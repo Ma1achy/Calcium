@@ -23,6 +23,7 @@ import {
 } from "../../data/viewmodel/index.js";
 import { NO_PROBE } from "../../data/viewmodel/index.js";
 import type { Block, Probe, Status } from "../../data/viewmodel/index.js";
+import type { ResolvedTheme } from "../theme/index.js";
 import { DEFAULT_DEFINITIONS } from "./defaults.js";
 import { clampSpans, paint, rows, tone } from "./paint.js";
 import { truncate } from "../text.js";
@@ -1090,8 +1091,8 @@ class Registry implements BlockRegistry {
       width: inner,
       measureChild: this.#measureChild,
       widthChild: this.width,
-      renderChild: (child: Block, childWidth: number): Rendered =>
-        this.render(child, { ...ctx, width: childWidth }),
+      renderChild: (child: Block, childWidth: number, theme?: ResolvedTheme): Rendered =>
+        this.render(child, theme === undefined ? { ...ctx, width: childWidth } : { ...ctx, width: childWidth, theme }),
       windowChild: this.windowChild,
     };
 

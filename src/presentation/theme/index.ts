@@ -19,6 +19,7 @@ export {
   cacheSize,
   clearResolutionCache,
   quantisedHex,
+  recede,
   resolve,
   resolveBackground,
   resolveBase,

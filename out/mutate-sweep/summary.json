@@ -1,14 +1,14 @@
 {
   "label": "all",
-  "only": "c17-reply-isolation",
+  "only": "c23-refresh",
   "rows": [
     {
-      "run": "c17-reply-isolation.mjs",
+      "run": "c23-refresh.mjs",
       "exit": 0,
-      "seconds": 27,
+      "seconds": 1064,
       "state": "green",
       "restored": 0,
-      "caught": 9,
+      "caught": 17,
       "elsewhere": 0,
       "survived": 0,
       "anchorMissed": 0,
