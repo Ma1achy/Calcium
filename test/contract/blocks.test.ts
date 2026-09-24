@@ -553,20 +553,37 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
     // two marks the registry names and this tree could not draw (C09 I88).
     const NEUTRAL = new Set(["ok", "error", "quote", "nested", "continuation", "question", "current"]);
     expect(new Set([...AMBIGUOUS, ...NEUTRAL])).toEqual(new Set(GLYPH_TOKENS));
+    // **The partition is measured now, not inferred from the resolver** (I48,
+    // §093). It used to read `wide === ascii && narrow !== ascii` — which asked
+    // *did this member fall* and took the answer as its width class. The
+    // vocabulary takes its ASCII rung **whole** at `wide`, so every member falls
+    // and that question no longer separates them: the old form would put all
+    // eighteen in `tiered` and none in `steady`.
+    //
+    // **The fact it was a proxy for is unchanged and is asserted directly**:
+    // `ⓘ` is East Asian Ambiguous and `✓` is not, whatever the resolver does
+    // with either. Measuring the Unicode half at the wide convention says so in
+    // one step, and a member moving between the two named sets still fails the
+    // row by equality. This is the stronger form — it survives the next change
+    // to how the rung is taken, which the old one did not.
     const tiered: string[] = [];
     const steady: string[] = [];
     for (const token of GLYPH_TOKENS) {
       const narrow = glyphFor(token, FULL_CAPS);
       const wide = glyphFor(token, WIDE_CAPS);
       const ascii = glyphFor(token, ASCII_CAPS);
+      // The invariant's own subject, untouched: one cell at every rung, through
+      // `glyphFor`, which is what lets `measure` skip capabilities (I5).
       expect(cells(narrow, "narrow"), `${token} narrow`).toBe(1);
       expect(cells(wide, "wide"), `${token} at wide, through glyphFor`).toBe(1);
       expect(cells(ascii, "wide"), `${token} ascii`).toBe(1);
-      if (wide === ascii && narrow !== ascii) {
+      // And the rung is taken whole — T2.171 is the row for it; here it is the
+      // premise the partition below no longer gets to assume.
+      expect(wide, `${token}: the wide arm is the ASCII rung`).toBe(ascii);
+      if (cells(narrow, "wide") === 2) {
         tiered.push(token);
       } else {
         steady.push(token);
-        expect(cells(narrow, "wide"), `${token} is Neutral`).toBe(1);
       }
     }
     expect(new Set(tiered)).toEqual(AMBIGUOUS);

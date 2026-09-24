@@ -1425,12 +1425,6 @@ export const GLYPH_TOKENS: readonly Glyph[] = Object.freeze(
  * T2.5b asserted the 1:1 rule at one arm while more than half its members broke
  * it at the other.
  */
-const AMBIGUOUS_TOKENS: ReadonlySet<Glyph> = new Set(
-  (Object.keys(GLYPH_TABLE) as Glyph[]).filter(
-    (token) => cells(GLYPH_TABLE[token][0], "wide") !== cells(GLYPH_TABLE[token][1], "wide"), // ambiguousWidth "wide" for both halves: the one arm where they can differ
-  ),
-);
-
 /**
  * A block's glyph slot, resolved against capabilities. The single place either
  * character enters a frame.
@@ -1442,7 +1436,15 @@ const AMBIGUOUS_TOKENS: ReadonlySet<Glyph> = new Set(
 export function glyphFor(token: Glyph, caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">): string {
   const pair = GLYPH_TABLE[token];
   if (caps.unicode === "ascii") return pair[1];
-  return caps.ambiguousWidth === "wide" && AMBIGUOUS_TOKENS.has(token) ? pair[1] : pair[0];
+  // **The whole vocabulary, not the Ambiguous members** (I48, §093). A set is
+  // legible because its members were drawn by one hand; resolving per token
+  // drew `*` for running beneath a `⎿` continuation with `✓` and `✗` as
+  // outcomes — eleven of eighteen fallen and seven still Unicode, which is C02
+  // I9's *mostly ASCII dressed as Unicode* inside one alphabet. The rule the
+  // old line implemented was about **width**, and it was right about width:
+  // every slot is one cell at either arm either way, which is why `glyphCells`
+  // needs no capability and why nothing caught this.
+  return caps.ambiguousWidth === "wide" ? pair[1] : pair[0];
 }
 
 /**

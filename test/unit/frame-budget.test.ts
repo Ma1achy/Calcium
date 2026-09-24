@@ -515,9 +515,20 @@ describe("C22 §6l.8 — the gutter carries the call", () => {
     const long = body("b", "a body row long enough to wrap three times at the width the card leaves it");
     const blocks = [head("h", "ps · ok"), long];
     expect(REGISTRY.measureSequence([long], 40 - BODY_INDENT), "the fixture responds: three rows").toBe(3);
-    // The hook is Neutral and keeps its form at wide (C09 I5); the bar is box
-    // drawing and flattens there (F293) — two tiers, one column.
-    for (const [caps, hook, bar] of [[FULL_CAPS, "⎿", "│"], [ASCII_CAPS, "`", "|"], [WIDE_CAPS, "⎿", "|"]] as const) {
+    // **This row held the mixture and called it a design** (C09 I48, §093). It
+    // read *the hook is Neutral and keeps its form at wide; the bar is box
+    // drawing and flattens there — two tiers, one column*, and expected `⎿`
+    // beside `|` at the wide arm: **a Unicode hook and an ASCII bar in the same
+    // gutter column.** Both halves of that sentence are true about width and
+    // neither is about the alphabet, which is how it read as deliberate.
+    //
+    // §093 measures the vocabulary as mixed — four Ambiguous, eight Narrow — and
+    // rules that the set takes its ASCII rung whole, *exactly the condition that
+    // sent the scrollbar to its ascii rung*. So the wide arm is one alphabet:
+    // the hook falls with everything else. Everything the row is actually about
+    // — the hook on row 0, the bar on rows 1–2, the closing blank, measure
+    // unchanged — is untouched.
+    for (const [caps, hook, bar] of [[FULL_CAPS, "⎿", "│"], [ASCII_CAPS, "`", "|"], [WIDE_CAPS, "`", "|"]] as const) {
       const rows = draw(blocks, 40, caps);
       expect(rows[1]?.startsWith(`  ${hook} `), `row 0 under the hook (${caps.unicode}/${caps.ambiguousWidth})`).toBe(true);
       expect(rows[2]?.startsWith(`  ${bar} `), "row 1 carries the bar").toBe(true);

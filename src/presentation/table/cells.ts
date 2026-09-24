@@ -290,9 +290,11 @@ export function rowSpans(
       // glyph table cannot reach it today: `glyphFor` collapses `expand` and
       // `collapse` to `>` and `v` at `ambiguousWidth: "wide"` (C09 I48), so the
       // marker is one cell under both conventions and the two padders agree.
-      // Stated rather than relied on — the day a token leaves `AMBIGUOUS_TOKENS`
-      // this is a two-cell glyph in a one-cell column, and the site that decides
-      // that is in a different component (I21).
+      // Stated rather than relied on — the day a token's ASCII half stops being
+      // one cell this is a two-cell glyph in a one-cell column, and the site
+      // that decides that is in a different component (C09 I21). **`AMBIGUOUS_TOKENS`
+      // is gone**: the vocabulary takes its ASCII rung whole at `wide` now, so
+      // the condition is about the half rather than about the member (C09 I48).
       spans.push({
         text: fitAt(marker, planned.width, ctx),
         style: tone("dim", ctx.theme, ctx.capabilities, options.on),

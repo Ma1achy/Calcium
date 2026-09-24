@@ -62,11 +62,33 @@ const results = runPass({
       expect: "T2.116",
     },
     {
+      // **THE DEFECT I48 replaced**, written inline because `AMBIGUOUS_TOKENS`
+      // is gone with it: the rung taken member by member, so eleven of eighteen
+      // fall at `wide` and seven stay Unicode. Every width assertion in the
+      // tree passes against it — each slot is one cell at either arm either way
+      // — and the frame draws `*` for running beneath a `\u23bf` continuation with
+      // `\u2713` and `\u2717` as outcomes.
+      //
+      // **Expressed with `cells` rather than the deleted set**, since a mutation
+      // that fails to compile is killed by the compiler and that is a kill the
+      // run did not earn (F1254).
+      name: "THE DEFECT: the vocabulary takes its ASCII rung member by member",
+      file: GLYPHS,
+      from: '  return caps.ambiguousWidth === "wide" ? pair[1] : pair[0];',
+      to: '  return caps.ambiguousWidth === "wide" && cells(pair[0], "wide") === 2 ? pair[1] : pair[0];',
+      expect: "T2.115",
+    },
+    {
       // C09 I48 (T2.115), F825 — `glyphFor` reading `unicode` alone: ten Ambiguous
       // members are two cells at wide against a one-cell ASCII half.
+      //
+      // **Re-anchored 2026-09-24**: the vocabulary takes its ASCII rung whole at
+      // `wide` (I48, §093), so the line no longer tests membership and
+      // `AMBIGUOUS_TOKENS` is gone. The mutation is unchanged in meaning — the
+      // wide arm ignored — and now lands on the whole-set form.
       name: "glyphFor ignores ambiguousWidth",
       file: GLYPHS,
-      from: '  return caps.ambiguousWidth === "wide" && AMBIGUOUS_TOKENS.has(token) ? pair[1] : pair[0];',
+      from: '  return caps.ambiguousWidth === "wide" ? pair[1] : pair[0];',
       to: "  return pair[0];",
       expect: "T2.115",
     },

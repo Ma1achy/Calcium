@@ -297,12 +297,12 @@ CPU   ⣿⣿⣿⣿⣿⣿⣿⣿ 101.2%  8 cores
 SWAP  -                unavailable
 PIDS  12
 ── notice · notice-continuation
-  ⎿ queued behind /logs
+  \` queued behind /logs
 ── notice · notice-spans
-✓ the quick brown fox jumps over the
++ the quick brown fox jumps over the
   lazy dog and keeps running past the
   wrap
-✓ the quick brown fox jumps over the
++ the quick brown fox jumps over the
   lazy dog and keeps running past the
   wrap
 ── prompt · prompt-paste-chip
@@ -361,10 +361,10 @@ CPU   ⣿⣿⣿⣿⣿⣿⣿⣿ 101.2%  8 cores
 SWAP  -                unavailable
 PIDS  12
 ── notice · notice-continuation
-  ⎿ queued behind /logs
+  \` queued behind /logs
 ── notice · notice-spans
-✓ the quick brown fox jumps over the lazy dog and keeps running past the wrap
-✓ the quick brown fox jumps over the lazy dog and keeps running past the wrap
++ the quick brown fox jumps over the lazy dog and keeps running past the wrap
++ the quick brown fox jumps over the lazy dog and keeps running past the wrap
 ── prompt · prompt-paste-chip
 read  #1 pasted · 184L  and summarise it"
 `;

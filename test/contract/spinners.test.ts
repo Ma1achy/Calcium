@@ -13,7 +13,7 @@ import { FREE_WIDTH_SLOTS, glyphs, spinnerFrames, spinnerIntervalMs } from "../.
 // no reader in `src/` — the two functions are the seam. Imported from the module
 // so the rows can walk every set rather than a list they keep themselves, which
 // would be a coverage set drawn from the test's own table.
-import { SPINNER_SETS } from "../../src/presentation/blocks/glyphs.js";
+import { GLYPH_TOKENS, glyphFor, SPINNER_SETS } from "../../src/presentation/blocks/glyphs.js";
 import { spinnerSetNames } from "../../src/presentation/blocks/glyphs.js";
 // **The design's own resolver, not a reimplementation** (C09 I98). `asciiPattern`
 // is a *pattern* and `asciiTrajectory` says how it fits the set's frame count; a
@@ -528,7 +528,41 @@ const STATED_CYCLES: Readonly<Record<string, number>> = Object.freeze(
     );
   });
 
-  it.todo("T2.171 (C09 I48, §093): the mark vocabulary takes its ASCII rung whole at wide — not deferred on a component, the row lands with I48's code half");
+  it("T2.171 (C09 I48, \u00a7093, C02 I9): the mark vocabulary takes its ASCII rung whole at wide", () => {
+    // **Over the whole vocabulary, not over the members that move.** An
+    // assertion restricted to the Ambiguous tokens is satisfied *exactly* by the
+    // per-member build — those are the members it already fell for — so it is
+    // the seven that stayed which carry the property: `\u27e9 \u203a \u2713 \u2717 \u23b8 \u2043 \u23bf`.
+    //
+    // **The width rule is not this rule, and that is what let the old form
+    // stand.** Every slot was one cell at either arm either way (T2.115, I5),
+    // so `glyphCells` needs no capability and every arithmetic row agreed. What
+    // was wrong was the alphabet: `*` for running beneath a `\u23bf` continuation
+    // with `\u2713` and `\u2717` as outcomes is C02 I9's *mostly ASCII dressed as
+    // Unicode* inside one vocabulary.
+    const wide = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
+    for (const token of GLYPH_TOKENS) {
+      expect(
+        glyphFor(token, wide),
+        `${String(token)}: the wide arm is the ASCII rung, whole`,
+      ).toBe(glyphFor(token, ASCII_CAPS));
+    }
+
+    // **The control is the narrow arm**, which keeps every Unicode half — without
+    // it, *wide equals ascii* is satisfied by a table that collapsed entirely.
+    const stayedUnicode = GLYPH_TOKENS.filter(
+      (t) => glyphFor(t, FULL_CAPS) !== glyphFor(t, ASCII_CAPS),
+    );
+    expect(stayedUnicode.length, "the narrow arm still draws Unicode").toBeGreaterThan(10);
+
+    // And the fixture's own premise, because *the set is mixed* is what \u00a7093
+    // rules on: before this landed, eleven of eighteen fell at wide and seven
+    // did not. A vocabulary that drifted to all-Ambiguous would make the row
+    // above vacuous without failing it (A03 \u00a72).
+    const twoCellsWide = GLYPH_TOKENS.filter((t) => cells(glyphFor(t, FULL_CAPS), "wide") === 2);
+    expect(twoCellsWide.length, "Ambiguous members").toBe(11);
+    expect(GLYPH_TOKENS.length - twoCellsWide.length, "Narrow members — the mixed half").toBe(7);
+  });
 
   it("T2.75 (C02 I9): the glyph set falls to ASCII on a wide terminal", () => {
     // **`▌` is the framework's own instance of the finding.** Box drawing is
