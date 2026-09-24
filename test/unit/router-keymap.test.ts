@@ -1670,7 +1670,53 @@ describe("C17 §5b — every motion twice, at the binding", () => {
 });
 
 describe("C16 I55 — the platform keeps its chords", () => {
-  it.todo(
-    "T1.108 (C16 I55, §063, §019, R-REF-002): no binding takes a chord the platform owns, and ⌥←/⌥→ mean word motion — not deferred on a component: the sweep lands in the next commit of this MR",
-  );
+  /**
+   * The chords the design says the platform keeps (§063, §019), and the
+   * measured window-switcher pair. Written as key records rather than chord
+   * text, so the comparison is the one the keymap itself makes.
+   */
+  const OWNED: readonly Readonly<{ why: string; key: Partial<Key> & { name: string } }>[] = [
+    { why: "§063 ⌘←→ is line ends", key: { name: "left", super: true } },
+    { why: "§063 ⌘←→ is line ends", key: { name: "right", super: true } },
+    { why: "§063 ⌘C is the terminal's copy", key: { name: "c", super: true } },
+    { why: "§063 ⌃↑ is Mission Control", key: { name: "up", ctrl: true } },
+    { why: "the window switcher takes ⌥⇥ before a byte arrives", key: { name: "tab", meta: true } },
+    { why: "the window switcher takes ⇧⌥⇥ before a byte arrives", key: { name: "tab", meta: true, shift: true } },
+    { why: "§019 ⌃C remains interrupt, and is the ladder's", key: { name: "c", ctrl: true } },
+  ];
+  /** §019: ⌥← and ⌥→ remain word-left and word-right in text fields. */
+  const PLATFORM_MEANING: Readonly<Record<string, string>> = {
+    [keySlot({ name: "left", meta: true } as Key)]: "wordLeft",
+    [keySlot({ name: "right", meta: true } as Key)]: "wordRight",
+  };
+
+  const violations = (table: readonly Binding[]): string[] => {
+    const owned = new Map(OWNED.map((o) => [keySlot({ ctrl: false, meta: false, shift: false, ...o.key } as Key), o.why]));
+    const out: string[] = [];
+    for (const b of table) {
+      const slot = keySlot(b.key);
+      const why = owned.get(slot);
+      if (why !== undefined) out.push(`${b.target} ${chordText(b.key)} → ${b.action}: ${why}`);
+      const meaning = PLATFORM_MEANING[slot];
+      if (meaning !== undefined && b.action !== meaning) {
+        out.push(`${b.target} ${chordText(b.key)} → ${b.action}: the platform's meaning is ${meaning}`);
+      }
+    }
+    return out;
+  };
+
+  it("T1.108 (C16 I55, §063, §019, R-REF-002): no binding takes a chord the platform owns, and ⌥←/⌥→ mean word motion", () => {
+    // Both profiles: `defaultKeymap` carries the enhanced rows beside the base
+    // ones, and `⌘` only arrives in the enhanced one — which is exactly where a
+    // row taking `⌘←` would be written.
+    expect(violations(defaultKeymap), "the default keymap").toEqual([]);
+
+    // **The control.** The table complies today, so a predicate that read
+    // nothing would pass as well; one fabricated row on each arm must not.
+    const fabricated: Binding[] = [
+      { target: "prompt", key: { name: "left", super: true, ctrl: false, meta: false, shift: false } as Key, action: "home" },
+      { target: "liveBlock", key: { name: "left", meta: true, ctrl: false, shift: false } as Key, action: "entryPrev" },
+    ];
+    expect(violations([...defaultKeymap, ...fabricated]), "a row on ⌘←, and ⌥← given another meaning").toHaveLength(2);
+  });
 });
