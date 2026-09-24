@@ -68,8 +68,17 @@ M14's accent-on-focus taken at the consumer rather than the primitive, M15's
 `LineState`. A sweep that has to be redone is a memory, so these are symbols
 too, resolved against the tree by the same gate.
 
-**Three deliverables landed differently from the plan and better**, which is
-why the row names the tree's answer rather than the plan's words:
+**M4 is absent on purpose.** Its six rulings have a file of their own —
+`test/unit/m4-rulings.test.ts`, seven rows — written because *M4 landed* was
+carried across several sessions as a settled fact and disputed again each
+time. Each row reads the thing the ruling is about rather than a mention of
+it: a grep for `live` answers on a comment, where what the ruling says is that
+the **slot** is gone. Duplicating those rows here would be a second record of
+one fact, which is what this document argues against everywhere else.
+
+**Five deliverables landed differently from the plan**, three of them better,
+and one because the plan is looser than the design — which is why every row
+names the tree's answer rather than the plan's words:
 
 | MR | the deliverable, in the plan's words | how the tree answers it | symbol | file |
 |---|---|---|---|---|
@@ -80,6 +89,16 @@ why the row names the tree's answer rather than the plan's words:
 | **M8** | *the innermost-scrollable walk is built here* | and it is what R-SEL-012's *innermost* needs to have a referent | `innermostScrollUnder` | `src/shell/construct.ts` |
 | **M9** | *`kind: "view"` is deleted* | retired by `R-EXA-082`, with the note kept in place rather than the line deleted | `R-EXA-082` | `src/viewport/overlay/types.ts` |
 | **M9** | *`PushedSurface` → `ChildSurface`* | with the handle renamed to match; 0.x, no deprecation cycle | `ChildSurfaceHandle` | `src/shell/surface.ts` |
+| **M7** | *press arms `(stableId, ownerEpoch)`, release commits* | one epoch shared by keys and pointer, so a raise invalidates a press already in flight | `pointerArm` | `src/interaction/router/router.ts` |
+| **M7** | *the safe default of a question is deny* | the fallback is the **last** choice, not the first — for a destructive verb the safe option is conventionally last, and a caller that forgets should forget safely | `defaultChoice` | `src/shell/confirm.ts` |
+| **M10** | *`v`/`V`/`a`/`A`* | **the plan is looser than the design here.** `R-SEL-008` is *a, A, and no whole-record key*, so `v`/`V` are not owed and their absence is the rule being followed | `selectAllLoadedEntries` | `src/interaction/router/keymap.ts` |
+| **M10** | *a block is atomic in a selection* (`R-SEL-003`) | the copy walks whole blocks and drops an entry whose selected blocks all decline, rather than contributing a blank paragraph | `copyTextOf` | `src/shell/semantic-selection.ts` |
+| **M11** | *contrast generated over every tone × surface × theme* | including `selection`, across all ten themes, with the ground taken by lookup rather than by a conditional — the shape that answered wrongly for a third band | `validateBands` | `src/presentation/theme/contrast.ts` |
+| **M12** | *a malicious-content fixture suite covering every escape class* | a payload covering SGR, erase-display, OSC-with-BEL and C1 CSI appended to every string in every block kind | `R-TRU-001` | `test/unit/trust-boundary.test.ts` |
+| **M13** | *§026's trails attach to streaming text* | declared on the notice rather than inferred, so the trail and the mark degrade separately — at 1-bit the trail is gone and the mark is not | `streaming` | `src/data/viewmodel/types.ts` |
+| **M13** | *the chip is one wrap unit, never half-painted* | and the delimiter travels **inside** the one edit, which is what the frame could not show: a second `insert` let `⌘_` take back the space and leave the chip | `ChipInsert` | `src/interaction/editor/editor.ts` |
+| **M13** | *the prompt's top rule gains §069's label* | painted as a ground and not as text, shedding first at 60 columns | `labelSpansOf` | `src/shell/paint.ts` |
+| **M16** | *the design fixtures onto the golden frames* | one row per surface, each carrying its evidence and its named remainder, with the census driven rather than written | `ONE_PER_KIND` | `test/support/design-surfaces.ts` |
 | **M14** | *the thumb takes `accent` when its container has focus* | at the **consumer**, not the primitive — which is why a grep of `scrollbar.ts` alone reports it missing | `scrollbarSet` | `src/presentation/blocks/kinds/containers.ts` |
 | **M15** | *`Snapshot` widens past `{text, cursor}`* | **three types, not one widened** — one type would have to be the widest of the three and would make the other two's exclusions unstateable (C17 I22 drops the region on purpose, C20 §4 holds text alone) | `LineState` | `src/interaction/editor/editor.ts` |
 | **M15** | *the overflow path replaces eliding the evidence* | the `...` arm is the **entry** to a suspended state that bounds the payload with C04 I49's residue row, rather than the whole answer | `inspection` | `src/shell/confirm.ts` |

@@ -1562,8 +1562,8 @@ describe("C10 I52 — the registry's state axes and the spec's declarations", ()
     // the population is the MRs that carry one rather than a fixed span. What
     // must not happen is the table quietly emptying, so the set is compared.
     expect(new Set(rows.map((r) => r.mr)), "the MRs whose deliverables are recorded")
-      .toEqual(new Set(["M5", "M6", "M8", "M9", "M14", "M15"]));
-    expect(rows.length, "and every row of the table parsed").toBe(10);
+      .toEqual(new Set(["M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16"]));
+    expect(rows.length, "and every row of the table parsed").toBe(20);
 
     const root = new URL("../../", import.meta.url);
     const missing: string[] = [];
