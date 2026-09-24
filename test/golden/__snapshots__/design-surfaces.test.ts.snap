@@ -380,6 +380,25 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa. The parser tracks quotes with a
 aaaaaaaaaaaa.................................... which is why
   a = fg 38;2;212;212;212
 
+── §99 · the middle cut — a path narrowing, beside the end cut it replaced
+· a path narrowing — the head says WHERE, the tail says WHAT, and both survive to the last cell
+   31 │src/integration/parser/parse.ts│ 31 cells
+   29 │src/integ~ion/parser/parse.ts│ 29 cells
+   24 │src/int~/parser/parse.ts│ 24 cells
+   21 │src/in~arser/parse.ts│ 21 cells
+   16 │src/i~r/parse.ts│ 16 cells
+   11 │src~arse.ts│ 11 cells
+    8 │sr~se.ts│ 8 cells
+    5 │s~.ts│ 5 cells
+    3 │~ts│ 3 cells
+
+· the same widths cut from the END — what the tree drew, and *what* is gone by 24
+   29 │src/integration/parser/parse~│
+   24 │src/integration/parser/~│
+   21 │src/integration/pars~│
+   16 │src/integration~│
+   11 │src/integr~│
+
 ── §73 · painted chrome — every kind against §073's test, and the button's rungs
 · every kind, and what it grounds — §073's test: a THING takes a ground, a FACT takes a tone
   rule         — no ground
@@ -931,6 +950,25 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa. The parser tracks quotes with a
 aaaaaaaaaaaa.................................... which is why
   a = fg 38;2;212;212;212
 
+── §99 · the middle cut — a path narrowing, beside the end cut it replaced
+· a path narrowing — the head says WHERE, the tail says WHAT, and both survive to the last cell
+   31 │src/integration/parser/parse.ts│ 31 cells
+   29 │src/integ~ion/parser/parse.ts│ 29 cells
+   24 │src/int~/parser/parse.ts│ 24 cells
+   21 │src/in~arser/parse.ts│ 21 cells
+   16 │src/i~r/parse.ts│ 16 cells
+   11 │src~arse.ts│ 11 cells
+    8 │sr~se.ts│ 8 cells
+    5 │s~.ts│ 5 cells
+    3 │~ts│ 3 cells
+
+· the same widths cut from the END — what the tree drew, and *what* is gone by 24
+   29 │src/integration/parser/parse~│
+   24 │src/integration/parser/~│
+   21 │src/integration/pars~│
+   16 │src/integration~│
+   11 │src/integr~│
+
 ── §73 · painted chrome — every kind against §073's test, and the button's rungs
 · every kind, and what it grounds — §073's test: a THING takes a ground, a FACT takes a tone
   rule         — no ground
@@ -1460,6 +1498,25 @@ raw             0     — atomic: nothing to focus
 ................................................ The parser tracks quotes with a single boolean,
 ................................................ which is why
 
+── §99 · the middle cut — a path narrowing, beside the end cut it replaced
+· a path narrowing — the head says WHERE, the tail says WHAT, and both survive to the last cell
+   31 │src/integration/parser/parse.ts│ 31 cells
+   29 │src/integ…ion/parser/parse.ts│ 29 cells
+   24 │src/int…/parser/parse.ts│ 24 cells
+   21 │src/in…arser/parse.ts│ 21 cells
+   16 │src/i…r/parse.ts│ 16 cells
+   11 │src…arse.ts│ 11 cells
+    8 │sr…se.ts│ 8 cells
+    5 │s….ts│ 5 cells
+    3 │…ts│ 3 cells
+
+· the same widths cut from the END — what the tree drew, and *what* is gone by 24
+   29 │src/integration/parser/parse…│
+   24 │src/integration/parser/…│
+   21 │src/integration/pars…│
+   16 │src/integration…│
+   11 │src/integr…│
+
 ── §73 · painted chrome — every kind against §073's test, and the button's rungs
 · every kind, and what it grounds — §073's test: a THING takes a ground, a FACT takes a tone
   rule         — no ground
@@ -1979,6 +2036,25 @@ raw             0     — atomic: nothing to focus
 · and the same block settled at 48 — \`boolean,\` stays up, which is the two cells, and it is the whole of what \`measure\` has to agree with
 ................................................ The parser tracks quotes with a single boolean,
 ................................................ which is why
+
+── §99 · the middle cut — a path narrowing, beside the end cut it replaced
+· a path narrowing — the head says WHERE, the tail says WHAT, and both survive to the last cell
+   31 │src/integration/parser/parse.ts│ 31 cells
+   29 │src/integ…ion/parser/parse.ts│ 29 cells
+   24 │src/int…/parser/parse.ts│ 24 cells
+   21 │src/in…arser/parse.ts│ 21 cells
+   16 │src/i…r/parse.ts│ 16 cells
+   11 │src…arse.ts│ 11 cells
+    8 │sr…se.ts│ 8 cells
+    5 │s….ts│ 5 cells
+    3 │…ts│ 3 cells
+
+· the same widths cut from the END — what the tree drew, and *what* is gone by 24
+   29 │src/integration/parser/parse…│
+   24 │src/integration/parser/…│
+   21 │src/integration/pars…│
+   16 │src/integration…│
+   11 │src/integr…│
 
 ── §73 · painted chrome — every kind against §073's test, and the button's rungs
 · every kind, and what it grounds — §073's test: a THING takes a ground, a FACT takes a tone
@@ -2537,6 +2613,25 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa. The parser tracks quotes with a
 aaaaaaaaaaaa.................................... which is why
   a = fg 38;2;212;212;212
 
+── §99 · the middle cut — a path narrowing, beside the end cut it replaced
+· a path narrowing — the head says WHERE, the tail says WHAT, and both survive to the last cell
+   31 │src/integration/parser/parse.ts│ 31 cells
+   29 │src/integ…ion/parser/parse.ts│ 29 cells
+   24 │src/int…/parser/parse.ts│ 24 cells
+   21 │src/in…arser/parse.ts│ 21 cells
+   16 │src/i…r/parse.ts│ 16 cells
+   11 │src…arse.ts│ 11 cells
+    8 │sr…se.ts│ 8 cells
+    5 │s….ts│ 5 cells
+    3 │…ts│ 3 cells
+
+· the same widths cut from the END — what the tree drew, and *what* is gone by 24
+   29 │src/integration/parser/parse…│
+   24 │src/integration/parser/…│
+   21 │src/integration/pars…│
+   16 │src/integration…│
+   11 │src/integr…│
+
 ── §73 · painted chrome — every kind against §073's test, and the button's rungs
 · every kind, and what it grounds — §073's test: a THING takes a ground, a FACT takes a tone
   rule         — no ground
@@ -3088,6 +3183,25 @@ aaaaaaaaaaaaaaaaaabcaab......................... boolean, which is why ⋅
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa. The parser tracks quotes with a single boolean,
 aaaaaaaaaaaa.................................... which is why
   a = fg 38;2;212;212;212
+
+── §99 · the middle cut — a path narrowing, beside the end cut it replaced
+· a path narrowing — the head says WHERE, the tail says WHAT, and both survive to the last cell
+   31 │src/integration/parser/parse.ts│ 31 cells
+   29 │src/integ…ion/parser/parse.ts│ 29 cells
+   24 │src/int…/parser/parse.ts│ 24 cells
+   21 │src/in…arser/parse.ts│ 21 cells
+   16 │src/i…r/parse.ts│ 16 cells
+   11 │src…arse.ts│ 11 cells
+    8 │sr…se.ts│ 8 cells
+    5 │s….ts│ 5 cells
+    3 │…ts│ 3 cells
+
+· the same widths cut from the END — what the tree drew, and *what* is gone by 24
+   29 │src/integration/parser/parse…│
+   24 │src/integration/parser/…│
+   21 │src/integration/pars…│
+   16 │src/integration…│
+   11 │src/integr…│
 
 ── §73 · painted chrome — every kind against §073's test, and the button's rungs
 · every kind, and what it grounds — §073's test: a THING takes a ground, a FACT takes a tone

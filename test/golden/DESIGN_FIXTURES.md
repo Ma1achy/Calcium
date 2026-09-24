@@ -188,7 +188,7 @@ most-drawn line in the application.
 | 96 | surface | `MESSAGE_LINE_CAP\|widthRung` | `design-surfaces.test.ts` | a status has three parts, and the frame is separate |
 | 97 | surface | `kind: "panel"` | `design-surfaces.test.ts` | a transient panel floats, between two rules |
 | 98 | prose | — | — | input ownership — what was in flight |
-| 99 | surface | `chipSpans` | — | wrapping, truncation and the atomic chip |
+| 99 | surface | `chipSpans` | `design-surfaces.test.ts` | wrapping, truncation and the atomic chip — `design-surfaces` §099, drawn as a **ladder** because one width proves nothing: an end cut and a middle cut are the same number of cells and both begin with the path's head, and what tells them apart is whether any of the tail is left. **The tree cut from the end**: `fitRuns` passed `"end"` to `truncate`, so `read_file(src/integration/parser/parse.ts)` kept *where* and threw *what* away — the one cut §099 names as wrong — and by 24 cells `parse.ts` was already gone. C09 I103 gives `truncate` a third arm on I79's walk; `truncateParts` deliberately does **not** get one, because a middle cut keeps two pieces and its contract promises one substring at one offset. **The split is this repository's and `R-SEC-099` is why**: *the prescriptive statements are current; specimen values and sample content remain examples* — and measured against the section's own figures, its 21-cell specimen ends `/rser/parse.ts`, which is not a suffix of the path at all. What the three do settle is the bias toward the tail; a third to the head reproduces one exactly and the others within a cell. **The remainder, named**: decimal-point alignment wants `ColumnDef.align`, which is `"left" | "right"` and is exactly §099's complaint that *align: r lines up the LAST character*; the atomic chip is M13's, where the editor's sentinel meets `Atom`; and *prose in a cell wraps at the cell width, height never feeding back into width* is C11's solved-width pass and already holds |
 | 100 | surface | `kind: "table"` | `table.test.ts` | a table that cannot shed, and two columns |
 | 101 | surface | `routingFor` | `question-slot.test.ts` | replace or float; the chip preview is M13's |
 | 102 | prose | — | — | view state is not liveness |
@@ -217,7 +217,7 @@ that is the reconciliation working, and it should be visible as a number moving 
 than inferred from a suite staying green.
 
     surface 66 · prose 37 · app 6 · total 109
-    of the surfaces: built 60 · unbuilt 6 · framed 60
+    of the surfaces: built 60 · unbuilt 6 · framed 61
 
 **`framed` is the figure this MR moves, and `built` is the one that went backwards.**
 Seven surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks

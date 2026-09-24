@@ -202,7 +202,7 @@ describe("C04 §3am.1 — `elide`", () => {
     }
 
     // **On a fitted token the marked run gives way first** (C09 I46): the run
-    // ends in the marker and the runs outside it are byte-identical.
+    // carries the marker inside it and the runs outside it are byte-identical.
     const head = block({ kind: "notice", id: "h", tone: "info", glyph: "running", state: "running", text: TEXT, spans: [ARG] });
     const wide = rows(head, 80)[0] ?? "";
     const narrow = rows(head, 40)[0] ?? "";
@@ -210,7 +210,12 @@ describe("C04 §3am.1 — `elide`", () => {
     expect(rows(head, 40)).toHaveLength(1);
     expect(narrow.startsWith("● verb(")).toBe(true);
     expect(narrow.endsWith(") · 4s · 12 rows")).toBe(true);
-    expect(narrow).toContain("…) · 4s · 12 rows");
+    // **The marker is INSIDE the argument, not at its end** (C09 I103, §099).
+    // This read `"…) · 4s · 12 rows"`, which is the end-cut's signature: the
+    // claim the row makes — *the marked run gives way and the runs outside it
+    // are byte-identical* — is unchanged, and only the shape of the cut moved.
+    expect(narrow).toContain("…");
+    expect(narrow.indexOf("…"), "the marker is inside the argument").toBeLessThan(narrow.indexOf(") · 4s"));
     expect(narrow.length, "shorter, and only in the marked run").toBeLessThan(wide.length);
   });
 

@@ -307,7 +307,11 @@ function fitRuns(runs: readonly Run[], budget: number, caps: RenderContext["capa
     const have = width(run);
     // At least the marker: an argument reduced to `…` still says *there was
     // one*, where an empty run leaves two separators touching.
-    const shortened = { ...run, text: truncate(run.text, Math.max(1, have - excess), caps, "end") };
+    // **From the MIDDLE** (I103, §099): an elided argument is a path, and *the
+    // head says where and the tail says what*. This read `"end"`, so
+    // `read_file(src/integration/parser/parse.ts)` kept *where* and threw *what*
+    // away — the one cut the section names as wrong.
+    const shortened = { ...run, text: truncate(run.text, Math.max(1, have - excess), caps, "middle") };
     out[i] = shortened;
     excess -= have - width(shortened);
   }

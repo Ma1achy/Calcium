@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { validateDocument, TRAIL_FORMS } from "../../src/data/viewmodel/index.js";
 import type { Notice } from "../../src/data/viewmodel/index.js";
 import { measurable, visible, FULL_CAPS, DARK_THEME } from "../support/render.js";
-import { cells } from "../../src/presentation/text.js";
+import { cells, truncate } from "../../src/presentation/text.js";
 import { capabilities } from "../support/fake-terminal.js";
 import { spinnerFrames } from "../../src/presentation/blocks/glyphs.js";
 import { background, slot } from "../../src/presentation/blocks/paint.js";
@@ -458,5 +458,80 @@ describe("C09 §073 — the button's three rungs", () => {
     const grid = gridOf(head as Notice);
     expect(grid[0]!.some((c) => c.style.bg !== ""), "a call head takes no ground").toBe(false);
     expect(runOf(gridOf(button())).painted, "and the same notice with an action does").not.toBe("");
+  });
+});
+
+describe("C09 §099 — an elided run shortens from its middle", () => {
+  const PATH = "src/integration/parser/parse.ts";
+  const CAPS = { unicode: "full" as const, ambiguousWidth: "narrow" as const };
+
+  it("T1.69 (C09 I103, §099, C09 I79): the cut keeps the head AND the tail, which is what an end-cut does not", () => {
+    for (const w of [29, 21, 11, 8, 5]) {
+      const out = truncate(PATH, w, CAPS, "middle");
+      expect(cells(out), `${String(w)}: exactly the budget`).toBe(w);
+      const [head, tail] = out.split("…") as [string, string];
+      // **The tail is the assertion that separates this from the defect.** An
+      // end-cut answer is also exactly the budget and also begins with the
+      // path's head, so a row checking only those passes under `"end"`.
+      expect(PATH.startsWith(head.trimEnd()), `${String(w)}: the head is the path's head`).toBe(true);
+      expect(PATH.endsWith(tail.trimStart()), `${String(w)}: the tail is the path's own tail`).toBe(true);
+      expect(tail.trim().length, `${String(w)}: there IS a tail`).toBeGreaterThan(0);
+    }
+    // The control: short enough to fit is byte-identical, marker and all.
+    expect(truncate(PATH, 60, CAPS, "middle"), "no cut when it fits").toBe(PATH);
+    // And the old behaviour is a different answer, so the row can tell them apart.
+    expect(truncate(PATH, 21, CAPS, "middle")).not.toBe(truncate(PATH, 21, CAPS, "end"));
+
+    // **Through the fitter, not only the function** — the mutation pass is what
+    // said so. Everything above calls `truncate` directly, so the mutation
+    // pointing `fitRuns` back at `"end"` **survived**: the mechanism was tested
+    // and the wiring was not. This arm renders a block with an `elide` span, the
+    // shape `callHead` writes, and asks the frame.
+    const head = "read_file(";
+    const text = `${head}${PATH})`;
+    const elided = {
+      kind: "notice",
+      id: "e",
+      tone: "default",
+      glyph: "running",
+      state: "running",
+      text,
+      spans: [{ from: head.length, to: head.length + PATH.length, elide: true }],
+    } as unknown as Notice;
+    const drawn = visible(bytesOf(elided, 34));
+    expect(drawn, "the fitter cut the argument").toContain("…");
+    expect(drawn.endsWith(".ts)"), "and the path's own tail survived the fitter").toBe(true);
+    expect(drawn.indexOf("…"), "the marker is inside the argument").toBeGreaterThan(drawn.indexOf(head));
+  });
+
+  it("T1.70 (C09 I103, C09 I79, C04 I84): one cut, on a cluster boundary, at every width and both widths of ambiguous", () => {
+    const corpus = [
+      PATH,
+      "src/👨‍👩‍👧‍👦/parse.ts",
+      "src/1️⃣/parse.ts",
+      "src/école/parse.ts",
+      "src/図表ディレクトリ/parse.ts",
+    ];
+    for (const ambiguousWidth of ["narrow", "wide"] as const) {
+      const caps = { unicode: "full" as const, ambiguousWidth };
+      for (const text of corpus) {
+        for (let w = 4; w <= cells(text, ambiguousWidth) + 1; w += 1) { // cells-ok — a width sweep
+          const out = truncate(text, w, caps, "middle");
+          expect(cells(out, ambiguousWidth), `${text} at ${String(w)} never overruns`).toBeLessThanOrEqual(w);
+          // **One marker is the assertion that the kind cut once**: a second cut
+          // by the composer is §099's named defect, and it shows as two.
+          const marks = [...out].filter((c) => c === "…").length;
+          expect(marks, `${text} at ${String(w)}: cut once, not twice`).toBeLessThanOrEqual(1);
+          // No cluster split: every cluster of the answer is a cluster of the
+          // input, or a space or the marker.
+          const segs = new Intl.Segmenter("en", { granularity: "grapheme" });
+          const source = new Set([...segs.segment(text)].map((x) => x.segment));
+          for (const g of [...segs.segment(out)].map((x) => x.segment)) {
+            if (g === "…" || g === " ") continue;
+            expect(source.has(g), `${JSON.stringify(g)} is a cluster of the input`).toBe(true);
+          }
+        }
+      }
+    }
   });
 });

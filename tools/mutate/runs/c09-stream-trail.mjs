@@ -16,6 +16,10 @@ const ROOT = process.cwd();
 const SIMPLE = "src/presentation/blocks/kinds/simple.ts";
 const VALIDATE = "src/data/viewmodel/validate.ts";
 const ANIMATION = "src/presentation/blocks/animation.ts";
+// **The command is what a mutation reaches** (F1243): T1.69 and T1.70 live in
+// this run's suite, so the middle cut is mutated here rather than in
+// `c09-cut-walk.mjs`, whose command names `text.test.ts` and not this file.
+const TEXT = "src/presentation/text.ts";
 const FILES = "test/unit/stream-trail.test.ts";
 
 const { read, write } = fsIo(ROOT);
@@ -235,6 +239,37 @@ const results = runPass({
       from: "const BUTTON_CELLS = 4;",
       to: "const BUTTON_CELLS = 2;",
       expect: "T1.67",
+    },
+    {
+      // **§099's defect, reinstated**: the elided argument cut from its end, so
+      // a path keeps *where* and loses *what*. The row is still exactly the
+      // budget and still begins with the path's head — every assertion but the
+      // tail passes, which is why T1.69 asserts the tail.
+      name: "an elided run shortens from its end rather than its middle",
+      file: SIMPLE,
+      from: "caps, \"middle\") };",
+      to: "caps, \"end\") };",
+      expect: "T1.69",
+    },
+    {
+      // **The head given the whole budget**, so the tail is empty and the
+      // marker lands at the end — an end cut reached by a different route,
+      // which a row asserting only *there is a marker* accepts.
+      name: "the middle cut gives the head the whole budget",
+      file: TEXT,
+      from: "    const headBudget = Math.floor(budget / 3); // cells-ok — a cell budget",
+      to: "    const headBudget = budget; // cells-ok — a cell budget",
+      expect: "T1.69",
+    },
+    {
+      // **The tail budgeted against the whole rather than the remainder**, so
+      // head and tail together overrun: the answer is wider than the frame it
+      // was measured at, which is the one failure that scrolls the alt screen.
+      name: "the middle cut's tail does not pay for the head",
+      file: TEXT,
+      from: "    const tail = keptWithin(clean, budget - head.used, caps.ambiguousWidth, \"start\");",
+      to: "    const tail = keptWithin(clean, budget, caps.ambiguousWidth, \"start\");",
+      expect: "T1.70",
     },
   ],
 });

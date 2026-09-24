@@ -34,6 +34,7 @@ import { tableDefinition } from "../../src/presentation/table/index.js";
 import { patchOf } from "./blocks.js";
 import { measurable, registry } from "./render.js";
 import { ALL_KINDS, ONE_PER_KIND } from "./blocks.js";
+import { cells, truncate } from "../../src/presentation/text.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { styledScreenFrom } from "./styled-screen.js";
 import type { ResolvedTheme } from "../../src/presentation/theme/index.js";
@@ -1098,6 +1099,40 @@ const buttonRungs = (
   ];
 };
 
+// --- §099, the middle cut ---------------------------------------------------
+
+/**
+ * §099 — *a path truncates in the MIDDLE, because the head says where and the
+ * tail says what. Either end alone is the wrong half.*
+ *
+ * **The frame is the ladder, because one width proves nothing.** An end cut and
+ * a middle cut are the same number of cells and both begin with the path's head;
+ * what tells them apart is whether anything of the tail is left, and that is only
+ * legible as a sequence of widths narrowing together. The tree cut from the end,
+ * so every row here used to read `src/integ…` and nothing else.
+ *
+ * **§099's own three specimens are not the reference**, and `R-SEC-099` says so:
+ * *the prescriptive statements are current; specimen values and sample content
+ * remain examples*. Measured against them, the section's 21-cell figure ends
+ * `/rser/parse.ts`, which is not a suffix of the path at all — they are drawn by
+ * hand. What they settle is the bias toward the tail, which is what this draws.
+ */
+const middleCut = (_width: number, capabilities: TerminalCapabilities): readonly string[] => {
+  const path = "src/integration/parser/parse.ts";
+  const full = cells(path, capabilities.ambiguousWidth);
+  const out = ["· a path narrowing — the head says WHERE, the tail says WHAT, and both survive to the last cell"];
+  for (const at of [full, 29, 24, 21, 16, 11, 8, 5, 3]) {
+    if (at > full) continue;
+    const cut = truncate(path, at, capabilities, "middle");
+    out.push(`  ${String(at).padStart(3)} │${cut}│ ${String(cells(cut, capabilities.ambiguousWidth))} cells`);
+  }
+  out.push("", "· the same widths cut from the END — what the tree drew, and *what* is gone by 24");
+  for (const at of [29, 24, 21, 16, 11]) {
+    out.push(`  ${String(at).padStart(3)} │${truncate(path, at, capabilities, "end")}│`);
+  }
+  return [...out, ""];
+};
+
 export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 95, name: "a tape, where a row of peers would shed", rows: draw(TAPE) },
   { section: 42, name: "widgets — a row of peers that sheds", rows: draw(PILLS) },
@@ -1124,6 +1159,7 @@ export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 17, name: "focus treatment follows the shape — what each kind publishes against what it draws", rows: focusByShape },
   { section: 76, name: "per-token values — the valued run, and the token that wraps whole", rows: valuedTokens },
   { section: 26, name: "the trail and the mark at the head — two carriers, and what each survives", rows: streamHead },
+  { section: 99, name: "the middle cut — a path narrowing, beside the end cut it replaced", rows: (w, c) => middleCut(w, c) },
   { section: 73, name: "painted chrome — every kind against §073's test, and the button's rungs", rows: (w, c, t) => [
     ...paintedChrome(w, c, t),
     ...buttonRungs(w, c, t),

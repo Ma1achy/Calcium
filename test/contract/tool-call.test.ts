@@ -250,7 +250,15 @@ describe("C09 §4 — the head is fitted and is an element", () => {
           // The row can hold verb, marker, duration and outcome: the argument
           // alone gives way, and everything outside it is intact.
           expect(marked.endsWith(") · 4s · exit 0"), `duration and outcome are intact at ${String(width)}`).toBe(true);
-          if (width < 80) expect(marked, `the argument ends in the marker at ${String(width)}`).toContain(`${marker}) · 4s · exit 0`);
+          // **The marker is inside the argument** (C09 I103, §099): a path
+          // shortens from its middle, so it ends in its own tail and not in the
+          // marker. The claim here is unchanged — the argument alone gives way
+          // — and `endsWith` above still carries it.
+          if (width < 80) {
+            const at = marked.indexOf(marker);
+            expect(at, `the argument carries a marker at ${String(width)}`).toBeGreaterThan(0);
+            expect(at, `and it is inside the argument at ${String(width)}`).toBeLessThan(marked.indexOf(") · 4s"));
+          }
         } else {
           // Twenty cells cannot hold `● run_command(…) · 4s · exit 0` (29), so
           // the whole row is cut last — after the argument is down to its marker.
