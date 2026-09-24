@@ -1539,6 +1539,8 @@ describe("C16 §8 I53 — key repeat is declared per binding", () => {
     expect(repeatSteps(DEFAULT_REPEAT, 10_000, 0), "and holding earns nothing").toBe(1);
   });
 
+  it.todo("T1.159f (I53, R-KEY-002): a ⌥↑ repeat through dispatch meets the page policy bound at global — not deferred on a component: the lookup falls back to global in the next commit of this MR");
+
   it("T1.159e (I53, R-DEG-002): nothing is synthesised — the module schedules nothing", () => {
     // **The invariant's other half, and the one no rate assertion can see.** A
     // reader who disabled key repeat sends none; a policy that fired on its own
