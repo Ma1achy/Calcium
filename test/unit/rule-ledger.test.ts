@@ -42,8 +42,22 @@ function row(id: string): string {
   return line as string;
 }
 
+/**
+ * Each row here spawns `rule-status.mjs` two or three times, and the tool walks
+ * `src/` per backticked identifier across 118 rows (`R-INT-005` alone cites
+ * four files). **Measured 2026-09-24: 1.5 s per invocation on an idle
+ * container** — and the suite runs fifteen workers wide, each spawning node
+ * subprocesses of its own, so the same call has been observed past vitest's
+ * 30 s default while passing in 1.5 s when this file runs alone.
+ *
+ * **The budget is the harness's, not the rule's**: every assertion below is
+ * unchanged, and a row that fails on its own still fails. `mutate-anchors`'
+ * `SWEEP_BUDGET_MS` is the same decision one file over, for the same reason.
+ */
+const LEDGER_BUDGET_MS = 120_000;
+
 describe("A03 SS66 — the rule ledger resolves against the tree", () => {
-  it("T1.154 (SS66, R-SPC-001): the live ledger is green, and its three states partition the registry", () => {
+  it("T1.154 (SS66, R-SPC-001): the live ledger is green, and its three states partition the registry", { timeout: LEDGER_BUDGET_MS }, () => {
     const { code, out } = run(text());
     expect(out, "the counts are reported rather than left to a reader").toMatch(
       /^\d+ current rules — \d+ cited, \d+ covered, \d+ owed$/mu,
@@ -52,7 +66,7 @@ describe("A03 SS66 — the rule ledger resolves against the tree", () => {
     expect(code, "and it is green").toBe(0);
   });
 
-  it("T1.155 (SS66): an `owed` row whose rule has since been cited is a violation", () => {
+  it("T1.155 (SS66): an `owed` row whose rule has since been cited is a violation", { timeout: LEDGER_BUDGET_MS }, () => {
     // **The negative check, and the only one a snapshot cannot hold.** A ledger
     // asserting only its positive claims certifies whichever subset chose to
     // carry one; the stale half is the half that reads as coverage. This is the
@@ -64,7 +78,7 @@ describe("A03 SS66 — the rule ledger resolves against the tree", () => {
     expect(code).toBe(1);
   });
 
-  it("T1.156 (SS66): a rule with no row, and a row with no rule, both fail", () => {
+  it("T1.156 (SS66): a rule with no row, and a row with no rule, both fail", { timeout: LEDGER_BUDGET_MS }, () => {
     const dropped = run(text().split("\n").filter((l) => !l.startsWith("| **R-SEL-012**")).join("\n"));
     expect(dropped.out).toContain("R-SEL-012: a current rule with no ledger row");
     expect(dropped.code).toBe(1);
@@ -76,7 +90,7 @@ describe("A03 SS66 — the rule ledger resolves against the tree", () => {
     expect(extra.code).toBe(1);
   });
 
-  it("T1.157 (SS66): a `covered` row's subject must resolve, and must be more than a path", () => {
+  it("T1.157 (SS66): a `covered` row's subject must resolve, and must be more than a path", { timeout: LEDGER_BUDGET_MS }, () => {
     // **Two arms, and the second is the one the first control pass missed.**
     // Moving the file is caught by the identifier check; removing the identifier
     // leaves a path that exists, which is not evidence that the rule lives in it.

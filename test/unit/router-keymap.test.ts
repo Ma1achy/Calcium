@@ -110,27 +110,42 @@ describe("C16 §6 — a colliding block key is placed, not refused (I27)", () =>
   });
 
   it("T2.4c (I27): a key `liveBlock` binds lands at `interaction` too, and a free key at `liveBlock`", () => {
-    // **The fabricated collision, on the real table.** `up` is `rowUp` at
-    // `liveBlock`; a block binding it must not take the arrow away from
-    // navigation, and must still be able to have it once the reader is inside.
-    // `x` is free, so it works from the first `↓` (A01 D4) — the two halves of
-    // one block keymap landing at two targets is the ruling, not an accident.
-    // Both actions are union members no default row binds (I19), so the listing
-    // below is the block's rows and nothing else.
+    // **The fabricated collision, on the real table.** `pagedown` is
+    // `blockPageDown` at `liveBlock`; a block binding it must not take the key
+    // away from paging, and must still be able to have it once the reader is
+    // inside. `x` is free, so it works from the first `↓` (A01 D4) — the two
+    // halves of one block keymap landing at two targets is the ruling, not an
+    // accident. Both actions are union members no default row binds (I19), so
+    // the listing below is the block's rows and nothing else.
+    //
+    // **It was `up`, and `↑` stopped being available** (C26 I26, I27, §102).
+    // The arrows are the inside's own now, so a block binding one has nowhere
+    // to be placed and is refused — T2.173's subject. `pagedown` is the
+    // collision this row is about, and it is untouched.
     const map = createKeymap(defaultKeymap);
     map.mergeBlock([
-      { key: { name: "up" }, action: "toggleSeries1" },
+      { key: { name: "pagedown" }, action: "toggleSeries1" },
       { key: { name: "x" }, action: "toggleSeries2" },
     ]);
 
-    expect(map.resolve("liveBlock", k("up"))?.action, "navigation keeps the arrow").toBe("rowUp");
-    expect(map.resolve("interaction", k("up"))?.action, "the block has it inside").toBe("toggleSeries1");
+    expect(map.resolve("liveBlock", k("pagedown"))?.action, "navigation keeps the key").toBe("blockPageDown");
+    expect(map.resolve("interaction", k("pagedown"))?.action, "the block has it inside").toBe("toggleSeries1");
     expect(map.resolve("liveBlock", k("x"))?.action, "a free key needs no mode").toBe("toggleSeries2");
-    expect(map.resolve("interaction", k("x")), "and is not duplicated inside").toBeNull();
+    // **And it is the block's inside too** (C26 I2, I26). Dispatch does not fall
+    // through from one rung to the next, so a free key merged at `liveBlock`
+    // alone stopped working the moment `⏎` entered — the silent shadow this
+    // rule exists to prevent, arriving from the side that was unreachable until
+    // `R-INT-005` built the entry. *The block owns its keys while the reader is
+    // inside it.*
+    expect(map.resolve("interaction", k("x"))?.action, "and it survives the way in").toBe("toggleSeries2");
 
-    // `/help` lists both, at their targets — nothing silent (I19).
+    // `/help` lists every one, at its target — nothing silent (I19).
     const listed = map.entries().filter((b) => b.action === "toggleSeries1" || b.action === "toggleSeries2");
-    expect(listed.map((b) => `${b.target}:${b.action}`).sort()).toEqual(["interaction:toggleSeries1", "liveBlock:toggleSeries2"]);
+    expect(listed.map((b) => `${b.target}:${b.action}`).sort()).toEqual([
+      "interaction:toggleSeries1",
+      "interaction:toggleSeries2",
+      "liveBlock:toggleSeries2",
+    ]);
   });
 
   it("T2.4d (I10, I27): the same key twice inside one block keymap is still a construction error", () => {
@@ -191,7 +206,9 @@ describe("C16 §6 — /help renders from the table dispatch uses", () => {
     map.mergeBlock([{ key: { name: "s" }, action: "rowActivate" }]);
 
     const listed = map.entries();
-    expect(listed.length, "base bindings and the live block's").toBe(3);
+    // Four: the two base rows and the block's `s` at both its targets — free,
+    // so it is the block's on the row and inside it alike (I27, C26 I2).
+    expect(listed.length, "base bindings and the live block's, at both targets").toBe(4);
 
     for (const entry of listed) {
       const resolved = map.resolve(entry.target, k(entry.key.name, entry.key));
@@ -411,26 +428,27 @@ describe("§6 — the default table (C17 I12)", () => {
       // `⌃a` is the byte `0x01`, the same one `prompt c+a` walks above — one
       // byte, two targets, two actions (C26 §5c).
       "liveBlock c+a": ["\u0001"],
-      // **A plain printable, and T2.13 is what said the first choice was not.**
-      // The binding was written as a bare key name and this table has no default:
-      // a row with no wire form fails, which is how it was found that nobody
-      // could press it. `[` and `]` are their own bytes, exactly as `y` is —
-      // and this table is what measured that rather than assuming it.
-      "liveBlock [": ["["],
-      "liveBlock ]": ["]"],
-      // **Step 8's five, and the shifted brackets are the reason this table is
-      // the check.** A terminal sends `{` as the byte `{` with no shift flag —
-      // the modifier is the layout's and never reaches the wire — so a binding
-      // written as `{name: "[", shift: true}` would resolve against an event
-      // nothing sends, which is Shift-Enter's defect on a printable. Measured
-      // here rather than assumed, exactly as `[` and `]` were.
-      "liveBlock {": ["{"],
-      "liveBlock }": ["}"],
-      "liveBlock +": ["+"],
-      "liveBlock =": ["="],
-      "liveBlock -": ["-"],
-      "liveBlock r": ["r"],
-      "liveBlock o": ["o"],
+      // **The inside's own, moved with the family** (C26 I27, C16 I28, §102).
+      // `[` `]` `{` `}` retired: §102's control row is `←→ orbit   ↑↓ tilt`,
+      // and the brackets existed only because `liveBlock`'s arrows step
+      // elements. The shifted-printable finding the retired rows recorded is
+      // kept in the prose and not in a row, because there is no longer a
+      // binding to be wrong about: a terminal sends `{` as the byte `{` with no
+      // shift flag, so `{name: "[", shift: true}` would have resolved against
+      // an event nothing sends.
+      //
+      // `+` `=` `-` `r` `o` are the same printables at the new target, and the
+      // arrows carry the same two wire forms the prompt's do.
+      "interaction left": ["\u001b[D", "\u001bOD"],
+      "interaction right": ["\u001b[C", "\u001bOC"],
+      "interaction up": ["\u001b[A", "\u001bOA"],
+      "interaction down": ["\u001b[B", "\u001bOB"],
+      "interaction escape": ["\u001b"],
+      "interaction +": ["+"],
+      "interaction =": ["="],
+      "interaction -": ["-"],
+      "interaction r": ["r"],
+      "interaction o": ["o"],
 
       // Native selection's entry, at both targets it is bound to (C16 §5b). The key is
       // provisional — which key enters native selection is the rebindable-keys row's
@@ -565,10 +583,6 @@ describe("§6 — the default table (C17 I12)", () => {
       // parameterised `Z` stays malformed (router-decode T3.13).
       "liveBlock tab": ["\t"],
       "liveBlock s+tab": ["\u001b[Z"],
-      // The horizontal pair (C22 I76). The same two wire forms the prompt's
-      // `left`/`right` carry, at the target where they used to be dropped.
-      "liveBlock left": ["\u001b[D", "\u001bOD"],
-      "liveBlock right": ["\u001b[C", "\u001bOC"],
       // Re-run (C23 I18): the prompt's newline pair, at the other target.
       "liveBlock s+enter": ["\u001b[13;2u", "\u001b[27;2;13~"],
       "liveBlock m+enter": ["\u001b\r"],
@@ -1071,13 +1085,22 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     // are bindable only because nothing else can be active while this target
     // is, which is what the rule relies on when it names them unmodified.
     //
+    // **120 from `R-INT-005`** (C26 I26, I27, §102). The camera family moved
+    // from `liveBlock` to `interaction` — nine rows, target changed and nothing
+    // else — and the shape of the set changed underneath them: `[` `]` `{` `}`
+    // retired with the target that forced them (four out), `±` `=` `r` `o` kept
+    // their keycaps at the new one, the horizontal pair moved with them, the
+    // vertical pair joined it, and `escape` gained a row at `interaction` for
+    // §102's *esc out*. Net one fewer, and the count is what says the four
+    // retirements are four and not three.
+    //
     // The count is pinned as well as the set: a table that lost a row *and*
     // gained an equal one would satisfy a set comparison alone.
     const rows = defaultKeymap
       .map((b) => `${b.target}\t${keySlot(b.key)}\t${b.action}\t${b.profile ?? "both"}`)
       .sort();
-    expect(rows).toHaveLength(121);
-    expect(new Set(rows).size, "no two rows are identical").toBe(121);
+    expect(rows).toHaveLength(120);
+    expect(new Set(rows).size, "no two rows are identical").toBe(120);
 
     // Every row whose chord the registry names resolves to the registry's key —
     // the join asserted from the table's side, so a `chordOf` call that silently
@@ -1108,8 +1131,14 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
       // `↑`/`↓` spell chords the registry names for the transcript's motions —
       // so all four are in this count, where `a`, `A` and `y` are not. The
       // figure measures *which spelling the registry owns*, not which action.
+      //
+      // **63 from `R-INT-005`** (C26 I27, §102): the inside's four arrows and
+      // its `escape`. `←`/`→` were already counted — they moved target and did
+      // not join — so the three new entries are `↑`, `↓` and `escape`. The
+      // retired `[` `]` `{` `}` were never in this count: the registry names no
+      // chord spelled that way, which is itself the finding §102 settled.
       "the rows the registry supplies a chord for",
-    ).toBe(60);
+    ).toBe(63);
   });
 
   it("T1.94 (I41): ⌘↑ and ⌥↑ are two actions under the enhanced profile and one under the base", () => {
@@ -1355,7 +1384,12 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     // pattern walked past all three — which is why the classification is
     // asserted against `defaultKeymap` and not against a count taken by hand.
     const TYPING = ["child", "global", "overlay", "panel", "prompt"];
-    const NOT_TYPING = ["liveBlock", "nativeSelection", "semanticSelection"];
+    // `interaction` joins the not-typing side with its first framework rows
+    // (C26 I26, I27, §102). It is the one rung where a bare `o` or `r` is the
+    // design's own control row rather than a character somebody meant to type:
+    // *KEYBOARD CONTROLS APPEAR ONLY INSIDE*, and inside a figure there is no
+    // line being composed.
+    const NOT_TYPING = ["interaction", "liveBlock", "nativeSelection", "semanticSelection"];
 
     const targets = [...new Set(defaultKeymap.map((b) => b.target))].sort();
     expect(targets, "every target is classified — a new one fails here first")
@@ -1434,8 +1468,10 @@ describe("C16 §8 I53 — key repeat is declared per binding", () => {
       menuPrev: { das: 170, arr: 25, accelerate: true },
       scrollPageUp: { das: 250, arr: 90, accelerate: false },
       scrollPageDown: { das: 250, arr: 90, accelerate: false },
-      orbitLeft: { das: 0, arr: 16, accelerate: false },
-      orbitRight: { das: 0, arr: 16, accelerate: false },
+      insideLeft: { das: 0, arr: 16, accelerate: false },
+      insideRight: { das: 0, arr: 16, accelerate: false },
+      insideUp: { das: 0, arr: 16, accelerate: false },
+      insideDown: { das: 0, arr: 16, accelerate: false },
       backspace: { das: 300, arr: 30, accelerate: false },
     });
     // §020's fifth row is a slider at 200/40 and the keymap has no slider
@@ -1455,7 +1491,7 @@ describe("C16 §8 I53 — key repeat is declared per binding", () => {
 
     // The orbit is the control for DAS: 0 means there is no pause at all, so a
     // repeat one millisecond after the press is acted on if the rate allows.
-    const orbit = repeatFor("orbitLeft");
+    const orbit = repeatFor("insideLeft");
     expect(repeatSteps(orbit, 1, 16), "no delay, 60fps — it is analogue").toBe(1);
     expect(repeatSteps(orbit, 1, 15), "and the rate still holds").toBe(0);
   });
@@ -1471,7 +1507,7 @@ describe("C16 §8 I53 — key repeat is declared per binding", () => {
     // **The three that do not accelerate, at the same durations.** Each is
     // refused by the sentence that set its numbers: a page is a whole screen, an
     // orbit is analogue, and a mis-held ⌫ is expensive.
-    for (const action of ["scrollPageDown", "orbitRight", "backspace"]) {
+    for (const action of ["scrollPageDown", "insideRight", "backspace"]) {
       const flat = repeatFor(action);
       expect(
         [repeatSteps(flat, 500, 1000), repeatSteps(flat, 2000, 1000), repeatSteps(flat, 10_000, 1000)],
@@ -1513,5 +1549,78 @@ describe("C16 §8 I53 — key repeat is declared per binding", () => {
     }
     // The control: the stripper did not empty the corpus.
     expect(code.includes("export function repeatSteps"), "the stripped source still holds the policy").toBe(true);
+  });
+});
+
+/**
+ * C26 I27 — the commit gate, over the table rather than over one key (§102, §018).
+ */
+describe("a continuous control commits only from inside (C26 I27, R-INT-005)", () => {
+  /**
+   * Every action that moves a camera, a cursor or a handle.
+   *
+   * Written out rather than matched by name, because a prefix sweep is the
+   * fabrication this row is most likely to make: `inside*` would be exactly the
+   * set that already sits at `interaction`, and the rule would test itself.
+   */
+  const COMMITS: ReadonlySet<string> = new Set([
+    "insideLeft",
+    "insideRight",
+    "insideUp",
+    "insideDown",
+    "dollyIn",
+    "dollyOut",
+    "cameraReset",
+    "orbitToggle",
+  ]);
+
+  it("T1.163 (C26 I27, §8b.9, §102): every domain-value binding resolves at interaction", () => {
+    const committing = defaultKeymap.filter((b) => COMMITS.has(b.action));
+    // The corpus is non-empty and holds every member — a sweep over a set the
+    // table has drifted away from is a sweep over nothing (F134's shape).
+    expect(new Set(committing.map((b) => b.action)), "every commit action is bound").toEqual(COMMITS);
+
+    const elsewhere = committing.filter((b) => b.target !== "interaction");
+    expect(elsewhere.map((b) => `${b.target}:${b.key.name}:${b.action}`), "§102: KEYBOARD CONTROLS APPEAR ONLY INSIDE").toEqual([]);
+  });
+
+  it("T1.163b (C26 I27, C22 I75): the brackets retired with the target that forced them", () => {
+    // **The other half, and it is not implied by the row above**: a build that
+    // moved the nine rows *and kept* `[` `]` at `liveBlock` pointing at the same
+    // effects satisfies every assertion there, because the sweep sees the moved
+    // rows and the stale ones name no action in the set once they are gone.
+    // Unmodified only: `⌃]` is `hostDetach` at `child` (M9's re-homing) and
+    // is a different key by every rule this table has.
+    const brackets = defaultKeymap.filter(
+      (b) =>
+        ["[", "]", "{", "}"].includes(b.key.name) &&
+        b.key.ctrl !== true &&
+        b.key.meta !== true &&
+        b.key.shift !== true,
+    );
+    expect(brackets, "§102 draws the arrows; the brackets were liveBlock's cost").toEqual([]);
+  });
+});
+
+describe("a block key with nowhere to be placed (C16 I27, C26 I26)", () => {
+  it("T2.173 (C16 I27, C26 I26): a collision that is also the inside's own is refused", () => {
+    const keymap = createKeymap(defaultKeymap);
+
+    // `↑` is bound at `liveBlock` as `rowUp` **and** at `interaction` as the
+    // inside's own, so the placement rule sends the block's copy to
+    // `interaction` and finds the slot taken. There is nowhere left to put it
+    // that is not a silent shadow, which is the one refusal I27 now needs.
+    expect(() => keymap.mergeBlock([{ key: k("up"), action: "rowUp" }])).toThrow(KeymapError);
+
+    // **The control**: a key that collides below and is *not* one of the
+    // inside's is still placed, which is what I27 is for. Without this arm the
+    // row passes against a build that refuses every colliding block key — the
+    // exact regression the placement rule replaced.
+    const withdraw = keymap.mergeBlock([{ key: k("pageup"), action: "blockPageUp" }]);
+    expect(
+      keymap.resolve("interaction", k("pageup"))?.action,
+      "placed at interaction, not refused",
+    ).toBe("blockPageUp");
+    withdraw();
   });
 });

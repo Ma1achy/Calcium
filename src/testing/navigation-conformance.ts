@@ -1,12 +1,12 @@
 /**
- * C26 §5 — the four predicates `elements` earns, checked generically.
+ * C26 §5 — the five predicates `elements` earns, checked generically.
  *
  * **`window` earned an equality and this does not**, which is the honest thing to
  * say up front rather than to discover. `measure(w.block, width) − w.skipRows ===
  * to − from` is one number against one number, total over every kind that
  * declares a window, and it is what made an app's wrong implementation catchable
  * by a sweep rather than by a row someone thought to write. There is no single
- * equality here. There are four predicates, and each catches a class:
+ * equality here. There are five predicates, and each catches a class:
  *
  *   1. **Containment** — every element lies inside the block it came from.
  *      Catches positions derived from something other than the block handed in,
@@ -19,6 +19,12 @@
  *      rule would forbid the structure (C26 I6).
  *   4. **Stability** — two calls agree. Catches an implementation reading a
  *      clock or a counter, which the signature does not forbid.
+ *   5. **An inside or an action, never both** (C26 I26, §018). `⏎` enters an
+ *      element declaring `viewState` and dispatches one declaring `activate`;
+ *      the design rules them disjoint — *direct-action toggles and choices act
+ *      without an inside state* — so the key needs no precedence. Without the
+ *      predicate the ruling is prose, and a block declaring both loses its
+ *      action silently.
  *
  * **Purity in focus is not checked here and cannot be**, which is the strongest
  * of the five and the only one that needs no test: focus is not a parameter, so
@@ -73,7 +79,7 @@ export type ElementFailure = Readonly<{
   kind: string;
   blockId: string;
   width: number;
-  predicate: "containment" | "order" | "disjoint" | "stability" | "window-agreement";
+  predicate: "containment" | "order" | "disjoint" | "stability" | "window-agreement" | "inside-or-action";
   detail: string;
 }>;
 
@@ -198,6 +204,20 @@ export function checkElements(
             (e.rows.from === previous.rows.from && e.cols.from < previous.cols.from))
         ) {
           fail("order", `${e.id} is drawn above ${previous.id} and listed after it`);
+        }
+
+        // 5 — an inside and an action are exclusive (C26 I26, §018).
+        //
+        // **A ruling rather than a precedence, so it is checkable rather than
+        // ordered.** `⏎` enters an element that declares view state and
+        // dispatches one that declares an `activate`; §018 says *direct-action
+        // toggles and choices act without an inside state*, so the two sets are
+        // disjoint and the key never has to choose. An element declaring both is
+        // the block author contradicting the design, and without this the
+        // invariant is prose — the entry arm simply wins and the `activate`
+        // never fires, silently.
+        if (e.viewState === true && e.activate !== undefined) {
+          fail("inside-or-action", `${e.id} declares both viewState and an activate; ⏎ cannot mean both`);
         }
         previous = e;
       }

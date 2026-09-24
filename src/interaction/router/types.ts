@@ -438,8 +438,21 @@ export type KeyAction =
   // its crosshair; a kind with no horizontal interior is a no-op, which is the
   // camera family's precedent (C22 I75) and the cost of binding before every
   // consumer exists. A table's column cursor is the second consumer (C26 §11).
-  | "cursorLeft"
-  | "cursorRight"
+  // **Amended — the four arrows are the inside's, at `interaction`** (C16 I28,
+  // C26 I26, I27, §102). The pair above described `liveBlock`, where a crosshair
+  // stepped from outside the plot is the commit `R-INT-005` forbids. One action
+  // per arrow, resolving by what the focused element declared: a camera takes
+  // the horizontal as azimuth and the vertical as tilt, a cursor takes the
+  // horizontal as a sample step and has no vertical, a kind with neither is a
+  // no-op. Two actions on one key at one target is the duplicate this table
+  // refuses, so the resolution has to be by declaration — and §102's kind table
+  // makes it total, since a kind has a camera **or** a cursor, never both.
+  | "insideLeft"
+  | "insideRight"
+  | "insideUp"
+  | "insideDown"
+  /** `esc out` (§102) — leave the inside and stay on the element (C26 I14). */
+  | "exitInside"
   // --- re-run the focused entry (C23 I18) ------------------------------------
   //
   // **Not an action kind.** The five `Action` kinds fire against a document's
@@ -449,10 +462,6 @@ export type KeyAction =
   // notebook's *re-run this cell* and an agent harness's *retry that tool call*
   // — are this key on a settled entry.
   | "rerunEntry"
-  | "orbitLeft"
-  | "orbitRight"
-  | "tiltDown"
-  | "tiltUp"
   | "dollyIn"
   | "dollyOut"
   | "cameraReset"

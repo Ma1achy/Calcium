@@ -89,8 +89,17 @@ export const REPEAT_POLICIES: ReadonlyMap<string, RepeatPolicy> = new Map<string
   ["scrollPageUp", Object.freeze({ das: 250, arr: 90, accelerate: false })],
   ["scrollPageDown", Object.freeze({ das: 250, arr: 90, accelerate: false })],
   // `a 3D orbit — 0 / 16 — NO delay, 60fps — it is analogue`.
-  ["orbitLeft", Object.freeze({ das: 0, arr: 16, accelerate: false })],
-  ["orbitRight", Object.freeze({ das: 0, arr: 16, accelerate: false })],
+  //
+  // **The names moved with the keys** (C16 I28, C26 I27, §102). The camera's
+  // horizontal pair was `orbitLeft`/`orbitRight` at `liveBlock`; §102 puts the
+  // controls inside and draws them on the arrows, and the action resolves by
+  // what the element declared. The vertical pair is on the same policy for the
+  // same reason — a tilt is as analogue as a turn — where before it had none,
+  // which was the bracket family being four keys with two policies.
+  ["insideLeft", Object.freeze({ das: 0, arr: 16, accelerate: false })],
+  ["insideRight", Object.freeze({ das: 0, arr: 16, accelerate: false })],
+  ["insideUp", Object.freeze({ das: 0, arr: 16, accelerate: false })],
+  ["insideDown", Object.freeze({ das: 0, arr: 16, accelerate: false })],
   // `⌫ in the prompt — 300 / 30 — slow to start, a mis-hold is expensive`.
   ["backspace", Object.freeze({ das: 300, arr: 30, accelerate: false })],
 ]);

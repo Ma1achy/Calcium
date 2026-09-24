@@ -29,6 +29,8 @@ const runsOf = parseLine as (l: string) => readonly { text: string; colour: stri
 
 /** `Down` on the wire, in both the forms a terminal sends. */
 const DOWN = "\u001b[B";
+/** `←` — the inside's orbit key (§102, C16 I28). */
+const LEFT = "\u001b[D";
 
 /** One revolution in twelve seconds, in radians per millisecond — session.ts's ORBIT_RATE. */
 const RATE = (2 * Math.PI) / 12_000;
@@ -116,6 +118,12 @@ async function session(
   // declares one exactly when it declares a camera (C12 I85).
   await type(DOWN);
   await type(DOWN);
+  // **And `\r` enters the plot** (C26 I26, §102: *focused — the way IN — ⏎
+  // enter*). Every camera key moved to `interaction` with `R-INT-005`: a camera
+  // nudged from `liveBlock` is a domain value committed from outside, which is
+  // the one thing §018 forbids. The plot declares `viewState`, so `⏎` enters
+  // rather than dispatching an action.
+  await type("\r");
   return { ...built, type };
 }
 
@@ -449,7 +457,7 @@ describe("C22 §6i — the cache, and the manual family", () => {
     await built.type("x");
     expect(renders, "a frame with nothing moved is served from the cache").toBe(settled);
 
-    await built.type("[");
+    await built.type(LEFT); // §102: `←→ orbit`, and the brackets retired with `liveBlock`
     const afterNudge = renders;
     expect(afterNudge, "a camera that moved is a miss").toBeGreaterThan(settled);
 
@@ -495,7 +503,7 @@ describe("C22 §6i — the cache, and the manual family", () => {
       { kind: "panel", id: "pan", title: "inside", children: [plot("deep")] },
     ]);
 
-    await built.type("[");
+    await built.type(LEFT); // §102: `←→ orbit`, and the brackets retired with `liveBlock`
     const cam = w.cameras().at(-1)?.deep;
     expect(cam, "the nested plot's camera reached the renderer").toBeDefined();
     expect(cam?.azimuth ?? 0, "and the key turned it").toBeCloseTo(-Math.PI / 8, 9);

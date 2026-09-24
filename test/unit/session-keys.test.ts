@@ -20,6 +20,7 @@ import type { Graph } from "../../src/shell/construct.js";
 import { producerContext } from "../support/producer-context.js";
 import { navElement } from "../support/focus.js";
 import type { Action } from "../../src/data/viewmodel/index.js";
+import type { NavElement } from "../../src/presentation/blocks/index.js";
 const key = (k: { name: string; ctrl?: boolean; meta?: boolean; shift?: boolean }): Key => ({
   name: k.name,
   ctrl: k.ctrl ?? false,
@@ -170,6 +171,43 @@ function enterLive(graph: Graph): void {
   graph.router.dispatch(press({ name: "down" }));
 }
 
+/**
+ * Focus **inside** a block, reached the way a reader reaches it (C26 I26, §102).
+ *
+ * `enterLive`'s argument one rung up: through the keystrokes rather than by
+ * calling `setMode`, so the setup is a claim about the mechanism. The block has
+ * to be one with an inside — a plot with a camera, which is what declares
+ * `viewState` — because `⏎` on a table row dispatches its `activate` instead.
+ */
+function enterInside(graph: Graph): void {
+  if (!graph.transcript.entries.some((e) => e.doc.command === "/plot")) {
+    graph.transcript.append(
+      {
+        schema: "tui.view/1",
+        command: "/plot",
+        status: "ok",
+        blocks: [{ kind: "plot", id: "camera-plot", form: "line", height: 3, camera: { azimuth: 0 }, series: [{ label: "s", values: [1, 2, 3] }] }],
+        meta: {
+          verb: "plot",
+          adapter: "passthrough",
+          exitCode: 0,
+          durationMs: 0,
+          truncated: false,
+          argv: [],
+          stderr: "",
+          transport: "local",
+          origin: "user",
+        },
+      } as never,
+      { streaming: true },
+    );
+  }
+  graph.editor.clear();
+  graph.focus.reset();
+  graph.router.dispatch(press({ name: "down" }));
+  graph.router.dispatch(press({ name: "enter" }));
+}
+
 describe("C22 §3 step 11 — the effect table", () => {
   it("T1.4h (C22 I26): every binding in the table is consumed at its target", async () => {
     // **Derived from `defaultKeymap`, never listed here.** A hand-written list
@@ -208,6 +246,11 @@ describe("C22 §3 step 11 — the effect table", () => {
       // `liveBlock` needs both halves of what `activeTarget` reads: a live
       // entry in C13 and focus stored there (C16 §3).
       if (b.target === "liveBlock") enterLive(graph);
+      // **The inside needs a block that has one** (C26 I26, §102). `enterLive`'s
+      // table declares no view state, so `⏎` there dispatches a row action and
+      // leaves the mode alone — the row would fail for a reason that has nothing
+      // to do with whether its effect exists, which is `child`'s argument above.
+      if (b.target === "interaction") enterInside(graph);
       // **The `copy` rung's two targets, and they were unreachable** (C16 I50).
       // `FRAME` hard-wired both flags to `false`, so no row at either could
       // resolve — and `nativeSelection`'s `escape` row passed anyway, consumed
@@ -1121,5 +1164,102 @@ describe("C22 §6 — a keystroke cancels a pending completion (I39)", () => {
     stdin.emit("\u001b[200~pasted\u001b[201~");
 
     expect(cancel, "a paste supersedes a pending request as a keystroke does").toHaveBeenCalled();
+  });
+});
+
+/**
+ * C26 I26, I27 — the way in, the way out, and the arrows inside (§102, §018).
+ */
+describe("the inside (C26 I26, I27, §102)", () => {
+  const insideEffects = () => {
+    const focus = createFocusStore();
+    const fired: Action[] = [];
+    const moves: string[] = [];
+    const withView = (id: string, row: number): NavElement =>
+      Object.freeze({ ...navElement(id, row), viewState: true });
+    const elements = [
+      // **A plain element beside the one with an inside**, so *enters* and
+      // *enters on everything* are separable: with only the plot in the list,
+      // a build that ignored the declaration would pass every row here.
+      { blockId: "a", element: navElement("row", 0, { kind: "fill", label: "a", command: "a" }) },
+      { blockId: "p", element: withView("plot", 1) },
+    ];
+    const effects = createKeyEffects({
+      editor: {},
+      completion: {},
+      overlays: {},
+      history: { entries: [], append: () => undefined, next: () => null },
+      visibilityChanged: () => undefined,
+      resized: () => undefined,
+      manifest: null,
+      viewport: recordingViewport().viewport,
+      anchor: () => ({ row: 10, rows: 1 }),
+      overlayRegion: () => ({ width: 80, height: 24 }),
+      redraw: () => undefined,
+      focus,
+      liveElements: () => elements,
+      liveEntryId: () => "e1",
+      focusedEntryId: () => "e1",
+      focusedElements: () => elements,
+      neighbourEntry: () => null,
+      orbitBlock: (d: number) => void moves.push(`orbit${String(d)}`),
+      tiltBlock: (d: number) => void moves.push(`tilt${String(d)}`),
+      cursorBlock: (d: number) => void moves.push(`cursor${String(d)}`),
+      rerunEntry: () => undefined,
+      onAction: (action: Action) => void fired.push(action),
+      schedule: (fn: () => void) => {
+        fn();
+        return { [Symbol.dispose]: () => undefined };
+      },
+    } as unknown as Parameters<typeof createKeyEffects>[0]);
+    return { effects, focus, fired, moves };
+  };
+
+  it("T1.160 (C26 I26, §102): ⏎ on an element declaring view state enters, and esc leaves", () => {
+    const { effects, focus, fired } = insideEffects();
+    focus.enterLiveBlock("e1", { blockId: "p", elementId: "plot" });
+
+    effects.table["rowActivate"]?.();
+    expect(focus.current, "the way IN — ⏎ enter (§102)").toMatchObject({ mode: "interact" });
+    expect(fired, "entering is not an action; nothing fired").toEqual([]);
+
+    effects.table["exitInside"]?.();
+    expect(focus.current, "esc out (§102)").toMatchObject({ mode: "navigate" });
+  });
+
+  it("T1.161 (C26 I26): ⏎ on an element that declares none dispatches its activate instead", () => {
+    // **The control, and the whole of §018's *arrowing down a document past
+    // three sliders*** read from the entry side: without it the row above
+    // passes against a build that enters on every element, which would put an
+    // ordinary table row into a mode with no way to act.
+    const { effects, focus, fired } = insideEffects();
+    focus.enterLiveBlock("e1", { blockId: "a", elementId: "row" });
+
+    effects.table["rowActivate"]?.();
+    expect(focus.current, "no inside declared, so no mode change").toMatchObject({ mode: "navigate" });
+    expect(fired, "the element's own action").toEqual([{ kind: "fill", label: "a", command: "a" }]);
+  });
+
+  it("T2.172 (C26 I27, C16 I28, §102): the inside's arrows drive what the element declared", () => {
+    const { effects, moves } = insideEffects();
+
+    // §102's control row: `←→ orbit   ↑↓ tilt`. The horizontal arrow reaches
+    // both writers and each resolves the focused block itself — a kind has a
+    // camera **or** a cursor, never both, which is what makes one action total.
+    effects.table["insideLeft"]?.();
+    expect(moves).toEqual(["orbit-1", "cursor-1"]);
+
+    moves.length = 0; // cells-ok — a recorded-call count, not a width
+    effects.table["insideRight"]?.();
+    expect(moves).toEqual(["orbit1", "cursor1"]);
+
+    // **The vertical arm is what says the resolution is by declaration and not
+    // by key**: a crosshair runs along one axis, so `↑`/`↓` reach the camera
+    // alone. A build that routed all four arrows to both writers passes the two
+    // rows above and fails here.
+    moves.length = 0; // cells-ok — a recorded-call count, not a width
+    effects.table["insideUp"]?.();
+    effects.table["insideDown"]?.();
+    expect(moves).toEqual(["tilt1", "tilt-1"]);
   });
 });

@@ -3386,6 +3386,25 @@ export async function constructGraph(
       return true;
     });
 
+    // **The inside's own handler, and the target's first** (C26 I26, I27, §102,
+    // `R-INT-005`). The `interaction` rung has been in the ladder since it
+    // landed with no handler at all, which was the same defect `pushedView`'s
+    // note below names: **a target's table row is bound and never consulted
+    // unless something registers the handler that reads it.** It was invisible
+    // while the rung was unreachable and while the target held no rows — the
+    // router's own `⌃c` registration was the whole of it — and both changed in
+    // this MR at once, so the missing seam surfaced as the camera keys silently
+    // doing nothing rather than as a resolvable failure.
+    //
+    // Keys only: the pointer's gesture table is `liveBlock`'s, and a click
+    // inside a block is still a click on the block (C16 §4a).
+    router.register("interaction", (e) => {
+      const effect = bound("interaction", e);
+      if (effect === null) return false;
+      effect();
+      return true;
+    });
+
     // **`pushedView`'s registration retires with the target** (R-EXA-082,
     // F1254). It was C16 I24's measured case twice over: a target in the focus
     // union since C16 was written with neither a binding nor a handler, so every

@@ -775,7 +775,11 @@ describe("C16 §4a — the pointer sets the crosshair (C12 §3s, C22 I76)", () =
     // The release leaves nothing and is unconsumed.
     expect(graph.router.dispatch(mouse(term(4), 78, { press: false }))).toBe(false);
     expect(graph.cursorPositions.get(live, "p")).toBe(4);
-    // **Two writers, one store**: `←` continues from where the pointer left it.
+    // **Two writers, one store**: `←` continues from where the pointer left it
+    // — from **inside**, because §102 gives the pointer the preview and the
+    // keyboard the commit (C26 I27). The plot already holds focus here, so `⏎`
+    // is the whole of the way in.
+    graph.router.dispatch(press("enter"));
     graph.router.dispatch(press("left"));
     expect(graph.cursorPositions.get(live, "p"), "← from the pointer's 4").toBe(3);
     graph.router.dispatch(mouse(term(3), 4));
@@ -926,9 +930,12 @@ describe("C16 §4a — a hover aims and moves nothing else (C01 I21, C12 §3s)",
     expect(graph.cursorPositions.get(live, "p"), "still 1").toBe(1);
     expect(graph.focus.current).toEqual({ at: "prompt" });
 
-    // `↓` then `→` continues from where the hover left it: one store, three writers.
+    // `↓`, `⏎`, then `→` continues from where the hover left it: one store,
+    // three writers — and §102's split between them, *pointer preview moves the
+    // readout without entering* against *keyboard controls appear only inside*.
     graph.router.dispatch(press("down"));
     expect(graph.focus.current).toEqual(AT(live, "p", "p"));
+    graph.router.dispatch(press("enter"));
     graph.router.dispatch(press("right"));
     expect(graph.cursorPositions.get(live, "p")).toBe(2);
   });

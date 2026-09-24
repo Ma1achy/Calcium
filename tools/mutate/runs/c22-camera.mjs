@@ -103,7 +103,11 @@ const results = await runPass({
       // carries it; nothing can move a camera.
       name: "the binding is gone",
       file: KEYMAP,
-      from: '  { target: "liveBlock", key: { name: "[" }, action: "orbitLeft" },',
+      // Re-anchored 2026-09-24: the camera family moved to `interaction` and the
+      // brackets retired with it (§102, C26 I27, C16 I28) — §102's control row is
+      // `←→ orbit`, and `liveBlock` is *outside*, where a camera may not be
+      // committed from.
+      from: '  { target: "interaction", key: chordOf("move.left"), action: "insideLeft" },',
       to: "",
       expect: "T4.17f",
     },

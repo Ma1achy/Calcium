@@ -77,6 +77,8 @@ function tallDividing(): { definition: BlockDefinition; renders: () => number } 
 
 const PAGE_UP = "\u001b[5~";
 const DOWN = "\u001b[B";
+/** `←` — the inside's orbit key (§102, C16 I28). */
+const LEFT = "\u001b[D";
 
 /**
  * A painting session over several kinds, with the profiler's counters on and
@@ -385,9 +387,10 @@ describe("C22 §6c — the render cache", () => {
     const { type } = await session(watcher, PLOT_DOC);
     await type("\u001b[B"); // the card's head is the first element (C09 I47)
     await type("\u001b[B");
+    await type("\r"); // ⏎ into the plot (C26 I26, §102: *the way IN*)
     seen.length = 0;
 
-    await type("[");
+    await type(LEFT); // §102: `←→ orbit`
     const last = seen.at(-1);
     expect(last, "the renderer received the record").toBeDefined();
     // **Keyed by block id and not by entry**, which is the whole reason it is a
@@ -427,13 +430,14 @@ describe("C22 §6c — the render cache", () => {
     const { type } = await session(definition, PLOT_DOC);
     await type("\u001b[B"); // the card's head is the first element (C09 I47)
     await type("\u001b[B");
+    await type("\r"); // ⏎ into the plot (C26 I26, §102: *the way IN*)
 
     const before = count();
-    await type("[");
+    await type(LEFT); // §102: `←→ orbit`
     const once = count();
     expect(once, "a keystroke turned the camera and the frame followed").toBeGreaterThan(before);
 
-    await type("[");
+    await type(LEFT); // §102: `←→ orbit`
     expect(count(), "and again").toBeGreaterThan(once);
   });
 

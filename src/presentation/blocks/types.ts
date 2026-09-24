@@ -465,6 +465,25 @@ export type NavElement = Readonly<{
    */
   activate?: Action;
   /**
+   * The element has an **inside** — §102's *a block declares whether it has
+   * VIEW STATE* (C26 I26, I27, `R-INT-005`).
+   *
+   * **Per element and not per kind**, which §102's own table makes easy to get
+   * wrong: every row of it — *a 3D plot · a camera*, *a table · sort + scroll* —
+   * is a figure that fills its block, so kind and element coincide there.
+   * §018's row 2 does not: *arrowing down a document past three sliders* is
+   * three insides in one page. The element is what one is entered on, so it is
+   * where the declaration sits, and a kind whose figure fills its block declares
+   * it on the element it produces.
+   *
+   * **Disjoint from `activate`**, and that is a ruling rather than a
+   * precedence: §018 says *direct-action toggles and choices act without an
+   * inside state*, so a control either has an inside or acts, and `⏎` never has
+   * to choose between them. Declaring both is the block author contradicting
+   * the design and is a construction error.
+   */
+  viewState?: boolean;
+  /**
    * What `y` copies here — the element's **source**, never its rendering (C26 §5c).
    *
    * **Declared by the block, and that is the whole of semantic copy.** The

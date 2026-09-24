@@ -905,6 +905,15 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       const elements = deps.focusedElements();
       const i = resolveFocus(current.element, elements);
       if (i === null) return;
+      // **The way IN** (C26 I26, §102: *focused — the way IN — ⏎ enter*). An
+      // element that declares view state is entered rather than activated, and
+      // the two are disjoint by §018 — *direct-action toggles and choices act
+      // without an inside state* — so this is a ruling read off the element and
+      // not a precedence between two meanings of one key.
+      if (elements[i]?.element.viewState === true) {
+        deps.focus.setMode("interact");
+        return;
+      }
       // `activate` is the element's own, declared by the kind (C26 §5), rather
       // than a row shape this layer would otherwise have to know.
       const action = elements[i]?.element.activate;
@@ -996,19 +1005,34 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // pager does and what makes a reader able to join two screens. The store
     // floors at zero and the renderer bounds the top, so nothing here clamps
     // (C04 §3c cell 4).
-    orbitLeft: () => void deps.orbitBlock(-1),
-    orbitRight: () => void deps.orbitBlock(1),
-    tiltDown: () => void deps.tiltBlock(-1),
-    tiltUp: () => void deps.tiltBlock(1),
+    // **The inside's four arrows, resolved by declaration** (C16 I28, C26 I27,
+    // §102). §102's control row is `←→ orbit   ↑↓ tilt`, and its kind table is
+    // what makes one action per key total: *a 3D plot · a camera*, *a 2D plot ·
+    // a cursor* — a kind has one or the other, never both. So the horizontal
+    // arrow turns a camera and steps a cursor, and neither effect has to ask
+    // which kind it is on: `orbitBlock` already resolves the focused plot and
+    // no-ops without a camera, and `cursorBlock` no-ops without `cursorable`.
+    // **Both are called, and the exclusivity is what makes that one effect
+    // rather than two.** A version that tested the block here would be a second
+    // copy of a predicate C12 owns, which is `moveCursor`'s own warning.
+    insideLeft: () => {
+      deps.orbitBlock(-1);
+      deps.cursorBlock(-1);
+    },
+    insideRight: () => {
+      deps.orbitBlock(1);
+      deps.cursorBlock(1);
+    },
+    // No vertical for a cursor: a crosshair runs along one axis, and §102's
+    // table gives the 2D plot *a cursor* where the 3D plot has *a camera*.
+    insideUp: () => void deps.tiltBlock(1),
+    insideDown: () => void deps.tiltBlock(-1),
+    /** `esc out` (§102) — leave the inside, stay on the element (C26 I14). */
+    exitInside: () => void deps.focus.setMode("navigate"),
     dollyIn: () => void deps.dollyBlock(1),
     dollyOut: () => void deps.dollyBlock(-1),
     cameraReset: () => void deps.resetCamera(),
     orbitToggle: () => void deps.toggleOrbit(),
-    // **The horizontal pair, and the first writer of `cursorPositions`** (C22
-    // I76, C12 §3s). The vertical pair steps elements; this moves the focused
-    // plot's crosshair and is a no-op on a kind with no horizontal interior.
-    cursorLeft: () => void deps.cursorBlock(-1),
-    cursorRight: () => void deps.cursorBlock(1),
     // **The digits, and the first writer of `seriesVisibility`** (C22 I78, C12
     // I116). Nine effects because an effect takes no key; bound by no default
     // row — the plot's own `keymap` declares the ones it has.

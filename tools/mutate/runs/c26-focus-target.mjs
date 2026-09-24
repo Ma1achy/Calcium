@@ -75,24 +75,20 @@ const MUTATIONS = [
     expect: "T1.3d",
   },
   {
-    // **Freezing is a mode exit nobody signals.** Drop the gate and a settled
-    // entry keeps every keystroke: the prompt stops receiving input and the
-    // block cannot act on it either.
-    //
-    // **Re-anchored, and the gate is two clauses now** (F1118). The condition
-    // grew `deps.stored.entryId === deps.liveEntry.id` under §4g row d — a
-    // settled entry can hold focus with the mode stored — and that clause reads
-    // `deps.liveEntry.id`, so removing only the null check would not compile.
-    // Dropping the liveness test means dropping both: what shipped without it
-    // is a stored mode answering `interaction` for an entry that is gone.
-    name: "the liveEntry gate dropped, so a frozen entry stays interactable",
+    // **Re-anchored 2026-09-24, and it inverted with its subject** (§102, C26
+    // I2, §8b.9). The mutation was *drop the liveEntry gate, so a frozen entry
+    // stays interactable*, and the design withdrew that gate: §102's heading is
+    // *VIEW STATE IS NOT LIVENESS*, and *Settled an hour ago, from a call that
+    // finished — it STILL ORBITS.* So the live mutation is the gate coming
+    // back, and T1.3e is the row that now dies on it — inverted rather than
+    // retired, because the thing worth watching is unchanged: whether liveness
+    // decides who may be inside a block.
+    name: "the liveness gate restored, so a frozen entry stops being interactable",
     file: FOCUS,
-    from:
-      '    deps.stored.mode === "interact" &&\n' +
-      '    deps.liveEntry !== null &&\n' +
-      '    deps.stored.entryId === deps.liveEntry.id\n' +
-      "  ) {",
-    to: '    deps.stored.mode === "interact"\n  ) {',
+    from: '  if (deps.stored.at === "liveBlock" && deps.stored.mode === "interact") {',
+    to:
+      '  if (\n    deps.stored.at === "liveBlock" &&\n    deps.stored.mode === "interact" &&\n' +
+      '    deps.liveEntry !== null &&\n    deps.stored.entryId === deps.liveEntry.id\n  ) {',
     expect: "T1.3e",
   },
   {

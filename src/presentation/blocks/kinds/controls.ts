@@ -182,6 +182,11 @@ export const controlDefinition: BlockDefinition<Control> = {
       level: "block" as const,
       rows: Object.freeze({ from: 0, to: 1 }),
       cols: Object.freeze({ from: 0, to: normaliseWidth(width) }),
+      // **§018's subject, and the reason the rule is not about plots alone**
+      // (C26 I26, I27). *Arrowing down a document past three sliders must not
+      // move three sliders* is this element three times, and `isInside` below
+      // is what draws the third state once something can enter it.
+      viewState: true,
       copy: `${block.label}  ${block.value}`,
     }),
   ],

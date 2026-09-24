@@ -829,7 +829,7 @@ describe("C26 §8b.8 — interaction mode is vacuous, and this is the row that s
    * when `⏎`'s second effect and I14's first level go live and it is inverted
    * again.
    */
-  it("T2.6a (C26 §8b.8, C22 I78): one caller merges a block keymap, and it puts nothing at interaction", () => {
+  it("T2.6a (C26 §8b.8, I26, C22 I78): one caller merges a block keymap, and it puts nothing at interaction", () => {
     // `mergeBlock` is the only route a `BlockKeymap` reaches the router by.
     // Counted over `src/` and not over the tree, because a test calling it is
     // not a producer.
@@ -858,7 +858,7 @@ describe("C26 §8b.8 — interaction mode is vacuous, and this is the row that s
 
     // **The half the ruling rests on now.** The one producer is the plot's
     // digits; merged over the real default table they collide with nothing, so
-    // the mode is still empty and `⏎`'s second effect is still uncommitted.
+    // they land at `liveBlock` and the inside's rows are the framework's alone.
     const plot = block({
       kind: "plot", id: "p", form: "line", height: 5,
       series: Array.from({ length: 9 }, (_, i) => ({ values: [i, i + 1] })),
@@ -871,15 +871,30 @@ describe("C26 §8b.8 — interaction mode is vacuous, and this is the row that s
     const before = map.entries().length;
     map.mergeBlock(declared);
     const merged = map.entries().slice(before);
-    expect(merged.map((b) => b.target), "every digit at liveBlock — none collides").toEqual(
-      Array.from({ length: 9 }, () => "liveBlock"),
+    // **Each digit twice, at `liveBlock` and at `interaction`** (C16 I27, C26
+    // I2). None collides, so each keeps its `liveBlock` row and gains the
+    // block's inside — without which entering the plot to orbit it would take
+    // its series toggles away, silently.
+    expect(new Set(merged.map((b) => b.target)), "both targets, no third").toEqual(
+      new Set(["liveBlock", "interaction"]),
     );
-    // `⌃c` on the mode is a router handler, not a keymap row (T2.6b), so the
-    // table has **zero** rows at this target before and after the merge.
-    expect(
-      map.entries().filter((b) => b.target === "interaction").map((b) => b.action),
-      "the mode has no bindings",
-    ).toEqual([]);
+    expect(merged.filter((b) => b.target === "liveBlock").map((b) => b.key.name)).toEqual(
+      ["1", "2", "3", "4", "5", "6", "7", "8", "9"],
+    );
+    // **The mode's rows are the inside's own, and the merge adds none**
+    // (C26 I26, I27, §102). The row read *the mode has no bindings*, and that
+    // was the state §8b.8's refusal rested on — §102 put the camera family
+    // here, since *KEYBOARD CONTROLS APPEAR ONLY INSIDE* leaves them no other
+    // target. What this row still measures is what it was written for: the one
+    // production merge contributes nothing to it.
+    const framework = map
+      .entries()
+      .slice(0, before)
+      .filter((b) => b.target === "interaction")
+      .map((b) => b.action);
+    expect(framework.sort(), "the inside's own, and the merge adds none of them").toEqual(
+      ["cameraReset", "dollyIn", "dollyIn", "dollyOut", "exitInside", "insideDown", "insideLeft", "insideRight", "insideUp", "orbitToggle"],
+    );
   });
 
   it("T2.6b (C26 §8b.8, I14): the interaction target binds ⌃c and nothing else", () => {

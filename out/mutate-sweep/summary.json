@@ -1,15 +1,15 @@
 {
   "label": "all",
-  "only": "c10-selection-pairing",
+  "only": "c16-scope-order",
   "rows": [
     {
-      "run": "c10-selection-pairing.mjs",
+      "run": "c16-scope-order.mjs",
       "exit": 0,
-      "seconds": 28,
+      "seconds": 8,
       "state": "green",
       "restored": 0,
       "caught": 4,
-      "elsewhere": 1,
+      "elsewhere": 0,
       "survived": 0,
       "anchorMissed": 0,
       "unbuilt": 0,

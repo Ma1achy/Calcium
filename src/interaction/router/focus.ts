@@ -125,17 +125,20 @@ export function activeTarget(deps: FocusInputs): FocusTarget {
   // freeze), and answering `interaction` for an entry that is no longer live
   // would hand every key to a block the reader cannot act on.
   //
-  // **And gated on the focused entry being the live one, not on a live entry
-  // existing** (C26 §4g row d). The two tests were the same while focus could
-  // only be in the live entry; now a settled entry can hold focus with the mode
-  // stored, and A01 D4 has withdrawn its block's keys, so there is nothing to
-  // interact with there.
-  if (
-    deps.stored.at === "liveBlock" &&
-    deps.stored.mode === "interact" &&
-    deps.liveEntry !== null &&
-    deps.stored.entryId === deps.liveEntry.id
-  ) {
+  // **The liveness gate is withdrawn** (C26 I2, §8b.9, §102, `R-INT-005`). It
+  // read `deps.liveEntry !== null && deps.stored.entryId === deps.liveEntry.id`,
+  // on §4g row d's ground that A01 D4 withdraws a block's keys on freeze so a
+  // settled entry has nothing to interact with. §102's heading is *VIEW STATE IS
+  // NOT LIVENESS* and its starred line answers it: *A 3D PLOT IS INTERACTIVE
+  // BECAUSE IT HAS A CAMERA, not because it is live. Settled an hour ago, from a
+  // call that finished — it STILL ORBITS.* The row was right about D4 and wrong
+  // about what D4 withdraws — the adapter's bindings, not the camera the block
+  // declared, which lives in `Cameras` per entry and survives the freeze.
+  //
+  // **And the mode cannot arrive here by drift**: `focusRow` clears it on every
+  // move between rows, so the one way in is `⏎` on an element declaring view
+  // state (C26 I26).
+  if (deps.stored.at === "liveBlock" && deps.stored.mode === "interact") {
     return "interaction";
   }
   if (deps.stored.at === "prompt") return "prompt";

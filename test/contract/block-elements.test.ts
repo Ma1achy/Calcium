@@ -65,6 +65,25 @@ describe("C26 §5 — one declaration, keyboard and pointer", () => {
     expect(report.kinds, "the kind that declares them is covered").toContain("table");
   });
 
+  it("T2.174 (C26 I26, §018): an inside and an action are exclusive, and the predicate has a subject", () => {
+    // **The fabricated violation, because the ruling would otherwise be prose.**
+    // §018 says *direct-action toggles and choices act without an inside state*,
+    // so `⏎` never has to choose — and with no check, a block declaring both
+    // loses its action silently, the entry arm simply winning.
+    const real = nav();
+    const both: NavigableRegistry = {
+      measure: (b, w) => real.measure(b, w),
+      elementsOf: (b, w) =>
+        real.elementsOf(b, w).map((e) => ({ ...e, viewState: true, activate: { kind: "fill", label: "x", command: "x" } as const })),
+      get: (k) => real.get(k),
+    };
+    expect(checkElements(both, TABLE_CORPUS).failures.map((f) => f.predicate)).toContain("inside-or-action");
+
+    // The control: the real corpus does not trip it, so the row above is about
+    // the predicate rather than about every element in the tree.
+    expect(checkElements(real, TABLE_CORPUS).failures.map((f) => f.predicate)).not.toContain("inside-or-action");
+  });
+
   it("T2.17 (C26 I7): the window × elements agreement is live, and it holds", () => {
     // **This row was the assertion that it was vacuous, and it failed on the
     // commit that added `table.window`** — which is the whole reason a vacuity
@@ -650,13 +669,3 @@ describe("C26 §7 — the scope stack, the one resolver, and the vocabulary with
   });
 });
 
-// C26 I27, C16 I27/I28 — the inside's arrows and the block-keymap refusal.
-// Spec-alone commit; the rows land with the code in the next commit of this MR.
-describe("the inside's arrows resolve by declaration (C26 I27, C16 I28, §102)", () => {
-  it.todo(
-    "T2.172 (C26 I27, C16 I28, §102): ← orbits a plot with a camera, steps the sample of a plot with a cursor, and does nothing on a kind with neither; ↑ tilts the first and is a no-op on the second — not deferred on a component: the four arrows move to interaction and gain the declaration-resolved effect in the next commit of this MR",
-  );
-  it.todo(
-    "T2.173 (C26 I27, C16 I27): a block keymap on a block declaring viewState that binds one of the inside's own keys is a construction error, and one on a block declaring none is merged at interaction as before — not deferred on a component: mergeBlock's narrow refusal lands with the declaration in the next commit of this MR",
-  );
-});

@@ -3571,6 +3571,12 @@ function elements(block: Plot, width: number, measureChild: MeasureFn): readonly
       level: "block" as const,
       rows: Object.freeze({ from: 0, to: measureChild(block, width) }),
       cols: Object.freeze({ from: 0, to: width }),
+      // **The plot has an inside** (C26 I26, I27, §102). The guard above is
+      // already §102's own table read as a predicate — *a 3D plot · a camera*,
+      // *a 2D plot · a cursor* — so the element exists exactly when there is
+      // view state to be inside of, and the declaration is the same condition
+      // said out loud rather than a second one to disagree with it.
+      viewState: true,
       // **Absent rather than `undefined`**, so the member reads as the ruling it
       // is — a `plot3d` is a place to stand — and `"copy" in e` answers it.
       ...(copy === undefined ? {} : { copy }),

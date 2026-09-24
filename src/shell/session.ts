@@ -2318,9 +2318,18 @@ function focusFor(graph: Graph, entryId: string): FocusState | null {
   // The head alone is no selection and the field is **absent**, not `[]`
   // (`FocusState.selected`): the two draw identically and must key
   // identically.
-  if (ext.extent.length === 1) return head; // graphemes-ok: an element count, not text
+  // **The bridge** (C26 I26, §102). `FocusState.inside` is read by `isInside` in
+  // `blocks/kinds/controls.ts` and was written by nothing, so §018's third state
+  // — *weight plus a painted handle* — was drawn, specified and had never
+  // appeared in a frame. It reflects the stored mode and nothing else: the
+  // renderer asks *am I the one being driven*, and `blockId` and `rowId` already
+  // answer *which* (`FocusState.inside`'s own note).
+  //
+  // Absent rather than `false`, so a block with no inside keys as it always did.
+  const inside = stored.mode === "interact" ? { inside: true } : {};
+  if (ext.extent.length === 1) return Object.freeze({ ...head, ...inside }); // graphemes-ok: an element count, not text
   const selected = ext.extent.map((p) => Object.freeze({ blockId: p.blockId, rowId: p.element.id }));
-  return Object.freeze({ ...head, selected: Object.freeze(selected) });
+  return Object.freeze({ ...head, ...inside, selected: Object.freeze(selected) });
 }
 
 /**

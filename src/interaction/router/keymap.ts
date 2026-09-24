@@ -149,8 +149,13 @@ export interface Keymap {
    * A key `global` or `liveBlock` already binds is not refused and not
    * shadowed: it lands at the `interaction` target, the one rung where the
    * built-ins are out of scope, so it fires only once the reader has entered
-   * the block. Everything else lands at `liveBlock` and works from the first
-   * `↓`. Two keys inside one block keymap is still a construction error.
+   * the block. Everything else lands at `liveBlock` **and at `interaction`**,
+   * so it works from the first `↓` and survives the way in — dispatch does not
+   * fall through between rungs, and a key that died on `⏎` would be this
+   * rule's own silent shadow from the other side (C26 I2, I26). The one
+   * refusal: a key that collides below **and** is one of the inside's own has
+   * nowhere left to be placed. Two keys inside one block keymap is still a
+   * construction error.
    * Returns a withdrawal, called when the block freezes.
    */
   mergeBlock(blockKeymap: BlockKeymap): () => void;
@@ -541,15 +546,41 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // **`=` beside `+` because `+` is shifted on every layout this ships to**, and
   // two keys for one action is not the duplicate the conflict rule refuses —
   // that is one key at one target with two actions.
-  { target: "liveBlock", key: { name: "[" }, action: "orbitLeft" },
-  { target: "liveBlock", key: { name: "]" }, action: "orbitRight" },
-  { target: "liveBlock", key: { name: "{" }, action: "tiltDown" },
-  { target: "liveBlock", key: { name: "}" }, action: "tiltUp" },
-  { target: "liveBlock", key: { name: "+" }, action: "dollyIn" },
-  { target: "liveBlock", key: { name: "=" }, action: "dollyIn" },
-  { target: "liveBlock", key: { name: "-" }, action: "dollyOut" },
-  { target: "liveBlock", key: { name: "r" }, action: "cameraReset" },
-  { target: "liveBlock", key: { name: "o" }, action: "orbitToggle" },
+  // **Amended — the whole family moves to `interaction`** (C26 I26, I27, §102,
+  // `R-INT-005`). Every sentence above is about `liveBlock`, and `liveBlock` is
+  // *outside* by §102's own reading of the word: *at rest*, *hovered* and
+  // *focused* are the three outside states and only *inside* has the keyboard
+  // controls. A camera nudged from `liveBlock` is a domain value committed from
+  // outside, on the one subject `R-INT-005` has.
+  //
+  // **And the brackets retire with the target that forced them.** They were
+  // chosen because `liveBlock`'s arrows are `rowUp`/`rowDown`; inside an element
+  // there is nothing to step, which is §018's *entering narrows it, and the
+  // arrows change what they drive* read from the other end. §102's control row
+  // is `←→ orbit   ↑↓ tilt   o auto   r reset   esc out`, and this is it.
+  //
+  // **One action per arrow, which is what forces the resolution to be by
+  // declaration** (C16 I28): two rows for `←` at one target is the duplicate
+  // this table refuses, and §102's kind table is what makes one action total —
+  // a kind has a camera **or** a cursor, never both.
+  { target: "interaction", key: chordOf("move.left"), action: "insideLeft" },
+  { target: "interaction", key: chordOf("move.right"), action: "insideRight" },
+  { target: "interaction", key: chordOf("move.up"), action: "insideUp" },
+  { target: "interaction", key: chordOf("move.down"), action: "insideDown" },
+  // `+` `=` `-` keep the dolly. The control row **sheds descriptions and then
+  // becomes `?` keys**, so its not naming a dolly key is a fact about its width
+  // and not a retirement — reading an absence in a shed form as a ruling is
+  // reading half a row as the whole of one.
+  { target: "interaction", key: { name: "+" }, action: "dollyIn" },
+  { target: "interaction", key: { name: "=" }, action: "dollyIn" },
+  { target: "interaction", key: { name: "-" }, action: "dollyOut" },
+  { target: "interaction", key: { name: "r" }, action: "cameraReset" },
+  { target: "interaction", key: { name: "o" }, action: "orbitToggle" },
+  // **`esc out`** (§102). `⌃c` already leaves interaction and stays on the row
+  // (`router.ts`'s `interaction` registration); `esc` is what the design draws
+  // in the control row, and it leaves by the same one step — the rung below is
+  // what takes the reader out of the block, which is C26 I14's two-level escape.
+  { target: "interaction", key: chordOf("escape"), action: "exitInside" },
   { target: "liveBlock", key: { name: "pagedown" }, action: "blockPageDown" },
   { target: "liveBlock", key: { name: "pageup" }, action: "blockPageUp" },
 
@@ -576,8 +607,10 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // movement, with the plot's crosshair as its first consumer and a table's
   // column cursor the second (C26 §11), which is why it is a built-in at
   // `liveBlock` rather than one kind's key.
-  { target: "liveBlock", key: chordOf("move.left"), action: "cursorLeft" },
-  { target: "liveBlock", key: chordOf("move.right"), action: "cursorRight" },
+  // **Amended — the pair moved to `interaction` with the rest of the family**
+  // (C16 I28, C26 I27, §102). A crosshair stepped from `liveBlock` is the same
+  // commit-from-outside the camera was, on the other kind of view state; the
+  // rows above are where both now live, as one action resolving by declaration.
 
   // --- re-run the focused entry (C23 I18) -----------------------------------
   //
@@ -875,13 +908,12 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
     rowDown: true,
     entryPrev: true,
     entryNext: true,
-    cursorLeft: true,
-    cursorRight: true,
+    insideLeft: true,
+    insideRight: true,
+    insideUp: true,
+    insideDown: true,
+    exitInside: true,
     rerunEntry: true,
-    orbitLeft: true,
-    orbitRight: true,
-    tiltDown: true,
-    tiltUp: true,
     dollyIn: true,
     dollyOut: true,
     cameraReset: true,
@@ -1024,6 +1056,28 @@ export function createKeymap(
         const binding: Binding = Object.freeze({ target, key: entry.key, action: entry.action });
         const s = slot(target, entry.key);
 
+        // **The one refusal the placement rule now needs** (I27, C26 I26, §102).
+        // `interaction` used to hold no framework rows, which is what made the
+        // placement total: there was always somewhere to put a colliding key.
+        // §102 put the inside's own keys there — *KEYBOARD CONTROLS APPEAR ONLY
+        // INSIDE* leaves them no other target — so a key that collides below
+        // **and** is one of the inside's has nowhere left, and placing it would
+        // be the silent shadow this whole rule exists to avoid.
+        //
+        // **Asked of the table rather than of the block's declaration**, which
+        // is both narrower and the only form available here: `mergeBlock` is
+        // handed a keymap and not a block. A block with no inside could never
+        // fire the key it placed at `interaction` anyway — there is no way in —
+        // so refusing loudly is what it was owed either way.
+        if (collides && bySlot.has(s)) {
+          throw new KeymapError(
+            `block keymap binds ${entry.key.name} to "${entry.action}", and that key is bound below ` +
+              `and is one of the inside's own (C16 I27, C26 I26). A colliding key is placed at ` +
+              `interaction, and interaction has no free slot for this one — so there is nowhere to ` +
+              `put it that is not a silent shadow.`,
+          );
+        }
+
         // Two keys inside one block keymap is still the construction error it
         // always was (I10): the block's author wrote both, and neither can win.
         const twice = next.get(s);
@@ -1034,6 +1088,26 @@ export function createKeymap(
           );
         }
         next.set(s, binding);
+
+        // **A free key is the block's at both targets** (I27, C26 I2, I26).
+        // `interaction` is a strictly narrower state than `liveBlock` — the
+        // reader is inside *this* block — and dispatch does not fall through
+        // from one rung to the next, so a key merged at `liveBlock` alone stops
+        // working the moment `⏎` enters. **That is the silent shadow this whole
+        // rule exists to prevent, arriving from the other side**: it was
+        // unreachable while nothing could enter, and `R-INT-005`'s entry is what
+        // made it a state a reader can stand in. C26 I2's own words are the
+        // ruling — *the block owns its keys while the reader is inside it*.
+        //
+        // Only where the framework has not claimed the slot: the refusal above
+        // has already stopped a key that collides below and is the inside's own,
+        // and this is its counterpart for a key that collides with neither.
+        if (!collides) {
+          const insideSlot = slot("interaction", entry.key);
+          if (!bySlot.has(insideSlot) && !next.has(insideSlot)) {
+            next.set(insideSlot, Object.freeze({ target: "interaction", key: entry.key, action: entry.action }));
+          }
+        }
       }
 
       block = next;

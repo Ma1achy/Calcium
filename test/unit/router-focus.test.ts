@@ -117,20 +117,19 @@ describe("C16 §3 — activeTarget", () => {
     expect(store.current, "no way in through setMode").toEqual({ at: "prompt" });
   });
 
-  it("T1.3e (C26 I2): a frozen entry is not interactable, however the mode was left", () => {
-    // **Freezing is a mode exit nobody signals** (C26 §8a, the live-block
-    // freeze). The mode is stored, so it outlives the entry; answering
-    // `interaction` here would hand every key to a block the reader cannot act
-    // on and the prompt would stop receiving them. The gate is `liveEntry`.
+  it("T1.3e (C26 I2, §8b.9, §102): a settled entry is still interactable — view state is not liveness", () => {
+    // **Inverted, and the design is what inverted it.** The row read *a frozen
+    // entry is not interactable, however the mode was left*, on C26 §4g row d's
+    // ground that A01 D4 withdraws a block's keys on freeze. §102's heading is
+    // *VIEW STATE IS NOT LIVENESS* and its starred line answers that sentence:
+    // *A 3D PLOT IS INTERACTIVE BECAUSE IT HAS A CAMERA, not because it is
+    // live. Settled an hour ago, from a call that finished — it STILL ORBITS.*
     //
-    // **It is no longer the same gate the `liveBlock` row had**, and the split is
-    // the point (M5, R-COR-002): being *inside* a block is a thing you cannot be
-    // once it has settled, where *standing in the transcript* is not. So the mode
-    // is refused and the rung is kept — `liveBlock`, one position of `scope`,
-    // rather than a fall to `global`.
+    // The old row was right that D4 withdraws something and wrong about what:
+    // the adapter's bindings go, and the camera the block declared does not.
     expect(
       at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "interact" }, liveEntry: null }),
-    ).toBe("liveBlock");
+    ).toBe("interaction");
   });
 
   it("the priority holds where two conditions are true at once", () => {
@@ -330,20 +329,18 @@ describe("C16 §3 — the stored location", () => {
     expect(resolveFocus(null, []), "and still null with nothing there").toBeNull();
   });
 
-  it("T1.3j (C26 §4e row 5, §8b.8): nothing in `src/` can put focus into interact", () => {
-    // **The vacuity, asserted rather than described.** §10 promises this row and
-    // every other row here *constructs* `mode: "interact"` on the store shape —
-    // which tests `activeTarget`'s ordering correctly and says nothing about
-    // whether the state is reachable. It is not: `setMode` has one caller, the
-    // `⌃c` rung, and it passes `"navigate"`.
+  it("T1.3j (C26 I26, §8b.9, §102): the entry exists, and it is ⏎ on an element declaring view state", () => {
+    // **The row expired by itself, which is what it was written to do.** It read
+    // *nothing in `src/` can put focus into interact* and asserted the vacuity
+    // rather than describing it: `setMode` had one caller, the `⌃c` rung,
+    // passing `"navigate"`, so the `interaction` rung was dead code and §018's
+    // third state had never appeared in a frame.
     //
-    // So the `interaction` rung of the ladder is dead code, `⏎`'s entry arm is
-    // uncommitted for a measured reason (§8b.8), and the mode indicator's second
-    // value has nothing to display (roadmap 29).
-    //
-    // **It expires by itself.** The day anything sets `"interact"`, this fails
-    // and the prose that rests on the vacuity has to be re-derived rather than
-    // quietly surviving.
+    // §102 built the entry — *focused — the way IN — ⏎ enter* — so the row
+    // inverts rather than retires, and the thing worth pinning is the same one:
+    // **how many ways in there are.** One, because a second would be a second
+    // answer to *when is the reader inside*, and the mode decides what every
+    // key means.
     const dir = new URL("../../src/", import.meta.url);
     const files: string[] = [];
     const walk = (at: URL): void => {
@@ -357,7 +354,10 @@ describe("C16 §3 — the stored location", () => {
 
     const entering = files.filter((text) => /setMode\(\s*["']interact["']/u.test(text));
 
-    expect(entering, "no caller puts the store into interact").toEqual([]);
+    expect(entering.length, "exactly one caller puts the store into interact").toBe(1); // cells-ok — a file count, not a width
+    // And it is `rowActivate`'s, gated on the element's declaration — without
+    // this the count passes against an entry wired anywhere at all.
+    expect(entering[0]).toMatch(/viewState === true[\s\S]{0,120}setMode\(\s*"interact"/u);
   });
 
   it("the stored value is frozen, so a consumer cannot move focus by mutation", () => {
@@ -396,19 +396,42 @@ describe("C16 §5d — semantic copy mode is the second target at the `copy` run
   });
 });
 
-// C26 I26, I27 — §102's inside chain and the commit gate. Spec-alone commit;
-// the code lands next and these rows go with it.
+// C26 I26, I27 — §102's inside chain and the commit gate.
 describe("the inside — declared, entered, reflected (C26 I26, I27, §102, §018)", () => {
-  it.todo(
-    "T1.160 (C26 I26, §8b.9, §102): ⏎ on an element declaring viewState stores mode interact and focusFor answers inside true; Esc there stores navigate and inside goes false — not deferred on a component: NavElement.viewState, rowActivate's setMode call and focusFor's reflection land together in the next commit of this MR",
-  );
-  it.todo(
-    "T1.161 (C26 I26, §8b.9): ⏎ on an element that declares no viewState stores no mode and dispatches its activate — the control, without which the pair passes against a build that enters on every element — not deferred on a component: same commit as T1.160",
-  );
-  it.todo(
-    "T1.162 (C26 I26, §8b.9): a settled entry's element with viewState is entered and activeTarget answers interaction — I2's liveness gate withdrawn — not deferred on a component: same commit as T1.160",
-  );
-  it.todo(
-    "T1.163 (C26 I27, §8b.9, §018): every binding whose action moves a camera, a cursor or a handle resolves at interaction and at no other target, swept over the whole table — not deferred on a component: the nine camera rows move target in the next commit of this MR",
-  );
+  const inside = {
+    at: "liveBlock",
+    entryId: "e9",
+    element: addr("r1"),
+    anchor: null,
+    mode: "interact",
+  } as const;
+
+  it("T1.162 (C26 I26, §8b.9, §102): a settled entry with the mode stored answers interaction", () => {
+    // **The state that used to be unreachable** (C26 I2, §4g row d). The gate
+    // read `liveEntry !== null && stored.entryId === liveEntry.id`, on the
+    // ground that A01 D4 withdraws a block's keys on freeze; §102's heading is
+    // *VIEW STATE IS NOT LIVENESS* and its starred line answers it — *Settled
+    // an hour ago, from a call that finished — it STILL ORBITS.*
+    expect(at({ stored: inside, liveEntry: { id: "e1" } })).toBe("interaction");
+    // And with nothing live at all, which is the stronger arm: the old gate
+    // failed this one on `liveEntry !== null` before it reached the entry ids,
+    // so a row asserting only the mismatch above passes against half a fix.
+    expect(at({ stored: inside, liveEntry: null })).toBe("interaction");
+  });
+
+  it("T1.162b (C26 I26): the mode is still what decides, and it cannot arrive by drift", () => {
+    // **The control.** Without it the row above passes against a build that
+    // answers `interaction` for any stored location in the transcript.
+    expect(at({ stored: { ...inside, mode: "navigate" }, liveEntry: null })).toBe("liveBlock");
+
+    // `focusRow` clears the mode on every move between rows, so the one way in
+    // is `⏎` on an element declaring view state — asserted here because the
+    // withdrawn gate was the only other thing keeping a stale mode harmless.
+    const store = createFocusStore();
+    store.enterLiveBlock("e9", addr("r1"));
+    store.setMode("interact");
+    expect(at({ stored: store.current, liveEntry: null })).toBe("interaction");
+    store.focusRow("e9", addr("r2"));
+    expect(at({ stored: store.current, liveEntry: null })).toBe("liveBlock");
+  });
 });

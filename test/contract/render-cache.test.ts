@@ -149,7 +149,13 @@ describe("C22 §6c — the camera, and the two halves separated", () => {
     expect(graph.router.target, "focus is in the block").toBe("liveBlock");
     expect(graph.cameras.forEntry(id)["p"], "nothing has moved yet").toBeUndefined();
 
-    graph.router.dispatch(press("["));
+    // **`⏎` in, then `←`** (C26 I26, I27, §102). The camera family moved to
+    // `interaction` with `R-INT-005` and the brackets retired with the target
+    // that forced them; §102's control row is `←→ orbit`, and it sits in the
+    // *inside* state alone.
+    graph.router.dispatch(press("enter"));
+    expect(graph.router.target, "and inside it").toBe("interaction");
+    graph.router.dispatch(press("left"));
     const after = graph.cameras.forEntry(id)["p"];
     expect(after, "the binding reached the store").toBeDefined();
     expect(after?.azimuth, "one step left of the declared azimuth").toBeCloseTo(-Math.PI / 8, 10);
