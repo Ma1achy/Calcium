@@ -274,7 +274,81 @@ describe("C09 §3a — the spinner", () => {
     expect(unknown.some((r) => r.includes(frames[0] ?? "\u0000")), "unknown falls back").toBe(true);
   });
 
-  it.todo("T2.170 (C09 I108, I81): a shed row keeps its mark whole at both rungs — not deferred on a component, the row lands with I108's code half");
+  it("T2.170 (C09 I108, I81, R-GLY-003): a shed row keeps its mark whole at both rungs, and the ASCII one could not", () => {
+    // **Read from the drawn row, not from `shedRow`'s return**, because the
+    // defect is downstream of the plan: the plan named `...2` and the clamp cut
+    // it to `..~` on the way into the frame. A row asserting the plan is green
+    // against the picture that shipped.
+    //
+    // **The first draft of this row could not fail.** It searched the drawn row
+    // for the lead `...` and checked the digits after it — but `..~` contains no
+    // `...`, so the search missed and the check was skipped. **An assertion
+    // keyed on the thing the defect removes never fires.** What replaces it is
+    // a sweep over every kind that sheds, at every width, at both rungs, asking
+    // two things of each drawn row: that it fits, and that a lead appearing in
+    // it is followed by its count. The damaged form fails the second by
+    // carrying a cut lead — `..~` — which is the shape the shipped reservation
+    // actually drew.
+    //
+    // **Measured on the build this row landed with**: the correct reservation
+    // draws 40 marks and damages none; the shipped constant `2` draws 25 and
+    // damages **19**, every one of them `..~`.
+    const BLOCKS = [
+      { kind: "events", id: "e", events: [
+        { ts: "22:13:20", type: "deploy", message: "rolled the fleet forward" },
+        { ts: "22:14:02", type: "warn", message: "one node lagged" }] },
+      { kind: "keyValue", id: "k", pairs: [
+        { key: "endpoint", value: "https://api.internal.example/v2" },
+        { key: "region", value: "eu-west-1" }] },
+      { kind: "comparison", id: "c", rows: [
+        { field: "latency", left: "412 ms", right: "119 ms" },
+        { field: "throughput", left: "3.2k/s", right: "9.8k/s" }] },
+      { kind: "steps", id: "s", steps: [
+        { label: "install dependencies", state: "succeeded" },
+        { label: "run the whole suite", state: "running" }] },
+    ];
+
+    const problems: string[] = [];
+    let marks = 0;
+    for (const b of BLOCKS) {
+      for (let width = 6; width <= 60; width += 1) {
+        for (const [rung, caps, lead] of [
+          ["unicode", FULL_CAPS, "\u22ef"],
+          ["ascii", ASCII_CAPS, "..."],
+        ] as const) {
+          let rows: string[];
+          try {
+            rows = measurable({ capabilities: caps as never })
+              .renderToLines(b as never, width)
+              .map(plain);
+          } catch {
+            continue;
+          }
+          for (const row of rows) {
+            // A mark whose cells were never reserved is paid for out of the
+            // clamp, so this and the mark check are two halves of one fact.
+            if (cells(row) > width) {
+              problems.push(`overflow ${b.kind} ${rung} w${String(width)} |${row}|`);
+            }
+            const at = row.lastIndexOf(lead);
+            if (at === -1) continue;
+            marks += 1;
+            if (!/^[0-9]+$/u.test(row.slice(at + lead.length).trim())) {
+              problems.push(`damaged ${b.kind} ${rung} w${String(width)} |${row}|`);
+            }
+          }
+        }
+      }
+    }
+
+    expect(problems).toEqual([]);
+    // The fixture responds to the thing under test: with no mark drawn anywhere
+    // the sweep asserts nothing and passes on any build. The figure is the
+    // count on the build this landed with, not a threshold — it moves when a
+    // kind's parts move, and a run drawing far fewer marks is a fixture that
+    // stopped shedding rather than a pass.
+    expect(marks, "the kinds shed, so there are marks to read").toBeGreaterThan(30);
+  });
 
   it("T3.45 (C09 I32): the default is width-stable, and a narrow-only set takes its ASCII pair", () => {
     // **Both routes to the ASCII pair**, because a set reaches it by width or by

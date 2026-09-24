@@ -24,6 +24,8 @@
  * two records of one decision.
  */
 
+import { cells } from "../text.js";
+
 /**
  * What running out of width does to a part (C09 I81).
  *
@@ -161,7 +163,7 @@ export function shedRow(
   // The mark's own separator, floored at one cell: a row whose parts carry
   // their own leading gaps passes `gap: 0`, and a mark written hard against the
   // last part is a mark that reads as part of it.
-  const mark = MARK_CELLS + Math.max(gap, 1); // cells-ok — a cell count
+  const mark = markCells(lead, parts.length) + Math.max(gap, 1); // cells-ok — a cell count
   const second = solveRow(parts, Math.max(0, Math.floor(width) - mark), gap); // cells-ok — a cell count
   // **The reservation gives way where it would make the row clip, and
   // `clipped` is what says so.** At four columns `events` shed its type and its
@@ -264,15 +266,34 @@ function solveRow(parts: readonly Part[], width: number, gap: number): Solved {
 }
 
 /**
- * The mark's width, reserved before the widths are settled.
+ * The mark's width, reserved before the widths are settled (C09 I108).
  *
- * Two cells covers `⋯1` through `⋯9`, and a row with ten parts to shed is not a
- * row this mechanism is saving. A count that outgrew the reservation would take
- * its extra cell from the clamp, which is the defect the reservation exists to
- * prevent — so the constant is the honest bound rather than a guess, and the
- * kinds have three, four and five parts.
+ * **It was the constant `2` and the constant was a sentence about one rung.**
+ * The justification read *two cells covers `⋯1` through `⋯9`* — true, and
+ * written where the lead is a **parameter**. The ASCII `residue` is `...`, three
+ * cells, so `...2` is four against a reservation of two, and the shortfall came
+ * out of the clamp: a rendered `events` row at 20 columns drew
+ * `rolled the flee~ ..~`, the mark itself cut and its **count truncated away**.
+ * A residue mark that has lost its count is not a degraded mark; it is a mark
+ * that says nothing, which is the exact failure this reservation exists to
+ * prevent — named in the paragraph above and defeated by the line below it.
+ *
+ * **Both halves are derived now, so neither is a guess.** The lead is measured
+ * rather than assumed, and the count's width comes from the most parts that can
+ * ever shed — the highest-ranked one never does, so it is `parts.length - 1`.
+ * That removes the old bound's escape clause (*a row with ten parts to shed is
+ * not a row this mechanism is saving*) rather than restating it: a kind with
+ * eleven parts now reserves three cells for the count because it can need them.
  */
-const MARK_CELLS = 2;
+const markCells = (lead: string, parts: number): number =>
+  // narrow-ok — the lead is `⋯` only where the terminal is narrow. `⋯` is
+  // Ambiguous, so measuring it matters; but the whole glyph set falls to ASCII
+  // wholesale at the wide arm (C02 I9, T2.75: `glyphs(WIDE_CAPS)` equals
+  // `glyphs(ASCII_CAPS)`), so a wide terminal hands in `...`, which is three
+  // cells under either convention. The narrow measurement is right for every
+  // lead this is ever called with, and this module holds no capabilities to
+  // ask with.
+  cells(lead) + String(Math.max(1, parts - 1)).length; // cells-ok — a digit count // narrow-ok — see above
 
 /** The row's span at its natural widths, for a caller deciding whether to ask at all. */
 export const naturalSpan = (parts: readonly Part[], gap: number): number =>
