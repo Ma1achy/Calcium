@@ -585,3 +585,7 @@ const STATED_CYCLES: Readonly<Record<string, number>> = Object.freeze(
     expect(cells(wide.residue, "wide"), "and the residue mark is the bare `...` at the wide arm").toBe(3);
   });
 });
+
+describe("C09 I112 — a spinner steps at its own set's interval", () => {
+  it.todo("T1.78 (C09 I112, §039): at one tick, agent and the default set take their own frames — not deferred on a component: specified before the index reads the interval");
+});

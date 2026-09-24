@@ -318,6 +318,8 @@ describe("C22 §6i — the ticker is the second writer", () => {
     }
   });
 
+  it.todo("T4.17v (C22 I74, C09 I112): the counter is elapsed time over 80 ms, whatever the wake — not deferred on a component: specified before the session counts in TICK_MS");
+
   it("T4.17j (C22 I73): a live orbit draws at the stream rate and a spinner at the spinner's", async () => {
     vi.useFakeTimers();
     try {
