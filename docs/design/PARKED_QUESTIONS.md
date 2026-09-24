@@ -451,6 +451,33 @@ naming because it is what a smaller change would look like.
 
 ---
 
+**25 · The design's own figures draw two columns where `R-STR-003` says
+three.** The rule is `status: current` — *every nested level costs three
+columns* — and it is the only place in the kit that says three.
+
+**Measured over all 130 fixtures.** Taking every `⎿` row and the head above
+it, and the step as the difference between the two content columns: **28
+instances at two columns and none at three.** The nine remaining are step 0,
+where the line above is the `✦` activity line, which is not a parent. So
+the figure the rule states appears in no drawn frame the kit ships.
+
+**The repository already draws the design's figure rather than the design's
+prose.** `GLYPH_INDENT` and `prefixCells`
+(`src/presentation/blocks/kinds/simple.ts`) give a head two cells and `⎿`
+four, so content moves from column 2 to column 4 — the same two-column step, by
+arithmetic rather than by coincidence, since `prefixCells` *is* the hanging
+indent.
+
+**Which leaves the question the brief reserves.** The design contradicts itself
+here: 28 figures against one sentence. Taking the sentence changes every nested
+row in every golden and puts the repo out of agreement with the kit's own
+fixtures; taking the figures amends a `current` rule's text, which is a change
+to the normative source and not mine to make. The second clause — *nesting is
+limited by width while the deepest child still clears its own minimum width* —
+is unaffected either way and stays owed on its own account.
+
+---
+
 ## Not yet recovered
 
 **Sixteen distinct questions are above, and the running count in the reports
