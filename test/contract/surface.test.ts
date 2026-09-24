@@ -255,6 +255,8 @@ describe("C16 §5 — the captured child owns the keyboard (M9)", () => {
     await handle.close();
   });
 
+  it.todo("T1.109 (C16 I57, C23 I79, R-KEY-005): F1 and ? append the keymap entry and keep the draft and history — not deferred on a component: emitLocal lands in the next commit of this MR");
+
   it("T1.106b (C16 I49, R-BLK-908): ⌃] is the one key the child does not get", async () => {
     const h = await buildGraph();
     h.graph.lifecycle.acquire();
