@@ -410,6 +410,153 @@ export function callHead(call: ToolCallSpec, caps: Caps, tick = 0, foldTarget?: 
   return block(foldTarget === undefined ? marked : { ...marked, action: { kind: "expand" as const, label: "expand", target: foldTarget } });
 }
 
+/**
+ * An operation — a process rather than a call (C23 I76, §036).
+ *
+ * **The verb is the caller's and the grammar is this file's.** *The head names
+ * what is HAPPENING, not a tool — a gerund, because an operation is a process
+ * rather than a call*; nothing here can compose a gerund and nothing here needs
+ * to. What this owns is the bracket, the separator inside it, the flattening at
+ * settlement and the bar's disappearance.
+ *
+ * `verb` changes at settlement and the caller supplies both — §036 draws
+ * `Compacting conversation…` running and `compacted` settled, which is a
+ * different word and not a tense this file could derive.
+ */
+export type OperationSpec = Readonly<{
+  /** What is happening, as the caller says it. */
+  verb: string;
+  /** The head block's id, so a readout can replace it in place (C23 I54). */
+  id?: string;
+  /** Since it started, in milliseconds. */
+  elapsedMs?: number;
+  /**
+   * What it has ACHIEVED so far, in the operation's own units — `↓ 8.0k tokens`,
+   * `4,102 of 9,318 files`. A string, because *a percentage is the same word for
+   * all four, and the unit is what tells you whether 44% is nearly done*.
+   */
+  delta?: string;
+  /** The settled summary — the delta FINISHED, `41k → 12k tokens`, never `done`. */
+  outcome?: string;
+  /** Running unless said otherwise. `succeeded`, `cancelled` and `failed` all stop it. */
+  state?: CallState;
+  /** How far through. Both, or neither: a bar with no total is not a bar (`R-PRG-002`). */
+  current?: number;
+  total?: number;
+}>;
+
+/** Is the operation still going? The one predicate the bar and the bracket both read (C23 I76). */
+function operationRunning(op: OperationSpec): boolean {
+  return (op.state ?? "running") === "running";
+}
+
+/**
+ * The running mark: the `agent` set's own frame, indexed by the readout's tick
+ * exactly as the duration slot's is (C23 I58).
+ *
+ * **It is composed into the text rather than left to the gutter**, and that is
+ * a fact about this tree rather than a reading of §036. The glyph slot draws
+ * one character chosen from a state, which is what a stopped operation wants —
+ * `●`, muted or error — and there is no slot that animates. The duration
+ * spinner has always been composed this way and re-drawn by the readout
+ * replacing the head by id; a second mechanism for the same job would be a
+ * second timer, which C23 I58 exists to refuse.
+ */
+function operationSpin(caps: Caps, tick: number): string {
+  const frames = spinnerFrames(caps, "agent");
+  return frames[tick % frames.length] ?? ""; // cells-ok — a frame count
+}
+
+/**
+ * The operation's header line (C23 I76, §036).
+ *
+ * **Bracketed while it runs and flat once it stops**, and those are not the same
+ * line: *the parentheses group the two as an aside, so the eye reads the VERB
+ * first and the numbers second*, and §036's settled head — `● compacted · 6m 12s
+ * · 41k → 12k tokens · 18 turns summarised` — puts every field on one level.
+ * **An empty group is not drawn**, and a group of one takes no separator:
+ * parentheses around nothing say *these are the numbers* about no numbers.
+ */
+export function operationHeader(op: OperationSpec, caps: Caps, tick = 0): string {
+  const sep = ` ${glyphs(caps).separator} `;
+  const since = op.elapsedMs === undefined ? "" : elapsed(op.elapsedMs);
+  const numbers = [since, op.delta ?? ""].filter((n) => n !== "");
+  if (operationRunning(op)) {
+    const mark = operationSpin(caps, tick);
+    const head = mark === "" ? op.verb : `${mark} ${op.verb}`;
+    return numbers.length === 0 ? head : `${head} (${numbers.join(sep)})`; // cells-ok — a field count
+  }
+  const outcome = op.outcome === undefined || op.outcome === "" ? [] : [op.outcome];
+  return [op.verb, ...numbers, ...outcome].join(sep);
+}
+
+/** Muted for cancelled, error for failed, and info for the rest (§036, `R-BLK-265`). */
+function operationTone(op: OperationSpec): "muted" | "error" | "info" {
+  const state = op.state ?? "running";
+  return state === "cancelled" ? "muted" : state === "failed" ? "error" : "info";
+}
+
+/**
+ * The operation's head block (C23 I76): a notice carrying the header, the
+ * state's mark in the gutter once it has stopped and the walking one in the
+ * text while it has not.
+ */
+export function operationHead(op: OperationSpec, caps: Caps, tick = 0): Block {
+  const running = operationRunning(op);
+  const base = {
+    kind: "notice" as const,
+    id: op.id ?? blockId("operation"),
+    tone: operationTone(op),
+    text: operationHeader(op, caps, tick),
+  };
+  // **A state at both ends, and a glyph at only one.** `state` is what makes a
+  // notice a head (C09 I46's `isCallHead`), and a head is **one committed row,
+  // fitted rather than wrapped** — *a head that wraps is two heads to a reader
+  // skimming the gutter*. The running arm had no state on its first draft and
+  // the frame said so: at 28 cells the aside fell onto a second row at column
+  // zero, where it reads as a line of its own rather than as the verb's
+  // numbers. `glyph` stays off while it runs, because the walking mark is
+  // already at the head of the text and §036's running line carries one mark.
+  return block(
+    running
+      ? { ...base, state: "running" as const }
+      : { ...base, glyph: "running" as const, state: op.state ?? "succeeded" },
+  );
+}
+
+/**
+ * The operation's rows: the head, and the bar **only while it is running**
+ * (C23 I76, §036).
+ *
+ * **Two arguments end with no bar and neither substitutes for the other.** *A
+ * 100% bar on a finished thing is a row spent on nothing* is settlement's; *a
+ * stopped bar is a claim about progress that is not being made any more* is
+ * cancellation's and failure's. So the predicate is `operationRunning`, asked
+ * once — a rule written about settlement alone leaves a cancelled operation
+ * drawing its frozen fill, which is the state that lies.
+ *
+ * The bar carries no label (C09 I104): the verb is on the head above it, and a
+ * meter that reserved a column regardless made §036's row unreachable.
+ */
+export function operationRows(op: OperationSpec, caps: Caps, tick = 0): readonly Block[] {
+  const head = operationHead(op, caps, tick);
+  if (!operationRunning(op) || op.current === undefined || op.total === undefined) return [head];
+  return [
+    head,
+    block({
+      kind: "progress",
+      id: blockId("operation-bar"),
+      label: "",
+      current: op.current,
+      total: op.total,
+      // §036's OPERATION preset — *progress · segmented · active* (C09 I97).
+      quantity: "progress",
+      granularity: "segmented",
+      liveness: "active",
+    }),
+  ];
+}
+
 /** The words a settled child can carry that count against the parent (C23 I62). */
 const FAILURE_WORDS: ReadonlySet<string> = new Set(["failed", "denied", "cancelled", "truncated"]);
 

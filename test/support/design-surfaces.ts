@@ -29,6 +29,8 @@ import {
   spinnerSetNames,
   toneCarries,
 } from "../../src/presentation/blocks/glyphs.js";
+import { operationRows } from "../../src/shell/documents.js";
+import type { OperationSpec } from "../../src/shell/documents.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { patchOf } from "./blocks.js";
@@ -1200,7 +1202,64 @@ const decimalColumn = (
   ];
 };
 
+/**
+ * §036 — the operation surface: *the head names what is HAPPENING, not a tool*,
+ * and *when it ends, the motion stops and it settles as an entry*.
+ *
+ * **Drawn as a table because the two heads differ by which rule applies**, not
+ * by a value. The aside groups the elapsed and the delta while the operation
+ * runs; a head joins its fields with the separator; both statements are true
+ * and only one holds at each end, and nothing happens between them that a
+ * sequence could key on. The eight rows are the four running shapes and the
+ * four stopped ones, and the reading is whether the parentheses are there.
+ *
+ * **And the bar is read as an absence three times**, because two arguments end
+ * with no bar and neither substitutes for the other — *a 100% bar on a finished
+ * thing is a row spent on nothing*, and *a stopped bar is a claim about progress
+ * that is not being made any more*.
+ */
+const OPERATION_CASES: readonly (readonly [string, OperationSpec])[] = [
+  ["running · elapsed and delta", { verb: "Compacting conversation…", elapsedMs: 338_000, delta: "↓ 8.0k tokens", current: 77, total: 100 }],
+  ["running · elapsed alone", { verb: "Compacting conversation…", elapsedMs: 338_000, current: 77, total: 100 }],
+  ["running · delta alone", { verb: "Compacting conversation…", delta: "↓ 8.0k tokens", current: 77, total: 100 }],
+  ["running · neither — and no empty parentheses", { verb: "Compacting conversation…", current: 77, total: 100 }],
+  ["settled — flat, and the bar is GONE", { verb: "compacted", state: "succeeded", elapsedMs: 372_000, delta: "41k → 12k tokens", outcome: "18 turns summarised", current: 100, total: 100 }],
+  ["cancelled — muted, and the bar goes for its own reason", { verb: "compacting", state: "cancelled", elapsedMs: 130_000, outcome: "cancelled", current: 41, total: 100 }],
+  ["failed — error, and the bar goes too", { verb: "compacting", state: "failed", elapsedMs: 130_000, outcome: "failed", current: 41, total: 100 }],
+  ["settled carrying nothing — the verb alone", { verb: "compacted", state: "succeeded" }],
+];
+
+const operationSurface = (
+  width: number,
+  capabilities: TerminalCapabilities,
+  theme: ResolvedTheme,
+): readonly string[] => {
+  const kit = measurable({ theme, capabilities });
+  const at = Math.min(width, 56);
+  const out = ["· the head brackets while it runs and flattens when it stops — and the bar goes with the motion"];
+  for (const [name, op] of OPERATION_CASES) {
+    out.push(`  ${name}`);
+    for (const b of operationRows(op, capabilities, 4)) {
+      for (const line of kit.renderToLines(b, at)) out.push(`    ${line}`);
+    }
+  }
+  out.push("", "· the same shape for every operation — §036's four, the delta in each one's own units");
+  const four: readonly (readonly [string, string, number, number, number])[] = [
+    ["Compacting conversation…", "↓ 8.0k tokens", 338_000, 77, 100],
+    ["Indexing the repository…", "4,102 of 9,318 files", 12_000, 44, 100],
+    ["Uploading the checkpoint…", "2.1 of 4.8 GiB", 64_000, 44, 100],
+    ["Running the suite…", "892 of 1,204 tests", 31_000, 74, 100],
+  ];
+  for (const [verb, delta, ms, current, total] of four) {
+    for (const b of operationRows({ verb, delta, elapsedMs: ms, current, total }, capabilities, 4)) {
+      for (const line of kit.renderToLines(b, at)) out.push(`    ${line}`);
+    }
+  }
+  return [...out, ""];
+};
+
 export const SURFACES: readonly Surface[] = Object.freeze([
+  { section: 36, name: "the operation surface — the aside, the flattening, and the bar that goes", rows: operationSurface },
   { section: 95, name: "a tape, where a row of peers would shed", rows: draw(TAPE) },
   { section: 42, name: "widgets — a row of peers that sheds", rows: draw(PILLS) },
   { section: 34, name: "active progress bars", rows: draw(BAR) },

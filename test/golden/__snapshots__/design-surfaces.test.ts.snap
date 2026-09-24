@@ -1,7 +1,40 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`golden frames — one per design fixture > dark-ascii at 40 1`] = `
-"── §95 · a tape, where a row of peers would shed
+"── §36 · the operation surface — the aside, the flattening, and the bar that goes
+· the head brackets while it runs and flattens when it stops — and the bar goes with the motion
+  running · elapsed and delta
+    . Compacting conversation… (5m 38s : ↓ ~
+    ############################-------- 77%
+  running · elapsed alone
+    . Compacting conversation… (5m 38s)
+    ############################-------- 77%
+  running · delta alone
+    . Compacting conversation… (↓ 8.0k toke~
+    ############################-------- 77%
+  running · neither — and no empty parentheses
+    . Compacting conversation…
+    ############################-------- 77%
+  settled — flat, and the bar is GONE
+    + compacted : 6m 12s : 41k → 12k tokens~
+  cancelled — muted, and the bar goes for its own reason
+    / compacting : 2m 10s : cancelled
+  failed — error, and the bar goes too
+    x compacting : 2m 10s : failed
+  settled carrying nothing — the verb alone
+    + compacted
+
+· the same shape for every operation — §036's four, the delta in each one's own units
+    . Compacting conversation… (5m 38s : ↓ ~
+    ############################-------- 77%
+    . Indexing the repository… (12s : 4,102~
+    ################-------------------- 44%
+    . Uploading the checkpoint… (64s : 2.1 ~
+    ################-------------------- 44%
+    . Running the suite… (31s : 892 of 1,20~
+    ###########################--------- 74%
+
+── §95 · a tape, where a row of peers would shed
 scout +  planner +  * builder .  2]
 ── §42 · widgets — a row of peers that sheds
 auto  plan  manual  accept edits
@@ -593,7 +626,40 @@ line 6                                 |
 `;
 
 exports[`golden frames — one per design fixture > dark-ascii at 80 1`] = `
-"── §95 · a tape, where a row of peers would shed
+"── §36 · the operation surface — the aside, the flattening, and the bar that goes
+· the head brackets while it runs and flattens when it stops — and the bar goes with the motion
+  running · elapsed and delta
+    . Compacting conversation… (5m 38s : ↓ 8.0k tokens)
+    ########################################------------ 77%
+  running · elapsed alone
+    . Compacting conversation… (5m 38s)
+    ########################################------------ 77%
+  running · delta alone
+    . Compacting conversation… (↓ 8.0k tokens)
+    ########################################------------ 77%
+  running · neither — and no empty parentheses
+    . Compacting conversation…
+    ########################################------------ 77%
+  settled — flat, and the bar is GONE
+    + compacted : 6m 12s : 41k → 12k tokens : 18 turns summ~
+  cancelled — muted, and the bar goes for its own reason
+    / compacting : 2m 10s : cancelled
+  failed — error, and the bar goes too
+    x compacting : 2m 10s : failed
+  settled carrying nothing — the verb alone
+    + compacted
+
+· the same shape for every operation — §036's four, the delta in each one's own units
+    . Compacting conversation… (5m 38s : ↓ 8.0k tokens)
+    ########################################------------ 77%
+    . Indexing the repository… (12s : 4,102 of 9,318 files)
+    #######################----------------------------- 44%
+    . Uploading the checkpoint… (64s : 2.1 of 4.8 GiB)
+    #######################----------------------------- 44%
+    . Running the suite… (31s : 892 of 1,204 tests)
+    ######################################-------------- 74%
+
+── §95 · a tape, where a row of peers would shed
 scout 4s +  planner 1m12s +  * builder . 8s  critic 2s o  scribe 0s o
 ── §42 · widgets — a row of peers that sheds
 auto  plan  manual  accept edits
@@ -1178,7 +1244,40 @@ line 6                                                                         |
 `;
 
 exports[`golden frames — one per design fixture > dark-mono-unicode at 40 1`] = `
-"── §95 · a tape, where a row of peers would shed
+"── §36 · the operation surface — the aside, the flattening, and the bar that goes
+· the head brackets while it runs and flattens when it stops — and the bar goes with the motion
+  running · elapsed and delta
+    ✦ Compacting conversation… (5m 38s · ↓ …
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+  running · elapsed alone
+    ✦ Compacting conversation… (5m 38s)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+  running · delta alone
+    ✦ Compacting conversation… (↓ 8.0k toke…
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+  running · neither — and no empty parentheses
+    ✦ Compacting conversation…
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+  settled — flat, and the bar is GONE
+    ✓ compacted · 6m 12s · 41k → 12k tokens…
+  cancelled — muted, and the bar goes for its own reason
+    ⊘ compacting · 2m 10s · cancelled
+  failed — error, and the bar goes too
+    ✗ compacting · 2m 10s · failed
+  settled carrying nothing — the verb alone
+    ✓ compacted
+
+· the same shape for every operation — §036's four, the delta in each one's own units
+    ✦ Compacting conversation… (5m 38s · ↓ …
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ✦ Indexing the repository… (12s · 4,102…
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ✦ Uploading the checkpoint… (64s · 2.1 …
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ✦ Running the suite… (31s · 892 of 1,20…
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱ 74%
+
+── §95 · a tape, where a row of peers would shed
 scout ✓  planner ✓  › builder ⋅  2»
 ── §42 · widgets — a row of peers that sheds
 auto  plan  manual  accept edits
@@ -1740,7 +1839,40 @@ line 6                                 │
 `;
 
 exports[`golden frames — one per design fixture > dark-mono-unicode at 80 1`] = `
-"── §95 · a tape, where a row of peers would shed
+"── §36 · the operation surface — the aside, the flattening, and the bar that goes
+· the head brackets while it runs and flattens when it stops — and the bar goes with the motion
+  running · elapsed and delta
+    ✦ Compacting conversation… (5m 38s · ↓ 8.0k tokens)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+  running · elapsed alone
+    ✦ Compacting conversation… (5m 38s)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+  running · delta alone
+    ✦ Compacting conversation… (↓ 8.0k tokens)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+  running · neither — and no empty parentheses
+    ✦ Compacting conversation…
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+  settled — flat, and the bar is GONE
+    ✓ compacted · 6m 12s · 41k → 12k tokens · 18 turns summ…
+  cancelled — muted, and the bar goes for its own reason
+    ⊘ compacting · 2m 10s · cancelled
+  failed — error, and the bar goes too
+    ✗ compacting · 2m 10s · failed
+  settled carrying nothing — the verb alone
+    ✓ compacted
+
+· the same shape for every operation — §036's four, the delta in each one's own units
+    ✦ Compacting conversation… (5m 38s · ↓ 8.0k tokens)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ✦ Indexing the repository… (12s · 4,102 of 9,318 files)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ✦ Uploading the checkpoint… (64s · 2.1 of 4.8 GiB)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ✦ Running the suite… (31s · 892 of 1,204 tests)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 74%
+
+── §95 · a tape, where a row of peers would shed
 scout 4s ✓  planner 1m12s ✓  › builder ⋅ 8s  critic 2s ○  scribe 0s ○
 ── §42 · widgets — a row of peers that sheds
 auto  plan  manual  accept edits
@@ -2294,7 +2426,40 @@ line 6                                                                         �
 `;
 
 exports[`golden frames — one per design fixture > dark-unicode at 40 1`] = `
-"── §95 · a tape, where a row of peers would shed
+"── §36 · the operation surface — the aside, the flattening, and the bar that goes
+· the head brackets while it runs and flattens when it stops — and the bar goes with the motion
+  running · elapsed and delta
+    ✦ Compacting conversation… (5m 38s · ↓ …
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+  running · elapsed alone
+    ✦ Compacting conversation… (5m 38s)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+  running · delta alone
+    ✦ Compacting conversation… (↓ 8.0k toke…
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+  running · neither — and no empty parentheses
+    ✦ Compacting conversation…
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+  settled — flat, and the bar is GONE
+    ● compacted · 6m 12s · 41k → 12k tokens…
+  cancelled — muted, and the bar goes for its own reason
+    ● compacting · 2m 10s · cancelled
+  failed — error, and the bar goes too
+    ● compacting · 2m 10s · failed
+  settled carrying nothing — the verb alone
+    ● compacted
+
+· the same shape for every operation — §036's four, the delta in each one's own units
+    ✦ Compacting conversation… (5m 38s · ↓ …
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ✦ Indexing the repository… (12s · 4,102…
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ✦ Uploading the checkpoint… (64s · 2.1 …
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ✦ Running the suite… (31s · 892 of 1,20…
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱ 74%
+
+── §95 · a tape, where a row of peers would shed
 scout ✓  planner ✓  › builder ⋅  2»
 ── §42 · widgets — a row of peers that sheds
 auto  plan  manual  accept edits
@@ -2887,7 +3052,40 @@ line 6                                 │
 `;
 
 exports[`golden frames — one per design fixture > dark-unicode at 80 1`] = `
-"── §95 · a tape, where a row of peers would shed
+"── §36 · the operation surface — the aside, the flattening, and the bar that goes
+· the head brackets while it runs and flattens when it stops — and the bar goes with the motion
+  running · elapsed and delta
+    ✦ Compacting conversation… (5m 38s · ↓ 8.0k tokens)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+  running · elapsed alone
+    ✦ Compacting conversation… (5m 38s)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+  running · delta alone
+    ✦ Compacting conversation… (↓ 8.0k tokens)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+  running · neither — and no empty parentheses
+    ✦ Compacting conversation…
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+  settled — flat, and the bar is GONE
+    ● compacted · 6m 12s · 41k → 12k tokens · 18 turns summ…
+  cancelled — muted, and the bar goes for its own reason
+    ● compacting · 2m 10s · cancelled
+  failed — error, and the bar goes too
+    ● compacting · 2m 10s · failed
+  settled carrying nothing — the verb alone
+    ● compacted
+
+· the same shape for every operation — §036's four, the delta in each one's own units
+    ✦ Compacting conversation… (5m 38s · ↓ 8.0k tokens)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ✦ Indexing the repository… (12s · 4,102 of 9,318 files)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ✦ Uploading the checkpoint… (64s · 2.1 of 4.8 GiB)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ✦ Running the suite… (31s · 892 of 1,204 tests)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 74%
+
+── §95 · a tape, where a row of peers would shed
 scout 4s ✓  planner 1m12s ✓  › builder ⋅ 8s  critic 2s ○  scribe 0s ○
 ── §42 · widgets — a row of peers that sheds
 auto  plan  manual  accept edits

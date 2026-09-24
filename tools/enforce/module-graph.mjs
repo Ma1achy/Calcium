@@ -1643,6 +1643,21 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // --- C23 I76's operation surface, ahead of the producer that reports one ---
+  //
+  // **The queued consumer is an adapter that emits an operation, and none
+  // does.** §036's verb is the application's — *the head names what is
+  // HAPPENING, not a tool — a gerund* — and nothing in `src/` can compose a
+  // gerund or knows which of its processes is one. What lands here is the half
+  // the caller cannot decide: the bracket while it runs, the flattening when it
+  // stops, and the bar going with the motion. The day a producer reports an
+  // operation, this entry is itself the violation.
+  "OperationSpec.delta":
+    "C23 I76, §036 — what the operation has ACHIEVED so far, in its own units, read by "
+    + "`operationHeader` into the aside. A string rather than a number because *a percentage "
+    + "is the same word for all four, and the unit is what tells you whether 44% is nearly "
+    + "done*; the units are the caller's and nothing in src/ can supply them yet. T1.71 holds "
+    + "the four running shapes against the four stopped ones.",
   // --- C14 §6e's rectangle, groundwork ahead of a chord the registry has not
   // --- named -----------------------------------------------------------------
   //
@@ -3569,6 +3584,11 @@ export function checkExportedArguments(files, readFile = (f) => readFileSync(f, 
 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
+  operationRows:
+    "C23 I76, §036 — the operation's head and its bar, composed by the shell the day an "
+    + "adapter reports an operation. Parked because the verb is a gerund the caller supplies "
+    + "and no producer in src/ names one; `design-surfaces` §036 draws all eight cases and "
+    + "T1.72 holds the bar's absence in three stopped states rather than one.",
   // **`rectBetween` and `cellTextOf` are `R-SEL-007`'s mechanism with no door**
   // (C14 §6e). The rule's two mechanical claims — the clip to the anchor's
   // block, and cells rather than source — are settled completely by the design;

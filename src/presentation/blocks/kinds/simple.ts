@@ -732,16 +732,26 @@ export const progressDefinition: BlockDefinition<Progress> = {
     // walks the whole label, `truncate` throws most of it away, and `measure`
     // is 1 either way.
     ctx.probe?.gauge("progress.label", block.label.length); // cells-ok — an input size, not a display width
-    const labelRoom = Math.max(0, Math.floor(width / 3));
-    const labelColumn = pad(
-      truncate(stripControl(block.label), labelRoom, ctx.capabilities),
-      labelRoom,
-    );
+    // **No label, no column** (I104, §036, C23 I76). The third of the row was
+    // unconditional, so §036's operation bar — which carries no label, the verb
+    // being on the head above it — spent nineteen cells of fifty-six on blank
+    // and drew a bar nineteen cells short. The predicate is the label's text
+    // rather than a flag: a caller that wants no column omits the label, which
+    // is the thing it already does, and the block needs no second member.
+    const labelRoom = block.label === "" ? 0 : Math.max(0, Math.floor(width / 3));
+    const labelColumn =
+      labelRoom === 0
+        ? ""
+        : pad(truncate(stripControl(block.label), labelRoom, ctx.capabilities), labelRoom);
 
     // The bar takes the residual (\u00a73), which is what makes this one row at any
     // width rather than one row at most widths. It can reach zero, and a bar of
     // no cells is still a row: the label and the percentage carry the meaning.
-    const barWidth = Math.max(0, width - cells(labelColumn, ctx.capabilities.ambiguousWidth) - cells(percent, ctx.capabilities.ambiguousWidth) - 2);
+    // **The gaps are counted, not assumed** (I104). There were always two — one
+    // after the label and one before the readout — and with the column gone
+    // there is one, so a bar with no label starts at the row's own first cell.
+    const gaps = labelRoom === 0 ? 1 : 2;
+    const barWidth = Math.max(0, width - cells(labelColumn, ctx.capabilities.ambiguousWidth) - cells(percent, ctx.capabilities.ambiguousWidth) - gaps);
     const filled = Math.round(fill * barWidth);
 
     // **The ramp varies over the axis, and only the `on` cells take it** (I52).
@@ -817,7 +827,7 @@ export const progressDefinition: BlockDefinition<Progress> = {
       paint(
         clampSpans(
           [
-            { text: `${labelColumn} `, style: tone("default", ctx.theme, ctx.capabilities) },
+            { text: labelRoom === 0 ? "" : `${labelColumn} `, style: tone("default", ctx.theme, ctx.capabilities) },
             ...onCells,
             {
               text: (painted ? " " : bar.off).repeat(barWidth - filled),

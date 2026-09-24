@@ -12,7 +12,9 @@ import { measurable, FULL_CAPS, DARK_THEME } from "../support/render.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import type { Table } from "../../src/data/viewmodel/index.js";
 
-const SGR = /\[[0-9;]*m/gu;
+// A literal ESC byte in a source file is a character nobody can see; the
+// escape names itself.
+const SGR = /\u001b\[[0-9;]*m/gu;
 
 /** §099's four values, in one column, at a width the caller picks. */
 const figure = (align: string, minWidth: number, extra: readonly string[] = []): Table =>
