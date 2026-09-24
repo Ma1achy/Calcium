@@ -226,6 +226,8 @@ describe("C16 §5 — the captured child owns the keyboard (M9)", () => {
     await h.graph.lifecycle.release();
   });
 
+  it.todo("T1.106c (C16 I56, R-OWN-002): two ⌃c at an attached child reach the child twice and raise no exit confirm — not deferred on a component: the arming condition is amended in the next commit of this MR");
+
   it("T1.106b (C16 I49, R-BLK-908): ⌃] is the one key the child does not get", async () => {
     const h = await buildGraph();
     h.graph.lifecycle.acquire();
