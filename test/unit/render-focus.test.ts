@@ -713,6 +713,8 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
   const noticeAt = (b: typeof NOTICE, focus: FocusState | null, depth: 24 | 1 = 24) =>
     renderToLines(registry, b, 40, { theme, capabilities: capabilities({ colourDepth: depth }), focus });
 
+  it.todo("T1.75b (C09 I45, C14 I54, R-THM-003): a washed call head on the selection band takes the state's own mark — not deferred on a component: specified before RenderContext.washed exists");
+
   it("T1.75 (C09 I45, C10 I45, R-THM-003): a focused call head on a band takes the state's own mark, and the page keeps ●", () => {
     const STATES = ["queued", "running", "succeeded", "failed", "cancelled"] as const;
     const caps = capabilities({ colourDepth: 24 });

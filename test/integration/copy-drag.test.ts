@@ -136,6 +136,8 @@ const release = (col: number, row: number): string =>
   `[<0;${String(col)};${String(row)}m`;
 
 describe("C14 §6f — the drag in a real session", () => {
+  it.todo("T4.37f (C14 I54, R-THM-003): in hcDark a selected failed head draws its own mark and esc restores ● — not deferred on a component: specified before the axis exists");
+
   it("T4.37 (C14 I44, I45): a drag past the region autoscrolls, and keeps going with the pointer still", async () => {
     vi.useFakeTimers();
     try {
