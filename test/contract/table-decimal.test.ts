@@ -104,3 +104,7 @@ describe("C11 I26 — a column aligns on its decimal point", () => {
     }
   });
 });
+
+describe("C11 I31 — the window pins the number column's width", () => {
+  it.todo("T2.16 (C11 I31, I19, I27): a window plans a number column at the table's widest value — not deferred on a component: specified before the window pins it");
+});

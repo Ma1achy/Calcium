@@ -1275,3 +1275,7 @@ describe("the missing number and the trend (I29, I30)", () => {
   });
   it.todo("T1.39 (C11 I30, R-COL-006): a trend cell's arrow takes its tone from the column's polarity — not deferred on a component: parked as 38, the down arrow has no ASCII half (docs/design/PARKED_QUESTIONS.md)");
 });
+
+describe("a number column is planned at its widest value (I31)", () => {
+  it.todo("T1.40 (C11 I31, R-TBL-005): a number column is shown whole or dropped, never cut — not deferred on a component: specified before the definition raises the minimum");
+});
