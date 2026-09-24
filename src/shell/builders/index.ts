@@ -327,7 +327,13 @@ function col(key: string, spec?: Partial<Omit<ColumnDef, "key">>): ColumnDef {
   return Object.freeze({
     key,
     label: key,
-    align: "left" as const,
+    // **No alignment declared, so C11 derives it from the cells** (C11 I27,
+    // §078 `R-TBL-001`). `left` sat here beside `priority` and `minWidth` and
+    // was described in the same sentence as them — *a surface that cares sets
+    // them* — so it was already a default rather than a declaration. The
+    // difference is that the other two have no better answer and this one does:
+    // the column's own values. A surface that means `left` over numbers still
+    // says so through `spec`.
     priority: 50,
     minWidth: 8,
     sortable: false,

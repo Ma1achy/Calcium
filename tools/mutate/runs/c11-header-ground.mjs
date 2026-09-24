@@ -79,8 +79,8 @@ const results = runPass({
       // resolver stopped agreeing about which ground a row took.
       name: "the header's ink is resolved off its ground",
       file: TABLE,
-      from: '        const spans = clampSpans(headerSpans(block, plan, ctx, "bgElev"), inner, ctx.capabilities);',
-      to: "        const spans = clampSpans(headerSpans(block, plan, ctx), inner, ctx.capabilities);",
+      from: '          headerSpans(block, plan, ctx, columnAlignments(block), "bgElev"),',
+      to: "          headerSpans(block, plan, ctx, columnAlignments(block)),",
       expect: "T2.161",
     },
     {

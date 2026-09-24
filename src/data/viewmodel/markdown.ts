@@ -261,7 +261,11 @@ function columnsOf(headers: readonly string[]): readonly ColumnDef[] {
       // duplicate key would silently drop a column.
       key: `c${String(i)}`,
       label,
-      align: "left" as const,
+      // **No alignment declared, so C11 derives it from the cells** (C11 I27,
+      // §078 `R-TBL-001`). A markdown table's columns are whatever the document
+      // holds and this function has not read a row, so `left` here was an
+      // answer given before the question could be asked — and it left-aligned
+      // every column of numbers a document contains.
       priority: 50,
       minWidth: 4,
       sortable: false,

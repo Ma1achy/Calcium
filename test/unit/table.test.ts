@@ -7,6 +7,8 @@
 import { describe, expect, it } from "vitest";
 import { atContent, body } from "../support/table-gutter.js";
 import { COLUMN_GAP, planColumns, tableDefinition, tableElements } from "../../src/presentation/table/index.js";
+import { columnAlignments } from "../../src/presentation/table/kind.js";
+import { markdownBlocks } from "../../src/data/viewmodel/markdown.js";
 
 /**
  * The drawn order of a table's rows (C26 §5).
@@ -948,14 +950,145 @@ describe("C11 §5a — the window", () => {
 // C11 §3 — I27, a column's alignment derived from its own values.
 // ---------------------------------------------------------------------------
 
+/** A column declaring everything but an alignment. */
+const undeclared = (key: string, minWidth: number): ColumnDef => ({
+  key,
+  label: key,
+  priority: 50,
+  minWidth,
+  sortable: false,
+});
+
 describe("derived alignment (I27)", () => {
-  it.todo(
-    "T1.31 (I27, §078, R-TBL-001): four columns declaring no alignment — integers, decimals, durations and a mixed column of 200/404/timeout — resolve to decimal, decimal, right and left, with a fifth column declaring left over the same integers keeping left as the control — not deferred on a component: ColumnDef.align becomes optional and the derivation lands in this same MR",
-  );
-  it.todo(
-    "T1.32 (I27, I26): a table of integer columns declaring no alignment renders byte-identical to the same table declaring align right, at every width from 20 to 120, with one fractional value added as the control where the two must differ — not deferred on a component: the derivation lands in this same MR",
-  );
-  it.todo(
-    "T1.33 (I27, I19, F429): a status column of 200/404/503/timeout windowed to its first three rows renders at the whole table's alignment and not the slice's, with the unwindowed table as the control — not deferred on a component: window resolves the alignment before slicing, in this same MR",
-  );
+  it("T1.31 (I27, §078, R-TBL-001): four undeclared columns take the alignment their values imply, and a declared one is left alone", () => {
+    const block: Table = {
+      kind: "table",
+      id: "kinds",
+      columns: [
+        undeclared("ints", 8),
+        undeclared("decs", 8),
+        undeclared("age", 8),
+        // **The row that matters.** Two of its three values parse as numbers,
+        // so a classifier taking the majority would right-align it; the
+        // agreement rule says a column whose values disagree has no kind.
+        undeclared("status", 8),
+        // The control: the same integers with `left` declared. Without it the
+        // assertions below pass against an implementation that ignores a
+        // declaration — which is exactly what would reach into C07's adapter.
+        { ...undeclared("declared", 8), align: "left" },
+      ],
+      rows: [
+        { id: "a", cells: { ints: { text: "1204" }, decs: { text: "0.0372" }, age: { text: "12m" }, status: { text: "200" }, declared: { text: "1204" } } },
+        { id: "b", cells: { ints: { text: "88" }, decs: { text: "0.941" }, age: { text: "1h 12m" }, status: { text: "404" }, declared: { text: "88" } } },
+        { id: "c", cells: { ints: { text: "120" }, decs: { text: "3e-4" }, age: { text: "2h ago" }, status: { text: "timeout" }, declared: { text: "120" } } },
+      ],
+      showHeader: false,
+    };
+
+    expect(Object.fromEntries(columnAlignments(block))).toEqual({
+      // All integers, nothing to align on: flush to the column's inline end,
+      // which is what §078's `rows` column draws.
+      ints: "right",
+      // A point exists, so the column aligns on it — §078's `metric` column,
+      // and R-TBL-002 arriving through the same field.
+      decs: "decimal",
+      age: "right",
+      status: "left",
+      declared: "left",
+    });
+
+    // **And it reaches the frame rather than only the map.** The integer column
+    // ends flush and the declared one starts flush, over the same three values —
+    // so the two are distinguished by where the slack sits rather than by the
+    // digits, which is the whole of what the declaration buys.
+    const rows = registry.renderToLines(block, atContent(64)).map((l) => body(visible(l)));
+    expect(rows.length).toBe(3);
+    const ints = rows.map((r) => r.slice(0, 8));
+    const declared = rows.map((r) => r.slice(-8));
+    expect(ints, "an integer column is flush to its inline end").toEqual(["    1204", "      88", "     120"]);
+    expect(declared, "a declared `left` is untouched").toEqual(["1204    ", "88      ", "120     "]);
+  });
+
+  it("T1.32 (I27, I26): a derived integer column renders byte-identical to a declared `right`, and parts from it the moment a point exists", () => {
+    const rows = (v: readonly string[]) =>
+      v.map((text, i) => ({ id: `r${String(i)}`, cells: { n: { text } } }));
+    const of = (align: ColumnDef["align"], values: readonly string[]): Table => ({
+      kind: "table",
+      id: "refine",
+      columns: [align === undefined ? undeclared("n", 10) : { ...undeclared("n", 10), align }],
+      rows: rows(values),
+      showHeader: false,
+    });
+
+    const integers = ["1204", "88", "120"];
+    for (let w = 20; w <= 120; w += 1) {
+      expect(
+        registry.renderToLines(of(undefined, integers), w),
+        `derived and declared right agree on integers at width ${String(w)}`,
+      ).toEqual(registry.renderToLines(of("right", integers), w));
+    }
+
+    // **The control, and it is what overturned the invariant's first form.** One
+    // fractional value and the two must part — because `decimal` leaves the
+    // column's slack *after* the number where `right` puts it before, so a
+    // byte-identical result here would mean nothing is being resolved at all.
+    const mixed = ["1204", "0.941", "120"];
+    expect(registry.renderToLines(of(undefined, mixed), 40)).not.toEqual(
+      registry.renderToLines(of("right", mixed), 40),
+    );
+    expect(registry.renderToLines(of(undefined, mixed), 40)).toEqual(
+      registry.renderToLines(of("decimal", mixed), 40),
+    );
+  });
+
+  it("T1.34 (I27): a markdown table's numeric column reaches the frame flush to its inline end", () => {
+    // **The only row here that goes through a producer.** `markdownBlocks` is
+    // one of the three that hardcoded `left` without reading a row, and this is
+    // what the awkward measurement asked for: the derivation moved no golden
+    // frame, because every table in that corpus either declares its alignment
+    // or holds text. A change that fails nothing is a finding about the tests.
+    const md = "| file | rows |\n| --- | --- |\n| parse.ts | 1204 |\n| lexer.ts | 88 |\n";
+    const table = markdownBlocks(md).find((b) => b.kind === "table");
+    expect(table, "markdown yields a table").not.toBeUndefined();
+    const lines = registry.renderToLines(table as Table, atContent(38)).map((l) => body(visible(l)));
+    // Header, then two rows. The assertion is that the shorter number is
+    // **padded on its left** — which is the whole of the derivation reaching
+    // the frame — rather than a literal width, so the row survives a change to
+    // the markdown producer's `minWidth`.
+    const rows = lines.slice(1).map((l) => l.trimEnd());
+    expect(rows.length).toBe(2);
+    expect(new Set(rows.map((r) => r.length)).size, "both rows end at the same cell").toBe(1);
+    expect(rows[0]?.endsWith("1204")).toBe(true);
+    expect(rows[1]?.endsWith("  88"), "88 is padded to 1204's width, not left-aligned").toBe(true);
+  });
+
+  it("T1.33 (I27, I19, F429): a window takes the whole table's alignment, not its slice's", () => {
+    const block: Table = {
+      kind: "table",
+      id: "slice",
+      columns: [undeclared("status", 9)],
+      rows: [
+        { id: "a", cells: { status: { text: "200" } } },
+        { id: "b", cells: { status: { text: "404" } } },
+        { id: "c", cells: { status: { text: "503" } } },
+        // The only non-numeric value, and it is the last row — so every window
+        // that stops short of it sees a column of numbers.
+        { id: "d", cells: { status: { text: "timeout" } } },
+      ],
+      showHeader: false,
+    };
+
+    const at = atContent(12);
+    const whole = registry.renderToLines(block, at).map((l) => body(visible(l)));
+    const win = tableDefinition.window?.(block, at, 0, 3, registry.measure);
+    expect(win, "the definition windows").not.toBeUndefined();
+    const sliced = registry.renderToLines(win?.block as Table, at).map((l) => body(visible(l)));
+
+    // **The slice agrees with the whole**, row for row, which is the pin.
+    expect(sliced).toEqual(whole.slice(0, sliced.length));
+    // **And it is left-aligned rather than right**, which is what says the whole
+    // table's answer travelled rather than the two happening to agree: the
+    // slice alone holds `200 / 404 / 503` and would derive `right` from them.
+    expect(sliced.map((r) => r.search(/\S/u))).toEqual([0, 0, 0]);
+  });
 });

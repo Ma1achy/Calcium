@@ -18,6 +18,7 @@ import type { AmbiguousWidth } from "../text.js";
 import type { Cell, ColumnDef, Table, TableRow } from "../../data/viewmodel/index.js";
 import type { RenderContext } from "../blocks/types.js";
 import type { PlannedColumns } from "./plan.js";
+import type { Alignment } from "./kind.js";
 
 /** The gap between columns, as a span. */
 function gapSpan(gap: number): Span {
@@ -107,11 +108,17 @@ export function decimalPoints(
   block: Table,
   plan: PlannedColumns,
   ambiguous: AmbiguousWidth,
+  /** Each column's resolved alignment (I27), from `columnAlignments`. */
+  aligns: ReadonlyMap<string, Alignment>,
 ): ReadonlyMap<string, number> {
   const points = new Map<string, number>();
   const widthOf = new Map(plan.visible.map((c) => [c.key, c.width]));
   for (const column of block.columns) {
-    if (column.align !== "decimal") continue;
+    // **The resolved alignment, not the declared one** (I27). A numeric column
+    // that declared nothing resolves to `decimal`, so it takes a point here
+    // exactly as a declared one does — which is the whole of what makes the
+    // default a refinement of `right` rather than a second behaviour.
+    if (aligns.get(column.key) !== "decimal") continue;
     const room = widthOf.get(column.key);
     if (room === undefined) continue;
     let int = 0;
@@ -203,6 +210,8 @@ export function headerSpans(
   block: Table,
   plan: PlannedColumns,
   ctx: RenderContext,
+  /** Each column's resolved alignment (I27), from `columnAlignments`. */
+  aligns: ReadonlyMap<string, Alignment>,
   /**
    * The ground the row is painted on — a surface name (I24, C10 I48).
    *
@@ -228,8 +237,23 @@ export function headerSpans(
         ? ` ${block.sort.direction === "desc" ? g.sortDesc : g.sortAsc}`
         : "";
 
+    // **The header takes the column's *resolved* alignment, and the rule is the
+    // one that already shipped** (I27, I21). A header that kept `left` over a
+    // column its values right-align would put the label at one end and every
+    // value beneath it at the other — I21's *every drawn row begins each column
+    // at the same cell* holding while the frame reads as two tables. What I27
+    // changes is only which value is read: a column that declared nothing now
+    // has an answer here.
+    //
+    // **`decimal` is deliberately not included**, which is where this differs
+    // from `rowSpans` below. A decimal column's right edge is **ragged on
+    // purpose** — the fraction side is left-aligned after the point (I26, and
+    // §099's own figure) — so the column's inline end is not where its data is,
+    // and a header pushed there would sit past every value it names. Left is
+    // the answer it has always had and the one §099's golden recorded.
+    const align = aligns.get(planned.key);
     const text =
-      column?.align === "right"
+      align === "right"
         ? padStart(
             truncate(label + indicator, planned.width, ctx.capabilities),
             planned.width,
@@ -268,6 +292,8 @@ export function rowSpans(
     marked: ReadonlySet<string>;
     /** Where each decimal column's point sits (I26), from `decimalPoints`. */
     points?: ReadonlyMap<string, number> | undefined;
+    /** Each column's resolved alignment (I27), from `columnAlignments`. */
+    aligns: ReadonlyMap<string, Alignment>;
   }>,
 ): readonly Span[] {
   const byKey = new Map<string, ColumnDef>(block.columns.map((c) => [c.key, c]));
@@ -399,11 +425,12 @@ export function rowSpans(
     // `1284` under `0.941`'s point with no case of its own. The lead is clamped
     // to what the cell actually has, so a cut cell cannot push itself past its
     // own width.
-    const point = column?.align === "decimal" ? options.points?.get(planned.key) : undefined;
+    const align = options.aligns.get(planned.key);
+    const point = align === "decimal" ? options.points?.get(planned.key) : undefined;
     // **A decimal column that could not align falls back to `right`, not left**
     // — the convention for numbers, and §099's complaint about `right` is that
     // it misaligns *points*, which a column with no room for them has anyway.
-    const rightish = column?.align === "right" || column?.align === "decimal";
+    const rightish = align === "right" || align === "decimal";
     const pointLead =
       point === undefined
         ? undefined

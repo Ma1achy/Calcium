@@ -38,7 +38,7 @@ const results = runPass({
   run,
   control: {
     file: FILE,
-    from: '    const point = column?.align === "decimal" ? options.points?.get(planned.key) : undefined;',
+    from: '    const point = align === "decimal" ? options.points?.get(planned.key) : undefined;',
     to: "    const point: number | undefined = undefined;",
     why: "the tree before C11 I26 — `decimal` draws exactly what `right` draws, which is §099's complaint; T2.14's two points land in two columns and the row that cannot see that cannot see the invariant",
   },
@@ -70,8 +70,8 @@ const results = runPass({
       // default and the arm reads like a special case being removed.
       name: "a column with no room falls back to left",
       file: FILE,
-      from: '    const rightish = column?.align === "right" || column?.align === "decimal";',
-      to: '    const rightish = column?.align === "right";',
+      from: '    const rightish = align === "right" || align === "decimal";',
+      to: '    const rightish = align === "right";',
       expect: "T2.15",
     },
     {

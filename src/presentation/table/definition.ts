@@ -28,6 +28,7 @@ import { glyphCells, glyphFor } from "../blocks/glyphs.js";
 import { background, based, clampSpans, focusStyle, groundSequence, paint, selectionStyle, tone, withBackground, type Span } from "../blocks/paint.js";
 import type { BlockDefinition, NavElement, Rendered, RenderContext, Windowed } from "../blocks/types.js";
 import { decimalPoints, emptySpans, headerSpans, markedSeriesColumns, rowSpans } from "./cells.js";
+import { columnAlignments } from "./kind.js";
 import { detailBlocks, isExpandable } from "./detail.js";
 import { planColumns } from "./plan.js";
 import { sortedRows } from "./sort.js";
@@ -287,6 +288,7 @@ export const tableDefinition: BlockDefinition<Table> = {
     }
 
     const kept = units.slice(first, last + 1);
+    const wholeAligns = columnAlignments(block);
     return Object.freeze({
       block: {
         ...block,
@@ -294,6 +296,24 @@ export const tableDefinition: BlockDefinition<Table> = {
         showHeader: first === 0 && hasHeader(block),
         actionBar: kept.some((u) => u.bar),
         presorted: true,
+        // **The window pins each column's alignment, resolved over the whole
+        // table** (I27, I18, I19). A derived alignment reads *the values
+        // present*, so a slice that dropped the only non-numeric value in a
+        // numeric-looking column re-classifies it — and where F429's version of
+        // that reverses an order, this one flips a column from `left` to
+        // `decimal` between two scroll positions, with every count, every width
+        // and every `skipRows` correct. I18 pins the action bar's presence and
+        // I19 pins the sort for exactly this shape; this is the third instance
+        // of one argument rather than a new mechanism. A resolved alignment is
+        // an ordinary declaration by the time the renderer sees it, so no field
+        // is added to `Table`.
+        columns: block.columns.map((c) => {
+          if (c.align !== undefined) return c;
+          const align = wholeAligns.get(c.key);
+          // Every column key is in the map by construction; the guard is what
+          // `exactOptionalPropertyTypes` wants rather than a case that arises.
+          return align === undefined ? c : { ...c, align };
+        }),
       },
       skipRows: lo - (tops[first] ?? 0), // cells-ok
       dropRows: bottomOf(last) - hi, // cells-ok
@@ -402,9 +422,13 @@ export const tableDefinition: BlockDefinition<Table> = {
         // would put trailing blanks on every monochrome frame in the corpus for
         // a surface that is not there — which is what the first draft did, and
         // four goldens that carry no colour at all moved to say so.
-        emit(headerSpans(block, plan, ctx));
+        emit(headerSpans(block, plan, ctx, columnAlignments(block)));
       } else {
-        const spans = clampSpans(headerSpans(block, plan, ctx, "bgElev"), inner, ctx.capabilities);
+        const spans = clampSpans(
+          headerSpans(block, plan, ctx, columnAlignments(block), "bgElev"),
+          inner,
+          ctx.capabilities,
+        );
         const drawn = spans.reduce((n, sp) => n + cells(sp.text, ctx.capabilities.ambiguousWidth), 0);
         const tail = Math.max(0, inner - drawn); // cells-ok — the row's own residue
         parts.push(
@@ -440,7 +464,12 @@ export const tableDefinition: BlockDefinition<Table> = {
     // **Once per block, not once per row** (I26): `rowSpans` holds the whole
     // table, so taking the decimal points there would walk every cell for every
     // row — the same reason the marked set is hoisted here.
-    const points = decimalPoints(block, plan, ctx.capabilities.ambiguousWidth);
+    // **Once per block, beside the points and the marked set** (I26, I27). A
+    // column's alignment is derived from its own cells, so `rowSpans` could take
+    // it every time it draws a row — the same walk once per row, which is the
+    // reason the other two are already hoisted here.
+    const aligns = columnAlignments(block);
+    const points = decimalPoints(block, plan, ctx.capabilities.ambiguousWidth, aligns);
     for (const row of sortedRows(block)) {
       const expandable = isExpandable(row, plan);
       const isHead = focused !== null && focused === row.id;
@@ -463,7 +492,7 @@ export const tableDefinition: BlockDefinition<Table> = {
         : isHead
           ? "focusGround"
           : undefined;
-      const spans = rowSpans(block, row, plan, ctx, { expandable, on, marked, points });
+      const spans = rowSpans(block, row, plan, ctx, { expandable, on, marked, points, aligns });
       // **The ground goes to `emit`, not to the spans** (§5c). Applied here it
       // stopped at the gutter, which is the divergence: the reserved column is
       // part of the row it leads, so the ground has to be put on where the

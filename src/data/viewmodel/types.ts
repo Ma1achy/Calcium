@@ -592,8 +592,19 @@ export type ColumnDef = Readonly<{
    * The point itself is **derived** from the column's own cells and never
    * authored: a declared one is a number the planner can contradict when a
    * column yields width, with nothing to report the disagreement.
+   *
+   * **Optional, and absent means *ask the values* (C11 I27, §078
+   * `R-TBL-001`).** It was required, so every producer that builds columns out
+   * of data had to answer before it had seen one — and three of the four answer
+   * `left` unconditionally, which left-aligns a column of numbers in most of
+   * the places C11's columns come from. The default is derived from the cells
+   * on the same argument the point is: an author's `left` on a column of
+   * numbers is a claim the data falsifies, and nothing reports that either.
+   * A declaration is honoured unchanged, so an adapter that means `left` keeps
+   * it. `numeric` implies `decimal`, `duration` implies `right`, and a column
+   * whose values disagree about their kind is text.
    */
-  align: "left" | "right" | "decimal";
+  align?: "left" | "right" | "decimal";
   priority: number;
   minWidth: number;
   maxWidth?: number;
