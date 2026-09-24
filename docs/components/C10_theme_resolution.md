@@ -482,9 +482,17 @@ floor passes, and the screen is painted a colour no floor was measured against.
 
 - **The light theme's `surface` is a token change and the dark theme's is a
   decision.** Dark keeps `terminal` and keeps your transparency; that is the
-  entry's ruling and it means **the shipped default paints nothing**, so every
-  test that has ever run has run against the inheriting arm. The painting arm
-  ships with one theme exercising it.
+  entry's ruling and it means **the shipped default paints nothing**. The
+  painting arm ships with `light` exercising it.
+
+  **This bullet used to end *so every test that has ever run has run against the
+  inheriting arm*, and that stopped being true without the sentence moving.**
+  `validatePaintedFloors` is asserted directly at `test/unit/theme.test.ts:461`,
+  with `background: "terminal"` beside it as the control, and
+  `test/support/frame-golden.ts:177` branches on *any theme declaring
+  `background: "surface"`* — so the painting arm has rows of its own and the
+  harness knows about it. A sentence that reads as a limit and is a count is the
+  kind that goes stale silently, because nothing about it looks like a number.
 - **A theme declaring `paint` with a `bg` that fails no floor can still be
   wrong**, because floors constrain the *pair* and not the absolute. A theme
   whose `bg` is `#000000` on a terminal the user configured white is legible and

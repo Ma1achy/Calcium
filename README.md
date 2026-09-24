@@ -346,11 +346,23 @@ knows it happened:
 
 ![The same dashboard in the light variant on a light terminal: dark text on a pale background, container names and bars in green, the busy container's CPU bar in red, blue accents in the panel title](docs/media/theme-light.gif)
 
-**Calcium paints no background, and that is a decision rather than an omission.**
-The surface tones stop at 1-bit because *background colours are the emulator's and
-a user may override them* — so a variant is a set of foregrounds chosen to pair
-with a terminal, not a skin that repaints one. The image above is rendered on a
-light terminal for that reason.
+**A theme decides whether it paints the page, and the two shipped ones decide
+differently.** `dark` takes `background: "terminal"` and emits nothing behind the
+text, because *background colours are the emulator's and a user may override
+them* — so on a dark terminal it is a set of foregrounds chosen to pair with
+what is already there. `light` takes `background: "surface"` and **paints**,
+because it cannot work otherwise: dark foregrounds emitting nothing behind them
+are dark-on-dark, and the name is the lie.
+
+Grounds are separate from that choice and every theme has them — focus,
+selection, wells, meter fills, diff lines — resolved through `resolveBackground`
+and painted per cell. What a theme chooses is whether it also paints the page
+underneath.
+
+*This paragraph read "Calcium paints no background" until it was measured
+against `tokens-light.ts:24`. The claim was true of `dark` alone, and its own
+next sentence — that the image above needs a light terminal for that reason —
+was a consequence of the false half.*
 
 ### Spinners and bars, every one
 

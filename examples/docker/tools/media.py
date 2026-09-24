@@ -175,13 +175,18 @@ SHOTS: list[tuple[str, int, int, bytes, float, dict[str, str], float | None]] = 
     #     and `❯ /co` are adjacent rows of text and read as one path.
     ("completion", 120, 34, b"/co", 8.0, TRUE, 4.0),
 
-    # 7 — the light variant, **rendered on a light terminal on purpose.**
-    #     C10 paints no background: §4a's channel exists for diff rows, and the
-    #     surface tones stop at 1-bit precisely because "background colours are
-    #     the emulator's and a user may override them". So a variant is a set of
-    #     foregrounds chosen to pair with a terminal, not a skin that repaints
-    #     one — and showing `/theme light` on a dark terminal would be dark text
-    #     on a dark background, which is a picture of the wrong thing.
+    # 7 — the light variant, **rendered on a light terminal, and the reason this
+    #     comment used to give was false.** It read *C10 paints no background*,
+    #     which is true of `dark` and not of `light`: `tokens-light.ts:24` takes
+    #     `background: "surface"` and paints, for the reason its own comment
+    #     gives — dark foregrounds emitting nothing behind them are dark-on-dark
+    #     and the name is the lie. So `/theme light` on a dark terminal would
+    #     work.
+    #
+    #     The shot stays on a light terminal for a smaller and checkable reason:
+    #     a capture of a painting theme over a dark emulator shows the paint as
+    #     a rectangle inside a dark field, and the picture is then about the
+    #     capture's frame rather than about the variant.
     ("theme-light", 120, 34, b"/theme light", 10.0, TRUE, 8.0),
 
     # 8 — scrolling a transcript taller than the screen.
