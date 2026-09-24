@@ -489,17 +489,17 @@ aaaaaaaaaaaa.................................... which is why
 · decimal (left) beside right (right) — §099's four values, and the points
 · room for the point: every point in ONE cell, and \`1284\` ends where it sits
     metric    value                      metric         value            
-    val loss     0.0372                  val loss      0.0372
-    accuracy     0.941                   accuracy       0.941
-    lr        3e-4                       lr              3e-4
-    steps     1284                       steps           1284
+    val loss      0.0372                 val loss      0.0372
+    accuracy      0.941                  accuracy       0.941
+    lr         3e-4                      lr              3e-4
+    steps     1,284                      steps          1,284
 
 · no room for it: the column falls back to \`right\` WHOLE — the two sides are identical
     metric    value                      metric       value              
     val loss    0.0372                   val loss    0.0372
     accuracy     0.941                   accuracy     0.941
     lr            3e-4                   lr            3e-4
-    steps         1284                   steps         1284
+    steps        1,284                   steps        1,284
 
 ── §73 · painted chrome — every kind against §073's test, and the button's rungs
 · every kind, and what it grounds — §073's test: a THING takes a ground, a FACT takes a tone
@@ -1163,17 +1163,17 @@ aaaaaaaaaaaa.................................... which is why
 · decimal (left) beside right (right) — §099's four values, and the points
 · room for the point: every point in ONE cell, and \`1284\` ends where it sits
     metric    value                      metric         value            
-    val loss     0.0372                  val loss      0.0372
-    accuracy     0.941                   accuracy       0.941
-    lr        3e-4                       lr              3e-4
-    steps     1284                       steps           1284
+    val loss      0.0372                 val loss      0.0372
+    accuracy      0.941                  accuracy       0.941
+    lr         3e-4                      lr              3e-4
+    steps     1,284                      steps          1,284
 
 · no room for it: the column falls back to \`right\` WHOLE — the two sides are identical
     metric    value                      metric       value              
     val loss    0.0372                   val loss    0.0372
     accuracy     0.941                   accuracy     0.941
     lr            3e-4                   lr            3e-4
-    steps         1284                   steps         1284
+    steps        1,284                   steps        1,284
 
 ── §73 · painted chrome — every kind against §073's test, and the button's rungs
 · every kind, and what it grounds — §073's test: a THING takes a ground, a FACT takes a tone
@@ -1811,17 +1811,17 @@ raw             0     — atomic: nothing to focus
 · decimal (left) beside right (right) — §099's four values, and the points
 · room for the point: every point in ONE cell, and \`1284\` ends where it sits
     metric    value                      metric         value
-    val loss     0.0372                  val loss      0.0372
-    accuracy     0.941                   accuracy       0.941
-    lr        3e-4                       lr              3e-4
-    steps     1284                       steps           1284
+    val loss      0.0372                 val loss      0.0372
+    accuracy      0.941                  accuracy       0.941
+    lr         3e-4                      lr              3e-4
+    steps     1,284                      steps          1,284
 
 · no room for it: the column falls back to \`right\` WHOLE — the two sides are identical
     metric    value                      metric       value
     val loss    0.0372                   val loss    0.0372
     accuracy     0.941                   accuracy     0.941
     lr            3e-4                   lr            3e-4
-    steps         1284                   steps         1284
+    steps        1,284                   steps        1,284
 
 ── §73 · painted chrome — every kind against §073's test, and the button's rungs
 · every kind, and what it grounds — §073's test: a THING takes a ground, a FACT takes a tone
@@ -2450,17 +2450,17 @@ raw             0     — atomic: nothing to focus
 · decimal (left) beside right (right) — §099's four values, and the points
 · room for the point: every point in ONE cell, and \`1284\` ends where it sits
     metric    value                      metric         value
-    val loss     0.0372                  val loss      0.0372
-    accuracy     0.941                   accuracy       0.941
-    lr        3e-4                       lr              3e-4
-    steps     1284                       steps           1284
+    val loss      0.0372                 val loss      0.0372
+    accuracy      0.941                  accuracy       0.941
+    lr         3e-4                      lr              3e-4
+    steps     1,284                      steps          1,284
 
 · no room for it: the column falls back to \`right\` WHOLE — the two sides are identical
     metric    value                      metric       value
     val loss    0.0372                   val loss    0.0372
     accuracy     0.941                   accuracy     0.941
     lr            3e-4                   lr            3e-4
-    steps         1284                   steps         1284
+    steps        1,284                   steps        1,284
 
 ── §73 · painted chrome — every kind against §073's test, and the button's rungs
 · every kind, and what it grounds — §073's test: a THING takes a ground, a FACT takes a tone
@@ -3130,17 +3130,17 @@ aaaaaaaaaaaa.................................... which is why
 · decimal (left) beside right (right) — §099's four values, and the points
 · room for the point: every point in ONE cell, and \`1284\` ends where it sits
     metric    value                      metric         value            
-    val loss     0.0372                  val loss      0.0372
-    accuracy     0.941                   accuracy       0.941
-    lr        3e-4                       lr              3e-4
-    steps     1284                       steps           1284
+    val loss      0.0372                 val loss      0.0372
+    accuracy      0.941                  accuracy       0.941
+    lr         3e-4                      lr              3e-4
+    steps     1,284                      steps          1,284
 
 · no room for it: the column falls back to \`right\` WHOLE — the two sides are identical
     metric    value                      metric       value              
     val loss    0.0372                   val loss    0.0372
     accuracy     0.941                   accuracy     0.941
     lr            3e-4                   lr            3e-4
-    steps         1284                   steps         1284
+    steps        1,284                   steps        1,284
 
 ── §73 · painted chrome — every kind against §073's test, and the button's rungs
 · every kind, and what it grounds — §073's test: a THING takes a ground, a FACT takes a tone
@@ -3805,17 +3805,17 @@ aaaaaaaaaaaa.................................... which is why
 · decimal (left) beside right (right) — §099's four values, and the points
 · room for the point: every point in ONE cell, and \`1284\` ends where it sits
     metric    value                      metric         value            
-    val loss     0.0372                  val loss      0.0372
-    accuracy     0.941                   accuracy       0.941
-    lr        3e-4                       lr              3e-4
-    steps     1284                       steps           1284
+    val loss      0.0372                 val loss      0.0372
+    accuracy      0.941                  accuracy       0.941
+    lr         3e-4                      lr              3e-4
+    steps     1,284                      steps          1,284
 
 · no room for it: the column falls back to \`right\` WHOLE — the two sides are identical
     metric    value                      metric       value              
     val loss    0.0372                   val loss    0.0372
     accuracy     0.941                   accuracy     0.941
     lr            3e-4                   lr            3e-4
-    steps         1284                   steps         1284
+    steps        1,284                   steps        1,284
 
 ── §73 · painted chrome — every kind against §073's test, and the button's rungs
 · every kind, and what it grounds — §073's test: a THING takes a ground, a FACT takes a tone

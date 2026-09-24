@@ -19,6 +19,7 @@ import type { Cell, ColumnDef, Table, TableRow } from "../../data/viewmodel/inde
 import type { RenderContext } from "../blocks/types.js";
 import type { PlannedColumns } from "./plan.js";
 import type { Alignment } from "./kind.js";
+import { displayText } from "./kind.js";
 
 /** The gap between columns, as a span. */
 function gapSpan(gap: number): Span {
@@ -110,6 +111,8 @@ export function decimalPoints(
   ambiguous: AmbiguousWidth,
   /** Each column's resolved alignment (I27), from `columnAlignments`. */
   aligns: ReadonlyMap<string, Alignment>,
+  /** The columns that group their thousands (I28), from `groupingColumns`. */
+  grouping: ReadonlySet<string>,
 ): ReadonlyMap<string, number> {
   const points = new Map<string, number>();
   const widthOf = new Map(plan.visible.map((c) => [c.key, c.width]));
@@ -126,9 +129,15 @@ export function decimalPoints(
     for (const row of block.rows) {
       const cell = row.cells[column.key];
       if (cell === undefined) continue;
-      const whole = integerPart(cell.text);
+      // **Measured over the text that will be DRAWN, not the bare value**
+      // (I28). A separator is part of an integer part, so taking the point
+      // first would put the column's point one cell left of where its own
+      // values sit, once per separator — and every width assertion would still
+      // be correct, which is what makes it worth a row of its own (T1.37).
+      const text = displayText(cell.text, grouping.has(column.key));
+      const whole = integerPart(text);
       int = Math.max(int, cells(whole, ambiguous));
-      frac = Math.max(frac, cells(cell.text.slice(whole.length), ambiguous)); // cells-ok — a code-unit offset
+      frac = Math.max(frac, cells(text.slice(whole.length), ambiguous)); // cells-ok — a code-unit offset
     }
     // **A column too narrow to hold the alignment falls back as a COLUMN**
     // (I26). Clamping each cell's lead to its own slack instead produced a
@@ -294,6 +303,8 @@ export function rowSpans(
     points?: ReadonlyMap<string, number> | undefined;
     /** Each column's resolved alignment (I27), from `columnAlignments`. */
     aligns: ReadonlyMap<string, Alignment>;
+    /** The columns that group their thousands (I28), from `groupingColumns`. */
+    grouping: ReadonlySet<string>;
   }>,
 ): readonly Span[] {
   const byKey = new Map<string, ColumnDef>(block.columns.map((c) => [c.key, c]));
@@ -374,7 +385,14 @@ export function rowSpans(
     // tone resolves *against* the wash — the band's single ink where the theme
     // declares a band, which is the one-ink reading kept exactly where it was
     // ever true, and the theme's composed value where it does not (F1240).
-    const textRuns = cell === undefined ? [] : runsOf(cell.text, cell.spans);
+    // **Grouped where the column groups** (I28). `spans` are code-unit offsets
+    // into `text` and grouping splices into it, so a column with any span does
+    // not group at all — clause 2 — and `runsOf` is therefore never handed a
+    // string the offsets no longer address.
+    const textRuns =
+      cell === undefined
+        ? []
+        : runsOf(displayText(cell.text, options.grouping.has(planned.key)), cell.spans);
     const text = runsText(textRuns);
     const glyph = cell?.glyph === undefined ? "" : glyphFor(cell.glyph, ctx.capabilities);
 

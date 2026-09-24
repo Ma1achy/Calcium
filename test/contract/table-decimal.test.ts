@@ -56,7 +56,15 @@ describe("C11 I26 — a column aligns on its decimal point", () => {
     // **And a value with no point ENDS there** — §099's own sentence, and it is
     // what makes `3e-4` correct for the same reason `1284` is rather than for a
     // rule of its own.
-    for (const [row, value] of [[2, "3e-4"], [3, "1284"]] as const) {
+    // **`1,284` and not `1284`, which is C11 I28 arriving at §099's own
+    // figure.** The section draws the value ungrouped and cites neither
+    // `R-TBL-001` nor `R-TBL-004`; §078 is the sole example for both and its
+    // fourth rule is unconditional — *thousands are grouped* — so the rule
+    // outranks a figure drawn to demonstrate something else. **The property
+    // §099 states survives intact**: `1,284` still ends exactly where `0.941`'s
+    // point sits, for the same reason it did at four digits — it is all integer
+    // part — and the column's point simply moves one cell right with it.
+    for (const [row, value] of [[2, "3e-4"], [3, "1,284"]] as const) {
       const at = startOf(body[row]!, value);
       expect(at, `${value} is drawn`).toBeGreaterThan(0);
       expect(at + value.length, `${value} ends where the point sits`).toBe(point);

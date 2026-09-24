@@ -9,6 +9,7 @@ import { atContent, body } from "../support/table-gutter.js";
 import { COLUMN_GAP, planColumns, tableDefinition, tableElements } from "../../src/presentation/table/index.js";
 import { columnAlignments } from "../../src/presentation/table/kind.js";
 import { markdownBlocks } from "../../src/data/viewmodel/markdown.js";
+import { runsOf } from "../../src/presentation/runs.js";
 
 /**
  * The drawn order of a table's rows (C26 §5).
@@ -1005,7 +1006,9 @@ describe("derived alignment (I27)", () => {
     expect(rows.length).toBe(3);
     const ints = rows.map((r) => r.slice(0, 8));
     const declared = rows.map((r) => r.slice(-8));
-    expect(ints, "an integer column is flush to its inline end").toEqual(["    1204", "      88", "     120"]);
+    // `1,204` rather than `1204`: I28 groups this column, which is the later
+    // invariant showing through here rather than a change to this one.
+    expect(ints, "an integer column is flush to its inline end").toEqual(["   1,204", "      88", "     120"]);
     expect(declared, "a declared `left` is untouched").toEqual(["1204    ", "88      ", "120     "]);
   });
 
@@ -1098,13 +1101,124 @@ describe("derived alignment (I27)", () => {
 // ---------------------------------------------------------------------------
 
 describe("thousands grouping (I28)", () => {
-  it.todo(
-    "T1.35 (I28, §078, R-TBL-004): a numeric column of 1204/41208/88/10000 renders 1,204/41,208/88/10,000; the same values beside one `timeout` render bare because the column is text by I27; and the control, one cell too narrow for its separators, draws bare rather than truncating — not deferred on a component: groupingColumns lands in this same MR",
-  );
-  it.todo(
-    "T1.36 (I28, C04 I86): a numeric column whose cells carry spans draws ungrouped and its run boundaries still address the characters they named, with the spans removed as the control — not deferred on a component: clause 2 lands in this same MR",
-  );
-  it.todo(
-    "T1.37 (I28, I26): a decimal column of 1204.5 and 88.25 puts its point where the grouped integer part ends, with grouping suppressed as the control where the point moves left by one cell — not deferred on a component: the points are taken over the grouped text in this same MR",
-  );
+  /** One numeric column, `minWidth` wide, over the given values. */
+  const numbers = (values: readonly string[], minWidth: number, extra?: string): Table => ({
+    kind: "table",
+    id: "grp",
+    columns: [{ key: "n", label: "n", priority: 50, minWidth, sortable: false }],
+    rows: [
+      ...values.map((text, i) => ({ id: `r${String(i)}`, cells: { n: { text } } })),
+      ...(extra === undefined ? [] : [{ id: "x", cells: { n: { text: extra } } }]),
+    ],
+    showHeader: false,
+  });
+
+  const drawn = (block: Table, width: number): readonly string[] =>
+    registry.renderToLines(block, atContent(width)).map((l) => body(visible(l)).trim());
+
+  it("T1.35 (I28, §078, R-TBL-004): a numeric column groups; one non-numeric value takes the whole column out; and a column that cannot afford its separators draws bare rather than truncating", () => {
+    const values = ["1204", "41208", "88", "10000"];
+    expect(drawn(numbers(values, 8), 20)).toEqual(["1,204", "41,208", "88", "10,000"]);
+
+    // **The clause doing the work.** `timeout` makes the column text by I27's
+    // agreement rule, so it never reaches the grouping at all — which is how a
+    // port, a year and a line number stay bare without anything telling them
+    // apart.
+    expect(drawn(numbers(values, 8, "timeout"), 20)).toEqual([
+      "1204",
+      "41208",
+      "88",
+      "10000",
+      "timeout",
+    ]);
+
+    // **The control**: one cell too narrow for `41,208`. Without it the row
+    // passes against an implementation that groups and then truncates, which is
+    // §078's *half a number is a different number*.
+    expect(drawn(numbers(values, 5), 12)).toEqual(["1204", "41208", "88", "10000"]);
+
+    // **A duration column stays bare, and this is the only arm that reaches
+    // clause 1.** Dropping the numeric guard failed nothing on the first
+    // mutation pass, because a text column is already `left` by I27 and never
+    // arrives — a duration is the one kind that resolves to `right` and is not
+    // a bare quantity. `10000s` would otherwise draw `10,000s`, which the
+    // design shows nowhere: §078's durations are `2m`, `41m`, `1h`, none of
+    // them near a thousand, so bare is the reading that invents nothing.
+    expect(drawn(numbers(["10000s", "88m", "1h 12m"], 8), 20)).toEqual([
+      "10000s",
+      "88m",
+      "1h 12m",
+    ]);
+  });
+
+  it("T1.36 (I28, C04 I83): a cell carrying spans takes its column out of grouping, and the runs still address the characters they named", () => {
+    const spanned: Table = {
+      kind: "table",
+      id: "spanned",
+      columns: [{ key: "n", label: "n", priority: 50, minWidth: 8, sortable: false }],
+      rows: [
+        // The span names the last three characters — `204` of `1204`. Grouped,
+        // those offsets would land on `204` of `1,204` shifted by one, so the
+        // run would paint `,20`.
+        { id: "a", cells: { n: { text: "1204", spans: [{ from: 1, to: 4, tone: "error" }] } } },
+        { id: "b", cells: { n: { text: "41208" } } },
+      ],
+      showHeader: false,
+    };
+    expect(drawn(spanned, 20), "the column does not group").toEqual(["1204", "41208"]);
+
+    // **Asserted on the run boundary rather than on the text**: a row checking
+    // only the text passes against an implementation that groups and shifts
+    // every offset silently.
+    const runs = runsOf("1204", spanned.rows[0]?.cells["n"]?.spans);
+    expect(runs.map((r) => r.text)).toEqual(["1", "204"]);
+
+    // The control: the same column with the spans gone, which groups.
+    const bare: Table = {
+      ...spanned,
+      rows: spanned.rows.map((r) => ({ id: r.id, cells: { n: { text: r.cells["n"]?.text ?? "" } } })),
+    };
+    expect(drawn(bare, 20), "and it groups once nothing addresses the string").toEqual([
+      "1,204",
+      "41,208",
+    ]);
+  });
+
+  it("T1.37 (I28, I26): a decimal column's point is taken over the grouped text", () => {
+    const decimals = (minWidth: number): Table => ({
+      kind: "table",
+      id: "dec",
+      columns: [{ key: "n", label: "n", align: "decimal", priority: 50, minWidth, sortable: false }],
+      rows: [
+        { id: "a", cells: { n: { text: "1204.5" } } },
+        { id: "b", cells: { n: { text: "88.2" } } },
+      ],
+      showHeader: false,
+    });
+
+    // Wide enough to group: the point sits after `1,204`, five cells in.
+    const wide = registry
+      .renderToLines(decimals(10), atContent(10))
+      .map((l) => body(visible(l)));
+    expect(wide.map((l) => l.indexOf(".")), "both points in one column").toEqual([5, 5]);
+    expect(wide[0]?.trim()).toBe("1,204.5");
+
+    // **The control**: six cells. `1,204.5` is seven and does not fit, so
+    // clause 3 suppresses grouping; `1204.5` is six and the decimal alignment
+    // still holds, since `max(int) + max(frac)` is 4 + 2. So the only thing
+    // that moves between the two is the separator, and the point follows it by
+    // exactly one cell. Every width assertion is correct in both, which is why
+    // this needs a row of its own.
+    //
+    // The two widths were chosen to keep I26's own fallback out of it: at a
+    // fraction of three cells there is no width where grouping is off and the
+    // decimal alignment is on, and the first draft of this row measured that
+    // fallback instead — the column right-aligning, both points wrong, and the
+    // failure reading as if the grouping had leaked into the point.
+    const narrow = registry
+      .renderToLines(decimals(6), atContent(6))
+      .map((l) => body(visible(l)));
+    expect(narrow.map((l) => l.indexOf("."))).toEqual([4, 4]);
+    expect(narrow[0]?.trim()).toBe("1204.5");
+  });
 });

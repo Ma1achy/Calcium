@@ -80,8 +80,8 @@ const results = runPass({
       // off-by-one that puts the last digit outside the column.
       name: "the fraction is measured without its point",
       file: FILE,
-      from: "      frac = Math.max(frac, cells(cell.text.slice(whole.length), ambiguous)); // cells-ok — a code-unit offset",
-      to: "      frac = Math.max(frac, cells(cell.text.slice(whole.length + 1), ambiguous)); // cells-ok — a code-unit offset",
+      from: "      frac = Math.max(frac, cells(text.slice(whole.length), ambiguous)); // cells-ok — a code-unit offset",
+      to: "      frac = Math.max(frac, cells(text.slice(whole.length + 1), ambiguous)); // cells-ok — a code-unit offset",
       expect: "T2.15",
     },
   ],

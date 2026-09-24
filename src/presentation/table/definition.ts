@@ -28,7 +28,7 @@ import { glyphCells, glyphFor } from "../blocks/glyphs.js";
 import { background, based, clampSpans, focusStyle, groundSequence, paint, selectionStyle, tone, withBackground, type Span } from "../blocks/paint.js";
 import type { BlockDefinition, NavElement, Rendered, RenderContext, Windowed } from "../blocks/types.js";
 import { decimalPoints, emptySpans, headerSpans, markedSeriesColumns, rowSpans } from "./cells.js";
-import { columnAlignments } from "./kind.js";
+import { columnAlignments, groupingColumns } from "./kind.js";
 import { detailBlocks, isExpandable } from "./detail.js";
 import { planColumns } from "./plan.js";
 import { sortedRows } from "./sort.js";
@@ -469,7 +469,16 @@ export const tableDefinition: BlockDefinition<Table> = {
     // it every time it draws a row — the same walk once per row, which is the
     // reason the other two are already hoisted here.
     const aligns = columnAlignments(block);
-    const points = decimalPoints(block, plan, ctx.capabilities.ambiguousWidth, aligns);
+    // **The grouping set before the points, because the points measure what
+    // will be drawn** (I28, I26). A separator is part of an integer part, so
+    // the order is plan, then grouping, then points.
+    const grouping = groupingColumns(
+      block,
+      aligns,
+      new Map(plan.visible.map((c) => [c.key, c.width])),
+      (text) => cells(text, ctx.capabilities.ambiguousWidth),
+    );
+    const points = decimalPoints(block, plan, ctx.capabilities.ambiguousWidth, aligns, grouping);
     for (const row of sortedRows(block)) {
       const expandable = isExpandable(row, plan);
       const isHead = focused !== null && focused === row.id;
@@ -492,7 +501,7 @@ export const tableDefinition: BlockDefinition<Table> = {
         : isHead
           ? "focusGround"
           : undefined;
-      const spans = rowSpans(block, row, plan, ctx, { expandable, on, marked, points, aligns });
+      const spans = rowSpans(block, row, plan, ctx, { expandable, on, marked, points, aligns, grouping });
       // **The ground goes to `emit`, not to the spans** (§5c). Applied here it
       // stopped at the gutter, which is the divergence: the reserved column is
       // part of the row it leads, so the ground has to be put on where the

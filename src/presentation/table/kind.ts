@@ -16,7 +16,12 @@
  * about their kind **has** no kind, and the safe reading of a mixed column is
  * the one that treats it as prose. The same rule, arrived at twice.
  */
-import type { Cell, ColumnDef, Table, TableRow } from "../../data/viewmodel/index.js";
+import type {
+  Cell,
+  ColumnDef,
+  Table,
+  TableRow,
+} from "../../data/viewmodel/index.js";
 
 /** The value a row carries for a column, or "" when it carries none. */
 export function valueOf(row: TableRow, key: string): string {
@@ -165,7 +170,11 @@ function hasPoint(rows: readonly TableRow[], key: string): boolean {
  * to align on, and §078 draws the `age` column inline-end like the counts
  * beside it. Everything else is prose and starts at the inline edge.
  */
-function impliedBy(kind: ColumnKind, rows: readonly TableRow[], key: string): Alignment {
+function impliedBy(
+  kind: ColumnKind,
+  rows: readonly TableRow[],
+  key: string,
+): Alignment {
   if (kind === "text") return "left";
   if (kind === "duration") return "right";
   return hasPoint(rows, key) ? "decimal" : "right";
@@ -190,8 +199,98 @@ export function columnAlignments(block: Table): ReadonlyMap<string, Alignment> {
   for (const column of block.columns) {
     out.set(
       column.key,
-      column.align ?? impliedBy(columnKind(block.rows, column.key), block.rows, column.key),
+      column.align ??
+        impliedBy(columnKind(block.rows, column.key), block.rows, column.key),
     );
   }
   return out;
+}
+
+const GROUP_FROM = 4;
+const THREES = /\B(?=(\d{3})+(?!\d))/gu;
+
+/**
+ * A number's integer part with its thousands grouped (I28, §078 `R-TBL-004`).
+ *
+ * **The comma is the design's own and was settled by measurement rather than
+ * parked**: 29 grouped occurrences of 14 distinct numerals across
+ * `docs/design/language/fixtures`, a comma every time, against one ungrouped
+ * numeral in a numeric table column — §099's `steps 1284`, in a section citing
+ * neither `R-TBL-001` nor `R-TBL-004`, whose figure is about the decimal point.
+ *
+ * **Only the integer part, and only from four digits.** A fraction's digits are
+ * not places of a thousand, and `1000` is the first value with a group to make.
+ * The sign and any trailing `%` travel untouched, because neither is a digit.
+ */
+export function grouped(text: string): string {
+  const m = /^([+-]?)(\d+)(.*)$/su.exec(text.trim());
+  if (m === null) return text;
+  const [, sign = "", whole = "", rest = ""] = m;
+  if (whole.length < GROUP_FROM) return text; // cells-ok — a digit count, not a width
+  return `${sign}${whole.replace(THREES, ",")}${rest}`;
+}
+
+/**
+ * The columns that group, by I28's three clauses — all-or-nothing, each.
+ *
+ * **A column grouping some of its rows and not others would put `1,204` above
+ * `41208`**, which is worse than grouping neither and is exactly the comparison
+ * `R-TBL-001` says a reader makes by shape without reading. So every clause is
+ * a property of the column, and a single cell can take the whole column out.
+ *
+ * Clause 1 is the resolved alignment being a number's — a column holding one
+ * non-numeric value is `left` by I27's agreement rule and never arrives here,
+ * which is how a port, a year and a line number stay bare without this having
+ * to tell them apart. Clause 2 is `spans`: they are code-unit offsets into
+ * `text` (C04 I83) and grouping splices into that string, so a run would land
+ * on different characters — no producer in `src/` writes them on a table cell
+ * today, and the clause is here because the failure would be silent. Clause 3
+ * is the width: §078's fifth rule is explicit that *a number column never
+ * truncates, because half a number is a different number*, and separators make
+ * a value wider, so a column that cannot afford them draws without them.
+ */
+export function groupingColumns(
+  block: Table,
+  aligns: ReadonlyMap<string, Alignment>,
+  widthOf: ReadonlyMap<string, number>,
+  measure: (text: string) => number,
+): ReadonlySet<string> {
+  const out = new Set<string>();
+  for (const column of block.columns) {
+    const align = aligns.get(column.key);
+    if (align !== "right" && align !== "decimal") continue;
+    // **Clause 1, and a duration is the only kind it reaches.** A text column
+    // is already `left` by I27 and never arrives here, so this guard failed
+    // nothing on the first mutation pass — the one kind that resolves to
+    // `right` without being a bare quantity is a duration, where `10000s`
+    // would otherwise draw `10,000s`. The design shows that nowhere: §078's
+    // durations are `2m`, `41m` and `1h`, none near a thousand, so bare is the
+    // reading that invents nothing (T1.35's fourth arm).
+    if (columnKind(block.rows, column.key) !== "numeric") continue;
+
+    const room = widthOf.get(column.key);
+    if (room === undefined) continue;
+
+    let ok = true;
+    for (const row of block.rows) {
+      const cell: Cell | undefined = row.cells[column.key];
+      if (cell === undefined) continue;
+      const spanned = (cell.spans ?? []).length > 0; // cells-ok — a span count, not a width
+      if (spanned) {
+        ok = false;
+        break;
+      }
+      if (measure(grouped(cell.text)) > room) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) out.add(column.key);
+  }
+  return out;
+}
+
+/** A cell's text as it will be drawn (I28) — grouped where its column groups. */
+export function displayText(text: string, grouping: boolean): string {
+  return grouping ? grouped(text) : text;
 }
