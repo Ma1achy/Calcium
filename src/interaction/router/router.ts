@@ -822,7 +822,11 @@ export function createRouter(
           // this arm is unreachable and the operating system’s own repeat
           // stands unchanged — no capability check, because the absence of
           // the field *is* the absence of the capability.
-          const action = keymap.resolve(activeTarget(inputs()), e.key)?.action;
+          // **Where dispatch finds the binding: the target's, then `global`'s**
+          // (I53, §4). Asking the target alone missed every global binding, and
+          // `⌥↑`/`⌥↓` are bound only there — so the page policy never applied
+          // and each OS repeat turned a whole screen.
+          const action = (keymap.resolve(activeTarget(inputs()), e.key) ?? keymap.resolve("global", e.key))?.action;
           steps = repeatSteps(repeatFor(action ?? ""), t - was.pressedAt, t - was.lastActedAt);
           // Absorbed rather than passed on: the policy decided about this
           // event, so letting it fall through would hand a repeat this

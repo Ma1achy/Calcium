@@ -1,11 +1,11 @@
 {
   "label": "all",
-  "only": "c16-help-emission",
+  "only": "c16-key-repeat",
   "rows": [
     {
-      "run": "c16-help-emission.mjs",
+      "run": "c16-key-repeat.mjs",
       "exit": 0,
-      "seconds": 23,
+      "seconds": 10,
       "state": "green",
       "restored": 0,
       "caught": 3,

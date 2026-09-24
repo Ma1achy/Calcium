@@ -45,7 +45,7 @@ const box = (
   ...at,
 });
 
-function harness(over: Partial<RouterDeps> = {}, start = 1_000) {
+function harness(over: Partial<RouterDeps> = {}, start = 1_000, keymap = createKeymap([])) {
   let t = start;
   const calls: string[] = [];
   const layer = { top: null as Placed["layer"] | null, placed: [] as Placed[] };
@@ -84,7 +84,7 @@ function harness(over: Partial<RouterDeps> = {}, start = 1_000) {
     ...over,
   };
   const focus = createFocusStore();
-  const router = createRouter({ focus, keymap: createKeymap([]), now: () => t, deps });
+  const router = createRouter({ focus, keymap, now: () => t, deps });
   return { router, focus, calls, layer, advance: (ms: number) => (t += ms) };
 }
 
@@ -1389,5 +1389,44 @@ describe("C16 §4a — the dismissing click and the scroll order (M8)", () => {
     // peek* is byte-identical here to *no layer is open* — an assertion about
     // it would be an assertion about the fixture. Where it is observable is
     // C15's own `top` row (T1.23) and the filter in `construct.ts`.
+  });
+});
+
+describe("C16 I53 — the repeat policy through dispatch", () => {
+  const withEvent = (e: InputEvent, event: "press" | "repeat"): InputEvent =>
+    e.kind === "key" ? { ...e, event } : e;
+  const altUp = key("up", { meta: true });
+  const left = key("left");
+
+  it("T1.159f (I53, R-KEY-002): a ⌥↑ repeat through dispatch meets the page policy bound at global", () => {
+    const h = harness({}, 1_000, createKeymap(defaultKeymap));
+    let pages = 0;
+    let lefts = 0;
+    h.router.register("global", (e) => (e.kind === "key" && e.key.meta && e.key.name === "up" ? ((pages += 1), true) : false));
+    h.router.register("prompt", (e) => (e.kind === "key" && e.key.name === "left" ? ((lefts += 1), true) : false));
+
+    // **The control: an undeclared binding acts on every repeat** (T1.159d's
+    // rule, through the router). Without it the rows below are passed by a
+    // router that absorbs every repeat.
+    h.router.dispatch(withEvent(left, "press"));
+    h.advance(100);
+    h.router.dispatch(withEvent(left, "repeat"));
+    expect(lefts, "undeclared: the repeat at 100 ms acts").toBe(2);
+
+    // **The page policy — 250 / 90 — found at `global`, where ⌥↑ is bound.**
+    h.router.dispatch(withEvent(altUp, "press"));
+    expect(pages, "the press acts").toBe(1);
+    h.advance(100);
+    h.router.dispatch(withEvent(altUp, "repeat"));
+    expect(pages, "100 ms: inside the delay, absorbed").toBe(1);
+    h.advance(160);
+    h.router.dispatch(withEvent(altUp, "repeat"));
+    expect(pages, "260 ms: past the delay, it acts").toBe(2);
+    h.advance(40);
+    h.router.dispatch(withEvent(altUp, "repeat"));
+    expect(pages, "40 ms later: under the 90 ms rate, absorbed").toBe(2);
+    h.advance(60);
+    h.router.dispatch(withEvent(altUp, "repeat"));
+    expect(pages, "100 ms after the last act: it acts, and only once").toBe(3);
   });
 });
