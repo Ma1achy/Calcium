@@ -153,7 +153,7 @@ most-drawn line in the application.
 | 61 | prose | — | — | eight cases that are not edge cases |
 | 62 | prose | — | — | latency, and the window that causes it |
 | 63 | prose | — | — | three refusals, and what stays rebindable |
-| 64 | prose | — | — | undo |
+| 64 | surface | no | — | undo — **reclassified from `prose`, and the classification was the finding.** §064's own sentence is *undo is a transcript entry, because an invisible undo is one you do twice*, which is a claim about a drawn form: `● reverted · parse.ts · +2 −2 undone   ↺ redo` over a `⎿` continuation, muted *because nothing went wrong and nothing is pending*. Every part is the framework's — the head grammar (C23 I76), the delta, the gutter, the tone, and a row affordance through `Action` (`types.ts:629`, whose bar is derived from `rows.some(r => r.actions)`). What is NOT the framework's is when to produce one, and §064 rules that too: an edit yes, a whole turn yes, **a command it ran NO** — *rm does not come back, and offering an undo that cannot work is worse than having none*. **Blocked on parked question 17**: `↺` is drawn 22 times in the registry and carried by no glyph record, so drawing this surface means inventing its ASCII rung |
 | 65 | prose | — | — | compaction — which turns go |
 | 66 | surface | `FAILURE_WORDS` | `states.test.ts` | tool failures against model failures |
 | 67 | surface | `viewport` | `session-frame.test.ts` | scrolled back while a turn runs |
@@ -216,8 +216,8 @@ one without anything saying so, and the direction that matters here is `owed` �
 that is the reconciliation working, and it should be visible as a number moving rather
 than inferred from a suite staying green.
 
-    surface 66 · prose 37 · app 6 · total 109
-    of the surfaces: built 60 · unbuilt 6 · framed 64
+    surface 67 · prose 36 · app 6 · total 109
+    of the surfaces: built 60 · unbuilt 7 · framed 64
 
 **`framed` is the figure this MR moves, and `built` is the one that went backwards.**
 Seven surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks

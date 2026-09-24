@@ -67,7 +67,7 @@ M = {
  61:("prose","—","eight cases that are not edge cases"),
  62:("prose","—","latency, and the window that causes it"),
  63:("prose","—","three refusals, and what stays rebindable"),
- 64:("prose","—","undo"),
+ 64:("owed","Q17","undo \u2014 **reclassified from `prose`, and the classification was the finding.** \u00a7064's own sentence is *undo is a transcript entry, because an invisible undo is one you do twice*, which is a claim about a drawn form: `\u25cf reverted \u00b7 parse.ts \u00b7 +2 \u22122 undone   \u21ba redo` over a `\u23bf` continuation, muted *because nothing went wrong and nothing is pending*. Every part is the framework's \u2014 the head grammar (C23 I76), the delta, the gutter, the tone, and a row affordance through `Action` (`types.ts:629`, whose bar is derived from `rows.some(r => r.actions)`). What is NOT the framework's is when to produce one, and \u00a7064 rules that too: an edit yes, a whole turn yes, **a command it ran NO** \u2014 *rm does not come back, and offering an undo that cannot work is worse than having none*. **Blocked on parked question 17**: `\u21ba` is drawn 22 times in the registry and carried by no glyph record, so drawing this surface means inventing its ASCII rung"),
  65:("prose","—","compaction — which turns go"),
  66:("frame","states.test.ts","tool failures against model failures"),
  67:("frame","session-frame.test.ts","scrolled back while a turn runs"),
