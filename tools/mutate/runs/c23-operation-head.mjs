@@ -82,12 +82,13 @@ const results = runPass({
       expect: "T1.71",
     },
     {
-      // C09 I104 restored to the unconditional third. Every count agrees; the
-      // bar is nineteen cells short and the row begins with blank.
-      name: "the label column is reserved whether or not there is a label",
+      // C09 I104 restored to the unconditional third — both halves at once, and
+      // that is the point: the empty label spends nineteen cells of fifty-six,
+      // and `ctx` spends eighteen for three. Every count agrees either way.
+      name: "the label column is a share of the row rather than the label's width",
       file: SIMPLE,
-      from: '    const labelRoom = block.label === "" ? 0 : Math.max(0, Math.floor(width / 3));',
-      to: "    const labelRoom = Math.max(0, Math.floor(width / 3));",
+      from: '      : Math.min(labelCap, cells(stripControl(block.label), ctx.capabilities.ambiguousWidth));',
+      to: "      : labelCap;",
       expect: "T1.71",
     },
     {

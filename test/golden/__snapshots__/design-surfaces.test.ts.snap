@@ -1,7 +1,18 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`golden frames — one per design fixture > dark-ascii at 40 1`] = `
-"── §11 · a mention is a chip — the parts cross the seam and the label does not
+"── §65 · the context fills — a capacity beside an operation, and the head that stops
+· the context is a CAPACITY — a budget being spent, and it does not animate
+    ctx #######################- 94%  94/100
+
+· the compaction is an OPERATION — segmented, active, and §036's head above it
+    . compacting (4s : 3 of 5 turns)
+    ######################-------------- 60%
+
+· and when it stops the bar goes and the delta stays — one grammar, not two specimens
+    + 3 turns compacted : 10.7k → 0.9k tok
+
+── §11 · a mention is a chip — the parts cross the seam and the label does not
 · painted — the ground says chip
    40 │summarise  parse.ts : 184L  for me│
    20 │summarise │
@@ -80,7 +91,7 @@ scout +  planner +  * builder .  2]
 ── §42 · widgets — a row of peers that sheds
 auto  plan  manual  accept edits
 ── §34 · active progress bars
-download      ###############------- 70%
+download ###################-------- 70%
 ── §96 · a status has three parts, and a frame is separate
 +--------------------------------------+
 | -------------- ERROR --------------- |
@@ -155,15 +166,15 @@ pipe            | | / / - - \\ \\
 arrow           < ^ > v
 pulse           . o O @ O o
 ── §33 · nine alphabets, and where each belongs
-block         ###############------- 70%
-halfblock     ###############------- 70%
-rectangle     ###############------- 70%
-beads         ###############------- 70%
-posts         ###############------- 70%
-slant         ###############------- 70%
-squares       ###############------- 70%
-braille       ###############------- 70%
-ascii         ###############------- 70%
+block #####################--------- 70%
+halfblock ##################-------- 70%
+rectangle ##################-------- 70%
+beads #####################--------- 70%
+posts #####################--------- 70%
+slant #####################--------- 70%
+squares ####################-------- 70%
+braille ####################-------- 70%
+ascii #####################--------- 70%
 ── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
 · the fills — 24 bits, one letter per distinct ink, assigned within the row
   gradient-linear   ABCDEFGHIJKLMNOPQRSTUVWX
@@ -264,25 +275,25 @@ ascii         ###############------- 70%
   typewriter        ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
   ripple            AAAAAAAAAAABBAAAAAAAAAAA | AAAAAAAAAAABBAAAAAAAAAAA
 ── §34 · the same bar painted, and the glyph rung beneath it
-..............AAAAAAAAAAAAAABBBBBBBB.... slant                                63%
+......AAAAAAAAAAAAAAAAAAABBBBBBBBBBB.... slant                                63%
   A = bg 48;2;49;90;52
   B = bg 48;2;20;20;20
-........................................ slant         ##############-------- 63%
-..............AAAAAAAAAAAAAABBBBBBBB.... block                                63%
+........................................ slant ###################----------- 63%
+......AAAAAAAAAAAAAAAAAAABBBBBBBBBBB.... block                                63%
   A = bg 48;2;49;90;52
   B = bg 48;2;20;20;20
-........................................ block         ##############-------- 63%
+........................................ block ###################----------- 63%
 ── §35 · quantity, granularity and liveness — five triples, two of them the presets
 · BUDGET · capacity · continuous · still
-work          #########------ 62%  31/50
+work ###############--------- 62%  31/50
 · OPERATION · progress · segmented · active
-work          ##############-------- 62%
+work ###################------------ 62%
 · a training run · progress · continuous · active
-work          ##############-------- 62%
+work ###################------------ 62%
 · a step count · count · segmented · still
-work          ###########------ 31 of 50
+work ################---------- 31 of 50
 · stalled · progress · segmented · stalled
-work          ##############-------- 62%
+work ###################------------ 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ........................................ -- serving/volatility-estimator.yaml ---
@@ -671,7 +682,18 @@ line 6                                 |
 `;
 
 exports[`golden frames — one per design fixture > dark-ascii at 80 1`] = `
-"── §11 · a mention is a chip — the parts cross the seam and the label does not
+"── §65 · the context fills — a capacity beside an operation, and the head that stops
+· the context is a CAPACITY — a budget being spent, and it does not animate
+    ctx ######################################-- 94%  94/100
+
+· the compaction is an OPERATION — segmented, active, and §036's head above it
+    . compacting (4s : 3 of 5 turns)
+    ###############################--------------------- 60%
+
+· and when it stops the bar goes and the delta stays — one grammar, not two specimens
+    + 3 turns compacted : 10.7k → 0.9k tok
+
+── §11 · a mention is a chip — the parts cross the seam and the label does not
 · painted — the ground says chip
    80 │summarise  parse.ts : 184L  for me│
    20 │summarise │
@@ -750,7 +772,7 @@ scout 4s +  planner 1m12s +  * builder . 8s  critic 2s o  scribe 0s o
 ── §42 · widgets — a row of peers that sheds
 auto  plan  manual  accept edits
 ── §34 · active progress bars
-download                   ##################################--------------- 70%
+download ###############################################-------------------- 70%
 ── §96 · a status has three parts, and a frame is separate
 +------------------------------------------------------------------------------+
 |                                                                              |
@@ -825,15 +847,15 @@ pipe            | | / / - - \\ \\
 arrow           < ^ > v
 pulse           . o O @ O o
 ── §33 · nine alphabets, and where each belongs
-block                      ##################################--------------- 70%
-halfblock                  ##################################--------------- 70%
-rectangle                  ##################################--------------- 70%
-beads                      ##################################--------------- 70%
-posts                      ##################################--------------- 70%
-slant                      ##################################--------------- 70%
-squares                    ##################################--------------- 70%
-braille                    ##################################--------------- 70%
-ascii                      ##################################--------------- 70%
+block #################################################--------------------- 70%
+halfblock ##############################################-------------------- 70%
+rectangle ##############################################-------------------- 70%
+beads #################################################--------------------- 70%
+posts #################################################--------------------- 70%
+slant #################################################--------------------- 70%
+squares ################################################-------------------- 70%
+braille ################################################-------------------- 70%
+ascii #################################################--------------------- 70%
 ── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
 · the fills — 24 bits, one letter per distinct ink, assigned within the row
   gradient-linear   ABCDEFGHIJKLMNOPQRSTUVWX
@@ -934,25 +956,25 @@ ascii                      ##################################--------------- 70%
   typewriter        ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
   ripple            AAAAAAAAAAABBAAAAAAAAAAA | AAAAAAAAAAABBAAAAAAAAAAA
 ── §34 · the same bar painted, and the glyph rung beneath it
-...........................AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBB.... slant                                                                        63%
+......AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBB.... slant                                                                        63%
   A = bg 48;2;49;90;52
   B = bg 48;2;20;20;20
-................................................................................ slant                      ###############################------------------ 63%
-...........................AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBB.... block                                                                        63%
+................................................................................ slant ############################################-------------------------- 63%
+......AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBB.... block                                                                        63%
   A = bg 48;2;49;90;52
   B = bg 48;2;20;20;20
-................................................................................ block                      ###############################------------------ 63%
+................................................................................ block ############################################-------------------------- 63%
 ── §35 · quantity, granularity and liveness — five triples, two of them the presets
 · BUDGET · capacity · continuous · still
-work                       ##########################---------------- 62%  31/50
+work ########################################------------------------ 62%  31/50
 · OPERATION · progress · segmented · active
-work                       ##############################------------------- 62%
+work ############################################--------------------------- 62%
 · a training run · progress · continuous · active
-work                       ##############################------------------- 62%
+work ############################################--------------------------- 62%
 · a step count · count · segmented · still
-work                       ###########################----------------- 31 of 50
+work #########################################------------------------- 31 of 50
 · stalled · progress · segmented · stalled
-work                       ##############################------------------- 62%
+work ############################################--------------------------- 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ................................................................................ -- serving/volatility-estimator.yaml -------------------------------------------
@@ -1334,7 +1356,18 @@ line 6                                                                         |
 `;
 
 exports[`golden frames — one per design fixture > dark-mono-unicode at 40 1`] = `
-"── §11 · a mention is a chip — the parts cross the seam and the label does not
+"── §65 · the context fills — a capacity beside an operation, and the head that stops
+· the context is a CAPACITY — a budget being spent, and it does not animate
+    ctx ███████████████████████░ 94%  94/100
+
+· the compaction is an OPERATION — segmented, active, and §036's head above it
+    ✦ compacting (4s · 3 of 5 turns)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 60%
+
+· and when it stops the bar goes and the delta stays — one grammar, not two specimens
+    ✓ 3 turns compacted · 10.7k → 0.9k tok
+
+── §11 · a mention is a chip — the parts cross the seam and the label does not
 · painted — the ground says chip
    40 │summarise  parse.ts · 184L  for me│
    20 │summarise │
@@ -1409,7 +1442,7 @@ scout ✓  planner ✓  › builder ⋅  2»
 ── §42 · widgets — a row of peers that sheds
 auto  plan  manual  accept edits
 ── §34 · active progress bars
-download      ███████████████░░░░░░░ 70%
+download ███████████████████░░░░░░░░ 70%
 ── §96 · a status has three parts, and a frame is separate
 ┌──────────────────────────────────────┐
 │ ────────────── ERROR ─────────────── │
@@ -1484,15 +1517,15 @@ pipe            ┤ ┘ ┴ └ ├ ┌ ┬ ┐
 arrow           ← ↑ → ↓
 pulse           ✢ ✲ ✱ ✻ ✱ ✲
 ── §33 · nine alphabets, and where each belongs
-block         ███████████████░░░░░░░ 70%
-halfblock     ▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░ 70%
-rectangle     ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬░░░░░░░ 70%
-beads         •••••••••••••••◦◦◦◦◦◦◦ 70%
-posts         ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯ 70%
-slant         ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱ 70%
-squares       ■■■■■■■■■■■■■■■□□□□□□□ 70%
-braille       ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿        70%
-ascii         ###############------- 70%
+block █████████████████████░░░░░░░░░ 70%
+halfblock ▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░░ 70%
+rectangle ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬░░░░░░░░ 70%
+beads •••••••••••••••••••••◦◦◦◦◦◦◦◦◦ 70%
+posts ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯ 70%
+slant ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱ 70%
+squares ■■■■■■■■■■■■■■■■■■■■□□□□□□□□ 70%
+braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿         70%
+ascii #####################--------- 70%
 ── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
 · the fills — 24 bits, one letter per distinct ink, assigned within the row
   gradient-linear   ABCDEFGHIJKLMNOPQRSTUVWX
@@ -1593,21 +1626,21 @@ ascii         ###############------- 70%
   typewriter        ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
   ripple            AAAAAAAAAAABBAAAAAAAAAAA | AAAAAAAAAAABBAAAAAAAAAAA
 ── §34 · the same bar painted, and the glyph rung beneath it
-........................................ slant         ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 63%
-........................................ slant         ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 63%
-........................................ block         ██████████████░░░░░░░░ 63%
-........................................ block         ██████████████░░░░░░░░ 63%
+........................................ slant ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱ 63%
+........................................ slant ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱ 63%
+........................................ block ███████████████████░░░░░░░░░░░ 63%
+........................................ block ███████████████████░░░░░░░░░░░ 63%
 ── §35 · quantity, granularity and liveness — five triples, two of them the presets
 · BUDGET · capacity · continuous · still
-work          █████████░░░░░░ 62%  31/50
+work ███████████████░░░░░░░░░ 62%  31/50
 · OPERATION · progress · segmented · active
-work          ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 62%
+work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 62%
 · a training run · progress · continuous · active
-work          ██████████████░░░░░░░░ 62%
+work ███████████████████░░░░░░░░░░░░ 62%
 · a step count · count · segmented · still
-work          ▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱ 31 of 50
+work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱ 31 of 50
 · stalled · progress · segmented · stalled
-work          ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 62%
+work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ........................................ ── serving/volatility-estimator.yaml ───
@@ -1970,7 +2003,18 @@ line 6                                 │
 `;
 
 exports[`golden frames — one per design fixture > dark-mono-unicode at 80 1`] = `
-"── §11 · a mention is a chip — the parts cross the seam and the label does not
+"── §65 · the context fills — a capacity beside an operation, and the head that stops
+· the context is a CAPACITY — a budget being spent, and it does not animate
+    ctx ██████████████████████████████████████░░ 94%  94/100
+
+· the compaction is an OPERATION — segmented, active, and §036's head above it
+    ✦ compacting (4s · 3 of 5 turns)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 60%
+
+· and when it stops the bar goes and the delta stays — one grammar, not two specimens
+    ✓ 3 turns compacted · 10.7k → 0.9k tok
+
+── §11 · a mention is a chip — the parts cross the seam and the label does not
 · painted — the ground says chip
    80 │summarise  parse.ts · 184L  for me│
    20 │summarise │
@@ -2045,7 +2089,7 @@ scout 4s ✓  planner 1m12s ✓  › builder ⋅ 8s  critic 2s ○  scribe 0s �
 ── §42 · widgets — a row of peers that sheds
 auto  plan  manual  accept edits
 ── §34 · active progress bars
-download                   ██████████████████████████████████░░░░░░░░░░░░░░░ 70%
+download ███████████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░ 70%
 ── §96 · a status has three parts, and a frame is separate
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                                                                              │
@@ -2120,15 +2164,15 @@ pipe            ┤ ┘ ┴ └ ├ ┌ ┬ ┐
 arrow           ← ↑ → ↓
 pulse           ✢ ✲ ✱ ✻ ✱ ✲
 ── §33 · nine alphabets, and where each belongs
-block                      ██████████████████████████████████░░░░░░░░░░░░░░░ 70%
-halfblock                  ▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░░░░░░░░░ 70%
-rectangle                  ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬░░░░░░░░░░░░░░░ 70%
-beads                      ••••••••••••••••••••••••••••••••••◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦ 70%
-posts                      ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 70%
-slant                      ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 70%
-squares                    ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■□□□□□□□□□□□□□□□ 70%
-braille                    ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿                70%
-ascii                      ##################################--------------- 70%
+block █████████████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░ 70%
+halfblock ▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░░░░░░░░░░░░░░ 70%
+rectangle ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬░░░░░░░░░░░░░░░░░░░░ 70%
+beads •••••••••••••••••••••••••••••••••••••••••••••••••◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦ 70%
+posts ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 70%
+slant ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 70%
+squares ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■□□□□□□□□□□□□□□□□□□□□ 70%
+braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿                     70%
+ascii #################################################--------------------- 70%
 ── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
 · the fills — 24 bits, one letter per distinct ink, assigned within the row
   gradient-linear   ABCDEFGHIJKLMNOPQRSTUVWX
@@ -2229,21 +2273,21 @@ ascii                      ##################################--------------- 70%
   typewriter        ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
   ripple            AAAAAAAAAAABBAAAAAAAAAAA | AAAAAAAAAAABBAAAAAAAAAAA
 ── §34 · the same bar painted, and the glyph rung beneath it
-................................................................................ slant                      ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 63%
-................................................................................ slant                      ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 63%
-................................................................................ block                      ███████████████████████████████░░░░░░░░░░░░░░░░░░ 63%
-................................................................................ block                      ███████████████████████████████░░░░░░░░░░░░░░░░░░ 63%
+................................................................................ slant ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 63%
+................................................................................ slant ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 63%
+................................................................................ block ████████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░ 63%
+................................................................................ block ████████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░ 63%
 ── §35 · quantity, granularity and liveness — five triples, two of them the presets
 · BUDGET · capacity · continuous · still
-work                       ██████████████████████████░░░░░░░░░░░░░░░░ 62%  31/50
+work ████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░ 62%  31/50
 · OPERATION · progress · segmented · active
-work                       ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
 · a training run · progress · continuous · active
-work                       ██████████████████████████████░░░░░░░░░░░░░░░░░░░ 62%
+work ████████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░ 62%
 · a step count · count · segmented · still
-work                       ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 31 of 50
+work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 31 of 50
 · stalled · progress · segmented · stalled
-work                       ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ................................................................................ ── serving/volatility-estimator.yaml ───────────────────────────────────────────
@@ -2598,7 +2642,18 @@ line 6                                                                         �
 `;
 
 exports[`golden frames — one per design fixture > dark-unicode at 40 1`] = `
-"── §11 · a mention is a chip — the parts cross the seam and the label does not
+"── §65 · the context fills — a capacity beside an operation, and the head that stops
+· the context is a CAPACITY — a budget being spent, and it does not animate
+    ctx ███████████████████████░ 94%  94/100
+
+· the compaction is an OPERATION — segmented, active, and §036's head above it
+    ✦ compacting (4s · 3 of 5 turns)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 60%
+
+· and when it stops the bar goes and the delta stays — one grammar, not two specimens
+    ● 3 turns compacted · 10.7k → 0.9k tok
+
+── §11 · a mention is a chip — the parts cross the seam and the label does not
 · painted — the ground says chip
    40 │summarise  parse.ts · 184L  for me│
    20 │summarise │
@@ -2677,7 +2732,7 @@ scout ✓  planner ✓  › builder ⋅  2»
 ── §42 · widgets — a row of peers that sheds
 auto  plan  manual  accept edits
 ── §34 · active progress bars
-download      ███████████████░░░░░░░ 70%
+download ███████████████████░░░░░░░░ 70%
 ── §96 · a status has three parts, and a frame is separate
 ┌──────────────────────────────────────┐
 │ ────────────── ERROR ─────────────── │
@@ -2752,15 +2807,15 @@ pipe            ┤ ┘ ┴ └ ├ ┌ ┬ ┐
 arrow           ← ↑ → ↓
 pulse           ✢ ✲ ✱ ✻ ✱ ✲
 ── §33 · nine alphabets, and where each belongs
-block         ███████████████░░░░░░░ 70%
-halfblock     ▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░ 70%
-rectangle     ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬░░░░░░░ 70%
-beads         •••••••••••••••◦◦◦◦◦◦◦ 70%
-posts         ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯ 70%
-slant         ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱ 70%
-squares       ■■■■■■■■■■■■■■■□□□□□□□ 70%
-braille       ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿        70%
-ascii         ###############------- 70%
+block █████████████████████░░░░░░░░░ 70%
+halfblock ▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░░ 70%
+rectangle ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬░░░░░░░░ 70%
+beads •••••••••••••••••••••◦◦◦◦◦◦◦◦◦ 70%
+posts ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯ 70%
+slant ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱ 70%
+squares ■■■■■■■■■■■■■■■■■■■■□□□□□□□□ 70%
+braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿         70%
+ascii #####################--------- 70%
 ── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
 · the fills — 24 bits, one letter per distinct ink, assigned within the row
   gradient-linear   ABCDEFGHIJKLMNOPQRSTUVWX
@@ -2861,25 +2916,25 @@ ascii         ###############------- 70%
   typewriter        ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
   ripple            AAAAAAAAAAABBAAAAAAAAAAA | AAAAAAAAAAABBAAAAAAAAAAA
 ── §34 · the same bar painted, and the glyph rung beneath it
-..............AAAAAAAAAAAAAABBBBBBBB.... slant                                63%
+......AAAAAAAAAAAAAAAAAAABBBBBBBBBBB.... slant                                63%
   A = bg 48;2;49;90;52
   B = bg 48;2;20;20;20
-........................................ slant         ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 63%
-..............AAAAAAAAAAAAAABBBBBBBB.... block                                63%
+........................................ slant ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱ 63%
+......AAAAAAAAAAAAAAAAAAABBBBBBBBBBB.... block                                63%
   A = bg 48;2;49;90;52
   B = bg 48;2;20;20;20
-........................................ block         ██████████████░░░░░░░░ 63%
+........................................ block ███████████████████░░░░░░░░░░░ 63%
 ── §35 · quantity, granularity and liveness — five triples, two of them the presets
 · BUDGET · capacity · continuous · still
-work          █████████░░░░░░ 62%  31/50
+work ███████████████░░░░░░░░░ 62%  31/50
 · OPERATION · progress · segmented · active
-work          ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 62%
+work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 62%
 · a training run · progress · continuous · active
-work          ██████████████░░░░░░░░ 62%
+work ███████████████████░░░░░░░░░░░░ 62%
 · a step count · count · segmented · still
-work          ▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱ 31 of 50
+work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱ 31 of 50
 · stalled · progress · segmented · stalled
-work          ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 62%
+work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ........................................ ── serving/volatility-estimator.yaml ───
@@ -3269,7 +3324,18 @@ line 6                                 │
 `;
 
 exports[`golden frames — one per design fixture > dark-unicode at 80 1`] = `
-"── §11 · a mention is a chip — the parts cross the seam and the label does not
+"── §65 · the context fills — a capacity beside an operation, and the head that stops
+· the context is a CAPACITY — a budget being spent, and it does not animate
+    ctx ██████████████████████████████████████░░ 94%  94/100
+
+· the compaction is an OPERATION — segmented, active, and §036's head above it
+    ✦ compacting (4s · 3 of 5 turns)
+    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 60%
+
+· and when it stops the bar goes and the delta stays — one grammar, not two specimens
+    ● 3 turns compacted · 10.7k → 0.9k tok
+
+── §11 · a mention is a chip — the parts cross the seam and the label does not
 · painted — the ground says chip
    80 │summarise  parse.ts · 184L  for me│
    20 │summarise │
@@ -3348,7 +3414,7 @@ scout 4s ✓  planner 1m12s ✓  › builder ⋅ 8s  critic 2s ○  scribe 0s �
 ── §42 · widgets — a row of peers that sheds
 auto  plan  manual  accept edits
 ── §34 · active progress bars
-download                   ██████████████████████████████████░░░░░░░░░░░░░░░ 70%
+download ███████████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░ 70%
 ── §96 · a status has three parts, and a frame is separate
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                                                                              │
@@ -3423,15 +3489,15 @@ pipe            ┤ ┘ ┴ └ ├ ┌ ┬ ┐
 arrow           ← ↑ → ↓
 pulse           ✢ ✲ ✱ ✻ ✱ ✲
 ── §33 · nine alphabets, and where each belongs
-block                      ██████████████████████████████████░░░░░░░░░░░░░░░ 70%
-halfblock                  ▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░░░░░░░░░ 70%
-rectangle                  ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬░░░░░░░░░░░░░░░ 70%
-beads                      ••••••••••••••••••••••••••••••••••◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦ 70%
-posts                      ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 70%
-slant                      ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 70%
-squares                    ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■□□□□□□□□□□□□□□□ 70%
-braille                    ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿                70%
-ascii                      ##################################--------------- 70%
+block █████████████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░ 70%
+halfblock ▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░░░░░░░░░░░░░░ 70%
+rectangle ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬░░░░░░░░░░░░░░░░░░░░ 70%
+beads •••••••••••••••••••••••••••••••••••••••••••••••••◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦ 70%
+posts ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 70%
+slant ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 70%
+squares ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■□□□□□□□□□□□□□□□□□□□□ 70%
+braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿                     70%
+ascii #################################################--------------------- 70%
 ── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
 · the fills — 24 bits, one letter per distinct ink, assigned within the row
   gradient-linear   ABCDEFGHIJKLMNOPQRSTUVWX
@@ -3532,25 +3598,25 @@ ascii                      ##################################--------------- 70%
   typewriter        ABBBBBBBBBBBBBBBBBBBBBBB | ABBBBBBBBBBBBBBBBBBBBBBB
   ripple            AAAAAAAAAAABBAAAAAAAAAAA | AAAAAAAAAAABBAAAAAAAAAAA
 ── §34 · the same bar painted, and the glyph rung beneath it
-...........................AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBB.... slant                                                                        63%
+......AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBB.... slant                                                                        63%
   A = bg 48;2;49;90;52
   B = bg 48;2;20;20;20
-................................................................................ slant                      ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 63%
-...........................AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBB.... block                                                                        63%
+................................................................................ slant ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 63%
+......AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBB.... block                                                                        63%
   A = bg 48;2;49;90;52
   B = bg 48;2;20;20;20
-................................................................................ block                      ███████████████████████████████░░░░░░░░░░░░░░░░░░ 63%
+................................................................................ block ████████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░ 63%
 ── §35 · quantity, granularity and liveness — five triples, two of them the presets
 · BUDGET · capacity · continuous · still
-work                       ██████████████████████████░░░░░░░░░░░░░░░░ 62%  31/50
+work ████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░ 62%  31/50
 · OPERATION · progress · segmented · active
-work                       ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
 · a training run · progress · continuous · active
-work                       ██████████████████████████████░░░░░░░░░░░░░░░░░░░ 62%
+work ████████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░ 62%
 · a step count · count · segmented · still
-work                       ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 31 of 50
+work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 31 of 50
 · stalled · progress · segmented · stalled
-work                       ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ................................................................................ ── serving/volatility-estimator.yaml ───────────────────────────────────────────

@@ -154,7 +154,7 @@ most-drawn line in the application.
 | 62 | prose | — | — | latency, and the window that causes it |
 | 63 | prose | — | — | three refusals, and what stays rebindable |
 | 64 | surface | no | — | undo — **reclassified from `prose`, and the classification was the finding.** §064's own sentence is *undo is a transcript entry, because an invisible undo is one you do twice*, which is a claim about a drawn form: `● reverted · parse.ts · +2 −2 undone   ↺ redo` over a `⎿` continuation, muted *because nothing went wrong and nothing is pending*. Every part is the framework's — the head grammar (C23 I76), the delta, the gutter, the tone, and a row affordance through `Action` (`types.ts:629`, whose bar is derived from `rows.some(r => r.actions)`). What is NOT the framework's is when to produce one, and §064 rules that too: an edit yes, a whole turn yes, **a command it ran NO** — *rm does not come back, and offering an undo that cannot work is worse than having none*. **Blocked on parked question 17**: `↺` is drawn 22 times in the registry and carried by no glyph record, so drawing this surface means inventing its ASCII rung |
-| 65 | prose | — | — | compaction — which turns go |
+| 65 | surface | no | `design-surfaces.test.ts` | the context fills — `design-surfaces` §65, **reclassified from `prose`, and drawing it found a live defect.** Two bars in one figure because they are the section's argument: the context is a **capacity** (`██░░`, still, a budget being spent) and the compaction an **operation** (segmented, active), which is §035's independent axes landing in one place — a figure drawing both with one alphabet would say the distinction does not exist. The compaction rows are §036's head unchanged, running and settled, which is what says the two are one grammar (C23 I76) rather than two specimens. **The frame-read finding**: `ctx` spent eighteen cells of fifty-six on a three-cell label, because C09 I104's `width / 3` was a *reservation*; the design draws `ctx` and `disk` in a column four wide plus a gap, so the third is a **ceiling** now. Thirty goldens moved, and `table`'s were the worst case — `epoch`, five cells, reserving forty-eight. **The remainders, named**: which turns drop and the panel listing them are the application's (§065's own sentence is that only a harness holds the turns to say it); the shared column across sibling meters is C22's `entryLayout`, the seam §036's bar indent is owed to; and `39k/50k` wants a unit abbreviation the framework does not have, where it draws `94/100` |
 | 66 | surface | `FAILURE_WORDS` | `states.test.ts` | tool failures against model failures |
 | 67 | surface | `viewport` | `session-frame.test.ts` | scrolled back while a turn runs |
 | 68 | surface | `degradesTo1Bit` | `compositions.test.ts` | one exchange at three capability rungs |
@@ -216,8 +216,8 @@ one without anything saying so, and the direction that matters here is `owed` �
 that is the reconciliation working, and it should be visible as a number moving rather
 than inferred from a suite staying green.
 
-    surface 68 · prose 35 · app 6 · total 109
-    of the surfaces: built 60 · unbuilt 8 · framed 64
+    surface 69 · prose 34 · app 6 · total 109
+    of the surfaces: built 60 · unbuilt 9 · framed 65
 
 **`framed` is the figure this MR moves, and `built` is the one that went backwards.**
 Seven surface rows carry no probe now, not two. §054 and §055 want OSC 8 hyperlinks

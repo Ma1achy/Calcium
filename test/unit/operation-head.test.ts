@@ -155,5 +155,17 @@ describe("C09 I104 — a meter's label column costs nothing when there is no lab
     expect(none.startsWith("▰"), `drawn as |${none}|`).toBe(true);
     // The control: the labelled bar is unchanged, column and all.
     expect(some.startsWith("Compacting")).toBe(true);
+
+    // **The second half, and the fixture above cannot see it** (§065). Its label
+    // is 23 cells against a cap of 18, so it is clamped either way and the rule
+    // could change underneath it with every assertion still passing — which is
+    // what happened: a mutation restoring the unconditional third survived this
+    // row. A *short* label is the case the ceiling is about.
+    const short = bar("ctx");
+    expect(short.startsWith("ctx "), `drawn as |${short}|`).toBe(true);
+    // The bar begins one gap after the label, not a third of the row in.
+    expect(short.indexOf("\u25b0"), "the label's width plus one gap, and no more").toBe(4);
+    // And the cells the padding used to take are the bar's: 18 − 3 = 15 back.
+    expect(cellsOf(short) - cellsOf(some), "a short label spends what it is, not what it may").toBe(15);
   });
 });

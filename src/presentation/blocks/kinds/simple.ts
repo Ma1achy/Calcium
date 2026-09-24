@@ -738,7 +738,16 @@ export const progressDefinition: BlockDefinition<Progress> = {
     // and drew a bar nineteen cells short. The predicate is the label's text
     // rather than a flag: a caller that wants no column omits the label, which
     // is the thing it already does, and the block needs no second member.
-    const labelRoom = block.label === "" ? 0 : Math.max(0, Math.floor(width / 3));
+    // **The label's own width, clamped by a third of the row** (I104, §065). The
+    // third was a *reservation* and is a *ceiling*: `ctx` in a 56-cell row took
+    // eighteen cells for three, where §065 draws the label, one gap and the bar.
+    // A block cannot see its siblings, so the column `ctx` and `disk` share is
+    // the container's (C22 `entryLayout`); what a meter alone can hold is this.
+    const labelCap = Math.max(0, Math.floor(width / 3));
+    const labelRoom =
+      block.label === ""
+        ? 0
+        : Math.min(labelCap, cells(stripControl(block.label), ctx.capabilities.ambiguousWidth));
     const labelColumn =
       labelRoom === 0
         ? ""

@@ -1138,6 +1138,81 @@ const middleCut = (_width: number, capabilities: TerminalCapabilities): readonly
 };
 
 /**
+ * §065 — *the context fills, and a harness can say WHICH TURNS GO*.
+ *
+ * **Two bars in one figure, and they are the section's argument.** The context
+ * is a **capacity** — `██░░`, still, a budget you are spending — and the
+ * compaction is an **operation**, segmented and active, shimmering along its
+ * fill. §035 rules them as independent axes and this is where the two land in
+ * one place: a figure drawing both with one alphabet would say the section's
+ * distinction does not exist.
+ *
+ * **The compaction row is §036's head, unchanged**, which is the point worth a
+ * frame rather than an assertion — *✦ compacting … 3 of 5 turns* running, and
+ * `● 3 turns compacted · 10.7k → 0.9k tok` when it stops, are one grammar
+ * (C23 I76) and not two specimens. The settled row is the one that shows it: the
+ * bar goes with the motion and the delta stays.
+ *
+ * **What is the application's and not drawn here**: which turns drop, and the
+ * panel listing them. §065's own sentence is that only a harness holds the turns
+ * to say it — so the framework owes the bar, the head and the entry, and the
+ * decision is the application's.
+ */
+const contextFill = (
+  width: number,
+  capabilities: TerminalCapabilities,
+  theme: ResolvedTheme,
+): readonly string[] => {
+  const kit = measurable({ theme, capabilities });
+  const at = Math.min(width, 56);
+  const draw = (b: Block): readonly string[] => kit.renderToLines(b, at).map((l) => `    ${l}`);
+  const out: string[] = [
+    "· the context is a CAPACITY — a budget being spent, and it does not animate",
+  ];
+  out.push(
+    ...draw(
+      block({
+        kind: "progress",
+        id: "ctx",
+        label: "ctx",
+        current: 94,
+        total: 100,
+        quantity: "capacity",
+        granularity: "continuous",
+        liveness: "still",
+      }) as Block,
+    ),
+    "",
+    "· the compaction is an OPERATION — segmented, active, and §036's head above it",
+  );
+  for (const b of operationRows(
+    { verb: "compacting", delta: "3 of 5 turns", elapsedMs: 4_000, current: 3, total: 5 },
+    capabilities,
+    4,
+  )) {
+    out.push(...draw(b));
+  }
+  out.push(
+    "",
+    "· and when it stops the bar goes and the delta stays — one grammar, not two specimens",
+  );
+  for (const b of operationRows(
+    {
+      verb: "3 turns compacted",
+      delta: "10.7k → 0.9k tok",
+      state: "succeeded",
+      current: 5,
+      total: 5,
+    },
+    capabilities,
+    4,
+  )) {
+    out.push(...draw(b));
+  }
+  return [...out, ""];
+};
+
+/**
  * §011 — *@ pulls a file into the turn, and it is a chip like a paste*.
  *
  * **Drawn rather than asserted, because the seam's whole claim is a form.** What
@@ -1358,6 +1433,7 @@ const focusShapes = (
 };
 
 export const SURFACES: readonly Surface[] = Object.freeze([
+  { section: 65, name: "the context fills — a capacity beside an operation, and the head that stops", rows: contextFill },
   { section: 11, name: "a mention is a chip — the parts cross the seam and the label does not", rows: mentionChip },
   { section: 18, name: "focus on things that are not rows — a choice's two channels, and a control's three states", rows: focusShapes },
   { section: 36, name: "the operation surface — the aside, the flattening, and the bar that goes", rows: operationSurface },
