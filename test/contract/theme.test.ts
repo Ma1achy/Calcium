@@ -253,6 +253,41 @@ describe("C10 contract", () => {
     expect(pairs.some(([, , surface]) => surface === "focusGround"), "and it meets the focus ground").toBe(true);
   });
 
+  it("T2.55 (C10 I45, R-THM-003): a third band is measured against ITS OWN ground, not selection's", () => {
+    const hc = defaultTheme["hcDark"]!;
+    expect(validateBands(hc), "the shipped band clears every constraint").toEqual([]);
+
+    // A third band, whose ground is its own. `groundOf` read *`focusGround` if
+    // the name is `focusGround`, otherwise `selection`* — correct for the two
+    // entries that exist and wrong for a third, silently.
+    const band = (ground: string, ink: string) => ({
+      ...hc,
+      surfaces: { ...hc.surfaces, probe: ground },
+      bandInk: { ...hc.bandInk, probe: ink },
+    });
+
+    // **The direction that matters: a defect the old lookup let through.** Black
+    // ink on a near-black band is 1.19 : 1 and unreadable; measured against
+    // `selection` instead it clears the floor, so the gate said nothing.
+    const unreadable = band("#111111", "#000000");
+    expect(ratio("#000000", "#111111"), "black on near-black").toBeLessThan(DEFAULT_FLOOR);
+    expect(ratio("#000000", hc.surfaces["selection"]!), "and the ground it was being measured against is fine")
+      .toBeGreaterThanOrEqual(hc.floor ?? DEFAULT_FLOOR);
+    expect(validateBands(unreadable).map((e) => e.path), "the band is reported against its own ground")
+      .toContain("bandInk.probe");
+
+    // **And the other direction, which the old lookup reported wrongly.** A band
+    // whose ink is right on its own ground and wrong on selection's must be
+    // silent — a gate that fires here is naming a ground the band never lands on.
+    const fine = band("#000000", "#ffffff");
+    expect(validateBands(fine).map((e) => e.path), "a correct third band says nothing")
+      .not.toContain("bandInk.probe");
+
+    // The two named bands are unchanged by the generalisation, because their keys
+    // were surface names already — which is what the conditional was approximating.
+    expect(validateBands(fine), "and nothing else moved").toEqual([]);
+  });
+
   it("T2.42 (I45, R-THM-003): the four band contrasts each fire on their own", () => {
     const hc = defaultTheme["hcDark"]!;
     expect(validateBands(hc), "the shipped band clears every constraint").toEqual([]);

@@ -693,8 +693,22 @@ export function validateBands(tokens: ThemeTokens): readonly ThemeError[] {
   const errors: ThemeError[] = [];
   const promised = tokens.floor ?? DEFAULT_FLOOR;
 
+  // **The band's name IS the surface's name** (I45). This read *`focusGround` if
+  // the name is `focusGround`, otherwise `selection`* — correct for the two
+  // entries that exist and wrong for a third the moment there is one, silently:
+  // its ink would have been measured against the selection wash, and the gate
+  // would have passed or failed for a ground the band never lands on. A lookup
+  // written for a two-member population and keyed by exclusion answers wrongly
+  // for the third member and reports nothing.
+  //
+  // `surfaces` is a closed record and `Object.entries` hands back `string`, so
+  // the lookup is the one place the two cannot be joined by the type. `bandInk`
+  // is keyed by `SurfaceName`, which is what makes the cast safe, and T2.55 is
+  // what holds it: a third band measured against its own ground in both
+  // directions — a bad one reported, a good one silent.
+  const grounds = tokens.surfaces as Readonly<Record<string, string | undefined>>;
   const groundOf = (name: string): string | undefined => {
-    const v = name === "focusGround" ? tokens.surfaces.focusGround : tokens.surfaces.selection;
+    const v = grounds[name];
     return v !== undefined && isHex(v) ? v : undefined;
   };
   const say = (path: string, got: number, need: number, what: string): void => {

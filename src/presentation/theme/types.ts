@@ -290,6 +290,21 @@ export type ThemeTokens = Readonly<{
    *
    * It costs the row its tone, paid for by moving state onto the glyph and the
    * outcome word — the one-bit rung's carrier, asked per cell.
+   *
+   * **Keyed by SURFACE name**, and the type says so rather than the prose alone
+   * (C10 I45): a band is a ground that something is drawn on, so its name is
+   * that ground's name and `validateBands` finds the ground by looking it up.
+   * The first implementation found it by exclusion instead — *`focusGround` if
+   * the name is `focusGround`, otherwise `selection`* — which is right for the
+   * two entries that exist and silently wrong for a third. Naming the key type
+   * here is what stops a band being invented that no ground answers to.
+   *
+   * **Left as an open record rather than keyed by `SurfaceName`, and measured.**
+   * Narrowing the key type was tried: `surfaces` is a closed record, so every
+   * reader that holds a band name as a `string` — `inkOn`'s public parameter,
+   * and `Object.entries` inside `validateBands` — then needs a cast, and the
+   * rule ends up stated in three casts instead of one. It is stated here and in
+   * `validateBands`, and T2.55 is what enforces it.
    */
   bandInk?: Readonly<Record<string, string>>;
 }>;

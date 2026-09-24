@@ -103,6 +103,19 @@ const results = runPass({
       to: "export const BAND_VS_BAND = 1;",
       expect: "T2.42",
     },
+    {
+      // **The lookup restored to the conditional it shipped as** (C10 I45).
+      // `focusGround` if the name is `focusGround`, otherwise `selection` —
+      // right for the two entries that exist and wrong for a third, silently.
+      // A lookup written for a two-member population and keyed by exclusion
+      // answers wrongly for the third member and reports nothing, which is why
+      // this was found by reaching for a third band rather than by reading it.
+      name: "a band's ground found by exclusion — the third band gets selection's",
+      file: CONTRAST,
+      from: "    const v = grounds[name];",
+      to: '    const v = name === "focusGround" ? grounds["focusGround"] : grounds["selection"];',
+      expect: "T2.55",
+    },
   ],
 });
 
