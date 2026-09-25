@@ -3394,6 +3394,12 @@ on the values. §105 draws it:
 › save    cancel
 ```
 
+**Built flush, one cell left of the figure — parked 47.** The figure's field rows start one
+cell right of the button row's `›`, and C09 I87 forbids any row starting left of a block's
+head, because a naive drag picks up whatever sits in that gutter. The fields are therefore
+drawn at column 0, flush with the button row, and every column below is the figure's less
+one. Keeping the indent would mean weakening I87, which is not this section's to do.
+
 ```ts
 Readonly<{
   kind: "form";
@@ -3424,10 +3430,10 @@ type FormButton = Readonly<{
 by two cells, and the split's is flush, so the offsets below are the form's own relative
 to its button row, which starts at column 0.
 
-- **The label is Fixed and the field Grows.** Field rows start one cell in. The label
-  column is the widest label plus a gap of four, which puts `prism-serve` at column 13:
-  one cell, `replicas`' eight, then four. The field takes the rest of the width,
-  `F = w − 1 − L − 4` for the widest label `L`.
+- **The label is Fixed and the field Grows.** Field rows start at column 0, flush with
+  the button row (parked 47). The label column is the widest label plus a gap of four,
+  which puts `prism-serve` at column 12: `replicas`' eight, then four. The field takes the
+  rest of the width, `F = w − L − 4` for the widest label `L`.
 - **The hint and the error sit under the field**, at the field's column. §105: *an ERROR
   REPLACES THE HINT rather than joining it*. The error is `✗` and a space, then the text,
   in `error` tone. It is the same `✗` and tone as every other failure, so a form error is
@@ -3440,7 +3446,8 @@ to its button row, which starts at column 0.
 
 - **Labels and fields are content**, with a floor. The field's floor is one cell. Below it,
   at `F < 1`, the form takes its **representation** rung: each label on a row of its own
-  at column 1, with its field, hint and error under it at column 3, where `F = w − 3`.
+  at column 0, with its field, hint and error under it at column 2, where `F = w − 2`.
+  Every row then takes §094's final container clip at `w`.
 - **The hint is decoration.** It is drawn whole where it fits in `F`, and dropped with no
   mark where it does not. Decoration's minimum is a threshold and never a floor.
 - **The error is content.** It wraps in `F`, with continuation rows hung under the text
@@ -3478,7 +3485,7 @@ applies unchanged.
 
 | # | the state | rules meeting | the ruling |
 |---|---|---|---|
-| S1 | `F < 1` | *the label is Fixed* × *the field has a floor* | **the representation rung**: labels on their own rows, fields under them at column 3. The label is never shortened to make room, because it is the fact that says what the field is |
+| S1 | `F < 1` | *the label is Fixed* × *the field has a floor* | **the representation rung**: labels on their own rows, fields under them at column 2. The label is never shortened to make room, because it is the fact that says what the field is |
 | S2 | a field with a hint and an error | *the hint is decoration* × *an error replaces the hint* | the error alone. §105 says why: *two lines under one field is two things competing to be read* |
 | S3 | a hint longer than `F` | *decoration truncates with no mark* × *a hint is a sentence* | **dropped whole**. A cut sentence reads as a different one, and §094's *then drops with no trace* is the rung that does not |
 | S4 | an error longer than `F` | *content has a floor* × *the error is one fact* | wrapped, hung under its text. The height is the producer's data and the width's, and never the focus's |
@@ -4090,7 +4097,7 @@ band from, and it is asserted rather than left to follow.
 - **I133** — *(§3aq S1–S5, §021, ruling 22)* **The divider is the left pane's bar, and it is never a second column.** At width `w ≥ 4` the left pane is `d = clamp(divider ?? ⌊(w − 2) / 2⌋, 1, w − 3)` wide, the divider is column `d`, column `d + 1` is blank, and the right pane starts at `d + 2`. It draws §021's bar for the left pane where that pane overflows `height`, and bare track where it does not. The right pane draws its own bar in its own last column by `barOf`'s one-step rule. The clamp is applied at read and never written back. Below four columns the left pane draws alone and the right is placed by neither `render` nor `elements`.
 - **I134** — *(§3aq S6, E1–E5)* **Focus crosses the divider only when asked.** Each pane contributes its block's elements, or one block-level element addressed `(split, pane's block)` where it declares none — lit with `focusGround` when focused, as a mosaic's pane is — and the walk records which pane each element is in. `↓` and `↑` skip the other pane of the split they are in, and enter a split from outside on its left pane. `←` and `→` move focus to the other pane's element nearest on screen. `⌥←` and `⌥→` move the divider one cell, and the pointer drags it. Both are a shell-origin `replace` of `divider`, and neither moves focus.
 - **I135** — *(§3ar, §105, S8–S10)* **A form is at least one field and any number of buttons, addressed by ids unique across both.** Every field has a string `id` and `label`, and `value`, `hint`, `error` and `flag` are strings where present. Every button has a string `id` and `label`, at most one declares `default`, and one with `submit: true` carries a `fill` or an `exec`. `validateDocument` refuses each with the field named.
-- **I136** — *(§3ar S1–S7, §105, §094)* **The label is Fixed, the field Grows, the hint is decoration and the error is content.** Field rows start one cell in; the field starts four cells after the widest label and takes the rest, `F`. The hint is drawn whole where it fits in `F` and dropped with no mark where it does not; an error replaces it, as `✗`, a space and the text in `error` tone, wrapped in `F` and hung under its text. A value is one row, end-truncated with `…`. Below `F = 1` each label takes a row of its own and its field sits under it at column 3. After a blank row the buttons wrap as whole buttons, each a two-cell mark slot then its label two cells from the next, and the default's slot holds `›`. `measure` reads block data and the width only: the draft being edited is drawn on the field's one row, windowed round its caret, and never changes a height.
+- **I136** — *(§3ar S1–S7, §105, §094)* **The label is Fixed, the field Grows, the hint is decoration and the error is content.** Field rows start at column 0, flush with the button row (parked 47, C09 I87); the field starts four cells after the widest label and takes the rest, `F`. The hint is drawn whole where it fits in `F` and dropped with no mark where it does not; an error replaces it, as `✗`, a space and the text in `error` tone, wrapped in `F` and hung under its text. A value is one row, end-truncated with `…`. Below `F = 1` each label takes a row of its own and its field sits under it at column 2. After a blank row the buttons wrap as whole buttons, each a two-cell mark slot then its label two cells from the next, and the default's slot holds `›`. `measure` reads block data and the width only: the draft being edited is drawn on the field's one row, windowed round its caret, and never changes a height.
 - **I137** — *(§3ar F4, F8, §105, A01 D8)* **A field's value is block data, and a submit writes the values as its command's arguments.** The reader's value is written by a shell-origin `replace` of the form as the store holds it at the write, so a producer's other changes survive. A button with `submit: true` dispatches its `fill` or `exec` with the command extended, per field with a non-empty value in field order, by ` <flag> <value>` — `flag` `--<id>` when absent and nothing when `""`, the value quoted by C18's `quote`. The dispatch is C23's, so C23 I18's frozen-entry refusal holds.
 
 

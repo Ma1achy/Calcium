@@ -930,6 +930,11 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 **The proposal**: keep what is built. Every alternative spends a second carrier on one column. One is a half-cell edge (`▕`/`▏`) facing the focused pane, which is a glyph the registry does not have. Another is accent on the divider whenever either pane is focused, which says *in the split* and not *which side*.
 
+
+**47 · OPEN — §105's form indents its fields one cell right of the button row, and C09 I87 forbids it.** §105 draws ` name        prism-serve` over `› save    cancel`: every field row starts one cell right of the button row's `›`. C09 I87 says nothing is drawn left of a block's **head**, its first drawn row, on any row — a naive drag picks up whatever sits in that gutter as though it were text (`R-SEL-016`). With the fields first, the head is the first field row at column 1, and the button row starts at column 0, left of it.
+
+**Built meanwhile** (C04 §3ar): the fields flush at column 0, so the button row is exactly the figure's and every field column is the figure's less one. **Why parked, not ruled**: keeping the figure's cell means weakening I87, and the obvious weakening — measure from the leftmost row rather than the head — is the tautology I87 records its own control catching. **The one-word answers**: (a) keep it flush; (b) indent the button row with the fields, so `›` sits at column 1 under the labels' first letter; (c) I87 exempts a row whose first cell is a mark the block declares, which is a list.
+
 ---
 
 ## Not yet recovered
