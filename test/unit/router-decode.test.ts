@@ -921,3 +921,7 @@ describe("C16 §2b — I12 held on one ESC arm of four (F1045)", () => {
     }
   });
 });
+
+describe("C16 focus reports (I61)", () => {
+  it.todo("T1.160 (I61, I44): a focus report decodes and is never routed — not deferred on a component: specified ahead of the code in this commit");
+});

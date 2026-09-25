@@ -440,3 +440,8 @@ describe("C02 the route (I15)", () => {
     expect(isUsable({ ...dumb, renderMode: "rich" }), "rich does not").toBe(false);
   });
 });
+
+describe("C02 notifications (I16, I17)", () => {
+  it.todo("T1.16 (I16, I11): notification from the one identification — not deferred on a component: specified ahead of the code in this commit");
+  it.todo("T1.17 (I17): CALCIUM_NOTIFY, canonical and warned — not deferred on a component: specified ahead of the code in this commit");
+});

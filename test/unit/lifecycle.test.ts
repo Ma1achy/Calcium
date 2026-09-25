@@ -658,3 +658,7 @@ describe("C01 the linear profile (I22)", () => {
     expect(() => dead.acquire(), "and rich without an alternate screen is fatal").toThrow(/alternate screen/u);
   });
 });
+
+describe("C01 focus reporting and the title stack (I23, I24)", () => {
+  it.todo("T1.31 (I23, I24): focus reporting taken iff a rung is opted in, and the title pushed once and popped — not deferred on a component: specified ahead of the code in this commit");
+});

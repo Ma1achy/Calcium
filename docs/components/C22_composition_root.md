@@ -2508,6 +2508,112 @@ is held under it exactly as C17 I29 holds it under a field.
 - **A form in linear** — *mixed forms add an explicit text arm* — and **the toast**, which is
   transient status and in linear is a line.
 
+## 6n. Notifications, walked by hand — reaching a reader who left (ruling 27, `R-NTF-001`)
+
+*A four-minute turn means you left. Something has to reach you* (§014). `R-NTF-001` is the rule —
+*a watched run that completes while it is not visible emits the declared completion notification
+without moving the reader* — and everything that gives it a subject is `example` prose, which
+ruling 27 settled: **§088 §3's five earning rows plus §014's *the model failed***, because a row
+dropped in silence is not a decision; **§014's three rungs as drawn** — the bell, a system
+notification, the title; and **the watch built as a declaration that producers fill.** §014 adds
+the two properties every rung has: *detected, not assumed*, and *opt-in, because a tool that
+beeps at you unasked is a tool people mute forever.*
+
+### 6n.1 — measured before ruling
+
+- **Nothing emits any of the three rungs.** `git grep` over `src/` for `\x07`, `]2;`, `]9;`,
+  `1004` and a title write finds the one `BEL` constant in `presentation/rows.ts`, which is the
+  sanitiser's name for a byte it strips. There is no bell, no title and no focus reporting.
+- **A focus report is swallowed today, whole.** Through `createDecoder` with an advancing
+  clock, `ESC [ I` and `ESC [ O` each yield `[]` from `push` and from `poll`, and a following
+  `a` yields its key. So no report has ever leaked as a key — and none has ever been heard.
+- **Which terminal takes which system notification is in each terminal's own documentation**,
+  read 2026-09-25: iTerm2's escape-code page defines `OSC 9 ; message ST` and never mentions
+  777; WezTerm's lists OSC 9 and OSC 777's `notify` extension; kitty's says *kitty also
+  supports the legacy OSC 9 protocol developed by iTerm2*; Ghostty's defines OSC 9 and warns
+  that ConEmu also uses OSC 9, so *the title should not begin with a number and then a
+  semicolon*; foot's `foot-ctlseqs(7)` lists OSC 9, 99 and 777, mode 1004 and the title stack
+  `CSI 22 ; 2 t` / `CSI 23 ; 2 t`. **All five take OSC 9, and none needs 777.**
+- **A settled document carries its duration** (`meta.durationMs`) and its state is the head's
+  (C23 I59) — the ~30 s row needs no clock of the notifier's own.
+- **The residue §014 draws for *when you come back* does not ship.** `● 3 entries settled while
+  you were away · ⌘↓ to the bottom` has no counterpart: the owner line's `N waiting` chip
+  (`bufferedEntries`) counts entries a **frozen** view holds back (C14 I34), not entries that
+  arrived while the reader was elsewhere, and `git grep` finds no new-entries-below indicator.
+  *First drafted as "already ships", from the chip's field name* — checked before committing.
+
+### 6n.2 — the classification table: which facts earn, and which one when two do
+
+**One settle is one fact, and it earns at most one notification** (I126). The rows are the cells
+where two earning rules could both claim a settle — a row governed by one rule restates it.
+
+| watched | failed | ran ≥ 30 s | earns | its word |
+|---|---|---|---|---|
+| no | no | no | nothing — §014's *a tool call ended, never* is the short case | — |
+| no | no | yes | *a turn ended* | `done` |
+| no | yes | no | *the model failed*, always | `failed` |
+| no | yes | yes | **one**, the failure — the more specific row | `failed` |
+| yes | no | no | *a watched run ended*, always | `done` |
+| yes | no | yes | **one**, the watched row — the ≥ 30 s row adds nothing | `done` |
+| yes | yes | either | *a watched run failed*, **one** | `failed` |
+
+A question arriving is its own fact — *a question is waiting, always* — and its word is
+`waiting`. `failed` is C23 I59's state; `cancelled` and `succeeded` are both *ended*.
+
+### 6n.3 — the sequence trace: what happens when two things meet
+
+| # | sequence | what is written | the rule it forced |
+|---|---|---|---|
+| 1 | `CALCIUM_NOTIFY` absent; a 45 s entry settles | nothing, and `?1004h` was never taken | opt-in is the default, and not a byte changes (C01 I23) |
+| 2 | opted in; **no focus report has ever arrived**; a 45 s entry settles | nothing | *detected, not assumed*: a terminal that never said it lost focus is one the reader may be looking at (I127) |
+| 3 | opted in `bell`; `ESC [ O`; a 45 s entry settles; a 2 s one settles | `BEL` once | the table's short row, across a gap in focus |
+| 4 | opted in `title`; `ESC [ O`; two long entries settle; `ESC [ I` | `CSI 22;2t`, `OSC 2 • prism · done` twice, then `CSI 23;2t` | **pushed once per absence**, popped on return — two pushes and one pop would leave the stack a level deep (C01 I24) |
+| 5 | `title`; `ESC [ O`; a long entry settles; the session exits while away | push, title, and **pop at release** | release restores what acquire did not take — the title is a mode taken late (C01 I24) |
+| 6 | `system` opted, `notification: "none"` | nothing for that rung; the others fire | the rung is detected; opting in cannot make a terminal take OSC 9 (I128) |
+| 7 | `ESC [ O`; a question arrives | every opted rung, word `waiting` | *always — the turn is BLOCKED* |
+| 8 | a question arrives while focused; then `ESC [ O` | nothing | the fact arose while the reader could see it; leaving is not a new fact |
+| 9 | a question's guard is armed (C16 I44); `ESC [ I` arrives; then `2` | the guard still refuses `2` | **a focus report is not a key and not an activation** — decoded, never routed (C16 I61) |
+| 10 | `ESC [ O`; `/clear`; an entry cleared before settling settles | nothing | an entry the transcript no longer holds has no fact to report — §6m.3 row 2's shape |
+| 11 | an entry watched while streaming; it settles in 2 s, away | every opted rung, `done`, and the watch is gone | *it drops itself when the run ends* — so a second settle cannot earn twice (I130) |
+| 12 | `watch` on a settled entry, or an id that is not one | refused, `false` | a watch on a run that has ended is a declaration with no future to watch |
+| 13 | `ESC [ O`; a long entry settles while the reader is scrolled away | the rungs; the viewport, focus and transcript unchanged | *without moving the reader* (I129) |
+| 14 | the linear route (§6m), `ESC [ O`, a long settle | the rungs, beside the stream | a rung is not an event of the stream, so the stream's rules neither add nor forbid it |
+
+### 6n.4 — the rulings
+
+1. **The earning table is §6n.2**, and a settle's duration is its document's `meta.durationMs`
+   against **30 000 ms** — §014's *~30s* with the tilde read as the design's, not a range.
+2. **The focus gate is the terminal's own report.** Focus reporting (`CSI ? 1004 h`) is taken
+   when any rung is opted in; *unfocused* is the last report being `ESC [ O`, and never having
+   had one is focused.
+3. **The rungs fire together, per fact, in a fixed order — bell, system, title** — each only if
+   opted in and, for `system`, only if `notification` is `osc9`. **The rate is 49's**: a numeric
+   limit on a stream of facts is the question parked for linear announcements, and until it is
+   answered each fact rings once.
+4. **The words are linear's** — a consistent picture beats a single rule. The system body is the
+   binary's name, then §6m.2's completion line (`prism: entry 3: pytest — failed, 4s`) or the
+   question line (`prism: question: which branch? 1 feat/c26, 2 main`); control-stripped, and
+   never opening with a number and a semicolon, which Ghostty reserves for ConEmu. The title is
+   §014's as drawn: `• <binary> · <word>`.
+5. **The watch is a declaration, and its producers arrive later** (ruling 27's first sentence).
+   A streaming entry can be watched; the watch drops at settle and its completion earns always.
+   **Nothing in the tree fills it today**: `/watch` is a ninth framework verb, which C05 §3 makes
+   a breaking change, and the footer's watch row (§085) is `example` display — both parked as
+   **50**.
+
+### 6n.5 — what the rulings leave behind, named so it is not read as coverage
+
+- **OSC 777.** §014 names it beside OSC 9, and every terminal the table identifies takes OSC 9.
+  The one that takes 777 alone is urxvt, through a Perl extension whose presence nothing in the
+  environment reports — an arm no detection could select, so it is not built.
+- **Windows Terminal is `none`**: its OSC 9 is ConEmu's family of sub-commands, unmeasured here.
+- **The watch's producers and its footer row** — **50**.
+- **The rate of repeated rungs** — **49**.
+- **The return line** — §014's *the transcript says what you missed*. The transcript holds
+  entries, and a line appended to it is either an entry the reader never ran or a second kind of
+  row §6m's stream would have to read; the placement is a visible choice the design leaves open —
+  **51**.
+
 ## 7. Health and identity
 
 **Identity comes from the app, through `config.identity`.** C22 owns the cadence
@@ -2805,6 +2911,11 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I123** — *(§6m.3 row 1, row 8)* **An event is written with the input line erased first and redrawn after**, caret where it was, and the line is windowed to the width round its caret, so a long draft never wraps a row the next erase cannot reach.
 - **I124** — *(§6m.4 ruling 8, §107)* **Every event carries an announcement level**: `assertive` for a failed completion, a question and an appended error or warning notice; `polite` otherwise. Linear stdout writes both, and no event names a transport that does not exist.
 - **I125** — *(§6m.4 ruling 10, §107)* **`/capabilities` shows the route first, then every capability field with its value and its source** — `declared`, `stated`, `inferred`, `assumed` or `unreachable`, as C02 resolved it.
+- **I126** — *(§6n.2, ruling 27, `R-NTF-001`)* **A settle earns at most one notification, by §6n.2's table**: failed always (*the model failed*, *a watched run failed*); a watched entry's end always; any other end only when its document's `meta.durationMs` is at least 30 000 ms. A question arriving earns one, word `waiting`. Each fact earns once, by id — a second settle says nothing.
+- **I127** — *(§6n.4 ruling 2, §014 *detected, not assumed*)* **Nothing earns while the reader may be looking.** *Unfocused* is the terminal's last focus report being `ESC [ O` (C16 I61); a session that has never had one is focused, and a fact that arose while focused earns nothing when the reader later leaves.
+- **I128** — *(§6n.4 rulings 3–4, §014)* **An earning fact fires every opted rung, in the order bell, system, title**: `BEL`; `OSC 9 ; <binary>: <line> ST` only while `capabilities.notification` is `osc9`; the title `• <binary> · <word>` through C01 I24. The line is §6m.2's completion line or §6m.3's question line, control-stripped, and never opens with a number and a semicolon.
+- **I129** — *(`R-NTF-001` *without moving the reader*)* **A notification writes only its rungs' bytes.** No entry is appended, no focus moves, no viewport scrolls and no frame is scheduled for it.
+- **I130** — *(§6n.4 ruling 5, §085, §091)* **A watch is a declaration on a streaming entry, and it drops at settle.** `watch(id)` is `true` for a streaming entry the transcript holds and `false` otherwise; the entry's settle earns by I126's watched rows and removes the watch, so the declaration cannot earn twice. Its producers — `/watch`, the footer's watch row — are parked as 50.
 
   **The composition root owns both halves and they are separate.** *Where the blocks go* is this invariant; *who has the keyboard* is C16 I49, and the root wires the second by answering `attachedChild` from the attachment as well as from `inFlight() === "shell"`. Keeping them apart is what makes the child's ownership independent of where its output landed — which is the distinction the single `kind: "view"` flag could not hold, since a layer that filled the region carried both claims in one field and neither was declared.
 
@@ -3264,6 +3375,7 @@ PTY harness.
 - **T1.73** (I116, §6l.13 K1, K3): the default footer given `toast: "copied 3 lines"` draws `✓ copied 3 lines` where the working directory was, and the cwd is absent from that row; given none, the cwd is drawn — asserted at Unicode and at ASCII, where the mark is `glyphFor("ok")`.
 - **T1.74** (I120, I121, I124): §6m.2's table, row by row, through the event function alone — each change kind against a streaming and a settled entry, an appended refusal after settle, a replace after settle writing nothing, a second settle writing nothing, and the number reading `seq` after an eviction.
 - **T1.75** (I121): every kind of `ONE_PER_KIND` through the body function — role, name and value text, a table's header before its rows, a choice without its radio glyph, nothing for a figure but its name, a notice's text once, and no SGR or glyph in any line — through the registry a session builds, with C11's, C12's and C25's kinds registered.
+- **T1.76** (I126, I127, I130): §6n.2's seven rows through the earning function alone — watched × failed × a duration either side of 30 000 ms — each giving exactly its row's word or nothing; a second settle of one id gives nothing; a watch on a settled or unknown id is `false`, and a watched entry's settle clears it.
 - **T1.65c** (I111, §6l.10): the ground reader sees a background that is not the sequence's first parameter, and does not read a 256-colour or rgb *foreground* whose index spells `4x` or `10x` as one. The reader's own fabricated violation, and it earned its place: the first draft matched only at the head of the sequence, so a rule that was painting `38;5;188;48;5;235` was reported as painting nothing — a defect of the instrument that reads exactly like a defect of the code.
 - **T1.65d** (I111, §6l.10): a supplied string that strips to nothing — `""`, spaces, a tab — leaves the frame that shipped, and a padded name still draws. The narrowing belongs to the frame because an application computing its label may return a blank on some frames, and a one-cell ground floating in the rule is not a name.
 - **T1.67** (I112, §6l.11, C17 §5c): a prompt holding a chip paints a background over exactly the chip's cells and nothing else, and a prompt holding the same text without a chip paints none. Read off the emitted bytes, since the screen model folds SGR away.
@@ -3325,6 +3437,7 @@ PTY harness.
 - **T4.102** (I119, I120, I123, C01 I22): bytes through stdin on a session with `renderMode: "linear"` — no `?1049h`, `?1002h` or `?25l` is written; a local verb writes its start and completion as ruling 29's lines and its body; a typed draft is erased and redrawn round an event with the caret where it was; a resize writes nothing but the input line; and a linear session **opened** below the rich route's 60 × 16 floor opens rather than drawing the fallback — the gate at open and the gate at resize are two sites, and a row resizing an open session reaches only the second.
 - **T4.103** (I122, I124): a question in linear — its numbered line, the cue carrying `(ready in a moment)` while C16 I44's guard is armed, the first `2` refused and the cue redrawn without it, the second `2` answering the second choice, `answer: <label>`, the input line reading `answer 1 to 3:` while open; the same question on the rich route, where `2` answers nothing and the draft given back after; the question's level `assertive`.
 - **T4.104** (I125, C02 I15): `/capabilities` under `CALCIUM_RENDER_MODE=linear` — the route row first, reading `linear` and `stated`, and every capability field after it.
+- **T4.105** (I126–I129, C01 I23, C01 I24, C16 I61, C02 I16, C02 I17): bytes through stdin with `CALCIUM_NOTIFY=bell,system,title` and `TERM_PROGRAM=WezTerm` — `?1004h` taken at open; a 45 s settle before any focus report writes no rung; after `ESC [ O` it writes `BEL`, `OSC 9` naming the entry and `CSI 22;2t` then the title, a 2 s settle writes nothing, and a second long settle writes a title with no second push; `ESC [ I` writes `CSI 23;2t`; a question arriving while away writes `waiting`; the viewport's position is unchanged throughout. The same session with `CALCIUM_NOTIFY` absent writes none of those bytes and takes no `?1004h`.
 - **T4.98** (I117, C04 §3aq E5): a press on the divider's column, a motion report with button 0 held five columns to the right, then the release — the divider is five cells right on the frame and focus is where it was. A motion report after the release moves nothing.
 - **T6.113** (I101): the range split dropped from the slot → T4.89a renders every kept child; the gap row dropped from the assembly → T4.89b fails on the first `gapBefore` child.
 - **T6.114** (I100, C09 I70): the memo dropped from the window's closures in `session.ts`, or from C14's measurer in `construct.ts`, or from the profiler's wrapper round `measureSequence` → T4.88 fails; the registry ignoring a handed memo, or keeping it past the call → C09 T1.44 fails.

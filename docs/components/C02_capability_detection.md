@@ -37,6 +37,8 @@ type TerminalCapabilities = Readonly<{
   keyboardProtocol:   "none" | "kitty";
   altScreen:          boolean;
   renderMode:         "rich" | "linear";   // I15 — the route, not the terminal's
+  notification:       "none" | "osc9";     // I16 — a system notification the terminal takes
+  notify:             readonly ("bell" | "system" | "title")[];   // I17 — the rungs the reader opted into
 }>;
 
 function detectCapabilities(
@@ -92,6 +94,8 @@ everything the hover sets, `←`/`→` on a focused plot set too (C16 §4a).
 | `backgroundPolarity` | `COLORFGBG`'s **last** `;`-separated field: 0–6 or 8 → `dark`; 7 or 9–15 → `light`; absent, non-numeric or outside 0–15 → `unknown`. Not gated by `dumb` — the rule is derived from `COLORFGBG` and not from `TERM` |
 | `altScreen` | `TERM` present and ≠ `dumb` |
 | `renderMode` | `CALCIUM_RENDER_MODE` is `linear` or `rich`; otherwise `rich`, `assumed`. Not gated by `dumb` (I15) |
+| `notification` | the identification: kitty, Ghostty, iTerm2, WezTerm and foot → `osc9`; Windows Terminal and an unidentified terminal → `none`; inside `TMUX`, `unreachable` (I16) |
+| `notify` | `CALCIUM_NOTIFY`, comma-separated, of `bell`, `system`, `title` — `stated`; absent → `[]`, `assumed`; an unknown member is dropped with a warning naming it (I17) |
 
 ### One identification, consulted by every capability
 
@@ -201,7 +205,7 @@ wrong**, which is the only property a consumer can act on:
 | kind | the answer came from | wrong when |
 |---|---|---|
 | `declared` | the reader's own `[terminal]` override (I4) | never — it is not a claim about the terminal |
-| `stated` | a variable whose **value carries the fact**: `COLORTERM`, `COLORFGBG`, `LC_ALL` · `LC_CTYPE` · `LANG`, `CALCIUM_RENDER_MODE` | the writer of the variable is wrong |
+| `stated` | a variable whose **value carries the fact**: `COLORTERM`, `COLORFGBG`, `LC_ALL` · `LC_CTYPE` · `LANG`, `CALCIUM_RENDER_MODE`, `CALCIUM_NOTIFY` | the writer of the variable is wrong |
 | `inferred` | the identification — a **name** matched against a table | **the name is wrong**, which is a whole class: `TERM` set by hand, a terminal borrowing another's terminfo entry, a name that survives a hop the capability does not |
 | `assumed` | `TERM` is present and not `dumb`, or its shape contains `256color` — nothing about *which* terminal this is | any terminal that is present and does not do the thing |
 | `unreachable` | nothing: the terminal was identified and the sequence is **known not to reach it** (F432's measurement) | it stops being true when the wrapper in `escapes.ts` lands |
@@ -219,6 +223,8 @@ wrong**, which is the only property a consumer can act on:
 | `keyboardProtocol` | `inferred` | `inferred` | **`unreachable`** | `declared` |
 | `altScreen` | `assumed` | `assumed` | `assumed` | `declared` |
 | `renderMode` | `assumed` | `assumed` | `assumed` | `declared` |
+| `notification` | `inferred` | `inferred` | **`unreachable`** | `declared` |
+| `notify` | `assumed` | `assumed` | `assumed` | `declared` |
 
 **The gate demotes `colourDepth` and refuses the other three, and that asymmetry is the table's
 content rather than an inconsistency.** Inside a multiplexer the identification is `null` for every
@@ -540,6 +546,7 @@ fine; what cannot happen is a field with no row, or a row for no field.
 | Background polarity | `backgroundPolarity` | `unknown` keeps the app's own opening theme — the set's first key, or whatever the reader persisted. Nothing is painted differently and no notice is drawn: a terminal that does not say is a terminal the framework does not guess about | C22 |
 | Alternate screen | `altScreen` | **The shell refuses to open**, prints help, exits 0 — on the rich route; linear needs none (I7, I15) | L4 |
 | Route | `renderMode` | **Linear**: an append-only stream of semantic events, and no frame (C22 §6m) | L4 |
+| System notification | `notification` | The `system` rung writes nothing; the bell and the title still reach a reader who opted into them (C22 I128) | L4 |
 
 Alternate screen is the sole hard requirement (D28). A fullscreen application on the primary screen destroys the user's scrollback, which is worse than not running.
 
@@ -569,6 +576,8 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 
 - **I14** — **Nothing in the framework reads what the terminal says back, and the record's lifetime is the reason.** A reply is unreadable until raw mode — measured, four queries against XTerm(398) and kitty 0.41.1 give **0 bytes in 1500 ms** of canonical mode against 0.89–0.99 ms and 13.3–23.4 ms in raw — and raw mode is entered in one place, C01's `acquire()`, which C22 reaches after the record has been built at its step 2, read at eleven sites and handed into six objects built there — the lifecycle, the frame scheduler, the profile view, the pipeline, C16's decoder and the session graph. C22 I58's cache key omits the record **because** it never moves (T4.18d). So a capability answered from the wire would have to move a record six objects already hold, which is C22's to allow and not this component's to do. **The reason is neither of the two it reads as, and both are measured in §3 so that a reader who checks finds the argument does not rest on them**: C16 I32 makes a reply harmless, and a burst terminated by DA1 prices a probe at one round trip with a silent capability costing nothing. A reply channel, if one is built, runs **before construction** and arrives as `TuiConfig.capabilities` overrides — I4 makes them win, I13 records them `declared`, and the entry point is C24's. **The watch is on the condition and not on the remedy** (T2.10): raw mode is the entry price a reply reader cannot avoid, so a scan for every route into it fails the day one exists, where a row asserting `q=2` on C09's transmissions would be green for exactly as long as the silence is (F414, F1057).
 - **I15** — *(C22 §6m, §107, `R-ACC-001`, parked 28)* **`renderMode` is `"rich" | "linear"`, read from `CALCIUM_RENDER_MODE`, and carries its source like every field.** `linear` or `rich` there is `stated`; absent, the route is `rich` and `assumed`; any other value leaves `rich` `assumed` and warns naming the value, as an invalid override does (I4); a `capabilities.renderMode` in `TuiConfig` is `declared` and wins. **It is not gated on `TERM`**: a terminal that says `dumb` is one a screen reader may well be driving, and the route is the reader's to choose. `--linear` and persistent config are §107's other two selectors and wait on question 28's producers.
+- **I16** — *(C22 §6n.1, ruling 27, → I11)* **`notification` is `"none" | "osc9"`, read from the one identification (I11)**: every terminal the table names takes OSC 9 by its own documentation except Windows Terminal, whose OSC 9 is ConEmu's family; inside a multiplexer it is `none`, `unreachable`. OSC 777 is not an arm: the one terminal that takes it alone reports nothing that would select it.
+- **I17** — *(C22 §6n, §014 *every one is opt-in*)* **`notify` is the rungs the reader opted into, read from `CALCIUM_NOTIFY`**, a comma-separated list of `bell`, `system` and `title` in any order, duplicates collapsed, frozen in that canonical order; `stated` when present, `[]` and `assumed` when absent. An unknown member is dropped and warned about by name, as I15's invalid route is; the empty list is the default, so nothing rings unasked.
 
 ---
 
@@ -615,6 +624,8 @@ A table of `env` fixtures. No mocks, no terminal.
 - **T1.13** (I11, I12): keyboard protocol — `TERM=xterm-kitty`, `TERM=xterm-ghostty`, `TERM_PROGRAM=WezTerm` and `TERM=foot` → `kitty`; `TERM_PROGRAM=iTerm.app`, `TERM_PROGRAM=WindowsTerminal` and plain `xterm` → `none`; **and `TERM=xterm-kitty` with `TMUX=/tmp/x` → `none`**, through the identification's gate rather than a gate of its own — asserted beside `imageProtocol` in the same row, because a gate applied to one column and not the other is the state T1.12b was written against. `keyboardProtocol: "kitty"` declared over `TERM=xterm` wins (I4), and `"sixel"` declared for it is rejected with a warning (T3.5's shape).
 - **T1.14** (I13): **`sources` over the whole record, at four environments in one row** — `TERM=xterm-kitty`, plain `xterm`, the same kitty inside `TMUX`, and one with an override. The four together, because a source asserted at one environment is satisfied by a constant: the row that carries the content is kitty inside tmux, where `colourDepth` goes to `assumed` and the other three to `unreachable` from the same gate. `COLORTERM` beside the name moves `colourDepth` from `inferred` to `stated` with the value unchanged at 24 — **the value cannot see that move**, which is the whole argument for the field. **The three `stated` fields are also asserted at the environment that states nothing, and the mutation pass is why**: flipping each *nothing carried the fact* arm to `stated` killed nothing at first, because `assumed` is produced by four other fields at every fixture, so T2.9's bijection, its control over the set of kinds, and every whole-map comparison stayed green. A set over sites records the vocabulary and reads as though it records the assignment.
 - **T1.15** (I15, I7): `CALCIUM_RENDER_MODE` at `linear`, `rich`, absent and `braille` → `linear`/`stated`, `rich`/`stated`, `rich`/`assumed`, and `rich`/`assumed` with one warning naming `braille`; an override `renderMode: "linear"` over `rich` in the environment → `linear`/`declared`; `TERM=dumb` with `linear` stays `linear`. `isUsable` with `altScreen: false` is false on `rich` and true on `linear`.
+- **T1.16** (I16, I11): `notification` for `TERM_PROGRAM` `iTerm.app`, `WezTerm`, `ghostty`, `TERM=xterm-kitty`, `TERM=foot` → `osc9`/`inferred`; `WindowsTerminal` and `TERM=xterm` → `none`; `TERM=xterm-kitty` under `TMUX` → `none`/`unreachable`.
+- **T1.17** (I17): `CALCIUM_NOTIFY` at `title,bell`, `bell,bell`, absent and `bell,beep` → `["bell","title"]`/`stated`, `["bell"]`/`stated`, `[]`/`assumed`, and `["bell"]`/`stated` with one warning naming `beep`; an override `notify: ["system"]` → `declared`.
 - **T1.8**: alt screen — `TERM=xterm` → true; `TERM=dumb` → false; `TERM` unset → false.
 - **T1.9** (I4): every field can be overridden, including `altScreen: true` on `TERM=dumb`.
 - **T1.10** (I7): `isUsable` is true iff `altScreen`, regardless of every other field being at its worst value.
