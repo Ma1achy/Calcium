@@ -152,6 +152,12 @@ export type KeyDeps = Readonly<{
    * a copy cannot leave the process is the mode's statement rather than a key's.
    */
   copySelectedEntries: () => void;
+  /**
+   * A toast in the footer's tail (C22 I116, §012) — for a fact that changed
+   * nothing, which a copy is: *you pressed a key and something happened. What
+   * says so?*
+   */
+  toast: (text: string) => void;
   /** The caret's four, as one dep with two axes (C14 I37, §6c). */
   moveSemanticCaret: (delta: number, extend: boolean) => void;
   /**
@@ -1205,6 +1211,11 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         .join("\n");
       if (text === "") return;
       deps.editor.copyText(text);
+      // **What says so** (C22 I116, §012): a copy changes nothing, so it
+      // confirms in the footer, briefly. Counted in lines because the elements
+      // are rows and the text is joined on newlines.
+      const lines = text.split("\n").length; // cells-ok — a count of lines
+      deps.toast(`copied ${String(lines)} ${lines === 1 ? "line" : "lines"}`);
     },
 
     /**

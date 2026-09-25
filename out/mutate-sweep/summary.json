@@ -1,14 +1,14 @@
 {
   "label": "all",
-  "only": "c04-tree-kind",
+  "only": "c22-toast",
   "rows": [
     {
-      "run": "c04-tree-kind.mjs",
+      "run": "c22-toast.mjs",
       "exit": 0,
-      "seconds": 28,
+      "seconds": 25,
       "state": "green",
       "restored": 0,
-      "caught": 13,
+      "caught": 8,
       "elsewhere": 0,
       "survived": 0,
       "anchorMissed": 0,

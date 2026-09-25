@@ -122,6 +122,8 @@ export type ComposeDeps = Readonly<{
    * frame declare a zero it cannot be wrong about.
    */
   bufferedEntries?: () => number;
+  /** C22 I116 — the live toast's text, or undefined. Optional: absent is *none live*. */
+  toast?: () => string | undefined;
   /**
    * The copy rung's mode and size (C14 I55). Optional for `bufferedEntries`'
    * reason: a composition with no session graph has no mode to report.
@@ -190,6 +192,7 @@ export function compose(deps: ComposeDeps): Composed {
   const lastFrame = deps.lastFrame?.();
   const capabilities = deps.capabilities();
   const copy = deps.copy?.();
+  const toast = deps.toast?.();
   const ctx = {
     session,
     now,
@@ -203,6 +206,7 @@ export function compose(deps: ComposeDeps): Composed {
     ...(lastFrame === undefined ? {} : { lastFrame }),
     ...(capabilities === null ? {} : { capabilities }),
     ...(copy === undefined ? {} : { copy }),
+    ...(toast === undefined ? {} : { toast }),
   };
 
   const { header, footer, label } = chromeOf(deps, ctx);

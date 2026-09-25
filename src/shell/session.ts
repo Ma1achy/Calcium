@@ -307,6 +307,12 @@ const ORBIT_RATE = (2 * Math.PI) / 12_000;
  */
 const CAPTURE_DRAIN_MS = 250;
 
+/**
+ * How long a toast lives (C22 I116, §6l.13) — §012's *it replaces the footer's
+ * own tail for ~2s, then the tail returns*.
+ */
+const TOAST_MS = 2000;
+
 class Session implements TuiInstance {
   #state: SessionState = "created";
   #graph: Graph | null = null;
@@ -823,6 +829,10 @@ class Session implements TuiInstance {
     // open — the same shape `refresh.dispose()` sets `stopped` first for.
     this.#spinner?.[Symbol.dispose]();
     this.#spinner = null;
+    // C22 I116, §6l.13 E3 — the toast's expiry on the same terms as the ticker.
+    this.#toastTimer?.[Symbol.dispose]();
+    this.#toastTimer = null;
+    this.#toast = null;
     this.#animation = NOTHING_ANIMATES;
     this.#tickAt = null;
     this.#motionAt = null;
@@ -1569,6 +1579,30 @@ class Session implements TuiInstance {
   #autoscroll: Disposable | null = null;
 
   /**
+   * The live toast and its expiry (C22 I116, §6l.13, §105, §012).
+   *
+   * **The text and a timer, and no stamp**: the lifetime is the scheduled
+   * expiry, so nothing here reads time. The handle is held rather than fired
+   * and forgotten because two toasts are the interaction (§6l.13 E2) — the
+   * first's expiry, left armed, would clear the second early.
+   */
+  #toast: string | null = null;
+  #toastTimer: Disposable | null = null;
+
+  #raiseToast(text: string): void {
+    const graph = this.#graph;
+    if (graph === null || graph.session.snapshot.stopping) return;
+    this.#toastTimer?.[Symbol.dispose]();
+    this.#toast = text;
+    this.#toastTimer = this.config.schedule(() => {
+      this.#toastTimer = null;
+      this.#toast = null;
+      graph.scheduler.commit("input");
+    }, TOAST_MS);
+    graph.scheduler.commit("input");
+  }
+
+  /**
    * A pointer gesture in semantic copy mode (C14 §6f, `R-SEL-012`).
    *
    * The width is taken once and used for all three of the caret, the spans and
@@ -1829,6 +1863,7 @@ class Session implements TuiInstance {
       selectEntryUnderCaret: () => this.#selectEntries("caret"),
       selectAllLoadedEntries: () => this.#selectEntries("all"),
       copySelectedEntries: () => this.#copySelectedEntries(),
+      toast: (text) => this.#raiseToast(text),
       moveSemanticCaret: (delta, extend) => this.#moveSemanticCaret(delta, extend),
       semanticDrag: (row, phase) => this.#semanticDrag(row, phase),
       enterNativeSelection: () => this.#setNativeSelection(true),
@@ -1905,6 +1940,8 @@ class Session implements TuiInstance {
       // C14 I55 — which copy mode, and how much `⏎` would take. Over the held
       // view, as the copy itself is (A6), so the count is the paste.
       copy: () => this.#copyState(),
+      // C22 I116 — the live toast, drawn in the footer's tail while it lives.
+      toast: () => this.#toast ?? undefined,
       // A03 SS47 — the owner line draws chords, so the chrome resolves them.
       capabilities: () => graph?.capabilities ?? null,
       // C24 I32 — read per frame from the recorder rather than kept here. A

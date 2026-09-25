@@ -146,6 +146,16 @@ export type ChromeContext = Readonly<{
    */
   copy?: CopyState;
   /**
+   * The live toast's text, if one is live (C22 I116, §6l.13, §105, §012).
+   *
+   * **For a fact that changed nothing** — a copy, a toggle with no record —
+   * and drawn by the default footer in place of its tail for `TOAST_MS`. Handed
+   * to an application's own footer as `copy` and `owner` are; one that ignores
+   * it draws none, which §012's table allows because nothing here is the only
+   * record of anything. Absent when no toast is live.
+   */
+  toast?: string;
+  /**
    * C02's resolved record, because **the chrome draws marks and a mark needs a
    * rung** (A03 SS47, C09 I22). The owner line's chords are `⏎ ⇧ ⇥ ⌃] ←→ ↑↓`,
    * none of which an ASCII terminal can render, and a framework string carrying

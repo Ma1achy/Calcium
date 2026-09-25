@@ -16,7 +16,7 @@
 
 import { block } from "../data/viewmodel/index.js";
 import type { Block, Pills } from "../data/viewmodel/index.js";
-import { glyphs } from "../presentation/blocks/index.js";
+import { glyphFor, glyphs } from "../presentation/blocks/index.js";
 import { cells } from "../presentation/text.js";
 import type { ChromeContext, ChromeFn, CopyState } from "./types.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
@@ -444,7 +444,18 @@ const footer = (ctx: ChromeContext): readonly Block[] => [
         ? []
         : [{ label: formatFrameCost(ctx.lastFrame), tone: "muted" as const }]),
     ],
-    [{ label: foldHome(ctx.session.cwd, ctx.session.env["HOME"]), tone: "muted" }],
+    // **The toast replaces the tail for its lifetime** (C22 I116, §012): the
+    // working directory is what it displaces, and it returns unchanged. `ok`
+    // tone and `ok`'s mark, so the mark carries it where tone cannot (K3).
+    ctx.toast === undefined
+      ? [{ label: foldHome(ctx.session.cwd, ctx.session.env["HOME"]), tone: "muted" }]
+      : [
+          {
+            label:
+              ctx.capabilities === undefined ? ctx.toast : `${glyphFor("ok", ctx.capabilities)} ${ctx.toast}`,
+            tone: "ok",
+          },
+        ],
   ),
   // **Last**, which is the whole of where §103 puts it: *in the footer's last
   // line*. A row above the working directory is a row a reader scans past.

@@ -393,6 +393,7 @@ describe("C22 §3 step 11 — the effect table", () => {
     selectEntryUnderCaret: () => undefined,
     selectAllLoadedEntries: () => undefined,
     copySelectedEntries: () => undefined,
+    toast: () => undefined,
     moveSemanticCaret: () => undefined,
     exitNativeSelection: () => undefined,
       manifest: null,
@@ -1039,6 +1040,8 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
       cursorBlock: () => undefined,
       rerunEntry: () => undefined,
       onAction: () => undefined,
+      // C22 I116 — the copy's confirmation; these rows are about the clipboard.
+      toast: () => undefined,
       schedule: (fn: () => void) => {
         fn();
         return { [Symbol.dispose]: () => undefined };
