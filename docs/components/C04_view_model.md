@@ -3378,6 +3378,147 @@ the tree has nowhere to go, and the split is one pane plus a picture of another.
 - E5 needs motion reports with a button held. Mode 1002 is what the session enables
   (`escapes.ts`, `MOUSE`), and C16 I30 decodes them as `press: true, motion: true`.
 
+## 3ar. `form` — labelled fields and the buttons that act on them (§105)
+
+**§105's third primitive.** A form is labelled one-line text fields, each with an optional
+hint or error, and a row of buttons. The reader edits each field in place and a button acts
+on the values. §105 draws it:
+
+```
+ name        prism-serve
+ port        80▌
+             ✗ ports below 1024 need root
+ replicas    3
+             0 stops the service
+
+› save    cancel
+```
+
+```ts
+Readonly<{
+  kind: "form";
+  id: string;
+  fields: readonly FormField[];            // at least one
+  buttons?: readonly FormButton[];
+}>
+
+type FormField = Readonly<{
+  id: string;
+  label: string;
+  value?: string;                          // one line; absent is empty
+  hint?: string;                           // decoration: dropped whole where it does not fit
+  error?: string;                          // content: replaces the hint, and wraps
+  flag?: string;                           // the flag a submit writes it under; absent is `--<id>`, "" is positional
+}>
+
+type FormButton = Readonly<{
+  id: string;
+  label: string;
+  action?: Action;
+  submit?: boolean;                        // the action's command gains the fields' values
+  default?: boolean;                       // at most one; absent everywhere is the first
+}>
+```
+
+**The figure's columns, read cell for cell.** The document indents every figure in §105
+by two cells, and the split's is flush, so the offsets below are the form's own relative
+to its button row, which starts at column 0.
+
+- **The label is Fixed and the field Grows.** Field rows start one cell in. The label
+  column is the widest label plus a gap of four, which puts `prism-serve` at column 13:
+  one cell, `replicas`' eight, then four. The field takes the rest of the width,
+  `F = w − 1 − L − 4` for the widest label `L`.
+- **The hint and the error sit under the field**, at the field's column. §105: *an ERROR
+  REPLACES THE HINT rather than joining it*. The error is `✗` and a space, then the text,
+  in `error` tone. It is the same `✗` and tone as every other failure, so a form error is
+  not a new visual idea.
+- **A blank row, then the buttons.** Each button is a two-cell mark slot then its label,
+  with two cells between buttons. The default button's slot holds `›`. The others' hold
+  two blanks, which is what puts `cancel` at column 10.
+
+**§094 decides every narrow width, and no threshold is invented here.**
+
+- **Labels and fields are content**, with a floor. The field's floor is one cell. Below it,
+  at `F < 1`, the form takes its **representation** rung: each label on a row of its own
+  at column 1, with its field, hint and error under it at column 3, where `F = w − 3`.
+- **The hint is decoration.** It is drawn whole where it fits in `F`, and dropped with no
+  mark where it does not. Decoration's minimum is a threshold and never a floor.
+- **The error is content.** It wraps in `F`, with continuation rows hung under the text
+  rather than under the `✗`. It is never truncated and never dropped. §096's
+  *losing the end loses the fact* is the reason.
+- **A value is content.** One row, end-truncated with `…` where it is longer than `F`.
+- **Buttons are content.** They wrap onto further rows as whole buttons, and one wider
+  than the row is truncated. None is shed: a button that sheds is an action the reader
+  cannot reach.
+
+`measure` is therefore the sum, per field, of `1` plus the error's wrapped rows or the
+hint's one row where it fits, plus a stacked label row per field on the representation
+rung, plus `1 + button rows` where there are buttons. It reads block data and the width
+only. The draft being edited is appearance: it is drawn on the field's one row, windowed
+round the caret, and never changes a height.
+
+**A field's value is block data, and the reader writes it with a shell-origin
+`replace`.** This is the split's divider's precedent (§3aq). A submit reads the values,
+and a value in a view store would be a submit the producer's own `replace` could not see.
+While a field is being edited the text lives in the prompt's editor, borrowed (C17 I28,
+I29, `R-QST-003`: *editor code is shared; buffers, undo stacks, and histories are
+isolated by owner*). A field is the third owner, after the prompt and a typed reply, and
+it owns neither history nor newline.
+
+**A submit writes the values as the command's own arguments.** A button with `submit: true`
+must carry a `fill` or an `exec`. Its command gains, per field with a non-empty value in
+field order, ` <flag> <value>`, with the value quoted by C18's `quote`. `flag` is `--<id>`
+when absent, and the value alone when `""`. The command is still a string the reader can
+read before it runs, which is A01 D8's argument for `fill`. C23 I18's frozen-entry refusal
+applies unchanged.
+
+### The walk — both artefacts, because a form is structure and the borrow is state
+
+**The classification table — where two rules hold at rest.**
+
+| # | the state | rules meeting | the ruling |
+|---|---|---|---|
+| S1 | `F < 1` | *the label is Fixed* × *the field has a floor* | **the representation rung**: labels on their own rows, fields under them at column 3. The label is never shortened to make room, because it is the fact that says what the field is |
+| S2 | a field with a hint and an error | *the hint is decoration* × *an error replaces the hint* | the error alone. §105 says why: *two lines under one field is two things competing to be read* |
+| S3 | a hint longer than `F` | *decoration truncates with no mark* × *a hint is a sentence* | **dropped whole**. A cut sentence reads as a different one, and §094's *then drops with no trace* is the rung that does not |
+| S4 | an error longer than `F` | *content has a floor* × *the error is one fact* | wrapped, hung under its text. The height is the producer's data and the width's, and never the focus's |
+| S5 | a value longer than `F`, not being edited | *content truncation marks loss* × *one row* | end-truncated with `…` |
+| S6 | a value longer than `F`, being edited | *the caret must be visible* × *the draft never changes a height* | the draft windowed round the caret on the field's one row, the caret drawn as §105's `▌` in a cell of its own. A block has no terminal cursor to place |
+| S7 | `›` beside a button while focus is in a field | *`›` is the palette's current-row mark* × *focus is on `port`, not `save`* | **`›` marks the default button, not focus.** The figure draws it on `save` while `port` is being edited, so it cannot be focus's. Focus is the wash, as a `choice`'s is (C09 I105) |
+| S8 | two buttons declaring `default` | *at most one default* × *a producer's data* | refused by `validateDocument`, with the field named |
+| S9 | a field id equal to a button id | *an element is addressed by id within its block* | refused. Ids are unique across fields and buttons |
+| S10 | `submit: true` on an `open` or an `expand` | *a submit writes arguments* × *those kinds have no command* | refused |
+
+**The sequence trace — where something happens in between.**
+
+| # | what happens | ruling |
+|---|---|---|
+| F1 | `⏎` on a field | **the field is entered**: C26's inside mode, and the shell takes the prompt's line whole (`hold`) and loads the field's value with the caret at its end. The field draws the editor's text and caret. The prompt row draws the held line |
+| F2 | an editing key inside | the prompt's own binding, through the borrower's action set: the reply's set without `insertNewline`, `historyPrev` and `historyNext`. `⌥←`/`⌥→` are word motion, because a field being edited is a text field (§019) |
+| F3 | a key a field does not own, inside | **rejected**, and it says so (I8). Dispatch never falls between rungs, so `↓` does not leave the field silently |
+| F4 | `⏎` inside | **commit**: the value is written by a shell-origin `replace` of the form, built from the form as the store holds it now, so a producer's newer `error` survives. Focus moves to the next field, which is entered, and the held line stays held. From the last field focus moves to the default button, in navigate mode, and the held line is given back. **`⏎` never presses a button from inside a field**: a submit is a command, and it takes a key aimed at it |
+| F5 | `esc` or `⌃c` inside | **discard**: the held line is given back exactly (C17 I28), the value is unchanged, and focus stays on the field |
+| F6 | focus leaves the field by any other path: a pointer press elsewhere, a producer's `replace` that drops the field, the entry evicted, a programmatic move | **the borrow ends, and it commits where the field still exists** — a blur keeps what was typed. **One predicate separates F5 from F6**: whether focus is still on the field. It is checked after every event, so no path out of the inside mode can leave the line borrowed |
+| F7 | an action dispatches while a field is being edited: a pointer release on a `submit` button, or a `fill` from another entry | **the borrow ends first, by F6's rule, and then the action runs.** Otherwise a submit reads the value from before the edit, and a `fill` writes a line the restore then overwrites |
+| F8 | a producer's `replace` of the form while a field is being edited, the field still present | the draft is kept. F4's `replace` is built from the form the store holds at commit, so the producer's other changes survive and the reader's value is the last write |
+| F9 | a paste inside a field | one line is inserted as one edit (C17 I5). **A paste holding a newline is refused, and says why**, which is §089's own example of REJECTED: *a refused paste*. A chip is the prompt's and never a field's |
+| F10 | `⏎` on a field in a frozen entry | entered and edited as in a live one. A value is the reader's, and nothing stale is read or run. A submit from it is refused by C23 I18 |
+
+**Checked against the layer below, because six rulings name an operation.**
+
+- F1 and F5 name `hold` and `resume`. Both exist (C17 I29), and a typed reply uses them.
+- F2 names the prompt's bindings under a borrower's filter. A typed reply's forward does
+  exactly this (C16 I54), with `REPLY_ACTIONS` as the filter.
+- F4 names a shell-origin `replace`. The split's divider uses it.
+- F1 names C26's inside mode. A `control` enters it through `viewState: true`.
+- F6 needs the focus after every event. The session already reads it to draw.
+- F7 needs a seam before every action. Every action reaches `createActionDispatcher`
+  through the one `onAction`.
+
+**What the tree did not have**, and so what is built: a field's draft on the render context,
+a caret drawn by a block, a borrower's forward at the inside rung, and an action whose
+command is completed from block data.
+
 ## 4. Patches
 
 **Four ops carry data and two carry view state, and that split is the whole reason the fifth and sixth exist.** `append`, `replace`, `merge` and `status` all say *something arrived or changed on the far side*. `expand` says *the reader opened a row*. C13 gates the first four on an entry still streaming (C13 §6) — a settled stream can receive nothing more — and the gate is wrong for the second kind: expansion is exactly what a reader does to a **finished** table.
@@ -3948,6 +4089,9 @@ band from, and it is asserted rather than left to follow.
 - **I132** — *(§3aq, §105)* **A split is two panes and a declared height.** Its `children` are exactly two blocks, its `height` is a positive integer, and its `divider` is a positive integer where present. `validateDocument` refuses each with the field named. `measure` is `height` at every width. There is no residue row, because the bars say where.
 - **I133** — *(§3aq S1–S5, §021, ruling 22)* **The divider is the left pane's bar, and it is never a second column.** At width `w ≥ 4` the left pane is `d = clamp(divider ?? ⌊(w − 2) / 2⌋, 1, w − 3)` wide, the divider is column `d`, column `d + 1` is blank, and the right pane starts at `d + 2`. It draws §021's bar for the left pane where that pane overflows `height`, and bare track where it does not. The right pane draws its own bar in its own last column by `barOf`'s one-step rule. The clamp is applied at read and never written back. Below four columns the left pane draws alone and the right is placed by neither `render` nor `elements`.
 - **I134** — *(§3aq S6, E1–E5)* **Focus crosses the divider only when asked.** Each pane contributes its block's elements, or one block-level element addressed `(split, pane's block)` where it declares none — lit with `focusGround` when focused, as a mosaic's pane is — and the walk records which pane each element is in. `↓` and `↑` skip the other pane of the split they are in, and enter a split from outside on its left pane. `←` and `→` move focus to the other pane's element nearest on screen. `⌥←` and `⌥→` move the divider one cell, and the pointer drags it. Both are a shell-origin `replace` of `divider`, and neither moves focus.
+- **I135** — *(§3ar, §105, S8–S10)* **A form is at least one field and any number of buttons, addressed by ids unique across both.** Every field has a string `id` and `label`, and `value`, `hint`, `error` and `flag` are strings where present. Every button has a string `id` and `label`, at most one declares `default`, and one with `submit: true` carries a `fill` or an `exec`. `validateDocument` refuses each with the field named.
+- **I136** — *(§3ar S1–S7, §105, §094)* **The label is Fixed, the field Grows, the hint is decoration and the error is content.** Field rows start one cell in; the field starts four cells after the widest label and takes the rest, `F`. The hint is drawn whole where it fits in `F` and dropped with no mark where it does not; an error replaces it, as `✗`, a space and the text in `error` tone, wrapped in `F` and hung under its text. A value is one row, end-truncated with `…`. Below `F = 1` each label takes a row of its own and its field sits under it at column 3. After a blank row the buttons wrap as whole buttons, each a two-cell mark slot then its label two cells from the next, and the default's slot holds `›`. `measure` reads block data and the width only: the draft being edited is drawn on the field's one row, windowed round its caret, and never changes a height.
+- **I137** — *(§3ar F4, F8, §105, A01 D8)* **A field's value is block data, and a submit writes the values as its command's arguments.** The reader's value is written by a shell-origin `replace` of the form as the store holds it at the write, so a producer's other changes survive. A button with `submit: true` dispatches its `fill` or `exec` with the command extended, per field with a non-empty value in field order, by ` <flag> <value>` — `flag` `--<id>` when absent and nothing when `""`, the value quoted by C18's `quote`. The dispatch is C23's, so C23 I18's frozen-entry refusal holds.
 
 
 ## 7. Commitments
@@ -4097,6 +4241,9 @@ Six tiers. No state machine, so no transition table.
 - **T1.55** (I129, §4, §3ap E1): `op: "expand"` toggles a node at depth zero and at depth two of one tree, refuses an id no node carries with the id named, and still refuses a kind with neither rows nor nodes.
 - **T1.56** (I132): a split with one child, with three, with `height: 0` and with `divider: 0` or `1.5` is refused with the field named, and §105's split validates. `measure` is `height` at 3, 4, 40 and 120 columns.
 - **T1.57** (I133, §3aq S1–S5, §105): §105's figure drawn back at 40 columns, asserted as literal rows, with the left pane overflowing so that the divider carries its thumb. Then S1's bare track with both panes fitting; S3's right bar in the last column with the right content one cell narrower; S4's `divider: 99` clamped to `w − 3` and `divider: 1` kept; and S5 at width 3, with the left pane alone. **The divider column is asserted to be the only column between the panes at every width**, which is the mutation a separate bar column fails.
+- **T1.59** (I135, §3ar S8–S10): §105's form validates; no fields, a duplicate id across a field and a button, two defaults, and `submit` on an `open` are each refused with the field named.
+- **T1.60** (I136, C09 I119, §3ar S1–S7, §105): §105's figure drawn back as literal rows — the error replacing `port`'s hint, `replicas`' hint under its field, `›` on `save` and `cancel` at column 10 — with `port` being edited and its caret after `80`. Then S1 at a width where `F < 1`, S3's long hint dropped whole, S4's long error wrapped and hung, S5's value cut with `…`, and `measure` equal to the rows drawn at every width with and without a draft.
+- **T1.61** (I137, §3ar): a submit's command — `serve --name prism-serve --port 80 --replicas 3` from §105's values, a value with a space quoted, an empty value omitted, a `flag: ""` field written positionally, and a `--p` flag honoured.
 - **T1.58** (I134, §3aq S6, S7): the elements at 40 columns — the left tree's rows then the right pane's one block-level element for its `code` block, addressed to the split, each record carrying its pane; that pane focused draws `focusGround` behind every row of its extent and the unfocused frame does not, and the right pane's `cols` starting two past the divider. Then S7: the divider in accent with focus in the left pane and muted with focus in the right, asserted on the column's SGR.
 
 - **T1.1** (I1): every constructor returns a frozen value; mutation attempts do not change it, at every nesting depth.
