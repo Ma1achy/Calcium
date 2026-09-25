@@ -369,7 +369,7 @@ was a consequence of the false half.*
 The two glyph catalogues the framework ships, drawn rather than listed — and generated from the
 same tables the renderer reads, so neither picture can go stale against the code.
 
-![Twenty-six spinner sets in three columns, each turning beside its name](docs/media/spinner-sets.gif)
+![Twenty-seven spinner sets in three columns, each turning beside its name at its own interval](docs/media/spinner-sets.gif)
 
 ![Nine bar styles at four fills on three capability arms: full, ASCII, and ambiguous-wide](docs/media/bar-styles.png)
 

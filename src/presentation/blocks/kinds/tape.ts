@@ -7,7 +7,7 @@
 import type { CallState, Tape } from "../../../data/viewmodel/index.js";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate } from "../../text.js";
-import { CALL_STATE_GLYPH, glyphFor, glyphs, spinnerFrames } from "../glyphs.js";
+import { CALL_STATE_GLYPH, glyphFor, glyphs, spinnerFrameAt } from "../glyphs.js";
 import { clampSpans, focusStyle, paint, rows, selectionStyle, tone, type Span } from "../paint.js";
 import { tapeWindow, type TapeMarks } from "../tape-window.js";
 import type { BlockDefinition, NavElement, RenderContext, Rendered } from "../types.js";
@@ -27,12 +27,6 @@ const LEAD_CELLS = 2;
 const TAPE_SPINNER = "agent";
 
 type Member = Tape["members"][number];
-
-/** The frame this tick shows — the index arithmetic every spinner does (C09 §4). */
-function frameAt(frames: readonly string[], tick: number): string {
-  const count = frames.length; // cells-ok — a count of frames
-  return count === 0 ? "" : (frames[tick % count] ?? "");
-}
 
 /**
  * A member's text at a given rung of the ladder.
@@ -60,7 +54,7 @@ function memberText(
     slot === undefined
       ? ""
       : running
-        ? frameAt(spinnerFrames(ctx.capabilities, TAPE_SPINNER), glyphTick(ctx.tick, ctx.motion))
+        ? spinnerFrameAt(ctx.capabilities, glyphTick(ctx.tick, ctx.motion), TAPE_SPINNER)
         : glyphFor(slot, ctx.capabilities);
   const shown = detail ? stripControl(member.detail ?? "") : "";
   const tail = running ? [mark, shown] : [shown, mark];

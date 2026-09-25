@@ -197,7 +197,7 @@ const results = await runPass({
       // spins the glyph three times too fast.
       name: "the spinner counter advances once per wake",
       file: SESSION,
-      from: "      const steps = Math.floor((now - (this.#tickAt ?? now)) / spinnerMs);",
+      from: "      const steps = Math.floor((now - (this.#tickAt ?? now)) / TICK_MS);",
       to: "      const steps = 1;",
       expect: "T4.17l",
     },

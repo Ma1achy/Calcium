@@ -13,7 +13,7 @@ import type { AmbiguousWidth } from "../../text.js";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Comparison, Events, Glyph, KeyValue, Logs, Steps, Tone } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate } from "../../text.js";
-import { glyphFor, glyphs, spinnerFrames } from "../glyphs.js";
+import { glyphFor, glyphs, spinnerFrameAt } from "../glyphs.js";
 import { valueBar } from "../../plot/bar.js";
 import { clampSpans, pad, paint, rows, tone, type Span } from "../paint.js";
 import { naturalSpan, shedRow } from "../shed.js";
@@ -875,7 +875,6 @@ export const stepsDefinition: BlockDefinition<Steps> = {
   render(block: Steps, ctx: RenderContext): Rendered {
     ctx.probe?.gauge("steps.steps", block.steps.length); // cells-ok — a count of items, not a display width
     const g = glyphs(ctx.capabilities);
-    const frames = spinnerFrames(ctx.capabilities);
     const width = normaliseWidth(ctx.width);
     const ambiguous = ctx.capabilities.ambiguousWidth;
     // **Uncapped, for `events`' reason.** Half the row was this kind's guard
@@ -940,7 +939,7 @@ export const stepsDefinition: BlockDefinition<Steps> = {
         // never shifts the row it sits on.
         const marker =
           step.state === "active"
-            ? (frames[glyphTick(ctx.tick, ctx.motion) % frames.length] ?? g.dotted) // cells-ok
+            ? spinnerFrameAt(ctx.capabilities, glyphTick(ctx.tick, ctx.motion)) || g.dotted
             : step.state === "done"
               ? g.tick
               : step.state === "failed"

@@ -43,7 +43,7 @@ import { descendants } from "../data/viewmodel/index.js";
 import type { Block, Image, Plot } from "../data/viewmodel/index.js";
 import { blockSpansOfEntry, elementsOfEntry, entryLayout, renderEntryPieces, windowEntry } from "./entry-layout.js";
 import { washedRowsOf, washSelectedRows } from "./paint.js";
-import { animationIntervalOf } from "../presentation/blocks/index.js";
+import { animationIntervalOf, TICK_MS } from "../presentation/blocks/index.js";
 import { isBand } from "../presentation/blocks/paint.js";
 import type { EntryParts } from "./render-cache.js";
 import type { EntryPiece } from "./entry-layout.js";
@@ -1242,11 +1242,17 @@ class Session implements TuiInstance {
     // would lose a fraction of an interval on every wake and run it slow.
     // Advancing the stamp by the steps consumed keeps it exact, and zero steps is
     // a wake the spinner was not the reason for.
+    //
+    // **In `TICK_MS` and not in `spinnerMs`** (C09 I112). The counter is time, and
+    // each set turns it into its own frame; counted in the fastest interval on
+    // screen, every set took that set's rate — `agent` at 120 ms stepped every 80
+    // beside a braille spinner. The wake is still armed at `spinnerMs`, which is
+    // when something on screen can next change.
     if (spinnerMs !== null) {
-      const steps = Math.floor((now - (this.#tickAt ?? now)) / spinnerMs);
+      const steps = Math.floor((now - (this.#tickAt ?? now)) / TICK_MS);
       if (steps > 0) {
         this.#tick += steps;
-        this.#tickAt = (this.#tickAt ?? now) + steps * spinnerMs;
+        this.#tickAt = (this.#tickAt ?? now) + steps * TICK_MS;
       }
     }
 

@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { FREE_WIDTH_SLOTS, glyphs, spinnerFrames, spinnerIntervalMs } from "../../src/presentation/blocks/index.js";
+import { FREE_WIDTH_SLOTS, glyphs, spinnerFrameAt, spinnerFrames, spinnerIntervalMs, TICK_MS } from "../../src/presentation/blocks/index.js";
 // **The table itself is not on the barrel**, and MG24 is why: its members have
 // no reader in `src/` — the two functions are the seam. Imported from the module
 // so the rows can walk every set rather than a list they keep themselves, which
@@ -22,7 +22,7 @@ import { spinnerSetNames } from "../../src/presentation/blocks/glyphs.js";
 import { loadRegistry, spinnerAsciiFrames } from "../../docs/design/language/build-calcium.mjs";
 import type { Registry } from "../../docs/design/language/build-calcium.mjs";
 import { cells, hasEmojiForm } from "../../src/presentation/text.js";
-import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_UNICODE_CAPS, registry } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_UNICODE_CAPS, measurable, registry, visible } from "../support/render.js";
 // C09 I99's three rows: the preference, the two resolvers it drives, and the
 // union the ambient set partitions.
 import type { Block } from "../../src/data/viewmodel/index.js";
@@ -587,6 +587,69 @@ const STATED_CYCLES: Readonly<Record<string, number>> = Object.freeze(
 });
 
 describe("C09 I112 — a spinner steps at its own set's interval", () => {
-  it.todo("T1.78 (C09 I112, §039): at one tick, agent and the default set take their own frames — not deferred on a component: specified before the index reads the interval");
-  it.todo("T1.79 (C09 I112): every kind drawing a non-default set draws spinnerFrameAt's frame — not deferred on a component: specified after a renderer bypass survived the mutation pass");
+  it("T1.78 (C09 I112, §039): at one tick, agent and the default set take their own frames", () => {
+    const caps = { unicode: "full" as const, ambiguousWidth: "narrow" as const };
+    const at = (tick: number, name?: string) => spinnerFrameAt(caps, tick, name);
+    const def = spinnerFrames(caps);
+    const agent = spinnerFrames(caps, "agent");
+    expect(spinnerIntervalMs(), "the default set is the unit").toBe(TICK_MS);
+    expect(spinnerIntervalMs("agent")).toBe(120);
+
+    // At tick 3 — 240 ms — the default set is on frame 3 and `agent` on frame 2.
+    expect(at(3)).toBe(def[3]);
+    expect(at(3, "agent")).toBe(agent[2]);
+
+    // **Over thirty ticks `agent` changes twenty times**, its own 120 ms, and the
+    // default set thirty. The old index changed both on every tick.
+    const changes = (name?: string) =>
+      Array.from({ length: 30 }, (_, t) => at(t + 1, name) !== at(t, name)).filter(Boolean).length;
+    expect(changes(), "the default set, every tick").toBe(30);
+    expect(changes("agent"), "agent, at its own interval").toBe(20);
+  });
+
+  it("T1.79 (C09 I112): every kind drawing a non-default set draws spinnerFrameAt's frame", () => {
+    const caps = FULL_CAPS;
+    const TICKS = Array.from({ length: 12 }, (_, t) => t);
+    const drawn = (block: unknown, tick: number): string =>
+      visible(measurable({ capabilities: caps, tick }).renderToLines(block as never, 40).join("\n"));
+
+    // **Each site's frame, read out of the frame it draws** rather than asked of
+    // the helper, which is what T1.78 already does. Twelve ticks is a whole
+    // `agent` step pattern (2 of every 3) and more than an `arc` cycle.
+    const sites: readonly (readonly [string, unknown, string, (text: string) => string])[] = [
+      [
+        "a streaming notice's mark",
+        { kind: "notice", id: "n", tone: "default", text: "streaming", streaming: true },
+        "agent",
+        (text) => text.trimEnd().slice(-1),
+      ],
+      [
+        "a loading status declaring arc",
+        { kind: "status", id: "s", state: "loading", message: "fetching", height: 7, spinner: "arc" },
+        "arc",
+        (text) => /(\S) loading/u.exec(text)?.[1] ?? "",
+      ],
+      [
+        "a tape's running member",
+        { kind: "tape", id: "t", members: [{ id: "a", label: "build", state: "running" }], current: "a" },
+        "agent",
+        (text) => /build (\S)/u.exec(text)?.[1] ?? "",
+      ],
+    ];
+    for (const [site, block, set, read] of sites) {
+      const seen = TICKS.map((t) => read(drawn(block, t)));
+      expect(seen.every((f) => f !== ""), `${site} draws a frame at every tick`).toBe(true);
+      expect(seen, site).toEqual(TICKS.map((t) => spinnerFrameAt(caps, t, set)));
+      // **And the set's own rate is visible in it**: over twelve ticks the old
+      // index changed the frame twelve times; these sets are slower than the unit.
+      const changes = seen.slice(1).filter((f, i) => f !== seen[i]).length;
+      expect(changes, `${site} steps slower than the tick`).toBeLessThan(TICKS.length - 1);
+    }
+  });
+
+  it("T2.175 (C09 I112): no set is faster than the tick, so none skips a frame", () => {
+    for (const name of spinnerSetNames()) {
+      expect(spinnerIntervalMs(name), name).toBeGreaterThanOrEqual(TICK_MS);
+    }
+  });
 });

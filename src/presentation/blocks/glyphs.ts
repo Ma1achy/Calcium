@@ -1214,6 +1214,36 @@ export function spinnerIntervalMs(name: string = DEFAULT_SET): number {
   return setFor(name).intervalMs;
 }
 
+/**
+ * The animation time one `ctx.tick` counts, in milliseconds (C09 I112, C22 I74).
+ *
+ * C03's `spinner` window and the fastest shipped interval (F1197), so no set
+ * skips a frame at this resolution — T2.70's interval band holds every set at or
+ * above it.
+ */
+export const TICK_MS = 80;
+
+/**
+ * A set's frame at `tick`, stepping at the **set's own** interval (C09 I112).
+ *
+ * It was `frames[tick % frames.length]` over a counter that advanced once per
+ * the fastest interval on screen, so every set took that set's rate — `agent`
+ * at 120 ms stepped every 80 beside a braille spinner. The tick is time now,
+ * and this is the one place that turns it into a frame. For the default set,
+ * at 80 ms, the index is `tick` exactly.
+ */
+export function spinnerFrameAt(
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+  tick: number,
+  name: string = DEFAULT_SET,
+): string {
+  const frames = spinnerFrames(caps, name);
+  const count = frames.length; // cells-ok — a frame count
+  if (count === 0) return "";
+  const step = Math.floor((tick * TICK_MS) / spinnerIntervalMs(name));
+  return frames[step % count] ?? "";
+}
+
 // --- the `Glyph` vocabulary (C04 §5, C09 §4) --------------------------------
 
 /**

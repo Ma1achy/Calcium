@@ -694,7 +694,7 @@ kinds of twenty-five, or a linear stream with no settled line, is the frame with
 nothing in it — and it would be read as coverage.
 ---
 
-> **Ruled 2026-09-24.** `R-MOT-011` applies **per rung**: sets that collapse to one ASCII alphabet share an interval at that rung. **Owed.** **Premise note, 2026-09-25:** the ruling says the sets share an interval and not which, and the registry records none — `|/-\` is at 80, 90, 100, 110, 120, 120, 130, 140 and 140 ms across nine sets. Choosing one is a visible timing value, so the choice is parked as **40**. The strobe the entry named as *a defect either way* is specified as C09 I112 and C22 I74's amendment.
+> **Ruled 2026-09-24.** `R-MOT-011` applies **per rung**: sets that collapse to one ASCII alphabet share an interval at that rung. **Owed.** **Premise note, 2026-09-25:** the ruling says the sets share an interval and not which, and the registry records none — `|/-\` is at 80, 90, 100, 110, 120, 120, 130, 140 and 140 ms across nine sets. Choosing one is a visible timing value, so the choice is parked as **40**. The strobe the entry named as *a defect either way* is specified as C09 I112 and C22 I74's amendment. **Strobe built 2026-09-25:** `tick` counts 80 ms `TICK_MS` ticks and every renderer steps through `spinnerFrameAt`, so `agent` walks at its 120 ms rather than the wake's 80 (T1.78, T1.79, T2.175, T4.17v). The interval half waits on 40.
 
 **30 · RULED — The registry gives one ASCII alphabet to sets at different intervals, and
 `R-MOT-011` says a shared alphabet shares an interval.** §039: *SETS THAT SHARE

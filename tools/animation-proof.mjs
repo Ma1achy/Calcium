@@ -78,7 +78,7 @@ import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs
 import { join } from "node:path";
 
 import { gifFrom, ansiToSvg, pngFromSvg } from "./catalogue-png.mjs";
-import { barStyleNames, createBlockRegistry, spinnerFrames, spinnerIntervalMs, spinnerSetNames } from "../src/presentation/blocks/index.js";
+import { barStyleNames, createBlockRegistry, spinnerFrames, spinnerIntervalMs, spinnerSetNames, TICK_MS } from "../src/presentation/blocks/index.js";
 import { plotDefinition } from "../src/presentation/plot/index.js";
 import { plotToSvg } from "../src/presentation/plot/svg.js";
 import { renderSequenceToLines } from "../src/presentation/render-lines.js";
@@ -588,18 +588,26 @@ export function animationFrames() {
       delay: interval,
       frames: Array.from({ length: setFrames }, (_, tick) => ansiFor(STEPS, 34, tick)),
     },
-    // **Every set the catalogue names, turning at once** (C24 §6). One frame per
-    // tick for every set — `activityLine` indexes by `tick % frames.length` — at
-    // the C03 tick, so this is the cadence a session with several sets on screen
-    // shows and not each set's own interval; the notes carry the intervals. Forty
-    // ticks covers every set's cycle at least once (the longest is `decimal` at 10)
-    // and the `distinct` column says whether the picture moved.
+    // **Every set the catalogue names, turning at once, each at its own interval**
+    // (C24 §6, C09 I112). A frame is one `TICK_MS` tick and `spinnerFrameAt` steps
+    // a set only when its interval has elapsed, so the GIF plays at the speed a
+    // session shows. **The length is the longest cycle, measured, not a constant**:
+    // this said *forty ticks, the longest is `decimal` at 10* until `agent`'s 82
+    // frames at 120 ms made it 123 ticks, and a hard-coded length goes stale the
+    // next time a set joins.
     "spinner-sets": {
       arm: "terminal",
-      delay: 100,
-      frames: Array.from({ length: 40 }, (_, tick) => ansiFor(spinnerGallery(), 78, tick)),
+      delay: TICK_MS,
+      frames: Array.from({ length: longestCycleTicks() }, (_, tick) => ansiFor(spinnerGallery(), 78, tick)),
     },
   };
+}
+
+/** Ticks for every set to show its whole cycle once: frames × interval over `TICK_MS`. */
+function longestCycleTicks() {
+  return Math.max(
+    ...spinnerSetNames().map((name) => Math.ceil((spinnerFrames(FULL, name).length * spinnerIntervalMs(name)) / TICK_MS)),
+  );
 }
 
 /** The `/spinners` gallery's shape, built here so the GIF needs no session (C24 §6). */
@@ -641,7 +649,7 @@ export function barSheetArms() {
   const names = barStyleNames();
   const arms = [
     ["full · colourDepth 24 · unicode full · ambiguousWidth narrow", FULL],
-    ["unicode: ascii — every style is # and .", { ...FULL, unicode: "ascii" }],
+    ["unicode: ascii — every style is # and - (R-PRG-003)", { ...FULL, unicode: "ascii" }],
     ["ambiguousWidth: wide — narrow-only styles fall to ASCII; braille stays", { ...FULL, ambiguousWidth: "wide" }],
   ];
   const per = Math.ceil(names.length / 3);

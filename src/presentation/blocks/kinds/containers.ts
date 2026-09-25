@@ -25,7 +25,7 @@ import type { Block, CopyFn, Group, MeasureFn, Mosaic, MosaicRect, Panel, Scroll
 import { axesOf, groupPlacements, mosaicRects, parseAreas } from "../../../data/viewmodel/index.js";
 import type { NavElement } from "../types.js";
 import { cells, sliceCells, stripControl, truncate } from "../../text.js";
-import { SPINNER_CELLS, glyphs, scrollbarSet, spinnerFrames } from "../glyphs.js";
+import { SPINNER_CELLS, glyphs, scrollbarSet, spinnerFrameAt } from "../glyphs.js";
 import { scrollbarColumn } from "../scrollbar.js";
 import { based, clampSpans, groundSequence, paint, rows, tone } from "../paint.js";
 import { composeRow, fitRow, placeRows, rowCells, type Placed } from "../../rows.js";
@@ -172,10 +172,9 @@ export const panelDefinition: BlockDefinition<Panel> = {
     // is untouched and a panel is still children + 2. Every frame of every set
     // is one cell at both alphabets (T2.75, T2.70), so the title does not
     // change width as it animates and `measure` never sees the tick (I8).
-    const frames = spinnerFrames(ctx.capabilities);
     const titlePart = railPart(
       block.live === true
-        ? `${frames[glyphTick(ctx.tick, ctx.motion) % frames.length] ?? g.dotted} ${stripControl(block.title)}`.trimEnd() // cells-ok — a frame index
+        ? `${spinnerFrameAt(ctx.capabilities, glyphTick(ctx.tick, ctx.motion)) || g.dotted} ${stripControl(block.title)}`.trimEnd()
         : block.title,
       inner - noticeRoom,
     );

@@ -16,7 +16,7 @@
 import { normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Status } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate, wrapCells } from "../../text.js";
-import { glyphs, spinnerFrames } from "../glyphs.js";
+import { glyphs, spinnerFrameAt, spinnerFrames } from "../glyphs.js";
 import { background, fit, paint, rows, slot as surface, tone, withBackground, type Span } from "../paint.js";
 import type { BlockDefinition, RenderContext, Rendered } from "../types.js";
 import type { Style } from "../../theme/index.js";
@@ -208,8 +208,7 @@ export function elapsed(ms: number): string {
  * the history. Below one second `loading` shows no counter, because a fast load
  * must not flash one.
  */
-export function activityLine(block: Status, frames: readonly string[], tick: number): string {
-  const mark = frames[tick % frames.length] ?? ""; // cells-ok — a frame count, not a width
+export function activityLine(block: Status, mark: string): string {
   if (block.state === "retrying") {
     if (block.retryInMs === undefined) return "";
     // **Parentheses rather than a middle dot, and T4.4 is what said so.** `·` has
@@ -440,7 +439,7 @@ export function statusRowsFor(
   const mark = block.state === "error" || block.state === "retrying" ? `${g.warning} ` : "";
   // Tick zero: the *emptiness* of the line is a function of the state and the
   // fields, never of which frame the spinner is on, so any tick answers it.
-  const line = activityLine(block, spinnerFrames(caps, block.spinner), 0);
+  const line = activityLine(block, spinnerFrames(caps, block.spinner)[0] ?? "");
 
   const wrapped = wrapCells(`${mark}${stripControl(block.message)}`, textWidth).length; // cells-ok — a row count
   // **The message is served first and has no cap of its own** (I84). What is
@@ -521,9 +520,9 @@ export const statusDefinition: BlockDefinition<Status> = {
     // **The block's set, and `spinnerFrames` resolves an unknown name to the
     // default rather than throwing** — a spinner is decoration, and a session
     // that will not start because a set was misspelt is worse than one that
-    // spins the wrong way. The interval is `spinnerIntervalMs(block.spinner)`
-    // and belongs to whoever schedules the tick, which is not this layer.
-    const line = activityLine(block, spinnerFrames(ctx.capabilities, block.spinner), glyphTick(ctx.tick, ctx.motion));
+    // spins the wrong way. **The set's own interval is read here** (C09 I112):
+    // the tick is time, and `spinnerFrameAt` turns it into this set's frame.
+    const line = activityLine(block, spinnerFrameAt(ctx.capabilities, glyphTick(ctx.tick, ctx.motion), block.spinner));
 
     // **The interior is the remainder and the group is centred inside it.** The
     // height ladder says which furniture it can afford and the width ladder

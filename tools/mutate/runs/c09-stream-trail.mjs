@@ -187,8 +187,8 @@ const results = runPass({
       // coming* and draws nothing saying so.
       name: "the cells are reserved and the mark is never drawn",
       file: SIMPLE,
-      from: "  if (markCells(block) === 0) return wrapped;\n  const frames = spinnerFrames(ctx.capabilities, \"agent\");",
-      to: "  return wrapped;\n  const frames = spinnerFrames(ctx.capabilities, \"agent\");",
+      from: "  if (markCells(block) === 0) return wrapped;\n  const frame = spinnerFrameAt(",
+      to: "  return wrapped;\n  const frame = spinnerFrameAt(",
       expect: "T1.63",
     },
     {
@@ -208,8 +208,8 @@ const results = runPass({
       // thing that asks.
       name: "the mark is frozen at the set's first frame",
       file: SIMPLE,
-      from: "  const frame = frames[glyphTick(ctx.tick, ctx.motion) % frames.length]; // cells-ok — a frame index",
-      to: "  const frame = frames[0]; // cells-ok — a frame index",
+      from: "  const frame = spinnerFrameAt(ctx.capabilities, glyphTick(ctx.tick, ctx.motion), \"agent\");",
+      to: "  const frame = spinnerFrameAt(ctx.capabilities, 0, \"agent\");",
       expect: "T1.63",
     },
     {

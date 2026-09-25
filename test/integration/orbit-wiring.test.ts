@@ -318,7 +318,32 @@ describe("C22 §6i — the ticker is the second writer", () => {
     }
   });
 
-  it.todo("T4.17v (C22 I74, C09 I112): the counter is elapsed time over 80 ms, whatever the wake — not deferred on a component: specified before the session counts in TICK_MS");
+  it("T4.17v (C22 I74, C09 I112): the counter is elapsed time over 80 ms, whatever the wake", async () => {
+    vi.useFakeTimers();
+    try {
+      const SPAN = 1200;
+      // A streaming notice draws the `agent` mark, a 120 ms set, and nothing
+      // else on screen animates — so the wake is armed at 120.
+      const HEAD = { kind: "notice", id: "n", tone: "default", text: "streaming", streaming: true };
+
+      const a = watching();
+      const ba = await session(a.definition, [{ kind: "count", id: "c" }, HEAD]);
+      const a0 = a.ticks().at(-1) ?? 0;
+      await pass(ba, SPAN);
+
+      // **The control: a braille spinner beside it**, whose 80 ms wake is the
+      // unit — so the two arms agree only if the counter is time and not wakes.
+      const b = watching();
+      const bb = await session(b.definition, [{ kind: "count", id: "c" }, HEAD, SPINNER]);
+      const b0 = b.ticks().at(-1) ?? 0;
+      await pass(bb, SPAN);
+
+      expect((b.ticks().at(-1) ?? 0) - b0, "beside an 80 ms spinner").toBe(SPAN / 80);
+      expect((a.ticks().at(-1) ?? 0) - a0, "and with the 120 ms mark alone").toBe(SPAN / 80);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it("T4.17j (C22 I73): a live orbit draws at the stream rate and a spinner at the spinner's", async () => {
     vi.useFakeTimers();

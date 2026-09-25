@@ -1,20 +1,20 @@
 {
   "label": "all",
-  "only": "c09-stream-trail",
+  "only": "c09-spinner-interval",
   "rows": [
     {
-      "run": "c09-stream-trail.mjs",
+      "run": "c09-spinner-interval.mjs",
       "exit": 0,
-      "seconds": 41,
+      "seconds": 21,
       "state": "green",
       "restored": 0,
-      "caught": 23,
+      "caught": 5,
       "elsewhere": 0,
-      "survived": 1,
+      "survived": 0,
       "anchorMissed": 0,
       "unbuilt": 0,
       "noSummary": 0,
-      "expected": 1,
+      "expected": 0,
       "staleExemption": 0
     }
   ]

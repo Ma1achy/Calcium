@@ -135,8 +135,8 @@ const results = runPass({
       // strips the set from. Holding the whole `activityLine` call rotted the
       // day I99 wrapped the tick in `glyphTick`, for a reason that had nothing
       // to do with the set — the anchor is on what changes and no more.
-      from: "spinnerFrames(ctx.capabilities, block.spinner)",
-      to: "spinnerFrames(ctx.capabilities)",
+      from: "glyphTick(ctx.tick, ctx.motion), block.spinner)",
+      to: "glyphTick(ctx.tick, ctx.motion))",
       expect: "T3.44",
     },
   ],

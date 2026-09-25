@@ -14,7 +14,7 @@ import type { Run } from "../../runs.js";
 import { runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../runs.js";
 import { NO_STYLE, rampStyle } from "../../theme/index.js";
 import { animateT, effectiveAnimation, effectiveTick, extentT, glyphTick } from "../ramp.js";
-import { barStyle, glyphFor, glyphCells, glyphs, headMark, spinnerFrames } from "../glyphs.js";
+import { barStyle, glyphFor, glyphCells, glyphs, headMark, spinnerFrameAt } from "../glyphs.js";
 import { background, clampSpans, focusStyle, isBand, pad, paint, paintRuns, rows, selectionStyle, slot as surface, tone, withBackground, type Span } from "../paint.js";
 import type { BlockDefinition, NavElement, RenderContext, Windowed, Rendered } from "../types.js";
 
@@ -499,9 +499,8 @@ function headMarked(
   // were reserved, so a change to `markCells` moves the reservation and the draw
   // together — they cannot disagree about which blocks have a head.
   if (markCells(block) === 0) return wrapped;
-  const frames = spinnerFrames(ctx.capabilities, "agent");
-  const frame = frames[glyphTick(ctx.tick, ctx.motion) % frames.length]; // cells-ok — a frame index
-  if (frame === undefined) return wrapped;
+  const frame = spinnerFrameAt(ctx.capabilities, glyphTick(ctx.tick, ctx.motion), "agent");
+  if (frame === "") return wrapped;
   const last = wrapped.length - 1; // cells-ok — an array index
   const line = wrapped[last];
   if (line === undefined) return wrapped;
