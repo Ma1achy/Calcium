@@ -923,6 +923,13 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 **The proposal**: `>` typed as the first character of an empty prompt switches the menu's source from verbs to actions, as in VS Code's quick-open. That costs no chord, keeps the query in the prompt as §105 draws it, and the base and enhanced profiles agree. The alternatives: (b) an action `palette.open` on `⌃⇧P` enhanced and `⌥k` base; (c) a verb `/actions`.
 
+
+**46 · OPEN — Whether the divider takes the accent while the right pane holds focus.** §105: *the focused pane takes the accent ON the divider, so which side owns the arrows is visible without a label.* The figure shows one state, with a `┃` segment in the divider. Built (C04 §3aq S7): the divider is the left pane's bar (ruling 22 and §021, read together), so it takes the accent under §021's rule, *the thumb takes the accent when its container has focus*, while focus is in the left pane. It is `muted` otherwise. With focus in the right pane, the accent is on that pane's own bar in its last column, and only where the pane overflows.
+
+**Why parked, not ruled**: *which side owns the arrows is visible* asks for a difference between the two sides, and a single column in one tone gives only two states for three conditions (left pane, right pane, neither). With focus in a right pane that fits, the divider reads the same as with no focus in the split. The focus mark on the focused row still shows the side, but that is a mark, not the divider.
+
+**The proposal**: keep what is built. Every alternative spends a second carrier on one column. One is a half-cell edge (`▕`/`▏`) facing the focused pane, which is a glyph the registry does not have. Another is accent on the divider whenever either pane is focused, which says *in the split* and not *which side*.
+
 ---
 
 ## Not yet recovered
