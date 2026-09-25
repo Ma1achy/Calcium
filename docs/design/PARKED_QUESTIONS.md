@@ -146,7 +146,7 @@ FRAME takes its border*, and `smallmultiples` and `pairplot` have four. The
 design does not say which, and lighting four sub-frames at once is a visible
 choice.
 
-> **Ruled 2026-09-24.** Chord glyphs fall back to **text names**, free-width, in help and footer only: `C-`, `M-`, `S-`, `Enter`, `Esc`, `Tab`, `Up`, `Down`, `Left`, `Right`. **Premise note:** that list covers nine of the eleven. It leaves out `⌘` (Super) and `⌫` (Backspace). The proposal, in Emacs's spelling to match the rest, is `s-` and `Backspace`, in the batch. **Owed:** `chordText`'s shorthand (`s+enter`, `m+C`) is replaced. **Specified 2026-09-25** as C16 I58, with `⌘`/`⌫` spelled `s-`/`Backspace` under the batch proposal's assumption. **A finding on the way**: the owner line held its own ASCII table, which spelled `↑↓` two ways and wrote `⌃c` against the registry's `⌃C` at the Unicode rung — so it now asks `chordText` too.
+> **Ruled 2026-09-24.** Chord glyphs fall back to **text names**, free-width, in help and footer only: `C-`, `M-`, `S-`, `Enter`, `Esc`, `Tab`, `Up`, `Down`, `Left`, `Right`. **Premise note:** that list covers nine of the eleven. It leaves out `⌘` (Super) and `⌫` (Backspace). The proposal, in Emacs's spelling to match the rest, is `s-` and `Backspace`, in the batch. **Owed:** `chordText`'s shorthand (`s+enter`, `m+C`) is replaced. **Specified 2026-09-25** as C16 I58, with `⌘`/`⌫` spelled `s-`/`Backspace` under the batch proposal's assumption. **Built 2026-09-25** (aba41404), with `Home End PageUp PageDown Delete` added to the list — the first draft stopped at `Backspace` and `/help` printed `C-home`. **A finding on the way**: the owner line held its own ASCII table, which spelled `↑↓` two ways and wrote `⌃c` against the registry's `⌃C` at the Unicode rung — so it now asks `chordText` too.
 
 **15 · RULED — The chord glyphs have no ASCII rung.** The design draws eleven — `← ↑ →
 ↓ ⇥ ⇧ ⌃ ⌘ ⌥ ⌫ ⏎` — throughout §019 and the binding registry, and **registers
@@ -194,7 +194,7 @@ the hexes appear nowhere in `src/`, `test/` or `docs/components/`, and
 `categorical` is a separate eight-slot cycle (C10 I37), not these. That is M2's
 work left undone, not a question, and §070's census row says so.
 
-> **Ruled 2026-09-24.** Register `↺` with a proposed ASCII fallback, which is in the batch. **Owed:** the glyph record.
+> **Ruled 2026-09-24.** Register `↺` with a proposed ASCII fallback, which is in the batch. **Owed:** the glyph record. **Specified 2026-09-25** as C09 I114: `GlyphSet.revert`, ASCII `<` proposed. **Premise note:** `~`, the first reach, is `nested`'s ASCII in `row-lead`, and `content-row` holds both `row-lead` and `inline` — so the fallback had to be free in both, and twenty-one marks plus the registry's `@ # $` were already spent.
 
 **17 · RULED — `↺` is an affordance the design draws and the registry does not record.**
 It is `↺ redo` on a reverted entry (§064), `↺ revert` on a stopped one (§005),
