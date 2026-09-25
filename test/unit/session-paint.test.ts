@@ -1142,3 +1142,7 @@ describe("C22 §6l.11 — the chip's ground in the prompt", () => {
   });
 });
 
+
+describe("C16 I58 — the owner line asks chordText", () => {
+  it.todo("T1.111 (C16 I58, C22 §6l): the owner line spells every chord as chordText does, at both rungs — not deferred on a component: specified ahead of the code in this commit");
+});

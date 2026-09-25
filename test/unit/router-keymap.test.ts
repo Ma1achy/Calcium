@@ -1740,3 +1740,7 @@ describe("C16 I55 — the platform keeps its chords", () => {
     expect(violations([...defaultKeymap, ...fabricated]), "a row on ⌘←, and ⌥← given another meaning").toHaveLength(2);
   });
 });
+
+describe("C16 I58 — a chord has one spelling per rung", () => {
+  it.todo("T1.110 (I58): chordText at the ASCII rung spells every binding in Emacs text names — not deferred on a component: specified ahead of the code in this commit");
+});

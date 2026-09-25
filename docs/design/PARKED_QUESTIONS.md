@@ -146,7 +146,7 @@ FRAME takes its border*, and `smallmultiples` and `pairplot` have four. The
 design does not say which, and lighting four sub-frames at once is a visible
 choice.
 
-> **Ruled 2026-09-24.** Chord glyphs fall back to **text names**, free-width, in help and footer only: `C-`, `M-`, `S-`, `Enter`, `Esc`, `Tab`, `Up`, `Down`, `Left`, `Right`. **Premise note:** that list covers nine of the eleven. It leaves out `⌘` (Super) and `⌫` (Backspace). The proposal, in Emacs's spelling to match the rest, is `s-` and `Backspace`, in the batch. **Owed:** `chordText`'s shorthand (`s+enter`, `m+C`) is replaced.
+> **Ruled 2026-09-24.** Chord glyphs fall back to **text names**, free-width, in help and footer only: `C-`, `M-`, `S-`, `Enter`, `Esc`, `Tab`, `Up`, `Down`, `Left`, `Right`. **Premise note:** that list covers nine of the eleven. It leaves out `⌘` (Super) and `⌫` (Backspace). The proposal, in Emacs's spelling to match the rest, is `s-` and `Backspace`, in the batch. **Owed:** `chordText`'s shorthand (`s+enter`, `m+C`) is replaced. **Specified 2026-09-25** as C16 I58, with `⌘`/`⌫` spelled `s-`/`Backspace` under the batch proposal's assumption. **A finding on the way**: the owner line held its own ASCII table, which spelled `↑↓` two ways and wrote `⌃c` against the registry's `⌃C` at the Unicode rung — so it now asks `chordText` too.
 
 **15 · RULED — The chord glyphs have no ASCII rung.** The design draws eleven — `← ↑ →
 ↓ ⇥ ⇧ ⌃ ⌘ ⌥ ⌫ ⏎` — throughout §019 and the binding registry, and **registers
