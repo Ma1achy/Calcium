@@ -606,7 +606,7 @@ So three answers are needed before this can land: which earning table binds and
 whether *the model failed* survives; what declares the rungs and their wording;
 and whether the watch itself is mine to build.
 
-> **Ruled 2026-09-24.** Build the mechanism and the display now. `default` shows today; `config`, `env` and `flag` rows arrive with their producers. **Owed.** **Specified 2026-09-25** as C22 I115 and C23 I80. **Premise taken:** a `TuiConfig` value is `default` whether the framework or the application supplied it — the reader chose neither. **The verb is parked as 43**: docker-tui ships its own `/config`, and a framework verb of that name is a parse error for it.
+> **Ruled 2026-09-24.** Build the mechanism and the display now. `default` shows today; `config`, `env` and `flag` rows arrive with their producers. **Owed.** **Specified 2026-09-25** as C22 I115 and C23 I80. **Premise taken:** a `TuiConfig` value is `default` whether the framework or the application supplied it — the reader chose neither. **The verb is parked as 43**: docker-tui ships its own `/config`, and a framework verb of that name is a parse error for it. **And the ladder's two loud rungs as 44**: C04 I6 refuses `warn` and `error` on a cell without a glyph.
 
 **28 · RULED — `R-HON-008`'s display is fully specified and three of its four sources do
 not exist.** §075 — *`/config` — and the third column is the one that matters* —
@@ -908,6 +908,12 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 **43 · OPEN — §075's `/config` collides with docker-tui's `/config`.** Ruling 28 builds the provenance display, and §075 names its verb `/config`. `examples/docker/src/manifest/read.ts:163` already declares a `config` verb — a container's config file against its image's original (S8) — and C05 I6 makes a framework verb of the same name a **parse error** for that manifest, so the example would not start. The design decides the framework's name; it does not decide the example's new one, and the rename reaches **106 references across 19 files**, a recorded `demo.cast` and the media tools among them.
 
 **Built meanwhile** (C22 I115, C23 I80): the provenance record, the ladder and the table. What waits is the verb and its manifest row. **The one-word answer** is the example's new name — `/filediff` is the proposal — or a different framework verb, which would depart from §075.
+
+---
+
+**44 · OPEN — §075's ladder puts `warn` and `error` on a word, and C04 I6 refuses both without a glyph.** §075: `env` is *warn — your shell chose it*, `flag` is *error — this invocation chose it*. C04 I6 (D29) throws for a cell whose tone is `warn` or `error` and whose glyph is empty — *colour alone does not survive 1-bit or a colour-blind reader*. Here colour is not alone: the word `env` or `flag` **is** the fact, and the tone is its second carrier, which is tie-break 4's per-fact count. The design is consistent; C04 I6 counts per effect.
+
+**Why parked, not ruled**: making C04 I6 accept a word that carries its own fact weakens an invariant, and *which words qualify* has no field to answer from — a free-text cell cannot say whether its text is a label or the fact. **Nothing reaches it today**: `env` and `flag` have no producer (ruling 28). **The one-word answers**: (a) C04 I6 exempts a cell drawn from a closed vocabulary the block declares; (b) the ladder's two loud rungs take a glyph (`warn`'s `▲`, `error`'s `✗`) beside the word; (c) the ladder stops at `meta`.
 
 ---
 
