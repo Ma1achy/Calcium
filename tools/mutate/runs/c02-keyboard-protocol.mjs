@@ -82,11 +82,11 @@ const results = runPass({
       name: "PUSHED-BEFORE-MOUSE: step 7 taken before step 6, so it is not released first",
       file: LIFECYCLE,
       from:
-        '      if (capabilities.mouse) take("mouse"); // I10\n' +
+        '      if (!linear && capabilities.mouse) take("mouse"); // I10, C01 I22\n' +
         '      if (capabilities.keyboardProtocol === "kitty") take("keyboardProtocol"); // I10, C02 I12',
       to:
         '      if (capabilities.keyboardProtocol === "kitty") take("keyboardProtocol"); // I10, C02 I12\n' +
-        '      if (capabilities.mouse) take("mouse"); // I10',
+        '      if (!linear && capabilities.mouse) take("mouse"); // I10, C01 I22',
       expect: "T1.1",
     },
     {

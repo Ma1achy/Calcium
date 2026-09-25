@@ -28,6 +28,15 @@ import { createAdapterRegistry } from "../data/adapters/index.js";
 import { blankRowsAbove, commandRows } from "./paint.js";
 import { childBorderLegend } from "./chrome.js";
 import { compose, noticeDoc } from "./documents.js";
+import {
+  answerEvent,
+  createLinearOutput,
+  linearEvents,
+  linearState as createLinearState,
+  questionEvent,
+  type BodyDeps,
+} from "./linear.js";
+import type { AskOptions } from "./local/registry.js";
 import type { MeasureMemo, NavElement, PaneRef, PlacedElement } from "../presentation/blocks/index.js";
 import { initialRegionHeight } from "./frame.js";
 import { blockWidthInEntry, elementsOfEntry, measureEntry } from "./entry-layout.js";
@@ -110,7 +119,7 @@ import { createKeyEffects } from "./keys.js";
 import type { ElementAddress, FocusTarget, InputEvent, Key, KeyAction, Verdict } from "../interaction/router/types.js";
 import { createNavigator, openHistory, SEARCH_ID } from "../interaction/history/index.js";
 import type { HistoryEntry, Navigator } from "../interaction/history/index.js";
-import { detectCapabilities, type TerminalCapabilities } from "../terminal/capabilities.js";
+import { detectCapabilities, type CapabilitySource, type TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Motion } from "../presentation/blocks/index.js";
 import { defaultButton, glyphs, tapeStart } from "../presentation/blocks/index.js";
 import { submitAction } from "./form-submit.js";
@@ -494,6 +503,13 @@ export type Graph = Readonly<{
    * (C22 I118). The prompt row draws this, and the field draws the editor.
    */
   fieldHeld: () => LineState | null;
+  /**
+   * The linear route's writer, or `null` on the rich route (C22 I119). The
+   * session hands it every commit instead of composing a frame.
+   */
+  linear: Readonly<{ redraw: () => void }> | null;
+  /** How each capability field was answered (C02 I13), for `/capabilities` (C22 I125). */
+  capabilitySources: Readonly<Record<keyof TerminalCapabilities, CapabilitySource>>;
   /** C04 I48 — page the focused container, in rows, focus unmoved (C26 I18). */
   pageBlock: (direction: 1 | -1) => void;
   /** C22 I71 — turn the focused plot camera. A no-op where there is none. */
@@ -1651,8 +1667,72 @@ export async function constructGraph(
   // with it, so each question starts its walk where §052 says it should: with
   // what was submitted through it, which for a question asked once is nothing.
   let replyHistory: Navigator | null = null;
+  // **C22 §6m — the linear route** (I119–I124, §107, ruling 29). One flag read
+  // once, as C01 reads it: the route a session opens on is the route it runs.
+  const linearRoute = detection.capabilities.renderMode === "linear";
+  /** The open question, for the input line's cue (I122). */
+  let asking: AskOptions | null = null;
+  const linearState = createLinearState();
+  const linearBody = (): BodyDeps => ({
+    width: lifecycle.size().columns,
+    elementsOf: (b, w) => built.blocks.elementsOf(b, w),
+    copyOf: (b) => built.blocks.copyOf(b),
+  });
+  const linear = !linearRoute
+    ? null
+    : createLinearOutput({
+        write: (bytes) => void lifecycle.writer.write(bytes),
+        width: () => lifecycle.size().columns,
+        // **The one thing linear edits in place** (I123). While a question is
+        // open the line is its cue; while a typed reply composes, the question
+        // is the label — §107's *labelled line editor* — and the reader's own
+        // line is held under both (C17 I29).
+        input: () => {
+          const { text, cursor } = stores.editor;
+          if (asking !== null && !confirm.composing) {
+            // **Armed, it says so in the footer's own words** (I122, R-OWN-002):
+            // the key the guard refuses redraws the cue without them, which
+            // is the refusal stated where rich mode states it in a chip.
+            // `router` is built below and read only when the line is drawn —
+            // the temporal dead zone, as `pipeline`'s thunk, not a quiet default.
+            const ready = router.ownerArmed ? " (ready in a moment)" : "";
+            return { label: `answer 1 to ${String(Math.min(9, asking.choices.length))}${ready}: `, text: "", cursor: 0 };
+          }
+          if (asking !== null) return { label: `${asking.question}: `, text, cursor };
+          return { label: "> ", text, cursor };
+        },
+      });
+  if (linear !== null) {
+    stores.transcript.subscribe((change) => {
+      linear.emit(
+        linearEvents(
+          change,
+          (id) => stores.transcript.entries.find((e) => e.id === id),
+          linearState,
+          linearBody(),
+        ),
+      );
+    });
+  }
+
   const confirm = createConfirmHost({
     overlays: stores.overlays,
+    // C22 I122 — numbered on the linear route, and told what was asked.
+    numbered: linearRoute,
+    ...(linear === null
+      ? {}
+      : {
+          announce: {
+            asked: (opts: AskOptions) => {
+              asking = opts;
+              linear.emit([questionEvent(opts, linearBody())]);
+            },
+            answered: (label: string) => {
+              asking = null;
+              linear.emit([answerEvent(label)]);
+            },
+          },
+        }),
     // The same anchor C19's menu takes, read at `ask` time (C15 I17).
     anchor: deps.frame.promptAnchor,
     overlayRegion: deps.frame.overlayRegion,
@@ -1762,6 +1842,8 @@ export async function constructGraph(
 
       transcript: stores.transcript,
       scheduler,
+      // C22 I125 — `/capabilities` reads how the record the session opened on was answered.
+      capabilitySources: detection.sources,
       // **The report reaches a surface through the local route and no other**
       // (C24 I31, C22 I93). A `/profile` verb is where it is wanted, and
       // `LocalContext` is L4; `ProducerContext` is L0 and putting it there
@@ -4139,6 +4221,8 @@ export async function constructGraph(
     focusedEntryId,
     focusedElements,
     fieldHeld: () => fieldBorrow?.held.line ?? null,
+    linear,
+    capabilitySources: detection.sources,
     pageBlock,
     orbitBlock,
     tiltBlock,

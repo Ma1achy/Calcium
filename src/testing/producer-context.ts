@@ -43,6 +43,7 @@ export const FULL_CAPABILITIES: TerminalCapabilities = Object.freeze({
   imageProtocol: "none",
   keyboardProtocol: "none",
   altScreen: true,
+  renderMode: "rich",
 });
 
 let registry: ReturnType<typeof fullRegistry> | null = null;

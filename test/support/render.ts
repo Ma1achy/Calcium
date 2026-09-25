@@ -90,6 +90,7 @@ export const FULL_CAPS: TerminalCapabilities = Object.freeze({
   imageProtocol: "none",
   keyboardProtocol: "none",
   altScreen: true,
+  renderMode: "rich",
 });
 
 /** `LANG=C`: ASCII glyphs throughout, and the `~` truncation marker. */

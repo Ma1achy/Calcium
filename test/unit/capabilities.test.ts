@@ -263,6 +263,7 @@ describe("C02 detection", () => {
       imageProtocol: "inferred",
       keyboardProtocol: "inferred",
       altScreen: "assumed",
+      renderMode: "assumed",
     });
 
     // **`COLORTERM` moves `colourDepth` from `inferred` to `stated` and the
@@ -374,6 +375,7 @@ describe("C02 detection", () => {
       imageProtocol: "kitty",
       keyboardProtocol: "kitty",
       altScreen: true,
+      renderMode: "rich",
     };
     // TERM=dumb detects every field at its floor; the overrides must win anyway.
     expect(caps({ TERM: "dumb" }, overrides)).toEqual(overrides);
@@ -392,8 +394,8 @@ describe("C02 detection", () => {
       keyboardProtocol: "none",
     } as const;
 
-    expect(isUsable({ ...worst, altScreen: true })).toBe(true);
-    expect(isUsable({ ...worst, altScreen: false })).toBe(false);
+    expect(isUsable({ ...worst, altScreen: true, renderMode: "rich" })).toBe(true);
+    expect(isUsable({ ...worst, altScreen: false, renderMode: "rich" })).toBe(false);
 
     // And the converse: every other field at its best cannot rescue altScreen.
     expect(
@@ -408,11 +410,33 @@ describe("C02 detection", () => {
         imageProtocol: "kitty",
         keyboardProtocol: "kitty",
         altScreen: false,
+        renderMode: "rich",
       }),
     ).toBe(false);
   });
 });
 
 describe("C02 the route (I15)", () => {
-  it.todo("T1.15 (C02 I15, C02 I7): CALCIUM_RENDER_MODE, its sources, the override, and isUsable on each route — not deferred on a component: specified ahead of the code in this commit");
+  it("T1.15 (C02 I15, C02 I7): CALCIUM_RENDER_MODE, its sources, the override, and isUsable on each route", () => {
+    const route = (env: NodeJS.ProcessEnv, overrides?: Partial<TerminalCapabilities>) => {
+      const d = detectCapabilities(env, overrides);
+      return [d.capabilities.renderMode, d.sources.renderMode, d.warnings.length];
+    };
+    const TERM = "xterm-256color";
+    expect(route({ TERM, CALCIUM_RENDER_MODE: "linear" }), "the reader's statement").toEqual(["linear", "stated", 0]);
+    expect(route({ TERM, CALCIUM_RENDER_MODE: "rich" })).toEqual(["rich", "stated", 0]);
+    expect(route({ TERM }), "absent, the framework's default").toEqual(["rich", "assumed", 0]);
+    // A value that is not a route is said out loud, and the route stays rich.
+    const typo = detectCapabilities({ TERM, CALCIUM_RENDER_MODE: "braille" });
+    expect([typo.capabilities.renderMode, typo.sources.renderMode]).toEqual(["rich", "assumed"]);
+    expect(typo.warnings.filter((w) => w.includes('"braille"')), "one warning naming the value").toHaveLength(1);
+    // The override wins, as every field's does (I4).
+    expect(route({ TERM, CALCIUM_RENDER_MODE: "rich" }, { renderMode: "linear" })).toEqual(["linear", "declared", 0]);
+    // **Not gated on `TERM`** — `dumb` refuses the alternate screen and leaves the route alone.
+    const dumb = caps({ TERM: "dumb", CALCIUM_RENDER_MODE: "linear" });
+    expect([dumb.renderMode, dumb.altScreen]).toEqual(["linear", false]);
+    // I7 on each route: the alternate screen is a frame's requirement, and linear draws none.
+    expect(isUsable(dumb), "linear opens without an alternate screen").toBe(true);
+    expect(isUsable({ ...dumb, renderMode: "rich" }), "rich does not").toBe(false);
+  });
 });

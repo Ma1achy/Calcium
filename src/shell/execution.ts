@@ -195,6 +195,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // from here would pin the tier for the session and reset the ring doing
       // it (C28 I50, I18). There is nothing to reach it with.
       profileReport: () => deps.profile?.() ?? null,
+      // C22 I125 — the record and its sources, as C02 resolved them.
+      capabilities: () => ({ values: deps.capabilities, sources: deps.capabilitySources }),
       // **The one operation, `null` where there is no profiler** (C28 I64).
       // Required rather than optional for the same reason `profileReport` is:
       // a wiring site that may omit a member is a wiring site that will, and

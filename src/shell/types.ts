@@ -29,7 +29,7 @@ import type { CommandPolicy } from "../interaction/parser/index.js";
 import type { AnyBlockDefinition, BlockRegistry, Motion } from "../presentation/blocks/index.js";
 import type { ThemeSet, ThemeStore } from "../presentation/theme/index.js";
 import type { FrameScheduler } from "../terminal/frame-scheduler.js";
-import type { TerminalCapabilities } from "../terminal/capabilities.js";
+import type { CapabilitySource, TerminalCapabilities } from "../terminal/capabilities.js";
 import type { TerminalLifecycle } from "../terminal/lifecycle.js";
 import type { OverlayManager } from "../viewport/overlay/index.js";
 import type { TranscriptStore } from "../viewport/transcript/index.js";
@@ -496,6 +496,8 @@ export type PipelineDeps = Readonly<{
   confirm: ConfirmHost;
   /** C28's report, when a profiler exists (C22 I93). Absent otherwise. */
   profile?: () => ProfileReport;
+  /** How each field of `capabilities` was answered (C02 I13), for `/capabilities` (C22 I125). */
+  capabilitySources: Readonly<Record<keyof TerminalCapabilities, CapabilitySource>>;
   /**
    * One operation from C28's recorder, for `/profile capture` (C28 I64).
    *

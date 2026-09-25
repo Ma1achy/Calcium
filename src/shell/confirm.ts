@@ -49,6 +49,19 @@ export const CONFIRM_WIDTH = 72;
 export type ConfirmDeps = Readonly<{
   overlays: OverlayManager;
   /**
+   * **`1`–`9` answer choices in order** (C22 I122, §107: *choice questions use
+   * numbered choices*). The linear route's, where a question is a line of text
+   * with its choices numbered and no picture to point at. A choice's own key is
+   * asked first, so a question whose choices are keyed by digit keeps them.
+   */
+  numbered?: boolean;
+  /**
+   * Told when a question is asked and when it is answered (C22 I122) — the
+   * linear stream's events, which an overlay change cannot give: it carries an
+   * id and nothing of what was asked.
+   */
+  announce?: Readonly<{ asked: (opts: AskOptions) => void; answered: (label: string) => void }>;
+  /**
    * The prompt's own span, for an anchored question (`AskOptions.placement`).
    *
    * The same seam C19's menu takes, and for its reason: `rows` is the prompt's
@@ -399,6 +412,9 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
       // the menu's; the start is what differs, and it is supplied.
       const selection = createChoiceSelection(opts.choices.length, defaultStart(opts.choices));
       const selected = (): number => selection.at ?? 0;
+      /** The choice a digit names on the linear route (C22 I122), or none. */
+      const numberedPick = (name: string): Choice | undefined =>
+        deps.numbered === true && /^[1-9]$/u.test(name) ? opts.choices[Number(name) - 1] : undefined;
 
       // **§101's table, asked rather than restated** (I73, §7f). Both fields
       // were literals here and both are the table's answer for a question that
@@ -428,6 +444,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
       };
 
       const disposable = deps.overlays.push(layer);
+      deps.announce?.asked(opts);
       // **The second pass, and it drops the payload rather than marking it**
       // (entry 16 R2). See `collapsed`.
       if (truncated(deps)) {
@@ -436,6 +453,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
 
       return new Promise<AskAnswer>((resolve) => {
         const settle = (key: string, text?: string): boolean => {
+          deps.announce?.answered(text ?? opts.choices.find((c) => c.key === key)?.label ?? key);
           handler = null;
           meaning = null;
           consumer = null;
@@ -539,12 +557,13 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
           if (name === "up" || name === "left") return "move";
           if (name === "down" || name === "right" || name === "tab") return "move";
           if (!ctrl && !e.key.meta && opts.choices.some((c) => c.key === name)) return "resolve";
+          if (!ctrl && !e.key.meta && numberedPick(name) !== undefined) return "resolve";
           return "none";
         };
         meaning = classify;
 
         const chosen = (key: string): Choice | undefined =>
-          opts.choices.find((c) => c.key === key);
+          opts.choices.find((c) => c.key === key) ?? numberedPick(key);
 
         handler = (e) => {
           if (e.kind !== "key") return false;

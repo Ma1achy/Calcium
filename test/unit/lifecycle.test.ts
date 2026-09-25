@@ -606,5 +606,55 @@ describe("C01 hover — 1003 in 1002's slot, never both (I21)", () => {
 });
 
 describe("C01 the linear profile (I22)", () => {
-  it.todo("T1.30 (I22, I6): linear takes raw mode, paste and the keyboard protocol, never the alternate screen, the mouse or the hidden cursor — not deferred on a component: specified ahead of the code in this commit");
+  function opened(caps: Partial<TerminalCapabilities>) {
+    const stdout = fakeStdout();
+    const lifecycle = createTerminalLifecycle({
+      stdout,
+      stdin: fakeStdin(),
+      capabilities: capabilities({ keyboardProtocol: "kitty", ...caps }),
+      onFatal: ((err: unknown) => {
+        throw err;
+      }) as (err: unknown) => never,
+      debug: fakeDebug(),
+    });
+    live.push(lifecycle);
+    return { lifecycle, stdout };
+  }
+
+  it("T1.30 (I22, I6): linear takes raw mode, paste and the keyboard protocol, never the alternate screen, the mouse or the hidden cursor", () => {
+    const { lifecycle, stdout } = opened({ renderMode: "linear" });
+    lifecycle.acquire();
+    const on = stdout.output;
+    for (const never of [MODES.altScreenOn, MODES.mouseOn, MODES.hoverOn, MODES.cursorHide]) {
+      expect(on, `linear takes no ${JSON.stringify(never)}`).not.toContain(never);
+    }
+    expect(on, "paste is taken").toContain(MODES.pasteOn);
+    expect(on, "and the keyboard protocol").toContain(MODES.keyboardOn);
+    // The toggle cannot take the mouse after the fact either.
+    lifecycle.setMouseTracking(true);
+    lifecycle.release();
+    const off = stdout.output.slice(on.length);
+    for (const never of [MODES.altScreenOff, MODES.mouseOff, MODES.cursorShow]) {
+      expect(off, `and releases no ${JSON.stringify(never)} it never took`).not.toContain(never);
+    }
+    expect(off).toContain(MODES.pasteOff);
+    expect(off).toContain(MODES.keyboardOff);
+  });
+
+  it("T1.30 (cont., I22): with no alternate screen, linear opens rather than reaching onFatal", () => {
+    const { lifecycle } = opened({ renderMode: "linear", altScreen: false });
+    expect(() => lifecycle.acquire()).not.toThrow();
+    expect(lifecycle.acquired).toBe(true);
+  });
+
+  it("T1.30 (control): the same harness on the rich route takes the alternate screen and hides the cursor", () => {
+    // A lifecycle that never took either passes every arm above.
+    const { lifecycle, stdout } = opened({ renderMode: "rich" });
+    lifecycle.acquire();
+    expect(stdout.output).toContain(MODES.altScreenOn);
+    expect(stdout.output).toContain(MODES.cursorHide);
+    expect(stdout.output).toContain(MODES.mouseOn);
+    const { lifecycle: dead } = opened({ renderMode: "rich", altScreen: false });
+    expect(() => dead.acquire(), "and rich without an alternate screen is fatal").toThrow(/alternate screen/u);
+  });
 });

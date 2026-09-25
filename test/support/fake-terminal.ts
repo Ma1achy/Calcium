@@ -18,6 +18,7 @@ export const ALL_CAPABILITIES: TerminalCapabilities = Object.freeze({
   // the pop from this record, and T1.28 turns it off by hand.
   keyboardProtocol: "kitty",
   altScreen: true,
+  renderMode: "rich",
 });
 
 export function capabilities(over: Partial<TerminalCapabilities> = {}): TerminalCapabilities {

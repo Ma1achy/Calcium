@@ -66,6 +66,14 @@ export type TerminalCapabilities = Readonly<{
    */
   keyboardProtocol: "none" | "kitty";
   altScreen: boolean;
+  /**
+   * **The route, not the terminal's** (I15, C22 §6m, §107): `linear` is an
+   * append-only stream of semantic events, `rich` the cursor-addressed frame.
+   * Read from `CALCIUM_RENDER_MODE` and never gated on `TERM` — a terminal that
+   * says `dumb` is one a screen reader may well be driving, and the route is
+   * the reader's to choose.
+   */
+  renderMode: "rich" | "linear";
 }>;
 
 /**
@@ -176,7 +184,11 @@ export const DEGRADATION: Readonly<
     owner: "C01 C16",
   }),
   altScreen: Object.freeze({
-    behaviour: "The shell refuses to open, prints help, exits 0",
+    behaviour: "The shell refuses to open, prints help, exits 0 — on the rich route; linear needs none",
+    owner: "L4",
+  }),
+  renderMode: Object.freeze({
+    behaviour: "Linear: an append-only stream of semantic events, and no frame",
     owner: "L4",
   }),
 });
@@ -536,7 +548,20 @@ function detect(env: Readonly<NodeJS.ProcessEnv>): Answers {
     // because the identification is, not because this line remembered to ask.
     keyboardProtocol: fromIdentity(identified, terminal, KEYBOARD_PROTOCOL, "none"),
     altScreen: [usable, "assumed"],
+    renderMode: detectRenderMode(read(env, RENDER_MODE)),
   };
+}
+
+/** §107's environment setting (I15); `--linear` and persistent config wait on 28. */
+const RENDER_MODE = "CALCIUM_RENDER_MODE";
+
+/**
+ * `linear` or `rich` is the reader's statement; anything else is not, and the
+ * route stays `rich` as though the variable were absent — the warning that
+ * names the value is `detectCapabilities`', where warnings are collected (I8).
+ */
+function detectRenderMode(value: string | undefined): Answer<"rich" | "linear"> {
+  return value === "linear" || value === "rich" ? [value, "stated"] : ["rich", "assumed"];
 }
 
 // --- overrides --------------------------------------------------------------
@@ -565,6 +590,7 @@ const VALIDATORS: Readonly<Record<keyof TerminalCapabilities, (v: unknown) => bo
     imageProtocol: oneOf("none", "iterm2", "kitty", "sixel"),
     keyboardProtocol: oneOf("none", "kitty"),
     altScreen: isBoolean,
+    renderMode: oneOf("rich", "linear"),
   });
 
 const FIELDS = Object.keys(VALIDATORS) as (keyof TerminalCapabilities)[];
@@ -600,6 +626,16 @@ export function detectCapabilities(
     sources[field] = source;
   }
   const warnings: string[] = [];
+  // **An unreadable route is said out loud** (I15): a reader who set
+  // `CALCIUM_RENDER_MODE=braile` asked for something, and a silent `rich` is
+  // the one answer that looks like it worked.
+  const route = read(env, RENDER_MODE);
+  if (route !== undefined && route !== "linear" && route !== "rich") {
+    warnings.push(
+      `${RENDER_MODE}: ${JSON.stringify(route)} is not a route; ` +
+        `keeping "rich" — the values are "rich" and "linear"`,
+    );
+  }
 
   if (overrides !== undefined) {
     for (const field of FIELDS) {
@@ -636,9 +672,11 @@ export function detectCapabilities(
 }
 
 /**
- * Alternate screen is the sole hard requirement (D28). No other capability can
- * prevent the shell opening (I7) — everything else has a fallback in §4.
+ * Alternate screen is the sole hard requirement (D28), **on the rich route**
+ * (I7, I15). No other capability can prevent the shell opening — everything
+ * else has a fallback in §4 — and on the linear route nothing can, because the
+ * alternate screen is what a frame needs and linear draws none (C01 I22).
  */
 export function isUsable(caps: TerminalCapabilities): boolean {
-  return caps.altScreen;
+  return caps.renderMode === "linear" || caps.altScreen;
 }

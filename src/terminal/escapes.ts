@@ -177,6 +177,16 @@ export type SgrStyle = Readonly<{
 export const CURSOR_HOME = "\x1b[H";
 
 /**
+ * **The linear route's two sequences** (C01 I22, C22 I123): the input line is
+ * the one thing linear edits in place, so it is erased — carriage return, then
+ * erase-in-line 2, the whole row whatever the cursor's column — and the caret
+ * is put back by column. Neither addresses a row, which is what linear forbids.
+ */
+export const ERASE_LINE = "\r\x1b[2K";
+/** Cursor Horizontal Absolute, 1-based as the terminal counts. */
+export const cursorColumn = (col: number): string => `\x1b[${String(Math.max(1, Math.trunc(col)))}G`;
+
+/**
  * Cursor to a 0-based row and column.
  *
  * `CURSOR_HOME` generalised, and here for its reason: every escape literal

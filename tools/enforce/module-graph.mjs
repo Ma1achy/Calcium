@@ -1644,14 +1644,6 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
-  // --- C09 §7h's semantic node, ahead of the linear renderer that reads it ---
-  //
-  // **The queued consumer is the linear rendering (§107, ruling 29's second
-  // cut)**, which speaks a node's `valueText` where the rich rendering paints
-  // the bar. The day it lands and does not read it, this entry is the violation.
-  "SemanticNode.valueText":
-    "C09 I117, §107, parked 29 — the human text of a node's value (`3 of 10`), which the "
-    + "linear rendering speaks. T2.178 holds it for `progress` and `control`.",
   // --- C09 I114's revert mark, registered ahead of the rows that draw it ---
   //
   // **The queued consumers are §005's stopped-edit row and §064's reverted

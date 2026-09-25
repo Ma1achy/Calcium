@@ -169,6 +169,7 @@ describe("C02 fail-on-revert", () => {
       imageProtocol: "inferred",
       keyboardProtocol: "inferred",
       altScreen: "assumed",
+      renderMode: "assumed",
     };
 
     // It agrees with the real thing on the environment it was written from…

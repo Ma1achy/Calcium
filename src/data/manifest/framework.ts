@@ -38,6 +38,13 @@ export const FRAMEWORK_TOOLS: readonly ToolDef[] = Object.freeze([
     flags: [],
   }),
   Object.freeze({
+    name: "capabilities",
+    local: true,
+    summary: "the rendering route, and what the terminal can do",
+    args: [],
+    flags: [],
+  }),
+  Object.freeze({
     name: "clear",
     local: true,
     summary: "empty the transcript; command history is untouched",

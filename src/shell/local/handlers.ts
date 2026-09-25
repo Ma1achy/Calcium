@@ -30,6 +30,7 @@ import { TIER_RANK } from "../profiling/types.js";
 import type { CaptureResult, ProfileReport } from "../profiling/types.js";
 import type { LocalHandler } from "./registry.js";
 import type { StopReason } from "../types.js";
+import type { CapabilitySource, TerminalCapabilities } from "../../terminal/capabilities.js";
 import { scopesInReadingOrder } from "../../interaction/router/keymap.js";
 
 export type HandlerDeps = Readonly<{
@@ -80,6 +81,14 @@ export type HandlerDeps = Readonly<{
    * state every arm answers with a `warn` notice naming that option.
    */
   profileReport: () => ProfileReport | null;
+  /**
+   * The resolved capability record and how each field was answered (C02 I13),
+   * for `/capabilities` (C22 I125).
+   */
+  capabilities: () => Readonly<{
+    values: TerminalCapabilities;
+    sources: Readonly<Record<keyof TerminalCapabilities, CapabilitySource>>;
+  }>;
   /**
    * `/profile capture`'s one operation, `null` where no profiler exists
    * (C28 I64).
@@ -640,5 +649,29 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
 
     // The seventh (C23 §2, I68).
     profile: profileHandler(deps.profileReport, deps.profileCapture),
+
+    /**
+     * **Where the route appears** (C22 I125, §107: *the chosen route appears in
+     * `/capabilities`*). The route first, then every field C02 resolved, each
+     * with the source that would falsify it — the column §075 argues for:
+     * *the commonest question is not what is it, it is WHY is it that*.
+     */
+    capabilities: () => {
+      const { values, sources } = deps.capabilities();
+      const fields = [
+        "renderMode" as const,
+        ...(Object.keys(values) as (keyof TerminalCapabilities)[]).filter((f) => f !== "renderMode"),
+      ];
+      return doc("/capabilities", [
+        b.table({
+          id: blockId("capabilities"),
+          columns: [b.col("field"), b.col("value"), b.col("source")],
+          rows: fields.map((f) => ({
+            id: f,
+            cells: { field: { text: f }, value: { text: String(values[f]) }, source: { text: sources[f] } },
+          })),
+        }),
+      ]);
+    },
   };
 }

@@ -255,6 +255,9 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
   // entered — a toggle reading `MOUSE` while acquisition took `MOUSE_ANY` would
   // emit `1002l` for a 1003 the terminal still holds.
   const mouseMode = opts.hover === true ? MOUSE_ANY : MOUSE;
+  // **The route, read once** (I22, C02 I15): the profile a session acquires
+  // under is the profile it releases, suspends and resumes under.
+  const linear = capabilities.renderMode === "linear";
 
   let state: LifecycleState = "constructed";
   const held = new Set<HeldKey>();
@@ -436,6 +439,7 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
    */
   function setMouseTracking(on: boolean): void {
     if (!capabilities.mouse) return; // I10 — never taken; nothing to toggle.
+    if (linear) return; // I22 — a report would arrive as typing nobody asked for.
     if (state !== "acquired") return; // suspended or released: not ours to change.
     if (on === held.has("mouse")) return; // idempotent (T3.x, the second call).
     if (on) {
@@ -631,27 +635,34 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     if (state === "acquired") return; // T3.5 — no-op, not an error.
 
     // I14 — the record has already concluded the shell cannot open. Fatal
-    // before anything is emitted (T3.15).
-    if (!capabilities.altScreen) {
+    // before anything is emitted (T3.15). **On the rich route only** (I22): the
+    // refusal exists because a frame needs the alternate screen, and linear
+    // draws none.
+    if (!linear && !capabilities.altScreen) {
       unwind();
       onFatal(new Error("alternate screen unsupported — the shell cannot open"));
     }
 
-    try {
-      take("altScreen");
-    } catch (err) {
-      // §5 — the fatal path unwinds first. onFatal returns `never`, so nothing
-      // runs after it; otherwise the only fatal case in the system would be the
-      // one case that leaves state behind.
-      unwind();
-      onFatal(err);
+    // **The linear profile** (I22, C22 §6m): the stream is appended to the
+    // terminal's own scrollback, a mouse report would arrive as typing, and a
+    // screen reader follows the cursor — so none of the three is taken.
+    if (!linear) {
+      try {
+        take("altScreen");
+      } catch (err) {
+        // §5 — the fatal path unwinds first. onFatal returns `never`, so nothing
+        // runs after it; otherwise the only fatal case in the system would be the
+        // one case that leaves state behind.
+        unwind();
+        onFatal(err);
+      }
     }
 
     try {
-      take("cursor");
+      if (!linear) take("cursor");
       take("rawMode");
       if (capabilities.bracketedPaste) take("bracketedPaste"); // I10
-      if (capabilities.mouse) take("mouse"); // I10
+      if (!linear && capabilities.mouse) take("mouse"); // I10, C01 I22
       if (capabilities.keyboardProtocol === "kitty") take("keyboardProtocol"); // I10, C02 I12
     } catch (err) {
       // T3.7 — partial acquisition never leaves partial state.

@@ -641,7 +641,9 @@ class Session implements TuiInstance {
     }
 
     const size = this.#graph.lifecycle.size();
-    if (tooSmall(size)) {
+    // **No size gate on the linear route** (C22 I119): the gate exists because a
+    // frame cannot be composed below 60 × 16, and linear composes none.
+    if (this.#graph.linear === null && tooSmall(size)) {
       // **C01's writer, not `config.stdout`** — F67, and the one-line difference
       // between this working and the shell drawing nothing for ever.
       //
@@ -948,6 +950,14 @@ class Session implements TuiInstance {
   #render(reason: CommitReason = "input"): void {
     const graph = this.#graph;
     if (graph === null || !graph.lifecycle.acquired) return;
+
+    // **The linear route composes no frame** (C22 I119, §107): a commit redraws
+    // the input line, the one thing linear edits in place, and nothing else —
+    // no composition, and so no spinner armed from what a frame drew.
+    if (graph.linear !== null) {
+      graph.linear.redraw();
+      return;
+    }
 
     // **The frame's brackets, and the reason C03 chose** (C28 I16). Decoration:
     // the profiler is `null` unless the app asked for one, so an unprofiled
