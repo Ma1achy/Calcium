@@ -646,7 +646,7 @@ five are capability detection. A row reading them as one question would be the
 homonym this ledger has now hit four times.)*
 
 
-> **Ruled 2026-09-24.** An ARIA-derived role vocabulary, with linear output per the access spec in M12. **Premise contradicted:** the plan's M12 is **the trust boundary** (escaping untrusted text), not access. The access spec is §107. Taken as: the ARIA table proposed in this entry, and the linear line form it proposes, both under §107. **Owed.**
+> **Ruled 2026-09-24.** An ARIA-derived role vocabulary, with linear output per the access spec in M12. **Premise contradicted:** the plan's M12 is **the trust boundary** (escaping untrusted text), not access. The access spec is §107. Taken as: the ARIA table proposed in this entry, and the linear line form it proposes, both under §107. **Owed.** **Specified 2026-09-25, first cut** as C09 §7h (I116–I118): the node, the role table, and five kinds the table did not name — `keyValue`, `comparison` → `table`; `events` → `log`; `patch` → `document`; `tip` → `note`, by ARIA's nearest. The linear renderer and announcements follow.
 
 **29 · RULED — `R-ACC-001` — §107 fixes the semantic node's fields and neither its role
 vocabulary nor a line of linear output.** Nothing of §107 exists in the tree: the

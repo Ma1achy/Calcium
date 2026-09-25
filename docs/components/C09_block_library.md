@@ -3156,6 +3156,48 @@ subject, and the surface has no consumer until it lands.
 ---
 
 
+
+## 7h. The semantic node — every block, every element (§107, `R-ACC-001`, parked 29)
+
+*The cell grid is a projection. It is not the interface.* §107 fixes a node's nine
+fields — *id, role, name, description, value + valueText, state, position, actions,
+relations* — and says **everything drawn** has one. This section is the block half:
+`semanticsOf(block, width)` answers a node for a block and for each element it
+publishes at that width, so the two readers of one declaration — the pointer and
+the keyboard (C26 I8) — gain a third, and a screen reader's view cannot drift from
+what focus can reach. Focus and selection are the renderer's, not the block's, so
+they join the node where the render context is (the linear renderer); nothing here
+reads a clock, a capability or a theme.
+
+**The role table is ruling 29's**: ARIA's vocabulary wherever §107 is silent, because
+§107's own list is already mostly ARIA and a screen reader speaks those names.
+
+| kind | role | | kind | role |
+|---|---|---|---|---|
+| `table` | `table` | | `notice` | `note` — `alert` when its tone is `error` |
+| `keyValue` | `table` ¹ | | `tip` | `note` ¹ |
+| `comparison` | `table` ¹ | | `status` | `status` |
+| `progress` | `progressbar` | | `rule` | `separator` |
+| `logs` | `log` | | `events` | `log` ¹ |
+| `pills`, `steps` | `list` | | `choice` | `radiogroup` |
+| `control` | `slider` | | `tape` | `tablist` |
+| `plot`, `mosaic`, `image` | `figure` | | `panel`, `scroll`, `group` | `group` |
+| `code`, `raw`, `terminal` | `document` | | `patch` | `document` ¹ |
+
+¹ **Five kinds the entry's table did not name**, ruled here by the same rule — ARIA's
+nearest: `keyValue` and `comparison` are label/value grids; `events` is a timestamped
+append stream as `logs` is; `patch` is text as `code` is; `tip` is a note as `notice`
+is. An application's own kind reads `document`, as its fallback draws `raw`.
+
+**The name is the kind's own label, and empty where the kind has none** — `rule.label`,
+`notice.text`, `progress.label`, `code.language`, `patch.path`, `choice.label`,
+`control.label`, `tip.text`, `panel.title`, `status.message`, `image.alt`. §107's *what
+it is, without colour, position or punctuation* rules out deriving one from painted
+rows, and an empty name is ARIA's own answer for an unlabelled group; inventing one
+would be a label nobody wrote.
+
+The three invariants are I116–I118, in §9's list.
+
 ## 8. Commitments
 
 1. C09 owns the registry; C04 owns the schema and the measurement contract (I13).
@@ -3481,6 +3523,9 @@ Six tiers. Every cell of the §6 transition table is covered.
   **It is not the composer's cut and must not become one** (§099's *a kind shortens itself, given the width it got*). The section names the double-cut as a real defect — middle-truncated by the form, then tail-truncated again by the composer — and the reason this tree cannot have it is structural rather than lucky: `fitRuns` runs inside `noticeRows`, against the budget the block was handed, and what it returns is already at the width. There is no second pass. The row asserts it as a property of the answer, not of the call order.
 - **I114** — *(§005, §013, §064, §092, parked 17)* **`↺` is registered: `GlyphSet.revert`, U+21BA at the Unicode rung and `<` at ASCII, in the `inline` domain.** The design draws it 22 times — `↺ redo` on a reverted entry, `↺ revert` on a stopped one, `↺ revert all` on a review row — always `accent` beside a `muted` label, and until this it was in no glyph record and no file in `src/`, so SS64's domains, built from records, could not see it. **The ASCII half is a proposal in the batch (17)**, chosen by measurement rather than taste: `content-row` holds `row-lead` and `inline`, which already spend twenty-one ASCII marks between them plus the registry's `@ # $` and ruling 26's pending `^`; `~` — the first reach, for a loop — is `nested`'s. `<` is free in both and reads as *back*. U+21BA is `East_Asian_Width=Ambiguous`, one cell at `narrow` and two at `wide`, which `GlyphSet`'s wholesale ASCII collapse at `wide` (C02 I9) already absorbs. **Its consumers are queued, not present**: §005's stopped-edit row and §064's reverted entry, neither built; the slot lands with the ruling that registered it, and SS65 is what makes a current record without one red.
 - **I115** — *(§7f, §021, `R-SEL-012`, parked 22)* **Nested scrollables each draw their own bar, in their own last column.** `R-SEL-012` (`current`) makes nesting legal — *the wheel takes the innermost scrollable* has no referent otherwise — and `R-BLK-165`'s *two bars for one document is a layout error* is an `example` block, which does not bind; ruling 22 took the per-box reading over the three the entry laid out. **It is what `barOf` already did**, measured before this was written: an outer box of five rows holding an inner of three, both overflowing, draws the inner's bar in column `w − 2` on the inner's rows and the outer's in column `w − 1` on every interior row, at both rungs. Each box narrows its own content by one column and its children are drawn inside that, so the inner's last column is one left of the outer's — two columns, never one shared. Nothing held it until now, so the invariant is the ruling given a row rather than new behaviour.
+- **I116** — *(§107, `R-ACC-001`, parked 29)* **Every known kind has a role, from one table exhaustive over `KnownBlockKinds`.** The table above, as `SEMANTIC_ROLES`; a `notice` whose tone is `error` is `alert`; an application kind is `document`. Exhaustive by type, so a twenty-sixth kind without a row does not compile.
+- **I117** — *(§107)* **A block's node carries its id, role and name, and the value where the kind has one.** `id` is `block.id`; `name` is the kind's label field above, or `""`; `progress` carries `value: current` and `valueText: "current of total"`, `control` carries `value: at` and `valueText: value`. `state` holds what the block itself records — `busy` for a `status` that is `loading` or `retrying` and a `notice` that is `streaming`, `stale` for a `panel` with `staleForMs`. No field carries SGR, a glyph slot or a colour.
+- **I118** — *(§107, C26 I8)* **A node's children are its children's nodes, or its elements' — never both, never neither where either exists.** `panel`, `group`, `scroll` and `mosaic` nest their children's nodes in order; every other kind nests one node per element `elementsOf(block, width)` publishes — `id` the element's, `role` `row` or `cell` by its level, `position` `{ index, of }` over the elements, `actions` `confirm` where the element activates or has an inside and `copy` where it declares a copy, which are the registry's own action ids. **The same width as the render**, because the elements are: a row that sheds is a target at 40 columns and not at 120 (I113).
 - **IF8** (C22 I77): `Frames.advance` is a function of elapsed time — four wakes of 25 ms and one of 100 leave the index, the remainder and `due` where one wake of 200 does; a full loop is frame 0 and keys as untouched; a minute idle lands where the clock says; a still and a zero advance are no-ops. In `test/edge/image-frames.test.ts` beside the rows that consume it.
 - **IF9** (I39): `transmitAnimation` is one `a=T` as raw RGBA, one `a=f` per later frame carrying its delay in `z`, an `a=a` for the root frame's gap and an `a=a,s=3` to run — every escape under 4096 bytes — and on the 8x8 fixture the whole upload is under ten ticks of retransmission.
 - **T1.1**: `register` in open state → `get` returns it, `kinds` includes it.
@@ -3599,6 +3644,9 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.174** (I111, R-COL-006): `glyphFor("trendUp")` and `glyphFor("trendDown")` are `↑`/`↓` at full capabilities and `^`/`v` at ASCII and at `wide`; the registry's `trend-up`/`trend-down` records carry the same pairs, in the `inline` domain.
 - **T2.175** (I112): every registered set's interval is at least `TICK_MS`, so no set is faster than the unit its frame is computed in and none skips a frame.
 - **T2.176** (I114, SS64, SS65): `glyphs(caps).revert` is `↺` at Unicode and `<` at ASCII and at `wide`; the registry's `revert` record carries the same two halves and `inline`; and the content-row collision check is green with it. **The control is the first reach**: the record's ASCII half set to `~` is reported against `nested`, which is the collision that ruled `~` out.
+- **T2.177** (I116, §107): `SEMANTIC_ROLES` holds a role for every key of `KnownBlockKinds` and each is one of the table's; a `notice` at `error` reads `alert` and at `warn` reads `note`; an unregistered kind reads `document`. **The control is the twenty-six**: the table has exactly the kinds the union has, compared both ways.
+- **T2.178** (I117, §107): the canonical fixture of every kind answers a node whose `id` is the block's and whose `name` is the label field I117 names — or `""` for the kinds with none; `progress` and `control` carry their `value` and `valueText`; a `loading` `status` and a `streaming` `notice` are `busy`; and no string anywhere in any node carries ESC or a character from the glyph table's Unicode column.
+- **T2.179** (I118, C26 I8, I113): a `group` of a `rule` and a `table` answers a group node with two children in order, the table's children its rows with `position` `1 of n`…; a table row with an `activate` carries `confirm`; and a shedding `keyValue` answers element children at 9 columns and none at 60 — the same set `elementsOf` publishes at each.
 - **T2.112** (I45): every non-ASCII base in `GLYPH_TABLE`'s unicode column, `UNICODE`'s slots and every spinner set's frames is followed by U+FE0E; the control asserts `⏺` U+23FA and `ℹ` U+2139 **are** in the derived set and `*` is not, so an empty table cannot pass the row, and a second arm asserts the bare base is still a violation — the remedy is the selector, not an exemption. T2.71 in `spinners.test.ts` runs over the same set in place of its hand list.
 - **T2.113** (I46): a `step` notice whose text overflows the width measures 1 and renders 1 row at 80, 40 and 20 cells in both alphabets; with the argument span marked `elide`, the argument ends in the marker and the verb, duration and outcome are intact; without the span the row is cut from its end. The control is the same text under `info`, which wraps to two rows.
 - **T2.114** (I47): `elementsIn` over a `step` notice with no `action` yields one element spanning the block with `copy` equal to the text and no `activate`; with an `action`, `activate` is that action; an `info` notice with no `action` yields none.
