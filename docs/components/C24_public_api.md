@@ -475,11 +475,13 @@ come from the far side and the far side has not promised they are distinct.
 C04 §3a puts vertical rhythm in the block; if every adapter had to think about it,
 half of them would not, and the surfaces would render dense while the specs drew
 them spaced. So the builders decide: `b.table`, `b.plot`, `b.panel`, `b.rule`,
-`b.steps`, `b.kv`, `b.comparison`, `b.patch`, `b.code` and `b.tip` set `gapBefore`
-when they are not the first block in the sequence they are built into; `b.pills`,
-`b.notice`, `b.progress`, `b.logs`, `b.events`, `b.raw`, `b.spark`, `b.group` and
-`b.spinner` do not — a second `pills` row belongs against the first, and a run of
-notices is a list rather than a set of sections.
+`b.steps`, `b.kv`, `b.comparison`, `b.patch`, `b.code`, `b.tree` and `b.tip` set
+`gapBefore` when they are not the first block in the sequence they are built into;
+`b.pills`, `b.tape`, `b.notice`, `b.progress`, `b.logs`, `b.events`, `b.raw`,
+`b.spark`, `b.group` and `b.spinner` do not — a second `pills` row belongs against
+the first, a tape is that row with a window over it, and a run of notices is a list
+rather than a set of sections. **A tree is a section** (C04 §3ap): it is a structure
+of its own, as a table is, and not a row of peers set against the one before it.
 
 **Nineteen builders return blocks, and this paragraph names nineteen** — `b.live`
 is the twentieth. It was deferred with §5 and has landed; it takes `gapBefore`'s
