@@ -15,6 +15,7 @@ export { ANIMATES, animationIntervalOf, tickIntervalOf } from "./animation.js";
 export { countdown, elapsed, statusDetailRows, statusRowsFor } from "./kinds/status.js";
 export { age } from "./kinds/containers.js";
 export { tapeStart } from "./kinds/tape.js";
+export { defaultButton } from "./kinds/form.js";
 export {
   glyphs,
   type GlyphCaps,

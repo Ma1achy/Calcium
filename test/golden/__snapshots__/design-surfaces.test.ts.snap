@@ -411,6 +411,7 @@ control         1     control-1
 tape            5     seams arm count probe
 tree            6     src interaction parser frame data package
 split           2     split-files split-code
+form            5     name port replicas save cancel
 tip             0     — atomic: nothing to focus
 panel           0     — atomic: nothing to focus
 status          0     — atomic: nothing to focus
@@ -420,7 +421,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 27 kinds · 10 publish a focusable element · 10 draw a treatment
+· 28 kinds · 11 publish a focusable element · 11 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them
@@ -548,6 +549,7 @@ aaaaaaaaaaaa.................................... which is why
   tape         — no ground
   tree         — no ground
   split        — no ground
+  form         — no ground
   tip          — no ground
   panel        — no ground
   status       [" ERROR "]
@@ -1125,6 +1127,7 @@ control         1     control-1
 tape            5     seams arm count probe trace
 tree            6     src interaction parser frame data package
 split           2     split-files split-code
+form            5     name port replicas save cancel
 tip             0     — atomic: nothing to focus
 panel           0     — atomic: nothing to focus
 status          0     — atomic: nothing to focus
@@ -1134,7 +1137,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 27 kinds · 10 publish a focusable element · 10 draw a treatment
+· 28 kinds · 11 publish a focusable element · 11 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them
@@ -1257,6 +1260,7 @@ aaaaaaaaaaaa.................................... which is why
   tape         — no ground
   tree         — no ground
   split        — no ground
+  form         — no ground
   tip          — no ground
   panel        — no ground
   status       [" ERROR "]
@@ -1818,6 +1822,7 @@ control         1     ** 1 focusable, NONE drawn **
 tape            5     seams arm probe
 tree            6     src interaction parser frame data package
 split           2     split-files split-code
+form            5     name port replicas save cancel
 tip             0     — atomic: nothing to focus
 panel           0     — atomic: nothing to focus
 status          0     — atomic: nothing to focus
@@ -1827,7 +1832,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 27 kinds · 10 publish a focusable element · 7 draw a treatment
+· 28 kinds · 11 publish a focusable element · 8 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them
@@ -1916,6 +1921,7 @@ raw             0     — atomic: nothing to focus
   tape         — no ground
   tree         — no ground
   split        — no ground
+  form         — no ground
   tip          — no ground
   panel        — no ground
   status       — no ground
@@ -2474,6 +2480,7 @@ control         1     ** 1 focusable, NONE drawn **
 tape            5     seams arm probe trace
 tree            6     src interaction parser frame data package
 split           2     split-files split-code
+form            5     name port replicas save cancel
 tip             0     — atomic: nothing to focus
 panel           0     — atomic: nothing to focus
 status          0     — atomic: nothing to focus
@@ -2483,7 +2490,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 27 kinds · 10 publish a focusable element · 7 draw a treatment
+· 28 kinds · 11 publish a focusable element · 8 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them
@@ -2566,6 +2573,7 @@ raw             0     — atomic: nothing to focus
   tape         — no ground
   tree         — no ground
   split        — no ground
+  form         — no ground
   tip          — no ground
   panel        — no ground
   status       — no ground
@@ -3144,6 +3152,7 @@ control         1     control-1
 tape            5     seams arm count probe
 tree            6     src interaction parser frame data package
 split           2     split-files split-code
+form            5     name port replicas save cancel
 tip             0     — atomic: nothing to focus
 panel           0     — atomic: nothing to focus
 status          0     — atomic: nothing to focus
@@ -3153,7 +3162,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 27 kinds · 10 publish a focusable element · 10 draw a treatment
+· 28 kinds · 11 publish a focusable element · 11 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them
@@ -3281,6 +3290,7 @@ aaaaaaaaaaaa.................................... which is why
   tape         — no ground
   tree         — no ground
   split        — no ground
+  form         — no ground
   tip          — no ground
   panel        — no ground
   status       [" ERROR "]
@@ -3859,6 +3869,7 @@ control         1     control-1
 tape            5     seams arm count probe trace
 tree            6     src interaction parser frame data package
 split           2     split-files split-code
+form            5     name port replicas save cancel
 tip             0     — atomic: nothing to focus
 panel           0     — atomic: nothing to focus
 status          0     — atomic: nothing to focus
@@ -3868,7 +3879,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 27 kinds · 10 publish a focusable element · 10 draw a treatment
+· 28 kinds · 11 publish a focusable element · 11 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them
@@ -3991,6 +4002,7 @@ aaaaaaaaaaaa.................................... which is why
   tape         — no ground
   tree         — no ground
   split        — no ground
+  form         — no ground
   tip          — no ground
   panel        — no ground
   status       [" ERROR "]

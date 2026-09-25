@@ -58,6 +58,7 @@ export const RAMP_EXTENT: Readonly<Record<KnownBlockKind, RampExtent>> = Object.
   // A split holds two panes and draws a divider; the ramp is its children's,
   // as a group's is.
   split: "none",
+  form: "none",
   table: "clusters",
   tip: "none",
 });

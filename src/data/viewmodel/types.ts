@@ -3254,6 +3254,52 @@ export type Split = Readonly<{
   divider?: number;
 }> & Padded & Floor;
 
+/**
+ * One labelled field of a form (C04 §3ar, I135–I137, §105).
+ *
+ * **`value` is block data though the reader types it**: a submit reads it, and a
+ * value held in a view store is one the producer's own `replace` cannot see.
+ * The shell writes it with a shell-origin `replace`, as it writes a split's
+ * `divider`. The draft being typed is the borrowed editor's (C17 I29) and never
+ * reaches the block until it is committed.
+ */
+export type FormField = Readonly<{
+  id: string;
+  label: string;
+  /** One line; absent is empty. */
+  value?: string;
+  /** Decoration (§094): drawn whole where it fits, dropped with no mark where it does not. */
+  hint?: string;
+  /** Content: replaces the hint, drawn as `✗` in `error` tone, and wraps (§105). */
+  error?: string;
+  /** The flag a submit writes the value under — absent is `--<id>`, `""` is positional (C04 I137). */
+  flag?: string;
+}>;
+
+/** One button of a form (C04 §3ar). */
+export type FormButton = Readonly<{
+  id: string;
+  label: string;
+  action?: Action;
+  /** The action's command gains the fields' values as arguments (C04 I137) — a `fill` or `exec` only. */
+  submit?: boolean;
+  /** At most one; absent on every button, the first is the default. Its slot holds `›` (C09 I119). */
+  default?: boolean;
+}>;
+
+/**
+ * Labelled one-line fields and the buttons that act on them (C04 §3ar, I135,
+ * I136, I137, §105): *the label is Fixed, the field Grows, the hint is
+ * decoration*.
+ */
+export type Form = Readonly<{
+  kind: "form";
+  id: string;
+  /** At least one (C04 I135). */
+  fields: readonly FormField[];
+  buttons?: readonly FormButton[];
+}> & Padded & Floor;
+
 export type Tip = Readonly<{
   kind: "tip";
   id: string;
@@ -3929,6 +3975,7 @@ export type KnownBlockKinds = {
   tape: Tape;
   tree: Tree;
   split: Split;
+  form: Form;
   tip: Tip;
   panel: Panel;
   group: Group;

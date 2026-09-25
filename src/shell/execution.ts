@@ -1773,6 +1773,28 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     }
   };
 
+  const refuse = (from: EntryId | null, text: string): void => {
+    if (from === null) {
+      appendAndCommit(noticeDoc("", text, "warn", { origin: "action" }));
+      return;
+    }
+    const outcome = deps.transcript.patch(
+      from,
+      {
+        op: "append",
+        block: refusalNotice(text, blockId("refused")),
+      },
+      // **The whole of why this works now.** A refusal notice *is* data, so a
+      // gate reading the operation refused it on every settled entry — which
+      // is most of the ones a reader acts on. The gate reads who is writing
+      // (C13 §6), and this is the shell.
+      "shell",
+    );
+    // The entry was evicted or cleared under the action. Nothing to patch and
+    // nothing worth appending about it.
+    if (outcome.ok) deps.scheduler.commit("input");
+  };
+
   /**
    * C23 I16 — C23 supplies `onAction` and nothing else may.
    *
@@ -1791,27 +1813,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // append freezes the block the action came from, so the next action is
     // refused as frozen rather than for its own reason and the selection A01 D7
     // preserves is cleared — C23 §4's pop row, one section over.
-    refuse: (from, text) => {
-      if (from === null) {
-        appendAndCommit(noticeDoc("", text, "warn", { origin: "action" }));
-        return;
-      }
-      const outcome = deps.transcript.patch(
-        from,
-        {
-          op: "append",
-          block: refusalNotice(text, blockId("refused")),
-        },
-        // **The whole of why this works now.** A refusal notice *is* data, so a
-        // gate reading the operation refused it on every settled entry — which
-        // is most of the ones a reader acts on. The gate reads who is writing
-        // (C13 §6), and this is the shell.
-        "shell",
-      );
-      // The entry was evicted or cleared under the action. Nothing to patch and
-      // nothing worth appending about it.
-      if (outcome.ok) deps.scheduler.commit("input");
-    },
+    refuse,
 
     notify: (text) => void appendAndCommit(noticeDoc("", text, "warn", { origin: "action" })),
   });
@@ -2016,6 +2018,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     submit,
     emitLocal,
     onAction,
+    refuse,
     /**
      * C23 I48 — read by C22 §8 step 3, on the restored primary screen.
      *

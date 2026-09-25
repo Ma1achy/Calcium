@@ -41,6 +41,7 @@ import { choiceDefinition, controlDefinition } from "./kinds/controls.js";
 import { tapeDefinition } from "./kinds/tape.js";
 import { treeDefinition } from "./kinds/tree.js";
 import { splitDefinition } from "./kinds/split.js";
+import { formDefinition } from "./kinds/form.js";
 import type { AnyBlockDefinition } from "./types.js";
 
 // **`AnyBlockDefinition`, which is what these are** (C04 I119, F405). The
@@ -63,6 +64,7 @@ export const DEFAULT_DEFINITIONS: readonly AnyBlockDefinition[] = Object.freeze(
   tapeDefinition,
   treeDefinition,
   splitDefinition,
+  formDefinition,
   tipDefinition,
   panelDefinition,
   groupDefinition,

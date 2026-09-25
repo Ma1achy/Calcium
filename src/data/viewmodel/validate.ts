@@ -2037,6 +2037,66 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
       );
     }
   },
+  // C04 I135 — at least one field, buttons, and ids unique across both.
+  form: (b, e, at) => {
+    requireArray(b, "fields", e, at);
+    const ids = new Map<string, number>();
+    const count = (id: unknown): void => {
+      if (isString(id)) ids.set(id, (ids.get(id) ?? 0) + 1);
+    };
+    const fields = b["fields"];
+    if (isArray(fields)) {
+      if (fields.length === 0) e.push(`${at}: a "form" holds at least one field (C04 I135)`); // cells-ok — a field count
+      fields.forEach((raw, i) => {
+        const here = `${at} field ${String(i)}`;
+        if (!isRecord(raw)) {
+          e.push(`${here}: must be an object`);
+          return;
+        }
+        requireString(raw, "id", e, here);
+        requireString(raw, "label", e, here);
+        for (const key of ["value", "hint", "error", "flag"]) {
+          if (raw[key] !== undefined && !isString(raw[key])) e.push(`${here}: "${key}" must be a string when present (C04 I135)`);
+        }
+        count(raw["id"]);
+      });
+    }
+    const buttons = b["buttons"];
+    if (buttons !== undefined && !isArray(buttons)) e.push(`${at}: "buttons" must be an array`);
+    if (isArray(buttons)) {
+      let defaults = 0;
+      buttons.forEach((raw, i) => {
+        const here = `${at} button ${String(i)}`;
+        if (!isRecord(raw)) {
+          e.push(`${here}: must be an object`);
+          return;
+        }
+        requireString(raw, "id", e, here);
+        requireString(raw, "label", e, here);
+        count(raw["id"]);
+        if (raw["default"] === true) defaults += 1;
+        if (raw["action"] !== undefined) checkAction(raw["action"], `${here}.action`, e);
+        if (raw["submit"] === true) {
+          const kind = isRecord(raw["action"]) ? raw["action"]["kind"] : undefined;
+          if (kind !== "fill" && kind !== "exec") {
+            e.push(
+              `${here}: "submit" needs a "fill" or "exec" action (C04 I135) — ` +
+                `a submit writes the values as the command's arguments, and only those kinds have a command`,
+            );
+          }
+        }
+      });
+      if (defaults > 1) e.push(`${at}: at most one button is "default" (C04 I135) — got ${String(defaults)}`);
+    }
+    for (const [id, n] of ids) {
+      if (n > 1) {
+        e.push(
+          `${at}: id "${id}" appears ${String(n)} times across fields and buttons (C04 I135) — ` +
+            `each is an element, and a duplicate has no correct target`,
+        );
+      }
+    }
+  },
   scroll: (b, e, at) => {
     requireArray(b, "children", e, at);
     if (isArray(b["children"]) && b["children"].length === 0) {

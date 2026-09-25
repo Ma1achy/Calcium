@@ -782,10 +782,12 @@
   ],
   "current": [
    "chooser-row",
-   "tape"
+   "tape",
+   "form"
   ],
   "error": [
-   "row-lead"
+   "row-lead",
+   "form"
   ],
   "expand": [
    "row-lead",
@@ -827,7 +829,8 @@
  },
  "GLYPH_SET_DOMAINS": {
   "bar": [
-   "plot"
+   "plot",
+   "form"
   ],
   "blocked": [
    "row-lead",

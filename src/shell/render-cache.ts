@@ -134,6 +134,7 @@ export function focusKey(
     rowId: string | null;
     selected?: readonly Readonly<{ blockId: string; rowId: string }>[];
     inside?: boolean;
+    draft?: Readonly<{ text: string; cursor: number }>;
   }> | null,
 ): string {
   if (focus === null) return "";
@@ -155,7 +156,12 @@ export function focusKey(
   // neither `rev`, nor the width, nor `(blockId, rowId)`, which is the sixth
   // axis's own argument arriving on a seventh: a correct stale frame, and the
   // reader's `⏎` doing nothing visible.
-  return `${focus.blockId}\u0000${focus.rowId ?? ""}\u0000${extent}\u0000${focus.inside === true ? "in" : ""}`;
+  // **And the draft** (C22 I118, C09 I119): a keystroke in a form field changes
+  // what the field draws and moves none of the axes above — the inside's own
+  // argument, one keystroke later. Measured: the frame showed the value from
+  // before the key.
+  const draft = focus.draft === undefined ? "" : `${String(focus.draft.cursor)}\u0001${focus.draft.text}`;
+  return `${focus.blockId}\u0000${focus.rowId ?? ""}\u0000${extent}\u0000${focus.inside === true ? "in" : ""}\u0000${draft}`;
 }
 
 /** `HeightCache`'s two axes and the three this one adds (C28 I8, C14 I27). */

@@ -1,14 +1,14 @@
 {
   "label": "all",
-  "only": "c04-split",
+  "only": "c04-form",
   "rows": [
     {
-      "run": "c04-split.mjs",
+      "run": "c04-form.mjs",
       "exit": 0,
-      "seconds": 49,
+      "seconds": 35,
       "state": "green",
       "restored": 0,
-      "caught": 19,
+      "caught": 12,
       "elsewhere": 0,
       "survived": 0,
       "anchorMissed": 0,

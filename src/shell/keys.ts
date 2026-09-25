@@ -281,7 +281,11 @@ export type KeyDeps = Readonly<{
    * C23's dispatcher (C23 I16). Supplied, never constructed here — an action is
    * a submission by another route, and L4's routing component owns routes.
    */
-  onAction: (action: Action, from: EntryId | null) => void;
+  /**
+   * `at` is the element that fired it, where one did — the button a form's
+   * submit completes from (C04 I137, C22 I118).
+   */
+  onAction: (action: Action, from: EntryId | null, at?: ElementAddress) => void;
   /**
    * Commit a frame for something that settled after its batch (C22 I31).
    *
@@ -1038,7 +1042,8 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       // the live entry's document instead and been refused by nothing.
       const from = deps.focusedEntryId();
       if (action === undefined || from === null) return;
-      deps.onAction(action, from);
+      const fired = elements[i];
+      deps.onAction(action, from, fired === undefined ? undefined : addressOf(fired));
     },
     rowUp: () => {
       const elements = deps.focusedElements();

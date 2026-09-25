@@ -93,11 +93,13 @@ describe("M4 — the six rulings, against the tree", () => {
     expect(glyphFor("focus", ASCII), "at every rung").toBe(">");
   });
 
-  it("M4.2: `current` is the chooser row and the tape", () => {
+  it("M4.2: `current` is the chooser row, the tape and the form's default button", () => {
     // **The collision domains, not the glyph table.** The ruling is about which
     // positions `›` may occupy — a chooser row and a tape, and not `row-lead`,
     // because over every `›` in the design not one is a transcript gutter.
-    expect(GLYPH_DOMAINS.current, "both consumers, named").toEqual(["chooser-row", "tape"]);
+    // §105's form is the third, and it is a button row's slot, not a gutter
+    // (C04 §3ar S7).
+    expect(GLYPH_DOMAINS.current, "the three consumers, named").toEqual(["chooser-row", "tape", "form"]);
   });
 
   it("M4.3: the residue is `⋯` and `...`, reserving three cells at every rung", () => {

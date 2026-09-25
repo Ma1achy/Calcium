@@ -113,6 +113,9 @@ const KINDS_WITH_NOTHING_TO_CHECK: ReadonlyMap<BlockKind, Exemption> = new Map<
   ["code", { premise: "no-field", why: "syntax is its own palette, not the tone one" }],
   ["patch", { premise: "no-field", why: "the +/- marker carries the change axis (C04 I35)" }],
   ["tip", { premise: "no-field", why: "text only" }],
+  // C04 §3ar — a form declares no tone: its error is the error glyph in `error` tone by
+  // rendering, and the glyph is the carrier that survives one bit (C09 I119).
+  ["form", { premise: "no-field", why: "labels, values, hints and errors are text; an error takes its mark by rendering" }],
   [
     "choice",
     {

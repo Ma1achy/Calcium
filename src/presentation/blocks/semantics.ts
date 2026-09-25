@@ -34,6 +34,9 @@ export type SemanticRole =
   | "document"
   | "tree"
   | "treeitem"
+  | "form"
+  | "textbox"
+  | "button"
   | "row"
   | "cell";
 
@@ -99,6 +102,9 @@ export const SEMANTIC_ROLES: Readonly<Record<KnownBlockKind, SemanticRole>> = Ob
   // Two regions and the divider between them (C04 §3aq): a group of two, as
   // `panel` and `group` are — its children's nodes are its children.
   split: "group",
+  // Fields and buttons (C04 §3ar): ARIA's `form`, whose elements are
+  // `textbox` and `button` (C09 I118).
+  form: "form",
 });
 
 /** An application's own kind reads `document`, as its fallback draws `raw`. */
@@ -166,7 +172,18 @@ function elementNode(e: NavElement, index: number, of: number, parent: SemanticR
     id: e.id,
     // **`treeitem` for a tree's rows** (I118): a screen reader announces depth
     // and expansion for a `treeitem` and nothing for a `row`.
-    role: parent === "tree" ? "treeitem" : e.level === "cell" ? "cell" : "row",
+    // **`textbox` and `button` for a form's** (I118): a screen reader offers
+    // editing on the one and pressing on the other, and neither on a `row`.
+    role:
+      parent === "tree"
+        ? "treeitem"
+        : parent === "form"
+          ? e.viewState === true
+            ? "textbox"
+            : "button"
+          : e.level === "cell"
+            ? "cell"
+            : "row",
     name: "",
     state: [],
     position: Object.freeze({ index: index + 1, of }),

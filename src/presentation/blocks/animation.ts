@@ -29,6 +29,7 @@ export const ANIMATES: Readonly<Record<KnownBlockKind, boolean>> = Object.freeze
   // A split draws its panes; a pane that animates ticks through the walk
   // below, which reaches it by `children` (C04 §3aq).
   split: false,
+  form: false,
   keyValue: false,
   image: false,
   // A terminal redraws when the child writes, on C23's stream cadence, not on a

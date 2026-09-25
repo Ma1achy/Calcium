@@ -34,7 +34,7 @@ import { blockWidthInEntry, elementsOfEntry, measureEntry } from "./entry-layout
 import { createManifestStore, parseManifest, withThemeNames } from "../data/manifest/index.js";
 import type { ManifestError } from "../data/manifest/index.js";
 import { NO_SPAN, block as makeBlock, descendants, splitColumns, splitPaneKey, splitPanes } from "../data/viewmodel/index.js";
-import type { Block, Plot, Result, Split } from "../data/viewmodel/index.js";
+import type { Action, Block, Form, Plot, Result, Split } from "../data/viewmodel/index.js";
 import { createProcessRunner } from "../data/process/runner.js";
 import {
   createTransport,
@@ -107,12 +107,13 @@ import { createRouter, type RouterDeps } from "../interaction/router/router.js";
 import { createConfirmHost, type ConfirmHost } from "./confirm.js";
 import { createDecoder } from "../interaction/router/decode.js";
 import { createKeyEffects } from "./keys.js";
-import type { FocusTarget, InputEvent, Key, KeyAction } from "../interaction/router/types.js";
+import type { ElementAddress, FocusTarget, InputEvent, Key, KeyAction, Verdict } from "../interaction/router/types.js";
 import { createNavigator, openHistory, SEARCH_ID } from "../interaction/history/index.js";
 import type { HistoryEntry, Navigator } from "../interaction/history/index.js";
 import { detectCapabilities, type TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Motion } from "../presentation/blocks/index.js";
-import { glyphs, tapeStart } from "../presentation/blocks/index.js";
+import { defaultButton, glyphs, tapeStart } from "../presentation/blocks/index.js";
+import { submitAction } from "./form-submit.js";
 import { createFrameScheduler, type CommitReason } from "../terminal/frame-scheduler.js";
 import type { CaptureResult, Profiler, ProfileReport, TraceFn } from "./profiling/types.js";
 import { instrumentRegistry, type ProbeableRegistry } from "./profiling/registry-probe.js";
@@ -488,6 +489,11 @@ export type Graph = Readonly<{
   focusedEntryId: () => EntryId | null;
   /** The focused entry's elements, from the same walk as `liveElements` (C26 I21). */
   focusedElements: () => readonly PlacedElement[];
+  /**
+   * The reader's line while a form field has borrowed the editor, or `null`
+   * (C22 I118). The prompt row draws this, and the field draws the editor.
+   */
+  fieldHeld: () => LineState | null;
   /** C04 I48 — page the focused container, in rows, focus unmoved (C26 I18). */
   pageBlock: (direction: 1 | -1) => void;
   /** C22 I71 — turn the focused plot camera. A no-op where there is none. */
@@ -2312,6 +2318,126 @@ export async function constructGraph(
     placeDivider(entryId, splitId, splitColumns(found.split, found.width).left + delta);
   };
 
+  // --- a form field's borrow (C22 I118, C04 §3ar) --------------------------
+
+  /**
+   * The field being edited and the reader's line it took (C17 I29).
+   *
+   * **One record, and `reconcileField` is its only lifecycle.** Every way in
+   * and every way out goes through that function — or through `⏎`, which swaps
+   * the field and keeps the line — so a path nobody listed cannot leave the
+   * prompt's line held: it is noticed on the next event, whatever it was.
+   */
+  let fieldBorrow: Readonly<{ entryId: EntryId; formId: string; fieldId: string; held: HeldLine }> | null = null;
+
+  const formIn = (entryId: EntryId, formId: string): Form | null => {
+    const entry = stores.transcript.entries.find((e) => e.id === entryId);
+    const found = entry === undefined ? null : blockIn(entry, formId);
+    return found !== null && found.kind === "form" ? found : null;
+  };
+
+  /** C04 I137 — a value written by the reader, as a split's divider is. */
+  const writeField = (entryId: EntryId, formId: string, fieldId: string, value: string): void => {
+    const form = formIn(entryId, formId);
+    const field = form?.fields.find((f) => f.id === fieldId);
+    if (form === null || field === undefined || (field.value ?? "") === value) return;
+    // **From the form as the store holds it now** (C04 §3ar F8): a producer's
+    // newer `error` survives, and the reader's value is the last write.
+    stores.transcript.patch(
+      entryId,
+      { op: "replace", blockId: formId, block: { ...form, fields: form.fields.map((f) => (f.id === fieldId ? { ...f, value } : f)) } },
+      "shell",
+    );
+  };
+
+  /** The field's value into the borrowed editor, caret at its end — `restore` records no unit (C17 I28). */
+  const loadField = (value: string): void =>
+    stores.editor.restore({ text: value, cursor: value.length, selection: null }); // cells-ok — code units, the editor's measure
+
+  /** Give the line back, writing the draft first where `commit` says so. */
+  const endField = (commit: boolean): void => {
+    const b = fieldBorrow;
+    if (b === null) return;
+    fieldBorrow = null;
+    if (commit) writeField(b.entryId, b.formId, b.fieldId, stores.editor.text);
+    stores.editor.resume(b.held);
+  };
+
+  /**
+   * C22 I118 — the borrow's whole life, asked after every event.
+   *
+   * **One predicate separates discard from commit**: whether focus is still on
+   * the field. `esc` and `⌃c` leave it there in navigate mode, which is *I did
+   * not mean that*; anything that moved focus elsewhere is a blur, and a blur
+   * keeps what was typed (C04 §3ar F5, F6).
+   */
+  const reconcileField = (): void => {
+    const at = focus.current;
+    const b = fieldBorrow;
+    if (b !== null) {
+      const onIt =
+        at.at === "liveBlock" &&
+        at.entryId === b.entryId &&
+        at.element?.blockId === b.formId &&
+        at.element.elementId === b.fieldId;
+      if (onIt && at.mode === "interact") return;
+      endField(!onIt);
+    }
+    if (at.at !== "liveBlock" || at.mode !== "interact" || at.element === null) return;
+    const form = formIn(at.entryId, at.element.blockId);
+    const field = form?.fields.find((f) => f.id === at.element?.elementId);
+    if (form === null || field === undefined) return;
+    fieldBorrow = { entryId: at.entryId, formId: form.id, fieldId: field.id, held: stores.editor.hold() };
+    loadField(field.value ?? "");
+  };
+
+  /**
+   * `⏎` inside a field (C04 §3ar F4, C26 I29): write it, and enter the next
+   * field with the line still held — or land on the default button, in navigate
+   * mode, and give the line back. **Never a press**: a submit is a command.
+   */
+  const commitField = (): void => {
+    const b = fieldBorrow;
+    if (b === null) return;
+    writeField(b.entryId, b.formId, b.fieldId, stores.editor.text);
+    const form = formIn(b.entryId, b.formId);
+    const fields = form?.fields ?? [];
+    const next = fields[fields.findIndex((f) => f.id === b.fieldId) + 1];
+    // The line goes back here and the next field takes it again through the
+    // one lifecycle — **a stack per field** (C17 I29), so `⌃z` in the next
+    // field never reaches what was typed in this one.
+    endField(false);
+    if (next !== undefined) {
+      focus.focusRow(b.entryId, { blockId: b.formId, elementId: next.id });
+      // **Entered by `⏎`'s own path** (C26 I26, T1.3j): one caller puts the
+      // store into interact, gated on the element's declaration, and the
+      // reconcile after this event takes the line for the next field.
+      keys.table.rowActivate();
+      return;
+    }
+    const buttons = form?.buttons ?? [];
+    const primary = form === null ? undefined : buttons[defaultButton(form)];
+    if (primary !== undefined) focus.focusRow(b.entryId, { blockId: b.formId, elementId: primary.id });
+    else focus.setMode("navigate");
+  };
+
+  /** C04 I137 — a submit completed from the form as the store holds it, after the borrow (F7). */
+  const completeSubmit = (action: Action, from: EntryId | null, at: ElementAddress | undefined): Action => {
+    if (at === undefined || from === null) return action;
+    const form = formIn(from, at.blockId);
+    return form === null ? action : submitAction(form, at.elementId, action);
+  };
+
+  // **A field that is gone gives the line back and writes nothing** (C04 §3ar
+  // F6): a producer's `replace` dropped it, or the entry was evicted. Only the
+  // editor moves here — writing a patch from inside the store's own
+  // notification is the half-applied store C14 met once already.
+  stores.transcript.subscribe(() => {
+    const b = fieldBorrow;
+    if (b === null) return;
+    if (formIn(b.entryId, b.formId)?.fields.some((f) => f.id === b.fieldId) !== true) endField(false);
+  });
+
   /**
    * A block of `entry` by id, at any depth — `focusedBlock`'s walk, for the
    * pointer (C16 §4a).
@@ -3045,8 +3171,13 @@ export async function constructGraph(
     toggleOrbit,
     liveEntryId: () => stores.transcript.liveId,
     // C23 I16 — the dispatcher is C23's and is supplied, never built here.
-    onAction: (action, from) => {
-      pipeline.onAction(action, from);
+    onAction: (action, from, at) => {
+      // **No field holds the line here** (C22 I118, C04 §3ar F7): this is the
+      // dispatcher's one path, it activates the focused element, and a field
+      // is entered rather than activated — so the reconcile after the event
+      // that moved focus has already written it. A second path to the
+      // dispatcher ends the borrow, writing, before it dispatches.
+      pipeline.onAction(completeSubmit(action, from, at), from);
     },
     // **I31 — an effect that settles after its batch commits its own frame.**
     // `"completion"` because its window is zero (C03 I2): by the time this
@@ -3658,7 +3789,54 @@ export async function constructGraph(
     //
     // Keys only: the pointer's gesture table is `liveBlock`'s, and a click
     // inside a block is still a click on the block (C16 §4a).
+    /**
+     * C16 I60 — a field being edited owns the editor's keys and nothing else.
+     *
+     * The reply's set without a newline and without history: a field is one
+     * line and owns no history (C17 I29, `R-QST-003`).
+     */
+    const FIELD_ACTIONS: ReadonlySet<KeyAction> = new Set(
+      [...REPLY_ACTIONS].filter((a) => a !== "insertNewline" && a !== "historyPrev" && a !== "historyNext"),
+    );
+    const fieldKeys = (e: InputEvent, entryId: EntryId): boolean | Verdict => {
+      if (e.kind === "paste") {
+        // §089's own example of REJECTED: *a refused paste*, and it says why.
+        if (/[\r\n]/u.test(e.text)) {
+          pipeline.refuse(entryId, "A field is one line, and the paste held a line break — nothing was inserted.");
+          return true;
+        }
+        stores.editor.insert(e.text, { atomic: true });
+        return true;
+      }
+      if (e.kind !== "key") return false;
+      // **`⏎` and `esc` first** (C16 I60): the field's own two answers, ahead
+      // of the prompt's `⏎`, which would submit.
+      if (e.key.name === "enter" && e.key.ctrl !== true && e.key.meta !== true && e.key.shift !== true) {
+        commitField();
+        return true;
+      }
+      const inside = keymap.resolve("interaction", e.key);
+      if (inside !== null && inside.action === "exitInside") {
+        bound("interaction", e)?.();
+        return true;
+      }
+      const binding = keymap.resolve("prompt", e.key);
+      if (binding !== null && FIELD_ACTIONS.has(binding.action as KeyAction)) {
+        bound("prompt", e)?.();
+        return true;
+      }
+      if (binding === null && isPrintable(e.key)) {
+        stores.editor.insert(e.key.sequence);
+        return true;
+      }
+      // **Passed, as the plot's inside rung passes** (C16 I60, R-KEY-004): a
+      // pass reaches the `global` fallback and no lower rung, so `F1` and `PgUp`
+      // still answer and `↓`, bound at neither, is dropped on the field.
+      return false;
+    };
+
     router.register("interaction", (e) => {
+      if (fieldBorrow !== null) return fieldKeys(e, fieldBorrow.entryId);
       const effect = bound("interaction", e);
       if (effect === null) return false;
       effect();
@@ -3790,6 +3968,9 @@ export async function constructGraph(
     const routed = (e: InputEvent): void => {
       using _s = probe?.span("route") ?? NO_SPAN;
       router.dispatch(e);
+      // **After every event** (C22 I118): whatever moved focus, the borrow
+      // follows it here rather than at each place that can move it.
+      reconcileField();
     };
 
     const deliver = (events: readonly InputEvent[]): void => {
@@ -3957,6 +4138,7 @@ export async function constructGraph(
     liveElements,
     focusedEntryId,
     focusedElements,
+    fieldHeld: () => fieldBorrow?.held.line ?? null,
     pageBlock,
     orbitBlock,
     tiltBlock,

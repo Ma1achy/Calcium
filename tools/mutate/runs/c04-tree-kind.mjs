@@ -140,8 +140,8 @@ const results = runPass({
       // C09 I118 — a tree's rows read as a table's.
       name: "a tree's rows read row, not treeitem",
       file: SEMANTICS,
-      from: "    role: parent === \"tree\" ? \"treeitem\" : e.level === \"cell\" ? \"cell\" : \"row\",",
-      to: "    role: parent === (\"never\" as SemanticRole) ? \"treeitem\" : e.level === \"cell\" ? \"cell\" : \"row\",",
+      from: "      parent === \"tree\"\n        ? \"treeitem\"",
+      to: "      parent === (\"never\" as SemanticRole)\n        ? \"treeitem\"",
       expect: "T2.180",
     },
     {

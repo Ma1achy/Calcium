@@ -1372,10 +1372,13 @@ export const GLYPH_DOMAINS: Readonly<Record<Glyph, readonly string[]>> = {
   // every `›` in the design not one is a transcript gutter. Recording it here
   // would spend `*` against the running head mark for a position `›` never
   // occupies.
-  current: ["chooser-row", "tape"],
+  // **And a form's default button** (C09 I119): §105 draws `› save`.
+  current: ["chooser-row", "tape", "form"],
   ok: ["row-lead"],
   warn: ["row-lead"],
-  error: ["row-lead"],
+  // **And a form field's error** (C04 I136): §105 — *the same ✗ and the same
+  // tone as every other failure*.
+  error: ["row-lead", "form"],
   info: ["row-lead"],
   pending: ["row-lead"],
   working: ["row-lead"],
@@ -1442,7 +1445,8 @@ export const GLYPH_SET_DOMAINS: Readonly<Record<keyof GlyphSet, readonly string[
   candleCross: ["plot"],
   diamond: ["plot"],
   diamondTee: ["plot"],
-  bar: ["plot"],
+  // **And a form field's caret** (C09 I119): a block has no terminal cursor.
+  bar: ["plot", "form"],
 
   tick: ["row-lead", "plot"],
   cross: ["row-lead", "plot"],

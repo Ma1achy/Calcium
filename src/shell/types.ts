@@ -146,6 +146,11 @@ export type ChromeContext = Readonly<{
    */
   copy?: CopyState;
   /**
+   * A form field holds the editor (C22 I118): the inside rung's owner is a
+   * field, and its keys are `⏎` and `esc`, not a plot's. Absent is *no field*.
+   */
+  editingField?: boolean;
+  /**
    * The live toast's text, if one is live (C22 I116, §6l.13, §105, §012).
    *
    * **For a fact that changed nothing** — a copy, a toggle with no record —
@@ -367,6 +372,12 @@ export interface Pipeline {
    * `meta`.
    */
   identityNotice(text: string): void;
+  /**
+   * A refusal stated on the entry it came from (C23 I18's shape) — the
+   * dispatcher's own, exposed so a form field's refused paste says why by the
+   * same path a refused action does (C22 I118, C04 §3ar F9).
+   */
+  refuse(from: EntryId | null, text: string): void;
   /**
    * §4 step 7's greeting, appended (I44).
    *

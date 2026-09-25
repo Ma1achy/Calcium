@@ -2602,11 +2602,11 @@ sites and every one of them would need its own answer:
 |---|---|
 | `shell/construct.ts:2534` | `pipeline?.submit(stores.editor.resolved)` — **C23 takes a string**, and `resolved` is declared `readonly resolved: string` |
 | `shell/keys.ts:407`, `:716` | `contextAt(text, cursor, manifest)` — C19 completes against it |
-| `shell/keys.ts:582` | `const before = deps.editor.text`, then `setText` — an **edit round-trip** through a plain string |
+| `shell/keys.ts:586` | `const before = deps.editor.text`, then `setText` — an **edit round-trip** through a plain string |
 | `shell/keys.ts:829`, `:1106` | `history.previous(text)`, `searchOpen(text)` — **C20 stores strings** |
 | `shell/session.ts:1242` | `selectionSpans(text, …)` — C09's wash |
 | `shell/session.ts:1282` | `contextAt(text, cursor, …)` inside `completion.ghost(…)` — C19 again, from the shell (`:579` when this was written) |
-| `shell/construct.ts:3286` | `promptHasText` |
+| `shell/construct.ts:4342` | `promptHasText` |
 
 **The count read *seven* until 2026-09-10 and the population has never been seven.** Measured
 at `437aaa79`, the commit that wrote this table: nine reader sites, of which the table listed
@@ -4473,7 +4473,7 @@ what landed**.
 | # | status | evidence in the tree | residue |
 |---|---|---|---|
 | 0 | BUILT | `examples/docker/README.md` (F157), the media (F158), `.github/workflows/ci.yml` `fast`/`proof` (F150, F154, F156) | — |
-| 52 | BUILT | **the field, the cache-key axis and one binding landed together, which is the condition the entry set** — `cameras` on the render context (`src/presentation/blocks/types.ts:165`), the store `Cameras` with its `key` (`src/shell/cameras.ts:59`), `nudge` bound to the orbit keys (`src/shell/construct.ts:2805`), `plot3d` a validated form (`src/data/viewmodel/validate.ts:2535`), `azimuth` and `elevation` the projection's own angles (`src/presentation/plot/project3.ts:171`) and `halfBlockRows` the rung (`src/presentation/plot/scatter3.ts`). Re-measured 2026-09-04 | the dither is still not ported and is worth nothing at this rung (F433); the fit argument the refusal rested on was asserted rather than measured (F431) and stays retracted |
+| 52 | BUILT | **the field, the cache-key axis and one binding landed together, which is the condition the entry set** — `cameras` on the render context (`src/presentation/blocks/types.ts:165`), the store `Cameras` with its `key` (`src/shell/cameras.ts:59`), `nudge` bound to the orbit keys (`src/shell/construct.ts:2931`), `plot3d` a validated form (`src/data/viewmodel/validate.ts:2535`), `azimuth` and `elevation` the projection's own angles (`src/presentation/plot/project3.ts:171`) and `halfBlockRows` the rung (`src/presentation/plot/scatter3.ts`). Re-measured 2026-09-04 | the dither is still not ported and is worth nothing at this rung (F433); the fit argument the refusal rested on was asserted rather than measured (F431) and stays retracted |
 | 3 | PART | **three of the entry's four names are built** — `heatmap` (`src/presentation/plot/heatmap.ts`), `confusion`, `correlation` all in `PLOT_FORM_MEMBERS` (`src/data/viewmodel/validate.ts:3215`); the planning pass this entry said was *the real blocker* exists as `docs/notes/CALCIUM_PLOT_SYSTEM_PLAN.md` (2026-09-03) | **Gate**: `tensor` occurs zero times in `src/` — re-measured 2026-09-04, still zero, and red the day the ML half starts. Design at `docs/notes/CALCIUM_ENTRY3_KICKOFF.md` — one slice as a heatmap, plus a header |
 | 1 | PART | **1.2 change axis** built: `change?: "unchanged" \| "changed" \| "added" \| "removed"`, `src/data/viewmodel/types.ts:2764` | 1.1, 1.3, 1.4 not checked in this pass |
 | 5 | PART | **CI from the tarball** built: `.github/workflows/ci.yml` `proof` job + `make regime`. **0.x** said: `README.md:482` | error messages: F151 fixed, **F152 and F153 open**. The outside-reader test is **owed and unrunnable from inside the repository** (R01 R4.4) |

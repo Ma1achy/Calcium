@@ -25,7 +25,7 @@ const NAME_FIELD: Readonly<Record<KnownBlockKind, string | null>> = {
   notice: "text", tip: "text", code: "language", patch: "path", panel: "title",
   status: "message", image: "alt",
   keyValue: null, table: null, comparison: null, steps: null, logs: null, events: null,
-  plot: null, pills: null, tape: null, tree: null, split: null, mosaic: null, scroll: null, group: null,
+  plot: null, pills: null, tape: null, tree: null, split: null, form: null, mosaic: null, scroll: null, group: null,
   terminal: null, raw: null,
 };
 
@@ -34,7 +34,7 @@ describe("C09 §7h — every block, every element", () => {
     // **The control is the twenty-seven, both ways**: the table's keys are the
     // corpus's, which is keyed by `KnownBlockKind` and exhaustive by type.
     expect(Object.keys(SEMANTIC_ROLES).sort()).toEqual(Object.keys(ONE_PER_KIND).sort());
-    expect(Object.keys(SEMANTIC_ROLES)).toHaveLength(27);
+    expect(Object.keys(SEMANTIC_ROLES)).toHaveLength(28);
     for (const [kind, b] of Object.entries(ONE_PER_KIND)) expect(roleOf(b), kind).toBe(SEMANTIC_ROLES[kind as KnownBlockKind]);
 
     expect(roleOf(block({ kind: "notice", id: "n", tone: "error", glyph: "error", text: "x" }))).toBe("alert");

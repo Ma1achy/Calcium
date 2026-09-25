@@ -77,6 +77,9 @@ import type {
   Tape,
   Tree,
   Split,
+  Form,
+  FormField,
+  FormButton,
   TreeNode,
   Plot,
   Progress,
@@ -1274,6 +1277,23 @@ function split(
   );
 }
 
+/**
+ * §105's form (C04 §3ar): labelled fields and the buttons that act on them. A
+ * section, as a table is — so it takes `gapBefore` (C24 §4).
+ */
+function form(fields: readonly FormField[], buttons?: readonly FormButton[], opts?: BlockOpts): Form {
+  return finish<Form>(
+    {
+      kind: "form",
+      id: idOf(opts, "form"),
+      fields,
+      ...(buttons === undefined ? {} : { buttons }),
+    } as Form,
+    opts,
+    true,
+  );
+}
+
 function tip(text: string, actions?: readonly Action[], opts?: BlockOpts): Tip {
   return finish<Tip>(
     {
@@ -2013,6 +2033,7 @@ export const b = {
   tape,
   tree,
   split,
+  form,
   tip,
   panel,
   group,

@@ -303,8 +303,9 @@ export function ownerLine(
   armed = false,
   buffered = 0,
   copy?: CopyState,
+  field = false,
 ): readonly Chip[] {
-  const chips = ownerChips(rung, caps, buffered, copy);
+  const chips = ownerChips(rung, caps, buffered, copy, field);
   // **The armed mark, and it is a chip rather than a decoration** (C16 I44,
   // C22 §6, R-INT-008). A newly raised owner refuses one activation so a key
   // already in flight cannot answer a question that arrived under it, and a
@@ -326,6 +327,7 @@ function ownerChips(
   caps: TerminalCapabilities,
   buffered: number,
   copy?: CopyState,
+  field = false,
 ): readonly Chip[] {
   switch (rung) {
     case "child":
@@ -408,6 +410,16 @@ function ownerChips(
         { label: hint([ESC], "close", caps), tone: "muted" },
       ];
     case "inside":
+      // **A field is an inside with two keys** (C22 I118, C16 I60): `⏎` keeps
+      // what was typed and `esc` does not. A plot's orbit named over a text
+      // field is an owner line naming someone else.
+      if (field) {
+        return [
+          { label: "field", tone: "accent" },
+          { label: hint([ENTER], "keep", caps), tone: "muted" },
+          { label: hint([ESC], "discard", caps), tone: "muted" },
+        ];
+      }
       return [
         { label: "inside", tone: "accent" },
         { label: hint([{ name: "left" }, { name: "right" }], "orbit", caps), tone: "muted" },
@@ -480,6 +492,7 @@ const footer = (ctx: ChromeContext): readonly Block[] => [
               ctx.ownerArmed === true,
               ctx.bufferedEntries ?? 0,
               ctx.copy,
+              ctx.editingField === true,
             ),
             ctx.columns,
             ctx.capabilities,

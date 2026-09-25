@@ -129,6 +129,8 @@ export type ComposeDeps = Readonly<{
    * reason: a composition with no session graph has no mode to report.
    */
   copy?: () => CopyState | undefined;
+  /** C22 I118 — a form field holds the editor; the owner line names it. */
+  editingField?: () => boolean;
   /** C02's resolved record, for the chrome's marks (A03 SS47). `null` before
    * the session graph exists, which is also when there is no owner. */
   capabilities: () => TerminalCapabilities | null;
@@ -192,6 +194,7 @@ export function compose(deps: ComposeDeps): Composed {
   const lastFrame = deps.lastFrame?.();
   const capabilities = deps.capabilities();
   const copy = deps.copy?.();
+  const editingField = deps.editingField?.() === true;
   const toast = deps.toast?.();
   const ctx = {
     session,
@@ -206,6 +209,7 @@ export function compose(deps: ComposeDeps): Composed {
     ...(lastFrame === undefined ? {} : { lastFrame }),
     ...(capabilities === null ? {} : { capabilities }),
     ...(copy === undefined ? {} : { copy }),
+    ...(editingField ? { editingField } : {}),
     ...(toast === undefined ? {} : { toast }),
   };
 

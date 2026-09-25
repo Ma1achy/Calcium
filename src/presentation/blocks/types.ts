@@ -108,6 +108,16 @@ export type FocusState = Readonly<{
    * category error for a table row.
    */
   inside?: boolean;
+  /**
+   * The borrowed editor's line while the focused element is a form field being
+   * edited (C09 I119, C22 I118), and absent otherwise.
+   *
+   * **Appearance and never geometry**: the field draws it on its one row,
+   * windowed round the caret, so `measure` — which never sees a focus — and the
+   * rows drawn agree with or without it (C04 I136). `cursor` is in code units,
+   * the editor's own measure.
+   */
+  draft?: Readonly<{ text: string; cursor: number }>;
 }>;
 
 /**

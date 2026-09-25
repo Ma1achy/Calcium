@@ -247,6 +247,7 @@ const KEPT_WHOLE: Readonly<Record<string, string>> = {
   progress: "one row — label, bar and percentage, with the bar taking the residual width",
   rule: "one row — a label, an optional `meta`, and a fill to the width",
   scroll: "a region whose height is declared cannot measure less without becoming a different box; it bounds its own content instead (C04 I47, I49)",
+  form: "one question put to the reader: its fields and its buttons answer it together, a field's element spans its value and its error, and a slice would hand a submit the values of fields it no longer shows — no producer draws one taller than its box yet (C04 I136)",
   split: "`height` exactly, a box whose height is declared, as `scroll`'s is: its panes scroll inside it, so a slice of it is a smaller split and not less of this one (C04 I132)",
   status: "a bordered box the registry draws rather than the definition, with two ladders on it and neither may change the row count (I27, §3a)",
   steps: "one row per step, `logs`' shape again, so it divides in principle and does not — an unmeasured F424 candidate",

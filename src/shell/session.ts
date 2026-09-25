@@ -52,7 +52,7 @@ import { framesOf, placesAtProtocol } from "../presentation/blocks/kinds/image.j
 import type { FocusState } from "../presentation/blocks/index.js";
 import type { RenderScratch } from "../presentation/blocks/types.js";
 import { contextAt } from "../interaction/completion/index.js";
-import { chipSpans, selectionSpans, type CellSpan } from "../interaction/editor/index.js";
+import { chipSpans, cursorCell, layout, selectionSpans, type CellSpan } from "../interaction/editor/index.js";
 import { extentOf } from "../interaction/router/focus.js";
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import { PROMPT_GUTTER, regionWidth } from "./config.js";
@@ -1340,15 +1340,28 @@ class Session implements TuiInstance {
             : { blocks: this.#semantic.blocks, spans: this.#selectionSpans(width) },
         ),
       // **The question's rows when one replaces the prompt** (C23 I74, §7f).
-      promptRows: () => this.#questionRows(graph, width) ?? graph.editor.layout(width, PROMPT_GUTTER),
+      // **And the reader's held line while a form field has the editor** (C22
+      // I118): the field draws what is typed, and the prompt keeps showing what
+      // the reader left there — drawn by the same walk, chips and all.
+      promptRows: () => {
+        const question = this.#questionRows(graph, width);
+        if (question !== null) return question;
+        const held = graph.fieldHeld();
+        return held === null
+          ? graph.editor.layout(width, PROMPT_GUTTER)
+          : layout(held.text, width, PROMPT_GUTTER, graph.editor.drawAs);
+      },
       // **No caret in a replaced prompt.** §101 draws the `▌` only once the
       // reader has chosen `reply…` and the prompt has come live beneath the
       // question; a caret left at the editor's position would sit inside the
       // question's box, on a row the editor did not write.
-      promptCursor: () =>
-        this.#questionRows(graph, width) === null
+      promptCursor: () => {
+        if (this.#questionRows(graph, width) !== null) return { row: 0, col: 0 };
+        const held = graph.fieldHeld();
+        return held === null
           ? graph.editor.cursorCell(width, PROMPT_GUTTER)
-          : { row: 0, col: 0 },
+          : cursorCell(held.text, held.cursor, width, PROMPT_GUTTER, graph.editor.drawAs);
+      },
       promptReplaced: () => this.#questionRows(graph, width) !== null,
       // **The wash, mapped through the same walk the rows came from** (C17 I18,
       // roadmap entry 23). `selection` is read here rather than a
@@ -1364,10 +1377,11 @@ class Session implements TuiInstance {
         // are the question's — so a live region would wash cells of a box it
         // has no coordinates in.
         if (this.#questionRows(graph, width) !== null) return EMPTY_SPANS;
-        const sel = graph.editor.selection;
+        const held = graph.fieldHeld();
+        const sel = held === null ? graph.editor.selection : held.selection;
         if (sel === null) return EMPTY_SPANS;
         return selectionSpans(
-          graph.editor.text,
+          held?.text ?? graph.editor.text,
           sel.anchor,
           sel.head,
           width,
@@ -1386,7 +1400,7 @@ class Session implements TuiInstance {
       // ground is measured where its label was drawn or it is somewhere else,
       // which is the same argument `promptSelection` above rests on.
       promptChips: () =>
-        chipSpans(graph.editor.text, width, PROMPT_GUTTER, graph.editor.drawAs),
+        chipSpans(graph.fieldHeld()?.text ?? graph.editor.text, width, PROMPT_GUTTER, graph.editor.drawAs),
       promptFocused: () =>
         graph.router.target === "prompt" || graph.promptUnderMenu(),
       // **Read at paint, not captured** (C22 I66). `/theme light --no-bg`
@@ -1940,6 +1954,8 @@ class Session implements TuiInstance {
       // C14 I55 — which copy mode, and how much `⏎` would take. Over the held
       // view, as the copy itself is (A6), so the count is the paste.
       copy: () => this.#copyState(),
+      // C22 I118 — the owner line's field arm.
+      editingField: () => this.#graph?.fieldHeld() != null,
       // C22 I116 — the live toast, drawn in the footer's tail while it lives.
       toast: () => this.#toast ?? undefined,
       // A03 SS47 — the owner line draws chords, so the chrome resolves them.
@@ -2462,9 +2478,14 @@ function focusFor(graph: Graph, entryId: string): FocusState | null {
   //
   // Absent rather than `false`, so a block with no inside keys as it always did.
   const inside = stored.mode === "interact" ? { inside: true } : {};
-  if (ext.extent.length === 1) return Object.freeze({ ...head, ...inside }); // graphemes-ok: an element count, not text
+  // **The field's draft, and only the field's** (C09 I119, C22 I118): the
+  // editor is lent to exactly one field at a time and `fieldHeld` says whether
+  // it is lent, so a control that is inside draws no draft it never had.
+  const lent = stored.mode === "interact" && graph.fieldHeld() !== null;
+  const draft = lent ? { draft: Object.freeze({ text: graph.editor.text, cursor: graph.editor.cursor }) } : {};
+  if (ext.extent.length === 1) return Object.freeze({ ...head, ...inside, ...draft }); // graphemes-ok: an element count, not text
   const selected = ext.extent.map((p) => Object.freeze({ blockId: p.blockId, rowId: p.element.id }));
-  return Object.freeze({ ...head, ...inside, selected: Object.freeze(selected) });
+  return Object.freeze({ ...head, ...inside, ...draft, selected: Object.freeze(selected) });
 }
 
 /**

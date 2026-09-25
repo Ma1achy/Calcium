@@ -242,6 +242,21 @@ export const ONE_PER_KIND: Readonly<Record<KnownBlockKind, Block>> = Object.free
     ],
   }),
 
+  // §105's form, whole: an error replacing a hint, a hint kept, a default button.
+  form: block({
+    kind: "form",
+    id: "form-1",
+    fields: [
+      { id: "name", label: "name", value: "prism-serve" },
+      { id: "port", label: "port", value: "80", hint: "the port it listens on", error: "ports below 1024 need root" },
+      { id: "replicas", label: "replicas", value: "3", hint: "0 stops the service" },
+    ],
+    buttons: [
+      { id: "save", label: "save", submit: true, action: { kind: "fill", label: "save", command: "serve" } },
+      { id: "cancel", label: "cancel" },
+    ],
+  }),
+
   tip: block({
     kind: "tip",
     id: "tip-1",
