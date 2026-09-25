@@ -412,3 +412,7 @@ describe("C02 detection", () => {
     ).toBe(false);
   });
 });
+
+describe("C02 the route (I15)", () => {
+  it.todo("T1.15 (C02 I15, C02 I7): CALCIUM_RENDER_MODE, its sources, the override, and isUsable on each route — not deferred on a component: specified ahead of the code in this commit");
+});

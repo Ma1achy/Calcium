@@ -604,3 +604,7 @@ describe("C01 hover — 1003 in 1002's slot, never both (I21)", () => {
     expect(stdout.output).not.toContain("1003");
   });
 });
+
+describe("C01 the linear profile (I22)", () => {
+  it.todo("T1.30 (I22, I6): linear takes raw mode, paste and the keyboard protocol, never the alternate screen, the mouse or the hidden cursor — not deferred on a component: specified ahead of the code in this commit");
+});

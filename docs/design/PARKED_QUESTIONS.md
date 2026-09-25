@@ -935,6 +935,10 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 **Built meanwhile** (C04 §3ar): the fields flush at column 0, so the button row is exactly the figure's and every field column is the figure's less one. **Why parked, not ruled**: keeping the figure's cell means weakening I87, and the obvious weakening — measure from the leftmost row rather than the head — is the tautology I87 records its own control catching. **The one-word answers**: (a) keep it flush; (b) indent the button row with the fields, so `›` sits at column 1 under the labels' first letter; (c) I87 exempts a row whose first cell is a mark the block declares, which is a list.
 
+
+**48 · OPEN — How often a running call says it is still running, in linear mode.** §107: *a running call announces start, useful elapsed milestones, blockage and completion — not spinner frames.* Start, blockage (a question) and completion are built (C22 §6m). **A milestone needs an interval**, and the design gives none — `R-MOT-*` fixes spinner intervals, which are frames, and §107 excludes frames by name. It is a visible timing value, which is why it is here. **The proposal**: at 10 s, 30 s, 1 min and every minute after — `entry 7: pytest tests/unit — running, 30s` — a doubling-ish ladder that says *still going* often early and rarely late, and is silent for a call that finishes inside ten seconds. **Built meanwhile**: nothing between start and completion, so a long call is silent in linear until it ends.
+
+**49 · OPEN — The rate limit on linear announcements.** §107: *announce is none / polite / assertive, with deduplication and rate limits.* Deduplication is built (C22 I120): a fact is written once per id. **A rate limit is a number** — events per second, or a minimum gap between polite events — and the design gives none. **The proposal**: no limit on `assertive`; `polite` events inside 250 ms of each other are written as one batch, which is §107's *coherent batches* reached from the other side. **Built meanwhile**: every event is written as it happens.
 ---
 
 ## Not yet recovered

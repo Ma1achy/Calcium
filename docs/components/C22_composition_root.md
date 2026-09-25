@@ -2362,6 +2362,138 @@ only record by accident.
 
 ---
 
+## 6m. Linear rendering, walked by hand — §107's second rendering (ruling 29, `R-ACC-001`)
+
+*The cell grid is a projection. It is not the interface.* §107 gives the semantic tree two
+renderings — **rich**, the cursor-addressed interface the rest of this document describes, and
+**linear**, *an append-only stream of semantic events* — and says what linear refuses: no
+alternate screen, no mouse tracking, no cursor-addressed repaint, no animation, and never a
+rewrite of an emitted event; **only the active input line edits in place.** Ruling 29 fixed the
+two things §107 leaves open, the role vocabulary (C09 §7h) and the text of an event: *the
+node's own fields in a fixed order, no glyph and no colour.* This section is the renderer.
+
+### 6m.1 — measured before ruling
+
+- **Three things rule a linear mode out today, and none of them is about linear.** A missing
+  alternate screen is fatal at acquire (C01), `isUsable` is `caps.altScreen` (C02 I7), and the
+  60 × 16 size gate draws the fallback screen. Each is true of a cursor-addressed frame and
+  false of a stream, so each is amended for the linear route rather than bypassed. A stdout
+  that is not a TTY still prints usage: linear edits its input line in place, which is a
+  terminal's, and a pipe has none.
+- **A node's name is the kind's label and is empty where it has none** (C09 §7h), so names
+  cannot carry content. **The content is the copy source** — §057's *what copy takes*, and
+  §107's *the source value, not the painted string*. Every kind but `rule` and `progress`
+  declares one (`copyOf`, measured over `ONE_PER_KIND`); `rule` has its label and `progress`
+  its `valueText`. Three copy sources are the block's JSON — `table`, `plot`, `patch` — and a
+  table's rows each declare their own.
+- **A change carries ids and nothing else** (C13 §2): `append`, `patch`, `settle`, `evict`,
+  `clear`. The persist subscriber's filter — `append` or `settle`, and not `streaming` — is
+  already *this entry will not move again*.
+- **A question has no event of its own.** It is an overlay layer with id `confirm`, raised by
+  `push` and resolved by its removal.
+- **The call's state is resolved already** — `running`, `succeeded`, `failed`, `cancelled` —
+  by the head (C23 I59), so a completion line reads a state and never parses painted text.
+
+### 6m.2 — the classification table: which change writes which line
+
+| change | the entry | what is written | level |
+|---|---|---|---|
+| `append` | streaming | the **start**: `entry 7 of 7: pytest tests/unit — running` | polite |
+| `append` | settled | the start and the completion as one event, then the body | by outcome |
+| `patch` | streaming | nothing — the batch closes at `settle` | — |
+| `patch` | settled, a block **appended** | `entry 7:` and the appended block's body | assertive when it is an error or warning `notice`, else polite |
+| `patch` | settled, a block **replaced** or merged | nothing — never a rewrite, and a rich view's own state | — |
+| `settle` | — | the **completion**: `entry 7: pytest tests/unit — failed, exit 1, 4s`, then the body | assertive when failed, else polite |
+| `evict` | — | nothing — the scrollback holds it | — |
+| `clear` | — | `transcript cleared` | polite |
+| a question raised | — | its detail's body, then `question: which branch? 1 feat/c26, 2 main, 3 reply…` | assertive |
+| a question resolved | — | `answer: main` | polite |
+
+**Two rules meet in row 4, and the table is what found it.** *A patch writes nothing* is right
+for a stream, and *a refusal states its reason* (`R-INT-009`) arrives as a patch — C22 I118's
+refused paste is a notice appended to a settled entry. With row 3's rule alone, every refusal
+after settle is silent in linear. A **replaced** block stays silent: its first body was
+written, and writing its successor would be the rewrite §107 forbids, told as news.
+
+**And two rules meet in the body.** A `notice`'s name is its text and so is its copy source —
+*a repaint of the same fact does not say it twice*, so a source line equal to the name is not
+written again.
+
+### 6m.3 — the sequence trace: what happens when two things meet
+
+| # | sequence | what is written |
+|---|---|---|
+| 1 | the reader has typed `abc`; an entry settles | the input line is erased, the event written, `❯ abc` redrawn with the caret where it was |
+| 2 | entry 7 starts; `/clear`; 7 settles | `entry 7 … running`, `transcript cleared`, and nothing for 7 — its id is gone and nothing can be said about it |
+| 3 | entries 7 and 8 both run; 8 settles, then 7 | two starts, then `entry 8:` and `entry 7:` — each completion names its own start |
+| 4 | the transcript evicts entries 1–3 while 7 runs | nothing; 7's completion still reads `entry 7:` |
+| 5 | a question arrives while the reader has typed `abc` | the question's lines, then the input line reads `answer 1–3:` — `abc` is held, and comes back when the question resolves |
+| 6 | `2` while the question is open | `answer: main`, and the input line is `❯ abc` again |
+| 7 | the question's `reply…` is chosen | the input line reads `which branch?:` and the typed reply; `⏎` answers it |
+| 8 | a resize | nothing written; the input line is redrawn at the new width |
+| 9 | the same entry settles twice | one completion — the fact is the entry's settlement, keyed by its id |
+
+**Row 4 is the trace's finding.** *`entry 3 of 18`* reads as a position, and a position moves:
+evicting three entries between a start and its completion makes the number that announced the
+call name another one, so the reader hears `entry 4: … failed` about a call they were told was
+`entry 7`. §107's *id — the same stable id used by focus, patches and pointer arms* is the
+remedy: **the number is the entry's `seq`**, which never moves and is never reused, and *of M*
+is the highest `seq` so far. It reads as a position until something is evicted and as an
+identity afterwards, which is the property a reader needs.
+
+**Row 5 is the other.** A question is a new owner of the keys, and the in-place line is the one
+thing linear may edit — so the line is the question's while it is open, and the reader's draft
+is held under it exactly as C17 I29 holds it under a field.
+
+### 6m.4 — the rulings
+
+1. **Selected by `CALCIUM_RENDER_MODE`, read by C02** (C02 I15), where A02 allows the
+   environment; a `capabilities.renderMode` in `TuiConfig` overrides it, as every capability
+   field is overridden. `--linear` and persistent config wait on question 28's producers, and
+   so does `accessibility.screenReader=auto`: *auto falls back to linear when no bridge exists*,
+   and a config key the tree cannot read has nothing to fall back from.
+2. **The lifecycle's linear profile** (C01 I22): raw mode, bracketed paste and the keyboard
+   protocol are taken; the alternate screen, mouse tracking and the hidden cursor are not — a
+   screen reader follows the cursor.
+3. **No frame is composed** (I119): no size gate, no spinner, no ramp, no composition. The
+   scheduler's commits redraw the input line and nothing else.
+4. **The line forms are ruling 29's**: the start `entry N of M: <command> — running`; the
+   completion `entry N: <command> — <state>[, <outcome>][, <duration>]`, the state being the
+   head's word; a block `<role>[: <name>][ — <valueText>]`, then its source lines (I121).
+5. **A block's source lines are its elements' copies where its elements declare them, and its
+   own copy source otherwise** — a table reads its rows and not its JSON. **A `figure` reads its
+   name and nothing else**: a plot's copy source is its JSON document, and §107's *a figure owes
+   a summary and a data view* has no field to carry either yet (§6m.5). A container reads its
+   children's bodies in order.
+6. **Never a glyph, never an SGR sequence, never a control character** in an event — the copy
+   source is already control-stripped (C09 I18) and nothing in this renderer paints.
+7. **A question is numbered** (I122). `1`–`9` answer it, a choice's own key still answers it,
+   and `reply…` turns the input line into §107's *labelled line editor*.
+8. **Levels are declared, per event** (I124): `assertive` for a failure, a question and an
+   appended error or warning; `polite` for the rest; ARIA's own reading of `alert` and `status`.
+   Linear stdout is the one transport that exists, and it writes both — the level is carried on
+   the event for the bridge §107 names, and **no event claims a bridge that does not exist.**
+9. **Deduplication is by fact** (I120): a start, a completion, an appended block and a question
+   are each written once per id.
+10. **`/capabilities` is where the route appears** (I125, §107): the route first, then every
+    capability field with its value and its source.
+
+### 6m.5 — what the rulings leave behind, named so it is not read as coverage
+
+- **Milestones.** §107's *useful elapsed milestones* need an interval, which is a visible
+  timing value the design does not give — parked as **48**. Until it is answered a long call is
+  silent between its start and its completion.
+- **Rate limits.** Deduplication is built; a numeric limit is the same kind of value — **49**.
+- **Batches finer than settlement.** *Streaming prose arrives in coherent batches*, and the
+  batch here is the settled document. A finer boundary needs a block that can no longer
+  change, and `replace` can reach any block of a streaming entry.
+- **A figure's summary and data view** (R-BLK-895) — design-settled and owed; they need a field
+  on `plot` and `mosaic`, which is C04's.
+- **Panels, peeks, completion and find** are rich placement. In linear they draw nothing, and
+  `⇥` completes nothing a reader can hear.
+- **A form in linear** — *mixed forms add an explicit text arm* — and **the toast**, which is
+  transient status and in linear is a line.
+
 ## 7. Health and identity
 
 **Identity comes from the app, through `config.identity`.** C22 owns the cadence
@@ -2652,6 +2784,13 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I116** — *(§6l.13, §105, §012)* **A toast is one string the session holds for `TOAST_MS`, drawn by the default footer in place of its tail, and it takes no keys.** It raises no layer and is no rung, so no key reaches it. A newer toast replaces an older and **disposes its timer**, so the older's expiry cannot clear the newer; stopping disposes it before the release. The lifetime is a scheduled expiry through the injected `schedule`, never a clock read. A toast is for a fact that changed nothing (§012's table) — the session's toast takes text alone and appends nothing, so it is never the only record of one that did.
 - **I117** — *(C04 §3aq, C04 I134, C26 I28, §105, §021)* **The shell keeps a split's panes as it keeps a scroll box.** Each pane's offset is held under the pane's own key in the offset store. The pull moves the focused pane by the minimum (C26 I24). `PgUp`/`PgDn` page the pane focus is in. The wheel pages the pane under the pointer. The divider is written by a shell-origin `replace`, from `⌥←`/`⌥→` one cell at a time and from a pointer drag. A press on the divider's column arms the drag on that split, motion with the button held moves it, and the release ends it. Neither moves focus.
 - **I118** — *(C04 §3ar F1–F10, C04 I137, C17 I29, C16 I60)* **The shell lends a form field the prompt's editor, and every path out of the field gives it back.** Entering a field holds the reader's line (C17 I29) and loads the field's value with the caret at its end. While it is held the prompt row draws the held line, the field draws the editor, and `RenderContext.focus.draft` carries the editor's text and caret (C09 I119). `⏎` writes the value by a shell-origin `replace` and enters the next field, keeping the line held; from the last field focus goes to the default button in navigate mode and the line is given back. `esc` and `⌃c` give the line back and write nothing. **After every event, a held line whose field is no longer focused in the inside mode is given back** — written first where focus is on another element and the field still exists, discarded where focus is still on the field. **And no action dispatches while a field holds the line** (C04 §3ar F7): the dispatcher's one path activates the focused element, a field is entered rather than activated, and a pointer focuses on its press, so the rule above has written the field before a release can activate anything — which is what makes a submit read what was typed and keeps a `fill` from being overwritten by the restore. A second path to the dispatcher ends the borrow, writing, before it dispatches. **While a field holds the line the owner line names it**: `field`, `⏎ keep`, `esc discard` (§6's owner line, `R-KEY-004`), not the inside rung's plot keys, which name an owner the reader is not in. The prompt row draws the held line through C17's own walk (`layout`, `cursorCell`, the editor's `drawAs`), so its chips resolve as they did before it was held.
+- **I119** — *(§6m, §107, `R-ACC-001`, → C01 I22, C02 I15)* **When `capabilities.renderMode` is `linear` the session composes no frame.** No size gate, no spinner, no ramp and no composition runs, and the scheduler's commits redraw the input line and nothing else; the terminal is acquired under C01's linear profile. **The only output edited in place is the input line** — every other byte is appended and never rewritten.
+- **I120** — *(§6m.2, §6m.3)* **Linear events come from transcript changes by §6m.2's table, once per fact.** A start on a streaming `append`; a start and a completion together on a settled `append`; a completion on `settle`; an appended block's body on a `patch` that appends to a settled entry; `transcript cleared` on `clear`; nothing on a streaming `patch`, a replace or merge, or an `evict`. **A start, a completion and an appended block are each written once per id.** An entry's number is its `seq` and *of M* is the highest `seq` so far, so eviction never renumbers a call between its start and its completion.
+- **I121** — *(§6m.4 rulings 4–6, C09 §7h, §057)* **A block reads `<role>[: <name>][ — <valueText>]`, then its source lines** — its elements' copies where they declare them, else its own copy source, and nothing for a `figure` beyond its name. A container reads its children in order. A source line equal to the name is not written twice. No event carries a glyph, an SGR sequence or a control character.
+- **I122** — *(§6m.3 rows 5–7, §107)* **A question is written as its detail's body and one numbered line, and answered by its number.** `1`–`9` answer choices in order and a choice's own key still does; resolution writes `answer: <label>`. While it is open the input line reads `answer 1–N:`, or the question and the typed reply when `reply…` is chosen, and the reader's draft is held and given back.
+- **I123** — *(§6m.3 row 1, row 8)* **An event is written with the input line erased first and redrawn after**, caret where it was, and the line is windowed to the width round its caret, so a long draft never wraps a row the next erase cannot reach.
+- **I124** — *(§6m.4 ruling 8, §107)* **Every event carries an announcement level**: `assertive` for a failed completion, a question and an appended error or warning notice; `polite` otherwise. Linear stdout writes both, and no event names a transport that does not exist.
+- **I125** — *(§6m.4 ruling 10, §107)* **`/capabilities` shows the route first, then every capability field with its value and its source** — `declared`, `stated`, `inferred`, `assumed` or `unreachable`, as C02 resolved it.
 
   **The composition root owns both halves and they are separate.** *Where the blocks go* is this invariant; *who has the keyboard* is C16 I49, and the root wires the second by answering `attachedChild` from the attachment as well as from `inFlight() === "shell"`. Keeping them apart is what makes the child's ownership independent of where its output landed — which is the distinction the single `kind: "view"` flag could not hold, since a layer that filled the region carried both claims in one field and neither was declared.
 
@@ -3109,6 +3248,8 @@ PTY harness.
 - **T1.71** (I114, §070, C10 I55, `R-COL-003`): a label naming a hue is painted with **that hue's ground and that hue's `on` ink**, over all ten hues in all ten themes, read off the emitted bytes; a label naming no hue is byte-identical to the frame that shipped, which is the control and is what stops the row passing by painting something everywhere. A hue name no theme carries falls back to `bgElev` rather than to nothing, because an unknown name is a typo in a config file and a label that vanishes is a worse answer than one that is not tinted. **The ink is asserted as the BAND's and not the hue's, and the first draft was not**: a mutation taking the label's ink from the hue's own colour **survived** — ten runs still distinct, a ground still painted, an ink still in the run, every one of them true of a hue drawn on itself. What separates them is the shape of the tier rather than any value: because `on` is the higher-contrast of black and white (C10 I54, 100 of 100), across ten hues the **grounds take ten values and the inks at most two**, where a hue drawn on itself gives ten. The row asserts that count, so it fails on the `R-THM-005` failure it was written for rather than on a value it copied.
 - **T1.72** (I115, `R-HON-008`): `resolveConfig` over the minimal config records the four settings in order, each `default`, with the framework's values as text; the same config with `motion: "reduced"` records `reduced` and **still `default`** — the premise asserted, so a reading that called a caller's value `config` fails here.
 - **T1.73** (I116, §6l.13 K1, K3): the default footer given `toast: "copied 3 lines"` draws `✓ copied 3 lines` where the working directory was, and the cwd is absent from that row; given none, the cwd is drawn — asserted at Unicode and at ASCII, where the mark is `glyphFor("ok")`.
+- **T1.74** (I120, I121, I124): §6m.2's table, row by row, through the event function alone — each change kind against a streaming and a settled entry, an appended refusal after settle, a replace after settle writing nothing, a second settle writing nothing, and the number reading `seq` after an eviction.
+- **T1.75** (I121): every kind of `ONE_PER_KIND` through the body function — role, name and value text, elements' copies for a table rather than its JSON, nothing for a figure but its name, a notice's text once, and no SGR or glyph in any line.
 - **T1.65c** (I111, §6l.10): the ground reader sees a background that is not the sequence's first parameter, and does not read a 256-colour or rgb *foreground* whose index spells `4x` or `10x` as one. The reader's own fabricated violation, and it earned its place: the first draft matched only at the head of the sequence, so a rule that was painting `38;5;188;48;5;235` was reported as painting nothing — a defect of the instrument that reads exactly like a defect of the code.
 - **T1.65d** (I111, §6l.10): a supplied string that strips to nothing — `""`, spaces, a tab — leaves the frame that shipped, and a padded name still draws. The narrowing belongs to the frame because an application computing its label may return a blank on some frames, and a one-cell ground floating in the rule is not a name.
 - **T1.67** (I112, §6l.11, C17 §5c): a prompt holding a chip paints a background over exactly the chip's cells and nothing else, and a prompt holding the same text without a chip paints none. Read off the emitted bytes, since the screen model folds SGR away.
@@ -3167,6 +3308,9 @@ PTY harness.
 - **T4.99** (I118, C16 I60, C26 I29, C04 §3ar F1–F5): bytes through stdin on a session holding §105's form. `↓` to `port`, `⏎`, backspace twice, `8080`: the field draws `8080▌` and the prompt row draws the reader's held line; `⌥←` moves the caret a word and the form's split, where it sits in one, does not move; `⏎` writes `8080` into the block and enters `replicas`; `esc` there leaves `3` unchanged and gives the held line back exactly, text and caret.
 - **T4.100** (I118, C04 §3ar F6, F7): a field being edited and a click on `save` — the click focuses `save` and presses nothing, the typed value is written and the line given back; a second click presses it, and the submitted command carries the typed value, not the one before the edit.
 - **T4.101** (I118, C04 §3ar F9, F3, C16 I60): a multi-line paste into a field is refused with its reason and the field is unchanged; `↓` inside a field is dropped and focus stays on the field; and `F1` inside a field puts the keymap in the transcript with the field still being edited — the one key that tells a pass from a reject, since a reject withholds the `global` fallback and every other key the row presses draws the same frame either way.
+- **T4.102** (I119, I120, I123, C01 I22): bytes through stdin on a session with `renderMode: "linear"` — no `?1049h`, `?1002h` or `?25l` is written; a local verb writes its start and completion as ruling 29's lines and its body; a typed draft is erased and redrawn round an event with the caret where it was; a resize writes nothing but the input line.
+- **T4.103** (I122, I124): a question in linear — its numbered line, `2` answering the second choice, `answer: <label>`, the input line reading `answer 1–3:` while open and the draft given back after; the question's level `assertive`.
+- **T4.104** (I125, C02 I15): `/capabilities` under `CALCIUM_RENDER_MODE=linear` — the route row first, reading `linear` and `stated`, and every capability field after it.
 - **T4.98** (I117, C04 §3aq E5): a press on the divider's column, a motion report with button 0 held five columns to the right, then the release — the divider is five cells right on the frame and focus is where it was. A motion report after the release moves nothing.
 - **T6.113** (I101): the range split dropped from the slot → T4.89a renders every kept child; the gap row dropped from the assembly → T4.89b fails on the first `gapBefore` child.
 - **T6.114** (I100, C09 I70): the memo dropped from the window's closures in `session.ts`, or from C14's measurer in `construct.ts`, or from the profiler's wrapper round `measureSequence` → T4.88 fails; the registry ignoring a handed memo, or keeping it past the call → C09 T1.44 fails.
