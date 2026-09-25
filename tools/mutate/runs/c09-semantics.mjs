@@ -32,7 +32,7 @@ const MUTATIONS = [
   { name: "an activating element offers no confirm", file: S, from: '    ...(e.activate !== undefined || e.viewState === true ? ["confirm"] : []),\n', to: "", expect: "T2.179" },
   { name: "position counts from zero", file: S, from: "position: Object.freeze({ index: index + 1, of }),", to: "position: Object.freeze({ index, of }),", expect: "T2.179" },
   { name: "a copy is not an action", file: S, from: '    ...(e.copy !== undefined ? ["copy"] : []),\n', to: "", expect: "T2.179" },
-  { name: "containers nest their elements, not their children", file: S, from: 'if (block.kind === "panel" || block.kind === "group" || block.kind === "scroll" || block.kind === "mosaic") {', to: 'if (block.kind === "panel" || block.kind === "scroll" || block.kind === "mosaic") {', expect: "T2.179" },
+  { name: "containers nest their elements, not their children", file: S, from: "  if (hasChildren(block)) {", to: '  if (hasChildren(block) && block.kind !== "group") {', expect: "T2.179" },
   { name: "the elements are taken at a fixed width", file: S, from: "  const elements = elementsOf(block, width);\n", to: "  const elements = elementsOf(block, 80);\n", expect: "T2.179" },
 ];
 

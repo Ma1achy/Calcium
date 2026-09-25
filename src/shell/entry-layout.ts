@@ -18,9 +18,9 @@
  */
 
 import type { Block, Group } from "../data/viewmodel/index.js";
-import { block as rebuild, paddingOf } from "../data/viewmodel/index.js";
+import { block as rebuild, childWidths, contentWidth, hasChildren, paddingOf } from "../data/viewmodel/index.js";
 import { glyphFor } from "../presentation/blocks/index.js";
-import type { BlockRegistry, NavElement } from "../presentation/blocks/index.js";
+import type { BlockRegistry, PlacedElement } from "../presentation/blocks/index.js";
 import type { RenderScratch } from "../presentation/blocks/types.js";
 import { paint as paintSpans, tone } from "../presentation/blocks/paint.js";
 import { glyphForMask, LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "../presentation/plot/linedraw.js";
@@ -282,8 +282,8 @@ export function elementsOfEntry(
   blocks: readonly Block[],
   width: number,
   command?: string,
-): readonly Readonly<{ blockId: string; element: NavElement }>[] {
-  const out: Readonly<{ blockId: string; element: NavElement }>[] = [];
+): readonly PlacedElement[] {
+  const out: PlacedElement[] = [];
   // **The head copies the invocation** (I90): `y` on a card's head yields what
   // ran, and `⌃a y` yields it first, followed by the body's own copies through
   // C26 I16's one aggregator. Every other element's `copy` is its block's — a
@@ -291,9 +291,15 @@ export function elementsOfEntry(
   const headId = command !== undefined && isCard(blocks) ? blocks[0]?.id : undefined;
   let top = 0;
   for (const run of entryLayout(blocks, width)) {
-    for (const { blockId, element } of registry.elementsIn(run.blocks, run.width)) {
+    for (const { blockId, element, pane } of registry.elementsIn(run.blocks, run.width)) {
       out.push({
         blockId,
+        // **Carried, not dropped** (C26 I28): the walk records the split pane
+        // and this lift is a layer above it, so a record rebuilt from two of
+        // its three members loses the one `↓` needs to keep to a pane.
+        ...(pane === undefined
+          ? {}
+          : { pane: Object.freeze({ ...pane, top: top + pane.top, left: run.indent + pane.left }) }),
         element: Object.freeze({
           ...element,
           ...(blockId === headId && command !== undefined ? { copy: command } : {}),
@@ -308,6 +314,43 @@ export function elementsOfEntry(
     top += runRows(registry.measureSequence, run);
   }
   return Object.freeze(out);
+}
+
+/**
+ * The width block `id` is drawn at inside an entry, or `null` where the entry
+ * holds no such block (C22 I117).
+ *
+ * **The runs' widths, then `childWidths` down the path** — the same two
+ * functions the element walk and the renderer lay out with, so a split's
+ * divider is clamped against the width its own columns were computed at and
+ * not against the region's. A nested split is narrower than the frame, and a
+ * clamp at the frame's width would write a divider the renderer then clamps
+ * again, which is a key that did nothing while a patch said it had.
+ */
+export function blockWidthInEntry(blocks: readonly Block[], width: number, id: string): number | null {
+  // **Inside the padding**, which the registry takes off before a definition
+  // sees its width (C09 I80) — so the answer is the width the kind computes
+  // its own columns at.
+  const find = (block: Block, outer: number): number | null => {
+    const at = contentWidth(block, outer);
+    if (block.id === id) return at;
+    if (!hasChildren(block)) return null;
+    const widths = childWidths(block, at);
+    for (const [i, child] of block.children.entries()) {
+      const w = widths[i];
+      if (w === undefined) continue;
+      const found = find(child, w);
+      if (found !== null) return found;
+    }
+    return null;
+  };
+  for (const run of entryLayout(blocks, width)) {
+    for (const block of run.blocks) {
+      const found = find(block, run.width);
+      if (found !== null) return found;
+    }
+  }
+  return null;
 }
 
 /**

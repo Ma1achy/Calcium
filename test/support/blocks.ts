@@ -222,6 +222,26 @@ export const ONE_PER_KIND: Readonly<Record<KnownBlockKind, Block>> = Object.free
     ],
   }),
 
+  // C04 §3aq — §105's split. **The left pane overflows and the right does
+  // not**, so the divider carries the left pane's thumb (C04 I133 S2) and the
+  // right pane draws no bar of its own — both halves of the column rule in one
+  // representative. The right pane is a `code` block, which declares no
+  // elements, so the pane's own element (§3aq S6) is reached too.
+  split: block({
+    kind: "split",
+    id: "split-1",
+    height: 4,
+    children: [
+      block({ kind: "raw", id: "split-files", text: "src/\n  interaction/\n  data/\n  presentation/\n  shell/\nREADME.md\npackage.json" }),
+      block({
+        kind: "code",
+        id: "split-code",
+        language: "typescript",
+        text: "export function layout(b, w, h) {\n  b = chooseRep(b, w);\n  solveW(b, w);\n  return b;\n}",
+      }),
+    ],
+  }),
+
   tip: block({
     kind: "tip",
     id: "tip-1",

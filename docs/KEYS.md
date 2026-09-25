@@ -70,8 +70,8 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⌃J` | both |  |  |  |  |  |  | insertNewline |  |  |
 | `⌃K` | both |  |  |  |  |  |  | killToEnd |  |  |
 | `⌃←` | both |  |  |  |  |  |  | wordLeft |  |  |
-| `←` † | both |  |  |  |  |  | insideLeft | left |  |  |
-| `⌥←` | both |  |  |  |  |  |  | wordLeft |  |  |
+| `←` † | both |  |  |  |  |  | insideLeft | left | paneLeft |  |
+| `⌥←` † | both |  |  |  |  |  |  | wordLeft | dividerLeft |  |
 | `⌥⇧←` | both |  |  |  |  |  |  | extendWordLeft |  |  |
 | `⇧←` | both |  |  |  |  |  |  | extendCharLeft |  |  |
 | `o` | both |  |  |  |  |  | orbitToggle |  |  |  |
@@ -81,9 +81,9 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⌃R` † | both |  |  |  |  | searchOlder |  | reverseSearch |  |  |
 | `r` | both |  |  |  |  |  | cameraReset |  |  |  |
 | `⌃→` | both |  |  |  |  |  |  | wordRight |  |  |
-| `⌥→` | both |  |  |  |  |  |  | wordRight |  |  |
+| `⌥→` † | both |  |  |  |  |  |  | wordRight | dividerRight |  |
 | `⌥⇧→` | both |  |  |  |  |  |  | extendWordRight |  |  |
-| `→` † | both |  |  |  |  |  | insideRight | acceptGhostOrForward |  |  |
+| `→` † | both |  |  |  |  |  | insideRight | acceptGhostOrForward | paneRight |  |
 | `⇧→` | both |  |  |  |  |  |  | extendCharRight |  |  |
 | `⌃⇥` | enhanced-terminal |  |  |  |  |  |  |  |  | agentNext |
 | `⌃⇧⇥` | enhanced-terminal |  |  |  |  |  |  |  |  | agentPrevious |
@@ -103,4 +103,4 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⌃Z` | both |  |  |  |  |  |  | undo |  |  |
 | `⌥z` | both |  |  |  |  |  |  | redo |  |  |
 
-123 bindings · 91 keys · 20 resolved by the ladder (†).
+127 bindings · 91 keys · 22 resolved by the ladder (†).

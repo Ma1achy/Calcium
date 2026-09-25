@@ -15,7 +15,7 @@
  * whichever width a child happens to wrap. A shared function cannot drift.
  */
 
-import type { Align, Block, Group, Halign, MeasureFn, Padded, Panel, Valign, WidthFn } from "./types.js";
+import type { Align, Block, Group, Halign, MeasureFn, Padded, Panel, Split, Valign, WidthFn } from "./types.js";
 import { divideShares, mosaicRects, parseAreas } from "./mosaic.js";
 import type { ContainerBlock } from "./tree.js";
 
@@ -196,7 +196,72 @@ export function placeable(block: Panel | Group, width: number): number {
   return Math.max(1, placed);
 }
 
+/**
+ * A split's columns at `width` (C04 I133, §3aq).
+ *
+ * `left` is the left pane's width and the divider's column; the blank cell is
+ * `left + 1` and the right pane starts at `left + 2`. **`right` is `null` below
+ * four columns**, where the left pane draws alone and the right is placed by
+ * neither half — `placeable`'s rule for a row group. The clamp is applied here,
+ * at read, and never written back (§3aq S4).
+ */
+export function splitColumns(block: Split, width: number): Readonly<{ left: number; right: number | null }> {
+  const w = atLeastOne(width);
+  if (w < 4) return { left: w, right: null };
+  const held = block.divider ?? Math.floor((w - 2) / 2);
+  const left = Math.min(Math.max(1, Math.trunc(held)), w - 3);
+  return { left, right: w - left - 2 };
+}
+
+/**
+ * The key a split pane's offset is held under (C04 §3aq, C22 I117).
+ *
+ * **Not the pane's block id**: a pane that is itself a `scroll` keeps its own
+ * offset under that id, and one number cannot be both. The separator is a NUL,
+ * which no block id a reader wrote contains.
+ */
+export function splitPaneKey(splitId: string, side: number): string {
+  return `${splitId}\u0000${String(side)}`;
+}
+
+/**
+ * Each placed pane of a split: its block, its first column, the width its
+ * content is drawn at and how tall that content is (C04 I133).
+ *
+ * **One function for the renderer and the element walk**, so the two cannot
+ * disagree about where the right pane starts or whether its bar took a column.
+ * The right pane's bar is `barOf`'s one step: measured at the pane's width,
+ * then one cell narrower only if it overflowed there, since narrowing never
+ * shortens content. The left pane's bar is the divider and costs it nothing.
+ */
+export function splitPanes(
+  block: Split,
+  width: number,
+  measureChild: MeasureFn,
+): readonly Readonly<{ child: Block; side: number; col: number; width: number; content: number; bar: boolean }>[] {
+  const { left, right } = splitColumns(block, width);
+  const out: Readonly<{ child: Block; side: number; col: number; width: number; content: number; bar: boolean }>[] = [];
+  const first = block.children[0];
+  if (first !== undefined) {
+    out.push({ child: first, side: 0, col: 0, width: left, content: measureChild(first, left), bar: false });
+  }
+  const second = block.children[1];
+  if (second !== undefined && right !== null) {
+    const full = measureChild(second, right);
+    const bar = full > block.height && right >= 2;
+    const at = bar ? right - 1 : right; // cells-ok — a width less its bar
+    out.push({ child: second, side: 1, col: left + 2, width: at, content: bar ? measureChild(second, at) : full, bar });
+  }
+  return out;
+}
+
 export function childWidths(block: ContainerBlock, width: number): readonly number[] {
+  // **The panes' widths, before any bar** (C04 I133). A right pane that
+  // overflows draws its bar inside this width, as a scroll box does.
+  if (block.kind === "split") {
+    const { left, right } = splitColumns(block, width);
+    return right === null ? [left] : [left, right];
+  }
   if (block.kind === "panel") {
     return block.children.map(() => insetWidth(width));
   }

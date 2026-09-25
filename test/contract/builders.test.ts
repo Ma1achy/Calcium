@@ -150,6 +150,7 @@ const BUILDERS: readonly Readonly<{
   // **`gaps: true`, as `table` and `steps`** — a tree is a section of its own,
   // not a row of peers set against the one before it (C04 §3ap).
   { name: "tree", gaps: true, kind: "tree", make: (o) => b.tree([{ id: "src", label: "src", children: [] }], o) },
+  { name: "split", gaps: true, kind: "split", make: (o) => b.split(2, b.raw("left"), b.raw("right"), o) },
   { name: "tip", gaps: true, kind: "tip", make: (o) => b.tip("press ? for help", undefined, o) },
   { name: "panel", gaps: true, kind: "panel", make: (o) => b.panel("details", [b.raw("x")], o) },
   { name: "group", gaps: false, kind: "group", make: (o) => b.group("column", [b.raw("x")], o) },
@@ -220,8 +221,8 @@ const BUILDERS: readonly Readonly<{
   },
 ];
 
-describe("C24 §4 — the twenty-seven builders", () => {
-  it("T2.9: the enumeration covers every block-returning builder, and twenty-six is the count", () => {
+describe("C24 §4 — the twenty-eight builders", () => {
+  it("T2.9: the enumeration covers every block-returning builder, and twenty-seven is the count", () => {
     // The count is asserted so that adding a builder without a row fails here
     // rather than silently going untested — which is exactly how §4's paragraph
     // came to name two builders that did not exist.

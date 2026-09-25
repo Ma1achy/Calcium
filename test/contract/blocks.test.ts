@@ -279,7 +279,7 @@ describe("C09 contract — measurement", () => {
     }
   });
 
-  it("T2.6 (I13): the twenty-three ship here; the other three are registered elsewhere", () => {
+  it("T2.6 (I13): the twenty-four ship here; the other three are registered elsewhere", () => {
     // The composition-level half of I13 belongs with C11, C12 and C25. What is
     // assertable here is the split itself — and that the three absentees still
     // render, through `raw`, rather than throwing (I10).
@@ -304,6 +304,7 @@ describe("C09 contract — measurement", () => {
         "raw",
         "rule",
         "scroll",
+        "split",
         "status",
         "steps",
         "tape",
@@ -328,7 +329,7 @@ describe("C09 contract — measurement", () => {
     expect(uncoveredKinds(measurable(), CORPUS)).toEqual([]);
   });
 
-  it("T2.6c (I13): all twenty-six kinds, and the three arrive through `register`", () => {
+  it("T2.6c (I13): all twenty-seven kinds, and the three arrive through `register`", () => {
     // **The composition-level half, assertable for the first time.** It waited on
     // C25 because "every block kind" cannot be honest while one is unregistered,
     // and a test that named the fourteen would have read as covering the union.
@@ -365,6 +366,7 @@ describe("C09 contract — measurement", () => {
       "raw",
       "rule",
       "scroll",
+      "split",
       "status",
       "steps",
       "table",
@@ -418,6 +420,7 @@ describe("C09 contract — measurement", () => {
       "progress",
       "rule",
       "scroll",
+      "split",
       "status",
       "steps",
       "tape",

@@ -449,6 +449,23 @@ export type Windowed = Readonly<{
  * that knows where the block starts knows where the element is without the block
  * knowing where it was placed.
  */
+/**
+ * The split pane an element sits in — the innermost, where splits nest
+ * (C04 I134, C26 I28). `side` is `0` for the left pane and `1` for the right.
+ *
+ * **`top` and `left` are the split's origin, in the element's own
+ * coordinates** and lifted with it, so a caller finds a pane-local row as
+ * `rows.from − top` without asking the walk a second time (C26 I8).
+ */
+export type PaneRef = Readonly<{ split: string; side: number; top: number; left: number }>;
+
+/**
+ * An element as the walk places it: the block that declared it, the element in
+ * sequence coordinates, and **the split pane it is in, where it is in one** —
+ * which is what lets `↓` keep to a pane (C26 I28) without a second walk.
+ */
+export type PlacedElement = Readonly<{ blockId: string; element: NavElement; pane?: PaneRef }>;
+
 export type NavElement = Readonly<{
   /**
    * Unique within the block's own declaration (C26 I6).
@@ -740,10 +757,7 @@ export interface BlockRegistry {
    * The pairing with `blockId` is what C09 I14's renderer needs and what stops
    * two blocks' element ids sharing one namespace.
    */
-  elementsIn(
-    blocks: readonly Block[],
-    width: number,
-  ): readonly Readonly<{ blockId: string; element: NavElement }>[];
+  elementsIn(blocks: readonly Block[], width: number): readonly PlacedElement[];
   /**
    * Rows `[from, to)` of a *sequence*, as a smaller sequence plus an offset
    * (C09 §2a, I25).

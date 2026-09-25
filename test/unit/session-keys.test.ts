@@ -394,6 +394,8 @@ describe("C22 §3 step 11 — the effect table", () => {
     selectAllLoadedEntries: () => undefined,
     copySelectedEntries: () => undefined,
     toast: () => undefined,
+    paneOffset: () => 0,
+    moveDivider: () => undefined,
     moveSemanticCaret: () => undefined,
     exitNativeSelection: () => undefined,
       manifest: null,
@@ -452,7 +454,7 @@ describe("C22 §3 step 11 — the effect table", () => {
     expect(unreached, "a C17 editing method no key can reach").toEqual([]);
   });
 
-  it("T1.4l (C09 I13): a constructed graph can render all twenty-six kinds", async () => {
+  it("T1.4l (C09 I13): a constructed graph can render all twenty-seven kinds", async () => {
     // **`table`, `plot` and `patch` register through the public mechanism, and
     // nobody called it.** `defaults: true` ships C09's sixteen; the other
     // three came from C11, C12 and C25 and no composition root registered them,
@@ -477,7 +479,7 @@ describe("C22 §3 step 11 — the effect table", () => {
     // C04 T2.10 holds the derivable half -- a literal list checked against
     // `BlockKind` at compile time, where adding a kind is a type error. This row
     // is the runtime half and it can only count.
-    expect(graph.blocks.kinds.length, "C09's twenty-three and the three registered").toBe(26);
+    expect(graph.blocks.kinds.length, "C09's twenty-four and the three registered").toBe(27);
   });
 
   it("T2.15 (C16 I22): ↓ into the live block, ↑ and Esc back out — as one sequence", async () => {
@@ -1042,6 +1044,8 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
       onAction: () => undefined,
       // C22 I116 — the copy's confirmation; these rows are about the clipboard.
       toast: () => undefined,
+      paneOffset: () => 0,
+      moveDivider: () => undefined,
       schedule: (fn: () => void) => {
         fn();
         return { [Symbol.dispose]: () => undefined };

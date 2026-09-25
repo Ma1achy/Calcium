@@ -818,9 +818,10 @@ const expansionGrounds = (
  * shape* is a table of shape against treatment. A row asserting one kind states
  * the rule about itself; the set is what says which shapes have no treatment.
  *
- * **Each kind is asked for its own elements and then focused on each of them.**
- * That is the whole method, and three earlier forms of it were wrong in three
- * ways worth keeping, because each reads as a correct answer:
+ * **Each kind is walked for the elements a session places, and then focused on
+ * each of them.** That is the whole method, and four earlier forms of it were
+ * wrong in four ways worth keeping, because each reads as a correct answer —
+ * the fourth, asking a kind for its own list, is recorded where it is read:
  *
  * - focusing `{blockId, rowId: null}`, a shape **no session writes**. `plot`
  *   tests `rowId === block.id` and its own comment records the same defect — it
@@ -853,12 +854,20 @@ const focusByShape = (width: number, capabilities: TerminalCapabilities, theme: 
     const id = (b as Readonly<{ id?: string }>).id ?? "";
     // **No catch here** — see the third defect above. A kind that cannot answer
     // its elements is a fault, not a kind with none.
-    const els = reg.elementsOf(b, width).map((e) => e.id);
+    //
+    // **The walk, not the kind's own list** — the fourth form, and the one a
+    // session reads (C26 I8). A split declares no elements of its own and the
+    // walk places its panes' (C04 I134), so `elementsOf` called it atomic while
+    // a session focused both panes. Each element is focused at the block the
+    // walk placed it under, which is the address a session writes.
+    const placed = reg.elementsIn([b], width);
+    const els = placed.map((p) => p.element.id);
     const base = kit.renderToLines(b, width).join("\n");
-    const lit = [...new Set([id, ...els])].filter((t) => {
-      const one = measurable({ theme, capabilities, definitions: defs, focus: { blockId: id, rowId: t } });
+    const targets = new Map<string, string>([[id, id], ...placed.map((p): [string, string] => [p.element.id, p.blockId])]);
+    const lit = [...targets].filter(([t, at]) => {
+      const one = measurable({ theme, capabilities, definitions: defs, focus: { blockId: at, rowId: t } });
       return one.renderToLines(b, width).join("\n") !== base;
-    });
+    }).map(([t]) => t);
     if (els.length > 0) publishes += 1;
     if (lit.length > 0) draws += 1;
     const verdict =

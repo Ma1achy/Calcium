@@ -20,6 +20,7 @@ import {
   parseAreas,
   placeable,
   sequenceHeight,
+  splitPanes,
 } from "../../data/viewmodel/index.js";
 import { NO_PROBE } from "../../data/viewmodel/index.js";
 import type { Block, Probe, Status } from "../../data/viewmodel/index.js";
@@ -37,6 +38,7 @@ import type {
   BlockFault,
   BlockRegistry,
   NavElement,
+  PlacedElement,
   RenderContext,
   RenderContextInput,
   Windowed,
@@ -749,11 +751,8 @@ class Registry implements BlockRegistry {
    * `gapBefore` is counted here and never inside a block, for `windowSequence`'s
    * reason: the gap belongs to the run.
    */
-  elementsIn = (
-    blocks: readonly Block[],
-    width: number,
-  ): readonly Readonly<{ blockId: string; element: NavElement }>[] => {
-    const out: Readonly<{ blockId: string; element: NavElement }>[] = [];
+  elementsIn = (blocks: readonly Block[], width: number): readonly PlacedElement[] => {
+    const out: PlacedElement[] = [];
 
     /**
      * One block at `(top, left)`, `atWidth` wide — its own elements lifted in
@@ -859,6 +858,39 @@ class Registry implements BlockRegistry {
           // Content rows from the box's top (C26 I3 — never the offset), which
           // is where `childRanges` puts them.
           sequence(block.children, top, left, widths[0] ?? 1);
+          return;
+        case "split":
+          // **Each pane at the column and width the renderer draws it at**
+          // (C04 I133) — `splitPanes` is the renderer's own answer, so the
+          // right pane's bar narrows both or neither. Content rows from the
+          // split's top, as a scroll's are (C26 I3).
+          for (const pane of splitPanes(block, atWidth, this.#measureChild)) {
+            const before = out.length; // cells-ok — an index into the walk
+            place(pane.child, top, left + pane.col, pane.width);
+            // **A pane with nothing to stand on still has a place** (§3aq S6):
+            // one block-level element addressed to the split, as a mosaic's
+            // pane is, so `→` always has somewhere to land.
+            if (out.length === before) { // cells-ok — a count of elements
+              const copy = this.copyOf(pane.child);
+              out.push({
+                blockId: block.id,
+                element: Object.freeze({
+                  id: pane.child.id,
+                  level: "block" as const,
+                  rows: Object.freeze({ from: top, to: top + Math.max(1, pane.content) }),
+                  cols: Object.freeze({ from: left + pane.col, to: left + pane.col + pane.width }),
+                  ...(copy === null || copy === "" ? {} : { copy }),
+                }),
+              });
+            }
+            // **The innermost pane wins** (C26 I28): a nested split tagged its
+            // own elements first, on the way down.
+            const ref = Object.freeze({ split: block.id, side: pane.side, top, left });
+            for (let i = before; i < out.length; i += 1) { // cells-ok — an index into the walk
+              const placed = out[i];
+              if (placed !== undefined && placed.pane === undefined) out[i] = Object.freeze({ ...placed, pane: ref });
+            }
+          }
           return;
       }
     };

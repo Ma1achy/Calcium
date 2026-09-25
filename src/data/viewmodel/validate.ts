@@ -2013,6 +2013,30 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
       }
     }
   },
+  // C04 I132 — two panes, a height, and a divider where present.
+  split: (b, e, at) => {
+    requireArray(b, "children", e, at);
+    if (isArray(b["children"]) && b["children"].length !== 2) { // cells-ok — a child count
+      e.push(
+        `${at}: a "split" holds exactly two children (C04 I132) — got ` +
+          `${String(b["children"].length)}; a pane holds one block, and several stack in a column group`, // cells-ok — a child count
+      );
+    }
+    // **Absent and wrong said apart** (C04 I114): scroll's shape.
+    const height = b["height"];
+    if (height === undefined) {
+      e.push(`${absentMessage(`${at}: "height"`, "a positive integer")} (C04 I132) — the panes' rows`);
+    } else if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
+      e.push(`${at}: "height" must be a positive integer (C04 I132) — got ${JSON.stringify(height)}`);
+    }
+    const divider = b["divider"];
+    if (divider !== undefined && (typeof divider !== "number" || !Number.isInteger(divider) || divider < 1)) {
+      e.push(
+        `${at}: "divider" must be a positive integer when present (C04 I132) — got ` +
+          `${JSON.stringify(divider)}; it is the left pane's width in cells`,
+      );
+    }
+  },
   scroll: (b, e, at) => {
     requireArray(b, "children", e, at);
     if (isArray(b["children"]) && b["children"].length === 0) {

@@ -1,14 +1,14 @@
 {
   "label": "all",
-  "only": "c22-toast",
+  "only": "c04-split",
   "rows": [
     {
-      "run": "c22-toast.mjs",
+      "run": "c04-split.mjs",
       "exit": 0,
-      "seconds": 25,
+      "seconds": 49,
       "state": "green",
       "restored": 0,
-      "caught": 8,
+      "caught": 19,
       "elsewhere": 0,
       "survived": 0,
       "anchorMissed": 0,

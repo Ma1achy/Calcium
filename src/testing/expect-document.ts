@@ -178,7 +178,7 @@ function carriesATone(value: unknown): boolean {
 }
 
 /**
- * The four kinds that hold blocks — **and why two of them were exemptions**
+ * The five kinds that hold blocks — **and why two of them were exemptions**
  * (F925).
  *
  * `scroll` and `mosaic` sat in `KINDS_WITH_NOTHING_TO_CHECK`, each with a `why`
@@ -204,6 +204,7 @@ const CONTAINER_PREMISE: ReadonlyMap<BlockKind, string> = new Map<BlockKind, str
   ["panel", "a title, a footer and a live flag"],
   ["scroll", "a box and a residue row whose meaning is in its numbers"],
   ["mosaic", "pure geometry — a grid string, a height and two share arrays"],
+  ["split", "pure geometry — a height and a divider's column (C04 §3aq)"],
 ]);
 
 /** `carriesATone` over a container's **own** fields, its children excluded. */
@@ -629,6 +630,7 @@ export function expectDocument(
           case "group":
           case "scroll":
           case "mosaic":
+          case "split":
             assertContainerPremise(block);
             for (const child of block.children) visit(child);
             break;

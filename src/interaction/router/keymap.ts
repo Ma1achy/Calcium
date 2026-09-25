@@ -647,6 +647,20 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   { target: "liveBlock", key: chordOf("focus.next"), action: "entryNext" },
   { target: "liveBlock", key: chordOf("focus.previous"), action: "entryPrev" },
 
+  // --- a split's panes and its divider (C04 §3aq, C26 I28, C16 I59) --------
+  //
+  // **`←` `→` were unbound here** since the horizontal pair moved to
+  // `interaction`, so no working key gains a second meaning: the registry's
+  // `move.left`/`move.right` — *move left within the focused thing* — and
+  // inside a split the thing is the pair of panes. **`⌥←` `⌥→` are §105's
+  // divider chord**, *the SCROLLBAR's rule on the other axis*; §019 keeps them
+  // word motion *in text fields*, which is the `prompt` rows above, so one
+  // chord at two targets is resolved by the ladder rather than refused.
+  { target: "liveBlock", key: chordOf("move.left"), action: "paneLeft" },
+  { target: "liveBlock", key: chordOf("move.right"), action: "paneRight" },
+  { target: "liveBlock", key: { name: "left", meta: true }, action: "dividerLeft" },
+  { target: "liveBlock", key: { name: "right", meta: true }, action: "dividerRight" },
+
   // --- the horizontal pair (C22 I76, C12 §3s) -------------------------------
   //
   // **`←` and `→` did nothing at this target, and the comment above said they
@@ -959,6 +973,10 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
     rowDown: true,
     entryPrev: true,
     entryNext: true,
+    paneLeft: true,
+    paneRight: true,
+    dividerLeft: true,
+    dividerRight: true,
     insideLeft: true,
     insideRight: true,
     insideUp: true,

@@ -10,7 +10,7 @@
  * (C26 I8). Focus and selection are the renderer's and join the node there.
  */
 
-import { childWidths, type Block, type KnownBlockKind } from "../../data/viewmodel/index.js";
+import { childWidths, hasChildren, type Block, type KnownBlockKind } from "../../data/viewmodel/index.js";
 import type { NavElement } from "./types.js";
 
 /**
@@ -96,6 +96,9 @@ export const SEMANTIC_ROLES: Readonly<Record<KnownBlockKind, SemanticRole>> = Ob
   terminal: "document",
   patch: "document",
   tree: "tree",
+  // Two regions and the divider between them (C04 §3aq): a group of two, as
+  // `panel` and `group` are — its children's nodes are its children.
+  split: "group",
 });
 
 /** An application's own kind reads `document`, as its fallback draws `raw`. */
@@ -187,7 +190,7 @@ export function semanticsOf(
   elementsOf: (block: Block, width: number) => readonly NavElement[],
 ): SemanticNode {
   const base = { id: block.id, role: roleOf(block), name: nameOf(block), ...valueOf(block), state: stateOf(block), actions: [] };
-  if (block.kind === "panel" || block.kind === "group" || block.kind === "scroll" || block.kind === "mosaic") {
+  if (hasChildren(block)) {
     const widths = childWidths(block, width);
     return Object.freeze({
       ...base,

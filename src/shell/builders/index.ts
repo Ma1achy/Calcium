@@ -76,6 +76,7 @@ import type {
   Control,
   Tape,
   Tree,
+  Split,
   TreeNode,
   Plot,
   Progress,
@@ -1244,6 +1245,35 @@ function tree(nodes: readonly TreeNode[], opts?: BlockOpts): Tree {
   return finish<Tree>({ kind: "tree", id: idOf(opts, "tree"), nodes } as Tree, opts, true);
 }
 
+/**
+ * Two peer panes and a divider that is a control (C04 §3aq, §105).
+ *
+ * One block per pane — stack several in `b.group("column", …)`. `divider` is
+ * the left pane's width in cells, absent for half; the reader moves it, and a
+ * producer that sets it is stating where it opens (C04 I133).
+ */
+function split(
+  height: number,
+  left: Block,
+  right: Block,
+  opts?: BlockOpts & { divider?: number },
+): Split {
+  if (!Number.isInteger(height) || height < 1) {
+    throw new TypeError(`b.split: height is a positive integer — got ${JSON.stringify(height)} (C04 I132)`);
+  }
+  return finish<Split>(
+    {
+      kind: "split",
+      id: idOf(opts, "split"),
+      height,
+      children: [left, right],
+      ...(opts?.divider === undefined ? {} : { divider: opts.divider }),
+    } as Split,
+    opts,
+    true,
+  );
+}
+
 function tip(text: string, actions?: readonly Action[], opts?: BlockOpts): Tip {
   return finish<Tip>(
     {
@@ -1982,6 +2012,7 @@ export const b = {
   control,
   tape,
   tree,
+  split,
   tip,
   panel,
   group,

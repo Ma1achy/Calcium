@@ -55,6 +55,9 @@ export const RAMP_EXTENT: Readonly<Record<KnownBlockKind, RampExtent>> = Object.
   // A tree is rows of names under guides — no run of text for a ramp to cool
   // along, on `tape`'s reason.
   tree: "none",
+  // A split holds two panes and draws a divider; the ramp is its children's,
+  // as a group's is.
+  split: "none",
   table: "clusters",
   tip: "none",
 });

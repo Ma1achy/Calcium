@@ -45,7 +45,7 @@ const keysMatchKinds: Exact<keyof KnownBlockKinds, KnownBlockKind> = true;
 const KIND_NAMES: Readonly<Record<KnownBlockKind, true>> = Object.freeze({
   rule: true, notice: true, keyValue: true, table: true, steps: true, logs: true,
   events: true, plot: true, progress: true, code: true, comparison: true,
-  patch: true, pills: true, choice: true, control: true, tape: true, tree: true, tip: true, panel: true, group: true, scroll: true,
+  patch: true, pills: true, choice: true, control: true, tape: true, tree: true, split: true, tip: true, panel: true, group: true, scroll: true,
   mosaic: true, image: true, status: true, terminal: true, raw: true,
 });
 
@@ -853,7 +853,7 @@ describe("C04 required fields report absence and wrong type differently", () => 
 
     // Non-vacuity, and the count by equality: without this the row passes on a
     // corpus that reaches nothing.
-    expect(found).toHaveLength(48); // §018's four — `choice.options`, `control.label`, `.at`, `.value` — and `tree.nodes` (C04 §3ap)
+    expect(found).toHaveLength(50); // §018's four — `choice.options`, `control.label`, `.at`, `.value` — `tree.nodes` (C04 §3ap), and `split.height`, `split.children` (C04 §3aq)
     expect(found.filter((at) => EXEMPT.includes(at)), "the exemption is reached").toEqual(EXEMPT);
   });
 
@@ -901,6 +901,6 @@ describe("C04 required fields report absence and wrong type differently", () => 
     // `npm run check` goes red; the assertion below is what makes the row
     // visible in a suite. Mutated to confirm: swapping a key fails `tsc`.
     expect(keysMatchKinds, "keys and kinds agree in both directions").toBe(true);
-    expect(KNOWN_KIND_COUNT, "and the framework declares 26").toBe(26);
+    expect(KNOWN_KIND_COUNT, "and the framework declares 27").toBe(27);
   });
 });

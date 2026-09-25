@@ -28,13 +28,13 @@ import { createAdapterRegistry } from "../data/adapters/index.js";
 import { blankRowsAbove, commandRows } from "./paint.js";
 import { childBorderLegend } from "./chrome.js";
 import { compose, noticeDoc } from "./documents.js";
-import type { MeasureMemo, NavElement } from "../presentation/blocks/index.js";
+import type { MeasureMemo, NavElement, PaneRef, PlacedElement } from "../presentation/blocks/index.js";
 import { initialRegionHeight } from "./frame.js";
-import { elementsOfEntry, measureEntry } from "./entry-layout.js";
+import { blockWidthInEntry, elementsOfEntry, measureEntry } from "./entry-layout.js";
 import { createManifestStore, parseManifest, withThemeNames } from "../data/manifest/index.js";
 import type { ManifestError } from "../data/manifest/index.js";
-import { NO_SPAN, block as makeBlock, descendants } from "../data/viewmodel/index.js";
-import type { Block, Plot, Result } from "../data/viewmodel/index.js";
+import { NO_SPAN, block as makeBlock, descendants, splitColumns, splitPaneKey, splitPanes } from "../data/viewmodel/index.js";
+import type { Block, Plot, Result, Split } from "../data/viewmodel/index.js";
 import { createProcessRunner } from "../data/process/runner.js";
 import {
   createTransport,
@@ -473,7 +473,7 @@ export type Graph = Readonly<{
    * copies existed and the third was in this file's consumer, which is why the
    * comment warning about the second could not see it.
    */
-  liveElements: () => readonly Readonly<{ blockId: string; element: NavElement }>[];
+  liveElements: () => readonly PlacedElement[];
   /**
    * The entry focus is in, or `null` at the prompt (C26 I22, §4g).
    *
@@ -487,7 +487,7 @@ export type Graph = Readonly<{
    */
   focusedEntryId: () => EntryId | null;
   /** The focused entry's elements, from the same walk as `liveElements` (C26 I21). */
-  focusedElements: () => readonly Readonly<{ blockId: string; element: NavElement }>[];
+  focusedElements: () => readonly PlacedElement[];
   /** C04 I48 — page the focused container, in rows, focus unmoved (C26 I18). */
   pageBlock: (direction: 1 | -1) => void;
   /** C22 I71 — turn the focused plot camera. A no-op where there is none. */
@@ -1905,7 +1905,7 @@ export async function constructGraph(
    */
   const elementsOf = (
     id: EntryId | null,
-  ): readonly Readonly<{ blockId: string; element: NavElement }>[] => {
+  ): readonly PlacedElement[] => {
     if (id === null) return [];
     const entry = stores.transcript.entries.find((e) => e.id === id);
     if (entry === undefined) return [];
@@ -1916,7 +1916,7 @@ export async function constructGraph(
     return elementsOfEntry(built.blocks, entry.doc.blocks, deps.frame.overlayRegion().width, entry.doc.command);
   };
   /** The live entry's — what `↓` from the prompt enters (C16 I22). */
-  const liveElements = (): readonly Readonly<{ blockId: string; element: NavElement }>[] =>
+  const liveElements = (): readonly PlacedElement[] =>
     elementsOf(stores.transcript.liveId);
 
   /**
@@ -1942,7 +1942,7 @@ export async function constructGraph(
     if (stores.transcript.entries.some((e) => e.id === at.entryId)) return at.entryId;
     return stores.transcript.liveId;
   };
-  const focusedElements = (): readonly Readonly<{ blockId: string; element: NavElement }>[] =>
+  const focusedElements = (): readonly PlacedElement[] =>
     elementsOf(focusedEntryId());
 
   /**
@@ -2206,6 +2206,21 @@ export async function constructGraph(
   };
 
   const pageBlock = (direction: 1 | -1): void => {
+    // **A split pane pages itself** (C22 I117): the pane focus is in, by the
+    // split's height less one row, as a box pages by its own.
+    const inEntry = focusedEntryId();
+    const at = focus.current;
+    const elements = focusedElements();
+    const index = at.at === "liveBlock" ? resolveFocus(at.element, elements) : null;
+    const pane = index === null ? undefined : elements[index]?.pane;
+    if (inEntry !== null && pane !== undefined) {
+      const s = splitIn(inEntry, pane.split);
+      const box = s === null ? undefined : paneBox(s.split, pane.side, s.width);
+      if (s === null || box === undefined) return;
+      stores.scrollOffsets.nudge(inEntry, splitPaneKey(pane.split, pane.side), direction * Math.max(1, s.split.height - 1), box);
+      scheduler.commit("input");
+      return;
+    }
     const found = focusedBlock();
     if (found === null) return;
     const { entryId, block } = found;
@@ -2231,6 +2246,70 @@ export async function constructGraph(
     const width = deps.frame.overlayRegion().width;
     const content = block.children.reduce((n, c) => n + built.blocks.measure(c, width), 0);
     return { ceiling: Math.max(0, content - block.height), follow: block.follow === true };
+  };
+
+  /**
+   * A split of an entry by id, and the width it is drawn at (C22 I117).
+   *
+   * **The width is the split's own**, through the entry's layout and down the
+   * containers holding it — the one its columns were computed at. A nested
+   * split is narrower than the frame, and every question below (a pane's
+   * ceiling, where the divider may go) turns on it.
+   */
+  const splitIn = (
+    entryId: EntryId,
+    id: string,
+  ): Readonly<{ entry: TranscriptEntry; split: Split; width: number }> | null => {
+    const entry = stores.transcript.entries.find((e) => e.id === entryId);
+    if (entry === undefined) return null;
+    const found = blockIn(entry, id);
+    if (found === null || found.kind !== "split") return null;
+    const width = blockWidthInEntry(entry.doc.blocks, deps.frame.overlayRegion().width, id);
+    return width === null ? null : { entry, split: found, width };
+  };
+
+  /** The box a split pane's offset is clamped against — `scrollBox`'s, per pane. */
+  const paneBox = (split: Split, side: number, width: number): { ceiling: number } | undefined => {
+    const pane = splitPanes(split, width, built.blocks.measure).find((p) => p.side === side);
+    return pane === undefined ? undefined : { ceiling: Math.max(0, pane.content - split.height) };
+  };
+
+  /** How far a pane is scrolled, clamped as the renderer clamps it (C04 I48). */
+  const paneOffsetIn = (entryId: EntryId, splitId: string, side: number): number => {
+    const found = splitIn(entryId, splitId);
+    if (found === null) return 0;
+    const box = paneBox(found.split, side, found.width);
+    if (box === undefined) return 0;
+    return Math.min(stores.scrollOffsets.resolved(entryId, splitPaneKey(splitId, side), box), box.ceiling);
+  };
+
+  /**
+   * Put a split's divider at `left` cells, clamped (C22 I117, C04 §3aq E4, E5).
+   *
+   * **A shell-origin `replace`**, the scroll fold's mechanism (C04 I98): the
+   * divider sets widths, so it is the block's and not a view store's. Clamped
+   * against the split's own width before the write, so a key at the clamp is
+   * no patch at all rather than a patch the renderer clamps back.
+   */
+  const placeDivider = (entryId: EntryId, splitId: string, left: number): void => {
+    const found = splitIn(entryId, splitId);
+    if (found === null) return;
+    const { left: now, right } = splitColumns(found.split, found.width);
+    if (right === null) return;
+    const next = Math.min(Math.max(1, Math.trunc(left)), found.width - 3);
+    if (next === now) return;
+    stores.transcript.patch(
+      entryId,
+      { op: "replace", blockId: splitId, block: { ...found.split, divider: next } },
+      "shell",
+    );
+  };
+  const moveDivider = (splitId: string, delta: number): void => {
+    const entryId = focusedEntryId();
+    if (entryId === null) return;
+    const found = splitIn(entryId, splitId);
+    if (found === null) return;
+    placeDivider(entryId, splitId, splitColumns(found.split, found.width).left + delta);
   };
 
   /**
@@ -2303,6 +2382,23 @@ export async function constructGraph(
     if (index === null) return;
     const found = placed[index];
     if (found === undefined) return;
+    // **A split pane pulls as a box does** (C22 I117, C26 I24): its offset is
+    // rows and its window is the split's height. The element's rows are asked
+    // of the split alone, at its own width, which puts them in the pane's
+    // content — the placed rows are the entry's.
+    if (found.pane !== undefined) {
+      const pane = found.pane;
+      const s = splitIn(entry.id, pane.split);
+      if (s === null) return;
+      const box = paneBox(s.split, pane.side, s.width);
+      if (box === undefined) return;
+      const key = splitPaneKey(pane.split, pane.side);
+      const held = Math.min(stores.scrollOffsets.resolved(entry.id, key, box), box.ceiling);
+      // Pane-local rows: the walk carried the split's top (C26 I8, one resolver).
+      const next = pullIntoView(held, found.element.rows.from - pane.top, found.element.rows.to - pane.top, s.split.height);
+      if (next !== held) stores.scrollOffsets.set(entry.id, key, next, box);
+      return;
+    }
     // The box the focused element belongs to, if it is in one. A `scroll`
     // declares one element per child and owns them (C26 §4b cell 3), so the
     // element's `blockId` names the box itself rather than the child.
@@ -2545,10 +2641,36 @@ export async function constructGraph(
    *
    * Deepest level wins (C26 §6): a cell over a row over a block.
    */
+  /**
+   * A split's box in entry space — its top row, its height and its divider's
+   * column (C22 I117) — or `null` where the entry holds no such split.
+   *
+   * **Read off the placed elements rather than laid out a second time** (C26
+   * I8): the walk records the split's origin on every pane element it places,
+   * and every pane has one (§3aq S6).
+   */
+  const splitTop = (
+    entryId: EntryId,
+    splitId: string,
+  ): Readonly<{ top: number; left: number; height: number; divider: number | null }> | null => {
+    const s = splitIn(entryId, splitId);
+    if (s === null) return null;
+    const pane = elementsOf(entryId).find((p) => p.pane?.split === splitId)?.pane;
+    if (pane === undefined) return null;
+    const left = pane.left;
+    const { left: d, right } = splitColumns(s.split, s.width);
+    return {
+      top: pane.top,
+      left,
+      height: s.split.height,
+      divider: right === null ? null : left + d,
+    };
+  };
+
   const elementAt = (
     hit: Readonly<{ id: EntryId; rowOffset: number }>,
     col: number,
-  ): Readonly<{ blockId: string; element: NavElement; block: Block; row: number }> | null => {
+  ): Readonly<{ blockId: string; element: NavElement; block: Block; row: number; pane?: PaneRef }> | null => {
     const entry = stores.transcript.entries.find((e) => e.id === hit.id);
     if (entry === undefined) return null;
     const width = deps.frame.overlayRegion().width;
@@ -2556,11 +2678,19 @@ export async function constructGraph(
     if (blockRow < 0) return null;
 
     const placed = elementsOf(hit.id);
-    let best: Readonly<{ blockId: string; element: NavElement; block: Block; row: number }> | null = null;
+    let best: Readonly<{ blockId: string; element: NavElement; block: Block; row: number; pane?: PaneRef }> | null = null;
     for (const p of placed) {
       const block = blockIn(entry, p.blockId);
       if (block === null) continue;
       let row = blockRow;
+      // **A split pane is a box of its own** (C22 I117): the pointer's row is
+      // inside the split's `height` and moves with the pane's offset, as a
+      // scroll's does below.
+      if (p.pane !== undefined) {
+        const box = splitTop(hit.id, p.pane.split);
+        if (box === null || blockRow < box.top || blockRow >= box.top + box.height) continue;
+        row = blockRow + paneOffsetIn(hit.id, p.pane.split, p.pane.side);
+      }
       if (block.kind === "scroll") {
         // The box's top is its first child's content row 0, lifted; its content
         // is the last child's end. Both read off the list rather than measured
@@ -2577,7 +2707,13 @@ export async function constructGraph(
       if (best === null || LEVEL_DEPTH[p.element.level] > LEVEL_DEPTH[best.element.level]) {
         // `row` is the pointer's row inside the element — the legend's inverse
         // needs it (C12 I117) as the crosshair's needs the column.
-        best = { blockId: p.blockId, element: p.element, block, row: row - p.element.rows.from };
+        best = {
+          blockId: p.blockId,
+          element: p.element,
+          block,
+          row: row - p.element.rows.from,
+          ...(p.pane === undefined ? {} : { pane: p.pane }),
+        };
       }
     }
     return best;
@@ -2891,6 +3027,12 @@ export async function constructGraph(
     // prompt; everything that moves, activates or copies asks these two.
     focusedElements,
     focusedEntryId,
+    // A split's panes and its divider (C22 I117, C26 I28).
+    paneOffset: (split, side) => {
+      const entryId = focusedEntryId();
+      return entryId === null ? 0 : paneOffsetIn(entryId, split, side);
+    },
+    moveDivider,
     neighbourEntry: neighbourOf,
     cursorBlock: moveCursor,
     toggleSeries: toggleSeriesBlock,
@@ -3034,6 +3176,12 @@ export async function constructGraph(
    * gesture is still live; this holds what the gesture was.
    */
   let armedActivation: (() => void) | null = null;
+  /**
+   * A divider being dragged (C22 I117, C04 §3aq E5): the split, its entry, and
+   * the split's left column, so a motion report's column becomes a width.
+   * Armed by a press on the divider's column and ended by any release.
+   */
+  let dividerDrag: Readonly<{ entryId: EntryId; split: string; left: number }> | null = null;
 
   /**
    * Arm `effect` on `id`, as an effect rather than as a side effect of resolving
@@ -3063,6 +3211,12 @@ export async function constructGraph(
     // it back.
     if (!e.press) {
       if (e.button === "none") return null;
+      // **A release ends a divider drag and does nothing else** (§3aq E5): the
+      // press armed no activation, so there is nothing for it to commit.
+      if (dividerDrag !== null) {
+        dividerDrag = null;
+        return () => undefined;
+      }
       const armed = armedActivation;
       armedActivation = null;
       if (armed === null) return null;
@@ -3084,6 +3238,13 @@ export async function constructGraph(
     // router drops its half on every press (I46's second cancellation); this is
     // the other half of the same fact, kept in step here rather than inferred.
     if (e.button !== "none") armedActivation = null;
+    // **The drag's motion moves the divider and nothing else** (§3aq E5) —
+    // before any element under the pointer is asked, because a motion report
+    // with a button held otherwise reads as a press on whatever it crosses.
+    if (dividerDrag !== null && e.motion && e.button === "button0") {
+      const drag = dividerDrag;
+      return () => placeDivider(drag.entryId, drag.split, e.col - drag.left);
+    }
     // **A hover aims and does nothing else** (§4a's hover row; C01 I21). Mode
     // 1003's motion with no button held: the crosshair follows the pointer and
     // focus stays where the keys left it — the readout half of `←`/`→` without
@@ -3109,12 +3270,42 @@ export async function constructGraph(
     const hit = entryAtRegionRow(e.row - deps.frame.region().top);
     if (hit === null) return null;
 
+    // **A press on a divider's column arms the drag** (§3aq E5) and moves no
+    // focus: a divider is a control, not an element, so there is nothing under
+    // the pointer for a click to land on.
+    if (e.button === "button0" && !e.motion && !e.meta && !e.ctrl) {
+      const entry = stores.transcript.entries.find((x) => x.id === hit.id);
+      const blockRow = entry === undefined ? -1 : hit.rowOffset - chromeRowsOf(entry, deps.frame.overlayRegion().width);
+      const splits = new Set(elementsOf(hit.id).flatMap((p) => (p.pane === undefined ? [] : [p.pane.split])));
+      for (const split of splits) {
+        const box = splitTop(hit.id, split);
+        if (box === null || box.divider !== e.col) continue;
+        if (blockRow < box.top || blockRow >= box.top + box.height) continue;
+        return () => {
+          dividerDrag = { entryId: hit.id, split, left: box.left };
+        };
+      }
+    }
+
     if (e.button.startsWith("wheel")) {
       // A horizontal wheel is a wheel and does nothing (§4a row j); a vertical
       // one over a box pages **that** box, and elsewhere is declined so the
       // transcript takes it (row i).
       if (e.button !== "wheelUp" && e.button !== "wheelDown") return null;
       const under = elementAt(hit, e.col);
+      // **A split pane pages itself under the wheel** (C22 I117), the pane the
+      // pointer is over, by the wheel's rows.
+      if (under?.pane !== undefined) {
+        const pane = under.pane;
+        const s = splitIn(hit.id, pane.split);
+        const box = s === null ? undefined : paneBox(s.split, pane.side, s.width);
+        if (box === undefined) return null;
+        const rows = e.button === "wheelUp" ? -WHEEL_ROWS : WHEEL_ROWS;
+        return () => {
+          stores.scrollOffsets.nudge(hit.id, splitPaneKey(pane.split, pane.side), rows, box);
+          scheduler.commit("input");
+        };
+      }
       if (under === null || under.block.kind !== "scroll") return null;
       // **The innermost, not the outermost** (C16 I48, R-SEL-012).
       const box = innermostScrollUnder(hit.id, under);

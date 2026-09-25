@@ -3225,6 +3225,35 @@ export type Tree = Readonly<{
   nodes: readonly TreeNode[];
 }> & Padded & Floor;
 
+/**
+ * Two peer panes side by side, and the divider between them is a control
+ * (C04 §3aq, I132, I133, I134, §105).
+ *
+ * **`children` and not `left`/`right`**, because which blocks hold blocks is
+ * `tree.ts`'s question and the compiler answers it from this field. The
+ * divider is the left pane's bar (ruling 22, §021), so the one column is both.
+ *
+ * **`divider` is block data though a reader moves it**: it sets both panes'
+ * widths, so their heights and their elements, and a view store would hand the
+ * element walk a geometry it cannot see (C04 I18). The shell writes it with a
+ * shell-origin `replace`, as it writes a scroll's `collapsed`. The panes'
+ * offsets are view state, held by the shell under each pane's own key.
+ */
+export type Split = Readonly<{
+  kind: "split";
+  id: string;
+  /** The panes' rows — a positive integer, and the split's height at every width. */
+  height: number;
+  /**
+   * The left pane, then the right — exactly two, refused otherwise (C04 I132).
+   * One block each; several stack in a `column` group. An array and not a pair
+   * type, because every walk that maps a container's children maps this one.
+   */
+  children: readonly Block[];
+  /** The left pane's width in cells; absent is half. Clamped at read (C04 I133). */
+  divider?: number;
+}> & Padded & Floor;
+
 export type Tip = Readonly<{
   kind: "tip";
   id: string;
@@ -3899,6 +3928,7 @@ export type KnownBlockKinds = {
   control: Control;
   tape: Tape;
   tree: Tree;
+  split: Split;
   tip: Tip;
   panel: Panel;
   group: Group;

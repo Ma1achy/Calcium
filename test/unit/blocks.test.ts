@@ -224,6 +224,7 @@ describe("C09 §6 — the registry's transition table", () => {
     "twenty-four": 24,
     "twenty-five": 25,
     "twenty-six": 26,
+    "twenty-seven": 27,
     one: 1,
     two: 2,
     three: 3,
@@ -273,6 +274,7 @@ describe("C09 §6 — the registry's transition table", () => {
       group: 1, // row: max of children
       scroll: 3, // height, plus a residue row where the content overflows
       mosaic: 4, // `height`, exactly — declared and never derived (C04 I71)
+      split: 4, // `height`, exactly — the bars say where, and there is no residue row (C04 I132)
       image: 3, // `height`, clamped by the width — 8x8 at 3 rows needs 6 columns (C04 I73)
       status: 7, // the declared height — six is the figure, seven shows its line
       raw: 2, // lines

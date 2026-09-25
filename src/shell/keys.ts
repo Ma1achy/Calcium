@@ -42,7 +42,7 @@ import type { HistoryStore, Navigator } from "../interaction/history/index.js";
 import type { ElementAddress, KeyAction } from "../interaction/router/types.js";
 import { extentOf, resolveFocus } from "../interaction/router/focus.js";
 import type { Action } from "../data/viewmodel/index.js";
-import type { NavElement } from "../presentation/blocks/index.js";
+import type { NavElement, PaneRef } from "../presentation/blocks/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
 import type { Manifest } from "../data/manifest/index.js";
 import type { OverlayManager } from "../viewport/overlay/index.js";
@@ -200,6 +200,14 @@ export type KeyDeps = Readonly<{
   focusedElements: () => readonly PlacedNavElement[];
   focusedEntryId: () => EntryId | null;
   /**
+   * How far a split pane of the focused entry is scrolled, clamped as the
+   * renderer clamps it (C22 I117) — what `←`/`→` need to find the element
+   * nearest on screen when the two panes scroll apart (C26 I28).
+   */
+  paneOffset: (split: string, side: number) => number;
+  /** Move a split's divider by `delta` cells in the focused entry (C22 I117). */
+  moveDivider: (split: string, delta: number) => void;
+  /**
    * The nearest entry with an element in `direction`, or `null` at the end
    * (C26 I21). `-1` is older and `1` newer; L4 walks the transcript because
    * this file knows neither its order nor the registry.
@@ -307,7 +315,25 @@ export type PlacedNavElement = Readonly<{
   // are watched at all (FINDINGS F159).
   blockId: string;
   element: NavElement;
+  /** The split pane the element sits in, innermost (C26 I28). */
+  pane?: PaneRef;
 }>;
+
+/**
+ * Whether `to` is in a split pane that a vertical step from `from` passes over
+ * (C26 I28, C04 §3aq E1, E2).
+ *
+ * **Inside a split, the other pane; from outside it, the right pane.** The
+ * first is what keeps `↓` from running off the left pane's last row into the
+ * right pane's first — focus crosses the divider only on `←`/`→`. The second
+ * is that a split is entered on its left pane from either side, so which pane
+ * a reader lands in does not depend on the direction they came from.
+ */
+const passedOver = (from: PlacedNavElement | undefined, to: PlacedNavElement): boolean => {
+  if (to.pane === undefined) return false;
+  if (from?.pane !== undefined && from.pane.split === to.pane.split) return to.pane.side !== from.pane.side;
+  return to.pane.side !== 0;
+};
 
 /** The address of a placed element. One expression, so no call site spells it. */
 const addressOf = (p: PlacedNavElement): ElementAddress =>
@@ -406,6 +432,39 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
    */
   let fits = 0;
   let seq = 0;
+
+  /** The focused element's placed record, or `null` (C26 I10). */
+  const focusedPlaced = (): Readonly<{ at: number; elements: readonly PlacedNavElement[] }> | null => {
+    const current = deps.focus.current;
+    if (current.at !== "liveBlock") return null;
+    const elements = deps.focusedElements();
+    const at = resolveFocus(current.element, elements);
+    return at === null ? null : { at, elements };
+  };
+
+  /** `←`/`→` across a split's divider (C26 I28, C04 §3aq E3). */
+  const crossPane = (side: number): void => {
+    const found = focusedPlaced();
+    const entry = deps.focusedEntryId();
+    if (found === null || entry === null) return;
+    const here = found.elements[found.at];
+    const pane = here?.pane;
+    if (here === undefined || pane === undefined || pane.side === side) return;
+    const others = found.elements.filter((q) => q.pane?.split === pane.split && q.pane.side === side);
+    if (others.length === 0) return; // cells-ok — a count of elements
+    // **Screen rows, each pane's own offset off** — the two scroll apart.
+    const row = here.element.rows.from - deps.paneOffset(pane.split, pane.side);
+    const shift = deps.paneOffset(pane.split, side);
+    const target = others.find((q) => q.element.rows.to - shift > row) ?? others.at(-1); // cells-ok — the last element
+    if (target !== undefined) deps.focus.focusRow(entry, addressOf(target));
+  };
+
+  /** `⌥←`/`⌥→` — the innermost split holding focus (C04 §3aq E4). */
+  const nudgeDivider = (delta: number): void => {
+    const found = focusedPlaced();
+    const pane = found?.elements[found.at]?.pane;
+    if (pane !== undefined) deps.moveDivider(pane.split, delta);
+  };
   /**
    * Where `Esc` dismissed a typed menu, as the token's start offset (C19 I19).
    *
@@ -877,6 +936,21 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       deps.focus.focusRow(to.entryId, addressOf(to.first));
     },
 
+    // --- a split's panes and its divider (C04 §3aq, C26 I28, C22 I117) ------
+    //
+    // **`←`/`→` are the only way focus leaves a pane**, and they go to the
+    // other pane's element nearest the focused row **on screen**: each pane's
+    // own offset is taken off, because the two scroll apart and a content row
+    // in one is not the same line of the frame as the same number in the
+    // other. The first element whose visible rows reach the focused one's, or
+    // the pane's last where none does. Outside a split both do nothing.
+    paneLeft: () => crossPane(0),
+    paneRight: () => crossPane(1),
+    // **The divider moves a cell and focus stays** (C04 §3aq E4): element ids
+    // do not change with width, and the next resolution finds the same one.
+    dividerLeft: () => nudgeDivider(-1),
+    dividerRight: () => nudgeDivider(1),
+
     // --- the way back, and between rows (C16 I22) ------------------------
     //
     // Entry with no exit is a session whose prompt cannot be reached, so both
@@ -904,7 +978,9 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       // "leave to the prompt".
       const i = resolveFocus(current.element, elements);
       if (i === null) return;
-      const next = elements[i + 1];
+      // **The next element this step can reach**, which is the next in reading
+      // order unless a split pane is in the way (C26 I28).
+      const next = elements.slice(i + 1).find((q) => !passedOver(elements[i], q));
       // **The resolved entry, not the stored one** (C26 I22): after an eviction
       // the two differ, and writing the stored one back would leave the store
       // pointing at nothing while the frame highlights the live entry.
@@ -968,7 +1044,23 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       const elements = deps.focusedElements();
       const current = deps.focus.current;
       if (current.at !== "liveBlock") return;
-      const i = resolveFocus(current.element, elements);
+      const found = resolveFocus(current.element, elements);
+      // **The nearest element this step can reach** (C26 I28): a split pane in
+      // the way is passed over, so `↑` from under a split lands on its left
+      // pane and `↑` inside a pane never climbs into the other. Where nothing
+      // before is reachable the step is at its first element, and the edge
+      // rule below reads it so.
+      let reach = -1;
+      if (found !== null) {
+        for (let j = found - 1; j >= 0; j -= 1) {
+          const q = elements[j];
+          if (q !== undefined && !passedOver(elements[found], q)) {
+            reach = j;
+            break;
+          }
+        }
+      }
+      const i = found === null ? null : reach === -1 ? 0 : found;
       // At the first element `↑` leaves. **A stale address no longer arrives
       // here as one** (C26 I10): it used to reach this as `indexOf`'s −1 and
       // exit to the prompt, while `rowDown` read the same −1 as "go to the top"
@@ -993,12 +1085,15 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         // entry's first element is an end, and an end is not a place a
         // selection outlives an unshifted key — `rowDown`'s tail rule from the
         // other direction. Leaving, above, is a collapse already.
+        // **Where it stands, not `elements[0]`** (C26 I28): at a right pane's
+        // first element nothing before is reachable, and the entry's first
+        // element is across the divider.
         const entry = deps.focusedEntryId();
-        const first = elements[0];
+        const first = elements[found ?? 0];
         if (entry !== null && first !== undefined) deps.focus.focusRow(entry, addressOf(first));
         return;
       }
-      const previous = elements[i - 1];
+      const previous = elements[reach];
       const entry = deps.focusedEntryId();
       if (entry === null) return;
       deps.focus.focusRow(entry, previous === undefined ? null : addressOf(previous));

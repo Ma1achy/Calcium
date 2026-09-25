@@ -443,6 +443,12 @@ describe("§6 — the default table (C17 I12)", () => {
       //
       // `+` `=` `-` `r` `o` are the same printables at the new target, and the
       // arrows carry the same two wire forms the prompt's do.
+      // A split's panes and its divider (C26 I28, C16 I59): the prompt's arrow
+      // and word-motion bytes, at the other target.
+      "liveBlock left": ["\u001b[D", "\u001bOD"],
+      "liveBlock right": ["\u001b[C", "\u001bOC"],
+      "liveBlock m+left": ["\u001b[1;3D", "\u001b[1;9D"],
+      "liveBlock m+right": ["\u001b[1;3C", "\u001b[1;9C"],
       "interaction left": ["\u001b[D", "\u001bOD"],
       "interaction right": ["\u001b[C", "\u001bOC"],
       "interaction up": ["\u001b[A", "\u001bOA"],
@@ -1112,8 +1118,11 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     // **123 from C14 I47** (R-SEL-015, §103): `⏎` joined `semanticSelection` as
     // `y`'s copy, one row in and none out — the footer had advertised it with
     // nothing bound.
-    expect(rows).toHaveLength(123);
-    expect(new Set(rows).size, "no two rows are identical").toBe(123);
+    //
+    // **127 from C16 I59** (§105, C26 I28): a split's four at `liveBlock` —
+    // `←` `→` across the divider and `⌥←` `⌥→` moving it — four in, none out.
+    expect(rows).toHaveLength(127);
+    expect(new Set(rows).size, "no two rows are identical").toBe(127);
 
     // Every row whose chord the registry names resolves to the registry's key —
     // the join asserted from the table's side, so a `chordOf` call that silently
@@ -1153,8 +1162,13 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
       //
       // **64 from C14 I47** (R-SEL-015): `⏎` at `semanticSelection` is spelled
       // `chordOf("confirm")`, the registry's return, so the new row joins.
+      //
+      // **66 from C16 I59** (C26 I28): a split's `←` `→` at `liveBlock` are
+      // `chordOf("move.left")` and `chordOf("move.right")`. The divider's `⌥←`
+      // `⌥→` are not — the registry names no chord for the divider — and that
+      // absence is the one the two rows' literal keys record.
       "the rows the registry supplies a chord for",
-    ).toBe(64);
+    ).toBe(66);
   });
 
   it("T1.94 (I41): ⌘↑ and ⌥↑ are two actions under the enhanced profile and one under the base", () => {
@@ -1704,10 +1718,14 @@ describe("C16 I55 — the platform keeps its chords", () => {
     { why: "the window switcher takes ⇧⌥⇥ before a byte arrives", key: { name: "tab", meta: true, shift: true } },
     { why: "§019 ⌃C remains interrupt, and is the ladder's", key: { name: "c", ctrl: true } },
   ];
-  /** §019: ⌥← and ⌥→ remain word-left and word-right in text fields. */
-  const PLATFORM_MEANING: Readonly<Record<string, string>> = {
-    [keySlot({ name: "left", meta: true } as Key)]: "wordLeft",
-    [keySlot({ name: "right", meta: true } as Key)]: "wordRight",
+  /**
+   * §019: ⌥← and ⌥→ remain word-left and word-right **in text fields** — the
+   * prompt. Outside one they are §105's divider and nothing else (C16 I55, I59).
+   * One meaning per target class, so a third meaning anywhere is refused.
+   */
+  const PLATFORM_MEANING: Readonly<Record<string, Readonly<{ text: string; elsewhere: string }>>> = {
+    [keySlot({ name: "left", meta: true } as Key)]: { text: "wordLeft", elsewhere: "dividerLeft" },
+    [keySlot({ name: "right", meta: true } as Key)]: { text: "wordRight", elsewhere: "dividerRight" },
   };
 
   const violations = (table: readonly Binding[]): string[] => {
@@ -1717,7 +1735,8 @@ describe("C16 I55 — the platform keeps its chords", () => {
       const slot = keySlot(b.key);
       const why = owned.get(slot);
       if (why !== undefined) out.push(`${b.target} ${chordText(b.key)} → ${b.action}: ${why}`);
-      const meaning = PLATFORM_MEANING[slot];
+      const pair = PLATFORM_MEANING[slot];
+      const meaning = pair === undefined ? undefined : b.target === "prompt" ? pair.text : pair.elsewhere;
       if (meaning !== undefined && b.action !== meaning) {
         out.push(`${b.target} ${chordText(b.key)} → ${b.action}: the platform's meaning is ${meaning}`);
       }
@@ -1725,7 +1744,7 @@ describe("C16 I55 — the platform keeps its chords", () => {
     return out;
   };
 
-  it("T1.108 (C16 I55, §063, §019, R-REF-002): no binding takes a chord the platform owns, and ⌥←/⌥→ mean word motion", () => {
+  it("T1.108 (C16 I55, C16 I59, §063, §019, §105, R-REF-002): no binding takes a chord the platform owns, and ⌥←/⌥→ mean word motion in the prompt and the divider elsewhere", () => {
     // Both profiles: `defaultKeymap` carries the enhanced rows beside the base
     // ones, and `⌘` only arrives in the enhanced one — which is exactly where a
     // row taking `⌘←` would be written.
@@ -1736,8 +1755,13 @@ describe("C16 I55 — the platform keeps its chords", () => {
     const fabricated: Binding[] = [
       { target: "prompt", key: { name: "left", super: true, ctrl: false, meta: false, shift: false } as Key, action: "home" },
       { target: "liveBlock", key: { name: "left", meta: true, ctrl: false, shift: false } as Key, action: "entryPrev" },
+      // **Each side's meaning is its own**: the divider in the prompt is as
+      // wrong as word motion would be at `liveBlock`.
+      { target: "prompt", key: { name: "right", meta: true, ctrl: false, shift: false } as Key, action: "dividerRight" },
     ];
-    expect(violations([...defaultKeymap, ...fabricated]), "a row on ⌘←, and ⌥← given another meaning").toHaveLength(2);
+    expect(violations([...defaultKeymap, ...fabricated]), "a row on ⌘←, ⌥← given a third meaning, and the divider in the prompt").toHaveLength(3);
+    // The positive half: the divider's rows are present, not merely tolerated.
+    expect(defaultKeymap.filter((b) => b.target === "liveBlock" && b.key.meta === true && (b.key.name === "left" || b.key.name === "right")).map((b) => b.action)).toEqual(["dividerLeft", "dividerRight"]);
   });
 });
 
