@@ -110,4 +110,6 @@ describe("C09 §7h — every block, every element", () => {
     expect(nodeOf(kv, 9).children).toHaveLength(2);
     expect(nodeOf(kv, 60).children, "nothing sheds, nothing to reach").toEqual([]);
   });
+
+  it.todo("T2.180 (C09 I116, C09 I118): a tree reads tree and its rows treeitem — not deferred on a component: specified ahead of the code in this commit");
 });

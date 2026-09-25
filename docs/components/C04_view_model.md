@@ -3180,6 +3180,93 @@ question is whether a clock may be bought back with a member. Rule 1 answers it,
 the answer has to be written down or the natural implementation re-measures and puts
 the clocks back.
 
+## 3ap. `tree` — the twisty is content, the guides are decoration (§105)
+
+**§105's first primitive, and a kind because of what it holds rather than how it
+looks.** A tree needs node-level expansion that a reader changes, guides that shed
+independently of the names, and one focusable row per visible node — which is a
+`table`'s `expanded` arm, a `pills` ladder and a list's elements, and no existing kind
+holds all three. §105 says *built from what already exists* and each part is: the
+twisty is `GlyphSet`'s disclosure pair, the guide is `vertical`, expansion is the
+`expand` op and its action, and the ladder is §094's three tiers.
+
+```ts
+Readonly<{
+  kind: "tree";
+  id: string;
+  nodes: readonly TreeNode[];
+}>
+
+type TreeNode = Readonly<{
+  id: string;               // unique within the block, at any depth
+  label: string;            // the name — content, never shed
+  aside?: string;           // right-aligned, §105's `4.1 kB` — one all-or-nothing group
+  expanded?: boolean;       // absent is collapsed, as a table row's is
+  children?: readonly TreeNode[];  // present, even empty, is a node with a twisty
+}>
+```
+
+**The twisty is the disclosure pair and not the glyphs §105 draws.** §105 writes
+`▾`/`▸`; the repository already separated disclosure from focus (§024, `R-BLK-928`) —
+`▸` is focus and disclosure is hollow, `▹` collapsed and `▿` expanded — because one
+row can be focused and collapsed at once and one slot cannot say both. A tree is the
+case that ruling was made for, so it takes `expand` and `collapse` and the fixture's
+filled pair is read as the fixture predating the split (the tie-break: a consistent
+picture beats a single figure).
+
+**The figure, drawn before the code** — §105's own tree at 40 columns:
+
+```
+▿ src
+│  ▿ interaction
+│  │  ▹ parser
+│  │    frame.ts                    4.1 kB
+│  ▹ data
+  package.json                      1.2 kB
+```
+
+A row at depth `d` is `d` guide columns of three cells each (`│` and two spaces), a
+two-cell twisty slot (the mark and a space, or two blanks for a leaf), the label, and
+the aside right-aligned with at least two cells before it. **A guide is drawn at every
+ancestor's twisty column** — §105 draws no elbows, so the guide says *inside this* and
+not *last child*, and a row needs nothing but its own depth to draw it.
+
+### The walk — both artefacts, because expansion is state and the ladder is structure
+
+**The classification table — where two rules hold at rest.**
+
+| # | the state | rules meeting | the ruling |
+|---|---|---|---|
+| L1 | everything fits | none | guides, three-cell steps, every aside |
+| L2 | the asides fit only without the guides | *guides are decoration* × *asides are content* | **the guides go first** (§105, §094): the step narrows to two cells, which is the only width a guide was ever buying, and the asides stay |
+| L3 | one row's aside does not fit at two-cell steps | *asides are a group* × *each row fits or does not* | **every** aside goes, never one — a column of sizes with a hole says that file has none |
+| L4 | a label does not fit at its depth, asides gone | *names never shed* × *depth is indentation* | **the indent is capped, by the widest visible name**: no row starts past `width − 2 − widest`, so every name keeps its whole width while one can. §105's *depth is capped by the floor rule, not by a constant* — and the floor of a name is the name |
+| L5 | the widest name alone is wider than the row | *names never shed* × *the row has a width* | the cap reaches zero and that name **truncates with a mark**; nothing is shed, because a tree whose node vanished says less than one whose node is cut |
+| L6 | `children: []` | *children present has a twisty* × *there is nothing to show* | **drawn with a twisty** — a directory with nothing in it is still a directory; expanding it reveals no rows and is not an error |
+| L7 | `expanded: true` on a node with no `children` | *expanded shows children* × *a leaf has none* | the flag is ignored and the slot is blank: a leaf's twisty would be a control that does nothing |
+| L8 | a collapsed node whose descendants are `expanded` | *a node is visible when every ancestor is expanded* × *each node owns its flag* | the descendants are hidden and **their flags are kept**, so re-expanding restores the subtree as the reader left it — the flag is on the node and never derived from its parent's |
+
+**L4 is the row the first draft got wrong, and the figure is what showed it.** Capping
+each row by its own label makes a deep short name sit to the right of its shallow long
+parent — the indentation contradicting the depth it exists to show. One cap for the
+block, set by the widest name, keeps every row's order: two rows past the cap share a
+column, which loses the difference between them and never inverts it.
+
+**The sequence trace — expansion, where something happens in between.**
+
+| # | what happens | ruling |
+|---|---|---|
+| E1 | `⏎` on a node with children | its element's `activate` is `expand` aimed at the node's id; the shell patches `op: "expand"` with the node as `rowId`, the flag inverts, and the node's own element survives, so focus stays on it (C26 I11 re-resolves it) |
+| E2 | a producer's `replace` collapses a node while focus is inside it | the focused element is gone at the next dispatch, and C26's trace 4 remedy (fall forward from the anchor) is the operation, which exists. **Not reachable from the keyboard**: only a node's own element collapses it |
+| E3 | a producer rebuilds the tree without the flags | every expansion the reader made is lost. **A `table` has `merge` for a `--watch` tick and a tree has none**; stated as the kind's limit rather than built, because no producer rebuilds a tree yet and a merge op with no caller is surface nobody asked for |
+| E4 | two blocks in one entry both hold id `x` — a tree node and a table row | the dispatcher takes the first block, in document order, holding a row or node `x`, which is the rule tables already live under (C23 I31); I129's uniqueness is per block and does not widen it |
+
+**Checked against the layer below, because two rulings name an operation.** E1 needs the
+`expand` op to reach a node at any depth of one block — it did not: the arm refused
+every kind but `table` (*is a tree, which has no rows*), so the op is extended rather
+than a second op added. E2 needs the fall-forward, which is C14's `#restoreFromAnchor`
+and exists.
+
 ## 4. Patches
 
 **Four ops carry data and two carry view state, and that split is the whole reason the fifth and sixth exist.** `append`, `replace`, `merge` and `status` all say *something arrived or changed on the far side*. `expand` says *the reader opened a row*. C13 gates the first four on an entry still streaming (C13 §6) — a settled stream can receive nothing more — and the gate is wrong for the second kind: expansion is exactly what a reader does to a **finished** table.
@@ -3744,6 +3831,9 @@ band from, and it is asserted rather than left to follow.
 - **I126** — *(§3ao, §095)* **An all-or-nothing group is shed before any single member goes offscreen, and it does not come back.** Every member's detail goes together or none does — a row with three clocks and two blanks says the blanks are still running — and once the window has slid, the details stay gone even where the few visible members would fit with them. Bringing them back trades a member for a clock, which is what rule 1 forbids and what keeps the ladder monotonic. The current is never shed: a member wider than the whole width **truncates**, because a tape with nothing in it says less than a tape with one truncated name.
 - **I127** — *(§047, R-HON-002)* **`Panel.staleForMs` names a stale reading and how old it is; C09 draws the notice from it.** Absent is fresh. Present, it is the age in milliseconds of the reading the panel's children show — a non-negative finite number, and anything else is a validation error rather than a notice about nothing. **A number and not words**, on I38's rule and `Status.elapsedMs`'s precedent: the block names the fact, the renderer owns *updated 4m ago*, and a producer never formats a duration the renderer would format again. It changes no measurement — the notice rides in the top border, which is drawn either way.
 - **I128** — *(§088 §4, §086, `R-COL-006`, `R-DEG-001`)* **A cell's trend is two readings, and the column says which way is good.** `Cell.trend` is `{ from, to }` — finite numbers, the earlier reading and the later — and the cell's `text` is what follows the arrow (`from 0.41`), so the producer keeps its own formatting. `ColumnDef.polarity` is `"higher" | "lower" | "neutral"`: which movement the metric wants, declared on the column because §086 homes a metric *inside a table cell* and a column is one metric; undeclared is neutral, so no adapter changes. **The direction and the tone are derived, never supplied**: the arrow is the sign of `to − from`, and its tone is `ok` when the movement runs with the declared polarity and `error` against it. So construction **refuses a trend cell that also carries `glyph`, `tone`, `spark` or `bar`** — a supplied glyph or tone would be a second answer to a question the rule gives one, and §088 says why that matters: *a trend that always paints DOWN as ok misleads on half of every ML metric.* The arrow's shape carries the direction at every rung, so it survives 1-bit (`R-DEG-001`); the tone carries the polarity. → T2.133
+- **I129** — *(§3ap, §105)* **A tree's node ids are unique within the block at any depth, and a node is visible exactly when every ancestor is expanded.** Validation refuses a duplicate anywhere in the block, because each visible node is a focusable element and C26 I6 addresses an element by its id within the declaration. **`children` present — even empty — is a node with a twisty; absent is a leaf**, whose `expanded` is ignored (§3ap L6, L7). Each node owns its flag, so a collapsed ancestor hides its descendants' flags without clearing them (L8). `op: "expand"` reaches a node at any depth of the tree it names, with the node's id as `rowId`.
+- **I130** — *(§3ap, §105, §094)* **The twisty is content and the guides are decoration: at narrow widths the guides go first and the names never do.** The ladder has four rungs in one order: guides at three-cell steps with every aside; no guides at two-cell steps with every aside; no asides, as one group; and the indent capped at `width − 2 − widest visible name`, so every name keeps its whole width while one can. A name wider than the row alone truncates with a mark and is never shed. The rows are one per visible node at every width, so the ladder moves cells and never the height.
+- **I131** — *(§3ap, §105)* **The twisty is the disclosure pair — `expand` collapsed, `collapse` expanded — never focus's `▸`.** A tree row can be focused and collapsed at once, so the two facts take two slots (§024, `R-BLK-928`), and §105's filled pair is read as predating that split.
 
 
 ## 7. Commitments
@@ -3867,6 +3957,8 @@ band from, and it is asserted rather than left to follow.
 110. **A tape slides and a row of peers sheds, and the two are different kinds rather than two widths of one** (I124, §3ao, §095). The distinction is whether anything points into the row: a focus, a current, a key that walks it. `pills` keeps shedding on that rule and `steps`' refusal — *dropping a row orphans a C26 focus* — is **satisfied** by this kind rather than overturned by it.
 111. **The window's arithmetic is derived from §095's figure, and the one thing the walk got wrong was a symmetry it read as corroboration** (I125, §3ao). A residue mark that disappears at the end makes *grow while it fits* draw fewer members than fit — 233 cases in 200,000, with no exotic shape to them. The walk then measured the same thing at the left end, got 447, and wrote both down as one rule; the second figure was taken over a question the window never asks, and the implementation is what found it. The start is a **distance** and the end is an **extremum**, and they look alike because both turn on a mark that vanishes.
 112. **A tape's ladder is monotonic, which is a statement about what it does NOT do** (I126, §3ao, §095). The clocks do not come back when the window slides, and that clause exists because the natural implementation re-measures the visible members and puts them back — two correct rules disagreeing exactly once, which is the cell a classification table is for.
+113. **A tree is a kind because it holds three things no kind holds together** (I129, §3ap, §105): expansion a reader changes per node, guides that shed apart from the names, and one element per visible node. Each part is one the repository had — the disclosure pair, `vertical`, the `expand` op and §094's tiers — which is §105's *built from what already exists*, arriving as the kind's parts rather than as its absence.
+114. **A cap on indentation is one number for the block, not one per row** (I130, §3ap L4). A per-row cap is the natural implementation and it inverts depth — a deep short name drawn right of its shallow long parent — which the figure showed and no statement of the rule does. One cap loses the difference between rows past it and never reverses it.
 
 
 110. A block names the fact that it is streaming and C09 derives the band; a producer cannot compute a span whose offsets depend on a width it cannot see (I122).
@@ -3883,6 +3975,10 @@ Six tiers. No state machine, so no transition table.
 - **T1.49** (I125, §3ao, §095): §095's own moves, reproduced — the window sliding by the minimum, the `«n` that appears costing it a member on top of the one it slid past, and the mark that disappears at an end giving a cell back. Then the property, over a sweep of member widths, widths, currents **and held starts**: the end is the maximum run that fits and the start is the first at or after the held one that reaches the current, against a reference that asks the same question exhaustively. **The held start is its own axis** — the first draft passed it equal to the current, so the current was inside the window in every case and two of the three branches were never taken: 700 assertions exercising one arm, which is A03 §2's vacuity class wearing a sweep. **And the ceiling**: a held start past the smallest one whose window still reaches the last member is clamped back to it, so widening the terminal after a walk to the end reveals the tape rather than keeping a `«n` beside empty room. Swept over the same axes, because the arm only shows where the room grew after the start was written — and the reference asks it as a minimum over candidates, which is what caught the walk-back the implementation landed with (`1 3 9 5` at 24 from 2).
 - **T1.50** (I126, §3ao, §095): the ladder, asserted as a ladder. Every detail present or none; once the window has slid the details stay gone even at a width where the visible members would fit with them; and a single member wider than the whole width truncates rather than vanishing. The middle arm is the one a re-measuring implementation fails, and it is the cell the classification table found.
 - **T1.51** (I127): `staleForMs` of `0` and `240000` validate; `-1`, `NaN` and `Infinity` are refused with the field named.
+- **T1.52** (I129, §3ap, §105): a tree round-trips through validation; a duplicate node id is refused at depth zero **and** at depth two, with the id named; `children: []` draws a twisty and `expanded: true` on a leaf draws none; and a collapsed node over an expanded child hides the child, and expanding the node again shows it expanded — the flag was kept, not rebuilt.
+- **T1.53** (I130, §3ap L1–L5, §105): §105's figure at 40 columns, asserted as rows, then the ladder asserted rung by rung at the widths where each change happens — guides present then absent with every aside still drawn; every aside gone together at the width where one no longer fits; the indent capped so the widest name is whole and **no row starts right of a deeper one's parent** (the per-row cap inverts it, §3ap L4); and a name wider than the row truncated with a mark. The row count is asserted equal to the visible nodes at every width.
+- **T1.54** (I131, §3ap): the twisty is `expand` collapsed and `collapse` expanded at both rungs, and never `focus` — asserted at Unicode and ASCII against `glyphFor`, not against literals, and with a row that is focused and collapsed at once.
+- **T1.55** (I129, §4, §3ap E1): `op: "expand"` toggles a node at depth zero and at depth two of one tree, refuses an id no node carries with the id named, and still refuses a kind with neither rows nor nodes.
 
 - **T1.1** (I1): every constructor returns a frozen value; mutation attempts do not change it, at every nesting depth.
 - **T1.39** (I1, F1065): the memo — a subtree handed to `deepFreeze` twice is **walked once**, observed through an accessor that counts its own reads, and the value is frozen at depth either way. A count and not a duration, because a timing assertion on a shared runner measures the runner (F929).
