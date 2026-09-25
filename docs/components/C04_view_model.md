@@ -3319,12 +3319,19 @@ one number with the box it sits in.
 
 **The geometry at width `w`.**
 
-- `d = clamp(divider ?? ⌊(w − 1) / 2⌋, 1, w − 2)` is the left pane's width. The divider
-  sits at column `d`, and the right pane takes the `w − d − 1` columns after it.
+- `d = clamp(divider ?? ⌊(w − 2) / 2⌋, 1, w − 3)` is the left pane's width. The divider
+  sits at column `d`, column `d + 1` is blank, and the right pane takes the `w − d − 2`
+  columns after that.
+- **The blank column is the figure's, and it is on one side only.** §105 draws
+  `│ export`, with one cell between the divider and the right pane's text, and nothing
+  on the left that says either way. The divider is the left pane's bar, and a bar sits
+  against its own content, as a scroll box's does (C09 §7f). The blank cell keeps it
+  off the other pane's content, which is a different document.
 - The right pane's bar is `barOf`'s rule. The pane is measured at its full width, then
   re-measured one cell narrower only if it overflowed there.
-- Below three columns there is no room for two panes and a divider. The left pane draws
-  alone at the full width, and the right is placed by neither `render` nor `elements`.
+- Below four columns there is no room for two panes, a divider and the blank cell. The
+  left pane draws alone at the full width, and the right is placed by neither `render`
+  nor `elements`.
   This is `placeable`'s rule for a `row` group (§3): *a child that cannot be placed is
   placed by neither half*.
 - `measure` is `height` at every width. There is no residue row. The bars say where, and
@@ -3339,8 +3346,8 @@ one number with the box it sits in.
 | S1 | both panes fit | *the divider is a column* × *a bar that cannot move is decoration* | the divider is bare track at every row. The column is still spent, because it is the boundary between two regions, and a boundary is not a bar |
 | S2 | the left pane overflows | *each box draws its bar in its own last column* × *the divider is one column* | **the divider is the left pane's bar**: track, thumb and half-row forms, at §021's arithmetic. Never a second column beside it |
 | S3 | the right pane overflows | *its own last column* × *a bar takes a column from the content* | the right pane's content narrows by one and is re-measured once, which is `barOf`'s rule; its bar is the split's last column |
-| S4 | `divider` wider than the split allows, after a resize or from a producer | *the producer's number* × *two panes need a cell each* | clamped **at read** to `[1, w − 2]` and never corrected at write. This is I48's rule for an offset: a store fixed up on every change is one that accumulates |
-| S5 | `w < 3` | *two persistent panes* × *the width has room for one* | the left pane alone at `w`. The right is placed by neither half, so `measure`, `render` and `elements` agree |
+| S4 | `divider` wider than the split allows, after a resize or from a producer | *the producer's number* × *two panes need a cell each* | clamped **at read** to `[1, w − 3]` and never corrected at write. This is I48's rule for an offset: a store fixed up on every change is one that accumulates |
+| S5 | `w < 4` | *two persistent panes* × *the width has room for one* | the left pane alone at `w`. The right is placed by neither half, so `measure`, `render` and `elements` agree |
 | S6 | a pane whose block declares no elements (prose, a `code` block) | *focus lands on elements* × *a pane is a region focus can be in* | **the pane contributes one block-level element for its block**. Otherwise a pane of code is a region explicit transfer cannot reach, and §105's figure has one |
 | S7 | focus is inside the left pane | *the thumb takes accent when its container has focus* (§021) × *the divider is that thumb's track* | the divider takes **accent**. It is `muted` otherwise. **Whether it also takes accent while the right pane holds focus is parked (46)**: §105 says *the focused pane takes the accent ON the divider* and draws only one state |
 
@@ -3939,7 +3946,7 @@ band from, and it is asserted rather than left to follow.
 - **I130** — *(§3ap, §105, §094)* **The twisty is content and the guides are decoration: at narrow widths the guides go first and the names never do.** The ladder has four rungs in one order: guides at three-cell steps with every aside; no guides at two-cell steps with every aside; no asides, as one group; and the indent capped at `width − 2 − widest visible name`, so every name keeps its whole width while one can. A name wider than the row alone truncates with a mark and is never shed. The rows are one per visible node at every width, so the ladder moves cells and never the height.
 - **I131** — *(§3ap, §105)* **The twisty is the disclosure pair — `expand` collapsed, `collapse` expanded — never focus's `▸`.** A tree row can be focused and collapsed at once, so the two facts take two slots (§024, `R-BLK-928`), and §105's filled pair is read as predating that split.
 - **I132** — *(§3aq, §105)* **A split is two panes and a declared height.** Its `children` are exactly two blocks, its `height` is a positive integer, and its `divider` is a positive integer where present. `validateDocument` refuses each with the field named. `measure` is `height` at every width. There is no residue row, because the bars say where.
-- **I133** — *(§3aq S1–S5, §021, ruling 22)* **The divider is the left pane's bar, and it is never a second column.** At width `w ≥ 3` the left pane is `d = clamp(divider ?? ⌊(w − 1) / 2⌋, 1, w − 2)` wide, and the divider is column `d`. It draws §021's bar for the left pane where that pane overflows `height`, and bare track where it does not. The right pane draws its own bar in its own last column by `barOf`'s one-step rule. The clamp is applied at read and never written back. Below three columns the left pane draws alone and the right is placed by neither `render` nor `elements`.
+- **I133** — *(§3aq S1–S5, §021, ruling 22)* **The divider is the left pane's bar, and it is never a second column.** At width `w ≥ 4` the left pane is `d = clamp(divider ?? ⌊(w − 2) / 2⌋, 1, w − 3)` wide, the divider is column `d`, column `d + 1` is blank, and the right pane starts at `d + 2`. It draws §021's bar for the left pane where that pane overflows `height`, and bare track where it does not. The right pane draws its own bar in its own last column by `barOf`'s one-step rule. The clamp is applied at read and never written back. Below four columns the left pane draws alone and the right is placed by neither `render` nor `elements`.
 - **I134** — *(§3aq S6, E1–E5)* **Focus crosses the divider only when asked.** Each pane contributes its block's elements, or one block-level element for that block where it declares none, and the walk records which pane each element is in. `↓` and `↑` skip the other pane of the split they are in, and enter a split from outside on its left pane. `←` and `→` move focus to the other pane's element nearest on screen. `⌥←` and `⌥→` move the divider one cell, and the pointer drags it. Both are a shell-origin `replace` of `divider`, and neither moves focus.
 
 
@@ -4088,9 +4095,9 @@ Six tiers. No state machine, so no transition table.
 - **T1.53** (I130, §3ap L1–L5, §105): §105's figure at 40 columns, asserted as rows, then the ladder asserted rung by rung at the widths where each change happens — guides present then absent with every aside still drawn; every aside gone together at the width where one no longer fits; the indent capped so the widest name is whole and **no row starts right of a deeper one's parent** (the per-row cap inverts it, §3ap L4); and a name wider than the row truncated with a mark. The row count is asserted equal to the visible nodes at every width.
 - **T1.54** (I131, §3ap): the twisty is `expand` collapsed and `collapse` expanded at both rungs, and never `focus` — asserted at Unicode and ASCII against `glyphFor`, not against literals, and with a row that is focused and collapsed at once.
 - **T1.55** (I129, §4, §3ap E1): `op: "expand"` toggles a node at depth zero and at depth two of one tree, refuses an id no node carries with the id named, and still refuses a kind with neither rows nor nodes.
-- **T1.56** (I132): a split with one child, with three, with `height: 0` and with `divider: 0` or `1.5` is refused with the field named, and §105's split validates. `measure` is `height` at 2, 3, 40 and 120 columns.
-- **T1.57** (I133, §3aq S1–S5, §105): §105's figure drawn back at 40 columns, asserted as literal rows, with the left pane overflowing so that the divider carries its thumb. Then S1's bare track with both panes fitting; S3's right bar in the last column with the right content one cell narrower; S4's `divider: 99` clamped to `w − 2` and `divider: 1` kept; and S5 at width 2, with the left pane alone. **The divider column is asserted to be the only column between the panes at every width**, which is the mutation a separate bar column fails.
-- **T1.58** (I134, §3aq S6, S7): the elements at 40 columns — the left tree's rows then the right pane's one block-level element for its `code` block, each record carrying its pane, and the right pane's `cols` starting one past the divider. Then S7: the divider in accent with focus in the left pane and muted with focus in the right, asserted on the column's SGR.
+- **T1.56** (I132): a split with one child, with three, with `height: 0` and with `divider: 0` or `1.5` is refused with the field named, and §105's split validates. `measure` is `height` at 3, 4, 40 and 120 columns.
+- **T1.57** (I133, §3aq S1–S5, §105): §105's figure drawn back at 40 columns, asserted as literal rows, with the left pane overflowing so that the divider carries its thumb. Then S1's bare track with both panes fitting; S3's right bar in the last column with the right content one cell narrower; S4's `divider: 99` clamped to `w − 3` and `divider: 1` kept; and S5 at width 3, with the left pane alone. **The divider column is asserted to be the only column between the panes at every width**, which is the mutation a separate bar column fails.
+- **T1.58** (I134, §3aq S6, S7): the elements at 40 columns — the left tree's rows then the right pane's one block-level element for its `code` block, each record carrying its pane, and the right pane's `cols` starting two past the divider. Then S7: the divider in accent with focus in the left pane and muted with focus in the right, asserted on the column's SGR.
 
 - **T1.1** (I1): every constructor returns a frozen value; mutation attempts do not change it, at every nesting depth.
 - **T1.39** (I1, F1065): the memo — a subtree handed to `deepFreeze` twice is **walked once**, observed through an accessor that counts its own reads, and the value is frozen at depth either way. A count and not a duration, because a timing assertion on a shared runner measures the runner (F929).
