@@ -923,5 +923,16 @@ describe("C16 §2b — I12 held on one ESC arm of four (F1045)", () => {
 });
 
 describe("C16 focus reports (I61)", () => {
-  it.todo("T1.160 (I61, I44): a focus report decodes and is never routed — not deferred on a component: specified ahead of the code in this commit");
+  it("T1.160 (I61): ESC [ I and ESC [ O decode to one focus event each, alone, between keys, and under the kitty protocol", () => {
+    const { d } = decoder();
+    expect(feed(d, "\x1b[I")).toEqual([{ kind: "focus", focused: true }]);
+    expect(feed(d, "\x1b[O")).toEqual([{ kind: "focus", focused: false }]);
+    // Between two keys, in one chunk: neither key is eaten and no key is made.
+    const mixed = feed(d, "\x1b[Ax\x1b[O\x1b[B");
+    expect(names(mixed)).toEqual(["up", "x", "focus", "down"]);
+    const { d: kitty } = decoder({ keyboardProtocol: "kitty" });
+    expect(feed(kitty, "\x1b[O")).toEqual([{ kind: "focus", focused: false }]);
+    // The bare form only, as `Z`'s: a parameter makes it malformed, and malformed is discarded.
+    expect(feed(d, "\x1b[2O")).toEqual([]);
+  });
 });

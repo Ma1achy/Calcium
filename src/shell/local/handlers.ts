@@ -658,6 +658,10 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
      */
     capabilities: () => {
       const { values, sources } = deps.capabilities();
+      // `notify` is a list (C02 I17), and `String([])` is a blank cell — which
+      // reads as a value that is missing rather than one that is empty.
+      const shown = (v: unknown): string =>
+        Array.isArray(v) ? (v.length === 0 ? "none" : v.join(", ")) : String(v);
       const fields = [
         "renderMode" as const,
         ...(Object.keys(values) as (keyof TerminalCapabilities)[]).filter((f) => f !== "renderMode"),
@@ -668,7 +672,7 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
           columns: [b.col("field"), b.col("value"), b.col("source")],
           rows: fields.map((f) => ({
             id: f,
-            cells: { field: { text: f }, value: { text: String(values[f]) }, source: { text: sources[f] } },
+            cells: { field: { text: f }, value: { text: shown(values[f]) }, source: { text: sources[f] } },
           })),
         }),
       ]);

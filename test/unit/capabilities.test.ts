@@ -264,6 +264,8 @@ describe("C02 detection", () => {
       keyboardProtocol: "inferred",
       altScreen: "assumed",
       renderMode: "assumed",
+      notification: "inferred",
+      notify: "assumed",
     });
 
     // **`COLORTERM` moves `colourDepth` from `inferred` to `stated` and the
@@ -279,8 +281,8 @@ describe("C02 detection", () => {
     // the three that read it are `inferred` at their `none` values — a guess,
     // and not a withheld claim.
     const plain = detectCapabilities({ TERM: "xterm" }).sources;
-    expect([plain.imageProtocol, plain.synchronisedUpdate, plain.keyboardProtocol, plain.mouse])
-      .toEqual(["inferred", "inferred", "inferred", "assumed"]);
+    expect([plain.imageProtocol, plain.synchronisedUpdate, plain.keyboardProtocol, plain.notification, plain.mouse])
+      .toEqual(["inferred", "inferred", "inferred", "inferred", "assumed"]);
 
     // **The gate demotes one field and refuses three, from one expression.**
     // `colourDepth` has a rule below the identification to fall through to, so
@@ -294,8 +296,9 @@ describe("C02 detection", () => {
       inside.sources.imageProtocol,
       inside.sources.synchronisedUpdate,
       inside.sources.keyboardProtocol,
+      inside.sources.notification,
       inside.sources.mouse,
-    ]).toEqual(["assumed", "unreachable", "unreachable", "unreachable", "unreachable"]);
+    ]).toEqual(["assumed", "unreachable", "unreachable", "unreachable", "unreachable", "unreachable"]);
     // And the values are identical to the unidentified terminal's, which is why
     // one value with two remedies needed a second field to tell them apart.
     expect(inside.capabilities.imageProtocol).toBe(detectCapabilities({ TERM: "xterm" }).capabilities.imageProtocol);
@@ -376,6 +379,8 @@ describe("C02 detection", () => {
       keyboardProtocol: "kitty",
       altScreen: true,
       renderMode: "rich",
+      notification: "osc9",
+      notify: ["system", "title"],
     };
     // TERM=dumb detects every field at its floor; the overrides must win anyway.
     expect(caps({ TERM: "dumb" }, overrides)).toEqual(overrides);
@@ -392,6 +397,8 @@ describe("C02 detection", () => {
       mouse: false,
       imageProtocol: "none",
       keyboardProtocol: "none",
+      notification: "none",
+      notify: [],
     } as const;
 
     expect(isUsable({ ...worst, altScreen: true, renderMode: "rich" })).toBe(true);
@@ -411,6 +418,8 @@ describe("C02 detection", () => {
         keyboardProtocol: "kitty",
         altScreen: false,
         renderMode: "rich",
+        notification: "osc9",
+        notify: ["bell", "system", "title"],
       }),
     ).toBe(false);
   });
@@ -442,6 +451,52 @@ describe("C02 the route (I15)", () => {
 });
 
 describe("C02 notifications (I16, I17)", () => {
-  it.todo("T1.16 (I16, I11): notification from the one identification — not deferred on a component: specified ahead of the code in this commit");
-  it.todo("T1.17 (I17): CALCIUM_NOTIFY, canonical and warned — not deferred on a component: specified ahead of the code in this commit");
+  const answer = (env: Record<string, string>) => {
+    const d = detectCapabilities({ TERM: "xterm-256color", ...env });
+    return [d.capabilities.notification, d.sources.notification];
+  };
+
+  it("T1.16 (I16, I11): notification from the one identification, by each terminal's documentation", () => {
+    for (const env of [
+      { TERM_PROGRAM: "iTerm.app" },
+      { TERM_PROGRAM: "WezTerm" },
+      { TERM_PROGRAM: "ghostty" },
+      { TERM: "xterm-kitty" },
+      { TERM: "foot" },
+    ]) {
+      expect(answer(env), JSON.stringify(env)).toEqual(["osc9", "inferred"]);
+    }
+    // ConEmu's OSC 9 family, unmeasured, and a terminal nobody named.
+    expect(answer({ TERM_PROGRAM: "WindowsTerminal" })).toEqual(["none", "inferred"]);
+    expect(answer({ TERM: "xterm" })).toEqual(["none", "inferred"]);
+    // The same gate as every identity-read field (I11): withheld, not guessed.
+    expect(answer({ TERM: "xterm-kitty", TMUX: "/tmp/x" })).toEqual(["none", "unreachable"]);
+  });
+
+  it("T1.17 (I17): CALCIUM_NOTIFY is the reader's opt-in — canonical, deduplicated, frozen and warned", () => {
+    const notify = (value?: string) => {
+      const d = detectCapabilities({ TERM: "xterm", ...(value === undefined ? {} : { CALCIUM_NOTIFY: value }) });
+      return { value: d.capabilities.notify, source: d.sources.notify, warnings: d.warnings };
+    };
+    // Any order in, the canonical order out — the order a fact fires them in.
+    expect(notify("title,bell")).toMatchObject({ value: ["bell", "title"], source: "stated" });
+    expect(notify("bell,bell").value).toEqual(["bell"]);
+    expect(notify(" system , title ").value).toEqual(["system", "title"]);
+    // Absent is empty: nothing rings unasked (§014).
+    expect(notify()).toMatchObject({ value: [], source: "assumed", warnings: [] });
+    const beep = notify("bell,beep");
+    expect(beep.value).toEqual(["bell"]);
+    expect(beep.warnings).toHaveLength(1);
+    expect(beep.warnings[0]).toContain('"beep"');
+    expect(Object.isFrozen(beep.value), "frozen, as the record is").toBe(true);
+
+    // An override is the reader's config: declared, canonical, and not held by reference.
+    const mine = ["title", "system"] as const;
+    const over = detectCapabilities({ TERM: "xterm", CALCIUM_NOTIFY: "bell" }, { notify: [...mine] });
+    expect([over.capabilities.notify, over.sources.notify]).toEqual([["system", "title"], "declared"]);
+    expect(Object.isFrozen(over.capabilities.notify)).toBe(true);
+    const bad = detectCapabilities({ TERM: "xterm" }, { notify: ["siren"] as never });
+    expect(bad.capabilities.notify, "an unknown rung is not an override").toEqual([]);
+    expect(bad.warnings).toHaveLength(1);
+  });
 });

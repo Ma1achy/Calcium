@@ -19,6 +19,8 @@ export const ALL_CAPABILITIES: TerminalCapabilities = Object.freeze({
   keyboardProtocol: "kitty",
   altScreen: true,
   renderMode: "rich",
+  notification: "none",
+  notify: [],
 });
 
 export function capabilities(over: Partial<TerminalCapabilities> = {}): TerminalCapabilities {

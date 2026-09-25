@@ -794,6 +794,11 @@ export function createRouter(
   }
 
   function dispatch(e: InputEvent): boolean {
+    // **A focus report is never routed** (I61): before the owner is read and
+    // before the stages reset, so the last dispatch's stages, I44's guard, the
+    // exit arm and I45's pointer arm are exactly as they were. L4 reads the
+    // report before dispatch; this is the line that keeps a stray one inert.
+    if (e.kind === "focus") return false;
     // **Read at the top as well as written at the bottom** (§4a W7). The bottom
     // call catches a raise the dispatch itself caused — a handler pushing a
     // layer. This one catches a raise nothing dispatched: `ctx.ask` is called

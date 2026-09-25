@@ -65,7 +65,7 @@ import { largeManifest, toolNamed } from "../support/manifest.js";
 describe("harness parameters — fake-terminal", () => {
   it("capabilities(over): each field of the override reaches the record", () => {
     // Every field, not a sample. A spread that dropped one key would pass a
-    // spot check on the other ten.
+    // spot check on the other twelve.
     const all = capabilities({
       colourDepth: 1,
       unicode: "ascii",
@@ -78,6 +78,8 @@ describe("harness parameters — fake-terminal", () => {
       keyboardProtocol: "none",
       altScreen: false,
       renderMode: "linear",
+      notification: "osc9",
+      notify: ["title"],
     });
     expect(all).toEqual({
       colourDepth: 1,
@@ -91,6 +93,8 @@ describe("harness parameters — fake-terminal", () => {
       keyboardProtocol: "none",
       altScreen: false,
       renderMode: "linear",
+      notification: "osc9",
+      notify: ["title"],
     });
     // And the defaults are not the override values, or the assertion above
     // would hold for a helper that ignored its argument entirely.

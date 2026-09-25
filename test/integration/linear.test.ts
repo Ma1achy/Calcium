@@ -105,7 +105,7 @@ describe("C22 §6m — a linear session", () => {
       expect(at, "the start").toBeGreaterThan(-1);
       expect(out.slice(at, at + 4)).toEqual([
         "entry 1 of 1: /capabilities",
-        "entry 1: /capabilities — succeeded, 11 rows",
+        "entry 1: /capabilities — succeeded, 13 rows",
         "table",
         "field  value  source",
       ]);
@@ -192,7 +192,7 @@ describe("C22 §6m — a linear session", () => {
       const header = out.indexOf("field  value  source");
       expect(out[header + 1], "the route, stated by the environment").toBe("renderMode  linear  stated");
       // Every field after it, each with its source.
-      const fields = out.slice(header + 1, header + 12).map((l) => l.split("  ")[0]);
+      const fields = out.slice(header + 1, header + 14).map((l) => l.split("  ")[0]);
       expect(fields).toEqual([
         "renderMode",
         "colourDepth",
@@ -205,6 +205,8 @@ describe("C22 §6m — a linear session", () => {
         "imageProtocol",
         "keyboardProtocol",
         "altScreen",
+        "notification",
+        "notify",
       ]);
     } finally {
       vi.useRealTimers();

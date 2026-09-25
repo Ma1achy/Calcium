@@ -623,6 +623,13 @@ export function createDecoder(options: DecoderOptions): Decoder {
     // malformed sequence into a keystroke, which the existing row caught.
     if (final === "Z" && body === "") return out.push(key("tab", sequence, { shift: true })), consumed;
 
+    // **Focus reports** (I61, C01 I23): taken only when a notification rung is
+    // opted in, and swallowed whole before this — so none ever leaked as a key,
+    // and none was ever heard. The bare form only, as `Z`'s.
+    if ((final === "I" || final === "O") && body === "") {
+      return out.push(Object.freeze({ kind: "focus" as const, focused: final === "I" })), consumed;
+    }
+
     const name = CSI_LETTER_KEYS[final];
     if (name === undefined) return consumed;
     return out.push(key(name, sequence, mods)), consumed;

@@ -34,8 +34,11 @@ import {
   linearEvents,
   linearState as createLinearState,
   questionEvent,
+  questionLine,
   type BodyDeps,
 } from "./linear.js";
+import { createNotifier } from "./notify.js";
+import { BELL, systemNotification } from "../terminal/escapes.js";
 import type { AskOptions } from "./local/registry.js";
 import type { MeasureMemo, NavElement, PaneRef, PlacedElement } from "../presentation/blocks/index.js";
 import { initialRegionHeight } from "./frame.js";
@@ -121,7 +124,7 @@ import { createNavigator, openHistory, SEARCH_ID } from "../interaction/history/
 import type { HistoryEntry, Navigator } from "../interaction/history/index.js";
 import { detectCapabilities, type CapabilitySource, type TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Motion } from "../presentation/blocks/index.js";
-import { defaultButton, glyphs, tapeStart } from "../presentation/blocks/index.js";
+import { defaultButton, glyphFor, glyphs, tapeStart } from "../presentation/blocks/index.js";
 import { submitAction } from "./form-submit.js";
 import { createFrameScheduler, type CommitReason } from "../terminal/frame-scheduler.js";
 import type { CaptureResult, Profiler, ProfileReport, TraceFn } from "./profiling/types.js";
@@ -1715,19 +1718,51 @@ export async function constructGraph(
     });
   }
 
+  /**
+   * **The rungs, only when the reader asked for one** (C22 §6n, C02 I17): with
+   * nothing opted in there is no notifier, no subscription and no focus
+   * reporting, so not a byte of a session changes (C01 I23).
+   */
+  const notifyCaps = detection.capabilities;
+  const notifier =
+    notifyCaps.notify.length === 0
+      ? null
+      : createNotifier({
+          rungs: notifyCaps.notify,
+          system: notifyCaps.notification === "osc9",
+          binary: config.binary,
+          // §014 draws `• calcium · done`; the bullet is a `Glyph` slot (C09 I22).
+          mark: glyphFor("bullet", notifyCaps),
+          separator: glyphs(notifyCaps).separator,
+          entryOf: (id) => stores.transcript.entries.find((e) => e.id === id),
+          bell: () => void lifecycle.writer.write(BELL),
+          notify: (text) => void lifecycle.writer.write(systemNotification(text)),
+          title: (text) => lifecycle.title(text),
+          restoreTitle: () => lifecycle.restoreTitle(),
+        });
+  if (notifier !== null) {
+    stores.transcript.subscribe((change) => {
+      if (change.kind === "append" || change.kind === "settle") notifier.settled(change.id);
+    });
+  }
+
   const confirm = createConfirmHost({
     overlays: stores.overlays,
     // C22 I122 — numbered on the linear route, and told what was asked.
     numbered: linearRoute,
-    ...(linear === null
+    ...(linear === null && notifier === null
       ? {}
       : {
           announce: {
             asked: (opts: AskOptions) => {
+              // C22 I126 — *a question is waiting*, whichever route.
+              notifier?.asked(questionLine(opts));
+              if (linear === null) return;
               asking = opts;
               linear.emit([questionEvent(opts, linearBody())]);
             },
             answered: (label: string) => {
+              if (linear === null) return;
               asking = null;
               linear.emit([answerEvent(label)]);
             },
@@ -4055,7 +4090,15 @@ export async function constructGraph(
       reconcileField();
     };
 
-    const deliver = (events: readonly InputEvent[]): void => {
+    const deliver = (batch: readonly InputEvent[]): void => {
+      // **A focus report is read here and routed nowhere** (C16 I61, C22 I129):
+      // it moves no focus and commits no frame, so a batch holding only one is
+      // an empty batch below.
+      const events = batch.filter((e) => {
+        if (e.kind !== "focus") return true;
+        notifier?.focus(e.focused);
+        return false;
+      });
       if (events.length > 0) {
         for (const e of events) routed(e);
         // After the keys and before the frame: the peek follows the focus the

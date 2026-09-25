@@ -86,6 +86,48 @@ export const KITTY_KEYBOARD = mode("\x1b[>3u", "\x1b[<u");
  */
 export const SYNC_UPDATE = mode("\x1b[?2026h", "\x1b[?2026l");
 
+/**
+ * DECSET 1004 — focus reporting (C01 I23, C22 §6n). Taken only when a
+ * notification rung is opted in, because *unfocused* is the one thing it tells
+ * us and nothing else needs it.
+ */
+export const FOCUS_REPORT = mode("\x1b[?1004h", "\x1b[?1004l");
+
+/**
+ * XTWINOPS 22 / 23 with `2` — push and pop the window **title** alone (C01 I24).
+ *
+ * A mode taken late: the first title write pushes, the reader's return or
+ * release pops. foot's `foot-ctlseqs(7)` documents both; a terminal without a
+ * stack ignores them.
+ */
+export const TITLE_STACK = mode("\x1b[22;2t", "\x1b[23;2t");
+
+// --- notifications ----------------------------------------------------------
+
+/** The bell (C22 I128). Stateless, like an SGR sequence. */
+export const BELL = "\x07";
+
+/**
+ * C0, DEL and C1 — anything that could end the string early or start another
+ * sequence inside it. `terminal/` may not import `data/`, so the rule is
+ * restated here at its narrowest: an OSC payload is text, and text has no
+ * controls in it.
+ */
+const oscText = (text: string): string => text.replace(/[\u0000-\u001f\u007f-\u009f]/gu, "");
+
+/** OSC 2 — the window title (C01 I24), control-stripped. */
+export const windowTitle = (text: string): string => `\x1b]2;${oscText(text)}\x07`;
+
+/**
+ * OSC 9 — a system notification (C02 I16, C22 I128), control-stripped.
+ *
+ * **Never opens with a number and a semicolon**: Ghostty's documentation
+ * reserves that shape for ConEmu's OSC 9 sub-commands, so `7zip;` would be read
+ * as a command rather than shown. The semicolon is spaced off instead.
+ */
+export const systemNotification = (text: string): string =>
+  `\x1b]9;${oscText(text).replace(/^(\d+);/u, "$1 ;")}\x07`;
+
 // --- settings ---------------------------------------------------------------
 
 /** The three shapes `DECSCUSR` can name (C01 I20, C22 §6f). */

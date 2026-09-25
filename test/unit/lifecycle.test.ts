@@ -660,5 +660,63 @@ describe("C01 the linear profile (I22)", () => {
 });
 
 describe("C01 focus reporting and the title stack (I23, I24)", () => {
-  it.todo("T1.31 (I23, I24): focus reporting taken iff a rung is opted in, and the title pushed once and popped — not deferred on a component: specified ahead of the code in this commit");
+  // Literals, not the constants: a row reading `FOCUS_REPORT.enter` agrees with
+  // whatever the constant says.
+  const FOCUS_ON = "\x1b[?1004h";
+  const FOCUS_OFF = "\x1b[?1004l";
+  const PUSH = "\x1b[22;2t";
+  const POP = "\x1b[23;2t";
+  const count = (hay: string, needle: string): number => hay.split(needle).length - 1;
+
+  function opened(caps: Partial<TerminalCapabilities>) {
+    const stdout = fakeStdout();
+    const lifecycle = createTerminalLifecycle({
+      stdout,
+      stdin: fakeStdin(),
+      capabilities: capabilities({ keyboardProtocol: "kitty", ...caps }),
+      onFatal: ((err: unknown) => {
+        throw err;
+      }) as (err: unknown) => never,
+      debug: fakeDebug(),
+    });
+    live.push(lifecycle);
+    return { lifecycle, stdout };
+  }
+
+  it("T1.31 (I23, I6): focus reporting is taken iff a rung is opted in, after the keyboard protocol and released before it", () => {
+    const { lifecycle, stdout } = opened({ notify: ["bell"] });
+    lifecycle.acquire();
+    const on = stdout.output;
+    expect(on.indexOf(FOCUS_ON), "after the protocol").toBeGreaterThan(on.indexOf(MODES.keyboardOn));
+    lifecycle.release();
+    const off = stdout.output.slice(on.length);
+    expect(off.indexOf(FOCUS_OFF), "before the protocol's pop").toBeGreaterThan(-1);
+    expect(off.indexOf(FOCUS_OFF)).toBeLessThan(off.indexOf(MODES.keyboardOff));
+
+    // The control: nothing opted in, and not a byte of it.
+    const { lifecycle: quiet, stdout: still } = opened({ notify: [] });
+    quiet.acquire();
+    quiet.release();
+    expect(still.output).not.toContain("1004");
+  });
+
+  it("T1.31 (cont., I24): the title is pushed once per absence, popped once, and popped at release", () => {
+    const { lifecycle, stdout } = opened({ notify: ["title"] });
+    lifecycle.acquire();
+    const mark = stdout.output.length;
+    lifecycle.title("a");
+    lifecycle.title("b");
+    lifecycle.restoreTitle();
+    lifecycle.restoreTitle();
+    const away = stdout.output.slice(mark);
+    expect(away).toBe(`${PUSH}\x1b]2;a\x07\x1b]2;b\x07${POP}`);
+
+    // Taken late, released like any mode: a title still pushed at exit comes back.
+    const again = stdout.output.length;
+    lifecycle.title("c\x1b[31m");
+    lifecycle.release();
+    const tail = stdout.output.slice(again);
+    expect(tail.startsWith(`${PUSH}\x1b]2;c[31m\x07`), "pushed, and the text control-stripped").toBe(true);
+    expect(count(tail, POP), "popped at release").toBe(1);
+  });
 });

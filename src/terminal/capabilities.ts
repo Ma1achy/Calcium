@@ -74,7 +74,25 @@ export type TerminalCapabilities = Readonly<{
    * the reader's to choose.
    */
   renderMode: "rich" | "linear";
+  /**
+   * A system notification the terminal takes (I16, C22 §6n): OSC 9, read from
+   * the one identification. Every terminal the table names documents OSC 9
+   * except Windows Terminal, whose OSC 9 is ConEmu's family.
+   */
+  notification: "none" | "osc9";
+  /**
+   * **The rungs the reader opted into** (I17, §014 *every one is opt-in*), from
+   * `CALCIUM_NOTIFY`, in the canonical order `bell`, `system`, `title`. Empty
+   * by default, so nothing rings unasked.
+   */
+  notify: readonly NotifyRung[];
 }>;
+
+/** §014's three rungs (C22 I128). */
+export type NotifyRung = "bell" | "system" | "title";
+
+/** The canonical order, which is also the order a fact fires them in (C22 I128). */
+export const NOTIFY_RUNGS: readonly NotifyRung[] = Object.freeze(["bell", "system", "title"]);
 
 /**
  * **How a field was answered, named for what would falsify it** (I13, §3).
@@ -190,6 +208,14 @@ export const DEGRADATION: Readonly<
   renderMode: Object.freeze({
     behaviour: "Linear: an append-only stream of semantic events, and no frame",
     owner: "L4",
+  }),
+  notification: Object.freeze({
+    behaviour: "The system rung writes nothing; the bell and the title still reach a reader who opted into them",
+    owner: "L4",
+  }),
+  notify: Object.freeze({
+    behaviour: "Nothing is opted in, so no rung fires and focus reporting is not taken",
+    owner: "C01 L4",
   }),
 });
 
@@ -549,7 +575,39 @@ function detect(env: Readonly<NodeJS.ProcessEnv>): Answers {
     keyboardProtocol: fromIdentity(identified, terminal, KEYBOARD_PROTOCOL, "none"),
     altScreen: [usable, "assumed"],
     renderMode: detectRenderMode(read(env, RENDER_MODE)),
+    // The same `terminal`, so the same gate (I11, I16).
+    notification: fromIdentity(identified, terminal, NOTIFICATION, "none"),
+    notify: detectNotify(read(env, NOTIFY)),
   };
+}
+
+/**
+ * **By each terminal's own documentation** (I16, C22 §6n.1), read 2026-09-25:
+ * iTerm2's escape codes, WezTerm's escape sequences, kitty's desktop
+ * notifications (*also supports the legacy OSC 9 protocol*), Ghostty's OSC 9
+ * page and foot's `foot-ctlseqs(7)`. Windows Terminal's OSC 9 is ConEmu's
+ * family of sub-commands and is unmeasured here, so it is `none`.
+ */
+const NOTIFICATION: Readonly<Record<TerminalName, "none" | "osc9">> = {
+  kitty: "osc9",
+  ghostty: "osc9",
+  iterm2: "osc9",
+  wezterm: "osc9",
+  foot: "osc9",
+  windowsterminal: "none",
+};
+
+/** §014's opt-in (I17). */
+const NOTIFY = "CALCIUM_NOTIFY";
+
+const members = (value: string): string[] =>
+  value.split(",").map((m) => m.trim()).filter((m) => m !== "");
+
+/** The known members, canonical and deduplicated; the unknown are `detectCapabilities`' to warn about. */
+function detectNotify(value: string | undefined): Answer<readonly NotifyRung[]> {
+  if (value === undefined) return [Object.freeze([]), "assumed"];
+  const asked = new Set(members(value));
+  return [Object.freeze(NOTIFY_RUNGS.filter((r) => asked.has(r))), "stated"];
 }
 
 /** §107's environment setting (I15); `--linear` and persistent config wait on 28. */
@@ -591,6 +649,9 @@ const VALIDATORS: Readonly<Record<keyof TerminalCapabilities, (v: unknown) => bo
     keyboardProtocol: oneOf("none", "kitty"),
     altScreen: isBoolean,
     renderMode: oneOf("rich", "linear"),
+    notification: oneOf("none", "osc9"),
+    notify: (v: unknown) =>
+      Array.isArray(v) && v.every((r) => (NOTIFY_RUNGS as readonly unknown[]).includes(r)),
   });
 
 const FIELDS = Object.keys(VALIDATORS) as (keyof TerminalCapabilities)[];
@@ -637,13 +698,29 @@ export function detectCapabilities(
     );
   }
 
+  // **An unknown rung is said out loud** (I17), as an unknown route is.
+  const notify = read(env, NOTIFY);
+  if (notify !== undefined) {
+    for (const m of new Set(members(notify))) {
+      if ((NOTIFY_RUNGS as readonly string[]).includes(m)) continue;
+      warnings.push(
+        `${NOTIFY}: ${JSON.stringify(m)} is not a rung; dropped — the rungs are "bell", "system" and "title"`,
+      );
+    }
+  }
+
   if (overrides !== undefined) {
     for (const field of FIELDS) {
       if (!Object.hasOwn(overrides, field)) continue;
       const value: unknown = overrides[field];
       if (value === undefined) continue;
       if (VALIDATORS[field](value)) {
-        resolved[field] = value;
+        // The one array field (I17): canonical and frozen, as the environment's is,
+        // so a record never holds a reader's array by reference.
+        resolved[field] =
+          field === "notify"
+            ? Object.freeze(NOTIFY_RUNGS.filter((r) => (value as readonly unknown[]).includes(r)))
+            : value;
         // **Only here** (I13). I4 says an out-of-domain value *is not an
         // override*, and this is the line where that sentence becomes something
         // a reader can observe: the rejected arm below keeps the detected value

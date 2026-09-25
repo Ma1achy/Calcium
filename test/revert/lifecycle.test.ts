@@ -182,6 +182,8 @@ describe("C01 fail-on-revert", () => {
         "onResume",
         "onInput",
         "setMouseTracking",
+        "title",
+        "restoreTitle",
         "size",
         "writer",
         "acquired",

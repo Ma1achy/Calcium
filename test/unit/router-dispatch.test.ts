@@ -1190,6 +1190,24 @@ describe("C16 §7 and §4a — the epoch, the question guard and pointer commit 
     expect(router.lastStages).not.toContain("question-guard");
   });
 
+  it("T1.160 (cont., I61, I44): a focus report is never routed — the guard still refuses the key after it", () => {
+    const { router, q } = withQuestion();
+    q.open = true;
+    router.dispatch(key("x"));
+    const before = router.lastStages;
+    // Returning to the window with a question waiting is not an answer, and not
+    // the neutral key that would end the guard.
+    const again = withQuestion();
+    again.q.open = true;
+    expect(again.router.dispatch({ kind: "focus", focused: true }), "not routed").toBe(false);
+    expect(again.router.ownerArmed, "the guard is untouched").toBe(true);
+    expect(again.router.dispatch(key("y")), "refused, as the first activation").toBe(true);
+    expect(again.router.lastStages).toEqual(["arming", "question-guard", "reject"]);
+    // And a focus report leaves the last dispatch's stages as they were.
+    router.dispatch({ kind: "focus", focused: false });
+    expect(router.lastStages).toEqual(before);
+  });
+
   it("T1.99b (I44): a neutral key is handled and ends the guard", () => {
     // An arrow under a question that has just arrived is how a reader reads what
     // arrived. Guarding it would close the failure I40 opened on the scroll side.

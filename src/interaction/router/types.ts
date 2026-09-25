@@ -314,7 +314,14 @@ export type InputEvent =
        * true of it without a consumer changing (I30, C01 I21).
        */
       motion: boolean;
-    }>;
+    }>
+  /**
+   * A focus report, `ESC [ I` or `ESC [ O` (I61, C22 I127). **Never routed**:
+   * not a key, not an activation and not a pointer event, so it takes no stage
+   * and leaves I44's guard and I45's arm as they were. L4 reads it before
+   * dispatch; the router returns at once if one reaches it.
+   */
+  | Readonly<{ kind: "focus"; focused: boolean }>;
 
 /**
  * A binding, declaratively (C16 §6).

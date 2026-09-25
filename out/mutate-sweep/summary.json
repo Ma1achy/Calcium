@@ -5,7 +5,7 @@
     {
       "run": "c22-linear.mjs",
       "exit": 0,
-      "seconds": 34,
+      "seconds": 35,
       "state": "green",
       "restored": 0,
       "caught": 14,

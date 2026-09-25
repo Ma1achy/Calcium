@@ -29,6 +29,8 @@ export const FULL_CAPABILITIES: TerminalCapabilities = Object.freeze({
   keyboardProtocol: "none",
   altScreen: true,
   renderMode: "rich",
+  notification: "none",
+  notify: [],
 });
 
 // The same three `expect-document.ts` registers, and for its reason: a registry

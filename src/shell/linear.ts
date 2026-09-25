@@ -112,6 +112,16 @@ function verdict(doc: ViewDocument): string {
 
 const command = (doc: ViewDocument): string => clean(doc.command);
 
+/** Whether a settled call failed — C23 I59's state, read from the head (C22 §6n.2). */
+export const failed = (doc: ViewDocument): boolean => stateOf(doc) === "failed";
+
+/**
+ * §6m.2's completion line, `entry N: <command> — <verdict>` — the words linear
+ * writes and the system notification repeats (C22 §6n.4 ruling 4).
+ */
+export const completionLine = (entry: LinearEntry): string =>
+  `entry ${String(entry.seq)}: ${command(entry.doc)} — ${verdict(entry.doc)}`;
+
 /** The body: every top-level block but the head, and the ids it read. */
 function body(doc: ViewDocument, deps: BodyDeps, skip: ReadonlySet<string>): { lines: string[]; ids: string[] } {
   const head = headOf(doc);
@@ -160,12 +170,11 @@ export function linearEvents(
     state.said.add(done);
     const { lines, ids } = body(entry.doc, deps, read);
     for (const id of ids) read.add(id);
-    const failed = stateOf(entry.doc) === "failed";
     // A settled append is its start and its completion as one event.
     const opening = change.kind === "append" ? [`entry ${n} of ${String(state.highest)}: ${command(entry.doc)}`] : [];
     out.push({
-      lines: [...opening, `entry ${n}: ${command(entry.doc)} — ${verdict(entry.doc)}`, ...lines],
-      level: failed ? "assertive" : "polite",
+      lines: [...opening, completionLine(entry), ...lines],
+      level: failed(entry.doc) ? "assertive" : "polite",
     });
     return out;
   }
@@ -188,9 +197,14 @@ export function questionEvent(
   q: Readonly<{ question: string; detail?: Block; choices: readonly Readonly<{ label: string }>[] }>,
   deps: BodyDeps,
 ): LinearEvent {
-  const numbered = q.choices.map((c, i) => `${String(i + 1)} ${clean(c.label)}`).join(", ");
   const detail = q.detail === undefined ? [] : blockLines(q.detail, deps);
-  return { lines: [...detail, `question: ${clean(q.question)} ${numbered}`], level: "assertive" };
+  return { lines: [...detail, questionLine(q)], level: "assertive" };
+}
+
+/** The question's one numbered line (I122), which a system notification repeats (§6n.4 ruling 4). */
+export function questionLine(q: Readonly<{ question: string; choices: readonly Readonly<{ label: string }>[] }>): string {
+  const numbered = q.choices.map((c, i) => `${String(i + 1)} ${clean(c.label)}`).join(", ");
+  return `question: ${clean(q.question)} ${numbered}`;
 }
 
 export const answerEvent = (label: string): LinearEvent => ({ lines: [`answer: ${clean(label)}`], level: "polite" });

@@ -15,9 +15,12 @@ import {
   BRACKET_PASTE,
   CURSOR,
   CURSOR_SHAPE,
+  FOCUS_REPORT,
   KITTY_KEYBOARD,
   MOUSE,
   MOUSE_ANY,
+  TITLE_STACK,
+  windowTitle,
   cursorTo,
 } from "./escapes.js";
 import type { CursorStyle } from "./escapes.js";
@@ -110,6 +113,13 @@ export interface TerminalLifecycle {
    * predicate answering both is how they come to disagree.
    */
   setMouseTracking(on: boolean): void;
+  /**
+   * The window title (I24, C22 I128): pushes the reader's title on the first
+   * write, then `OSC 2`, control-stripped. A no-op unless acquired.
+   */
+  title(text: string): void;
+  /** Pops what `title` pushed, once; nothing when nothing was (I24). */
+  restoreTitle(): void;
   readonly writer: NodeJS.WriteStream;
   readonly acquired: boolean;
   readonly suspended: boolean;
@@ -171,7 +181,9 @@ type HeldKey =
   | "rawMode"
   | "bracketedPaste"
   | "mouse"
-  | "keyboardProtocol";
+  | "keyboardProtocol"
+  | "focusReport"
+  | "title";
 
 /**
  * §5's transition table, as data. Every cell, including the nine that throw.
@@ -403,6 +415,8 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     bracketedPaste: () => emit(BRACKET_PASTE.enter),
     mouse: () => emit(mouseMode.enter),
     keyboardProtocol: () => emit(KITTY_KEYBOARD.enter),
+    focusReport: () => emit(FOCUS_REPORT.enter),
+    title: () => emit(TITLE_STACK.enter),
   });
 
   const RELEASE: Readonly<Record<Exclude<HeldKey, "stdout">, () => void>> = Object.freeze({
@@ -415,6 +429,9 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     // (C02 §3). Last taken and so first released — the terminal is on legacy
     // key reporting before the mouse and paste modes leave.
     keyboardProtocol: () => emit(KITTY_KEYBOARD.leave),
+    focusReport: () => emit(FOCUS_REPORT.leave),
+    // The pop (I24): the title the reader had comes back.
+    title: () => emit(TITLE_STACK.leave),
   });
 
   function setRawMode(on: boolean): void {
@@ -448,6 +465,24 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     }
     emit(mouseMode.leave);
     held.delete("mouse");
+  }
+
+  /**
+   * The title, **a mode taken late** (I24): the first write pushes the
+   * reader's title and every later one only writes, so one pop restores it
+   * however many facts arrived while they were away.
+   */
+  function title(text: string): void {
+    if (state !== "acquired") return; // suspended: the child's title is its own
+    if (!held.has("title")) take("title");
+    emit(windowTitle(text));
+  }
+
+  /** The pop, once (I24); nothing when nothing was pushed. */
+  function restoreTitle(): void {
+    if (!held.has("title")) return;
+    emit(TITLE_STACK.leave);
+    held.delete("title");
   }
 
   // --- the transition guard -------------------------------------------------
@@ -664,6 +699,7 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
       if (capabilities.bracketedPaste) take("bracketedPaste"); // I10
       if (!linear && capabilities.mouse) take("mouse"); // I10, C01 I22
       if (capabilities.keyboardProtocol === "kitty") take("keyboardProtocol"); // I10, C02 I12
+      if (capabilities.notify.length > 0) take("focusReport"); // I23, C02 I17
     } catch (err) {
       // T3.7 — partial acquisition never leaves partial state.
       unwind();
@@ -784,6 +820,8 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     // terminal nobody has entered is still the size of the terminal.
     size: snapshotSize,
     setMouseTracking,
+    title,
+    restoreTitle,
     writer,
     // Getters, not stored booleans: two booleans for four states admits two
     // combinations that cannot happen (T2.1).

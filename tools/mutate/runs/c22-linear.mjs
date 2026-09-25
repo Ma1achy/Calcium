@@ -73,7 +73,7 @@ const results = runPass({
       // I124 — a failure is assertive.
       name: "a failed completion is polite",
       file: LINEAR,
-      from: '      level: failed ? "assertive" : "polite",',
+      from: '      level: failed(entry.doc) ? "assertive" : "polite",',
       to: '      level: "polite",',
       expect: "T1.74",
     },

@@ -410,6 +410,8 @@ const MODE_OWNERS = {
   MOUSE:          "src/terminal/lifecycle.ts",
   MOUSE_ANY:      "src/terminal/lifecycle.ts",
   KITTY_KEYBOARD: "src/terminal/lifecycle.ts",
+  FOCUS_REPORT:   "src/terminal/lifecycle.ts",
+  TITLE_STACK:    "src/terminal/lifecycle.ts",
   SCROLL_REGION:  "src/terminal/frame-scheduler.ts",
   SYNC_UPDATE:    "src/terminal/frame-scheduler.ts",
 };

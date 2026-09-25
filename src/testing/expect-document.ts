@@ -270,6 +270,8 @@ const TRUECOLOUR: TerminalCapabilities = Object.freeze({
   keyboardProtocol: "none",
   altScreen: true,
   renderMode: "rich",
+  notification: "none",
+  notify: [],
 });
 
 const ONE_BIT: TerminalCapabilities = Object.freeze({ ...TRUECOLOUR, colourDepth: 1 });
