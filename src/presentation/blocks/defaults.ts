@@ -39,6 +39,7 @@ import {
 } from "./kinds/simple.js";
 import { choiceDefinition, controlDefinition } from "./kinds/controls.js";
 import { tapeDefinition } from "./kinds/tape.js";
+import { treeDefinition } from "./kinds/tree.js";
 import type { AnyBlockDefinition } from "./types.js";
 
 // **`AnyBlockDefinition`, which is what these are** (C04 I119, F405). The
@@ -59,6 +60,7 @@ export const DEFAULT_DEFINITIONS: readonly AnyBlockDefinition[] = Object.freeze(
   choiceDefinition,
   controlDefinition,
   tapeDefinition,
+  treeDefinition,
   tipDefinition,
   panelDefinition,
   groupDefinition,

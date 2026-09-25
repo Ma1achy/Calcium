@@ -1803,6 +1803,45 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
   // choosing within it — refusing it would make a document invalid for a
   // moment that is legitimate.
   tape: (b, e, at) => requireArray(b, "members", e, at),
+  // **Node ids are unique at any depth, not per level** (C04 I129). Each visible
+  // node is an element and C26 I6 addresses one by id within the declaration,
+  // and `op: "expand"` names a node by it — so two nodes `x` in different
+  // subtrees are two targets for one name, which is I31's argument one axis
+  // down.
+  tree: (b, e, at) => {
+    requireArray(b, "nodes", e, at);
+    if (!isArray(b["nodes"])) return;
+    const ids = new Map<string, number>();
+    const walk = (nodes: readonly unknown[], where: string): void => {
+      nodes.forEach((raw, i) => {
+        const here = `${where}[${String(i)}]`;
+        if (!isRecord(raw)) {
+          e.push(`${at}: node ${here} must be an object`);
+          return;
+        }
+        requireString(raw, "id", e, `${at} node ${here}`);
+        requireString(raw, "label", e, `${at} node ${here}`);
+        const id = raw["id"];
+        if (isString(id)) ids.set(id, (ids.get(id) ?? 0) + 1);
+        const children = raw["children"];
+        if (children === undefined) return;
+        if (!isArray(children)) {
+          e.push(`${at} node ${here}: "children" must be an array`);
+          return;
+        }
+        walk(children, `${here}.children`);
+      });
+    };
+    walk(b["nodes"], "nodes");
+    for (const [id, count] of ids) {
+      if (count > 1) {
+        e.push(
+          `${at}: node id "${id}" appears ${String(count)} times (C04 I129) — ` +
+            `each visible node is an element and expand names one, so a duplicate has no correct target`,
+        );
+      }
+    }
+  },
   tip: (b, e, at) => {
     requireString(b, "text", e, at);
     checkActions(b, e, at);

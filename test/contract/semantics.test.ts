@@ -25,16 +25,16 @@ const NAME_FIELD: Readonly<Record<KnownBlockKind, string | null>> = {
   notice: "text", tip: "text", code: "language", patch: "path", panel: "title",
   status: "message", image: "alt",
   keyValue: null, table: null, comparison: null, steps: null, logs: null, events: null,
-  plot: null, pills: null, tape: null, mosaic: null, scroll: null, group: null,
+  plot: null, pills: null, tape: null, tree: null, mosaic: null, scroll: null, group: null,
   terminal: null, raw: null,
 };
 
 describe("C09 §7h — every block, every element", () => {
   it("T2.177 (C09 I116): a role for every known kind", () => {
-    // **The control is the twenty-five, both ways**: the table's keys are the
+    // **The control is the twenty-six, both ways**: the table's keys are the
     // corpus's, which is keyed by `KnownBlockKind` and exhaustive by type.
     expect(Object.keys(SEMANTIC_ROLES).sort()).toEqual(Object.keys(ONE_PER_KIND).sort());
-    expect(Object.keys(SEMANTIC_ROLES)).toHaveLength(25);
+    expect(Object.keys(SEMANTIC_ROLES)).toHaveLength(26);
     for (const [kind, b] of Object.entries(ONE_PER_KIND)) expect(roleOf(b), kind).toBe(SEMANTIC_ROLES[kind as KnownBlockKind]);
 
     expect(roleOf(block({ kind: "notice", id: "n", tone: "error", glyph: "error", text: "x" }))).toBe("alert");
@@ -111,5 +111,41 @@ describe("C09 §7h — every block, every element", () => {
     expect(nodeOf(kv, 60).children, "nothing sheds, nothing to reach").toEqual([]);
   });
 
-  it.todo("T2.180 (C09 I116, C09 I118): a tree reads tree and its rows treeitem — not deferred on a component: specified ahead of the code in this commit");
+  it("T2.180 (C09 I116, C09 I118): a tree reads tree and its rows treeitem", () => {
+    const t = block({
+      kind: "tree",
+      id: "t",
+      nodes: [
+        { id: "src", label: "src", children: [{ id: "a", label: "a" }, { id: "b", label: "b" }] },
+        { id: "pkg", label: "package.json" },
+      ],
+    });
+    const shut = nodeOf(t);
+    expect(shut.role).toBe("tree");
+    expect(shut.name, "a tree has no label field").toBe("");
+    // Asserted literally — two at the root collapsed.
+    expect(shut.children.map((c) => [c.id, c.role, c.position, c.actions])).toEqual([
+      ["src", "treeitem", { index: 1, of: 2 }, ["confirm", "copy"]],
+      ["pkg", "treeitem", { index: 2, of: 2 }, ["copy"]],
+    ]);
+    // Expanded: four, the children in place, `position` over the visible nodes.
+    const open = nodeOf(
+      block({
+        kind: "tree",
+        id: "t",
+        nodes: [
+          { id: "src", label: "src", expanded: true, children: [{ id: "a", label: "a" }, { id: "b", label: "b" }] },
+          { id: "pkg", label: "package.json" },
+        ],
+      }),
+    );
+    expect(open.children.map((c) => [c.id, c.position?.index, c.position?.of])).toEqual([
+      ["src", 1, 4],
+      ["a", 2, 4],
+      ["b", 3, 4],
+      ["pkg", 4, 4],
+    ]);
+    // The control: a table's rows are still `row`.
+    expect(walk(nodeOf(ONE_PER_KIND.table)).filter((n) => n.role === "treeitem")).toEqual([]);
+  });
 });

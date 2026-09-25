@@ -90,6 +90,12 @@ const BAR_PERCENT =
  */
 export const POST_INK: ReadonlyMap<string, string> = new Map([
   [
+    "tree",
+    "C04 I129 / §3ap / §105 (ruling 20): the tree is a kind §105 asks for and Ink never "
+    + "drew — it was registered after the producer was deleted, so no capture of it "
+    + "exists and none can be made",
+  ],
+  [
     "tape",
     "C04 I124 / §3ao / §095 (M14): the tape is a kind §095 asks for and Ink never "
     + "drew — it was registered after the producer was deleted, so no capture of it "

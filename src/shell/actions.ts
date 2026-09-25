@@ -29,7 +29,7 @@
  */
 
 import { descendants } from "../data/viewmodel/index.js";
-import type { Action, Block, Scroll } from "../data/viewmodel/index.js";
+import type { Action, Block, Scroll, TreeNode } from "../data/viewmodel/index.js";
 import type { EntryId, TranscriptStore } from "../viewport/transcript/index.js";
 
 /** The schemes an `open` action may use. Nothing else reaches the OS handler. */
@@ -62,6 +62,16 @@ export type ActionDeps = Readonly<{
  * Exported because the refusal is the interesting half and a test that derives
  * its expectation from the same walk agrees with itself.
  */
+/** The node carrying `id`, at any depth of a tree (C04 I129), or undefined. */
+function findNode(nodes: readonly TreeNode[], id: string): TreeNode | undefined {
+  for (const n of nodes) {
+    if (n.id === id) return n;
+    const inner = n.children === undefined ? undefined : findNode(n.children, id);
+    if (inner !== undefined) return inner;
+  }
+  return undefined;
+}
+
 export function isFrozen(transcript: TranscriptStore, entryId: EntryId | null): boolean {
   if (entryId === null) return false;
   return transcript.liveId !== entryId;
@@ -159,8 +169,15 @@ export function createActionDispatcher(deps: ActionDeps) {
         ];
 
         for (const b of reachable) {
-          if (b.kind !== "table") continue;
-          const row = b.rows.find((r) => r.id === action.target);
+          // **A tree's node is a row here** (C04 I129, §3ap E1), found at any
+          // depth of its tree; the first block in document order holding the id
+          // answers, as it does between two tables (C23 I31, §3ap E4).
+          const row =
+            b.kind === "table"
+              ? b.rows.find((r) => r.id === action.target)
+              : b.kind === "tree"
+                ? findNode(b.nodes, action.target)
+                : undefined;
           if (row === undefined) continue;
 
           const outcome = deps.transcript.patch(

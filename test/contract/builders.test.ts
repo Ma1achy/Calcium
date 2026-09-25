@@ -147,6 +147,9 @@ const BUILDERS: readonly Readonly<{
   // their own and a leading space would put the mark off the gutter it belongs in.
   { name: "choice", gaps: false, kind: "choice", make: (o) => b.choice([{ id: "a", label: "linear" }], o) },
   { name: "control", gaps: false, kind: "control", make: (o) => b.control("learning rate", 0.42, "3e-4", o) },
+  // **`gaps: true`, as `table` and `steps`** — a tree is a section of its own,
+  // not a row of peers set against the one before it (C04 §3ap).
+  { name: "tree", gaps: true, kind: "tree", make: (o) => b.tree([{ id: "src", label: "src", children: [] }], o) },
   { name: "tip", gaps: true, kind: "tip", make: (o) => b.tip("press ? for help", undefined, o) },
   { name: "panel", gaps: true, kind: "panel", make: (o) => b.panel("details", [b.raw("x")], o) },
   { name: "group", gaps: false, kind: "group", make: (o) => b.group("column", [b.raw("x")], o) },
@@ -218,7 +221,7 @@ const BUILDERS: readonly Readonly<{
 ];
 
 describe("C24 §4 — the twenty-seven builders", () => {
-  it("T2.9: the enumeration covers every block-returning builder, and twenty-five is the count", () => {
+  it("T2.9: the enumeration covers every block-returning builder, and twenty-six is the count", () => {
     // The count is asserted so that adding a builder without a row fails here
     // rather than silently going untested — which is exactly how §4's paragraph
     // came to name two builders that did not exist.

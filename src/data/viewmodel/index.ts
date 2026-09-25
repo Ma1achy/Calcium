@@ -64,6 +64,8 @@ export type {
   Choice,
   Control,
   Tape,
+  Tree,
+  TreeNode,
   Plot,
   Camera,
   PlotForm,

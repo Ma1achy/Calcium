@@ -597,6 +597,21 @@ export function expectDocument(
               }
             }
             break;
+          case "tree": {
+            const walk = (nodes: typeof block.nodes): void => {
+              for (const n of nodes) {
+                if (bare(undefined, undefined, n.label)) {
+                  offences.push(
+                    `tree "${block.id}" has a node with an empty label — ` +
+                      `the name is the node's content, and its twisty is derived`,
+                  );
+                }
+                if (n.children !== undefined) walk(n.children);
+              }
+            };
+            walk(block.nodes);
+            break;
+          }
           case "table":
             for (const r of block.rows) {
               for (const [key, cell] of Object.entries(r.cells)) {

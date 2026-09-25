@@ -1,11 +1,11 @@
 {
   "label": "all",
-  "only": "c09-semantics",
+  "only": "c04-tree-kind",
   "rows": [
     {
-      "run": "c09-semantics.mjs",
+      "run": "c04-tree-kind.mjs",
       "exit": 0,
-      "seconds": 32,
+      "seconds": 28,
       "state": "green",
       "restored": 0,
       "caught": 13,

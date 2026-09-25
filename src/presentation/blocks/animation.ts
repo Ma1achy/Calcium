@@ -52,6 +52,9 @@ export const ANIMATES: Readonly<Record<KnownBlockKind, boolean>> = Object.freeze
   // the same fact `steps` animates for — the window itself never moves on a
   // tick, only when the current leaves it (C04 I124).
   tape: true,
+  // A tree has no clock and no spinner: its rows change when a flag does,
+  // which is a patch and a frame, never a tick (C04 I129).
+  tree: false,
   table: false,
   tip: false,
 });

@@ -322,6 +322,7 @@ holds? Both are defensible and the first is the one this reconciliation's
 authority points at, which is why it is asked rather than taken.
 
 > **Ruled 2026-09-24.** **Yes**: build §105's five primitives, together with the divider's chord and the scrollbar's. **Owed.**
+> **Tree built 2026-09-25** (C04 §3ap, I129–I131). Its twisty is the hollow disclosure pair, not §105's filled one, because `▸` has been focus since R-BLK-928. Its indent is capped by the widest visible name, one number for the whole block. A tree is kept whole in a bounded box: its ladder is chosen over every row, so a slice would pick a different rung. Form, split, palette and toast are still owed.
 
 **20 · RULED — Whether this reconciliation builds §105's five primitives.** §105 draws a
 tree, a form, a split, a command palette and a toast, and says *each is built

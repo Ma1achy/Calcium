@@ -24,6 +24,7 @@ import type {
   PatchResult,
   Table,
   TableRow,
+  TreeNode,
   ViewDocument,
   ViewPatch,
 } from "./types.js";
@@ -72,6 +73,33 @@ function withoutFloor<B extends Block>(block: B): B {
   if (block.minHeight === undefined) return block;
   const { minHeight: _dropped, ...rest } = block;
   return rest as B;
+}
+
+/**
+ * `nodes` with node `id`'s flag set, at any depth — or null when no node
+ * carries it (C04 I129). Only the path to the node is rebuilt, so every other
+ * subtree keeps its identity and its own flags (§3ap L8).
+ */
+function withNodeExpanded(
+  nodes: readonly TreeNode[],
+  id: string,
+  expanded: boolean,
+): readonly TreeNode[] | null {
+  for (let i = 0; i < nodes.length; i += 1) { // cells-ok — an index over nodes
+    const node = nodes[i];
+    if (node === undefined) continue;
+    const next =
+      node.id === id
+        ? { ...node, expanded }
+        : node.children === undefined
+          ? null
+          : (() => {
+              const children = withNodeExpanded(node.children, id, expanded);
+              return children === null ? null : { ...node, children };
+            })();
+    if (next !== null) return nodes.map((n, j) => (j === i ? next : n));
+  }
+  return null;
 }
 
 function rewrite(blocks: readonly Block[], id: string, f: (b: Block) => Block): readonly Block[] {
@@ -254,6 +282,16 @@ export function applyPatch(doc: ViewDocument, patch: ViewPatch): PatchResult {
       let wrongKind: string | null = null;
       let noSuchRow = false;
       const blocks = rewrite(doc.blocks, patch.blockId, (b) => {
+        // **A tree's node is the row here** (C04 I129), at any depth of the
+        // tree the op names — the same flag, the same inversion, one axis down.
+        if (b.kind === "tree") {
+          const nodes = withNodeExpanded(b.nodes, patch.rowId, patch.expanded);
+          if (nodes === null) {
+            noSuchRow = true;
+            return b;
+          }
+          return withoutFloor({ ...b, nodes });
+        }
         if (b.kind !== "table") {
           wrongKind = b.kind;
           return b;
@@ -272,12 +310,12 @@ export function applyPatch(doc: ViewDocument, patch: ViewPatch): PatchResult {
 
       if (wrongKind !== null) {
         return fail(
-          `expand: block "${patch.blockId}" is a ${String(wrongKind)}, which has no rows`,
+          `expand: block "${patch.blockId}" is a ${String(wrongKind)}, which has no rows or nodes`,
           "expand",
         );
       }
       if (noSuchRow) {
-        return fail(`expand: no row "${patch.rowId}" in block "${patch.blockId}"`, "expand");
+        return fail(`expand: no row or node "${patch.rowId}" in block "${patch.blockId}"`, "expand");
       }
 
       return { ok: true, doc: deepFreeze({ ...doc, blocks }) };

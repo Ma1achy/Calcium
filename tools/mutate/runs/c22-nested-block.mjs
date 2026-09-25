@@ -97,8 +97,15 @@ const results = await runPass({
         "          ...entry.doc.blocks.flatMap((b) => [...descendants(b)]),\n" +
         "        ];\n\n" +
         "        for (const b of reachable) {\n" +
-        "          if (b.kind !== \"table\") continue;\n" +
-        "          const row = b.rows.find((r) => r.id === action.target);\n" +
+        "          // **A tree's node is a row here** (C04 I129, §3ap E1), found at any\n" +
+        "          // depth of its tree; the first block in document order holding the id\n" +
+        "          // answers, as it does between two tables (C23 I31, §3ap E4).\n" +
+        "          const row =\n" +
+        "            b.kind === \"table\"\n" +
+        "              ? b.rows.find((r) => r.id === action.target)\n" +
+        "              : b.kind === \"tree\"\n" +
+        "                ? findNode(b.nodes, action.target)\n" +
+        "                : undefined;\n" +
         "          if (row === undefined) continue;\n\n" +
         "          const outcome = deps.transcript.patch(\n" +
         "            from,\n",
@@ -109,8 +116,12 @@ const results = await runPass({
         "          ),\n" +
         "        );\n\n" +
         "        for (const [owner, b] of every) {\n" +
-        "          if (b.kind !== \"table\") continue;\n" +
-        "          const row = b.rows.find((r) => r.id === action.target);\n" +
+        "          const row =\n" +
+        "            b.kind === \"table\"\n" +
+        "              ? b.rows.find((r) => r.id === action.target)\n" +
+        "              : b.kind === \"tree\"\n" +
+        "                ? findNode(b.nodes, action.target)\n" +
+        "                : undefined;\n" +
         "          if (row === undefined) continue;\n\n" +
         "          const outcome = deps.transcript.patch(\n" +
         "            owner,\n",

@@ -75,6 +75,8 @@ import type {
   Choice,
   Control,
   Tape,
+  Tree,
+  TreeNode,
   Plot,
   Progress,
   Ramp,
@@ -1231,6 +1233,17 @@ function tape(members: readonly TapeMember[], current?: string, opts?: BlockOpts
   );
 }
 
+/**
+ * A tree — the twisty is content, the guides are decoration (C04 §3ap, §105).
+ *
+ * `children` present, even empty, is a node with a twisty; `expanded` absent is
+ * collapsed. Node ids are unique within the tree at any depth (C04 I129),
+ * because each visible node is an element and `expand` names one.
+ */
+function tree(nodes: readonly TreeNode[], opts?: BlockOpts): Tree {
+  return finish<Tree>({ kind: "tree", id: idOf(opts, "tree"), nodes } as Tree, opts, true);
+}
+
 function tip(text: string, actions?: readonly Action[], opts?: BlockOpts): Tip {
   return finish<Tip>(
     {
@@ -1968,6 +1981,7 @@ export const b = {
   choice,
   control,
   tape,
+  tree,
   tip,
   panel,
   group,

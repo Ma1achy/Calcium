@@ -251,6 +251,7 @@ const KEPT_WHOLE: Readonly<Record<string, string>> = {
   steps: "one row per step, `logs`' shape again, so it divides in principle and does not — an unmeasured F424 candidate",
   tape: "one row at every width, and the window it slides is horizontal — there is no vertical unit to divide into, and shedding a member is the one thing §095 exists to refuse (C04 I124)",
   tip: "`ceil(cells(text) / w)` of one text, as `notice` — dim, with fill actions, and nothing to divide into",
+  tree: "the ladder is chosen over every visible row (C04 I130), so a slice of the rows picks a different rung than the whole and draws different cells — dividing needs the rung carried into the window, which is a field no block has. The cost is F424's, paid by a tree taller than its box, and no producer draws one yet",
 };
 
 describe("C09 §2a — a block reduced to a valid smaller block", () => {
@@ -636,7 +637,7 @@ describe("C09 §2c width — the registry's answer (I42, I44)", () => {
   // `choice` declares one — its natural width is where the last option ends
   // (C09 I105). `control` declares none: §018's track takes the residual, so a
   // control fills and the registry's default already says that.
-  const DECLARING = ["notice", "raw", "pills", "tape", "choice", "keyValue", "code", "table", "group", "panel"];
+  const DECLARING = ["notice", "raw", "pills", "tape", "tree", "choice", "keyValue", "code", "table", "group", "panel"];
 
   it("T2.110 (C09 I42): a kind declaring no width answers the width, and an answer outside the range is clamped and reported", () => {
     const kit = measurable({ definitions: [plotDefinition as never, tableDefinition as never] });

@@ -1382,8 +1382,10 @@ export const GLYPH_DOMAINS: Readonly<Record<Glyph, readonly string[]>> = {
   running: ["row-lead"],
   queued: ["row-lead"],
   cancelled: ["row-lead"],
-  expand: ["row-lead"],
-  collapse: ["row-lead"],
+  // **And a tree's twisty** (C04 I131): the same pair in the tree's own indent
+  // columns, where the guide beside it is `vertical`.
+  expand: ["row-lead", "tree"],
+  collapse: ["row-lead", "tree"],
   focus: ["row-lead"],
   bullet: ["row-lead"],
   quote: ["row-lead"],
@@ -1411,7 +1413,9 @@ export const GLYPH_SET_DOMAINS: Readonly<Record<keyof GlyphSet, readonly string[
   separator: ["inline"],
 
   horizontal: ["border"],
-  vertical: ["border"],
+  // **And a tree's guide** (C04 I130) — block content in the indent columns,
+  // not the transcript gutter, so it does not meet the quote rail's `|`.
+  vertical: ["border", "tree"],
   dashedVertical: ["border"],
   dashedHorizontal: ["border"],
   topLeft: ["border"],

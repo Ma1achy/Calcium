@@ -774,7 +774,8 @@
    "row-lead"
   ],
   "collapse": [
-   "row-lead"
+   "row-lead",
+   "tree"
   ],
   "continuation": [
    "row-lead"
@@ -787,7 +788,8 @@
    "row-lead"
   ],
   "expand": [
-   "row-lead"
+   "row-lead",
+   "tree"
   ],
   "focus": [
    "row-lead"
@@ -952,7 +954,8 @@
    "border"
   ],
   "vertical": [
-   "border"
+   "border",
+   "tree"
   ],
   "warning": [
    "row-lead",

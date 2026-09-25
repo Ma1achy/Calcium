@@ -32,6 +32,8 @@ export type SemanticRole =
   | "figure"
   | "group"
   | "document"
+  | "tree"
+  | "treeitem"
   | "row"
   | "cell";
 
@@ -93,6 +95,7 @@ export const SEMANTIC_ROLES: Readonly<Record<KnownBlockKind, SemanticRole>> = Ob
   raw: "document",
   terminal: "document",
   patch: "document",
+  tree: "tree",
 });
 
 /** An application's own kind reads `document`, as its fallback draws `raw`. */
@@ -151,14 +154,16 @@ function stateOf(block: Block): readonly SemanticState[] {
 }
 
 /** I118 — an element as a node: its level's role, its place, the registry's action ids. */
-function elementNode(e: NavElement, index: number, of: number): SemanticNode {
+function elementNode(e: NavElement, index: number, of: number, parent: SemanticRole): SemanticNode {
   const actions = [
     ...(e.activate !== undefined || e.viewState === true ? ["confirm"] : []),
     ...(e.copy !== undefined ? ["copy"] : []),
   ];
   return Object.freeze({
     id: e.id,
-    role: e.level === "cell" ? "cell" : "row",
+    // **`treeitem` for a tree's rows** (I118): a screen reader announces depth
+    // and expansion for a `treeitem` and nothing for a `row`.
+    role: parent === "tree" ? "treeitem" : e.level === "cell" ? "cell" : "row",
     name: "",
     state: [],
     position: Object.freeze({ index: index + 1, of }),
@@ -192,6 +197,6 @@ export function semanticsOf(
   const elements = elementsOf(block, width);
   return Object.freeze({
     ...base,
-    children: Object.freeze(elements.map((e, i) => elementNode(e, i, elements.length))), // cells-ok — a count of elements
+    children: Object.freeze(elements.map((e, i) => elementNode(e, i, elements.length, base.role))), // cells-ok — a count of elements
   });
 }

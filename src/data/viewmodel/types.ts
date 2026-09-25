@@ -3189,6 +3189,42 @@ export type Tape = Readonly<{
   current?: string;
 }> & Padded & Floor;
 
+/**
+ * One node of a `tree` (C04 §3ap, I129, §105).
+ *
+ * **`children` present — even empty — is a node with a twisty; absent is a
+ * leaf.** A directory with nothing in it is still a directory (L6), and a
+ * leaf's `expanded` is ignored, because a twisty on a leaf would be a control
+ * that does nothing (L7). Each node owns its flag: a collapsed ancestor hides
+ * a descendant's without clearing it, so re-expanding restores the subtree as
+ * the reader left it (L8).
+ */
+export type TreeNode = Readonly<{
+  /** Unique within the block at any depth — each visible node is an element (C26 I6). */
+  id: string;
+  /** The name — content, and never shed (I130). */
+  label: string;
+  /** Right-aligned beside the name — §105's `4.1 kB`, one all-or-nothing group (I130). */
+  aside?: string;
+  /** Absent is collapsed, as a table row's is. */
+  expanded?: boolean;
+  children?: readonly TreeNode[];
+}>;
+
+/**
+ * A tree — the twisty is content, the guides are decoration (C04 §3ap, I129,
+ * I130, I131, §105).
+ *
+ * **A kind because of what it holds together**: expansion a reader changes per
+ * node, guides that shed apart from the names, and one focusable row per
+ * visible node. `op: "expand"` names a node as it names a table's row.
+ */
+export type Tree = Readonly<{
+  kind: "tree";
+  id: string;
+  nodes: readonly TreeNode[];
+}> & Padded & Floor;
+
 export type Tip = Readonly<{
   kind: "tip";
   id: string;
@@ -3862,6 +3898,7 @@ export type KnownBlockKinds = {
   choice: Choice;
   control: Control;
   tape: Tape;
+  tree: Tree;
   tip: Tip;
   panel: Panel;
   group: Group;

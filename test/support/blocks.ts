@@ -192,6 +192,36 @@ export const ONE_PER_KIND: Readonly<Record<KnownBlockKind, Block>> = Object.free
     current: "count",
   }),
 
+  // C04 §3ap — §105's own tree. **Three depths, a collapsed folder, a leaf
+  // at the root and two asides**, so the representative reaches every rung of
+  // C04 I130's ladder across the corpus's widths — guides at the wide ones, the
+  // asides gone and the indent capped at the narrow ones — and both halves of
+  // the twisty pair.
+  tree: block({
+    kind: "tree",
+    id: "tree-1",
+    nodes: [
+      {
+        id: "src",
+        label: "src",
+        expanded: true,
+        children: [
+          {
+            id: "interaction",
+            label: "interaction",
+            expanded: true,
+            children: [
+              { id: "parser", label: "parser", children: [{ id: "decode", label: "decode.ts" }] },
+              { id: "frame", label: "frame.ts", aside: "4.1 kB" },
+            ],
+          },
+          { id: "data", label: "data", children: [] },
+        ],
+      },
+      { id: "package", label: "package.json", aside: "1.2 kB" },
+    ],
+  }),
+
   tip: block({
     kind: "tip",
     id: "tip-1",

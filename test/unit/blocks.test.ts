@@ -223,6 +223,7 @@ describe("C09 §6 — the registry's transition table", () => {
     "twenty-three": 23,
     "twenty-four": 24,
     "twenty-five": 25,
+    "twenty-six": 26,
     one: 1,
     two: 2,
     three: 3,
@@ -264,6 +265,7 @@ describe("C09 §6 — the registry's transition table", () => {
       comparison: 2, // rows + header
       pills: 1, // one logical row
       tape: 1, // one row at every width — the window is what changes
+      tree: 6, // visible nodes — `parser` is collapsed, so `decode.ts` is not one (C04 I129)
       choice: 1, // a checkbox or a radio group, on one row (C09 I105)
       control: 1, // label, track and value, on one row (C09 I106)
       tip: 1, // ceil(cells / w)
