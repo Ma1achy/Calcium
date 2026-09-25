@@ -713,7 +713,7 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
   const noticeAt = (b: typeof NOTICE, focus: FocusState | null, depth: 24 | 1 = 24) =>
     renderToLines(registry, b, 40, { theme, capabilities: capabilities({ colourDepth: depth }), focus });
 
-  it("T1.75b (C09 I45, C14 I54, R-THM-003): a washed call head on the selection band takes the state's own mark", () => {
+  it("T1.75b (C09 I45, C14 I54, R-THM-005): a washed call head on the selection band takes the state's own mark", () => {
     const STATES = ["queued", "running", "succeeded", "failed", "cancelled"] as const;
     const caps = capabilities({ colourDepth: 24 });
     const WASHED: ReadonlySet<string> = new Set(["n"]);
@@ -737,7 +737,7 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
     expect(STATES.map((s) => headOf(theme, s, WASHED)), "dark: washed, still ●").toEqual(STATES.map(() => running));
   });
 
-  it("T1.75 (C09 I45, C10 I45, R-THM-003): a focused call head on a band takes the state's own mark, and the page keeps ●", () => {
+  it("T1.75 (C09 I45, C10 I45, R-THM-005): a focused call head on a band takes the state's own mark, and the page keeps ●", () => {
     const STATES = ["queued", "running", "succeeded", "failed", "cancelled"] as const;
     const caps = capabilities({ colourDepth: 24 });
     const headOf = (t: typeof theme, state: (typeof STATES)[number], focus: FocusState | null): string => {
@@ -1034,7 +1034,7 @@ describe("C11 I14 — the ink a focused or selected row takes", () => {
       );
     }
 
-    // **A banded theme is the same rule and not an exception** (R-THM-003): the
+    // **A banded theme is the same rule and not an exception** (R-THM-005): the
     // band answers for every slot, so the row does read as one ink — the
     // one-ink reading kept exactly where it was ever true.
     const hc = loadTheme(defaultTheme, "hcDark");

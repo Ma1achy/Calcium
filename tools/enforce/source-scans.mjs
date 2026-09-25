@@ -1797,7 +1797,7 @@ export const SURFACE_ROLES = Object.freeze({
   diffAdd: { role: "text" },
   diffRemove: { role: "text" },
   bgDeep: { role: "text" },
-  selection: { role: "gated", gate: "validateBands", why: "a band's ink answers for every ref on it (`bandInk`, R-THM-003), and `validateBands` measures it; a theme without a band paints no ink change on it" },
+  selection: { role: "gated", gate: "validateBands", why: "a band's ink answers for every ref on it (`bandInk`, R-THM-005), and `validateBands` measures it; a theme without a band paints no ink change on it" },
   pick: { role: "gated", gate: "pickPairs", why: "the focused chip's ink is `surface.pickInk`, one pair, measured by `pickPairs`" },
   errorGround: { role: "gated", gate: "errorTagPairs", why: "the error tag's ink is `surface.errorInk`, one pair, measured by `errorTagPairs`" },
   errorInk: { role: "ink", why: "the error tag's foreground, on `errorGround`" },

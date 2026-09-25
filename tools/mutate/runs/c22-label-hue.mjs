@@ -49,7 +49,7 @@ const results = runPass({
     },
     {
       // The ink taken from the hue rather than from the band — a hue drawn on
-      // itself, which is `R-THM-003`'s failure exactly: an ink chosen by
+      // itself, which is `R-THM-005`'s failure exactly: an ink chosen by
       // whoever was nearest rather than by the band it lands on. It reads as a
       // tidy simplification, and at 4.62 : 1 worst the two are far apart.
       name: "the label's ink taken from the hue's own ink, not from its band",

@@ -1,4 +1,4 @@
-// The head mark under a banded selection (C14 I54, C09 I45, `R-THM-003`).
+// The head mark under a banded selection (C14 I54, C09 I45, `R-THM-005`).
 //
 // **Every mutation here leaves a selection that washes and a head that
 // draws.** The ground and the band's ink are I53's and untouched; what changes

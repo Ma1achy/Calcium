@@ -1,4 +1,4 @@
-// C10 I45, R-THM-003 — the band, its total ink, and the four contrasts.
+// C10 I45, R-THM-005 — the band, its total ink, and the four contrasts.
 //
 // **The subject is totality, and totality is invisible to a sweep.** Every row
 // about `hcDark` was green while ten of its nineteen meaning slots sat below the

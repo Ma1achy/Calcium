@@ -18719,15 +18719,31 @@
       "id": "R-THM-003",
       "title": "A high-contrast theme takes focus and selection as bands",
       "text": "In a high-contrast theme, focus and selection are bands rather than grounds an ink is composed against: the band declares one colour and one ink, and everything drawn on the band takes that ink, so the theme's ratio holds by construction and no slot can fall through a list. Tone is spent on a banded row, so state moves to the glyph and the outcome word, which is the one-bit rung's carrier asked per cell rather than per terminal; the focus mark persists on the band. Four contrasts bind and the gate checks each as stated: every ink keeps the theme's declared ratio against its own band; the selection band keeps 3 : 1 against the page, because the ground is selection's only carrier; the focus band keeps 3 : 1 against the selection band, because the two can be adjacent; and the focus band keeps only 2 : 1 against the page, because the focus mark already carries focus at the declared ratio and the band need only read as an extent. It follows that the focus band is the one nearer the page and the selection band the one further from it, which is a consequence of the constraints rather than a choice.",
-      "status": "current",
+      "status": "superseded",
       "sectionKey": "current-contract",
       "tags": [
         "contract"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-THM-005",
       "legacyIds": [],
       "contentDigest": "947f328a3748e1afc918007fa069e7bc40420a6c7f51e65403eafc12276e6fc2"
+    },
+    {
+      "id": "R-THM-005",
+      "title": "A high-contrast theme takes focus and selection as bands",
+      "text": "In a high-contrast theme, focus and selection are bands rather than grounds an ink is composed against: the band declares one colour and one ink, and everything drawn on the band takes that ink, so the theme's ratio holds by construction and no slot can fall through a list. Tone is spent on a banded row, so state moves to the glyph and the outcome word, which is the one-bit rung's carrier asked per cell rather than per terminal; the focus mark persists on the band. Four contrasts bind and the gate checks each as stated: every ink keeps the theme's declared ratio against its own band; the selection band keeps 3 : 1 against the page, because the ground is selection's only ground-level carrier — its second is the `▌` selection rail (§017), a mark in the gutter's domain and not the prompt's caret; the focus band keeps 3 : 1 against the selection band, because the two can be adjacent; and the focus band keeps only 2 : 1 against the page, because the focus mark already carries focus at the declared ratio and the band need only read as an extent. It follows that the focus band is the one nearer the page and the selection band the one further from it, which is a consequence of the constraints rather than a choice.",
+      "status": "current",
+      "sectionKey": "current-contract",
+      "tags": [
+        "contract"
+      ],
+      "supersedes": [
+        "R-THM-003"
+      ],
+      "supersededBy": null,
+      "legacyIds": [],
+      "contentDigest": "01e69ec2bf18fe6df45a353ade8687766606e7bf1489b7bf0501130787b83610"
     },
     {
       "id": "R-THM-004",
@@ -23675,7 +23691,7 @@
       "status": "current",
       "ruleIds": [
         "R-THM-001",
-        "R-THM-003"
+        "R-THM-005"
       ]
     },
     {
@@ -23772,7 +23788,7 @@
       "status": "current",
       "ruleIds": [
         "R-THM-001",
-        "R-THM-003"
+        "R-THM-005"
       ]
     },
     {
@@ -23933,7 +23949,7 @@
       "status": "current",
       "ruleIds": [
         "R-THM-001",
-        "R-THM-003"
+        "R-THM-005"
       ]
     },
     {
@@ -24030,7 +24046,7 @@
       "status": "current",
       "ruleIds": [
         "R-THM-001",
-        "R-THM-003"
+        "R-THM-005"
       ]
     },
     {

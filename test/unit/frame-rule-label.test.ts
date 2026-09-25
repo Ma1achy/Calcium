@@ -180,7 +180,7 @@ describe("C22 §6l.10 — the labelled rule", () => {
       expect(run, `${hue}: the label is painted`).not.toBe("");
       expect(run, `${hue}: and not with the untinted ground`).not.toBe(untinted);
       runs.set(hue, run);
-      // The ink comes WITH the band — `R-THM-003`, and it is why the third tier
+      // The ink comes WITH the band — `R-THM-005`, and it is why the third tier
       // exists. Both channels are in the one run, which is what says the ink was
       // not left behind on the ground's arrival (the first build's defect: the
       // ground was handed back on the `colour` channel and silently dropped).
@@ -193,7 +193,7 @@ describe("C22 §6l.10 — the labelled rule", () => {
     // row was missing.** A mutation taking the ink from the hue's own colour
     // survived every check above: ten runs still distinct, a ground still
     // painted, an ink still in the run. All of them are true of a hue drawn on
-    // itself, which is `R-THM-003`'s failure exactly — an ink chosen by whoever
+    // itself, which is `R-THM-005`'s failure exactly — an ink chosen by whoever
     // was nearest rather than by the band it lands on.
     //
     // What separates them is the shape of the tier rather than any value: the

@@ -220,7 +220,7 @@ describe("C10 contract", () => {
    * answer to *would anything notice if it stopped clearing*.
    */
   /**
-   * **T2.42 (C10 I45, R-THM-003) — each of the four, broken on its own.**
+   * **T2.42 (C10 I45, R-THM-005) — each of the four, broken on its own.**
    *
    * A gate that passes on the shipped set has been read, not verified: every one
    * of these four constraints holds today, so a sweep over the shipped themes
@@ -422,7 +422,7 @@ describe("C10 contract", () => {
     expect(resolved, "ten hues through the resolver in ten themes").toBe(100);
   });
 
-  it("T2.55 (C10 I45, R-THM-003): a third band is measured against ITS OWN ground, not selection's", () => {
+  it("T2.55 (C10 I45, R-THM-005): a third band is measured against ITS OWN ground, not selection's", () => {
     const hc = defaultTheme["hcDark"]!;
     expect(validateBands(hc), "the shipped band clears every constraint").toEqual([]);
 
@@ -457,7 +457,7 @@ describe("C10 contract", () => {
     expect(validateBands(fine), "and nothing else moved").toEqual([]);
   });
 
-  it("T2.42 (I45, R-THM-003): the four band contrasts each fire on their own", () => {
+  it("T2.42 (I45, R-THM-005): the four band contrasts each fire on their own", () => {
     const hc = defaultTheme["hcDark"]!;
     expect(validateBands(hc), "the shipped band clears every constraint").toEqual([]);
     expect(hc.bandInk, "and it is a banded theme, so the gate is not vacuous").toBeDefined();
@@ -502,7 +502,7 @@ describe("C10 contract", () => {
   /**
    * **T2.43 (C10 I45) — a band's ink is total, which is the whole of why it exists.**
    */
-  it("T2.43 (I45, R-THM-003): every meaning ink on a band resolves to the band's ink", () => {
+  it("T2.43 (I45, R-THM-005): every meaning ink on a band resolves to the band's ink", () => {
     for (const id of ["hcDark", "hcLight"]) {
       const t = defaultTheme[id]!;
       for (const band of ["focusGround", "selection"] as const) {
@@ -1895,7 +1895,7 @@ describe("C10 I48 — the ink a slot takes on the ground it lands on", () => {
    * for the reason T2.14c's count is: a ground or a slot leaving the sweep is
    * otherwise a smaller green run.
    */
-  it("T2.49 (I48, R-THM-001, R-THM-003, F1240): the painter's ink and the gate's ink are one value", () => {
+  it("T2.49 (I48, R-THM-001, R-THM-005, F1240): the painter's ink and the gate's ink are one value", () => {
     const grounds = ["selection", "focusGround"] as const;
     const wrong: string[] = [];
     let pairs = 0;

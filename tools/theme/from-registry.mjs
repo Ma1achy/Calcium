@@ -205,7 +205,7 @@ function tokensFor(themeId) {
         hues[hue].ground = norm(value);
       }
       else surfaces[name] = norm(value);
-      // **A band declares its ground and its one ink together** (R-THM-003).
+      // **A band declares its ground and its one ink together** (R-THM-005).
       // Before this arm existed the `color:` on such a rule was read, found to be
       // a `.bg-` selector, and dropped \u2014 a declaration with no reader, which is
       // the shape that makes a promise unenforceable. A band's ink is total by
@@ -334,7 +334,7 @@ function solveDiffGrounds(themeId, tone, surfaces, composed) {
   return out;
 }
 /**
- * `<band>` -> the one ink everything on that band takes (R-THM-003), omitted
+ * `<band>` -> the one ink everything on that band takes (R-THM-005), omitted
  * entirely when a theme declares no band.
  *
  * Separate from `composed` because it is a different claim. `composed` is a

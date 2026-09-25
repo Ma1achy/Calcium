@@ -125,7 +125,7 @@ export function resolve(ref: ColourRef, theme: ResolvedTheme, caps: Caps, on?: s
  * arriving on a surface instead of on the page.
  *
  * A band answers for every slot, so on a banded ground every entry is the band's
- * one ink — and the set collapses to one value on purpose. That is R-THM-003
+ * one ink — and the set collapses to one value on purpose. That is R-THM-005
  * and not a degenerate case.
  */
 function composedSlots(
@@ -155,7 +155,7 @@ function compute(ref: ColourRef, theme: ResolvedTheme, depth: Depth, on?: string
   if (palette === undefined || flat === undefined) return NO_STYLE;
 
   // **The composition step is `inkOn` and not a second copy of the rule** (I48):
-  // the band first (R-THM-003), then the theme's `(ground, ref)` value
+  // the band first (R-THM-005), then the theme's `(ground, ref)` value
   // (R-THM-001), then the flat slot. `inkOn` answers `""` for a ref it cannot
   // place, which is the flat slot's cue rather than an error — `resolve` is
   // total (I1) and a missing composition is not a missing slot.
@@ -231,7 +231,7 @@ function surface(ref: ColourRef, slot: string, theme: ResolvedTheme, depth: Dept
  * other two tiers, for a hue used as a painted label. Both come from the one
  * `hues` record, and the ink on a band comes with the band because it is a
  * property of the band — a caller choosing its own ink over a hue is the
- * failure `R-THM-003` exists to prevent.
+ * failure `R-THM-005` exists to prevent.
  *
  * `null` for a name the theme does not carry, and `null` at the two rungs that
  * cannot serve it: at 1-bit no colour is emitted at all (I2), and at 4-bit

@@ -414,7 +414,7 @@ export const CALL_STATE_GLYPH: Readonly<Record<CallState, Glyph>> = Object.freez
  * five meanings distinguished only by colour is the collapse §030 accepts
  * because it has `●` to fall back on, which ASCII does not.
  *
- * **And per cell, on a band** (C10 I45, R-THM-003). A band's ink is total, so a
+ * **And per cell, on a band** (C10 I45, R-THM-005). A band's ink is total, so a
  * cell on one has spent its tone exactly as a 1-bit terminal has. `onBand` is
  * the ground's answer and the capability record cannot give it: in `hcDark` a
  * focused head is on a band and every other head on the page is not.

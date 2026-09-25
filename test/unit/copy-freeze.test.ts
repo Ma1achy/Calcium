@@ -339,7 +339,7 @@ describe("C14 §6d — the selection's ground", () => {
     expect(mono).toContain("▸ x");
   });
 
-  it("T1.40e (C14 I53, R-THM-003): on a banded theme the wash carries the band's ink, and every cell takes it", () => {
+  it("T1.40e (C14 I53, R-THM-005): on a banded theme the wash carries the band's ink, and every cell takes it", () => {
     const SGR = /\x1b\[[0-9;]*m/uy;
     const lastBefore = (out: string): string[] => {
       const seen: string[] = [];

@@ -117,11 +117,11 @@ const FLOORS: Readonly<Record<string, number>> = Object.freeze({
 
 export const DEFAULT_FLOOR = 4.5;
 
-/** A selection band against the page (R-THM-003) — the ground is its only carrier. */
+/** A selection band against the page (R-THM-005) — the ground is its only carrier. */
 export const BAND_VS_PAGE = 3;
-/** A focus band against the page (R-THM-003) — relaxed, because the focus mark carries focus. */
+/** A focus band against the page (R-THM-005) — relaxed, because the focus mark carries focus. */
 export const FOCUS_VS_PAGE = 2;
-/** The two bands against each other (R-THM-003) — they can be adjacent rows. */
+/** The two bands against each other (R-THM-005) — they can be adjacent rows. */
 export const BAND_VS_BAND = 3;
 
 /**
@@ -141,7 +141,7 @@ export const BAND_VS_BAND = 3;
  * `validateTokens`, so they kept the birthday clause the src had already lost.
  */
 export function inkOn(tokens: ThemeTokens, ref: string, surfaceName: string): string {
-  // **A band answers for every ref, and it answers first** (R-THM-003). The band
+  // **A band answers for every ref, and it answers first** (R-THM-005). The band
   // ink is the ink for everything drawn on that surface, so it outranks both a
   // per-slot composition and the flat slot — a band whose ratio a later
   // composition could undercut would be a promise held everywhere except where
@@ -503,7 +503,7 @@ function validateDecorationText(tokens: ThemeTokens): readonly ThemeError[] {
     //
     // **Through `inkOn` rather than reading `composed` directly**, which is the
     // fourth time that lookup has been written out and the second time a copy of
-    // it has been left behind by a change: a band (R-THM-003) answers for every
+    // it has been left behind by a change: a band (R-THM-005) answers for every
     // ref on its surface and a direct read of `composed` cannot see one, so this
     // check would have measured a flat categorical slot against a band the
     // renderer never paints it on.
@@ -676,7 +676,7 @@ export function validateTokens(tokens: ThemeTokens): readonly ThemeError[] {
 }
 
 /**
- * **The four contrasts a band declares, checked as stated** (R-THM-003).
+ * **The four contrasts a band declares, checked as stated** (R-THM-005).
  *
  * Not one rule with four consequences but four separate claims, because they bind
  * for four different reasons and a reader meeting a failure needs the reason, not
@@ -866,7 +866,7 @@ function validatePalette(
   /**
    * **The whole token set, where this took `composed` alone.** A floor is a claim
    * about the ink a ground actually takes, and that answer now has more than one
-   * source — a band (R-THM-003) as well as a composition. Narrowing the parameter
+   * source — a band (R-THM-005) as well as a composition. Narrowing the parameter
    * to the one mechanism that existed when it was written is what made bands
    * invisible here; `inkOn` is the answer, and it needs the set.
    */

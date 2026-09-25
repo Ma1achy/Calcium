@@ -136,7 +136,7 @@ const release = (col: number, row: number): string =>
   `[<0;${String(col)};${String(row)}m`;
 
 describe("C14 §6f — the drag in a real session", () => {
-  it("T4.37f (C14 I54, R-THM-003): in hcDark a selected failed head draws its own mark, and esc restores ●", async () => {
+  it("T4.37f (C14 I54, R-THM-005): in hcDark a selected failed head draws its own mark, and esc restores ●", async () => {
     vi.useFakeTimers();
     try {
       // The head's first cell, read off the screen: the glyph lead is the mark

@@ -166,7 +166,7 @@ export type Surfaces = Readonly<{
  * text — an agent's name in the strip; `ground` is the hue as a band; and `on` is
  * whichever of black or white reads **on** that band, which is a property of the
  * band and not of the hue. A single colour per hue cannot express the third, and
- * a band whose ink is guessed is the failure R-THM-003 exists to prevent.
+ * a band whose ink is guessed is the failure R-THM-005 exists to prevent.
  *
  * **Per theme, all three.** Measured over the registry's 300 tokens: `ground`
  * takes nine distinct values across the ten themes, `on` is black in some and
@@ -180,7 +180,7 @@ export type Hue = Readonly<{
   ink: string;
   /** The hue as a band. */
   ground: string;
-  /** The ink that reads on that band (`R-THM-003`). */
+  /** The ink that reads on that band (`R-THM-005`). */
   on: string;
 }>;
 
@@ -276,7 +276,7 @@ export type ThemeTokens = Readonly<{
   floor?: number;
 
   /**
-   * A band's one ink (R-THM-003): `<surface>` -> the ink everything drawn on that
+   * A band's one ink (R-THM-005): `<surface>` -> the ink everything drawn on that
    * surface takes, whatever slot it names.
    *
    * **Total, where `composed` is enumerated**, and that difference is the whole

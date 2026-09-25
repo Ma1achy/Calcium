@@ -269,7 +269,7 @@ function labelSpansOf(
   // **The hue the application named, or `bgElev` when it named none** (I114,
   // §070, C10 I55). Both the band and its ink come from the hue, because the
   // ink on a band is a property of the band — a label whose ink is guessed is
-  // the failure `R-THM-003` exists to prevent. A name no theme carries paints
+  // the failure `R-THM-005` exists to prevent. A name no theme carries paints
   // the untinted ground rather than nothing: the name arrives from a config
   // file where a person typed it, so the reachable wrong input is a misspelling.
   const band = label.hue === undefined ? null : resolveHueBand(deps.theme, label.hue, deps.capabilities);

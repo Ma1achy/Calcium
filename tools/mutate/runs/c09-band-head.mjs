@@ -1,5 +1,5 @@
 // The head mark on a band — tone is spent per cell, not per terminal (C09 I45,
-// C10 I45, `R-THM-003`).
+// C10 I45, `R-THM-005`).
 //
 // **Every mutation here leaves a head that draws.** A call head still has a
 // mark, the page still reads, and at 1 bit every state still has its shape.
