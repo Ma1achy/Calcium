@@ -959,10 +959,10 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     // capital and there is no separate bit — both spellings render `⇧`.
     expect(chordText({ name: "C", meta: true })).toBe("⌥⇧C");
     expect(chordText({ name: "v", meta: true })).toBe("⌥v");
-    // The parked arm (clause 6): below Unicode this is the shorthand, because
-    // the design registers none of its eleven chord glyphs and so declares no
-    // fallback.
-    expect(chordText({ name: "enter", shift: true }, false)).toBe("s+enter");
+    // Below Unicode this was the shorthand while clause 6 was parked; ruling 15
+    // gave the ASCII rung Emacs text names (I58, T1.110), so the slot and the
+    // display now differ at both rungs.
+    expect(chordText({ name: "enter", shift: true }, false)).toBe("S-Enter");
 
     // **The premise `MARK_EXEMPTIONS` rests on, re-checked here rather than
     // inherited** — `chrome.ts`'s T1.46e is the precedent and the same subject.
@@ -1742,5 +1742,35 @@ describe("C16 I55 — the platform keeps its chords", () => {
 });
 
 describe("C16 I58 — a chord has one spelling per rung", () => {
-  it.todo("T1.110 (I58): chordText at the ASCII rung spells every binding in Emacs text names — not deferred on a component: specified ahead of the code in this commit");
+  it("T1.110 (I58): chordText at the ASCII rung spells every binding in Emacs text names", () => {
+    // The eleven glyphs the Unicode rung draws, none of which an ASCII terminal renders.
+    const GLYPHS = ["⌃", "⌥", "⇧", "⌘", "⏎", "⇥", "↑", "↓", "←", "→", "⌫"];
+    for (const b of defaultKeymap) {
+      const text = chordText(b.key, false);
+      expect(/^[\x21-\x7e]+$/u.test(text), `${b.action} is printable ASCII — \`${text}\``).toBe(true);
+      for (const g of GLYPHS) expect(text, `${b.action} carries ${g}`).not.toContain(g);
+    }
+    // **By equality on the design's own chords**: a printable-ASCII check is
+    // satisfied by a spelling that drops the modifier, which is a different key.
+    const CASES: readonly (readonly [Key, string, string])[] = [
+      [{ name: "enter", shift: true } as Key, "⇧⏎", "S-Enter"],
+      [{ name: "c", ctrl: true } as Key, "⌃C", "C-c"],
+      [{ name: "c", meta: true, shift: true } as Key, "⌥⇧C", "M-C"],
+      [{ name: "1", super: true } as Key, "⌘1", "s-1"],
+      [{ name: "backspace", meta: true } as Key, "⌥⌫", "M-Backspace"],
+      [{ name: "tab", shift: true } as Key, "⇧⇥", "S-Tab"],
+      [{ name: "escape" } as Key, "esc", "Esc"],
+      [{ name: "]", ctrl: true } as Key, "⌃]", "C-]"],
+    ];
+    // Every named key is capitalised (I58's list stopped at `Backspace` once,
+    // and `/help` printed `C-home` beside `C-Left`).
+    const lower = defaultKeymap
+      .map((b) => chordText(b.key, false).replace(/^([CMSs]-)+/u, ""))
+      .filter((t) => /^[a-z]{2,}/u.test(t));
+    expect([...new Set(lower)], "a named key reaching the ASCII rung as an identifier").toEqual([]);
+    for (const [key, unicode, ascii] of CASES) {
+      expect(chordText(key, true), "the Unicode rung is the registry's").toBe(unicode);
+      expect(chordText(key, false), `${unicode} at ASCII`).toBe(ascii);
+    }
+  });
 });

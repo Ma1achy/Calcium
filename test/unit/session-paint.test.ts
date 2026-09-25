@@ -28,8 +28,9 @@ import type { Placed } from "../../src/viewport/overlay/index.js";
 import type { ProfileReport } from "../../src/shell/profiling/types.js";
 import { registry as measurer, rows as contentRows } from "../support/overlay.js";
 import { buildSession } from "../support/session.js";
-import { makeDefaultChrome, ownerLine, shedToWidth } from "../../src/shell/chrome.js";
-import type { OwnerRung } from "../../src/interaction/router/types.js";
+import { childBorderLegend, makeDefaultChrome, ownerLine, shedToWidth } from "../../src/shell/chrome.js";
+import type { Key, OwnerRung } from "../../src/interaction/router/types.js";
+import { chordText, defaultKeymap } from "../../src/interaction/router/keymap.js";
 import { tone } from "../../src/presentation/blocks/paint.js";
 import type { Block, Pills } from "../../src/data/viewmodel/index.js";
 
@@ -990,12 +991,15 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
     // sheds, so at 60 columns the ASCII line took a second row and the frame
     // grew by one. A footer that spends a transcript row to say what the keys do
     // has inverted what the line is for.
-    for (const rung of ALL_RUNGS) {
-      const full = ownerLine(rung, FULL_CAPS);
-      const narrow = shedToWidth(full, 24, FULL_CAPS);
+    // **At both rungs** (C16 I58): the ladder found the exit by a literal
+    // `"esc"`, and the ASCII chip reads `Esc out` — so at ASCII the way out was
+    // shed like any other chip, and this row, run at Unicode alone, agreed.
+    for (const caps of [FULL_CAPS, ASCII_CAPS]) for (const rung of ALL_RUNGS) {
+      const full = ownerLine(rung, caps);
+      const narrow = shedToWidth(full, 24, caps);
       expect(narrow.length, `the ${rung} rung sheds at 24 columns`).toBeLessThan(full.length);
       expect(narrow[0], `the ${rung} rung keeps its owner`).toEqual(full[0]);
-      const exit = full.find((c) => c.label.includes("esc") || c.label.includes("host escape"));
+      const exit = full.find((c) => /^(esc|Esc) /u.test(c.label) || c.label.includes("host escape"));
       // `scope` has no escape: its second survivor is the primary action, which
       // is the same rule reaching the same place by the same order.
       expect(narrow, `the ${rung} rung keeps the way out`).toContain(exit ?? full[1]);
@@ -1144,5 +1148,61 @@ describe("C22 §6l.11 — the chip's ground in the prompt", () => {
 
 
 describe("C16 I58 — the owner line asks chordText", () => {
-  it.todo("T1.111 (C16 I58, C22 §6l): the owner line spells every chord as chordText does, at both rungs — not deferred on a component: specified ahead of the code in this commit");
+  it("T1.111 (C16 I58, C22 §6l): the owner line spells every chord as chordText does, at both rungs", () => {
+    const RUNGS: readonly OwnerRung[] = ["child", "copy", "question", "substate", "inside", "scope"];
+    const labels = (rung: OwnerRung, caps: typeof FULL_CAPS): string[] => ownerLine(rung, caps).map((c) => c.label);
+
+    // **By equality**, the scope rung at ASCII — the line a reader on a plain
+    // terminal sees most, and the one whose table had drifted.
+    const scope = labels("scope", ASCII_CAPS);
+    for (const want of ["Enter send", "S-Enter newline", "Tab complete", "S-Tab transcript"]) {
+      expect(scope, "the scope rung at ASCII").toContain(want);
+    }
+    // The registry writes `⌃C`, and the line's own table wrote `⌃c`. It is the
+    // child's border legend that draws it — the child rung's owner line names
+    // `⌃]` alone.
+    expect(childBorderLegend(FULL_CAPS), "the child's legend at Unicode").toContain("⌃C interrupts child");
+    expect(childBorderLegend(FULL_CAPS)).not.toContain("⌃c");
+    expect(childBorderLegend(ASCII_CAPS), "and at ASCII").toContain("C-c interrupts child");
+
+    // **Every chord on the line, at both rungs, is chordText's**: the key part of
+    // a chip is everything before its first space, and it must be a spelling
+    // chordText produces for some binding — or a pair of them, joined by one
+    // rule. A label that is not a chord (`keys → child`, an owner word) has no
+    // chordText spelling and is read as prose.
+    const spellings = (unicode: boolean): Set<string> =>
+      new Set([
+        ...defaultKeymap.map((b) => chordText(b.key, unicode)),
+        ...["enter", "tab", "up", "down", "left", "right", "escape"].flatMap((name) =>
+          [{ name }, { name, shift: true }].map((k) => chordText(k as Key, unicode))),
+        chordText({ name: "]", ctrl: true } as Key, unicode),
+        chordText({ name: "escape", meta: true } as Key, unicode),
+        chordText({ name: "c", ctrl: true } as Key, unicode),
+      ]);
+    let chords = 0;
+    for (const [caps, unicode] of [[FULL_CAPS, true], [ASCII_CAPS, false]] as const) {
+      const known = spellings(unicode);
+      for (const rung of RUNGS) {
+        for (const label of [...labels(rung, caps), ...childBorderLegend(caps).split(/ [:\u00b7] /u)]) {
+          const head = label.split(" ")[0] ?? "";
+          const parts = unicode ? [head] : head.split("/");
+          const pair = unicode && !known.has(head) ? [head.slice(0, 1), head.slice(1)] : parts;
+          if (!pair.every((p) => known.has(p))) continue;
+          chords += 1;
+          // The pair rule: nothing between two keys at Unicode, `/` at ASCII.
+          if (pair.length === 2) expect(head, `${rung}: \`${label}\``).toBe(pair.join(unicode ? "" : "/"));
+        }
+      }
+      // And the old ASCII spellings are gone. At Unicode `esc` is the
+      // registry's own spelling (§019), so the check is the ASCII rung's.
+      if (!unicode) for (const rung of RUNGS) {
+        for (const label of labels(rung, caps)) {
+          expect(label, `${rung}: \`${label}\``).not.toMatch(/^(arrows|up\/down|left\/right|enter|tab|S-enter|S-tab|esc) /u);
+        }
+      }
+    }
+    // The count is read, not assumed: the lines draw chords, so a matcher that
+    // recognised nothing would pass every row above.
+    expect(chords, "the owner lines drew chords the matcher recognised").toBeGreaterThan(20);
+  });
 });

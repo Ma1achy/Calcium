@@ -26,7 +26,7 @@ exports[`golden frames — a composed session, not a block > SF1 · boot · asci
 21 >                                                                               
 22 --------------------------------------------------------------------------------
 23 /help                                                                      /work
-24 enter send  S-enter newline  tab complete  S-tab transcript                     "
+24 Enter send  S-Enter newline  Tab complete  S-Tab transcript                     "
 `;
 
 exports[`golden frames — a composed session, not a block > SF1 · boot · dark — the grid 1`] = `
@@ -835,7 +835,7 @@ exports[`golden frames — a composed session, not a block > SF1 · window-tail 
 13   last                                                      
 14 ------------------------------------------------------------
 15 /help                                                  /work
-16 enter send  S-enter newline  tab complete  S-tab transcript "
+16 Enter send  S-Enter newline  Tab complete  S-Tab transcript "
 `;
 
 exports[`golden frames — a composed session, not a block > SF1 · window-tail · dark — the grid 1`] = `
@@ -1895,19 +1895,19 @@ ESC[90m
 ESC[39m
 CRLF
 ESC[90m
-«enter send»
+«Enter send»
 ESC[39m
 «» +2sp
 ESC[90m
-«S-enter newline»
+«S-Enter newline»
 ESC[39m
 «» +2sp
 ESC[90m
-«tab complete»
+«Tab complete»
 ESC[39m
 «» +2sp
 ESC[90m
-«S-tab transcript»
+«S-Tab transcript»
 ESC[39m
 «» +21sp
 ESC[?25l

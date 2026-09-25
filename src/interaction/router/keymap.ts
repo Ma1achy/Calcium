@@ -78,10 +78,11 @@ export function keySlot(key: Binding["key"]): string {
  * bit. Both render `⇧`, which is why the letter arm tests the name rather than
  * the flag.
  *
- * **The ASCII rung is parked** (C16 §6a clause 6): the design draws eleven chord
- * glyphs and registers none of them, so none has a declared fallback. Below the
- * Unicode rung this answers `keySlot`'s shorthand — the behaviour that already
- * shipped, held as the arm to revisit rather than eleven spellings chosen here.
+ * **The ASCII rung is text names** (C16 I58, ruling 15): Emacs's notation —
+ * `C-` `M-` `S-` `s-` before `Enter` `Esc` `Tab` `Up` `Down` `Left` `Right`
+ * `Backspace` — with Emacs's case rule for a letter: lower case under a
+ * modifier, and a capital *is* the shift, so `⌃C` is `C-c` and `⌥⇧C` is `M-C`.
+ * `s-` and `Backspace` are the batch proposal's, under its assumption.
  */
 const CHORD_KEYS: Readonly<Record<string, string>> = Object.freeze({
   enter: "⏎",
@@ -100,7 +101,7 @@ const CHORD_KEYS: Readonly<Record<string, string>> = Object.freeze({
 });
 
 export function chordText(key: Binding["key"], unicode = true): string {
-  if (!unicode) return keySlot(key);
+  if (!unicode) return chordName(key);
   // A single capital carries the shift on the letters — see the doc comment.
   // A key *name* is an identifier from the decoder's fixed vocabulary (`enter`,
   // `c`, `f1`), never reader text, so "is this one letter" is a unit count and
@@ -121,6 +122,47 @@ export function chordText(key: Binding["key"], unicode = true): string {
   const name =
     key.name.length === 1 && (key.ctrl === true || shift) ? key.name.toUpperCase() : key.name; // graphemes-ok
   return `${mods}${CHORD_KEYS[key.name] ?? name}`;
+}
+
+/** The keys the ASCII rung names, where the Unicode rung draws a glyph (C16 I58). */
+const CHORD_NAMES: Readonly<Record<string, string>> = Object.freeze({
+  enter: "Enter",
+  tab: "Tab",
+  up: "Up",
+  down: "Down",
+  left: "Left",
+  right: "Right",
+  backspace: "Backspace",
+  home: "Home",
+  end: "End",
+  pageup: "PageUp",
+  pagedown: "PageDown",
+  delete: "Delete",
+  escape: "Esc",
+  f1: "F1",
+});
+
+/**
+ * A chord in Emacs's text names — `chordText`'s ASCII rung (C16 I58).
+ *
+ * **A letter's case is the shift**, which is why the shift flag is spelled `S-`
+ * only on a named key: `⇧C` is the capital `C` and not `S-c`. The same letter
+ * under `C-` or `M-` alone is lower case, so the registry's `⌃C` — written with
+ * a capital by convention and not because shift is held — reads `C-c`.
+ */
+function chordName(key: Binding["key"]): string {
+  // A key *name* is an identifier from the decoder's fixed vocabulary, never
+  // reader text, so "one letter" is a unit count — see `chordText`.
+  const letter = key.name.length === 1 && key.name.toLowerCase() !== key.name.toUpperCase(); // graphemes-ok
+  const capital = letter && key.name !== key.name.toLowerCase();
+  const shifted = key.shift === true || capital;
+  const mods =
+    (key.ctrl === true ? "C-" : "") +
+    (key.meta === true ? "M-" : "") +
+    (shifted && !letter ? "S-" : "") +
+    (key.super === true ? "s-" : "");
+  const name = letter ? (shifted ? key.name.toUpperCase() : key.name.toLowerCase()) : key.name;
+  return `${mods}${CHORD_NAMES[key.name] ?? name}`;
 }
 
 /** `(target, key)` as one comparable string. */

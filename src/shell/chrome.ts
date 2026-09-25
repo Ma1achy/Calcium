@@ -20,7 +20,8 @@ import { glyphs } from "../presentation/blocks/index.js";
 import { cells } from "../presentation/text.js";
 import type { ChromeContext, ChromeFn, CopyState } from "./types.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
-import type { OwnerRung } from "../interaction/router/types.js";
+import type { Binding, OwnerRung } from "../interaction/router/types.js";
+import { chordText } from "../interaction/router/keymap.js";
 
 type Chip = Pills["chips"][number];
 
@@ -197,6 +198,23 @@ const mark = (m: Mark, caps: TerminalCapabilities): string =>
   caps.unicode === "ascii" ? m[1] : m[0];
 
 /**
+ * A chord and what it does, **spelled by `chordText` at the terminal's rung**
+ * (C16 I58). The line held its own table of ASCII spellings and it drifted
+ * three ways — `↑↓` was `arrows` on one rung and `up/down` on another, and
+ * `⌃c` stood where the registry writes `⌃C`. A pair of keys joins with nothing
+ * at Unicode (`↑↓`) and `/` in text names (`Up/Down`), one rule for every pair.
+ */
+const hint = (keys: readonly Binding["key"][], does: string, caps: TerminalCapabilities): string => {
+  const unicode = caps.unicode !== "ascii";
+  return `${keys.map((k) => chordText(k, unicode)).join(unicode ? "" : "/")} ${does}`;
+};
+
+const ENTER = { name: "enter" } as const;
+const ESC = { name: "escape" } as const;
+const UP = { name: "up" } as const;
+const DOWN = { name: "down" } as const;
+
+/**
  * The gap `pills` puts between chips, so the shed measures what will be drawn
  * rather than the sum of the labels (`simple.ts` `CHIP_GAP`).
  */
@@ -236,7 +254,11 @@ export function shedToWidth(
     chips.reduce((n, c, i) => n + cells(c.label, caps.ambiguousWidth) + (i > 0 ? OWNER_GAP : 0), 0);
   if (line.length <= 1 || width(line) <= columns) return line;
 
-  const exit = line.findIndex((c) => c.label.includes("esc") || c.label.includes("host escape"));
+  // **The way out is found by the spelling `hint` gave it** (C16 I58): a literal
+  // `"esc"` matched the Unicode rung alone, so at ASCII — where the chip reads
+  // `Esc out` — the ladder found no exit and shed it like any other chip.
+  const esc = `${chordText(ESC, caps.unicode !== "ascii")} `;
+  const exit = line.findIndex((c) => c.label.startsWith(esc) || c.label.includes("host escape"));
   // The two §103 names. When there is no escape on the line the second survivor
   // is the primary action, which is the chip that follows the owner.
   const keep = new Set([0, exit === -1 ? 1 : exit]);
@@ -269,9 +291,9 @@ export function childBorderLegend(caps: TerminalCapabilities): string {
   // draws as a question mark between two chords a reader is trying to read.
   const sep = ` ${glyphs(caps).separator} `;
   return [
-    mark(["\u2303] host escape", "C-] host escape"], caps),
-    mark(["\u2325esc enhanced detach", "M-esc enhanced detach"], caps),
-    mark(["\u2303c interrupts child", "C-c interrupts child"], caps),
+    hint([{ name: "]", ctrl: true }], "host escape", caps),
+    hint([{ name: "escape", meta: true }], "enhanced detach", caps),
+    hint([{ name: "c", ctrl: true }], "interrupts child", caps),
   ].join(sep);
 }
 
@@ -310,7 +332,7 @@ function ownerChips(
       return [
         { label: "attached", tone: "warn" },
         { label: mark(["keys → child", "keys -> child"], caps), tone: "muted" },
-        { label: mark(["⌃] host escape", "C-] host escape"], caps), tone: "muted" },
+        { label: hint([{ name: "]", ctrl: true }], "host escape", caps), tone: "muted" },
       ];
     case "copy": {
       // **Native handoff** (C14 I55, fixture 044): the terminal owns the mouse,
@@ -320,7 +342,7 @@ function ownerChips(
           { label: "native", tone: "warn" },
           { label: "mouse tracking off", tone: "muted" },
           { label: "the terminal owns the mouse", tone: "muted" },
-          { label: "esc out", tone: "muted" },
+          { label: hint([ESC], "out", caps), tone: "muted" },
           { label: "the screen is frozen", tone: "muted" },
         ];
       }
@@ -333,15 +355,15 @@ function ownerChips(
         // the axis belongs to `R-SEL-007`'s rectangular selection, which copies
         // cells rather than source. A footer naming a key that does nothing is
         // C16 I19's second keymap disagreeing with the first.
-        { label: mark(["↑↓ extend", "arrows extend"], caps), tone: "muted" },
-        { label: mark(["⏎ copy", "enter copy"], caps), tone: "muted" },
+        { label: hint([UP, DOWN], "extend", caps), tone: "muted" },
+        { label: hint([ENTER], "copy", caps), tone: "muted" },
         // **Two chips, not one label with a `·` in it.** The separator is the
         // cluster's to draw (C09 I49) — a literal one in a string is the head's
         // unresolved join F828 found, and T2.116 is right to refuse it here too.
         // **Which press is next** (`R-SEL-005`, C16 I51): over a selection the
         // first `esc` clears it, and a footer saying `out` labels that press as
         // the leaving one.
-        { label: size === null ? "esc out" : "esc clear", tone: "muted" },
+        { label: hint([ESC], size === null ? "out" : "clear", caps), tone: "muted" },
         // **The count, over the copy text** (C14 I38, I55, `R-SEL-015`): what
         // `⏎` would put on the clipboard now, as question 35 ruled it —
         // `418 chars · 9 rows · 2 entries`. **One chip**, because the pill's gap
@@ -376,30 +398,30 @@ function ownerChips(
       return [
         { label: "question", tone: "warn" },
         { label: "declared actions", tone: "muted" },
-        { label: "esc safe path", tone: "muted" },
+        { label: hint([ESC], "safe path", caps), tone: "muted" },
       ];
     case "substate":
       return [
         { label: "find", tone: "accent" },
-        { label: mark(["↑↓ hits", "up/down hits"], caps), tone: "muted" },
-        { label: mark(["⏎ open", "enter open"], caps), tone: "muted" },
-        { label: "esc close", tone: "muted" },
+        { label: hint([UP, DOWN], "hits", caps), tone: "muted" },
+        { label: hint([ENTER], "open", caps), tone: "muted" },
+        { label: hint([ESC], "close", caps), tone: "muted" },
       ];
     case "inside":
       return [
         { label: "inside", tone: "accent" },
-        { label: mark(["←→ orbit", "left/right orbit"], caps), tone: "muted" },
-        { label: mark(["↑↓ tilt", "up/down tilt"], caps), tone: "muted" },
-        { label: "esc out", tone: "muted" },
+        { label: hint([{ name: "left" }, { name: "right" }], "orbit", caps), tone: "muted" },
+        { label: hint([UP, DOWN], "tilt", caps), tone: "muted" },
+        { label: hint([ESC], "out", caps), tone: "muted" },
       ];
     case "scope":
       // No owner word: the scope is the rung a reader is on when nothing has
       // been raised, so naming it would put a label on the absence of one.
       return [
-        { label: mark(["⏎ send", "enter send"], caps), tone: "muted" },
-        { label: mark(["⇧⏎ newline", "S-enter newline"], caps), tone: "muted" },
-        { label: mark(["⇥ complete", "tab complete"], caps), tone: "muted" },
-        { label: mark(["⇧⇥ transcript", "S-tab transcript"], caps), tone: "muted" },
+        { label: hint([ENTER], "send", caps), tone: "muted" },
+        { label: hint([{ name: "enter", shift: true }], "newline", caps), tone: "muted" },
+        { label: hint([{ name: "tab" }], "complete", caps), tone: "muted" },
+        { label: hint([{ name: "tab", shift: true }], "transcript", caps), tone: "muted" },
       ];
     default:
       return [];

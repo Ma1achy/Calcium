@@ -44,7 +44,7 @@ const results = runPass({
       // failure an exemption inherited rather than re-checked would hide.
       name: "the ASCII rung carries the chord glyphs",
       file: K,
-      from: "  if (!unicode) return keySlot(key);",
+      from: "  if (!unicode) return chordName(key);",
       to: "  // the rung is gone",
       expect: "T1.98",
     },
@@ -73,7 +73,7 @@ const results = runPass({
       // the state clause 6 was written to end.
       name: "`chordText` is `keySlot` under another name",
       file: K,
-      from: "  if (!unicode) return keySlot(key);",
+      from: "  if (!unicode) return chordName(key);",
       to: "  return keySlot(key);",
       expect: "T1.98",
     },

@@ -32,8 +32,8 @@ const MUTATIONS = [
     // **As it shipped**: the clearing press labelled as the leaving one.
     name: "esc always says out",
     file: CHROME,
-    from: '{ label: size === null ? "esc out" : "esc clear", tone: "muted" },',
-    to: '{ label: "esc out", tone: "muted" },',
+    from: 'hint([ESC], size === null ? "out" : "clear", caps)',
+    to: 'hint([ESC], "out", caps)',
     expect: "T4.37g",
   },
   {
@@ -107,8 +107,8 @@ const results = await runPass({
     // **A change the run's own corpus can see** (F1254): every copy footer
     // says `esc clear`, so the idle frames fail.
     file: CHROME,
-    from: '{ label: size === null ? "esc out" : "esc clear", tone: "muted" },',
-    to: '{ label: "esc clear", tone: "muted" },',
+    from: 'hint([ESC], size === null ? "out" : "clear", caps)',
+    to: 'hint([ESC], "clear", caps)',
     why: "the idle copy footer says esc clear, so T1.50's and T4.37g's controls fail — if this survives, nothing reads the footer",
   },
   mutations: MUTATIONS,
