@@ -3595,6 +3595,14 @@ export function checkExportedArguments(files, readFile = (f) => readFileSync(f, 
 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
+  // **`configBlock` is ruling 28's table with no verb** (C23 I80). §075 names
+  // the verb `/config`, docker-tui ships a `/config` of its own, and a framework
+  // verb of that name is a parse error for it — parked as 43. The day 43 is
+  // answered the handler draws this, and if nothing in `src/` calls it then,
+  // this entry is the violation.
+  configBlock:
+    "C23 I80, §075, parked 43 — the `key · value · source` table, drawn by the /config "
+    + "handler once the verb's name is answered. T1.75 holds the ladder.",
   operationRows:
     "C23 I76, §036 — the operation's head and its bar, composed by the shell the day an "
     + "adapter reports an operation. Parked because the verb is a gerund the caller supplies "

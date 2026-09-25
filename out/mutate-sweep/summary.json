@@ -1,14 +1,14 @@
 {
   "label": "all",
-  "only": "c09-scrollbar-nested",
+  "only": "c22-config-provenance",
   "rows": [
     {
-      "run": "c09-scrollbar-nested.mjs",
+      "run": "c22-config-provenance.mjs",
       "exit": 0,
-      "seconds": 7,
+      "seconds": 12,
       "state": "green",
       "restored": 0,
-      "caught": 3,
+      "caught": 4,
       "elsewhere": 0,
       "survived": 0,
       "anchorMissed": 0,

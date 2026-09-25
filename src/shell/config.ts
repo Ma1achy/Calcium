@@ -159,6 +159,20 @@ export const DEFAULT_RETAIN_PAYLOADS = 50;
  */
 export const DEFAULT_STATE_DIR = ".calcium";
 
+/**
+ * Where a configuration value came from (C22 I115, §075, `R-HON-008`).
+ *
+ * Ordered as §075's ladder is, by when the layer is applied — and **only
+ * `default` has a producer today**. A `TuiConfig` value is the reader's
+ * default whether the framework supplied it or the application did, because the
+ * reader chose neither. The other three are the reader's own choices; a config
+ * file, the environment and flags declare them the day they are read.
+ */
+export type Provenance = "default" | "config" | "env" | "flag";
+
+/** One reader-facing value, as text, with where it came from (C22 I115). */
+export type Setting = Readonly<{ key: string; value: string; source: Provenance }>;
+
 const REQUIRED = ["name", "binary", "manifest", "theme"] as const;
 
 /**
@@ -412,6 +426,16 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     platform: ambient.platform,
     fs: config.fs ?? ambient.fs,
     stateDir: config.stateDir ?? DEFAULT_STATE_DIR,
+    // **Taken here, at the one site that knows which side of each `??` won**
+    // (C22 I115). Every source is `default`: a caller's value is still one the
+    // reader did not choose, so it is not `config` — that layer is a file the
+    // reader wrote, and nothing reads one yet.
+    settings: Object.freeze<Setting[]>([
+      { key: "motion", value: config.motion ?? "full", source: "default" },
+      { key: "hover", value: String(config.hover ?? false), source: "default" },
+      { key: "maxBlockRows", value: String(config.maxBlockRows ?? DEFAULT_MAX_BLOCK_ROWS), source: "default" },
+      { key: "stateDir", value: config.stateDir ?? DEFAULT_STATE_DIR, source: "default" },
+    ]),
     ...(config.persist === undefined ? {} : { persist: config.persist }),
     openUrl: config.openUrl,
     // C28 I46 — the input tap, applied at the one place that resolves the
