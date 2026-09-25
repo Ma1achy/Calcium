@@ -547,6 +547,7 @@ fine; what cannot happen is a field with no row, or a row for no field.
 | Alternate screen | `altScreen` | **The shell refuses to open**, prints help, exits 0 — on the rich route; linear needs none (I7, I15) | L4 |
 | Route | `renderMode` | **Linear**: an append-only stream of semantic events, and no frame (C22 §6m) | L4 |
 | System notification | `notification` | The `system` rung writes nothing; the bell and the title still reach a reader who opted into them (C22 I128) | L4 |
+| Notification opt-in | `notify` | Nothing is opted in, so no rung fires and focus reporting is not taken — the default, not a failure (I17, C01 I23) | C01 L4 |
 
 Alternate screen is the sole hard requirement (D28). A fullscreen application on the primary screen destroys the user's scrollback, which is worse than not running.
 
