@@ -2431,7 +2431,7 @@ written again.
 | 2 | entry 7 starts; `/clear`; 7 settles | `entry 7 … running`, `transcript cleared`, and nothing for 7 — its id is gone and nothing can be said about it |
 | 3 | entries 7 and 8 both run; 8 settles, then 7 | two starts, then `entry 8:` and `entry 7:` — each completion names its own start |
 | 4 | the transcript evicts entries 1–3 while 7 runs | nothing; 7's completion still reads `entry 7:` |
-| 5 | a question arrives while the reader has typed `abc` | the question's lines, then the input line reads `answer 1–3:` — `abc` is held, and comes back when the question resolves |
+| 5 | a question arrives while the reader has typed `abc` | the question's lines, then the input line reads `answer 1 to 3:` — `abc` is held, and comes back when the question resolves |
 | 6 | `2` while the question is open | `answer: main`, and the input line is `❯ abc` again |
 | 7 | the question's `reply…` is chosen | the input line reads `which branch?:` and the typed reply; `⏎` answers it |
 | 8 | a resize | nothing written; the input line is redrawn at the new width |
@@ -2474,8 +2474,11 @@ is held under it exactly as C17 I29 holds it under a field.
 6. **Never a glyph, never an SGR sequence, never a control character** in an event — the copy
    source is already control-stripped (C09 I18) and nothing in this renderer paints.
 7. **A question is numbered** (I122). `1`–`9` answer it, a choice's own key still answers it,
-   and `reply…` turns the input line into §107's *labelled line editor*. **While C16 I44's
-   guard is armed the cue says so, in the rich footer's own words** — `answer 1–N (ready in a
+   and `reply…` turns the input line into §107's *labelled line editor*. **The cue's range is
+   words, `answer 1 to N:`, as `entry N of M` is** — row 6 holds for the input line too, and
+   an en dash is a mark C09 I22 would have to substitute on an ASCII terminal and speech reads
+   as punctuation rather than as a range. **While C16 I44's
+   guard is armed the cue says so, in the rich footer's own words** — `answer 1 to N (ready in a
    moment): ` — and the key the guard refuses redraws it without them. In rich mode the
    refusal is the footer's armed chip; linear has no footer, and a key refused with nothing
    written is the silent refusal `R-OWN-002` and `R-INT-008` forbid. The redraw is the
@@ -2798,7 +2801,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I119** — *(§6m, §107, `R-ACC-001`, → C01 I22, C02 I15)* **When `capabilities.renderMode` is `linear` the session composes no frame.** No size gate, no spinner, no ramp and no composition runs, and the scheduler's commits redraw the input line and nothing else; the terminal is acquired under C01's linear profile. **The only output edited in place is the input line** — every other byte is appended and never rewritten.
 - **I120** — *(§6m.2, §6m.3)* **Linear events come from transcript changes by §6m.2's table, once per fact.** A start on a streaming `append`; a start and a completion together on a settled `append`; a completion on `settle`; an appended block's body on a `patch` that appends to a settled entry; `transcript cleared` on `clear`; nothing on a streaming `patch`, a replace or merge, or an `evict`. **A start, a completion and an appended block are each written once per id.** An entry's number is its `seq` and *of M* is the highest `seq` so far, so eviction never renumbers a call between its start and its completion.
 - **I121** — *(§6m.4 rulings 4–6, C09 §7h, §057)* **A block reads `<role>[: <name>][ — <valueText>]`, then its source lines** — its own copy source (C09 §7a), and nothing for a `figure` beyond its name. A container reads its children in order. A source line equal to the name is not written twice. No event carries a glyph, an SGR sequence or a control character.
-- **I122** — *(§6m.3 rows 5–7, §107)* **A question is written as its detail's body and one numbered line, and answered by its number.** `1`–`9` answer choices in order and a choice's own key still does; resolution writes `answer: <label>`. While it is open the input line reads `answer 1–N:` — `answer 1–N (ready in a moment):` while C16 I44's guard is armed, redrawn without the clause when the guard refuses a key — or the question and the typed reply when `reply…` is chosen, and the reader's draft is held and given back.
+- **I122** — *(§6m.3 rows 5–7, §107)* **A question is written as its detail's body and one numbered line, and answered by its number.** `1`–`9` answer choices in order and a choice's own key still does; resolution writes `answer: <label>`. While it is open the input line reads `answer 1 to N:` — `answer 1 to N (ready in a moment):` while C16 I44's guard is armed, redrawn without the clause when the guard refuses a key — or the question and the typed reply when `reply…` is chosen, and the reader's draft is held and given back.
 - **I123** — *(§6m.3 row 1, row 8)* **An event is written with the input line erased first and redrawn after**, caret where it was, and the line is windowed to the width round its caret, so a long draft never wraps a row the next erase cannot reach.
 - **I124** — *(§6m.4 ruling 8, §107)* **Every event carries an announcement level**: `assertive` for a failed completion, a question and an appended error or warning notice; `polite` otherwise. Linear stdout writes both, and no event names a transport that does not exist.
 - **I125** — *(§6m.4 ruling 10, §107)* **`/capabilities` shows the route first, then every capability field with its value and its source** — `declared`, `stated`, `inferred`, `assumed` or `unreachable`, as C02 resolved it.
@@ -3320,7 +3323,7 @@ PTY harness.
 - **T4.100** (I118, C04 §3ar F6, F7): a field being edited and a click on `save` — the click focuses `save` and presses nothing, the typed value is written and the line given back; a second click presses it, and the submitted command carries the typed value, not the one before the edit.
 - **T4.101** (I118, C04 §3ar F9, F3, C16 I60): a multi-line paste into a field is refused with its reason and the field is unchanged; `↓` inside a field is dropped and focus stays on the field; and `F1` inside a field puts the keymap in the transcript with the field still being edited — the one key that tells a pass from a reject, since a reject withholds the `global` fallback and every other key the row presses draws the same frame either way.
 - **T4.102** (I119, I120, I123, C01 I22): bytes through stdin on a session with `renderMode: "linear"` — no `?1049h`, `?1002h` or `?25l` is written; a local verb writes its start and completion as ruling 29's lines and its body; a typed draft is erased and redrawn round an event with the caret where it was; a resize writes nothing but the input line.
-- **T4.103** (I122, I124): a question in linear — its numbered line, the cue carrying `(ready in a moment)` while C16 I44's guard is armed, the first `2` refused and the cue redrawn without it, the second `2` answering the second choice, `answer: <label>`, the input line reading `answer 1–3:` while open and the draft given back after; the question's level `assertive`.
+- **T4.103** (I122, I124): a question in linear — its numbered line, the cue carrying `(ready in a moment)` while C16 I44's guard is armed, the first `2` refused and the cue redrawn without it, the second `2` answering the second choice, `answer: <label>`, the input line reading `answer 1 to 3:` while open and the draft given back after; the question's level `assertive`.
 - **T4.104** (I125, C02 I15): `/capabilities` under `CALCIUM_RENDER_MODE=linear` — the route row first, reading `linear` and `stated`, and every capability field after it.
 - **T4.98** (I117, C04 §3aq E5): a press on the divider's column, a motion report with button 0 held five columns to the right, then the release — the divider is five cells right on the frame and focus is where it was. A motion report after the release moves nothing.
 - **T6.113** (I101): the range split dropped from the slot → T4.89a renders every kept child; the gap row dropped from the assembly → T4.89b fails on the first `gapBefore` child.
