@@ -139,7 +139,7 @@ keeps *missing* and *empty* distinct on purpose. The two collide only because
 this tree degrades the em dash where `ambiguousWidth` forbids it. A glyph
 choice, not a divergence left standing.
 
-> **Ruled 2026-09-24.** Already answered: **the frame is the container's.** A sub-panel's border is not the block's enclosure, and focus lights the container's frame.
+> **Ruled 2026-09-24.** Already answered: **the frame is the container's.** A sub-panel's border is not the block's enclosure, and focus lights the container's frame. **Premise measured 2026-09-25: the ruling has no subject in the tree yet.** `smallmultiples` and `pairplot` publish no elements (`registry.elementsOf` answers `[]` for both), so focus never lands on either, and a render handed focus on the block or on a facet draws all four sub-frames `muted` exactly as unfocused. Nothing to build until one of them declares `elements` — **the condition to grep is `elements` on the facet forms in `src/presentation/plot/`**; the day it holds, the container's frame lights and the sub-frames do not. R-COL-005's other frame subject, `panel`, is unaffected and stays in its ledger row.
 
 **14 · RULED — Whether a sub-panel's border is the block's enclosure.** §017 says *a
 FRAME takes its border*, and `smallmultiples` and `pairplot` have four. The
