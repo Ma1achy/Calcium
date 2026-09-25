@@ -12,12 +12,19 @@
 // `...`, so the search missed and the check never ran. An assertion keyed on
 // the thing the defect removes never fires. The row is a cross-rung comparison
 // now — wherever the Unicode rung draws a mark, the ASCII rung must too.
+//
+// **Parked 19 moved the lead to `+`, and the defect this run was written for
+// stopped being a mutation.** The constant `2` is `cells("+") + 1` — the same
+// number the derived reservation gives for up to nine parts — so restoring it
+// changes no frame: the rung dependence has no subject. The control stays,
+// because the reservation still has to exist, and the mutation is the lead
+// becoming a slot again.
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/edge/status.test.ts test/unit/blocks.test.ts";
+const CMD = "npx vitest run test/edge/status.test.ts test/unit/blocks.test.ts test/contract/shed-target.test.ts";
 const S = "src/presentation/blocks/shed.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -39,18 +46,30 @@ const results = runPass({
     // The reservation removed entirely: the mark is composed and nothing is set
     // aside for it, so it comes out of the clamp at *both* rungs. A run where
     // this survives is not reading the drawn row at all.
-    from: "  const mark = markCells(lead, parts.length) + Math.max(gap, 1); // cells-ok — a cell count",
+    from: "  const mark = markCells(parts.length) + Math.max(gap, 1); // cells-ok — a cell count",
     to: "  const mark = 0; // cells-ok — a cell count",
     why: "with nothing reserved the mark is clamped at both rungs; a run where this survives cannot see a kill",
   },
   mutations: [
     {
-      // **THE DEFECT, restored.** Not a fabrication — this is the line as it
-      // shipped, and it took a frame-read at the ASCII rung to find.
-      name: "THE DEFECT: the reservation is the constant 2, and the ASCII lead is three cells",
+      // The lead a slot again — the `residue` glyph's ASCII form, which is what
+      // it was before parked 19. Both rungs would still agree, so the row that
+      // kills this is the one that names the mark rather than compares rungs.
+      name: "the lead is the residue's `...` rather than `+`",
       file: S,
-      from: "  const mark = markCells(lead, parts.length) + Math.max(gap, 1); // cells-ok — a cell count",
-      to: "  const mark = 2 + Math.max(gap, 1); // cells-ok — a cell count",
+      from: 'export const SHED_LEAD = "+";',
+      to: 'export const SHED_LEAD = "...";',
+      expect: "T1.80",
+    },
+    {
+      // **F1257, restored**: the key padded at `narrow` while `truncate` cut at
+      // the terminal's convention. At `wide` a key ending in `…` overruns its
+      // column by a cell and the clamp takes the mark whole — which a per-row
+      // check cannot see, so the row that kills this is the block-wide one.
+      name: "F1257: keyValue pads its key at narrow whatever the terminal says",
+      file: "src/presentation/blocks/kinds/structured.ts",
+      from: "          keyRoom,\n          ambiguous,\n        );",
+      to: "          keyRoom,\n        );",
       expect: "T2.170",
     },
     // **Two more mutations were written here and both survived — and the

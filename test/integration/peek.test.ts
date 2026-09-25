@@ -76,8 +76,6 @@ async function seeded(blocks: readonly unknown[] = [table()]) {
 }
 
 describe("C15 §2a — the peek beside the focused element", () => {
-  it.todo("T4.59 (C09 I113, C15 §2a, C26 §5): a keyValue row that sheds its value is a stop for ↓ and its peek holds the value — not deferred on a component: specified ahead of the code in this commit");
-
   it("T4.10 (C15 I21, C16): with a peek on the stack the keys reach the element — the cell a plain overlay was measured to steal", async () => {
     const s = await seeded();
 
@@ -186,7 +184,7 @@ describe("C15 §2a — the peek beside the focused element", () => {
 });
 
 /** The wire forms and a painting session, as `session-navigation.test.ts` builds one. */
-async function painting() {
+async function painting(blocks: readonly unknown[] = [table()], size = { columns: 80, rows: 24 }) {
   const stdin = fakeStdin();
   const built = await buildSession(
     {
@@ -198,10 +196,10 @@ async function painting() {
         tools: [{ name: "rows", local: true, summary: "three rows", args: [], flags: [] }],
       },
       localHandlers: {
-        rows: () => ({ schema: "tui.view/1", status: "ok", blocks: [table()] }),
+        rows: () => ({ schema: "tui.view/1", status: "ok", blocks }),
       },
     } as never,
-    { columns: 80, rows: 24 },
+    size,
   );
   const type = async (bytes: string): Promise<void> => {
     stdin.emit(bytes);
@@ -214,6 +212,53 @@ async function painting() {
 }
 
 describe("C15 §2a — the frame", () => {
+  it("T4.59 (C09 I113, C15 §2a, C26 §5): a keyValue row that sheds its value is a stop for ↓ and its peek holds the value", async () => {
+    // **In a narrow column, because a top-level keyValue never sheds here.** It
+    // sheds below ten content cells and the frame refuses a terminal under
+    // 60×16, so the column is the only way a session meets this kind shedding.
+    const kv = {
+      kind: "keyValue",
+      id: "k",
+      rows: [
+        { label: "endpoint", value: "https://api.internal.example/v2" },
+        { label: "region", value: "eu-west-1" },
+      ],
+    };
+    const inColumn = (cells: number) => ({
+      kind: "group",
+      id: "g",
+      direction: "row",
+      flex: [{ cells }, 1],
+      children: [kv, { kind: "notice", id: "n", tone: "muted", text: "the rest of the row" }],
+    });
+    const URL = "https://api.internal.example/v2";
+
+    const s = await painting([inColumn(9)]);
+    const bare = s.screen().rows.join("\n");
+    expect(bare, "the row sheds its value and says so").toContain("endpo… +1");
+    expect(bare, "the value is not on screen").not.toContain(URL);
+
+    await s.type(DOWN); // the card's head (C09 I47)
+    expect(s.screen().rows.join("\n"), "the head has no peek").not.toContain("Detail");
+    await s.type(DOWN); // shed-0
+    const first = s.screen().rows.join("\n");
+    expect(first, "shed-0 is a stop and its peek is up").toContain("Detail");
+    expect(first, "and holds the withheld value, whole").toContain(`endpoint  ${URL}`);
+    await s.type(DOWN); // shed-1
+    const second = s.screen().rows.join("\n");
+    expect(second, "the peek moved with focus").toContain("region  eu-west-1");
+    expect(second, "and left the first row's value behind").not.toContain(URL);
+
+    // **The control — the same group with room**: nothing sheds, the block is
+    // atomic as before, and no key ever opens a peek.
+    const roomy = await painting([inColumn(50)]);
+    expect(roomy.screen().rows.join("\n"), "the value fits").toContain(URL);
+    for (let i = 0; i < 3; i += 1) {
+      await roomy.type(DOWN);
+      expect(roomy.screen().rows.join("\n"), `↓ ${String(i + 1)} opens no peek`).not.toContain("Detail");
+    }
+  });
+
   it("T4.11b (C15 §2a, I17): the peek's first row is the element's row plus one, and the rows it does not cover are unchanged", async () => {
     const s = await painting();
     const rowOf = (rows: readonly string[], needle: string): number => {

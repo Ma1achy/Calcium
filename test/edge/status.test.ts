@@ -274,80 +274,80 @@ describe("C09 §3a — the spinner", () => {
     expect(unknown.some((r) => r.includes(frames[0] ?? "\u0000")), "unknown falls back").toBe(true);
   });
 
-  it("T2.170 (C09 I108, I81, R-GLY-003): a shed row keeps its mark whole at both rungs, and the ASCII one could not", () => {
+  it("T2.170 (C09 I108, I81, R-GLY-003): a shed row keeps its mark whole at both rungs, and every shedding kind draws one", () => {
     // **Read from the drawn row, not from `shedRow`'s return**, because the
     // defect is downstream of the plan: the plan named `...2` and the clamp cut
     // it to `..~` on the way into the frame. A row asserting the plan is green
-    // against the picture that shipped.
+    // against the picture that shipped. The lead is `+` at both rungs now
+    // (parked 19), so the rungs are two conventions over one mark.
     //
-    // **The first draft of this row could not fail.** It searched the drawn row
-    // for the lead `...` and checked the digits after it — but `..~` contains no
-    // `...`, so the search missed and the check was skipped. **An assertion
-    // keyed on the thing the defect removes never fires.** What replaces it is
-    // a sweep over every kind that sheds, at every width, at both rungs, asking
-    // two things of each drawn row: that it fits, and that a lead appearing in
-    // it is followed by its count. The damaged form fails the second by
-    // carrying a cut lead — `..~` — which is the shape the shipped reservation
-    // actually drew.
-    //
-    // **Measured on the build this row landed with**: the correct reservation
-    // draws 40 marks and damages none; the shipped constant `2` draws 25 and
-    // damages **19**, every one of them `..~`.
+    // **The first version could not see three of its four kinds.** It cast
+    // each fixture `as never` and skipped any that threw, and `keyValue`
+    // (`pairs`/`key`) and `comparison` (`left`/`right`) threw at every one of
+    // the 55 widths — the sweep that read as four kinds was `events` and a
+    // `steps` fixture on states the type does not have. So the blocks go
+    // through the view model here, nothing is caught, and the count of marks
+    // is asserted **per kind**: a kind that stops drawing one fails rather than
+    // drops out of the total.
     const BLOCKS = [
-      { kind: "events", id: "e", events: [
+      block({ kind: "events", id: "e", events: [
         { ts: "22:13:20", type: "deploy", message: "rolled the fleet forward" },
-        { ts: "22:14:02", type: "warn", message: "one node lagged" }] },
-      { kind: "keyValue", id: "k", pairs: [
-        { key: "endpoint", value: "https://api.internal.example/v2" },
-        { key: "region", value: "eu-west-1" }] },
-      { kind: "comparison", id: "c", rows: [
-        { field: "latency", left: "412 ms", right: "119 ms" },
-        { field: "throughput", left: "3.2k/s", right: "9.8k/s" }] },
-      { kind: "steps", id: "s", steps: [
-        { label: "install dependencies", state: "succeeded" },
-        { label: "run the whole suite", state: "running" }] },
+        { ts: "22:14:02", type: "warn", message: "one node lagged" }] }),
+      block({ kind: "keyValue", id: "k", rows: [
+        { label: "endpoint", value: "https://api.internal.example/v2" },
+        { label: "region", value: "eu-west-1" }] }),
+      block({ kind: "comparison", id: "c", rows: [
+        { field: "latency", a: "412 ms", b: "119 ms", change: "changed" },
+        { field: "throughput", a: "3.2k/s", b: "9.8k/s", change: "changed" }] }),
+      block({ kind: "steps", id: "s", steps: [
+        { label: "install dependencies", state: "done", detail: "412 packages in 9s" },
+        { label: "run the whole suite", state: "active", detail: "unit, contract, edge" }] }),
+      // **East-Asian Ambiguous values, for the `wide` convention** (F1257): the
+      // key column was measured at `narrow` while `truncate` cut at the
+      // terminal's, and a key ending in `…` took its extra cell from the mark.
+      block({ kind: "keyValue", id: "w", rows: [
+        { label: "tolerance", value: "±±" },
+        { label: "drift", value: "±±" }] }),
     ];
 
     const problems: string[] = [];
-    let marks = 0;
+    const marks = new Map<string, number>(BLOCKS.map((b) => [b.id, 0]));
     for (const b of BLOCKS) {
       for (let width = 6; width <= 60; width += 1) {
-        for (const [rung, caps, lead] of [
-          ["unicode", FULL_CAPS, "\u22ef"],
-          ["ascii", ASCII_CAPS, "..."],
+        for (const [rung, caps] of [
+          ["unicode", FULL_CAPS],
+          ["ascii", ASCII_CAPS],
+          ["wide", { ...FULL_CAPS, ambiguousWidth: "wide" as const }],
         ] as const) {
-          let rows: string[];
-          try {
-            rows = measurable({ capabilities: caps as never })
-              .renderToLines(b as never, width)
-              .map(plain);
-          } catch {
-            continue;
+          const rows = measurable({ capabilities: caps }).renderToLines(b, width).map(plain);
+          // **The plan is the block's, so the mark is on every row or on none**
+          // (C09 I81). A clamp that takes the whole mark leaves a row whose last
+          // token is not a lead at all — `tole… …` — which the per-row check
+          // below reads as a row that shed nothing; beside a sibling that kept
+          // its `+1` it is the damage F1257 found.
+          const marked = rows.filter((row) => /^\+[0-9]+$/u.test(row.trimEnd().split(" ").at(-1) ?? "")).length;
+          if (marked !== 0 && marked !== rows.length) {
+            problems.push(`partial ${b.id} ${rung} w${String(width)} ${JSON.stringify(rows)}`);
           }
           for (const row of rows) {
             // A mark whose cells were never reserved is paid for out of the
             // clamp, so this and the mark check are two halves of one fact.
-            if (cells(row) > width) {
-              problems.push(`overflow ${b.kind} ${rung} w${String(width)} |${row}|`);
-            }
-            const at = row.lastIndexOf(lead);
-            if (at === -1) continue;
-            marks += 1;
-            if (!/^[0-9]+$/u.test(row.slice(at + lead.length).trim())) {
-              problems.push(`damaged ${b.kind} ${rung} w${String(width)} |${row}|`);
-            }
+            if (cells(row) > width) problems.push(`overflow ${b.kind} ${rung} w${String(width)} |${row}|`);
+            // The mark is the row's last token. A last token that opens with the
+            // lead and is not the lead and a count is the damaged form — `+~`,
+            // the clamp's cut where the count was.
+            const last = row.trimEnd().split(" ").at(-1) ?? "";
+            if (!last.startsWith("+")) continue;
+            if (/^\+[0-9]+$/u.test(last)) marks.set(b.id, (marks.get(b.id) ?? 0) + 1);
+            else problems.push(`damaged ${b.kind} ${rung} w${String(width)} |${row}|`);
           }
         }
       }
     }
 
     expect(problems).toEqual([]);
-    // The fixture responds to the thing under test: with no mark drawn anywhere
-    // the sweep asserts nothing and passes on any build. The figure is the
-    // count on the build this landed with, not a threshold — it moves when a
-    // kind's parts move, and a run drawing far fewer marks is a fixture that
-    // stopped shedding rather than a pass.
-    expect(marks, "the kinds shed, so there are marks to read").toBeGreaterThan(30);
+    // The fixture responds to the thing under test, kind by kind.
+    for (const [id, n] of marks) expect(n, `${id} sheds, so it draws marks to read`).toBeGreaterThan(0);
   });
 
   it("T3.45 (C09 I32): the default is width-stable, and a narrow-only set takes its ASCII pair", () => {

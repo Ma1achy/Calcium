@@ -1,14 +1,14 @@
 {
   "label": "all",
-  "only": "c09-spinner-interval",
+  "only": "c09-keyvalue-window",
   "rows": [
     {
-      "run": "c09-spinner-interval.mjs",
+      "run": "c09-keyvalue-window.mjs",
       "exit": 0,
-      "seconds": 21,
+      "seconds": 10,
       "state": "green",
       "restored": 0,
-      "caught": 5,
+      "caught": 3,
       "elsewhere": 0,
       "survived": 0,
       "anchorMissed": 0,

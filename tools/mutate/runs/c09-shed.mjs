@@ -51,7 +51,7 @@ const results = runPass({
       // same width, and a part has gone with nothing saying so.
       name: "the withholding is never stated",
       file: SHED,
-      from: "mark: lead === null || solved.shed.length === 0 ? null : `${lead}${String(solved.shed.length)}`,",
+      from: "mark: !marked || solved.shed.length === 0 ? null : `${SHED_LEAD}${String(solved.shed.length)}`,",
       to: "mark: null,",
       expect: "T3.93",
     },
@@ -96,8 +96,8 @@ const results = runPass({
       // is the construction that actually holds the property (F1233).
       name: "the two value columns are measured apart",
       file: KINDS,
-      from: "    const valueNat = Math.max(",
-      to: "    const valueNat = Math.min(",
+      from: "  const valueNat = Math.max(",
+      to: "  const valueNat = Math.min(",
       expect: "T3.93",
     },
     {
@@ -106,8 +106,8 @@ const results = runPass({
       // first span rather than the last — so the frame is the withholding.
       name: "the reservation is taken even where it makes the row clip",
       file: SHED,
-      from: "  return second.clipped ? stated(first, null) : stated(second, lead);",
-      to: "  return stated(second, lead);",
+      from: "  return second.clipped ? stated(first, false) : stated(second, true);",
+      to: "  return stated(second, true);",
       expect: "T3.93",
     },
     {
@@ -127,8 +127,8 @@ const results = runPass({
       // shed before the values, which the frame overturned.
       name: "comparison sheds the field name first",
       file: KINDS,
-      from: '      { id: "field", natural: fieldNat, min: Math.min(fieldNat, MIN_PART), tier: "content" as const, rank: 4 },',
-      to: '      { id: "field", natural: fieldNat, min: Math.min(fieldNat, MIN_PART), tier: "content" as const, rank: 0 },',
+      from: '    { id: "field", natural: fieldNat, min: Math.min(fieldNat, MIN_PART), tier: "content" as const, rank: 4 },',
+      to: '    { id: "field", natural: fieldNat, min: Math.min(fieldNat, MIN_PART), tier: "content" as const, rank: 0 },',
       expect: "T3.93",
     },
     {

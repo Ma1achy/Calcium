@@ -24,7 +24,18 @@
  * two records of one decision.
  */
 
+import type { KeyValue } from "../../data/viewmodel/index.js";
 import { cells } from "../text.js";
+import type { NavElement } from "./types.js";
+
+/**
+ * The shed mark's lead (C09 I108, §104, parked 19) — `+`, at every rung.
+ *
+ * **Not a `GlyphSet` slot, because it has no second rung to fall to.** A slot
+ * exists so a mark can change with the terminal; this one is ASCII already, so
+ * a slot would be a table entry with the same character in both columns.
+ */
+export const SHED_LEAD = "+";
 
 /**
  * What running out of width does to a part (C09 I81).
@@ -87,9 +98,13 @@ export type ShedResult = Readonly<{
    * cannot be the part that survives.
    *
    * A count and not a list, because a list of what went is wider than what
-   * stayed. The lead is the `residue` slot (C09 I22, C04 I49) — `⋯` against
-   * `~`, one cell at both conventions — handed in because this module holds no
-   * capabilities.
+   * stayed. **The lead is `+` at every rung** (C09 I108, §104, parked 19): the
+   * design draws `val loss  0.0372  +1`, and a lead that is ASCII everywhere is
+   * one this module can hold itself rather than take from a caller with
+   * capabilities. It was the `residue` slot, `⋯` against `...`, which the
+   * design keeps for a truncated list and never draws beside a shed row. What
+   * went is reachable through the kind's element (C09 I113), not through this
+   * string.
    */
   mark: string | null;
 }>;
@@ -145,12 +160,7 @@ const spanOf = (parts: readonly Part[], at: (p: Part) => number, gap: number): n
  * decision — the message gives up its room before the timestamp gives up any —
  * so a proportional rule would answer a different question correctly.
  */
-export function shedRow(
-  parts: readonly Part[],
-  width: number,
-  gap: number,
-  lead: string,
-): ShedResult {
+export function shedRow(parts: readonly Part[], width: number, gap: number): ShedResult {
   // **The withholding is a part of the row and is budgeted like one.** A mark
   // appended after the widths are settled is a mark the clamp pays for, which
   // takes the cells out of whichever part happens to be last — silently, and
@@ -159,11 +169,11 @@ export function shedRow(
   // second can only shed more, and a third would have nothing new to remove
   // that the second did not already see.
   const first = solveRow(parts, Math.max(0, Math.floor(width)), gap); // cells-ok — a cell count
-  if (first.shed.length === 0) return stated(first, null); // cells-ok — a part count
+  if (first.shed.length === 0) return stated(first, false); // cells-ok — a part count
   // The mark's own separator, floored at one cell: a row whose parts carry
   // their own leading gaps passes `gap: 0`, and a mark written hard against the
   // last part is a mark that reads as part of it.
-  const mark = markCells(lead, parts.length) + Math.max(gap, 1); // cells-ok — a cell count
+  const mark = markCells(parts.length) + Math.max(gap, 1); // cells-ok — a cell count
   const second = solveRow(parts, Math.max(0, Math.floor(width) - mark), gap); // cells-ok — a cell count
   // **The reservation gives way where it would make the row clip, and
   // `clipped` is what says so.** At four columns `events` shed its type and its
@@ -173,7 +183,7 @@ export function shedRow(
   // without cutting; past that the row wins. **The first pass is the answer
   // then, not a narrower second one**: it is the same shedding against a budget
   // that spends nothing on a mark the container was going to clip anyway.
-  return second.clipped ? stated(first, null) : stated(second, lead);
+  return second.clipped ? stated(first, false) : stated(second, true);
 }
 
 /**
@@ -182,11 +192,11 @@ export function shedRow(
  * the difference between a row that says it withheld something and a row that
  * spends its last cells saying so.
  */
-const stated = (solved: Solved, lead: string | null): ShedResult =>
+const stated = (solved: Solved, marked: boolean): ShedResult =>
   Object.freeze({
     kept: solved.kept,
     shed: solved.shed,
-    mark: lead === null || solved.shed.length === 0 ? null : `${lead}${String(solved.shed.length)}`, // cells-ok — a part count
+    mark: !marked || solved.shed.length === 0 ? null : `${SHED_LEAD}${String(solved.shed.length)}`, // cells-ok — a part count
   });
 
 /** One pass of the ladder, against a budget the caller has already reserved from. */
@@ -284,17 +294,68 @@ function solveRow(parts: readonly Part[], width: number, gap: number): Solved {
  * That removes the old bound's escape clause (*a row with ten parts to shed is
  * not a row this mechanism is saving*) rather than restating it: a kind with
  * eleven parts now reserves three cells for the count because it can need them.
+ *
+ * **The lead is a constant now, and the reservation is not.** Parked 19 moved
+ * the mark to `+n`, which is one cell at every rung — so the half of this that
+ * measured the lead has nothing left to vary. The half that reserves before
+ * solving is the one that was ever load-bearing, and it stays.
  */
-const markCells = (lead: string, parts: number): number =>
-  // narrow-ok — the lead is `⋯` only where the terminal is narrow. `⋯` is
-  // Ambiguous, so measuring it matters; but the whole glyph set falls to ASCII
-  // wholesale at the wide arm (C02 I9, T2.75: `glyphs(WIDE_CAPS)` equals
-  // `glyphs(ASCII_CAPS)`), so a wide terminal hands in `...`, which is three
-  // cells under either convention. The narrow measurement is right for every
-  // lead this is ever called with, and this module holds no capabilities to
-  // ask with.
-  cells(lead) + String(Math.max(1, parts - 1)).length; // cells-ok — a digit count // narrow-ok — see above
+const markCells = (parts: number): number =>
+  // `+` is one cell under either convention, so there is nothing to ask the
+  // terminal: the rung dependence I108 was written against has no subject.
+  // **The reservation itself stays** — without it the clamp cuts the mark.
+  cells(SHED_LEAD) + String(Math.max(1, parts - 1)).length; // cells-ok — a digit count // narrow-ok — `+` is ASCII, one cell under either convention
 
 /** The row's span at its natural widths, for a caller deciding whether to ask at all. */
 export const naturalSpan = (parts: readonly Part[], gap: number): number =>
   spanOf(parts, (p) => p.natural, gap);
+
+/** One item's answer to *what did your row not draw* — label against full text. */
+export type Withheld = readonly Readonly<{ label: string; value: string }>[];
+
+/**
+ * C09 I113 — the rows that shed, as targets whose peek holds what they withheld.
+ *
+ * **Keyed on the drawn mark and not on the shed alone.** A plan that shed with
+ * no room for the mark (`second.clipped`) draws no `+n`, and a target on a row
+ * that says nothing about withholding is a stop the reader cannot account for.
+ *
+ * **One element per item, at the full width, and `detail` only where the item
+ * lost something** — `tableElements`' shape (C26 §5), because a dropped part
+ * here and a dropped column there are one subject. A `steps` row with no
+ * detail draws the block's mark and withheld nothing of its own, so it is a
+ * target with no peek, exactly as a table row that fits is.
+ */
+export function shedElements(
+  blockId: string,
+  plan: ShedResult | null,
+  parts: readonly Part[],
+  width: number,
+  items: number,
+  firstRow: number,
+  withheld: (index: number, gone: ReadonlySet<string>) => Withheld,
+  copy: (index: number) => string,
+): readonly NavElement[] {
+  if (plan === null || plan.mark === null) return Object.freeze([]);
+  const kept = new Set(plan.kept.map((k) => k.id));
+  const gone: ReadonlySet<string> = new Set(parts.filter((p) => !kept.has(p.id)).map((p) => p.id));
+  const out: NavElement[] = [];
+  for (let i = 0; i < items; i += 1) {
+    const rows = withheld(i, gone);
+    const detail: KeyValue | null =
+      rows.length === 0 // cells-ok — a count of withheld parts
+        ? null
+        : Object.freeze({ kind: "keyValue", id: `${blockId}-shed-${String(i)}-detail`, rows: Object.freeze(rows) });
+    out.push(
+      Object.freeze({
+        id: `shed-${String(i)}`,
+        level: "row" as const,
+        rows: Object.freeze({ from: firstRow + i, to: firstRow + i + 1 }),
+        cols: Object.freeze({ from: 0, to: width }),
+        copy: copy(i),
+        ...(detail === null ? {} : { detail }),
+      }),
+    );
+  }
+  return Object.freeze(out);
+}

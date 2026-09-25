@@ -729,7 +729,9 @@ describe("C09 §2 padding — the registry's one application", () => {
         // **1 · A withholding is stated rather than silent**, and its count is
         // the number of parts that went — not a smaller number, which is the
         // shape a mark appended after the widths are settled produces.
-        const stated = /⋯(\d+)/u.exec(row);
+        // Anchored at the row's end, where the mark is drawn: `+` is ASCII and a
+        // message can carry one (C09 I108).
+        const stated = /\s\+(\d+)\s*$/u.exec(row);
         if (stated !== null) {
           expect(
             Number(stated[1]!), // cells-ok — a part count
@@ -749,7 +751,7 @@ describe("C09 §2 padding — the registry's one application", () => {
           // showing two parts and withholding a third had the room to say so
           // and chose the third part's cells instead. `keyValue` at five
           // columns is the boundary the second arm keeps — `port` stands in
-          // four cells and `port ⋯1` needs seven.
+          // four cells and `port +1` needs seven.
           const drawn = Object.keys(ladder.parts).length - absent.length; // cells-ok — a part count
           expect(
             absent.length === 0 || (drawn <= 1 && cells(row) + MARK_ROOM > width), // cells-ok — a part count

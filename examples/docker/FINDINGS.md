@@ -56216,9 +56216,15 @@ T2.170 compared `FULL_CAPS` and `ASCII_CAPS`, both `narrow`; the wide convention
 collapses the glyph set but not the user's text, so the text is where it bit.
 Found by constructing the case a surviving mutation said no row reached — the
 elements planning at `narrow` — which needed a value whose width moves with the
-convention, and the first frame of it showed the damage. The fix threads the
-render's convention through all three measurements; T2.170 gains the `wide`
-convention over an ambiguous-valued fixture.
+convention, and the first frame of it showed the damage. **The fix is `pad`, and the other two stay at `narrow` on purpose.** `pad` now
+fills the column at the terminal's convention, so a cut key is exactly its
+column wide. Threading the convention through the key's natural width and
+`keyColumn` as well was tried and reverted: `window` pins `keyWidth` and is pure,
+so a render measuring its own column at `wide` would draw a slice and its whole
+block differently (C09 I25). A column counted at `narrow` and drawn at `wide`
+cuts a label with an ambiguous character a cell early and never overruns — the
+safe direction. T2.170 gains the `wide` convention over an ambiguous-valued
+fixture.
 
 **Wider than the case that found it.** Run against the unfixed tree the `wide`
 arm failed on the ordinary `endpoint`/`region` fixture too — `endp… …` beside

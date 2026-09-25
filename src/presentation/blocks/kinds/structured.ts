@@ -16,8 +16,8 @@ import { cells, stripControl, truncate } from "../../text.js";
 import { glyphFor, glyphs, spinnerFrameAt } from "../glyphs.js";
 import { valueBar } from "../../plot/bar.js";
 import { clampSpans, pad, paint, rows, tone, type Span } from "../paint.js";
-import { naturalSpan, shedRow } from "../shed.js";
-import type { BlockDefinition, RenderContext, Windowed, Rendered } from "../types.js";
+import { naturalSpan, shedElements, shedRow, type Part } from "../shed.js";
+import type { BlockDefinition, NavElement, RenderContext, Windowed, Rendered } from "../types.js";
 import { glyphTick } from "../ramp.js";
 
 /** §3: the key column is sized to the longest key and capped here. */
@@ -132,6 +132,43 @@ function keyColumn(block: KeyValue, width: number): number {
   );
 }
 
+/**
+ * The `keyValue` row's parts (C09 I81) — **one answer for the layout and the
+ * elements** (C09 I113), so the rows that draw a mark and the rows that are
+ * targets cannot disagree about whether the block shed.
+ */
+function keyValueParts(block: KeyValue, width: number, ambiguous: AmbiguousWidth): readonly Part[] {
+  const valueNat = widest(block.rows.map((r) => stripControl(r.value)), width, ambiguous);
+  // **The declared order** (C09 I81): the value gives way first and the key
+  // is the last part standing, because a value with no key is not a fact —
+  // which is the half of the invariant's table this kind's frame agreed with.
+  //
+  // **The key's natural is its content and not `keyColumn`'s answer**, which
+  // is the width already narrowed: `keyColumn` caps at `width - 4`, so at four
+  // columns it hands back **one**, and a ladder told the key naturally wants
+  // one cell keeps it at one and spends the rest on a mark. Read as a frame
+  // that is `… ⋯1` — a key crushed to an ellipsis beside a statement about
+  // something else. A part's natural width is what it wants; what it gets is
+  // the ladder's to decide, and the two must not be the same number.
+  const keyNat = block.keyWidth ?? widest(block.rows.map((r) => stripControl(r.label)), KEY_COLUMN_CAP);
+  return [
+    {
+      id: "key",
+      natural: keyNat,
+      min: Math.min(keyNat, MIN_PART),
+      tier: "content" as const,
+      rank: 2,
+    },
+    {
+      id: "value",
+      natural: valueNat + COLUMN_GAP,
+      min: Math.min(valueNat, MIN_PART) + COLUMN_GAP,
+      tier: "content" as const,
+      rank: 1,
+    },
+  ];
+}
+
 export const keyValueDefinition: BlockDefinition<KeyValue> = {
   kind: "keyValue",
 
@@ -187,9 +224,38 @@ export const keyValueDefinition: BlockDefinition<KeyValue> = {
     });
   },
 
+  // C09 I113 — a row that sheds is a target whose peek holds its value. The
+  // plan is taken at `wide`, the convention that sheds at least as much as any
+  // drawn row, so the detail can over-list and never under-list.
+  elements: (block: KeyValue, width: number): readonly NavElement[] => {
+    const w = normaliseWidth(width);
+    const parts = keyValueParts(block, w, "wide");
+    const plan = naturalSpan(parts, 0) <= w ? null : shedRow(parts, w, 0);
+    return shedElements(
+      block.id,
+      plan,
+      parts,
+      w,
+      block.rows.length, // cells-ok — an item count
+      0,
+      (i, gone) => {
+        const row = block.rows[i];
+        return row === undefined || !gone.has("value") ? [] : [{ label: row.label, value: row.value }];
+      },
+      (i) => `${block.rows[i]?.label ?? ""}\t${block.rows[i]?.value ?? ""}`,
+    );
+  },
+
   render(block: KeyValue, ctx: RenderContext): Rendered {
     ctx.probe?.gauge("keyValue.rows", block.rows.length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
+    // **The column is counted at `narrow` and drawn at the terminal's
+    // convention, and that is the safe direction** (F1257). `window` pins this
+    // width and is pure, so a render measuring its own column at `wide` would
+    // draw a slice and its whole block differently (I25). `truncate` cuts to the
+    // column at the terminal's convention and `pad` fills it at the same one, so
+    // the only cost at `wide` is a label with an ambiguous character cut a cell
+    // early — never a row that overruns and hands the clamp the mark.
     const keyWidth = block.keyWidth ?? keyColumn(block, width);
     const ambiguous = ctx.capabilities.ambiguousWidth;
 
@@ -209,37 +275,9 @@ export const keyValueDefinition: BlockDefinition<KeyValue> = {
     // row that has no bar. Read at thirty-two columns it took eleven cells off
     // two rows to hold a bar belonging to the third. It sheds inside the value
     // column instead, where {@link valueOf} has the row that owns it.
-    const valueNat = widest(block.rows.map((r) => stripControl(r.value)), width, ambiguous);
-    // **The declared order** (C09 I81): the value gives way first and the key
-    // is the last part standing, because a value with no key is not a fact —
-    // which is the half of the invariant's table this kind's frame agreed with.
-    //
-    // **The key's natural is its content and not `keyColumn`'s answer**, which
-    // is the width already narrowed: `keyColumn` caps at `width - 4`, so at four
-    // columns it hands back **one**, and a ladder told the key naturally wants
-    // one cell keeps it at one and spends the rest on a mark. Read as a frame
-    // that is `… ⋯1` — a key crushed to an ellipsis beside a statement about
-    // something else. A part's natural width is what it wants; what it gets is
-    // the ladder's to decide, and the two must not be the same number.
-    const keyNat = block.keyWidth ?? widest(block.rows.map((r) => stripControl(r.label)), KEY_COLUMN_CAP);
-    const parts = [
-      {
-        id: "key",
-        natural: keyNat,
-        min: Math.min(keyNat, MIN_PART),
-        tier: "content" as const,
-        rank: 2,
-      },
-      {
-        id: "value",
-        natural: valueNat + COLUMN_GAP,
-        min: Math.min(valueNat, MIN_PART) + COLUMN_GAP,
-        tier: "content" as const,
-        rank: 1,
-      },
-    ];
+    const parts = keyValueParts(block, width, ambiguous);
 
-    const plan = naturalSpan(parts, 0) <= width ? null : shedRow(parts, width, 0, glyphs(ctx.capabilities).residue);
+    const plan = naturalSpan(parts, 0) <= width ? null : shedRow(parts, width, 0);
     const got = (id: string): number | null =>
       plan === null ? null : (plan.kept.find((k) => k.id === id)?.width ?? null);
     const mark = plan?.mark ?? null;
@@ -257,6 +295,7 @@ export const keyValueDefinition: BlockDefinition<KeyValue> = {
         const key = pad(
           truncate(stripControl(entry.label), keyRoom, ctx.capabilities),
           keyRoom,
+          ambiguous,
         );
         const value = valueWidth <= 0 ? "" : valueOf(entry, valueWidth, ctx);
 
@@ -402,6 +441,67 @@ function shortTime(ts: string): string {
   return cut === null ? ts : `${cut[1]!}${cut[2]!}`;
 }
 
+/**
+ * The `events` row's parts and plan (C09 I81) — **one answer for the layout and
+ * the elements** (C09 I113). The two time widths travel with it because the
+ * layout snaps between them.
+ */
+function eventsLayout(block: Events, width: number, ambiguous: AmbiguousWidth) {
+  const typeWidth = widest(block.events.map((e) => stripControl(e.type)), width);
+  // **One ladder for the block, not one per row** (C09 I81). The columns have
+  // to agree down the block or the rows stop being a table, so the parts are
+  // measured over every event and the shed decision is taken once. A per-row
+  // ladder would shed the type on one line and keep it on the next, which is
+  // the same defect this replaces wearing a tidier shape.
+  const tsWidth = widest(block.events.map((e) => stripControl(e.ts)), width, ambiguous);
+  const tsFloor = widest(block.events.map((e) => shortTime(stripControl(e.ts))), width, ambiguous);
+  const msgWidth = widest(block.events.map((e) => stripControl(e.message)), width, ambiguous);
+  // **The declared order** (C09 I81), highest rank last to go: the time is
+  // what a reader locates an event by, the message is what it says, and the
+  // type is the part a row can lose and still be read. The tone costs no
+  // cells, so it is never a part here — a part is something that takes width.
+  //
+  // **The order declared for this kind put the time above the message and the
+  // frame overturned it.** *The time and the tone never shed* is right about
+  // the type and wrong about the message: at sixteen columns it drew
+  // `22:13:20   ⋯2`, a column of bare timestamps, which is not an event log.
+  // The message is what the row says, so it is the last part standing; the
+  // time still sheds after the type and never before it, which is the half of
+  // the declaration the frame agreed with (C09 I81).
+  const parts: readonly Part[] = [
+    { id: "ts", natural: tsWidth, min: tsFloor, tier: "content", rank: 2 },
+    {
+      // **A cut label is not a label**, so the type is a threshold rather
+      // than a floor: it is drawn whole or it is shed. That is the
+      // `decoration` tier's rule, and reading the frame is what assigned it
+      // — at forty columns a floor of three drew `sc…` beside a message
+      // with twenty cells of slack.
+      id: "type",
+      natural: typeWidth,
+      // **A floor smaller than the natural, so the tier is what holds the
+      // line** (F1233). It read `min: typeWidth` — the same number twice —
+      // and the mutation pass found the consequence: `decoration` shedding
+      // whole rather than shrinking could not be violated, because no kind
+      // declared a minimum for it to ignore. A tier that cannot be
+      // disobeyed is a tier nothing tests.
+      min: MIN_TYPE,
+      tier: "decoration",
+      rank: 1,
+    },
+    {
+      // **The floor carries the judgement**, which is what keeps the step
+      // itself simple: twelve cells is a few words, and below that the row
+      // is better off shedding the type than keeping it beside a stub.
+      id: "message",
+      natural: msgWidth,
+      min: Math.min(msgWidth, MIN_MESSAGE),
+      tier: "content",
+      rank: 3,
+    },
+  ];
+  return { parts, tsWidth, tsFloor, plan: shedRow(parts, width, COLUMN_GAP) };
+}
+
 export const eventsDefinition: BlockDefinition<Events> = {
   kind: "events",
 
@@ -409,6 +509,33 @@ export const eventsDefinition: BlockDefinition<Events> = {
   copy: (block) => block.events.map((e) => `${e.ts}\t${e.type}\t${e.message}`).join("\n"),
 
   measure: (block: Events): number => atLeastOne(block.events.length), // cells-ok
+
+  // C09 I113 — a row that sheds is a target whose peek holds its type and time.
+  // At `wide`, for `keyValue`'s reason.
+  elements: (block: Events, width: number): readonly NavElement[] => {
+    const w = normaliseWidth(width);
+    const { parts, plan } = eventsLayout(block, w, "wide");
+    return shedElements(
+      block.id,
+      plan,
+      parts,
+      w,
+      block.events.length, // cells-ok — an item count
+      0,
+      (i, gone) => {
+        const event = block.events[i];
+        if (event === undefined) return [];
+        return [
+          ...(gone.has("ts") ? [{ label: "time", value: event.ts }] : []),
+          ...(gone.has("type") ? [{ label: "type", value: event.type }] : []),
+        ];
+      },
+      (i) => {
+        const event = block.events[i];
+        return event === undefined ? "" : `${event.ts}\t${event.type}\t${event.message}`;
+      },
+    );
+  },
 
   render(block: Events, ctx: RenderContext): Rendered {
     ctx.probe?.gauge("events.events", block.events.length); // cells-ok — a count of items, not a display width
@@ -421,63 +548,7 @@ export const eventsDefinition: BlockDefinition<Events> = {
     // and drew `schedul\u2026` at thirty-two columns, which is the shredding
     // this invariant exists to remove, applied by the very kind that declares
     // the type is drawn whole or shed (C09 I81).
-    const typeWidth = widest(block.events.map((e) => stripControl(e.type)), width);
-    // **One ladder for the block, not one per row** (C09 I81). The columns have
-    // to agree down the block or the rows stop being a table, so the parts are
-    // measured over every event and the shed decision is taken once. A per-row
-    // ladder would shed the type on one line and keep it on the next, which is
-    // the same defect this replaces wearing a tidier shape.
-    const tsWidth = widest(block.events.map((e) => stripControl(e.ts)), width, ambiguous);
-    const tsFloor = widest(block.events.map((e) => shortTime(stripControl(e.ts))), width, ambiguous);
-    const msgWidth = widest(block.events.map((e) => stripControl(e.message)), width, ambiguous);
-    // **The declared order** (C09 I81), highest rank last to go: the time is
-    // what a reader locates an event by, the message is what it says, and the
-    // type is the part a row can lose and still be read. The tone costs no
-    // cells, so it is never a part here — a part is something that takes width.
-    //
-    // **The order declared for this kind put the time above the message and the
-    // frame overturned it.** *The time and the tone never shed* is right about
-    // the type and wrong about the message: at sixteen columns it drew
-    // `22:13:20   ⋯2`, a column of bare timestamps, which is not an event log.
-    // The message is what the row says, so it is the last part standing; the
-    // time still sheds after the type and never before it, which is the half of
-    // the declaration the frame agreed with (C09 I81).
-    const plan = shedRow(
-      [
-        { id: "ts", natural: tsWidth, min: tsFloor, tier: "content", rank: 2 },
-        {
-          // **A cut label is not a label**, so the type is a threshold rather
-          // than a floor: it is drawn whole or it is shed. That is the
-          // `decoration` tier's rule, and reading the frame is what assigned it
-          // — at forty columns a floor of three drew `sc…` beside a message
-          // with twenty cells of slack.
-          id: "type",
-          natural: typeWidth,
-          // **A floor smaller than the natural, so the tier is what holds the
-          // line** (F1233). It read `min: typeWidth` — the same number twice —
-          // and the mutation pass found the consequence: `decoration` shedding
-          // whole rather than shrinking could not be violated, because no kind
-          // declared a minimum for it to ignore. A tier that cannot be
-          // disobeyed is a tier nothing tests.
-          min: MIN_TYPE,
-          tier: "decoration",
-          rank: 1,
-        },
-        {
-          // **The floor carries the judgement**, which is what keeps the step
-          // itself simple: twelve cells is a few words, and below that the row
-          // is better off shedding the type than keeping it beside a stub.
-          id: "message",
-          natural: msgWidth,
-          min: Math.min(msgWidth, MIN_MESSAGE),
-          tier: "content",
-          rank: 3,
-        },
-      ],
-      width,
-      COLUMN_GAP,
-      glyphs(ctx.capabilities).residue,
-    );
+    const { tsWidth, tsFloor, plan } = eventsLayout(block, width, ambiguous);
     // **A shed part is not drawn**, and the first draft drew one. Defaulting a
     // missing width to the floor put the message back on the row at three cells
     // beside a mark saying it had gone — the frame is what said so, and no
@@ -623,6 +694,78 @@ function markFor(
   return pad(token === null ? "" : glyphFor(token, ctx.capabilities), reserved);
 }
 
+/**
+ * The `comparison` row's parts (C09 I81) — **one answer for the layout and the
+ * elements** (C09 I113), with the two mark widths and the labels the layout
+ * also reads.
+ */
+function comparisonParts(block: Comparison, width: number, ambiguous: AmbiguousWidth) {
+  // The marker column appears only when a row declares a change, so a block
+  // that uses the verdict half alone renders exactly as it did before the
+  // split. Per-block and deterministic: every row of one block agrees, which
+  // is what keeps the field column aligned.
+  const marked = block.rows.some((r) => r.change !== undefined) ? MARKER_WIDTH : 0;
+  // The verdict's mark, on the same terms and inside the `b` column: it
+  // qualifies one cell rather than the row, which is where the tone already
+  // sits (C04 I38).
+  const judged = block.rows.some((r) => r.verdict !== undefined) ? MARKER_WIDTH : 0;
+
+  // **The narrow ladder** (C09 I81), engaged only where the natural row does
+  // not fit; above that the three equal columns stand as they always have.
+  // Parts carry their own leading gap and the step is given `gap: 0`, because
+  // this row is not evenly separated: the change mark abuts the field name
+  // and the verdict mark abuts its value inside one column.
+  const labelA = stripControl(block.labels?.[0] ?? "a");
+  const labelB = stripControl(block.labels?.[1] ?? "b");
+  const valueNat = Math.max(
+    widest(block.rows.map((r) => stripControl(r.a)), width, ambiguous),
+    widest(block.rows.map((r) => stripControl(r.b)), width, ambiguous),
+    cells(labelA, ambiguous),
+    cells(labelB, ambiguous),
+  );
+  const fieldNat = Math.max(
+    widest(block.rows.map((r) => stripControl(r.field)), width, ambiguous),
+    cells("field", ambiguous),
+  );
+  // **The declared order** (C09 I81), and it is the reverse of the one the
+  // invariant's table carried, because the frame overturned that one. The
+  // table read *sheds the field label, then the change and verdict marks;
+  // never sheds the two values*, and built that way this block drew
+  // `run\u2026  run 5` over `312\u2026  289 \u2026` at sixteen columns — two anonymous
+  // numbers, which is what a comparison is not. A field name with one value
+  // is still a reading; two values with no field name is nothing at all.
+  //
+  // So the marks go first, then `a`, and the **field name is the last part
+  // standing**. The two values carry **one** natural width between them — the
+  // widest of either column, taken above — which is what keeps them equal:
+  // equal naturals are equal slack, so they give up their cells together
+  // without a rule saying they must (F1233).
+  const parts: readonly Part[] = [
+    ...(marked > 0
+      ? [{ id: "change", natural: marked, min: marked, tier: "decoration" as const, rank: 1 }]
+      : []),
+    { id: "field", natural: fieldNat, min: Math.min(fieldNat, MIN_PART), tier: "content" as const, rank: 4 },
+    {
+      id: "a",
+      natural: valueNat + COLUMN_GAP,
+      min: Math.min(valueNat, MIN_PART) + COLUMN_GAP,
+      tier: "content" as const,
+      rank: 2,
+    },
+    ...(judged > 0
+      ? [{ id: "verdict", natural: judged, min: judged, tier: "decoration" as const, rank: 1 }]
+      : []),
+    {
+      id: "b",
+      natural: valueNat + COLUMN_GAP,
+      min: Math.min(valueNat, MIN_PART) + COLUMN_GAP,
+      tier: "content" as const,
+      rank: 3,
+    },
+  ];
+  return { parts, marked, judged, labelA, labelB };
+}
+
 export const comparisonDefinition: BlockDefinition<Comparison> = {
   kind: "comparison",
 
@@ -640,74 +783,43 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
   // with no rows is still a header.
   measure: (block: Comparison): number => atLeastOne(block.rows.length + 1), // cells-ok
 
+  // C09 I113 — a row that sheds is a target whose peek holds what it withheld;
+  // the header is not an item, so the elements start on the row below it. At
+  // `wide`, for `keyValue`'s reason.
+  elements: (block: Comparison, width: number): readonly NavElement[] => {
+    const w = normaliseWidth(width);
+    const { parts, labelA, labelB } = comparisonParts(block, w, "wide");
+    const plan = naturalSpan(parts, 0) <= w ? null : shedRow(parts, w, 0);
+    return shedElements(
+      block.id,
+      plan,
+      parts,
+      w,
+      block.rows.length, // cells-ok — an item count
+      1,
+      (i, gone) => {
+        const row = block.rows[i];
+        if (row === undefined) return [];
+        return [
+          ...(gone.has("change") && row.change !== undefined ? [{ label: "change", value: row.change }] : []),
+          ...(gone.has("a") ? [{ label: labelA, value: row.a }] : []),
+          ...(gone.has("verdict") && row.verdict !== undefined ? [{ label: "verdict", value: row.verdict }] : []),
+          ...(gone.has("b") ? [{ label: labelB, value: row.b }] : []),
+        ];
+      },
+      (i) => {
+        const row = block.rows[i];
+        return row === undefined ? "" : `${row.field}\t${row.a}\t${row.b}`;
+      },
+    );
+  },
+
   render(block: Comparison, ctx: RenderContext): Rendered {
     ctx.probe?.gauge("comparison.rows", block.rows.length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
-    // The marker column appears only when a row declares a change, so a block
-    // that uses the verdict half alone renders exactly as it did before the
-    // split. Per-block and deterministic: every row of one block agrees, which
-    // is what keeps the field column aligned.
-    const marked = block.rows.some((r) => r.change !== undefined) ? MARKER_WIDTH : 0;
-    // The verdict's mark, on the same terms and inside the `b` column: it
-    // qualifies one cell rather than the row, which is where the tone already
-    // sits (C04 I38).
-    const judged = block.rows.some((r) => r.verdict !== undefined) ? MARKER_WIDTH : 0;
     const ambiguous = ctx.capabilities.ambiguousWidth;
-
-    // **The narrow ladder** (C09 I81), engaged only where the natural row does
-    // not fit; above that the three equal columns stand as they always have.
-    // Parts carry their own leading gap and the step is given `gap: 0`, because
-    // this row is not evenly separated: the change mark abuts the field name
-    // and the verdict mark abuts its value inside one column.
-    const labelA = stripControl(block.labels?.[0] ?? "a");
-    const labelB = stripControl(block.labels?.[1] ?? "b");
-    const valueNat = Math.max(
-      widest(block.rows.map((r) => stripControl(r.a)), width, ambiguous),
-      widest(block.rows.map((r) => stripControl(r.b)), width, ambiguous),
-      cells(labelA, ambiguous),
-      cells(labelB, ambiguous),
-    );
-    const fieldNat = Math.max(
-      widest(block.rows.map((r) => stripControl(r.field)), width, ambiguous),
-      cells("field", ambiguous),
-    );
-    // **The declared order** (C09 I81), and it is the reverse of the one the
-    // invariant's table carried, because the frame overturned that one. The
-    // table read *sheds the field label, then the change and verdict marks;
-    // never sheds the two values*, and built that way this block drew
-    // `run\u2026  run 5` over `312\u2026  289 \u2026` at sixteen columns — two anonymous
-    // numbers, which is what a comparison is not. A field name with one value
-    // is still a reading; two values with no field name is nothing at all.
-    //
-    // So the marks go first, then `a`, and the **field name is the last part
-    // standing**. The two values carry **one** natural width between them — the
-    // widest of either column, taken above — which is what keeps them equal:
-    // equal naturals are equal slack, so they give up their cells together
-    // without a rule saying they must (F1233).
-    const parts = [
-      ...(marked > 0
-        ? [{ id: "change", natural: marked, min: marked, tier: "decoration" as const, rank: 1 }]
-        : []),
-      { id: "field", natural: fieldNat, min: Math.min(fieldNat, MIN_PART), tier: "content" as const, rank: 4 },
-      {
-        id: "a",
-        natural: valueNat + COLUMN_GAP,
-        min: Math.min(valueNat, MIN_PART) + COLUMN_GAP,
-        tier: "content" as const,
-        rank: 2,
-      },
-      ...(judged > 0
-        ? [{ id: "verdict", natural: judged, min: judged, tier: "decoration" as const, rank: 1 }]
-        : []),
-      {
-        id: "b",
-        natural: valueNat + COLUMN_GAP,
-        min: Math.min(valueNat, MIN_PART) + COLUMN_GAP,
-        tier: "content" as const,
-        rank: 3,
-      },
-    ];
-    const plan = naturalSpan(parts, 0) <= width ? null : shedRow(parts, width, 0, glyphs(ctx.capabilities).residue);
+    const { parts, marked, judged, labelA, labelB } = comparisonParts(block, width, ambiguous);
+    const plan = naturalSpan(parts, 0) <= width ? null : shedRow(parts, width, 0);
     const got = (id: string): number | null =>
       plan === null ? null : (plan.kept.find((k) => k.id === id)?.width ?? null);
     const mark = plan?.mark ?? null;
@@ -862,6 +974,59 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
 
 // --- steps -----------------------------------------------------------------
 
+/**
+ * The `steps` row's parts and the room left after the mark (C09 I81) — **one
+ * answer for the layout and the elements** (C09 I113).
+ */
+function stepsParts(block: Steps, width: number, ambiguous: AmbiguousWidth) {
+  const labelNat = widest(block.steps.map((s) => stripControl(s.label)), width, ambiguous);
+  const detailNat = widest(
+    block.steps.map((s) => stripControl(s.detail ?? "")),
+    width,
+    ambiguous,
+  );
+  // Every marker is one cell in both glyph sets (§4), and the space after it
+  // belongs to it — so the mark's part is two cells whatever the row holds.
+  const MARK = 2;
+
+  // **The narrow ladder** (C09 I81), engaged only where the natural row does
+  // not fit.
+  //
+  // **The order declared for this kind in C09 I81 was about a different
+  // kind.** It reads *the done steps from the ends, then the pending ones* —
+  // a horizontal tape, where the steps share one row and shedding one is a
+  // width decision. This kind draws one step per row, so that order asks for
+  // an item to be dropped, which the same invariant refuses two paragraphs
+  // later: dropping a row changes the block's element ids and orphans a C26
+  // focus. The parts of *this* kind's row are the mark, the label and the
+  // detail, and the order below is the one it can have. The spec is corrected
+  // rather than the frame bent to it.
+  //
+  // **The mark is not a part of the ladder, and the frame is what settled
+  // that.** Declared as one it is two cells the row can shed, and at eight
+  // columns the step shed its *label* to keep them: a column of bare `\u2713`
+  // and `\u25cc` saying three things happened and nothing about what. The mark is
+  // one cell and a space, it is the same width in both glyph sets, and it is
+  // what this kind draws — so it is reserved before the ladder is asked,
+  // like a border rather than like a column.
+  const parts: readonly Part[] = [
+    { id: "label", natural: labelNat, min: Math.min(labelNat, MIN_PART), tier: "content" as const, rank: 2 },
+    ...(detailNat > 0
+      ? [
+          {
+            id: "detail",
+            natural: detailNat + COLUMN_GAP,
+            min: MIN_DETAIL + COLUMN_GAP,
+            tier: "content" as const,
+            rank: 1,
+          },
+        ]
+      : []),
+  ];
+  const room = Math.max(0, width - MARK);
+  return { parts, room, labelNat };
+}
+
 export const stepsDefinition: BlockDefinition<Steps> = {
   kind: "steps",
 
@@ -872,6 +1037,31 @@ export const stepsDefinition: BlockDefinition<Steps> = {
 
   measure: (block: Steps): number => atLeastOne(block.steps.length), // cells-ok
 
+  // C09 I113 — a row that sheds is a target whose peek holds its detail. A row
+  // with no detail draws the block's mark and lost nothing of its own, so it is
+  // a target with no peek. At `wide`, for `keyValue`'s reason.
+  elements: (block: Steps, width: number): readonly NavElement[] => {
+    const w = normaliseWidth(width);
+    const { parts, room } = stepsParts(block, w, "wide");
+    const plan = naturalSpan(parts, 0) <= room ? null : shedRow(parts, room, 0);
+    return shedElements(
+      block.id,
+      plan,
+      parts,
+      w,
+      block.steps.length, // cells-ok — an item count
+      0,
+      (i, gone) => {
+        const step = block.steps[i];
+        return step?.detail === undefined || !gone.has("detail") ? [] : [{ label: step.label, value: step.detail }];
+      },
+      (i) => {
+        const step = block.steps[i];
+        return step === undefined ? "" : step.detail === undefined ? step.label : `${step.label}\t${step.detail}`;
+      },
+    );
+  },
+
   render(block: Steps, ctx: RenderContext): Rendered {
     ctx.probe?.gauge("steps.steps", block.steps.length); // cells-ok — a count of items, not a display width
     const g = glyphs(ctx.capabilities);
@@ -880,52 +1070,8 @@ export const stepsDefinition: BlockDefinition<Steps> = {
     // **Uncapped, for `events`' reason.** Half the row was this kind's guard
     // against a long label crowding out the detail, and under the ladder the
     // detail's floor is that guard. Left in place it cut a label that fitted.
-    const labelNat = widest(block.steps.map((s) => stripControl(s.label)), width, ambiguous);
-    const detailNat = widest(
-      block.steps.map((s) => stripControl(s.detail ?? "")),
-      width,
-      ambiguous,
-    );
-    // Every marker is one cell in both glyph sets (§4), and the space after it
-    // belongs to it — so the mark's part is two cells whatever the row holds.
-    const MARK = 2;
-
-    // **The narrow ladder** (C09 I81), engaged only where the natural row does
-    // not fit.
-    //
-    // **The order declared for this kind in C09 I81 was about a different
-    // kind.** It reads *the done steps from the ends, then the pending ones* —
-    // a horizontal tape, where the steps share one row and shedding one is a
-    // width decision. This kind draws one step per row, so that order asks for
-    // an item to be dropped, which the same invariant refuses two paragraphs
-    // later: dropping a row changes the block's element ids and orphans a C26
-    // focus. The parts of *this* kind's row are the mark, the label and the
-    // detail, and the order below is the one it can have. The spec is corrected
-    // rather than the frame bent to it.
-    //
-    // **The mark is not a part of the ladder, and the frame is what settled
-    // that.** Declared as one it is two cells the row can shed, and at eight
-    // columns the step shed its *label* to keep them: a column of bare `\u2713`
-    // and `\u25cc` saying three things happened and nothing about what. The mark is
-    // one cell and a space, it is the same width in both glyph sets, and it is
-    // what this kind draws — so it is reserved before the ladder is asked,
-    // like a border rather than like a column.
-    const parts = [
-      { id: "label", natural: labelNat, min: Math.min(labelNat, MIN_PART), tier: "content" as const, rank: 2 },
-      ...(detailNat > 0
-        ? [
-            {
-              id: "detail",
-              natural: detailNat + COLUMN_GAP,
-              min: MIN_DETAIL + COLUMN_GAP,
-              tier: "content" as const,
-              rank: 1,
-            },
-          ]
-        : []),
-    ];
-    const room = Math.max(0, width - MARK);
-    const plan = naturalSpan(parts, 0) <= room ? null : shedRow(parts, room, 0, glyphs(ctx.capabilities).residue);
+    const { parts, room, labelNat } = stepsParts(block, width, ambiguous);
+    const plan = naturalSpan(parts, 0) <= room ? null : shedRow(parts, room, 0);
     const got = (id: string): number | null =>
       plan === null ? null : (plan.kept.find((k) => k.id === id)?.width ?? null);
     const mark = plan?.mark ?? null;
