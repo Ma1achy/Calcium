@@ -1,11 +1,11 @@
 {
   "label": "all",
-  "only": "c09-revert-glyph",
+  "only": "c09-scrollbar-nested",
   "rows": [
     {
-      "run": "c09-revert-glyph.mjs",
+      "run": "c09-scrollbar-nested.mjs",
       "exit": 0,
-      "seconds": 4,
+      "seconds": 7,
       "state": "green",
       "restored": 0,
       "caught": 3,
