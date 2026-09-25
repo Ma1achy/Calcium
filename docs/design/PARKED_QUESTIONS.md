@@ -606,7 +606,7 @@ So three answers are needed before this can land: which earning table binds and
 whether *the model failed* survives; what declares the rungs and their wording;
 and whether the watch itself is mine to build.
 
-> **Ruled 2026-09-24.** Build the mechanism and the display now. `default` shows today; `config`, `env` and `flag` rows arrive with their producers. **Owed.**
+> **Ruled 2026-09-24.** Build the mechanism and the display now. `default` shows today; `config`, `env` and `flag` rows arrive with their producers. **Owed.** **Specified 2026-09-25** as C22 I115 and C23 I80. **Premise taken:** a `TuiConfig` value is `default` whether the framework or the application supplied it — the reader chose neither. **The verb is parked as 43**: docker-tui ships its own `/config`, and a framework verb of that name is a parse error for it.
 
 **28 · RULED — `R-HON-008`'s display is fully specified and three of its four sources do
 not exist.** §075 — *`/config` — and the third column is the one that matters* —
@@ -902,6 +902,12 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
   carry today.
 - **(c) No in-place form** — the peek is the expansion, and `⏎` does nothing on these
   rows; which is §104's *reachable* without its *`⏎`*.
+
+---
+
+**43 · OPEN — §075's `/config` collides with docker-tui's `/config`.** Ruling 28 builds the provenance display, and §075 names its verb `/config`. `examples/docker/src/manifest/read.ts:163` already declares a `config` verb — a container's config file against its image's original (S8) — and C05 I6 makes a framework verb of the same name a **parse error** for that manifest, so the example would not start. The design decides the framework's name; it does not decide the example's new one, and the rename reaches **106 references across 19 files**, a recorded `demo.cast` and the media tools among them.
+
+**Built meanwhile** (C22 I115, C23 I80): the provenance record, the ladder and the table. What waits is the verb and its manifest row. **The one-word answer** is the example's new name — `/filediff` is the proposal — or a different framework verb, which would depart from §075.
 
 ---
 
