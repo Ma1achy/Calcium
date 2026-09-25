@@ -588,4 +588,5 @@ const STATED_CYCLES: Readonly<Record<string, number>> = Object.freeze(
 
 describe("C09 I112 — a spinner steps at its own set's interval", () => {
   it.todo("T1.78 (C09 I112, §039): at one tick, agent and the default set take their own frames — not deferred on a component: specified before the index reads the interval");
+  it.todo("T1.79 (C09 I112): every kind drawing a non-default set draws spinnerFrameAt's frame — not deferred on a component: specified after a renderer bypass survived the mutation pass");
 });
