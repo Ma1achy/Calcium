@@ -56171,3 +56171,59 @@ code is right, the sentence is violable, and the tree has no instance. The tell
 is a mutation whose removal leaves every assertion's *value* unchanged — not a
 failing comparison anywhere, just nothing different to compare.
 
+
+## F1256 — a sweep over four kinds that could render two ★★★☆☆
+
+| | |
+|---|---|
+| **Surface** | C09 T2.170, the shed mark kept whole at both rungs (I108). |
+| **Reached for** | re-aiming the row when the shed lead became `+n` (parked 19). |
+| **Verdict** | **Two of the four kinds never rendered and a third rendered states the type does not have.** |
+
+The row built its blocks as literals cast `as never` and wrapped each render in
+`try { … } catch { continue }`. `keyValue` was written with `pairs` and `key`
+where the type has `rows` and `label`, and `comparison` with `left`/`right`
+where it has `a`/`b`; both threw at all 55 widths and were skipped. `steps` used
+`succeeded`/`running` where the type has `done`/`active`. The row read as a
+sweep over four kinds and asserted a total mark count that `events` alone could
+satisfy.
+
+**A catch that skips is an exemption with no list.** It is the same shape as an
+allow-list nobody counts: the population the row claims is the population that
+did not throw, and a fixture typo moves a kind from one to the other in silence.
+The replacement builds the blocks through the view model, catches nothing, and
+asserts the count **per kind** — so a kind that stops drawing a mark fails
+rather than drops out of a total.
+
+## F1257 — `keyValue` measured its key column at one convention and drew it at another ★★★★☆
+
+| | |
+|---|---|
+| **Surface** | `keyValue`'s key column under `ambiguousWidth: "wide"` (C02 I9, C09 I108). |
+| **Reached for** | a mutation that survived — T1.82's construction, the elements' `wide` plan. |
+| **Verdict** | **I108's clamped mark, alive at the one convention its sweep never ran.** |
+
+`truncate` measures at the terminal's convention; the key's natural width
+(`widest(labels, KEY_COLUMN_CAP)`), the key column (`keyColumn`) and `pad` all
+defaulted to `narrow`. At `wide` a key cut to `tole…` is six cells — `…` is
+East-Asian Ambiguous — in a column counted as five, and the clamp took the extra
+cell from the row's last span. Read off the frame with values `±±`: at 7–9
+columns the first row drew `tole… …`, its `+1` cut to the ellipsis; at 10–14 the
+value drew as a bare `…` where `±±` fitted.
+
+**The sweep that owned the defect ran two rungs, and neither was this one.**
+T2.170 compared `FULL_CAPS` and `ASCII_CAPS`, both `narrow`; the wide convention
+collapses the glyph set but not the user's text, so the text is where it bit.
+Found by constructing the case a surviving mutation said no row reached — the
+elements planning at `narrow` — which needed a value whose width moves with the
+convention, and the first frame of it showed the damage. The fix threads the
+render's convention through all three measurements; T2.170 gains the `wide`
+convention over an ambiguous-valued fixture.
+
+**Wider than the case that found it.** Run against the unfixed tree the `wide`
+arm failed on the ordinary `endpoint`/`region` fixture too — `endp… …` beside
+`region +1` at nine columns — because any key cut with `…` overran, whatever
+its value. And the first version of the arm **passed**: its per-row check looked
+for a lead followed by a count, and a mark the clamp takes whole leaves no lead
+to find. What sees it is block-wide — the plan is the block's (C09 I81), so a
+render marks every row or none, and a render that marks some is the damage.
