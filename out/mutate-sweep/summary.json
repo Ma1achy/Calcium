@@ -1,14 +1,14 @@
 {
   "label": "all",
-  "only": "c16-chord-spelling",
+  "only": "c09-revert-glyph",
   "rows": [
     {
-      "run": "c16-chord-spelling.mjs",
+      "run": "c09-revert-glyph.mjs",
       "exit": 0,
-      "seconds": 23,
+      "seconds": 4,
       "state": "green",
       "restored": 0,
-      "caught": 6,
+      "caught": 3,
       "elsewhere": 0,
       "survived": 0,
       "anchorMissed": 0,

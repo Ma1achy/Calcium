@@ -899,6 +899,9 @@
    "row-lead",
    "inline"
   ],
+  "revert": [
+   "inline"
+  ],
   "separator": [
    "inline"
   ],
@@ -2018,6 +2021,10 @@
    "]"
   ],
   [
+   "↺",
+   "<"
+  ],
+  [
    "·",
    ":"
   ],
@@ -2283,6 +2290,7 @@
   "hollow": "o",
   "horizontal": "-",
   "residue": "...",
+  "revert": "<",
   "separator": ":",
   "sortAsc": "^",
   "sortDesc": "v",
@@ -2326,6 +2334,7 @@
   "hollow": "○",
   "horizontal": "─",
   "residue": "⋯",
+  "revert": "↺",
   "separator": "·",
   "sortAsc": "▴",
   "sortDesc": "▾",

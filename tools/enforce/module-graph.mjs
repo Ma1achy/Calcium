@@ -1644,6 +1644,16 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // --- C09 I114's revert mark, registered ahead of the rows that draw it ---
+  //
+  // **The queued consumers are §005's stopped-edit row and §064's reverted
+  // entry**, neither built. Ruling 17 registered the mark, and SS65 makes a
+  // current registry record with no slot red, so the slot lands with the record
+  // rather than with its first row. The day either row draws `↺`, this entry is
+  // itself the violation.
+  "GlyphSet.revert":
+    "C09 I114, parked 17 — `↺` / `<`, the undo affordance §005 and §064 draw beside a muted "
+    + "label. Registered on the ruling; SS65 requires the slot for the record. T2.176 holds both.",
   // --- C23 I76's operation surface, ahead of the producer that reports one ---
   //
   // **The queued consumer is an adapter that emits an operation, and none

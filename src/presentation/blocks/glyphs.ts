@@ -219,6 +219,16 @@ export type GlyphSet = Readonly<{
    */
   tapeRight: string;
   /**
+   * The undo affordance — `↺ redo` on a reverted entry, `↺ revert` on a stopped
+   * one (C09 I114, §005, §064, parked 17). Drawn `accent` beside a `muted` label.
+   *
+   * **The ASCII half `<` is a proposal awaiting approval**, and measured rather
+   * than picked: `~` was the first reach and is `nested`'s, and a content row
+   * holds both `row-lead` and `inline`. Its consumers — §005's stopped-edit row
+   * and §064's reverted entry — are queued, not built.
+   */
+  revert: string;
+  /**
    * The separator between a call head's fields — `verb · args · duration ·
    * outcome` (C09 I49, `AGENT_TUI_DESIGN.md` §9e).
    *
@@ -237,6 +247,7 @@ const UNICODE: GlyphSet = Object.freeze({
   residue: "\u22ef",
   tapeLeft: "\u00ab",
   tapeRight: "\u00bb",
+  revert: "\u21ba",
   separator: "\u00b7",
   horizontal: "─",
   vertical: "│",
@@ -305,6 +316,7 @@ const ASCII: GlyphSet = Object.freeze({
   // makes the direction readable without the chevron doing it.
   tapeLeft: "[",
   tapeRight: "]",
+  revert: "<",
   // `:` and not `-` (F834): `-` is `TURN_ASCII`'s first frame, and a dispatched
   // head read `verb - -`. The rung is a character no set's ASCII frames use.
   separator: ":",
@@ -1395,6 +1407,7 @@ export const GLYPH_SET_DOMAINS: Readonly<Record<keyof GlyphSet, readonly string[
   residue: ["row-lead", "inline"],
   tapeLeft: ["inline"],
   tapeRight: ["inline"],
+  revert: ["inline"],
   separator: ["inline"],
 
   horizontal: ["border"],

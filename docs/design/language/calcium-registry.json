@@ -28715,6 +28715,28 @@
       "collisionDomains": [
         "row-lead"
       ]
+    },
+    {
+      "id": "revert",
+      "unicode": "↺",
+      "ascii": "<",
+      "semanticRole": "undo affordance",
+      "tone": "accent",
+      "widthByCapability": {
+        "unicode": 1,
+        "ascii": 1
+      },
+      "reservedCells": 1,
+      "collisionDomains": [
+        "inline"
+      ],
+      "accessibleName": "undo affordance",
+      "status": "current",
+      "ruleIds": [
+        "R-GLY-003"
+      ],
+      "canonical": true,
+      "widthClass": "ambiguous"
     }
   ],
   "delimiters": [
