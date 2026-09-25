@@ -916,6 +916,13 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 **Why parked, not ruled**: making C04 I6 accept a word that carries its own fact weakens an invariant, and *which words qualify* has no field to answer from — a free-text cell cannot say whether its text is a label or the fact. **Nothing reaches it today**: `env` and `flag` have no producer (ruling 28). **The one-word answers**: (a) C04 I6 exempts a cell drawn from a closed vocabulary the block declares; (b) the ladder's two loud rungs take a glyph (`warn`'s `▲`, `error`'s `✗`) beside the word; (c) the ladder stops at `meta`.
 
+
+**45 · OPEN — How the palette opens, and where its query is typed.** Ruling 20 builds §105's five primitives. The registry defines the palette as *an overlay whose rows are filtered actions* (R-PRI-001), and §105 draws it as `❯ open▌  3 of 61` above action rows carrying their chords, with `+58 more` beneath. **Everything it draws is built already**, as §105 says: C19's menu is §097's panel between two rules, with a detail column and the `+ N more` residue, and the registry's 40 actions are the rows. **What the design does not give is the way in.** No action opens a palette and no binding names one. §105's `❯ open▌` is a prompt row, so the query may be typed in the prompt, but the figure does not say what turns a prompt into a palette.
+
+**Why parked, not ruled**: the opener is a key or a word the reader has to learn. That is a visible choice, and every candidate collides with something: `⌃⇧P` collapses to `⌃P` in the base profile; `⌥p` is `posture.cycle`; `/` already opens the verb menu.
+
+**The proposal**: `>` typed as the first character of an empty prompt switches the menu's source from verbs to actions, as in VS Code's quick-open. That costs no chord, keeps the query in the prompt as §105 draws it, and the base and enhanced profiles agree. The alternatives: (b) an action `palette.open` on `⌃⇧P` enhanced and `⌥k` base; (c) a verb `/actions`.
+
 ---
 
 ## Not yet recovered
