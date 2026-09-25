@@ -203,10 +203,10 @@ already declared:
 
 | declares | `↓` | kinds today |
 |---|---|---|
-| `elements` only | steps elements | `table`, and **`plot` when it declares a `camera`** (C12 I85) |
+| `elements` only | steps elements | `table`, **`plot` when it declares a `camera`** (C12 I85), and **`keyValue`, `events`, `comparison` and `steps` while their row sheds** (C09 I113) |
 | `window` only | moves a viewport | `logs`, `patch` |
 | **both** | **ruled in §4b** — `↓` steps and the window follows; it was never two readings of one key | **none, and the build kept it that way** — see the correction below |
-| neither | passes through; the block is atomic | `keyValue`, `code`, `plot` |
+| neither | passes through; the block is atomic | `keyValue` that sheds nothing, `code`, `plot` |
 
 **Nothing is adopted here and no field is added.** The check's job was to say whether the
 vocabulary survives contact with four kinds, and it does not; what replaces it is §4's

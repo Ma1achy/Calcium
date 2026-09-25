@@ -32,7 +32,7 @@ Adding a bare new `current` rule would leave two `current` rules contradicting
 each other, which is worse. **Done under assumption:** the repo-side spec
 (C09 §4, I5) carries the narrowed rule and the registry does not.
 
-> **Ruled 2026-09-24.** Each rung takes its **natural width**. The fixture's `⋯ 5 more` is exact at two cells, and the no-column-moves guarantee is given up. **Owed:** the three-cell slot is retired, and the plot legend and residue goldens move.
+> **Ruled 2026-09-24.** Each rung takes its **natural width**. The fixture's `⋯ 5 more` is exact at two cells, and the no-column-moves guarantee is given up. **Owed:** the three-cell slot is retired, and the plot legend and residue goldens move. **Built** in 263a10cc1 (M4): `FREE_WIDTH_SLOTS` holds `residue`, C09 §4 records the scope, and the pie-legend baselines draw `⋯ 5 more`.
 
 **2 · RULED — The Unicode residue lead diverges from the design's own fixtures.** The
 three-cell slot at every rung draws `⋯   5 more`; the fixtures draw `⋯ 5 more`,
@@ -243,7 +243,7 @@ a question about the registry's completeness.
 
 ---
 
-> **Ruled 2026-09-24.** Already answered: **`+n`**, and the mark is itself a target (focusable; `⏎` expands what it stands for). **Premise note:** the entry records that §104's row is classified `app`. The ruling adopts `+n` as the framework's mark regardless, and that is recorded here so it isn't later read as inferred. **Owed:** `ShedResult.mark` gains an id; C09 I108's reservation goes, because `+` is ASCII at both rungs.
+> **Ruled 2026-09-24.** Already answered: **`+n`**, and the mark is itself a target (focusable; `⏎` expands what it stands for). **Premise note:** the entry records that §104's row is classified `app`. The ruling adopts `+n` as the framework's mark regardless, and that is recorded here so it isn't later read as inferred. **Owed:** `ShedResult.mark` gains an id; C09 I108's reservation goes, because `+` is ASCII at both rungs. **Premise note, 2026-09-25:** `+` makes the reservation's *rung dependence* moot, not the reservation — `shedRow` must still take the mark's cells out of the budget first, or the clamp cuts the mark (I108's `..~`). The reservation stays at `1 + digits`. The id lands on the element and not on `ShedResult`: the mark is published as a `row` element whose `detail` lists the withheld parts, on the table's dropped-column precedent (C09 I113). *Focus lands on the `+n`* has no subject yet — these kinds' parts are not elements. `⏎`'s expansion form is parked as **42**.
 
 **19 · RULED — What a framework kind draws when it sheds a part from a row.** `shedRow`
 composes a bare `⋯n` — the `residue` lead and a count — for the four kinds that
@@ -734,7 +734,7 @@ and the sub-cell braille ramp.
 
 ---
 
-> **Ruled 2026-09-24.** Selection's second carrier is **the `▌` selection rail** (§017). `R-THM-003`'s *only carrier* is superseded to *only ground-level carrier*, and the rail is asserted. **Note:** `▌` is also the prompt's caret (the `bar` slot). The two are in different domains (the transcript's gutter and the prompt), so this is not a collision, but the rail's domain has to say so. **Owed.**
+> **Ruled 2026-09-24.** Selection's second carrier is **the `▌` selection rail** (§017). `R-THM-003`'s *only carrier* is superseded to *only ground-level carrier*, and the rail is asserted. **Note:** `▌` is also the prompt's caret (the `bar` slot). The two are in different domains (the transcript's gutter and the prompt), so this is not a collision, but the rail's domain has to say so. **Owed.** **Premise note, 2026-09-25:** the ruling names the mark and not its column, and no column is free on every selected row — a selected row is its block's first row (C14 I39), whose column 1 holds the head mark (`●`, `❯`) on a top-level block, the one carrier of a call's state at 1-bit. §017's figure draws the rail only on code rows with a free left edge. The column is parked as **41**; the registry half — *only carrier* → *only ground-level carrier* — does not depend on it.
 
 **33 · RULED — `R-THM-003` says the ground is selection's only carrier; `R-COR-003` and
 `R-COL-004` say no interaction distinction has one.** R-THM-003: *the selection
@@ -861,6 +861,47 @@ and `binary4` at 120. The number is visible — it is how fast the ASCII rung tu
 - **(c) The slowest member's interval** — 140, 120, 120 — on the argument that an
   ASCII frame changes more of the character than a braille dot does, so it reads
   as busier at the same rate.
+
+---
+
+**41 · OPEN — Which column the `▌` selection rail takes.** Ruling 33 makes `▌` selection's
+second carrier. §017 (`R-BLK-127`, `R-BLK-129`) draws it as the first two cells of a
+selected row, `▌ ` on the band, before the focus mark's column — on search-result rows
+whose left edge is blank. In the transcript a selected row is its block's first row (C14
+I39): column 1 holds the head mark on a top-level block (`● help`, `❯ /help` in
+`SF1 · transcript`), column 2 is the gap after it, and a nested block starts at column 3.
+So the rail has no column that is free on every row it must mark, and drawing it over
+column 1 displaces the head mark — which at 1-bit is the call state's only glyph carrier
+(`R-COR-003`), so the fix would break the rule it serves. **Proposed, (a) recommended**:
+
+- **(a) The live gutter's column** — C14 D6 already carries a frame-chrome `▌` beside a
+  live entry's rows at no geometric cost (*C14 marks; S01 draws*). Selection takes the
+  same column with the same glyph: one column that means *this row is marked*, drawn
+  by the frame, never by a block, so no head mark moves. It needs the column to exist
+  on every row, which is the frame's to reserve.
+- **(b) Column 2, the head mark's gap**, which is blank on every row the golden shows —
+  `●▌help`. No geometry moves, but the rail reads as part of the mark it abuts.
+- **(c) Over column 1 only where column 1 is blank**, the ground alone elsewhere — which
+  leaves a selected call head with one carrier, the case the ruling exists to close.
+
+---
+
+**42 · OPEN — What `⏎` on a shed row expands into.** Ruling 19: *`⏎` expands what it
+stands for*; §104 says the same and draws only the collapsed row (`val loss  0.0372
++1`). C09 I113 makes the withheld parts reachable through the peek, which is the
+table's dropped-column precedent and exists. The in-place form does not: the four
+kinds' rows carry no ids and no `expanded` flag, and the only in-place expansion in the
+tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
+
+- **(a) The table's expanded row** — `⏎` on `shed-${i}` sends `expand` for the block,
+  `expanded` flips on the block (as `Scroll.collapsed` does, so C04 I34's *a block id*
+  already admits the target), and each shedding row draws its withheld parts beneath
+  it as `label  value`, the form a table row's dropped columns take. Block-wide
+  because the plan is block-wide: every row sheds the same parts.
+- **(b) Per row**, which needs an id on the four kinds' items that the documents do not
+  carry today.
+- **(c) No in-place form** — the peek is the expansion, and `⏎` does nothing on these
+  rows; which is §104's *reachable* without its *`⏎`*.
 
 ---
 

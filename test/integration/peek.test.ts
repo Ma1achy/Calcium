@@ -76,6 +76,8 @@ async function seeded(blocks: readonly unknown[] = [table()]) {
 }
 
 describe("C15 §2a — the peek beside the focused element", () => {
+  it.todo("T4.59 (C09 I113, C15 §2a, C26 §5): a keyValue row that sheds its value is a stop for ↓ and its peek holds the value — not deferred on a component: specified ahead of the code in this commit");
+
   it("T4.10 (C15 I21, C16): with a peek on the stack the keys reach the element — the cell a plain overlay was measured to steal", async () => {
     const s = await seeded();
 
