@@ -2384,8 +2384,12 @@ node's own fields in a fixed order, no glyph and no colour.* This section is the
   cannot carry content. **The content is the copy source** — §057's *what copy takes*, and
   §107's *the source value, not the painted string*. Every kind but `rule` and `progress`
   declares one (`copyOf`, measured over `ONE_PER_KIND`); `rule` has its label and `progress`
-  its `valueText`. Three copy sources are the block's JSON — `table`, `plot`, `patch` — and a
-  table's rows each declare their own.
+  its `valueText`. *Amended*: this bullet first read *three copy sources are the block's JSON —
+  `table`, `plot`, `patch`*. That was the instrument's: the probe built its registry with
+  `defaults` alone, which registers neither C11's table nor C12's plot nor C25's patch, so each
+  degraded to `raw` and `raw` copies the document. Through the registry a session builds, a
+  table copies its header and rows and a patch its unified diff; only the `figure` kinds have
+  no text source (§6m.5).
 - **A change carries ids and nothing else** (C13 §2): `append`, `patch`, `settle`, `evict`,
   `clear`. The persist subscriber's filter — `append` or `settle`, and not `streaming` — is
   already *this entry will not move again*.
@@ -2460,11 +2464,13 @@ is held under it exactly as C17 I29 holds it under a field.
 4. **The line forms are ruling 29's**: the start `entry N of M: <command> — running`; the
    completion `entry N: <command> — <state>[, <outcome>][, <duration>]`, the state being the
    head's word; a block `<role>[: <name>][ — <valueText>]`, then its source lines (I121).
-5. **A block's source lines are its elements' copies where its elements declare them, and its
-   own copy source otherwise** — a table reads its rows and not its JSON. **A `figure` reads its
-   name and nothing else**: a plot's copy source is its JSON document, and §107's *a figure owes
-   a summary and a data view* has no field to carry either yet (§6m.5). A container reads its
-   children's bodies in order.
+5. **A block's source lines are its own copy source** — C09 §7a's *a row's copy and the
+   block's are one source at two sizes*, and the block's size carries what the elements drop: a
+   table's header row, a tree's indentation. The element copies were the first ruling here, and
+   reading the stream over `ONE_PER_KIND` overturned it: a `choice`'s option copies carry the
+   radio glyph its block copy does not. **A `figure` reads its name and nothing else** — §107's
+   *a figure owes a summary and a data view* has no field to carry either yet (§6m.5). A
+   container reads its children's bodies in order.
 6. **Never a glyph, never an SGR sequence, never a control character** in an event — the copy
    source is already control-stripped (C09 I18) and nothing in this renderer paints.
 7. **A question is numbered** (I122). `1`–`9` answer it, a choice's own key still answers it,
@@ -2786,7 +2792,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I118** — *(C04 §3ar F1–F10, C04 I137, C17 I29, C16 I60)* **The shell lends a form field the prompt's editor, and every path out of the field gives it back.** Entering a field holds the reader's line (C17 I29) and loads the field's value with the caret at its end. While it is held the prompt row draws the held line, the field draws the editor, and `RenderContext.focus.draft` carries the editor's text and caret (C09 I119). `⏎` writes the value by a shell-origin `replace` and enters the next field, keeping the line held; from the last field focus goes to the default button in navigate mode and the line is given back. `esc` and `⌃c` give the line back and write nothing. **After every event, a held line whose field is no longer focused in the inside mode is given back** — written first where focus is on another element and the field still exists, discarded where focus is still on the field. **And no action dispatches while a field holds the line** (C04 §3ar F7): the dispatcher's one path activates the focused element, a field is entered rather than activated, and a pointer focuses on its press, so the rule above has written the field before a release can activate anything — which is what makes a submit read what was typed and keeps a `fill` from being overwritten by the restore. A second path to the dispatcher ends the borrow, writing, before it dispatches. **While a field holds the line the owner line names it**: `field`, `⏎ keep`, `esc discard` (§6's owner line, `R-KEY-004`), not the inside rung's plot keys, which name an owner the reader is not in. The prompt row draws the held line through C17's own walk (`layout`, `cursorCell`, the editor's `drawAs`), so its chips resolve as they did before it was held.
 - **I119** — *(§6m, §107, `R-ACC-001`, → C01 I22, C02 I15)* **When `capabilities.renderMode` is `linear` the session composes no frame.** No size gate, no spinner, no ramp and no composition runs, and the scheduler's commits redraw the input line and nothing else; the terminal is acquired under C01's linear profile. **The only output edited in place is the input line** — every other byte is appended and never rewritten.
 - **I120** — *(§6m.2, §6m.3)* **Linear events come from transcript changes by §6m.2's table, once per fact.** A start on a streaming `append`; a start and a completion together on a settled `append`; a completion on `settle`; an appended block's body on a `patch` that appends to a settled entry; `transcript cleared` on `clear`; nothing on a streaming `patch`, a replace or merge, or an `evict`. **A start, a completion and an appended block are each written once per id.** An entry's number is its `seq` and *of M* is the highest `seq` so far, so eviction never renumbers a call between its start and its completion.
-- **I121** — *(§6m.4 rulings 4–6, C09 §7h, §057)* **A block reads `<role>[: <name>][ — <valueText>]`, then its source lines** — its elements' copies where they declare them, else its own copy source, and nothing for a `figure` beyond its name. A container reads its children in order. A source line equal to the name is not written twice. No event carries a glyph, an SGR sequence or a control character.
+- **I121** — *(§6m.4 rulings 4–6, C09 §7h, §057)* **A block reads `<role>[: <name>][ — <valueText>]`, then its source lines** — its own copy source (C09 §7a), and nothing for a `figure` beyond its name. A container reads its children in order. A source line equal to the name is not written twice. No event carries a glyph, an SGR sequence or a control character.
 - **I122** — *(§6m.3 rows 5–7, §107)* **A question is written as its detail's body and one numbered line, and answered by its number.** `1`–`9` answer choices in order and a choice's own key still does; resolution writes `answer: <label>`. While it is open the input line reads `answer 1–N:`, or the question and the typed reply when `reply…` is chosen, and the reader's draft is held and given back.
 - **I123** — *(§6m.3 row 1, row 8)* **An event is written with the input line erased first and redrawn after**, caret where it was, and the line is windowed to the width round its caret, so a long draft never wraps a row the next erase cannot reach.
 - **I124** — *(§6m.4 ruling 8, §107)* **Every event carries an announcement level**: `assertive` for a failed completion, a question and an appended error or warning notice; `polite` otherwise. Linear stdout writes both, and no event names a transport that does not exist.
@@ -3249,7 +3255,7 @@ PTY harness.
 - **T1.72** (I115, `R-HON-008`): `resolveConfig` over the minimal config records the four settings in order, each `default`, with the framework's values as text; the same config with `motion: "reduced"` records `reduced` and **still `default`** — the premise asserted, so a reading that called a caller's value `config` fails here.
 - **T1.73** (I116, §6l.13 K1, K3): the default footer given `toast: "copied 3 lines"` draws `✓ copied 3 lines` where the working directory was, and the cwd is absent from that row; given none, the cwd is drawn — asserted at Unicode and at ASCII, where the mark is `glyphFor("ok")`.
 - **T1.74** (I120, I121, I124): §6m.2's table, row by row, through the event function alone — each change kind against a streaming and a settled entry, an appended refusal after settle, a replace after settle writing nothing, a second settle writing nothing, and the number reading `seq` after an eviction.
-- **T1.75** (I121): every kind of `ONE_PER_KIND` through the body function — role, name and value text, elements' copies for a table rather than its JSON, nothing for a figure but its name, a notice's text once, and no SGR or glyph in any line.
+- **T1.75** (I121): every kind of `ONE_PER_KIND` through the body function — role, name and value text, a table's header before its rows, a choice without its radio glyph, nothing for a figure but its name, a notice's text once, and no SGR or glyph in any line — through the registry a session builds, with C11's, C12's and C25's kinds registered.
 - **T1.65c** (I111, §6l.10): the ground reader sees a background that is not the sequence's first parameter, and does not read a 256-colour or rgb *foreground* whose index spells `4x` or `10x` as one. The reader's own fabricated violation, and it earned its place: the first draft matched only at the head of the sequence, so a rule that was painting `38;5;188;48;5;235` was reported as painting nothing — a defect of the instrument that reads exactly like a defect of the code.
 - **T1.65d** (I111, §6l.10): a supplied string that strips to nothing — `""`, spaces, a tab — leaves the frame that shipped, and a padded name still draws. The narrowing belongs to the frame because an application computing its label may return a blank on some frames, and a one-cell ground floating in the rule is not a name.
 - **T1.67** (I112, §6l.11, C17 §5c): a prompt holding a chip paints a background over exactly the chip's cells and nothing else, and a prompt holding the same text without a chip paints none. Read off the emitted bytes, since the screen model folds SGR away.

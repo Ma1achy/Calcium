@@ -538,7 +538,8 @@ fine; what cannot happen is a field with no row, or a row for no field.
 | Keyboard protocol | `keyboardProtocol` | The OS owns auto-repeat, `Esc` is a prefix resolved by C16's 50 ms window, `⇧` alone is invisible, Shift-Enter arrives as `\r`; every affordance still works, because nothing may be bound to an event the protocol alone can produce (I12, A03 SS55) | C01 C16 |
 | Ambiguous width | `ambiguousWidth` | Every `East_Asian_Width=Ambiguous` glyph is measured and drawn as **narrow**, which is the Western convention and today's behaviour; where a locale says otherwise the wide arm is used and the ramps and fills that would double in width are replaced by narrow ones | C09 C12 |
 | Background polarity | `backgroundPolarity` | `unknown` keeps the app's own opening theme — the set's first key, or whatever the reader persisted. Nothing is painted differently and no notice is drawn: a terminal that does not say is a terminal the framework does not guess about | C22 |
-| Alternate screen | `altScreen` | **The shell refuses to open**, prints help, exits 0 | L4 |
+| Alternate screen | `altScreen` | **The shell refuses to open**, prints help, exits 0 — on the rich route; linear needs none (I7, I15) | L4 |
+| Route | `renderMode` | **Linear**: an append-only stream of semantic events, and no frame (C22 §6m) | L4 |
 
 Alternate screen is the sole hard requirement (D28). A fullscreen application on the primary screen destroys the user's scrollback, which is worse than not running.
 
