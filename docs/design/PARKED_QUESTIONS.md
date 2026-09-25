@@ -53,13 +53,13 @@ tail of deleting the pushed view, but C15 I20, I22 and I27 are each written as a
 amending them** — which is the one shape the standing instruction says to stop
 on. **Held.**
 
-> **Ruled 2026-09-24.** Semantic mode reads **`copy`** and native handoff reads **`native`**. **Checked:** fixture 044 draws `⌥⇧C native`, and §103's footer opens `copy ←→↑↓`. **Owed:** the label.
+> **Ruled 2026-09-24.** Semantic mode reads **`copy`** and native handoff reads **`native`**. **Checked:** fixture 044 draws `⌥⇧C native`, and §103's footer opens `copy ←→↑↓`. **Owed:** the label. **Built** in aae861a0 (C14 I55): the copy rung's footer leads `copy` or `native`, and the header chip `COPY` or `NATIVE`.
 
 **4 · RULED — The copy-mode chrome label's wording.** Both modes now read
 `owner === "copy"`, so shipping a second `COPY` would ship a collision. The
 seam is built and the label waits on the word.
 
-> **Ruled 2026-09-24.** The label is **`RECT 12×4 · cells, not source`**. **Premise note:** no fixture or HTML page draws this. `cells, not source` is `R-SEL-007`'s own rule text, and `RECT 12×4` appears nowhere in the kit. It was not already answered; it is answered now, and the wording is yours. **Owed.**
+> **Ruled 2026-09-24.** The label is **`RECT 12×4 · cells, not source`**. **Premise note:** no fixture or HTML page draws this. `cells, not source` is `R-SEL-007`'s own rule text, and `RECT 12×4` appears nowhere in the kit. It was not already answered; it is answered now, and the wording is yours. **Owed.** **Waits on 36, 2026-09-25**: `rectBetween` is built and tested (`copy-rect.test.ts`) and nothing in the session calls it — no action, binding or chord enters a rectangle, which is 36's question. The label has no surface until 36 is answered.
 
 **5 · RULED — `R-SEL-007`'s rectangular-selection mode label.** The registry gives the
 rule and no chord: no rectangular action, no binding, and no wording in the
@@ -350,7 +350,7 @@ binding for both, or neither.
 
 ---
 
-> **Ruled 2026-09-24.** Each scrollable box draws **its own bar in its own last column**. **Premise note:** `R-BLK-165` (`example`) calls two bars for one document a layout error. The ruling overrides an example, which does not bind, so no `current` rule is contradicted. **Owed.**
+> **Ruled 2026-09-24.** Each scrollable box draws **its own bar in its own last column**. **Premise note:** `R-BLK-165` (`example`) calls two bars for one document a layout error. The ruling overrides an example, which does not bind, so no `current` rule is contradicted. **Owed.** **Measured 2026-09-25: the tree already draws it** — `barOf` decides per box, and each box narrows its own content by one column, so a nested pair draws the inner's bar at `w − 2` and the outer's at `w − 1`. Nothing held it. **Specified** as C09 I115, T1.83.
 
 **22 · RULED — Which box draws the bar when two scrollables nest.** M14's plan says
 *two bars for one document is a layout error and is asserted as one*, from
@@ -760,7 +760,7 @@ is parked* — **and it was not**: no entry here named it until this one. Does
 `fade`'s head clear the text floor (and so not reach the ground), or is a
 streaming head exempt because the text is still arriving?
 
-> **Ruled 2026-09-24.** The count reads **`418 chars · 9 rows · 2 entries`**, in the footer. **Premise note:** no fixture draws a count. §103's footer has none, which is why this was parked. The wording is new and yours. **And the mechanism differs:** `semanticSelectionCount` counts blocks, while the ruled form counts the copy text's characters and rows and its entries. **Owed.**
+> **Ruled 2026-09-24.** The count reads **`418 chars · 9 rows · 2 entries`**, in the footer. **Premise note:** no fixture draws a count. §103's footer has none, which is why this was parked. The wording is new and yours. **And the mechanism differs:** `semanticSelectionCount` counts blocks, while the ruled form counts the copy text's characters and rows and its entries. **Owed.** **Built** in aae861a0 (C14 I55): one chip, `418 chars · 9 rows · 2 entries`.
 
 **35 · RULED — Semantic copy mode's count has no drawn form.** `R-SEL-009` names *the
 count* among the three things that redraw while frozen, and `R-SEL-015` defines
