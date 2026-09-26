@@ -67,3 +67,27 @@ rule itself looks wrong, stop and ask — do not substitute a different design.
 - **The layering rules** (imports go down, L0 halves independent). Any task that needs
   an upward edge is routed through L4, per A02 Seam 4.
 - **`make enforce`.** Every task leaves it green.
+
+## Release — a rule is current only once it is released
+
+**`released-baseline.json` seals every rule in the registry**: its content digest,
+its status, and both supersession links. The registry's `meta.revision` names the
+release, and the baseline's `registryRevision` equals it.
+
+1. **Becoming current and being released are one commit.** `lint-immutable.mjs`
+   fails when a `current` rule is absent from the baseline, so there is no window
+   in which a normative rule can be rewritten under its own ID and every gate still
+   passes.
+2. **A release only adds.** A sealed entry is never removed, and its digest and
+   links never change. Its status moves only along the legal transitions —
+   `current` or `example` to `superseded`.
+3. **A release bumps the revision.** `tools/design/release.mjs` is the one writer: it
+   seals every rule the baseline lacks, refuses any edit to a sealed entry, and sets
+   both revisions together. A registry edit that adds a rule is followed by a release
+   in the same commit.
+
+**Why, measured.** At revision 0.9 the baseline held 1 247 of 1 287 rules. The 40 it
+lacked included 22 `current` rules — every `R-SEL-*`, `R-THM-002`, `R-THM-004`,
+`R-THM-005`, `R-GLY-003` among them — because the gate only compared entries the
+baseline already held. A reviewer rewrote `R-SEL-005`'s behaviour under the same ID
+and every gate passed.
