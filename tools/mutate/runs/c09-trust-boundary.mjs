@@ -118,7 +118,10 @@ const results = runPass({
       file: "src/presentation/blocks/registry.ts",
       from: "message: neutraliseControl(text), height }",
       to: "message: text, height }",
-      expect: "T4.107",
+      // **First written against T4.107, and it survived**: that row's error is
+      // a handler's, which C23 draws. No row made a definition throw, so T2.191
+      // gained the clause.
+      expect: "T2.191",
     },
     {
       // **THE DEFECT: the exemption stops being paid for.** With the gate's
@@ -149,28 +152,13 @@ const results = runPass({
     // was measured. The mutations aimed at it went with it. What caught the
     // mistake was `T3.73` — a row asserting `terminal.ts` contains no call to
     // `stripControl`, watching a claim that really was written down.
-    {
-      // **The filter keeps the ESC byte**, which is the single most plausible
-      // loosening: ESC is what carries a terminal's own colour, so letting it
-      // through reads as *preserving the child's styling* and is exactly the
-      // thing `runs` exists to do properly.
-      name: "the filter lets the ESC byte through, to preserve a child's colour",
-      file: DATA_TEXT,
-      from: "  if (cp === 0x09 || cp === 0x0a) return false; // tab, newline",
-      to: "  if (cp === 0x09 || cp === 0x0a || cp === 0x1b) return false; // tab, newline, escape",
-      expect: "T2.156",
-    },
-    {
-      // **The C1 range dropped from the filter.** `0x9b` is a single-byte CSI
-      // introducer, so a payload written in C1 form passes a filter that only
-      // knows C0 — and nothing in the frame looks different until something
-      // interprets it.
-      name: "the filter covers C0 only, so a C1 introducer passes",
-      file: DATA_TEXT,
-      from: "  return cp < 0x20 || (cp >= 0x7f && cp <= 0x9f);",
-      to: "  return cp < 0x20;",
-      expect: "T2.156",
-    },
+    // **Two mutations removed on review batch 4, and they indict their subject.**
+    // `stripControl` letting ESC through, and covering C0 only, both survived:
+    // `#resolve` now neutralises every field before a definition's own
+    // `stripControl` sees it, so the filter receives no control from a field
+    // and no row can see it change. The neutraliser's own two mutations above
+    // replace them. Whether the definitions' remaining `stripControl` calls are
+    // still load-bearing anywhere is a question for C07's ingress follow-up.
     {
       // **The corpus stops carrying the payload**, which is the state the
       // session probe was in on its first run: every frame clean, and the sweep

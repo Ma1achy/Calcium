@@ -13,7 +13,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { CORPUS, ONE_PER_KIND } from "../support/blocks.js";
-import { measurable, visible } from "../support/render.js";
+import { QUIET, measurable, visible } from "../support/render.js";
 import { buildGraph } from "../support/session.js";
 import { validateDocument } from "../../src/data/viewmodel/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
@@ -392,6 +392,27 @@ describe("C09 §7d — the trust boundary", () => {
     // member's shed detail; and the tree's collapsed third level.
     expect(undrawn.sort(), "the fields a kind does not draw, declared").toEqual(NOT_DRAWN);
     expect(drawnFields, "fields drawn with their residue").toBeGreaterThan(0);
+
+    // **The one string the registry builds from content itself**: a renderer's
+    // thrown message, drawn in the error box by calling `status`'s definition
+    // directly — outside `#resolve`, so the neutraliser above never sees it.
+    // Found by the mutation pass: the box's own neutralisation was reachable by
+    // no row, because T4.107's error is a handler's and C23 draws it.
+    const throwing = measurable({
+      definitions: [
+        {
+          kind: "throws",
+          measure: () => 1,
+          render: () => {
+            throw new Error(`boom ${PAYLOAD}`);
+          },
+        },
+      ] as never,
+      onError: QUIET,
+    });
+    const box = throwing.renderToLines({ kind: "throws", id: "x" } as unknown as Block, 100).join("\n");
+    expect(visible(box), "the box shows the message, neutralised").toContain("boom ^[[31mRED");
+    expect(hitsIn(box), "the thrown message's controls, in the error box").toEqual([]);
   });
 
   it("T2.192 (C09 I125, C09 I89): the bidi payload reaches no frame as the character and appears as <U+XXXX>", () => {
