@@ -109,6 +109,60 @@ lacked included 22 `current` rules — every `R-SEL-*`, `R-THM-002`, `R-THM-004`
 baseline already held. A reviewer rewrote `R-SEL-005`'s behaviour under the same ID
 and every gate passed.
 
+### Theme rules are sealed the same way
+
+5. **A theme value is released history, like a rule.** Every record in `themeRules`
+   carries a stable `id` (`TR-0001` …, one flat sequence, because seventeen rules
+   span several themes through `:is(…)`), a `status`, `supersedes` and
+   `supersededBy`, and a `contentDigest` over its `selector` and `declarations` —
+   the value and what it applies to. `ruleIds` are citations and sit outside the
+   digest, as a rule's `tags` do. The baseline seals them under `themeRules` beside
+   `rules`, and clauses 1 to 4 hold for them word for word: current means sealed,
+   a sealed entry is never removed and its digest and `supersedes` never change,
+   `release.mjs` is the one writer, and `released-against.mjs` compares both maps
+   with `origin/main`'s. The anchor covers both.
+
+   **A value is changed by superseding it.** The new record is `current` and names
+   the old in `supersedes`; the old keeps its value, becomes `superseded` and links
+   forward, and the chain ends in exactly one current record — the rules' own
+   check, over theme rules. **No reader takes a superseded record**: the page's CSS,
+   `tools/theme/from-registry.mjs`, and every row that reads `themeRules` take
+   `current` only.
+
+   **One current value per slot.** After `:is(…)` groups and comma lists are
+   expanded, no two current records set one property for one theme and selector.
+   Two current values for one slot is a supersession nobody recorded, and the later
+   one wins in the cascade and in the generator alike, so nothing on screen says
+   so. Measured when this clause landed, over 863 records: **one instance** —
+   `nord`'s `.c-meta`, `#b48ead` (Nord's own purple, 4.41 : 1 on `#2e3440`, under
+   the 4.5 floor) at record 105, overridden by `#ba96b3` (4.82 : 1) in the
+   contrast-override block at 747. Both arrived with the kit. The earlier is
+   recorded as superseded by the later; the shipped value does not move.
+
+   **The history this clause restores.** Commit `76070636` (R-THM-003, the bands)
+   wrote four values over their predecessors and deleted a fifth record, so what
+   `hcDark` and `hcLight` drew before the bands existed nowhere but in git. They
+   return as superseded records, each linked to the band record that replaced it:
+   `hcDark` selection `#00405c` and focus ground `#2e2e2e`; `hcLight` selection
+   `#a8ccf0` and focus ground `#c9c9c9`; and `hcDark`'s composed
+   `.bg-selection .c-*` rule, `color:#fff`, superseded by `hcDark`'s selection
+   band, whose one ink is what replaced it. The band values stand.
+
+   **And the sixth, found by walking for the class rather than the instance.**
+   Every registry revision since the kit landed — fifteen — compared selector by
+   selector: six values were written over or deleted in place, the five above and
+   `mono`'s accent, `color:#fff` → `color:#f0f0f0` in `3e039d99`. It returns too,
+   superseded by the current record; the rule giving its reason is registered
+   separately and cited from the current record's `ruleIds`, which sit outside the
+   digest and so need no supersession of their own.
+
+   Rows: **A03-DSN4** — the checker's refusals (digest drift, a non-reciprocal
+   link, a chain ending anywhere but current, a malformed or repeated id, two
+   current values for one slot); `lint-immutable.mjs` over theme rules (unreleased,
+   digest changed, link redirected, deleted); `release.mjs` sealing them and
+   refusing a rewrite; `released-against.mjs` over both maps; and the restored
+   history, all seven records.
+
 ## Browser conformance — the page's own checks, executed
 
 **The generated page carries its own conformance scripts, and a browser runs them.**

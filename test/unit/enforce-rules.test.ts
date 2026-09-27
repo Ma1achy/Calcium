@@ -3748,6 +3748,12 @@ describe("the design registry — supersession chains", () => {
     ];
     expect(() => { validate(rules); }).toThrow(/supersession is not reciprocal/u);
   });
+
+  it.todo("A03-DSN4 (AUTHORITY §Release 5): the checker refuses a theme rule's digest drift, a non-reciprocal link, a chain not ending current, a malformed or repeated id, and two current values for one slot — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("A03-DSN4 (AUTHORITY §Release 5): lint-immutable fails a theme rule unreleased, its digest changed, its link redirected, or deleted — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("A03-DSN4 (AUTHORITY §Release 5): release.mjs seals theme rules and refuses to rewrite a sealed one — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("A03-DSN4 (AUTHORITY §Release 5): released-against fails a rewritten theme digest and passes a theme supersession — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("A03-DSN4 (AUTHORITY §Release 5): the restored history — four band predecessors, the composed hcDark rule, mono's accent and nord's meta — each superseded and linked — not deferred on a component: the code lands in the next commit of this round");
 });
 
 /**
