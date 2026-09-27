@@ -1243,7 +1243,7 @@ gap this project has now found eleven times.
 ### ~~The command prefix is unreachable~~ — CORRECTED: it is wired
 
 **This entry was wrong and the correction is recorded rather than deleted.** `TuiConfig` has
-`commandPolicy?: CommandPolicy`, threaded `config.ts:108 → construct.ts:673 →
+`commandPolicy?: CommandPolicy`, threaded `config.ts:377 → construct.ts:673 →
 execution.ts:174 → parse`. An app can supply its own prefix today.
 
 I concluded otherwise from grepping `config.ts` for "policy", finding a comment about size
@@ -1265,7 +1265,7 @@ policy, *"which is what stops a replaceable prefix from becoming a replaceable p
 
 ```
 src/shell/types.ts:339      commandPolicy?: CommandPolicy;
-src/shell/config.ts:108     commandPolicy: config.commandPolicy ?? slashPolicy
+src/shell/config.ts:377     commandPolicy: config.commandPolicy ?? slashPolicy
 src/shell/construct.ts:699  commandPolicy: config.commandPolicy
 src/shell/execution.ts:174  policy: deps.commandPolicy
 ```
@@ -4575,7 +4575,7 @@ before it resolves anything.
 **32** — the retraction reached the body and **not** this clause, which is F86/F89/F92's own
 mechanism landing on the sentence that cites them. F89 retracted *CommandPolicy is exported and
 unreachable — a config field*: `CommandPolicy` is exported (`src/index.ts:278`) and reachable,
-`TuiConfig.commandPolicy` (`src/shell/types.ts:451`) threading through `src/shell/config.ts:108`
+`TuiConfig.commandPolicy` (`src/shell/types.ts:451`) threading through `src/shell/config.ts:377`
 to `src/shell/execution.ts:174`, so an app supplies its own prefix today. Confirmed at HEAD
 2026-09-04. **The surviving half is the whole entry**: prefix-*out* — prose by default, verbs by
 exception — is inexpressible, because `prefixPolicy("")` makes every token a verb

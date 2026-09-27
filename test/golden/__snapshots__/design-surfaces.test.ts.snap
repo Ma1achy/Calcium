@@ -31,12 +31,12 @@ exports[`golden frames — one per design fixture > dark-ascii at 40 1`] = `
 ── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
 · a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
   at rest
-    ........................................ scale  o linear  * log  o log2
+    ........................................ scale  @ linear  * log  @ log2
   focused on \`linear\` — NOT chosen: the mark did not move
-    .......AAAAAAAA......................... scale  o linear  * log  o log2
+    .......AAAAAAAA......................... scale  @ linear  * log  @ log2
       A = bg 48;2;46;46;46
   focused on \`log\` — chosen: the same wash, the same mark
-    .................AAAAA.................. scale  o linear  * log  o log2
+    .................AAAAA.................. scale  @ linear  * log  @ log2
       A = bg 48;2;46;46;46
   a checkbox, on
     ........................................ + run the suite after each edit
@@ -749,12 +749,12 @@ exports[`golden frames — one per design fixture > dark-ascii at 80 1`] = `
 ── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
 · a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
   at rest
-    .................................................... scale  o linear  * log  o log2
+    .................................................... scale  @ linear  * log  @ log2
   focused on \`linear\` — NOT chosen: the mark did not move
-    .......AAAAAAAA..................................... scale  o linear  * log  o log2
+    .......AAAAAAAA..................................... scale  @ linear  * log  @ log2
       A = bg 48;2;46;46;46
   focused on \`log\` — chosen: the same wash, the same mark
-    .................AAAAA.............................. scale  o linear  * log  o log2
+    .................AAAAA.............................. scale  @ linear  * log  @ log2
       A = bg 48;2;46;46;46
   a checkbox, on
     .................................................... + run the suite after each edit

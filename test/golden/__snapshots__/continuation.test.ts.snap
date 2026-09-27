@@ -2,34 +2,34 @@
 
 exports[`the continuation mark, in an entry > ascii at 40 1`] = `
 "── queued
-> /ps --all
+$ /ps --all
   \`- queued behind /logs
 ── stalled
-> /ps --all
+$ /ps --all
   \`- no output for 2m
 ── wrapped
-> /ps --all
+$ /ps --all
   \`- a queued line long enough to wrap,
      so the hanging gutter is visible
      under the mark
 ── cancelled
-> /ps --all
+$ /ps --all
 ! cancelled before it ran"
 `;
 
 exports[`the continuation mark, in an entry > ascii at 56 1`] = `
 "── queued
-> /ps --all
+$ /ps --all
   \`- queued behind /logs
 ── stalled
-> /ps --all
+$ /ps --all
   \`- no output for 2m
 ── wrapped
-> /ps --all
+$ /ps --all
   \`- a queued line long enough to wrap, so the hanging
      gutter is visible under the mark
 ── cancelled
-> /ps --all
+$ /ps --all
 ! cancelled before it ran"
 `;
 

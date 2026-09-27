@@ -174,7 +174,8 @@ describe("C22 §2 — config", () => {
     // one entry — and only on a terminal nobody develops on.
     expect(promptFor({ unicode: "full" })).toBe("❯ ");
     expect(promptFor({ unicode: "bmp" })).toBe("❯ ");
-    expect(promptFor({ unicode: "ascii" })).toBe("> ");
+    // `$`, the registry's `reader` record (C09 I123) — `>` is `focus`'s ASCII mark.
+    expect(promptFor({ unicode: "ascii" })).toBe("$ ");
     expect(PROMPT_SUBSTITUTION.map((f) => cells(f))).toEqual([2, 2]);
   });
 });

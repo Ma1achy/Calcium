@@ -176,6 +176,12 @@ export type GlyphSet = Readonly<{
   cross: string;
   filled: string;
   hollow: string;
+  /**
+   * An unchosen option in an exclusive choice — the registry's `choice-open`
+   * (C09 I123). `○` like `hollow`, and a slot of its own because the ASCII
+   * halves differ: `@` here, `o` for the plot's hollow marker.
+   */
+  choiceOpen: string;
   dotted: string;
   blocked: string;
   warning: string;
@@ -297,6 +303,7 @@ const UNICODE: GlyphSet = Object.freeze({
   cross: "✗",
   filled: "●",
   hollow: "○",
+  choiceOpen: "○",
   dotted: "◌",
   blocked: "⊘",
   warning: "▲",
@@ -373,6 +380,7 @@ const ASCII: GlyphSet = Object.freeze({
   cross: "x",
   filled: "*",
   hollow: "o",
+  choiceOpen: "@",
   dotted: ".",
   blocked: "/",
   warning: "!",
@@ -1485,6 +1493,7 @@ export const GLYPH_SET_DOMAINS: Readonly<Record<keyof GlyphSet, readonly string[
   cross: ["row-lead", "plot"],
   filled: ["row-lead", "plot"],
   hollow: ["row-lead", "plot"],
+  choiceOpen: ["row-lead"],
   dotted: ["row-lead", "plot"],
   blocked: ["row-lead", "plot"],
   warning: ["row-lead", "plot"],

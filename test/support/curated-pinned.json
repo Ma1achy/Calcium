@@ -897,6 +897,9 @@
   "candleHollow": [
    "plot"
   ],
+  "choiceOpen": [
+   "row-lead"
+  ],
   "cross": [
    "row-lead",
    "plot"
@@ -2208,6 +2211,10 @@
    "o"
   ],
   [
+   "○",
+   "@"
+  ],
+  [
    "◌",
    "."
   ],
@@ -2338,6 +2345,7 @@
   "candleCross": "+",
   "candleFilled": "#",
   "candleHollow": "=",
+  "choiceOpen": "@",
   "cross": "x",
   "crossing": "+",
   "cursorMark": "^",
@@ -2384,6 +2392,7 @@
   "candleCross": "┿",
   "candleFilled": "┃",
   "candleHollow": "▯",
+  "choiceOpen": "○",
   "cross": "✗",
   "crossing": "┼",
   "cursorMark": "▲",

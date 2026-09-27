@@ -85,7 +85,9 @@ export const MAX_FOOTER_ROWS =
  * row the reader types into. `promptFor` is the only reader; nothing resolves it
  * at module scope, which would read a capability before C02 has detected one.
  */
-const PROMPT_FORMS: readonly [unicode: string, ascii: string] = Object.freeze(["❯ ", "> "]);
+// `$` at ASCII is the registry's `reader` record (C09 I123). It was `>`, which
+// is `focus`'s ASCII mark — the collision the design moved the reader off.
+const PROMPT_FORMS: readonly [unicode: string, ascii: string] = Object.freeze(["❯ ", "$ "]);
 
 export function promptFor(caps: Pick<TerminalCapabilities, "unicode">): string {
   return caps.unicode === "ascii" ? PROMPT_FORMS[1] : PROMPT_FORMS[0];

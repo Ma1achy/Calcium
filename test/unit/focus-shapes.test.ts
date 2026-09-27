@@ -83,7 +83,8 @@ describe("C09 I105 — a choice is one shape, and its two channels never substit
     // not** — which is why the pair is this way round and not the other.
     const ascii = plain(drawn(radio(), at("lin"), ASCII_CAPS));
     expect(ascii, "chosen survives on its glyph").toContain("* log");
-    expect(ascii).toContain("o linear");
+    // `@`, the registry's `choice-open` ASCII half (C09 I123) — `o` was `queued`'s.
+    expect(ascii).toContain("@ linear");
   });
 });
 
