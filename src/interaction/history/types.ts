@@ -72,8 +72,6 @@ export interface HistoryStore {
   searchEnd(action: SearchAction): string | null;
   searchLayer(anchor: Anchor): Layer;
 
-  clearConfirmLayer(): Layer;
-
   flush(): Promise<void>;
   drain(): void;
 

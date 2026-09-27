@@ -1783,20 +1783,6 @@ class Session implements TuiInstance {
     this.#graph?.scheduler.commit("input");
   }
 
-  /** `⌃c` — leave, and **never clear first** (C16 I51, §5d D5). */
-  #exitSemanticSelection(): void {
-    if (this.#semantic === null) return;
-    // Leaving the mode ends the gesture (C14 I48) — a ticker outliving it would
-    // scroll the live transcript the mode just handed back.
-    this.#endDrag();
-    this.#semantic = null;
-    this.#spans = null;
-    // One ordinary commit draws the record, and never a repaint: nothing on the
-    // terminal became unknown while the view was held (C14 I34, C03 I14).
-    this.#graph?.thawView();
-    this.#graph?.scheduler.commit("input");
-  }
-
   /**
    * `a` and `A` (`R-SEL-008`).
    *
@@ -1883,7 +1869,6 @@ class Session implements TuiInstance {
       semanticSelectionCount: () => semantic.count(this.#semantic),
       enterSemanticSelection: () => this.#enterSemanticSelection(),
       escapeSemanticSelection: () => this.#escapeSemanticSelection(),
-      exitSemanticSelection: () => this.#exitSemanticSelection(),
       selectEntryUnderCaret: () => this.#selectEntries("caret"),
       selectAllLoadedEntries: () => this.#selectEntries("all"),
       copySelectedEntries: () => this.#copySelectedEntries(),

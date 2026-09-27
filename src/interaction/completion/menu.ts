@@ -248,6 +248,9 @@ export function menuLayer(
     content: menuBlocks(candidates, selected, remainder),
     blocking: false,
     dismissal: "escape",
+    // The substate names itself (C15 I29), so the footer says *complete* and
+    // not the *find* it said for every panel.
+    owner: Object.freeze({ rung: "substate" as const, name: "complete" as const }),
     // **No `width`, which is how a layer says *the whole region* (C15 I16:
     // `min(layer.width ?? region.width, region.width)`).**
     //

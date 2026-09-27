@@ -56,9 +56,6 @@ function wire(editor: LineEditor): {
     popLayer: () => {},
     nativeSelection: () => false,
     semanticSelection: () => false,
-    escapeSemanticSelection: () => undefined,
-    exitSemanticSelection: () => undefined,
-    exitNativeSelection: () => {},
     liveEntry: () => null,
     entryAtRow: () => null,
     inFlight: () => null,
@@ -74,6 +71,7 @@ function wire(editor: LineEditor): {
     promptHasText: () => editor.text !== "",
     clearPrompt: () => editor.clear(),
     raiseExitConfirm: () => {},
+    refused: () => undefined,
   };
   const router = createRouter({ focus, keymap, now: () => 0, deps });
 

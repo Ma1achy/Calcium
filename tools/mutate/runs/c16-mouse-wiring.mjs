@@ -137,7 +137,9 @@ const results = runPass({
       // anchor is one line rather than three. What it says is unchanged.
       name: "a covering panel routes to the overlay target, as it did before the kind existed",
       file: "src/interaction/router/router.ts",
-      from: '      return run(covering.layer.kind === "panel" ? "panel" : "overlay", e);',
+      // Re-anchored in review batch 2: the target is the layer's rung now
+      // (C16 I63), and the mutation is unchanged in what it says.
+      from: '      return run(rungOfLayer(covering.layer) === "substate" ? "panel" : "overlay", e);',
       to: '      return run("overlay", e);',
       expect: "T1.104",
     },

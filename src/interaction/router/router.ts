@@ -3,17 +3,19 @@
  *
  * C16 §4, §5, §7 — see spec.
  *
- * **The ladder is not a list here.** Rungs 3 to 7 are handlers registered on
- * `overlay`, `nativeSelection`, `panel` and `liveBlock`, so their order *is*
- * `FOCUS_ORDER`'s and the two cannot disagree. Only rungs 1 and 2 sit outside
- * dispatch, because a verb in flight and a shell child are not focus targets and
- * have no target to register on. C16 §5's table documents what falls out of this;
- * it is not a second specification.
+ * **The ladder is not a list here.** The rungs below the two refusals are
+ * handlers registered on `panel`, `interaction`, `liveBlock` and `prompt`, so
+ * their order *is* `FOCUS_ORDER`'s and the two cannot disagree. The refusals — a
+ * question and either copy mode — are the intercept table's `reject`, read before
+ * everything (I62). Rungs 1 and 2 sit outside dispatch, because a verb in flight
+ * and a shell child are not focus targets and have no target to register on.
+ * C16 §5's table documents what falls out of this; it is not a second
+ * specification.
  */
 
 import { NO_SPAN } from "../../data/viewmodel/index.js";
 import type { Probe } from "../../data/viewmodel/index.js";
-import { activeTarget, type FocusInputs, type FocusStore } from "./focus.js";
+import { activeTarget, rungOfLayer, type FocusInputs, type FocusStore, type KeyedTop } from "./focus.js";
 import type { Keymap } from "./keymap.js";
 import {
   RUNG_OF,
@@ -22,18 +24,32 @@ import {
   type OwnerRung,
   type Verdict,
 } from "./types.js";
-import { interceptOf, interceptVerdict } from "./intercepts.js";
+import { INTERCEPTS, interceptOf, interceptVerdict } from "./intercepts.js";
 import { repeatFor, repeatSteps } from "./repeat.js";
 
 const EXIT_ARM_MS = 500;
 
 
 export type Placed = Readonly<{
-  layer: Readonly<{ id: string; kind: "overlay" | "panel"; blocking: boolean; dismissal: "escape" | "focus" | "answer" }>;
+  layer: KeyedTop & Readonly<{ id: string; blocking: boolean; dismissal: "escape" | "focus" | "answer" }>;
   top: number;
   left: number;
   height: number;
   width: number;
+}>;
+
+/**
+ * A refusal the router made, handed to L4 to explain (C16 I62).
+ *
+ * `cause` is which of the two refusals it was: an intercept's `reject` at the
+ * owner's rung, or an event that reached a blocking top and no rung took. A
+ * handler's own `reject` is not one — that handler has decided and explained
+ * for itself — and neither is the question guard, whose explanation is the
+ * armed mark on the owner line (I44).
+ */
+export type Refusal = Readonly<{
+  rung: OwnerRung | null;
+  cause: "intercept" | "blocked";
 }>;
 
 /**
@@ -60,7 +76,7 @@ export type RouterDeps = Readonly<{
    * `handler`/`local` ruling, one layer up.
    */
   probe?: Probe;
-  overlayTop: () => Readonly<{ id: string; kind: "overlay" | "panel"; blocking: boolean; dismissal: "escape" | "focus" | "answer" }> | null;
+  overlayTop: () => (KeyedTop & Readonly<{ id: string; blocking: boolean; dismissal: "escape" | "focus" | "answer" }>) | null;
   /**
    * The top layer's answer handler, or null — I25.
    *
@@ -69,28 +85,26 @@ export type RouterDeps = Readonly<{
    * searched downwards would be answered by the menu.
    *
    * C16 does not know what a key means to a question. It offers the event and
-   * honours the boolean, which is the same contract `register` already has — so
-   * `Esc`, `⌃c`, an accelerator and an arrow are one path here and four rules
-   * over in L4, where the question lives.
+   * honours the answer, which is the same contract `register` already has — so
+   * `Esc`, an accelerator and an arrow are one path here and three rules over in
+   * L4, where the question lives. **`⌃c` is not offered** (I62): the intercept
+   * table rejects it at `question` before any rung runs. A `reject` from the
+   * callback is a refusal the question has already explained (C23 I82).
    */
-  overlayAnswerCallback: () => ((e: InputEvent) => boolean) | null;
+  overlayAnswerCallback: () => ((e: InputEvent) => boolean | Verdict) | null;
   placed: () => readonly Placed[];
   popLayer: () => void;
   nativeSelection: () => boolean;
-  exitNativeSelection: () => void;
   /**
-   * Semantic copy mode's state and its two exits (C14 §6a, C16 §5d, I51).
+   * Semantic copy mode is up (C14 §6a, C16 §5d, I51).
    *
-   * **Two exits and not one, because they do different things.** `escape` clears
-   * a selection if there is one and leaves only when there is none; `exit`
-   * always leaves. The asymmetry is the ruling rather than an oversight — `esc`
-   * is the target's own way out and a selection is state within the rung, while
-   * the ladder's `⌃c` rung answers *cancel the innermost thing* and a rung that
-   * also tidied up would be answering two questions.
+   * **The router reads the state and calls no exit** (I62, ruling 59). It held
+   * both copy modes' exits for the `⌃c` rung, and §103 has COPY MODE *reject*
+   * the interrupt — so the rung went, and with it the only reader of either.
+   * `escapeSemanticSelection` was a member here that nothing in the router read:
+   * `esc` reaches it through the keymap's effect table, as every bound key does.
    */
   semanticSelection: () => boolean;
-  escapeSemanticSelection: () => void;
-  exitSemanticSelection: () => void;
   liveEntry: () => Readonly<{ id: string }> | null;
   entryAtRow: (row: number) => Readonly<{ id: string; rowOffset: number }> | null;
   /**
@@ -181,18 +195,29 @@ export type RouterDeps = Readonly<{
    * the shape no caller can use safely.
    */
   overlayWouldResolve: () => ((e: InputEvent) => boolean) | null;
+  /**
+   * The router refused an event — explain it (C16 I62, R-HON-004, R-INT-009).
+   *
+   * Called exactly once per refusal, and only for the two the router makes
+   * itself: an intercept's `reject` and a blocking top no rung took. **L4 routes
+   * it by rung**, because the explanation is the owner's: a question draws
+   * `answer this first` on its own row (C23 I82), semantic copy mode a one-shot
+   * chip on the owner line (C22 I133), and native selection nothing — the
+   * scheduler is suspended, and that is the stated limit (ruling 60).
+   */
+  refused: (r: Refusal) => void;
 }>;
 
 /**
- * What a handler answers (§103, R-OWN-001, C16 §3a W6).
+ * What a handler answers (§103, R-OWN-001, C16 §3a W6, I64).
  *
- * **`boolean` could say two of the four things and conflated the other two.**
+ * **`boolean` could say two of the three things and conflated the other one.**
  * `true` is `handle`; `false` meant *pass downward* **and** *consume without
  * acting*, which are different rungs of the design's decision — and that is why
  * a blocking question could drop a key in silence and read as correct (W2).
- * `global-intercept` had no representation at all.
+ * `global-intercept` is an intercept's word and not a handler's (I64).
  *
- * Both forms are accepted because the four-verdict form is only needed where a
+ * Both forms are accepted because the three-verdict form is only needed where a
  * handler has something to say beyond *yes* or *not mine*, and 30-odd handlers
  * in `construct.ts` have not. `true`/`false` normalise to `handle`/`pass`, which
  * is what they have always meant; a handler that means `reject` now says so.
@@ -405,44 +430,23 @@ export function createRouter(
     return null;
   }
 
-  /** Rungs 3–7, installed as handlers so the ladder has no order of its own. */
+  /** The ladder's rungs, installed as handlers so it has no order of its own. */
   function installLadder(): void {
     register("overlay", (e) => {
       // **I25 — a layer that must be answered gets its keys first, and the order
-      // is the invariant.** The clause below answers `⌃c` at a non-dismissable
-      // top with *consumed, and nothing happens*, which was the whole truth when
-      // no layer could be answered. Against a question it is a hang: the key
-      // vanishes and the handler awaiting it waits forever. `Esc` and `⌃c` are
-      // handed over rather than decided here, because what they mean belongs to
-      // the question (C23 I36) and half a rule in each place is how they drift.
+      // is the invariant.** `Esc` is handed over rather than decided here,
+      // because what it means belongs to the question (C23 I36) and half a rule
+      // in each place is how they drift. The callback's own verdict is honoured:
+      // `reject` is a refusal the question has already explained (C23 I82).
+      //
+      // **No `⌃c` clause, and no rungs for either copy mode** (I62, ruling 59).
+      // This handler used to pop an escapable overlay on `⌃c` and consume it at
+      // any other, and native and semantic selection each had a rung calling
+      // their exit. The intercept table rejects `⌃c` at `question` and `copy`
+      // before any of them could run, so all three were reachable only while a
+      // reject still ran the owning rung — which is the defect.
       const answer = deps.overlayAnswerCallback();
-      if (answer !== null && answer(e)) return true;
-
-      if (!isCtrlC(e)) return false;
-      const top = deps.overlayTop();
-      if (top === null) return false;
-      // `top`, never `pop()`'s return: null covers both "nothing to close" and
-      // "you may not close this", and those are a fall-through and a no-op.
-      if (top.dismissal !== "escape") return true; // consumed, and nothing happens (I8)
-      deps.popLayer();
-      return true;
-    });
-    register("nativeSelection", (e) => {
-      if (!isCtrlC(e)) return false;
-      deps.exitNativeSelection();
-      return true;
-    });
-    // **The same rung and a different verb** (I51, §5d D5). `⌃c` leaves the mode
-    // and does **not** clear a selection first, where `esc` does — which is the
-    // one cell the two exits differ in and therefore the only one a row can be
-    // written against. Carrying `esc`'s clear step over here reads as
-    // consistency and is the defect: this rung answers *cancel the innermost
-    // thing you entered*, and a rung that also tidied up would be answering two
-    // questions (I23).
-    register("semanticSelection", (e) => {
-      if (!isCtrlC(e)) return false;
-      deps.exitSemanticSelection();
-      return true;
+      return answer === null ? "pass" : verdictOf(answer(e));
     });
     // **A panel's rung is `substate`, and so is a view's** (§2c, R-BLK-109).
     // Two targets, one rung, and the registration is per target: a panel is
@@ -531,7 +535,11 @@ export function createRouter(
       // handlers registered at `panel` were unreachable by the pointer while
       // reachable by the keyboard, which is one seam answering two ways. It was
       // three until `kind: "view"` retired (R-EXA-082, F1254).
-      return run(covering.layer.kind === "panel" ? "panel" : "overlay", e);
+      //
+      // **And the target is the layer's rung, not its kind** (I63): the same
+      // `rungOfLayer` `activeTarget` reads, so a key and a click over one layer
+      // cannot reach two different rungs.
+      return run(rungOfLayer(covering.layer) === "substate" ? "panel" : "overlay", e);
     }
 
     // **The click that dismisses does not also act** (I47, R-BLK-854,
@@ -664,6 +672,16 @@ export function createRouter(
     return "pass";
   }
 
+  /**
+   * The router's own refusal: consume, run nothing, and hand the explanation to
+   * L4 exactly once (I62). The caller has already decided no rung runs.
+   */
+  function refuse(rung: OwnerRung | null, cause: Refusal["cause"]): true {
+    stages.push("reject");
+    deps.refused({ rung, cause });
+    return true;
+  }
+
   /** The boolean the ladder's own call sites still read: did this rung consume it. */
   function run(target: FocusTarget, e: InputEvent): boolean {
     return runRung(target, e) !== "pass";
@@ -672,27 +690,6 @@ export function createRouter(
   function rungNow(): OwnerRung | null {
     const target = activeTarget(inputs());
     return target === "global" ? null : RUNG_OF[target];
-  }
-
-  /**
-   * The rung an intercept is answered at — `rungNow`, except that a **question**
-   * is an overlay *awaiting an answer* and not merely a layer.
-   *
-   * **§5 already drew this line and the ladder's targets do not.** `activeTarget`
-   * answers `overlay` for any top layer, where §103's QUESTION rung is *choice or
-   * text · resolves exactly once by answer · safe exit* — and §5's own Ctrl-C
-   * branch tests `overlayAnswerCallback() !== null` for exactly that reason.
-   * Without this the table rejects an interrupt under a non-dismissable layer
-   * that nobody is waiting on, and a verb in flight never gets cancelled: ruled
-   * behaviour overturned by a rung name being one word coarser than the rule.
-   */
-  function interceptRung(): OwnerRung | null {
-    const rung = rungNow();
-    if (rung !== "question") return rung;
-    if (deps.overlayAnswerCallback() !== null) return "question";
-    // A layer with nothing to answer is not a question; the work beneath it is
-    // the owner, which is the rung §5's cancel branch acts for.
-    return "scope";
   }
 
   /**
@@ -904,48 +901,36 @@ export function createRouter(
     // §5's own rungs below.
     const intercept = interceptOf(e);
     if (intercept !== null) {
-      const rung = interceptRung();
+      // **The rung every other reader reads** (I63). An `interceptRung` asked
+      // whether an answer callback was registered and answered `scope` where
+      // none was, so the table and the footer named two rungs for one layer.
+      const rung = rungNow();
       const declared = interceptVerdict(intercept, rung);
-      stages.push(`intercept:${intercept}:${rung ?? "idle"}:${declared ?? "none"}`);
-      // **`reject` means the owner deals with it and it never falls through** —
-      // not that nothing runs. The owning rung is given its turn first, because
-      // the rejection is a thing an owner *does*: a question's `⌃c` is its deny
-      // path (§5 ruling A — declining and cancelling produce the same outcome, and
-      // the one that leaves a record wins), and native selection's is its own refusal.
-      // Short-circuiting before the rung skipped exactly that, which is a table
-      // overruling the ladder rather than declaring an override for it.
-      //
-      // What the table *does* take away is the fall-through: after a reject the
-      // event is spent, so no lower rung and no global binding can act on a route
-      // it does not own. That is what "unclaimable by any rung" buys.
-      if (declared === "reject") {
-        const owner = activeTarget(inputs());
-        if (owner !== "global") runRung(owner, e);
-        stages.push("reject");
-        return true;
-      }
+      stages.push(`intercept:${intercept}:${rung ?? "idle"}:${declared}`);
+      // **A reject consumes the event and runs no rung** (I62, ruling 59). This
+      // used to give the owning rung its turn first, on the reading that a
+      // rejection is a thing an owner *does* — and running the rung made the
+      // reject perform what it refused: a question's answer callback classified
+      // `⌃c` as `resolve` and settled with the default, and copy mode's rung
+      // called its exit. §103: *QUESTION and COPY MODE reject* the interrupt.
+      // What the reject owes is an explanation, and that is `refused`'s.
+      if (declared === "reject") return refuse(rung, "intercept");
 
-      // **`handle` is a destination for two of the three, and only dispatching
-      // on `reject` was the whole defect** (I40, §103). The table said `handle`
-      // at every rung and the code did nothing with it: the event fell to the
-      // ladder, a question's answer handler took `⌥↑`, and **a reader could not
-      // scroll to read the thing they were being asked to approve**. A route no
-      // rung may claim that is nevertheless resolved by the ladder is not
-      // reserved; it is documented.
+      // **`global-intercept` takes the intercept's own exception, ahead of the
+      // ladder** (I40, I64, §103). The table said `handle` at every rung and the
+      // code did nothing with it: the event fell to the ladder, a question's
+      // answer handler took `⌥↑`, and **a reader could not scroll to read the
+      // thing they were being asked to approve**. A route no rung may claim that
+      // is nevertheless resolved by the ladder is not reserved; it is
+      // documented.
       //
       // §103 names the destination for both — *the active viewport handles* for
-      // page-scroll, *its pointer-hit owner* for the wheel — so each goes there
-      // directly, ahead of the ladder, exactly as `reject` goes to the owner.
-      // The viewport's scroller is `global`: all four paging routes register
-      // there (`keymap.ts`), which is what makes this one call rather than a
-      // second scroller beside the first.
-      //
-      // **`interrupt` is excluded and keeps falling through.** Its `handle`
-      // means *this rung's own cancel* — a different verb at a child, a substate
-      // and a scope — so the ladder is where it resolves, and the branch is on
-      // the intercept rather than on the verdict for that reason.
-      if (declared === "handle" && intercept !== "interrupt") {
-        if (intercept === "wheel") {
+      // page-scroll, *its pointer-hit owner* for the wheel — and each intercept
+      // declares which as its `exception`. The branch is on the verdict alone:
+      // it asked `intercept !== "interrupt"` while `handle` meant two things,
+      // and `handle` now means only *continue to this rung* (I64).
+      if (declared === "global-intercept") {
+        if (INTERCEPTS[intercept].exception === "pointer") {
           stages.push("intercept:wheel");
           return e.kind === "mouse" ? routeMouse(e) : false;
         }
@@ -969,6 +954,7 @@ export function createRouter(
         stages.push("intercept:scroll:transcript");
         return run("global", e);
       }
+      // `handle`: continue — the rung answers the route with its own verb.
     }
 
     if (e.kind === "mouse") return routeMouse(e);
@@ -984,27 +970,14 @@ export function createRouter(
     }
 
     if (isCtrlC(e)) {
-      // **A verb waiting for an answer is not a verb to cancel** (I25).
+      // **A verb waiting for an answer is not a verb to cancel** (I7, I25, I62).
+      // A local verb awaiting `ctx.ask` is in flight for the whole time its
+      // question is on screen, and this branch used to hand `⌃c` to the
+      // question ahead of rung 1 — cancellation discards the entry, and the
+      // submitted line vanished. The intercept table now rejects `⌃c` at
+      // `question` before this is reached, so neither happens: the question
+      // stays open, the verb stays waiting, and the question says why.
       //
-      // Rungs 1 and 2 read `inFlight`, and a local verb awaiting `ctx.ask` is in
-      // flight for the whole time its question is on screen — so `⌃c` was taken
-      // by rung 1 and the question never saw it. The outcome looked right, which
-      // is why only a frame-read found it: the container was untouched and the
-      // layer was gone, and a test asserting both passes. What the frame showed
-      // is that **the submitted line vanished** — cancellation discards the
-      // entry, so there was no record the command had been run at all, where
-      // declining settles one saying nothing changed.
-      //
-      // Ruling A's own argument decides it. `Esc` and `⌃c` collapse *because*
-      // declining and cancelling produce the same outcome — and when they do,
-      // the one that leaves a record is the one to keep. So a question outranks
-      // the cancel rungs, which is the only place the ladder's newest-first
-      // order is not enough on its own: both rungs have a claim, and the older
-      // one is higher.
-      if (deps.overlayAnswerCallback() !== null) {
-        stages.push("question");
-        return run("overlay", e);
-      }
       // Rungs 1 and 2, discriminated by route rather than by two sources.
       const route = deps.inFlight();
       if (route === "app" || route === "local") {
@@ -1079,8 +1052,7 @@ export function createRouter(
       // states its reason by the owner being visible, rather than by a notice
       // per keystroke.
       stages.push("modal-blocked");
-      stages.push("reject");
-      return true;
+      return refuse(rungNow(), "blocked");
     }
 
     stages.push("global");

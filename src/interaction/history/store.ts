@@ -14,7 +14,7 @@
  */
 
 import { load } from "./codec.js";
-import { clearConfirmLayer, listBlocks, searchLayer, type Listed } from "./layers.js";
+import { listBlocks, searchLayer, type Listed } from "./layers.js";
 import { createNavigator } from "./navigate.js";
 import { createWriter } from "./persist.js";
 import { redact } from "./redact.js";
@@ -170,10 +170,6 @@ export async function openHistory(deps: HistoryDeps): Promise<HistoryStore> {
 
     searchLayer(anchor: Anchor) {
       return searchLayer(search.state ?? EMPTY_SEARCH, anchor);
-    },
-
-    clearConfirmLayer() {
-      return clearConfirmLayer(entries.length);
     },
 
     async flush() {

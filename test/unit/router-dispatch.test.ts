@@ -11,7 +11,7 @@ import { createKeymap, defaultKeymap } from "../../src/interaction/router/keymap
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { block, type Plot } from "../../src/data/viewmodel/index.js";
 import { INTERCEPTS, interceptVerdict, type InterceptId } from "../../src/interaction/router/intercepts.js";
-import { createRouter, type Placed, type RouterDeps } from "../../src/interaction/router/router.js";
+import { createRouter, type Placed, type Refusal, type RouterDeps } from "../../src/interaction/router/router.js";
 import { OWNER_RUNGS, type InputEvent, type Key } from "../../src/interaction/router/types.js";
 import { addr } from "../support/focus.js";
 
@@ -48,6 +48,9 @@ const box = (
 function harness(over: Partial<RouterDeps> = {}, start = 1_000, keymap = createKeymap([])) {
   let t = start;
   const calls: string[] = [];
+  // **Its own list, not `calls`** (C16 I62): a refusal is an explanation, not an
+  // action, and a row asserting what acted must not have to subtract it.
+  const refusals: Refusal[] = [];
   const layer = { top: null as Placed["layer"] | null, placed: [] as Placed[] };
   const deps: RouterDeps = {
     keyReleasesReported: () => false,
@@ -61,10 +64,7 @@ function harness(over: Partial<RouterDeps> = {}, start = 1_000, keymap = createK
     placed: () => layer.placed,
     popLayer: () => void calls.push("pop"),
     nativeSelection: () => false,
-    exitNativeSelection: () => void calls.push("exitCopy"),
     semanticSelection: () => false,
-    escapeSemanticSelection: () => void calls.push("escapeSemantic"),
-    exitSemanticSelection: () => void calls.push("exitSemantic"),
     liveEntry: () => ({ id: "e1" }),
     entryAtRow: (row) => (row < 5 ? { id: `row${String(row)}`, rowOffset: row } : null),
     inFlight: () => null,
@@ -81,11 +81,12 @@ function harness(over: Partial<RouterDeps> = {}, start = 1_000, keymap = createK
     promptHasText: () => false,
     clearPrompt: () => void calls.push("clearPrompt"),
     raiseExitConfirm: () => void calls.push("exitConfirm"),
+    refused: (r) => void refusals.push(r),
     ...over,
   };
   const focus = createFocusStore();
   const router = createRouter({ focus, keymap, now: () => t, deps });
-  return { router, focus, calls, layer, advance: (ms: number) => (t += ms) };
+  return { router, focus, calls, refusals, layer, advance: (ms: number) => (t += ms) };
 }
 
 describe("C16 §4 — dispatch", () => {
@@ -162,11 +163,15 @@ describe("C16 §4 — dispatch", () => {
 
 describe("C16 §5 — the ladder, as handlers on their targets", () => {
   it("T1.11 (I7): a verb in flight cancels, ahead of everything else", () => {
+    // **A panel on top, where this was a confirm** (review batch 2, I62). A
+    // question rejects the interrupt before rung 1 is read, so under one the
+    // verb is *not* cancelled — T4.81b. A panel's rung handles it, and rung 1 is
+    // still ahead of the panel's own pop: the promote, not the pop.
     const { router, calls, layer } = harness({ inFlight: () => "app" });
-    layer.top = { id: "confirm", kind: "overlay", blocking: true, dismissal: "answer" };
+    layer.top = { id: "menu", kind: "panel", blocking: false, dismissal: "escape" };
 
     expect(router.dispatch(ctrlC)).toBe(true);
-    expect(calls, "not the confirm, not the view — the promote").toEqual(["cancel"]);
+    expect(calls, "not the panel's pop — the promote").toEqual(["cancel"]);
   });
 
   it("T1.11b (§5): a live subscription is cancelled below the layer rungs and above the prompt's", () => {
@@ -238,12 +243,13 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     expect(calls).toEqual(["sigint"]);
   });
 
-  it("T1.12, T1.12b (I8): a confirm is a no-op, and nothing beneath it moves", () => {
-    const { router, calls, layer } = harness({ nativeSelection: () => true });
+  it("T1.12, T1.12b (I8, I62): a confirm refuses ⌃c once, and nothing beneath it moves", () => {
+    const { router, calls, refusals, layer } = harness({ nativeSelection: () => true });
     layer.top = { id: "confirm", kind: "overlay", blocking: true, dismissal: "answer" };
 
     expect(router.dispatch(ctrlC), "consumed").toBe(true);
     expect(calls, "native selection is untouched and no layer popped").toEqual([]);
+    expect(refusals, "refused once, at the question").toEqual([{ rung: "question", cause: "intercept" }]);
   });
 
   it("T1.39 (I39): every intercept declares a verdict at every rung, by equality", () => {
@@ -255,7 +261,9 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     // added with an `as`, when a table is assembled rather than written, or when
     // `OWNER_RUNGS` grows and the record is widened with an index signature.
     for (const id of Object.keys(INTERCEPTS) as InterceptId[]) {
-      const declared = Object.keys(INTERCEPTS[id]).filter((k) => k !== "idle" && k !== "why");
+      const declared = Object.keys(INTERCEPTS[id]).filter(
+        (k) => k !== "idle" && k !== "why" && k !== "exception",
+      );
       expect(declared.sort(), `${id}: every rung, no omissions`).toEqual([...OWNER_RUNGS].sort());
       for (const rung of OWNER_RUNGS) {
         expect(interceptVerdict(id, rung), `${id} at ${rung}`).toBeTypeOf("string");
@@ -291,39 +299,42 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     // only way to tell that from a handler that declined.
     expect(router.lastStages).toEqual([
       "arming",
-      "intercept:page-scroll:question:handle",
+      "intercept:page-scroll:question:global-intercept",
       "intercept:scroll:transcript",
     ]);
 
     // **The control, and it is the reason this is not a test of "⌥↑ is special".**
     // `⌃c` is a reserved route at the same rung with the other verdict, so it
-    // takes the other road: `reject` resolves at the **owning rung**, where
-    // `handle` short-circuits to the viewport. Without this row the assertions
-    // above are equally passed by a router that sends every intercept to the
-    // scroller, which would answer the question by scrolling it.
+    // takes the other road: `reject` consumes it and runs no rung (I62), where
+    // `global-intercept` takes the route's exception. Without this row the
+    // assertions above are equally passed by a router that sends every
+    // intercept to the scroller, which would answer the question by scrolling it.
     //
-    // The ladder's own `overlay` handler is what runs, not a test double —
-    // §5's question branch — so the assertion is the destination rather than a
-    // spy: nothing scrolled, and the event was spent at the rung.
+    // *It read "`reject` resolves at the owning rung"* until review batch 2, and
+    // that was the defect: the rung it resolved at answered the question.
     calls.length = 0;
     expect(router.dispatch(ctrlC)).toBe(true);
-    expect(router.lastStages, "the owner's road, not the viewport's").toEqual([
+    expect(router.lastStages, "the refusal's road, not the viewport's").toEqual([
       "arming",
       "intercept:interrupt:question:reject",
       "reject",
     ]);
     expect(calls, "an interrupt does not scroll").toEqual([]);
+    expect(offered, "and the question was not offered it").toEqual([]);
     expect(layer.top?.id, "and it did not dismiss the question either").toBe("confirm");
   });
 
-  it("T1.41f (I51, §5d D5): ⌃c in semantic copy mode calls the exit, never the escape verb", () => {
-    // **The wiring, where T1.41c is the rule.** The model says the two exits
-    // differ; this says the ladder reaches the right one — a row that only
-    // called the verb would pass with the rung bound to the other.
-    const { router, calls } = harness({ semanticSelection: () => true });
+  it("T1.41f (I51, I62, §5d D5): ⌃c in semantic copy mode is refused — consumed, and no rung runs", () => {
+    // **Inverted in review batch 2** (ruling 59). This asserted `["exitSemantic"]`
+    // — the ladder reaching the mode's exit — and §103 has COPY MODE reject the
+    // interrupt. A handler registered at the target is the probe: a reject that
+    // still ran the owning rung would reach it.
+    const { router, calls, refusals } = harness({ semanticSelection: () => true });
+    router.register("semanticSelection", () => (calls.push("rung"), true));
 
     expect(router.dispatch(key("c", { ctrl: true }))).toBe(true);
-    expect(calls, "leaves, and does not clear first").toEqual(["exitSemantic"]);
+    expect(calls, "the mode's rung is not run").toEqual([]);
+    expect(refusals, "and the refusal is handed on, once").toEqual([{ rung: "copy", cause: "intercept" }]);
   });
 
   it("T1.41g (I50): the `copy` rung's intercepts answer for both modes, not just the handoff", () => {
@@ -398,13 +409,12 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     expect(calls, "a reader under a full-region layer can still page").toEqual(["up"]);
     expect(router.lastStages).toEqual([
       "arming",
-      // **`scope`, where it was `substate`** (R-EXA-082, F1254). The rung named
-      // here is the one the page-scroll intercept resolved at, and it used to be
-      // the pushed view's own paging; with `viewPageUp` and its eight siblings
-      // deleted there is nothing registered at `substate` for this key, so it
-      // falls to the transcript's — which is the reader still being able to
-      // page, stated one rung lower.
-      "intercept:page-scroll:scope:handle",
+      // **`question`, where it was `scope`** (C16 I63, review batch 2). An
+      // overlay that declares no owner is a question, and the footer, the guard
+      // and the epoch always said so; the intercept table alone said `scope`,
+      // because it asked whether an answer callback was registered. One rung
+      // now, and the reader can still page from it.
+      "intercept:page-scroll:question:global-intercept",
       "intercept:scroll:transcript",
     ]);
 
@@ -448,15 +458,19 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
     expect(calls, "and a one-row layer that does own it holds every key").toEqual([]);
   });
 
-  it("a dismissable overlay pops; a view beneath is reached only when it is the top", () => {
+  it("a panel pops on ⌃c; an overlay does not", () => {
+    // **Amended in review batch 2** (I62, I63). This popped an escapable
+    // *overlay* on `⌃c`, which was the ladder's `overlay` handler's second
+    // clause. An overlay's rung is `question`, which rejects the interrupt, so
+    // the clause is gone; what pops is the substate, a panel.
     const { router, calls, layer } = harness();
-    layer.top = { id: "menu", kind: "overlay", blocking: false, dismissal: "escape" };
+    layer.top = { id: "dash", kind: "panel", blocking: false, dismissal: "escape" };
     router.dispatch(ctrlC);
     expect(calls).toEqual(["pop"]);
 
-    layer.top = { id: "dash", kind: "panel", blocking: false, dismissal: "escape" };
+    layer.top = { id: "menu", kind: "overlay", blocking: false, dismissal: "escape" };
     router.dispatch(ctrlC);
-    expect(calls).toEqual(["pop", "pop"]);
+    expect(calls, "the overlay is not popped").toEqual(["pop"]);
   });
 
   it("T1.14: Ctrl-C in the live block returns focus to the prompt, keeping the buffer", () => {
@@ -470,11 +484,15 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
 
   it("the ladder's order is FOCUS_ORDER's, asserted where two rungs are both live", () => {
     // The pairwise form again: each rung firing in isolation is true under any
-    // permutation. A confirm over native selection is the pair the reorder turned on.
-    const { router, calls, layer } = harness({ nativeSelection: () => true });
-    layer.top = { id: "menu", kind: "overlay", blocking: false, dismissal: "escape" };
+    // permutation. **A panel over the live block** is the pair now: an overlay
+    // over native selection was, and both of those rungs refuse `⌃c` (I62), so
+    // neither can show an order by acting.
+    const { router, focus, calls, layer } = harness();
+    focus.enterLiveBlock("e1", addr("r3"));
+    layer.top = { id: "dash", kind: "panel", blocking: false, dismissal: "escape" };
     router.dispatch(ctrlC);
-    expect(calls, "overlay beats native selection").toEqual(["pop"]);
+    expect(calls, "the panel beats the live block").toEqual(["pop"]);
+    expect(focus.current.at, "and focus stayed where it was").not.toBe("prompt");
   });
 });
 
@@ -605,7 +623,7 @@ describe("C16 §4 — mouse routes by position", () => {
         // `copy`** (I40): a horizontal wheel is still a wheel to the table (M5,
         // W4), and `handle` routes it to its pointer-hit owner ahead of the
         // ladder rather than letting it fall through to the same place.
-        "intercept:wheel:scope:handle",
+        "intercept:wheel:scope:global-intercept",
         "intercept:wheel",
         "mouse",
         "viewport:row2",
@@ -644,7 +662,7 @@ describe("C16 §4 — mouse routes by position", () => {
     seen.length = 0;
     router.dispatch(click(8, 0, "wheelDown"));
     expect(seen).toEqual(["global:wheelDown"]);
-    expect(router.lastStages).toEqual(["arming", "intercept:wheel:scope:handle",
+    expect(router.lastStages).toEqual(["arming", "intercept:wheel:scope:global-intercept",
         "intercept:wheel", "mouse", "viewport:wheel"]);
 
     // T3.12b's half, kept: a layer covering the point takes it and nothing else sees it.
@@ -798,9 +816,11 @@ describe("C16 — the dispatch trace, run against the implementation", () => {
       // **The entry under the pointer is offered the wheel first** (§4a row i):
       // a `scroll` block is a second thing a wheel can mean. The harness's
       // `liveBlock` handler binds nothing, so the wheel falls to the viewport.
-      "wheel → intercept:wheel:scope:handle,intercept:wheel,mouse,viewport:row2,viewport:wheel",
+      "wheel → intercept:wheel:scope:global-intercept,intercept:wheel,mouse,viewport:row2,viewport:wheel",
       "f (panel) → target:panel,global,dropped",
-      "ctrl-c (confirm) → intercept:interrupt:scope:handle,target:overlay",
+      // A question refuses the interrupt and runs no rung (I62, I63). It read
+      // `scope:handle,target:overlay` — the table's second derivation.
+      "ctrl-c (confirm) → intercept:interrupt:question:reject,reject",
       "t (global, under confirm) → target:overlay,modal-blocked,reject",
     ]);
 
@@ -1044,51 +1064,97 @@ describe("C16 §5 — Ctrl-D, and the one thing C16 stores", () => {
 
 describe("C16 §3a — the global-intercept table and the child rung (M5)", () => {
   /** Put the router in each rung in turn, by the inputs `activeTarget` reads. */
-  const atRung = (rung: string) => {
+  const atRung = (rung: string, answered: string[] = []) => {
     const over: Partial<RouterDeps> =
       rung === "child"
-        ? { inFlight: () => "shell" }
+        ? { childAttached: () => true }
         : rung === "copy"
           ? { nativeSelection: () => true }
-          : // A question is an overlay *awaiting an answer*, which is the line §5
-            // draws and the target name does not.
+          : // The question's callback would answer anything it is offered, and
+            // records what it was offered — which is how a cell sees a rung
+            // that ran when it should not have.
             rung === "question"
-            ? { overlayAnswerCallback: () => () => true }
+            ? { overlayAnswerCallback: () => (e: InputEvent) => (answered.push(e.kind), true) }
             : {};
-    return harness(over);
+    return harness({ promptHasText: () => true, ...over });
   };
 
-  it("T1.32 (R-OWN-001, §103): all three reserved routes are read before the ladder, from inside every rung", () => {
-    // **Three, and the wheel is the one a table gets written without.** §103
-    // names `interrupt · page-scroll · the wheel` together, and the wheel is not
-    // a key — so a classifier reading `InputEvent.key` alone is complete over
-    // two thirds of its subject and green. C16 §3a W4 is the row: the tree had
-    // one intercept, hand-rolled, and no table.
+  it("T1.166 (I64, R-OWN-001, §103): the reserved routes by outcome, three routes over every rung", () => {
+    // **By outcome, where this was a stage-only row** (review batch 2, I64). It
+    // was T1.32 and asserted that an `intercept:<id>` stage appeared at every
+    // rung — which a router refusing every intercept, or scrolling on every one,
+    // passes equally. Three routes × six rungs, each cell the thing that
+    // happened: who was offered the event, whether anything scrolled, and
+    // whether a refusal was handed on. The id moved because this spec's T1.32
+    // is I24's.
+    //
+    // **The wheel is the one a table gets written without.** §103 names
+    // `interrupt · page-scroll · the wheel` together, and the wheel is not a key.
     const routes: readonly [string, InputEvent][] = [
       ["interrupt", ctrlC],
       ["page-scroll", key("up", { meta: true })],
-      ["page-scroll", key("down", { meta: true })],
       ["wheel", click(3, 0, "wheelUp")],
     ];
+    const TARGET_OF = {
+      child: "child",
+      copy: "nativeSelection",
+      question: "overlay",
+      substate: "panel",
+      inside: "interaction",
+      scope: "prompt",
+    } as const;
+    // What each cell must read as — `offered` is whether the rung's own
+    // handlers saw the event, `scrolled` how many times the scroller ran.
+    const expected: Record<string, Record<string, Readonly<{ offered: boolean; scrolled: number; refused: number; did: readonly string[] }>>> = {
+      interrupt: {
+        child: { offered: true, scrolled: 0, refused: 0, did: [] },
+        copy: { offered: false, scrolled: 0, refused: 1, did: [] },
+        question: { offered: false, scrolled: 0, refused: 1, did: [] },
+        substate: { offered: true, scrolled: 0, refused: 0, did: ["pop"] },
+        inside: { offered: true, scrolled: 0, refused: 0, did: ["navigate"] },
+        scope: { offered: true, scrolled: 0, refused: 0, did: ["clearPrompt"] },
+      },
+      "page-scroll": Object.fromEntries(
+        OWNER_RUNGS.map((r) => [r, r === "copy"
+          ? { offered: false, scrolled: 0, refused: 1, did: [] }
+          : { offered: false, scrolled: 1, refused: 0, did: [] }]),
+      ),
+      wheel: Object.fromEntries(
+        OWNER_RUNGS.map((r) => [r, r === "copy"
+          ? { offered: false, scrolled: 0, refused: 1, did: [] }
+          : { offered: false, scrolled: 1, refused: 0, did: [] }]),
+      ),
+    };
 
-
-    // **Every rung, including the two that reject.** A rejection is delivery: the
-    // intercept decided, which is the thing being asserted, and a rung that could
-    // *claim* one ahead of the table is what "read before the ladder" forbids.
-    for (const rung of ["child", "copy", "question", "substate", "inside", "scope"]) {
+    for (const rung of OWNER_RUNGS) {
       for (const [id, event] of routes) {
-        const { router, layer, focus } = atRung(rung);
-        // The rung-specific state each one needs, set here so the row constructs
-        // what it claims rather than asserting against a default prompt.
+        const answered: string[] = [];
+        const { router, layer, focus, calls, refusals } = atRung(rung, answered);
         if (rung === "question") layer.top = { id: "confirm", kind: "overlay", blocking: true, dismissal: "answer" };
         if (rung === "substate") layer.top = { id: "dash", kind: "panel", blocking: false, dismissal: "escape" };
         if (rung === "inside") {
           focus.enterLiveBlock("e1", addr("r1"));
           focus.setMode("interact");
         }
+        // The probe passes everywhere but at the child, which consumes what it
+        // is handed exactly as an attached surface does (I49).
+        const offered: string[] = [];
+        router.register(TARGET_OF[rung], (e) => (offered.push(e.kind), rung === "child"), { first: true });
+        let scrolled = 0;
+        router.register("global", () => ((scrolled += 1), true));
+
         router.dispatch(event);
-        const seen = router.lastStages.find((s) => s.startsWith(`intercept:${id}`));
-        expect(seen, `${id} is read at the ${rung} rung — stages were ${router.lastStages.join(",")}`).toBeDefined();
+        const did = [...calls, ...(rung === "inside" && focus.current.at === "liveBlock" && focus.current.mode === "navigate" ? ["navigate"] : [])];
+        const want = expected[id]?.[rung];
+        const where = `${id} at ${rung} — stages ${router.lastStages.join(",")}`;
+        expect(router.lastStages.some((st) => st.startsWith(`intercept:${id}:${rung}:`)), `${where}: read before the ladder`).toBe(true);
+        expect(offered.length > 0, `${where}: offered to the rung`).toBe(want?.offered);
+        expect(scrolled, `${where}: scrolled`).toBe(want?.scrolled);
+        expect(refusals.length, `${where}: refused`).toBe(want?.refused);
+        expect(did, `${where}: what acted`).toEqual(want?.did);
+        // A question's own callback is never offered a reserved route: it
+        // either refuses (interrupt) or is stepped over (the other two).
+        expect(answered, `${where}: the question was offered nothing`).toEqual([]);
       }
     }
   });
@@ -1450,18 +1516,99 @@ describe("C16 I53 — the repeat policy through dispatch", () => {
 });
 
 describe("C16 §3b — a reject consumes and explains; one rung; two verdict vocabularies (review batch 2, M5)", () => {
-  it.todo(
-    "T1.164 (I62, §103, ruling 59): ⌃c at a question, at semantic copy mode and at native selection is consumed, offered to nothing and refused once — not deferred on a component: the code lands in the next commit of this round",
-  );
-  it.todo(
-    "T1.165 (I62): refused is called once for an intercept's reject and a blocking top, and never for a handler's reject or the guard — not deferred on a component: the code lands in the next commit of this round",
-  );
+  it("T1.164 (I62, §103, ruling 59): ⌃c at a question, at semantic copy mode and at native selection is consumed, offered to nothing and refused once", () => {
+    // **The callback would resolve on anything it is offered**, and records
+    // what it was offered. T1.40's control declined every key, so a reject that
+    // still ran the owning rung left it green; this one answers, so the same
+    // defect is an answer recorded.
+    const cells = [
+      { rung: "question", over: {} },
+      { rung: "copy", over: { semanticSelection: () => true } },
+      { rung: "copy", over: { nativeSelection: () => true } },
+    ] as const;
+    for (const cell of cells) {
+      const offered: string[] = [];
+      const { router, calls, refusals, layer } = harness({
+        ...cell.over,
+        overlayAnswerCallback: () => (e: InputEvent) => (offered.push(e.kind), true),
+        promptHasText: () => true,
+      });
+      if (cell.rung === "question") layer.top = { id: "confirm", kind: "overlay", blocking: true, dismissal: "answer" };
+      for (const target of ["overlay", "nativeSelection", "semanticSelection"] as const) {
+        router.register(target, () => (calls.push(`rung:${target}`), true), { first: true });
+      }
+      const where = `at ${cell.rung} (${Object.keys(cell.over).join() || "question"})`;
+
+      expect(router.dispatch(ctrlC), `${where}: consumed`).toBe(true);
+      expect(offered, `${where}: the answer callback was offered nothing`).toEqual([]);
+      expect(calls, `${where}: no rung ran, no exit, no clear`).toEqual([]);
+      expect(refusals, `${where}: refused once`).toEqual([{ rung: cell.rung, cause: "intercept" }]);
+      expect(router.lastStages.at(-1)).toBe("reject");
+    }
+
+    // **The control**: the same key at a prompt holding text is not refused —
+    // the scope rung handles it and clears the line. Without it every assertion
+    // above is passed by a router that refuses `⌃c` everywhere.
+    const control = harness({ promptHasText: () => true });
+    expect(control.router.dispatch(ctrlC)).toBe(true);
+    expect(control.calls).toEqual(["clearPrompt"]);
+    expect(control.refusals).toEqual([]);
+  });
+
+  it("T1.165 (I62): refused is called once for an intercept's reject and a blocking top, and never for a handler's reject or the guard", () => {
+    const confirm = { id: "confirm", kind: "overlay", blocking: true, dismissal: "answer" } as const;
+
+    // An intercept's `reject`: once.
+    const intercept = harness();
+    intercept.layer.top = confirm;
+    intercept.router.dispatch(ctrlC);
+    expect(intercept.refusals, "intercept").toEqual([{ rung: "question", cause: "intercept" }]);
+
+    // A blocking top no rung took: once, after `modal-blocked`.
+    const blocked = harness();
+    blocked.layer.top = confirm;
+    blocked.router.dispatch(key("t"));
+    expect(blocked.router.lastStages.slice(-2)).toEqual(["modal-blocked", "reject"]);
+    expect(blocked.refusals, "blocked").toEqual([{ rung: "question", cause: "blocked" }]);
+
+    // A handler's own `reject`: it has explained for itself, so never.
+    const own = harness({ overlayAnswerCallback: () => () => "reject" });
+    own.layer.top = confirm;
+    own.router.dispatch(key("t"));
+    expect(own.router.lastStages.at(-1), "consumed as a reject").toBe("reject");
+    expect(own.router.lastStages, "and not by the blocking step").not.toContain("modal-blocked");
+    expect(own.refusals, "handler").toEqual([]);
+
+    // The question guard: its explanation is the armed mark (I44), never.
+    const guarded = harness({ overlayWouldResolve: () => () => true });
+    guarded.layer.top = confirm;
+    guarded.router.dispatch(key("y"));
+    expect(guarded.router.lastStages, "the guard refused it").toContain("question-guard");
+    expect(guarded.refusals, "guard").toEqual([]);
+  });
   it.todo(
     "T1.166 (I64): the reserved routes by outcome, three routes over every rung — not deferred on a component: the code lands in the next commit of this round",
   );
-  it.todo(
-    "T1.167 (I63): the rung, the guard on arrival and the intercept stage agree for a question and a substate — not deferred on a component: the code lands in the next commit of this round",
-  );
+  it("T1.167 (I63): the rung, the guard on arrival and the intercept stage agree for a question and a substate", () => {
+    // **The three readers that disagreed** (§3b S13). The question here has no
+    // answer callback, which is the cell where the intercept table used to say
+    // `scope` while the footer and the guard said `question`.
+    const cells = [
+      { name: "a declared question", top: { id: "q", kind: "overlay", blocking: true, dismissal: "answer", owner: { rung: "question" } }, rung: "question", armed: true },
+      { name: "a declared substate", top: { id: "m", kind: "panel", blocking: false, dismissal: "escape", owner: { rung: "substate" } }, rung: "substate", armed: false },
+      // The control: an overlay that declares nothing is a question in all three.
+      { name: "an undeclared overlay", top: { id: "o", kind: "overlay", blocking: false, dismissal: "escape" }, rung: "question", armed: true },
+    ] as const;
+    for (const cell of cells) {
+      const { router, layer } = harness();
+      layer.top = cell.top;
+      expect(router.rung, `${cell.name}: the rung`).toBe(cell.rung);
+      expect(router.ownerArmed, `${cell.name}: the guard on arrival`).toBe(cell.armed);
+      router.dispatch(key("up", { meta: true }));
+      const stage = router.lastStages.find((st) => st.startsWith("intercept:"));
+      expect(stage?.split(":")[2], `${cell.name}: the intercept's rung`).toBe(cell.rung);
+    }
+  });
   it.todo(
     "T1.169 (I65): a release answers nothing — y answers Q1, and y's release leaves Q2 open — not deferred on a component: the code lands in the next commit of this round",
   );

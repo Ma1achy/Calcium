@@ -139,10 +139,7 @@ function world(
     placed: () => overlays.layout({ width: 80, height: 24 }),
     popLayer: () => void overlays.pop(),
     nativeSelection: () => false,
-    exitNativeSelection: () => undefined,
     semanticSelection: () => false,
-    escapeSemanticSelection: () => undefined,
-    exitSemanticSelection: () => undefined,
     liveEntry: () => null,
     entryAtRow: () => null,
     inFlight: () => null,
@@ -155,6 +152,7 @@ function world(
     region: () => ({ top: 0, height: 10 }),
     mouseEnabled: () => false,
     raiseExitConfirm: () => undefined,
+    refused: () => undefined,
     ...over,
   } as unknown as RouterDeps;
 
@@ -234,18 +232,28 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     await expect(answer).resolves.toEqual({ key: "n" });
   });
 
-  it("T4.3 (C23 I36, C16 I25): ⌃c resolves with the default, and is not consumed into silence", async () => {
+  it("T4.81 (C16 I62, C23 I36, ruling 59): ⌃c at an open question leaves it open, unanswered and saying so", async () => {
+    // **Inverted in review batch 2.** This was T4.3, *⌃c resolves with the
+    // default*, and it was the specified behaviour: the intercept table said
+    // `reject` and the dispatch ran the owning rung, whose answer callback
+    // classified `⌃c` as `resolve`. §103 has a QUESTION reject the interrupt
+    // (ruling 59), so the refusal is what is asserted — and the promise is still
+    // the only thing that tells *refused* from *answered and popped late*.
     const w = world();
     const answer = present(w, { question: "Stop api-gateway?", choices: YES_NO });
 
-    expect(w.router.dispatch(ctrlC)).toBe(true);
+    expect(w.router.dispatch(ctrlC), "consumed").toBe(true);
+    expect(w.router.lastStages).toEqual(["arming", "intercept:interrupt:question:reject", "reject"]);
 
-    // **The assertion the rung's old behaviour passes.** `⌃c` at a
-    // non-dismissable top returned true and did nothing (C16 I8), so "consumed" and
-    // "the layer is gone" are both satisfiable without the question ever being
-    // answered. The promise is the only thing that tells them apart.
+    let settled = false;
+    void answer.then(() => (settled = true));
+    await Promise.resolve();
+    expect(settled, "the question is not answered").toBe(false);
+    expect(w.overlays.top?.id, "and it is still up").toBe("confirm");
+
+    // The control: an answer still answers it.
+    w.router.dispatch(key("n"));
     await expect(answer).resolves.toEqual({ key: "n" });
-    expect(w.overlays.top).toBeNull();
   });
 
   it("T4.4 (C23 I36): arrows move the selection and Enter takes it", async () => {
@@ -414,33 +422,31 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     await answer;
   });
 
-  it("T4.10 (C16 I25): ⌃c answers the question rather than cancelling the verb", async () => {
-    // **The state the other rows could not construct.** `world()` reports
-    // `inFlight: () => null`, and a local verb awaiting `ctx.ask` is in flight
-    // for the whole time its question is up — so rung 1 took `⌃c` and the
-    // question never saw it. T4.3 passed throughout, because its harness was the
-    // one arrangement where both readings agree.
+  it("T4.81b (C16 I62, I7): ⌃c at a question with a local verb in flight cancels nothing", async () => {
+    // **The state the other rows could not construct**, kept from T4.10.
+    // `world()` reports `inFlight: () => null`, and a local verb awaiting
+    // `ctx.ask` is in flight for the whole time its question is up — so rung 1
+    // took `⌃c` and the question never saw it; cancellation discards the entry,
+    // and a frame-read found the submitted line had **disappeared**.
     //
-    // Found by a frame-read and by nothing else: the container was untouched and
-    // the layer was gone, which is what a test asserts, and the frame showed the
-    // submitted line had **disappeared** — cancellation discards the entry.
+    // **Amended in review batch 2** (ruling 59): T4.10 asserted `⌃c` *answered*
+    // the question instead. It now does neither — the question is open, the verb
+    // is waiting, and the refusal is the table's, before rung 1 is read (I7).
     const w = world({ inFlight: () => "local" });
     const cancelled = w.cancels;
 
     const answer = present(w, { question: "Stop api-gateway?", choices: YES_NO });
     expect(w.router.dispatch(ctrlC)).toBe(true);
 
-    await expect(answer).resolves.toEqual({ key: "n" });
     expect(cancelled(), "the verb must not be cancelled — it was waiting for us").toBe(0);
-    // **The rung that answered is the intercept table's, not §5's** (M5). §103
-    // gives `interrupt` an owner-applicability table where a QUESTION *rejects*
-    // — consume it and let the question resolve, never cancel the verb that is
-    // waiting on the answer — so `⌃c` never reaches §5's cancel rungs and the
-    // stage that records the decision names the route and the rung it was
-    // decided at. The two assertions above are the behaviour; this is the
-    // channel, named so a refactor that reached the same answer by the old path
-    // is visible rather than silent.
+    let settled = false;
+    void answer.then(() => (settled = true));
+    await Promise.resolve();
+    expect(settled, "and the question is not answered for it").toBe(false);
     expect(w.router.lastStages).toEqual(["arming", "intercept:interrupt:question:reject", "reject"]);
+
+    w.router.dispatch(key("n"));
+    await answer;
   });
 
   it("T4.11 (C16 I25): with no question open, ⌃c still cancels a running verb", async () => {
@@ -750,7 +756,9 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
   });
 
   it("T4.8 (C23 I36): resolves with a choice on every path, never null", async () => {
-    for (const k of [key("y"), key("n"), key("escape"), ctrlC, key("return")]) {
+    // **`⌃c` is not a path** (ruling 59): it is refused, and T4.81 asserts what
+    // that leaves.
+    for (const k of [key("y"), key("n"), key("escape"), key("return")]) {
       const w = world();
       const answer = present(w, { question: "q?", choices: YES_NO });
       w.router.dispatch(k);
@@ -767,12 +775,6 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
 });
 
 describe("C23 I82 — a question refuses once and says so (review batch 2, M5)", () => {
-  it.todo(
-    "T4.81 (C16 I62, C23 I36, ruling 59): ⌃c at an open question leaves it open, unanswered and saying so — not deferred on a component: the code lands in the next commit of this round",
-  );
-  it.todo(
-    "T4.81b (C16 I62, I7): ⌃c at a question with a local verb in flight cancels nothing — not deferred on a component: the code lands in the next commit of this round",
-  );
   it.todo(
     "T4.82 (C23 I82, R-HON-004, ruling 60): the first refused key adds the notice with one update and one invalidate; the second changes nothing — not deferred on a component: the code lands in the next commit of this round",
   );

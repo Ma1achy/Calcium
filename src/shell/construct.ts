@@ -340,7 +340,7 @@ export type FrameQueries = Readonly<{
    * Leave native selection (C16 §5b B1).
    *
    * **Ships with `nativeSelection` and with `enterNativeSelection`, never after them.** The
-   * `⌃c` rung already calls this, so a producer landing alone gives a mode that
+   * `esc` row calls this through the keymap, so a producer landing alone gives a mode that
    * consumes the key and does nothing — entered and not leavable, which is
    * worse than unreachable. Both stubs were in the tree for the length of C26.
    */
@@ -357,14 +357,14 @@ export type FrameQueries = Readonly<{
    * label, the selection, and the count. A boolean would give the chrome the
    * label and leave the other two with no source.
    *
-   * `escape` and `exit` are two verbs deliberately (C16 I51): `escape` clears a
-   * selection if there is one and leaves only when there is none, and `exit`
-   * always leaves. `⌃c` takes the second, `esc` the first.
+   * `escape` clears a selection if there is one and leaves only when there is
+   * none (C16 I51). There was a second verb, `exit`, which always left, and
+   * `⌃c` took it; §103 has COPY MODE reject the interrupt (C16 I62, ruling 59),
+   * so `esc` is the one way out and the second verb had no caller.
    */
   semanticSelection: () => boolean;
   enterSemanticSelection: () => void;
   escapeSemanticSelection: () => void;
-  exitSemanticSelection: () => void;
   /**
    * How many entries a copy would take right now (`R-SEL-015`).
    *
@@ -1813,6 +1813,11 @@ export async function constructGraph(
     invalidate: () => void scheduler.commit("input"),
   });
 
+  // **Where the router's refusals are explained** (C16 I62). By rung, because
+  // the explanation is the owner's; the question's and the copy chip's sinks
+  // land with C23 I82 and C22 I133 in this round's next commits.
+  const refused = (_r: Parameters<RouterDeps["refused"]>[0]): void => undefined;
+
   const router = at("router", () =>
     createRouter({
       focus,
@@ -1837,6 +1842,7 @@ export async function constructGraph(
           (row) => entryAtRegionRow(row),
           () => detection.capabilities.keyboardProtocol === "kitty",
           () => surface.attached,
+          (r) => refused(r),
         ),
         // C28 I39 — the `handler` span. Spread in here rather than threaded
         // through `routerDeps`, whose seven parameters are all C16's own and
@@ -2256,6 +2262,9 @@ export async function constructGraph(
         content,
         blocking: false,
         dismissal: "escape",
+        // **`preview`, and `promptUnderMenu` reads it** (C15 I29, ruling 61):
+        // the substate's name is what said *the prompt answers first* by id.
+        owner: { rung: "substate", name: "preview" },
       });
     }
     previewed = chip;
@@ -3361,12 +3370,13 @@ export async function constructGraph(
     // now*. A chip preview composes nothing and is a projection of the caret; a
     // completion menu composes nothing **while it holds no selection** (C19
     // I20). Both are layers over a prompt that is still being typed into, and
-    // they are named rather than derived because no field distinguishes them
-    // from a search — which is a gap worth closing and not a rule to guess at.
-    return (
-      stores.overlays.top?.id === CHIP_PREVIEW_ID ||
-      (stores.overlays.top?.id === MENU_ID && keys.selected === null)
-    );
+    // **The field that distinguishes them is the substate's name** (C15 I29,
+    // ruling 61). This compared two layer ids, because no field told a preview
+    // or a menu from a search — *a gap worth closing and not a rule to guess
+    // at*, said here — and the declared owner is that field.
+    const owner = stores.overlays.top?.owner;
+    if (owner?.rung !== "substate") return false;
+    return owner.name === "preview" || (owner.name === "complete" && keys.selected === null);
   };
 
   /**
@@ -4413,12 +4423,22 @@ function routerDeps(
   keyReleasesReported: () => boolean,
   /** The `child` rung's second source, late because the host is built after the router (C16 I49). */
   childAttached: () => boolean,
+  /** Where a refusal is explained, by rung (C16 I62). L4's, because the explanation is the owner's. */
+  refused: RouterDeps["refused"],
 ): RouterDeps {
-  const top = (): Readonly<{ id: string; kind: "overlay" | "panel"; blocking: boolean; dismissal: "escape" | "focus" | "answer" }> | null => {
+  const top = (): ReturnType<RouterDeps["overlayTop"]> => {
     const layer = stores.overlays.top;
+    // **The owner goes through** (C15 I29, C16 I63): it is the rung, and a
+    // projection that dropped it would hand the router the kind's answer.
     return layer === null
       ? null
-      : { kind: layer.kind, id: layer.id, blocking: layer.blocking, dismissal: layer.dismissal };
+      : {
+          kind: layer.kind,
+          id: layer.id,
+          blocking: layer.blocking,
+          dismissal: layer.dismissal,
+          ...(layer.owner === undefined ? {} : { owner: layer.owner }),
+        };
   };
 
   return {
@@ -4430,10 +4450,7 @@ function routerDeps(
     placed: () => stores.overlays.layout(frame.overlayRegion()).filter(takesInput),
     popLayer: () => void stores.overlays.pop(),
     nativeSelection: frame.nativeSelection,
-    exitNativeSelection: frame.exitNativeSelection,
     semanticSelection: frame.semanticSelection,
-    escapeSemanticSelection: frame.escapeSemanticSelection,
-    exitSemanticSelection: frame.exitSemanticSelection,
     // `liveId`, not a `live` entry: C13 exposes the id and C16 only compares it.
     liveEntry: () => {
       const id = stores.transcript.liveId;
@@ -4481,6 +4498,7 @@ function routerDeps(
       scheduler.commit("input");
     },
     raiseExitConfirm: frame.raiseExitConfirm,
+    refused,
   };
 }
 

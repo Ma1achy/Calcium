@@ -60,9 +60,6 @@ function world() {
     popLayer: () => void overlays.pop(),
     nativeSelection: () => false,
     semanticSelection: () => false,
-    escapeSemanticSelection: () => undefined,
-    exitSemanticSelection: () => undefined,
-    exitNativeSelection: () => undefined,
     liveEntry: () => {
       const id = store.liveId;
       return id === null ? null : { id };
@@ -82,6 +79,7 @@ function world() {
     promptHasText: () => false,
     clearPrompt: () => undefined,
     raiseExitConfirm: () => undefined,
+    refused: () => undefined,
   };
 
   const router = createRouter({ focus, keymap: createKeymap([]), now: () => 1_000, deps });

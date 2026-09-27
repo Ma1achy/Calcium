@@ -430,6 +430,9 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
         content: render(opts, selected()),
         blocking: routing.blocking,
         dismissal: routing.dismissal,
+        // **Declared, not inferred** (C15 I29, C16 I63, R-QST-001): *a question
+        // declares blocking and owner explicitly*.
+        owner: { rung: "question" },
         // **A question is not an advisory overlay, so the default fraction is
         // the wrong one** (C15 I18). Half the region is right for a peek, which
         // a reader dismisses; a confirm that does not fit loses its *answers*,

@@ -117,8 +117,13 @@ async function copiedFromBoxed(
   await step(0);
   stdin.emit("y");
   await step(0);
-  stdin.emit("\u0003");
-  await step(0);
+  // **`esc` twice, where this pressed `⌃c`** (C16 I62, ruling 59): copy mode
+  // refuses the interrupt. The first clears the selection and the second leaves
+  // (C16 I51); each waits out the decoder's lone-`Esc` window.
+  stdin.emit("\u001b");
+  await step(100);
+  stdin.emit("\u001b");
+  await step(100);
   stdin.emit("\u0019");
   await step(0);
   const rows = screen().rows;
@@ -354,8 +359,11 @@ describe("C14 §6f — the drag in a real session", () => {
         await step(0);
         stdin.emit("y");
         await step(0);
-        stdin.emit("\u0003");
-        await step(0);
+        // `esc` twice — clear, then leave (C16 I51, I62).
+        stdin.emit("\u001b");
+        await step(100);
+        stdin.emit("\u001b");
+        await step(100);
         stdin.emit("\u0019");
         await step(0);
         const text = prompt();
@@ -422,7 +430,7 @@ describe("C14 §6f — the drag in a real session", () => {
     }
   });
 
-  it("T4.37b (C14 I48, R-SEL-013): esc and ⌃c end the drag and its autoscroll", async () => {
+  it("T4.37b (C14 I48, R-SEL-013): esc ends the drag and its autoscroll; ⌃c, refused, ends nothing", async () => {
     vi.useFakeTimers();
     try {
       const stdin = fakeStdin();
@@ -486,13 +494,16 @@ describe("C14 §6f — the drag in a real session", () => {
         await step(0);
       }
 
-      // `⌃c` — leaves the mode, and the transcript it hands back holds still.
+      // **`⌃c` — refused, so it ends nothing** (C14 I48 amended, C16 I62,
+      // ruling 59). It used to leave the mode, and leaving is what ended the
+      // gesture; R-SEL-013 names release, esc and the container's end, and a
+      // refused key performs none of them. The held pointer keeps scrolling.
       await armedAndScrolling("⌃c");
       stdin.emit("\u0003");
       await step(0);
-      const afterExit = view();
+      const afterRefusal = view();
       await step(600);
-      expect(view(), "⌃c stopped the autoscroll").toBe(afterExit);
+      expect(view(), "⌃c is refused and the drag goes on").not.toBe(afterRefusal);
     } finally {
       vi.useRealTimers();
     }

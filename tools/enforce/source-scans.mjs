@@ -1164,7 +1164,6 @@ export const SCANS = [
   //     src/data/adapters/registry.ts      an unmapped verb's notice
   //     src/data/viewmodel/markdown.ts     a blockquote parses to a notice
   //     src/viewport/transcript/cap.ts     the cap marker (C13 §5)
-  //     src/interaction/history/layers.ts  the reverse-search layer's status
   //     src/presentation/art.ts            a figure's text fallback
   //   **the owed group is gone** (F777, 2026-09-05). Four L4 files carried
   //   fourteen sites — `confirm.ts` (1), `execution.ts` (5), `refresh.ts` (2),
@@ -1215,7 +1214,6 @@ export const SCANS = [
       "src/data/adapters/registry.ts",
       "src/data/viewmodel/markdown.ts",
       "src/viewport/transcript/cap.ts",
-      "src/interaction/history/layers.ts",
       "src/presentation/art.ts",
     ],
     why: "one grammar for a notice — composed in `documents.ts`, never a hand-composed `kind: \"notice\"` or a `b.notice.warn`/`.error` call outside it (C23 I61, F827); a site that rolls its own chooses its own glyph and the ones that forgot produced no entry at all" },

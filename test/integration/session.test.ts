@@ -1091,7 +1091,7 @@ describe("C22 — native selection, entered and left (C16 §5b, C03 §4a)", () =
     //
     // **B1 is the row this file owes.** `nativeSelection` and `exitNativeSelection` were both
     // stubs for the length of C26 — routed, ordered, unreachable — and the
-    // producer landing alone would have given a mode the ⌃c rung consumes and
+    // producer landing alone would have given a mode the exit row consumes and
     // does not end. The pair is asserted as a pair for that reason.
     const stdin = fakeStdin();
     const { stdout, screen } = await buildSession({ stdin: stdin as never });
@@ -1120,9 +1120,9 @@ describe("C22 — native selection, entered and left (C16 §5b, C03 §4a)", () =
     expect(screen().rows[0]).toContain("NATIVE");
   });
 
-  it("T4.31 (C16 §5b B1): ⌃c leaves it, and the screen comes back", async () => {
+  it("T4.31 (C16 §5b B1, I62): esc leaves it, and the screen comes back", async () => {
     const stdin = fakeStdin();
-    const { stdout, screen } = await buildSession({ stdin: stdin as never });
+    const { stdout, screen, clock } = await buildSession({ stdin: stdin as never });
 
     const type = async (bytes: string): Promise<void> => {
       stdin.emit(bytes);
@@ -1134,7 +1134,14 @@ describe("C22 — native selection, entered and left (C16 §5b, C03 §4a)", () =
     expect(screen().rows[0]).toContain("NATIVE");
 
     const before = stdout.output;
-    await type("\u0003");
+    // **`esc`, where this pressed `⌃c`** (C16 I62, ruling 59): copy mode
+    // rejects the interrupt, so `esc` is the one way out. A lone `Esc` waits
+    // C16 §2's 50 ms to be told apart from a sequence prefix; the wake is a real
+    // timer against the injected clock.
+    stdin.emit("\u001b");
+    clock.advance(80);
+    await new Promise((r) => setTimeout(r, 80));
+    for (let i = 0; i < 4; i += 1) await Promise.resolve();
 
     expect(screen().rows[0], "the indicator goes with the mode").not.toContain("NATIVE");
     expect(stdout.output.slice(before.length), "tracking back on").toContain("[?1002h");
@@ -1144,7 +1151,7 @@ describe("C22 — native selection, entered and left (C16 §5b, C03 §4a)", () =
     // The whole point of the suspension, at the level where it is visible:
     // a selection the reader is taking must not come to mean other text.
     const stdin = fakeStdin();
-    const { stdout, screen } = await buildSession({ stdin: stdin as never });
+    const { stdout, screen, clock } = await buildSession({ stdin: stdin as never });
 
     const type = async (bytes: string): Promise<void> => {
       stdin.emit(bytes);
@@ -1164,7 +1171,14 @@ describe("C22 — native selection, entered and left (C16 §5b, C03 §4a)", () =
     await type("def");
     expect(stdout.output, "nothing reaches the terminal while suspended").toBe(held);
 
-    await type("\u0003");
+    // **`esc`, where this pressed `⌃c`** (C16 I62, ruling 59): copy mode
+    // rejects the interrupt, so `esc` is the one way out. A lone `Esc` waits
+    // C16 §2's 50 ms to be told apart from a sequence prefix; the wake is a real
+    // timer against the injected clock.
+    stdin.emit("\u001b");
+    clock.advance(80);
+    await new Promise((r) => setTimeout(r, 80));
+    for (let i = 0; i < 4; i += 1) await Promise.resolve();
     expect(stdout.output.length, "and resume writes the catching-up frame").toBeGreaterThan(
       held.length,
     );
@@ -1190,16 +1204,30 @@ describe("C22 — native selection: the order inside the exit, and the far side 
 
   const count = (haystack: string, needle: string): number => haystack.split(needle).length - 1;
 
-  it("T4.31b (C16 §5b B1, C01 I10): after ⌃c the tracking pair is the first thing written, before any byte of the frame", async () => {
+  // **`esc`, where these rows pressed `⌃c`** (C16 I62, ruling 59): copy mode
+  // rejects the interrupt, so `esc` is the one way out. A lone `Esc` waits C16
+  // §2's 50 ms to be told apart from a sequence prefix; the wake is a real timer
+  // against the injected clock.
+  const leave = async (
+    stdin: ReturnType<typeof fakeStdin>,
+    clock: Readonly<{ advance: (ms: number) => void }>,
+  ): Promise<void> => {
+    stdin.emit("\u001b");
+    clock.advance(80);
+    await new Promise((r) => setTimeout(r, 80));
+    for (let i = 0; i < 4; i += 1) await Promise.resolve();
+  };
+
+  it("T4.31b (C16 §5b B1, C01 I10): after esc the tracking pair is the first thing written, before any byte of the frame", async () => {
     const stdin = fakeStdin();
-    const { stdout, screen } = await buildSession({ stdin: stdin as never });
+    const { stdout, screen, clock } = await buildSession({ stdin: stdin as never });
     const type = typer(stdin);
 
     await type("\u001bC");
     expect(screen().rows[0], "in native selection").toContain("NATIVE");
 
     const before = stdout.output.length;
-    await type("\u0003");
+    await leave(stdin, clock);
     const after = stdout.output.slice(before);
 
     // **The control comes first**: a frame did follow the pair. Without it,
@@ -1213,14 +1241,14 @@ describe("C22 — native selection: the order inside the exit, and the far side 
     // came first — the swap passes it.
     expect(
       after.startsWith(MOUSE.enter),
-      `the first bytes after ⌃c are 1002h 1006h, got ${JSON.stringify(after.slice(0, 48))}`,
+      `the first bytes after esc are 1002h 1006h, got ${JSON.stringify(after.slice(0, 48))}`,
     ).toBe(true);
   });
 
   it("T4.32b (C03 I13, C16 §5b B4): a verb settling during native selection writes nothing; the exit's one frame carries it", async () => {
     const stdin = fakeStdin();
     let settle: ((doc: unknown) => void) | null = null;
-    const { stdout, screen } = await buildSession({
+    const { stdout, screen, clock } = await buildSession({
       stdin: stdin as never,
       manifest: {
         schema: "tui.manifest/1",
@@ -1255,7 +1283,7 @@ describe("C22 — native selection: the order inside the exit, and the far side 
       "the screen still holds the frame the reader is selecting from",
     ).not.toContain(TEXT);
 
-    await type("\u0003");
+    await leave(stdin, clock);
     expect(stdout.output.length, "one catching-up frame").toBeGreaterThan(held.length);
     expect(screen().text.join("\n"), "and it carries what settled under the hold").toContain(TEXT);
   });

@@ -37,13 +37,10 @@ const results = runPass({
     why: "esc as it shipped before C14 I48 — the gesture and its ticker outlive the key",
   },
   mutations: [
-    {
-      name: "⌃c leaves the mode and the ticker runs on",
-      file: SESSION,
-      from: "    // scroll the live transcript the mode just handed back.\n    this.#endDrag();\n",
-      to: "    // scroll the live transcript the mode just handed back.\n",
-      expect: "T4.37b",
-    },
+    // **"⌃c leaves the mode and the ticker runs on" is retired with its
+    // subject** (C16 I62, ruling 59): `⌃c` is refused in the mode, so the exit
+    // it called — `#exitSemanticSelection` and its `#endDrag` — is gone, and
+    // T4.37b's `⌃c` half now asserts the drag goes on.
     {
       // `R-SEL-013`'s *stops on release*, the half that was built first.
       name: "a release leaves the ticker running",

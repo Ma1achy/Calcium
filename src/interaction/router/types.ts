@@ -172,9 +172,32 @@ export const RUNG_OF: Readonly<Record<Exclude<FocusTarget, "global">, OwnerRung>
  * - `handle` — this is the one owner that acts.
  * - `reject` — consume it, and explain where silence would look broken.
  * - `pass` — continue downward.
- * - `global-intercept` — take the registry-declared exception.
+ *
+ * **Three, and `global-intercept` is not one of them** (C16 I64). It was the
+ * fourth, and no handler produced it: `runRung` read it as *not `pass`*, so a
+ * handler that returned it was consumed with no stage and nothing acting. It is
+ * a thing an **intercept** declares — take the route's own exception, ahead of
+ * the ladder — and a handler has no exception to take. So it lives on
+ * `InterceptVerdict`, and a handler naming it does not compile.
  */
-export type Verdict = "handle" | "reject" | "pass" | "global-intercept";
+export type Verdict = "handle" | "reject" | "pass";
+
+/**
+ * What an intercept declares at one rung (C16 I64, §103).
+ *
+ * - `handle` — continue to the rung, which answers the route with its own verb.
+ *   Only `interrupt` declares it: a child's signal, a substate's pop and a
+ *   scope's cancel are three verbs, and the rung is where they are told apart.
+ * - `reject` — consume it, run no rung, and say why (I62).
+ * - `global-intercept` — take the intercept's declared `exception`; the ladder is
+ *   not consulted.
+ *
+ * `handle` meant the second of these for `page-scroll` and the wheel until review
+ * batch 2, and `dispatch` asked `intercept !== "interrupt"` to know which verb
+ * the word was — one word, two meanings, and the branch on the intercept id was
+ * where the second one lived.
+ */
+export type InterceptVerdict = "handle" | "reject" | "global-intercept";
 
 /**
  * Where focus is, as a thing that can be resolved (C26 I10, §8b.7).
@@ -583,14 +606,11 @@ export type KeyAction =
   | "exitNativeSelection"
   // --- semantic copy mode (C14 §6a, C16 §5d) ---------------------------------
   //
-  // **Two exits, and that is the one thing this mode does not share with the
-  // one above** (I51, §5d D1/D2/D5). `escapeSemanticSelection` clears a
-  // selection if there is one and leaves when there is none;
-  // `exitSemanticSelection` always leaves, and it is **not a `KeyAction`** — it
-  // sits on `RouterDeps` beside `popLayer`, because the `⌃c` rung is what calls
-  // it and no keymap row resolves to it. Folding the two into one action reads
-  // as tidier and would put the clear step on the ladder's cancel, which is the
-  // rung answering two questions.
+  // **One exit, and it clears first** (I51, §5d D1/D2). `escapeSemanticSelection`
+  // clears a selection if there is one and leaves when there is none. There was
+  // a second, `exitSemanticSelection`, which always left and sat on `RouterDeps`
+  // for the `⌃c` rung; §103 has COPY MODE reject the interrupt (I62, ruling 59),
+  // so the rung and the verb went together.
   //
   // `a` and `A` are `R-SEL-008`'s and are bound at this target only: the rule
   // gives them bare keycaps, which is legible exactly because no other target

@@ -121,23 +121,19 @@ export type KeyDeps = Readonly<{
   /**
    * Enter native selection (C16 §5b, C03 §4a).
    *
-   * **The entry half only, and the exit is deliberately not here.** Leaving is
-   * `⌃c` on the ladder's native-selection rung, which already calls `exitNativeSelection` —
-   * so a matching effect in this table would be a second exit with an order of
-   * its own. The pair still ships together; they just do not ship *here*
-   * together.
+   * **And the exit, `esc`'s** (C16 §5c). There was a second exit, `⌃c` on the
+   * ladder's native-selection rung; §103 has COPY MODE reject the interrupt
+   * (C16 I62, ruling 59), so `esc` is the one way out.
    */
   enterNativeSelection: () => void;
   exitNativeSelection: () => void;
   /**
    * Semantic copy mode (C14 §6a, C16 §5d, I51).
    *
-   * **The exit is here where the handoff's is not, and the difference is I51.**
-   * `⌃c` on the ladder's rung calls `exitSemanticSelection` directly, exactly as
-   * it calls `exitNativeSelection` — but `esc` needs a *different* verb, because
-   * it clears a selection first, and a verb a keymap row resolves has to live in
-   * this table. So the pair here is the entry and the `esc` verb; the ladder's
-   * exit is not a second way out of the same shape, it is the other one.
+   * **`esc` is the one way out, and it clears a selection first** (I51). The
+   * ladder's `⌃c` rung called a second verb, `exitSemanticSelection`, which
+   * always left; §103 has COPY MODE reject the interrupt (C16 I62, ruling 59),
+   * so the rung and the verb are gone.
    */
   enterSemanticSelection: () => void;
   escapeSemanticSelection: () => void;
@@ -731,11 +727,8 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // holding it for.
     enterSemanticSelection: () => void deps.enterSemanticSelection(),
     escapeSemanticSelection: () => void deps.escapeSemanticSelection(),
-    // **`exitSemanticSelection` is not in this table and that is I51.** The
-    // ladder's `⌃c` rung calls it on `RouterDeps`, and a row here would be a
-    // second way out with an order of its own — the shape the native handoff's
-    // exit is kept out of this table for. `esc` is here because it is a
-    // different verb, not a second spelling of the same one.
+    // **`esc` is the only way out** (I51, C16 I62). `⌃c` is refused in the mode,
+    // so there is no second exit to keep out of this table.
     selectEntryUnderCaret: () => void deps.selectEntryUnderCaret(),
     selectAllLoadedEntries: () => void deps.selectAllLoadedEntries(),
     copySelectedEntries: () => void deps.copySelectedEntries(),

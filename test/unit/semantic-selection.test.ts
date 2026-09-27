@@ -66,23 +66,6 @@ describe("C16 §5d — esc clears then leaves; ⌃c only leaves", () => {
     // single-press behaviour arriving as the second half of this one.
     expect(escape(enter(null, at("e2")))).toBeNull();
   });
-
-  it("T1.41c (C16 I51, §5d D5): ⌃c leaves without clearing first — asserted with a selection open", () => {
-    // The ladder's rung sets the mode to `null` directly rather than calling
-    // `escape`. Stated as the property rather than as a call: with a selection
-    // open, the two exits differ, and that is the only state in which they do.
-    const one = selectCaret(enter(null, at("e2")), SPANS);
-    expect(count(one)).toBe(1);
-
-    // `escape` here would leave the mode up with an empty selection. The rung's
-    // answer is the mode gone in one press.
-    expect(escape(one), "esc: still up").not.toBeNull();
-
-    // ⌃c's verb, which is `null` and not a transition — the whole of C16 I51.
-    const afterCtrlC: SemanticMode = null;
-    expect(afterCtrlC).toBeNull();
-    expect(count(afterCtrlC)).toBe(0);
-  });
 });
 
 describe("C14 §6a — the selection verbs", () => {

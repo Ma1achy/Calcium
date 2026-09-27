@@ -18,7 +18,6 @@ import { cells, type Block, type Layer } from "./deps.js";
 import type { Anchor, HistoryEntry, SearchState } from "./types.js";
 
 export const SEARCH_ID = "reverse-search";
-export const CONFIRM_ID = "history-clear-confirm";
 export const LIST_ID = "history-list";
 
 /** Padding either side plus C15's border, as C19's menu reckons it. */
@@ -67,6 +66,7 @@ export function searchLayer(state: SearchState, anchor: Anchor): Layer {
     content: searchBlocks(state),
     blocking: false,
     dismissal: "escape",
+    owner: Object.freeze({ rung: "substate" as const, name: "find" as const }),
     width: cells(searchLine(state)) + CHROME_CELLS,
     // **The search has a cursor and the menu does not** (C15 I19). Text is
     // being typed into this one, and leaving the terminal's cursor blinking at
@@ -86,47 +86,6 @@ export function searchLayer(state: SearchState, anchor: Anchor): Layer {
 function queryPrefix(state: SearchState): string {
   const label = state.failed ? "(failed reverse-i-search)" : "(reverse-i-search)";
   return `${label} \`${state.query}`;
-}
-
-/**
- * The confirm, frozen non-dismissable (I14).
- *
- * **It declared no width and C15 I20 refuses that now.** A centred layer with
- * no width is placed at `left = 0` across the whole region — `fill`, wearing
- * `centred`'s name — and this was the second instance in the tree, found by the
- * rule rather than by reading. The number is the question's own extent, as
- * `searchLayer` reckons it: nothing else here can measure content, and C15 knows
- * the region and nothing else (C15 I16).
- *
- * C15 already guarantees the behaviour — `pop()` inspects only the top layer and
- * returns `null` without removing a non-dismissable one, and C16's single
- * `overlay:escape → dismiss` row respects that. What was left to get wrong is
- * the layer handed over, which is why this is a function with no `dismissable`
- * argument rather than a call site's decision.
- */
-export function clearConfirmLayer(count: number): Layer {
-  return Object.freeze({
-    id: CONFIRM_ID,
-    kind: "overlay" as const,
-    placement: Object.freeze({ kind: "centred" as const }),
-    content: Object.freeze([
-      {
-        kind: "notice",
-        id: `${CONFIRM_ID}-text`,
-        tone: "warn",
-        glyph: "warn",
-        text: clearQuestion(count),
-      } satisfies Block,
-    ]),
-    blocking: true,
-    dismissal: "answer",
-    width: cells(clearQuestion(count)) + CHROME_CELLS,
-  });
-}
-
-/** The question, in one place, because the width is measured from it. */
-function clearQuestion(count: number): string {
-  return `Clear ${String(count)} history ${count === 1 ? "entry" : "entries"}? (y/N)`;
 }
 
 const DAYS_TO_MONTH = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334] as const;

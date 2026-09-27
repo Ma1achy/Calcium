@@ -496,7 +496,38 @@ describe("C15 §2c — blocking and dismissal are two fields (M8)", () => {
 });
 
 describe("C15 I29 — a keyed layer declares its owner (review batch 2, M5 item 3)", () => {
-  it.todo(
-    "T1.34 (C15 I29): push refuses an owner its fields contradict, and LayerUpdate does not admit one — not deferred on a component: the code lands in the next commit of this round",
-  );
+  it("T1.34 (C15 I29): push refuses an owner its fields contradict, and LayerUpdate does not admit one", () => {
+    const question = { ...centred("q", 2, { blocking: true, dismissal: "answer" }), owner: { rung: "question" } } as const;
+    const complete = { ...panel("menu", 2, { row: 10, prefer: "above" }), owner: { rung: "substate", name: "complete" } } as const;
+    const m = manager();
+
+    // **The controls first**, so the refusals below are not satisfied by a
+    // guard that refuses every owner — and the undeclared overlay is accepted,
+    // which is the narrow form this invariant is (the strict one refused 52
+    // rows of stand-ins).
+    for (const layer of [question, complete, centred("plain", 2)]) {
+      m.push(layer);
+      expect(m.top?.id, `${layer.id} is accepted`).toBe(layer.id);
+      m.dismiss(layer.id);
+    }
+
+    const refused: readonly Layer[] = [
+      { ...complete, owner: { rung: "question" } },
+      { ...question, blocking: false, dismissal: "escape" },
+      { ...question, dismissal: "escape" },
+      { ...question, owner: { rung: "substate", name: "find" } },
+      { ...peek("beside", 2, { row: 5, prefer: "below" }), owner: { rung: "substate", name: "preview" } },
+    ];
+    for (const layer of refused) {
+      expect(() => m.push(layer), `${layer.kind} ${layer.id} owning ${String(layer.owner?.rung)}`).toThrow(
+        OverlayError,
+      );
+      expect(m.stack, "and nothing is left behind").toEqual([]);
+    }
+
+    m.push(question);
+    // @ts-expect-error — I29, for I14's reason: an owner that moved mid-life
+    // makes the ladder depend on when it looked, so `LayerUpdate` has no field.
+    m.update("q", { owner: { rung: "substate", name: "find" } });
+  });
 });
