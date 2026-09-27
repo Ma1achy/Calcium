@@ -122,10 +122,21 @@ page logged no console error and threw no uncaught exception**. The set of flags
 compared by equality, so a flag the page stops setting fails as surely as one that
 reads `fail`.
 
+**And on every route the spinner resolver takes.** The page reads `?glyphs=` —
+`ascii`, `unicode`, `auto`, or nothing — and the runner loads it on all four: the
+five flags must pass on each, the body's capability and source must be the
+route's, and on `auto` every spinner must carry a per-set capability. Seven
+searches over the resolver's source said each branch was written; loading the
+route says what it does.
+
 **The runner proves it can see a failure before it is believed.** `--self-test`
 loads fabricated pages through the same browser — one flag reading `fail`, one flag
-absent, a `console.error`, an uncaught throw — and requires each to be refused, with
-a clean page as the control.
+absent, one unexpected, a `console.error`, an uncaught throw, a page ignoring the
+route, a spinner the `auto` route skipped — and requires each to be refused, with a
+clean page and a routing page as the controls. It also hands the digest check a
+fabricated archive. The rows live in `test/browser/`, which `make test` excludes as
+it does `e2e` and `golden`: every row needs the browser, and a row that skipped
+without it would be a silent pass.
 
 **Text searches stay only where the subject is the page's own content.** A
 `requireText` over a generated count, a claim, a rule id or a registry-derived
