@@ -1063,10 +1063,10 @@ export function createRouter(
       // reads as a conflict until §103's footer table: every rung retains *owner
       // plus its highest-ranked reachable safe action*, and **ordinary** rungs
       // *also* show primary action, safe exit and help. A question is not an
-      // ordinary rung. Its footer line is `question · declared actions · esc safe
-      // path`, and that line is the explanation R-INT-009 requires — the refusal
-      // states its reason by the owner being visible, rather than by a notice
-      // per keystroke.
+      // ordinary rung. Its footer line is its own vocabulary — `question · ←→
+      // move · ⏎ answer · esc → no` (C22 I133) — and the refusal's explanation
+      // R-INT-009 requires is the owner being visible **and** `refused`, which L4
+      // turns into `answer this first` on the question's row, once (C23 I82).
       stages.push("modal-blocked");
       return refuse(rungNow(), "blocked");
     }

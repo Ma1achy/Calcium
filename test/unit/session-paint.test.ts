@@ -27,10 +27,12 @@ import { createOverlayManager } from "../../src/viewport/overlay/index.js";
 import type { Placed } from "../../src/viewport/overlay/index.js";
 import type { ProfileReport } from "../../src/shell/profiling/types.js";
 import { registry as measurer, rows as contentRows } from "../support/overlay.js";
-import { buildSession } from "../support/session.js";
+import { buildGraph, buildSession } from "../support/session.js";
 import { childBorderLegend, makeDefaultChrome, ownerLine, shedToWidth } from "../../src/shell/chrome.js";
 import type { Key, OwnerRung } from "../../src/interaction/router/types.js";
-import { chordText, defaultKeymap } from "../../src/interaction/router/keymap.js";
+import { chordText, createKeymap, defaultKeymap } from "../../src/interaction/router/keymap.js";
+import type { Binding } from "../../src/interaction/router/types.js";
+import type { OwnerHints } from "../../src/shell/types.js";
 import { tone } from "../../src/presentation/blocks/paint.js";
 import type { Block, Pills } from "../../src/data/viewmodel/index.js";
 
@@ -912,7 +914,8 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
       "last  12.4ms",
       "~/work",
       "copy",
-      "↑↓ extend",
+      // The keymap's extend rows (C22 I133) — the bare arrows move the caret.
+      "⇧↑⇧↓ extend",
       "⏎ copy",
       // Two chips: the separator between them is the cluster's to draw, and a
       // literal `·` inside a label is the unresolved join T2.116 refuses.
@@ -1208,10 +1211,112 @@ describe("C16 I58 — the owner line asks chordText", () => {
 });
 
 describe("C22 I133 — the owner line's chords are the keymap's (review batch 2, M5 items 2 and 5)", () => {
-  it.todo(
-    "T1.171 (C16 I19, C22 I133, ruling 63): every chord on the owner line is the session keymap's first row for its action — not deferred on a component: the code lands in the next commit of this round",
-  );
-  it.todo(
-    "T1.77 (C22 I133): a rebound or unbound action moves or drops its chip; the substate and the question name themselves — not deferred on a component: the code lands in the next commit of this round",
-  );
+  /** Hints over a table, as the graph builds them: first row, this profile. */
+  const hintsOver = (rows: readonly Binding[]): OwnerHints => {
+    const entries = createKeymap(rows, "default-terminal").entries();
+    return { chord: (target, action) => entries.find((b) => b.target === target && b.action === action)?.key };
+  };
+  const labelsOf = (rung: OwnerRung, hints: OwnerHints, opts: { field?: boolean; semantic?: boolean } = {}) =>
+    ownerLine(rung, ASCII_CAPS, false, 0, opts.semantic === true ? { mode: "semantic", size: null } : { mode: "native" }, opts.field === true, hints)
+      .map((c) => c.label);
+  const ASK = { question: "Discard the draft?", choices: [{ key: "y", label: "discard" }, { key: "n", label: "keep", default: true as const }] };
+
+  it("T1.171 (C16 I19, C22 I133, ruling 63): every chord on the owner line is the session keymap's first row for its action", async () => {
+    const { graph } = await buildGraph();
+    graph.lifecycle.acquire();
+
+    // **The graph's resolver is the table's, over every pair the table holds** —
+    // derived from `defaultKeymap`, not listed, so a row added tomorrow is in it.
+    const entries = createKeymap(defaultKeymap, "default-terminal").entries();
+    const hints = graph.ownerHints();
+    const pairs = new Set(entries.map((b) => `${b.target}\t${b.action}`));
+    expect(pairs.size, "the walk has a corpus").toBeGreaterThan(80);
+    for (const pair of pairs) {
+      const [target, action] = pair.split("\t") as [Binding["target"], Binding["action"]];
+      const first = entries.find((b) => b.target === target && b.action === action);
+      expect(hints.chord(target, action as never), `${target} ${action}`).toBe(first?.key);
+    }
+
+    // **And the line spells nothing of its own.** With every action unbound, no
+    // rung the keymap serves draws a chip that starts with a chord — at either
+    // rung, since a literal spelled in one form and not the other would pass
+    // half of this. ASCII, so `keys -> child`'s arrow is not mistaken for `→`.
+    const spelled = new Set(defaultKeymap.flatMap((b) => [chordText(b.key, true), chordText(b.key, false)]));
+    const unbound: OwnerHints = { chord: () => undefined };
+    const drawn: string[] = [];
+    for (const [rung, opts] of [
+      ["scope", {}], ["child", {}], ["inside", {}], ["inside", { field: true }],
+      ["copy", { semantic: true }], ["copy", {}], ["substate", {}],
+    ] as const) {
+      for (const label of labelsOf(rung, unbound, opts)) {
+        drawn.push(label);
+        expect(spelled.has(label.split(" ")[0] ?? ""), `${rung}: \`${label}\` spells a chord nobody bound`).toBe(false);
+      }
+    }
+    // The control: the same lines over the real table do draw chords, so the
+    // loop above had chips that could have failed it.
+    const bound = labelsOf("scope", hints);
+    expect(bound.length, "the scope line over the real table has its four").toBe(4);
+    expect(bound.every((l) => spelled.has(l.split(" ")[0] ?? ""))).toBe(true);
+    expect(labelsOf("scope", unbound), "and with nothing bound it has none").toEqual([]);
+    expect(drawn.length, "the owner words and facts were drawn").toBeGreaterThan(6);
+
+    // The copy line names the extend rows — `⇧↑⇧↓` — and not the caret's `↑↓`.
+    expect(ownerLine("copy", FULL_CAPS, false, 0, { mode: "semantic", size: null }, false, hints).map((c) => c.label))
+      .toContain("⇧↑⇧↓ extend");
+
+    // **A question's line is its own vocabulary**, read through the graph: the
+    // state and the default's label come from the open question, not the rung.
+    void graph.confirm.ask(ASK);
+    const asked = graph.ownerHints();
+    expect(asked.question).toEqual({ state: "choice", resolvesTo: "keep" });
+    expect(ownerLine("question", FULL_CAPS, false, 0, undefined, false, asked).map((c) => c.label)).toEqual([
+      "question", "←→ move", "⏎ answer", "esc → keep",
+    ]);
+  });
+
+  it("T1.77 (C22 I133): a rebound or unbound action moves or drops its chip; the substate and the question name themselves", async () => {
+    // `insertNewline` on `⌃j` alone: the chip follows the binding.
+    const ctrlJ = defaultKeymap.filter((b) => b.action !== "insertNewline" || (b.key.name === "j" && b.key.ctrl === true));
+    const rebound = ownerLine("scope", FULL_CAPS, false, 0, undefined, false, hintsOver(ctrlJ)).map((c) => c.label);
+    expect(rebound).toContain(`${chordText({ name: "j", ctrl: true })} newline`);
+    expect(rebound, "the old chord is not named").not.toContain("⇧⏎ newline");
+    // The control: over the default table the chip is `⇧⏎`, so the move above
+    // is the rebinding's doing.
+    expect(ownerLine("scope", FULL_CAPS).map((c) => c.label)).toContain("⇧⏎ newline");
+
+    // `complete` unbound: no chip, rather than a chip nobody can press.
+    const noComplete = defaultKeymap.filter((b) => b.action !== "complete");
+    const scope = ownerLine("scope", FULL_CAPS, false, 0, undefined, false, hintsOver(noComplete)).map((c) => c.label);
+    expect(scope.some((l) => l.endsWith(" complete")), "an unbound action draws no chip").toBe(false);
+    expect(scope, "and the others stay").toHaveLength(3);
+
+    // **The substate names itself** (C15 I29), read through the graph from the
+    // top layer's declared owner — `find` was all it ever said.
+    const { graph } = await buildGraph();
+    graph.lifecycle.acquire();
+    const substate = (name: "find" | "complete" | "preview"): string | undefined => {
+      graph.overlays.push({
+        id: `probe-${name}`,
+        kind: "panel",
+        owner: { rung: "substate", name },
+        placement: { kind: "anchored", row: 20, rows: 1, prefer: "above" },
+        content: [],
+        blocking: false,
+        dismissal: "escape",
+      });
+      const first = ownerLine("substate", FULL_CAPS, false, 0, undefined, false, graph.ownerHints())[0]?.label;
+      graph.overlays.dismiss(`probe-${name}`);
+      return first;
+    };
+    expect(substate("complete")).toBe("complete");
+    expect(substate("find")).toBe("find");
+    expect(substate("preview")).toBe("preview");
+    expect(graph.ownerHints().substate, "and nothing named with no panel up").toBeUndefined();
+
+    // **A question's line ends on its default's label** — a different default
+    // from T1.171's, so the label is the question's and not a constant.
+    void graph.confirm.ask({ question: "Stop?", choices: [{ key: "y", label: "stop", default: true as const }, { key: "n", label: "go on" }] });
+    expect(ownerLine("question", FULL_CAPS, false, 0, undefined, false, graph.ownerHints()).at(-1)?.label).toBe("esc → stop");
+  });
 });

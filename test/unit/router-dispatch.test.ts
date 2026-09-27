@@ -913,7 +913,9 @@ describe("C26 §8b.8 — interaction mode is vacuous, and this is the row that s
       .filter((b) => b.target === "interaction")
       .map((b) => b.action);
     expect(framework.sort(), "the inside's own, and the merge adds none of them").toEqual(
-      ["cameraReset", "dollyIn", "dollyIn", "dollyOut", "exitInside", "insideDown", "insideLeft", "insideRight", "insideUp", "orbitToggle"],
+      // `keepField` is the held field's `⏎` (C22 I118, C22 I133): the field is
+      // the rung's other owner, and a framework row, not a merge.
+      ["cameraReset", "dollyIn", "dollyIn", "dollyOut", "exitInside", "insideDown", "insideLeft", "insideRight", "insideUp", "keepField", "orbitToggle"],
     );
   });
 
@@ -1586,9 +1588,6 @@ describe("C16 §3b — a reject consumes and explains; one rung; two verdict voc
     expect(guarded.router.lastStages, "the guard refused it").toContain("question-guard");
     expect(guarded.refusals, "guard").toEqual([]);
   });
-  it.todo(
-    "T1.166 (I64): the reserved routes by outcome, three routes over every rung — not deferred on a component: the code lands in the next commit of this round",
-  );
   it("T1.167 (I63): the rung, the guard on arrival and the intercept stage agree for a question and a substate", () => {
     // **The three readers that disagreed** (§3b S13). The question here has no
     // answer callback, which is the cell where the intercept table used to say

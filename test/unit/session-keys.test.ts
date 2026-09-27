@@ -270,6 +270,11 @@ describe("C22 §3 step 11 — the effect table", () => {
       // claimed to have reset, and the failure named the new binding rather
       // than the leak.
       while (graph.overlays.top !== null) graph.overlays.dismiss(graph.overlays.top.id);
+      // **And the inside, for the same reason** (C22 I133): `exitInside` used to
+      // be the last `interaction` row and left the mode as it found it; with
+      // `keepField` after it — a no-op with no field held — the walk stayed
+      // inside and every `liveBlock` row after it resolved at `interaction`.
+      if (b.target === "interaction") graph.focus.setMode("navigate");
       COPY_MODES.native = false;
       COPY_MODES.semantic = false;
       graph.editor.clear();
@@ -372,6 +377,10 @@ describe("C22 §3 step 11 — the effect table", () => {
       reply: () => null,
       emit: () => undefined,
       submit: () => undefined,
+      // C22 I133 — the prompt's `⏎` is a row now, so this walk reaches it; the
+      // line it sends is the composition root's to resolve, and nothing here is.
+      submitPrompt: () => undefined,
+      keepField: () => undefined,
       focusTranscript: () => undefined,
       // C16 I49 — the child's one exit. Counted here rather than stubbed
       // silent, because this harness is the one that walks every action.

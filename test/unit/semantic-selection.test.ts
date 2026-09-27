@@ -209,13 +209,16 @@ describe("C14 I55 — the copy rung's footer", () => {
   it("T1.50 (C14 I55, R-SEL-005, R-SEL-009): the copy rung's owner line reads by mode, esc clears before it leaves, and the count is three chips", () => {
     // **The control: nothing selected** — `esc out`, and no count at all
     // rather than a zero, which is what absent `copy` also reads as.
-    const idle = ["copy", "↑↓ extend", "⏎ copy", "esc out", "the screen is frozen"];
+    // `⇧↑⇧↓`, not `↑↓` (C22 I133): the bare arrows move the caret, and the chip
+    // is the keymap's `extendSemanticSelection*` rows since the line stopped
+    // spelling its own keys.
+    const idle = ["copy", "⇧↑⇧↓ extend", "⏎ copy", "esc out", "the screen is frozen"];
     expect(labels({ mode: "semantic", size: null })).toEqual(idle);
     expect(labels(undefined), "no copy state is semantic mode with nothing selected").toEqual(idle);
 
     // Over a selection the first esc clears, and the count follows it in order.
     expect(labels({ mode: "semantic", size: { chars: 418, rows: 9, entries: 2 } })).toEqual([
-      "copy", "↑↓ extend", "⏎ copy", "esc clear", "418 chars · 9 rows · 2 entries", "the screen is frozen",
+      "copy", "⇧↑⇧↓ extend", "⏎ copy", "esc clear", "418 chars · 9 rows · 2 entries", "the screen is frozen",
     ]);
     const one = labels({ mode: "semantic", size: { chars: 1, rows: 1, entries: 1 } });
     expect(one[4], "one of each is singular").toBe("1 char · 1 row · 1 entry");

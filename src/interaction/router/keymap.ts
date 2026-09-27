@@ -239,6 +239,11 @@ export interface Keymap {
  * produce, which is what found that.
  */
 export const defaultKeymap: readonly BuiltinBinding[] = [
+  // **The prompt's `⏎`, a row since ruling 63** (C22 I133). It was a branch in
+  // the composition root that tested `enter` by name, so the owner line's
+  // `⏎ send` named a chord this table did not hold. First, because it is the
+  // scope rung's primary action and the line reads an action's first row.
+  { target: "prompt", key: chordOf("confirm"), action: "submit" },
   { target: "prompt", key: chordOf("newline"), action: "insertNewline" },
   { target: "prompt", key: { name: "enter", meta: true }, action: "insertNewline" },
   { target: "prompt", key: { name: "j", ctrl: true }, action: "insertNewline" },
@@ -267,8 +272,10 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // and `exitNativeSelection` there, and one `(target, key)` takes one binding.
   // It was `pushedView` and `viewPop` until the view kind was deleted
   // (R-EXA-082, F1254) — the same collision, one rung over.
-  { target: "panel", key: chordOf("focus.next"), action: "menuNext" },
+  // **`↓` before `⇥`, and the order is read** (C22 I133): the owner line names
+  // an action by its first row, and §103's substate line is `↑↓ hits`.
   { target: "panel", key: chordOf("move.down"), action: "menuNext" },
+  { target: "panel", key: chordOf("focus.next"), action: "menuNext" },
   { target: "panel", key: chordOf("move.up"), action: "menuPrev" },
   { target: "panel", key: chordOf("confirm"), action: "menuAccept" },
   //
@@ -517,16 +524,18 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // the export path writes a file instead.
   { target: "semanticSelection", key: { name: "a" }, action: "selectEntryUnderCaret" },
   { target: "semanticSelection", key: { name: "A" }, action: "selectAllLoadedEntries" },
-  // `y`, as at `liveBlock` — the same keycap at a coarser grain (`R-SEL-004`),
-  // and **a different action**, which is the thing worth saying. `copySelection`
-  // already exists and is the prompt's `⌥w`: effects resolve per action rather
-  // than per target, so reusing the name would give this key the editor's
-  // region copy and a mode that selects entries would paste the prompt.
-  { target: "semanticSelection", key: { name: "y" }, action: "copySelectedEntries" },
-  // **`⏎` is the same copy** (C14 I47, R-SEL-015, §103): the footer has said
-  // `⏎ copy` since the mode landed, and the count is defined as *what return
-  // would copy*. `y`'s action, not a second one, so it reads the held view (A6).
+  // **`⏎` copies** (C14 I47, R-SEL-015, §103): the footer has said `⏎ copy`
+  // since the mode landed, and the count is defined as *what return would
+  // copy*. **First, because the order is read** (C22 I133): the owner line
+  // names an action by its first row, and §103's copy line is `⏎ copy`.
   { target: "semanticSelection", key: chordOf("confirm"), action: "copySelectedEntries" },
+  // `y` is the same copy, as at `liveBlock` — the same keycap at a coarser grain
+  // (`R-SEL-004`), and **a different action from the prompt's**, which is the
+  // thing worth saying. `copySelection` already exists and is the prompt's `⌥w`:
+  // effects resolve per action rather than per target, so reusing the name
+  // would give this key the editor's region copy and a mode that selects
+  // entries would paste the prompt. `⏎`'s action, so it reads the held view (A6).
+  { target: "semanticSelection", key: { name: "y" }, action: "copySelectedEntries" },
   // **The caret moves, and the shifted pair extends** (C14 I37, §6c). `⇧←` and
   // `⇧→` are deliberately absent: `selection.left`/`selection.right` are
   // horizontal, and at block granularity there is no horizontal extent — the
@@ -632,6 +641,12 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // in the control row, and it leaves by the same one step — the rung below is
   // what takes the reader out of the block, which is C26 I14's two-level escape.
   { target: "interaction", key: chordOf("escape"), action: "exitInside" },
+  // **A held field's `⏎`** (C22 I118, C22 I133, ruling 63). The field is the
+  // `interaction` rung's other owner, and its two answers are `⏎ keep` and
+  // `esc discard` — the second is `exitInside` above. Inside a block with no
+  // field held it keeps nothing, as `hostDetach` detaches nothing with no child:
+  // `⏎` there reached `global` and no row, so consuming it changes no frame.
+  { target: "interaction", key: chordOf("confirm"), action: "keepField" },
   { target: "liveBlock", key: { name: "pagedown" }, action: "blockPageDown" },
   { target: "liveBlock", key: { name: "pageup" }, action: "blockPageUp" },
 
@@ -709,8 +724,10 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   { target: "prompt", key: chordOf("focus.previous"), action: "focusTranscript" },
 
   // `page.up` / `page.down`. `pageup`/`pagedown` are already bound at `global`;
-  // these are the design's chords for the same operation, and M5's intercept
-  // table classifies all four as `page-scroll` before the ladder sees them.
+  // these are the design's chords for the same operation. Only these two are
+  // `page-scroll` in the intercept table (`interceptOf`, C16 §3): the legacy
+  // `pageup`/`pagedown` resolve through the ladder like any other `global` row,
+  // so a focused block's `blockPageUp`/`blockPageDown` takes them first.
   { target: "global", key: chordOf("page.up"), action: "scrollPageUp" },
   { target: "global", key: chordOf("page.down"), action: "scrollPageDown" },
 
@@ -982,6 +999,8 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
     insideUp: true,
     insideDown: true,
     exitInside: true,
+    submit: true,
+    keepField: true,
     rerunEntry: true,
     dollyIn: true,
     dollyOut: true,

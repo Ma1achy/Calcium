@@ -568,6 +568,7 @@ AAAAAAAAAAA............................. [ Approve ]
 
 ── §19 · the resolved keymap, the reader's own rung first
 -- prompt — where you are               
+Enter        submit
 S-Enter      insertNewline
 M-Enter      insertNewline
 C-j          insertNewline
@@ -656,15 +657,15 @@ Esc  exitNativeSelection
 Esc     escapeSemanticSelection
 a       selectEntryUnderCaret
 A       selectAllLoadedEntries
-y       copySelectedEntries
 Enter   copySelectedEntries
+y       copySelectedEntries
 Up      moveSemanticCaretUp
 Down    moveSemanticCaretDown
 S-Up    extendSemanticSelectionUp
 S-Down  extendSemanticSelectionDown
 -- panel                                
-Tab    menuNext
 Down   menuNext
+Tab    menuNext
 Up     menuPrev
 Enter  menuAccept
 Esc    dismiss
@@ -680,6 +681,7 @@ Down   insideDown
 r      cameraReset
 o      orbitToggle
 Esc    exitInside
+Enter  keepField
 -- liveBlock                            
 S-Up      extendRowUp
 S-Down    extendRowDown
@@ -1279,6 +1281,7 @@ AAAAAAAAAAA.....................................................................
 
 ── §19 · the resolved keymap, the reader's own rung first
 -- prompt — where you are                                                       
+Enter        submit
 S-Enter      insertNewline
 M-Enter      insertNewline
 C-j          insertNewline
@@ -1367,15 +1370,15 @@ Esc  exitNativeSelection
 Esc     escapeSemanticSelection
 a       selectEntryUnderCaret
 A       selectAllLoadedEntries
-y       copySelectedEntries
 Enter   copySelectedEntries
+y       copySelectedEntries
 Up      moveSemanticCaretUp
 Down    moveSemanticCaretDown
 S-Up    extendSemanticSelectionUp
 S-Down  extendSemanticSelectionDown
 -- panel                                                                        
-Tab    menuNext
 Down   menuNext
+Tab    menuNext
 Up     menuPrev
 Enter  menuAccept
 Esc    dismiss
@@ -1391,6 +1394,7 @@ Down   insideDown
 r      cameraReset
 o      orbitToggle
 Esc    exitInside
+Enter  keepField
 -- liveBlock                                                                    
 S-Up      extendRowUp
 S-Down    extendRowDown
@@ -1939,6 +1943,7 @@ raw             0     — atomic: nothing to focus
 
 ── §19 · the resolved keymap, the reader's own rung first
 ── prompt — where you are               
+⏎       submit
 ⇧⏎      insertNewline
 ⌥⏎      insertNewline
 ⌃J      insertNewline
@@ -2027,15 +2032,15 @@ esc  exitNativeSelection
 esc  escapeSemanticSelection
 a    selectEntryUnderCaret
 ⇧A   selectAllLoadedEntries
-y    copySelectedEntries
 ⏎    copySelectedEntries
+y    copySelectedEntries
 ↑    moveSemanticCaretUp
 ↓    moveSemanticCaretDown
 ⇧↑   extendSemanticSelectionUp
 ⇧↓   extendSemanticSelectionDown
 ── panel                                
-⇥    menuNext
 ↓    menuNext
+⇥    menuNext
 ↑    menuPrev
 ⏎    menuAccept
 esc  dismiss
@@ -2051,6 +2056,7 @@ esc  dismiss
 r    cameraReset
 o    orbitToggle
 esc  exitInside
+⏎    keepField
 ── liveBlock                            
 ⇧↑        extendRowUp
 ⇧↓        extendRowDown
@@ -2591,6 +2597,7 @@ raw             0     — atomic: nothing to focus
 
 ── §19 · the resolved keymap, the reader's own rung first
 ── prompt — where you are                                                       
+⏎       submit
 ⇧⏎      insertNewline
 ⌥⏎      insertNewline
 ⌃J      insertNewline
@@ -2679,15 +2686,15 @@ esc  exitNativeSelection
 esc  escapeSemanticSelection
 a    selectEntryUnderCaret
 ⇧A   selectAllLoadedEntries
-y    copySelectedEntries
 ⏎    copySelectedEntries
+y    copySelectedEntries
 ↑    moveSemanticCaretUp
 ↓    moveSemanticCaretDown
 ⇧↑   extendSemanticSelectionUp
 ⇧↓   extendSemanticSelectionDown
 ── panel                                                                        
-⇥    menuNext
 ↓    menuNext
+⇥    menuNext
 ↑    menuPrev
 ⏎    menuAccept
 esc  dismiss
@@ -2703,6 +2710,7 @@ esc  dismiss
 r    cameraReset
 o    orbitToggle
 esc  exitInside
+⏎    keepField
 ── liveBlock                                                                    
 ⇧↑        extendRowUp
 ⇧↓        extendRowDown
@@ -3310,6 +3318,7 @@ AAAAAAAAAAA.............................  › Approve
 
 ── §19 · the resolved keymap, the reader's own rung first
 ── prompt — where you are               
+⏎       submit
 ⇧⏎      insertNewline
 ⌥⏎      insertNewline
 ⌃J      insertNewline
@@ -3398,15 +3407,15 @@ esc  exitNativeSelection
 esc  escapeSemanticSelection
 a    selectEntryUnderCaret
 ⇧A   selectAllLoadedEntries
-y    copySelectedEntries
 ⏎    copySelectedEntries
+y    copySelectedEntries
 ↑    moveSemanticCaretUp
 ↓    moveSemanticCaretDown
 ⇧↑   extendSemanticSelectionUp
 ⇧↓   extendSemanticSelectionDown
 ── panel                                
-⇥    menuNext
 ↓    menuNext
+⇥    menuNext
 ↑    menuPrev
 ⏎    menuAccept
 esc  dismiss
@@ -3422,6 +3431,7 @@ esc  dismiss
 r    cameraReset
 o    orbitToggle
 esc  exitInside
+⏎    keepField
 ── liveBlock                            
 ⇧↑        extendRowUp
 ⇧↓        extendRowDown
@@ -4022,6 +4032,7 @@ AAAAAAAAAAA.....................................................................
 
 ── §19 · the resolved keymap, the reader's own rung first
 ── prompt — where you are                                                       
+⏎       submit
 ⇧⏎      insertNewline
 ⌥⏎      insertNewline
 ⌃J      insertNewline
@@ -4110,15 +4121,15 @@ esc  exitNativeSelection
 esc  escapeSemanticSelection
 a    selectEntryUnderCaret
 ⇧A   selectAllLoadedEntries
-y    copySelectedEntries
 ⏎    copySelectedEntries
+y    copySelectedEntries
 ↑    moveSemanticCaretUp
 ↓    moveSemanticCaretDown
 ⇧↑   extendSemanticSelectionUp
 ⇧↓   extendSemanticSelectionDown
 ── panel                                                                        
-⇥    menuNext
 ↓    menuNext
+⇥    menuNext
 ↑    menuPrev
 ⏎    menuAccept
 esc  dismiss
@@ -4134,6 +4145,7 @@ esc  dismiss
 r    cameraReset
 o    orbitToggle
 esc  exitInside
+⏎    keepField
 ── liveBlock                                                                    
 ⇧↑        extendRowUp
 ⇧↓        extendRowDown

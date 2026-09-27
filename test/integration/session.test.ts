@@ -1406,7 +1406,36 @@ describe("C22 §4 — the greeting's context, and where `stopped` leads", () => 
 });
 
 describe("C16 I51, I49 — refusals through a built session (review batch 2, M5)", () => {
-  it.todo(
-    "T4.83 (C16 I51, ruling 59, ruling 60): ⌃c in semantic copy mode keeps the mode and draws the one-shot chip — not deferred on a component: the code lands in the next commit of this round",
-  );
+  it("T4.83 (C16 I51, I62, C22 I133, ruling 59, ruling 60): ⌃c in semantic copy mode keeps the mode and draws the one-shot chip", async () => {
+    // **Refused, not swallowed** (R-HON-004): the mode's frame is otherwise
+    // still, so a `⌃c` that changed nothing on screen would read as a dead key.
+    // The chip is the difference, and it is one-shot — the next key takes it
+    // down whatever that key does.
+    const stdin = fakeStdin();
+    const { screen } = await buildSession({ stdin: stdin as never });
+    const type = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      await Promise.resolve();
+      await Promise.resolve();
+    };
+    const footer = (): string => screen().rows.find((r) => r.includes("the screen is frozen")) ?? "<no owner line>";
+    const header = (): string => screen().rows[0] ?? "";
+
+    // `⌥⇧V` — ESC V, the base route for `selection.semantic`.
+    await type("\u001bV");
+    // **The control**: the mode is up and the chip is not, so the chip below is
+    // the refusal's doing rather than the mode's.
+    expect(header(), "the mode is up").toContain("COPY");
+    expect(footer()).toContain("esc out");
+    expect(footer()).not.toContain("interrupt refused");
+
+    await type("\u0003");
+    expect(header(), "⌃c does not leave the mode (ruling 59)").toContain("COPY");
+    expect(footer(), "and the owner line says it was refused (ruling 60)").toContain("▲ interrupt refused");
+
+    // One-shot: `↓` moves the caret, and the chip goes with the key after it.
+    await type("\u001b[B");
+    expect(header(), "still in the mode").toContain("COPY");
+    expect(footer(), "the chip described one key, and it was not this one").not.toContain("interrupt refused");
+  });
 });

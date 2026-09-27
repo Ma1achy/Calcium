@@ -315,6 +315,8 @@ describe("§6 — the default table (C17 I12)", () => {
     const BYTES: Record<string, readonly string[]> = {
       // Both forms, because a terminal sends one or the other and a rule
       // satisfied by either is satisfied on half the terminals.
+      // The prompt's `submit` (C22 I133, ruling 63): the byte a return sends.
+      "prompt enter": ["\r"],
       "prompt s+enter": ["\u001b[13;2u", "\u001b[27;2;13~"],
       "prompt m+enter": ["\u001b\r"],
       "prompt c+j": ["\n"],
@@ -454,6 +456,8 @@ describe("§6 — the default table (C17 I12)", () => {
       "interaction up": ["\u001b[A", "\u001bOA"],
       "interaction down": ["\u001b[B", "\u001bOB"],
       "interaction escape": ["\u001b"],
+      // A held field's `keepField` (C22 I118, C22 I133).
+      "interaction enter": ["\r"],
       "interaction +": ["+"],
       "interaction =": ["="],
       "interaction -": ["-"],
@@ -1121,8 +1125,13 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     //
     // **127 from C16 I59** (§105, C26 I28): a split's four at `liveBlock` —
     // `←` `→` across the divider and `⌥←` `⌥→` moving it — four in, none out.
-    expect(rows).toHaveLength(127);
-    expect(new Set(rows).size, "no two rows are identical").toBe(127);
+    //
+    // **129 from C22 I133** (ruling 63): `⏎` joined `prompt` as `submit` and
+    // `interaction` as `keepField` — two in, none out. Both were branches in
+    // the composition root testing `enter` by name, so the owner line named
+    // chords this table did not hold.
+    expect(rows).toHaveLength(129);
+    expect(new Set(rows).size, "no two rows are identical").toBe(129);
 
     // Every row whose chord the registry names resolves to the registry's key —
     // the join asserted from the table's side, so a `chordOf` call that silently
@@ -1167,8 +1176,11 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
       // `chordOf("move.left")` and `chordOf("move.right")`. The divider's `⌥←`
       // `⌥→` are not — the registry names no chord for the divider — and that
       // absence is the one the two rows' literal keys record.
+      //
+      // **68 from C22 I133** (ruling 63): `submit` at `prompt` and `keepField`
+      // at `interaction` are both `chordOf("confirm")`.
       "the rows the registry supplies a chord for",
-    ).toBe(66);
+    ).toBe(68);
   });
 
   it("T1.94 (I41): ⌘↑ and ⌥↑ are two actions under the enhanced profile and one under the base", () => {

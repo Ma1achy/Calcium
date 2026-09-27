@@ -121,7 +121,7 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⌃end` | both |  |  |  |  |  |  |  |  | scrollBottom |
 | `end` | both |  |  |  |  |  |  | end |  |  |
 | `⇧end` | both |  |  |  |  |  |  | extendLineEnd |  |  |
-| `⏎` † | both |  |  |  | copySelectedEntries | menuAccept |  |  | rowActivate |  |
+| `⏎` † | both |  |  |  | copySelectedEntries | menuAccept | keepField | submit | rowActivate |  |
 | `⌥⏎` † | both |  |  |  |  |  |  | insertNewline | rerunEntry |  |
 | `⇧⏎` † | both |  |  |  |  |  |  | insertNewline | rerunEntry |  |
 | `esc` † | both |  | dismiss | exitNativeSelection | escapeSemanticSelection | dismiss | exitInside |  | focusPrompt |  |
@@ -168,4 +168,4 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⌃Z` | both |  |  |  |  |  |  | undo |  |  |
 | `⌥z` | both |  |  |  |  |  |  | redo |  |  |
 
-127 bindings · 91 keys · 22 resolved by the ladder (†).
+129 bindings · 91 keys · 22 resolved by the ladder (†).

@@ -34,18 +34,32 @@ import { createChoiceSelection, defaultStart } from "./choice-selection.js";
 export const CONFIRM_LAYER_ID = "confirm";
 
 /**
- * A question's own key vocabulary — what `classify` reads (C23 I36, I82).
+ * A question's own key vocabulary — what `classify` reads, and what the owner
+ * line names (C23 I36, I82, C22 I133, ruling 63).
  *
  * **A record rather than four literals in `classify`**, because what a question
  * does not classify is exactly what it refuses (C23 I82), and the set has to be
- * readable as a set to say so.
+ * readable as a set to say so. **And one record for both readers**: the footer's
+ * question line was the literal `declared actions · esc safe path`, which named
+ * no key at all, and a line spelling the keys itself would be a second record of
+ * what this file decides. `shown` is the subset the line draws — fixture 061
+ * draws `←→ move`, and `↑↓` and `⇥` move too without being named.
  */
 export const QUESTION_KEYS = Object.freeze({
   previous: Object.freeze(["up", "left"]),
   next: Object.freeze(["down", "right", "tab"]),
   answer: Object.freeze(["return", "enter"]),
   leave: Object.freeze(["escape"]),
+  shown: Object.freeze({ move: Object.freeze(["left", "right"]), answer: "enter", leave: "escape" }),
 });
+
+/** What the owner line reads of an open question (C22 I133). */
+export type QuestionVocabulary = Readonly<{
+  /** Which of the question's three states it is in — each owns a different set of keys. */
+  state: "choice" | "reply" | "inspection";
+  /** The label `esc` resolves with, so the line can say where the safe path goes. */
+  resolvesTo: string;
+}>;
 
 /** The refusal's words (C23 I82, ruling 60). */
 const REFUSED_TEXT = "answer this first";
@@ -156,6 +170,8 @@ export interface ConfirmHost {
    * reader reading, the other composing.
    */
   refuse(): void;
+  /** What the owner line reads of the open question, or `null` (C22 I133). */
+  vocabulary(): QuestionVocabulary | null;
   /** Whether a question is open — C22 refuses a submission while one is. */
   readonly open: boolean;
   /**
@@ -413,6 +429,8 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
   let handler: ((e: InputEvent) => boolean | Verdict) | null = null;
   /** The open question's refusal, or `null` when none is open (C23 I82). */
   let refuseOpen: (() => void) | null = null;
+  /** The open question's vocabulary, or `null` (C22 I133). */
+  let vocabularyOpen: (() => QuestionVocabulary) | null = null;
   let meaning: ((e: InputEvent) => Meaning) | null = null;
   // **The question's state, which is what the routing is derived from** (I73).
   // `null` when nothing is open; the consumer otherwise, so the table is asked
@@ -453,6 +471,10 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
 
     refuse() {
       refuseOpen?.();
+    },
+
+    vocabulary() {
+      return vocabularyOpen?.() ?? null;
     },
 
     resolvesHandler() {
@@ -531,6 +553,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
           deps.announce?.answered(text ?? opts.choices.find((c) => c.key === key)?.label ?? key);
           handler = null;
           refuseOpen = null;
+          vocabularyOpen = null;
           meaning = null;
           consumer = null;
           replying = null;
@@ -632,6 +655,10 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
           deps.invalidate();
         };
         refuseOpen = refuse;
+        vocabularyOpen = () => ({
+          state: suspended ? "inspection" : replying !== null ? "reply" : "choice",
+          resolvesTo: defaultChoice(opts.choices).label,
+        });
 
         // `Esc` resolves with the default (C23 I36). It is classified here
         // rather than special-cased in C16 because what it means is the

@@ -1951,6 +1951,8 @@ class Session implements TuiInstance {
       copy: () => this.#copyState(),
       // C22 I118 — the owner line's field arm.
       editingField: () => this.#graph?.fieldHeld() != null,
+      // C22 I133 — the owner line's keys, from the session's keymap.
+      hints: () => this.#graph?.ownerHints(),
       // C22 I116 — the live toast, drawn in the footer's tail while it lives.
       toast: () => this.#toast ?? undefined,
       // A03 SS47 — the owner line draws chords, so the chrome resolves them.

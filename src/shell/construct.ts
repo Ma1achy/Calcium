@@ -250,7 +250,7 @@ async function readOrAbsent(
     return null;
   }
 }
-import type { Pipeline, StopReason } from "./types.js";
+import type { OwnerHints, Pipeline, StopReason } from "./types.js";
 
 /**
  * The manifest file, read and decoded — the step that was missing (C22 I23).
@@ -507,6 +507,12 @@ export type Graph = Readonly<{
    * (C22 I118). The prompt row draws this, and the field draws the editor.
    */
   fieldHeld: () => LineState | null;
+  /**
+   * What the owner line names its keys from (C22 I133) — the session keymap
+   * as dispatch resolves it, the substate's declared name, the open question's
+   * vocabulary, and semantic copy mode's refused interrupt. Read per frame.
+   */
+  ownerHints: () => OwnerHints;
   /**
    * The linear route's writer, or `null` on the rich route (C22 I119). The
    * session hands it every commit instead of composing a frame.
@@ -1815,11 +1821,14 @@ export async function constructGraph(
 
   // **Where the router's refusals are explained** (C16 I62). By rung, because
   // the explanation is the owner's: a question says `answer this first` on its
-  // own row (C23 I82). Semantic copy mode's chip lands with C22 I133; native
-  // selection has nothing it can draw — the scheduler is suspended — and that
-  // is the stated limit (ruling 60).
+  // own row (C23 I82), and semantic copy mode draws a chip on the owner line
+  // for one frame (C22 I133). Native selection has nothing it can draw — the
+  // scheduler is suspended — and that is the stated limit (ruling 60).
+  /** Semantic copy mode refused the last key's interrupt (C22 I133); cleared before the next. */
+  let copyRefused = false;
   const refused = (r: Parameters<RouterDeps["refused"]>[0]): void => {
     if (r.rung === "question") confirm.refuse();
+    else if (r.rung === "copy" && deps.frame.semanticSelection()) copyRefused = true;
   };
 
   const router = at("router", () =>
@@ -3248,6 +3257,16 @@ export async function constructGraph(
     // same reason `submit` is: the host is built below, and this is only ever
     // called from a keystroke.
     detachChild: () => void surface.close("detach"),
+    // **The prompt's `⏎`, through the table** (C22 I133, ruling 63). The line
+    // goes away, so the menu and `Esc`'s hold on the token go with it (C19
+    // I19), and this is **the one resolution site** (roadmap 30): C23 takes a
+    // string, so a chip becomes its content here and no sentinel reaches the
+    // far side. `keys` is read when a key arrives, after it exists.
+    submitPrompt: () => {
+      keys.reset();
+      pipeline?.submit(stores.editor.resolved);
+    },
+    keepField: () => void commitField(),
     focusTranscript: () => {
       const id = stores.transcript.liveId ?? stores.transcript.entries.at(-1)?.id ?? null;
       if (id !== null) focus.enterLiveBlock(id, null);
@@ -3745,21 +3764,13 @@ export async function constructGraph(
         return true;
       }
 
-      // **`enter`, not `return`** — C16 I17's rule applied to a handler rather
-      // than to a keymap row. The decoder has only ever produced `enter` for
-      // `\r`, so this test named a key nothing sends and Enter did not submit.
-      // It was invisible because no decoded event ever reached the router: the
-      // two halves were each correct about a name and never compared.
+      // **A bare `⏎` is the `submit` row above** (C22 I133, ruling 63); this is
+      // the same effect for an `enter` carrying a modifier nothing binds — the
+      // prompt sends on any `enter` whatever its modifiers, which is what keeps
+      // an unbound `⇧⏎` from being a dead key (C16 §6c). `enter`, not `return`:
+      // C16 I17's rule, and the decoder has only ever produced `enter` for `\r`.
       if (e.kind === "key" && e.key.name === "enter") {
-        // The line goes away, so the menu and `Esc`'s hold on the token go with
-        // it (C19 I19): suppression is per token, and the next line's first
-        // token starts at the same offset the dismissed one did.
-        keys.reset();
-        // **The one resolution site** (roadmap 30). C23 takes a string, C18
-        // classifies one and C05 describes `argv`, so a chip becomes its content
-        // here and no sentinel reaches the far side. Every other reader sees the
-        // buffer as it is, because five of them read an index alongside it.
-        pipeline?.submit(stores.editor.resolved);
+        keys.table.submit();
         return true;
       }
 
@@ -3955,13 +3966,11 @@ export async function constructGraph(
       }
       if (e.kind !== "key") return false;
       // **`⏎` and `esc` first** (C16 I60): the field's own two answers, ahead
-      // of the prompt's `⏎`, which would submit.
-      if (e.key.name === "enter" && e.key.ctrl !== true && e.key.meta !== true && e.key.shift !== true) {
-        commitField();
-        return true;
-      }
+      // of the prompt's `⏎`, which would submit. Both are `interaction` rows —
+      // `keepField` and `exitInside` — so the owner line names the chords this
+      // resolves (C22 I133).
       const inside = keymap.resolve("interaction", e.key);
-      if (inside !== null && inside.action === "exitInside") {
+      if (inside !== null && (inside.action === "keepField" || inside.action === "exitInside")) {
         bound("interaction", e)?.();
         return true;
       }
@@ -4112,6 +4121,9 @@ export async function constructGraph(
     // paste of two hundred characters would read as one very slow route.
     const routed = (e: InputEvent): void => {
       using _s = probe?.span("route") ?? NO_SPAN;
+      // **One-shot by construction** (C16 I62, ruling 60): the chip describes
+      // the key just refused, so the next key takes it down whatever it does.
+      copyRefused = false;
       router.dispatch(e);
       // **After every event** (C22 I118): whatever moved focus, the borrow
       // follows it here rather than at each place that can move it.
@@ -4292,6 +4304,19 @@ export async function constructGraph(
     focusedEntryId,
     focusedElements,
     fieldHeld: () => fieldBorrow?.held.line ?? null,
+    ownerHints: (): OwnerHints => {
+      const top = stores.overlays.top?.owner;
+      const question = confirm.vocabulary();
+      return {
+        // **The session's table, on this terminal's profile** (C16 I35):
+        // `entries()` holds only the rows that can fire, so the chip names a
+        // chord this reader can press, and a rebinding moves it.
+        chord: (target, action) => keymap.entries().find((b) => b.target === target && b.action === action)?.key,
+        ...(top?.rung === "substate" ? { substate: top.name } : {}),
+        ...(question === null ? {} : { question }),
+        ...(copyRefused ? { refused: true } : {}),
+      };
+    },
     linear,
     capabilitySources: detection.sources,
     pageBlock,

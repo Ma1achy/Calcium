@@ -21,7 +21,7 @@ import type { EntryId } from "../viewport/transcript/index.js";
 import type { OwnerRung } from "../interaction/router/types.js";
 import type { RefreshHost } from "./refresh.js";
 import type { CompletionSource } from "../interaction/completion/index.js";
-import type { FocusTarget } from "../interaction/router/types.js";
+import type { Binding, FocusTarget, KeyAction } from "../interaction/router/types.js";
 import type { CursorStyle } from "../terminal/escapes.js";
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore } from "../interaction/history/types.js";
@@ -188,6 +188,33 @@ export type ChromeContext = Readonly<{
    * longer being maintained.
    */
   lastFrame?: number;
+  /**
+   * What the owner line names its keys from (C22 I133, ruling 63).
+   *
+   * **The session's keymap, not a table of its own.** The line spelled its
+   * chords itself — `⏎ send`, `⇧⏎ newline` — so an application that rebound one
+   * kept a footer naming the old chord, which is C16 I19's second keymap in the
+   * row §103 legislates. Absent is *the default keymap*, which is the same answer
+   * for a session that rebinds nothing and the only one before the graph exists.
+   */
+  hints?: OwnerHints;
+}>;
+
+/**
+ * The owner line's source of keys and words (C22 I133).
+ *
+ * `chord` is the session keymap's first row for an action at a target, as
+ * dispatch would resolve it on this terminal's profile; `undefined` is unbound,
+ * and an unbound action draws no chip. The rest are what an owner says of
+ * itself — the substate's declared name (C15 I29), an open question's state and
+ * where its safe path resolves (C23 I36), and semantic copy mode's refused
+ * interrupt (C16 I62), which is drawn once, on the frame after the refusal.
+ */
+export type OwnerHints = Readonly<{
+  chord(target: FocusTarget, action: KeyAction): Binding["key"] | undefined;
+  substate?: "find" | "complete" | "preview";
+  question?: Readonly<{ state: "choice" | "reply" | "inspection"; resolvesTo: string }>;
+  refused?: boolean;
 }>;
 
 export type ChromeFn = (ctx: ChromeContext) => readonly Block[];

@@ -99,6 +99,15 @@ export type KeyDeps = Readonly<{
   /** Move focus into the transcript, for `⇧⇥` (`focus.previous`, §6a). */
   focusTranscript: () => void;
   /**
+   * Send the prompt's line, for its `⏎` (C22 I133, ruling 63).
+   *
+   * **Not `submit`**, which takes a line: this sends the line the editor holds,
+   * and the composition root is where a chip becomes its content (roadmap 30).
+   */
+  submitPrompt: () => void;
+  /** Keep what a held form field holds, for its `⏎` (C22 I118, I133). A no-op with no field held. */
+  keepField: () => void;
+  /**
    * Leave a captured child and return ownership to the host (C16 I49,
    * R-BLK-908).
    *
@@ -743,6 +752,10 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
 
     // --- C17 ---------------------------------------------------------------
     insertNewline: () => void deps.editor.insert("\n"),
+
+    // --- the two `⏎`s the owner line names (C22 I133, ruling 63) -------------
+    submit: () => void deps.submitPrompt(),
+    keepField: () => void deps.keepField(),
 
     // --- C19 ---------------------------------------------------------------
     //

@@ -493,6 +493,16 @@ export type KeyAction =
   | "insideDown"
   /** `esc out` (§102) — leave the inside and stay on the element (C26 I14). */
   | "exitInside"
+  // --- the two `⏎`s the owner line names (C22 I133, ruling 63) --------------
+  //
+  // Both were branches in `construct.ts` that tested `enter` by name, so the
+  // footer's `⏎ send` and `⏎ keep` were chords the keymap did not hold — a hint
+  // with no row behind it is C16 I19's second keymap. As rows, the line looks
+  // them up like every other chip and a rebinding moves them.
+  /** Send the prompt's line (C23 §2) — the scope rung's primary action. */
+  | "submit"
+  /** Keep what a held form field holds (C22 I118, C16 I60). */
+  | "keepField"
   // --- re-run the focused entry (C23 I18) ------------------------------------
   //
   // **Not an action kind.** The five `Action` kinds fire against a document's
