@@ -1835,6 +1835,71 @@ else still propagates, and that is unchanged here.
   fallback, or is omitted when it has none; `docs/KEYS.md`, which has no session, shows
   `queueDrop, else killWordLeft`.
 
+### The palette's way in — ruling 45, corrected by ruling 67
+
+Ruling 45 (the person's): `>` opens the palette only at an empty prompt, and a `>` typed anywhere
+else is text. Ruling 67 corrected its premise — `/` has no empty-prompt exception to copy; it
+switches namespace at any command position — so the limit is written fresh here. **Two
+mechanisms, because the defect has two halves**: C19's slot classification decides what the menu
+offers, and the prompt's submit arm decides what `⏎` does with the line.
+
+**Measured before any of it was written**: C18 tokenises `> notes` as `[operator ">", word
+"notes"]` and classifies it rule 3 — delegated whole to the user's shell, which truncates the file
+`notes`. So the submit arm is a safety guard before it is a palette feature, and it holds whatever
+the menu does.
+
+**The classification table** — the structural half: lines where `>` as the palette meets `>` as
+C18's operator, at rest, cursor at the end.
+
+| # | line | C18 | C19 `contextAt` | `⏎` |
+|---|---|---|---|---|
+| P1 | `>` | rule 3 | `action`, prefix `""`, replace from 1 | a `warn` notice; the line stays |
+| P2 | `>page.u` | rule 3 | `action`, prefix `page.u` | a notice — a name is exact |
+| P3 | `>page.up` | rule 3 | `action` | `page.up`'s effect at the prompt; the line clears |
+| P4 | `> notes` | rule 3 — **the shell truncates `notes`** | `action`, prefix `notes`, the spaces after `>` skipped | a notice; never the shell |
+| P5 | `>>notes` | rule 3 (append) | `action`, prefix `>notes`: no candidate | a notice |
+| P6 | `ls > notes` | rule 3 | not `action` — `>` is not the first character | submitted as written: the redirect the reader wrote |
+| P7 | ` > notes` | rule 3 | not `action` — the first character is a space | submitted: the first code unit is the whole test |
+| P8 | a chip whose content begins `>` | — | not `action` — the buffer's first character is the chip | a notice: the guard reads the **resolved** line, which is what C18 would have been handed |
+| P9 | `>` put in front of `ls` | rule 3 | `action` | a notice |
+
+**P9 is where the ruling's words and the mechanism meet.** *At an empty prompt* is a fact about
+the line's history, and `contextAt` is a function of the line: so it is read as *the line's first
+character*, which a `>` typed at an empty prompt always is. A `>` put in front of existing text
+makes a `>`-led line all the same, and reading it as text would hand `>ls` to C18 — rule 3, and a
+truncated `ls`. The guard must hold for P9 whatever the menu does, and the menu agreeing with the
+guard is the reading that keeps them one rule.
+
+**P7 is the reader's own shell syntax** and is left to the shell: a leading space is typed, and
+*anywhere else is text* covers it. **P8 is why the two halves read different strings**: the
+menu reads the buffer the reader sees, and the guard reads what would be submitted.
+
+**The sequence trace** — the event-mediated half.
+
+| # | sequence | result |
+|---|---|---|
+| Q1 | `>` then `page.` | the menu opens as you type (C19 I19): `page.up` and `page.down`, each with its chords as `detail` |
+| Q2 | Q1, then `Tab`, then `⏎` | `Tab` is the requested menu with a selection; `⏎` is `menuAccept`, which in the `action` slot **runs** the row, clears the line and closes the menu |
+| Q3 | `>page.u`, then `Tab` | one candidate, inserted with the delimiter `""` → `>page.up`; `⏎` runs it through the guard |
+| Q4 | a typed reply composing; `>` | text — completion is the prompt's (I54) and the reply's `⏎` is the question's, never the submit arm |
+| Q5 | `>queue.` with no handler | nothing offered: a reserved action with no handler is not the design's action (C22 I134's listing rule); with one, `queue.drop` runs it |
+| Q6 | a palette row whose handler throws | §6c S6: contained at `bound`, the notice, the key spent — the palette runs through the same path a key does |
+
+### The palette's rulings
+
+- **The rows are the registry's actions the prompt reaches**, in the order the prompt reaches
+  them: an action with a `prompt` row, else a `global` row the prompt does not take first — not
+  bound at `prompt`, not `⏎`, not a printable character, which the prompt's own arms consume. The
+  effective action must be non-null (C22 I134), so a reserved action is offered only with a
+  handler. `confirm` and `help.question` are not offered: at the prompt `⏎` submits and `?` is
+  typed. Every chord that reaches the chosen row's action at its target is the row's `detail`.
+- **Running a row is `bound(target, key)`** — the effect table a key reaches, never a second one.
+- **A selection accepted from the menu runs; `Tab`'s unique match inserts; `⏎` runs an exact name
+  only.** A prefix is a query, not a command.
+- **An unknown name keeps the line** and appends a `warn` notice saying a `>`-led line is an
+  action's name and never a command — the reader's text is not thrown away for a typo.
+- **The rule is R-KEY-008**, registered through `tools/design/release.mjs` with its ledger row.
+
 ## 7. State machine
 
 Two small machines, both with an injected clock.
@@ -2025,6 +2090,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 
 - **I66** — *(§6c table B, ruling 65, R-KEY-003, `keymapPolicy.universal`)* **A registry-`global` binding is bound at `global` or at every owner with a verb for it; a narrower placement is a declared capture.** `?`, `selection.native` and `selection.semantic` are `global` rows; `copy` is an owner row at `prompt`, `liveBlock`, `interaction` and `semanticSelection`, and native selection passes it to the terminal. `?` at `nativeSelection` is captured to `passToTerminal`. Entering one copy mode leaves the other, so from the other mode a `selection.*` chord switches and from the same mode it does nothing. *The active owner resolves that purpose* — so an owner with the verb and no row is the defect, and it was: `copy` had one owner of four, `?` one of five.
 - **I67** — *(§6c S7–S10, ruling 65, ruling 3 of the reconciliation)* **`⌃c` recognition is exact.** `isCtrlC`, `interceptOf` and the question's classifier require `ctrl` and the name `c` with no `shift`, `meta` or `super`, so kitty's `⌃⇧C` is `copy` and never interrupt, exit-arming or a question's denial. On the base profile the bytes are `0x03` and interrupt wins.
+- **I68** — *(§6c "The palette's way in", ruling 45, ruling 67, R-KEY-008)* **`>` opens the palette only as the line's first character, and a `>`-led line never reaches C18.** C19's `contextAt` tests `input[0] === ">"` before tokenising and answers the `action` slot with the text after it; a `>` anywhere else is classified as C18 reads it. On `⏎`, a line whose **resolved** text begins with `>` runs the action it names exactly, or appends a `warn` notice and keeps the line — it is never submitted, so `> notes` cannot truncate a file.
 
 ## 9. Commitments
 
@@ -2073,6 +2139,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 41. No binding takes a chord the platform owns, and `⌥←`/`⌥→` mean word motion wherever they are bound (I55, §063, §019, `R-REF-002`). → T1.108
 42. A registry-`global` binding fires at every owner with a verb for it, and a narrower placement is declared (I66, §6c). → T1.173, T4.85, T4.86, T4.89
 43. `⌃c` is recognised exactly, so an enhanced `⌃⇧C` is copy and never an interrupt (I67, §6c). → T1.172, T4.87
+44. `>` opens the action palette only as the line's first character, and a `>`-led line is never handed to the parser or the shell (I68, ruling 45, R-KEY-008). → T1.176, T1.177, T1.178, C22 T4.109
 
 ---
 
@@ -2094,13 +2161,16 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.93** (I41): `CSI 1;9A` decodes as `{name: "up", super: true}` when `keyboardProtocol` is `"kitty"` and as `{name: "up", meta: true}` when it is not — in `router-decode.test.ts`, with `modifiersOf`, so `c16-modifiers.mjs`'s mutation run reaches it — **the same bytes, twice, through two decoders**, which is the only shape that asserts the protocol is the condition. The control is `CSI 1;3A`, which is `meta` under both and is what makes this a test of bit 8 rather than of the parameter.
 - **T1.94** (I41): under the enhanced profile `⌘↑` and `⌥↑` resolve to **different actions** — `transcript.top` and `scrollPageUp` — and under the base profile `⌘↑`'s bytes resolve to `scrollPageUp`, because there they *are* `⌥↑`. The pair that the accidental resolution I34 was written about could not distinguish.
 - **T1.95** (I42): `tools/generate-keymap.mjs` run against the registry reproduces `registry-bindings.ts` **byte for byte**. The generated file is in the tree and this is what stops it being a second hand-written record with a longer name.
-- **T1.96** (I42): every `kind: "key"` binding in the registry appears in `registry-bindings.ts`, **by equality on the set of `actionId`s** — so a binding added to the registry and not regenerated fails, which a subset check would not. It also pins `chordOf`'s throw — `fromRegistry`'s since §6c, which throws on any count but one — **by source**: a mutation replacing it with a fallback key fails nothing, because the branch is unreachable while this row's equality holds — so the guard's only witness is that it is written, which is T1.38's shape. A fallback is the worse failure: a registry rename would bind a chord nobody asked for with every row green, where a throw makes the module unloadable and names the missing id.
+- **T1.96** (I42): every `kind: "key"` binding in the registry appears in `registry-bindings.ts`, **by equality on the set of `actionId`s** — so a binding added to the registry and not regenerated fails, which a subset check would not. It also pins `chordOf`'s throw — `fromRegistry`'s since §6c, which throws on any count but one — **by source**: a mutation replacing it with a fallback key fails nothing, because the branch is unreachable while this row's equality holds — so the guard's only witness is that it is written — the shape the old T1.38 had before §6c replaced its source pin with a dispatch. A fallback is the worse failure: a registry rename would bind a chord nobody asked for with every row green, where a throw makes the module unloadable and names the missing id.
 - **T1.37** (I37, I42, I36, I66) — **replaced (§6c)**: for each current key record, decode each wire form under `"kitty"` or `"none"` by its profile, resolve through `createKeymap(defaultKeymap, profile)`, and assert **identity** with every row carrying its id; each resolving row's target is admitted by the record's scope and `when`, or is in `CAPTURES` by equality; a `default-terminal` record's wire forms contain no csi-u and no `CSI 27;`; no row without `registry` has a slot equal to a registry chord in its profile; an enhanced-only chord resolves to nothing under the default profile; the `⇧⏎` exception by equality. **T1.37b**: `⌃C` dispatched with an app in flight reaches the stage `cancel` — the site outside the keymap, by dispatch rather than by a declaration.
 - **T1.38** (I38, → C22 I134, C24 I39) — **replaced (§6c)**: through `buildGraph` — `git status`, `⌥⌫`, the line reads `git `; with `keyActions: {"queue.drop": spy}` the spy is called once and the line is unchanged; a handler returning `false` falls back to the word kill; `⌥1` with no handler ends in `dropped`, and with one the handler is called. **T1.38b** (C24 I39): a hook id outside the reserved set throws at construction and names the reserved ids. **T1.38c** (§6c S6): a handler that throws leaves the session running, spends the key and appends one `warn` notice naming the action.
 - **T1.172** (I67): the three predicates over one table of keys — `⌃c`, kitty `⌃⇧C`, `⌥⌃c`, `⌘⌃c`, `⌃C` from `0x03` — through `interceptOf`, and through dispatch's stages at a scope rung, an empty prompt and a question.
 - **T1.173** (I66): over `defaultKeymap`, every registry-`global` key record's rows are either one `global` row or one row at every owner its placement names, and the owners with no row are the declared passes — both lists by equality.
 - **T1.174** (I42, §6c table C): `tools/design/supersede-bindings.mjs` run against its own output refuses and writes nothing, naming a record that is already superseded; and `validateRegistry` refuses a binding whose supersession link is not reciprocal — the fabricated violation, on a copy.
 - **T1.175** (§6a clause 5): `renderKeysMarkdown` carries a `Profile` column whose values are the records' own, and no header claims a single profile.
+- **T1.176** (I68, §6c P1–P9): `contextAt` over the classification table — `>`, `>page.u`, `> notes` and `>>notes` answer `action` with the table's prefix and a `replace` starting after the `>` and its spaces; `ls > notes` and ` > notes` answer what they answered before; a cursor before the `>` is `none`.
+- **T1.177** (I68, §6c Q1–Q3, Q5): through `buildGraph` — `>` then `page.` opens the menu with `page.up` and `page.down` carrying their chords; `Tab` then `⏎` runs one, clears the line and closes the menu; `>page.u` `Tab` inserts `>page.up`, and `⏎` scrolls; `>queue.` offers nothing without a handler, and with one `>queue.drop` `⏎` calls it once.
+- **T1.178** (I68, §6c palette rulings): the palette's rows over a built graph — `confirm`, `help.question` and a handler-less reserved action absent; `help.f1`, `page.up` and `transcript.top` present; every row's `detail` the chords of its row's action at its target, so a kitty session's `transcript.top` carries `⌘↑` and a default one's does not.
 - **T1.97** (I42): `defaultKeymap` after the change is **the same 121 rows** it held before, compared as a sorted set of `(target, keyText, action, profile)`. The generation is a change of where the chords are written and of nothing else, and this is the row that says so.
 - **T1.31** (I8, C15 I26) — **amended in M8**: modality is read from `blocking`, and from neither the box nor the kind. A full-region layer declaring `blocking: false` **does not** skip step 3, and a one-row layer declaring `blocking: true` does — the pair that was inexpressible while the predicate was geometric, and the pair that fails in both directions under the old one. Hand-built `Placed` still, because the point is that the geometry is now irrelevant and a row whose boxes agree with its flags cannot show that. Originally: coverage read from the box, a non-view spanning the region skipping step 3 and a clamped view not.
 - **T1.32** (I24): every member of the `FocusTarget` union has at least one row in `defaultKeymap`. Derived from the union, not from a list written beside it — a coverage set built from the test's own table covers nothing.
