@@ -21,7 +21,6 @@ const CMD = "npx vitest run test/contract/theme.test.ts test/contract/patch-wind
 const CONTRAST = "src/presentation/theme/contrast.ts";
 const LINES = "src/presentation/patch/lines.ts";
 const SCANS = "tools/enforce/source-scans.mjs";
-const LENDER = "src/presentation/theme/tokens-high-contrast.ts";
 const GENERATED = "src/presentation/theme/tokens.generated.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -69,12 +68,13 @@ const MUTATIONS = [
     expect: "T1.27",
   },
   {
-    // **A lent composition reverted to the flat slot** — the lender's record
-    // is the only author of hcDark's syntax on a diff row (C10 I46).
+    // **A syntax composition reverted to the flat slot** — the registry's
+    // `.bg-diffAdd .syn-keyword` rule is the only author of hcDark's syntax on
+    // a diff row (C10 I46). It was a lent record until C10 I62.
     name: "hcDark's keyword on diffAdd is the flat slot",
-    file: LENDER,
-    from: '      "syntax.keyword": "#ff9eff",',
-    to: '      "syntax.keyword": "#e46dfb",',
+    file: GENERATED,
+    from: '        "syntax.keyword": "#ff9eff",',
+    to: '        "syntax.keyword": "#e46dfb",',
     expect: "T2.60",
   },
   {

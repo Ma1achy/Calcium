@@ -35,7 +35,8 @@ const CONTRACT = "test/contract/theme.test.ts";
 // one failure mode a mutation report cannot show you, because an uncaught live
 // mutant and a blind harness produce the same clean page.
 const HC = "src/presentation/theme/tokens.generated.ts";
-const FOURBIT = "src/presentation/theme/four-bit.ts";
+// The indices moved into the registry by C10 I62; `four-bit.ts` names them.
+const FOURBIT = "src/presentation/theme/four-bit.generated.ts";
 const INDEX = "src/presentation/theme/index.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -183,8 +184,8 @@ const MUTATIONS = [
     // rung can keep and the one an accessibility theme most owes.
     name: "high-contrast collapses two tones at 4-bit",
     file: FOURBIT,
-    from: '  "tone.accent": 13,\n  "tone.meta": 5,\n  "tone.identifier": 6,\n\n  "syntax.keyword": 13,',
-    to: '  "tone.accent": 14,\n  "tone.meta": 5,\n  "tone.identifier": 6,\n\n  "syntax.keyword": 13,',
+    from: '    "tone.accent": 13,\n    "tone.meta": 5,',
+    to: '    "tone.accent": 14,\n    "tone.meta": 5,',
     expect: "T2.3",
   },
   {

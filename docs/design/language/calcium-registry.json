@@ -21934,7 +21934,9 @@
       "status": "current",
       "ruleIds": [
         "R-THM-001"
-      ]
+      ],
+      "fourBit": "dark",
+      "spectrum": "dark"
     },
     {
       "id": "ink",
@@ -21945,7 +21947,9 @@
       "status": "current",
       "ruleIds": [
         "R-THM-001"
-      ]
+      ],
+      "fourBit": "dark",
+      "spectrum": "dark"
     },
     {
       "id": "warm",
@@ -21956,7 +21960,9 @@
       "status": "current",
       "ruleIds": [
         "R-THM-001"
-      ]
+      ],
+      "fourBit": "dark",
+      "spectrum": "dark"
     },
     {
       "id": "nord",
@@ -21967,7 +21973,9 @@
       "status": "current",
       "ruleIds": [
         "R-THM-001"
-      ]
+      ],
+      "fourBit": "dark",
+      "spectrum": "dark"
     },
     {
       "id": "viol",
@@ -21978,7 +21986,9 @@
       "status": "current",
       "ruleIds": [
         "R-THM-001"
-      ]
+      ],
+      "fourBit": "dark",
+      "spectrum": "dark"
     },
     {
       "id": "mono",
@@ -21989,7 +21999,9 @@
       "status": "current",
       "ruleIds": [
         "R-THM-001"
-      ]
+      ],
+      "fourBit": "dark",
+      "spectrum": "dark"
     },
     {
       "id": "hcDark",
@@ -22000,7 +22012,9 @@
       "status": "current",
       "ruleIds": [
         "R-THM-001"
-      ]
+      ],
+      "fourBit": "highContrast",
+      "spectrum": "dark"
     },
     {
       "id": "hcLight",
@@ -22011,7 +22025,9 @@
       "status": "current",
       "ruleIds": [
         "R-THM-001"
-      ]
+      ],
+      "fourBit": "light",
+      "spectrum": "light"
     },
     {
       "id": "light",
@@ -22022,7 +22038,9 @@
       "status": "current",
       "ruleIds": [
         "R-THM-001"
-      ]
+      ],
+      "fourBit": "light",
+      "spectrum": "light"
     },
     {
       "id": "paper",
@@ -22033,7 +22051,9 @@
       "status": "current",
       "ruleIds": [
         "R-THM-001"
-      ]
+      ],
+      "fourBit": "light",
+      "spectrum": "light"
     }
   ],
   "themeRules": [
@@ -28336,8 +28356,832 @@
       "ruleIds": [
         "R-THM-001"
       ]
+    },
+    {
+      "selector": "[data-theme=\"dark\"] .syn-keyword",
+      "declarations": "color:#c678dd",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"dark\"] .syn-string",
+      "declarations": "color:#98c379",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"dark\"] .syn-comment",
+      "declarations": "color:#676e7d",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"dark\"] .syn-number",
+      "declarations": "color:#d19a66",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"dark\"] .syn-key",
+      "declarations": "color:#e06c75",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"dark\"] .syn-type",
+      "declarations": "color:#e5c07b",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"dark\"] .syn-function",
+      "declarations": "color:#61afef",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"dark\"] .syn-operator",
+      "declarations": "color:#56b6c2",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"dark\"] .syn-punctuation",
+      "declarations": "color:#abb2bf",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"dark\"] .cat-c1",
+      "declarations": "color:#e69f00",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"dark\"] .cat-c2",
+      "declarations": "color:#56b4e9",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"dark\"] .cat-c3",
+      "declarations": "color:#3cbf9a",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"dark\"] .cat-c4",
+      "declarations": "color:#f0e442",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"dark\"] .cat-c5",
+      "declarations": "color:#8fa8ff",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"dark\"] .cat-c6",
+      "declarations": "color:#f07a3c",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"dark\"] .cat-c7",
+      "declarations": "color:#e4a3c4",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"dark\"] .cat-c8",
+      "declarations": "color:#cfcfcf",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .syn-keyword",
+      "declarations": "color:#a626a4",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .syn-string",
+      "declarations": "color:#3c793c",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .syn-comment",
+      "declarations": "color:#86888f",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .syn-number",
+      "declarations": "color:#916301",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .syn-key",
+      "declarations": "color:#a8432c",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .syn-type",
+      "declarations": "color:#7a5401",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .syn-function",
+      "declarations": "color:#1f60f0",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .syn-operator",
+      "declarations": "color:#0173a5",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .syn-punctuation",
+      "declarations": "color:#383a42",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .cat-c1",
+      "declarations": "color:#8a5f00",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .cat-c2",
+      "declarations": "color:#00688f",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .cat-c3",
+      "declarations": "color:#00674a",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .cat-c4",
+      "declarations": "color:#7a6a00",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .cat-c5",
+      "declarations": "color:#0043a8",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .cat-c6",
+      "declarations": "color:#9c3b00",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .cat-c7",
+      "declarations": "color:#8f3f6d",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .cat-c8",
+      "declarations": "color:#4a4a4a",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .syn-keyword",
+      "declarations": "color:#e46dfb",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .syn-string",
+      "declarations": "color:#0fb80f",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .syn-comment",
+      "declarations": "color:#9f9f9f",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .syn-number",
+      "declarations": "color:#f87c00",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .syn-key",
+      "declarations": "color:#fb7289",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .syn-type",
+      "declarations": "color:#bb9c00",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .syn-function",
+      "declarations": "color:#5fa0fb",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .syn-operator",
+      "declarations": "color:#0aafbe",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .syn-punctuation",
+      "declarations": "color:#d7d7d7",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .cat-c1",
+      "declarations": "color:#e69f00",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .cat-c2",
+      "declarations": "color:#56b4e9",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .cat-c3",
+      "declarations": "color:#3cbf9a",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .cat-c4",
+      "declarations": "color:#f0e442",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .cat-c5",
+      "declarations": "color:#8fa8ff",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .cat-c6",
+      "declarations": "color:#f07a3c",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .cat-c7",
+      "declarations": "color:#e4a3c4",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .cat-c8",
+      "declarations": "color:#cfcfcf",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"dark\"] .bg-focusGround .syn-comment,[data-theme=\"dark\"] .syn-comment.bg-focusGround",
+      "declarations": "color:#707785",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"dark\"] .bg-focusGround .syn-key,[data-theme=\"dark\"] .syn-key.bg-focusGround",
+      "declarations": "color:#e2737c",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .bg-focusGround .syn-string,[data-theme=\"light\"] .syn-string.bg-focusGround",
+      "declarations": "color:#387138",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .bg-focusGround .syn-comment,[data-theme=\"light\"] .syn-comment.bg-focusGround",
+      "declarations": "color:#7f8188",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .bg-focusGround .syn-number,[data-theme=\"light\"] .syn-number.bg-focusGround",
+      "declarations": "color:#875c01",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .bg-focusGround .syn-function,[data-theme=\"light\"] .syn-function.bg-focusGround",
+      "declarations": "color:#1d5ae1",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .bg-focusGround .syn-operator,[data-theme=\"light\"] .syn-operator.bg-focusGround",
+      "declarations": "color:#016b9a",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .bg-focusGround .cat-c1,[data-theme=\"light\"] .cat-c1.bg-focusGround",
+      "declarations": "color:#875d00",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"light\"] .bg-focusGround .cat-c4,[data-theme=\"light\"] .cat-c4.bg-focusGround",
+      "declarations": "color:#736400",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffAdd .syn-keyword,[data-theme=\"hcDark\"] .syn-keyword.bg-diffAdd",
+      "declarations": "color:#ff9eff",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffAdd .syn-string,[data-theme=\"hcDark\"] .syn-string.bg-diffAdd",
+      "declarations": "color:#34dd34",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffAdd .syn-comment,[data-theme=\"hcDark\"] .syn-comment.bg-diffAdd",
+      "declarations": "color:#c0c0c0",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffAdd .syn-number,[data-theme=\"hcDark\"] .syn-number.bg-diffAdd",
+      "declarations": "color:#ffb135",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffAdd .syn-key,[data-theme=\"hcDark\"] .syn-key.bg-diffAdd",
+      "declarations": "color:#ffa8bf",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffAdd .syn-type,[data-theme=\"hcDark\"] .syn-type.bg-diffAdd",
+      "declarations": "color:#debf23",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffAdd .syn-function,[data-theme=\"hcDark\"] .syn-function.bg-diffAdd",
+      "declarations": "color:#86c7ff",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffAdd .syn-operator,[data-theme=\"hcDark\"] .syn-operator.bg-diffAdd",
+      "declarations": "color:#2ed3e2",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffRemove .syn-keyword,[data-theme=\"hcDark\"] .syn-keyword.bg-diffRemove",
+      "declarations": "color:#f27bff",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffRemove .syn-string,[data-theme=\"hcDark\"] .syn-string.bg-diffRemove",
+      "declarations": "color:#1cc51c",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffRemove .syn-comment,[data-theme=\"hcDark\"] .syn-comment.bg-diffRemove",
+      "declarations": "color:#aaaaaa",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffRemove .syn-number,[data-theme=\"hcDark\"] .syn-number.bg-diffRemove",
+      "declarations": "color:#ff8d11",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffRemove .syn-key,[data-theme=\"hcDark\"] .syn-key.bg-diffRemove",
+      "declarations": "color:#ff859c",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffRemove .syn-type,[data-theme=\"hcDark\"] .syn-type.bg-diffRemove",
+      "declarations": "color:#c8a90d",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffRemove .syn-function,[data-theme=\"hcDark\"] .syn-function.bg-diffRemove",
+      "declarations": "color:#6cadff",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
+    },
+    {
+      "selector": "[data-theme=\"hcDark\"] .bg-diffRemove .syn-operator,[data-theme=\"hcDark\"] .syn-operator.bg-diffRemove",
+      "declarations": "color:#17bccb",
+      "status": "current",
+      "ruleIds": [
+        "R-THM-001"
+      ]
     }
   ],
+  "terminalPalettes": {
+    "ruleIds": [
+      "R-THM-001"
+    ],
+    "note": "What a theme carries that is not CSS, or not a theme's own (C10 I62). A theme record names its fourBit map and its spectrum; a theme with no .syn-* or .cat-* rules derives those palettes from its own tones by paletteDerivation. The ANSI indices are curated for the sixteen-colour rung and measured against the xterm defaults (C10 I61).",
+    "fourBit": {
+      "dark": {
+        "tone.default": 15,
+        "tone.dim": 7,
+        "tone.muted": 8,
+        "tone.ok": 10,
+        "tone.warn": 11,
+        "tone.error": 9,
+        "tone.info": 14,
+        "tone.accent": 3,
+        "tone.meta": 13,
+        "tone.identifier": 6,
+        "categorical.c1": 3,
+        "categorical.c2": 6,
+        "categorical.c3": 2,
+        "categorical.c4": 11,
+        "categorical.c5": 12,
+        "categorical.c6": 1,
+        "categorical.c7": 5,
+        "categorical.c8": 7,
+        "syntax.keyword": 13,
+        "syntax.string": 10,
+        "syntax.comment": 8,
+        "syntax.number": 3,
+        "syntax.key": 9,
+        "syntax.type": 11,
+        "syntax.function": 12,
+        "syntax.operator": 14,
+        "syntax.punctuation": 7,
+        "surface.bg": 0,
+        "surface.bgElev": 0,
+        "surface.bgDeep": 0,
+        "surface.border": 8,
+        "surface.borderStrong": 7,
+        "surface.diffAdd": 2,
+        "surface.diffRemove": 1,
+        "surface.errorGround": 9,
+        "surface.errorInk": 0
+      },
+      "light": {
+        "tone.default": 0,
+        "tone.dim": 8,
+        "tone.muted": 8,
+        "tone.ok": 2,
+        "tone.warn": 3,
+        "tone.error": 1,
+        "tone.info": 4,
+        "tone.accent": 12,
+        "tone.meta": 5,
+        "tone.identifier": 6,
+        "syntax.keyword": 5,
+        "syntax.string": 2,
+        "syntax.comment": 8,
+        "syntax.number": 3,
+        "syntax.key": 1,
+        "syntax.type": 3,
+        "syntax.function": 4,
+        "syntax.operator": 6,
+        "syntax.punctuation": 0,
+        "categorical.c1": 3,
+        "categorical.c2": 6,
+        "categorical.c3": 2,
+        "categorical.c4": 5,
+        "categorical.c5": 4,
+        "categorical.c6": 1,
+        "categorical.c7": 13,
+        "categorical.c8": 8,
+        "surface.bg": 15,
+        "surface.bgElev": 15,
+        "surface.bgDeep": 15,
+        "surface.border": 7,
+        "surface.borderStrong": 8,
+        "surface.diffAdd": 2,
+        "surface.diffRemove": 1,
+        "surface.errorGround": 1,
+        "surface.errorInk": 15
+      },
+      "highContrast": {
+        "tone.default": 15,
+        "tone.dim": 7,
+        "tone.muted": 8,
+        "tone.ok": 10,
+        "tone.warn": 11,
+        "tone.error": 9,
+        "tone.info": 14,
+        "tone.accent": 13,
+        "tone.meta": 5,
+        "tone.identifier": 6,
+        "syntax.keyword": 13,
+        "syntax.string": 10,
+        "syntax.comment": 8,
+        "syntax.number": 11,
+        "syntax.key": 9,
+        "syntax.type": 3,
+        "syntax.function": 12,
+        "syntax.operator": 14,
+        "syntax.punctuation": 15,
+        "categorical.c1": 11,
+        "categorical.c2": 14,
+        "categorical.c3": 10,
+        "categorical.c4": 3,
+        "categorical.c5": 12,
+        "categorical.c6": 9,
+        "categorical.c7": 13,
+        "categorical.c8": 7,
+        "surface.bg": 0,
+        "surface.bgElev": 0,
+        "surface.bgDeep": 0,
+        "surface.border": 8,
+        "surface.borderStrong": 7,
+        "surface.diffAdd": 2,
+        "surface.diffRemove": 1,
+        "surface.errorGround": 9,
+        "surface.errorInk": 0
+      }
+    },
+    "bandFourBit": {
+      "hcDark": {
+        "focusGround": {
+          "ground": 12,
+          "ink": 15
+        },
+        "selection": {
+          "ground": 11,
+          "ink": 0
+        }
+      },
+      "hcLight": {
+        "focusGround": {
+          "ground": 7,
+          "ink": 0
+        },
+        "selection": {
+          "ground": 5,
+          "ink": 15
+        }
+      }
+    },
+    "spectrum": {
+      "dark": {
+        "0": "#e8736b",
+        "1": "#e89866",
+        "2": "#e8c95e",
+        "3": "#a3d066",
+        "4": "#66c890",
+        "5": "#5fb5d4",
+        "6": "#7a8fe0",
+        "7": "#c187d4",
+        "outline": "#e8e8e8"
+      },
+      "light": {
+        "0": "#e45649",
+        "1": "#d19a66",
+        "2": "#c18401",
+        "3": "#50a14f",
+        "4": "#0997b3",
+        "5": "#0184bc",
+        "6": "#4078f2",
+        "7": "#a626a4",
+        "outline": "#383a42"
+      }
+    },
+    "classes": {
+      "tone": {
+        "default": "normal",
+        "dim": "deemphasised",
+        "muted": "deemphasised",
+        "ok": "emphasised",
+        "warn": "emphasised",
+        "error": "emphasised",
+        "info": "normal",
+        "accent": "emphasised",
+        "meta": "normal",
+        "identifier": "emphasised"
+      },
+      "syntax": {
+        "keyword": "emphasised",
+        "string": "normal",
+        "comment": "deemphasised",
+        "number": "normal",
+        "key": "normal",
+        "type": "normal",
+        "function": "normal",
+        "operator": "normal",
+        "punctuation": "deemphasised"
+      }
+    },
+    "paletteDerivation": {
+      "syntax": {
+        "keyword": "meta",
+        "string": "ok",
+        "comment": "muted",
+        "number": "warn",
+        "key": "error",
+        "type": "accent",
+        "function": "info",
+        "operator": "identifier",
+        "punctuation": "dim"
+      },
+      "categorical": {
+        "c1": "info",
+        "c2": "ok",
+        "c3": "warn",
+        "c4": "meta",
+        "c5": "identifier",
+        "c6": "accent",
+        "c7": "error",
+        "c8": "dim"
+      }
+    }
+  },
   "glyphs": [
     {
       "id": "work-unit",

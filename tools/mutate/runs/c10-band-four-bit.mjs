@@ -9,7 +9,8 @@ const ROOT = process.cwd();
 const CMD = "npx vitest run test/contract/band-four-bit.test.ts";
 const RESOLVE = "src/presentation/theme/resolve.ts";
 const CONTRAST = "src/presentation/theme/contrast.ts";
-const TABLE = "src/presentation/theme/band-four-bit.ts";
+// The curated pairs moved into the registry by C10 I62 and are generated here.
+const TABLE = "src/presentation/theme/four-bit.generated.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);

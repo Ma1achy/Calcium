@@ -28,7 +28,8 @@ const CONTRAST = "src/presentation/theme/contrast.ts";
 // one failure mode a mutation report cannot show you, because an uncaught live
 // mutant and a blind harness produce the same clean page.
 const DARK = "src/presentation/theme/tokens.generated.ts";
-const FOURBIT = "src/presentation/theme/four-bit.ts";
+// The indices moved into the registry by C10 I62; `four-bit.ts` names them.
+const FOURBIT = "src/presentation/theme/four-bit.generated.ts";
 
 // **`test/edge/status.test.ts` is in the set because T3.46 is where the pair is
 // read off a frame.** The two theme suites check the pair as *values*; only the
@@ -110,8 +111,8 @@ const results = runPass({
       // open key, so no value assertion can ask whether a slot has an answer.
       name: "the 4-bit arm goes back to being absent",
       file: FOURBIT,
-      from: 'not a measurement.\n  "surface.errorGround": 9,\n  "surface.errorInk": 0,',
-      to: "not a measurement.",
+      from: '    "surface.errorGround": 9,\n    "surface.errorInk": 0,\n  }),\n  light:',
+      to: "  }),\n  light:",
       expect: "T3.46",
     },
     {
@@ -121,8 +122,8 @@ const results = runPass({
       // arm is most likely to take, because the ground is the visible half.
       name: "the 4-bit ground arrives without its ink",
       file: FOURBIT,
-      from: 'not a measurement.\n  "surface.errorGround": 9,\n  "surface.errorInk": 0,',
-      to: 'not a measurement.\n  "surface.errorGround": 9,',
+      from: '    "surface.errorGround": 9,\n    "surface.errorInk": 0,\n  }),\n  light:',
+      to: '    "surface.errorGround": 9,\n  }),\n  light:',
       expect: "T3.46",
     },
     {

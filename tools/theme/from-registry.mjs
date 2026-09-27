@@ -5,16 +5,15 @@
  * **The registry is the source and this is a projection**, the same relationship
  * `calcium-design-language-revised.html` has to it. Regenerate with `make themes`.
  *
- * **What the registry does NOT carry, and where the rest comes from.** It has
- * tones, surfaces and a fixed hue vocabulary, and no `syntax`, `categorical` or
- * `spectrum` palette for any theme — while `validateTokens` requires the first two
- * of every theme (C10 I30, and rightly: an unresolvable reference paints as the
- * default foreground, silently). The hues cannot fill the gap, because they are
- * theme-INDEPENDENT — `h-blue` is `#3b82f6` in all ten, and `hi-blue` is the ink
- * to write on it rather than a brighter blue. So a theme that the registry does
- * not measure those palettes for inherits them from the shipping theme of its own
- * polarity, whose values ARE measured against their floors. Nothing is invented;
- * where the design is silent the repository's existing answer stands.
+ * **Every value it emits is read from the registry, and nothing is lent** (C10
+ * I62). Tones, surfaces, hues and a curated theme's `syntax` and `categorical`
+ * inks are CSS in `themeRules` — `.syn-<slot>`, `.cat-<slot>`, and on a ground
+ * `.bg-<ground> .syn-<slot>`. What is not CSS, or not a theme's own, is
+ * `terminalPalettes`: the three curated 4-bit maps and the band pairs (emitted to
+ * `four-bit.generated.ts`), the two spectra, the typographic classes, and the
+ * derivation a theme with no `.syn-*` rules takes its palettes by. Until I62 the
+ * generator lent all of that from three hand-written token sets, so a value
+ * reached a shipped theme without the design holding it.
  *
  * **`.term`, `.sw` and `.rmp` are skipped.** They are the HTML preview's own
  * chrome — R-THM-001's text names them, *"including composed ink-on-surface values
@@ -34,7 +33,11 @@ const registry = JSON.parse(readFileSync(
 // mode at another file, which is how the check's fabricated violation reaches it.
 const outAt = process.argv.indexOf("--out");
 const out = outAt >= 0 ? resolve(process.argv[outAt + 1]) : resolve(here, "../../src/presentation/theme/tokens.generated.ts");
+const fourBitAt = process.argv.indexOf("--four-bit-out");
+const fourBitOut = fourBitAt >= 0 ? resolve(process.argv[fourBitAt + 1]) : resolve(here, "../../src/presentation/theme/four-bit.generated.ts");
 const check = process.argv.includes("--check");
+/** What a theme carries that is not CSS, or not a theme's own (C10 I62). */
+const TP = registry.terminalPalettes;
 
 /** `#222` and `#222222` are one colour; only one of them is a diff. */
 const norm = (hex) => {
@@ -42,10 +45,7 @@ const norm = (hex) => {
   return h.length === 4 ? `#${h[1]}${h[1]}${h[2]}${h[2]}${h[3]}${h[3]}` : h;
 };
 
-/**
- * Polarity, and it decides two things: which shipping theme lends the unmeasured
- * palettes, and whether the theme paints its own ground.
- */
+/** Polarity, which decides the theme's `variant`. */
 const LIGHT_THEMES = new Set(["light", "paper", "hcLight"]);
 
 /**
@@ -57,29 +57,6 @@ const LIGHT_THEMES = new Set(["light", "paper", "hcLight"]);
  * promise nothing could read.
  */
 const PROMISES = new Map([["hcDark", 7], ["hcLight", 7]]);
-
-/**
- * **Which curated 4-bit map a theme lends, and `hcDark` is why this is a
- * function.** The registry is CSS and carries no ANSI indices, so the sixteen-
- * colour rung is repository data the design does not cover — which is one of the
- * two reasons `tokens-dark.ts` and its siblings stay in the tree.
- *
- * A first draft read `variant === "light" ? LIGHT : DARK`, and it silently threw
- * away `HIGH_CONTRAST_FOUR_BIT`: a map curated *for* high contrast, differing
- * from the dark one where the difference matters — `syntax.type` on plain yellow
- * so `number`'s bright yellow stays its own, and so on. Nothing caught it,
- * because `DARK_FOUR_BIT` is also legal and also keeps the five tones distinct.
- * **The mutation pass is what found it**: `c10-named-set`'s *high-contrast
- * collapses two tones at 4-bit* survived, and a mutation that cannot reach a
- * test is a question about the caller before it is a question about the row.
- *
- * `hcLight` is **not** given that map, and the map's own docblock says why: it
- * puts the bright half in the foreground *because the ground is index 0*. On
- * `hcLight` the ground is white, so a bright foreground is the illegible arm of
- * the same reasoning. It takes `LIGHT`'s.
- */
-const fourBitLender = (id, variant) =>
-  id === "hcDark" ? "HIGH_CONTRAST" : variant === "light" ? "LIGHT" : "DARK";
 
 /**
  * **Who paints, and it is the shipping decision preserved rather than a new one.**
@@ -100,6 +77,8 @@ const FLOOR = { comment: 3 };
 const floorOf = (slot) => FLOOR[slot] ?? 4.5;
 
 const HUE = /^h-|^hi-/;
+/** A rule's class prefix -> the palette family it composes. */
+const FAMILY = { c: "tone", syn: "syntax", cat: "categorical" };
 /**
  * The ten agent hues, **per theme and in three tiers** (C10 I53, §070, §093).
  *
@@ -148,6 +127,8 @@ function tokensFor(themeId) {
   const composed = {};
   const bandInk = {};
   const hues = {};
+  const syntax = {};
+  const categorical = {};
   for (const rule of registry.themeRules) {
     if (SKIP_SELECTORS.test(rule.selector)) continue;
     // **Ink ON a ground** — `.bg-X .c-Y`, which the registry writes twice in one
@@ -163,19 +144,32 @@ function tokensFor(themeId) {
     // reached the token set**, all on `selection`, six of them `muted`, and
     // no floor could see the loss because `SELECTION_SLOTS` excluded exactly
     // those tones. So the selector list is split and every member is read.
+    //
+    // A syntax or categorical ink on a ground is the same shape under another
+    // class prefix (C10 I62): `.bg-diffAdd .syn-keyword` composes
+    // `syntax.keyword` exactly as `.bg-diffAdd .c-ok` composes `tone.ok`.
     const pairs = rule.selector
       .split(",")
-      .map((sel) => sel.trim().match(/^\[data-theme="([a-zA-Z]+)"\] \.bg-([a-zA-Z-]+) \.c-([a-zA-Z-]+)$/))
+      .map((sel) => sel.trim().match(/^\[data-theme="([a-zA-Z]+)"\] \.bg-([a-zA-Z-]+) \.(c|syn|cat)-([a-zA-Z0-9-]+)$/))
       .filter((m) => m !== null);
     if (pairs.length > 0) {
       const colour = rule.declarations.match(/(?:^|;)color:(#[0-9a-fA-F]{3,8})/);
       for (const pair of pairs) {
         if (pair[1] !== themeId) continue;
-        if (colour === null || HUE.test(pair[2]) || HUE.test(pair[3])) continue;
+        if (colour === null || HUE.test(pair[2]) || (pair[3] === "c" && HUE.test(pair[4]))) continue;
         const ground = `surface.${pair[2]}`;
         composed[ground] ??= {};
-        composed[ground][`tone.${pair[3]}`] = norm(colour[1]);
+        composed[ground][`${FAMILY[pair[3]]}.${pair[4]}`] = norm(colour[1]);
       }
+      continue;
+    }
+    // A curated theme's own syntax and categorical inks (C10 I62).
+    const palette = rule.selector.match(/^\[data-theme="([a-zA-Z]+)"\] \.(syn|cat)-([a-zA-Z0-9]+)$/);
+    if (palette !== null) {
+      if (palette[1] !== themeId) continue;
+      const colour = rule.declarations.match(/(?:^|;)color:(#[0-9a-fA-F]{3,8})/);
+      if (colour === null) throw new Error(`${rule.selector} declares no color`);
+      (palette[2] === "syn" ? syntax : categorical)[palette[3]] = norm(colour[1]);
       continue;
     }
     const match = rule.selector.match(/^\[data-theme="([a-zA-Z]+)"\] (\.[a-zA-Z-]+)$/);
@@ -236,7 +230,7 @@ function tokensFor(themeId) {
     delete surfaces["error"];
   }
 
-  return { tone, surfaces, composed, bandInk, hues };
+  return { tone, surfaces, composed, bandInk, hues, syntax, categorical };
 }
 
 /**
@@ -292,7 +286,7 @@ const lit = (v) => JSON.stringify(v);
  * under other names.
  */
 function withDerived(themeId, composed) {
-  if (MEASURED.has(themeId)) return composed;
+  if (curates(themeId)) return composed;
   const out = {};
   for (const [ground, inks] of Object.entries(composed)) {
     const merged = { ...inks };
@@ -313,7 +307,7 @@ function withDerived(themeId, composed) {
  * because prose does not land on a diff row.
  */
 function solveDiffGrounds(themeId, tone, surfaces, composed) {
-  if (MEASURED.has(themeId)) return composed;
+  if (curates(themeId)) return composed;
   const out = { ...composed };
   for (const name of ["diffAdd", "diffRemove"]) {
     const ground = surfaces[name];
@@ -348,15 +342,20 @@ function solveDiffGrounds(themeId, tone, surfaces, composed) {
  * construction rather than by having been listed.
  */
 /**
- * `bandFourBit`, lent from the curated table (C10 I61) — for a theme that
- * declares a band and only then. A banded theme the table does not name is a
+ * `bandFourBit`, from `terminalPalettes.bandFourBit` (C10 I61, I62) — for a theme
+ * that declares a band and only then. A banded theme the table does not name is a
  * generation error rather than a band with no 4-bit answer, which is the state
- * `validateBands` refuses at load; failing here says so a step earlier.
+ * `validateBands` refuses at load; failing here says so a step earlier. The
+ * converse throws too: a pair for a theme with no band is a record nothing reads.
  */
 function bandFourBitLine(id, bandInk) {
-  if (Object.keys(bandInk).length === 0) return "";
-  if (id !== "hcDark" && id !== "hcLight") {
-    throw new Error(`${id} declares a band and band-four-bit.ts curates no 4-bit pair for it (C10 I61)`);
+  const named = TP.bandFourBit[id] !== undefined;
+  if (Object.keys(bandInk).length === 0) {
+    if (named) throw new Error(`terminalPalettes.bandFourBit names ${id}, which declares no band`);
+    return "";
+  }
+  if (!named) {
+    throw new Error(`${id} declares a band and terminalPalettes.bandFourBit curates no 4-bit pair for it (C10 I61)`);
   }
   return `\n    bandFourBit: BAND_FOUR_BIT.${id},`;
 }
@@ -369,44 +368,36 @@ function bandInkBlock(bandInk) {
 }
 
 /**
- * `surface.<ground>` -> `tone.<slot>` -> hex, merged with the lender's own
- * compositions and omitted entirely when there are none of either.
+ * `surface.<ground>` -> `<family>.<slot>` -> hex, omitted entirely when there are
+ * none.
  *
- * **Two authors, and the merge is per ground rather than per theme.** The registry
- * carries ten meaning tones and six ink slots and no syntax palette at all, so a
- * theme's `syntax` and `categorical` values are lent from a token file here — and
- * a composition can only be authored where the value it replaces lives. The
- * registry composes what it holds; the lender composes what it lends.
- *
- * A shallow spread would be wrong and silently so: both authors compose on
- * `surface.focusGround`, so one ground's record would replace the other's whole
- * record and drop every entry in it. The spread is therefore repeated **inside**
- * each ground the registry touches, and the lender's remaining grounds come
- * through the outer one.
- *
- * The registry is applied last, because it is normative where the two overlap.
+ * **One author since C10 I62.** Before it a curated theme's syntax inks were lent
+ * from a token file and so were their compositions — a composition can only be
+ * authored where the value it replaces lives — and the two records were merged
+ * per ground, the registry last. With the syntax inks in the registry their
+ * compositions are too, and there is nothing left to merge.
  */
-function composedBlock(composed, lender) {
+function composedBlock(composed) {
   const grounds = Object.keys(composed).sort();
-  if (grounds.length === 0 && lender === undefined) return "";
-  const lent = lender === undefined ? "" : `      ...(${lender}.composed ?? {}),\n`;
+  if (grounds.length === 0) return "";
   const body = grounds.map((g) => {
-    const inherit = lender === undefined ? "" : `        ...(${lender}.composed?.[${JSON.stringify(g)}] ?? {}),\n`;
     const inks = Object.entries(composed[g]).sort(([a], [b]) => a.localeCompare(b))
       .map(([ref, hex]) => `        ${JSON.stringify(ref)}: ${lit(hex)},`).join("\n");
-    return `      ${JSON.stringify(g)}: Object.freeze({\n${inherit}${inks}\n      }),`;
+    return `      ${JSON.stringify(g)}: Object.freeze({\n${inks}\n      }),`;
   }).join("\n");
-  return `\n    composed: Object.freeze({\n${lent}${body}\n    }),`;
+  return `\n    composed: Object.freeze({\n${body}\n    }),`;
 }
 
 
 /**
- * **What a theme whose palettes the registry does not carry gets instead.**
+ * **What a theme with no `.syn-*` or `.cat-*` rules gets instead** — read from
+ * `terminalPalettes.paletteDerivation` (C10 I62), which is where this mapping
+ * moved when the generator stopped holding data the design does not.
  *
- * A theme this repository already ships keeps its own measured palette — those
- * values were authored against these floors and re-deriving them would discard
- * the measurement for nothing. Every other theme derives from ITS OWN registry
- * tones, which are floor-checked by construction.
+ * A theme that curates its palettes — `dark`, `light` and `hcDark`, whose values
+ * were measured against these floors before the registry existed — carries them
+ * as registry rules. Every other theme derives from ITS OWN registry tones, which
+ * are floor-checked by construction.
  *
  * **The correspondence is not invented; `four-bit.ts` already states it.** Its
  * curated 16-colour map assigns each syntax slot an ANSI colour — keyword magenta,
@@ -417,38 +408,49 @@ function composedBlock(composed, lender) {
  * `nord`'s `bgElev` is lighter than `dark`'s, so dark's syntax colours lose their
  * margin on it. 64 errors borrowed, 16 derived, eight of ten themes clean.
  */
-const SYNTAX_FROM_TONE = {
-  keyword: "meta", string: "ok", comment: "muted", number: "warn", key: "error",
-  type: "accent", function: "info", operator: "identifier", punctuation: "dim",
-};
+const SYNTAX_FROM_TONE = TP.paletteDerivation.syntax;
 /** Eight distinct tones, loudest first; `default` and `muted` are text, not data. */
-const CATEGORICAL_FROM_TONE = {
-  c1: "info", c2: "ok", c3: "warn", c4: "meta",
-  c5: "identifier", c6: "accent", c7: "error", c8: "dim",
-};
-/** The themes whose palettes this repository measured before the registry existed. */
-const MEASURED = new Map([["dark", "DARK"], ["light", "LIGHT"], ["hcDark", "HIGH_CONTRAST"]]);
+const CATEGORICAL_FROM_TONE = TP.paletteDerivation.categorical;
 
-function derived(themeId, tone, lender) {
-  const owner = MEASURED.get(themeId);
-  if (owner !== undefined) {
-    return `      // ${themeId} is a theme this repository already measured against these\n` +
-      `      // floors; the registry carries no syntax or categorical tokens to match.\n` +
-      `      categorical: lend(${owner}, "categorical"),\n` +
-      `      syntax: lend(${owner}, "syntax"),`;
+/**
+ * **A theme curates both palettes whole or neither.** A curated theme missing a
+ * slot would resolve it to nothing — C10 I30's refusal, a step later — and one
+ * carrying a slot the derivation does not name is a slot no block asks for. So
+ * the curated key sets are compared to the derivation's by equality, and a theme
+ * with one family curated and the other not is refused rather than half-derived.
+ */
+const curates = (themeId) => {
+  const { syntax, categorical } = collected.get(themeId);
+  const has = [Object.keys(syntax).length > 0, Object.keys(categorical).length > 0];
+  if (has[0] !== has[1]) throw new Error(`${themeId} curates one of syntax and categorical and not the other (C10 I62)`);
+  if (!has[0]) return false;
+  for (const [family, record, map] of [["syntax", syntax, SYNTAX_FROM_TONE], ["categorical", categorical, CATEGORICAL_FROM_TONE]]) {
+    const have = Object.keys(record).sort().join(" ");
+    const want = Object.keys(map).sort().join(" ");
+    if (have !== want) throw new Error(`${themeId}: curated ${family} slots ${have} are not the derivation's ${want} (C10 I62)`);
   }
-  const one = (name, map) => {
+  return true;
+};
+
+function derived(themeId, tone) {
+  const { syntax, categorical } = collected.get(themeId);
+  const curated = curates(themeId);
+  const one = (name, map, own) => {
     const body = Object.entries(map)
-      .map(([k, t]) => `          ${JSON.stringify(k)}: ${lit(tone[t])}, // ${t}`).join("\n");
+      .map(([k, t]) => curated
+        ? `          ${JSON.stringify(k)}: ${lit(own[k])},`
+        : `          ${JSON.stringify(k)}: ${lit(tone[t])}, // ${t}`).join("\n");
     return `      ${name}: Object.freeze({\n` +
       `        carries: ${name === "syntax" ? '"meaning"' : '"decoration"'},\n` +
       `        monochrome: ${name === "syntax" ? '"typographic"' : '"foreground"'},\n` +
       `        slots: Object.freeze({\n${body}\n        }),\n` +
-      (name === "syntax" ? `        classes: classesOf(${lender}, "syntax"),\n` : "") +
+      (name === "syntax" ? `        classes: SYNTAX_CLASSES,\n` : "") +
       `      }),`;
   };
-  return `      // Derived from this theme's own registry tones — see SYNTAX_FROM_TONE.\n` +
-    one("categorical", CATEGORICAL_FROM_TONE) + "\n" + one("syntax", SYNTAX_FROM_TONE);
+  return (curated
+    ? `      // Curated for this theme — the registry's \`.syn-*\` and \`.cat-*\` rules.\n`
+    : `      // Derived from this theme's own registry tones — see paletteDerivation.\n`) +
+    one("categorical", CATEGORICAL_FROM_TONE, categorical) + "\n" + one("syntax", SYNTAX_FROM_TONE, syntax);
 }
 
 /**
@@ -501,13 +503,52 @@ function huePalette(hues) {
     `      }),`;
 }
 
+/** A flat record as a frozen literal, at an indent of `depth` pairs of spaces. */
+const frozen = (record, depth) => {
+  const pad = "  ".repeat(depth + 1);
+  const body = Object.entries(record).map(([k, v]) => `${pad}${JSON.stringify(k)}: ${lit(v)},`).join("\n");
+  return `Object.freeze({\n${body}\n${"  ".repeat(depth)}})`;
+};
+
+/**
+ * **`four-bit.generated.ts`** — the three curated 4-bit maps and the band pairs,
+ * from `terminalPalettes` (C10 I62). A second file rather than a section of
+ * this one because `four-bit.ts` re-exports the maps under the names every test
+ * and mutation run already uses, and it cannot import them from a file that
+ * imports it back.
+ */
+const fourBitSource = `// Generated by \`tools/theme/from-registry.mjs\` — do not edit by hand.
+// Regenerate with \`make themes\` after the design registry changes.
+//
+// The curated sixteen-colour maps and band pairs, projected from
+// \`docs/design/language/calcium-registry.json\` \`terminalPalettes\` (C10 I62).
+// Why each index is what it is lives beside the names in \`four-bit.ts\`.
+
+import type { BandFourBit, FourBitMap } from "./types.js";
+
+export const FOUR_BIT: Readonly<Record<${Object.keys(TP.fourBit).map(lit).join(" | ")}, FourBitMap>> = Object.freeze({
+${Object.entries(TP.fourBit).map(([name, map]) => `  ${name}: ${frozen(map, 1)},`).join("\n")}
+});
+
+export const BAND_FOUR_BIT: Readonly<Record<${Object.keys(TP.bandFourBit).map(lit).join(" | ")}, BandFourBit>> = Object.freeze({
+${Object.entries(TP.bandFourBit).map(([id, bands]) => `  ${id}: Object.freeze({
+${Object.entries(bands).map(([band, pair]) => `    ${band}: Object.freeze({ ground: ${pair.ground}, ink: ${pair.ink} }),`).join("\n")}
+  }),`).join("\n")}
+});
+`;
+
 const slots = (record) => Object.entries(record)
   .map(([k, v]) => `      ${JSON.stringify(k)}: ${lit(v)},`).join("\n");
 
 const body = themes.map((theme) => {
   const { tone, surfaces } = collected.get(theme.id);
   const variant = LIGHT_THEMES.has(theme.id) ? "light" : "dark";
-  const lender = variant === "light" ? "LIGHT" : "DARK";
+  // **A theme names its 4-bit map and its spectrum, and a name that resolves to
+  // nothing is thrown on** (C10 I62). Before I62 these were a function of the id
+  // and the polarity, and a first draft of that function silently gave `hcDark`
+  // the dark map — the substitution T6.110 now makes in the registry.
+  if (TP.fourBit[theme.fourBit] === undefined) throw new Error(`${theme.id} names 4-bit map ${JSON.stringify(theme.fourBit)}, which terminalPalettes does not carry`);
+  if (TP.spectrum[theme.spectrum] === undefined) throw new Error(`${theme.id} names spectrum ${JSON.stringify(theme.spectrum)}, which terminalPalettes does not carry`);
   return `  ${JSON.stringify(theme.id)}: Object.freeze({
     name: ${lit(theme.label)},
     variant: ${lit(variant)},
@@ -522,15 +563,14 @@ ${slots(surfaces)}
         slots: Object.freeze({
 ${slots(tone).replace(/^ {6}/gm, "          ")}
         }),
-        // The 1-bit typographic fallback per slot (C10 I15). The registry carries
-        // no such record, and a tone that resolves to nothing at 1-bit carries
-        // nothing — so ${lender}'s classes stand, as with the palettes below.
-        classes: classesOf(${lender}, "tone"),
+        // The 1-bit typographic fallback per slot (C10 I15), one record for every
+        // theme — \`terminalPalettes.classes\`.
+        classes: TONE_CLASSES,
       }),
-${derived(theme.id, tone, lender)}
-      spectrum: lend(${lender}, "spectrum"),${huePalette(collected.get(theme.id).hues)}
+${derived(theme.id, tone)}
+      spectrum: SPECTRUM.${theme.spectrum},${huePalette(collected.get(theme.id).hues)}
     }),
-    fourBit: ${fourBitLender(theme.id, variant)}.fourBit,${bandInkBlock(collected.get(theme.id).bandInk)}${bandFourBitLine(theme.id, collected.get(theme.id).bandInk)}${composedBlock(solveDiffGrounds(theme.id, tone, surfaces, withDerived(theme.id, collected.get(theme.id).composed)), MEASURED.get(theme.id))}${huesBlock(theme.id, collected.get(theme.id).hues)}
+    fourBit: FOUR_BIT.${theme.fourBit},${bandInkBlock(collected.get(theme.id).bandInk)}${bandFourBitLine(theme.id, collected.get(theme.id).bandInk)}${composedBlock(solveDiffGrounds(theme.id, tone, surfaces, withDerived(theme.id, collected.get(theme.id).composed)))}${huesBlock(theme.id, collected.get(theme.id).hues)}
   }),`;
 }).join("\n");
 
@@ -541,40 +581,23 @@ const source = `// Generated by \`tools/theme/from-registry.mjs\` — do not edi
 // The registry is normative for these values (R-THM-001); this file is a projection
 // of it, and a hand edit here is a value the design does not hold.
 
-import { BAND_FOUR_BIT } from "./band-four-bit.js";
-import { DARK } from "./tokens-dark.js";
-import { HIGH_CONTRAST } from "./tokens-high-contrast.js";
-import { LIGHT } from "./tokens-light.js";
-import type { MonoClass, PaletteSpec, ThemeSet, ThemeTokens } from "./types.js";
+import { BAND_FOUR_BIT, FOUR_BIT } from "./four-bit.generated.js";
+import type { MonoClass, PaletteSpec, ThemeSet } from "./types.js";
 
-/**
- * A lender's palette, by name. \`palettes\` is an open record, so a bare lookup is
- * \`| undefined\` — and a missing palette here is a build-time fact worth throwing
- * on rather than a value worth defaulting, since the theme it would produce is the
- * one C10 I30 exists to refuse.
- */
-const lend = (tokens: ThemeTokens, family: string): PaletteSpec => {
-  const palette = tokens.palettes[family];
-  if (palette === undefined) {
-    throw new Error(\`\${tokens.name} declares no \${family} palette to lend\`);
-  }
-  return palette;
-};
+/** The 1-bit typographic fallback per tone (C10 I15) — \`terminalPalettes.classes.tone\`. */
+const TONE_CLASSES: Readonly<Record<string, MonoClass>> = ${frozen(TP.classes.tone, 0)};
 
-/**
- * A lender's per-slot typographic classes (C10 I15). Separate from \`lend\` because
- * \`classes\` is optional under \`exactOptionalPropertyTypes\`, so passing the lookup
- * through unchecked would offer \`undefined\` to a property that does not accept it —
- * and a "meaning" palette without classes carries nothing at 1-bit, which is a
- * theme worth refusing at build time rather than shipping.
- */
-const classesOf = (tokens: ThemeTokens, family: string): Readonly<Record<string, MonoClass>> => {
-  const classes = lend(tokens, family).classes;
-  if (classes === undefined) {
-    throw new Error(\`\${tokens.name}'s \${family} palette declares no classes to lend\`);
-  }
-  return classes;
-};
+/** The same, per syntax slot — \`terminalPalettes.classes.syntax\`. */
+const SYNTAX_CLASSES: Readonly<Record<string, MonoClass>> = ${frozen(TP.classes.syntax, 0)};
+
+/** The two spectra a theme names by polarity — \`terminalPalettes.spectrum\`. */
+const SPECTRUM: Readonly<Record<${Object.keys(TP.spectrum).map(lit).join(" | ")}, PaletteSpec>> = Object.freeze({
+${Object.entries(TP.spectrum).map(([name, slotsOf]) => `  ${name}: Object.freeze({
+    carries: "decoration",
+    monochrome: "foreground",
+    slots: ${frozen(slotsOf, 2)},
+  }),`).join("\n")}
+});
 
 export const REGISTRY_THEMES: ThemeSet = Object.freeze({
 ${body}
@@ -584,23 +607,30 @@ ${body}
 if (check) {
   // **Byte equality, and the first line that differs by number.** A hand edit is
   // a value the design does not hold; saying *stale* and nothing else would
-  // send the reader to diff two revisions to find one hex.
-  let have = "";
-  try { have = readFileSync(out, "utf8"); } catch { have = ""; }
-  if (have !== source) {
-    const a = have.split("\n"), b = source.split("\n");
+  // send the reader to diff two revisions to find one hex. Both projections are
+  // checked, and both are reported before the exit.
+  let stale = 0;
+  for (const [path, want] of [[out, source], [fourBitOut, fourBitSource]]) {
+    let have = "";
+    try { have = readFileSync(path, "utf8"); } catch { have = ""; }
+    if (have === want) continue;
+    const a = have.split("\n"), b = want.split("\n");
     let i = 0;
     while (i < Math.max(a.length, b.length) && a[i] === b[i]) i += 1;
-    console.error(`FAIL · ${out} differs from the registry's projection at line ${i + 1}`);
+    console.error(`FAIL · ${path} differs from the registry's projection at line ${i + 1}`);
     console.error(`  on disk:   ${a[i] ?? "(end of file)"}`);
     console.error(`  generated: ${b[i] ?? "(end of file)"}`);
+    stale += 1;
+  }
+  if (stale > 0) {
     console.error("  run `make themes`, or change the registry — a hand edit is a value the design does not hold");
     process.exit(1);
   }
-  console.log(`OK · tokens.generated.ts is the registry's projection · ${themes.length} themes · ${source.length} bytes`);
+  console.log(`OK · tokens.generated.ts and four-bit.generated.ts are the registry's projection · ${themes.length} themes · ${source.length + fourBitSource.length} bytes`);
   process.exit(0);
 }
 writeFileSync(out, source);
+writeFileSync(fourBitOut, fourBitSource);
 console.log(`wrote ${themes.length} themes · ${source.length} bytes`);
 for (const t of themes) {
   const { tone, surfaces } = collected.get(t.id);

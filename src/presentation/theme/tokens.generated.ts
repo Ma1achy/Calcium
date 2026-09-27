@@ -5,40 +5,69 @@
 // The registry is normative for these values (R-THM-001); this file is a projection
 // of it, and a hand edit here is a value the design does not hold.
 
-import { BAND_FOUR_BIT } from "./band-four-bit.js";
-import { DARK } from "./tokens-dark.js";
-import { HIGH_CONTRAST } from "./tokens-high-contrast.js";
-import { LIGHT } from "./tokens-light.js";
-import type { MonoClass, PaletteSpec, ThemeSet, ThemeTokens } from "./types.js";
+import { BAND_FOUR_BIT, FOUR_BIT } from "./four-bit.generated.js";
+import type { MonoClass, PaletteSpec, ThemeSet } from "./types.js";
 
-/**
- * A lender's palette, by name. `palettes` is an open record, so a bare lookup is
- * `| undefined` — and a missing palette here is a build-time fact worth throwing
- * on rather than a value worth defaulting, since the theme it would produce is the
- * one C10 I30 exists to refuse.
- */
-const lend = (tokens: ThemeTokens, family: string): PaletteSpec => {
-  const palette = tokens.palettes[family];
-  if (palette === undefined) {
-    throw new Error(`${tokens.name} declares no ${family} palette to lend`);
-  }
-  return palette;
-};
+/** The 1-bit typographic fallback per tone (C10 I15) — `terminalPalettes.classes.tone`. */
+const TONE_CLASSES: Readonly<Record<string, MonoClass>> = Object.freeze({
+  "default": "normal",
+  "dim": "deemphasised",
+  "muted": "deemphasised",
+  "ok": "emphasised",
+  "warn": "emphasised",
+  "error": "emphasised",
+  "info": "normal",
+  "accent": "emphasised",
+  "meta": "normal",
+  "identifier": "emphasised",
+});
 
-/**
- * A lender's per-slot typographic classes (C10 I15). Separate from `lend` because
- * `classes` is optional under `exactOptionalPropertyTypes`, so passing the lookup
- * through unchecked would offer `undefined` to a property that does not accept it —
- * and a "meaning" palette without classes carries nothing at 1-bit, which is a
- * theme worth refusing at build time rather than shipping.
- */
-const classesOf = (tokens: ThemeTokens, family: string): Readonly<Record<string, MonoClass>> => {
-  const classes = lend(tokens, family).classes;
-  if (classes === undefined) {
-    throw new Error(`${tokens.name}'s ${family} palette declares no classes to lend`);
-  }
-  return classes;
-};
+/** The same, per syntax slot — `terminalPalettes.classes.syntax`. */
+const SYNTAX_CLASSES: Readonly<Record<string, MonoClass>> = Object.freeze({
+  "keyword": "emphasised",
+  "string": "normal",
+  "comment": "deemphasised",
+  "number": "normal",
+  "key": "normal",
+  "type": "normal",
+  "function": "normal",
+  "operator": "normal",
+  "punctuation": "deemphasised",
+});
+
+/** The two spectra a theme names by polarity — `terminalPalettes.spectrum`. */
+const SPECTRUM: Readonly<Record<"dark" | "light", PaletteSpec>> = Object.freeze({
+  dark: Object.freeze({
+    carries: "decoration",
+    monochrome: "foreground",
+    slots: Object.freeze({
+      "0": "#e8736b",
+      "1": "#e89866",
+      "2": "#e8c95e",
+      "3": "#a3d066",
+      "4": "#66c890",
+      "5": "#5fb5d4",
+      "6": "#7a8fe0",
+      "7": "#c187d4",
+      "outline": "#e8e8e8",
+    }),
+  }),
+  light: Object.freeze({
+    carries: "decoration",
+    monochrome: "foreground",
+    slots: Object.freeze({
+      "0": "#e45649",
+      "1": "#d19a66",
+      "2": "#c18401",
+      "3": "#50a14f",
+      "4": "#0997b3",
+      "5": "#0184bc",
+      "6": "#4078f2",
+      "7": "#a626a4",
+      "outline": "#383a42",
+    }),
+  }),
+});
 
 export const REGISTRY_THEMES: ThemeSet = Object.freeze({
   "dark": Object.freeze({
@@ -88,16 +117,42 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
           "meta": "#b89cd2",
           "identifier": "#7fb8b8",
         }),
-        // The 1-bit typographic fallback per slot (C10 I15). The registry carries
-        // no such record, and a tone that resolves to nothing at 1-bit carries
-        // nothing — so DARK's classes stand, as with the palettes below.
-        classes: classesOf(DARK, "tone"),
+        // The 1-bit typographic fallback per slot (C10 I15), one record for every
+        // theme — `terminalPalettes.classes`.
+        classes: TONE_CLASSES,
       }),
-      // dark is a theme this repository already measured against these
-      // floors; the registry carries no syntax or categorical tokens to match.
-      categorical: lend(DARK, "categorical"),
-      syntax: lend(DARK, "syntax"),
-      spectrum: lend(DARK, "spectrum"),
+      // Curated for this theme — the registry's `.syn-*` and `.cat-*` rules.
+      categorical: Object.freeze({
+        carries: "decoration",
+        monochrome: "foreground",
+        slots: Object.freeze({
+          "c1": "#e69f00",
+          "c2": "#56b4e9",
+          "c3": "#3cbf9a",
+          "c4": "#f0e442",
+          "c5": "#8fa8ff",
+          "c6": "#f07a3c",
+          "c7": "#e4a3c4",
+          "c8": "#cfcfcf",
+        }),
+      }),
+      syntax: Object.freeze({
+        carries: "meaning",
+        monochrome: "typographic",
+        slots: Object.freeze({
+          "keyword": "#c678dd",
+          "string": "#98c379",
+          "comment": "#676e7d",
+          "number": "#d19a66",
+          "key": "#e06c75",
+          "type": "#e5c07b",
+          "function": "#61afef",
+          "operator": "#56b6c2",
+          "punctuation": "#abb2bf",
+        }),
+        classes: SYNTAX_CLASSES,
+      }),
+      spectrum: SPECTRUM.dark,
       hue: Object.freeze({
         carries: "decoration",
         monochrome: "foreground",
@@ -115,17 +170,16 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
         }),
       }),
     }),
-    fourBit: DARK.fourBit,
+    fourBit: FOUR_BIT.dark,
     composed: Object.freeze({
-      ...(DARK.composed ?? {}),
       "surface.focusGround": Object.freeze({
-        ...(DARK.composed?.["surface.focusGround"] ?? {}),
+        "syntax.comment": "#707785",
+        "syntax.key": "#e2737c",
         "tone.dim": "#9e9e9e",
         "tone.error": "#fa6464",
         "tone.muted": "#969696",
       }),
       "surface.selection": Object.freeze({
-        ...(DARK.composed?.["surface.selection"] ?? {}),
         "tone.dim": "#bdbdbd",
         "tone.error": "#ff9b91",
         "tone.meta": "#ddc1ee",
@@ -192,16 +246,42 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
           "meta": "#a626a4",
           "identifier": "#07768c",
         }),
-        // The 1-bit typographic fallback per slot (C10 I15). The registry carries
-        // no such record, and a tone that resolves to nothing at 1-bit carries
-        // nothing — so LIGHT's classes stand, as with the palettes below.
-        classes: classesOf(LIGHT, "tone"),
+        // The 1-bit typographic fallback per slot (C10 I15), one record for every
+        // theme — `terminalPalettes.classes`.
+        classes: TONE_CLASSES,
       }),
-      // light is a theme this repository already measured against these
-      // floors; the registry carries no syntax or categorical tokens to match.
-      categorical: lend(LIGHT, "categorical"),
-      syntax: lend(LIGHT, "syntax"),
-      spectrum: lend(LIGHT, "spectrum"),
+      // Curated for this theme — the registry's `.syn-*` and `.cat-*` rules.
+      categorical: Object.freeze({
+        carries: "decoration",
+        monochrome: "foreground",
+        slots: Object.freeze({
+          "c1": "#8a5f00",
+          "c2": "#00688f",
+          "c3": "#00674a",
+          "c4": "#7a6a00",
+          "c5": "#0043a8",
+          "c6": "#9c3b00",
+          "c7": "#8f3f6d",
+          "c8": "#4a4a4a",
+        }),
+      }),
+      syntax: Object.freeze({
+        carries: "meaning",
+        monochrome: "typographic",
+        slots: Object.freeze({
+          "keyword": "#a626a4",
+          "string": "#3c793c",
+          "comment": "#86888f",
+          "number": "#916301",
+          "key": "#a8432c",
+          "type": "#7a5401",
+          "function": "#1f60f0",
+          "operator": "#0173a5",
+          "punctuation": "#383a42",
+        }),
+        classes: SYNTAX_CLASSES,
+      }),
+      spectrum: SPECTRUM.light,
       hue: Object.freeze({
         carries: "decoration",
         monochrome: "foreground",
@@ -219,11 +299,9 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
         }),
       }),
     }),
-    fourBit: LIGHT.fourBit,
+    fourBit: FOUR_BIT.light,
     composed: Object.freeze({
-      ...(LIGHT.composed ?? {}),
       "surface.bgDeep": Object.freeze({
-        ...(LIGHT.composed?.["surface.bgDeep"] ?? {}),
         "tone.accent": "#1556e6",
         "tone.dim": "#5f626d",
         "tone.identifier": "#006c82",
@@ -233,11 +311,16 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
         "tone.warn": "#875900",
       }),
       "surface.bgElev": Object.freeze({
-        ...(LIGHT.composed?.["surface.bgElev"] ?? {}),
         "tone.muted": "#64656c",
       }),
       "surface.focusGround": Object.freeze({
-        ...(LIGHT.composed?.["surface.focusGround"] ?? {}),
+        "categorical.c1": "#875d00",
+        "categorical.c4": "#736400",
+        "syntax.comment": "#7f8188",
+        "syntax.function": "#1d5ae1",
+        "syntax.number": "#875c01",
+        "syntax.operator": "#016b9a",
+        "syntax.string": "#387138",
         "tone.accent": "#1556e6",
         "tone.dim": "#5f626d",
         "tone.identifier": "#006c82",
@@ -247,7 +330,6 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
         "tone.warn": "#875900",
       }),
       "surface.selection": Object.freeze({
-        ...(LIGHT.composed?.["surface.selection"] ?? {}),
         "tone.accent": "#1747b8",
         "tone.dim": "#4e515b",
         "tone.error": "#a1190d",
@@ -320,16 +402,42 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
           "meta": "#eb68f7",
           "identifier": "#0eb2a5",
         }),
-        // The 1-bit typographic fallback per slot (C10 I15). The registry carries
-        // no such record, and a tone that resolves to nothing at 1-bit carries
-        // nothing — so DARK's classes stand, as with the palettes below.
-        classes: classesOf(DARK, "tone"),
+        // The 1-bit typographic fallback per slot (C10 I15), one record for every
+        // theme — `terminalPalettes.classes`.
+        classes: TONE_CLASSES,
       }),
-      // hcDark is a theme this repository already measured against these
-      // floors; the registry carries no syntax or categorical tokens to match.
-      categorical: lend(HIGH_CONTRAST, "categorical"),
-      syntax: lend(HIGH_CONTRAST, "syntax"),
-      spectrum: lend(DARK, "spectrum"),
+      // Curated for this theme — the registry's `.syn-*` and `.cat-*` rules.
+      categorical: Object.freeze({
+        carries: "decoration",
+        monochrome: "foreground",
+        slots: Object.freeze({
+          "c1": "#e69f00",
+          "c2": "#56b4e9",
+          "c3": "#3cbf9a",
+          "c4": "#f0e442",
+          "c5": "#8fa8ff",
+          "c6": "#f07a3c",
+          "c7": "#e4a3c4",
+          "c8": "#cfcfcf",
+        }),
+      }),
+      syntax: Object.freeze({
+        carries: "meaning",
+        monochrome: "typographic",
+        slots: Object.freeze({
+          "keyword": "#e46dfb",
+          "string": "#0fb80f",
+          "comment": "#9f9f9f",
+          "number": "#f87c00",
+          "key": "#fb7289",
+          "type": "#bb9c00",
+          "function": "#5fa0fb",
+          "operator": "#0aafbe",
+          "punctuation": "#d7d7d7",
+        }),
+        classes: SYNTAX_CLASSES,
+      }),
+      spectrum: SPECTRUM.dark,
       hue: Object.freeze({
         carries: "decoration",
         monochrome: "foreground",
@@ -347,26 +455,38 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
         }),
       }),
     }),
-    fourBit: HIGH_CONTRAST.fourBit,
+    fourBit: FOUR_BIT.highContrast,
     bandInk: Object.freeze({
       "focusGround": "#ffffff",
       "selection": "#000000",
     }),
     bandFourBit: BAND_FOUR_BIT.hcDark,
     composed: Object.freeze({
-      ...(HIGH_CONTRAST.composed ?? {}),
       "surface.bgDeep": Object.freeze({
-        ...(HIGH_CONTRAST.composed?.["surface.bgDeep"] ?? {}),
         "tone.meta": "#f471ff",
       }),
       "surface.diffAdd": Object.freeze({
-        ...(HIGH_CONTRAST.composed?.["surface.diffAdd"] ?? {}),
+        "syntax.comment": "#c0c0c0",
+        "syntax.function": "#86c7ff",
+        "syntax.key": "#ffa8bf",
+        "syntax.keyword": "#ff9eff",
+        "syntax.number": "#ffb135",
+        "syntax.operator": "#2ed3e2",
+        "syntax.string": "#34dd34",
+        "syntax.type": "#debf23",
         "tone.error": "#ffaaaa",
         "tone.muted": "#c0c0c0",
         "tone.ok": "#2fdd4c",
       }),
       "surface.diffRemove": Object.freeze({
-        ...(HIGH_CONTRAST.composed?.["surface.diffRemove"] ?? {}),
+        "syntax.comment": "#aaaaaa",
+        "syntax.function": "#6cadff",
+        "syntax.key": "#ff859c",
+        "syntax.keyword": "#f27bff",
+        "syntax.number": "#ff8d11",
+        "syntax.operator": "#17bccb",
+        "syntax.string": "#1cc51c",
+        "syntax.type": "#c8a90d",
         "tone.error": "#ff8787",
         "tone.muted": "#aaaaaa",
         "tone.ok": "#17c534",
@@ -433,12 +553,11 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
           "meta": "#8a006e",
           "identifier": "#00595e",
         }),
-        // The 1-bit typographic fallback per slot (C10 I15). The registry carries
-        // no such record, and a tone that resolves to nothing at 1-bit carries
-        // nothing — so LIGHT's classes stand, as with the palettes below.
-        classes: classesOf(LIGHT, "tone"),
+        // The 1-bit typographic fallback per slot (C10 I15), one record for every
+        // theme — `terminalPalettes.classes`.
+        classes: TONE_CLASSES,
       }),
-      // Derived from this theme's own registry tones — see SYNTAX_FROM_TONE.
+      // Derived from this theme's own registry tones — see paletteDerivation.
       categorical: Object.freeze({
         carries: "decoration",
         monochrome: "foreground",
@@ -467,9 +586,9 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
           "operator": "#00595e", // identifier
           "punctuation": "#2b2b2b", // dim
         }),
-        classes: classesOf(LIGHT, "syntax"),
+        classes: SYNTAX_CLASSES,
       }),
-      spectrum: lend(LIGHT, "spectrum"),
+      spectrum: SPECTRUM.light,
       hue: Object.freeze({
         carries: "decoration",
         monochrome: "foreground",
@@ -487,7 +606,7 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
         }),
       }),
     }),
-    fourBit: LIGHT.fourBit,
+    fourBit: FOUR_BIT.light,
     bandInk: Object.freeze({
       "focusGround": "#000000",
       "selection": "#ffffff",
@@ -597,12 +716,11 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
           "meta": "#b083f0",
           "identifier": "#56cfcf",
         }),
-        // The 1-bit typographic fallback per slot (C10 I15). The registry carries
-        // no such record, and a tone that resolves to nothing at 1-bit carries
-        // nothing — so DARK's classes stand, as with the palettes below.
-        classes: classesOf(DARK, "tone"),
+        // The 1-bit typographic fallback per slot (C10 I15), one record for every
+        // theme — `terminalPalettes.classes`.
+        classes: TONE_CLASSES,
       }),
-      // Derived from this theme's own registry tones — see SYNTAX_FROM_TONE.
+      // Derived from this theme's own registry tones — see paletteDerivation.
       categorical: Object.freeze({
         carries: "decoration",
         monochrome: "foreground",
@@ -631,9 +749,9 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
           "operator": "#56cfcf", // identifier
           "punctuation": "#8b949e", // dim
         }),
-        classes: classesOf(DARK, "syntax"),
+        classes: SYNTAX_CLASSES,
       }),
-      spectrum: lend(DARK, "spectrum"),
+      spectrum: SPECTRUM.dark,
       hue: Object.freeze({
         carries: "decoration",
         monochrome: "foreground",
@@ -651,7 +769,7 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
         }),
       }),
     }),
-    fourBit: DARK.fourBit,
+    fourBit: FOUR_BIT.dark,
     composed: Object.freeze({
       "surface.bgElev": Object.freeze({
         "syntax.comment": "#87919e",
@@ -732,12 +850,11 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
           "meta": "#c194c9",
           "identifier": "#77bdb0",
         }),
-        // The 1-bit typographic fallback per slot (C10 I15). The registry carries
-        // no such record, and a tone that resolves to nothing at 1-bit carries
-        // nothing — so DARK's classes stand, as with the palettes below.
-        classes: classesOf(DARK, "tone"),
+        // The 1-bit typographic fallback per slot (C10 I15), one record for every
+        // theme — `terminalPalettes.classes`.
+        classes: TONE_CLASSES,
       }),
-      // Derived from this theme's own registry tones — see SYNTAX_FROM_TONE.
+      // Derived from this theme's own registry tones — see paletteDerivation.
       categorical: Object.freeze({
         carries: "decoration",
         monochrome: "foreground",
@@ -766,9 +883,9 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
           "operator": "#77bdb0", // identifier
           "punctuation": "#a09488", // dim
         }),
-        classes: classesOf(DARK, "syntax"),
+        classes: SYNTAX_CLASSES,
       }),
-      spectrum: lend(DARK, "spectrum"),
+      spectrum: SPECTRUM.dark,
       hue: Object.freeze({
         carries: "decoration",
         monochrome: "foreground",
@@ -786,7 +903,7 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
         }),
       }),
     }),
-    fourBit: DARK.fourBit,
+    fourBit: FOUR_BIT.dark,
     composed: Object.freeze({
       "surface.focusGround": Object.freeze({
         "syntax.comment": "#9e948a",
@@ -860,12 +977,11 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
           "meta": "#ba96b3",
           "identifier": "#88c0d0",
         }),
-        // The 1-bit typographic fallback per slot (C10 I15). The registry carries
-        // no such record, and a tone that resolves to nothing at 1-bit carries
-        // nothing — so DARK's classes stand, as with the palettes below.
-        classes: classesOf(DARK, "tone"),
+        // The 1-bit typographic fallback per slot (C10 I15), one record for every
+        // theme — `terminalPalettes.classes`.
+        classes: TONE_CLASSES,
       }),
-      // Derived from this theme's own registry tones — see SYNTAX_FROM_TONE.
+      // Derived from this theme's own registry tones — see paletteDerivation.
       categorical: Object.freeze({
         carries: "decoration",
         monochrome: "foreground",
@@ -894,9 +1010,9 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
           "operator": "#88c0d0", // identifier
           "punctuation": "#a6aec0", // dim
         }),
-        classes: classesOf(DARK, "syntax"),
+        classes: SYNTAX_CLASSES,
       }),
-      spectrum: lend(DARK, "spectrum"),
+      spectrum: SPECTRUM.dark,
       hue: Object.freeze({
         carries: "decoration",
         monochrome: "foreground",
@@ -914,7 +1030,7 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
         }),
       }),
     }),
-    fourBit: DARK.fourBit,
+    fourBit: FOUR_BIT.dark,
     composed: Object.freeze({
       "surface.bgElev": Object.freeze({
         "categorical.c1": "#95b5d5",
@@ -1044,12 +1160,11 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
           "meta": "#e89bd0",
           "identifier": "#7fd4d4",
         }),
-        // The 1-bit typographic fallback per slot (C10 I15). The registry carries
-        // no such record, and a tone that resolves to nothing at 1-bit carries
-        // nothing — so DARK's classes stand, as with the palettes below.
-        classes: classesOf(DARK, "tone"),
+        // The 1-bit typographic fallback per slot (C10 I15), one record for every
+        // theme — `terminalPalettes.classes`.
+        classes: TONE_CLASSES,
       }),
-      // Derived from this theme's own registry tones — see SYNTAX_FROM_TONE.
+      // Derived from this theme's own registry tones — see paletteDerivation.
       categorical: Object.freeze({
         carries: "decoration",
         monochrome: "foreground",
@@ -1078,9 +1193,9 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
           "operator": "#7fd4d4", // identifier
           "punctuation": "#9d95b8", // dim
         }),
-        classes: classesOf(DARK, "syntax"),
+        classes: SYNTAX_CLASSES,
       }),
-      spectrum: lend(DARK, "spectrum"),
+      spectrum: SPECTRUM.dark,
       hue: Object.freeze({
         carries: "decoration",
         monochrome: "foreground",
@@ -1098,7 +1213,7 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
         }),
       }),
     }),
-    fourBit: DARK.fourBit,
+    fourBit: FOUR_BIT.dark,
     composed: Object.freeze({
       "surface.focusGround": Object.freeze({
         "syntax.comment": "#9992b2",
@@ -1169,12 +1284,11 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
           "meta": "#8e8e8e",
           "identifier": "#c4c4c4",
         }),
-        // The 1-bit typographic fallback per slot (C10 I15). The registry carries
-        // no such record, and a tone that resolves to nothing at 1-bit carries
-        // nothing — so DARK's classes stand, as with the palettes below.
-        classes: classesOf(DARK, "tone"),
+        // The 1-bit typographic fallback per slot (C10 I15), one record for every
+        // theme — `terminalPalettes.classes`.
+        classes: TONE_CLASSES,
       }),
-      // Derived from this theme's own registry tones — see SYNTAX_FROM_TONE.
+      // Derived from this theme's own registry tones — see paletteDerivation.
       categorical: Object.freeze({
         carries: "decoration",
         monochrome: "foreground",
@@ -1203,9 +1317,9 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
           "operator": "#c4c4c4", // identifier
           "punctuation": "#9a9a9a", // dim
         }),
-        classes: classesOf(DARK, "syntax"),
+        classes: SYNTAX_CLASSES,
       }),
-      spectrum: lend(DARK, "spectrum"),
+      spectrum: SPECTRUM.dark,
       hue: Object.freeze({
         carries: "decoration",
         monochrome: "foreground",
@@ -1223,7 +1337,7 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
         }),
       }),
     }),
-    fourBit: DARK.fourBit,
+    fourBit: FOUR_BIT.dark,
     composed: Object.freeze({
       "surface.diffRemove": Object.freeze({
         "syntax.keyword": "#929292",
@@ -1306,12 +1420,11 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
           "meta": "#8d3f8f",
           "identifier": "#0a6b7a",
         }),
-        // The 1-bit typographic fallback per slot (C10 I15). The registry carries
-        // no such record, and a tone that resolves to nothing at 1-bit carries
-        // nothing — so LIGHT's classes stand, as with the palettes below.
-        classes: classesOf(LIGHT, "tone"),
+        // The 1-bit typographic fallback per slot (C10 I15), one record for every
+        // theme — `terminalPalettes.classes`.
+        classes: TONE_CLASSES,
       }),
-      // Derived from this theme's own registry tones — see SYNTAX_FROM_TONE.
+      // Derived from this theme's own registry tones — see paletteDerivation.
       categorical: Object.freeze({
         carries: "decoration",
         monochrome: "foreground",
@@ -1340,9 +1453,9 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
           "operator": "#0a6b7a", // identifier
           "punctuation": "#6b625a", // dim
         }),
-        classes: classesOf(LIGHT, "syntax"),
+        classes: SYNTAX_CLASSES,
       }),
-      spectrum: lend(LIGHT, "spectrum"),
+      spectrum: SPECTRUM.light,
       hue: Object.freeze({
         carries: "decoration",
         monochrome: "foreground",
@@ -1360,7 +1473,7 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
         }),
       }),
     }),
-    fourBit: LIGHT.fourBit,
+    fourBit: FOUR_BIT.light,
     composed: Object.freeze({
       "surface.bgDeep": Object.freeze({
         "categorical.c1": "#15618a",

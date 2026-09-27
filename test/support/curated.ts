@@ -28,7 +28,7 @@ import {
 } from "../../src/presentation/theme/four-bit.js";
 import { OKABE_ITO_CANONICAL, VISIONS } from "../../src/presentation/theme/cvd.js";
 import { ANSI16_HEX, COLORMAPS } from "../../src/presentation/theme/colormap.js";
-import { BAND_FOUR_BIT } from "../../src/presentation/theme/band-four-bit.js";
+import { BAND_FOUR_BIT } from "../../src/presentation/theme/four-bit.generated.js";
 import { CATEGORY_REFS } from "../../src/presentation/theme/categorical.js";
 import { REQUIRED_SLOTS } from "../../src/presentation/theme/contrast.js";
 import {
@@ -151,8 +151,10 @@ export const DERIVED: Readonly<Record<string, string>> = {
   NO_STYLE: "the empty Style; its emptiness is the claim and C09 T1.2 asserts it",
   MARKER3_COLUMN: "C12's 3-D marker column, derived from the braille block's own encoding",
   DARK: "the ink oracle's frozen palette — `test/support/ink-oracle.ts` pins it at 1 913 captures",
-  LIGHT: "a lender for the 4-bit rung; the shipped light theme is the registry's",
-  HIGH_CONTRAST: "the same, and T2.39a pins its 4-bit map by reference",
+  FOUR_BIT:
+    "the generated container of the three 4-bit maps (C10 I62), which CURATED pins by value as "
+    + "`DARK_FOUR_BIT`, `LIGHT_FOUR_BIT` and `HIGH_CONTRAST_FOUR_BIT` — the names are the "
+    + "generated objects, and T2.66 asserts it by identity",
   SCROLLBAR_UNICODE:
     "the scrollbar set's own four members, listed for the width check that runs on the set "
     + "(C09 I93) — a pin would be a second record of `SCROLLBAR_UNICODE_SET`, and the check is what "
@@ -162,7 +164,7 @@ export const DERIVED: Readonly<Record<string, string>> = {
 /** The modules the driver scans, so a table added to one of them cannot go unpinned. */
 export const MODULES: readonly string[] = [
   "src/presentation/theme/four-bit.ts",
-  "src/presentation/theme/band-four-bit.ts",
+  "src/presentation/theme/four-bit.generated.ts",
   "src/presentation/theme/cvd.ts",
   "src/presentation/theme/colormap.ts",
   "src/presentation/theme/categorical.ts",
@@ -170,8 +172,6 @@ export const MODULES: readonly string[] = [
   "src/presentation/theme/types.ts",
   "src/presentation/theme/index.ts",
   "src/presentation/theme/tokens-dark.ts",
-  "src/presentation/theme/tokens-light.ts",
-  "src/presentation/theme/tokens-high-contrast.ts",
   "src/presentation/blocks/glyphs.ts",
 ];
 
