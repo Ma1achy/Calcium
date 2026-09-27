@@ -113,9 +113,28 @@ describe("C27 terminal emulator — tier 2", () => {
     term.dispose();
   });
 
-  it.todo(
-    "T2.7 (C27 I8, C04 I110): OSC 52, OSC 8 and OSC 2 have no effect on the snapshot, and it validates — not deferred on a component: the code lands in the next commit of this round",
-  );
+  it("T2.7 (C27 I8, C04 I110): OSC 52, OSC 8 and OSC 2 have no effect on the snapshot, and it validates", async () => {
+    // **The three OSCs a child can reach the reader through**, beside T2.3's
+    // bell and OSC 0. OSC 52 writes the clipboard — the reader's, if anything
+    // forwarded it; OSC 8 wraps text in a link the reader did not choose; OSC 2
+    // is the title by the other door. The snapshot keeps the text between an
+    // OSC 8 pair and nothing of the link.
+    const plain = createEmulator({ cols: 40, rows: 4 });
+    const noisy = createEmulator({ cols: 40, rows: 4 });
+    await feed(plain, "text link\r\n");
+    await feed(
+      noisy,
+      "\u001b]52;c;cHduZWQ=\u0007text \u001b]8;;https://example.org\u0007link\u001b]8;;\u0007\u001b]2;renamed\u0007\r\n",
+    );
+    const snapshot = noisy.snapshot("t");
+    expect(snapshot).toEqual(plain.snapshot("t"));
+    // **The control**: the text arrived. Two empty snapshots are deep-equal too.
+    expect(snapshot.lines[0]?.text).toBe("text link");
+    expect(errs(snapshot), "the snapshot validates (C04 I110)").toEqual([]);
+    plain.dispose();
+    noisy.dispose();
+  });
+
   it("T2.6 (C27 I7): a snapshot never carries dropped: 0", async () => {
     const term = createEmulator({ cols: 20, rows: 4, scrollback: 50 });
     await feed(term, "one\r\ntwo\r\n");

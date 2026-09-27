@@ -84,6 +84,15 @@ export function createEmulator(opts: EmulatorOptions): Emulator {
     if (!alternate) feeds += 1;
   });
 
+  // **A hyperlink's text is kept and its link is not** (C27 I8). The one OSC the
+  // dependency acts on by itself: measured, an OSC 8 pair left the linked cells
+  // `underline: true`, so a child's link reached the snapshot as an underline run
+  // — a claim that the text is a link, with the link gone. A handler answering
+  // `true` consumes the sequence before the built-in one sees it, which is the
+  // parser's documented order. OSC 52 needs nothing: no clipboard handler exists
+  // in the headless build, and nothing here registers one.
+  term.parser.registerOscHandler(8, () => true);
+
   const refuseDisposed = (member: string): void => {
     if (disposed) {
       throw new Error(
