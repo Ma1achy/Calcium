@@ -25,6 +25,7 @@ export type Registry = Record<string, unknown> & { rules: RuleRecord[] };
 
 export const registryPath: string;
 export const outputPath: string;
+export const repoRoot: string;
 export const keysOutputPath: string;
 
 export const isBlockRuleId: (id: string) => boolean;

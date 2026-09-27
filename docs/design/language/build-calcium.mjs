@@ -1,12 +1,18 @@
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const registryPath = resolve(here, 'calcium-registry.json');
 export const outputPath = resolve(here, 'calcium-design-language-revised.html');
-export const keysOutputPath = resolve(here, 'docs/KEYS.md');
+export const repoRoot = resolve(here, '../../..');
+// **The registry names the keymap file, and it is named from the repository root**
+// (C16 §6a clause 5). Resolved against this directory it was a second generated
+// keymap at `docs/design/language/docs/KEYS.md`. The builder writes nothing here:
+// `tools/keymap-table.mjs` is the file's one writer, and it takes this path and
+// `renderKeysMarkdown` from this module.
+export const keysOutputPath = resolve(repoRoot, JSON.parse(readFileSync(registryPath, 'utf8')).keymapPolicy.help.docsTarget);
 
 const RULE_ID = /^R-[A-Z]{3}-[0-9]{3}$/;
 const BLOCK_RULE_ID = /^R-(?:BLK|BK[A-Z])-[0-9]{3}$/;
@@ -898,7 +904,7 @@ export function renderKeysMarkdown(registry) {
   // Route and Condition are columns, not omissions. `/help` under a "Key" column
   // with no condition read as an unconditional global keystroke.
   const sections = [...groups.entries()].map(([scope, entries]) => `## ${scope}\n\n| Route | Binding | Condition | Action | Meaning |\n| --- | --- | --- | --- | --- |\n${entries.map(binding => `| ${markdownCell(binding.kind ?? 'key')} | ${markdownCell(binding.chord)} | ${markdownCell(binding.when ?? 'always')} | ${markdownCell(binding.actionId)} | ${markdownCell(binding.label)} |`).join('\n')}`).join('\n\n');
-  return `<!-- GENERATED FILE — DO NOT EDIT. Source: ../calcium-registry.json; builder: ../build-calcium.mjs -->\n# Calcium keys\n\nRevision ${registry.meta.revision} · ${bindings.length} current bindings · profile: default-terminal\n\n${registry.keymapPolicy.universal}\n\n${registry.keymapPolicy.help.docsContract}\n\n${sections}\n`;
+  return `<!-- GENERATED FILE — DO NOT EDIT. Source: docs/design/language/calcium-registry.json, rendered by build-calcium.mjs's renderKeysMarkdown; written with the key ladder below by tools/keymap-table.mjs -->\n# Calcium keys\n\nRevision ${registry.meta.revision} · ${bindings.length} current bindings · profile: default-terminal\n\n${registry.keymapPolicy.universal}\n\n${registry.keymapPolicy.help.docsContract}\n\n${sections}\n`;
 }
 
 function renderSpinners(registry) {
@@ -1273,11 +1279,8 @@ export function build() {
   const raw = readFileSync(registryPath, 'utf8');
   const registry = JSON.parse(raw);
   const output = buildHtml(registry, raw);
-  const keys = renderKeysMarkdown(registry);
   writeFileSync(outputPath, output);
-  mkdirSync(dirname(keysOutputPath), { recursive: true });
-  writeFileSync(keysOutputPath, keys);
-  return { outputPath, keysOutputPath, bytes: Buffer.byteLength(output), rules: registry.rules.length, sections: registry.sections.length };
+  return { outputPath, bytes: Buffer.byteLength(output), rules: registry.rules.length, sections: registry.sections.length };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

@@ -738,7 +738,8 @@ const registry = validateRegistry(JSON.parse(rawRegistry));
 const html = readFileSync(outputPath, 'utf8');
 const keysMarkdown = readFileSync(keysOutputPath, 'utf8');
 if (registry.keymapPolicy.help.docsTarget !== 'docs/KEYS.md') fail('generated keymap target changed without moving its artifact');
-if (keysMarkdown !== renderKeysMarkdown(registry)) fail('docs/KEYS.md differs from the binding registry projection');
+// The file's first half is the registry's table; the key ladder follows it (C16 §6a clause 5).
+if (!keysMarkdown.startsWith(renderKeysMarkdown(registry))) fail('docs/KEYS.md does not begin with the binding registry projection');
 checkImmutableBlockReconciliation();
 checkImmutableRuleRecords();
 checkProseCountGuard(registry, html);
