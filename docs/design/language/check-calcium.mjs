@@ -110,13 +110,11 @@ function checkSpinnerFallbacks(registry, html) {
   const reusable = current.filter(item => item.reusable);
   if (inventoryRows !== reusable.length) fail(`spinner inventory has ${inventoryRows} rows; registry has ${reusable.length} reusable sets`);
   requireText(html, '<body data-theme="dark" data-glyph-capability="unicode-narrow" data-spinner-capability-source="rich-preview-default">', 'rich Unicode spinner preview default');
-  requireText(html, 'id="generated-spinner-capability"', 'generated spinner capability resolver');
-  requireText(html, "requested==='ascii'", 'forced ASCII capability route');
-  requireText(html, "requested==='unicode'||requested==='unicode-narrow'", 'forced Unicode capability route');
-  requireText(html, "requested==='auto'", 'opt-in measured capability route');
-  requireText(html, "for(const [id,glyphs] of Object.entries(sets))", 'per-set measured capability resolution');
-  requireText(html, "node.dataset.spinnerCapability=result[id]", 'per-set capability application');
-  requireText(html, "animationName.split(',')[0].trim()!=='k-arrow-ascii'", 'computed ASCII spinner selection check');
+  // **The resolver's routes and the computed ASCII selection are executed, not
+  // searched** (AUTHORITY.md §Browser conformance). Seven searches over the
+  // scripts' source stood here — `requested==='ascii'` and six more — and said a
+  // branch was written, not what it did. `make design-browser` loads the page on
+  // each route and reads what the resolver set.
 
   for (const spinner of current) {
     const expected = independentlyResolveSpinner(registry, spinner);
@@ -343,9 +341,9 @@ function checkStructuredCoverageAndRetention(registry, html) {
   if (probeRows !== measuredItems * 2 - stateResolved) fail(`glyph grid has ${probeRows} rows; expected Unicode and ASCII rows for ${measuredItems} records, less ${stateResolved} state-resolved ASCII halves`);
   const declared = (html.match(/data-ascii-resolution="state"/g) ?? []).length;
   if (declared !== stateResolved) fail(`glyph grid declares ${declared} state-resolved rows; the registry has ${stateResolved}`);
-  requireText(html, 'id="generated-glyph-grid-check"', 'browser-measured glyph reservation check');
-  requireText(html, "range.selectNodeContents(value)", 'actual glyph ink measurement');
-  requireText(html, "forms.get('unicode')-forms.get('ascii')", 'following-column composed-grid comparison');
+  // The glyph-grid check's source was searched here, three ways; it now runs, and
+  // its flag is one of the five `make design-browser` compares by equality. The
+  // searches passed on the page whose check failed (dded6ee0).
 }
 
 function checkImmutableBlockReconciliation() {
@@ -726,7 +724,7 @@ function checkGeneration(registry, html, rawRegistry) {
     }
   }
   if (emittedByKey.size !== Object.keys(registry.countSources).length) fail('count manifest contains an unknown count source');
-  requireText(html, 'id="generated-runtime-check"', 'computed-style browser checks');
+  // `generated-runtime-check` is executed by `make design-browser`, not searched for.
   requireText(html, 'the third choice is an INSPECTION, not an answer; there is no second key-only path', 'single inspection path in ownership specimen');
   rejectText(html, '<span class="c-muted">  ○ </span><span class="c-muted">show the whole file</span>', 'detached approval inspection path');
   for (const spinner of registry.spinners.filter(item => item.status === 'current')) {

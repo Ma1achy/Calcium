@@ -646,7 +646,11 @@ function testCorpusOf(src, _run) {
       (e.isDirectory() ? walk(`${d}/${e.name}`) : /\.test\.[cm]?tsx?$/u.test(e.name) ? [`${d}/${e.name}`] : []));
   };
   const parts = testPathsOf(src).map((p) => rootsFor(p).map(read).join(""));
-  for (const m of src.matchAll(/vitest run --dir (\S+)/gu)) {
+  // **Up to a quote, not up to whitespace** — a command string that *ends* in
+  // `--dir test/browser` is followed by its own closing quote, and `\S+` took
+  // `test/browser";` whole, resolved nothing, and reported every row the run
+  // names as unreachable. Found by `design-chromium`, the first run to end so.
+  for (const m of src.matchAll(/vitest run --dir ([^\s"'`;]+)/gu)) {
     const dir = [`${ROOT}/${pkg}${m[1]}`, `${ROOT}/${m[1]}`].find((d) => existsSync(d));
     if (dir !== undefined) parts.push(...walk(dir).map(read));
   }

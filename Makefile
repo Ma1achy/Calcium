@@ -9,7 +9,7 @@
 SHELL := /usr/bin/env bash
 .SHELLFLAGS := -o pipefail -c
 
-.PHONY: install hooks quantised check design design-check released enforce catalogue instruments roadmap regime test golden e2e audit proof all clean
+.PHONY: install hooks quantised check design design-check released chromium design-browser enforce catalogue instruments roadmap regime test golden e2e audit proof all clean
 
 install:            ## npm ci, no install scripts, then the one named build (A04 §3)
 	git config core.hooksPath .githooks
@@ -105,6 +105,17 @@ design-check:       ## the registry ↔ HTML projection, released-rule immutabil
 	node tools/rule-status.mjs
 	@# The fixtures are the page's projection (AUTHORITY.md §Fixtures); --check writes nothing.
 	npx tsx tools/design/fixtures.ts --check
+
+# **The page's own conformance checks, executed** (AUTHORITY.md §Browser conformance).
+# `chromium` is the explicit install step — pinned by version and digest, into `.cache/`
+# (A04 §3) — and `design-browser` proves the runner can see a failure before it
+# loads the page. Not inside `design-check`: the pre-commit hook must not need a
+# 120 MB download.
+chromium:           ## fetch the pinned headless Chromium, verify its digest, unpack it
+	node tools/design/chromium.mjs install
+
+design-browser: chromium  ## the generated page in the pinned browser: every flag pass, no console error
+	npx vitest run --dir test/browser
 
 # **Not inside `design-check`**, because its subject is a ref the working tree cannot
 # supply: a clone with no `origin/main` fails it by design (AUTHORITY.md §Release 4),
