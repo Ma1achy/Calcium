@@ -1877,7 +1877,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.115** (I64): `validateTokens` dropping the floor check → **T1.54** fails on every refused value and **T2.69** fails — the `NaN` theme loads with an accent at 5.79 : 1.
 - **T6.116** (I64): the lower bound written as `0` rather than `DEFAULT_FLOOR` → **T1.54** fails on `3` and on `0`.
 - **T6.117** (I44): an exported table initialised from an identifier added to a theme module — `export const EXTRA_TABLE: Readonly<Record<string, Colormap>> = COLORMAPS;` in `colormap.ts` — → **T2.40** fails naming it. The regex this replaced passes it, which is the finding.
-- **T6.118** (I44): the same table added to a theme module the old list did not name (`budget.ts`) → **T2.40** fails naming it — the scope is the directory.
+- **T6.118** (I44): a table initialised by a helper's return — `export const EXTRA_TABLE = entryTones([]);`, a `ReadonlySet<Tone>` — added to a theme module the old list did not name (`budget.ts`) → **T2.40** fails naming it: the scope is the directory, and the initialiser is a call. *This read "the same table", which `budget.ts` cannot hold: it imports nothing object-typed to alias.*
 - **T6.119** (I44): the classifier dropping the call-signature test, so every exported function reads as a table → **T2.40** fails naming `glyphs`, `barStyle` and the rest.
 - **T6.120** (I44): `canon` losing its `Set` arm → **T2.40a** fails, and **T2.39** fails on `FREE_WIDTH_SLOTS`.
 - **T6.112** (I63): the alias consulted before the set's own keys → **T2.68** fails on the set that declares `high-contrast` itself.
