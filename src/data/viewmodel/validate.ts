@@ -2030,6 +2030,13 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
     } else if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
       e.push(`${at}: "height" must be a positive integer (C04 I73) — got ${JSON.stringify(height)}`);
     }
+    // **A record of where the bytes came from, never instead of them** (C04
+    // I142, I143): `data` is required above whether or not a path is present,
+    // and a path that is present says something.
+    const path = b["path"];
+    if (path !== undefined && (typeof path !== "string" || path === "")) {
+      e.push(`${wrongTypeMessage(`${at}: "path"`, "a non-empty string", path)} (C04 I143)`);
+    }
     const data = b["data"];
     if (typeof data === "string") {
       // The base64 of the eight-byte PNG signature. Checked as a prefix so a

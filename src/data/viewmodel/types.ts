@@ -3841,6 +3841,14 @@ export type Image = Readonly<{
    * `measure` and `render` disagree the moment it changed between them.
    */
   data: string;
+  /**
+   * The file `b.image({ path })` read the bytes from — **a record, never a
+   * source** (I142). Nothing below the builder opens it: `data` is what is
+   * drawn and the digest is the data's, so a path gone stale changes nothing on
+   * screen. Its reader is the copy (C09 I86), and a block built from bytes has
+   * none. A non-empty string when present (I143).
+   */
+  path?: string;
   /** Rows, declared. A positive integer — `Scroll.height`'s precedent (I47). */
   height: number;
   /**
