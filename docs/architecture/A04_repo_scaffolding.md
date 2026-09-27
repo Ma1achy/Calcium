@@ -238,7 +238,7 @@ install → check → enforce → audit → test → golden → e2e → [repo-sp
 
 | Trigger | Stages |
 |---|---|
-| Every push to a branch | `install → check → enforce → audit → test` — **nine minutes on the runner, measured**, and Calcium's job adds `instruments` and `regime` to that list (F1090) |
+| Every push to a branch | `install → check → enforce → audit → test` — **nine minutes on the runner, measured**, and Calcium's job adds `instruments`, `regime` and `released` to that list (F1090). `released` compares the design baseline with `origin/main`'s copy (AUTHORITY.md §Release 4) after a step fetching `main` by its full refspec — the checkout is one commit deep and holds no `origin/main`, and the check fails on a ref it cannot resolve rather than passing on nothing |
 | **Pull request**, push to `main`, and tags | The above plus `golden → e2e → [repo-specific]`, and **`proof` in a job of its own** — the reuse claim, which is not a stage in the chain (F807, F1095) |
 | **Weekly** (Sunday 03:00 UTC), and on dispatch | `mutation-sweep` — every run under `tools/mutate/runs/` through `tools/mutate/sweep.mjs`, six shards, the anchors sweep first. A survivor, a stale exemption, an anchor miss off the debt list or a run that leaves the tree mutated is red where nobody was running the pass by hand (F952, F990) |
 
