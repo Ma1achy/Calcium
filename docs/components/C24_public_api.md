@@ -89,6 +89,7 @@ export type { ThemeTokens, ThemeSet, PaletteSpec, ColourRef, Style };
 export { defaultTheme };
 
 // hooks
+export type { ReservedKeyAction };   // what `TuiConfig.keyActions` is keyed by — the registry's ids (I39, C16 §6c)
 export type { LocalHandler, LocalContext, AskOptions, Choice };   // C23 §2 — and `localHandlers` refuses a wider ctx (C23 I39)
 export type { CompletionSource, CompletionContext, Candidate, Slot };
 export type { LiveSpec, ViewRefresh };
@@ -138,6 +139,20 @@ captured child reserves one `host.detach` action, and an attach whose reserved
 chord is not reachable is a `SurfaceError` beside the existing four — *may never
 leave capture without a visible, reachable host escape* is a precondition, and a
 precondition nobody can fail is a sentence rather than a guarantee.
+
+**`keyActions` answers the chords the design reserved** (I39, C16 §6c, ruling 64). Fourteen
+of the registry's bindings name a feature the framework does not build — the agent strip,
+the permission posture, per-token values, the message queue — and hold the chord so an
+application cannot take it. An application that builds the feature registers the handler:
+
+```ts
+keyActions?: Partial<Record<ReservedKeyAction, () => boolean | void>>;
+```
+
+Keyed by the registry's id (`"queue.drop"`), because that is the name `/help`, `docs/KEYS.md`
+and the design all print. `false` means *not handled*: the row's displaced meaning runs if it
+has one — `⌥⌫` kills a word — and otherwise the key passes. With no handler the row resolves
+as though it were absent. An id outside the set is refused at construction, naming the set.
 
 **`greeting` is how the session's first entry gets there** (C22 I44). S02 specifies
 that entry — *"an ordinary `ViewDocument`, not a screen … appended to the
@@ -1237,6 +1252,7 @@ one more line on §3's list.
 35. **The runtime barrel imports nothing from the Mermaid renderer; the transform is its own entry** (I36, F1188).
 36. **Retired with Ink** (I37, F1209). It read: *a launcher can narrow the renderer's dependency graph before the app imports it, and the narrowing is exact or absent* (F1192, R01 R4.7). The graph it narrowed was Ink's — one import line, one barrel, 1,319 modules — and deleting Ink deleted every part of the subject: the file the `load` hook watched, the specifier the `resolve` hook answered, and the dependency that pulled es-toolkit into the tree at all. The entry point is removed rather than left registering hooks nothing can arm.
 37. **Every entry resolves into one bundled graph that keeps one instance, the same names, the emulator and the renderer off the graph, and a named frame** (I38, F1193, A04 §5).
+38. **A reserved key's handler is registered by the design's id, and an unknown id is refused at construction** (I39, C16 §6c). → T2.23, T3.14
 
 ---
 
@@ -1248,6 +1264,7 @@ one more line on §3's list.
 - **I36** (F1188) — **The runtime barrel imports nothing from the Mermaid renderer.** `@fmx/calcium` re-exports no `mermaidCode` and a process that imports `dist/index.js` under the import trace loads no module from `beautiful-mermaid` or `elkjs`; the transform is `@fmx/calcium/mermaid`, a one-line barrel over `presentation/mermaid.ts`, and the function behind it is the same function — the contract rows hold unchanged, because what moved is an import line and not a byte of output. **The observable is the graph and never a duration** (C23 I71's argument): a timing row is green on a fast machine with the renderer still on the graph, and red on a slow one with it gone. T5.8 runs the same check through the bundled entry, where the renderer is external to a separate entry point (F1193).
 - **I37** (F1192) — **Retired with Ink** (F1209). It read: *`prepareLaunch()` narrows Ink's es-toolkit import to the one module it binds, exactly or not at all* — a `load` hook matching Ink's import line byte for byte to arm a `resolve` hook that answered the resolved barrel URL with the one file. **It was a rule about a third party's import line**, and it retires rather than going unproven: with Ink gone es-toolkit is not in the tree, the hooks can never arm, and `prepareLaunch()` would be an export whose every branch is unreachable. **The measured win goes with it and is recorded here so nobody re-derives it**: 1,319 modules of a cold import's 2,442, and 235 → 208 ms without the compile cache, 205 → 162 with it, six of six interleaved pairs (R01 R4.7). The graph is smaller than either figure now, because the hundred modules of Ink itself went too.
 - **I38** (F1193, A04 §5) — **Every entry resolves into one bundled graph, and the bundle keeps four things the file tree had.** *One instance*: `testing` and `fixtures` share the registry, the theme and the measurer with the runtime, and a child importing two entries sees one class object — a bundle per entry without splitting would give a consumer's test two registries and an `instanceof` that lies. *The same names*: each bundled entry's export keys equal its `tsc` file's, for all six. *Off the graph still*: the emulator's dynamic import is its own chunk and the Mermaid renderer is external to a separate entry, so C23 I71 and I36 hold in bundle form and the same children show it. *Frames still named*: C28 I65. What makes the bundle safe to evaluate in one scope is MG1 and MG22 — the graph is acyclic across and within layers, so the bundler's order is the loader's — and nothing in `src/` reads `import.meta`, `__dirname` or `createRequire`. **The observable is the graph and never a duration** (I36's rule): under the import trace the armed bundled runtime is fewer than four hundred modules where the file tree was 1,130.
+- **I39** (C16 §6c, ruling 64) — **`TuiConfig.keyActions` is keyed by the registry's id for a reserved action, and an id outside that set is a construction error.** `keyActions?: Partial<Record<ReservedKeyAction, () => boolean | void>>`, with `ReservedKeyAction` exported from the runtime entry — the fourteen ids the design names and the tree reserves: `agent.next`, `agent.previous`, `agent.1`…`agent.9`, `posture.cycle`, `values.toggle`, `queue.drop`. **The design's spelling and not the tree's `KeyAction`**, because an application reads the registry, `/help` and `docs/KEYS.md`, and all three say `queue.drop`. The type refuses a wrong id at compile time for a consumer that names the field; `validateConfig` refuses it again for one that does not — a configuration read from JSON — and the message names every reserved id, so the reader learns the set from the refusal. A handler returning `false` has not handled the key.
 
 - **T1.9** (I31): every runtime value exported from `@fmx/calcium/profiling` → two frozen lookup tables and nothing callable; importing the module constructs no recorder, registers no timer and touches no process figure. Asserted on the module's own exports rather than on a written list, because a list is satisfied by the list. **The two tables are the operations a report's reader has that a type cannot give them**: `TIER_RANK` compares two tiers, and `PHASE_GROUP` groups a span into `compute` / `draw` / `output` / `input` / `far side` — which is the *is it computing or drawing* question, unanswerable from `spans` alone because a `Record<SpanName, Histogram>` carries no grouping. A frozen table starts nothing, which is the whole of why either is here.
 - **T1.10** (I32): at the recorder — `undefined` before any frame; the first frame's `work` after one; the **first** frame's figure after the second, so a member filled with the frame in flight reads a number that frame cannot have; the last completed frame's whatever its `outcome`, because a projection over drawn frames would hold a stale figure through a run of fallbacks; and `undefined` again after a tier change, which clears it with the ring. **The four clauses are four states and only one is reachable from a session** — a driven session has composed several frames before anything can read a footer, so *the first frame's is undefined* cannot be constructed there.
@@ -1289,6 +1306,7 @@ one more line on §3's list.
 - **T2.22** (I35, F405): `expectDocument(doc, [faultyDefinition])` on a document holding that kind measures its declared height; without the second argument the same document measures **one row**. **The control is the pair**, because the failing reading is not an error — it is a plausible number, and a row asserting only the passing arm cannot tell a registered kind from a fallback.
 - **T2.21** (I34): every `Owner["member"]` in the example apps' sources is resolved to the member's declared type name, and a name `src/` declares must be published by some entry point. **The row's subject is the resolution and not the count**, so it carries its own controls: `Series["tone"]` clears because `Tone` is published and `TerminalCapabilities["imageProtocol"]` clears because nothing is declared under that name — two clearances by two different arms, and a resolver that returned nothing would pass by finding nothing. The non-vacuity guard is that the scan finds index expressions at all, since an app rewritten without one empties the population while leaving the assertion green (SS26). **Four arms, and only the third can fail on the surface**: the population guard, the residue, the resolution of the finding's own two names against the published set, and a fabricated one-line surface — which is where the resolver's second defect was found, since every type in `src/` spans lines and a line-start anchor resolves the whole corpus while missing its own fabrication.
 - **T2.20** (I11): the surface signal is **reported and never gated** — `index.mjs` computes it after the violation set is closed, never pushes it into `violations`, and enforce exits 0 today with a residue in the hundreds. That last figure is what makes the absence a decision rather than a tree with nothing to report. The rest of I11 is a claim about another repository and a release cadence, which nothing here can hold; what is checkable is the disposition, and the disposition is the half that could silently change.
+- **T2.23** (I39): `ReservedKeyAction`'s members, as the keymap's reserved map holds them, equal the registry ids of the reserved actions and nothing else — by equality, so a fifteenth reservation the type does not name fails — and the runtime entry exports the type.
 
 ### Tier 3 — edge cases
 
@@ -1308,6 +1326,7 @@ one more line on §3's list.
 - **T3.10**: nesting `b.panel` inside `b.group` inside `b.panel` → valid, measured correctly.
 - **T3.11**: an adapter registered for an absent verb → warning at startup, session opens.
 - **T3.12**: a theme failing contrast → construction throws before the terminal is acquired.
+- **T3.14** (I39): `createTui` with `keyActions: {copy: …}` throws a `ConfigError` whose message names `copy` and every reserved id; the control is a known id, which constructs.
 - **T3.13 (I27)**: two `b.live` parts naming one `source` with different `every` → the losing part's panel names **both** ids and **both** values, and neither part is left at `◌ loading`. **From the public entry, and that is the whole row**: the first implementation threw, which every unit test of the driver could see and no consumer ever could.
 
 ### Tier 4 — integration

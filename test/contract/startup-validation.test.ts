@@ -123,3 +123,9 @@ describe("C24 §8 — the seventh severity", () => {
     }
   });
 });
+
+describe("C24 I39 — an unknown key-action id is refused at construction", () => {
+  it.todo(
+    "T3.14 (C24 I39): keyActions naming `copy` throws a ConfigError naming `copy` and every reserved id; a known id constructs — not deferred on a component: the code lands in the next commit of this round",
+  );
+});

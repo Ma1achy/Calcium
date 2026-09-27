@@ -403,3 +403,9 @@ describe("C24 §7 — the published surface answers for itself", () => {
     }
   });
 });
+
+describe("C24 I39 — a reserved key's handler is registered by the design's id", () => {
+  it.todo(
+    "T2.23 (C24 I39): ReservedKeyAction's members equal the reserved map's keys and the registry ids of the reserved actions, by equality, and the runtime entry exports the type — not deferred on a component: the code lands in the next commit of this round",
+  );
+});
