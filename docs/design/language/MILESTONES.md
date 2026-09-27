@@ -141,7 +141,6 @@ complete, which is the measurement that argues for keeping both.
 
 | Owed by | Item | What goes red when it lands |
 |---|---|---|
-| C10 §4k (F1240's MR) | **Composition 5 — `disabled` + `error`.** `disabled` is an availability fact and no block carries the field. Once it does, draw the frame at all three rungs in `test/golden/compositions.test.ts` and discharge **C10 T2.47**, which is `it.todo` on exactly this blocker. | C10 T2.48's attempt at case 5, which constructs a disabled row carrying an error and fails when both facts answer |
 | C10 §4k.4 | **The selection mark `▌` needs a glyph slot of its own.** The slot is taken by `GlyphSet.bar` (`glyphs.ts:276`). **The reason this row used to give was `live` is taken, and `live` was retired at M4's close**, so the occupant it named is gone and the conclusion survives on a different occupant — which is why the reason is written as a line the reader can go to. Recorded when §017's copy gutter was read; not ruled here, because whether a gutter column is added beside the wash is a width question C11 I14 owns, and `▌` is `East_Asian_Width=Ambiguous` besides (`glyphs.ts:462`, the finding that a 40-cell bar drew 80). | nothing yet — this is the one item with no watcher, and it is named as such |
 
 ## M7 · Arming, epochs and pointer commit

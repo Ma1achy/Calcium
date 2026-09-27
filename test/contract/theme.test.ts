@@ -1529,7 +1529,7 @@ describe("C10 §4k — focus, selection and the facts that contest a ground", ()
     "T2.46 (I47, R-STA-003): hover and focus hold disjoint carrier sets at every rung — focus has `\u25b8` at all three and hover never does; at 1-bit, where hover's ground is gone, hover holds bold and focus does not. A disjointness over sets, because two rows each naming one carrier agree while the two facts render identically — not deferred on a component: it lands with §4k's resolver change, and its hover half is exercised through a constructed state until a block declares `hovered`. **This clause used to name mouse mode 1003 and that was the wrong condition** — `lifecycle.ts:125` takes 1003 behind a `hover?: boolean` option and the decoder reads a no-button move, so a pointer move already arrives; the router discards it by rule (§4a row t) and no block carries the field, which is what T2.48 watches",
   );
   it.todo(
-    "T2.47 (I47, R-STA-004): where availability meets validity the well takes the ground and the error keeps two carriers — its mark and its outcome word. The row asserts the count, not just the winner: a row naming only which ground won passes a ruling that left validity with nothing — not deferred on a component: it lands with §4k's resolver change, on a constructed availability state until a block declares one",
+    "T2.47 (I47, R-STA-004): where availability meets validity the well takes the ground and the error keeps its mark and its word, on case 5 — not deferred on a component: the code lands in the next commit of this round",
   );
 
   it("T2.48 (I47, §4k.4): every composition §4k.2 rules is in one case table, every drawn case responds to both its facts, and every owed case is attempted", () => {
@@ -1882,10 +1882,10 @@ describe("C10 I52 — the registry's state axes and the spec's declarations", ()
       expect(violates(row.carriers), `${row.axis}: tone and ground are one carrier written twice`).toBe(false);
     }
 
-    // The population is measured, not quoted — nine of the twelve have a
+    // The population is measured, not quoted — ten of the twelve have a
     // subject, and a table that lost them all would otherwise pass.
-    expect(withSubject, "axes with a subject in this tree").toBe(9);
-    expect(rows.length - withSubject, "and the three with none").toBe(3);
+    expect(withSubject, "axes with a subject in this tree").toBe(10);
+    expect(rows.length - withSubject, "and the two with none").toBe(2);
 
     // **The fabricated violation, because the shipped table contains no such
     // pair** — a rule with nothing to be wrong about passes exactly like one

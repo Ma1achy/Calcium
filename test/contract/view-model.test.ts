@@ -1073,6 +1073,10 @@ describe("C04 §7 — the update model and the view state, checked rather than c
   });
 });
 
+describe("C04 I140 — a field's availability", () => {
+  it.todo("T2.134 (C04 I140, R-STA-001): availability is one of enabled, readonly and disabled by both doors — not deferred on a component: the code lands in the next commit of this round");
+});
+
 describe("C04 I128 — a trend cell", () => {
   it("T2.133 (C04 I128, R-COL-006): block() refuses a trend cell carrying glyph, tone, spark or bar", () => {
     const table = (cell: Record<string, unknown>, polarity?: string) => ({

@@ -147,4 +147,7 @@ describe("C04 §3ar — form", () => {
     // A button that does not submit is handed back unchanged.
     expect(submitAction(FORM, "cancel", fill)).toBe(fill);
   });
+
+  it.todo("T2.135 (C04 I137, C04 I140): a submit writes a readonly field's value and not a disabled one's, and the element list keeps the readonly field without viewState and drops the disabled one — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T2.186 (C09 I122, C04 I140): a disabled field stands in the well in dim, and its error keeps ✗ and its message — not deferred on a component: the code lands in the next commit of this round");
 });
