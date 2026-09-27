@@ -60,6 +60,7 @@ import { parseAreas } from "./mosaic.js";
 import { ALIGN_ENTRIES } from "./measure.js";
 import { overlayFault } from "./overlay.js";
 import { parseStartDate } from "../dates.js";
+import { isBidiFormat } from "../text.js";
 import { isContainerKind } from "./tree.js";
 // **The entries, not the names.** `COLORMAP_SET` above answers *is this a map*;
 // H3 asks *does it have two halves*, which is `kind` and lives on the entry.
@@ -1018,6 +1019,15 @@ function checkTerminalLine(line: Record<string, unknown>, e: string[], at: strin
     if (unit < 0x20 || (unit >= 0x7f && unit <= 0x9f)) {
       e.push(
         `${at}: "text" carries a control character at ${String(i)} (C04 I110) — a terminal line is emitted without stripping, so an escape here would reach the outer terminal`,
+      );
+      return;
+    }
+    // **Bidi format characters too** (ruling 71): this kind is exempt from the
+    // registry's neutraliser (C09 I56, I124), so an override here would reorder
+    // the frame around it exactly as an escape would repaint it.
+    if (isBidiFormat(unit)) {
+      e.push(
+        `${at}: "text" carries a bidi format character U+${unit.toString(16).toUpperCase().padStart(4, "0")} at ${String(i)} (C04 I110) — a terminal line is emitted without neutralising, so it would reorder the frame`,
       );
       return;
     }

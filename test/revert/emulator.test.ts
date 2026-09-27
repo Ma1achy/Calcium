@@ -103,9 +103,25 @@ describe("C27 terminal emulator — tier 6", () => {
   it.todo(
     "T6.11 (C27 I8): an OSC 52 handler writing its payload into the buffer → T2.7's deep-equal fails — not deferred on a component: the code lands in the next commit of this round",
   );
-  it.todo(
-    "T6.12 (C27 I2): containText passing bidi characters through → T1.13 fails and the snapshot stops validating — not deferred on a component: the code lands in the next commit of this round",
-  );
+  it("T6.12 (C27 I2): containText passing bidi characters through → T1.13 fails and the snapshot stops validating", () => {
+    // Both placements: a mark sharing a cell with a letter, and one alone in its cell.
+    expect(containText("b\u202e")).toBe("b");
+    expect(containText("\u2067")).toBe("?");
+    const line = lineOf(lineFrom([{ chars: "a\u200f" }, { chars: "\u2067" }, { chars: "z" }]));
+    expect(line.text).toBe("a?z");
+    const doc = {
+      schema: "tui.view/1",
+      command: "!x",
+      status: "ok",
+      meta: {
+        verb: null, adapter: "shell", stderr: "", exitCode: 0, durationMs: 1,
+        truncated: false, argv: ["x"], transport: "subprocess", origin: "user",
+      },
+      blocks: [{ kind: "terminal", id: "t", cols: 20, screen: "lines", lines: [line] }],
+    };
+    expect(validateDocument(doc as never).ok, "the walked line validates under C04 I110").toBe(true);
+  });
+
   it("T6.10 (C27 I10): applying the cap before the reflow → T1.7 loses a line", async () => {
     const term = createEmulator({ cols: 40, rows: 4, scrollback: 8 });
     await term.write(`${"y".repeat(120)}\r\n`);
