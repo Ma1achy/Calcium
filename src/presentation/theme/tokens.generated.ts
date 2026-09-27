@@ -5,6 +5,7 @@
 // The registry is normative for these values (R-THM-001); this file is a projection
 // of it, and a hand edit here is a value the design does not hold.
 
+import { BAND_FOUR_BIT } from "./band-four-bit.js";
 import { DARK } from "./tokens-dark.js";
 import { HIGH_CONTRAST } from "./tokens-high-contrast.js";
 import { LIGHT } from "./tokens-light.js";
@@ -351,6 +352,7 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
       "focusGround": "#ffffff",
       "selection": "#000000",
     }),
+    bandFourBit: BAND_FOUR_BIT.hcDark,
     composed: Object.freeze({
       ...(HIGH_CONTRAST.composed ?? {}),
       "surface.bgDeep": Object.freeze({
@@ -490,6 +492,7 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
       "focusGround": "#000000",
       "selection": "#ffffff",
     }),
+    bandFourBit: BAND_FOUR_BIT.hcLight,
     composed: Object.freeze({
       "surface.bgDeep": Object.freeze({
         "categorical.c4": "#820066",

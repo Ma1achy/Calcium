@@ -179,6 +179,11 @@ function compute(ref: ColourRef, theme: ResolvedTheme, depth: Depth, on?: string
   // a ground to change. A floor is a 24-bit claim and both rungs already depart
   // from the hexes wholesale.
   if (depth === 4) {
+    // **A band binds at 4-bit** (I61): its one ink for every ref drawn on it,
+    // read before the flat map, which is per ref and would spread that one ink
+    // across as many indices as there are tones.
+    const band = on === undefined ? undefined : theme.tokens.bandFourBit?.[on];
+    if (band !== undefined) return styleOf({ kind: "ansi16", index: band.ink });
     const index = theme.tokens.fourBit[ref];
     return index === undefined ? NO_STYLE : styleOf({ kind: "ansi16", index });
   }
@@ -204,6 +209,9 @@ function surface(ref: ColourRef, slot: string, theme: ResolvedTheme, depth: Dept
   if (depth === 24) return styleOf({ kind: "rgb", hex });
 
   if (depth === 4) {
+    // A band's curated ground (I61) — the flat map has no entry for either band.
+    const band = theme.tokens.bandFourBit?.[slot];
+    if (band !== undefined) return styleOf({ kind: "ansi16", index: band.ground });
     const index = theme.tokens.fourBit[ref];
     return index === undefined ? NO_STYLE : styleOf({ kind: "ansi16", index });
   }

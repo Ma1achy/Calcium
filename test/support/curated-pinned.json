@@ -1,4 +1,44 @@
 {
+ "ANSI16_HEX": [
+  "#000000",
+  "#800000",
+  "#008000",
+  "#808000",
+  "#000080",
+  "#800080",
+  "#008080",
+  "#c0c0c0",
+  "#808080",
+  "#ff0000",
+  "#00ff00",
+  "#ffff00",
+  "#0000ff",
+  "#ff00ff",
+  "#00ffff",
+  "#ffffff"
+ ],
+ "BAND_FOUR_BIT": {
+  "hcDark": {
+   "focusGround": {
+    "ground": 12,
+    "ink": 15
+   },
+   "selection": {
+    "ground": 11,
+    "ink": 0
+   }
+  },
+  "hcLight": {
+   "focusGround": {
+    "ground": 7,
+    "ink": 0
+   },
+   "selection": {
+    "ground": 5,
+    "ink": 15
+   }
+  }
+ },
  "CALL_STATE_GLYPH": {
   "cancelled": "cancelled",
   "failed": "error",

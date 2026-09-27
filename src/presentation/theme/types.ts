@@ -307,7 +307,19 @@ export type ThemeTokens = Readonly<{
    * `validateBands`, and T2.55 is what enforces it.
    */
   bandInk?: Readonly<Record<string, string>>;
+  /**
+   * Each band's curated ANSI16 pair, for `colourDepth: 4` (C10 I61).
+   *
+   * The flat 4-bit map is per ref and composes nothing, so without this a band
+   * at 4-bit had no ground and one index per tone — the one ink it promises
+   * spread across six. Keyed like `bandInk`, by the band's surface name, and
+   * `validateBands` refuses a band in `bandInk` with no pair here.
+   */
+  bandFourBit?: BandFourBit;
 }>;
+
+/** One ANSI16 index for a band's ground and one for everything drawn on it. */
+export type BandFourBit = Readonly<Record<string, Readonly<{ ground: number; ink: number }>>>;
 
 /**
  * The themes a session can switch between, **keyed by name** (I27).

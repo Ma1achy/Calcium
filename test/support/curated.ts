@@ -27,7 +27,8 @@ import {
   MUST_STAY_DISTINCT,
 } from "../../src/presentation/theme/four-bit.js";
 import { OKABE_ITO_CANONICAL, VISIONS } from "../../src/presentation/theme/cvd.js";
-import { COLORMAPS } from "../../src/presentation/theme/colormap.js";
+import { ANSI16_HEX, COLORMAPS } from "../../src/presentation/theme/colormap.js";
+import { BAND_FOUR_BIT } from "../../src/presentation/theme/band-four-bit.js";
 import { CATEGORY_REFS } from "../../src/presentation/theme/categorical.js";
 import { REQUIRED_SLOTS } from "../../src/presentation/theme/contrast.js";
 import {
@@ -76,6 +77,17 @@ export const CURATED: Readonly<Record<string, unknown>> = {
   LIGHT_FOUR_BIT,
   HIGH_CONTRAST_FOUR_BIT,
   MUST_STAY_DISTINCT,
+
+  // **C10 I61 — each HC band's one ground and one ink at 4-bit.** Chosen by an
+  // exhaustive search over the sixteen indices against four constraints, and
+  // hcLight's pair is the best of a set with no feasible member — so any other
+  // pair is legal, passes every property row that does not name the shortfall,
+  // and is a different ruling.
+  BAND_FOUR_BIT,
+  // **The reference palette those constraints are measured on**: xterm's
+  // defaults. The values are the emulator's; choosing *which* emulator is the
+  // ruling, and every I61 shortfall figure moves with it.
+  ANSI16_HEX,
 
   // C10 §4j — the calibrating set. A *different* palette that also separates
   // under all three dichromacies would pass `collisions() === []` exactly as
@@ -150,6 +162,7 @@ export const DERIVED: Readonly<Record<string, string>> = {
 /** The modules the driver scans, so a table added to one of them cannot go unpinned. */
 export const MODULES: readonly string[] = [
   "src/presentation/theme/four-bit.ts",
+  "src/presentation/theme/band-four-bit.ts",
   "src/presentation/theme/cvd.ts",
   "src/presentation/theme/colormap.ts",
   "src/presentation/theme/categorical.ts",

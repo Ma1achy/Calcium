@@ -31,6 +31,7 @@
  */
 
 import type { PaletteSpec, ThemeError, ThemeTokens } from "./types.js";
+import { ANSI16_HEX } from "./colormap.js";
 import { TONES } from "../../data/viewmodel/index.js";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -765,7 +766,62 @@ export function validateBands(tokens: ThemeTokens): readonly ThemeError[] {
         "the two bands can be adjacent rows, and telling them apart by hue alone is the failure a high-contrast theme exists to prevent");
     }
   }
+
+  // **Every band has a 4-bit pair, and the pair is two indices** (C10 I61).
+  // Structural, so it binds at load: a band with no pair resolves at 4-bit to
+  // no ground and one index per tone, the state I61 was written against. The
+  // pair's contrast is a claim about a reference palette and is T2.64's, not
+  // this gate's — a user's sixteen are the user's.
+  for (const name of Object.keys(bands)) {
+    const pair = tokens.bandFourBit?.[name];
+    if (pair === undefined) {
+      errors.push({
+        path: `bandFourBit.${name}`,
+        message: "a band with no 4-bit pair has no ground at colourDepth 4 and one index per tone on it (C10 I61)",
+      });
+    } else if (pair.ground === pair.ink) {
+      errors.push({
+        path: `bandFourBit.${name}`,
+        message: `ground and ink are both index ${String(pair.ground)} — a band whose ink is its ground draws nothing on it (C10 I61)`,
+      });
+    }
+  }
   return Object.freeze(errors);
+}
+
+/**
+ * C10 I45's four band constraints, measured on the **4-bit** pairs against the
+ * reference palette (C10 I61).
+ *
+ * Not part of `validateTokens`, and on purpose: the ratios are a claim about the
+ * xterm defaults and not about any terminal a theme loads in, so a shortfall is
+ * a fact T2.64 holds to a named list rather than a reason to refuse the theme.
+ * The page is `fourBit["surface.bg"]`, as the resolver draws it.
+ */
+export function bandFourBitShortfalls(
+  tokens: ThemeTokens,
+): readonly Readonly<{ path: string; measured: number; need: number }>[] {
+  const pairs = tokens.bandFourBit;
+  const pageIndex = tokens.fourBit["surface.bg"];
+  if (pairs === undefined || pageIndex === undefined) return Object.freeze([]);
+  const hex = (i: number): string => ANSI16_HEX[i] ?? "#000000";
+  const page = hex(pageIndex);
+  const promised = tokens.floor ?? DEFAULT_FLOOR;
+  const out: { path: string; measured: number; need: number }[] = [];
+  const hold = (path: string, measured: number, need: number): void => {
+    if (measured < need) out.push({ path, measured: Math.round(measured * 100) / 100, need });
+  };
+  for (const [name, pair] of Object.entries(pairs)) {
+    hold(`${name}.ink`, ratio(hex(pair.ink), hex(pair.ground)), promised);
+  }
+  const focus = pairs["focusGround"];
+  const selection = pairs["selection"];
+  if (selection !== undefined) hold("selection.page", ratio(hex(selection.ground), page), BAND_VS_PAGE);
+  if (focus !== undefined) hold("focusGround.page", ratio(hex(focus.ground), page), FOCUS_VS_PAGE);
+  if (focus !== undefined && selection !== undefined) {
+    hold("focusGround.selection", ratio(hex(focus.ground), hex(selection.ground)), BAND_VS_BAND);
+  }
+  return Object.freeze(out);
 }
 
 /**

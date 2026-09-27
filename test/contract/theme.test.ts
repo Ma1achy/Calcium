@@ -433,6 +433,9 @@ describe("C10 contract", () => {
       ...hc,
       surfaces: { ...hc.surfaces, probe: ground },
       bandInk: { ...hc.bandInk, probe: ink },
+      // Every band carries its 4-bit pair (C10 I61) — without one the probe is
+      // refused for that, and this row's subject is the hex ground.
+      bandFourBit: { ...hc.bandFourBit, probe: { ground: 0, ink: 15 } },
     });
 
     // **The direction that matters: a defect the old lookup let through.** Black
