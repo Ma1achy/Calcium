@@ -32678,6 +32678,82 @@
         }
       }
     },
+    "textGrounds": {
+      "ruleIds": [
+        "R-THM-004"
+      ],
+      "note": "Every ground a theme paints text on, with the refs that land on it: the floor's whole scope (R-THM-004, C10 I60). refs 'meaning' is every slot of every palette that carries meaning. pairing names the walker that measures the row at the common floor: 'page' the palette check over the page grounds, 'diff' the diff pairing (§4a: the gutter's three tones and the text's syntax); every row is measured against a theme's declared floor. A theme lacking a ground skips its row.",
+      "grounds": [
+        {
+          "ground": "bg",
+          "pairing": "page",
+          "refs": "meaning"
+        },
+        {
+          "ground": "bgElev",
+          "pairing": "page",
+          "refs": "meaning"
+        },
+        {
+          "ground": "focusGround",
+          "pairing": "page",
+          "refs": "meaning"
+        },
+        {
+          "ground": "diffAdd",
+          "pairing": "diff",
+          "refs": {
+            "syntax": [
+              "keyword",
+              "string",
+              "comment",
+              "number",
+              "key",
+              "type",
+              "function",
+              "operator",
+              "punctuation"
+            ],
+            "tone": [
+              "ok",
+              "error",
+              "muted"
+            ]
+          }
+        },
+        {
+          "ground": "diffRemove",
+          "pairing": "diff",
+          "refs": {
+            "syntax": [
+              "keyword",
+              "string",
+              "comment",
+              "number",
+              "key",
+              "type",
+              "function",
+              "operator",
+              "punctuation"
+            ],
+            "tone": [
+              "ok",
+              "error",
+              "muted"
+            ]
+          }
+        },
+        {
+          "ground": "bgDeep",
+          "pairing": "chip",
+          "refs": {
+            "tone": [
+              "meta"
+            ]
+          }
+        }
+      ]
+    },
     "spectrum": {
       "dark": {
         "0": "#e8736b",

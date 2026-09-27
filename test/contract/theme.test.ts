@@ -228,6 +228,8 @@ describe("C10 contract", () => {
    * and asserts that the failure names the *path* that has to move — which is what
    * makes the message the reason rather than the number.
    */
+  it.todo("T2.71 (C10 I60): each walker selects by pairing, and every shipped theme validates clean over the table — not deferred on a component: the code lands in the next commit of this round");
+
   it("T2.59 (C10 I60, R-THM-004): textGrounds is the page, the diff grounds and bgDeep, each with the refs that land on it", () => {
     for (const [variant, tokens] of SHIPPED) {
       const rows = textGrounds(tokens);
