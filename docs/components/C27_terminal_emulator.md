@@ -145,6 +145,8 @@ new width (design S8). C27 only reflows; it does not know a child exists.
 |---|---|
 | `\x07` (bell) | nothing — `onBell` has no subscriber (I8) |
 | `OSC 0 ; title` | nothing — `onTitleChange` has no subscriber (I8) |
+| `OSC 52 ; c ; data` (clipboard) | nothing — no handler is registered, and the clipboard the child names is not the reader's (I8) |
+| `OSC 8 ; ; url` … `OSC 8 ; ;` (hyperlink) | nothing reaches the snapshot — the text between is kept, the link is not (I8) |
 | `?1000h` … (mouse tracking), `?2004h` (bracketed paste) | records the mode in the dependency; nothing reads it this round. The attach round reads it to say *this program wants the mouse* |
 | `CSI c`, `CSI 6 n`, `DCS … ST` queries | **no answer**. The dependency would emit a response through `onData` and nothing subscribes, so a child that waits for one waits. `vim` waits about a second for its `t_RV` reply and then proceeds; the attach round wires `onData` to `PtyProcess.write` and the wait goes away. Recorded in design §7 as the deferral's fourth row |
 | an unknown CSI, DCS or OSC | dropped, not stored (I9, design M5). **Passing an unknown sequence through is how a block corrupts the frame around it** — the tempting implementation is a passthrough default and it is wrong on the twentieth program |
@@ -170,13 +172,13 @@ takes its final snapshot **before** disposing (C23).
 ## 7. Invariants
 
 - **I1** — C27 emits no bytes. It writes to no stream, subscribes to no `onData`, and has no reference to the real `process.stdout` or `process.stdin`.
-- **I2** — Every `TerminalLine.text` in a snapshot is free of C0 and C1 controls and of unpaired surrogates; each is replaced by an ASCII question mark. **ASCII rather than U+FFFD**, because a mark the framework draws needs a `Glyph` slot with a rung (C09 I22, A03 SS47) and C27 is L0 with no capabilities in hand — the rule refused the obvious character and was right.
+- **I2** — Every `TerminalLine.text` in a snapshot is free of C0 and C1 controls, of bidi format characters (C04 I110, ruling 71) and of unpaired surrogates. A control or a surrogate is replaced by an ASCII question mark. **A bidi format character follows its cell**: dropped from a cell it shares, and a cell holding nothing else becomes `?`, because `@xterm/headless` joins U+200F and U+202E to the previous cell at no width and gives U+2067 and U+061C a cell of their own (measured, review batch 4), and I6's painted width has to hold either way. **ASCII rather than U+FFFD**, because a mark the framework draws needs a `Glyph` slot with a rung (C09 I22, A03 SS47) and C27 is L0 with no capabilities in hand — the rule refused the obvious character and was right.
 - **I3** — A `write` whose promise has resolved is visible in the next `snapshot`; a snapshot is a frozen value unaffected by later writes.
 - **I4** — In `lines` mode `lines` is the scrollback then the screen, trimmed to the later of the last non-empty line and the cursor's line; in `grid` mode `lines` has exactly `rows` entries. `screen` names the active buffer and `cursor` indexes into `lines`.
 - **I5** — A run covers a maximal range of adjacent cells with one style; a default-styled cell is in no run; colours are `ColourValue`s formatted from the cell's integer.
 - **I6** — A wide cluster is one code-point sequence in `text` with no filler, and `cells(text)` equals the emulator's painted width for that line. Trailing default-styled blanks are trimmed; a styled blank is kept.
 - **I7** — `lines.length ≤ scrollback + rows` always; `dropped` counts every line lost above the cap and is absent when none has been.
-- **I8** — Bell and title have no observable effect on any snapshot.
+- **I8** — Bell, title (OSC 0 and 2), clipboard (OSC 52) and hyperlink (OSC 8) sequences have no observable effect on any snapshot, and the snapshot validates (C04 I110). *Amended in review batch 4 (M12 item 6)*: bell and title were the whole of it, and nothing covered OSC 52, OSC 8 or the snapshot still validating.
 - **I9** — An unrecognised sequence changes no cell and appears in no text.
 - **I10** — `resize` reflows and loses no characters; the cap is applied after the reflow.
 - **I11** — `src/data/emulator/` imports nothing from `terminal/`, reads no ambient global, and `@xterm/headless` is imported by `emulator.ts` alone.
@@ -191,7 +193,7 @@ takes its final snapshot **before** disposing (C23).
 3. **Cells carry the child's colours as `ColourValue`.** Formatted, never literal; degraded by C10 at render, never here. (I5)
 4. **Measurement agrees.** The text a line carries measures, by `cells()`, exactly the width the emulator painted. (I6)
 5. **The cap is honest.** Never more than `scrollback + rows` lines, and the count of what was lost travels with the block. (I7, I10)
-6. **Bell, title and queries go nowhere.** (I1, I8)
+6. **Bell, title, clipboard, hyperlinks and queries go nowhere.** (I1, I8)
 7. **L0 data, and only one importer.** No `terminal/`, no globals, one file touching the dependency. (I11)
 8. **Disposal is final and safe.** (I12)
 
@@ -218,6 +220,7 @@ literal: `src/data/emulator/` writes none (A03's escape rule is about `src/`).
 - **T1.10** (I12): `dispose(); dispose()` → no throw.
 - **T1.11** (I4): `cursor` after `abc` is `{ line: 0, col: 3 }`; after `\r\n` it is `{ line: 1, col: 0 }`; in `grid` mode after `\x1b[3;5H` it is `{ line: 2, col: 4 }`.
 - **T1.12** (I6): a line ending in `\x1b[41m   \x1b[0m` keeps its three background blanks with a run; a line ending in three plain blanks is trimmed.
+- **T1.13** (I2, I6, C04 I110): `a\u200Fb\u202Ec\u2067d\u061Ce` → the text is `abc?d?e`, `cells(text)` is 7, and `validateDocument` admits a document holding the snapshot. The two joined marks are dropped and the two that took a cell become `?`, which is what the dependency painted.
 
 ### Tier 2 — contract / interface
 
@@ -227,6 +230,7 @@ literal: `src/data/emulator/` writes none (A03's escape rule is about `src/`).
 - **T2.4** (I2): every character of every line of a snapshot taken after a corpus of 1,000 random byte strings is outside U+0000–U+001F, U+007F–U+009F. The corpus is seeded and the seed is in the failure message.
 - **T2.5** (I5): a snapshot round-trips through `JSON.parse(JSON.stringify(...))` deep-equal, and `validateDocument` (C04) admits a document holding it.
 - **T2.6** (I7): `dropped` is absent from the snapshot when `dropped === 0` and present otherwise — a `Terminal` never carries `dropped: 0`.
+- **T2.7** (I8, C04 I110): a snapshot after `\x1b]52;c;cHduZWQ=\x07`, `\x1b]8;;https://example.org\x07link\x1b]8;;\x07` and `\x1b]2;renamed\x07` around `text` equals the snapshot after `text link`, deep; and `validateDocument` admits a document holding it.
 
 ### Tier 3 — edge cases
 
@@ -265,6 +269,8 @@ literal: `src/data/emulator/` writes none (A03's escape rule is about `src/`).
 - **T6.8** (I12): `snapshot` after `dispose` returning the last value → T3.7 fails.
 - **T6.9** (I11): importing `@xterm/headless` from `snapshot.ts` → T2.1 fails. The mutation pass makes the edit; the assertion is T2.1's, over the stripped source (a comment naming the package is prose, and counting it would measure the documentation).
 - **T6.10** (I10): applying the cap before the reflow → T1.7 loses a line when the reflow lands over the cap at `scrollback: 8`.
+- **T6.11** (I8): an OSC 52 handler registered on the parser that writes its payload into the buffer → **T2.7**'s deep-equal fails. The mutation pass makes the edit (`c27-emulator.mjs`).
+- **T6.12** (I2): `containText` passing bidi format characters through → **T1.13** fails on the text, and the snapshot stops validating.
 
 ---
 

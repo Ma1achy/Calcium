@@ -222,6 +222,9 @@ describe("C27 terminal emulator — tier 1", () => {
     term.dispose();
   });
 
+  it.todo(
+    "T1.13 (C27 I2, C27 I6, C04 I110): a bidi character follows its cell — dropped where it joined one, ? where it took one — and the snapshot validates — not deferred on a component: the code lands in the next commit of this round",
+  );
   it("T1.12 (C27 I6): a styled trailing blank is kept and a plain one is trimmed", async () => {
     const term = createEmulator({ cols: 20, rows: 4 });
     await feed(term, "a\u001b[41m   \u001b[0m\r\nb   \r\n");

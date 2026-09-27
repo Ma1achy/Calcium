@@ -100,6 +100,12 @@ describe("C27 terminal emulator — tier 6", () => {
     expect(() => term.snapshot("t")).toThrow();
   });
 
+  it.todo(
+    "T6.11 (C27 I8): an OSC 52 handler writing its payload into the buffer → T2.7's deep-equal fails — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T6.12 (C27 I2): containText passing bidi characters through → T1.13 fails and the snapshot stops validating — not deferred on a component: the code lands in the next commit of this round",
+  );
   it("T6.10 (C27 I10): applying the cap before the reflow → T1.7 loses a line", async () => {
     const term = createEmulator({ cols: 40, rows: 4, scrollback: 8 });
     await term.write(`${"y".repeat(120)}\r\n`);

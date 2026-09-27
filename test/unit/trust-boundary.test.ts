@@ -158,6 +158,21 @@ describe("C09 §7d — the trust boundary", () => {
     expect(gateErrors(clean), "a clean line is not refused by the gate").toEqual([]);
   });
 
+  it.todo(
+    "T1.86 (C09 I125, C09 I124): neutraliseControl over each class, idempotent, tab and newline kept, and a span moves with its text — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T2.190 (C09 I127): the sweep's registry is a constructed session's, and its kinds less terminal equal the kinds swept — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T2.191 (C09 I124, C09 I127): per (kind, field), each field poisoned alone draws its neutralised residue and no control — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T2.192 (C09 I125, C09 I89): the bidi payload reaches no frame as the character and appears as <U+XXXX> — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T2.193 (C09 I126): every kind's copy carries no control and no bidi format character, and carries the residue — not deferred on a component: the code lands in the next commit of this round",
+  );
   it("T2.156b (C09 I89, §7d): the sweep can see a leak — the fabricated violation", () => {
     // **The rule's own check, and it is not about the tree.** The assertion
     // above is an absence, and an absence assertion is satisfied by a corpus

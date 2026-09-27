@@ -113,6 +113,9 @@ describe("C27 terminal emulator — tier 2", () => {
     term.dispose();
   });
 
+  it.todo(
+    "T2.7 (C27 I8, C04 I110): OSC 52, OSC 8 and OSC 2 have no effect on the snapshot, and it validates — not deferred on a component: the code lands in the next commit of this round",
+  );
   it("T2.6 (C27 I7): a snapshot never carries dropped: 0", async () => {
     const term = createEmulator({ cols: 20, rows: 4, scrollback: 50 });
     await feed(term, "one\r\ntwo\r\n");
