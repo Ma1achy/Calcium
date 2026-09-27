@@ -284,7 +284,31 @@ describe("C04 §3am — the ink ramps are the registry's", () => {
     expect(late[0]!, "and reaches the ends").toBeGreaterThan(late[n / 2]!);
   });
 
-  it.todo("T2.117j (C04 I138): scatter lights one cell per frame, every cell once per pass, in a per-pass permutation — not deferred on a component: the code lands in the next commit of this round");
+  it("T2.117j (C04 I138): scatter lights one cell per frame, every cell once per pass, in a per-pass permutation", () => {
+    // Every width a bar or span can have, not a chosen few: the shipped form
+    // was correct at n = 2, 3 and 4 and at nothing wider.
+    for (let n = 2; n <= 80; n += 1) {
+      const period = n + 3;
+      const orders: string[] = [];
+      for (let pass = 0; pass < 3; pass += 1) {
+        const order: number[] = [];
+        for (let step = 0; step < period; step += 1) {
+          const k = pass * period + step;
+          const lit = Array.from({ length: n }, (_v, i) => i).filter(
+            (i) => animateT("scatter", i / (n - 1), k, n, i) === 1,
+          );
+          expect(lit.length, `n=${String(n)} pass ${String(pass)} step ${String(step)}`).toBe(step < n ? 1 : 0);
+          order.push(...lit);
+        }
+        expect([...order].sort((a, b) => a - b), `n=${String(n)} pass ${String(pass)} covers every cell`).toEqual(
+          Array.from({ length: n }, (_v, i) => i),
+        );
+        orders.push(order.join(","));
+      }
+      if (n >= 4) expect(new Set(orders).size, `n=${String(n)}: the order is redrawn per pass`).toBeGreaterThan(1);
+    }
+  });
+
 
   it("T2.117g (C04 I109): two one-shots in one frame time independently", () => {
     // **The half the deferral got wrong, asserted rather than argued.** §3am

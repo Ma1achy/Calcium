@@ -161,6 +161,24 @@ function hash01(a: number, b: number): number {
   return (h >>> 0) / 0x100000000;
 }
 
+/**
+ * Cell `i`'s rank among `n` cells ordered by `hash01(cell, pass)` — so over `i`
+ * in `0 … n − 1` the ranks are a permutation (C04 I138), and each pass draws a
+ * new one. **No tiebreak, because there are no ties**: for a fixed second
+ * argument `hash01` is a bijection on the first — an odd multiply, a constant
+ * XOR and two xorshifts, each invertible on 32 bits — so distinct cells never
+ * share a key. Counted rather than sorted: a rank is what one cell needs, and
+ * it keeps the function pure with no cache.
+ */
+function scatterRank(i: number, n: number, pass: number): number {
+  const own = hash01(i, pass + 1);
+  let rank = 0;
+  for (let j = 0; j < n; j += 1) {
+    if (hash01(j, pass + 1) < own) rank += 1;
+  }
+  return rank;
+}
+
 /** A triangular band of half-width `w` centred on `c`, at cell `i`: 1 at the centre, 0 outside. */
 function band(i: number, c: number, w: number): number {
   return Math.max(0, 1 - Math.abs(i - c) / w);
@@ -204,7 +222,7 @@ function shotProgress(since: number | undefined, k: number, ticks: number): numb
  * | `neon` | a sixteen-tick envelope: two bursts of jitter, then steady | 16 ticks |
  * | `drift` | two sines at 37 and 53 ticks — no common period inside any session | ≈37·53 ticks |
  * | `bookend` | `converge` reversed: the edges arrive first and the centre last | `⌈n/2⌉ + 3` |
- * | `scatter` | each cell lights in a hashed order within one pass | `n + 3` ticks |
+ * | `scatter` | one cell per tick in a per-pass permutation, then three dark ticks | `n + 3` ticks |
  * | `sweep` | **one-shot** — a band crosses once; after, every cell at `to` | `n + 3` then held |
  * | `pop` | **one-shot** — one flash, then rest | 6 ticks then held |
  * | `wipe` | **one-shot** — a hard edge crosses once; after, every cell changed | `n` then held |
@@ -331,12 +349,15 @@ export function animateT(
       return Math.max(band(i, from, SHIMMER_HALF_WIDTH), band(i, span - 1 - from, SHIMMER_HALF_WIDTH));
     }
     case "scatter": {
-      // Each cell has a place in a hashed order and lights when the pass reaches
-      // it — *one glyph at a time, irregular*. Hashed on `i` alone, so the order
-      // is stable within a pass rather than re-rolled every tick.
+      // *One glyph at a time, irregular* (C04 I138). A cell's place is its rank
+      // in this pass's order, so the places are a permutation of `0 … n − 1`
+      // and no two cells share a tick; the pass's last three ticks are dark.
+      // This hashed each cell's place independently into `[0, n + 3)`, which is
+      // not a permutation — two to six cells lit at once on 76 of 79 widths.
       const period = span + 3;
-      const place = Math.floor(hash01(i, 0) * period);
-      return (k % period) === place ? 1 : 0;
+      const step = k % period;
+      if (step >= span) return 0;
+      return scatterRank(i, span, Math.floor(k / period)) === step ? 1 : 0;
     }
 
     // --- the five one-shots --------------------------------------------------
