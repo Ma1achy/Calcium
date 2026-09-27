@@ -23,7 +23,8 @@ import { fsIo, report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const DATA_TEXT = "src/data/text.ts";
 const VALIDATE = "src/data/viewmodel/validate.ts";
-const FILES = "test/unit/trust-boundary.test.ts";
+const FILES =
+  "test/unit/trust-boundary.test.ts test/revert/trust-boundary.test.ts test/integration/trust-writer.test.ts";
 
 const { read, write } = fsIo(ROOT);
 const run = () => {
@@ -40,18 +41,85 @@ const results = runPass({
   write,
   run,
   control: {
-    // **A change the run's own corpus can see** (F1254): with the filter a
-    // no-op, every kind in the sweep leaks and the fabricated-violation row is
-    // untouched. If this survives, nothing below reaches the boundary at all
+    // **A change the run's own corpus can see** (F1254): with the neutraliser
+    // a no-op, every kind in the sweep leaks and the fabricated-violation row
+    // is untouched. If this survives, nothing below reaches the boundary at all
     // and every kill is unearned.
+    //
+    // **Retargeted on review batch 4 (ruling 71).** The control was
+    // `stripControl` returning its input; the registry now neutralises every
+    // field at `#resolve` before any definition's own `stripControl` sees it,
+    // so a no-op filter there changes nothing a frame shows.
     file: DATA_TEXT,
-    from: "export function stripControl(text: string): string {",
-    to: "export function stripControl(text: string): string {\n  if (text.length >= 0) return text;",
+    from: "export function neutraliseControl(text: string): string {",
+    to: "export function neutraliseControl(text: string): string {\n  if (text.length >= 0) return text;",
     why:
-      "the filter returns its input, so every kind in the registry sweep leaks — "
+      "the neutraliser returns its input, so every kind in the registry sweep leaks — "
       + "if this survives, the sweep is not reading the frames it thinks it is",
   },
   mutations: [
+    {
+      // **The registry hands the definition the raw block** (C09 §7d, T6.142):
+      // the class that leaked `patch`'s path, hunk header and line text.
+      name: "#resolve hands a registered kind the block un-neutralised",
+      file: "src/presentation/blocks/registry.ts",
+      from: "    if (held !== undefined) return { definition: held, block: neutralBlock(block) };",
+      to: "    if (held !== undefined) return { definition: held, block };",
+      expect: "T2.191",
+    },
+    {
+      // **The isolates dropped from the bidi arm** (T6.144): added to Unicode
+      // after the embeddings, so a range written from memory reads complete.
+      name: "the bidi arm loses U+2066–U+2069",
+      file: DATA_TEXT,
+      from: "(cp >= 0x2066 && cp <= 0x2069)",
+      to: "(cp >= 0x2066 && cp <= 0x2065)",
+      expect: "T1.86",
+    },
+    {
+      // **The neutraliser keeps ESC**, the plausible loosening one layer up
+      // from the filter's own: ESC carries a child's colour.
+      name: "the neutraliser shows ESC as itself",
+      file: DATA_TEXT,
+      from: "  if (unit === 0x09 || unit === 0x0a) return null; // tab, newline",
+      to: "  if (unit === 0x09 || unit === 0x0a || unit === 0x1b) return null; // tab, newline",
+      expect: "T2.156",
+    },
+    {
+      // **C1 passes the neutraliser**: `0x9b` is a single-byte CSI introducer.
+      name: "the neutraliser covers C0 only, so a C1 introducer passes",
+      file: DATA_TEXT,
+      from: "  if (unit >= 0x80 && unit <= 0x9f) return ",
+      to: "  if (false) return ",
+      expect: "T2.156",
+    },
+    {
+      // **A span left on the old offsets** (C04 I83): the text grew, so the
+      // span colours the wrong characters.
+      name: "a span is not re-based onto the neutralised text",
+      file: "src/presentation/blocks/neutral.ts",
+      from: '    out["spans"] = rebased(spans, raw);',
+      to: '    out["spans"] = spans;',
+      expect: "T1.86",
+    },
+    {
+      // **The sweep back on a bare registry** (T6.145): `table`, `plot` and
+      // `patch` fall to `raw`, and the three-site leak is invisible again.
+      name: "the sweep runs on a bare registry",
+      file: "test/unit/trust-boundary.test.ts",
+      from: "  production = (await buildGraph()).graph.blocks;",
+      to: "  production = measurable().registry;",
+      expect: "T2.190",
+    },
+    {
+      // **A thrown message drawn raw** — the error box is a block the registry
+      // builds itself, from text a definition's exception carried.
+      name: "the error status carries the thrown message un-neutralised",
+      file: "src/presentation/blocks/registry.ts",
+      from: "message: neutraliseControl(text), height }",
+      to: "message: text, height }",
+      expect: "T4.107",
+    },
     {
       // **THE DEFECT: the exemption stops being paid for.** With the gate's
       // control check gone, `C04 I110` accepts a `TerminalLine.text` carrying
@@ -115,8 +183,10 @@ const results = runPass({
       // control is for is the corpus going wrong, so that is what is broken.
       name: "the sweep's corpus stops carrying the payload",
       file: "test/unit/trust-boundary.test.ts",
-      from: "  if (typeof value === \"string\") return value + PAYLOAD;",
-      to: "  if (typeof value === \"string\") return value;",
+      // Re-anchored on review batch 4: the corpus is built by `poisonWith`, so
+      // one suffix serves the control payload and the bidi one.
+      from: "const poison = poisonWith(PAYLOAD);",
+      to: "const poison = poisonWith(\"\");",
       expect: "T2.156"
     },
   ],
