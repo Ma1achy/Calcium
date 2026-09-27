@@ -1870,7 +1870,9 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.108** (I61): `validateBands` dropping the missing-pair check → **T2.63** fails on the theme with no pair.
 - **T6.109** (I62): the generator lending `dark`'s syntax palette from a token set again → **T1.52** and **T2.65** fail.
 - **T6.110** (I62): a theme record naming the dark 4-bit map for `hcDark` → **T2.39a** and **T1.52** fail — T6.102's substitution, now made in the registry.
-- **T6.111** (I63): `setTheme` looking the name up without resolving it → **T1.53** and **T4.38** fail.
+- **T6.111** (I63): `setTheme` looking the name up without resolving it → **T1.53** fails. *This read "T1.53 and T4.38", and T4.38 cannot see it: the composition root and `/theme`'s handler both resolve before they call `setTheme`, so the store's own resolution is reached only by a caller holding the alias — measured by the mutation pass, which is why the three callers have rows of their own below.*
+- **T6.113** (I63, C22 I68): the persisted preference tested for membership in `names` rather than resolved → **T4.38** fails on the persisted half. `loadTheme`'s `opening` looked up rather than resolved → **T1.53** fails.
+- **T6.114** (I63): `/theme` writing back the word typed rather than the name resolved, or its enum built from the set's keys alone → **T4.38** fails on the typed half.
 - **T6.112** (I63): the alias consulted before the set's own keys → **T2.68** fails on the set that declares `high-contrast` itself.
 - **T6.106** (I48, F1240): dropping the `on` argument from `runStyle`'s `resolveTone` call — the one line that carries a ground from the painter into the resolver — → **T2.49 still passes** and C11 T2.13 fails. The pairing is the row: T2.49 measures the resolver and cannot see a painter that never asks, which is the shape of F1240 itself, so the fail-on-revert names the row that sits on the other side of the seam.
 
