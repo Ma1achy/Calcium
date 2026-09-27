@@ -806,6 +806,9 @@
   "tone.ok": 10,
   "tone.warn": 11
  },
+ "FREE_WIDTH_SLOTS": [
+  "residue"
+ ],
  "GLYPH_DOMAINS": {
   "bullet": [
    "row-lead"

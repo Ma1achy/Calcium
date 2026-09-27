@@ -423,6 +423,36 @@ const MUTATIONS = [
     expect(reachable.ok, reachable.out).toBe(true);
   });
 
+  it("MA10b (F1243, C10 I44): a directory a reached support module lists is reach, and only that directory", () => {
+    // **C10 T2.40 reaches a module by listing its directory**, inside
+    // `test/support/curated.ts`, and hands it to the type checker — no import,
+    // no path. `c10-curated-discovery.mjs` mutates `budget.ts`, which nothing
+    // imports, and the mutation is caught; before this arm the sweep called it
+    // unreachable. The fixture is that run's shape.
+    const fixture = (module: string): string =>
+      [
+        `const CMD = "npx vitest run test/contract/curated.test.ts";`,
+        `const MUTATIONS = [`,
+        `  {`,
+        `    file: "${module}",`,
+        `    from: "export const TONE_SMELL = 5;",`,
+        `    to: "export const TONE_SMELL = 6;",`,
+        `    expect: "T2.40",`,
+        `  },`,
+        `];`,
+      ].join("\n");
+    const listed = run(runsDir("fake.mjs", fixture("src/presentation/theme/budget.ts")));
+    expect(listed.ok, listed.out).toBe(true);
+
+    // **The control: a sibling directory the support module does not list.**
+    // The same command and the same row, pointed at a module one directory
+    // over that nothing it runs imports, still fails — so the arm is the
+    // listing's directory and not "a test that lists anything".
+    const other = run(runsDir("fake.mjs", fixture("src/presentation/table/cells.ts")));
+    expect(other.ok, "a directory nobody lists is not reached by a listing").toBe(false);
+    expect(other.out).toContain("which no test file its command runs can import");
+  });
+
   it("MA7 (F768): a run that runs and says nothing fails, and one that prints and exits does not", () => {
     // **The fabricated violation is F768's exact line.** `c26-select-all.mjs`
     // ended `report(results);` — five mutations applied, the tree restored, a
