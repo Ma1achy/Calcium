@@ -610,6 +610,28 @@ export const REQUIRED_SLOTS: Readonly<Record<string, readonly string[]>> = Objec
   ]),
 });
 
+/** The greatest ratio two colours can have: white on black. */
+const MAX_RATIO = 21;
+
+/**
+ * **A declared floor is a ratio a pair can meet, and not less than the common
+ * one** (C10 I64). Two readers take the field differently — `validateHighContrast`
+ * holds a pair to `max(floor, floorFor(slot))`, `validateBands` to the floor
+ * itself — so a value one of them shrugs off empties the other: `NaN` fails no
+ * comparison, `0` is met by every ratio, and `3` checks a band below the floor
+ * every other theme owes. The domain is stated here, once, rather than repaired
+ * in each reader. Absent is legal and means the common floor.
+ */
+function validateFloor(tokens: ThemeTokens): readonly ThemeError[] {
+  const floor = tokens.floor;
+  if (floor === undefined) return Object.freeze([]);
+  if (Number.isFinite(floor) && floor >= DEFAULT_FLOOR && floor <= MAX_RATIO) return Object.freeze([]);
+  return Object.freeze([{
+    path: "floor",
+    message: `a declared floor of ${String(floor)} is not a promise a theme can make: it must be a finite ratio from ${DEFAULT_FLOOR} : 1, the common floor, to ${MAX_RATIO} : 1, white on black`,
+  }]);
+}
+
 /**
  * The families and slots a theme must carry (I30).
  *
@@ -647,7 +669,7 @@ function validateRequiredSlots(tokens: ThemeTokens): readonly ThemeError[] {
 }
 
 export function validateTokens(tokens: ThemeTokens): readonly ThemeError[] {
-  const errors: ThemeError[] = [];
+  const errors: ThemeError[] = [...validateFloor(tokens)];
   const surfaces = Object.entries(tokens.surfaces);
 
   for (const [name, value] of surfaces) {
