@@ -20,7 +20,7 @@ held at the point where a choice would be mine to invent.
 
 ## Entries
 
-**Open: 23, 36, 37, 39, 40, 41–51.** Every other entry is ruled or retracted. *Recounted 2026-09-27 from the headings*: the line read *18, 23, 32, 36, 37, 39, 40* while 41–51 were headed OPEN below it, so eleven open questions were missing from the summary that says which are open. A ruled entry keeps its body, with the ruling directly above it and a premise note wherever the ruling rested on something the entry or the design contradicts.
+**Open: none.** Ruled 2026-09-27: 18, 23, 32, 36, 37, 39–54. Every other entry is ruled or retracted. *Recounted 2026-09-27 from the headings*: the line read *18, 23, 32, 36, 37, 39, 40* while 41–51 were headed OPEN below it, so eleven open questions were missing from the summary that says which are open. A ruled entry keeps its body, with the ruling directly above it and a premise note wherever the ruling rested on something the entry or the design contradicts.
 
 > **Ruled 2026-09-24.** Already answered, by the chain rule. The repo-side spec (C09 §4, I5) carries the narrowed rule and the registry does not. That assumption stands as the answer.
 
@@ -404,7 +404,9 @@ refused.
 
 ---
 
-**23 · Does §101's `completion` row answer twice?** M15's last deliverable is
+> **Ruled 2026-09-27** (by the person). **Keep six rows; carry the second property on the layer.** *Where a printable key goes* and *whether the prompt is drawn underneath* are two properties that part in one cell, so the layer declares the second one rather than a kind or an id standing in for it, and `promptUnderMenu`'s hard-coded exemption is replaced by reading that field. **Built in:** review batch 4 (M15).
+
+**23 · RULED — Does §101's `completion` row answer twice?** M15's last deliverable is
 `promptUnderMenu`'s hardcoded exemption, whose comment has long said what it
 needed: *named rather than derived because no field distinguishes them from a
 search — which is a gap worth closing and not a rule to guess at.* The walk is
@@ -778,7 +780,9 @@ the footer, beside `copy`, or in the prompt rule's label) are both visible
 choices. Question 4's shared chip is adjacent and separate: that one is which
 mode's label the rung shows, this one is what the count says and where.
 
-**36 · OPEN — `R-SEL-007`'s rectangular selection has a label and no way in.** Ruling
+> **Ruled 2026-09-27** (by the person). **`⇧←` / `⇧→` extend the selection from its anchor, and rectangular selection toggles on `⌃V` in copy mode.** This is not the entry's proposal (a), which had `⇧←`/`⇧→` begin a rectangle; the horizontal extend is what they do, and the rectangle gets its own toggle, so the `RECT 12×4 · cells, not source` label has a state to be drawn in. **Built in:** review batch 4 (M10 items 2–3).
+
+**36 · RULED — `R-SEL-007`'s rectangular selection has a label and no way in.** Ruling
 5 gave the mode label, `RECT 12×4 · cells, not source`, and the clip and the
 escape-free cells are built (`rectBetween`, `cellTextOf`, C14 I42, I43). But the
 registry holds no rectangular action and no binding, and neither the HTML nor any
@@ -796,7 +800,9 @@ make. **Proposed, (a) recommended**:
   beside the `v`/`V` the mode already takes. One new chord, delivered as `0x16` on
   every terminal, and free in the registry and the repo at that rung.
 
-**37 · OPEN — A trend with no movement.** §088 §4 draws a trend going down and a
+> **Ruled 2026-09-27** (by the person). **A flat trend gets `→` (ASCII `=`); an absent trend stays `-`. No arrow is not *flat*.** A reading that held is a fact with a direction of its own, and leaving it unmarked makes it indistinguishable from a reading with no comparison at all. The registry gains the mark through the builder. **Built in:** review batch 2 (M4).
+
+**37 · RULED — A trend with no movement.** §088 §4 draws a trend going down and a
 trend going up, and `R-COL-006` gives each a tone from the metric's polarity. It
 draws no reading that did not move, and `from === to` is ordinary data — a metric
 that held. **Taken unless you say otherwise** (C11 I30): no arrow, the text alone
@@ -827,7 +833,9 @@ alone, because a glyph slot is a pair and has no ASCII half to ship without.
 
 ---
 
-**39 · OPEN — What a collision inside a spinner set is.** Ruling 11 put spinner frames
+> **Ruled 2026-09-27** (by the person). **A set's ASCII frames must not all be one character.** The within-set rule is that the ASCII rung *moves*; downsampling several Unicode frames onto one ASCII frame is allowed, which is what the 12 of 27 SS64 hits are. A set whose ASCII rung is a single repeated character is a still mark in a slot that says *live*. **Built in:** review batch 2 (M4, with item 7's glyph gate).
+
+**39 · RULED — What a collision inside a spinner set is.** Ruling 11 put spinner frames
 in their own domain, the duration slot, and said collisions are checked only within a
 set. **The premise that the static test applies inside a set does not hold.** Every
 set's `ascii` aligns with its `frames` index for index (27 of 27), and SS64's test — one
@@ -851,7 +859,9 @@ because a set compared with nothing is a rule with nothing to be wrong about.
 
 ---
 
-**40 · OPEN — Which interval a shared ASCII alphabet takes.** Ruling 30 applies
+> **Ruled 2026-09-27** (by the person). **120 ms for every ASCII alphabet.** One cadence for the ASCII rung — the entry's proposal (a) — which is §039's *nothing varies its rate*. **Built in:** review batch 2 (M4).
+
+**40 · RULED — Which interval a shared ASCII alphabet takes.** Ruling 30 applies
 `R-MOT-011` per rung — sets that collapse to one ASCII alphabet share an interval at
 that rung — and the registry records no ASCII interval to share. Measured from its
 spinner records: `|/-\` is nine sets at 80, 90, 100, 110, 120, 120, 130, 140 and
@@ -871,7 +881,9 @@ and `binary4` at 120. The number is visible — it is how fast the ASCII rung tu
 
 ---
 
-**41 · OPEN — Which column the `▌` selection rail takes.** Ruling 33 makes `▌` selection's
+> **Ruled 2026-09-27** (by the person). **The selection rail takes the live gutter's column** — the entry's proposal (a). It is the one column that displaces no head mark, and the head mark is the call state's only glyph carrier at 1-bit. **Built in:** review batch 4 (M11 item 1).
+
+**41 · RULED — Which column the `▌` selection rail takes.** Ruling 33 makes `▌` selection's
 second carrier. §017 (`R-BLK-127`, `R-BLK-129`) draws it as the first two cells of a
 selected row, `▌ ` on the band, before the focus mark's column — on search-result rows
 whose left edge is blank. In the transcript a selected row is its block's first row (C14
@@ -893,7 +905,9 @@ column 1 displaces the head mark — which at 1-bit is the call state's only gly
 
 ---
 
-**42 · OPEN — What `⏎` on a shed row expands into.** Ruling 19: *`⏎` expands what it
+> **Ruled 2026-09-27** (by the person). **`⏎` on a shed row gives the table's expanded-row form** — the entry's proposal (a): `expand` for the block, `expanded` on the block, the withheld parts drawn beneath each row as `label  value`. It lands with in-place expansion, which is the same mechanism. **Built in:** review batch 3 (M9 item 1).
+
+**42 · RULED — What `⏎` on a shed row expands into.** Ruling 19: *`⏎` expands what it
 stands for*; §104 says the same and draws only the collapsed row (`val loss  0.0372
 +1`). C09 I113 makes the withheld parts reachable through the peek, which is the
 table's dropped-column precedent and exists. The in-place form does not: the four
@@ -912,43 +926,61 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
-**43 · OPEN — §075's `/config` collides with docker-tui's `/config`.** Ruling 28 builds the provenance display, and §075 names its verb `/config`. `examples/docker/src/manifest/read.ts:163` already declares a `config` verb — a container's config file against its image's original (S8) — and C05 I6 makes a framework verb of the same name a **parse error** for that manifest, so the example would not start. The design decides the framework's name; it does not decide the example's new one, and the rename reaches **106 references across 19 files**, a recorded `demo.cast` and the media tools among them.
+> **Ruled 2026-09-27** (by the person). **The example's verb is renamed to `/filediff`**, so §075's `/config` stays the framework's. The 106 references, `demo.cast` and the media tools move with it. **Built in:** review batch 3 (with M9's manifest work).
+
+**43 · RULED — §075's `/config` collides with docker-tui's `/config`.** Ruling 28 builds the provenance display, and §075 names its verb `/config`. `examples/docker/src/manifest/read.ts:163` already declares a `config` verb — a container's config file against its image's original (S8) — and C05 I6 makes a framework verb of the same name a **parse error** for that manifest, so the example would not start. The design decides the framework's name; it does not decide the example's new one, and the rename reaches **106 references across 19 files**, a recorded `demo.cast` and the media tools among them.
 
 **Built meanwhile** (C22 I115, C23 I80): the provenance record, the ladder and the table. What waits is the verb and its manifest row. **The one-word answer** is the example's new name — `/filediff` is the proposal — or a different framework verb, which would depart from §075.
 
 ---
 
-**44 · OPEN — §075's ladder puts `warn` and `error` on a word, and C04 I6 refuses both without a glyph.** §075: `env` is *warn — your shell chose it*, `flag` is *error — this invocation chose it*. C04 I6 (D29) throws for a cell whose tone is `warn` or `error` and whose glyph is empty — *colour alone does not survive 1-bit or a colour-blind reader*. Here colour is not alone: the word `env` or `flag` **is** the fact, and the tone is its second carrier, which is tie-break 4's per-fact count. The design is consistent; C04 I6 counts per effect.
+> **Ruled 2026-09-27** (by the person). **C04 I6 exempts a closed vocabulary.** A word drawn from a declared, closed set — `env`, `flag` — carries its own fact, and the tone is its second carrier (tie-break 4, carriers count per fact). The exemption is by declared vocabulary, never by free text, so a cell's text cannot opt itself out. **Built in:** review batch 3 (with 43).
+
+**44 · RULED — §075's ladder puts `warn` and `error` on a word, and C04 I6 refuses both without a glyph.** §075: `env` is *warn — your shell chose it*, `flag` is *error — this invocation chose it*. C04 I6 (D29) throws for a cell whose tone is `warn` or `error` and whose glyph is empty — *colour alone does not survive 1-bit or a colour-blind reader*. Here colour is not alone: the word `env` or `flag` **is** the fact, and the tone is its second carrier, which is tie-break 4's per-fact count. The design is consistent; C04 I6 counts per effect.
 
 **Why parked, not ruled**: making C04 I6 accept a word that carries its own fact weakens an invariant, and *which words qualify* has no field to answer from — a free-text cell cannot say whether its text is a label or the fact. **Nothing reaches it today**: `env` and `flag` have no producer (ruling 28). **The one-word answers**: (a) C04 I6 exempts a cell drawn from a closed vocabulary the block declares; (b) the ladder's two loud rungs take a glyph (`warn`'s `▲`, `error`'s `✗`) beside the word; (c) the ladder stops at `meta`.
 
 
-**45 · OPEN — How the palette opens, and where its query is typed.** Ruling 20 builds §105's five primitives. The registry defines the palette as *an overlay whose rows are filtered actions* (R-PRI-001), and §105 draws it as `❯ open▌  3 of 61` above action rows carrying their chords, with `+58 more` beneath. **Everything it draws is built already**, as §105 says: C19's menu is §097's panel between two rules, with a detail column and the `+ N more` residue, and the registry's 40 actions are the rows. **What the design does not give is the way in.** No action opens a palette and no binding names one. §105's `❯ open▌` is a prompt row, so the query may be typed in the prompt, but the figure does not say what turns a prompt into a palette.
+> **Ruled 2026-09-27** (by the person). **`>` opens the palette only at an EMPTY prompt — the same exception `/` already has — and that limit is written into the rule.** A `>` typed anywhere else is text. **Built in:** review batch 2 (M6).
+
+**45 · RULED — How the palette opens, and where its query is typed.** Ruling 20 builds §105's five primitives. The registry defines the palette as *an overlay whose rows are filtered actions* (R-PRI-001), and §105 draws it as `❯ open▌  3 of 61` above action rows carrying their chords, with `+58 more` beneath. **Everything it draws is built already**, as §105 says: C19's menu is §097's panel between two rules, with a detail column and the `+ N more` residue, and the registry's 40 actions are the rows. **What the design does not give is the way in.** No action opens a palette and no binding names one. §105's `❯ open▌` is a prompt row, so the query may be typed in the prompt, but the figure does not say what turns a prompt into a palette.
 
 **Why parked, not ruled**: the opener is a key or a word the reader has to learn. That is a visible choice, and every candidate collides with something: `⌃⇧P` collapses to `⌃P` in the base profile; `⌥p` is `posture.cycle`; `/` already opens the verb menu.
 
 **The proposal**: `>` typed as the first character of an empty prompt switches the menu's source from verbs to actions, as in VS Code's quick-open. That costs no chord, keeps the query in the prompt as §105 draws it, and the base and enhanced profiles agree. The alternatives: (b) an action `palette.open` on `⌃⇧P` enhanced and `⌥k` base; (c) a verb `/actions`.
 
 
-**46 · OPEN — Whether the divider takes the accent while the right pane holds focus.** §105: *the focused pane takes the accent ON the divider, so which side owns the arrows is visible without a label.* The figure shows one state, with a `┃` segment in the divider. Built (C04 §3aq S7): the divider is the left pane's bar (ruling 22 and §021, read together), so it takes the accent under §021's rule, *the thumb takes the accent when its container has focus*, while focus is in the left pane. It is `muted` otherwise. With focus in the right pane, the accent is on that pane's own bar in its last column, and only where the pane overflows.
+> **Ruled 2026-09-27** (by the person). **Keep what's built**: the divider is the left pane's bar and takes the accent under §021's rule; the right pane's focus shows on its own bar. **Built in:** nothing to build.
+
+**46 · RULED — Whether the divider takes the accent while the right pane holds focus.** §105: *the focused pane takes the accent ON the divider, so which side owns the arrows is visible without a label.* The figure shows one state, with a `┃` segment in the divider. Built (C04 §3aq S7): the divider is the left pane's bar (ruling 22 and §021, read together), so it takes the accent under §021's rule, *the thumb takes the accent when its container has focus*, while focus is in the left pane. It is `muted` otherwise. With focus in the right pane, the accent is on that pane's own bar in its last column, and only where the pane overflows.
 
 **Why parked, not ruled**: *which side owns the arrows is visible* asks for a difference between the two sides, and a single column in one tone gives only two states for three conditions (left pane, right pane, neither). With focus in a right pane that fits, the divider reads the same as with no focus in the split. The focus mark on the focused row still shows the side, but that is a mark, not the divider.
 
 **The proposal**: keep what is built. Every alternative spends a second carrier on one column. One is a half-cell edge (`▕`/`▏`) facing the focused pane, which is a glyph the registry does not have. Another is accent on the divider whenever either pane is focused, which says *in the split* and not *which side*.
 
 
-**47 · OPEN — §105's form indents its fields one cell right of the button row, and C09 I87 forbids it.** §105 draws ` name        prism-serve` over `› save    cancel`: every field row starts one cell right of the button row's `›`. C09 I87 says nothing is drawn left of a block's **head**, its first drawn row, on any row — a naive drag picks up whatever sits in that gutter as though it were text (`R-SEL-016`). With the fields first, the head is the first field row at column 1, and the button row starts at column 0, left of it.
+> **Ruled 2026-09-27** (by the person). **Keep what's built**: the fields flush at column 0. C09 I87 stands and the figure's one-cell indent is the specimen's (R-SEC-036). **Built in:** nothing to build.
+
+**47 · RULED — §105's form indents its fields one cell right of the button row, and C09 I87 forbids it.** §105 draws ` name        prism-serve` over `› save    cancel`: every field row starts one cell right of the button row's `›`. C09 I87 says nothing is drawn left of a block's **head**, its first drawn row, on any row — a naive drag picks up whatever sits in that gutter as though it were text (`R-SEL-016`). With the fields first, the head is the first field row at column 1, and the button row starts at column 0, left of it.
 
 **Built meanwhile** (C04 §3ar): the fields flush at column 0, so the button row is exactly the figure's and every field column is the figure's less one. **Why parked, not ruled**: keeping the figure's cell means weakening I87, and the obvious weakening — measure from the leftmost row rather than the head — is the tautology I87 records its own control catching. **The one-word answers**: (a) keep it flush; (b) indent the button row with the fields, so `›` sits at column 1 under the labels' first letter; (c) I87 exempts a row whose first cell is a mark the block declares, which is a list.
 
 
-**48 · OPEN — How often a running call says it is still running, in linear mode.** §107: *a running call announces start, useful elapsed milestones, blockage and completion — not spinner frames.* Start, blockage (a question) and completion are built (C22 §6m). **A milestone needs an interval**, and the design gives none — `R-MOT-*` fixes spinner intervals, which are frames, and §107 excludes frames by name. It is a visible timing value, which is why it is here. **The proposal**: at 10 s, 30 s, 1 min and every minute after — `entry 7: pytest tests/unit — running, 30s` — a doubling-ish ladder that says *still going* often early and rarely late, and is silent for a call that finishes inside ten seconds. **Built meanwhile**: nothing between start and completion, so a long call is silent in linear until it ends.
+> **Ruled 2026-09-27** (by the person). **Linear mode reports a long call at 10 s, 30 s, 1 min, then every minute** — the entry's proposal. **Built in:** review batch 4 (M11, linear mode).
 
-**49 · OPEN — The rate limit on linear announcements.** §107: *announce is none / polite / assertive, with deduplication and rate limits.* Deduplication is built (C22 I120): a fact is written once per id. **A rate limit is a number** — events per second, or a minimum gap between polite events — and the design gives none. **The proposal**: no limit on `assertive`; `polite` events inside 250 ms of each other are written as one batch, which is §107's *coherent batches* reached from the other side. **Built meanwhile**: every event is written as it happens. **Widened 2026-09-25 by ruling 27** (C22 §6n): a notification rung repeated while the reader is away is the same number asked of a second stream — every earning fact rings once until this is answered.
+**48 · RULED — How often a running call says it is still running, in linear mode.** §107: *a running call announces start, useful elapsed milestones, blockage and completion — not spinner frames.* Start, blockage (a question) and completion are built (C22 §6m). **A milestone needs an interval**, and the design gives none — `R-MOT-*` fixes spinner intervals, which are frames, and §107 excludes frames by name. It is a visible timing value, which is why it is here. **The proposal**: at 10 s, 30 s, 1 min and every minute after — `entry 7: pytest tests/unit — running, 30s` — a doubling-ish ladder that says *still going* often early and rarely late, and is silent for a call that finishes inside ten seconds. **Built meanwhile**: nothing between start and completion, so a long call is silent in linear until it ends.
 
-**50 · OPEN — Who fills a watch, and where it is shown.** Ruling 27 built the watch as *a declaration that producers fill* (C22 I130): a streaming entry can be watched, the watch drops at settle, and its completion earns a notification always. **Nothing in the tree fills it.** §085 names two producers — `/watch` to *pin one that is not yours*, and *a long-running job you started* — and one display, the footer's watch row (`⋯ › a3f9b21 █████░ 43%`, `⇧⇥` to focus it, `←→` among watches, `⏎` to scroll to its entry and open it). **`/watch` and `/unwatch` would be the ninth and tenth framework verbs**, and C05 §3 makes each a breaking change for any app declaring the name — the process is a grep of every manifest first, and the brief puts the manifest out of scope. The row is `example` display with a binding (`watch.jump[n]`) the registry does not hold. **The one-word answers**: (a) build `/watch` and `/unwatch` as framework verbs after the grep; (b) a producer declares it — an application calling a `watch(id)` on `TuiInstance`, which is C24 surface; (c) both, and the footer row with them. **Built meanwhile**: the declaration and its earning; no producer, no row.
+> **Ruled 2026-09-27** (by the person). **Polite events within 250 ms are written as one batch**; `assertive` is not limited. The entry's proposal. **Built in:** review batch 4 (M11, linear mode).
 
-**51 · OPEN — Where the return line goes.** §014: *when you come back, the transcript says what you missed* — `● 3 entries settled while you were away   ⌘↓ to the bottom`. The transcript holds entries, and every line in it is one: a line appended on return is either an entry the reader never ran, with a `seq` and a place in `/history`'s neighbour, or a second kind of row that §6m's stream and C13's eviction would both have to learn. Nothing in the tree counts arrivals while away — the `N waiting` chip counts what a **frozen** view holds back (C14 I34). **The one-word answers**: (a) a chip on the owner line, beside `N waiting`, shown from the focus-in until the reader reaches the bottom; (b) a transient toast (§6j's) on focus-in; (c) a notice entry, accepting that it is one. **Built meanwhile**: nothing on return; the rungs are what reached the reader.
+**49 · RULED — The rate limit on linear announcements.** §107: *announce is none / polite / assertive, with deduplication and rate limits.* Deduplication is built (C22 I120): a fact is written once per id. **A rate limit is a number** — events per second, or a minimum gap between polite events — and the design gives none. **The proposal**: no limit on `assertive`; `polite` events inside 250 ms of each other are written as one batch, which is §107's *coherent batches* reached from the other side. **Built meanwhile**: every event is written as it happens. **Widened 2026-09-25 by ruling 27** (C22 §6n): a notification rung repeated while the reader is away is the same number asked of a second stream — every earning fact rings once until this is answered.
+
+> **Ruled 2026-09-27** (by the person). **`/watch` is a reserved framework verb, and watches get built.** Framework verb names are reserved **in the manifest schema**, so an app declaring one gets a validation error rather than a parse failure found at start; **`/capabilities` is confirmed on the same basis.** The grep of every manifest the entry names is the first step. **Built in:** review batch 3 (with M9 item 7's manifest diagnostic).
+
+**50 · RULED — Who fills a watch, and where it is shown.** Ruling 27 built the watch as *a declaration that producers fill* (C22 I130): a streaming entry can be watched, the watch drops at settle, and its completion earns a notification always. **Nothing in the tree fills it.** §085 names two producers — `/watch` to *pin one that is not yours*, and *a long-running job you started* — and one display, the footer's watch row (`⋯ › a3f9b21 █████░ 43%`, `⇧⇥` to focus it, `←→` among watches, `⏎` to scroll to its entry and open it). **`/watch` and `/unwatch` would be the ninth and tenth framework verbs**, and C05 §3 makes each a breaking change for any app declaring the name — the process is a grep of every manifest first, and the brief puts the manifest out of scope. The row is `example` display with a binding (`watch.jump[n]`) the registry does not hold. **The one-word answers**: (a) build `/watch` and `/unwatch` as framework verbs after the grep; (b) a producer declares it — an application calling a `watch(id)` on `TuiInstance`, which is C24 surface; (c) both, and the footer row with them. **Built meanwhile**: the declaration and its earning; no producer, no row.
+
+> **Ruled 2026-09-27** (by the person). **"While you were away" is a transcript entry** — the entry's answer (c). It is what R-BLK-314's detach summary is too, so the two share one form. **Built in:** review batch 3 (with M9 item 3's detach summary).
+
+**51 · RULED — Where the return line goes.** §014: *when you come back, the transcript says what you missed* — `● 3 entries settled while you were away   ⌘↓ to the bottom`. The transcript holds entries, and every line in it is one: a line appended on return is either an entry the reader never ran, with a `seq` and a place in `/history`'s neighbour, or a second kind of row that §6m's stream and C13's eviction would both have to learn. Nothing in the tree counts arrivals while away — the `N waiting` chip counts what a **frozen** view holds back (C14 I34). **The one-word answers**: (a) a chip on the owner line, beside `N waiting`, shown from the focus-in until the reader reaches the bottom; (b) a transient toast (§6j's) on focus-in; (c) a notice entry, accepting that it is one. **Built meanwhile**: nothing on return; the rungs are what reached the reader.
 ---
 
 > **Ruled 2026-09-27** (review batch 3, M7 item 9). **The quiet window.** An activation is refused only if it arrives within ~250 ms of the question appearing; while guarded, the guard holds for as long as activation keys keep arriving inside the window, so a held key's auto-repeat stays caught however long it is held. A deliberate `⏎` after the window answers at once. This replaces the refuse-the-first-activation rule, and it is also M7 item 3's remedy (auto-repeat defeating a guard that disarms after one refusal). **Owed:** C16's guard amended spec-first when batch 3 opens, with a 30 Hz synthetic repeat and a deliberate press after quiet as the two rows.
