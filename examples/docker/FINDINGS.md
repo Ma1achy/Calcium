@@ -56233,3 +56233,35 @@ its value. And the first version of the arm **passed**: its per-row check looked
 for a lead followed by a count, and a mark the clamp takes whole leaves no lead
 to find. What sees it is block-wide — the plan is the block's (C09 I81), so a
 render marks every row or none, and a render that marks some is the damage.
+
+---
+
+## F1258 — the row composer closes a dim run with `22` and never re-opens the bold beside it ★★★☆☆
+*2026-09-27 · review batch 1, item 22 (C25 §3d), at a7248226.*
+
+**Expected.** A span painted `{bold, dim}` followed by spans painted `{bold}` reaches the terminal
+bold throughout: `paint` writes each span as its own sequence and reset, and the painter's bytes
+say so.
+
+**Measured.** `out/p22-intensity.mts`, the painter's bytes and `normaliseRow`'s, each written to
+`@xterm/headless` and read back a cell at a time:
+
+    painted    "\u001b[1;2m18\u001b[0m\u001b[1m \u001b[0m\u001b[1mctx\u001b[0m"
+    normalised "\u001b[1m\u001b[2m18\u001b[22m ctx\u001b[22m"
+    painted    1:BD 8:BD  :B- c:B- t:B- x:B-
+    normalised 1:BD 8:BD  :-- c:-- t:-- x:--
+
+Six cells bold of six, then two. **SGR 1 and 2 are one channel** — both close with `22` — and
+`between` (`rows.ts`) closes the dim with `22` and treats the bold as still held, because the
+state it carries says it is. That is `@alcalzone/ansi-tokenize`'s `diffAnsiCodes`, which the file
+reproduces rule for rule on purpose (C09 I72: *a normaliser that corrected any of them would move
+a golden*), and T1.46 holds the two equal over ten thousand seeded rows — so the defect is Ink's,
+carried faithfully, and the equality row is what keeps it.
+
+**Found by reading a frame**, not by a row: a focused context line in a patch at 1-bit, where the
+`muted` gutter is dim (F34) and the head is bold (C25 I25). The patch no longer paints the shape —
+the head's bold replaces the dim, which is F34's rule (C25 §3d row h) — so nothing shipped is known
+to hit it. **Not measured**: how many frames in the golden corpus carry a `{bold, dim}` cell followed
+by a `{bold}` one. **Open**, and it is a C09 ruling rather than a fix: correcting `between` breaks
+T1.46's equality with the tokeniser by design, so the ruling is whether the canonical form keeps
+Ink's serialiser or the terminal's meaning. Symbol: `between`.
