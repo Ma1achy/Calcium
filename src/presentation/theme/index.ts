@@ -27,7 +27,7 @@ export {
   resolveTone,
   validatePaintedFloors,
 } from "./resolve.js";
-export { loadTheme, type Overrides, type ThemeStore } from "./store.js";
+export { loadTheme, themeNames, type Overrides, type ThemeStore } from "./store.js";
 export { DARK } from "./tokens-dark.js";
 export {
   NO_STYLE,

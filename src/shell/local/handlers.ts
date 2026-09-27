@@ -546,7 +546,11 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
           warnNotice(`usage: /theme ${deps.theme.names.join("|")} — got \`${argv[0] ?? ""}\``, blockId("theme-usage")),
         ]);
       }
-      deps.theme.setTheme(wanted);
+      // **The name the set answers, not the word typed** (C10 I63): an alias is
+      // read on the way in and never written on the way out, so the preference
+      // file only ever holds a name the set declares.
+      const chosen = deps.theme.resolveName(wanted) ?? wanted;
+      deps.theme.setTheme(chosen);
       // **Written on the change, not at exit** (C22 I40). A session killed by
       // `SIGKILL` runs no shutdown path (C01 §5), and a preference that
       // survives a clean exit and not a crash is one people stop trusting.
@@ -556,7 +560,7 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
       // handler that awaited a disk would block the frame on it. A failed write
       // means the choice does not survive the session, which is what the state
       // directory being unwritable already means for history (C20).
-      deps.persistTheme?.(wanted);
+      deps.persistTheme?.(chosen);
 
       // **Warn and comply, and only where the flag suppresses an actual paint**
       // (C22 I66, C10 §4c row 5). `/theme light --no-bg` on a dark terminal
@@ -569,7 +573,7 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
         ctx.args["no-bg"] === true && deps.theme.current.tokens.background === "surface";
 
       return doc("/theme", [
-        b.notice("muted", `theme: ${wanted}`, undefined, { id: blockId("theme") }),
+        b.notice("muted", `theme: ${chosen}`, undefined, { id: blockId("theme") }),
         ...(suppressed
           ? [
               warnNotice(

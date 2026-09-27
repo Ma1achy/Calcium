@@ -59,7 +59,7 @@ import { BlockFaultLog } from "./block-faults.js";
 import { tableDefinition } from "../presentation/table/index.js";
 import { cursorable, legendHitAt, plotDefinition, sampleIndexAt } from "../presentation/plot/index.js";
 import { patchDefinition } from "../presentation/patch/index.js";
-import { loadTheme, type ThemeStore } from "../presentation/theme/index.js";
+import { loadTheme, themeNames, type ThemeStore } from "../presentation/theme/index.js";
 import { createTranscriptStore } from "../viewport/transcript/index.js";
 import type { EntryId, TranscriptEntry, TranscriptView } from "../viewport/transcript/index.js";
 import { createViewport } from "../viewport/viewport/index.js";
@@ -882,8 +882,10 @@ export async function constructGraph(
     // **`/theme`'s values, supplied where both facts are held** (C10 I27). The
     // manifest describes the verb and the config declares the themes, and this
     // is the one place with each — so the enum, the completion and the usage
-    // text all name the set the session actually holds.
-    manifest.load(withThemeNames(parsed.value, Object.keys(config.theme)));
+    // text all name the set the session actually holds. **Plus the aliases that
+    // resolve in it** (C10 I63): a word the store would honour, refused at the
+    // parser, is the membership test failing one layer early.
+    manifest.load(withThemeNames(parsed.value, themeNames(config.theme)));
 
     // **The product's source-error sink** (C19 T3.6, C22 §8 step 3). Every
     // test supplied `onSourceError` and nothing in `src/` did, so a failing
@@ -1213,8 +1215,10 @@ export async function constructGraph(
     // (C10 I27). The migration is nothing — `dark` and `light` are names in
     // the shipped set — and a literal pair here would refuse a legitimate
     // name the moment a third theme existed.
-    const stated = themed.value.names.includes(trimmed);
-    if (stated) themed.value.setTheme(trimmed);
+    // **Resolved, not merely looked up** (C10 I63): a persisted `high-contrast`
+    // is a preference the set can honour, as `hcDark`.
+    const stated = trimmed === "" ? undefined : themed.value.resolveName(trimmed);
+    if (stated !== undefined) themed.value.setTheme(stated);
     else if (trimmed !== "") {
       // Appended here rather than carried out to `start()`: the transcript
       // exists at this point and a warning threaded through the graph is a

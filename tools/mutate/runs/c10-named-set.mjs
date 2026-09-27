@@ -83,7 +83,8 @@ const MUTATIONS = [
     // reports a theme change that did not happen.
     name: "an unknown theme is a silent no-op",
     file: STORE,
-    from: '        throw new Error(`no theme named "${next}"; this set declares ${Object.keys(tokens).join(", ")}`);',
+    // Re-anchored when C10 I63 resolved the name first; `requested` is the word asked for.
+    from: '        throw new Error(`no theme named "${requested}"; this set declares ${Object.keys(tokens).join(", ")}`);',
     to: "        return;",
     expect: "T1.21",
   },
@@ -92,8 +93,9 @@ const MUTATIONS = [
     // be requiring of every app's set.
     name: "the set opens on a name C10 invented",
     file: STORE,
-    from: "  const opened = opening ?? first;",
-    to: '  const opened = opening ?? "dark";',
+    // Re-anchored when C10 I63 resolved the opening through the alias table.
+    from: "  const opened = opening === undefined ? first : resolveThemeName(set, opening);",
+    to: '  const opened = opening === undefined ? "dark" : resolveThemeName(set, opening);',
     expect: "T1.21a",
   },
   {
@@ -119,7 +121,8 @@ const MUTATIONS = [
     // the only place both facts are held.
     name: "the composition root does not supply the names",
     file: CONSTRUCT,
-    from: "    manifest.load(withThemeNames(parsed.value, Object.keys(config.theme)));",
+    // Re-anchored when C10 I63 added the aliases to the enum's names.
+    from: "    manifest.load(withThemeNames(parsed.value, themeNames(config.theme)));",
     to: "    manifest.load(parsed.value);",
     expect: "T2.22",
   },
@@ -131,8 +134,9 @@ const MUTATIONS = [
     // Re-anchored when C22 I68 split the membership test out of the `if`, so
     // absent, empty and unusable could share one arm. Same mutation, same
     // subject; the line it lives on moved.
-    from: "    const stated = themed.value.names.includes(trimmed);",
-    to: '    const stated = trimmed === "dark" || trimmed === "light";',
+    // And again when C10 I63 made it a resolution rather than a membership test.
+    from: '    const stated = trimmed === "" ? undefined : themed.value.resolveName(trimmed);',
+    to: '    const stated = trimmed === "dark" || trimmed === "light" ? trimmed : undefined;',
     expect: "T4.36",
   },
   {
@@ -216,8 +220,8 @@ const results = await runPass({
   run,
   control: {
     file: STORE,
-    from: "    setTheme(next: string): void {",
-    to: "    setTheme(_next: string): void {\n      throw new Error(`control`);\n    },\n    unusedSetTheme(next: string): void {",
+    from: "    setTheme(requested: string): void {",
+    to: "    setTheme(_requested: string): void {\n      throw new Error(`control`);\n    },\n    unusedSetTheme(requested: string): void {",
     why:
       "no theme can be switched to at all — if this survives, nothing in the set reaches the " +
       "store's selection and every kill below is unearned",
