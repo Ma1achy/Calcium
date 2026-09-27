@@ -875,12 +875,22 @@ describe("C04 §7 — the update model and the view state, checked rather than c
     for (const [why, over, field] of [
       ["an empty message", { message: "" }, /"message"/u],
       ["a non-positive height", { height: 0 }, /"height"/u],
-      ["an absent height", { height: undefined }, /"height"/u],
+      ["a negative height", { height: -2 }, /"height"/u],
+      ["a fractional height", { height: 1.5 }, /"height"/u],
+      ["a height that is not a number", { height: "3" }, /"height"/u],
     ] as const) {
       const bad = status(over);
       expect(bad.ok, why).toBe(false);
       expect(bad.error?.join(" "), `${why}: naming its field (I57)`).toMatch(field);
     }
+    // **An absent height is the fitted box** (C09 §3a-quater) — the row asserted
+    // the opposite until `b.status` stopped declaring one. The key is removed
+    // rather than set to `undefined`, so the row is about absence and not about
+    // how a validator reads an undefined value.
+    const { height: _declared, ...fitted } = {
+      kind: "status", id: "st", state: "error", message: "the fetch failed", height: 3,
+    };
+    expect(validateBlock(fitted as never).ok, "an absent height").toBe(true);
 
     /**
      * **Supplied rather than derived, measured rather than scanned.** `tick`

@@ -42,9 +42,6 @@ import { samplesChildren, samplesLayout, type Sample, type SamplesOptions, sampl
 import { readFileSync } from "node:fs";
 import { digestOf, intralineLines, overlayFault, parseAreas } from "../../data/viewmodel/index.js";
 import { COLORMAPS } from "../../data/colormaps/index.js";
-// The detail's cap is C09's (C09 I84), asked rather than restated — a second
-// `Math.min(3, …)` here is the drift `statusDetailRows` exists to stop.
-import { statusDetailRows } from "../../presentation/blocks/index.js";
 import { parseStartDate } from "../../data/dates.js";
 import type {
   ImageOverlay,
@@ -1708,20 +1705,24 @@ function spinner(label: string, opts?: BlockOpts): Steps {
  * `status` — the kind both framework defaults return, and the one no builder made
  * (C24 I30, §4b, §8d).
  *
- * **The parameters are `renderError`'s own, in its own order**, so the null
- * override is `renderError: b.status` and the useful one wraps it:
- * `b.group("column", [history, b.status(err, retryInMs, attempt)])`, which keeps
- * the data the default replaces outright.
+ * **The parameters are `renderError`'s own, in its own order**, and the useful
+ * override wraps it: `b.group("column", [history, b.status(err, retryInMs,
+ * attempt)])`, which keeps the data the default replaces outright.
+ * `renderError: b.status` is **not** the null override (C24 §4b): the default is
+ * the framed figure, and this is the free-standing one, so inside a live panel it
+ * draws a border within the border.
  *
  * **What is relayed and what is derived, which is the whole of the ruling.** A
  * consumer is *handed* the error, the countdown and the attempt by the driver, so
  * passing them back is relaying rather than claiming — the thing MG27 refuses is a
  * `state` asserted against a fetch that never failed, and `state` is derived here
- * from whether a countdown is present. `height` is derived too, and it is the one
- * the scoping does not reach: 1 and 2 are C23's frame read about sitting inside
- * `b.live`'s panel (F234, F235), so a consumer choosing 3 puts a second border
- * inside the first and a consumer choosing 2 draws `loading` over `⠋ loading`.
- * `elapsedMs` and `spinner` are never parameters at all.
+ * from whether a countdown is present. `height` is **fitted** and never a
+ * parameter (C09 §3a-quater): the box carries none, and `measure` sizes it at the
+ * width the layout hands it — border, banner, the message wrapped whole, the
+ * detail within its cap. It used to declare 1 or 2, read from a frame inside
+ * `b.live`'s panel and applied here to a box in no panel, which cut every message
+ * longer than a row and dropped `details` whole. `elapsedMs` and `spinner` are
+ * never parameters at all.
  *
  * **One implementation, and that is the other half.** This kind was constructed in
  * three places — here, `execution.ts`'s default `renderError`, and the registry's
@@ -1822,25 +1823,19 @@ export function framedStatus(
   // row, where as prose it would have been joined onto the end of a sentence and
   // then cut. One `key: value` per line, so a cut takes whole facts.
   const detail = detailFrom(err);
-  // **Framed heights are one row taller, and the row buys the tag** (F406, C09
-  // I31). Free-standing the numbers are 1 and 2 — the rungs below the ladder's
-  // first border — and inside `b.live`'s panel they read as a red line of text,
-  // which is what a reader with two screenshots reported. Framed, two rows are
-  // *tag and message* and three buy `retrying` its activity line.
-  // **The detail's rows are added rather than absorbed**, so every figure C23
-  // read from a frame is unchanged for the box as it ships today — an error with
-  // no `details` is the same two rows it has always been — and the box grows
-  // only when there is something to put in it. `statusDetailRows` is C09's, not
-  // a second cap here (C09 I84).
-  const height =
-    (framed ? (retryInMs === null ? 2 : 3) : retryInMs === null ? 1 : 2) + statusDetailRows(detail);
+  // **No `height`: the box is fitted** (C09 §3a-quater, C04 I66). The numbers
+  // this used to declare — 2 and 3 framed, 1 and 2 free-standing, plus the
+  // detail's rows — were computed from everything except the message, because
+  // a producer has no width to wrap at. `measure` has one. Framed, a one-row
+  // message still measures the 2 and 3 C23 I51 read from a frame (tag and
+  // message, and the activity line), so the figure survives as a consequence of
+  // the fit rather than as a number written beside it.
   return finish<Status>(
     block({
       kind: "status",
       id: idOf(opts, "status"),
       message: err.message,
       state,
-      height,
       ...(framed ? { framed } : {}),
       ...(detail === "" ? {} : { detail }),
       ...(retryInMs === null ? {} : { retryInMs, attempt }),

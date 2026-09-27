@@ -40,7 +40,8 @@ const results = runPass({
   run,
   control: {
     file: SRC,
-    from: "  measure: (block: Status): number => Math.max(1, Math.floor(block.height)), // cells-ok — a row count",
+    // Re-anchored 2026-09-27 (C09 I31, §3a-quater): the declared height or the fit.
+    from: "  measure: (block: Status, width: number): number => statusHeight(block, width),",
     to: "  measure: (): number => 1,",
     why: "every box collapses to one row, which T3.38 asserts across seven heights and three states",
   },

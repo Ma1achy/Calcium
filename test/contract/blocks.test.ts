@@ -988,11 +988,30 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
     // message and is 7 on the box, so a message that wrapped past four rows asks
     // for more than it used to and nothing asks for less.
     const asked = (message: string, width: number): number =>
-      statusRowsFor(statusAt({ message, height: 1 }) as never, width, FULL_CAPS);
+      statusRowsFor(statusAt({ message, height: 1 }) as never, width);
     expect(asked(LONG, 40), "a nine-row message used to be held to four").toBeGreaterThan(4);
     expect(asked(LONG, 40), "and is held by the box's cap instead").toBeLessThanOrEqual(CONTENT_LINE_CAP + 3);
     for (const width of WIDTHS) {
       expect(asked("decode failed", width), `w=${String(width)}: a short message is unmoved`).toBeLessThanOrEqual(5);
+    }
+  });
+
+  it("T2.182 (C09 I31): a declared height wins over the fit, at every width", () => {
+    // **The fit is for a box that declares nothing** (C09 §3a-quater). A box
+    // with a height is a commitment its producer made — the registry's error
+    // path, `loading`'s one row, `empty`'s three — and re-sizing it behind the
+    // producer's back would break the pair the registry builds by construction.
+    // The message is one the fit would give seven content rows at any width.
+    const kit = measurable({ capabilities: FULL_CAPS });
+    const huge = Array.from({ length: 40 }, (_u, i) => `word${String(i)}`).join(" ");
+    const declared = statusAt({ message: huge, height: 2 });
+    const fitted = block({ kind: "status", id: "s", state: "error", message: huge } as never) as Block;
+    for (let width = 1; width <= 120; width += 1) {
+      expect(kit.measure(declared, width), `w=${String(width)}: the declared two`).toBe(2);
+      expect(kit.renderToLines(declared, width), `w=${String(width)}: drawn at two`).toHaveLength(2);
+      // The control: the same message undeclared is not two anywhere, so the
+      // row above is about the declaration and not about a message that fits.
+      expect(kit.measure(fitted, width), `w=${String(width)}: the fit differs`).toBeGreaterThan(2);
     }
   });
 

@@ -2151,7 +2151,12 @@ describe("C23 §4 — the submit row's two other steps", () => {
     // it replaced — reported by a reader with two screenshots. Framed, the box
     // draws no border of its own (the panel has one) and spends the rows on the
     // tag and the content: tag, message, activity line.
-    expect(child).toMatchObject({ state: "retrying", height: 3, framed: true, attempt: 1 });
+    expect(child).toMatchObject({ state: "retrying", framed: true, attempt: 1 });
+    // **Fitted, and the frame read survives as its consequence** (C09
+    // §3a-quater, table row F4): no height is declared, and a one-row message at
+    // 80 columns measures tag, message and activity line.
+    expect(child).not.toHaveProperty("height");
+    expect(createBlockRegistry().measure(child as Block, 80), "tag, message, activity line").toBe(3);
     expect((child as { retryInMs?: number }).retryInMs, "the countdown is the driver's").toBeGreaterThan(0);
     expect((child as { message: string }).message).toContain("the far side is gone");
   });
@@ -2203,11 +2208,11 @@ describe("C23 §4 — the submit row's two other steps", () => {
     // **A row asserting only the count could not tell those two apart**, which is
     // how the unframed pair looked right for an arc. `framed` is asserted beside
     // the height for that reason.
-    expect(child, "no retry is coming, so no countdown — the second row is the tag").toMatchObject({
-      state: "error",
-      height: 2,
-      framed: true,
-    });
+    expect(child, "no retry is coming, so no countdown").toMatchObject({ state: "error", framed: true });
+    // **Measured rather than declared** (C09 §3a-quater, table row F3): the box
+    // carries no height, and at 80 columns the fit is the tag and the message.
+    expect(child).not.toHaveProperty("height");
+    expect(createBlockRegistry().measure(child as Block, 80), "the second row is the tag").toBe(2);
     expect(child).not.toHaveProperty("retryInMs");
     expect((child as { message: string }).message).toContain("nothing there");
   });

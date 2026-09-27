@@ -96,8 +96,9 @@ const results = runPass({
       // width will not draw does not make `measure` and `render` disagree — the
       // box takes another blank row — so a length assertion passes on it. What
       // it breaks is *at worst one row of slack*, which is what T3.64 reads.
-      from: "  const tagRows = rung.frame.tag && rung.tag !== \"none\" ? 1 : 0;",
-      to: "  const tagRows = rung.frame.tag ? 1 : 0;",
+      // Re-anchored 2026-09-27 (C09 I34, F10): an `empty` box counts no banner.
+      from: "  const tagRows = rung.frame.tag && rung.tag !== \"none\" && block.state !== \"empty\" ? 1 : 0;",
+      to: "  const tagRows = rung.frame.tag && block.state !== \"empty\" ? 1 : 0;",
       expect: "T3.64",
     },
     {
@@ -105,7 +106,8 @@ const results = runPass({
       // shell imported a constant it had no way to compute.
       name: "the render fault asks for one row rather than what it needs",
       file: REG,
-      from: "        statusRowsFor(errorStatus(text, 1), inner, childContext.capabilities),",
+      // Re-anchored 2026-09-27 (C09 I34): the count takes no capability record.
+      from: "        statusRowsFor(errorStatus(text, 1), inner),",
       to: "        1,",
       expect: "T4.57",
     },

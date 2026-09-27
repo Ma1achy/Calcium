@@ -3895,14 +3895,17 @@ export type Status = Readonly<{
    */
   detail?: string;
   /**
-   * The rows the box occupies — required, on `plot`'s argument (C09 I31).
+   * The rows the box occupies — **absent, it is fitted** (C04 I66, C09 §3a-quater).
    *
-   * A box the framework sized by guess is silently wrong and nobody notices it
-   * is wrong. On the error path the registry supplies the number `measure` has
-   * already committed, which is what makes the pair self-consistent by
-   * construction rather than by agreement.
+   * Present, it is a committed measure and the box occupies it exactly: on the
+   * error path the registry supplies the number `measure` has already committed,
+   * which is what makes the pair self-consistent by construction rather than by
+   * agreement. Absent, `measure` and `render` both take `statusRowsFor` at the
+   * width they are given — the same function, so not a guess. The field was
+   * required on the argument that a guessed height is silently wrong, and what
+   * requiring it produced was `b.status` guessing 1 or 2 with no width to fit at.
    */
-  height: number;
+  height?: number;
   /**
    * Supplied by whoever holds the clock, never derived from `ctx.tick` (C04 I66).
    *

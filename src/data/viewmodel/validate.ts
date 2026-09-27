@@ -1511,13 +1511,10 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
           `nothing in it reports that something happened and not what`,
       );
     }
+    // **Absent is the fitted box** (C04 I66, C09 §3a-quater): `measure` sizes it
+    // at the width it is given. Present, it is a commitment and has to be one.
     const height = b["height"];
-    if (height === undefined) {
-      e.push(
-        `${absentMessage(`${at}: "height"`, "a positive integer")} (C04 I66) — the box is ` +
-          `bound by the number \`measure\` committed and cannot choose its own`,
-      );
-    } else if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
+    if (height !== undefined && (typeof height !== "number" || !Number.isInteger(height) || height < 1)) {
       e.push(
         `${at}: "height" must be a positive integer (C04 I66) — the box is bound by ` +
           `the number \`measure\` committed and cannot choose its own`,

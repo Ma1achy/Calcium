@@ -26,7 +26,7 @@ import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
-import { DARK_THEME, FULL_CAPS, measurable, visible } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_UNICODE_CAPS, measurable, visible } from "../support/render.js";
 
 /** Every kind the builders produce, so nothing renders as `raw` by accident. */
 const kit = (): ReturnType<typeof measurable> =>
@@ -354,6 +354,45 @@ describe("C24 T4.2 — build, render, assert the frame", () => {
   });
 });
 
+describe("C24 T4.8 — b.status, fitted at the layout width", () => {
+  // 158 cells — the message C09 §3a-quater measured this builder cutting at
+  // `4099bb6e`: one row ending in `…` and no detail at all.
+  const LONG =
+    "plot failed to render: series 'loss' has 0 points after filtering by the window you asked " +
+    "for, and the fallback axis could not be derived from an empty domain";
+  const err = { message: LONG, details: { code: "ENOENT", path: "/var/run/docker.sock" } };
+
+  it("T4.8 (C24 §4b, C09 §3a-quater, C04 I66): every word and every detail line is on screen, and measure is the rows", () => {
+    const failed = b.status(err, null, 1);
+    const backing = b.status(err, 4000, 2);
+    // **The block carries no height**, because a declared one is the defect.
+    expect("height" in failed, "fitted, not declared").toBe(false);
+    for (const capabilities of [FULL_CAPS, ASCII_CAPS, MONO_UNICODE_CAPS]) {
+      const r = measurable({ capabilities });
+      for (const width of [80, 40]) {
+        for (const [name, blk] of [["error", failed], ["retrying", backing]] as const) {
+          const lines = r.renderToLines(blk, width).map(visible);
+          const at = `${name} w=${String(width)} ${capabilities.unicode}/${String(capabilities.colourDepth)}`;
+          expect(r.measure(blk, width), `${at}: measure is the rows drawn`).toBe(lines.length);
+          // **The words are the check, not the furniture**, which differs by set:
+          // a cut would leave the tail's words missing and a `…` or `...` in their
+          // place, and a dropped detail would leave both lines missing.
+          const text = lines.join(" ");
+          for (const word of LONG.split(" ")) {
+            expect(text, `${at}: "${word}"`).toContain(word);
+          }
+          expect(text, `${at}: the first detail line`).toContain("code: ENOENT");
+          expect(text, `${at}: the second detail line`).toContain("path: /var/run/docker.sock");
+          expect(text, `${at}: the banner`).toContain("ERROR");
+        }
+      }
+    }
+    // A one-row message: border, banner, message — the figure a red line was.
+    const short = b.status({ message: "the far side is gone" }, null, 1);
+    expect(kit().renderToLines(short, 80), "border, banner, message, border").toHaveLength(4);
+  });
+});
+
 describe("C24 T4.2 — the two near-pairs, where only the frame separates them", () => {
   const frame = (blk: Block, width = 40): string =>
     kit().renderToLines(blk, width).map(visible).join("\n");
@@ -676,9 +715,10 @@ describe("C24 §5 — b.live", () => {
     // render worse is the contract half-kept.*
     //
     // **The parameters are `renderError`'s own, in its own order**, which is what
-    // makes `renderError: b.status` the null override and
-    // `b.group("column", [history, b.status(err, retryInMs, attempt)])` the useful
-    // one — the shape that keeps the data the default replaces outright.
+    // makes `b.group("column", [history, b.status(err, retryInMs, attempt)])` the
+    // useful override — the shape that keeps the data the default replaces
+    // outright. `renderError: b.status` is not the null override (C24 §4b): the
+    // default is framed and this box is not.
     const failed = b.status({ message: "the far side is gone" }, null, 1);
     expect(failed.kind).toBe("status");
     // **`null` means no retry is coming**, which C23 §3d rule 3 makes true of
@@ -686,18 +726,21 @@ describe("C24 §5 — b.live", () => {
     // `retrying` draws a blank row where the spinner goes (F234).
     expect(failed, "no countdown, so no activity line to draw").toMatchObject({
       state: "error",
-      height: 1,
       message: "the far side is gone",
     });
+    // **Fitted, so no height is declared** (C09 §3a-quater): border, banner and
+    // the one message row at 80 columns — table row F1.
+    expect("height" in failed, "the box is fitted").toBe(false);
+    expect(kit().measure(failed, 80), "border, banner, message").toBe(4);
     expect("retryInMs" in failed, "and nothing invented for the absent arm").toBe(false);
 
     const backing = b.status({ message: "ECONNREFUSED" }, 4000, 3);
     expect(backing, "the countdown and the attempt are relayed, not computed").toMatchObject({
       state: "retrying",
-      height: 2,
       retryInMs: 4000,
       attempt: 3,
     });
+    expect(kit().measure(backing, 80), "border, banner, message, activity line — F2").toBe(5);
 
     const waiting = b.status.loading();
     expect(waiting, "the third state has no error to be handed, so its own door").toMatchObject({
@@ -730,12 +773,11 @@ describe("C24 §5 — b.live", () => {
     }
   });
 
-  it("T1.6a (C24 I30, F234, F235): the height is derived, because it is a frame read", () => {
+  it("T1.6a (C24 I30, C09 §3a-quater): the height is fitted, and never an argument", () => {
     // **The one member the scoping does not reach, and the reason is measured.**
-    // 1 and 2 are not arithmetic: both boxes land inside `b.live`'s own panel, so
-    // three rows spend one on a second border inside the first, and two rows drew
-    // `loading` over `⠋ loading` — the same word twice, with `measure` saying 2,
-    // `render` drawing 2, and no assertion about rows or precedence able to fail.
+    // It was 1 and 2, read from a frame inside `b.live`'s panel and applied to a
+    // box in none: a 158-cell message with two `details` drew one row cut at `…`
+    // and no detail. Now the box carries no height and `measure` fits it.
     //
     // A consumer choosing a height reintroduces exactly that, so `height` is not
     // an argument. Asserted as the **absence of a way to pass one**: the third
@@ -743,7 +785,7 @@ describe("C24 §5 — b.live", () => {
     const opts = { id: "mine", padding: { t: 1 } } as const;
     const withOpts = b.status({ message: "x" }, null, 1, opts);
     expect(withOpts.id, "the id is the consumer's, as on every builder").toBe("mine");
-    expect(withOpts.height, "the height is not").toBe(1);
+    expect("height" in withOpts, "the height is not — the box is fitted").toBe(false);
     expect(Object.keys(opts).includes("height"), "BlockOpts has no height to smuggle one in").toBe(
       false,
     );
@@ -774,11 +816,11 @@ describe("C24 §5 — b.live", () => {
     expect(b.status(err, 2000, 2)).toMatchObject({
       kind: "status",
       state: "retrying",
-      height: 2,
       retryInMs: 2000,
       attempt: 2,
     });
-    expect(b.status(err, null, 2)).toMatchObject({ kind: "status", state: "error", height: 1 });
+    expect(b.status(err, null, 2)).toMatchObject({ kind: "status", state: "error" });
+    expect("height" in b.status(err, null, 2), "fitted, like the default").toBe(false);
   });
 
   it("T1.4b: renderLoading replaces the placeholder and nothing else", () => {
