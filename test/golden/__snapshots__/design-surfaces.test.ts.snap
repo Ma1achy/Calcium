@@ -404,7 +404,7 @@ plot            1     plot-1
 progress        0     — atomic: nothing to focus
 code            0     — atomic: nothing to focus
 comparison      0     — atomic: nothing to focus
-patch           0     — atomic: nothing to focus
+patch           3     18:18 :19 19:
 pills           2     chip-0 chip-1
 choice          3     linear log log2
 control         1     control-1
@@ -421,7 +421,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 28 kinds · 11 publish a focusable element · 11 draw a treatment
+· 28 kinds · 12 publish a focusable element · 12 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them
@@ -1120,7 +1120,7 @@ plot            1     plot-1
 progress        0     — atomic: nothing to focus
 code            0     — atomic: nothing to focus
 comparison      0     — atomic: nothing to focus
-patch           0     — atomic: nothing to focus
+patch           3     18:18 :19 19:
 pills           2     chip-0 chip-1
 choice          3     linear log log2
 control         1     control-1
@@ -1137,7 +1137,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 28 kinds · 11 publish a focusable element · 11 draw a treatment
+· 28 kinds · 12 publish a focusable element · 12 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them
@@ -1815,7 +1815,7 @@ plot            1     plot-1
 progress        0     — atomic: nothing to focus
 code            0     — atomic: nothing to focus
 comparison      0     — atomic: nothing to focus
-patch           0     — atomic: nothing to focus
+patch           3     18:18 :19 19:
 pills           2     chip-0 chip-1
 choice          3     linear log log2
 control         1     control-1
@@ -1832,7 +1832,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 28 kinds · 11 publish a focusable element · 10 draw a treatment
+· 28 kinds · 12 publish a focusable element · 11 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them
@@ -2473,7 +2473,7 @@ plot            1     plot-1
 progress        0     — atomic: nothing to focus
 code            0     — atomic: nothing to focus
 comparison      0     — atomic: nothing to focus
-patch           0     — atomic: nothing to focus
+patch           3     18:18 :19 19:
 pills           2     chip-0 chip-1
 choice          3     linear log log2
 control         1     control-1
@@ -2490,7 +2490,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 28 kinds · 11 publish a focusable element · 10 draw a treatment
+· 28 kinds · 12 publish a focusable element · 11 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them
@@ -3145,7 +3145,7 @@ plot            1     plot-1
 progress        0     — atomic: nothing to focus
 code            0     — atomic: nothing to focus
 comparison      0     — atomic: nothing to focus
-patch           0     — atomic: nothing to focus
+patch           3     18:18 :19 19:
 pills           2     chip-0 chip-1
 choice          3     linear log log2
 control         1     control-1
@@ -3162,7 +3162,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 28 kinds · 11 publish a focusable element · 11 draw a treatment
+· 28 kinds · 12 publish a focusable element · 12 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them
@@ -3862,7 +3862,7 @@ plot            1     plot-1
 progress        0     — atomic: nothing to focus
 code            0     — atomic: nothing to focus
 comparison      0     — atomic: nothing to focus
-patch           0     — atomic: nothing to focus
+patch           3     18:18 :19 19:
 pills           2     chip-0 chip-1
 choice          3     linear log log2
 control         1     control-1
@@ -3879,7 +3879,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 28 kinds · 11 publish a focusable element · 11 draw a treatment
+· 28 kinds · 12 publish a focusable element · 12 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them

@@ -1585,7 +1585,7 @@ describe("C10 §4k — focus, selection and the facts that contest a ground", ()
       }
     }
     // Drawn and owed partition the six, and the golden file draws the first set.
-    expect(COMPOSITIONS.filter((c) => c.owed === undefined).map((c) => c.row), "drawn today").toEqual([1, 4, 5, 6]);
+    expect(COMPOSITIONS.filter((c) => c.owed === undefined).map((c) => c.row), "drawn today").toEqual([1, 3, 4, 5, 6]);
   });
 });
 

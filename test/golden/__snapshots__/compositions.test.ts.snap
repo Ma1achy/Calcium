@@ -135,6 +135,111 @@ exports[`C10 §4k — the compositions, as frames > case 1 — focused + selecte
   ink beside each ground above is the value C10 T2.49 measures the gate against."
 `;
 
+exports[`C10 §4k — the compositions, as frames > case 3 — selection over a diff ground, at 1-bit 1`] = `
+"-- the frame
+  ── serving/volatility-estimator.yaml ───
+  @@ -18,1 +18,1 @@
+  18    - const a = 1
+     18 + const b = 2                     
+
+-- which fact took the ground, run by run
+  page/-:"── serving/volatility-estimator.yaml ───"
+  page/-:"@@ -18,1 +18,1 @@"
+  bold/-:"18" bold/-:"-" bold/-:"const" page/-:" a = 1"
+  inverse+bold/-:"   18 + const b = 2                     "
+
+-- without copy selection, run by run
+  page/-:"── serving/volatility-estimator.yaml ───"
+  page/-:"@@ -18,1 +18,1 @@"
+  bold/-:"18" bold/-:"-" bold/-:"const" page/-:" a = 1"
+  bold/-:"18" bold/-:"+" bold/-:"const" page/-:" b = 2"
+
+-- without a semantic extent, run by run
+  page/-:"── serving/volatility-estimator.yaml ───"
+  page/-:"@@ -18,2 +18,2 @@"
+  dim/-:"18" dim/-:"18" bold/-:"const" page/-:" a = 1"
+  inverse+bold/-:"19 19   const b = 2                     "
+
+-- the ruling (C10 §4k.2 row 3)
+  selection takes the ground · the diff keeps + and −
+
+-- and what drawing it found, kept because the record is the point
+  Owed until C25 I24 and I25: both facts shipped, and \`patch\` declared no elements and read
+  ctx.focus nowhere, so no line could be selected. The owed attempt named the line \`h0:1\` — hunk
+  0, line 1 — and that id does not survive a window, which hands the transcript a smaller patch
+  whose first hunk is wherever the window starts. The ids are the lines' numbers now."
+`;
+
+exports[`C10 §4k — the compositions, as frames > case 3 — selection over a diff ground, at 24-bit 1`] = `
+"-- the frame
+  ── serving/volatility-estimator.yaml ───
+  @@ -18,1 +18,1 @@
+  18    - const a = 1                     
+     18 + const b = 2                     
+
+-- which fact took the ground, run by run
+  page/-:"── serving/volatility-estimator.yaml ───"
+  page/-:"@@ -18,1 +18,1 @@"
+  diffRemove/error:"18" diffRemove/error:"-" diffRemove/-:" const" diffRemove/default:" a = " diffRemove/-:"1                     "
+  selection/ok:"18" selection/ok:"+" selection/-:" const" selection/default:" b = " selection/-:"2                     "
+
+-- without copy selection, run by run
+  page/-:"── serving/volatility-estimator.yaml ───"
+  page/-:"@@ -18,1 +18,1 @@"
+  diffRemove/error:"18" diffRemove/error:"-" diffRemove/-:" const" diffRemove/default:" a = " diffRemove/-:"1                     "
+  diffAdd/ok:"18" diffAdd/ok:"+" diffAdd/-:" const" diffAdd/default:" b = " diffAdd/-:"2                     "
+
+-- without a semantic extent, run by run
+  page/-:"── serving/volatility-estimator.yaml ───"
+  page/-:"@@ -18,2 +18,2 @@"
+  page/muted:"18" page/muted:"18" page/-:" const" page/default:" a = " page/-:"1"
+  selection/dim:"19" selection/dim:"19" selection/-:" const" selection/default:" b = " selection/-:"2                     "
+
+-- the ruling (C10 §4k.2 row 3)
+  selection takes the ground · the diff keeps + and −
+
+-- and what drawing it found, kept because the record is the point
+  Owed until C25 I24 and I25: both facts shipped, and \`patch\` declared no elements and read
+  ctx.focus nowhere, so no line could be selected. The owed attempt named the line \`h0:1\` — hunk
+  0, line 1 — and that id does not survive a window, which hands the transcript a smaller patch
+  whose first hunk is wherever the window starts. The ids are the lines' numbers now."
+`;
+
+exports[`C10 §4k — the compositions, as frames > case 3 — selection over a diff ground, at ascii 1`] = `
+"-- the frame
+  -- serving/volatility-estimator.yaml ---
+  @@ -18,1 +18,1 @@
+  18    - const a = 1                     
+     18 + const b = 2                     
+
+-- which fact took the ground, run by run
+  page/-:"-- serving/volatility-estimator.yaml ---"
+  page/-:"@@ -18,1 +18,1 @@"
+  diffRemove/error:"18" diffRemove/error:"-" diffRemove/-:" const" diffRemove/default:" a = " diffRemove/-:"1                     "
+  selection/ok:"18" selection/ok:"+" selection/-:" const" selection/default:" b = " selection/-:"2                     "
+
+-- without copy selection, run by run
+  page/-:"-- serving/volatility-estimator.yaml ---"
+  page/-:"@@ -18,1 +18,1 @@"
+  diffRemove/error:"18" diffRemove/error:"-" diffRemove/-:" const" diffRemove/default:" a = " diffRemove/-:"1                     "
+  diffAdd/ok:"18" diffAdd/ok:"+" diffAdd/-:" const" diffAdd/default:" b = " diffAdd/-:"2                     "
+
+-- without a semantic extent, run by run
+  page/-:"-- serving/volatility-estimator.yaml ---"
+  page/-:"@@ -18,2 +18,2 @@"
+  page/muted:"18" page/muted:"18" page/-:" const" page/default:" a = " page/-:"1"
+  selection/dim:"19" selection/dim:"19" selection/-:" const" selection/default:" b = " selection/-:"2                     "
+
+-- the ruling (C10 §4k.2 row 3)
+  selection takes the ground · the diff keeps + and −
+
+-- and what drawing it found, kept because the record is the point
+  Owed until C25 I24 and I25: both facts shipped, and \`patch\` declared no elements and read
+  ctx.focus nowhere, so no line could be selected. The owed attempt named the line \`h0:1\` — hunk
+  0, line 1 — and that id does not survive a window, which hands the transcript a smaller patch
+  whose first hunk is wherever the window starts. The ids are the lines' numbers now."
+`;
+
 exports[`C10 §4k — the compositions, as frames > case 4 — focus over a heatmap ground, at 1-bit 1`] = `
 "-- the frame
     one ┤⠄⠄⠄⠄⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⣿⣿⣿⣿⣿⣿⣿⣿
@@ -383,7 +488,5 @@ exports[`C10 §4k — the compositions, as frames > case 6 — stale + running, 
 
 exports[`C10 §4k — the compositions, as frames > the owed compositions name the change that would give each a subject 1`] = `
 "2 · hovering one link while another has keyboard focus
-    no render seam carries a hover: the router discards a no-button move by rule (C16 §4a row t) and RenderContext has no field for it (M7)
-3 · selection over a diff ground
-    \`patch\` declares no elements and reads ctx.focus nowhere, so no patch row can be selected (C25, M9)"
+    no render seam carries a hover: the router discards a no-button move by rule (C16 §4a row t) and RenderContext has no field for it (M7)"
 `;

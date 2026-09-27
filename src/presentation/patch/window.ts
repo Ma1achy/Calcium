@@ -296,8 +296,21 @@ export function windowRows(
 
   // A hunk whose header is out of range still renders one, because nothing
   // suppresses it (I18) — so it is slack, exactly as the path header is.
+  //
+  // **And it trails when the hunk's marker is the window's last row** (F1259).
+  // The marker is drawn above its header, so a range ending on it puts the
+  // forced header *after* `to`: counting it as leading slack shifted the window
+  // by a row — the reader's line gone and a header from below drawn in its
+  // place, with the height arithmetic still exact. A marker in range and a
+  // header out of it has no body in range either, since the header sits
+  // between them.
   const hunkIds = [...new Set([...touched.keys(), ...headerIn, ...markerIn])].sort((a, c) => a - c);
-  for (const h of hunkIds) if (!headerIn.has(h)) skipRows += 1;
+  let dropRows = 0;
+  for (const h of hunkIds) {
+    if (headerIn.has(h)) continue;
+    if (markerIn.has(h) && !touched.has(h)) dropRows += 1;
+    else skipRows += 1;
+  }
 
   // Where each hunk's body rows begin in `rows`, so a row index becomes a body
   // offset within the hunk — the plan's, not a second walk's.
@@ -343,11 +356,10 @@ export function windowRows(
     numberWidth: p.numberWidth,
   } as Patch);
 
-  // **No trailing slack** (C09 I26). A patch's slack is a path header and a hunk
-  // header, and both *lead*; its units are one row each below them, so nothing
-  // can hang past `to`. `table` is the kind that can, which is why the field
-  // exists (F428).
-  return Object.freeze({ block: block_, skipRows, dropRows: 0 });
+  // **One trailing slack row at most** (C09 I26, F1259). This read *a patch's
+  // slack is a path header and a hunk header, and both lead* — true of every
+  // header above a body row, and false of the one a trailing marker forces.
+  return Object.freeze({ block: block_, skipRows, dropRows });
 }
 
 /**

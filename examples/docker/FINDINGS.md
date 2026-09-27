@@ -56295,3 +56295,8 @@ window. A consumer finds variance a producer cannot.
 
 **Open** — the fix is one branch in `windowRows`: a hunk whose marker is in range and whose header
 is not pays its header to `dropRows`. Symbol: `windowRows`.
+
+**Closed, the same round.** The branch as sized: the same window answers `skip 2 drop 1`, and C25
+T2.16's window agreement is clean over the patch corpus at every offset. The comment claiming *both
+lead* is rewritten to say which header does not. `tools/mutate/runs/c25-elements.mjs` restores the
+old count and T2.16 dies on it (C25 T6.32).

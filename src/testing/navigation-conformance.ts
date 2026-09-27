@@ -101,7 +101,9 @@ export type ElementReport = Readonly<{
   kinds: readonly string[];
   /**
    * Kinds declaring **both** `window` and `elements`, so the agreement above has
-   * a subject. Zero today, by construction, and reported rather than implied.
+   * a subject — reported rather than implied, because a sweep with none passes
+   * exactly like one that agreed. `patch` is one since C25 I24, and its first
+   * run found F1259.
    */
   agreements: number;
 }>;

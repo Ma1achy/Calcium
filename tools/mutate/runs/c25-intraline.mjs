@@ -146,8 +146,9 @@ const results = runPass({
       file: DEF,
       // Re-anchored 2026-09-24 on the argument alone: the row's kind follows
       // the spans since C25 I23, and dropping the spans must not drop it too.
-      from: "layout.text, ctx, item.spans, item.kind)",
-      to: "layout.text, ctx, undefined, item.kind)",
+      // Re-anchored again 2026-09-27: the mark follows the kind since C25 I25.
+      from: "ctx, item.spans, item.kind, mark)",
+      to: "ctx, undefined, item.kind, mark)",
       expect: "T4.12",
     },
     {
@@ -157,8 +158,9 @@ const results = runPass({
       name: "SPANS-DROPPED-SPLIT-LEFT: the removed side of a split row loses its spans",
       file: DEF,
       // Re-anchored 2026-09-24 on the argument alone (C25 I23's kind follows).
-      from: "layout.text, ctx, left.spans, left.kind)",
-      to: "layout.text, ctx, undefined, left.kind)",
+      // Re-anchored again 2026-09-27 (C25 I25's mark follows).
+      from: "ctx, left.spans, left.kind, leftMark)",
+      to: "ctx, undefined, left.kind, leftMark)",
       expect: "T2.7",
     },
     {

@@ -63,8 +63,10 @@ const MUTATIONS = [
     // never drawn — hcDark's `+` at 4.80 : 1 on `diffAdd`.
     name: "the gutter's tone ignores the row's ground",
     file: LINES,
-    from: "  const style = tone(TONES[line.kind], ctx.theme, ctx.capabilities, groundOf(line.kind));",
-    to: "  const style = tone(TONES[line.kind], ctx.theme, ctx.capabilities);",
+    // Re-anchored 2026-09-27 on the argument alone: the ground follows the mark
+    // since C25 I25, and dropping it drops both.
+    from: "ctx.capabilities, groundOf(line.kind, mark))",
+    to: "ctx.capabilities)",
     expect: "T1.27",
   },
   {

@@ -148,27 +148,36 @@ export const COMPOSITIONS: readonly Composition[] = [
     name: "selection over a diff ground",
     facts: ["copy selection", "a semantic extent"],
     ruling: "selection takes the ground · the diff keeps + and −",
-    owed: "`patch` declares no elements and reads ctx.focus nowhere, so no patch row can be selected (C25, M9)",
     width: 40,
-    // The added line selected with the head on it. Without the diff the same
-    // text is two context lines; without the selection, focus sits elsewhere.
-    // `h0:1` is the element id the attempt names — hunk 0, line 1 — since no
-    // patch row has one yet.
-    draw: (capabilities, on) =>
-      measurable({
+    // The added line selected with the head on it (C25 I24, I25). Without the
+    // diff the same text is two context lines and the second is selected on the
+    // page; without the selection, focus sits in a sibling block. The ids are
+    // the lines' numbers — `:18` the addition, `19:19` the second context line
+    // — because a positional id does not survive a window (C25 §3d).
+    draw: (capabilities, on) => {
+      const diff = on.has("a semantic extent");
+      const id = diff ? ":18" : "19:19";
+      return measurable({
         capabilities,
         definitions: [patchDefinition as never],
         focus: on.has("copy selection")
-          ? { blockId: "p", rowId: "h0:1", selected: [{ blockId: "p", rowId: "h0:1" }] }
+          ? { blockId: "p", rowId: id, selected: [{ blockId: "p", rowId: id }] }
           : { blockId: "elsewhere", rowId: "x" },
       }).renderToLines(
         patchOf({
           id: "p",
           language: "typescript",
-          hunks: [hunkOf(on.has("a semantic extent") ? ["-const a = 1", "+const b = 2"] : [" const a = 1", " const b = 2"])],
+          hunks: [hunkOf(diff ? ["-const a = 1", "+const b = 2"] : [" const a = 1", " const b = 2"])],
         }),
         40,
-      ),
+      );
+    },
+    notes: [
+      "Owed until C25 I24 and I25: both facts shipped, and `patch` declared no elements and read",
+      "ctx.focus nowhere, so no line could be selected. The owed attempt named the line `h0:1` — hunk",
+      "0, line 1 — and that id does not survive a window, which hands the transcript a smaller patch",
+      "whose first hunk is wherever the window starts. The ids are the lines' numbers now.",
+    ],
   },
   {
     row: 4,
