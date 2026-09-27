@@ -91,3 +91,36 @@ lacked included 22 `current` rules — every `R-SEL-*`, `R-THM-002`, `R-THM-004`
 `R-THM-005`, `R-GLY-003` among them — because the gate only compared entries the
 baseline already held. A reviewer rewrote `R-SEL-005`'s behaviour under the same ID
 and every gate passed.
+
+## Fixtures — derived from the page, never kept by hand
+
+**`fixtures/` is a projection of the generated HTML, as the HTML is of the
+registry.** `tools/design/fixtures.ts` writes it and `make design` runs it after
+the builder. `make design-check` runs it with `--check`, which writes nothing and
+fails on any difference: a fixture's contents, its file name, its recorded
+dimensions or hash, a fixture missing, or a file present that the page does not
+produce. `INDEX.json` is held to the same equality.
+
+The derivation, measured against the page M1 landed:
+
+1. **One fixture per section that has a terminal panel**, numbered by the
+   section's position among all sections. A section with no `<pre class=term>`
+   has none, and a section with two takes its first.
+2. **The text is the panel's text.** Markup is removed and entities decoded.
+   Each spinner slot — an empty `sp` span that CSS fills at runtime — is written
+   as `✦`, because a fixture is a still. Trailing spaces are removed from every
+   line, and trailing blank lines from the panel. The file ends with one newline.
+3. **The file name** is the three-digit section number, a hyphen, and the first 46
+   characters of the section's id.
+4. **`INDEX.json`** records, per fixture: `file`, `section`, `id`, `title` (the
+   heading's text), `cols` (the widest line, in cells, measured by `cells()`),
+   `rows` (the line count), `sha` (the first 16 hex digits of the SHA-256 of the
+   text without its final newline) and `ruleIds` (the section's `data-rule-ids`,
+   then its `data-example-id`).
+
+**Why, measured.** The 109 fixtures were committed once, at M1, and never
+regenerated while the HTML was rebuilt thirteen times. Rebuilt by these rules from
+M1's own page, 108 of 109 come back byte for byte; the 109th, the rule list, is 15
+lines short, because M1 registered the `R-SEL-*` rules in the same commit. At
+`c7158c22`, 11 fixtures no longer matched the page, among them the keys, the help
+view and both rule lists.
