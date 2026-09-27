@@ -105,6 +105,8 @@ design-check:       ## the registry ↔ HTML projection, released-rule immutabil
 	node tools/rule-status.mjs
 	@# The fixtures are the page's projection (AUTHORITY.md §Fixtures); --check writes nothing.
 	npx tsx tools/design/fixtures.ts --check
+	@# The themes are the registry's projection (C10 §4b); --check renders in memory and writes nothing.
+	node tools/theme/from-registry.mjs --check
 
 # **The page's own conformance checks, executed** (AUTHORITY.md §Browser conformance).
 # `chromium` is the explicit install step — pinned by version and digest, into `.cache/`

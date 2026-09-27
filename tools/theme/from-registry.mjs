@@ -30,7 +30,11 @@ import { clearFloor, contrast, lum } from "./wcag.mjs";
 const here = dirname(fileURLToPath(import.meta.url));
 const registry = JSON.parse(readFileSync(
   resolve(here, "../../docs/design/language/calcium-registry.json"), "utf8"));
-const out = resolve(here, "../../src/presentation/theme/tokens.generated.ts");
+// \`--check\` renders in memory and writes nothing (C10 §4b); \`--out\` points either
+// mode at another file, which is how the check's fabricated violation reaches it.
+const outAt = process.argv.indexOf("--out");
+const out = outAt >= 0 ? resolve(process.argv[outAt + 1]) : resolve(here, "../../src/presentation/theme/tokens.generated.ts");
+const check = process.argv.includes("--check");
 
 /** `#222` and `#222222` are one colour; only one of them is a diff. */
 const norm = (hex) => {
@@ -577,6 +581,25 @@ ${body}
 });
 `;
 
+if (check) {
+  // **Byte equality, and the first line that differs by number.** A hand edit is
+  // a value the design does not hold; saying *stale* and nothing else would
+  // send the reader to diff two revisions to find one hex.
+  let have = "";
+  try { have = readFileSync(out, "utf8"); } catch { have = ""; }
+  if (have !== source) {
+    const a = have.split("\n"), b = source.split("\n");
+    let i = 0;
+    while (i < Math.max(a.length, b.length) && a[i] === b[i]) i += 1;
+    console.error(`FAIL · ${out} differs from the registry's projection at line ${i + 1}`);
+    console.error(`  on disk:   ${a[i] ?? "(end of file)"}`);
+    console.error(`  generated: ${b[i] ?? "(end of file)"}`);
+    console.error("  run `make themes`, or change the registry — a hand edit is a value the design does not hold");
+    process.exit(1);
+  }
+  console.log(`OK · tokens.generated.ts is the registry's projection · ${themes.length} themes · ${source.length} bytes`);
+  process.exit(0);
+}
 writeFileSync(out, source);
 console.log(`wrote ${themes.length} themes · ${source.length} bytes`);
 for (const t of themes) {
