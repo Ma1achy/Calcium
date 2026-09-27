@@ -56336,3 +56336,21 @@ queued head is `○` at every rung, and the duration slot spins for `running` al
 renders all five states at 24-, 8- and 4-bit and reads the cell; C23 T1.76 asserts a queued head
 does not move with the tick. `tools/mutate/runs/c23-call-state.mjs` restores both and dies on each.
 
+## F1262 — the design's fixtures draw the result branch two ways, and its three-rung specimen moves a column R-GLY-003 fixes ★★☆☆☆
+*2026-09-27 · review batch 2, M4 item 6 (C09 I5), at d36d9ed8.*
+
+**Measured**, counting the blanks between `⎿` and the text in every file under
+`docs/design/language/fixtures/`: **33 draw one, 8 draw two** — the tool-result gallery (§050)
+and `/ps` (§081) among the eight. And §068, the one specimen drawing the same exchange at three
+rungs, draws `····⎿·let` at 24-bit and 8-bit and `` ····`-·let `` at ASCII: the text at column 6
+above and 7 below. R-GLY-003 is the rule — *pads the selected representation to the reservation,
+so changing capability rung moves no column* — and the registry's `branch` reserves two. So the
+two-blank form is the rule drawn, and 33 fixtures and §068's upper rungs draw the one-blank form
+it forbids.
+
+**Ruled here, for the rule over the specimens**: the registry marks its sections' specimens as
+examples (R-SEC-036, *specimen values and sample content remain examples*), and rules as
+`current`. The tree now draws `  ⎿  ` and `` `- `` five cells wide at every rung (C09 I5, C22 I83).
+**Open**, and it is the design's to close: the fixtures are its record, and correcting them is a
+registry edit this repository does not make unasked. Symbol: `branch`.
+

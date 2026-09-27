@@ -160,6 +160,10 @@ describe("C09 contract — measurement", () => {
     }
   });
 
+  it.todo(
+    "T2.188 (C09 I5, R-GLY-003, C22 I83): a continuation notice at every width from 6 to 24, at Unicode and ASCII, measures what it renders and starts its text in one column at both rungs — not deferred on a component: the code lands in the next commit of this round",
+  );
+
   it("T2.5 (I5): every substitution in §4 occupies the same slot at every rung", () => {
     // **Amended twice, and the second amendment narrowed the first.** One cell
     // against one cell was a way of guaranteeing that no column moves when the
