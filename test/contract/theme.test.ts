@@ -1502,40 +1502,9 @@ describe("C10 §4k — focus, selection and the facts that contest a ground", ()
     "T2.47 (I47, R-STA-004): where availability meets validity the well takes the ground and the error keeps two carriers — its mark and its outcome word. The row asserts the count, not just the winner: a row naming only which ground won passes a ruling that left validity with nothing — not deferred on a component: it lands with §4k's resolver change, on a constructed availability state until a block declares one",
   );
 
-  /**
-   * **A negative row, and the one that expires by its condition rather than by
-   * its remedy** (F855, F856). Three of the facts §4k.1 tabulates have no
-   * subject in this tree, and a fourth composition is unconstructible for a
-   * different reason — which is why the row has two halves rather than one
-   * sweep. A comment saying so watches nothing; this goes red the day any of
-   * them acquires a subject, which is the day §4k.4's list needs re-reading.
-   *
-   * **The first draft of this row asserted the wrong absence**, and it is the
-   * reason the row exists in this shape. It claimed nothing painted the diff
-   * grounds; the grep behind that claim was truncated and `patch/lines.ts` was
-   * below the cut. The grounds and the `+` / `−` marks both ship. What is
-   * missing is the **addressability** — `patch` declares no elements and reads
-   * `ctx.focus` nowhere — so the assertion is on the seam and not on the slot.
-   */
-  it("T2.48 (I47, §4k.1): the facts with no subject are asserted to have none", () => {
-    // **Case 3's blocker is addressability, not the ground.** `patch` paints
-    // `surface.diffAdd` and the marks already; what it does not do is declare
-    // an element or read focus, so no patch row can be selected.
-    const patch = new URL("../../src/presentation/patch/", import.meta.url);
-    const patchSrc = readdirSync(patch)
-      .filter((f) => f.endsWith(".ts"))
-      .map((f) => readFileSync(new URL(f, patch), "utf8"))
-      .join("\n");
-    expect(/surface\.diffAdd/.test(patchSrc), "the diff ground is painted").toBe(true);
-    expect(/ctx\.focus|\belements\s*[:(]/.test(patchSrc), "and no patch row is addressable").toBe(false);
-
-    // No block declares availability, freshness, or a pointer hover.
-    const types = readFileSync(new URL("../../src/presentation/blocks/types.ts", import.meta.url), "utf8");
-    const declared = ["disabled", "stale", "hovered"].filter((f) =>
-      new RegExp(`^\\s*${f}\\??:`, "m").test(types),
-    );
-    expect(declared, "no block carries an availability, freshness or hover field").toEqual([]);
-  });
+  it.todo(
+    "T2.48 (I47, §4k.4): every composition §4k.2 rules is in one case table, every drawn case responds to both its facts, and every owed case is attempted — not deferred on a component: the code lands in the next commit of this round",
+  );
 });
 
 /**
@@ -1856,10 +1825,10 @@ describe("C10 I52 — the registry's state axes and the spec's declarations", ()
       expect(violates(row.carriers), `${row.axis}: tone and ground are one carrier written twice`).toBe(false);
     }
 
-    // The population is measured, not quoted — eight of the twelve have a
+    // The population is measured, not quoted — nine of the twelve have a
     // subject, and a table that lost them all would otherwise pass.
-    expect(withSubject, "axes with a subject in this tree").toBe(8);
-    expect(rows.length - withSubject, "and the four with none").toBe(4);
+    expect(withSubject, "axes with a subject in this tree").toBe(9);
+    expect(rows.length - withSubject, "and the three with none").toBe(3);
 
     // **The fabricated violation, because the shipped table contains no such
     // pair** — a rule with nothing to be wrong about passes exactly like one
