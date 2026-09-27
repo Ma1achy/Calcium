@@ -61,7 +61,7 @@ a run keeps its OWN ink as the trail's target
 
 ● The counter is set here and read there.
 
-▾ thinking · 4s · 312 tok
+▿ thinking · 4s · 312 tok
   The parser tracks quotes with a boolean, so a nested quote ✦
 
   the reasoning is DIM, so its trail cools to dim — not to the body
@@ -70,7 +70,7 @@ a run keeps its OWN ink as the trail's target
 
 and chrome is never revealed
 
-  the ● mark and the ▾ thinking header appear WHOLE. The reveal is a
+  the ● mark and the ▿ thinking header appear WHOLE. The reveal is a
   property of the STREAM; the trail is a property of a character's
   position in it. A header has no position in the stream, so it exists
   complete or not at all.

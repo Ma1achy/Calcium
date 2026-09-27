@@ -3,7 +3,7 @@
 
  ❯ refactor the parser to handle nested quotes
 
-  ▸ thinking · 4s · 312 tok
+  ▹ thinking · 4s · 312 tok
 
   ● I'll look at the current implementation first.
 

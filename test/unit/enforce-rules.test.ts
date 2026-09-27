@@ -3749,3 +3749,102 @@ describe("the design registry — supersession chains", () => {
     expect(() => { validate(rules); }).toThrow(/supersession is not reciprocal/u);
   });
 });
+
+/**
+ * **The fixtures are the page's projection** (AUTHORITY.md §Fixtures). They were
+ * committed once and sixteen of them went stale while the page was rebuilt around
+ * them, because nothing derived them and nothing compared them. `--check` is what
+ * `make design-check` runs, and each row below fabricates one kind of drift in a
+ * copy and asserts it is named — the clean control first, so a check that refused
+ * everything could not pass. Replacing `--check`'s comparison with a count of
+ * files → the content, dimension and hash rows fail; dropping the directory walk
+ * → the unexpected-file rows fail.
+ */
+describe("the design fixtures — derived from the page, checked against it", () => {
+  const from = "docs/design/language/fixtures";
+  const check = (dir: string) =>
+    spawnSync("npx", ["tsx", "tools/design/fixtures.ts", "--check", "--out", dir], { encoding: "utf8" });
+  const copy = (): string => {
+    const dir = mkdtempSync(join(tmpdir(), "calcium-fixtures-"));
+    for (const f of readdirSync(from)) copyFileSync(join(from, f), join(dir, f));
+    return dir;
+  };
+  const problems = (r: ReturnType<typeof check>): string[] =>
+    r.stderr.split("\n").map((l) => l.trim()).filter((l) => l !== "" && !l.startsWith("FAIL"));
+  type Entry = { file: string; cols: number; rows: number; sha: string };
+  const index = (dir: string): Entry[] => JSON.parse(readFileSync(join(dir, "INDEX.json"), "utf8")) as Entry[];
+  const writeIndex = (dir: string, entries: Entry[]) => {
+    writeFileSync(join(dir, "INDEX.json"), JSON.stringify(entries, null, 1));
+  };
+
+  it("A03-DSN2 passes: the committed corpus equals the derivation", () => {
+    const r = check(from);
+    expect(r.status, r.stdout + r.stderr).toBe(0);
+    expect(r.stdout).toMatch(/^fixtures · \d+ derived from the page, all equal, nothing unexpected$/mu);
+  });
+
+  it("A03-DSN2 fires on every kind of drift, one at a time, naming the file", () => {
+    const dir = copy();
+    const first = index(dir)[0]!;
+    const control = check(dir);
+    expect(control.status, "the copy is clean before anything is fabricated").toBe(0);
+
+    // Contents: one character of one panel.
+    const text = readFileSync(join(dir, first.file), "utf8");
+    writeFileSync(join(dir, first.file), `${text.slice(0, -1)}x\n`);
+    const content = check(dir);
+    expect(content.status).toBe(1);
+    expect(problems(content)).toEqual([`${first.file}: differs from the page`]);
+    writeFileSync(join(dir, first.file), text);
+
+    // Dimensions and hashes: each field of the index alone.
+    for (const field of ["cols", "rows", "sha"] as const) {
+      const entries = index(dir);
+      const e = entries[0]!;
+      if (field === "sha") e.sha = "0".repeat(16);
+      else e[field] += 1;
+      writeIndex(dir, entries);
+      const r = check(dir);
+      expect(r.status, field).toBe(1);
+      expect(problems(r), field).toEqual(["INDEX.json: differs from the page"]);
+      copyFileSync(join(from, "INDEX.json"), join(dir, "INDEX.json"));
+    }
+
+    // Names: a rename is one missing file and one unexpected one.
+    const renamed = first.file.replace(/^\d{3}/u, "999");
+    copyFileSync(join(dir, first.file), join(dir, renamed));
+    rmSync(join(dir, first.file));
+    const rename = check(dir);
+    expect(rename.status).toBe(1);
+    expect(problems(rename).sort()).toEqual(
+      [`${first.file}: missing — the page produces it`, `${renamed}: unexpected — the page does not produce it`].sort(),
+    );
+    rmSync(join(dir, renamed));
+
+    // Missing alone, then restored.
+    const missing = check(dir);
+    expect(problems(missing)).toEqual([`${first.file}: missing — the page produces it`]);
+    copyFileSync(join(from, first.file), join(dir, first.file));
+
+    // Unexpected alone: a file the page does not produce.
+    writeFileSync(join(dir, "stray.txt"), "kept by hand\n");
+    const extra = check(dir);
+    expect(extra.status).toBe(1);
+    expect(problems(extra)).toEqual(["stray.txt: unexpected — the page does not produce it"]);
+    rmSync(join(dir, "stray.txt"));
+
+    // And the copy is clean again, so every refusal above was the fabrication's.
+    expect(check(dir).status, "restored").toBe(0);
+    rmSync(dir, { recursive: true, force: true });
+  }, 60_000);
+
+  it("A03-DSN2: --check writes nothing", () => {
+    const dir = copy();
+    writeFileSync(join(dir, "stray.txt"), "kept by hand\n");
+    const before = readdirSync(dir).sort().map((f) => [f, readFileSync(join(dir, f), "utf8")]);
+    expect(check(dir).status).toBe(1);
+    const after = readdirSync(dir).sort().map((f) => [f, readFileSync(join(dir, f), "utf8")]);
+    expect(after).toEqual(before);
+    rmSync(dir, { recursive: true, force: true });
+  }, 30_000);
+});

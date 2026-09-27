@@ -4,7 +4,7 @@ STRUCTURE
   Keep one durable event record, one rendered window, and one model context. Eviction changes the window; compaction changes context; neither erases history.  [R-COR-001]
   A call has one head and one gutter, with at most one bounded body when output exists.  [R-STR-001]
   At transcript level, one blank row separates sibling entries; spacing inside a body belongs to that block.  [R-STR-002]
-  Every nested level costs three columns, and nesting is limited by width while the deepest child still clears its own minimum width.  [R-STR-003]
+  Every nested level costs two columns, and nesting is limited by width while the deepest child still clears its own minimum width.  [R-STR-005]
   Content stops one column before the inline-end edge.  [R-STR-004]
 
 COLOUR
@@ -41,7 +41,7 @@ HONESTY
 
 DEGRADATION
   Every actionable, status, and interaction distinction has two independent carriers and survives without colour. Dense data may shed colour-only detail only when a named readout preserves the meaning.  [R-COR-003]
-  Every semantic glyph declares a collision-free ASCII fallback, width by capability, and reservedCells equal to its widest representation. The renderer pads the selected representation to that reservation.  [R-GLY-001]
+  Every semantic glyph declares a collision-free ASCII fallback, width by capability, and reservedCells equal to its widest representation. Reserved cells BIND where the glyph sits in a fixed column - a gutter, a row lead, a frame edge, anywhere following content aligns to the column - and there the renderer pads the selected representation to the reservation, so changing capability rung moves no column. Where a mark stands in no column, reservedCells records the width of the widest rendering and nothing more, and the mark is drawn at its natural width at each rung. A residue lead is that case: it is followed only by its own count, so it reads as the ellipsis, a space and the count at every rung, and padding it would buy a gap the design does not draw and take the cells from whatever stands beside it.  [R-GLY-003]
   Capabilities form a vector, not a ladder. Every action has a base-terminal route; enhanced protocols improve bindings but never create the only route.  [R-CAP-001]
   Every component exposes semantics and announcement policy. Linear semantic events are append-only and non-animated; only the active input editor mutates in place.  [R-ACC-001]
   Only the renderer emits terminal controls. User, model, tool, path, URL, and log content is escaped; a PTY interprets controls only inside its emulator boundary.  [R-TRU-001]

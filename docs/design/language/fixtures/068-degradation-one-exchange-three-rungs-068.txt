@@ -4,13 +4,13 @@ the same exchange at three rungs
   ● I'll check the parser first.
   ● read_file(parse.ts) · 0.2s · 184 lines
     ⎿ let inQuote = false;
-  ▸ thinking · 4s
+  ▹ thinking · 4s
 
 1-bit — tone becomes weight, and the marks are unchanged
   ● I'll check the parser first.
   ● read_file(parse.ts) · 0.2s · 184 lines
     ⎿ let inQuote = false;
-  ▸ thinking · 4s
+  ▹ thinking · 4s
 
 ascii — every glyph takes its role-for-role fallback; layout remeasures the rung
   * I'll check the parser first.

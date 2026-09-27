@@ -45,7 +45,7 @@ and what an expanded entry looks like — which is most of the answer
 
 ● ps · 0.3s · 2 of 11
   ⎿  uuid     family            status      metric   age
-    ▸ ▾ a3f9b21  digit-classifier  running     0.0372   23m
+    ▸ ▿ a3f9b21  digit-classifier  running     0.0372   23m
         node   gpu-04.fmx.internal · 2×A100 · 16GiB
         mr     !1248  auto-merged
         ██████████░░░░░░░░░░░░░░  43%  ep 17/40  ~18m
@@ -53,7 +53,7 @@ and what an expanded entry looks like — which is most of the answer
       7c2d4e1  decoder-zoom      succeeded   0.0089   41m
       +9 more
 
-▸ keeps focus while ▾ independently says expanded. The detail sits on bgElev — the
+▸ keeps focus while ▿ independently says expanded. The detail sits on bgElev — the
 inside ground, which is the same one block scope already uses — and
 the rows below carry on underneath.
 

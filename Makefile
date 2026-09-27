@@ -103,9 +103,12 @@ design-check:       ## the registry ↔ HTML projection, released-rule immutabil
 	@# fails. Its fourth check is a claim about the tree that goes stale the
 	@# moment a rule lands, so it has to gate rather than report.
 	node tools/rule-status.mjs
+	@# The fixtures are the page's projection (AUTHORITY.md §Fixtures); --check writes nothing.
+	npx tsx tools/design/fixtures.ts --check
 
-design:             ## regenerate the HTML and KEYS.md from the registry
+design:             ## regenerate the HTML, KEYS.md and the fixtures from the registry
 	node docs/design/language/build-calcium.mjs
+	npx tsx tools/design/fixtures.ts
 
 # **The types are a gate, and they were not one.** `make enforce` ran 402 files
 # of source scans, the suite ran 6 416 rows, golden 528, tier 5 136 and three

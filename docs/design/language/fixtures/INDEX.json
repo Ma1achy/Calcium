@@ -4,9 +4,9 @@
   "section": 1,
   "id": "current-contract",
   "title": "Current contract — the rules implementations targetcurrent · R-SPC-001 · example R-EXA-001",
-  "cols": 355,
-  "rows": 103,
-  "sha": "5f4ad2eab35339d1",
+  "cols": 1244,
+  "rows": 123,
+  "sha": "3a795f66c8f5350c",
   "ruleIds": [
    "R-SPC-001",
    "R-EXA-001"
@@ -19,7 +19,7 @@
   "title": "The primitives, and where each is definedcurrent · R-PRI-001 R-PRI-002 · example R-EXA-002",
   "cols": 183,
   "rows": 67,
-  "sha": "8e6d270ccd050309",
+  "sha": "b3164d2c5fd7c87e",
   "ruleIds": [
    "R-PRI-001",
    "R-PRI-002",
@@ -33,7 +33,7 @@
   "title": "The agent at work — five regions, activity presentcurrent · R-STR-001 R-STR-002 R-MOT-008 · retained example blocks generated from registry · example R-EXA-003",
   "cols": 78,
   "rows": 41,
-  "sha": "117c31ecdb5e2c31",
+  "sha": "73ea21092462fdd2",
   "ruleIds": [
    "R-STR-001",
    "R-STR-002",
@@ -73,12 +73,12 @@
   "file": "006-the-mark-vocabulary-twelve-canonical-glyphs-00.txt",
   "section": 6,
   "id": "the-mark-vocabulary-twelve-canonical-glyphs-006",
-  "title": "The mark vocabulary — twelve canonical glyphscurrent · R-GLY-001 R-GLY-002 · example R-EXA-006",
+  "title": "The mark vocabulary — sixteen canonical glyphscurrent · R-GLY-003 R-GLY-002 · example R-EXA-006",
   "cols": 170,
-  "rows": 23,
-  "sha": "82281f6df12691e8",
+  "rows": 27,
+  "sha": "a40ea67d3b2ecd2c",
   "ruleIds": [
-   "R-GLY-001",
+   "R-GLY-003",
    "R-GLY-002",
    "R-EXA-006"
   ]
@@ -262,8 +262,8 @@
   "id": "the-keys-019",
   "title": "The keyscurrent · R-KEY-007 R-KEY-006 · example R-EXA-019",
   "cols": 140,
-  "rows": 69,
-  "sha": "fbeaa224e3cb2ebc",
+  "rows": 71,
+  "sha": "33bf1ebaf003d6a0",
   "ruleIds": [
    "R-KEY-007",
    "R-KEY-006",
@@ -305,8 +305,8 @@
   "id": "the-help-view-022",
   "title": "The help viewcurrent · R-KEY-007 R-KEY-005 · example R-EXA-022",
   "cols": 143,
-  "rows": 55,
-  "sha": "0612e819b9a6c4d7",
+  "rows": 57,
+  "sha": "5f03af580c372910",
   "ruleIds": [
    "R-KEY-007",
    "R-KEY-005",
@@ -317,12 +317,12 @@
   "file": "023-at-40-columns-023.txt",
   "section": 23,
   "id": "at-40-columns-023",
-  "title": "At 40 columnscurrent · R-STR-003 R-STR-004 R-CAP-001 · retained example blocks generated from registry · example R-EXA-023",
+  "title": "At 40 columnscurrent · R-STR-005 R-STR-004 R-CAP-001 · retained example blocks generated from registry · example R-EXA-023",
   "cols": 66,
   "rows": 29,
   "sha": "7fe1c2ccde50c242",
   "ruleIds": [
-   "R-STR-003",
+   "R-STR-005",
    "R-STR-004",
    "R-CAP-001",
    "R-EXA-023"
@@ -335,7 +335,7 @@
   "title": "Reasoningcurrent · R-MOT-006 R-MOT-004 · retained example blocks generated from registry · example R-EXA-024",
   "cols": 71,
   "rows": 9,
-  "sha": "786a0e79602c1bab",
+  "sha": "ef2bca6e09c656f0",
   "ruleIds": [
    "R-MOT-006",
    "R-MOT-004",
@@ -349,7 +349,7 @@
   "title": "The trail, and the mark at the headcurrent · R-MOT-004 R-COR-003 · retained example blocks generated from registry · example R-EXA-026",
   "cols": 84,
   "rows": 76,
-  "sha": "6334895423000052",
+  "sha": "d76dfb9e244e670f",
   "ruleIds": [
    "R-MOT-004",
    "R-COR-003",
@@ -420,8 +420,8 @@
   "id": "spinners-every-reusable-set-at-its-own-interval-031",
   "title": "Spinners — every reusable set, at its own intervalcurrent · R-MOT-002 R-MOT-005 · example R-EXA-031",
   "cols": 196,
-  "rows": 26,
-  "sha": "98a040aead3fabaf",
+  "rows": 32,
+  "sha": "2d9957d7cce9614b",
   "ruleIds": [
    "R-MOT-002",
    "R-MOT-005",
@@ -434,8 +434,8 @@
   "id": "the-four-spinner-rules-032",
   "title": "The four spinner rulescurrent · R-MOT-005 R-MOT-002 R-MOT-009 R-MOT-010 · retained example blocks generated from registry · example R-EXA-032",
   "cols": 166,
-  "rows": 69,
-  "sha": "cad007f43a182be0",
+  "rows": 75,
+  "sha": "23c286b8e9593451",
   "ruleIds": [
    "R-MOT-005",
    "R-MOT-002",
@@ -476,12 +476,13 @@
   "file": "035-meter-semantics-quantity-granularity-and-liven.txt",
   "section": 35,
   "id": "meter-semantics-quantity-granularity-and-liveness-035",
-  "title": "Meter semantics — quantity, granularity and livenesscurrent · R-PRG-001 · retained example blocks generated from registry · example R-EXA-035",
+  "title": "Meter semantics — quantity, granularity and livenesscurrent · R-PRG-001 R-PRG-003 · retained example blocks generated from registry · example R-EXA-035",
   "cols": 75,
   "rows": 37,
   "sha": "0f7b4e09dc5a1bc2",
   "ruleIds": [
    "R-PRG-001",
+   "R-PRG-003",
    "R-EXA-035"
   ]
  },
@@ -519,7 +520,7 @@
   "title": "The agent’s mark, and the verb’s rampcurrent · R-MOT-006 R-MOT-008 · retained example blocks generated from registry · example R-EXA-038",
   "cols": 81,
   "rows": 68,
-  "sha": "cc4a308ed92e34e7",
+  "sha": "0bacb7ae2a2d79ba",
   "ruleIds": [
    "R-MOT-006",
    "R-MOT-008",
@@ -661,14 +662,14 @@
   "file": "049-blocks-049.txt",
   "section": 49,
   "id": "blocks-049",
-  "title": "Blockscurrent · R-STR-001 R-STR-002 R-STR-003 · retained example blocks generated from registry · example R-EXA-049",
+  "title": "Blockscurrent · R-STR-001 R-STR-002 R-STR-005 · retained example blocks generated from registry · example R-EXA-049",
   "cols": 57,
   "rows": 28,
   "sha": "2f508a0609803340",
   "ruleIds": [
    "R-STR-001",
    "R-STR-002",
-   "R-STR-003",
+   "R-STR-005",
    "R-EXA-049"
   ]
  },
@@ -822,12 +823,12 @@
   "file": "060-resize-060.txt",
   "section": 60,
   "id": "resize-060",
-  "title": "Resizecurrent · R-STR-003 R-HON-003 · retained example blocks generated from registry · example R-EXA-060",
+  "title": "Resizecurrent · R-STR-005 R-HON-003 · retained example blocks generated from registry · example R-EXA-060",
   "cols": 69,
   "rows": 33,
   "sha": "0f5f65187da034e5",
   "ruleIds": [
-   "R-STR-003",
+   "R-STR-005",
    "R-HON-003",
    "R-EXA-060"
   ]
@@ -943,7 +944,7 @@
   "title": "Degradation — one exchange, three rungscurrent · R-DEG-001 R-DEG-002 R-DEG-003 · retained example blocks generated from registry · example R-EXA-068",
   "cols": 80,
   "rows": 28,
-  "sha": "1ffb8a44650d97ce",
+  "sha": "87f9782a9605d6af",
   "ruleIds": [
    "R-DEG-001",
    "R-DEG-002",
@@ -1147,7 +1148,7 @@
   "title": "No pushed viewscurrent · R-INT-001 R-INT-008 · retained example blocks generated from registry · example R-EXA-082",
   "cols": 82,
   "rows": 62,
-  "sha": "b4812892f3317cf5",
+  "sha": "3d5412b0b9c440e3",
   "ruleIds": [
    "R-INT-001",
    "R-INT-008",
@@ -1299,12 +1300,12 @@
   "file": "093-three-major-rules-it-broke-in-its-own-examples.txt",
   "section": 93,
   "id": "three-major-rules-it-broke-in-its-own-examples-093",
-  "title": "Three major rules it broke in its own examplescurrent · R-GLY-001 R-MOT-002 R-EVT-001 · retained example blocks generated from registry · example R-EXA-093",
+  "title": "Three major rules it broke in its own examplescurrent · R-GLY-003 R-MOT-002 R-EVT-001 · retained example blocks generated from registry · example R-EXA-093",
   "cols": 78,
-  "rows": 65,
-  "sha": "150aca51c294874e",
+  "rows": 84,
+  "sha": "5056cc7bb1e68ed1",
   "ruleIds": [
-   "R-GLY-001",
+   "R-GLY-003",
    "R-MOT-002",
    "R-EVT-001",
    "R-EXA-093"
@@ -1329,13 +1330,13 @@
   "file": "095-a-tape-where-a-row-of-peers-would-shed-095.txt",
   "section": 95,
   "id": "a-tape-where-a-row-of-peers-would-shed-095",
-  "title": "A tape, where a row of peers would shedcurrent · R-HON-003 R-STR-003 · retained example blocks generated from registry · example R-EXA-095",
+  "title": "A tape, where a row of peers would shedcurrent · R-HON-003 R-STR-005 · retained example blocks generated from registry · example R-EXA-095",
   "cols": 70,
   "rows": 27,
   "sha": "6ae68dbc7f4028bc",
   "ruleIds": [
    "R-HON-003",
-   "R-STR-003",
+   "R-STR-005",
    "R-EXA-095"
   ]
  },
@@ -1385,13 +1386,13 @@
   "file": "099-wrapping-truncation-and-the-atomic-chip-099.txt",
   "section": 99,
   "id": "wrapping-truncation-and-the-atomic-chip-099",
-  "title": "Wrapping, truncation and the atomic chipcurrent · R-TXT-001 R-STR-003 R-STR-004 · retained example blocks generated from registry · example R-EXA-099",
+  "title": "Wrapping, truncation and the atomic chipcurrent · R-TXT-001 R-STR-005 R-STR-004 · retained example blocks generated from registry · example R-EXA-099",
   "cols": 81,
   "rows": 59,
   "sha": "3ac8cf7f0043ccfa",
   "ruleIds": [
    "R-TXT-001",
-   "R-STR-003",
+   "R-STR-005",
    "R-STR-004",
    "R-EXA-099"
   ]
@@ -1400,12 +1401,12 @@
   "file": "100-resize-a-table-that-cannot-shed-and-two-column.txt",
   "section": 100,
   "id": "resize-a-table-that-cannot-shed-and-two-columns-100",
-  "title": "Resize, a table that cannot shed, and two columnscurrent · R-STR-003 R-TXT-001 R-HON-003 · retained example blocks generated from registry · example R-EXA-100",
+  "title": "Resize, a table that cannot shed, and two columnscurrent · R-STR-005 R-TXT-001 R-HON-003 · retained example blocks generated from registry · example R-EXA-100",
   "cols": 71,
   "rows": 35,
   "sha": "a45a246d2d3632f9",
   "ruleIds": [
-   "R-STR-003",
+   "R-STR-005",
    "R-TXT-001",
    "R-HON-003",
    "R-EXA-100"
@@ -1476,7 +1477,7 @@
   "title": "Five primitives the harness never neededcurrent · R-PRI-001 · retained example blocks generated from registry · example R-EXA-105",
   "cols": 78,
   "rows": 65,
-  "sha": "a10dc8ad9f2457ef",
+  "sha": "36f5d63331c58b83",
   "ruleIds": [
    "R-PRI-001",
    "R-EXA-105"
@@ -1530,14 +1531,14 @@
   "file": "109-responsive-space-and-international-text-109.txt",
   "section": 109,
   "id": "responsive-space-and-international-text-109",
-  "title": "Responsive space and international textcurrent · R-TXT-001 R-CAP-001 R-STR-003 · retained example blocks generated from registry · example R-EXA-109",
+  "title": "Responsive space and international textcurrent · R-TXT-001 R-CAP-001 R-STR-005 · retained example blocks generated from registry · example R-EXA-109",
   "cols": 86,
   "rows": 28,
   "sha": "1fabce1c8b260d3d",
   "ruleIds": [
    "R-TXT-001",
    "R-CAP-001",
-   "R-STR-003",
+   "R-STR-005",
    "R-EXA-109"
   ]
  },
@@ -1560,9 +1561,9 @@
   "section": 111,
   "id": "the-rules-condensed-111",
   "title": "The rules, condensedcurrent · R-SPC-001 · example R-EXA-111",
-  "cols": 351,
+  "cols": 825,
   "rows": 50,
-  "sha": "2410db62c76791fd",
+  "sha": "51b8234f59d31c10",
   "ruleIds": [
    "R-SPC-001",
    "R-EXA-111"
