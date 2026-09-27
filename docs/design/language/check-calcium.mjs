@@ -337,8 +337,12 @@ function checkStructuredCoverageAndRetention(registry, html) {
   }
   requireText(html, registry.keymapPolicy.help.docsTarget, 'shared docs/KEYS.md source contract');
   const measuredItems = registry.glyphs.filter(item => item.status === 'current').length + registry.delimiters.filter(item => item.status === 'current').length;
+  // A state-resolved ASCII half has a Unicode row only, and says so on it.
+  const stateResolved = [...registry.glyphs, ...registry.delimiters].filter(item => item.status === 'current' && item.asciiResolution === 'state').length;
   const probeRows = (html.match(/data-glyph-grid-probe=/g) ?? []).length;
-  if (probeRows !== measuredItems * 2) fail(`glyph grid has ${probeRows} rows; expected Unicode and ASCII rows for ${measuredItems} records`);
+  if (probeRows !== measuredItems * 2 - stateResolved) fail(`glyph grid has ${probeRows} rows; expected Unicode and ASCII rows for ${measuredItems} records, less ${stateResolved} state-resolved ASCII halves`);
+  const declared = (html.match(/data-ascii-resolution="state"/g) ?? []).length;
+  if (declared !== stateResolved) fail(`glyph grid declares ${declared} state-resolved rows; the registry has ${stateResolved}`);
   requireText(html, 'id="generated-glyph-grid-check"', 'browser-measured glyph reservation check');
   requireText(html, "range.selectNodeContents(value)", 'actual glyph ink measurement');
   requireText(html, "forms.get('unicode')-forms.get('ascii')", 'following-column composed-grid comparison');

@@ -800,9 +800,17 @@ ${rows}</pre>`;
 }
 
 function renderGlyphReservationProbe(registry) {
-  const rows = [...active(registry.glyphs), ...active(registry.delimiters)].flatMap(glyph => ['unicode', 'ascii'].map(form => {
+  // **A state-resolved ASCII half has no character to measure**, so it gets no
+  // ASCII row and its Unicode row says why — the same exclude-and-declare the
+  // collision check applies. The first browser run found this probe writing
+  // `esc(undefined)`: nine cells of the word in a one-cell slot, which failed
+  // the page's own check while every text search passed (AUTHORITY.md
+  // §Browser conformance). A form with no value is now a build error.
+  const rows = [...active(registry.glyphs), ...active(registry.delimiters)].flatMap(glyph => (glyph.asciiResolution === 'state' ? ['unicode'] : ['unicode', 'ascii']).map(form => {
     const value = glyph[form];
-    return `<span class="glyph-grid-probe-row" style="display:block" data-glyph-grid-probe="${esc(glyph.id)}" data-glyph-form="${form}" data-reserved-cells="${glyph.reservedCells}"><span class="glyph-grid-slot" style="display:inline-block;inline-size:${glyph.reservedCells}ch;white-space:pre"><span class="glyph-grid-value">${esc(value)}</span></span><span class="glyph-grid-sentinel">|</span></span>`;
+    if (typeof value !== 'string' || value === '') throw new Error(`${glyph.id}: the ${form} probe has no glyph to measure`);
+    const resolution = glyph.asciiResolution === 'state' ? ' data-ascii-resolution="state"' : '';
+    return `<span class="glyph-grid-probe-row" style="display:block" data-glyph-grid-probe="${esc(glyph.id)}" data-glyph-form="${form}"${resolution} data-reserved-cells="${glyph.reservedCells}"><span class="glyph-grid-slot" style="display:inline-block;inline-size:${glyph.reservedCells}ch;white-space:pre"><span class="glyph-grid-value">${esc(value)}</span></span><span class="glyph-grid-sentinel">|</span></span>`;
   })).join('');
   return `<div id="glyph-grid-probes" aria-hidden="true" data-rule-ids="R-GLY-002" style="position:absolute;left:-10000px;top:0;visibility:hidden;white-space:pre;font:12.5px/1.45 &quot;SF Mono&quot;,Menlo,Consolas,&quot;DejaVu Sans Mono&quot;,monospace"><span id="glyph-grid-cell" style="display:inline-block;inline-size:1ch">0</span>${rows}</div>`;
 }
@@ -1226,11 +1234,11 @@ const probe=document.createElement('span');probe.className='sp sp-agent';probe.s
 const glyphGridRuntimeCheck = `<script id="generated-glyph-grid-check">
 (()=>{const fail=message=>{document.documentElement.dataset.glyphGridCheck='fail';throw Error(message)};
 try{const fixture=document.getElementById('glyph-grid-probes'),cell=document.getElementById('glyph-grid-cell');if(!fixture||!cell)fail('glyph grid fixture missing');
-const cellWidth=cell.getBoundingClientRect().width;if(!(cellWidth>0))fail('one-cell reference has no width');const byGlyph=new Map();
-for(const row of fixture.querySelectorAll('[data-glyph-grid-probe]')){const id=row.dataset.glyphGridProbe,form=row.dataset.glyphForm,reserved=Number(row.dataset.reservedCells),slot=row.querySelector('.glyph-grid-slot'),value=row.querySelector('.glyph-grid-value'),sentinel=row.querySelector('.glyph-grid-sentinel');if(!id||!['unicode','ascii'].includes(form)||!Number.isInteger(reserved)||reserved<1||!slot||!value||!sentinel)fail('malformed glyph probe row');
+const cellWidth=cell.getBoundingClientRect().width;if(!(cellWidth>0))fail('one-cell reference has no width');const byGlyph=new Map(),stateResolved=new Set();
+for(const row of fixture.querySelectorAll('[data-glyph-grid-probe]')){const id=row.dataset.glyphGridProbe,form=row.dataset.glyphForm,reserved=Number(row.dataset.reservedCells),slot=row.querySelector('.glyph-grid-slot'),value=row.querySelector('.glyph-grid-value'),sentinel=row.querySelector('.glyph-grid-sentinel');if(!id||!['unicode','ascii'].includes(form)||!Number.isInteger(reserved)||reserved<1||!slot||!value||!sentinel)fail('malformed glyph probe row');if(row.dataset.asciiResolution==='state'){if(form!=='unicode')fail(id+' declares a state-resolved ASCII half and carries an ASCII row');stateResolved.add(id)}
 const slotRect=slot.getBoundingClientRect(),sentinelRect=sentinel.getBoundingClientRect(),range=document.createRange();range.selectNodeContents(value);const valueWidth=range.getBoundingClientRect().width,expected=reserved*cellWidth,tolerance=Math.max(1,cellWidth*.08);if(Math.abs(slotRect.width-expected)>tolerance)fail(id+' '+form+' reserves '+slotRect.width+'px, expected '+expected+'px');if(valueWidth>slotRect.width+tolerance)fail(id+' '+form+' overflows reservedCells: '+valueWidth+'px > '+slotRect.width+'px');
 const coordinate=sentinelRect.left-row.getBoundingClientRect().left;if(!byGlyph.has(id))byGlyph.set(id,new Map());byGlyph.get(id).set(form,coordinate)}
-for(const [id,forms] of byGlyph){if(forms.size!==2)fail(id+' lacks both measured capability forms');if(Math.abs(forms.get('unicode')-forms.get('ascii'))>1)fail(id+' shifts the following composed-grid column')}
+for(const [id,forms] of byGlyph){if(stateResolved.has(id)){if(forms.size!==1)fail(id+' is state-resolved and measured '+forms.size+' forms');continue}if(forms.size!==2)fail(id+' lacks both measured capability forms');if(Math.abs(forms.get('unicode')-forms.get('ascii'))>1)fail(id+' shifts the following composed-grid column')}if(byGlyph.size-stateResolved.size<1)fail('no glyph measured in both forms — an empty comparison is not a check');
 fixture.dataset.measurement='pass';document.documentElement.dataset.glyphGridCheck='pass';const out=document.getElementById('build-status');if(out&&!out.textContent.includes('composed glyph grid pass'))out.textContent+=' · composed glyph grid pass'}catch(error){fail(error.message)}})();
 </script>`;
 
