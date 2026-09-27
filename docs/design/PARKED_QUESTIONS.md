@@ -1001,6 +1001,108 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M4 item 8). **The band predicate's two latent cells are closed at the validator too.** `validateBands` checks C10 I61's pair before its `isHex(bg)` early return, and refuses a `bandFourBit` key with no `bandInk` partner. *Reason:* a consistent picture beats a lone rule — once the resolver and `isBand` share `bandAt`, a theme the validator admits must not be able to make them disagree. **Owed:** C10 I61's sentence and T2.73, in batch 2's M4 item 8.
+
+**55 · RULED — Does the validator close X1 and X3?** The M4 item 8 walk found two theme shapes no shipped theme reaches: a `bandInk` with no `bandFourBit` pair (the pair check sits after an early return), and an orphan `bandFourBit` (never iterated).
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M4 item 8). **A head on a receded (stale) panel takes its state's mark**, because tone does not carry there: every ink resolves to `dim`, so five states would otherwise draw one mark in one ink. The predicate is the existing one — *does tone carry here* — asked of the panel as well as the ground. *Reason:* carrier rules count per fact (R-COR-003, R-HON-002); a receded tone is tone that has stopped carrying. **Owed:** measure the frame first (the walk did not render it); build in the same lane, or record the measurement if the premise is false.
+
+**56 · RULED — A call head inside a `staleForMs` panel.** Found by the M4 item 8 walk as X2, outside the band claim and the same class.
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M4 item 9). **The `Glyph` token is spelled `"work-unit"`, the registry's id**, and SS64's three key parsers widen to accept a quoted hyphenated key, with a row asserting the parsed `GLYPH_TABLE` keys equal `GLYPH_TOKENS` by equality. *Reason:* structured data beats prose — the registry id is the name, and `workUnit` would be a second spelling of it. **Owed:** batch 2's M4 item 9.
+
+**57 · RULED — `work-unit` or `workUnit`.** The first hyphenated `Glyph` token drops silently out of SS64's `(\w+)` parsers.
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M4 item 10 and M5 item 10). **A root `CHANGELOG.md`, kept by hand under `## Unreleased`**, breaking changes named explicitly; A04 §9's row is amended first to say so until a generator exists. *Reason:* the repo is right about what ships — no generator exists, and a changelog row naming a generator that does not exist is a claim with no source. **Owed:** A04 §9 spec-first, then the file, carrying `live`, `step`, `running`→`work-unit`, `ChromeContext.copyMode`→`owner`, and each later batch's public breaks.
+
+**58 · RULED — Where the changelog lives.** A04 §9 says *generated from commits*; nothing generates it and no file exists.
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M5 item 1 — the item the person sent). **`⌃c` is refused at a question and in either copy mode**: the table's `reject` consumes and explains and runs no rung. The question stays open and unanswered; copy mode stays on. C16 ruling A, §5b B1/B2, §5d D5, I51 and C23 I36's `⌃c` half are amended, not cited. *Reason:* the design decides (§103 — *QUESTION and COPY MODE reject*), and the review item asks for exactly this. *Cost, stated:* in copy mode `⌃c` no longer cancels a running verb; the reader presses `esc` first.
+
+**59 · RULED — `⌃c` at a question and in copy mode.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M5). **How a refusal explains itself.** At a question: `▲ answer this first`, warn-toned, on the question's own row, triggered by the first non-answer input and **held until the question resolves**; later non-answers change nothing and invalidate nothing; the inspection state is silent (its only key is leave). In semantic copy mode: a one-shot warn chip on the owner line. In native selection the scheduler is suspended and nothing can be drawn — **stated as the limit**, not papered over; the toast is `ok`-toned and is not used for a refusal. *Reason:* fixture 061 is the picture, and a consistent picture beats a lone rule.
+
+**60 · RULED — The refusal notice's form, persistence and home in each owner.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M5 item 3). **Layer owners.** `history-clear-confirm` is retired: it has no `src` consumer and nothing could answer it under a declared `question` owner. The chip preview declares `owner: "substate"` named `preview`, which subsumes `promptUnderMenu`'s id switch. *Reason:* the repo is right about what ships — a layer only a test pushes is not a subject.
+
+**61 · RULED — Two layers with no owner to declare.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M5 item 8). **Shell delegation consumes keys at the `child` rung**; F1 and every other key no rung binds stop there instead of falling to `global` (C16 I49). Forwarding bytes to the delegated child's stdin needs a C21/C23 mechanism that does not exist and is **recorded as a finding, not built** here. A question raised while a surface child is attached cannot be answered today; it is **owed to batch 3's M9 item 4** (the host escape read before the child rung), whose symbol is `interceptOf`'s `host.detach` arm. *Reason:* C16 I49 is the rule; the minimum that makes it true is consumption.
+
+**62 · RULED — What a `child` owner does with keys it cannot deliver.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M5 item 5). **Hints come from the keymap, so the keymap gains the rows it lacks**: a prompt `submit` row for `⏎` and a field `keep` row, and a question's hints come from its own declared vocabulary. *Reason:* one source — a hint that is not a binding is C16 I19's second keymap.
+
+**63 · RULED — Hinted keys with no keymap row.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M6 item 1). **Reserved actions pass through.** The hook is `TuiConfig.keyActions?: Partial<Record<ReservedKeyAction, () => boolean | void>>`, keyed by registry id; a handler returning `false` falls through; an unknown id is a construction error. With no handler a reserved row resolves as though absent, except `queue.drop`, whose displaced meaning `killWordLeft` is its `fallback`. `⌥v` with no handler is **dropped**, not restored to copy mode, which stays on `⌥⇧C` — one verb, one chord. *Reason:* the review item's rule, and a consistent picture.
+
+**64 · RULED — The reserved-action hook's shape, and `⌥v`.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M6 item 4). **Registry-global bindings.** `?` and `selection.*` are `global` rows; `copy` is an owner row at every owner with a copy verb — prompt, focused block (`copyElement`), semantic selection, and at `interaction` the focused element — and native selection passes it to the terminal. `?` in native selection passes (the frame is frozen, so an entry would land unseen). `selection.native`/`selection.semantic` from the other copy mode switches mode; from the same mode it is a no-op. **`⌃c` recognition is exact**: `⌃⇧C` under kitty is copy, never interrupt or exit-arming; on the base profile the bytes are `⌃c` and interrupt wins (ruling 3 of the reconciliation, unchanged). `⇧⏎` stays bound in both profiles, listed by equality, because an unbound `⇧⏎` submits. *Reason:* the registry's scope is `global`, and the design decides.
+
+**65 · RULED — Where the registry-global bindings fire.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M6). **Ruling 53's chip-preview chords land in batch 4 with the preview**, not in M6: the two-direction gate M6 builds requires every registry binding to resolve to an action at a target, and the preview's target and verbs do not exist yet. Registering them now would need an *owed* arm in the gate, which is the exemption M6 item 3 removes. *Reason:* a consistent picture beats a lone rule.
+
+**66 · RULED — When ruling 53's chords are registered.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; ruling 45's build). **Ruling 45 corrected on one premise: `/` has no empty-prompt exception** — it switches namespace at any command position (`context.ts:218-225`, C19 T3.17). So `>`'s limit is written fresh: C19's slot classification tests `input[0] === ">"` **before** tokenising, a `>`-led line is never handed to C18 on submit, and the rule lands as **R-KEY-008** through `release.mjs`. **Measured by the walk: `> notes` then `⏎` today is delegated to the user's shell and truncates the file `notes`** — the submit guard closes that. Built as the last step of batch 2's M6. *Reason:* the ruling's intent stands; only its "same as `/`" premise was false, and a guard that stops a truncation strengthens a safety default.
+
+**67 · RULED — Ruling 45's premise about `/`.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 4, M11 item 1 — applying ruling 41). **Ruling 41's premise is corrected and the ruling stands: the frame reserves column 0 of the transcript region on every row, and the `▌` selection rail is drawn there.** Measured: no live gutter is drawn and no column is reserved today (`containers.ts:163-170`; SF1 row 07 starts `● help` in column 1), so ruling 41's *at no geometric cost* was false. The live gutter of A01 D6 and C14 D6/I18 is superseded — liveness is the spinner (R-GLY-003). The rail's ASCII form is `|` in a new `gutter` domain; it is never inverted at 1-bit. *Reason:* the ruling's intent — the rail takes the gutter column — is kept; only its cost claim was wrong. *Cost, stated:* every composed-session golden moves one column.
+
+**68 · RULED — Ruling 41 rested on a column that does not exist.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 4, M11 item 2). **Two carriers where the gate finds one.** Disclosure: `collapsed` carries its hidden count (`+N`) beside the mark, so collapsed and leaf differ by mark and word; `expanded` carries the content's position. Prompt selection is a **ruled exception** on the gate's equality list — the `▌` that would be its second carrier is the caret there — carried by ground (inverse at 1-bit) with the caret at one end. *Reason:* carrier rules count per fact; a named exception is the form the gate already has (`linear`).
+
+**69 · RULED — Disclosure and the prompt selection under the two-carrier gate.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 4, M10 item 3). **R-SEL-003/015 decide: a block stays atomic in semantic copy mode.** Ruling 36's `⇧←`/`⇧→` extend columns **in rectangle mode**, from the anchor, clamped to the block; there is no character caret over prose. *Reason:* when pictures disagree the rule decides, and the rendered column of markdown is not its source offset (R-SEL-001: copy takes the source). M10 item 3 is answered by the rectangle, not by a prose caret.
+
+**70 · RULED — Caret keys over prose.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 4, M12). **The trust boundary.** Neutralise once, at the block registry's resolve, memoised on identity; `cat -v` notation for C0/DEL/C1 and `<U+XXXX>` for every bidi format character including LRM/RLM/ALM (C04 I110 widened to refuse them in `terminal` lines). No raw-copy action. Switching C07's ingress from strip to escape, ANSI SGR to spans, and rebuilt OSC 8 are a **follow-up lane after the core**, because escaping ingress without the colour table makes coloured CLI output worse. OSC 52 is written only through `escapes.ts`, capped near 100 KB, and the toast says *sent by OSC 52*, never *copied*. ⏎ on an empty selection stays and says so; ⌃V off discards the rectangle. *Reason:* R-TRU-001 binds (*escaped*); R-BLK-898/900 are examples. *Cost, stated:* legitimate right-to-left text shows its marks.
+
+**71 · RULED — The trust boundary's mechanism and notation, and the copy destinations.**
+
+---
+
 ## Not yet recovered
 
 The gap between the entries and the running count in the per-MR reports was chased and closed: some questions had been counted twice. The list is the count. **No total is stated here in prose**, because the one that used to be here said *sixteen* long after that stopped being true — this file's own subject, arriving inside it.
