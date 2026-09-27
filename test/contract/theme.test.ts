@@ -34,6 +34,10 @@ import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
 import { checkSourceScans, checkTextGrounds, SCANS, SURFACE_ROLES } from "../../tools/enforce/source-scans.mjs";
 import * as contrastModule from "../../src/presentation/theme/contrast.js";
 import { caps, DEPTHS, store, SURFACES, SYNTAX_SLOTS, TONES } from "../support/theme.js";
+import { COMPOSITIONS, RUNGS, responds } from "../support/compositions.js";
+import { DARK_THEME, visible } from "../support/render.js";
+import { focusStyle, selectionStyle } from "../../src/presentation/blocks/paint.js";
+import { sgr } from "../../src/terminal/escapes.js";
 
 // This file walks `src/`; `budget.ts` carries the measurement and why the 5 s
 // default is not a margin. Re-measure before raising it.
@@ -1492,9 +1496,35 @@ describe("C10 §4j — the categorical separation debt", () => {
  * the window where somebody is building painters.
  */
 describe("C10 §4k — focus, selection and the facts that contest a ground", () => {
-  it.todo(
-    "T2.45 (I47, R-SEL-006): focused and selected take two grounds and one mark — the ground resolves to `surface.selection` and `\u25b8` is on the head row, at 24-bit, at 1-bit where the row is `inverse`, and in ASCII where the mark is `>`; asserted as a pair, because the mechanism this replaces draws one ground and tells the two apart by ink, which satisfies any row naming a single fact — not deferred on a component: the ground and the mark land with §4k's resolver change in this same MR",
-  );
+  it("T2.45 (I47, R-SEL-006): focused and selected take two grounds and one mark, at every rung", () => {
+    const c = COMPOSITIONS.find((k) => k.row === 1)!;
+    // The row the head is on, and the same row with focus alone: the pair is the
+    // assertion, because one ground told apart by ink satisfies any row that
+    // names a single fact.
+    const bravo = (lines: readonly string[]): string => lines.find((l) => visible(l).includes("bravo"))!;
+    const open = (style: Parameters<typeof sgr>[0]): string => sgr(style);
+    for (const rung of RUNGS) {
+      const both = bravo(c.draw(rung.capabilities, new Set(c.facts)));
+      const focusOnly = bravo(c.draw(rung.capabilities, new Set(["focus", "failure"])));
+      const mark = rung.capabilities.unicode === "ascii" ? ">" : "\u25b8";
+      expect(visible(both).trimStart().startsWith(`${mark} `), `${rung.name}: the head row carries ${mark}`).toBe(true);
+      expect(visible(focusOnly).trimStart().startsWith(`${mark} `), `${rung.name}: and so does focus alone`).toBe(true);
+      const wash = selectionStyle(DARK_THEME, rung.capabilities);
+      const ground = focusStyle(DARK_THEME, rung.capabilities);
+      if (rung.capabilities.colourDepth === 1) {
+        // No ground at 1-bit: selection falls to `inverse` and focus to nothing,
+        // so the mark is the whole of focus there.
+        expect(wash, "selection's 1-bit rung").toEqual({ inverse: true });
+        expect(both, `${rung.name}: the selected row inverts`).toContain(open({ inverse: true }));
+        expect(focusOnly, `${rung.name}: focus alone does not`).not.toContain(open({ inverse: true }));
+      } else {
+        expect(both, `${rung.name}: selection takes the ground`).toContain(open(wash));
+        expect(both, `${rung.name}: and focus's ground is displaced`).not.toContain(open(ground));
+        expect(focusOnly, `${rung.name}: focus alone takes a ground of its own`).toContain(open(ground));
+        expect(open(ground), "two grounds, not one").not.toEqual(open(wash));
+      }
+    }
+  });
   it.todo(
     "T2.46 (I47, R-STA-003): hover and focus hold disjoint carrier sets at every rung — focus has `\u25b8` at all three and hover never does; at 1-bit, where hover's ground is gone, hover holds bold and focus does not. A disjointness over sets, because two rows each naming one carrier agree while the two facts render identically — not deferred on a component: it lands with §4k's resolver change, and its hover half is exercised through a constructed state until a block declares `hovered`. **This clause used to name mouse mode 1003 and that was the wrong condition** — `lifecycle.ts:125` takes 1003 behind a `hover?: boolean` option and the decoder reads a no-button move, so a pointer move already arrives; the router discards it by rule (§4a row t) and no block carries the field, which is what T2.48 watches",
   );
@@ -1502,9 +1532,36 @@ describe("C10 §4k — focus, selection and the facts that contest a ground", ()
     "T2.47 (I47, R-STA-004): where availability meets validity the well takes the ground and the error keeps two carriers — its mark and its outcome word. The row asserts the count, not just the winner: a row naming only which ground won passes a ruling that left validity with nothing — not deferred on a component: it lands with §4k's resolver change, on a constructed availability state until a block declares one",
   );
 
-  it.todo(
-    "T2.48 (I47, §4k.4): every composition §4k.2 rules is in one case table, every drawn case responds to both its facts, and every owed case is attempted — not deferred on a component: the code lands in the next commit of this round",
-  );
+  it("T2.48 (I47, §4k.4): every composition §4k.2 rules is in one case table, every drawn case responds to both its facts, and every owed case is attempted", () => {
+    // §4k.2's rows as the document names them, bold in the first column.
+    const spec = readFileSync(new URL("../../docs/components/C10_theme_resolution.md", import.meta.url), "utf8");
+    const section = /### 4k\.2 [\s\S]*?\n### /u.exec(spec)?.[0] ?? "";
+    const ruled = [...section.matchAll(/^\|\s*\*\*([^*]+)\*\*\s*\|/gmu)].map((m) => m[1]!.trim());
+    expect(ruled, "§4k.2 rules six").toHaveLength(6);
+    expect(COMPOSITIONS.map((c) => c.name).sort(), "the case table is §4k.2's rows").toEqual([...ruled].sort());
+
+    for (const c of COMPOSITIONS) {
+      for (const rung of RUNGS) {
+        const answers = responds(c, rung.capabilities);
+        if (c.owed === undefined) {
+          // A drawn case answers every fact, or its frame is drawn on a state
+          // nothing constructs.
+          for (const a of answers) {
+            expect(a.answers, `case ${String(c.row)} at ${rung.name}: removing ${a.fact} changes the frame${a.why === undefined ? "" : ` (${a.why})`}`).toBe(true);
+          }
+        } else {
+          // **The attempt.** Both facts answering is a composition a producer
+          // can construct with no golden frame — draw it, and take `owed` off.
+          expect(
+            answers.every((a) => a.answers),
+            `case ${String(c.row)} at ${rung.name} is constructible with no golden — draw it (owed: ${c.owed})`,
+          ).toBe(false);
+        }
+      }
+    }
+    // Drawn and owed partition the six, and the golden file draws the first set.
+    expect(COMPOSITIONS.filter((c) => c.owed === undefined).map((c) => c.row), "drawn today").toEqual([1, 4, 6]);
+  });
 });
 
 /**
