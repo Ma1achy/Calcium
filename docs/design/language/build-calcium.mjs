@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const registryPath = resolve(here, 'calcium-registry.json');
-export const outputPath = resolve(here, 'calcium-design-language-revised.html');
+export const outputPath = resolve(here, 'calcium-design-language.html');
 export const repoRoot = resolve(here, '../../..');
 // **The registry names the keymap file, and it is named from the repository root**
 // (C16 §6a clause 5). Resolved against this directory it was a second generated

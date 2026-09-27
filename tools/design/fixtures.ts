@@ -33,7 +33,7 @@ const option = (name: string): string | undefined => {
   return at >= 0 ? args[at + 1] : undefined;
 };
 const check = args.includes("--check");
-const htmlPath = resolve(option("--html") ?? join(language, "calcium-design-language-revised.html"));
+const htmlPath = resolve(option("--html") ?? join(language, "calcium-design-language.html"));
 const out = resolve(option("--out") ?? join(language, "fixtures"));
 
 export type IndexEntry = Readonly<{

@@ -3,7 +3,7 @@
  * values, read from the design registry (C10 §2, R-THM-001).
  *
  * **The registry is the source and this is a projection**, the same relationship
- * `calcium-design-language-revised.html` has to it. Regenerate with `make themes`.
+ * `calcium-design-language.html` has to it. Regenerate with `make themes`.
  *
  * **Every value it emits is read from the registry, and nothing is lent** (C10
  * I62). Tones, surfaces, hues and a curated theme's `syntax` and `categorical`

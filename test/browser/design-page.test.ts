@@ -10,7 +10,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { checkPage, selfTest } from "../../tools/design/chromium.mjs";
 
-const PAGE = "docs/design/language/calcium-design-language-revised.html";
+const PAGE = "docs/design/language/calcium-design-language.html";
 
 describe("AUTHORITY §Browser conformance — the page's own checks, executed", () => {
   // **One row per case, so a mutation names the row that must catch it.** The
