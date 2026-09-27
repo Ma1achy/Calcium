@@ -11,7 +11,8 @@ The specs are the contract: 25 component specs, 4 architecture documents.
 
 Four reasons, and the first has already bitten:
 
-- **Node parity.** Ink 7 requires Node ≥ 22. A host on 20 gets different results
+- **Node parity.** `engines` is `>=22.22.1 <23`: the first Node 22 shipping Unicode 17,
+  which `cells()` measures through (A01 §Host assumptions). A host on an older Node gets different results
   from CI, and `EBADENGINE` is a warning people scroll past. `engine-strict=true`
   turns it into an error, but only inside a correctly built container.
 - **`node-pty` needs a build toolchain.** C01–C03's tier-5 PTY tests will not run
@@ -24,7 +25,7 @@ Four reasons, and the first has already bitten:
 
 First command in any session:
 
-    node --version        # expect v22.x — if not, rebuild the container
+    node --version        # expect v22.22.1 or later v22 — if not, rebuild the container
 
 **This does not contradict A04 §4.** That section says the devcontainer is never
 the *supported path*, and it means for consumers: R01 R4.4 commits that a clean

@@ -192,8 +192,11 @@ containers.
 `typescript-node:22` image can still resolve a different default through nvm, and
 the symptom is `EBADENGINE` warnings at install rather than a failure.
 `engine-strict=true` in `.npmrc` turns that warning into an error, which is what
-you want — Ink 7 requires Node ≥ 22 and a silently-20 container fails later and
-less clearly.
+you want — `engines` is `>=22.22.1 <23`, the first Node 22 shipping Unicode 17
+(A01 §Host assumptions), and a container on an older 22 measures width differently
+and fails later and less clearly. `engine-strict` binds an install in this checkout
+and nothing at run time, so `test/unit/node-floor.test.ts` asserts
+`process.versions.unicode` is `17.0` wherever the suite runs.
 
 Each declares its terminal as `xterm-256color` with a UTF-8 locale, and each also runs the suite under `TERM=dumb` and `LANG=C` — the degradation axes are not tested by hoping someone's laptop is misconfigured.
 
