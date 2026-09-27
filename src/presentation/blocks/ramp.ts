@@ -103,6 +103,46 @@ const POP_TICKS = 6;
 const RIPPLE_TICKS = 12;
 
 /**
+ * **How long each one-shot runs, over an extent of `span` cells — one table**
+ * (C09 I120). `animateT`'s held frame and the ticker's *done* both read it, so the
+ * painter cannot hold a frame the ticker is still asking to draw, nor the reverse.
+ * Keyed on exactly the five `RAMP_ONE_SHOTS` names; a row asserts the two sets
+ * are equal.
+ */
+const ONE_SHOT_TICKS = Object.freeze({
+  sweep: (span: number) => span + 3,
+  pop: () => POP_TICKS,
+  wipe: (span: number) => span,
+  typewriter: (span: number) => span,
+  ripple: () => RIPPLE_TICKS,
+});
+
+/** The one-shots `ONE_SHOT_TICKS` times, for the row comparing it with `RAMP_ONE_SHOTS`. */
+export const TIMED_ONE_SHOTS: readonly string[] = Object.freeze(Object.keys(ONE_SHOT_TICKS));
+
+/** Ticks a one-shot runs over an extent of `n`, or `undefined` for an effect that does not end (C09 I120). */
+export function oneShotTicks(effect: RampAnimation | undefined, n: number): number | undefined {
+  if (effect === undefined || !Object.hasOwn(ONE_SHOT_TICKS, effect)) return undefined;
+  return ONE_SHOT_TICKS[effect as keyof typeof ONE_SHOT_TICKS](Math.max(1, n));
+}
+
+/**
+ * **Whether a one-shot has run its course** at `tick`, over an extent no longer
+ * than `bound` (C09 I120, C22 §6o.2 row 11).
+ *
+ * The bound is what makes this answerable before rendering: every duration grows
+ * with the extent, so done over the bound is done over the drawn length. A
+ * periodic effect, `none` and an **unstamped** one-shot are never done — the last
+ * because it has not started, and the shell stamps it on the frame that draws it.
+ * `k` is `animateT`'s own, so the two agree on the tick the held frame begins.
+ */
+export function oneShotDone(ramp: Ramp, tick: number, bound: number): boolean {
+  const ticks = oneShotTicks(ramp.animate, bound);
+  if (ticks === undefined || ramp.since === undefined) return false;
+  return Math.max(0, Math.floor(tick)) - Math.floor(ramp.since) >= ticks;
+}
+
+/**
  * **A deterministic hash, because a frame must be reproducible.**
  *
  * Four of these effects are *irregular* by their own description — `flicker`,
@@ -303,21 +343,21 @@ export function animateT(
     case "sweep": {
       // A band crosses once. Finished, every cell sits at `to`: *done* is a state
       // and the frame that shows it is the full one.
-      const p = shotProgress(since, k, span + 3);
+      const p = shotProgress(since, k, ONE_SHOT_TICKS.sweep(span));
       if (p === undefined) return 1;
       return band(i, p * (span + 3) - SHIMMER_HALF_WIDTH, SHIMMER_HALF_WIDTH);
     }
     case "pop": {
       // One flash, then it settles — so the resting frame is 0 and not 1, which
       // is the difference between *arrived once* and *done*.
-      const p = shotProgress(since, k, POP_TICKS);
+      const p = shotProgress(since, k, ONE_SHOT_TICKS.pop());
       if (p === undefined) return 0;
       return 1 - p;
     }
     case "wipe": {
       // A hard edge, not a band: *cleanly*. Behind it the new state, ahead of it
       // the old, and afterwards the whole run is the new one.
-      const p = shotProgress(since, k, span);
+      const p = shotProgress(since, k, ONE_SHOT_TICKS.wipe(span));
       if (p === undefined) return 1;
       return i <= p * span ? 1 : 0;
     }
@@ -325,14 +365,14 @@ export function animateT(
       // Cells brighten one per tick from inline-start. It reveals by brightening
       // and never by withholding a cluster, which is what keeps it inside
       // R-MOT-005 and out of `measure`'s way.
-      const p = shotProgress(since, k, span);
+      const p = shotProgress(since, k, ONE_SHOT_TICKS.typewriter(span));
       if (p === undefined) return 1;
       return i <= p * span ? 1 : 0;
     }
     case "ripple": {
       // A ring leaving the centre, once. *Acknowledged* — it says a thing was
       // received, and then there is nothing more to say, so it rests at 0.
-      const p = shotProgress(since, k, RIPPLE_TICKS);
+      const p = shotProgress(since, k, ONE_SHOT_TICKS.ripple());
       if (p === undefined) return 0;
       const centre = (span - 1) / 2;
       const radius = p * (centre + 1);
@@ -421,8 +461,22 @@ export function rampMoves(ramp: Ramp | undefined): boolean {
   return ramp !== undefined && ramp.animate !== undefined && ramp.animate !== "none";
 }
 
-function spansMove(spans: readonly TextSpan[] | undefined): boolean {
-  return spans !== undefined && spans.some((span) => rampMoves(span.ramp));
+/**
+ * Where the ticker is asking (C09 I120): the session's tick and the region's
+ * width. Absent, a moving ramp is any `animate` but `none` — I54 as first
+ * written, which is what a caller with no tick can know.
+ */
+export type TickAt = Readonly<{ tick: number; width: number }>;
+
+/** A ramp that still moves at `at`: I54's answer, less a one-shot that has run its course. */
+function rampLive(ramp: Ramp | undefined, at: TickAt | undefined, bound: number): boolean {
+  if (!rampMoves(ramp) || ramp === undefined) return false;
+  return at === undefined || !oneShotDone(ramp, at.tick, bound);
+}
+
+// A span's extent is its drawn clusters, never more than its code units.
+function spansMove(spans: readonly TextSpan[] | undefined, at?: TickAt): boolean {
+  return spans !== undefined && spans.some((span) => rampLive(span.ramp, at, span.to - span.from));
 }
 
 /**
@@ -445,7 +499,7 @@ function rampExtentOf(kind: BlockKind): RampExtent | undefined {
   return (RAMP_EXTENT as Readonly<Partial<Record<BlockKind, RampExtent>>>)[kind];
 }
 
-export function animatesByContent(block: Block): boolean {
+export function animatesByContent(block: Block, at?: TickAt): boolean {
   switch (rampExtentOf(block.kind)) {
     // **An app's kind, and the arm the closed table made visible** (C04 I119).
     // The lookup was `Record<BlockKind, …>` and answered `RampExtent` for every
@@ -460,12 +514,74 @@ export function animatesByContent(block: Block): boolean {
     case "none":
       return false;
     case "axis":
-      return rampMoves((block as Progress).ramp);
+      // A bar is never wider than the region it is drawn in.
+      return rampLive((block as Progress).ramp, at, at?.width ?? 0);
     case "clusters": {
       if (block.kind === "table") {
-        return block.rows.some((row) => Object.values(row.cells).some((cell) => spansMove(cell.spans)));
+        return block.rows.some((row) => Object.values(row.cells).some((cell) => spansMove(cell.spans, at)));
       }
-      return spansMove((block as Readonly<{ spans?: readonly TextSpan[] }>).spans);
+      return spansMove((block as Readonly<{ spans?: readonly TextSpan[] }>).spans, at);
+    }
+  }
+}
+
+/**
+ * **Every ramp a block carries itself, with its address, rebuilt through `f`**
+ * (C22 I131). Children are not visited — the caller recurses, because which
+ * blocks hold blocks is `tree.ts`'s question and not this one's.
+ *
+ * The addresses are C22 I131's: `ramp` on a bar, `spans.i` on a span carrier,
+ * `rows.<row id>.<column>.spans.i` in a table cell. Driven by `RAMP_EXTENT`, the
+ * table `animatesByContent` reads, so the two walks cannot disagree about where a
+ * ramp may sit. **The block is returned by reference when `f` returns every ramp
+ * by reference**, which is what keeps a still document's memo keys stable.
+ */
+export function mapRamps(block: Block, f: (ramp: Ramp, address: string) => Ramp): Block {
+  const spansOf = (spans: readonly TextSpan[], prefix: string): readonly TextSpan[] => {
+    let changed = false;
+    const next = spans.map((span, i) => {
+      if (span.ramp === undefined) return span;
+      const ramp = f(span.ramp, `${prefix}spans.${String(i)}`);
+      if (ramp === span.ramp) return span;
+      changed = true;
+      return { ...span, ramp };
+    });
+    return changed ? next : spans;
+  };
+  switch (rampExtentOf(block.kind)) {
+    case undefined:
+    case "none":
+      return block;
+    case "axis": {
+      const bar = block as Progress;
+      if (bar.ramp === undefined) return block;
+      const ramp = f(bar.ramp, "ramp");
+      return ramp === bar.ramp ? block : ({ ...bar, ramp } as Block);
+    }
+    case "clusters": {
+      if (block.kind === "table") {
+        let changed = false;
+        const rows = block.rows.map((row) => {
+          let rowChanged = false;
+          const cells = Object.fromEntries(
+            Object.entries(row.cells).map(([column, cell]) => {
+              if (cell.spans === undefined) return [column, cell];
+              const spans = spansOf(cell.spans, `rows.${row.id}.${column}.`);
+              if (spans === cell.spans) return [column, cell];
+              rowChanged = true;
+              return [column, { ...cell, spans }];
+            }),
+          );
+          if (!rowChanged) return row;
+          changed = true;
+          return { ...row, cells };
+        });
+        return changed ? ({ ...block, rows } as Block) : block;
+      }
+      const spans = (block as Readonly<{ spans?: readonly TextSpan[] }>).spans;
+      if (spans === undefined) return block;
+      const next = spansOf(spans, "");
+      return next === spans ? block : ({ ...block, spans: next } as Block);
     }
   }
 }

@@ -2176,7 +2176,12 @@ function visibleRows(
     };
     // **The scratch travels with the memo** (I100, F1191): the window seam holds
     // the cap form (C09 I76) and the patch's plan (C25 I22) across frames.
-    const pieces = windowEntry(entryLayout(entry.doc.blocks, width), from, to, memoised, graph.scratch);
+    // **Stamped before it is laid out** (C22 I131, §6o.3 ruling 1): this is where
+    // the tick and the entry id meet, and nothing below L4 has either. A document
+    // with no one-shot comes back as the same array, and a stamped one as the
+    // same stamped array on every later frame, so the memos above stay keyed.
+    const blocks = graph.oneShots.stamp(entry.id, entry.doc.blocks, tick);
+    const pieces = windowEntry(entryLayout(blocks, width), from, to, memoised, graph.scratch);
     const windowed = { blocks: pieces.flatMap((piece) => piece.windowed.blocks) };
 
     // The key carries the range, because the cached lines are now the *window's*
@@ -2278,7 +2283,9 @@ function visibleRows(
       }
     }
 
-    const cadence = animationIntervalOf(windowed.blocks);
+    // **With the tick and the width** (C22 I132, C09 I120): a one-shot that has
+    // run its course asks for nothing, so a finished `pop` disarms the ticker.
+    const cadence = animationIntervalOf(windowed.blocks, { tick, width });
     if (cadence !== null && (fastest === null || cadence < fastest)) fastest = cadence;
     // **The tick is its own axis, not a suffix of the slot** (C22 I103, F1189).
     // Folded into the slot every spinner tick was a `focus` miss, which drops
@@ -2407,6 +2414,9 @@ function withoutAnimating(parts: EntryParts | undefined, pieces: readonly EntryP
   const animating = new Set<string>();
   for (const piece of pieces) {
     for (const block of piece.windowed.blocks) {
+      // **Without the tick, deliberately** (C22 I132): a part cached mid-flash is
+      // not the held frame, so a finished one-shot is still withheld and drawn
+      // fresh on a miss. With `at` here it would be served from the part.
       if (animationIntervalOf([block]) !== null) animating.add(block.id);
       if (block.kind === "group" && (block as Group).direction === "column") {
         for (const child of (block as Group).children) {

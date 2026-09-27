@@ -77,7 +77,8 @@ const results = runPass({
       // C09 I54 (T2.120, T4.8) — F227 restored by content: the cadence reads the kind alone.
       name: "tickIntervalOf reads ANIMATES alone",
       file: ANIMATION,
-      from: "  return animatesByContent(block) ? rampCadenceMs() : null;",
+      // Re-anchored 2026-09-27 (C09 I120): the content check takes the tick.
+      from: "  return animatesByContent(block, at) ? rampCadenceMs() : null;",
       to: "  return null;",
       expect: "T2.120",
     },

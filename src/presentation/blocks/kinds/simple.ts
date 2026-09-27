@@ -851,6 +851,9 @@ export const progressDefinition: BlockDefinition<Progress> = {
               effectiveTick(ctx.tick, ctx.capabilities),
               barWidth,
               i,
+              // **The stamp, which this call never passed** (C09 I120): a bar's
+              // one-shot drew frame 0 for ever while a span's played.
+              ramp?.since,
             );
             const sampled = ramp === undefined ? undefined : rampStyle(ramp, t, i, ctx.theme, ctx.capabilities);
             // **The ramp survives the rung and I52 is untouched**: the ink still

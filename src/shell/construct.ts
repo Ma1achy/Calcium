@@ -68,6 +68,7 @@ import { RenderCache } from "./render-cache.js";
 import { ChromeCache } from "./chrome-cache.js";
 import { Cameras } from "./cameras.js";
 import { Frames } from "./frames.js";
+import { OneShots } from "./one-shots.js";
 import { CursorPositions } from "./cursor-positions.js";
 import { SeriesVisibility } from "./series-visibility.js";
 import { VisibleIds } from "./visible-ids.js";
@@ -617,6 +618,8 @@ export type Graph = Readonly<{
   cameras: Cameras;
   /** C22 I77 — the frame each animated image is on, keyed like the two above and dropped with them. */
   frames: Frames;
+  /** When each one-shot began, per entry and identity (C22 I131). */
+  oneShots: OneShots;
   /** C22 I76 — the crosshair of each plot, keyed like the two above and dropped with them. */
   cursorPositions: CursorPositions;
   /** C22 I78 — the reader's series overrides per plot, keyed like the three above and dropped with them. */
@@ -1090,6 +1093,10 @@ export async function constructGraph(
     // shape, same subscription, same reason — and the fourth store to join it,
     // which is the count the argument was written to survive.
     const frames = new Frames();
+    // **And the one-shots' stamps — the sixth** (C22 I131). Same key shape, same
+    // subscription, same reason: a stamp outliving its entry would time a
+    // re-run's flash from the first run's tick.
+    const oneShots = new OneShots();
     // **And the series overrides — the fifth** (C22 I78). Same key shape, same
     // subscription, same reason; the first store whose writer is a keymap the
     // block declares rather than a row of the default table.
@@ -1110,6 +1117,7 @@ export async function constructGraph(
           cameras.delete(id);
           cursorPositions.delete(id);
           frames.delete(id);
+          oneShots.delete(id);
           seriesVisibility.delete(id);
         }
       } else if (change.kind === "clear") {
@@ -1118,6 +1126,7 @@ export async function constructGraph(
         cameras.clear();
         cursorPositions.clear();
         frames.clear();
+        oneShots.clear();
         seriesVisibility.clear();
       }
     });
@@ -1429,6 +1438,7 @@ export async function constructGraph(
       cursorPositions,
       seriesVisibility,
       frames,
+      oneShots,
       scratch,
       measures,
       overlays,
