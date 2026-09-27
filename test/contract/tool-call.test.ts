@@ -197,7 +197,7 @@ describe("C09 §4 — the head is fitted and is an element", () => {
     block({ kind: "notice", id: "h", tone: "default", glyph: "running", state: "running", text: LONG, ...(spans === undefined ? {} : { spans }), ...(action === undefined ? {} : { action }) });
   const rows = (b: Block, width: number, ascii = false): readonly string[] => frame([b], width, ascii);
 
-  it("T2.113 (C09 I46): a step notice is one row at 80, 40 and 20 in both alphabets; the elide run gives way first and the control wraps", () => {
+  it("T2.113 (C09 I46): a call head is one row at 80, 40 and 20 in both alphabets; the elide run gives way first and the control wraps", () => {
     for (const ascii of [false, true]) {
       const marker = ascii ? "~" : "…";
       for (const width of [80, 40, 20]) {
@@ -236,7 +236,7 @@ describe("C09 §4 — the head is fitted and is an element", () => {
     expect(rows(control, 40)).toHaveLength(registry.measure(control, 40));
   });
 
-  it("T2.114 (C09 I47): a step notice is one element with or without an action; an info notice without one is none", () => {
+  it("T2.114 (C09 I47): a call head is one element with or without an action; an info notice without one is none", () => {
     const bare = registry.elementsIn([head()], 80);
     expect(bare).toHaveLength(1);
     expect(bare[0]?.element.copy).toBe(LONG);
