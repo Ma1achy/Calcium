@@ -468,15 +468,15 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 07 ● help                                                                          
 08   ⎿                                                                             
 09   │                                                                             
-10   │ /help          list the verbs; \`/help keys\` lists the key bindings          
-11   │ /capabilities  the rendering route, and what the terminal can do            
-12   │ /clear         empty the transcript; command history is untouched           
-13   │ /theme         switch between the dark and light variants                   
-14   │ /history       show recent commands                                         
-15   │ /exit          end the session                                              
-16   │ /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\` 
+10   │  /help          list the verbs; \`/help keys\` lists the key bindings         
+11   │  /capabilities  the rendering route, and what the terminal can do           
+12   │  /clear         empty the transcript; command history is untouched          
+13   │  /theme         switch between the dark and light variants                  
+14   │  /history       show recent commands                                        
+15   │  /exit          end the session                                             
+16   │  /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`captur… 
 17   │                                                                             
-18   │ /help keys   Use                                                            
+18   │  /help keys   Use                                                           
 19                                                                                 
 20 ────────────────────────────────────────────────────────────────────────────────
 21 ❯                                                                               
@@ -497,15 +497,15 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 07 ● help                                                                          
 08   ⎿                                                                             
 09   │                                                                             
-10   │ /help          list the verbs; \`/help keys\` lists the key bindings          
-11   │ /capabilities  the rendering route, and what the terminal can do            
-12   │ /clear         empty the transcript; command history is untouched           
-13   │ /theme         switch between the dark and light variants                   
-14   │ /history       show recent commands                                         
-15   │ /exit          end the session                                              
-16   │ /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\` 
+10   │  /help          list the verbs; \`/help keys\` lists the key bindings         
+11   │  /capabilities  the rendering route, and what the terminal can do           
+12   │  /clear         empty the transcript; command history is untouched          
+13   │  /theme         switch between the dark and light variants                  
+14   │  /history       show recent commands                                        
+15   │  /exit          end the session                                             
+16   │  /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`captur… 
 17   │                                                                             
-18   │ /help keys   Use                                                            
+18   │  /help keys   Use                                                           
 19                                                                                 
 20 ────────────────────────────────────────────────────────────────────────────────
 21 ❯                                                                               
@@ -526,15 +526,15 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 07 ● help                                                                          
 08   ⎿                                                                             
 09   │                                                                             
-10   │ /help          list the verbs; \`/help keys\` lists the key bindings          
-11   │ /capabilities  the rendering route, and what the terminal can do            
-12   │ /clear         empty the transcript; command history is untouched           
-13   │ /theme         switch between the dark and light variants                   
-14   │ /history       show recent commands                                         
-15   │ /exit          end the session                                              
-16   │ /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\` 
+10   │  /help          list the verbs; \`/help keys\` lists the key bindings         
+11   │  /capabilities  the rendering route, and what the terminal can do           
+12   │  /clear         empty the transcript; command history is untouched          
+13   │  /theme         switch between the dark and light variants                  
+14   │  /history       show recent commands                                        
+15   │  /exit          end the session                                             
+16   │  /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`captur… 
 17   │                                                                             
-18   │ /help keys   Use                                                            
+18   │  /help keys   Use                                                           
 19                                                                                 
 20 ────────────────────────────────────────────────────────────────────────────────
 21 ❯                                                                               
@@ -555,15 +555,15 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 07 ● help                                                                          
 08   ⎿                                                                             
 09   │                                                                             
-10   │ /help          list the verbs; \`/help keys\` lists the key bindings          
-11   │ /capabilities  the rendering route, and what the terminal can do            
-12   │ /clear         empty the transcript; command history is untouched           
-13   │ /theme         switch between the dark and light variants                   
-14   │ /history       show recent commands                                         
-15   │ /exit          end the session                                              
-16   │ /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\` 
+10   │  /help          list the verbs; \`/help keys\` lists the key bindings         
+11   │  /capabilities  the rendering route, and what the terminal can do           
+12   │  /clear         empty the transcript; command history is untouched          
+13   │  /theme         switch between the dark and light variants                  
+14   │  /history       show recent commands                                        
+15   │  /exit          end the session                                             
+16   │  /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`captur… 
 17   │                                                                             
-18   │ /help keys   Use                                                            
+18   │  /help keys   Use                                                           
 19                                                                                 
 20 ────────────────────────────────────────────────────────────────────────────────
 21 ❯                                                                               
@@ -584,15 +584,15 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 07 ● help                                                                          
 08   ⎿                                                                             
 09   │                                                                             
-10   │ /help          list the verbs; \`/help keys\` lists the key bindings          
-11   │ /capabilities  the rendering route, and what the terminal can do            
-12   │ /clear         empty the transcript; command history is untouched           
-13   │ /theme         switch between the dark and light variants                   
-14   │ /history       show recent commands                                         
-15   │ /exit          end the session                                              
-16   │ /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\` 
+10   │  /help          list the verbs; \`/help keys\` lists the key bindings         
+11   │  /capabilities  the rendering route, and what the terminal can do           
+12   │  /clear         empty the transcript; command history is untouched          
+13   │  /theme         switch between the dark and light variants                  
+14   │  /history       show recent commands                                        
+15   │  /exit          end the session                                             
+16   │  /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`captur… 
 17   │                                                                             
-18   │ /help keys   Use                                                            
+18   │  /help keys   Use                                                           
 19                                                                                 
 20 ────────────────────────────────────────────────────────────────────────────────
 21 ❯                                                                               
@@ -613,15 +613,15 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 07 ● help                                                                          
 08   ⎿                                                                             
 09   │                                                                             
-10   │ /help          list the verbs; \`/help keys\` lists the key bindings          
-11   │ /capabilities  the rendering route, and what the terminal can do            
-12   │ /clear         empty the transcript; command history is untouched           
-13   │ /theme         switch between the dark and light variants                   
-14   │ /history       show recent commands                                         
-15   │ /exit          end the session                                              
-16   │ /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\` 
+10   │  /help          list the verbs; \`/help keys\` lists the key bindings         
+11   │  /capabilities  the rendering route, and what the terminal can do           
+12   │  /clear         empty the transcript; command history is untouched          
+13   │  /theme         switch between the dark and light variants                  
+14   │  /history       show recent commands                                        
+15   │  /exit          end the session                                             
+16   │  /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`captur… 
 17   │                                                                             
-18   │ /help keys   Use                                                            
+18   │  /help keys   Use                                                           
 19                                                                                 
 20 ────────────────────────────────────────────────────────────────────────────────
 21 ❯                                                                               
@@ -642,15 +642,15 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 07 ● help                                                                          
 08   ⎿                                                                             
 09   │                                                                             
-10   │ /help          list the verbs; \`/help keys\` lists the key bindings          
-11   │ /capabilities  the rendering route, and what the terminal can do            
-12   │ /clear         empty the transcript; command history is untouched           
-13   │ /theme         switch between the dark and light variants                   
-14   │ /history       show recent commands                                         
-15   │ /exit          end the session                                              
-16   │ /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\` 
+10   │  /help          list the verbs; \`/help keys\` lists the key bindings         
+11   │  /capabilities  the rendering route, and what the terminal can do           
+12   │  /clear         empty the transcript; command history is untouched          
+13   │  /theme         switch between the dark and light variants                  
+14   │  /history       show recent commands                                        
+15   │  /exit          end the session                                             
+16   │  /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`captur… 
 17   │                                                                             
-18   │ /help keys   Use                                                            
+18   │  /help keys   Use                                                           
 19                                                                                 
 20 ────────────────────────────────────────────────────────────────────────────────
 21 ❯                                                                               
@@ -671,15 +671,15 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 07 ● help                                                                          
 08   ⎿                                                                             
 09   │                                                                             
-10   │ /help          list the verbs; \`/help keys\` lists the key bindings          
-11   │ /capabilities  the rendering route, and what the terminal can do            
-12   │ /clear         empty the transcript; command history is untouched           
-13   │ /theme         switch between the dark and light variants                   
-14   │ /history       show recent commands                                         
-15   │ /exit          end the session                                              
-16   │ /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\` 
+10   │  /help          list the verbs; \`/help keys\` lists the key bindings         
+11   │  /capabilities  the rendering route, and what the terminal can do           
+12   │  /clear         empty the transcript; command history is untouched          
+13   │  /theme         switch between the dark and light variants                  
+14   │  /history       show recent commands                                        
+15   │  /exit          end the session                                             
+16   │  /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`captur… 
 17   │                                                                             
-18   │ /help keys   Use                                                            
+18   │  /help keys   Use                                                           
 19                                                                                 
 20 ────────────────────────────────────────────────────────────────────────────────
 21 ❯                                                                               
@@ -700,15 +700,15 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 07 ● help                                                                          
 08   ⎿                                                                             
 09   │                                                                             
-10   │ /help          list the verbs; \`/help keys\` lists the key bindings          
-11   │ /capabilities  the rendering route, and what the terminal can do            
-12   │ /clear         empty the transcript; command history is untouched           
-13   │ /theme         switch between the dark and light variants                   
-14   │ /history       show recent commands                                         
-15   │ /exit          end the session                                              
-16   │ /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\` 
+10   │  /help          list the verbs; \`/help keys\` lists the key bindings         
+11   │  /capabilities  the rendering route, and what the terminal can do           
+12   │  /clear         empty the transcript; command history is untouched          
+13   │  /theme         switch between the dark and light variants                  
+14   │  /history       show recent commands                                        
+15   │  /exit          end the session                                             
+16   │  /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`captur… 
 17   │                                                                             
-18   │ /help keys   Use                                                            
+18   │  /help keys   Use                                                           
 19                                                                                 
 20 ────────────────────────────────────────────────────────────────────────────────
 21 ❯                                                                               
@@ -729,15 +729,15 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 07 ● help                                                                          
 08   ⎿                                                                             
 09   │                                                                             
-10   │ /help          list the verbs; \`/help keys\` lists the key bindings          
-11   │ /capabilities  the rendering route, and what the terminal can do            
-12   │ /clear         empty the transcript; command history is untouched           
-13   │ /theme         switch between the dark and light variants                   
-14   │ /history       show recent commands                                         
-15   │ /exit          end the session                                              
-16   │ /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\` 
+10   │  /help          list the verbs; \`/help keys\` lists the key bindings         
+11   │  /capabilities  the rendering route, and what the terminal can do           
+12   │  /clear         empty the transcript; command history is untouched          
+13   │  /theme         switch between the dark and light variants                  
+14   │  /history       show recent commands                                        
+15   │  /exit          end the session                                             
+16   │  /profile       open the profiler's deck; also \`snapshot\`, \`live\`, \`captur… 
 17   │                                                                             
-18   │ /help keys   Use                                                            
+18   │  /help keys   Use                                                           
 19                                                                                 
 20 ────────────────────────────────────────────────────────────────────────────────
 21 ❯                                                                               
@@ -1366,15 +1366,15 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 CCCCCC..........................................................................
 ..B.............................................................................
 ..B.............................................................................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA..........
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA............
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...........
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAA.........................................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAA..............................................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.........
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...........
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA..........
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA..................
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAA........................................
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAA.............................................
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.
 ..B.............................................................................
-..B.BBBBBBBBBBBBBBBB............................................................
+..B..BBBBBBBBBBBBBBBB...........................................................
 ................................................................................
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ................................................................................
@@ -1397,15 +1397,15 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 DDDDDDBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-BBCBEEEEEEEEEEEEEEEEBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+BBCBBEEEEEEEEEEEEEEEEBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
@@ -1430,15 +1430,15 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 DDDDDDBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-BBCBEEEEEEEEEEEEEEEEBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+BBCBBEEEEEEEEEEEEEEEEBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
@@ -1463,15 +1463,15 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 CCCCCC..........................................................................
 ..B.............................................................................
 ..B.............................................................................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA..........
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA............
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...........
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAA.........................................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAA..............................................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.........
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...........
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA..........
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA..................
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAA........................................
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAA.............................................
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.
 ..B.............................................................................
-..B.DDDDDDDDDDDDDDDD............................................................
+..B..DDDDDDDDDDDDDDDD...........................................................
 ................................................................................
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ................................................................................
@@ -1495,15 +1495,15 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 DDDDDDBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCCCCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+BBCBBCCCCCCCCCCCCCCCCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
@@ -1527,15 +1527,15 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 CCCCCC..........................................................................
 ..B.............................................................................
 ..B.............................................................................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA..........
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA............
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...........
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAA.........................................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAA..............................................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.........
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...........
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA..........
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA..................
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAA........................................
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAA.............................................
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.
 ..B.............................................................................
-..B.DDDDDDDDDDDDDDDD............................................................
+..B..DDDDDDDDDDDDDDDD...........................................................
 ................................................................................
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ................................................................................
@@ -1559,15 +1559,15 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 CCCCCC..........................................................................
 ..B.............................................................................
 ..B.............................................................................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA..........
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA............
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...........
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAA.........................................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAA..............................................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.........
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...........
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA..........
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA..................
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAA........................................
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAA.............................................
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.
 ..B.............................................................................
-..B.DDDDDDDDDDDDDDDD............................................................
+..B..DDDDDDDDDDDDDDDD...........................................................
 ................................................................................
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ................................................................................
@@ -1591,15 +1591,15 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 DDDDDDBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-BBCBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+BBCBBCCCCCCCCCCCCCBBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB
 BBCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-BBCBEEEEEEEEEEEEEEEEBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+BBCBBEEEEEEEEEEEEEEEEBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
@@ -1624,15 +1624,15 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 CCCCCC..........................................................................
 ..B.............................................................................
 ..B.............................................................................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA..........
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA............
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...........
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAA.........................................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAA..............................................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.........
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...........
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA..........
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA..................
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAA........................................
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAA.............................................
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.
 ..B.............................................................................
-..B.BBBBBBBBBBBBBBBB............................................................
+..B..BBBBBBBBBBBBBBBB...........................................................
 ................................................................................
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ................................................................................
@@ -1655,15 +1655,15 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 CCCCCC..........................................................................
 ..B.............................................................................
 ..B.............................................................................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA..........
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA............
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...........
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAA.........................................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAA..............................................
-..B.BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.........
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...........
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA..........
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA..................
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAA........................................
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAA.............................................
+..B..BBBBBBBBBBBBB..AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.
 ..B.............................................................................
-..B.BBBBBBBBBBBBBBBB............................................................
+..B..BBBBBBBBBBBBBBBB...........................................................
 ................................................................................
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ................................................................................
@@ -3465,7 +3465,7 @@ ESC[0m
 ESC[38;5;245m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;245m
 «/help» +8sp
 ESC[39m
@@ -3473,14 +3473,14 @@ ESC[39m
 ESC[38;5;188m
 «list the verbs; \`/help keys\` lists the key bindings»
 ESC[39m
-«» +10sp
+«» +9sp
 ESC[11;1H
 ESC[0m
 «» +2sp
 ESC[38;5;245m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;245m
 «/capabilities»
 ESC[39m
@@ -3488,14 +3488,14 @@ ESC[39m
 ESC[38;5;188m
 «the rendering route, and what the terminal can do»
 ESC[39m
-«» +12sp
+«» +11sp
 ESC[12;1H
 ESC[0m
 «» +2sp
 ESC[38;5;245m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;245m
 «/clear» +7sp
 ESC[39m
@@ -3503,14 +3503,14 @@ ESC[39m
 ESC[38;5;188m
 «empty the transcript; command history is untouched»
 ESC[39m
-«» +11sp
+«» +10sp
 ESC[13;1H
 ESC[0m
 «» +2sp
 ESC[38;5;245m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;245m
 «/theme» +7sp
 ESC[39m
@@ -3518,14 +3518,14 @@ ESC[39m
 ESC[38;5;188m
 «switch between the dark and light variants»
 ESC[39m
-«» +19sp
+«» +18sp
 ESC[14;1H
 ESC[0m
 «» +2sp
 ESC[38;5;245m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;245m
 «/history» +5sp
 ESC[39m
@@ -3533,14 +3533,14 @@ ESC[39m
 ESC[38;5;188m
 «show recent commands»
 ESC[39m
-«» +41sp
+«» +40sp
 ESC[15;1H
 ESC[0m
 «» +2sp
 ESC[38;5;245m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;245m
 «/exit» +8sp
 ESC[39m
@@ -3548,20 +3548,20 @@ ESC[39m
 ESC[38;5;188m
 «end the session»
 ESC[39m
-«» +46sp
+«» +45sp
 ESC[16;1H
 ESC[0m
 «» +2sp
 ESC[38;5;245m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;245m
 «/profile» +5sp
 ESC[39m
 «» +2sp
 ESC[38;5;188m
-«open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\`»
+«open the profiler's deck; also \`snapshot\`, \`live\`, \`captur…»
 ESC[39m
 «» +1sp
 ESC[17;1H
@@ -3577,11 +3577,11 @@ ESC[0m
 ESC[38;5;245m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;245m
 «/help keys   Use»
 ESC[39m
-«» +60sp
+«» +59sp
 ESC[?25l
 ESC[21;3H
 ESC[?25h"
@@ -3635,7 +3635,7 @@ ESC[38;5;247m
 «│»
 ESC[0m
 ESC[48;5;16m
-«» +1sp
+«» +2sp
 ESC[38;5;247m
 «/help» +8sp
 ESC[39m
@@ -3643,7 +3643,7 @@ ESC[39m
 ESC[38;5;231m
 «list the verbs; \`/help keys\` lists the key bindings»
 ESC[39m
-«» +10sp
+«» +9sp
 ESC[0m
 ESC[11;1H
 ESC[0m
@@ -3653,7 +3653,7 @@ ESC[38;5;247m
 «│»
 ESC[0m
 ESC[48;5;16m
-«» +1sp
+«» +2sp
 ESC[38;5;247m
 «/capabilities»
 ESC[39m
@@ -3661,7 +3661,7 @@ ESC[39m
 ESC[38;5;231m
 «the rendering route, and what the terminal can do»
 ESC[39m
-«» +12sp
+«» +11sp
 ESC[0m
 ESC[12;1H
 ESC[0m
@@ -3671,7 +3671,7 @@ ESC[38;5;247m
 «│»
 ESC[0m
 ESC[48;5;16m
-«» +1sp
+«» +2sp
 ESC[38;5;247m
 «/clear» +7sp
 ESC[39m
@@ -3679,7 +3679,7 @@ ESC[39m
 ESC[38;5;231m
 «empty the transcript; command history is untouched»
 ESC[39m
-«» +11sp
+«» +10sp
 ESC[0m
 ESC[13;1H
 ESC[0m
@@ -3689,7 +3689,7 @@ ESC[38;5;247m
 «│»
 ESC[0m
 ESC[48;5;16m
-«» +1sp
+«» +2sp
 ESC[38;5;247m
 «/theme» +7sp
 ESC[39m
@@ -3697,7 +3697,7 @@ ESC[39m
 ESC[38;5;231m
 «switch between the dark and light variants»
 ESC[39m
-«» +19sp
+«» +18sp
 ESC[0m
 ESC[14;1H
 ESC[0m
@@ -3707,7 +3707,7 @@ ESC[38;5;247m
 «│»
 ESC[0m
 ESC[48;5;16m
-«» +1sp
+«» +2sp
 ESC[38;5;247m
 «/history» +5sp
 ESC[39m
@@ -3715,7 +3715,7 @@ ESC[39m
 ESC[38;5;231m
 «show recent commands»
 ESC[39m
-«» +41sp
+«» +40sp
 ESC[0m
 ESC[15;1H
 ESC[0m
@@ -3725,7 +3725,7 @@ ESC[38;5;247m
 «│»
 ESC[0m
 ESC[48;5;16m
-«» +1sp
+«» +2sp
 ESC[38;5;247m
 «/exit» +8sp
 ESC[39m
@@ -3733,7 +3733,7 @@ ESC[39m
 ESC[38;5;231m
 «end the session»
 ESC[39m
-«» +46sp
+«» +45sp
 ESC[0m
 ESC[16;1H
 ESC[0m
@@ -3743,13 +3743,13 @@ ESC[38;5;247m
 «│»
 ESC[0m
 ESC[48;5;16m
-«» +1sp
+«» +2sp
 ESC[38;5;247m
 «/profile» +5sp
 ESC[39m
 «» +2sp
 ESC[38;5;231m
-«open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\`»
+«open the profiler's deck; also \`snapshot\`, \`live\`, \`captur…»
 ESC[39m
 «» +1sp
 ESC[0m
@@ -3771,11 +3771,11 @@ ESC[38;5;247m
 «│»
 ESC[0m
 ESC[48;5;16m
-«» +1sp
+«» +2sp
 ESC[38;5;251m
 «/help keys   Use»
 ESC[39m
-«» +60sp
+«» +59sp
 ESC[0m
 ESC[?25l
 ESC[21;3H
@@ -3830,7 +3830,7 @@ ESC[38;5;239m
 «│»
 ESC[0m
 ESC[48;5;231m
-«» +1sp
+«» +2sp
 ESC[38;5;239m
 «/help» +8sp
 ESC[39m
@@ -3838,7 +3838,7 @@ ESC[39m
 ESC[38;5;16m
 «list the verbs; \`/help keys\` lists the key bindings»
 ESC[39m
-«» +10sp
+«» +9sp
 ESC[0m
 ESC[11;1H
 ESC[0m
@@ -3848,7 +3848,7 @@ ESC[38;5;239m
 «│»
 ESC[0m
 ESC[48;5;231m
-«» +1sp
+«» +2sp
 ESC[38;5;239m
 «/capabilities»
 ESC[39m
@@ -3856,7 +3856,7 @@ ESC[39m
 ESC[38;5;16m
 «the rendering route, and what the terminal can do»
 ESC[39m
-«» +12sp
+«» +11sp
 ESC[0m
 ESC[12;1H
 ESC[0m
@@ -3866,7 +3866,7 @@ ESC[38;5;239m
 «│»
 ESC[0m
 ESC[48;5;231m
-«» +1sp
+«» +2sp
 ESC[38;5;239m
 «/clear» +7sp
 ESC[39m
@@ -3874,7 +3874,7 @@ ESC[39m
 ESC[38;5;16m
 «empty the transcript; command history is untouched»
 ESC[39m
-«» +11sp
+«» +10sp
 ESC[0m
 ESC[13;1H
 ESC[0m
@@ -3884,7 +3884,7 @@ ESC[38;5;239m
 «│»
 ESC[0m
 ESC[48;5;231m
-«» +1sp
+«» +2sp
 ESC[38;5;239m
 «/theme» +7sp
 ESC[39m
@@ -3892,7 +3892,7 @@ ESC[39m
 ESC[38;5;16m
 «switch between the dark and light variants»
 ESC[39m
-«» +19sp
+«» +18sp
 ESC[0m
 ESC[14;1H
 ESC[0m
@@ -3902,7 +3902,7 @@ ESC[38;5;239m
 «│»
 ESC[0m
 ESC[48;5;231m
-«» +1sp
+«» +2sp
 ESC[38;5;239m
 «/history» +5sp
 ESC[39m
@@ -3910,7 +3910,7 @@ ESC[39m
 ESC[38;5;16m
 «show recent commands»
 ESC[39m
-«» +41sp
+«» +40sp
 ESC[0m
 ESC[15;1H
 ESC[0m
@@ -3920,7 +3920,7 @@ ESC[38;5;239m
 «│»
 ESC[0m
 ESC[48;5;231m
-«» +1sp
+«» +2sp
 ESC[38;5;239m
 «/exit» +8sp
 ESC[39m
@@ -3928,7 +3928,7 @@ ESC[39m
 ESC[38;5;16m
 «end the session»
 ESC[39m
-«» +46sp
+«» +45sp
 ESC[0m
 ESC[16;1H
 ESC[0m
@@ -3938,13 +3938,13 @@ ESC[38;5;239m
 «│»
 ESC[0m
 ESC[48;5;231m
-«» +1sp
+«» +2sp
 ESC[38;5;239m
 «/profile» +5sp
 ESC[39m
 «» +2sp
 ESC[38;5;16m
-«open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\`»
+«open the profiler's deck; also \`snapshot\`, \`live\`, \`captur…»
 ESC[39m
 «» +1sp
 ESC[0m
@@ -3966,11 +3966,11 @@ ESC[38;5;239m
 «│»
 ESC[0m
 ESC[48;5;231m
-«» +1sp
+«» +2sp
 ESC[38;5;235m
 «/help keys   Use»
 ESC[39m
-«» +60sp
+«» +59sp
 ESC[0m
 ESC[?25l
 ESC[21;3H
@@ -4013,7 +4013,7 @@ ESC[0m
 ESC[38;5;102m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;102m
 «/help» +8sp
 ESC[39m
@@ -4021,14 +4021,14 @@ ESC[39m
 ESC[38;5;252m
 «list the verbs; \`/help keys\` lists the key bindings»
 ESC[39m
-«» +10sp
+«» +9sp
 ESC[11;1H
 ESC[0m
 «» +2sp
 ESC[38;5;102m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;102m
 «/capabilities»
 ESC[39m
@@ -4036,14 +4036,14 @@ ESC[39m
 ESC[38;5;252m
 «the rendering route, and what the terminal can do»
 ESC[39m
-«» +12sp
+«» +11sp
 ESC[12;1H
 ESC[0m
 «» +2sp
 ESC[38;5;102m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;102m
 «/clear» +7sp
 ESC[39m
@@ -4051,14 +4051,14 @@ ESC[39m
 ESC[38;5;252m
 «empty the transcript; command history is untouched»
 ESC[39m
-«» +11sp
+«» +10sp
 ESC[13;1H
 ESC[0m
 «» +2sp
 ESC[38;5;102m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;102m
 «/theme» +7sp
 ESC[39m
@@ -4066,14 +4066,14 @@ ESC[39m
 ESC[38;5;252m
 «switch between the dark and light variants»
 ESC[39m
-«» +19sp
+«» +18sp
 ESC[14;1H
 ESC[0m
 «» +2sp
 ESC[38;5;102m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;102m
 «/history» +5sp
 ESC[39m
@@ -4081,14 +4081,14 @@ ESC[39m
 ESC[38;5;252m
 «show recent commands»
 ESC[39m
-«» +41sp
+«» +40sp
 ESC[15;1H
 ESC[0m
 «» +2sp
 ESC[38;5;102m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;102m
 «/exit» +8sp
 ESC[39m
@@ -4096,20 +4096,20 @@ ESC[39m
 ESC[38;5;252m
 «end the session»
 ESC[39m
-«» +46sp
+«» +45sp
 ESC[16;1H
 ESC[0m
 «» +2sp
 ESC[38;5;102m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;102m
 «/profile» +5sp
 ESC[39m
 «» +2sp
 ESC[38;5;252m
-«open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\`»
+«open the profiler's deck; also \`snapshot\`, \`live\`, \`captur…»
 ESC[39m
 «» +1sp
 ESC[17;1H
@@ -4125,11 +4125,11 @@ ESC[0m
 ESC[38;5;102m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;246m
 «/help keys   Use»
 ESC[39m
-«» +60sp
+«» +59sp
 ESC[?25l
 ESC[21;3H
 ESC[?25h"
@@ -4183,7 +4183,7 @@ ESC[38;5;242m
 «│»
 ESC[0m
 ESC[48;5;231m
-«» +1sp
+«» +2sp
 ESC[38;5;242m
 «/help» +8sp
 ESC[39m
@@ -4191,7 +4191,7 @@ ESC[39m
 ESC[38;5;237m
 «list the verbs; \`/help keys\` lists the key bindings»
 ESC[39m
-«» +10sp
+«» +9sp
 ESC[0m
 ESC[11;1H
 ESC[0m
@@ -4201,7 +4201,7 @@ ESC[38;5;242m
 «│»
 ESC[0m
 ESC[48;5;231m
-«» +1sp
+«» +2sp
 ESC[38;5;242m
 «/capabilities»
 ESC[39m
@@ -4209,7 +4209,7 @@ ESC[39m
 ESC[38;5;237m
 «the rendering route, and what the terminal can do»
 ESC[39m
-«» +12sp
+«» +11sp
 ESC[0m
 ESC[12;1H
 ESC[0m
@@ -4219,7 +4219,7 @@ ESC[38;5;242m
 «│»
 ESC[0m
 ESC[48;5;231m
-«» +1sp
+«» +2sp
 ESC[38;5;242m
 «/clear» +7sp
 ESC[39m
@@ -4227,7 +4227,7 @@ ESC[39m
 ESC[38;5;237m
 «empty the transcript; command history is untouched»
 ESC[39m
-«» +11sp
+«» +10sp
 ESC[0m
 ESC[13;1H
 ESC[0m
@@ -4237,7 +4237,7 @@ ESC[38;5;242m
 «│»
 ESC[0m
 ESC[48;5;231m
-«» +1sp
+«» +2sp
 ESC[38;5;242m
 «/theme» +7sp
 ESC[39m
@@ -4245,7 +4245,7 @@ ESC[39m
 ESC[38;5;237m
 «switch between the dark and light variants»
 ESC[39m
-«» +19sp
+«» +18sp
 ESC[0m
 ESC[14;1H
 ESC[0m
@@ -4255,7 +4255,7 @@ ESC[38;5;242m
 «│»
 ESC[0m
 ESC[48;5;231m
-«» +1sp
+«» +2sp
 ESC[38;5;242m
 «/history» +5sp
 ESC[39m
@@ -4263,7 +4263,7 @@ ESC[39m
 ESC[38;5;237m
 «show recent commands»
 ESC[39m
-«» +41sp
+«» +40sp
 ESC[0m
 ESC[15;1H
 ESC[0m
@@ -4273,7 +4273,7 @@ ESC[38;5;242m
 «│»
 ESC[0m
 ESC[48;5;231m
-«» +1sp
+«» +2sp
 ESC[38;5;242m
 «/exit» +8sp
 ESC[39m
@@ -4281,7 +4281,7 @@ ESC[39m
 ESC[38;5;237m
 «end the session»
 ESC[39m
-«» +46sp
+«» +45sp
 ESC[0m
 ESC[16;1H
 ESC[0m
@@ -4291,13 +4291,13 @@ ESC[38;5;242m
 «│»
 ESC[0m
 ESC[48;5;231m
-«» +1sp
+«» +2sp
 ESC[38;5;242m
 «/profile» +5sp
 ESC[39m
 «» +2sp
 ESC[38;5;237m
-«open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\`»
+«open the profiler's deck; also \`snapshot\`, \`live\`, \`captur…»
 ESC[39m
 «» +1sp
 ESC[0m
@@ -4319,11 +4319,11 @@ ESC[38;5;242m
 «│»
 ESC[0m
 ESC[48;5;231m
-«» +1sp
+«» +2sp
 ESC[38;5;242m
 «/help keys   Use»
 ESC[39m
-«» +60sp
+«» +59sp
 ESC[0m
 ESC[?25l
 ESC[21;3H
@@ -4366,7 +4366,7 @@ ESC[0m
 ESC[38;5;245m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;245m
 «/help» +8sp
 ESC[39m
@@ -4374,14 +4374,14 @@ ESC[39m
 ESC[38;5;254m
 «list the verbs; \`/help keys\` lists the key bindings»
 ESC[39m
-«» +10sp
+«» +9sp
 ESC[11;1H
 ESC[0m
 «» +2sp
 ESC[38;5;245m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;245m
 «/capabilities»
 ESC[39m
@@ -4389,14 +4389,14 @@ ESC[39m
 ESC[38;5;254m
 «the rendering route, and what the terminal can do»
 ESC[39m
-«» +12sp
+«» +11sp
 ESC[12;1H
 ESC[0m
 «» +2sp
 ESC[38;5;245m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;245m
 «/clear» +7sp
 ESC[39m
@@ -4404,14 +4404,14 @@ ESC[39m
 ESC[38;5;254m
 «empty the transcript; command history is untouched»
 ESC[39m
-«» +11sp
+«» +10sp
 ESC[13;1H
 ESC[0m
 «» +2sp
 ESC[38;5;245m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;245m
 «/theme» +7sp
 ESC[39m
@@ -4419,14 +4419,14 @@ ESC[39m
 ESC[38;5;254m
 «switch between the dark and light variants»
 ESC[39m
-«» +19sp
+«» +18sp
 ESC[14;1H
 ESC[0m
 «» +2sp
 ESC[38;5;245m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;245m
 «/history» +5sp
 ESC[39m
@@ -4434,14 +4434,14 @@ ESC[39m
 ESC[38;5;254m
 «show recent commands»
 ESC[39m
-«» +41sp
+«» +40sp
 ESC[15;1H
 ESC[0m
 «» +2sp
 ESC[38;5;245m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;245m
 «/exit» +8sp
 ESC[39m
@@ -4449,20 +4449,20 @@ ESC[39m
 ESC[38;5;254m
 «end the session»
 ESC[39m
-«» +46sp
+«» +45sp
 ESC[16;1H
 ESC[0m
 «» +2sp
 ESC[38;5;245m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;245m
 «/profile» +5sp
 ESC[39m
 «» +2sp
 ESC[38;5;254m
-«open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\`»
+«open the profiler's deck; also \`snapshot\`, \`live\`, \`captur…»
 ESC[39m
 «» +1sp
 ESC[17;1H
@@ -4478,11 +4478,11 @@ ESC[0m
 ESC[38;5;245m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;247m
 «/help keys   Use»
 ESC[39m
-«» +60sp
+«» +59sp
 ESC[?25l
 ESC[21;3H
 ESC[?25h"
@@ -4524,7 +4524,7 @@ ESC[0m
 ESC[38;5;246m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;246m
 «/help» +8sp
 ESC[39m
@@ -4532,14 +4532,14 @@ ESC[39m
 ESC[38;5;254m
 «list the verbs; \`/help keys\` lists the key bindings»
 ESC[39m
-«» +10sp
+«» +9sp
 ESC[11;1H
 ESC[0m
 «» +2sp
 ESC[38;5;246m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;246m
 «/capabilities»
 ESC[39m
@@ -4547,14 +4547,14 @@ ESC[39m
 ESC[38;5;254m
 «the rendering route, and what the terminal can do»
 ESC[39m
-«» +12sp
+«» +11sp
 ESC[12;1H
 ESC[0m
 «» +2sp
 ESC[38;5;246m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;246m
 «/clear» +7sp
 ESC[39m
@@ -4562,14 +4562,14 @@ ESC[39m
 ESC[38;5;254m
 «empty the transcript; command history is untouched»
 ESC[39m
-«» +11sp
+«» +10sp
 ESC[13;1H
 ESC[0m
 «» +2sp
 ESC[38;5;246m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;246m
 «/theme» +7sp
 ESC[39m
@@ -4577,14 +4577,14 @@ ESC[39m
 ESC[38;5;254m
 «switch between the dark and light variants»
 ESC[39m
-«» +19sp
+«» +18sp
 ESC[14;1H
 ESC[0m
 «» +2sp
 ESC[38;5;246m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;246m
 «/history» +5sp
 ESC[39m
@@ -4592,14 +4592,14 @@ ESC[39m
 ESC[38;5;254m
 «show recent commands»
 ESC[39m
-«» +41sp
+«» +40sp
 ESC[15;1H
 ESC[0m
 «» +2sp
 ESC[38;5;246m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;246m
 «/exit» +8sp
 ESC[39m
@@ -4607,20 +4607,20 @@ ESC[39m
 ESC[38;5;254m
 «end the session»
 ESC[39m
-«» +46sp
+«» +45sp
 ESC[16;1H
 ESC[0m
 «» +2sp
 ESC[38;5;246m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;246m
 «/profile» +5sp
 ESC[39m
 «» +2sp
 ESC[38;5;254m
-«open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\`»
+«open the profiler's deck; also \`snapshot\`, \`live\`, \`captur…»
 ESC[39m
 «» +1sp
 ESC[17;1H
@@ -4636,11 +4636,11 @@ ESC[0m
 ESC[38;5;246m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;247m
 «/help keys   Use»
 ESC[39m
-«» +60sp
+«» +59sp
 ESC[?25l
 ESC[21;3H
 ESC[?25h"
@@ -4694,7 +4694,7 @@ ESC[38;5;242m
 «│»
 ESC[0m
 ESC[48;5;255m
-«» +1sp
+«» +2sp
 ESC[38;5;242m
 «/help» +8sp
 ESC[39m
@@ -4702,7 +4702,7 @@ ESC[39m
 ESC[38;5;236m
 «list the verbs; \`/help keys\` lists the key bindings»
 ESC[39m
-«» +10sp
+«» +9sp
 ESC[0m
 ESC[11;1H
 ESC[0m
@@ -4712,7 +4712,7 @@ ESC[38;5;242m
 «│»
 ESC[0m
 ESC[48;5;255m
-«» +1sp
+«» +2sp
 ESC[38;5;242m
 «/capabilities»
 ESC[39m
@@ -4720,7 +4720,7 @@ ESC[39m
 ESC[38;5;236m
 «the rendering route, and what the terminal can do»
 ESC[39m
-«» +12sp
+«» +11sp
 ESC[0m
 ESC[12;1H
 ESC[0m
@@ -4730,7 +4730,7 @@ ESC[38;5;242m
 «│»
 ESC[0m
 ESC[48;5;255m
-«» +1sp
+«» +2sp
 ESC[38;5;242m
 «/clear» +7sp
 ESC[39m
@@ -4738,7 +4738,7 @@ ESC[39m
 ESC[38;5;236m
 «empty the transcript; command history is untouched»
 ESC[39m
-«» +11sp
+«» +10sp
 ESC[0m
 ESC[13;1H
 ESC[0m
@@ -4748,7 +4748,7 @@ ESC[38;5;242m
 «│»
 ESC[0m
 ESC[48;5;255m
-«» +1sp
+«» +2sp
 ESC[38;5;242m
 «/theme» +7sp
 ESC[39m
@@ -4756,7 +4756,7 @@ ESC[39m
 ESC[38;5;236m
 «switch between the dark and light variants»
 ESC[39m
-«» +19sp
+«» +18sp
 ESC[0m
 ESC[14;1H
 ESC[0m
@@ -4766,7 +4766,7 @@ ESC[38;5;242m
 «│»
 ESC[0m
 ESC[48;5;255m
-«» +1sp
+«» +2sp
 ESC[38;5;242m
 «/history» +5sp
 ESC[39m
@@ -4774,7 +4774,7 @@ ESC[39m
 ESC[38;5;236m
 «show recent commands»
 ESC[39m
-«» +41sp
+«» +40sp
 ESC[0m
 ESC[15;1H
 ESC[0m
@@ -4784,7 +4784,7 @@ ESC[38;5;242m
 «│»
 ESC[0m
 ESC[48;5;255m
-«» +1sp
+«» +2sp
 ESC[38;5;242m
 «/exit» +8sp
 ESC[39m
@@ -4792,7 +4792,7 @@ ESC[39m
 ESC[38;5;236m
 «end the session»
 ESC[39m
-«» +46sp
+«» +45sp
 ESC[0m
 ESC[16;1H
 ESC[0m
@@ -4802,13 +4802,13 @@ ESC[38;5;242m
 «│»
 ESC[0m
 ESC[48;5;255m
-«» +1sp
+«» +2sp
 ESC[38;5;242m
 «/profile» +5sp
 ESC[39m
 «» +2sp
 ESC[38;5;236m
-«open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\`»
+«open the profiler's deck; also \`snapshot\`, \`live\`, \`captur…»
 ESC[39m
 «» +1sp
 ESC[0m
@@ -4830,11 +4830,11 @@ ESC[38;5;242m
 «│»
 ESC[0m
 ESC[48;5;255m
-«» +1sp
+«» +2sp
 ESC[38;5;241m
 «/help keys   Use»
 ESC[39m
-«» +60sp
+«» +59sp
 ESC[0m
 ESC[?25l
 ESC[21;3H
@@ -4877,7 +4877,7 @@ ESC[0m
 ESC[38;5;103m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;103m
 «/help» +8sp
 ESC[39m
@@ -4885,14 +4885,14 @@ ESC[39m
 ESC[38;5;189m
 «list the verbs; \`/help keys\` lists the key bindings»
 ESC[39m
-«» +10sp
+«» +9sp
 ESC[11;1H
 ESC[0m
 «» +2sp
 ESC[38;5;103m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;103m
 «/capabilities»
 ESC[39m
@@ -4900,14 +4900,14 @@ ESC[39m
 ESC[38;5;189m
 «the rendering route, and what the terminal can do»
 ESC[39m
-«» +12sp
+«» +11sp
 ESC[12;1H
 ESC[0m
 «» +2sp
 ESC[38;5;103m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;103m
 «/clear» +7sp
 ESC[39m
@@ -4915,14 +4915,14 @@ ESC[39m
 ESC[38;5;189m
 «empty the transcript; command history is untouched»
 ESC[39m
-«» +11sp
+«» +10sp
 ESC[13;1H
 ESC[0m
 «» +2sp
 ESC[38;5;103m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;103m
 «/theme» +7sp
 ESC[39m
@@ -4930,14 +4930,14 @@ ESC[39m
 ESC[38;5;189m
 «switch between the dark and light variants»
 ESC[39m
-«» +19sp
+«» +18sp
 ESC[14;1H
 ESC[0m
 «» +2sp
 ESC[38;5;103m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;103m
 «/history» +5sp
 ESC[39m
@@ -4945,14 +4945,14 @@ ESC[39m
 ESC[38;5;189m
 «show recent commands»
 ESC[39m
-«» +41sp
+«» +40sp
 ESC[15;1H
 ESC[0m
 «» +2sp
 ESC[38;5;103m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;103m
 «/exit» +8sp
 ESC[39m
@@ -4960,20 +4960,20 @@ ESC[39m
 ESC[38;5;189m
 «end the session»
 ESC[39m
-«» +46sp
+«» +45sp
 ESC[16;1H
 ESC[0m
 «» +2sp
 ESC[38;5;103m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;103m
 «/profile» +5sp
 ESC[39m
 «» +2sp
 ESC[38;5;189m
-«open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\`»
+«open the profiler's deck; also \`snapshot\`, \`live\`, \`captur…»
 ESC[39m
 «» +1sp
 ESC[17;1H
@@ -4989,11 +4989,11 @@ ESC[0m
 ESC[38;5;103m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;103m
 «/help keys   Use»
 ESC[39m
-«» +60sp
+«» +59sp
 ESC[?25l
 ESC[21;3H
 ESC[?25h"
@@ -5035,7 +5035,7 @@ ESC[0m
 ESC[38;5;244m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;244m
 «/help» +8sp
 ESC[39m
@@ -5043,14 +5043,14 @@ ESC[39m
 ESC[38;5;253m
 «list the verbs; \`/help keys\` lists the key bindings»
 ESC[39m
-«» +10sp
+«» +9sp
 ESC[11;1H
 ESC[0m
 «» +2sp
 ESC[38;5;244m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;244m
 «/capabilities»
 ESC[39m
@@ -5058,14 +5058,14 @@ ESC[39m
 ESC[38;5;253m
 «the rendering route, and what the terminal can do»
 ESC[39m
-«» +12sp
+«» +11sp
 ESC[12;1H
 ESC[0m
 «» +2sp
 ESC[38;5;244m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;244m
 «/clear» +7sp
 ESC[39m
@@ -5073,14 +5073,14 @@ ESC[39m
 ESC[38;5;253m
 «empty the transcript; command history is untouched»
 ESC[39m
-«» +11sp
+«» +10sp
 ESC[13;1H
 ESC[0m
 «» +2sp
 ESC[38;5;244m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;244m
 «/theme» +7sp
 ESC[39m
@@ -5088,14 +5088,14 @@ ESC[39m
 ESC[38;5;253m
 «switch between the dark and light variants»
 ESC[39m
-«» +19sp
+«» +18sp
 ESC[14;1H
 ESC[0m
 «» +2sp
 ESC[38;5;244m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;244m
 «/history» +5sp
 ESC[39m
@@ -5103,14 +5103,14 @@ ESC[39m
 ESC[38;5;253m
 «show recent commands»
 ESC[39m
-«» +41sp
+«» +40sp
 ESC[15;1H
 ESC[0m
 «» +2sp
 ESC[38;5;244m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;244m
 «/exit» +8sp
 ESC[39m
@@ -5118,20 +5118,20 @@ ESC[39m
 ESC[38;5;253m
 «end the session»
 ESC[39m
-«» +46sp
+«» +45sp
 ESC[16;1H
 ESC[0m
 «» +2sp
 ESC[38;5;244m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;244m
 «/profile» +5sp
 ESC[39m
 «» +2sp
 ESC[38;5;253m
-«open the profiler's deck; also \`snapshot\`, \`live\`, \`capture\`»
+«open the profiler's deck; also \`snapshot\`, \`live\`, \`captur…»
 ESC[39m
 «» +1sp
 ESC[17;1H
@@ -5147,11 +5147,11 @@ ESC[0m
 ESC[38;5;244m
 «│»
 ESC[0m
-«» +1sp
+«» +2sp
 ESC[38;5;244m
 «/help keys   Use»
 ESC[39m
-«» +60sp
+«» +59sp
 ESC[?25l
 ESC[21;3H
 ESC[?25h"

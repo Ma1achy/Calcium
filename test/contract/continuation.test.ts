@@ -56,8 +56,10 @@ describe("the continuation mark", () => {
     // of it; this asserts membership, so that a token added to `Glyph` and
     // forgotten in `GLYPH_TABLE` fails here rather than at a call site.
     expect(GLYPH_TOKENS).toContain("continuation");
-    expect(glyphCells("continuation")).toBe(1);
-    expect(glyphFor("continuation", ASCII_CAPS), "`tree(1)`'s hook").toBe("`");
+    // The one two-cell slot (C09 I5, R-GLY-001): the registry's `` `- `` in
+    // ASCII, and `⎿` padded to it where it is drawn.
+    expect(glyphCells("continuation")).toBe(2);
+    expect(glyphFor("continuation", ASCII_CAPS), "the registry's branch").toBe("`-");
   });
 
   it("T2.96 (C09 §4): a muted notice takes the mark, and the condition is that a command line exists", () => {

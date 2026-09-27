@@ -150,7 +150,9 @@ describe("§9c — the header, the body, and the row the body already has", () =
       // the settled one takes `+` — which is R-COR-003 holding on the shape.
       const mark = (state: Parameters<typeof headMark>[0]): string => glyphFor(headMark(state, caps), caps);
       const run = mark("running");
-      const hook = ascii ? "`" : "⎿";
+      // The result's lead is the slot's two-cell reservation at both rungs
+      // (C09 I5, R-GLY-003): `⎿` padded, `` `- `` whole.
+      const hook = ascii ? "`-" : "⎿ ";
       // The residue lead at its natural width (§095, R-BLK-867, T2.5): `⋯` in
       // Unicode, `...` in ASCII. It is not a fixed column — only its own count
       // follows it — so it is not padded to a slot.

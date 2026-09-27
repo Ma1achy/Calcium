@@ -128,7 +128,7 @@ focus           >
 bullet          -
 quote           |
 nested          ~
-continuation    \`
+continuation    \`-
 ── §30 · the head mark's three rungs
 tone carries: false
 queued          o
@@ -846,7 +846,7 @@ focus           >
 bullet          -
 quote           |
 nested          ~
-continuation    \`
+continuation    \`-
 ── §30 · the head mark's three rungs
 tone carries: false
 queued          o

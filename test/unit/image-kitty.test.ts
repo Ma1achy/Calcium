@@ -37,7 +37,7 @@ import { DARK_THEME, FULL_CAPS } from "../support/render.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
 import { transmitFrame, transmitImage, transmits, type SentImages } from "../../src/shell/transmit-image.js";
-import { entryLayout } from "../../src/shell/entry-layout.js";
+import { BODY_INDENT, entryLayout } from "../../src/shell/entry-layout.js";
 import { readFileSync } from "node:fs";
 
 /**
@@ -450,7 +450,7 @@ describe("C22 §6j.4 — the seam takes the layout's width (I98)", () => {
     // against it.** A card is two runs at two widths; if it were one, every
     // assertion below would pass against a seam that had not changed.
     const runs = groupsFor(80);
-    expect(runs.map((r) => r.width), "a card is two runs, and the body is inset").toEqual([80, 76]);
+    expect(runs.map((r) => r.width), "a card is two runs, and the body is inset").toEqual([80, 80 - BODY_INDENT]);
     // And it transmits at all before any box is read off it: a fixture with no
     // digest emits `""` and satisfies every `not.toContain` below.
     expect(
@@ -459,27 +459,27 @@ describe("C22 §6j.4 — the seam takes the layout's width (I98)", () => {
     ).toBeGreaterThan(0);
 
     // **The ordinary width, which is where this was filed as latent and is not.**
-    // The seam declared `c=80` for a picture the renderer addresses across 76
-    // cells, so the right 5% of the image was drawn into a placement nothing
+    // The seam declared `c=80` for a picture the renderer addresses across the
+    // body's 75 cells (76 when the body sat four in), so the right 5% of the image was drawn into a placement nothing
     // pointed at. Both numbers are computed by `imageCells`; only the width
     // handed to it moved.
     const out = transmitFrame(runs, KITTY_CAPS, new Map<number, string>(), 80);
-    const body = imageCells(wide, 76);
+    const body = imageCells(wide, 80 - BODY_INDENT);
     const frame = imageCells(wide, 80);
     expect(frame.cols, "the two boxes must differ or the row asserts nothing").not.toBe(body.cols);
     expect(out, "the run's box, not the frame's").toContain(`,c=${String(body.cols)},`);
     expect(out, "and the frame's is absent").not.toContain(`,c=${String(frame.cols)},`);
 
-    // **The refusal half, in the four-column window where the two arms
-    // disagree.** At a frame width of 300 the frame's box is 300 cells — past
+    // **The refusal half, in the BODY_INDENT-column window where the two arms
+    // disagree** (five columns since the hook reserved two, C09 I5). At a frame width of 300 the frame's box is 300 cells — past
     // `MAX_PLACEHOLDER_SPAN` — so the seam refused and emitted nothing, while
-    // the renderer placed at the run's 296 and drew placeholders addressing a
+    // the renderer placed at the run's 295 and drew placeholders addressing a
     // transmission that never happened.
     expect(placesAtProtocol(wide, KITTY_CAPS, 300), "the frame's width refuses").toBe(false);
-    expect(placesAtProtocol(wide, KITTY_CAPS, 296), "the run's does not").toBe(true);
+    expect(placesAtProtocol(wide, KITTY_CAPS, 300 - BODY_INDENT), "the run's does not").toBe(true);
     const at300 = transmitFrame(groupsFor(300), KITTY_CAPS, new Map<number, string>(), 300);
     expect(at300, "the picture the renderer will place is transmitted").toContain(
-      `,c=${String(imageCells(wide, 296).cols)},`,
+      `,c=${String(imageCells(wide, 300 - BODY_INDENT).cols)},`,
     );
 
     // The control: a document that is not a card is one run at the frame's

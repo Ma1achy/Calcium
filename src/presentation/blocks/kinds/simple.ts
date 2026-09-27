@@ -128,7 +128,15 @@ function declaresElement(block: Notice): boolean {
  * reverse, and both are frames that measure correctly and are wrong.
  */
 function glyphLead(glyph: Glyph, caps: RenderContext["capabilities"]): string {
-  return `${" ".repeat(GLYPH_INDENT.get(glyph) ?? 0)}${glyphFor(glyph, caps)} `;
+  // **Padded to the token's reservation** (C09 I5, R-GLY-003): `⎿` is one cell
+  // of `continuation`'s two, and the blank after it is what keeps the text in
+  // the column `` `- `` puts it in. `prefixCells` counts the reservation, so
+  // the two agree by construction rather than by every mark being one cell.
+  const drawn = glyphFor(glyph, caps);
+  // `glyphFor` hands back the ASCII half at `wide` (I48), so the mark drawn is
+  // never Ambiguous and its narrow width is its width.
+  const pad = " ".repeat(Math.max(0, glyphCells(glyph) - cells(drawn))); // narrow-ok
+  return `${" ".repeat(GLYPH_INDENT.get(glyph) ?? 0)}${drawn}${pad} `;
 }
 
 /**

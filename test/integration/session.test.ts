@@ -982,13 +982,14 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     const rows = screen().rows;
     const at = rows.findIndex((r) => r.includes("● wide"));
     expect(at, "the card's header is on the screen").toBeGreaterThan(0);
-    // **95 and 4, where this read 96 and 3** (C22 I109): the body renders at
-    // the region's width less the hook's four cells, and the region is a column
+    // **94 and 5, where this read 95 and 4 and before that 96 and 3** (C22
+    // I109, C09 I5): the body renders at the region's width less BODY_INDENT —
+    // five since the hook reserved two cells — and the region is a column
     // narrower than the terminal. The premise the row was written for is
     // unchanged — a notice that fits the region and not the indented body, so
     // it wraps once more under the hook — and only the split moved.
-    expect(rows[at + 1]?.startsWith(`  ⎿ ${"a".repeat(95)}`), "the body's first row: the hook at 2 and 95 cells").toBe(true);
-    expect(rows[at + 2]?.trimEnd(), "the wrapped cells, under the bar (C22 I88)").toBe("  │ aaaa");
+    expect(rows[at + 1]?.startsWith(`  ⎿  ${"a".repeat(94)}`), "the body's first row: the hook at 2 and 94 cells").toBe(true);
+    expect(rows[at + 2]?.trimEnd(), "the wrapped cells, under the bar (C22 I88)").toBe("  │  aaaaa");
     expect(rows[at + 3]?.trim(), "the entry's blank row (I85)").toBe("");
     expect(/^[─-]{20,}/u.test(rows[at + 4] ?? ""), "then the upper rule — nothing dropped between").toBe(true);
     expect(rows[at + 5]?.trimStart().startsWith("❯"), "and the prompt").toBe(true);
@@ -1056,8 +1057,8 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     // The box is a card's body (C23 I55), so its first row carries the hook (C22
     // I83) — required, not optional: a `visibleRows` that skipped the layout
     // survived this row while the hook was `(⎿ )?`.
-    expect(/^\s*⎿ ┌/u.test(rows[at - 1] ?? ""), "the box opens above it, under the hook").toBe(true);
-    expect(/^\s*│ └/u.test(rows[at + 1] ?? ""), "and closes below it, under the bar (C22 I88)").toBe(true);
+    expect(/^\s*⎿  ┌/u.test(rows[at - 1] ?? ""), "the box opens above it, under the hook").toBe(true);
+    expect(/^\s*│  └/u.test(rows[at + 1] ?? ""), "and closes below it, under the bar (C22 I88)").toBe(true);
     // **The prompt directly below the closing border is the height assertion.**
     // Three rows measured, three drawn, and nothing between the box and what
     // follows it — a stronger claim than a blank row, which a box one row short

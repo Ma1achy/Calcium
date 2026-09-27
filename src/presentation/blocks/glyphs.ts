@@ -1370,7 +1370,13 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     // `unicode` alone. Recorded because §4's note says a third set of narrow
     // survivors is the better answer the day someone measures one, and this is
     // one. The ASCII half is `tree(1)`'s rendering of the same hook.
-    continuation: ["⎿", "`"],
+    //
+    // **The ASCII half is the registry's `` `- ``, two cells, and the slot
+    // reserves two at every rung** (C09 I5, R-GLY-001, R-GLY-003): `⎿` is
+    // padded to the reservation where it is drawn, so the text after it lands
+    // in one column at both. It was `` ` `` alone — half the design's mark,
+    // which is how every slot stayed one cell.
+    continuation: ["⎿", "`-"],
   });
 
 /**
@@ -1548,7 +1554,13 @@ export function glyphCells(token: Glyph): number {
   // this replaces said *2:2 at wide*, which assumed both halves Ambiguous;
   // none of the ASCII halves is (F825). Passing a capability here would make a
   // property of the table depend on the terminal reading it.
-  return cells(GLYPH_TABLE[token][0]); // narrow-ok
+  //
+  // **The reservation: the widest of the two** (I5, R-GLY-001, *reservedCells
+  // equal to its widest representation*), derived from the table rather than
+  // written beside it. One cell for every token but `continuation`, whose
+  // ASCII half is `` `- ``; the renderer pads the narrower one to it.
+  const [unicode, ascii] = GLYPH_TABLE[token];
+  return Math.max(cells(unicode), cells(ascii)); // narrow-ok
 }
 
 /**

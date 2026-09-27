@@ -160,9 +160,44 @@ describe("C09 contract — measurement", () => {
     }
   });
 
-  it.todo(
-    "T2.188 (C09 I5, R-GLY-003, C22 I83): a continuation notice at every width from 6 to 24, at Unicode and ASCII, measures what it renders and starts its text in one column at both rungs — not deferred on a component: the code lands in the next commit of this round",
-  );
+  it("T2.188 (C09 I5, R-GLY-003, C22 I83): a continuation notice at every width from 6 to 24, at Unicode and ASCII, measures what it renders and starts its text in one column at both rungs", () => {
+    // **The narrow widths are the point**: the hanging indent is five cells of a
+    // six-cell row at the bottom of the range, so a lead one cell wider than
+    // `measure` believes is a wrapped row `measure` did not count, and a lead one
+    // cell narrower at one rung moves every row's text at that rung.
+    const notice = block({
+      kind: "notice",
+      id: "t2-188",
+      tone: "muted",
+      glyph: "continuation",
+      text: "the quick brown fox jumps over the lazy dog, twice over",
+    });
+    const unicode = measurable({ capabilities: FULL_CAPS });
+    const ascii = measurable({ capabilities: ASCII_CAPS });
+    const LEAD = 5;
+    for (let width = 6; width <= 24; width += 1) {
+      const rungs = [
+        ["unicode", unicode, "  ⎿  "],
+        ["ascii", ascii, "  `- "],
+      ] as const;
+      const bodies: string[][] = [];
+      for (const [name, kit, hook] of rungs) {
+        const rows = kit.renderToLines(notice, width).map(visible);
+        expect(rows.length, `${name} at ${String(width)}: measure is what renders`).toBe(kit.measure(notice, width));
+        expect(rows.length, `${name} at ${String(width)}: the fixture wraps`).toBeGreaterThan(1);
+        expect(rows[0]?.slice(0, LEAD), `${name} at ${String(width)}: the hook, padded to its reservation`).toBe(hook);
+        for (const [index, row] of rows.entries()) {
+          expect(cells(row), `${name} at ${String(width)}, row ${String(index)}: inside the width`).toBeLessThanOrEqual(width);
+          if (index > 0) expect(row.slice(0, LEAD), `${name} at ${String(width)}, row ${String(index)}: the hanging indent`).toBe(" ".repeat(LEAD));
+          expect(row.charAt(LEAD), `${name} at ${String(width)}, row ${String(index)}: text starts at the column`).not.toBe(" ");
+        }
+        bodies.push(rows.map((row) => row.slice(LEAD)));
+      }
+      // One column at both rungs means one wrap at both rungs: the text after
+      // the lead is the same rows, not merely the same count.
+      expect(bodies[1], `at ${String(width)}: the ASCII rung wraps the text where Unicode does`).toEqual(bodies[0]);
+    }
+  });
 
   it("T2.5 (I5): every substitution in §4 occupies the same slot at every rung", () => {
     // **Amended twice, and the second amendment narrowed the first.** One cell
@@ -216,6 +251,27 @@ describe("C09 contract — measurement", () => {
       const widths = rungs.map((caps) => cells(glyphs(caps)[name], caps.ambiguousWidth));
       expect(new Set(widths).size, `${name} is exempt because it varies — ${widths.join(", ")}`).toBeGreaterThan(1);
     }
+
+    // **The block's glyph slot, by reservation** (R-GLY-001, R-GLY-003).
+    // `glyphCells` is the widest of the two renderings, and the lead a notice
+    // draws puts its text in one column at every rung — `continuation` is the
+    // one two-cell slot, `⎿` padded to `` `- ``, and it is what makes the
+    // padding a property rather than a no-op on one-cell marks.
+    const wideCaps = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
+    const reserved: string[] = [];
+    for (const token of GLYPH_TOKENS) {
+      const halves = [glyphFor(token, FULL_CAPS), glyphFor(token, ASCII_CAPS)];
+      expect(glyphCells(token), `${token}: the reservation is the widest half`).toBe(Math.max(...halves.map((half) => cells(half))));
+      if (glyphCells(token) > 1) reserved.push(token);
+      // Text no glyph draws: `x` is `error`'s ASCII half, and `indexOf` found
+      // the mark rather than the text the first time this ran.
+      const probe = block({ kind: "notice", id: `t2-5-${token}`, tone: "default", glyph: token, text: "Zq" });
+      const columns = [FULL_CAPS, wideCaps, ASCII_CAPS].map((caps) =>
+        visible(measurable({ capabilities: caps }).renderToLines(probe, 40)[0] ?? "").indexOf("Zq"),
+      );
+      expect(new Set(columns).size, `${token}: the text column at narrow, wide and ASCII — ${columns.join(", ")}`).toBe(1);
+    }
+    expect(reserved, "the multi-cell slots, by equality").toEqual(["continuation"]);
   });
 
   it("T2.5b (I5, C04 §5): every `Glyph` is 1:1 by cell count, in both renderings", () => {
@@ -224,19 +280,30 @@ describe("C09 contract — measurement", () => {
     // emitted a block-supplied character verbatim. Now every glyph a block can
     // name is in this table, so the guarantee covers the whole field rather
     // than most of it.
-    for (const [unicode, ascii] of GLYPH_SUBSTITUTIONS) {
-      expect(cells(ascii), `${unicode} → ${ascii}`).toBe(cells(unicode));
+    //
+    // *Restated for review batch 2, M4 item 6* (C09 T2.115): the halves are
+    // equal for every token but `continuation`, whose `` `- `` is the
+    // registry's two cells against `⎿`'s one. What a measurer relies on is the
+    // reservation, which bounds both; T2.5 asserts the renderer pads to it.
+    for (const token of GLYPH_TOKENS) {
+      const [unicode, ascii] = [glyphFor(token, FULL_CAPS), glyphFor(token, ASCII_CAPS)];
       expect(cells(unicode), `${unicode} is one cell`).toBe(1);
+      expect(cells(ascii), `${unicode} → ${ascii} fits the reservation`).toBeLessThanOrEqual(glyphCells(token));
+      if (token !== "continuation") expect(cells(ascii), `${unicode} → ${ascii}`).toBe(cells(unicode));
     }
+    expect(GLYPH_SUBSTITUTIONS.length, "every substitution is a token's pair").toBe(GLYPH_TOKENS.length);
   });
 
-  it("T2.5c: `glyphCells` agrees with both renderings, which is what lets measure skip capabilities", () => {
+  it("T2.5c: `glyphCells` bounds both renderings, which is what lets measure skip capabilities", () => {
     // `measure` receives width and no capability record (C04 §5), so it can only
-    // be right if the two renderings are the same width. This asserts the thing
-    // the measurer actually relies on rather than the table it is derived from.
+    // be right if no rendering is wider than the slot it measured. It used to
+    // assert both were *equal* to it; `continuation`'s `⎿` is one cell of a
+    // two-cell reservation (C09 I5) and the lead pads it, which T2.5 reads off
+    // the frame.
     for (const token of GLYPH_TOKENS) {
-      expect(glyphCells(token)).toBe(cells(glyphFor(token, FULL_CAPS)));
-      expect(glyphCells(token)).toBe(cells(glyphFor(token, ASCII_CAPS)));
+      expect(cells(glyphFor(token, FULL_CAPS))).toBeLessThanOrEqual(glyphCells(token));
+      expect(cells(glyphFor(token, ASCII_CAPS))).toBeLessThanOrEqual(glyphCells(token));
+      expect(Math.max(cells(glyphFor(token, FULL_CAPS)), cells(glyphFor(token, ASCII_CAPS)))).toBe(glyphCells(token));
     }
   });
 
@@ -555,7 +622,7 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
     expect(glyphFor("running", ASCII_CAPS), "so the ASCII rung is still *").toBe("*");
   });
 
-  it("T2.115 (C09 I48): every `Glyph` is 1:1 by cell count at BOTH conventions, through `glyphFor`", () => {
+  it("T2.115 (C09 I48, I5): every `Glyph` is its reservation's width at BOTH conventions, through `glyphFor`", () => {
     // T2.5b asserted the rule at `narrow` alone, and ten of seventeen members
     // broke it at `wide` while it was green (F825). The two named sets are
     // compared by equality so a member moving between them fails the row.
@@ -587,9 +654,11 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
       const ascii = glyphFor(token, ASCII_CAPS);
       // The invariant's own subject, untouched: one cell at every rung, through
       // `glyphFor`, which is what lets `measure` skip capabilities (I5).
+      // Restated (C09 T2.115, M4 item 6): the width at every rung is the
+      // reservation's for the ASCII half and one cell for the Unicode one.
       expect(cells(narrow, "narrow"), `${token} narrow`).toBe(1);
-      expect(cells(wide, "wide"), `${token} at wide, through glyphFor`).toBe(1);
-      expect(cells(ascii, "wide"), `${token} ascii`).toBe(1);
+      expect(cells(wide, "wide"), `${token} at wide, through glyphFor`).toBe(glyphCells(token));
+      expect(cells(ascii, "wide"), `${token} ascii`).toBe(glyphCells(token));
       // And the rung is taken whole — T2.171 is the row for it; here it is the
       // premise the partition below no longer gets to assume.
       expect(wide, `${token}: the wide arm is the ASCII rung`).toBe(ascii);

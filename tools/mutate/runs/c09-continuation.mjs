@@ -19,12 +19,13 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/contract/continuation.test.ts test/unit/execution.test.ts "
-  + "test/contract/blocks.test.ts test/golden/continuation.test.ts";
+  + "test/contract/blocks.test.ts test/golden/continuation.test.ts test/unit/frame-budget.test.ts";
 const DOCS = "src/shell/documents.ts";
 const GLYPHS = "src/presentation/blocks/glyphs.ts";
 const REFRESH = "src/shell/refresh.ts";
 const VALIDATE = "src/data/viewmodel/validate.ts";
 const SIMPLE = "src/presentation/blocks/kinds/simple.ts";
+const LAYOUT = "src/shell/entry-layout.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -42,7 +43,7 @@ const results = runPass({
   run,
   control: {
     file: GLYPHS,
-    from: '    continuation: ["⎿", "`"],',
+    from: '    continuation: ["⎿", "`-"],',
     to: '    continuation: ["", ""],',
     why: "with no rendering at all, T2.94 and T2.95 both fail; a run where this survives cannot see a kill",
   },
@@ -95,8 +96,8 @@ const results = runPass({
       // width row measured against the other convention can tell the two apart.
       name: "the mark is the box-drawing corner, which is Ambiguous and draws two cells at wide",
       file: GLYPHS,
-      from: '    continuation: ["⎿", "`"],',
-      to: '    continuation: ["└", "`"],',
+      from: '    continuation: ["⎿", "`-"],',
+      to: '    continuation: ["└", "`-"],',
       expect: "T2.94",
     },
     {
@@ -141,6 +142,41 @@ const results = runPass({
       from: 'b.notice("muted", `no output for ${String(quiet)}m`, "continuation", { id: STALL_BLOCK })',
       to: 'b.notice("muted", `no output for ${String(quiet)}m`, undefined, { id: STALL_BLOCK })',
       expect: "T3.22",
+    },
+    // **Review batch 2, M4 item 6** (C09 I5, R-GLY-003, C22 I83): the slot
+    // reserves two cells and the renderer pads to it. Each mutation restores a
+    // shape that shipped or one step of it, and T2.188 is the row written
+    // against all three of the first: the narrow widths are where a lead one
+    // cell off is a row `measure` did not count.
+    {
+      name: "the ASCII hook one character again, as shipped — half the registry's mark",
+      file: GLYPHS,
+      from: '    continuation: ["⎿", "`-"],',
+      to: '    continuation: ["⎿", "`"],',
+      expect: "T2.188",
+    },
+    {
+      name: "the reservation read from the Unicode half alone, as shipped",
+      file: GLYPHS,
+      from: "  return Math.max(cells(unicode), cells(ascii)); // narrow-ok",
+      to: "  return cells(unicode); // narrow-ok",
+      expect: "T2.188",
+    },
+    {
+      name: "the lead not padded to the reservation, so `⎿` puts its text a column left of `` `- ``",
+      file: SIMPLE,
+      from: "  const pad = \" \".repeat(Math.max(0, glyphCells(glyph) - cells(drawn))); // narrow-ok",
+      to: '  const pad = "";',
+      expect: "T2.188",
+    },
+    {
+      // The card's half: C09's lead moved and the shell's constant did not —
+      // two forms of one mark putting text in two columns (C22 I84).
+      name: "the card body four cells in, written rather than derived from the reservation",
+      file: LAYOUT,
+      from: 'export const BODY_INDENT = HOOK_INDENT + glyphCells("continuation") + 1;',
+      to: "export const BODY_INDENT = HOOK_INDENT + 2;",
+      expect: "T1.44",
     },
   ],
 });

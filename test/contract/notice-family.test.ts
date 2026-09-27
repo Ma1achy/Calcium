@@ -99,15 +99,15 @@ const BEFORE: Record<string, readonly string[]> = {
     "\u001b[38;2;98;98;98mexiting\u001b[39m",
   ],
   stalled: [
-    "\u001b[38;2;98;98;98m  ⎿ no output for 2m\u001b[39m",
+    "\u001b[38;2;98;98;98m  ⎿  no output for 2m\u001b[39m",
   ],
   // **Both halves of this row were wrong and this table recorded them** (C23 §3b,
   // 2026-09-05). The figure was measured from the notice, not from the last patch —
   // `1m` under a notice saying `2m`, one silence with two numbers — and the hook was
   // dropped on replacement, so the row changed column. A snapshot records; it does
-  // not check.
+  // not check. The pad after `⎿` is the slot's two-cell reservation (C09 I5).
   resumed: [
-    "\u001b[38;2;98;98;98m  ⎿ resumed after 2m\u001b[39m",
+    "\u001b[38;2;98;98;98m  ⎿  resumed after 2m\u001b[39m",
   ],
 };
 
