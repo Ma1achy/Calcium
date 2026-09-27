@@ -7,6 +7,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { buildSession } from "../support/session.js";
+import { createEditor, type LineEditor } from "../../src/interaction/editor/editor.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 import type { ProfileReport } from "../../src/index.js";
 import type { TuiConfig } from "../../src/shell/types.js";
@@ -381,45 +382,42 @@ describe("C14 §6f — the drag in a real session", () => {
 
   it("T4.37c (C14 I49, R-SEL-013): a tick extends the selection to the container's edge", async () => {
     vi.useFakeTimers();
+    // **The copy itself, at the seam it lands on**, rather than the prompt a
+    // yank draws it into. The prompt is capped at fifteen rows and elides the
+    // head with `⋯`, so reading it showed the last entry's tail whatever was
+    // copied above that — and the row's control read the same text as its
+    // subject. Every editor shares one prototype, so a spy on it hears the
+    // session's own editor.
+    const copyText = vi.spyOn(Object.getPrototypeOf(createEditor()) as LineEditor, "copyText");
     try {
-      const stdin = fakeStdin();
-      const { screen, clock } = await buildSession({
-        manifest: MANIFEST,
-        localHandlers: SAYS,
-        stdin: stdin as never,
-      });
-      await vi.advanceTimersByTimeAsync(0);
-      await settle();
-      const step = async (ms: number): Promise<void> => {
-        clock.advance(ms);
-        await vi.advanceTimersByTimeAsync(ms);
+      /**
+       * One gesture in a fresh session (the kill buffer is per session, and a
+       * copy of nothing leaves it holding whatever came before — measured: the
+       * control read the subject's text back through `⌃U`'s kill). Six calls,
+       * up three pages, visual mode, press at `(4,4)`, drag to `row`, hold,
+       * release, `y`.
+       */
+      const gesture = async (row: number, holdMs: number) => {
+        const stdin = fakeStdin();
+        const { screen, clock } = await buildSession({
+          manifest: MANIFEST,
+          localHandlers: SAYS,
+          stdin: stdin as never,
+        });
+        await vi.advanceTimersByTimeAsync(0);
         await settle();
-      };
-      for (let i = 0; i < 6; i += 1) {
-        said = i;
-        stdin.emit("/say\r");
-        await step(0);
-      }
-
-      /** The prompt's rows: between the last two full-width rules. */
-      const prompt = (): string => {
-        const rows = screen().rows;
-        const rules = rows.flatMap((r, i) => (/^─+$/u.test(r.trim()) ? [i] : []));
-        const [a, b] = rules.slice(-2);
-        return rows.slice((a ?? 0) + 1, b).map((r) => r.trimEnd()).join("\n").replace(/^❯ ?/u, "");
-      };
-
-      /** The entry a screen row (1-based) shows, from its `eN-line-` text. */
-      const entryOnRow = (row: number): string | null => /e(\d+)-line-/u.exec(screen().rows[row - 1] ?? "")?.[1] ?? null;
-      /** The entry on the transcript's last drawn row. */
-      const lastEntryOnScreen = (): string | null => {
-        const ids = screen().rows.flatMap((r) => /e(\d+)-line-/u.exec(r)?.[1] ?? []);
-        return ids.at(-1) ?? null;
-      };
-      const edges: { pressed: string | null; bottom: string | null }[] = [];
-
-      /** Enter, drag from `(4,4)` to `row`, hold, release, `y`, leave, yank. */
-      const copied = async (row: number, holdMs: number): Promise<string> => {
+        const step = async (ms: number): Promise<void> => {
+          clock.advance(ms);
+          await vi.advanceTimersByTimeAsync(ms);
+          await settle();
+        };
+        for (let i = 0; i < 6; i += 1) {
+          said = i;
+          stdin.emit("/say\r");
+          await step(0);
+        }
+        /** The entries whose lines a screen shows, top to bottom. */
+        const entries = (): string[] => screen().rows.flatMap((r) => /e(\d+)-line-/u.exec(r)?.[1] ?? []);
         for (let i = 0; i < 3; i += 1) {
           stdin.emit("\u001b[5~");
           await step(0);
@@ -428,48 +426,61 @@ describe("C14 §6f — the drag in a real session", () => {
         await step(0);
         stdin.emit(press(4, 4));
         await step(0);
-        const pressed = entryOnRow(4);
+        const pressed = /e(\d+)-line-(\d+)/u.exec(screen().rows[3] ?? "");
         stdin.emit(moveTo(4, row));
         await step(holdMs);
-        edges.push({ pressed, bottom: lastEntryOnScreen() });
+        const bottom = entries().at(-1) ?? null;
         stdin.emit(release(4, row));
         await step(0);
+        copyText.mockClear();
         stdin.emit("y");
         await step(0);
-        // `esc` twice — clear, then leave (C16 I51, I62).
-        stdin.emit("\u001b");
-        await step(100);
-        stdin.emit("\u001b");
-        await step(100);
-        stdin.emit("\u0019");
-        await step(0);
-        const text = prompt();
-        stdin.emit("\u0015"); // ⌃U — the next arm starts from an empty line
-        await step(0);
-        return text;
+        const copies = copyText.mock.calls.map(([text]) => text);
+        return { pressed, bottom, copies };
       };
 
-      // **The subject first, on an empty kill buffer.** `copyText("")` leaves
-      // the buffer alone on purpose, so a control run first would leave its own
-      // copy there and an empty selection here would yank it — measured: the
-      // row passed against the unfixed tick in that order.
-      //
-      // Below the transcript and held still: only the ticks can select anything.
-      const ticked = await copied(99, 400);
-      expect(ticked.trim(), "the ticks extended the selection").not.toBe("");
-      // **And to the edge they scrolled toward.** Not-empty alone is passed by a
+      /**
+       * **The copy the fixture predicts** for entries `from..to`: an entry's
+       * twelve lines, the second and later each led by its command, joined by
+       * the blank line that separates entries (`R-SEL-004`). The first entry
+       * starts at the pressed row, which is its body's first line.
+       */
+      const expected = (from: number, to: number): string =>
+        Array.from({ length: to - from + 1 }, (_, k) => {
+          const lines = Array.from({ length: 12 }, (_l, i) => `e${String(from + k)}-line-${String(i)}`).join("\n");
+          return k === 0 ? lines : `say\n${lines}`;
+        }).join("\n\n");
+      /** The entries a copy carries, in order — the block set the selection ended with. */
+      const entriesOf = (text: string): string[] => [...new Set([...text.matchAll(/e(\d+)-line-/gu)].map((m) => m[1] ?? ""))];
+
+      // **The control first**: a drag that stays inside the transcript, with no
+      // hold, copies through the same keys — so an empty or short copy below is
+      // the selection's, not the instrument's. And it must stop short of the
+      // edge the ticks reach, or the subject's assertions are about nothing.
+      const inside = await gesture(20, 0);
+      expect(inside.pressed?.[0], "the press lands on an entry's first line").toBe("e0-line-0");
+      expect(inside.copies, "in-container: one copy, exactly the entries the drag crossed").toEqual([expected(0, 1)]);
+
+      // **The subject**: below the transcript and held still, so only the ticks
+      // can select anything past the pointer's last row.
+      const ticked = await gesture(99, 400);
+      const pressed = Number(ticked.pressed?.[1]);
+      const bottom = Number(ticked.bottom);
+      // **To the edge they scrolled toward.** Not-empty alone is passed by a
       // tick extending to the top edge once prose is selectable (C14 I51) — the
       // mutation pass measured exactly that survivor. The bottom row's entry
       // after the ticks is what the correct edge takes, and it must differ from
       // the press's or the assertion is about nothing.
-      const [edge] = edges;
-      expect(edge?.bottom != null && edge.bottom !== edge.pressed, "the ticks scrolled past the press's entry").toBe(true);
-      expect(ticked, "the entry at the bottom edge was taken").toContain(`e${String(edge?.bottom)}-line-`);
-
-      // **The control: a drag inside the transcript copies through these keys**,
-      // so an empty prompt above would be the selection's and not the instrument's.
-      expect((await copied(20, 0)).trim(), "in-container: the copy reaches the prompt").not.toBe("");
+      expect(bottom > pressed, "the ticks scrolled past the press's entry").toBe(true);
+      expect(ticked.copies, "one copy, exactly press to edge").toEqual([expected(pressed, bottom)]);
+      expect(entriesOf(ticked.copies[0] ?? ""), "the block set: every entry from the press to the edge").toEqual(
+        Array.from({ length: bottom - pressed + 1 }, (_, k) => String(pressed + k)),
+      );
+      expect(entriesOf(ticked.copies[0] ?? "").length, "and more than the drag inside reached").toBeGreaterThan(
+        entriesOf(inside.copies[0] ?? "").length,
+      );
     } finally {
+      copyText.mockRestore();
       vi.useRealTimers();
     }
   });

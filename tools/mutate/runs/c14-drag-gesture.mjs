@@ -58,6 +58,17 @@ const results = runPass({
       expect: "T4.37c",
     },
     {
+      // **The head of the copy lost** (review batch 4, M10 item 4). The row read
+      // a yank in the prompt, which is capped and elides its head, so a copy
+      // missing its first entry drew the same fifteen rows — measured by hand
+      // against the row as it stood: it passed. Read at `copyText`, it fails.
+      name: "the copy drops its first entry",
+      file: "src/shell/semantic-selection.ts",
+      from: '    .filter((t) => t !== "");\n',
+      to: '    .filter((t) => t !== "").slice(1);\n',
+      expect: "T4.37c",
+    },
+    {
       // The wrong edge: scrolling down, the caret goes to the container's top.
       name: "a tick extends to the edge it is scrolling away from",
       file: SESSION,
