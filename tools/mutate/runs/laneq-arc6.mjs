@@ -83,7 +83,8 @@ const results = runPass({
       // what it removes.
       name: "NOTICE-NO-GROUND: the focused notice is a tone alone — the pills collision, one kind over",
       file: "src/presentation/blocks/kinds/simple.ts",
-      from: "      ? { ...tone(block.tone, ctx.theme, ctx.capabilities, \"focusGround\"), ...focusStyle(ctx.theme, ctx.capabilities) }\n",
+      // Re-anchored 2026-09-27 (C09 I121): the focus shapes read focusShapeStyle.
+      from: "      ? { ...tone(block.tone, ctx.theme, ctx.capabilities, \"focusGround\"), ...focusShapeStyle(ctx.theme, ctx.capabilities) }\n",
       to: "      ? tone(block.tone, ctx.theme, ctx.capabilities)\n",
       expect: "IC8",
     },

@@ -15,7 +15,7 @@ import { runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../runs.js";
 import { NO_STYLE, rampStyle } from "../../theme/index.js";
 import { animateT, effectiveAnimation, effectiveTick, extentT, glyphTick } from "../ramp.js";
 import { barStyle, glyphFor, glyphCells, glyphs, headMark, spinnerFrameAt } from "../glyphs.js";
-import { background, clampSpans, focusStyle, isBand, pad, paint, paintRuns, rows, selectionStyle, slot as surface, tone, withBackground, type Span } from "../paint.js";
+import { background, clampSpans, focusShapeStyle, isBand, pad, paint, paintRuns, rows, selectionStyle, slot as surface, tone, withBackground, type Span } from "../paint.js";
 import type { BlockDefinition, NavElement, RenderContext, Windowed, Rendered } from "../types.js";
 
 /** Chips in a `pills` row are separated by two spaces — one is too close to read. */
@@ -611,7 +611,7 @@ export const noticeDefinition: BlockDefinition<Notice> = {
     // focused notice keeps its own tone and takes the value the theme composed
     // for `focusGround`, which on a banded theme is the band's single ink.
     const style = focused
-      ? { ...tone(block.tone, ctx.theme, ctx.capabilities, "focusGround"), ...focusStyle(ctx.theme, ctx.capabilities) }
+      ? { ...tone(block.tone, ctx.theme, ctx.capabilities, "focusGround"), ...focusShapeStyle(ctx.theme, ctx.capabilities) }
       : tone(block.tone, ctx.theme, ctx.capabilities);
     const prefix = prefixCells(block.glyph);
     // **The band, over the wrapped text and before the glyph is added** (I90,
@@ -1063,7 +1063,7 @@ export const pillsDefinition: BlockDefinition<Pills> = {
             id === head
               ? {
                   ...tone("accent", ctx.theme, ctx.capabilities, on),
-                  ...(selected.has(id) ? selectionStyle : focusStyle)(ctx.theme, ctx.capabilities),
+                  ...(selected.has(id) ? selectionStyle : focusShapeStyle)(ctx.theme, ctx.capabilities),
                 }
               : selected.has(id)
                 ? { ...tone(name, ctx.theme, ctx.capabilities, on), ...selectionStyle(ctx.theme, ctx.capabilities) }

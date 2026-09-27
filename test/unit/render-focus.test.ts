@@ -391,16 +391,17 @@ describe("C11 I14 — the renderer, handed the extent directly", () => {
     // And the head is still told from its neighbours by ink, which is what
     // `accent` buys here and does not buy in a table (C11 §5b).
     expect(mutedOnWash, "two inks, not one").not.toBe(accentOnWash);
-    // **At 1-bit a focused chip is bold and NOT inverse** (C10 I47, R-SEL-006).
-    // `focusStyle` answers `NO_STYLE` without colour and has no inverse rung on
-    // purpose: inverse is selection's, and a second one would draw a focused chip
-    // and a selected chip as the same frame. `accent`'s mono class is the weight
-    // that is left. A *selected* chip still inverts, which is the row below.
+    // **At 1-bit a focused chip is bold and inverse** (C09 I121, R-FOC-001).
+    // This arm read *bold and NOT inverse*, on the argument that inverse is
+    // selection's — true for a table, where `▸` carries focus, and a pill has no
+    // `▸`: bold alone was the active chip's weight too. The cost the old arm
+    // avoided is now residue, recorded in I121: a selected *active* chip is the
+    // same cells as the head. A selected chip still inverts, the row below.
     const monoFocus = capabilities({ colourDepth: 1 });
     const mono = renderToLines(registry, pills, 60, { theme, capabilities: monoFocus, focus: { blockId: "p", rowId: "chip-1" } });
     const monoCells = styledScreenFrom([mono.join("\r\n")], { columns: 60, rows: mono.length });
     const monoHead = styleAt(rowContaining(monoCells, "exited")!, "exited")!;
-    expect(monoHead.attrs, "1-bit head: bold, and not inverse").toEqual([1]);
+    expect(monoHead.attrs, "1-bit head: bold and inverse").toEqual([1, 7]);
     expect(styleAt(rowContaining(monoCells, "all")!, "all")!.attrs).not.toContain(7);
     const monoSel = renderToLines(registry, pills, 60, { theme, capabilities: monoFocus, focus: { blockId: "p", rowId: "chip-2", selected: [pair("p", "chip-1"), pair("p", "chip-2")] } });
     const selCells = styledScreenFrom([monoSel.join("\r\n")], { columns: 60, rows: monoSel.length });
@@ -821,14 +822,14 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
     expect(noticeAt(NOTICE, { blockId: "q", rowId: "q" })).toEqual(none);
     expect(noticeAt(NOTICE, { blockId: "n", rowId: null })).toEqual(none);
 
-    // **1-bit: no ground, and no inverse** (C09 I83, C10 I47). `focusGround`
-    // answers `NO_STYLE` without colour and `focusStyle` has no inverse rung —
-    // inverse is selection's, and a notice is not selectable. What is left is the
-    // notice's own tone at its mono class, which is `error`'s: the frame says
-    // *this went wrong* and says nothing false about focus.
+    // **1-bit: the whole notice inverts** (C09 I121, C09 I83 superseded). This arm
+    // asserted the focused notice *equal* to the resting one — the defect written
+    // down as the expectation, on the argument that the tone's mono class says
+    // nothing false about focus. It said nothing true either. Now the notice
+    // inverts and keeps its tone's weight, and the resting frame is the control.
     const mono = noticeAt(NOTICE, { blockId: "n", rowId: "n" }, 1);
-    expect(at(mono, "pull failed").attrs, "no inverse at 1-bit").not.toContain(7);
-    expect(at(mono, "pull failed")).toEqual(at(noticeAt(NOTICE, null, 1), "pull failed"));
+    expect(at(mono, "pull failed").attrs, "inverse at 1-bit").toContain(7);
+    expect(at(noticeAt(NOTICE, null, 1), "pull failed").attrs, "and not at rest").not.toContain(7);
   });
 });
 

@@ -853,15 +853,16 @@ describe("C09 I83 — a notice takes the focus ground and no column", () => {
       "the ground moves at least one of them",
     ).not.toBe(params(tone("error", DARK_THEME, FULL_CAPS)));
 
-    // **At one bit the ground is gone and the tone's mono class is what is
-    // left.** `focusStyle` has no inverse rung — inverse is selection's only
-    // carrier — so what survives here is the notice's own ink, and `▸` is what
-    // says *focus* (R-SEL-006). A second inverse rung would make a focused row
-    // and a selected one one frame.
+    // **At one bit the whole notice inverts, keeping its tone's mono class**
+    // (C09 I121). This arm asserted the focused frame *equal* to the resting one
+    // and said `▸` carried focus — a notice has no `▸`, C09 I83 reserves it no
+    // column, so the frame carried nothing. The resting frame is the control.
     const mono = kitAt({ blockId: "h", rowId: "h" }, MONO_UNICODE_CAPS).renderSequence([HEAD], WIDTH);
     const monoPlain = kitAt(null, MONO_UNICODE_CAPS).renderSequence([HEAD], WIDTH);
-    expect(cellFor(mono, "ps · ok").attrs, "no inverse at 1-bit").not.toContain(7);
-    expect(cellFor(mono, "ps · ok"), "the tone's mono class, focused or not").toEqual(cellFor(monoPlain, "ps · ok"));
+    expect(cellFor(mono, "ps · ok").attrs, "inverse at 1-bit").toContain(7);
+    expect(cellFor(monoPlain, "ps · ok").attrs, "and not at rest").not.toContain(7);
+    const without = (attrs: readonly number[]): readonly number[] => attrs.filter((a) => a !== 7);
+    expect(without(cellFor(mono, "ps · ok").attrs), "the tone's mono class is kept").toEqual(cellFor(monoPlain, "ps · ok").attrs);
   });
 });
 

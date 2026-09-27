@@ -1816,10 +1816,10 @@ progress        0     — atomic: nothing to focus
 code            0     — atomic: nothing to focus
 comparison      0     — atomic: nothing to focus
 patch           0     — atomic: nothing to focus
-pills           2     chip-1
-choice          3     ** 3 focusable, NONE drawn **
-control         1     ** 1 focusable, NONE drawn **
-tape            5     seams arm probe
+pills           2     chip-0 chip-1
+choice          3     linear log log2
+control         1     control-1
+tape            5     seams arm count probe
 tree            6     src interaction parser frame data package
 split           2     split-files split-code
 form            5     name port replicas save cancel
@@ -1832,7 +1832,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 28 kinds · 11 publish a focusable element · 8 draw a treatment
+· 28 kinds · 11 publish a focusable element · 10 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them
@@ -2474,10 +2474,10 @@ progress        0     — atomic: nothing to focus
 code            0     — atomic: nothing to focus
 comparison      0     — atomic: nothing to focus
 patch           0     — atomic: nothing to focus
-pills           2     chip-1
-choice          3     ** 3 focusable, NONE drawn **
-control         1     ** 1 focusable, NONE drawn **
-tape            5     seams arm probe trace
+pills           2     chip-0 chip-1
+choice          3     linear log log2
+control         1     control-1
+tape            5     seams arm count probe trace
 tree            6     src interaction parser frame data package
 split           2     split-files split-code
 form            5     name port replicas save cancel
@@ -2490,7 +2490,7 @@ scroll          3     scroll-1 scroll-1-a scroll-1-b scroll-1-c
 group           0     — atomic: nothing to focus
 raw             0     — atomic: nothing to focus
 
-· 28 kinds · 11 publish a focusable element · 8 draw a treatment
+· 28 kinds · 11 publish a focusable element · 10 draw a treatment
 · the atomic kinds are not a missing treatment — a session cannot put focus on them at all
 ── §76 · per-token values — the valued run, and the token that wraps whole
 · room to spare — one ground per valued token, and none on the words between them

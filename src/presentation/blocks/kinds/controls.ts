@@ -14,7 +14,7 @@ import { normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Choice, Control } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate } from "../../text.js";
 import { glyphs } from "../glyphs.js";
-import { clampSpans, focusStyle, paint, rows, tone, type Span } from "../paint.js";
+import { clampSpans, focusShapeStyle, paint, rows, tone, type Span } from "../paint.js";
 import type { BlockDefinition, NavElement, RenderContext, Rendered } from "../types.js";
 
 /** The capability record the two shapes read: the glyph arm and the width convention. */
@@ -126,7 +126,7 @@ export const choiceDefinition: BlockDefinition<Choice> = {
       // **One span for the mark and the label together**, because *the label is
       // part of it*: a wash over one of them is a second shape.
       const style = focused
-        ? { ...tone("default", ctx.theme, ctx.capabilities, "focusGround"), ...focusStyle(ctx.theme, ctx.capabilities) }
+        ? { ...tone("default", ctx.theme, ctx.capabilities, "focusGround"), ...focusShapeStyle(ctx.theme, ctx.capabilities) }
         : tone("default", ctx.theme, ctx.capabilities);
       spans.push({ text: optionText(block, i, ctx.capabilities), style });
     });
@@ -217,7 +217,7 @@ export const controlDefinition: BlockDefinition<Control> = {
       { text: value, style: tone("info", ctx.theme, ctx.capabilities, on) },
     ];
     const lit = focused
-      ? spans.map((s) => ({ ...s, style: { ...s.style, ...focusStyle(ctx.theme, ctx.capabilities) } }))
+      ? spans.map((s) => ({ ...s, style: { ...s.style, ...focusShapeStyle(ctx.theme, ctx.capabilities) } }))
       : spans;
     return rows([paint(clampSpans(lit, width, ctx.capabilities))]);
   },
