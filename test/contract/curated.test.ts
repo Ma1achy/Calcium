@@ -127,6 +127,8 @@ describe("C10 §2 / C09 §4 — the curated tables", () => {
     expect(stale, "a derived-table exemption whose table is gone").toEqual([]);
   });
 
+  it.todo("T2.40a (C10 I44): canon reads a Set as its sorted members and refuses other non-plain objects — not deferred on a component: the code lands in the next commit of this round");
+
   it("T2.41 (C09 I45, C02 I9): the ASCII set is also the wide set, and that is a ruling", () => {
     // **A collision, asserted so it is not read as one.** Two different
     // capability records producing byte-identical output is ordinarily the tell
