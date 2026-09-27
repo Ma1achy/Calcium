@@ -959,12 +959,16 @@ export function createRouter(
 
     if (e.kind === "mouse") return routeMouse(e);
 
-    // Native release events exist for application surfaces. Calcium's own
-    // command bindings remain edge-triggered and must never fire on release.
+    // **A release reaches `child` and nothing else** (I65, R-OWN-002). Native
+    // release events exist for application surfaces; every other rung is
+    // edge-triggered. This ran the active target's handlers for any target, and
+    // a question's answer callback ignores `event` — so with releases reported,
+    // `y` answered one question and `y`'s release answered the next one the
+    // verb raised (§3b S12).
     if (e.kind === "key" && e.event === "release") {
       const target = activeTarget(inputs());
       stages.push(`target:${target}`);
-      if (run(target, e)) return true;
+      if (target === "child" && run(target, e)) return true;
       stages.push("release-dropped");
       return false;
     }
@@ -1026,6 +1030,18 @@ export function createRouter(
       // **`reject` consumes exactly as `handle` does** (R-OWN-001). The two
       // differ in what they did, not in whether the event is spent.
       if (verdict === "reject") stages.push("reject");
+      return true;
+    }
+
+    // **The child consumes what nothing at its rung took** (I49, ruling 62).
+    // *Takes all but host.detach*: a shell delegation registers no handler, so
+    // every key passed here and fell to `global` — `F1` at a delegated `vim`
+    // submitted `/help keys` behind it. An attached surface's handler already
+    // consumes what it does not bind; this is the rung saying so for both
+    // sources. Forwarding the bytes to the delegation's stdin is a C21/C23
+    // mechanism that does not exist, and is not built here.
+    if (target === "child") {
+      stages.push("child:consumed");
       return true;
     }
 

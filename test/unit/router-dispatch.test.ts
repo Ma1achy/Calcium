@@ -1609,7 +1609,40 @@ describe("C16 §3b — a reject consumes and explains; one rung; two verdict voc
       expect(stage?.split(":")[2], `${cell.name}: the intercept's rung`).toBe(cell.rung);
     }
   });
-  it.todo(
-    "T1.169 (I65): a release answers nothing — y answers Q1, and y's release leaves Q2 open — not deferred on a component: the code lands in the next commit of this round",
-  );
+  it("T1.169 (I65): a release answers nothing — y answers Q1, and y's release leaves Q2 open", () => {
+    // **The callback ignores `event`, as the question's does** (`classify`
+    // reads the key's name). Q1's answer chains Q2, which is the verb raising a
+    // follow-up — so `y`'s release arrives at a question that did not exist
+    // when `y` was pressed.
+    const answered: string[] = [];
+    const question = (id: string) =>
+      ({ id, kind: "overlay", blocking: true, dismissal: "answer", owner: { rung: "question" } }) as const;
+    const h = harness({
+      keyReleasesReported: () => true,
+      overlayAnswerCallback: () => (e: InputEvent) => {
+        if (e.kind !== "key" || e.key.name !== "y") return false;
+        answered.push(h.layer.top?.id ?? "none");
+        h.layer.top = h.layer.top?.id === "q1" ? question("q2") : null;
+        return true;
+      },
+    });
+    h.layer.top = question("q1");
+
+    h.router.dispatch({ ...key("y"), event: "press" } as InputEvent);
+    expect(answered, "y answers Q1").toEqual(["q1"]);
+    expect(h.layer.top?.id, "and the verb raised Q2").toBe("q2");
+
+    h.router.dispatch({ ...key("y"), event: "release" } as InputEvent);
+    expect(answered, "the release answered nothing").toEqual(["q1"]);
+    expect(h.layer.top?.id, "Q2 is open").toBe("q2");
+    expect(h.router.lastStages.at(-1)).toBe("release-dropped");
+
+    // **The control**: at `child`, a release is delivered — application
+    // surfaces are what native release events exist for.
+    const child = harness({ keyReleasesReported: () => true, childAttached: () => true });
+    const got: string[] = [];
+    child.router.register("child", (e) => (got.push(e.kind === "key" ? String(e.event) : e.kind), true));
+    child.router.dispatch({ ...key("y"), event: "release" } as InputEvent);
+    expect(got, "the child hears the release").toEqual(["release"]);
+  });
 });
