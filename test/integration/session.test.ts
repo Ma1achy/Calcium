@@ -1376,3 +1376,12 @@ describe("C22 §4 — the greeting's context, and where `stopped` leads", () => 
     await expect(tui.start()).rejects.toThrow(SessionStateError);
   });
 });
+
+describe("C16 I51, I49 — refusals through a built session (review batch 2, M5)", () => {
+  it.todo(
+    "T4.83 (C16 I51, ruling 59, ruling 60): ⌃c in semantic copy mode keeps the mode and draws the one-shot chip — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T4.84 (C16 I49, ruling 62): F1 during a shell delegation submits nothing — not deferred on a component: the code lands in the next commit of this round",
+  );
+});

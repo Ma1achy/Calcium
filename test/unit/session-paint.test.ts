@@ -1206,3 +1206,12 @@ describe("C16 I58 — the owner line asks chordText", () => {
     expect(chords, "the owner lines drew chords the matcher recognised").toBeGreaterThan(20);
   });
 });
+
+describe("C22 I133 — the owner line's chords are the keymap's (review batch 2, M5 items 2 and 5)", () => {
+  it.todo(
+    "T1.171 (C16 I19, C22 I133, ruling 63): every chord on the owner line is the session keymap's first row for its action — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T1.77 (C22 I133): a rebound or unbound action moves or drops its chip; the substate and the question name themselves — not deferred on a component: the code lands in the next commit of this round",
+  );
+});

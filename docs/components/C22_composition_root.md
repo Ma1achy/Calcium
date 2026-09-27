@@ -675,6 +675,17 @@ type ChromeContext = Readonly<{
   session: SessionSnapshot;
   now:     number;      // C22's injected clock, sampled once per frame
   columns: number;      // handed down from C01, never read
+  // … owner, ownerArmed, bufferedEntries, copy, editingField, toast,
+  //   capabilities, lastFrame — `src/shell/types.ts` carries each with its reason
+  hints?:  OwnerHints;  // the owner line's chords and vocabularies (I133)
+}>;
+
+/** What the owner line reads its hints from — the session's keymap, and the owners' own words (I133). */
+type OwnerHints = Readonly<{
+  chord(target: FocusTarget, action: KeyAction): Binding["key"] | undefined;
+  substate?: "find" | "complete" | "preview";
+  question?: Readonly<{ state: "choice" | "reply" | "inspection"; resolvesTo: string }>;
+  refused?:  boolean;   // semantic copy mode's one-shot chip (C16 I62)
 }>;
 
 // The footer's height is what its blocks measure, per frame (§6l, I82) — no budget field.
@@ -1967,6 +1978,8 @@ So the footer carries a **second row, last**, naming the owner and its routes �
 
 **Amended in M7 (C16 I44, R-BLK-786, R-BLK-788, R-INT-008): the line says when a question is *guarded*.** A newly presented question requires a fresh, deliberate activation — so a key already in flight when it arrived is refused, and R-BLK-788 says the refusal *names why*. The naming is here rather than in a notice, because the owner line is already the row that answers *who has your keys*, and *and not from that keystroke* is the same question one moment earlier. The mark is drawn while the guard is live and gone when the guard ends, so the refused key **changes the frame** — which is the whole difference between a key refused and a key swallowed, and the only part of it a frame-read can see. A **cancelled pointer arm draws nothing**: R-INT-008's other half is that passive untargeted pointer events may stay silent, and a press taken back is not a command.
 
+**Amended in review batch 2 (C16 M5 items 2 and 5, ruling 63): the hints come from the keymap, and a question's from its own vocabulary** (I133). §103 draws the scope rung as `⏎ run · ⇧⏎ newline · ⇥ complete · ⇧⇥ transcript` and the line spelled those four chords itself — so an application that rebound `insertNewline` kept a footer naming the old chord, which is C16 I19's second keymap in the one row this section said was safe from it. Every chip now names an action and asks `hints.chord(target, action)`; an action with no binding draws no chip. Two actions were missing for that to hold — `⏎` at the prompt ran a hard-coded branch, and `⏎` at a held field another — so `submit` and `keepField` are keymap rows now. A question is not an ordinary rung and its actions are its own, so its line reads `hints.question`: `←→ move · ⏎ answer · esc → <default>`, where the old line's *esc safe path* was a phrase and not the label. The substate names itself — `find`, `complete`, `preview` — from the layer's declared owner (C15 I29), where it was always `find`. And semantic copy mode's refused `⌃c` draws a one-shot `warn` chip after the owner (C16 I62).
+
 **Amended 2026-09-24 (C14 I55, questions 4 and 35): the copy rung's line is read by mode.** Both copy modes raise one rung, so the rung cannot say which — `ChromeContext.copy` does. Semantic mode's line carries the selection's size and says whether the next `esc` clears or leaves; native mode's names the terminal as the mouse's owner. The header's `COPY` becomes `NATIVE` in the handoff by the same field.
 
 ### 6l.5 — what this moves, counted before it is regenerated
@@ -3000,6 +3013,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 
   **Two things say so on screen, and neither is optional** (R-BLK-312, R-BLK-844). The entry's block is framed and its border carries `⌃] host escape · ⌥esc enhanced detach · ⌃c interrupts child`; the footer's owner line reads `attached · keys → child · ⌃] host escape`. *AN OWNER YOU CANNOT SEE IS AN OWNER YOU WILL FIGHT*, and the one key that still works is the one a reader has no other way to learn: a `/command` cannot reach the host while capture is active, so the chord on screen is the whole of the affordance.
 
+- **I133** — *(§103, `R-KEY-004`, `R-OWN-001`, C16 I19, ruling 63)* **The owner line names no chord the session's keymap does not bind.** Every chip on it is an action looked up through `ChromeContext.hints.chord(target, action)` — the session keymap's first row for that action — or a question's own declared vocabulary; an action with no binding draws no chip, and nothing on the line spells a chord of its own. `ownerLine` called without hints reads the default keymap, which is the same answer for a session that rebinds nothing. The substate's name is the layer's declared owner (C15 I29), and the question's default label is the question's. → T1.77, C16 T1.171
 
 ## 11. Commitments
 
@@ -3454,6 +3468,7 @@ PTY harness.
 - **T1.73** (I116, §6l.13 K1, K3): the default footer given `toast: "copied 3 lines"` draws `✓ copied 3 lines` where the working directory was, and the cwd is absent from that row; given none, the cwd is drawn — asserted at Unicode and at ASCII, where the mark is `glyphFor("ok")`.
 - **T1.74** (I120, I121, I124): §6m.2's table, row by row, through the event function alone — each change kind against a streaming and a settled entry, an appended refusal after settle, a replace after settle writing nothing, a second settle writing nothing, and the number reading `seq` after an eviction.
 - **T1.75** (I121): every kind of `ONE_PER_KIND` through the body function — role, name and value text, a table's header before its rows, a choice without its radio glyph, nothing for a figure but its name, a notice's text once, and no SGR or glyph in any line — through the registry a session builds, with C11's, C12's and C25's kinds registered.
+- **T1.77** (I133, C16 I19): a session keymap binding `insertNewline` to `⌃j` alone draws `⌃j newline` on the scope rung's line and not `⇧⏎`; a keymap with `complete` unbound draws no `complete` chip; the substate line says `complete` for a completion panel and `find` for a search; a question's line ends with its default's label.
 - **T1.76** (I126, I127, I130): §6n.2's seven rows through the earning function alone — watched × failed × a duration either side of 30 000 ms — each giving exactly its row's word or nothing; a **long** entry settled twice fires once — a short one earns nothing either way, so repeating one proves nothing about the dedup; a watch on a settled or unknown id is `false`.
 - **T1.65c** (I111, §6l.10): the ground reader sees a background that is not the sequence's first parameter, and does not read a 256-colour or rgb *foreground* whose index spells `4x` or `10x` as one. The reader's own fabricated violation, and it earned its place: the first draft matched only at the head of the sequence, so a rule that was painting `38;5;188;48;5;235` was reported as painting nothing — a defect of the instrument that reads exactly like a defect of the code.
 - **T1.65d** (I111, §6l.10): a supplied string that strips to nothing — `""`, spaces, a tab — leaves the frame that shipped, and a padded name still draws. The narrowing belongs to the frame because an application computing its label may return a blank on some frames, and a one-cell ground floating in the rule is not a name.

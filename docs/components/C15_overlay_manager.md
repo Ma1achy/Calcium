@@ -35,7 +35,9 @@ type Layer = Readonly<{
   kind:        "overlay" | "panel" | "peek";      // peek — takes no keys, is never `top` (§2a)
   placement:   Placement;
   content:     readonly Block[];
-  dismissable: boolean;                          // false = must be resolved, not escaped
+  blocking:    boolean;                          // owns input while it is up (I26)
+  dismissal:   "escape" | "focus" | "answer";    // what closes it (I26)
+  owner?:      LayerOwner;                        // the rung it answers at (I29, C16 I63)
   width?:      number;                            // cells; absent means the region's width
   maxHeightFraction?: number;                     // overlays; default 0.5
   /** Where this layer wants the terminal cursor, relative to its own origin (I19). */
@@ -75,6 +77,11 @@ interface OverlayManager {
   readonly stack:  readonly Layer[];             // bottom-first
   readonly top:    KeyedLayer | null;            // the topmost layer that takes keys — never a peek (I21)
 }
+
+/** Which owner rung a keyed layer is (§103, R-QST-001) — and, for a substate, which one. */
+type LayerOwner =
+  | Readonly<{ rung: "question" }>
+  | Readonly<{ rung: "substate"; name: "find" | "complete" | "preview" }>;
 
 /** A layer C16 can route to. `top` is typed to this so a peek cannot reach `activeTarget`. */
 type KeyedLayer = Layer & Readonly<{ kind: "overlay" | "panel" }>;
@@ -270,7 +277,7 @@ So a layer carries two fields.
 
 | kind | `blocking` | `dismissal` | takes keys |
 |---|---|---|---|
-| `overlay` | declared — a question's is `true`, a completion menu's is `false` | `answer` when blocking, `escape` otherwise | yes |
+| `overlay` | declared — a question's is `true`; a completion menu's was `false` until M8 made it a panel | `answer` when blocking, `escape` otherwise | yes |
 | `panel` | `false` | `escape` | yes |
 | `peek` | `false` | `focus` | no |
 
@@ -458,6 +465,9 @@ Over the stack's shape.
 - **I28** — **Pushing a `blocking` layer first dismisses every open `panel`**, each with its own change and its own reason, before the new layer is pushed (§2c, R-BLK-873). *A panel is a thing you opened; a question is a thing that arrived* — the arriving one cannot silently sit under something the reader was reading, and two layers differing on escapability make `esc` ambiguous. It lives here rather than in the caller because it is a rule about what the stack may hold, and a rule every caller must remember is the shape C16 §6 measured the cost of.
 
   **The subject is the panel and not every escapable layer**, which the first draft of this invariant got wrong in the direction that reads as more general. R-BLK-873 names both parties — *a panel is DISMISSABLE and a question is NOT*, and *THE PANEL CLOSES FIRST* — so the rule is about the pair it names. Read as *every `escape` layer*, it closed a **view**: a confirm raised over a dashboard took the dashboard with it, which is a full-region thing the reader is inside rather than a transient they opened above the prompt. **The instance is gone and the scoping is not** (F1254): the generalisation was invisible while a view was the only other escapable kind nobody had tested it against, T4.2 is where it showed, and the rule still has to say *panel* rather than *escapable* because a peek is escapable-adjacent and untouched by an arrival.
+- **I29** — **A keyed layer's owner rung is declared on the layer, and `push` refuses a declaration its fields contradict** (R-QST-001, §103, → C16 I63; review batch 2, M5 item 3). `owner: { rung: "question" }` is an `overlay`, `blocking`, closed by `answer`; `owner: { rung: "substate", name }` is a `panel`, and `name` is `find`, `complete` or `preview`; a `peek` declares none, because it takes no keys. `update` cannot change it — `LayerUpdate` does not admit it, for I14's reason. **An undeclared overlay is a question and an undeclared panel an unnamed substate**, which is C16's `rungOfLayer`. *A question declares blocking and owner explicitly* — the design's own words — and before this field C16 derived the rung twice, from `kind` for the footer and the guard and from an answer callback for the intercept table, and the two disagreed on a blocking overlay nothing could answer.
+
+  **The strict form is not built, and why.** R-QST-001 read to the letter makes every overlay declare `owner: question` and so be blocking and closed by `answer`. Probed on the tree, that refused **52 rows in 11 files** — C15's own placement fixtures (`anchored`, `centred`, `covering`, `wrappingLayer`), T1.33's non-blocking advisory, and session and router harnesses standing a non-blocking overlay in for a menu. None of those overlays has a design counterpart; they are test stand-ins, and migrating them is a sweep rather than this item. What closes the defect is one derivation, and the declared owner gives it; the strict refusal is recorded as a finding and left for the sweep.
 
 ---
 
@@ -530,6 +540,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.31** (I27): `push` refuses a centred panel, a blocking panel and a panel whose `dismissal` is not `escape`; the control is the anchored non-blocking `escape` one, which is accepted. `update` is checked on the same three, because `LayerUpdate` admits `placement`.
 - **T1.32** (I28, R-BLK-873): with a panel and a peek on the stack, pushing a blocking overlay leaves the peek and the overlay — the panel is gone, its change carried its id and the reason `explicit`, and it was emitted **before** the push returned. The control is pushing a *non*-blocking overlay, which leaves the panel where it was.
 - **T1.33** (I23, R-BLK-779): a stack pushed in every order sorts `peek · panel · overlay` bottom-first, asserted as the whole sequence of ids rather than by the top alone — a sort is a property of the list, and the first member is the degenerate one. **The overlay is a non-blocking advisory**, because I28 makes *a panel beneath a blocking layer* a stack this component will not hold: a row using a question would be asserting the sort over three bands while claiming four.
+
+- **T1.34** (I29): `push` refuses `owner: question` on a panel, on a non-blocking overlay and on an overlay closed by `escape`, `owner: substate` on an overlay, and any owner on a peek; the controls — a blocking `answer` overlay declaring `question`, a panel declaring `substate: "complete"`, and an overlay declaring nothing — are accepted. `LayerUpdate` does not admit `owner`, asserted at compile level.
 
 ### Tier 2 — contract / interface
 
@@ -617,7 +629,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.19** (I23): sorting peeks with the overlays → T1.24 fails, and a confirm raised over a peek is drawn beneath it.
 - **T6.20** (I22): dropping the placement check for peeks → T1.26 fails, and a centred peek sits over the transcript as a confirm with nothing to answer it.
 - **T6.21** (§2a): the emitter not reconciling on the next focus move → T4.11's second row fails, and the detail of row `a` sits beside row `b`.
-- **T6.17** (I20): moving the width check into `confirm.ts` — where it lived as a comment — → T1.21 and T1.22 both fail. **The revert that reads as a tidy-up**: the comment was correct, was written after the defect, and constrained exactly one caller. The second centred layer in the tree (`clearConfirmLayer`, C20) declares no width at all.
+- **T6.17** (I20): moving the width check into `confirm.ts` — where it lived as a comment — → T1.21 and T1.22 both fail. **The revert that reads as a tidy-up**: the comment was correct, was written after the defect, and constrained exactly one caller. The second centred layer in the tree (`clearConfirmLayer`, C20) declared no width at all; it was retired in review batch 2 (C16 ruling 61), so the confirm is the only one.
 - **T6.22** (I24): the approval pushed as a `peek` → T1.27's `activeTarget` assertion fails and `⏎` reaches the transcript instead of the choice; the consequence line drawn when none was supplied → T1.27's block count fails.
 - **T6.23** (I25): emitting the removal change on a microtask rather than before the call returns → T1.28's *before `pop()` returned* fails, and an owner answers *still open* for one turn after the ladder has already popped its layer; removing the `pop` emission → T1.28 fails and the owner's teardown never runs. **The measured instance was C28's view holding a raised profiler tier** (F944) and is gone with it; what the revert costs is the same and the owner is now a confirm with an answer in flight or a menu with a selected row.
 

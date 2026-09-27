@@ -1448,3 +1448,21 @@ describe("C16 I53 — the repeat policy through dispatch", () => {
     expect(pages, "100 ms after the last act: it acts, and only once").toBe(3);
   });
 });
+
+describe("C16 §3b — a reject consumes and explains; one rung; two verdict vocabularies (review batch 2, M5)", () => {
+  it.todo(
+    "T1.164 (I62, §103, ruling 59): ⌃c at a question, at semantic copy mode and at native selection is consumed, offered to nothing and refused once — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T1.165 (I62): refused is called once for an intercept's reject and a blocking top, and never for a handler's reject or the guard — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T1.166 (I64): the reserved routes by outcome, three routes over every rung — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T1.167 (I63): the rung, the guard on arrival and the intercept stage agree for a question and a substate — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T1.169 (I65): a release answers nothing — y answers Q1, and y's release leaves Q2 open — not deferred on a component: the code lands in the next commit of this round",
+  );
+});

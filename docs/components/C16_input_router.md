@@ -268,21 +268,44 @@ The fix is one check, not four: the buffering branch moves out of `decodeCsi` in
 
 ```typescript
 type FocusTarget =
-  | "child" | "overlay" | "nativeSelection" | "pushedView"
+  | "child" | "overlay" | "nativeSelection" | "semanticSelection" | "panel"
   | "interaction" | "prompt" | "liveBlock" | "global";
 
 function activeTarget(deps: Readonly<{
-  overlayTop:    Layer | null;
-  nativeSelection:      boolean;
-  attachedChild: boolean;
-  liveEntry:     TranscriptEntry | null;
-  stored:        StoredFocus;
+  overlayTop:        Readonly<{ kind: "overlay" | "panel"; owner?: LayerOwner }> | null;
+  nativeSelection:   boolean;
+  semanticSelection: boolean;
+  attachedChild:     boolean;          // a shell delegation or an attached surface (I49)
+  liveEntry:         Readonly<{ id: string }> | null;
+  stored:            StoredFocus;
 }>): FocusTarget;
 
+/** The rung a keyed layer answers at: its declared owner, else its kind's (I63, C15 I29). */
+function rungOfLayer(top: Readonly<{ kind: "overlay" | "panel"; owner?: LayerOwner }>): "question" | "substate";
+
 /** Who owns the keyboard (§103). Many targets, one owner. */
-type OwnerRung = "child" | "copy" | "question" | "substate" | "inside" | "scope";
-type Verdict   = "handle" | "reject" | "pass" | "global-intercept";
+type OwnerRung        = "child" | "copy" | "question" | "substate" | "inside" | "scope";
+/** What a handler answers (I64). */
+type Verdict          = "handle" | "reject" | "pass";
+/** What an intercept declares at a rung (I64); `global-intercept` takes the intercept's own exception. */
+type InterceptVerdict = "handle" | "reject" | "global-intercept";
 ```
+
+**Brought up to the tree in review batch 2 (M5 item 7).** The block above is `types.ts`
+and `focus.ts` at the commit that landed it. The one this section carried from M0 to
+review batch 2 is below, kept because the defects §3a and §3b record were found against
+it: it listed `pushedView`, which R-EXA-082 retired (F1254), and it had neither
+`semanticSelection` nor `panel`, so it described a ladder with seven targets while the
+tree routed nine. `git log -S"type FocusTarget"` showed one commit — the one that wrote it.
+
+> **Superseded — the M0 declaration, kept for the record.**
+>
+> ```typescript
+> type FocusTarget =
+>   | "child" | "overlay" | "nativeSelection" | "pushedView"
+>   | "interaction" | "prompt" | "liveBlock" | "global";
+> type Verdict   = "handle" | "reject" | "pass" | "global-intercept";
+> ```
 
 **Amended in M5 — `child` joins the union, and targets stop pretending to be rungs**
 (§103, R-OWN-001). §103’s ladder is six owners, highest first: `child · copy · question ·
@@ -295,11 +318,20 @@ in the reverse of the ladder’s order, because `installLadder` registers `liveB
 `global` maps to no rung: it is the keymap left when nothing owns the keyboard.
 
 **And `global-intercept` is read *before* the ladder**, not as its top rung. §103 names
-three reserved routes — `interrupt` (⌃C), `page-scroll` (⌥↑/⌥↓, and the legacy
-`pageup`/`pagedown`) and **the wheel**, which is a mouse event and is the one a table gets
-written without. They carry an explicit owner-applicability table (`intercepts.ts`) and no
-rung may claim one. A `reject` there still runs the owning rung first and consumes the
-event: rejecting is a decision the owner announces, not a hole the event falls through.
+three reserved routes — `interrupt` (⌃C), `page-scroll` (⌥↑/⌥↓ — `PgUp`/`PgDn` were on
+this route and are not, see I40) and **the wheel**, which is a mouse event and is the one a
+table gets written without. They carry an explicit owner-applicability table
+(`intercepts.ts`) and no rung may claim one.
+
+**A `reject` consumes the event and runs no rung** (I62, ruling 59). The owner is not
+offered the key, and the router explains through `refused`. This sentence used to say the
+opposite — *a `reject` there still runs the owning rung first*, because *rejecting is a
+decision the owner announces* — and running the rung made a reject **perform what it
+refused**: a question's answer callback classified `⌃c` as `resolve` and settled the
+question with its default, and copy mode's rung called its exit. §103 says *QUESTION and
+COPY MODE reject* the interrupt; the table said `reject` and the dispatch did the thing
+the table forbade. T1.40's control could not see it, because its answer callback declined
+every key it was offered.
 
 **Amended — the table is total, and `handle` is a route and not a note** (I39, I40). The
 first version declared a row only where §103 named one and let every other rung fall to
@@ -331,30 +363,51 @@ they are one fact from either end:
   rungs that are not viewports — was right for `PgUp` and wrong for the chord whose
   reservation exists precisely so it never has to ask.
 
-**`interrupt` is not changed by this and keeps falling to the ladder.** Its `handle` means
-*this rung's own cancel*, which is a different verb at the child, at a substate and at a
-scope, and the ladder is where that resolution lives. So `handle` short-circuits for the
-two routes whose destination is one object and not for the one whose destination is the
-owner — which is why the code branches on the intercept and not on the verdict alone.
+**Amended in review batch 2 — `handle` meant two things, and the dispatch branched on the
+intercept to tell them apart** (I64, M5 item 4). For `page-scroll` and the wheel `handle`
+was *the destination* — the transcript's pager, the pointer-hit owner — and for
+`interrupt` it was *the rung's own cancel*. One word, two verbs, and `router.ts` asked
+`intercept !== "interrupt"` to know which. The design already has the word for the first:
+**`global-intercept` is *take the registry-declared exception***, and each intercept now
+declares its `exception` — `page-scroll` the transcript's pager at `global`, the wheel
+`routeMouse` — so the dispatch branches on the verdict alone. `handle` is left meaning one
+thing: *continue to this rung, which answers the route with its own verb*. And
+`global-intercept` stops being a handler verdict at all: nothing produced it, and a handler
+that returned it was consumed silently with no stage and nothing acting (§3b S14). `Verdict`
+is a handler's three and `InterceptVerdict` is an intercept's three, and a handler naming
+the intercept's is a compile error.
 
-**A *question* is an overlay awaiting an answer, and §5 already drew that line.**
-`activeTarget` answers `overlay` for any top layer, where §103’s QUESTION rung is *choice
-or text · resolves exactly once by answer · safe exit*. So the intercept table reads its
-rung through `overlayAnswerCallback() !== null`; without it a non-dismissable layer nobody
-is waiting on rejects an interrupt, and a verb in flight never gets cancelled — ruled
-behaviour overturned by a rung name being one word coarser than the rule.
+**The rung is one function of the top layer, and it is the layer's declared owner** (I63,
+R-QST-001, C15 I29, M5 item 3). A layer says `owner: { rung: "question" }` or
+`owner: { rung: "substate", name }`, and `rungOfLayer` answers from that; an overlay that
+declares none is a question, because that is the only owner an overlay has. `activeTarget`,
+`rung`, the guard, the epoch, the intercept table and the footer all read that one answer.
+**This paragraph used to give the intercept table a second one** — *a question is an
+overlay awaiting an answer*, read through `overlayAnswerCallback() !== null` — so for a
+blocking overlay with no answer callback the footer, the guard and the epoch said
+`question` while the intercept said `scope` (§3b S13). The one layer that was such a thing,
+`history-clear-confirm`, had no `src` consumer and nothing could answer it, and ruling 61
+retires it. **The declared owner is also what names a substate** — `find`, `complete` or
+`preview` — which is how the footer says which one is up and how `promptUnderMenu` stops
+switching on two layer ids.
 
 Resolution order, first match wins:
 
 | Condition | Target |
 |---|---|
-| An overlay is on top of C15's stack | `overlay` |
+| A child holds the terminal — a shell delegation or an attached surface (I49) | `child` |
+| The top layer's rung is `question` (I63) | `overlay` |
 | C14 is in native selection | `nativeSelection` |
 | C14 is in semantic copy mode | `semanticSelection` |
-| A panel is on top of C15's stack | `panel` |
+| The top layer's rung is `substate` (I63) | `panel` |
+| Focus is stored in the transcript with `mode: "interact"` (C26 I2) | `interaction` |
 | The prompt holds focus (the default) | `prompt` |
-| Focus has been moved into the live block | `liveBlock` |
-| — | `global` |
+| Focus is stored in the transcript, whether or not an entry is live (§3a W1) | `liveBlock` |
+
+`global` is not a row. `activeTarget` has not answered it since §3a's W1 — the transcript
+is the owner whether or not anything is live — so it is the keymap read **below** the
+ladder and never a target the ladder resolves to. The table carried a `— | global` row and
+omitted `child` and `interaction` until review batch 2 (M5 item 7).
 
 Both copy modes sit above `panel` because each takes every key; only a confirm raised over one wins (A02 §2). **The view row is gone and the panel row is not new** — it was the second target at `substate`, and R-EXA-082 (F1254) deleted the one this table happened to name.
 
@@ -451,7 +504,7 @@ that rung and finds nothing.
 | the state | the action | which rung claims it | and the other |
 |---|---|---|---|
 | a blocking question is open, focus held at the prompt | an ordinary letter | `question` **rejects** (§103) | today: `overlay`'s handler declines, then `modal-blocked` drops it silently — **W2** |
-| a blocking question is open | `⌃c` | `question` (the older rung is higher — §5's ruling A) | the cancel rungs; already ruled and already right |
+| a blocking question is open | `⌃c` | `question` **rejects** (§103, ruling 59) — explained once (C23 I82) | neither the question's answer nor the cancel rungs act. *This row said `question` answers it, by §5's ruling A, and called it already right; review batch 2 found it was the defect (§3b S1)* |
 | the prompt holds focus, a block is live | `↓` | `scope` | `prompt` and `liveBlock` are two rungs here and one in the design — **W3** |
 | an attached child is running | `esc` | the **child** (R-OWN-002: *an attached child explicitly handles control-C and escape*) | ~~today nothing: `esc` never reaches a child, because the child is not a target~~ — **W5, answered in M9**: M5 made `child` a target and I49 gives it a subject. `esc` reaches the child because the child's handler consumes what it does not bind, and the one key it does not take is `host.detach` |
 | native selection is frozen | page-scroll | native selection **rejects** (the owner-applicability table) | today the intercept table does not exist — **W4** |
@@ -510,6 +563,92 @@ would have left every one of these in place and read as the MR being done.
 
 ---
 
+## 3b. The ownership ladder walked again — review batch 2, M5
+
+**Walked against the landed text before any code, as a trace and a table**, because the
+review's ten items are both kinds of interaction: what `⌃c`, a stray key or a release does
+at an owner is event-mediated, and which rung a layer answers at is structural. Rulings
+59–63 (`docs/design/PARKED_QUESTIONS.md`) decided the nine questions it raised; the rows
+cite them.
+
+**Three of the review's premises were stale, and were corrected rather than acted on.**
+Item 3's symptom — a completion menu's footer reading `question · esc safe path` — is gone:
+the menu is a panel and its footer reads `find · ↑↓ hits · ⏎ open · esc close`, which is
+wrong for a completion in its own way, and the structural defect behind it (S13) is still
+there. Item 6's `chrome.ts` exemption was removed as dead in `aba41404`. And item 7's §3
+declaration was stale rather than deleted — it is kept above, marked.
+
+### The sequence trace — event-mediated
+
+*Guard spent* means I44's guard is not live.
+
+| # | Sequence | What the tree did | Ruling |
+|---|---|---|---|
+| S1 | A question is open, guard spent; `⌃c`, no verb | `intercept:interrupt:question:reject` ran the owning rung: the answer callback classified `⌃c` as `resolve` and settled with the default | **Consumed, no handler runs, the question stays open and unanswered**; `refused({ rung: "question", cause: "intercept" })` puts `▲ answer this first` on it (I62, C23 I82, ruling 59) |
+| S1b | A question has just arrived, guard live, no releases; `⌃c` twice | the first refused by the guard as an activation, the second as S1 | once `⌃c` is not `resolve` it is **neutral**, so it ends the guard and then meets the reject. The notice keys on the refusal and not on the guard, so batch 3's quiet window can replace the guard without touching it. *That intercepts neither refuse nor end the guard is batch 3's, flagged here and not built* |
+| S2 | As S1 with `inFlight: "local"` | the intercept ran before rung 1, so the question was answered and the verb not cancelled | **Neither**: the question stays open, the verb stays waiting, the refusal is explained (I7, I62) |
+| S3 | Semantic copy mode; `⌃c` | the rung called `exitSemanticSelection` | **Consumed, the mode stays**, and a one-shot warn chip on the owner line explains it (I51, ruling 60) |
+| S3b | Native selection; `⌃c` | the rung called `exitNativeSelection` | **Consumed, the mode stays.** The scheduler is suspended, so nothing can be drawn to explain it — **stated as the limit** (ruling 60) |
+| S3c | Native selection, a verb in flight; `⌃c` | the reject exited the selection and the verb ran on — §5b B2 said *`⌃c` cancels the verb and native selection stays*, so B2 was **broken at HEAD** with no row | **Neither**; `esc` leaves, then `⌃c` cancels. B2 is amended |
+| S4 | Semantic copy mode, a question arrives, guard spent; `⌃c` | the question's rung ran, and answered it | the question rejects it; copy mode stays, the notice is the question's |
+| S5 | Completion panel open; `esc` | `dismiss` closes it, and the footer read `find · ↑↓ hits · ⏎ open · esc close` | same dispatch; the owner line names **complete** and the chords the keymap binds to `menuNext`, `menuAccept` and `dismiss` (C22 I133) |
+| S6 | Completion open, no verb; `⌃c` | `substate:handle`, the ladder's `panel` handler pops it | unchanged; `handle` is the rung's own verb (I64) |
+| S6b | Completion open, a verb in flight; `⌃c` | rung 1 cancels, the menu stays | unchanged — *an ordinary running owner handles* (§103) |
+| S7 | Completion open; `⌥↑` | `substate:handle`, then `intercept:scroll:transcript` | the same outcome under the verdict's own name, `global-intercept` (I64) |
+| S8 | A choice question open; `q`, then `q` again | each consumed by the callback's default arm, stages `[arming, target:overlay]`, no frame change | the first rejects and adds the notice — one layer `update`, one `invalidate`; the second rejects and changes **nothing**, no update and no invalidate (C23 I82) |
+| S8b | A question open; a paste | callback declines, `modal-blocked`, `reject`, silent | the same refusal, now explained: `refused({ cause: "blocked" })` reaches the question and adds the notice if it is the first |
+| S8c | A question composing a reply; a letter | `compose`, forwarded to the prompt | **unchanged, and never a refusal** — composition is what the reply state is for |
+| S8d | A question suspended in an inspection; a letter | consumed silently | **silent** (ruling 60): its only key is `esc`, which leaves, and the inspection is the reader reading |
+| S9 | Guard live; `q`, then `y` | `q` neutral, ends the guard; `y` answers | `q` is also the first refusal and draws the notice. The notice keys on **classification**, not on the guard (S1b) |
+| S10 | A surface child attached and a question raised; `⌃c` | the `⌃c` branch saw the answer callback and answered the question; the child never saw `⌃c` | the branch goes (it is dead once S1 holds). *Whether a question may be raised over an attached child is owed to batch 3's M9 item 4* (ruling 62), whose symbol is `interceptOf`'s `host.detach` arm |
+| S11 | A shell delegation; `F1` | target `child`, no child handler, `pass`, then `global` submitted `/help keys` | **consumed at the `child` rung** (I49, ruling 62). Forwarding the bytes to the child's stdin is a C21/C23 mechanism that does not exist — a finding, not built |
+| S12 | Releases reported. `y` answers Q1, the verb chains Q2, then `y`'s release | `held` emptied, the guard cleared, and the release path ran `activeTarget`'s handlers: the answer callback, whose `classify` ignores `event`, settled Q2 with `y` | **A release reaches `child` and nothing else** (I65). T1.99d/e could not see it: their callback accepted every key and asserted nothing about answering |
+| S13 | A blocking overlay with no answer callback; `⌃c` | the footer, the guard and the epoch said `question`; the intercept said `scope` and cancelled a verb beneath it | **one derivation** (I63). The only such layer, `history-clear-confirm`, is retired (ruling 61) |
+| S14 | A handler returns `"global-intercept"` | `runRung` read it as not-`pass`, dispatch consumed it with no stage and nothing acting | **unrepresentable** — a compile error (I64) |
+
+### The classification table — structural, at rest
+
+Every layer that can be on the stack, against the two derivations the tree had.
+
+| Layer | Producer | kind · blocking · dismissal | Answer callback | Rung — footer, guard, epoch | Rung — intercept | Declared owner, and its line |
+|---|---|---|---|---|---|---|
+| `confirm`, choice | `confirm.ts` `ask` | overlay · true · answer | yes | question | question | `question` → `question · ←→ move · ⏎ answer · esc → no`, from the question's own vocabulary (C22 I133, fixture 061) |
+| `confirm`, reply | the same layer after `toReply` | same | yes | question | question | `question` → `question · ⏎ answer · esc → no` |
+| `confirm`, inspection | the same layer after `suspend` | same | yes — `esc` only | question | question | `question` → `question · esc back`; the old line's *esc safe path* was false here, because `esc` goes back |
+| `history-clear-confirm` | `history/layers.ts`; pushed only by a test | overlay · true · answer | **no** | question | **scope** | **retired** (ruling 61) |
+| `completion-menu` | `menu.ts` | panel · false · escape | no | substate | substate | `substate`, `complete` |
+| reverse search | `history/layers.ts` | panel · false · escape | no | substate | substate | `substate`, `find` |
+| `chip-preview` | `construct.ts` | panel · false · escape | no | substate — and the prompt answers first, through an **id switch** in `promptUnderMenu` | substate | `substate`, `preview` (ruling 61), which is what `promptUnderMenu` reads |
+| `peek-panel` | `construct.ts` | peek · false · focus | — | never `top` (C15 I21) | — | none |
+| a harness overlay, `blocking: false, dismissal: "escape"` | `router-dispatch.test.ts`, `confirm.test.ts` T4.7 | overlay · false · escape | no | question | scope | undeclared, so `question` everywhere; the router rows that meant a menu are migrated to `panel` |
+
+**And the table's last two columns are why `idle` is unreachable.** `activeTarget` has not
+answered `global` since W1, so `rung` is never `null`: the intercept table's `idle` column
+and `ownerLine(null)` are read by nothing a session can construct, and
+`escapeSemanticSelection` was a `RouterDeps` member the router never read.
+
+### What the walk found
+
+- **A reject performed what it refused** (S1, S3, S3b, S3c, S4) — the review's item 1, and
+  the specified behaviour: §3, §3a, §5, §5b B1/B2, §5d D5, I25, I51 and the paragraph under
+  I51 all said `⌃c` answers a question and leaves copy mode. The design says both reject
+  (§103), so the spec is amended first (ruling 59). **The cost, stated:** in copy mode `⌃c`
+  no longer cancels a running verb; the reader presses `esc` first.
+- **A refusal explained nothing** (S8, S8b) — R-HON-004 and R-INT-008, both `unmet`.
+- **Two derivations of one rung** (S13) — item 3.
+- **A verdict with no producer and one meaning too many** (S7, S14) — item 4.
+- **A release answered a question** (S12), **a child that consumed nothing** (S11), and
+  **a question under a child that nothing could answer** (S10) — item 8's three.
+- **B2 was broken before this was written** (S3c): the row said *correct and kept*, and the
+  tree had stopped doing it when the intercept table arrived.
+
+**Every one lives in a cell where two correct statements meet** — *the table rejects* and
+*the owner decides*; *the guard ends on a neutral key* and *a refusal explains*; *a child
+takes every key* and *an unbound key falls to `global`*. Nine of the review's ten items;
+the tenth is a changelog.
+
+---
+
 ## 4. Dispatch
 
 Handlers register against a target and return a **verdict** (W6).
@@ -539,13 +678,30 @@ thing to keep in step — and it is exposed because the footer’s owner line mu
 (R-KEY-004, C22 §6l.4 E).
 
 ```
-0  the exit-arming machine observes    → always, before anything (§7)
-1  in-flight verb + Ctrl-C            → cancel, consume         (§5)
-2  handlers for activeTarget()        → first consumer wins
-3  handlers for "global"              → shortcuts, unless the top layer
-                                        must be answered OR covers the region
-4  otherwise                          → dropped
+0  a focus report                        → never routed (I61)
+1  owner sync; held keys, repeat policy  (I43, I53)
+2  the exit-arming machine observes      → may raise the confirm (§7)
+3  a newly presented question's guard    → reject; the armed mark explains it (I44)
+4  the reserved routes, verdict at the rung (I39, I64):
+     reject           → consume; refused(rung) — no rung runs (I62)
+     global-intercept → the intercept's declared exception; the ladder is not consulted
+     handle           → continue: the rung's own verb (interrupt only)
+5  a mouse event                         → §4's mouse table
+6  a key release                         → `child` only, else dropped (I65)
+7  Ctrl-C, rungs 1–2: in flight → cancel; a shell child → SIGINT (§5)
+8  handlers for activeTarget()           → the first that does not pass;
+                                           at `child`, consumed whatever they answer (I49)
+9  the top layer is blocking             → reject; refused(rung, "blocked") (I8, I62)
+10 handlers for "global"                 → shortcuts
+11 otherwise                             → dropped
 ```
+
+**Brought up to the tree in review batch 2 (M5 item 7).** The algorithm above is
+`dispatch` and `dispatchInner` at the commit that landed it. The five-step form it replaces
+had no guard, no intercept step, no child and no release path, and still read *covers the
+region* — a clause M8 retired (I8). The paragraphs below describe that form and are kept
+for the defects they record; **the subsection *The second condition* is superseded** by
+C15 I26's `blocking`, and the coverage test it argued for is gone.
 
 **Step 3 is skipped when the top layer must be answered or covers the region, and this is a rule rather than six special cases.** A layer that must be answered is modal, and a global shortcut firing beneath one acts on a surface the user cannot see — the same defect as a missing rung, one layer up.
 
@@ -724,18 +880,20 @@ Ctrl-C means "stop the most immediate thing", and what that is depends on contex
 
 | Context | Behaviour |
 |---|---|
-| **A verb is in flight** | Cancel it (C06's escalation ladder). **Takes precedence over everything.** *In flight* is `C23.inFlight`, not `C06.busy` — see below |
+| **A question is on top** | **Refused** — consumed, nothing runs, the question stays open and unanswered, and it says so (I62, C23 I82). Read before rung 1 |
+| **Either copy mode** | **Refused** — the mode stays; `esc` leaves (I51). Read before rung 1 |
+| **A verb is in flight** | Cancel it (C06's escalation ladder). **Takes precedence over every rung below the two above.** *In flight* is `C23.inFlight`, not `C06.busy` — see below |
 | A piped shell child is running | Forward `SIGINT` to the child |
-| A dismissable overlay is on top | Dismiss it |
-| A non-dismissable overlay is on top | No-op — a confirm is not cancellable by Ctrl-C |
-| Native selection | Exit native selection |
-| A pushed view | Pop it |
+| A panel is on top | Pop it |
+| Interaction on a block | Leave to `navigate`, on the same row (C26 I14) |
 | Focus in the live block | Return focus to the prompt, keeping the input; a second Ctrl-C then takes the prompt rungs |
 | **A live subscription is running** | Cancel the **newest**; a second Ctrl-C cancels the next-newest |
 | Prompt with text | Clear the input |
 | Prompt empty | Arm the exit confirm; a second within 500 ms raises it |
 
-> **This table documents derived behaviour. It is not a specification, and it is not implemented as a list.** Rungs 3 to 7 are handlers registered on `overlay`, `nativeSelection`, `pushedView` and `liveBlock`, so the order below **is** `activeTarget`'s order (§3) and the two cannot disagree. Rungs 1 and 2 are the exceptions and stay pre-dispatch, because a verb in flight and a shell child are not focus targets and so have no target to register on.
+> **This table documents derived behaviour. It is not a specification, and it is not implemented as a list.** The two refusals are the intercept table's `reject`, read before everything below them (§3, I62). The pop, the interaction exit and the live-block rung are handlers registered on `panel`, `interaction` and `liveBlock`, and the prompt's rungs on `prompt`, so their order **is** `activeTarget`'s order (§3) and the two cannot disagree. Rungs 1 and 2 stay pre-dispatch, because a verb in flight and a shell child are not focus targets and so have no target to register on.
+>
+> **Amended in review batch 2 (M5 item 1, ruling 59).** This table said a non-dismissable overlay was a no-op and native selection was exited, and the tree had since made the first *answer the question* and kept the second. §103 says *QUESTION and COPY MODE reject* the interrupt, so both rows became one refusal each, ahead of rung 1 — and the paragraphs below about the confirm's no-op, the pushed view and native selection's exit describe the ladder before that, kept for the defects they found.
 >
 > Said this loudly because the alternative already happened. The order defect corrected below existed *only* because the ladder was written as an independent table, and a second priority list beside the first will drift from it again — through the same door, on the next edit that touches one and not the other. If this table ever disagrees with §3, §3 is right and this is stale.
 >
@@ -803,10 +961,10 @@ constructible case.
 |---|---|---|---|
 | 1 | In-flight verb | `C23.inFlight` is `app` or `local`, any focus target | T1.11 |
 | 2 | Piped shell child | `C23.inFlight` is `shell` | T3.11 |
-| 3 | Dismissable overlay | completion menu or reverse search on top | T1.1x |
-| 4 | Non-dismissable overlay | a confirm on top — **over anything**, including either copy mode and a panel | T1.12, T1.12b |
-| 5 | Native selection | `nativeSelection` true, no layer on the stack | T4.3 |
-| 5b | Semantic copy mode | `semanticSelection` true, no layer on the stack | T1.41 |
+| 3 | *(retired — a dismissable overlay is a panel since M8, row 6)* | — | — |
+| 4 | A question — **refused**, ahead of rungs 1 and 2 | a confirm on top — **over anything**, including either copy mode and a panel | T1.12, T1.12b, T1.164, T4.81 |
+| 5 | Native selection — **refused**, ahead of rungs 1 and 2 | `nativeSelection` true, no layer on the stack | T1.164 |
+| 5b | Semantic copy mode — **refused**, ahead of rungs 1 and 2 | `semanticSelection` true, no layer on the stack | T1.164 |
 | 6 | Panel | a panel on the stack, no overlay above it | T5.3 |
 | 7 | Interaction on a block | `StoredFocus.at === "liveBlock"`, `mode === "interact"`, a live entry, no layer, neither copy mode | T2.6b |
 | 8 | Focus in the live block | as above with `mode === "navigate"` | T1.14 |
@@ -903,8 +1061,8 @@ types and one clipboard** survives the mode the count was originally wrong about
 
 | # | Sequence | What happens now | Ruling |
 |---|---|---|---|
-| B1 | Enter native selection, press `⌃c` | **Ships — measured 2026-09-05, and this row said otherwise for some time after it stopped being true.** `activeTarget` answers `nativeSelection`; the rung calls `deps.exitNativeSelection()`, which is `#setNativeSelection(false)` (`session.ts:930-950`): mouse tracking comes back **first** (`1002h 1006h`), then `resume()` writes the catching-up frame. Entry is `chordOf("selection.native")` — `⌥⇧C` — at `prompt` and `liveBlock` (`keymap.ts:368`); it was `⌥v` when this row was written and M6 read it from the registry instead. The `() => undefined` this row used to cite survives only in test harnesses' `FrameQueries` | **The producer and the exit are one piece of state or neither ships** — and they do: C22 T4.30/T4.31 assert the pair, T4.31b the order inside the exit. The stub was recorded here for the length of C26 *after* it was gone, which is F86/F89/F92's class — the record lagging the tree — and it let a survey read a working mode as a defect |
-| B2 | Enter native selection while a verb is in flight | rungs 1–2 dominate: `⌃c` cancels the verb and native selection stays | **Correct and kept.** Cancelling the work outranks leaving a viewing mode; the reader presses `⌃c` twice, which is the ladder's shape |
+| B1 | Enter native selection, press `⌃c` | **Ships — measured 2026-09-05, and this row said otherwise for some time after it stopped being true.** `activeTarget` answers `nativeSelection`; the rung calls `deps.exitNativeSelection()`, which is `#setNativeSelection(false)` (`session.ts:930-950`): mouse tracking comes back **first** (`1002h 1006h`), then `resume()` writes the catching-up frame. Entry is `chordOf("selection.native")` — `⌥⇧C` — at `prompt` and `liveBlock` (`keymap.ts:368`); it was `⌥v` when this row was written and M6 read it from the registry instead. The `() => undefined` this row used to cite survives only in test harnesses' `FrameQueries` | **The producer and the exit are one piece of state or neither ships** — and they do: C22 T4.30/T4.31 assert the pair, T4.31b the order inside the exit. The stub was recorded here for the length of C26 *after* it was gone, which is F86/F89/F92's class — the record lagging the tree — and it let a survey read a working mode as a defect. **Amended in review batch 2 (ruling 59): `⌃c` is refused and `esc` exits (§5c).** The exit this row measured is `esc`'s now; `⌃c` at native selection is consumed and does nothing, and the suspended scheduler means nothing can say so — the stated limit (ruling 60) |
+| B2 | Enter native selection while a verb is in flight | ~~rungs 1–2 dominate: `⌃c` cancels the verb and native selection stays~~ — **broken at HEAD before this was amended**: the intercept rejected `⌃c` and ran the rung, so the selection was left and the verb ran on (§3b S3c) | **Amended (ruling 59).** §103: COPY MODE rejects the interrupt, so neither happens — the reader leaves with `esc` and then cancels. *The ruling this replaced, kept*: cancelling the work outranks leaving a viewing mode. The design ranks the frozen screen higher, and the cost is one more key |
 | B3 | A confirm is raised while in native selection | rung 4 dominates native selection (T1.12b) — the confirm takes the key | **Correct and kept**, and it is the interaction the original ladder pass got wrong in the other direction |
 | B4 | Output arrives while in native selection | **Measured 2026-09-05.** C13 appends and C14 follows as it always does — the far side is **not** frozen — but `#setNativeSelection(true)` has suspended the scheduler (`session.ts:940`, C03 I13), so no frame is written: the screen holds the frame the reader is selecting from, and the catching-up frame arrives on exit (C22 T4.32, T4.32b). A resize is the one thing that paints through the hold — a contaminated write is never held (C03 I13) — and that is right, because the terminal has already destroyed the selection | **The mode suspends the *screen* and says so (`COPY` in the header — `NATIVE` since C14 I55); it does not suspend the far side.** The selection cannot come to mean other text because the text under it does not move, and what the reader missed is drawn the moment they leave. The open question this row carried has an owner — C22's `#setNativeSelection` — and C03 §4a is the mechanism |
 | B5 | `y` on a focused element, then `⌃y` at the prompt | `⌃y` yanks the kill buffer (C17 §5) — which `y` did not write | **One clipboard.** See C17 §5a |
@@ -982,7 +1140,7 @@ is only what the router owes it.
 | D2 | In the mode with no selection, press `esc` | as D1, with the state absent | **Leaves the mode**, which is `nativeSelection`'s single-press behaviour arriving as the second half of this one. The two targets differ in exactly this cell, which is why they are two targets at one rung |
 | D3 | `⌥⇧C` while in semantic copy mode | the entry rows' targets meet the mode being its own target | **Dropped.** `activeTarget` answers `semanticSelection`, so neither entry row resolves and `global` has no such row — the same two-guard shape as §5c C5, and for the same reason |
 | D4 | A confirm is raised while in the mode | rung 4 dominates the `copy` rung (T1.12b) | **The confirm takes the key**, exactly as B3 rules for the handoff. One rung, one answer: this is the cell that would have needed its own argument if the modes were two rungs |
-| D5 | `⌃c` in the mode | the ladder's cancel meets the mode's own exit | **Leaves the mode**, as rung 5 does for the handoff. The ladder's shape is *undo the innermost thing*, and `esc`'s two presses are the target's own way out — I24 defends the pair, and `⌃c` does **not** inherit D1's clear-first step, because a cancel that sometimes did something else first is the ladder rung answering two questions |
+| D5 | `⌃c` in the mode | the ladder's cancel meets the mode's own exit | **Refused** (§103: *COPY MODE rejects* the interrupt; ruling 59). `esc`'s two presses are the way out, and a one-shot warn chip on the owner line says so (ruling 60). *It read **leaves the mode**, as rung 5 did for the handoff, until review batch 2* |
 | D6 | Output arrives while in the mode | `R-SEL-010`'s buffering meets C13's append | **The far side is not frozen and the transcript is.** C13 appends as it always does; what is held is which rows C14 shows, and the footer says content is waiting. This is the mechanism the handoff does *not* share — §6's freeze is C03's scheduler suspension, which cannot draw the three things `R-SEL-009` requires to keep moving |
 
 ### What it found
@@ -994,6 +1152,11 @@ consistency and is the defect: the ladder's rung answers *cancel the innermost
 thing*, and a rung that first cleared a selection would be answering *and also tidy
 up*, which is the second-mechanism shape I23 objects to. So the two exits are not
 symmetrical, and the asymmetry is the ruling rather than an oversight.
+
+**Amended in review batch 2 — the asymmetry argument survives, pointed at `esc` alone**
+(ruling 59). §103 makes COPY MODE reject the interrupt, so `⌃c` is not an exit here at
+all; `esc` is the one way out, and *a selection is state within the rung* is still why its
+first press clears rather than leaves.
 
 **D6 is where the two modes stop being one mechanism with two names.** Both freeze,
 and they freeze different things: §6 suspends the scheduler, which is total and
@@ -1567,7 +1730,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I4** — Exactly one handler consumes an event; there is no bubbling past the first consumer.
 - **I5** — Unconsumed events are dropped, never inserted into a lower target.
 - **I6** — A paste emits one `paste` event regardless of length on the bracketed path. On the heuristic path it emits one event per window: **the guarantee is bounded work, not a single event.** The purpose survives the qualification — I6 exists because ten thousand characters as ten thousand key events would each trigger a completion recompute and a frame commit, a hang rather than a slowdown, and one event per 30 ms window makes T3.1's 100,000 characters roughly twenty-five. It is the literal wording that does not hold. A window that extended while bytes kept arriving would restore the single event and could not terminate, which is the same close-condition problem the fixed window was forced to solve (§7).
-- **I7** — Cancellation of an in-flight verb outranks every other Ctrl-C meaning.
+- **I7** — Cancellation of an in-flight verb outranks every other Ctrl-C meaning **of the rungs that handle the interrupt**. *Amended in review batch 2 (ruling 59, I62)*: at a question and in either copy mode the intercept table rejects `⌃c` before rung 1 is read, so a waiting verb is neither answered for nor cancelled.
 - **I8** — **While the top layer must be answered *or* covers the region, no event acts on anything beneath it.** It is never dismissed, no lower focus target is reached, and the `global` fallback does not run (§4 step 3). The invariant was originally about Ctrl-C alone, and Ctrl-C was only the first key traced past a confirm — forbidding the dismissal left every lower rung and every global shortcut reachable, so an unanswered confirm sat over a screen that had changed theme, scrolled, or entered copy mode. Not dismissing the confirm is small comfort when the thing under it moved. **The second clause is the same widening a second time, found the same way.** `dismissable` is modality, and a pushed view is dismissable — so a view, which fills the region by construction (C15 §4), let every global shortcut through to a transcript nobody could see. Coverage is asked of the layer's box rather than of its kind, because kind is a proxy for it and a proxy stops being true the moment a second full-region layer exists. **Amended — the three reserved routes are carved out** (I40, §103, R-OWN-001). *No event acts on anything beneath it* was written about events a rung could claim, and `page-scroll` and the wheel are events no rung may claim. Holding them under a question produced the defect the invariant exists to prevent, one layer up: a reader asked to approve a patch could not scroll to read it, so the layer blocked comprehension of its own question. I8 keeps every binding it ever held — the theme switch, the global shortcut, the focus move — and gives up exactly the two routes that move a viewport without changing state or answering anything. Scrolling the transcript under an unanswered confirm is not *the thing under it moved*: it is the reader looking at it. **Amended again in M8 — the predicate is `blocking`, and `coversRegion` is gone** (C15 I26, R-QST-001). The second clause above measured a box because the flag it had could not say *owns input*, and the remedy was right about the hazard and wrong about where the answer lives: *a question declares blocking and owner explicitly*, so a layer that owns input says so and one that does not is not made modal by being large. The coverage test was a proxy for a field that did not exist yet, and it fails in both directions once the field does — a full-region layer that blocks nothing would still be modal, and a one-row typed reply that blocks would not be. **Amended for the typed reply — the editor a composing question borrowed is not beneath it** (§052, §101, C23 I73, → I54, C17 I29). §052: *the question floats and borrows the editor implementation while the ordinary draft is held*, and *the question gets its OWN buffer*. So the line under a floating reply is the question's own composition, not the reader's held prompt, and the keys that edit it are the question's keys — which is also why §103's *it never passes keys into the held prompt* is kept rather than bent: the held draft is out of reach for the whole borrow (C17 I29). What a composing question reaches below itself is the `prompt` rung's editing bindings and nothing else — no transcript target, no live block, no `global` — and I54 is where that edge is drawn.
 - **I9** — C16 reads no ambient clock; timing is injected.
 - **I10** — The keymap is data; duplicate `(target, key)` bindings fail at construction.
@@ -1593,7 +1756,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
   **The illustration retired and the rule did not** (R-EXA-082, F1254). `pushedView` was in the union and in `focus.ts` from the start with no row anywhere in `defaultKeymap`, so every key at that target fell through step 3 — and this invariant called that *vacuous only for as long as nothing pushed a view*, which was true and was the wrong thing to watch. Three surfaces then pushed one and the target gained eleven rows; the design deletes all three and the target with them. **The two vacancies are different and the rule is about the first**: a name with no vocabulary is A03 §2's class and is a defect the day it is written, where a vocabulary with no subject is honest until someone reaches for the name. `pushedView` was the second for years and the first for a moment, and the interval between them is what demonstrated M5's *targets are not rungs*.
 
   **`nativeSelection` was the one exemption, and §5c withdraws it** (ruled 2026-09-05): its `escape` row is the target's own dismissal, and `⌃c` stays the ladder's. The exemption's reason — *a binding there would be the second mechanism I23 objects to* — was true of a `global` row and was attached to a `nativeSelection` one, which resolves at the same moment the rung does and has no order of its own.
-- **I25** — **A layer that must be answered gets its keys before the ladder does.** When the top layer carries an answer callback, rung 4 offers it every key — accelerators, `Enter`, `Esc` and `⌃c` — and consumes what it takes, **before both of the rung's existing clauses** — and it is two clauses rather than one, which the mutation pass had to establish because the first wording said "before the `⌃c` clause" and a reordering satisfied it. They fail differently: the `isCtrlC` bail-out returns false for every key that is not `⌃c`, so an accelerator, `Enter`, `Esc` and an arrow are **dropped**; the `!top.dismissable` clause returns *consumed, and nothing happens* (I8), so `⌃c` **hangs** — the key vanishes and the handler awaiting it waits forever. One ordering, two defects, and a wording naming only the second reads as satisfied while the first is live. **The rung was written when no layer could be answered, so "nothing happens" was the whole truth; a question makes it a hang.** `Esc` and `⌃c` are routed rather than special-cased here, because what they mean is the question's business — C23 I36 resolves both with the default choice — and a router that knew that would hold half of a rule whose other half lives two layers away. The callback is read from the top layer only, never searched down the stack, for C15 `pop()`'s reason: a question raised over a completion menu must not be answered by the menu. `overlayTop` is C15's `top`, which is never a peek (C15 I21, 2026-09-05): a peek is a layer kind the ladder does not see, so a tooltip changes no rung.
+- **I25** — **A layer that must be answered gets its keys before the ladder does.** When the top layer carries an answer callback, rung 4 offers it every key that reaches the ladder — accelerators, `Enter`, `Esc`; **`⌃c` never does**, because the intercept table rejects it at `question` first (I62, ruling 59) — and consumes what it takes, **before both of the rung's existing clauses** — and it is two clauses rather than one, which the mutation pass had to establish because the first wording said "before the `⌃c` clause" and a reordering satisfied it. They fail differently: the `isCtrlC` bail-out returns false for every key that is not `⌃c`, so an accelerator, `Enter`, `Esc` and an arrow are **dropped**; the `!top.dismissable` clause returns *consumed, and nothing happens* (I8), so `⌃c` **hangs** — the key vanishes and the handler awaiting it waits forever. One ordering, two defects, and a wording naming only the second reads as satisfied while the first is live. **The rung was written when no layer could be answered, so "nothing happens" was the whole truth; a question makes it a hang.** `Esc` is routed rather than special-cased here, because what it means is the question's business — C23 I36 resolves it with the default choice — and a router that knew that would hold half of a rule whose other half lives two layers away. **The callback answers a `Verdict`** as any handler may (I64): `reject` is a refusal it has already explained (C23 I82), and the router reports it no second time (I62). The callback is read from the top layer only, never searched down the stack, for C15 `pop()`'s reason: a question raised over a completion menu must not be answered by the menu. `overlayTop` is C15's `top`, which is never a peek (C15 I21, 2026-09-05): a peek is a layer kind the ladder does not see, so a tooltip changes no rung.
 - **I26** — **`enter` is bound on `liveBlock`, and `rowActivate` is in `KeyAction`.** I22 gave the target entry and exit and three bindings — `escape`, `down`, `up` — which is a cursor with nothing to press. The effect is C23's (C23 I37); what C16 owns is that the key resolves from the table like every other, so `/help` renders it and a consumer can rebind it. **The union's gap was the whole of F21 from this side**: an action with no `KeyAction` cannot be bound, and a binding that does not exist reads exactly like one that is unused. It is the same key `overlay` accepts a menu item with, which is the consistency a reader has already learnt before reaching a row.
 
 - **I27** — **A block key that collides with a `global` or `liveBlock` built-in is merged at `interaction`; a free key is merged at `liveBlock` **and at `interaction`**; the same key twice in one block keymap is a construction error.** The throw this replaces was correct about the hazard — a silent shadow — and wrong about the remedy, because its first consumer needs exactly the keys it refused: widgets bind the arrows, paging and `Esc` (§6). Placement at `interaction` is the mode's purpose made mechanical (C26 §4f): the built-ins are out of scope there by `FOCUS_ORDER`, so nothing is shadowed and `/help` lists both halves at their targets. Withdrawal on freeze takes both. **Amended by C26 I27 (§102, `R-INT-005`): `interaction` is no longer empty of framework rows.** The inside's four arrows and the rest of the camera family live there, because §102 rules that *KEYBOARD CONTROLS APPEAR ONLY INSIDE* and there is no target below it that satisfies the sentence. So the placement rule gains its one exception, and it is narrow: a block key that collides below **and** is one of the inside's own has nowhere left to be placed, and that is the same construction error as the same key twice in one keymap. **The test is the table's, not the block's declaration**, which is both narrower and the only form available — `mergeBlock` is handed a keymap and not a block. A block with no inside could never fire the key it placed at `interaction` anyway, because there is no way in, so the loud refusal is what it was owed either way.
@@ -1633,7 +1796,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 
 - **I49** — **The captured child is a rung with a subject, and its host escape is reserved, visible and refusable** (§5, §103, R-BLK-711, R-BLK-838, R-BLK-908, R-BLK-312, R-INT-007). `attachedChild` has **two** sources and they are one fact: a shell delegation in flight (`inFlight() === "shell"`), and an application's child attached over its own block. *An attached PTY transfers ownership without becoming a substate; only `host.detach` returns ownership* — so the rung is not entered by focus moving and is not left by `esc`.
 - **I50** — **Semantic copy mode is a second target at the `copy` rung, and the rung is not two** (§5d, `R-SEL-005`, `R-SEL-009`). `RUNG_OF` maps `nativeSelection` and `semanticSelection` to `copy`, so every rule written over the ladder — a confirm dominating, an intercept's verdict, the footer's owner line — answers once for both. They are separate **targets** because their `escape` rows disagree and for no other reason: two targets at one rung is what M5 bought when it separated the two, and this is its second instance after `panel` beside the retired `pushedView`.
-- **I51** — **`esc` clears then leaves; `⌃c` only leaves** (§5d D1, D2, D5, `R-SEL-005`). The first `esc` in semantic copy mode drops a selection if there is one and consumes the key, and the footer says the next press leaves; with no selection the first press leaves. `⌃c` never clears first. The asymmetry is the ruling: `esc` is the target's own way out and a selection is state within the rung, while the ladder's rung answers *cancel the innermost thing* and a rung that also tidied up would be answering two questions — which is the second-mechanism shape I23 objects to.
+- **I51** — **`esc` clears then leaves; `⌃c` is refused** (§5d D1, D2, D5, `R-SEL-005`, §103, ruling 59). The first `esc` in semantic copy mode drops a selection if there is one and consumes the key, and the footer says the next press leaves; with no selection the first press leaves. `⌃c` is the intercept table's `reject` (I62): consumed, the mode stays, and a one-shot warn chip on the owner line explains it (ruling 60). *It read `⌃c` only leaves, never clearing first* — the asymmetry argument is kept for `esc`: a selection is state within the rung, and its first press clears rather than leaves.
 
   **The child takes every key but one.** `esc` and `⌃c` are the child's (R-INT-007; R-BLK-842's interrupt row, *CHILD handles*), which is the whole of W5 and is why an unbound key may not fall through to a lower rung: a key that reached the prompt while a PTY held the terminal is the host typing into a line the reader cannot see. The handler therefore **consumes what it does not bind**, which is the one place in this component where declining is not passing.
 
@@ -1641,7 +1804,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 
   **What this retires**: an application-owned surface was a `kind: "view"` layer filling the region and answering at `pushedView` — *a pushed view takes the screen, you do something, you come back, and the transcript has a HOLE where that work was.* The child owns the keyboard and owns nothing else; the transcript stays, and the entries that settle while it is attached are there when it detaches (R-BLK-314).
 
-**And a question outranks rungs 1 and 2, which is the one place newest-first is not enough on its own.** A local verb awaiting `ctx.ask` is `inFlight` for the whole time its question is on screen, so `⌃c` was taken by the cancel rung and the question never saw it — two rungs with a claim, and the older one higher. Ruling A's own argument decides it: `Esc` and `⌃c` collapse *because* declining and cancelling produce the same outcome, and when two paths produce the same outcome the one that leaves a record is the one to keep. Cancellation discards the entry; declining settles one saying nothing changed. **Found by a frame-read and reachable by nothing else** — the container was untouched and the layer was gone, which is everything a test asserts, and the frame showed that the submitted line had disappeared. The suite agreed throughout, because every harness reported `inFlight: null` and that is the one arrangement where both readings agree.
+**And a question outranks rungs 1 and 2, which is the one place newest-first is not enough on its own.** A local verb awaiting `ctx.ask` is `inFlight` for the whole time its question is on screen, so `⌃c` was taken by the cancel rung and the question never saw it — two rungs with a claim, and the older one higher. **The conclusion stands and the mechanism is amended** (review batch 2, ruling 59, I62): the waiting verb is still not cancelled, but `⌃c` does not decline the question either — it is refused, so the question stays open, the verb stays waiting, and the question says `answer this first` (C23 I82). Ruling A's argument — `Esc` and `⌃c` collapse *because* declining and cancelling produce the same outcome, and the one that leaves a record wins — no longer applies to `⌃c`, which now produces neither; it is kept for `Esc`, which still declines. **Found by a frame-read and reachable by nothing else** — the container was untouched and the layer was gone, which is everything a test asserts, and the frame showed that the submitted line had disappeared. The suite agreed throughout, because every harness reported `inFlight: null` and that is the one arrangement where both readings agree.
 
 ---
 
@@ -1670,6 +1833,11 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
   **This does not contradict §4a W9's refusal of a clock**, and the two are worth reading together because they look alike. That refusal is about the ambiguous-activation boundary, where *a held key is precisely the thing that produces no event for a timer to be right about* — a timer waiting for silence. Here the premise is inverted: under the protocol a held key is the thing that produces events, and the clock is used to weigh a stream that already exists rather than to guess at one that does not.
 
   Text entry and destructive actions do not inherit navigation's repeat: a binding with no declaration of its own repeats at the terminal's rate and is worth one step, never four or sixteen.
+
+- **I62** — *(§3, §4, §103, R-OWN-001, R-HON-004, R-INT-009, ruling 59)* **A reject consumes and explains; it never performs.** On an intercept's `reject`, or at a blocking top no rung took, **no handler runs for the event**: the router pushes `reject` and calls `refused({ rung, cause, intercept? })` exactly once — `cause` is `intercept` or `blocked`. A handler that answers `reject` has decided and explained for itself and is not reported again. **The guard's refusal does not call `refused`** — I44's armed mark is its explanation — which keeps the notice keyed on what an owner classified rather than on the guard, so batch 3's quiet window can replace the one without the other (§3b S1b, S9). L4 routes `refused` by rung: `question` to the question (C23 I82), `copy` to semantic copy mode's one-shot chip (C22 I133); native selection has nothing it can draw, and that is the stated limit. → T1.164, T1.165, T4.81
+- **I63** — *(§3, R-QST-001, C15 I29)* **The rung is the top layer's declared owner, and there is one derivation.** `rungOfLayer(top)` answers `owner.rung` where the layer declares one, and the kind's own rung where it does not — an undeclared overlay is a `question` and an undeclared panel an unnamed `substate` (C15 I29). Every producer in `src/` declares. `activeTarget` (`question` → `overlay`, `substate` → `panel`), `rung`, the guard, the epoch, the intercept table, the mouse table and the footer read it and nothing else; `interceptRung` is deleted. → T1.167
+- **I64** — *(§3, §4, R-OWN-001, M5 item 4)* **Two verdict vocabularies, and neither holds the other's word.** An intercept declares `handle`, `reject` or `global-intercept` at each rung (`InterceptVerdict`); a handler answers `handle`, `reject` or `pass` (`Verdict`). `global-intercept` takes the intercept's declared `exception` — `page-scroll` the transcript's pager at `global`, the wheel `routeMouse` — and the ladder is not consulted; `handle` continues to the rung, which answers the route with its own verb, and only `interrupt` declares it. A handler returning `"global-intercept"` is a compile error. → T1.166, T1.168
+- **I65** — *(§4, R-OWN-002, M5 item 8)* **A key release reaches `child` and nothing else.** Native release events exist for an application surface; every other rung is edge-triggered, so a release anywhere else is dropped with the stage `release-dropped` and no handler runs. An answer callback that ignores `event` was a release answering the next question (§3b S12). → T1.169
 
 ## 9. Commitments
 
@@ -1768,8 +1936,8 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.8** (I5): an event no handler consumes → dropped; no lower target sees it.
 - **T1.9**: Ctrl-C at an empty prompt → armed, no confirm yet.
 - **T1.10**: a second Ctrl-C within 500 ms → confirm raised.
-- **T1.11** (I7): Ctrl-C with a verb in flight → cancel is invoked and no other handler runs.
-- **T1.12** (I8): Ctrl-C with a non-dismissable overlay on top → no-op.
+- **T1.11** (I7): Ctrl-C with a verb in flight → cancel is invoked and no other handler runs. *Amended in review batch 2*: the layer on top is a **panel**, whose rung handles the interrupt; under a question the cancel is refused, which is T4.81b.
+- **T1.12** (I8, I62): Ctrl-C with a question on top → consumed, no handler runs, and it is refused once with `cause: "intercept"`.
 - **T1.12b** (I8): Ctrl-C with a confirm raised over native selection → no-op, and native selection is **still active**. The pair, not the first of it: moving only the dismissable rung above native selection passes T1.12 and fails this.
 - **T1.12c** (I8): a key bound on `global` — a theme switch — pressed while a non-dismissable layer is on top → the global handler is **not** called. With a *dismissable* layer on top the same key does reach it, which is what makes this a test of `dismissable` rather than of "an overlay exists".
 - **T1.13**: Ctrl-D at an empty prompt arms the same confirm; with text present it is a no-op.
@@ -1796,6 +1964,14 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.106b** (I49, R-BLK-908): `⌃]` is the one key the child does not get — the handler never sees it and the attachment ends; under the enhanced profile `⌥esc` does the same, and under the base profile it does not, because `ESC ESC` is the lone-`Esc` window rather than a chord. Asserted from the child's side, on what it was handed, because a detach that also delivered the key is a child that acts on the way out.
 - **T1.107** (I49, R-BLK-908): an attach whose reserved host escape resolves to nothing reachable is **refused**, and the refusal names the chord; the control is the reachable one, which attaches. *May never leave capture without a visible, reachable host escape* is a precondition or it is a hope, and the difference is only visible in the refusing arm.
 - **T1.108** (I55, §063, §019, `R-REF-002`): over `defaultKeymap`, both profiles — no row's chord is `⌘←`, `⌘→`, `⌘C`, `⌃↑`, `⌥⇥`, `⇧⌥⇥` or `⌃C`, and every `⌥←`/`⌥→` row is `wordLeft`/`wordRight`. The control is a fabricated table with one row on `⌘←`, which the same predicate rejects — a check over a table that happens to comply passes exactly like a check that reads nothing.
+- **T1.164** (I62, §103, ruling 59): `⌃c` at a `question` whose answer callback **would** resolve and records every event it is offered, at `semanticSelection` and at `nativeSelection` — each consumed, the callback offered nothing, no exit called, and `refused` called once with `{ rung, cause: "intercept" }`. The control is `⌃c` at a prompt holding text, which clears it.
+- **T1.165** (I62): `refused`'s count over the four causes of a refusal — an intercept's `reject` 1, a blocking top 1, a handler's own `reject` 0, the guard 0.
+- **T1.166** (I64): the reserved routes by **outcome**, three routes over every rung — `interrupt`: the child's handler receives it; question and copy consume it with a refusal recorded and nothing run; substate pops; inside leaves to `navigate`; scope arms or clears. `page-scroll` and the wheel: copy refuses and nothing scrolls; every other rung scrolls once, the rung's handler is **not offered** the key, and a question's selection is unchanged. It replaces the stage-only T1.32 of `router-dispatch.test.ts`, whose id this spec's T1.32 (I24) already holds.
+- **T1.167** (I63): for a `question` layer and for a `substate` panel, `router.rung`, the guard on arrival and the intercept stage's rung field agree. The control is a harness overlay declaring nothing, which is `question` in all three.
+- **T1.168** (I64): `test/typecheck` — `@ts-expect-error` on a handler returning `"global-intercept"`, and on an intercept table declaring `pass`.
+- **T1.169** (I65): releases reported; `y` answers Q1, Q2 is raised, `y`'s release arrives → Q2 is open and unanswered and the stages end `release-dropped`. The control is a release at `child`, which reaches the surface.
+- **T1.170** (I49, ruling 62): a surface attached, `\x1b` emitted and the decoder's window advanced → the surface's handler sees `escape` and nothing else acts; a shell delegation and `F1` → consumed at `child`, and `global` is not reached.
+- **T1.171** (C22 I133, I19, ruling 63): every chord on the owner line equals `chordText` of the session keymap's first row for its action; a keymap rebinding `insertNewline` moves the scope rung's chip; the copy line names `⇧↑⇧↓` for extend; a question's line is its declared vocabulary with the default's label.
 - **T1.160** (I61, I44): `ESC [ I` and `ESC [ O` decode to one focus event each, alone and between two keys, and under the kitty protocol too; with a question's guard armed, a focus report followed by `2` still gives `stages "question-guard","reject"` for the `2`.
 
 ### Tier 2 — contract / interface
@@ -1894,6 +2070,10 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T4.76** (I44, R-BLK-788, R-INT-008): a question is raised while the reader holds `⏎`; the first `⏎` is refused and the question stays open and unanswered, and the second answers it on a terminal that reports no releases. **Read from the frame**: the footer's owner line carries the guarded mark while the guard is live and has lost it after the refusal, so the refused key **changed the frame** — the whole difference between refused and swallowed, and the assertion no verdict alone can make.
 - **T4.78** (I44, R-BLK-786, R-BLK-788): through the confirm host — a newly presented question is guarded, the first `y` is refused with the stages `["arming", "question-guard", "reject"]`, the question is **still open and still unanswered**, the guard is spent, and the second `y` answers it. **T4.79** (I44): the control — an arrow is neutral, reaches the question, moves its selection, leaves it open, and the `y` after it is unrefused. Without the pair the guard is equally passed by a router that refuses everything and by one that refuses nothing.
 - **T4.77** (I45, §4a's legend row): press on a legend entry of an unfocused plot focuses the plot and leaves the series shown; the release toggles it. The control is a press with the pointer moved off the entry before the release: focused, and still shown.
+- **T4.81** (I62, C23 I36, ruling 59): through the confirm host — `⌃c` at an open question: the promise is unsettled, the layer is open, and the notice is drawn. **T4.81b**: the same with `inFlight: "local"` — `cancels() === 0`.
+- **T4.82** (C23 I82, R-HON-004, R-INT-008, ruling 60): the first `q` at a choice question → exactly one C15 `content` change and one `invalidate`, and the frame at 80 columns, read as text, holds `answer this first` on the question's row; the second `q` → no change, no `invalidate`, the same lines; then `n` answers. At a 12-row region the choices are still drawn after the notice lands.
+- **T4.83** (I51, ruling 59, ruling 60): through a built session — semantic copy mode, `⌃c` through stdin → the mode stays on and the owner line carries the one-shot chip; the next key clears it.
+- **T4.84** (I49, ruling 62): through a built session — a shell delegation in flight, `F1` → nothing is submitted.
 - **T4.80** (I54, I8, §052): through a built session — a question with `reply…`, the arm spent, `reply…` chosen, then letters typed: the line holds them and the answer carries them; `lastStages` for a letter names `prompt` and never `modal-blocked`. The control is the same letters before `reply…` is chosen: rejected, and the line untouched.
 
 ### Tier 5 — e2e
@@ -1918,6 +2098,14 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.1** (I1): caching the focus target → T2.1 and T3.17 fail; keys go somewhere invisible.
 - **T6.2** (I6): dispatching paste bytes as key events → T3.1 fails and a large paste hangs the session.
 - **T6.3** (I7): letting an overlay consume Ctrl-C ahead of an in-flight verb → T1.11 fails.
+- **T6.37** (I62) — **the control**: the reject running the owning rung first, as it did → T1.164 and T4.81 fail, and `⌃c` answers the question.
+- **T6.38** (I62, ruling 59): `interrupt`'s `question` verdict back to `handle` → T4.81b fails, and the waiting verb is cancelled.
+- **T6.39** (I62): the `refused` call deleted from `refuse` → T1.165 and T4.82 fail.
+- **T6.40** (C23 I82): the one-shot guard deleted from the question's `refuse` → T4.82's second-key half fails. A frame diff cannot see it: the notice is already there, and the defect is a second `update` and `invalidate`.
+- **T6.41** (I64): the `global-intercept` dispatch deleted → `⌥↑` reaches the question's `classify` as `move`, and T1.166's question cell and T1.40 fail.
+- **T6.42** (I65): the release path given back to every target → T1.169 fails, and a release answers the next question.
+- **T6.43** (C15 I29): the owner check deleted from `assertPlaceable` → C15 T1.34 fails.
+- **T6.44** (I62, I44): `refused` called from the guard's branch as well → T1.165's guard cell fails. It keeps the notice apart from the guard, which is what batch 3 needs.
 - **T6.4** (I8): allowing Ctrl-C to dismiss a confirm → T1.12 fails.
 - **T6.4b** (I8): restoring native selection above the overlay rungs, or moving only the dismissable one → T1.12b fails, and Ctrl-C on an unanswered confirm changes the screen behind it.
 - **T6.4c** (I8): running the `global` fallback under a non-dismissable layer → T1.12c fails, and every shortcut except Ctrl-C acts beneath an unanswered confirm.

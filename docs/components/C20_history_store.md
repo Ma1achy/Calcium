@@ -122,8 +122,6 @@ interface HistoryStore {
   searchEnd(action: "submit" | "accept" | "cancel"): string | null;
   searchLayer(anchor: Readonly<{ row: number; rows: number }>): Layer;
 
-  clearConfirmLayer(): Layer;
-
   flush(): Promise<void>;
   drain(): void;                       // synchronous; `beforeRelease` only
 
@@ -206,10 +204,12 @@ Searching an empty query shows nothing rather than the whole history — a full 
 |---|---|
 | `/history` | Table of index, timestamp, command |
 | `/history <N>` | Returns entry N for re-execution |
-| `/history clear` | Wipes, **after a confirm** — a non-dismissable overlay (C15 §3) |
+| `/history clear` | Wipes, **after a confirm** — asked through C23's confirm host (`ctx.ask`), never a layer of C20's. *Not wired: no handler takes `clear` today* |
 | `/history --search=<term>` | Filtered listing |
 
 Rendered as blocks through the normal path, so it scrolls, is themed, and its rows carry `fill` actions. `listBlocks` builds them; L4 commits them, as it commits everything.
+
+**Retired in review batch 2 (C16 ruling 61)** — `clearConfirmLayer` was a blocking overlay no answer callback could answer: nothing in `src/` pushed it and `/history clear` is not wired, so it was reached only by a test, and at C16's ladder it was the one layer whose rung the footer and the intercept table disagreed on (C16 §3b S13). A question has one host, and `/history clear`, when it is wired, asks through it. The paragraph below is kept for the record.
 
 **The confirm is C20's layer, frozen non-dismissable.** C15 already guarantees the behaviour — `pop()` inspects only the top layer and returns `null` without removing a non-dismissable one, and C16's single `overlay:escape → dismiss` row respects that — so nothing in the stack can wipe history on a stray `Esc`. What is left to get wrong is the layer C20 hands over, which is why `clearConfirmLayer` exists rather than a `dismissable` argument, and why T3.15 drives the real manager and the real router action instead of reading the field back.
 
@@ -380,7 +380,7 @@ Redaction has no events. Its rules all hold at rest and interact structurally �
 - **I11** — C20 reads no ambient clock or filesystem; both are injected, as is the state directory.
 - **I12** — Paths are resolved from an injected `stateDir`, never hardcoded. Standalone development never writes to a real install.
 - **I13** — Reverse search is a C15 overlay with `Block[]` content.
-- **I14** — `/history clear` requires a non-dismissable confirm.
+- **I14** — **`/history clear` requires a confirm, and C20 does not hold it.** The confirm is asked through C23's confirm host (C23 I36), which is the one place a question is raised and answered; C20's layers are panels and declare their substate (C15 I29). *Amended in review batch 2 (C16 ruling 61)*: it read *`/history clear` requires a non-dismissable confirm*, and the confirm was `clearConfirmLayer` — a blocking overlay of C20's that nothing pushed, no answer callback could answer, and C16's footer and intercept table read as two different rungs (C16 §3b S13). `/history clear` is not wired; when it is, it asks.
 - **I15** — C20 imports nothing from `terminal/` and never commits a frame.
 - **I16** — Writes are serialised; `flush()` resolves when every append issued before it has settled or failed, and the sidecar stays index-aligned under concurrent appends.
 - **I17** — Warnings are returned, never emitted. C20 decides what is wrong, never when the user is told.
@@ -412,7 +412,7 @@ Redaction has no events. Its rules all hold at rest and interact structurally �
 9. Navigation resets on edit and submit (I3).
 10. Consecutive duplicates are stored once (I4).
 11. Reverse search is a C15 overlay, substring and case-insensitive, most-recent-first (I13).
-12. `/history clear` requires a confirm that `Esc` cannot dismiss (I14).
+12. `/history clear` requires a confirm, asked through C23's confirm host and never a layer of C20's (I14). *It read "a confirm that `Esc` cannot dismiss" until C16 ruling 61.*
 13. C20 returns strings; L4 applies them to the editor (I1).
 14. Clock and filesystem are injected (I11).
 15. Writes are serialised, and `flush()` reports them settled (I16).
@@ -495,7 +495,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T3.12**: search matching nothing → the query is retained so the user can delete a character.
 - **T3.13**: search for a substring appearing in 500 entries → most-recent-first, `⌃r` walks them all without repeating.
 - **T3.14**: `/history <N>` out of range → an error, not a crash.
-- **T3.15**: `/history clear` with `Esc` on the confirm → nothing is cleared (C15 I3).
+- **T3.15** (I14, C15 I29): every layer C20 builds is a `panel` declaring `owner: { rung: "substate" }` — `searchLayer` as `find` — and `history/index.ts` exports no layer builder of any other kind. *It read `/history clear` with `Esc` on the confirm → nothing is cleared, over a layer no handler pushed (C16 ruling 61).*
 - **T3.16**: two sessions appending concurrently → last writer wins; entries may be lost but neither file is corrupted. The `j22` limitation, documented and tested.
 - **T3.17**: a command containing a null byte → stripped before storage.
 - **T3.18**: unicode and CJK commands → round-trip byte-identical.
@@ -512,7 +512,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T4.1** (with C16): `↑`/`↓` reach C20 only when the prompt has focus.
 - **T4.2** (with C17, L4): navigation replaces the buffer as one undo unit, cursor at end; the draft returns with its cursor.
 - **T4.3** (with C15): `⌃r` opens an overlay; keys route to it; `Esc` pops it.
-- **T4.4** (with C15): `/history clear` raises a non-dismissable confirm.
+- **T4.4**: **retired with `clearConfirmLayer`** (C16 ruling 61). It read *`/history clear` raises a non-dismissable confirm*.
 - **T4.5** (with C18): a stored command re-parses to the same `ParseResult` it did originally.
 - **T4.6** (with C13, L4): `/clear` empties the transcript and leaves history untouched (C13 T4.7 from this side).
 - **T4.7** (with L4): `/history` renders as a block table whose rows carry `fill` actions.
@@ -540,7 +540,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.8** (I1): calling C17 directly → T2.5 fails.
 - **T6.9** (I11): reading the ambient clock → T2.4 fails and timestamps become untestable.
 - **T6.12** (I12): hardcoding a state path in either form — `.widget` or `~/.widget` → T2.4 fails, and standalone development writes beside a real install. **Both forms, and neither is the current default**: the tilde arm would pass against a pattern that had followed the rename, and the bare arm would pass against the one that preceded it, so a row carrying only one of them agrees with whichever mistake is current.
-- **T6.10** (I14): making the clear confirm dismissable → T3.15 fails, and a stray `Esc` wipes history.
+- **T6.10** (I14): `searchLayer` built as an `overlay` → T3.15 fails. *It read making the clear confirm dismissable → T3.15 fails* (C16 ruling 61).
 - **T6.11** (I4): storing consecutive duplicates → T1.2 fails and `↑` walks the same command repeatedly.
 - **T6.13** (I16): issuing appends in parallel rather than through the chain → T3.19 fails and the sidecar de-aligns, so every timestamp names the wrong command.
 - **T6.14** (I18): removing `drain` from `beforeRelease` → T5.7 fails, and the command lost is the one just typed.

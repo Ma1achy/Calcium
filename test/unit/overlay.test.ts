@@ -494,3 +494,9 @@ describe("C15 §2c — blocking and dismissal are two fields (M8)", () => {
     }
   });
 });
+
+describe("C15 I29 — a keyed layer declares its owner (review batch 2, M5 item 3)", () => {
+  it.todo(
+    "T1.34 (C15 I29): push refuses an owner its fields contradict, and LayerUpdate does not admit one — not deferred on a component: the code lands in the next commit of this round",
+  );
+});

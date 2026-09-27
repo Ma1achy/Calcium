@@ -473,3 +473,9 @@ describe("C22 §13a — the child surface is an entry (M9)", () => {
     await h.graph.lifecycle.release();
   });
 });
+
+describe("C16 I49 — the child rung consumes (review batch 2, M5 item 8)", () => {
+  it.todo(
+    "T1.170 (C16 I49, ruling 62): a bare esc through the decoder's window reaches the surface, and F1 at a shell delegation reaches nothing — not deferred on a component: the code lands in the next commit of this round",
+  );
+});

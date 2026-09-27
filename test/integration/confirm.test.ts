@@ -765,3 +765,18 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     }
   });
 });
+
+describe("C23 I82 — a question refuses once and says so (review batch 2, M5)", () => {
+  it.todo(
+    "T4.81 (C16 I62, C23 I36, ruling 59): ⌃c at an open question leaves it open, unanswered and saying so — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T4.81b (C16 I62, I7): ⌃c at a question with a local verb in flight cancels nothing — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T4.82 (C23 I82, R-HON-004, ruling 60): the first refused key adds the notice with one update and one invalidate; the second changes nothing — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T4.73 (C23 I82, ruling 60): the inspection and the reply state are never refused — not deferred on a component: the code lands in the next commit of this round",
+  );
+});
