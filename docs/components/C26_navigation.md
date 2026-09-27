@@ -204,8 +204,8 @@ already declared:
 | declares | `↓` | kinds today |
 |---|---|---|
 | `elements` only | steps elements | `table`, **`plot` when it declares a `camera`** (C12 I85), and **`keyValue`, `events`, `comparison` and `steps` while their row sheds** (C09 I113) |
-| `window` only | moves a viewport | `logs`, `patch` |
-| **both** | **ruled in §4b** — `↓` steps and the window follows; it was never two readings of one key | **none, and the build kept it that way** — see the correction below |
+| `window` only | moves a viewport | `logs` |
+| **both** | **ruled in §4b** — `↓` steps and the window follows; it was never two readings of one key | **none, and the build kept it that way** — see the correction below. **`patch` since C25 I24**: its lines are elements, so `↓` steps them, and `BlockDefinition.window` is the transcript's slice rather than a viewport of its own, which is the correction's point |
 | neither | passes through; the block is atomic | `keyValue` that sheds nothing, `code`, `plot` |
 
 **Nothing is adopted here and no field is added.** The check's job was to say whether the

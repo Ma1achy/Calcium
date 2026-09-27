@@ -151,9 +151,7 @@ complete, which is the measurement that argues for keeping both.
 
 ## M9 · No pushed views
 
-| Owed by | Item | What goes red when it lands |
-|---|---|---|
-| C10 §4k (F1240's MR) | **Composition 3 — selection over a diff ground.** Both facts ship — `patch/lines.ts` paints the grounds and the `+` / `−` marks, `selectionStyle` paints the wash — and they cannot meet, because `patch` **declares no elements and reads `ctx.focus` nowhere**. The ground is not missing; the **addressability** is. It is the only one of the four whose remedy does not begin with a new field. | C10 T2.48's attempt at case 3, which selects a patch row on a diff ground and fails when both answer |
+Nothing owed. Composition 3 — selection over a diff ground — was the one row, and C25 I24 and I25 discharged it (review batch 1, item 22): a patch line is an element, and a selected one takes the wash with `+` and `−` kept.
 
 ## M11 · The carrier matrix and the contrast gate
 

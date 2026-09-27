@@ -1252,7 +1252,7 @@ tree is T2.48's attempt at each composition the golden file does not draw (§4k.
   `hovered`, and `Panel.staleForMs` (C04 I127) had carried freshness since §047 landed. A watch on
   a name sees one encoding of a fact. So each owed case carries the construction it would take, and
   T2.48 **attempts it** — the row fails when both facts respond, which is *constructible, with no
-  golden*. Two are owed, and the two reasons are not one reason.
+  golden*. One is owed.
   *Hover* has no **consumer** — no block declares `hovered`, and the router discards a hover by
   rule (`router.ts:377`, `:525`, `:766`; §4a row t, *a hover is not a gesture and clears nothing*).
   **This bullet used to say the producer was missing — *mouse mode 1002 sends no motion* — and the
@@ -1260,14 +1260,12 @@ tree is T2.48's attempt at each composition the golden file does not draw (§4k.
   `hover?: boolean` option, and `router/types.ts:312` reads a no-button move, so a pointer move
   already arrives. The mode was never the condition, and a later MR picking the row up would have
   found the transport there and drawn a frame for a fact nothing produces. The condition that can
-  change is the **field**, which is what C10 T2.48's attempt constructs. **The diff case is not
-  that, and it is the one worth the correction above**: both
-  facts are fully built — `patch/lines.ts` paints the grounds and the `+` / `−` marks, and
-  `selectionStyle` paints the wash — and they cannot meet, because `patch` **declares no
-  elements and reads `ctx.focus` nowhere**, so no patch row can be focused or selected. The
-  ground is not missing; the **addressability** is. That is a C25 change and not a C10 one, and
-  its remedy does not begin with a new field. *Disabled* was the third, and `FormField.availability`
-  (C04 I140) was its field.
+  change is the **field**, which is what C10 T2.48's attempt constructs. **The diff case was not that, and it is the one worth the correction above**: both
+  facts were fully built — `patch/lines.ts` painted the grounds and the `+` / `−` marks, and
+  `selectionStyle` the wash — and they could not meet, because `patch` **declared no elements and
+  read `ctx.focus` nowhere**. The ground was never missing; the **addressability** was, and it is
+  C25 I24 and I25 — a C25 change and not a C10 one, with no new field. *Disabled* was the third,
+  and `FormField.availability` (C04 I140) was its field.
 - **Row 1's third clause was not met, and the frame is what said so — and it is met now** (F1240, I48).
   *Failure keeps its glyph, its word and its tone* — the frame kept two. A focused or selected row was
   repainted in **one ink**, `accent` under focus and `default` under selection alone, which was C11 I14's
