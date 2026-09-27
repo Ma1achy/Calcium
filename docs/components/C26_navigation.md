@@ -1035,11 +1035,12 @@ each kind names which:
   a camera and a focus naming it — zero rows differ at 60 columns. At 1-bit the frame goes dim to
   bold as the 2-D frame does (F34), since the frame cell carries a `Style` — F803, closed the day
   it was filed; T1.27's 1-bit row is that arm.
-- **`notice`** — with an `action` (C04), the whole notice: glyph and text go `accent` over the
-  selection ground, the `pills` head's rule and for the `pills` head's reason — `accent` is a
-  legal notice `tone`, so `accent` alone would draw a focused `info` notice as an unfocused
-  `accent` one. The tone is dropped under focus as a table row drops its cell tones (C11 I14);
-  the glyph keeps its character, so `▲` still says *warn* while the colour says *focused*. A
+- **`notice`** — with an `action` (C04), the whole notice: glyph and text keep the notice's own
+  tone over `surface.focusGround` (C09 I83), and **at 1-bit the whole notice inverts** (C09
+  I121), because the ground answers nothing there and the tone's mono class is the resting
+  notice's too. This bullet described `accent` over the selection ground, which is what the
+  notice drew before focus and selection were given two grounds; it is corrected rather than
+  kept. The glyph keeps its character, so `▲` still says *warn*. A
   notice without an `action` declares no element and cannot be focused, so no frame of one
   moves (C09's row, T1.29's byte-identical arm).
 - **`scroll`** — the residue row, in `accent` where it was `dim`, **and the scrollbar's column
@@ -1066,7 +1067,11 @@ each kind names which:
 
 **At 1-bit the carrier is the weight, not a colour** (F34): `accent`'s mono class is bold and
 `muted`'s and `dim`'s is dim, so a focused frame and a focused residue row go from `2m` to `1m`,
-and the head chip adds reverse video. Whether a terminal renders a bold box-drawing glyph heavier
+and the head chip adds reverse video. **Weight alone fails where the resting shape is already
+bold** — an active chip, an `accent` notice — and that is why the head chip, the notice, a
+`choice` option and a `control` invert at 1-bit through one function (C09 I121). This sentence
+said the head chip added reverse video when the code no longer did; measured, a focused active
+chip was byte-identical to a resting one. Whether a terminal renders a bold box-drawing glyph heavier
 is the terminal's; the residue row's text and the chip's are ordinary glyphs and read either way.
 
 **What still paints nothing**: a `table` under block-level focus (`rowId: null`, which the
