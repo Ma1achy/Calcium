@@ -215,6 +215,10 @@ describe("C14 §6f — the drag in a real session", () => {
     }
   });
 
+  it.todo(
+    "T4.37h (C14 I54, C10 I66): in hcDark at colourDepth 1 selecting the failed head and clearing it with esc costs the render cache no focus miss; at 24 bits each misses — not deferred on a component: the code lands in the next commit of this round",
+  );
+
   it("T4.37 (C14 I44, I45): a drag past the region autoscrolls, and keeps going with the pointer still", async () => {
     vi.useFakeTimers();
     try {

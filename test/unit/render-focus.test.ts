@@ -771,6 +771,10 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
     expect(STATES.map((s) => headOf(theme, s, FOCUS)), "dark: focused, still the toned mark").toEqual(STATES.map((s) => glyphFor(CALL_HEAD_GLYPH[s], caps)));
   });
 
+  it.todo(
+    "T1.84 (C09 I45, I110, C10 I66, C14 I54, R-THM-005): a call head in hcDark, hcLight and dark × depth {1, 4, 8, 24} × {focused, washed, neither} × {fresh, stale panel} × five states is the toned mark exactly where the five state inks resolved on its ground under its theme are not one Style, and the state's own mark elsewhere — not deferred on a component: the code lands in the next commit of this round",
+  );
+
   it("T1.29 (C26 §7, C04 §3, C09 I83): a focused notice keeps its own tone over the focus ground — glyph and text; one without an action declares nothing and cannot move", () => {
     const caps = capabilities({ colourDepth: 24 });
     const error = params(tone("error", theme, caps));
