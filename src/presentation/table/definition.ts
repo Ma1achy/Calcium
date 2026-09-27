@@ -183,9 +183,17 @@ function unitsOf(block: Table, width: number, measureChild: MeasureFn): readonly
  */
 export const GUTTER_CELLS = glyphCells("focus") + 1;
 
-/** The width the plan and every clamp see — never `ctx.width` (I15). */
+/**
+ * The width the plan and every clamp see — never `ctx.width` (I15).
+ *
+ * **Zero, not one, where the gutter fills the width.** `max(1, …)` handed the
+ * body a cell the row did not have, so at widths 1 and 2 every row drew three
+ * cells — a row the terminal wraps into rows nothing measured. The reservation
+ * outranks the data: a table narrower than its gutter has no column to show,
+ * and the mark is the one fact left to act on.
+ */
 function bodyWidth(width: number): number {
-  return Math.max(1, width - GUTTER_CELLS);
+  return Math.max(0, width - GUTTER_CELLS);
 }
 
 export const tableDefinition: BlockDefinition<Table> = {
@@ -379,6 +387,10 @@ export const tableDefinition: BlockDefinition<Table> = {
     // stay one axis and nothing moves when a row gains or loses focus. The plan
     // and every clamp see `inner`, never `width`.
     const inner = bodyWidth(width);
+    // **Every row is cut to the width at the exit** (I15, F1211's net): the
+    // gutter alone is two cells, so at width 1 no arm's arithmetic can fit it,
+    // and a row over the width is one the terminal wraps. Cuts, never pads.
+    const cut = (row: string): string => fitRow(row, width);
     const probe = ctx.probe;
     // **Rows and columns separately, because they are different failures.** A
     // table slow in `plan` is wide — the plan is a function of the declarations
@@ -497,7 +509,7 @@ export const tableDefinition: BlockDefinition<Table> = {
 
     if (!hasBody(block)) {
       emit(emptySpans(block, inner, ctx));
-      return parts;
+      return parts.map(cut);
     }
 
     // Sorting is a permutation, so this changes the order of what follows and
@@ -578,7 +590,11 @@ export const tableDefinition: BlockDefinition<Table> = {
       // content box of exactly `insetWidth`, so the two halves see one number.
       // **The detail's rows padded left by the inset** (C09 I73), one part per
       // row; a child that answers an element is its padded box, as before.
-      const inset = inner - insetWidth(inner); // cells-ok — the detail's own indent, inside the gutter
+      // **Floored at zero**: `insetWidth` answers at least one cell, so over a
+      // zero body (I15, widths 1–2) the indent was `0 − 1`. Measure and render
+      // both still ask `insetWidth(inner)`, so the heights agree; the rows the
+      // children draw are cut to the zero body below and the gutter carries them.
+      const inset = Math.max(0, inner - insetWidth(inner)); // cells-ok — the detail's own indent, inside the gutter
       const pad = " ".repeat(inset);
       // **The detail sits on `bgElev`, the block's whole width, gutter
       // included** (I25, §082 `R-BLK-941`). `based` and not a span pass,
@@ -633,7 +649,7 @@ export const tableDefinition: BlockDefinition<Table> = {
       emit([{ text: labels, style: tone("meta", ctx.theme, ctx.capabilities) }]);
     }
 
-    return parts;
+    return parts.map(cut);
   },
 };
 

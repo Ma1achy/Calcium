@@ -19,12 +19,16 @@ describe("C11 tier 6", () => {
     // or dropping the `clampSpans` at the end of a row. Either produces rows wider
     // than the terminal, which the terminal wraps into rows nobody measured.
     const columns = psColumns();
-    for (let width = 20; width <= 200; width += 7) {
+    // **From width 1** (I15): 1, 2 and 3 are where the gutter meets the body,
+    // and a sweep starting at 20 could not see the three-cell rows at 1 and 2.
+    // The plan's own sum is I5's from 20; below it the plan overflows by design
+    // (one truncated column, T1.5), so the rendered rows are the claim there.
+    for (const width of [1, 2, 3, ...Array.from({ length: 26 }, (_, i) => 20 + i * 7)]) {
       const plan = planColumns(columns, width);
       const sum =
         plan.visible.map((v) => v.width).reduce((a, b) => a + b, 0) +
         Math.max(0, plan.visible.length - 1) * plan.gap; // cells-ok
-      expect(sum, `plan overflows at ${String(width)}`).toBeLessThanOrEqual(width);
+      if (width >= 20) expect(sum, `plan overflows at ${String(width)}`).toBeLessThanOrEqual(width);
 
       const block = psTable({ rows: 3, expanded: [1] });
       for (const line of r.renderToLines(block, width)) {
