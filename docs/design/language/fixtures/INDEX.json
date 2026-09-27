@@ -19,7 +19,7 @@
   "title": "The primitives, and where each is definedcurrent · R-PRI-001 R-PRI-002 · example R-EXA-002",
   "cols": 183,
   "rows": 67,
-  "sha": "b3164d2c5fd7c87e",
+  "sha": "eb0cf11b541e38a1",
   "ruleIds": [
    "R-PRI-001",
    "R-PRI-002",
@@ -73,10 +73,10 @@
   "file": "006-the-mark-vocabulary-twelve-canonical-glyphs-00.txt",
   "section": 6,
   "id": "the-mark-vocabulary-twelve-canonical-glyphs-006",
-  "title": "The mark vocabulary — sixteen canonical glyphscurrent · R-GLY-003 R-GLY-002 · example R-EXA-006",
+  "title": "The mark vocabulary — eighteen canonical glyphscurrent · R-GLY-003 R-GLY-002 · example R-EXA-006",
   "cols": 170,
-  "rows": 27,
-  "sha": "a40ea67d3b2ecd2c",
+  "rows": 29,
+  "sha": "13f52d2a156dd5c8",
   "ruleIds": [
    "R-GLY-003",
    "R-GLY-002",
@@ -1303,7 +1303,7 @@
   "title": "Three major rules it broke in its own examplescurrent · R-GLY-003 R-MOT-002 R-EVT-001 · retained example blocks generated from registry · example R-EXA-093",
   "cols": 78,
   "rows": 84,
-  "sha": "5056cc7bb1e68ed1",
+  "sha": "66b14ccc6ae9b02c",
   "ruleIds": [
    "R-GLY-003",
    "R-MOT-002",

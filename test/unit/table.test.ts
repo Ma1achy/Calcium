@@ -1273,7 +1273,57 @@ describe("the missing number and the trend (I29, I30)", () => {
       expect(row).not.toContain("—");
     }
   });
-  it.todo("T1.39 (C11 I30, R-COL-006): a trend cell's arrow takes its tone from the column's polarity — not deferred on a component: the code lands in the next commit of this round");
+  it("T1.39 (C11 I30, R-COL-006): a trend cell's arrow takes its tone from the column's polarity", () => {
+    // §088 §4's three rows, and the two arms it does not draw: a neutral column
+    // and a reading that held.
+    const col = (key: string, polarity?: "higher" | "lower" | "neutral"): ColumnDef => ({
+      key, label: key, priority: 1, minWidth: 14, sortable: false, ...(polarity === undefined ? {} : { polarity }),
+    });
+    const metrics = {
+      kind: "table",
+      id: "m",
+      columns: [col("loss", "lower"), col("acc", "higher"), col("n")],
+      rows: [
+        { id: "a", cells: { loss: { text: "from 0.41", trend: { from: 0.41, to: 0.3 } }, acc: { text: "from 0.62", trend: { from: 0.62, to: 0.71 } }, n: { text: "from 3", trend: { from: 3, to: 5 } } } },
+        { id: "b", cells: { loss: { text: "from 0.04", trend: { from: 0.04, to: 0.09 } }, acc: { text: "from 0.5", trend: { from: 0.5, to: 0.5 } }, n: { text: "-" } } },
+      ],
+    } as unknown as Table;
+    const draw = (caps: TerminalCapabilities) =>
+      measurable({ capabilities: caps, definitions: [tableDefinition] }).renderToLines(metrics, atContent(60));
+    const [, good, bad] = draw(FULL_CAPS);
+    // The arrow is its own run, so it is found by character and occurrence, and
+    // the sequence that opens it is the one its tone resolved to.
+    const opener = (row: string, arrow: string, nth: number): string | undefined => {
+      let at = -1;
+      for (let i = 0; i <= nth; i += 1) at = row.indexOf(arrow, at + 1);
+      expect(at, `${arrow} #${String(nth)} is drawn`).toBeGreaterThanOrEqual(0);
+      return row.slice(0, at).match(/\x1b\[[0-9;]*m(?=[^\x1b]*$)/u)?.[0];
+    };
+    const ink = (name: "ok" | "error" | "default") => sgr(tone(name, DARK_THEME, FULL_CAPS));
+    expect(visible(good!)).toContain("\u2193 from 0.41");
+    expect(visible(good!)).toContain("\u2191 from 0.62");
+    // Lower is better and it fell: down, ok. Higher is better and it rose: up, ok.
+    expect(opener(good!, "\u2193", 0), "loss fell").toBe(ink("ok"));
+    expect(opener(good!, "\u2191", 0), "accuracy rose").toBe(ink("ok"));
+    // A neutral column draws the arrow in the cell's default tone.
+    expect(opener(good!, "\u2191", 1), "a neutral column").toBe(ink("default"));
+    // Lower is better and it rose: up, and **error** — the row §088 says a
+    // trend that always paints DOWN as ok gets wrong.
+    expect(visible(bad!)).toContain("\u2191 from 0.04");
+    expect(opener(bad!, "\u2191", 0), "loss rose").toBe(ink("error"));
+    // A reading that held draws no arrow and the text alone.
+    expect(visible(bad!)).toContain("from 0.5");
+    expect(visible(bad!)).not.toMatch(/[\u2191\u2193^V] from 0\.5/u);
+
+    // **The shape carries the direction at every rung** (R-DEG-001): at 1-bit the
+    // arrows survive the tone, and at ASCII they are `^` and `V`.
+    const mono = draw(MONO_UNICODE_CAPS).map(visible);
+    expect(mono[1]).toContain("\u2193 from 0.41");
+    expect(mono[2]).toContain("\u2191 from 0.04");
+    const ascii = draw(ASCII_CAPS).map(visible);
+    expect(ascii[1]).toContain("V from 0.41");
+    expect(ascii[1]).toContain("^ from 0.62");
+  });
 });
 
 describe("a number column is planned at its widest value (I31)", () => {

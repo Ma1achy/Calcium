@@ -999,6 +999,12 @@
   "topRight": [
    "border"
   ],
+  "trendDown": [
+   "inline"
+  ],
+  "trendUp": [
+   "inline"
+  ],
   "vertical": [
    "border",
    "tree"
@@ -2224,6 +2230,14 @@
   [
    "▾",
    "v"
+  ],
+  [
+   "↑",
+   "^"
+  ],
+  [
+   "↓",
+   "V"
   ]
  ],
  "VISIONS": [
@@ -2356,6 +2370,8 @@
   "tick": "+",
   "topLeft": "+",
   "topRight": "+",
+  "trendDown": "V",
+  "trendUp": "^",
   "vertical": "|",
   "warning": "!"
  },
@@ -2400,6 +2416,8 @@
   "tick": "✓",
   "topLeft": "┌",
   "topRight": "┐",
+  "trendDown": "↓",
+  "trendUp": "↑",
   "vertical": "│",
   "warning": "▲"
  }

@@ -33097,6 +33097,50 @@
       "widthClass": "ambiguous"
     },
     {
+      "id": "trend-up",
+      "unicode": "↑",
+      "ascii": "^",
+      "semanticRole": "trend rising",
+      "tone": "default",
+      "widthByCapability": {
+        "unicode": 1,
+        "ascii": 1
+      },
+      "reservedCells": 1,
+      "collisionDomains": [
+        "inline"
+      ],
+      "accessibleName": "rising",
+      "status": "current",
+      "ruleIds": [
+        "R-COL-006"
+      ],
+      "canonical": true,
+      "widthClass": "ambiguous"
+    },
+    {
+      "id": "trend-down",
+      "unicode": "↓",
+      "ascii": "V",
+      "semanticRole": "trend falling",
+      "tone": "default",
+      "widthByCapability": {
+        "unicode": 1,
+        "ascii": 1
+      },
+      "reservedCells": 1,
+      "collisionDomains": [
+        "inline"
+      ],
+      "accessibleName": "falling",
+      "status": "current",
+      "ruleIds": [
+        "R-COL-006"
+      ],
+      "canonical": true,
+      "widthClass": "ambiguous"
+    },
+    {
       "id": "sort-asc",
       "unicode": "▴",
       "ascii": "^",

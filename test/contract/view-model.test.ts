@@ -1074,5 +1074,27 @@ describe("C04 §7 — the update model and the view state, checked rather than c
 });
 
 describe("C04 I128 — a trend cell", () => {
-  it.todo("T2.133 (C04 I128, R-COL-006): block() refuses a trend cell carrying glyph, tone, spark or bar — not deferred on a component: the code lands in the next commit of this round");
+  it("T2.133 (C04 I128, R-COL-006): block() refuses a trend cell carrying glyph, tone, spark or bar", () => {
+    const table = (cell: Record<string, unknown>, polarity?: string) => ({
+      kind: "table",
+      id: "m",
+      columns: [{ key: "v", label: "val loss", priority: 1, minWidth: 12, sortable: false, ...(polarity === undefined ? {} : { polarity }) }],
+      rows: [{ id: "r", cells: { v: { text: "from 0.41", trend: { from: 0.41, to: 0.3 }, ...cell } } }],
+    });
+    // The trend alone is a cell, and so is every declared polarity.
+    expect(() => blockOf(table({}) as never), "a trend cell").not.toThrow();
+    for (const polarity of ["higher", "lower", "neutral"]) {
+      expect(validateBlock(table({}, polarity)).ok, polarity).toBe(true);
+    }
+    // Each second answer is refused, by both doors, and named.
+    for (const [field, value] of [["glyph", "ok"], ["tone", "ok"], ["spark", [1, 2]], ["bar", { value: 1, max: 2 }]] as const) {
+      expect(() => blockOf(table({ [field]: value }) as never), field).toThrow(new RegExp(`"${field}".*C04 I128`, "u"));
+      const r = validateBlock(table({ [field]: value }));
+      expect(r.ok ? "" : r.error.join("\n"), `${field} at the wire`).toMatch(new RegExp(`"${field}".*C04 I128`, "u"));
+    }
+    // The readings are finite numbers, and a polarity is one of three words.
+    expect(() => blockOf(table({ trend: { from: 0.41, to: Number.NaN } }) as never)).toThrow(/C04 I128/u);
+    const bad = validateBlock(table({}, "up"));
+    expect(bad.ok ? "" : bad.error.join("\n")).toMatch(/"polarity" is "higher", "lower" or "neutral" \(C04 I128\)/u);
+  });
 });

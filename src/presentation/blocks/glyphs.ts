@@ -184,6 +184,21 @@ export type GlyphSet = Readonly<{
   sortAsc: string;
   sortDesc: string;
 
+  /**
+   * A metric's movement, leading a table cell (C09 I111, C11 I30, §088 §4).
+   *
+   * **Here and not in `GLYPH_TABLE`, because a producer never names it.** The
+   * direction is the sign of the cell's `trend` and the tone its column's
+   * polarity (C04 I128), so a producer-namable slot would be a second way to
+   * paint the arrow with a tone the rule did not choose.
+   */
+  trendUp: string;
+  /**
+   * **`V` at ASCII, not `v`** (question 38): `v` is `collapse`'s in the row's
+   * lead, and the lead and a cell share one content row (SS64).
+   */
+  trendDown: string;
+
   // Progress.
 
   /**
@@ -293,6 +308,11 @@ const UNICODE: GlyphSet = Object.freeze({
   sortAsc: "▴",
   sortDesc: "▾",
 
+  // `↑` and `↓` — the registry's `trend-up` and `trend-down`. Both Ambiguous, so
+  // the set's collapse to ASCII at `wide` takes them with the rest (C09 I48).
+  trendUp: "\u2191",
+  trendDown: "\u2193",
+
 });
 
 const ASCII: GlyphSet = Object.freeze({
@@ -359,6 +379,9 @@ const ASCII: GlyphSet = Object.freeze({
 
   sortAsc: "^",
   sortDesc: "v",
+
+  trendUp: "^",
+  trendDown: "V",
 
 });
 
@@ -1458,6 +1481,9 @@ export const GLYPH_SET_DOMAINS: Readonly<Record<keyof GlyphSet, readonly string[
 
   sortAsc: ["table-header"],
   sortDesc: ["table-header"],
+
+  trendUp: ["inline"],
+  trendDown: ["inline"],
 };
 
 /** The pairs, for the test that asserts each is 1:1 by cell count (I5). */

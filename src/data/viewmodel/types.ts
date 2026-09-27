@@ -554,6 +554,16 @@ export type Cell = Readonly<{
    * numbers for everyone.
    */
   bar?: BarSpec;
+  /**
+   * Two readings of one metric, the earlier and the later (I128, §088 §4).
+   *
+   * `text` is what follows the arrow — `from 0.41` — so the producer keeps its
+   * own formatting. **The direction and the tone are derived, never supplied**:
+   * the arrow is the sign of `to − from` and its tone the column's `polarity`,
+   * which is why construction refuses a trend cell that also carries `glyph`,
+   * `tone`, `spark` or `bar` — a second answer to a question the rule gives one.
+   */
+  trend?: Readonly<{ from: number; to: number }>;
 }>;
 
 /** A quantity against a scale (I50c, C12 §3b). */
@@ -631,6 +641,14 @@ export type ColumnDef = Readonly<{
    * side is being described, on a field set once per column and never revisited.
    */
   truncateFrom?: "start" | "end";
+  /**
+   * Which movement the column's metric wants (I128, §086, `R-COL-006`).
+   *
+   * On the column because §086 homes a metric inside a table cell, and a column
+   * is one metric. Undeclared is `neutral`, so no adapter changes: a trend in a
+   * neutral column draws its arrow in the cell's default tone.
+   */
+  polarity?: "higher" | "lower" | "neutral";
 }>;
 
 export type TableRow = Readonly<{

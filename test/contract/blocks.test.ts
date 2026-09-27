@@ -1291,5 +1291,15 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
 });
 
 describe("C09 I111 — the trend arrows", () => {
-  it.todo("T2.174 (C09 I111, R-COL-006): trendUp and trendDown resolve to ↑ ↓ and ^ V — not deferred on a component: the code lands in the next commit of this round");
+  it("T2.174 (C09 I111, R-COL-006): trendUp and trendDown resolve to ↑ ↓ and ^ V", () => {
+    const at = (caps: Parameters<typeof glyphs>[0]) => [glyphs(caps).trendUp, glyphs(caps).trendDown];
+    expect(at({ unicode: "full", ambiguousWidth: "narrow" })).toEqual(["\u2191", "\u2193"]);
+    expect(at({ unicode: "ascii", ambiguousWidth: "narrow" })).toEqual(["^", "V"]);
+    // Both arrows are Ambiguous, so `wide` takes the ASCII rung with the set (C09 I48).
+    expect(at({ unicode: "full", ambiguousWidth: "wide" })).toEqual(["^", "V"]);
+    // **`V` and not `v`** (question 38): `v` is disclosure's, and a row's lead and
+    // a cell share one content row.
+    expect(glyphFor("collapse", { unicode: "ascii", ambiguousWidth: "narrow" })).toBe("v");
+    expect(glyphs({ unicode: "ascii", ambiguousWidth: "narrow" }).trendDown).not.toBe("v");
+  });
 });

@@ -27,7 +27,7 @@ import { fitRow, rowCells } from "../rows.js";
 import { glyphCells, glyphFor } from "../blocks/glyphs.js";
 import { background, based, clampSpans, focusStyle, groundSequence, paint, selectionStyle, tone, withBackground, type Span } from "../blocks/paint.js";
 import type { BlockDefinition, NavElement, Rendered, RenderContext, Windowed } from "../blocks/types.js";
-import { decimalEnds, decimalPoints, emptySpans, headerSpans, markedSeriesColumns, rowSpans } from "./cells.js";
+import { decimalEnds, decimalPoints, emptySpans, headerSpans, markedSeriesColumns, rowSpans, trendMark } from "./cells.js";
 import { columnAlignments, groupingColumns, unknownColumns } from "./kind.js";
 import { detailBlocks, isExpandable } from "./detail.js";
 import { planColumns, type PlannedColumns } from "./plan.js";
@@ -67,7 +67,10 @@ function effectiveColumns(block: Table): Table["columns"] {
     for (const row of block.rows) {
       const cell = row.cells[c.key];
       if (cell === undefined || cell.text.trim() === "") continue;
-      const lead = cell.glyph === undefined ? 0 : glyphCells(cell.glyph) + 1;
+      // A trend's arrow is a lead too (C11 I30), resolved at the same `wide`.
+      const arrow = trendMark(cell, c, { unicode: "full", ambiguousWidth: ambiguous })?.mark ?? "";
+      const lead =
+        cell.glyph !== undefined ? glyphCells(cell.glyph) + 1 : arrow === "" ? 0 : cells(arrow, ambiguous) + 1;
       widest = Math.max(widest, lead + cells(cell.text.trim(), ambiguous));
     }
     return widest > c.minWidth ? { ...c, minWidth: widest } : c;

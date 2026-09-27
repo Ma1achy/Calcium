@@ -153,6 +153,21 @@ const DECLARES_HEIGHT: Readonly<Record<PlotForm, boolean>> = {
  * renderer took and the picture is plausible either way.
  */
 function checkCellContent(cell: Cell, where: string): void {
+  // **I128 — a trend's arrow and tone are derived**, so a field that would
+  // supply either is a second answer, and §088 says what that costs: *a trend
+  // that always paints DOWN as ok misleads on half of every ML metric*.
+  if (cell.trend !== undefined) {
+    const second = (["glyph", "tone", "spark", "bar"] as const).filter((k) => cell[k] !== undefined);
+    if (second.length > 0) {
+      throw new BlockShapeError(
+        `${where}: a trend cell carries ${second.map((k) => `"${k}"`).join(", ")} (C04 I128) — the arrow is ` +
+          `the sign of the trend and its tone the column's polarity, so a supplied one is a second answer`,
+      );
+    }
+    if (!Number.isFinite(cell.trend.from) || !Number.isFinite(cell.trend.to)) {
+      throw new BlockShapeError(`${where}: "trend.from" and "trend.to" are finite numbers (C04 I128)`);
+    }
+  }
   if (cell.spark !== undefined && cell.bar !== undefined) {
     throw new BlockShapeError(
       `${where}: a cell carries a "spark" and a "bar" (C04 I50c) — both fill the ` +

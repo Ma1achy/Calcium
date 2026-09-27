@@ -1433,6 +1433,15 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
   table: (b, e, at) => {
     requireArray(b, "columns", e, at);
     requireArray(b, "rows", e, at);
+    // I128 — a column's polarity is one of three words, or absent for neutral.
+    if (isArray(b["columns"])) {
+      for (const column of b["columns"]) {
+        if (!isRecord(column) || column["polarity"] === undefined) continue;
+        if (!["higher", "lower", "neutral"].includes(column["polarity"] as string)) {
+          e.push(`${at} column "${String(column["key"])}": "polarity" is "higher", "lower" or "neutral" (C04 I128)`);
+        }
+      }
+    }
     // The other half of I6's glyph rule. A `Cell` carries one too, and a table
     // is where the far side's own status strings most often arrive.
     if (isArray(b["rows"])) {
@@ -1465,6 +1474,20 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
               `${at} cell "${key}": carries a "spark" and a "bar" (C04 I50c) — both fill ` +
                 `the planned width, so there is no rule for which wins`,
             );
+          }
+          // I128 — the same refusal `block()` makes, at the wire.
+          if (cell["trend"] !== undefined) {
+            const trend = cell["trend"];
+            if (!isRecord(trend) || !isFiniteNumber(trend["from"]) || !isFiniteNumber(trend["to"])) {
+              e.push(`${at} cell "${key}": "trend" is { from, to }, both finite numbers (C04 I128)`);
+            }
+            const second = ["glyph", "tone", "spark", "bar"].filter((k) => cell[k] !== undefined);
+            if (second.length > 0) {
+              e.push(
+                `${at} cell "${key}": a trend cell carries ${second.map((k) => `"${k}"`).join(", ")} (C04 I128) — ` +
+                  `its arrow and tone are derived`,
+              );
+            }
           }
           if (isRecord(cell["bar"])) {
             const spec = cell["bar"];
