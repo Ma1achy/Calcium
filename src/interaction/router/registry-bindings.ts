@@ -8,57 +8,78 @@
  *
  * `actionId` is the design's verb, not a `KeyAction`. Nine of these are one
  * verb several owners spell differently — `escape` is `dismiss`,
- * `exitNativeSelection` and `focusPrompt` — so the join to a handler is
- * `OWNER_ACTIONS` in `keymap.ts`, keyed by `(actionId, target)`. That is
- * R-KEY-003's *unless the current owner explicitly captures the action*, and
- * `when: "focused"` is the design saying so.
+ * `exitNativeSelection` and `focusPrompt` — so the join to a handler is the
+ * row in `keymap.ts`, which names the target and the action while
+ * `fromRegistry` supplies the chord. That is R-KEY-003's *unless the current
+ * owner explicitly captures the action*, and `when: "focused"` is the design
+ * saying so.
+ *
+ * `profile` is the record's (C16 §6c): `enhanced-terminal` for a chord only a
+ * terminal reporting the Kitty protocol can send, `default-terminal` otherwise.
  */
 
 export type RegistryBinding = Readonly<{
   id: string;
   actionId: string;
+  profile: "default-terminal" | "enhanced-terminal";
   key: Readonly<{ name: string; ctrl?: boolean; meta?: boolean; shift?: boolean; super?: boolean }>;
 }>;
 
 export const REGISTRY_BINDINGS: readonly RegistryBinding[] = Object.freeze([
-  { id: "binding.001", actionId: "confirm", key: { name: "enter" } },
-  { id: "binding.002", actionId: "newline", key: { name: "enter", shift: true } },
-  { id: "binding.003", actionId: "escape", key: { name: "escape" } },
-  { id: "binding.004", actionId: "focus.next", key: { name: "tab" } },
-  { id: "binding.005", actionId: "focus.previous", key: { name: "tab", shift: true } },
-  { id: "binding.006", actionId: "move.up", key: { name: "up" } },
-  { id: "binding.007", actionId: "move.down", key: { name: "down" } },
-  { id: "binding.008", actionId: "move.left", key: { name: "left" } },
-  { id: "binding.009", actionId: "move.right", key: { name: "right" } },
-  { id: "binding.010", actionId: "selection.up", key: { name: "up", shift: true } },
-  { id: "binding.011", actionId: "selection.down", key: { name: "down", shift: true } },
-  { id: "binding.012", actionId: "selection.left", key: { name: "left", shift: true } },
-  { id: "binding.013", actionId: "selection.right", key: { name: "right", shift: true } },
-  { id: "binding.014", actionId: "copy", key: { name: "c", ctrl: true, shift: true } },
-  { id: "binding.015", actionId: "paste", key: { name: "v", ctrl: true, shift: true } },
-  { id: "binding.016", actionId: "interrupt", key: { name: "c", ctrl: true } },
-  { id: "binding.017", actionId: "help.f1", key: { name: "f1" } },
-  { id: "binding.018", actionId: "help.question", key: { name: "?" } },
-  { id: "binding.020", actionId: "agent.next", key: { name: "tab", ctrl: true } },
-  { id: "binding.021", actionId: "agent.previous", key: { name: "tab", ctrl: true, shift: true } },
-  { id: "binding.022", actionId: "agent.1", key: { name: "1", super: true } },
-  { id: "binding.023", actionId: "agent.2", key: { name: "2", super: true } },
-  { id: "binding.024", actionId: "agent.3", key: { name: "3", super: true } },
-  { id: "binding.025", actionId: "agent.4", key: { name: "4", super: true } },
-  { id: "binding.026", actionId: "agent.5", key: { name: "5", super: true } },
-  { id: "binding.027", actionId: "agent.6", key: { name: "6", super: true } },
-  { id: "binding.028", actionId: "agent.7", key: { name: "7", super: true } },
-  { id: "binding.029", actionId: "agent.8", key: { name: "8", super: true } },
-  { id: "binding.030", actionId: "agent.9", key: { name: "9", super: true } },
-  { id: "binding.031", actionId: "page.up", key: { name: "up", meta: true } },
-  { id: "binding.032", actionId: "page.down", key: { name: "down", meta: true } },
-  { id: "binding.033", actionId: "transcript.top", key: { name: "up", super: true } },
-  { id: "binding.034", actionId: "transcript.bottom", key: { name: "down", super: true } },
-  { id: "binding.035", actionId: "posture.cycle", key: { name: "p", meta: true } },
-  { id: "binding.036", actionId: "values.toggle", key: { name: "v", meta: true } },
-  { id: "binding.037", actionId: "queue.drop", key: { name: "backspace", meta: true } },
-  { id: "binding.host-detach", actionId: "host.detach", key: { name: "]", ctrl: true } },
-  { id: "binding.host-detach-enhanced", actionId: "host.detach", key: { name: "escape", meta: true } },
-  { id: "binding.selection-native", actionId: "selection.native", key: { name: "C", meta: true } },
-  { id: "binding.selection-semantic", actionId: "selection.semantic", key: { name: "V", meta: true } },
+  { id: "binding.001", actionId: "confirm", profile: "default-terminal", key: { name: "enter" } },
+  { id: "binding.003", actionId: "escape", profile: "default-terminal", key: { name: "escape" } },
+  { id: "binding.004", actionId: "focus.next", profile: "default-terminal", key: { name: "tab" } },
+  { id: "binding.005", actionId: "focus.previous", profile: "default-terminal", key: { name: "tab", shift: true } },
+  { id: "binding.006", actionId: "move.up", profile: "default-terminal", key: { name: "up" } },
+  { id: "binding.007", actionId: "move.down", profile: "default-terminal", key: { name: "down" } },
+  { id: "binding.008", actionId: "move.left", profile: "default-terminal", key: { name: "left" } },
+  { id: "binding.009", actionId: "move.right", profile: "default-terminal", key: { name: "right" } },
+  { id: "binding.010", actionId: "selection.up", profile: "default-terminal", key: { name: "up", shift: true } },
+  { id: "binding.011", actionId: "selection.down", profile: "default-terminal", key: { name: "down", shift: true } },
+  { id: "binding.012", actionId: "selection.left", profile: "default-terminal", key: { name: "left", shift: true } },
+  { id: "binding.013", actionId: "selection.right", profile: "default-terminal", key: { name: "right", shift: true } },
+  { id: "binding.016", actionId: "interrupt", profile: "default-terminal", key: { name: "c", ctrl: true } },
+  { id: "binding.017", actionId: "help.f1", profile: "default-terminal", key: { name: "f1" } },
+  { id: "binding.018", actionId: "help.question", profile: "default-terminal", key: { name: "?" } },
+  { id: "binding.031", actionId: "page.up", profile: "default-terminal", key: { name: "up", meta: true } },
+  { id: "binding.032", actionId: "page.down", profile: "default-terminal", key: { name: "down", meta: true } },
+  { id: "binding.035", actionId: "posture.cycle", profile: "default-terminal", key: { name: "p", meta: true } },
+  { id: "binding.036", actionId: "values.toggle", profile: "default-terminal", key: { name: "v", meta: true } },
+  { id: "binding.037", actionId: "queue.drop", profile: "default-terminal", key: { name: "backspace", meta: true } },
+  { id: "binding.agent-1-base", actionId: "agent.1", profile: "default-terminal", key: { name: "1", meta: true } },
+  { id: "binding.agent-1-enhanced", actionId: "agent.1", profile: "enhanced-terminal", key: { name: "1", super: true } },
+  { id: "binding.agent-2-base", actionId: "agent.2", profile: "default-terminal", key: { name: "2", meta: true } },
+  { id: "binding.agent-2-enhanced", actionId: "agent.2", profile: "enhanced-terminal", key: { name: "2", super: true } },
+  { id: "binding.agent-3-base", actionId: "agent.3", profile: "default-terminal", key: { name: "3", meta: true } },
+  { id: "binding.agent-3-enhanced", actionId: "agent.3", profile: "enhanced-terminal", key: { name: "3", super: true } },
+  { id: "binding.agent-4-base", actionId: "agent.4", profile: "default-terminal", key: { name: "4", meta: true } },
+  { id: "binding.agent-4-enhanced", actionId: "agent.4", profile: "enhanced-terminal", key: { name: "4", super: true } },
+  { id: "binding.agent-5-base", actionId: "agent.5", profile: "default-terminal", key: { name: "5", meta: true } },
+  { id: "binding.agent-5-enhanced", actionId: "agent.5", profile: "enhanced-terminal", key: { name: "5", super: true } },
+  { id: "binding.agent-6-base", actionId: "agent.6", profile: "default-terminal", key: { name: "6", meta: true } },
+  { id: "binding.agent-6-enhanced", actionId: "agent.6", profile: "enhanced-terminal", key: { name: "6", super: true } },
+  { id: "binding.agent-7-base", actionId: "agent.7", profile: "default-terminal", key: { name: "7", meta: true } },
+  { id: "binding.agent-7-enhanced", actionId: "agent.7", profile: "enhanced-terminal", key: { name: "7", super: true } },
+  { id: "binding.agent-8-base", actionId: "agent.8", profile: "default-terminal", key: { name: "8", meta: true } },
+  { id: "binding.agent-8-enhanced", actionId: "agent.8", profile: "enhanced-terminal", key: { name: "8", super: true } },
+  { id: "binding.agent-9-base", actionId: "agent.9", profile: "default-terminal", key: { name: "9", meta: true } },
+  { id: "binding.agent-9-enhanced", actionId: "agent.9", profile: "enhanced-terminal", key: { name: "9", super: true } },
+  { id: "binding.agent-next-base", actionId: "agent.next", profile: "default-terminal", key: { name: ".", meta: true } },
+  { id: "binding.agent-next-enhanced", actionId: "agent.next", profile: "enhanced-terminal", key: { name: "tab", ctrl: true } },
+  { id: "binding.agent-previous-base", actionId: "agent.previous", profile: "default-terminal", key: { name: ",", meta: true } },
+  { id: "binding.agent-previous-enhanced", actionId: "agent.previous", profile: "enhanced-terminal", key: { name: "tab", ctrl: true, shift: true } },
+  { id: "binding.copy-base", actionId: "copy", profile: "default-terminal", key: { name: "w", meta: true } },
+  { id: "binding.copy-enhanced", actionId: "copy", profile: "enhanced-terminal", key: { name: "c", ctrl: true, shift: true } },
+  { id: "binding.host-detach", actionId: "host.detach", profile: "default-terminal", key: { name: "]", ctrl: true } },
+  { id: "binding.host-detach-enhanced", actionId: "host.detach", profile: "enhanced-terminal", key: { name: "escape", meta: true } },
+  { id: "binding.newline-base", actionId: "newline", profile: "default-terminal", key: { name: "enter", meta: true } },
+  { id: "binding.newline-enhanced", actionId: "newline", profile: "enhanced-terminal", key: { name: "enter", shift: true } },
+  { id: "binding.paste-base", actionId: "paste", profile: "default-terminal", key: { name: "y", ctrl: true } },
+  { id: "binding.paste-enhanced", actionId: "paste", profile: "enhanced-terminal", key: { name: "v", ctrl: true, shift: true } },
+  { id: "binding.selection-native", actionId: "selection.native", profile: "default-terminal", key: { name: "C", meta: true } },
+  { id: "binding.selection-semantic", actionId: "selection.semantic", profile: "default-terminal", key: { name: "V", meta: true } },
+  { id: "binding.transcript-bottom-base", actionId: "transcript.bottom", profile: "default-terminal", key: { name: "end", ctrl: true } },
+  { id: "binding.transcript-bottom-enhanced", actionId: "transcript.bottom", profile: "enhanced-terminal", key: { name: "down", super: true } },
+  { id: "binding.transcript-top-base", actionId: "transcript.top", profile: "default-terminal", key: { name: "home", ctrl: true } },
+  { id: "binding.transcript-top-enhanced", actionId: "transcript.top", profile: "enhanced-terminal", key: { name: "up", super: true } },
 ]);

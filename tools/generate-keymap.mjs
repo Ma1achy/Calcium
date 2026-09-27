@@ -12,8 +12,10 @@
  * bindings are one verb several owners spell differently — `escape` is
  * `dismiss`, `exitNativeSelection`, `focusPrompt` — so there is no handler to look up
  * by `actionId`. `when: "focused"` is the design saying the owner decides. That
- * mapping lives in `keymap.ts` as `OWNER_ACTIONS` and is joined to this, never
- * copied from it.
+ * mapping is **the row itself** in `keymap.ts` — it names the target and the
+ * `KeyAction`, and `fromRegistry` supplies the chord, the record's id and its
+ * profile. This comment named an `OWNER_ACTIONS` table, which was the first shape
+ * drafted in C16 §6b and never existed.
  *
  * Usage: `node tools/generate-keymap.mjs` writes; `--check` compares and exits 1
  * on a difference, which is T1.95.
@@ -35,6 +37,9 @@ const OUT = join(ROOT, "src/interaction/router/registry-bindings.ts");
 const NAMED = Object.freeze({
   "⏎": "enter", esc: "escape", "⇥": "tab", "↑": "up", "↓": "down",
   "←": "left", "→": "right", "⌫": "backspace", F1: "f1", "?": "?",
+  // `⌃home`/`⌃end` are `transcript.top`/`transcript.bottom`'s base routes (C16
+  // §6c table C). The design spells them in letters, as it spells `esc`.
+  home: "home", end: "end",
 });
 
 const MODIFIERS = Object.freeze({ "⌃": "ctrl", "⌥": "meta", "⌘": "super", "⇧": "shift" });
@@ -81,6 +86,9 @@ export function generate() {
     if (b.kind !== "key" || b.status !== "current") continue;
     const key = parseChord(b.chord);
     if (key === null) throw new Error(`${b.id}: cannot spell ${JSON.stringify(b.chord)} as a Key`);
+    if (b.profile !== "default-terminal" && b.profile !== "enhanced-terminal") {
+      throw new Error(`${b.id}: profile ${JSON.stringify(b.profile)} is neither terminal`);
+    }
     rows.push({ id: b.id, actionId: b.actionId, chord: b.chord, key, scope: b.scope,
                 profile: b.profile, when: b.when });
   }
@@ -92,10 +100,14 @@ export function generate() {
   // says the same thing from the other end — a published member nothing consumes
   // is a seam with nothing on the far side. The human-readable chord for a
   // reader of this file is `docs/KEYS.md`, generated from the live table.
+  //
+  // **`profile` is read now** (C16 §6c, I42 amended): `fromRegistry` gives a row
+  // its record's profile, so the design's field is the one record of whether a
+  // base terminal can deliver the chord.
   const body = rows
     .map((r) =>
       `  { id: ${JSON.stringify(r.id)}, actionId: ${JSON.stringify(r.actionId)}, ` +
-      `key: ${keyLiteral(r.key)} },`,
+      `profile: ${JSON.stringify(r.profile)}, key: ${keyLiteral(r.key)} },`,
     )
     .join("\n");
 
@@ -109,15 +121,20 @@ export function generate() {
  *
  * \`actionId\` is the design's verb, not a \`KeyAction\`. Nine of these are one
  * verb several owners spell differently — \`escape\` is \`dismiss\`,
- * \`exitNativeSelection\` and \`focusPrompt\` — so the join to a handler is
- * \`OWNER_ACTIONS\` in \`keymap.ts\`, keyed by \`(actionId, target)\`. That is
- * R-KEY-003's *unless the current owner explicitly captures the action*, and
- * \`when: "focused"\` is the design saying so.
+ * \`exitNativeSelection\` and \`focusPrompt\` — so the join to a handler is the
+ * row in \`keymap.ts\`, which names the target and the action while
+ * \`fromRegistry\` supplies the chord. That is R-KEY-003's *unless the current
+ * owner explicitly captures the action*, and \`when: "focused"\` is the design
+ * saying so.
+ *
+ * \`profile\` is the record's (C16 §6c): \`enhanced-terminal\` for a chord only a
+ * terminal reporting the Kitty protocol can send, \`default-terminal\` otherwise.
  */
 
 export type RegistryBinding = Readonly<{
   id: string;
   actionId: string;
+  profile: "default-terminal" | "enhanced-terminal";
   key: Readonly<{ name: string; ctrl?: boolean; meta?: boolean; shift?: boolean; super?: boolean }>;
 }>;
 

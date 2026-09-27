@@ -200,9 +200,9 @@ function modifiersOf(
  * kitty's modifier field, for the `u` arm alone (C02 §3, C16 §2).
  *
  * Plus one, like xterm's, and the low three bits agree — shift 1, alt 2, ctrl 4.
- * **Bit 8 is folded into nothing**: it is xterm's Meta and kitty's Super, and
- * `⌘a` arriving as `Alt-a` is the live-binding class `modifiersOf`'s comment
- * records, one encoding over. kitty's own meta is bit 32 and joins alt in
+ * **Bit 8 is `super`** — kitty's own definition, and what the body below has
+ * done since C16 I34 was amended; this comment said *folded into nothing* for
+ * as long after (C16 §6c). kitty's own meta is bit 32 and joins alt in
  * `meta`, the pair the `CSI 1;m X` arm already folds. Stated blind spot: an
  * xterm at `formatOtherKeys=1` loses a Meta modifier here; its default format is
  * `CSI 27;m;k ~`, which `modifiersOf` keeps.

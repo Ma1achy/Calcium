@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT. Source: docs/design/language/calcium-registry.json, rendered by build-calcium.mjs's renderKeysMarkdown; written with the key ladder below by tools/keymap-table.mjs -->
 # Calcium keys
 
-Revision 0.12 · 41 current bindings · profile: default-terminal
+Revision 0.13 · 57 current bindings · a `default-terminal` chord is one a terminal without the Kitty protocol sends; an `enhanced-terminal` chord needs the protocol
 
 The universal set gives one purpose to each key and does not depend on what has focus; the active owner resolves that purpose.
 
@@ -9,59 +9,75 @@ docs/KEYS.md and the help entry come from the same source; a hand-written keymap
 
 ## global
 
-| Route | Binding | Condition | Action | Meaning |
-| --- | --- | --- | --- | --- |
-| key | ⏎ | always | confirm | confirm · send · activate · open |
-| key | esc | always | escape | out one owner rung · cancel · clear |
-| key | ⇥ | always | focus.next | move focus forward; complete in the prompt |
-| key | ⇧⇥ | always | focus.previous | move focus backward |
-| key | ↑ | focused | move.up | move up within the focused thing |
-| key | ↓ | focused | move.down | move down within the focused thing |
-| key | ← | focused | move.left | move left within the focused thing |
-| key | → | focused | move.right | move right within the focused thing |
-| key | ⇧↑ | selectable | selection.up | extend selection up |
-| key | ⇧↓ | selectable | selection.down | extend selection down |
-| key | ⇧← | selectable | selection.left | extend selection left |
-| key | ⇧→ | selectable | selection.right | extend selection right |
-| key | ⌃⇧C | always | copy | copy source; ⌘C where passed through |
-| key | ⌃C | running | interrupt | interrupt |
-| key | F1 | always | help.f1 | emit the resolved keymap |
-| key | ? | non-typing | help.question | emit the resolved keymap |
-| command | /help | typing | help.command | base-terminal help route |
-| key | ⌃⇥ | always | agent.next | switch to next agent |
-| key | ⌃⇧⇥ | always | agent.previous | switch to previous agent |
-| key | ⌘1 | always | agent.1 | jump to agent 1 |
-| key | ⌘2 | always | agent.2 | jump to agent 2 |
-| key | ⌘3 | always | agent.3 | jump to agent 3 |
-| key | ⌘4 | always | agent.4 | jump to agent 4 |
-| key | ⌘5 | always | agent.5 | jump to agent 5 |
-| key | ⌘6 | always | agent.6 | jump to agent 6 |
-| key | ⌘7 | always | agent.7 | jump to agent 7 |
-| key | ⌘8 | always | agent.8 | jump to agent 8 |
-| key | ⌘9 | always | agent.9 | jump to agent 9 |
-| key | ⌥p | always | posture.cycle | cycle permission posture |
-| key | ⌥⇧C | always | selection.native | hand the mouse to the terminal |
-| key | ⌥⇧V | always | selection.semantic | enter Calcium copy mode |
-| key | ⌃] | attached | host.detach | host escape |
-| key | ⌥esc | attached | host.detach | enhanced detach |
+| Route | Binding | Profile | Condition | Action | Meaning |
+| --- | --- | --- | --- | --- | --- |
+| key | ⏎ | default-terminal | always | confirm | confirm · send · activate · open |
+| key | esc | default-terminal | always | escape | out one owner rung · cancel · clear |
+| key | ⇥ | default-terminal | always | focus.next | move focus forward; complete in the prompt |
+| key | ⇧⇥ | default-terminal | always | focus.previous | move focus backward |
+| key | ↑ | default-terminal | focused | move.up | move up within the focused thing |
+| key | ↓ | default-terminal | focused | move.down | move down within the focused thing |
+| key | ← | default-terminal | focused | move.left | move left within the focused thing |
+| key | → | default-terminal | focused | move.right | move right within the focused thing |
+| key | ⇧↑ | default-terminal | selectable | selection.up | extend selection up |
+| key | ⇧↓ | default-terminal | selectable | selection.down | extend selection down |
+| key | ⇧← | default-terminal | selectable | selection.left | extend selection left |
+| key | ⇧→ | default-terminal | selectable | selection.right | extend selection right |
+| key | ⌃⇧C | enhanced-terminal | always | copy | copy source; ⌘C where passed through |
+| key | ⌥w | default-terminal | always | copy | copy source; ⌘C where passed through |
+| key | ⌃C | default-terminal | running | interrupt | interrupt |
+| key | F1 | default-terminal | always | help.f1 | emit the resolved keymap |
+| key | ? | default-terminal | non-typing | help.question | emit the resolved keymap |
+| command | /help | default-terminal | typing | help.command | base-terminal help route |
+| key | ⌃⇥ | enhanced-terminal | always | agent.next | switch to next agent |
+| key | ⌥. | default-terminal | always | agent.next | switch to next agent |
+| key | ⌃⇧⇥ | enhanced-terminal | always | agent.previous | switch to previous agent |
+| key | ⌥, | default-terminal | always | agent.previous | switch to previous agent |
+| key | ⌘1 | enhanced-terminal | always | agent.1 | jump to agent 1 |
+| key | ⌥1 | default-terminal | always | agent.1 | jump to agent 1 |
+| key | ⌘2 | enhanced-terminal | always | agent.2 | jump to agent 2 |
+| key | ⌥2 | default-terminal | always | agent.2 | jump to agent 2 |
+| key | ⌘3 | enhanced-terminal | always | agent.3 | jump to agent 3 |
+| key | ⌥3 | default-terminal | always | agent.3 | jump to agent 3 |
+| key | ⌘4 | enhanced-terminal | always | agent.4 | jump to agent 4 |
+| key | ⌥4 | default-terminal | always | agent.4 | jump to agent 4 |
+| key | ⌘5 | enhanced-terminal | always | agent.5 | jump to agent 5 |
+| key | ⌥5 | default-terminal | always | agent.5 | jump to agent 5 |
+| key | ⌘6 | enhanced-terminal | always | agent.6 | jump to agent 6 |
+| key | ⌥6 | default-terminal | always | agent.6 | jump to agent 6 |
+| key | ⌘7 | enhanced-terminal | always | agent.7 | jump to agent 7 |
+| key | ⌥7 | default-terminal | always | agent.7 | jump to agent 7 |
+| key | ⌘8 | enhanced-terminal | always | agent.8 | jump to agent 8 |
+| key | ⌥8 | default-terminal | always | agent.8 | jump to agent 8 |
+| key | ⌘9 | enhanced-terminal | always | agent.9 | jump to agent 9 |
+| key | ⌥9 | default-terminal | always | agent.9 | jump to agent 9 |
+| key | ⌥p | default-terminal | always | posture.cycle | cycle permission posture |
+| key | ⌥⇧C | default-terminal | always | selection.native | hand the mouse to the terminal |
+| key | ⌥⇧V | default-terminal | always | selection.semantic | enter Calcium copy mode |
+| key | ⌃] | default-terminal | attached | host.detach | host escape |
+| key | ⌥esc | enhanced-terminal | attached | host.detach | enhanced detach |
 
 ## prompt
 
-| Route | Binding | Condition | Action | Meaning |
-| --- | --- | --- | --- | --- |
-| key | ⇧⏎ | always | newline | newline |
-| key | ⌃⇧V | always | paste | paste |
-| key | ⌥⌫ | always | queue.drop | drop the last queued message |
+| Route | Binding | Profile | Condition | Action | Meaning |
+| --- | --- | --- | --- | --- | --- |
+| key | ⇧⏎ | enhanced-terminal | always | newline | newline |
+| key | ⌥⏎ | default-terminal | always | newline | newline |
+| key | ⌃⇧V | enhanced-terminal | always | paste | paste |
+| key | ⌃Y | default-terminal | always | paste | paste |
+| key | ⌥⌫ | default-terminal | always | queue.drop | drop the last queued message |
 
 ## transcript
 
-| Route | Binding | Condition | Action | Meaning |
-| --- | --- | --- | --- | --- |
-| key | ⌥↑ | always | page.up | scroll one page up |
-| key | ⌥↓ | always | page.down | scroll one page down |
-| key | ⌘↑ | always | transcript.top | go to top |
-| key | ⌘↓ | always | transcript.bottom | go to bottom |
-| key | ⌥v | always | values.toggle | toggle per-token values |
+| Route | Binding | Profile | Condition | Action | Meaning |
+| --- | --- | --- | --- | --- | --- |
+| key | ⌥↑ | default-terminal | always | page.up | scroll one page up |
+| key | ⌥↓ | default-terminal | always | page.down | scroll one page down |
+| key | ⌘↑ | enhanced-terminal | always | transcript.top | go to top |
+| key | ⌃home | default-terminal | always | transcript.top | go to top |
+| key | ⌘↓ | enhanced-terminal | always | transcript.bottom | go to bottom |
+| key | ⌃end | default-terminal | always | transcript.bottom | go to bottom |
+| key | ⌥v | default-terminal | always | values.toggle | toggle per-token values |
 
 # Key ladder
 
@@ -99,18 +115,18 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⌥9` | both |  |  |  |  |  |  |  |  | agent9 |
 | `⌘9` | enhanced-terminal |  |  |  |  |  |  |  |  | agent9 |
 | `=` | both |  |  |  |  |  | dollyIn |  |  |  |
-| `?` | both |  |  |  |  |  |  |  | helpKeymap |  |
+| `?` † | both |  |  | passToTerminal |  |  |  |  |  | helpKeymap |
 | `⇧A` | both |  |  |  | selectAllLoadedEntries |  |  |  |  |  |
-| `⌥⇧C` † | both |  |  |  |  |  |  | enterNativeSelection | enterNativeSelection |  |
-| `⌥⇧V` † | both |  |  |  |  |  |  | enterSemanticSelection | enterSemanticSelection |  |
+| `⌥⇧C` | both |  |  |  |  |  |  |  |  | enterNativeSelection |
+| `⌥⇧V` | both |  |  |  |  |  |  |  |  | enterSemanticSelection |
 | `⌃]` | both | hostDetach |  |  |  |  |  |  |  |  |
 | `a` | both |  |  |  | selectEntryUnderCaret |  |  |  |  |  |
 | `⌃A` † | both |  |  |  |  |  |  | home | selectAllElements |  |
 | `⌥a` | both |  |  |  |  |  |  | selectAll |  |  |
 | `⌥b` | both |  |  |  |  |  |  | wordLeft |  |  |
 | `⌫` | both |  |  |  |  |  |  | backspace |  |  |
-| `⌥⌫` | both |  |  |  |  |  |  | queueDrop |  |  |
-| `⌃⇧C` | enhanced-terminal |  |  |  |  |  |  | copySelection |  |  |
+| `⌥⌫` | both |  |  |  |  |  |  | queueDrop, else killWordLeft |  |  |
+| `⌃⇧C` † | enhanced-terminal |  |  |  | copySelectedEntries |  | copyElement | copySelection | copyElement |  |
 | `⌥d` | both |  |  |  |  |  |  | killWordRight |  |  |
 | `delete` | both |  |  |  |  |  |  | delete |  |  |
 | `↓` † | both |  |  |  | moveSemanticCaretDown | menuNext | insideDown | historyNext | rowDown |  |
@@ -162,10 +178,10 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⌃⇧V` | enhanced-terminal |  |  |  |  |  |  | yank |  |  |
 | `⌥v` † | both |  |  |  |  |  |  | valuesToggle | valuesToggle |  |
 | `⌃W` | both |  |  |  |  |  |  | killWordLeft |  |  |
-| `⌥w` | both |  |  |  |  |  |  | copySelection |  |  |
+| `⌥w` † | both |  |  |  | copySelectedEntries |  | copyElement | copySelection | copyElement |  |
 | `⌃Y` | both |  |  |  |  |  |  | yank |  |  |
 | `y` † | both |  |  |  | copySelectedEntries |  |  |  | copyElement |  |
 | `⌃Z` | both |  |  |  |  |  |  | undo |  |  |
 | `⌥z` | both |  |  |  |  |  |  | redo |  |  |
 
-129 bindings · 91 keys · 22 resolved by the ladder (†).
+134 bindings · 91 keys · 23 resolved by the ladder (†).

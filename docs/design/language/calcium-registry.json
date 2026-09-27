@@ -1,7 +1,7 @@
 {
   "meta": {
     "name": "Calcium design language",
-    "revision": "0.12",
+    "revision": "0.13",
     "generatedArtifact": "calcium-design-language.html",
     "ruleIdPolicy": "IDs are explicit, permanent, and never derived from order.",
     "normativeSource": "calcium-registry.json",
@@ -34105,11 +34105,44 @@
       "scope": "prompt",
       "label": "newline",
       "profile": "default-terminal",
+      "status": "superseded",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersededBy": "binding.newline-enhanced"
+    },
+    {
+      "id": "binding.newline-enhanced",
+      "actionId": "newline",
+      "chord": "⇧⏎",
+      "scope": "prompt",
+      "label": "newline",
+      "profile": "enhanced-terminal",
       "status": "current",
       "ruleIds": [
         "R-KEY-007"
       ],
-      "kind": "key"
+      "kind": "key",
+      "supersedes": [
+        "binding.002"
+      ],
+      "supersededBy": null
+    },
+    {
+      "id": "binding.newline-base",
+      "actionId": "newline",
+      "chord": "⌥⏎",
+      "scope": "prompt",
+      "label": "newline",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersedes": [],
+      "supersededBy": null
     },
     {
       "id": "binding.003",
@@ -34269,11 +34302,44 @@
       "scope": "global",
       "label": "copy source; ⌘C where passed through",
       "profile": "default-terminal",
+      "status": "superseded",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersededBy": "binding.copy-enhanced"
+    },
+    {
+      "id": "binding.copy-enhanced",
+      "actionId": "copy",
+      "chord": "⌃⇧C",
+      "scope": "global",
+      "label": "copy source; ⌘C where passed through",
+      "profile": "enhanced-terminal",
       "status": "current",
       "ruleIds": [
         "R-KEY-007"
       ],
-      "kind": "key"
+      "kind": "key",
+      "supersedes": [
+        "binding.014"
+      ],
+      "supersededBy": null
+    },
+    {
+      "id": "binding.copy-base",
+      "actionId": "copy",
+      "chord": "⌥w",
+      "scope": "global",
+      "label": "copy source; ⌘C where passed through",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersedes": [],
+      "supersededBy": null
     },
     {
       "id": "binding.015",
@@ -34282,11 +34348,44 @@
       "scope": "prompt",
       "label": "paste",
       "profile": "default-terminal",
+      "status": "superseded",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersededBy": "binding.paste-enhanced"
+    },
+    {
+      "id": "binding.paste-enhanced",
+      "actionId": "paste",
+      "chord": "⌃⇧V",
+      "scope": "prompt",
+      "label": "paste",
+      "profile": "enhanced-terminal",
       "status": "current",
       "ruleIds": [
         "R-KEY-007"
       ],
-      "kind": "key"
+      "kind": "key",
+      "supersedes": [
+        "binding.015"
+      ],
+      "supersededBy": null
+    },
+    {
+      "id": "binding.paste-base",
+      "actionId": "paste",
+      "chord": "⌃Y",
+      "scope": "prompt",
+      "label": "paste",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersedes": [],
+      "supersededBy": null
     },
     {
       "id": "binding.016",
@@ -34350,11 +34449,44 @@
       "scope": "global",
       "label": "switch to next agent",
       "profile": "default-terminal",
+      "status": "superseded",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersededBy": "binding.agent-next-enhanced"
+    },
+    {
+      "id": "binding.agent-next-enhanced",
+      "actionId": "agent.next",
+      "chord": "⌃⇥",
+      "scope": "global",
+      "label": "switch to next agent",
+      "profile": "enhanced-terminal",
       "status": "current",
       "ruleIds": [
         "R-KEY-007"
       ],
-      "kind": "key"
+      "kind": "key",
+      "supersedes": [
+        "binding.020"
+      ],
+      "supersededBy": null
+    },
+    {
+      "id": "binding.agent-next-base",
+      "actionId": "agent.next",
+      "chord": "⌥.",
+      "scope": "global",
+      "label": "switch to next agent",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersedes": [],
+      "supersededBy": null
     },
     {
       "id": "binding.021",
@@ -34363,11 +34495,44 @@
       "scope": "global",
       "label": "switch to previous agent",
       "profile": "default-terminal",
+      "status": "superseded",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersededBy": "binding.agent-previous-enhanced"
+    },
+    {
+      "id": "binding.agent-previous-enhanced",
+      "actionId": "agent.previous",
+      "chord": "⌃⇧⇥",
+      "scope": "global",
+      "label": "switch to previous agent",
+      "profile": "enhanced-terminal",
       "status": "current",
       "ruleIds": [
         "R-KEY-007"
       ],
-      "kind": "key"
+      "kind": "key",
+      "supersedes": [
+        "binding.021"
+      ],
+      "supersededBy": null
+    },
+    {
+      "id": "binding.agent-previous-base",
+      "actionId": "agent.previous",
+      "chord": "⌥,",
+      "scope": "global",
+      "label": "switch to previous agent",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersedes": [],
+      "supersededBy": null
     },
     {
       "id": "binding.022",
@@ -34376,11 +34541,44 @@
       "scope": "global",
       "label": "jump to agent 1",
       "profile": "default-terminal",
+      "status": "superseded",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersededBy": "binding.agent-1-enhanced"
+    },
+    {
+      "id": "binding.agent-1-enhanced",
+      "actionId": "agent.1",
+      "chord": "⌘1",
+      "scope": "global",
+      "label": "jump to agent 1",
+      "profile": "enhanced-terminal",
       "status": "current",
       "ruleIds": [
         "R-KEY-007"
       ],
-      "kind": "key"
+      "kind": "key",
+      "supersedes": [
+        "binding.022"
+      ],
+      "supersededBy": null
+    },
+    {
+      "id": "binding.agent-1-base",
+      "actionId": "agent.1",
+      "chord": "⌥1",
+      "scope": "global",
+      "label": "jump to agent 1",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersedes": [],
+      "supersededBy": null
     },
     {
       "id": "binding.023",
@@ -34389,11 +34587,44 @@
       "scope": "global",
       "label": "jump to agent 2",
       "profile": "default-terminal",
+      "status": "superseded",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersededBy": "binding.agent-2-enhanced"
+    },
+    {
+      "id": "binding.agent-2-enhanced",
+      "actionId": "agent.2",
+      "chord": "⌘2",
+      "scope": "global",
+      "label": "jump to agent 2",
+      "profile": "enhanced-terminal",
       "status": "current",
       "ruleIds": [
         "R-KEY-007"
       ],
-      "kind": "key"
+      "kind": "key",
+      "supersedes": [
+        "binding.023"
+      ],
+      "supersededBy": null
+    },
+    {
+      "id": "binding.agent-2-base",
+      "actionId": "agent.2",
+      "chord": "⌥2",
+      "scope": "global",
+      "label": "jump to agent 2",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersedes": [],
+      "supersededBy": null
     },
     {
       "id": "binding.024",
@@ -34402,11 +34633,44 @@
       "scope": "global",
       "label": "jump to agent 3",
       "profile": "default-terminal",
+      "status": "superseded",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersededBy": "binding.agent-3-enhanced"
+    },
+    {
+      "id": "binding.agent-3-enhanced",
+      "actionId": "agent.3",
+      "chord": "⌘3",
+      "scope": "global",
+      "label": "jump to agent 3",
+      "profile": "enhanced-terminal",
       "status": "current",
       "ruleIds": [
         "R-KEY-007"
       ],
-      "kind": "key"
+      "kind": "key",
+      "supersedes": [
+        "binding.024"
+      ],
+      "supersededBy": null
+    },
+    {
+      "id": "binding.agent-3-base",
+      "actionId": "agent.3",
+      "chord": "⌥3",
+      "scope": "global",
+      "label": "jump to agent 3",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersedes": [],
+      "supersededBy": null
     },
     {
       "id": "binding.025",
@@ -34415,11 +34679,44 @@
       "scope": "global",
       "label": "jump to agent 4",
       "profile": "default-terminal",
+      "status": "superseded",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersededBy": "binding.agent-4-enhanced"
+    },
+    {
+      "id": "binding.agent-4-enhanced",
+      "actionId": "agent.4",
+      "chord": "⌘4",
+      "scope": "global",
+      "label": "jump to agent 4",
+      "profile": "enhanced-terminal",
       "status": "current",
       "ruleIds": [
         "R-KEY-007"
       ],
-      "kind": "key"
+      "kind": "key",
+      "supersedes": [
+        "binding.025"
+      ],
+      "supersededBy": null
+    },
+    {
+      "id": "binding.agent-4-base",
+      "actionId": "agent.4",
+      "chord": "⌥4",
+      "scope": "global",
+      "label": "jump to agent 4",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersedes": [],
+      "supersededBy": null
     },
     {
       "id": "binding.026",
@@ -34428,11 +34725,44 @@
       "scope": "global",
       "label": "jump to agent 5",
       "profile": "default-terminal",
+      "status": "superseded",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersededBy": "binding.agent-5-enhanced"
+    },
+    {
+      "id": "binding.agent-5-enhanced",
+      "actionId": "agent.5",
+      "chord": "⌘5",
+      "scope": "global",
+      "label": "jump to agent 5",
+      "profile": "enhanced-terminal",
       "status": "current",
       "ruleIds": [
         "R-KEY-007"
       ],
-      "kind": "key"
+      "kind": "key",
+      "supersedes": [
+        "binding.026"
+      ],
+      "supersededBy": null
+    },
+    {
+      "id": "binding.agent-5-base",
+      "actionId": "agent.5",
+      "chord": "⌥5",
+      "scope": "global",
+      "label": "jump to agent 5",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersedes": [],
+      "supersededBy": null
     },
     {
       "id": "binding.027",
@@ -34441,11 +34771,44 @@
       "scope": "global",
       "label": "jump to agent 6",
       "profile": "default-terminal",
+      "status": "superseded",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersededBy": "binding.agent-6-enhanced"
+    },
+    {
+      "id": "binding.agent-6-enhanced",
+      "actionId": "agent.6",
+      "chord": "⌘6",
+      "scope": "global",
+      "label": "jump to agent 6",
+      "profile": "enhanced-terminal",
       "status": "current",
       "ruleIds": [
         "R-KEY-007"
       ],
-      "kind": "key"
+      "kind": "key",
+      "supersedes": [
+        "binding.027"
+      ],
+      "supersededBy": null
+    },
+    {
+      "id": "binding.agent-6-base",
+      "actionId": "agent.6",
+      "chord": "⌥6",
+      "scope": "global",
+      "label": "jump to agent 6",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersedes": [],
+      "supersededBy": null
     },
     {
       "id": "binding.028",
@@ -34454,11 +34817,44 @@
       "scope": "global",
       "label": "jump to agent 7",
       "profile": "default-terminal",
+      "status": "superseded",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersededBy": "binding.agent-7-enhanced"
+    },
+    {
+      "id": "binding.agent-7-enhanced",
+      "actionId": "agent.7",
+      "chord": "⌘7",
+      "scope": "global",
+      "label": "jump to agent 7",
+      "profile": "enhanced-terminal",
       "status": "current",
       "ruleIds": [
         "R-KEY-007"
       ],
-      "kind": "key"
+      "kind": "key",
+      "supersedes": [
+        "binding.028"
+      ],
+      "supersededBy": null
+    },
+    {
+      "id": "binding.agent-7-base",
+      "actionId": "agent.7",
+      "chord": "⌥7",
+      "scope": "global",
+      "label": "jump to agent 7",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersedes": [],
+      "supersededBy": null
     },
     {
       "id": "binding.029",
@@ -34467,11 +34863,44 @@
       "scope": "global",
       "label": "jump to agent 8",
       "profile": "default-terminal",
+      "status": "superseded",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersededBy": "binding.agent-8-enhanced"
+    },
+    {
+      "id": "binding.agent-8-enhanced",
+      "actionId": "agent.8",
+      "chord": "⌘8",
+      "scope": "global",
+      "label": "jump to agent 8",
+      "profile": "enhanced-terminal",
       "status": "current",
       "ruleIds": [
         "R-KEY-007"
       ],
-      "kind": "key"
+      "kind": "key",
+      "supersedes": [
+        "binding.029"
+      ],
+      "supersededBy": null
+    },
+    {
+      "id": "binding.agent-8-base",
+      "actionId": "agent.8",
+      "chord": "⌥8",
+      "scope": "global",
+      "label": "jump to agent 8",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersedes": [],
+      "supersededBy": null
     },
     {
       "id": "binding.030",
@@ -34480,11 +34909,44 @@
       "scope": "global",
       "label": "jump to agent 9",
       "profile": "default-terminal",
+      "status": "superseded",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersededBy": "binding.agent-9-enhanced"
+    },
+    {
+      "id": "binding.agent-9-enhanced",
+      "actionId": "agent.9",
+      "chord": "⌘9",
+      "scope": "global",
+      "label": "jump to agent 9",
+      "profile": "enhanced-terminal",
       "status": "current",
       "ruleIds": [
         "R-KEY-007"
       ],
-      "kind": "key"
+      "kind": "key",
+      "supersedes": [
+        "binding.030"
+      ],
+      "supersededBy": null
+    },
+    {
+      "id": "binding.agent-9-base",
+      "actionId": "agent.9",
+      "chord": "⌥9",
+      "scope": "global",
+      "label": "jump to agent 9",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersedes": [],
+      "supersededBy": null
     },
     {
       "id": "binding.031",
@@ -34519,11 +34981,44 @@
       "scope": "transcript",
       "label": "go to top",
       "profile": "default-terminal",
+      "status": "superseded",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersededBy": "binding.transcript-top-enhanced"
+    },
+    {
+      "id": "binding.transcript-top-enhanced",
+      "actionId": "transcript.top",
+      "chord": "⌘↑",
+      "scope": "transcript",
+      "label": "go to top",
+      "profile": "enhanced-terminal",
       "status": "current",
       "ruleIds": [
         "R-KEY-007"
       ],
-      "kind": "key"
+      "kind": "key",
+      "supersedes": [
+        "binding.033"
+      ],
+      "supersededBy": null
+    },
+    {
+      "id": "binding.transcript-top-base",
+      "actionId": "transcript.top",
+      "chord": "⌃home",
+      "scope": "transcript",
+      "label": "go to top",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersedes": [],
+      "supersededBy": null
     },
     {
       "id": "binding.034",
@@ -34532,11 +35027,44 @@
       "scope": "transcript",
       "label": "go to bottom",
       "profile": "default-terminal",
+      "status": "superseded",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersededBy": "binding.transcript-bottom-enhanced"
+    },
+    {
+      "id": "binding.transcript-bottom-enhanced",
+      "actionId": "transcript.bottom",
+      "chord": "⌘↓",
+      "scope": "transcript",
+      "label": "go to bottom",
+      "profile": "enhanced-terminal",
       "status": "current",
       "ruleIds": [
         "R-KEY-007"
       ],
-      "kind": "key"
+      "kind": "key",
+      "supersedes": [
+        "binding.034"
+      ],
+      "supersededBy": null
+    },
+    {
+      "id": "binding.transcript-bottom-base",
+      "actionId": "transcript.bottom",
+      "chord": "⌃end",
+      "scope": "transcript",
+      "label": "go to bottom",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-007"
+      ],
+      "kind": "key",
+      "supersedes": [],
+      "supersededBy": null
     },
     {
       "id": "binding.035",
@@ -51126,6 +51654,13 @@
     "profiles": [
       {
         "id": "default-terminal",
+        "status": "current",
+        "ruleIds": [
+          "R-KEY-003"
+        ]
+      },
+      {
+        "id": "enhanced-terminal",
         "status": "current",
         "ruleIds": [
           "R-KEY-003"

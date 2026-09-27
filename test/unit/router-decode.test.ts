@@ -173,7 +173,7 @@ describe("C16 §2 — key decoding", () => {
     expect(feed(d, "\x1b[97:65;2u")).toStrictEqual([{ kind: "key", key: k("a", "\x1b[97:65;2u", { shift: true }) }]);
   });
 
-  it("T1.3q (C16 §2): the `u` arm's modifier bits are kitty's — bit 8 folds into nothing, bit 32 into meta", () => {
+  it("T1.3q (C16 §2): the `u` arm's modifier bits are kitty's — bit 8 is super and never meta, bit 32 is meta", () => {
     const { d } = decoder();
     const only = (s: string) => {
       const [e] = feed(d, s);
@@ -182,7 +182,9 @@ describe("C16 §2 — key decoding", () => {
     // alt: 1 + 2 = 3 → meta. kitty meta: 1 + 32 = 33 → meta. Both, 35 → meta.
     expect(only("\x1b[97;3u")).toEqual({ ctrl: false, meta: true, shift: false });
     expect(only("\x1b[97;33u")).toEqual({ ctrl: false, meta: true, shift: false });
-    // super: 1 + 8 = 9 → **no modifier**. `⌘a` is not `Alt-a`.
+    // super: 1 + 8 = 9 → **not meta**: it is `super` (C16 §6c, T1.34), and
+    // `⌘a` is not `Alt-a`. The title said *folds into nothing* after the body
+    // had started setting `super`.
     expect(only("\x1b[97;9u")).toEqual({ ctrl: false, meta: false, shift: false });
     // And the control the row needs: the same bit *is* meta through the xterm
     // arm, so a decoder that shared one function between the two would fail one

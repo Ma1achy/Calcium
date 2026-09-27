@@ -384,6 +384,12 @@ export function validateRegistry(registry) {
     }
   };
   walkForCitations(registry, '', 0);
+  // **Bindings are superseded the way rules are, and walked the same way** (C16
+  // §6c, T1.174). Sixteen were superseded when the design's `profile` field was
+  // corrected, and nothing walked their links: a binding carries no digest and no
+  // baseline, so a successor that named no predecessor would have read as two
+  // unrelated records. The rules' own walk, not a second copy of it.
+  validateSupersession(registry.bindings, new Map(registry.bindings.map(binding => [binding.id, binding])));
   const currentSpinners = active(registry.spinners);
   const spinnerIds = new Set();
   for (const spinner of currentSpinners) {
@@ -955,13 +961,16 @@ function renderKeymap(registry, compact = false) {
     const body = entries.map(item => {
       const route = item.kind === 'command' ? '<span class="c-meta">cmd </span>' : '<span class="c-muted">key </span>';
       const when = item.when ? `<span class="c-meta"> \u00b7 ${esc(item.when)}</span>` : '';
-      return `<span class="c-default">  </span>${route}<span class="c-accent">${esc(item.chord.padEnd(7))}</span><span class="c-muted">${esc(item.label)}</span>${when}`;
+      // The profile beside the condition, because it is one: an enhanced chord is
+      // a route only where the terminal reported the protocol (C16 §6c).
+      const profile = item.profile === 'enhanced-terminal' ? `<span class="c-meta"> \u00b7 enhanced</span>` : '';
+      return `<span class="c-default">  </span>${route}<span class="c-accent">${esc(item.chord.padEnd(7))}</span><span class="c-muted">${esc(item.label)}</span>${when}${profile}`;
     }).join('\n');
     return `${header}\n${body}`;
   }).join('\n<span class=gap> </span>\n');
   const heading = compact
     ? `<span class="c-ok">● </span><span class="c-default">keys</span><span class="c-muted"> · </span><span class="c-ok">${countValue(registry, 'bindings')} bindings</span>`
-    : `<span class="c-default bold">RESOLVED DEFAULT-TERMINAL KEYMAP · ${countValue(registry, 'bindings')} bindings</span>`;
+    : `<span class="c-default bold">RESOLVED KEYMAP · ${countValue(registry, 'bindings')} bindings · default and enhanced terminals</span>`;
   const intro = compact
     ? `<span class="c-muted" data-help-policy="durable-entry">${esc(registry.keymapPolicy.help.durableEntry)}</span>`
     : `<span class="c-muted" data-keymap-policy="universal">${esc(registry.keymapPolicy.universal)}</span>\n<span class="c-muted">Actions are primary. Chords are the resolved profile. A named command route is the intended contract; only ${active(registry.bindings).filter(b => b.kind === 'command').length} of ${active(registry.bindings).length} bindings carry one today.</span>`;
@@ -994,8 +1003,13 @@ export function renderKeysMarkdown(registry) {
   }
   // Route and Condition are columns, not omissions. `/help` under a "Key" column
   // with no condition read as an unconditional global keystroke.
-  const sections = [...groups.entries()].map(([scope, entries]) => `## ${scope}\n\n| Route | Binding | Condition | Action | Meaning |\n| --- | --- | --- | --- | --- |\n${entries.map(binding => `| ${markdownCell(binding.kind ?? 'key')} | ${markdownCell(binding.chord)} | ${markdownCell(binding.when ?? 'always')} | ${markdownCell(binding.actionId)} | ${markdownCell(binding.label)} |`).join('\n')}`).join('\n\n');
-  return `<!-- GENERATED FILE — DO NOT EDIT. Source: docs/design/language/calcium-registry.json, rendered by build-calcium.mjs's renderKeysMarkdown; written with the key ladder below by tools/keymap-table.mjs -->\n# Calcium keys\n\nRevision ${registry.meta.revision} · ${bindings.length} current bindings · profile: default-terminal\n\n${registry.keymapPolicy.universal}\n\n${registry.keymapPolicy.help.docsContract}\n\n${sections}\n`;
+  //
+  // **And Profile is a column, where it was a header** (C16 §6a clause 5, §6c).
+  // One header said `profile: default-terminal` over every row, so this file
+  // listed `⌘1` for a plain terminal: the record's own field is the fact, and a
+  // file-wide claim is a second record of it that cannot be true of every row.
+  const sections = [...groups.entries()].map(([scope, entries]) => `## ${scope}\n\n| Route | Binding | Profile | Condition | Action | Meaning |\n| --- | --- | --- | --- | --- | --- |\n${entries.map(binding => `| ${markdownCell(binding.kind ?? 'key')} | ${markdownCell(binding.chord)} | ${markdownCell(binding.profile)} | ${markdownCell(binding.when ?? 'always')} | ${markdownCell(binding.actionId)} | ${markdownCell(binding.label)} |`).join('\n')}`).join('\n\n');
+  return `<!-- GENERATED FILE — DO NOT EDIT. Source: docs/design/language/calcium-registry.json, rendered by build-calcium.mjs's renderKeysMarkdown; written with the key ladder below by tools/keymap-table.mjs -->\n# Calcium keys\n\nRevision ${registry.meta.revision} · ${bindings.length} current bindings · a \`default-terminal\` chord is one a terminal without the Kitty protocol sends; an \`enhanced-terminal\` chord needs the protocol\n\n${registry.keymapPolicy.universal}\n\n${registry.keymapPolicy.help.docsContract}\n\n${sections}\n`;
 }
 
 function renderSpinners(registry) {

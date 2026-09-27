@@ -1475,6 +1475,12 @@ class Session implements TuiInstance {
   #setNativeSelection(on: boolean): void {
     const graph = this.#graph;
     if (graph === null || this.#nativeSelection === on) return;
+    // **One copy mode at a time** (C16 I66, §6c S11). `⌥⇧C` is a `global` row,
+    // so it reaches here from semantic copy mode too, and this guard reads only
+    // its own flag: without the exit the held view stayed up under a
+    // suspended scheduler with the mouse handed to the terminal. Before the
+    // flag, so the semantic exit's own commit is the frame this one follows.
+    if (on) this.#exitSemanticSelection();
     this.#nativeSelection = on;
 
     if (on) {
@@ -1504,6 +1510,9 @@ class Session implements TuiInstance {
   #enterSemanticSelection(): void {
     const graph = this.#graph;
     if (graph === null || this.#semantic !== null) return;
+    // The other direction of the same rule (C16 I66): leaving native selection
+    // resumes the scheduler and takes the mouse back before this holds a view.
+    this.#setNativeSelection(false);
     const stored = graph.focus.current;
     const entryId =
       stored.at === "liveBlock" ? stored.entryId : (graph.transcript.entries.at(-1)?.id ?? null);
@@ -1780,6 +1789,27 @@ class Session implements TuiInstance {
       this.#spans = null;
       this.#graph?.thawView();
     }
+    this.#graph?.scheduler.commit("input");
+  }
+
+  /**
+   * Leave semantic copy whole, in one step — the copy-mode switch's half
+   * (C16 I66, §6c S11).
+   *
+   * **Its one caller is `#setNativeSelection`**: `⌃c` is a refusal in a copy
+   * mode since ruling 59, so the only thing that ends this mode without the
+   * reader's `esc` is entering the other one, which must not leave both up.
+   */
+  #exitSemanticSelection(): void {
+    if (this.#semantic === null) return;
+    // Leaving the mode ends the gesture (C14 I48) — a ticker outliving it would
+    // scroll the live transcript the mode just handed back.
+    this.#endDrag();
+    this.#semantic = null;
+    this.#spans = null;
+    // One ordinary commit draws the record, and never a repaint: nothing on the
+    // terminal became unknown while the view was held (C14 I34, C03 I14).
+    this.#graph?.thawView();
     this.#graph?.scheduler.commit("input");
   }
 

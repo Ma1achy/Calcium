@@ -88,7 +88,8 @@ const MUTATIONS = [
     // C14 I47 — the footer's `⏎ copy` with nothing bound, as it shipped.
     name: "⏎ is unbound at semanticSelection",
     file: "src/interaction/router/keymap.ts",
-    from: '  { target: "semanticSelection", key: chordOf("confirm"), action: "copySelectedEntries" },\n',
+    // Re-anchored for C16 §6c: the row spreads `fromRegistry` where it called `chordOf`.
+    from: '  { target: "semanticSelection", ...fromRegistry("confirm"), action: "copySelectedEntries" },\n',
     to: "",
     expect: "T1.47",
   },

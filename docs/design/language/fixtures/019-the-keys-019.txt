@@ -1,6 +1,6 @@
-RESOLVED DEFAULT-TERMINAL KEYMAP · 41 bindings
+RESOLVED KEYMAP · 57 bindings · default and enhanced terminals
 The universal set gives one purpose to each key and does not depend on what has focus; the active owner resolves that purpose.
-Actions are primary. Chords are the resolved profile. A named command route is the intended contract; only 1 of 41 bindings carry one today.
+Actions are primary. Chords are the resolved profile. A named command route is the intended contract; only 1 of 57 bindings carry one today.
 
  global
   key ⏎      confirm · send · activate · open
@@ -15,38 +15,54 @@ Actions are primary. Chords are the resolved profile. A named command route is t
   key ⇧↓     extend selection down · selectable
   key ⇧←     extend selection left · selectable
   key ⇧→     extend selection right · selectable
-  key ⌃⇧C    copy source; ⌘C where passed through
+  key ⌃⇧C    copy source; ⌘C where passed through · enhanced
+  key ⌥w     copy source; ⌘C where passed through
   key ⌃C     interrupt · running
   key F1     emit the resolved keymap
   key ?      emit the resolved keymap · non-typing
   cmd /help  base-terminal help route · typing
-  key ⌃⇥     switch to next agent
-  key ⌃⇧⇥    switch to previous agent
-  key ⌘1     jump to agent 1
-  key ⌘2     jump to agent 2
-  key ⌘3     jump to agent 3
-  key ⌘4     jump to agent 4
-  key ⌘5     jump to agent 5
-  key ⌘6     jump to agent 6
-  key ⌘7     jump to agent 7
-  key ⌘8     jump to agent 8
-  key ⌘9     jump to agent 9
+  key ⌃⇥     switch to next agent · enhanced
+  key ⌥.     switch to next agent
+  key ⌃⇧⇥    switch to previous agent · enhanced
+  key ⌥,     switch to previous agent
+  key ⌘1     jump to agent 1 · enhanced
+  key ⌥1     jump to agent 1
+  key ⌘2     jump to agent 2 · enhanced
+  key ⌥2     jump to agent 2
+  key ⌘3     jump to agent 3 · enhanced
+  key ⌥3     jump to agent 3
+  key ⌘4     jump to agent 4 · enhanced
+  key ⌥4     jump to agent 4
+  key ⌘5     jump to agent 5 · enhanced
+  key ⌥5     jump to agent 5
+  key ⌘6     jump to agent 6 · enhanced
+  key ⌥6     jump to agent 6
+  key ⌘7     jump to agent 7 · enhanced
+  key ⌥7     jump to agent 7
+  key ⌘8     jump to agent 8 · enhanced
+  key ⌥8     jump to agent 8
+  key ⌘9     jump to agent 9 · enhanced
+  key ⌥9     jump to agent 9
   key ⌥p     cycle permission posture
   key ⌥⇧C    hand the mouse to the terminal
   key ⌥⇧V    enter Calcium copy mode
   key ⌃]     host escape · attached
-  key ⌥esc   enhanced detach · attached
+  key ⌥esc   enhanced detach · attached · enhanced
 
  prompt
-  key ⇧⏎     newline
-  key ⌃⇧V    paste
+  key ⇧⏎     newline · enhanced
+  key ⌥⏎     newline
+  key ⌃⇧V    paste · enhanced
+  key ⌃Y     paste
   key ⌥⌫     drop the last queued message
 
  transcript
   key ⌥↑     scroll one page up
   key ⌥↓     scroll one page down
-  key ⌘↑     go to top
-  key ⌘↓     go to bottom
+  key ⌘↑     go to top · enhanced
+  key ⌃home  go to top
+  key ⌘↓     go to bottom · enhanced
+  key ⌃end   go to bottom
   key ⌥v     toggle per-token values
 
 WHAT CHANGED DELIBERATELY, AND WHY

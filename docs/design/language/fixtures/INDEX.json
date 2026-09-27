@@ -6,7 +6,7 @@
   "title": "Current contract — the rules implementations targetcurrent · R-SPC-001 · example R-EXA-001",
   "cols": 1244,
   "rows": 124,
-  "sha": "e9860f255d9cc219",
+  "sha": "d741f70bb1a3d459",
   "ruleIds": [
    "R-SPC-001",
    "R-EXA-001"
@@ -262,8 +262,8 @@
   "id": "the-keys-019",
   "title": "The keyscurrent · R-KEY-007 R-KEY-006 · example R-EXA-019",
   "cols": 140,
-  "rows": 71,
-  "sha": "33bf1ebaf003d6a0",
+  "rows": 87,
+  "sha": "6e98357c92dc003a",
   "ruleIds": [
    "R-KEY-007",
    "R-KEY-006",
@@ -305,8 +305,8 @@
   "id": "the-help-view-022",
   "title": "The help viewcurrent · R-KEY-007 R-KEY-005 · example R-EXA-022",
   "cols": 143,
-  "rows": 57,
-  "sha": "5f03af580c372910",
+  "rows": 73,
+  "sha": "1cc9e438af1687e0",
   "ruleIds": [
    "R-KEY-007",
    "R-KEY-005",

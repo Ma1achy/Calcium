@@ -691,6 +691,15 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   }
 
   /**
+   * **A reserved chord's executor, which `bound` never runs** (C16 §6c, C22 I134).
+   *
+   * The reservation passes through now: with no handler registered through
+   * `TuiConfig.keyActions` the row resolves as though absent, or to the
+   * `fallback` it names, and with one it resolves to the handler — so the
+   * composition root answers these rows before this table is consulted. The
+   * entries stay because §6's closed set makes an action with no executor
+   * uncompilable. What follows is the note as the no-op was written:
+   *
    * **A reserved chord with an explicit no-op** (C16 I38, §6a).
    *
    * Fourteen of these: the nine agent slots, `agent.next`/`agent.previous`,
@@ -1360,13 +1369,18 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // region under it is two selections at once. `collapse()` rather than a
     // motion, because the caret must stay where the reader left it — and here
     // rather than in `#setNativeSelection`, because this effect is the only way in
-    // (`⌥⇧C` at the prompt and in the block) and T2.14 asks that every C17
+    // (`⌥⇧C`, a `global` row since C16 §6c) and T2.14 asks that every C17
     // operation be reachable from a key.
     enterNativeSelection: () => {
       deps.editor.collapse();
       deps.enterNativeSelection();
     },
     exitNativeSelection: () => void deps.exitNativeSelection(),
+    // **Consumed, and nothing acts** (C16 I66, §6c table B): the key is the
+    // terminal's while it holds the selection. A named no-op, as `reserved`
+    // is, so a reader can tell a decline from an effect that happens to do
+    // nothing today.
+    passToTerminal: () => undefined,
   });
 
   /**

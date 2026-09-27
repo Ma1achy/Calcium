@@ -8,7 +8,7 @@
 // Every component involved was finished and had its own passing suite.
 import { describe, expect, it, vi } from "vitest";
 
-import { defaultKeymap } from "../../src/interaction/router/keymap.js";
+import { defaultKeymap, keySlot } from "../../src/interaction/router/keymap.js";
 import { MENU_ID } from "../../src/interaction/completion/index.js";
 import { SEARCH_ID } from "../../src/interaction/history/index.js";
 import { buildGraph, COPY_MODES } from "../support/session.js";
@@ -168,6 +168,12 @@ function enterLive(graph: Graph): void {
     );
   }
   graph.editor.clear();
+  // **From the prompt, as a user arrives** — `enterInside` below does the same.
+  // Without it the walk's previous row decides where `↓` lands: the inside's
+  // `copy` row (C16 §6c) leaves focus in `interact` mode, where `⇥` is the
+  // inside's and not `liveBlock`'s, and the next `liveBlock` row fails for a
+  // reason that has nothing to do with its own effect.
+  graph.focus.reset();
   graph.router.dispatch(press({ name: "down" }));
 }
 
@@ -440,9 +446,14 @@ describe("C22 §3 step 11 — the effect table", () => {
       },
     });
 
-    // Every prompt binding, through the table dispatch uses.
+    // Every binding a key at the prompt reaches, through the table dispatch
+    // uses: the prompt's rows, and the `global` rows whose key the prompt does
+    // not bind — step 3 answers those when the prompt passes (C16 §6c). `⌥⇧C`
+    // became a `global` row there, and it is the one path to `collapse`.
+    const promptSlots = new Set(defaultKeymap.filter((b) => b.target === "prompt").map((b) => keySlot(b.key)));
     for (const b of defaultKeymap) {
-      if (b.target !== "prompt") continue;
+      const reached = b.target === "prompt" || (b.target === "global" && !promptSlots.has(keySlot(b.key)));
+      if (!reached) continue;
       const effect = effects.table[b.action];
       expect(effect, `${b.action} has no effect`).toBeDefined();
       effect?.();

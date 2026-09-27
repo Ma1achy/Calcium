@@ -912,10 +912,13 @@ describe("C26 §8b.8 — interaction mode is vacuous, and this is the row that s
       .slice(0, before)
       .filter((b) => b.target === "interaction")
       .map((b) => b.action);
+    // `copyElement` is the inside's `copy` (C16 §6c, ruling 65): the element
+    // the reader is inside is what copy takes. Once, because this map is the
+    // default profile's and the `⌃⇧C` row is enhanced-only.
     expect(framework.sort(), "the inside's own, and the merge adds none of them").toEqual(
       // `keepField` is the held field's `⏎` (C22 I118, C22 I133): the field is
       // the rung's other owner, and a framework row, not a merge.
-      ["cameraReset", "dollyIn", "dollyIn", "dollyOut", "exitInside", "insideDown", "insideLeft", "insideRight", "insideUp", "keepField", "orbitToggle"],
+      ["cameraReset", "copyElement", "dollyIn", "dollyIn", "dollyOut", "exitInside", "insideDown", "insideLeft", "insideRight", "insideUp", "keepField", "orbitToggle"],
     );
   });
 

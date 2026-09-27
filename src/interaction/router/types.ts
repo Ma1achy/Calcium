@@ -16,8 +16,9 @@ export type Key = Readonly<{
    * `⌘` on macOS, the Windows key elsewhere — Kitty modifier bit 8 (C16 I34).
    *
    * **Optional, and it can only ever be `true` where the protocol said so.**
-   * `modifiersOf`'s legacy arm keeps folding bit 8 into `meta`, deliberately: on
-   * a terminal with no protocol `⌘a` genuinely arrives as `Alt-a`, and a decoder
+   * `modifiersOf`'s legacy arm keeps folding bit 8 into `meta` **without a
+   * protocol** (C16 I41), deliberately: on a terminal with no protocol `⌘a`
+   * genuinely arrives as `Alt-a`, and a decoder
    * that guessed otherwise would make one wire form two bindings. So the field is
    * safe to add — absent is *this terminal cannot tell*, not *not pressed*.
    *
@@ -614,6 +615,11 @@ export type KeyAction =
   // the same defect inverted, and just as testable.
   | "enterNativeSelection"
   | "exitNativeSelection"
+  // **A key native selection declines, and nothing in Calcium acts on it**
+  // (C16 I66, §6c table B, ruling 65). `?` while the terminal holds the
+  // selection: the frame is frozen, so the help entry would land unseen, and a
+  // pass in the ladder's sense reaches step 3's `global` `?`, which is that.
+  | "passToTerminal"
   // --- semantic copy mode (C14 §6a, C16 §5d) ---------------------------------
   //
   // **One exit, and it clears first** (I51, §5d D1/D2). `escapeSemanticSelection`
@@ -658,7 +664,47 @@ export type Binding = Readonly<{
    * an xterm without it can deliver, and I36 requires every action to have one.
    */
   profile?: "default-terminal" | "enhanced-terminal";
+  /**
+   * The registry record this row spells, by id (C16 §6c, I42 amended).
+   *
+   * Absent on a row whose chord the registry does not name. Internal —
+   * `Binding` is not published — and read by the gate, which asks from the
+   * table's side whether a row spelling a registry chord says which (T1.37).
+   */
+  registry?: string;
+  /**
+   * What a reserved row does when no handler is registered (C16 §6c, C22 I134).
+   *
+   * The meaning the reservation displaced: `⌥⌫` was `killWordLeft` before the
+   * registry gave it to `queue.drop`. A reserved row without one resolves as
+   * though it were absent.
+   */
+  fallback?: KeyAction;
 }>;
+
+/**
+ * The registry ids of the actions the design names and the tree reserves —
+ * what `TuiConfig.keyActions` is keyed by (C24 I39, C16 §6c, ruling 64).
+ *
+ * The design's spelling, because an application reads it in the registry,
+ * `/help` and `docs/KEYS.md`. `keymap.ts`'s `RESERVED_ACTIONS` is total over
+ * it, so the type and the table cannot name different sets.
+ */
+export type ReservedKeyAction =
+  | "agent.next"
+  | "agent.previous"
+  | "agent.1"
+  | "agent.2"
+  | "agent.3"
+  | "agent.4"
+  | "agent.5"
+  | "agent.6"
+  | "agent.7"
+  | "agent.8"
+  | "agent.9"
+  | "posture.cycle"
+  | "values.toggle"
+  | "queue.drop";
 
 /** A terminal’s profile, resolved from C02’s record (§6a, R-CAP-001). */
 export type KeyProfile = "default-terminal" | "enhanced-terminal";
