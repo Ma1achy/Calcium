@@ -9,7 +9,7 @@
 SHELL := /usr/bin/env bash
 .SHELLFLAGS := -o pipefail -c
 
-.PHONY: install hooks quantised check design design-check enforce catalogue instruments roadmap regime test golden e2e audit proof all clean
+.PHONY: install hooks quantised check design design-check released enforce catalogue instruments roadmap regime test golden e2e audit proof all clean
 
 install:            ## npm ci, no install scripts, then the one named build (A04 §3)
 	git config core.hooksPath .githooks
@@ -105,6 +105,12 @@ design-check:       ## the registry ↔ HTML projection, released-rule immutabil
 	node tools/rule-status.mjs
 	@# The fixtures are the page's projection (AUTHORITY.md §Fixtures); --check writes nothing.
 	npx tsx tools/design/fixtures.ts --check
+
+# **Not inside `design-check`**, because its subject is a ref the working tree cannot
+# supply: a clone with no `origin/main` fails it by design (AUTHORITY.md §Release 4),
+# and the pre-commit hook must not depend on what was last fetched.
+released:           ## the released baseline against origin/main's copy — added, never changed or removed
+	node tools/design/released-against.mjs --ref origin/main
 
 design:             ## regenerate the HTML, KEYS.md and the fixtures from the registry
 	node docs/design/language/build-calcium.mjs

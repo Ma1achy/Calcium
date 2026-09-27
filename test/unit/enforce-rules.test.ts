@@ -3751,6 +3751,106 @@ describe("the design registry — supersession chains", () => {
 });
 
 /**
+ * **The seal is outside the branch** (AUTHORITY.md §Release 4). The in-tree lint
+ * compares two files a branch can both edit, and its anchor is recomputable; this
+ * compares the branch's baseline with a ref's copy, which the branch cannot edit.
+ * Each row builds a throwaway repository — a commit holding the baseline as `main`,
+ * then an edit in the working tree — so no row depends on what `origin/main` holds
+ * today. Dropping the digest comparison → DSN3's rewrite row passes and fails
+ * here; treating a ref with no baseline as unresolved → the first-release row
+ * fails; passing on an unresolved ref → the shallow-clone row fails.
+ */
+describe("A03-DSN3 — the released baseline against another ref's copy", () => {
+  type Entry = { digest: string; status: string; supersedes: string[]; supersededBy: string[] };
+  type Baseline = { rules: Record<string, Entry>; count: number };
+  const real = JSON.parse(readFileSync("docs/design/language/released-baseline.json", "utf8")) as Baseline;
+  const git = (repo: string, ...a: string[]) =>
+    spawnSync("git", ["-C", repo, "-c", "user.email=t@t", "-c", "user.name=t", ...a], { encoding: "utf8" });
+  const repoWith = (base: Baseline | null): string => {
+    const repo = mkdtempSync(join(tmpdir(), "calcium-released-"));
+    git(repo, "init", "-q", "-b", "main");
+    const dir = join(repo, "docs/design/language");
+    spawnSync("mkdir", ["-p", dir]);
+    writeFileSync(join(repo, "README"), "x\n");
+    if (base !== null) writeFileSync(join(dir, "released-baseline.json"), JSON.stringify(base, null, 1));
+    git(repo, "add", "-A");
+    expect(git(repo, "commit", "-q", "-m", "base").status, "the base commit").toBe(0);
+    return repo;
+  };
+  const head = (repo: string, edit: (b: Baseline) => void): void => {
+    const b = structuredClone(real);
+    edit(b);
+    writeFileSync(join(repo, "docs/design/language/released-baseline.json"), JSON.stringify(b, null, 1));
+  };
+  const check = (repo: string, ref = "main") =>
+    spawnSync("node", ["tools/design/released-against.mjs", "--repo", repo, "--ref", ref], { encoding: "utf8" });
+  const run = (edit: (b: Baseline) => void, ref = "main") => {
+    const repo = repoWith(real);
+    head(repo, edit);
+    const r = check(repo, ref);
+    rmSync(repo, { recursive: true, force: true });
+    return { status: r.status, out: r.stdout + r.stderr };
+  };
+  const someCurrent = Object.keys(real.rules).find((id) => real.rules[id]!.status === "current")!;
+  const someSuperseded = Object.keys(real.rules).find((id) => real.rules[id]!.status === "superseded")!;
+
+  it("A03-DSN3 (AUTHORITY §Release 4): an unchanged baseline passes, and one with an entry added passes", () => {
+    const same = run(() => undefined);
+    expect(same.status, same.out).toBe(0);
+    expect(same.out).toMatch(new RegExp(`OK · ${String(Object.keys(real.rules).length)} entries sealed on main kept, 0 added`, "u"));
+    const added = run((b) => { b.rules["R-ZZZ-900"] = { digest: "a".repeat(64), status: "current", supersedes: [], supersededBy: [] }; });
+    expect(added.status, added.out).toBe(0);
+    expect(added.out).toMatch(/kept, 1 added/u);
+  });
+
+  it("A03-DSN3 (AUTHORITY §Release 4): a sealed digest rewritten — the re-anchor the in-tree lint passes — fails", () => {
+    const r = run((b) => { b.rules["R-SEL-005"]!.digest = "0".repeat(64); });
+    expect(r.status, r.out).toBe(1);
+    expect(r.out).toMatch(/R-SEL-005: digest changed from main's/u);
+  });
+
+  it("A03-DSN3 (AUTHORITY §Release 4): a removed entry, a changed supersedes, an illegal status and a redirected link each fail", () => {
+    const removed = run((b) => { delete b.rules[someCurrent]; });
+    expect(removed.status, removed.out).toBe(1);
+    expect(removed.out).toMatch(new RegExp(`${someCurrent}: REMOVED`, "u"));
+
+    const supersedes = run((b) => { b.rules[someCurrent]!.supersedes = ["R-ZZZ-901"]; });
+    expect(supersedes.out).toMatch(new RegExp(`${someCurrent}: supersedes changed`, "u"));
+
+    const revived = run((b) => { b.rules[someSuperseded]!.status = "current"; });
+    expect(revived.out).toMatch(new RegExp(`${someSuperseded}: status superseded → current is not a legal transition`, "u"));
+
+    const redirected = run((b) => { b.rules[someSuperseded]!.supersededBy = ["R-ZZZ-902"]; });
+    expect(redirected.status, redirected.out).toBe(1);
+    expect(redirected.out).toMatch(new RegExp(`${someSuperseded}: supersededBy changed`, "u"));
+  });
+
+  it("A03-DSN3 (AUTHORITY §Release 4): a supersession — status to superseded, a successor linked — is not a change", () => {
+    const r = run((b) => {
+      b.rules[someCurrent]!.status = "superseded";
+      b.rules[someCurrent]!.supersededBy = ["R-ZZZ-903"];
+      b.rules["R-ZZZ-903"] = { digest: "b".repeat(64), status: "current", supersedes: [someCurrent], supersededBy: [] };
+    });
+    expect(r.status, r.out).toBe(0);
+    // The control: the same link added *without* the transition is a change.
+    const linkOnly = run((b) => { b.rules[someCurrent]!.supersededBy = ["R-ZZZ-903"]; });
+    expect(linkOnly.status, linkOnly.out).toBe(1);
+  });
+
+  it("A03-DSN3 (AUTHORITY §Release 4): a ref holding no baseline passes and says so; a ref that does not resolve fails", () => {
+    const repo = repoWith(null);
+    head(repo, () => undefined);
+    const first = check(repo);
+    expect(first.status, first.stdout + first.stderr).toBe(0);
+    expect(first.stdout).toMatch(/main holds no docs\/design\/language\/released-baseline\.json — nothing is released there yet/u);
+    const shallow = check(repo, "origin/main");
+    expect(shallow.status, shallow.stdout + shallow.stderr).toBe(1);
+    expect(shallow.stderr).toMatch(/origin\/main does not resolve/u);
+    rmSync(repo, { recursive: true, force: true });
+  });
+});
+
+/**
  * **The fixtures are the page's projection** (AUTHORITY.md §Fixtures). They were
  * committed once and sixteen of them went stale while the page was rebuilt around
  * them, because nothing derived them and nothing compared them. `--check` is what
