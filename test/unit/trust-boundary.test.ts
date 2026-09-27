@@ -57,7 +57,7 @@ const RESIDUE = "^[[31mRED^[[0m^[[2J^[]0;title^GM-^[7m";
  * and overrides, and the isolates. An override reorders every cell after it on
  * the row, so a frame carrying one draws text that is not the text measured.
  */
-const BIDI = ["؜", "‎", "‏", "‪", "‫", "‬", "‭", "‮", "⁦", "⁧", "⁨", "⁩"];
+const BIDI = ["\u061c", "\u200e", "\u200f", "\u202a", "\u202b", "\u202c", "\u202d", "\u202e", "\u2066", "\u2067", "\u2068", "\u2069"];
 const BIDI_PAYLOAD = `A${BIDI.join("")}Z`;
 
 /**
