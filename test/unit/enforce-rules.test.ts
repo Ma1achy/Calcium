@@ -3656,6 +3656,90 @@ describe("the design registry — supersession chains", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  /**
+   * **A current rule the baseline never held was checked by nothing** (AUTHORITY.md
+   * §Release). Every comparison in `lint-immutable.mjs` walked the baseline, so 22
+   * current rules at revision 0.9 were outside every gate, and one was rewritten
+   * under its own ID with all of them green. Removing the registry walk from the
+   * lint → this row fails; it is the only row whose fabrication the baseline walk
+   * cannot see.
+   */
+  it("A03-DSN1 fires: a current rule absent from the baseline", () => {
+    const dir = mkdtempSync(join(tmpdir(), "calcium-release-"));
+    const from = "docs/design/language";
+    copyFileSync(`${from}/lint-immutable.mjs`, join(dir, "lint-immutable.mjs"));
+    copyFileSync(`${from}/released-baseline.json`, join(dir, "released-baseline.json"));
+    const reg = JSON.parse(readFileSync(`${from}/calcium-registry.json`, "utf8")) as {
+      rules: Record<string, unknown>[];
+    };
+    const lint = () => spawnSync("node", [join(dir, "lint-immutable.mjs")], { encoding: "utf8" });
+
+    writeFileSync(join(dir, "calcium-registry.json"), JSON.stringify(reg));
+    const clean = lint();
+    expect(clean.status, clean.stdout + clean.stderr).toBe(0);
+
+    reg.rules.push(linked("R-ZZZ-010", "current", [], null));
+    writeFileSync(join(dir, "calcium-registry.json"), JSON.stringify(reg));
+    const fired = lint();
+    expect(fired.status, "an unreleased current rule is refused").toBe(1);
+    expect(fired.stderr).toMatch(/R-ZZZ-010: CURRENT RULE NOT RELEASED/u);
+    expect(fired.stderr.match(/NOT RELEASED/gu), "and it is the only rule refused").toHaveLength(1);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  /**
+   * **The release only adds** (AUTHORITY.md §Release). The tool is run as it ships,
+   * against a copy: it seals a rule the baseline lacks and the lint then passes,
+   * and it refuses — writing nothing — when a sealed rule's content has changed or
+   * the revision was not bumped. A writer that re-derived every entry would seal
+   * the rewrite the baseline exists to catch; comparing sealed entries instead of
+   * rewriting them → the second fabrication below passes, and this row fails.
+   */
+  it("A03-DSN1: release.mjs seals what is missing and refuses to rewrite what is sealed", () => {
+    const dir = mkdtempSync(join(tmpdir(), "calcium-release-"));
+    const from = "docs/design/language";
+    for (const f of ["lint-immutable.mjs", "released-baseline.json", "calcium-registry.json"]) {
+      copyFileSync(`${from}/${f}`, join(dir, f));
+    }
+    const release = (rev: string) =>
+      spawnSync("node", ["tools/design/release.mjs", rev, "--dir", dir], { encoding: "utf8" });
+    const lint = () => spawnSync("node", [join(dir, "lint-immutable.mjs")], { encoding: "utf8" });
+    const read = () => readFileSync(join(dir, "calcium-registry.json"), "utf8");
+    const write = (r: unknown) => { writeFileSync(join(dir, "calcium-registry.json"), `${JSON.stringify(r, null, 2)}\n`); };
+    type Reg = { meta: { revision: string }; rules: Record<string, unknown>[] };
+
+    // The revision must move.
+    const same = release((JSON.parse(read()) as Reg).meta.revision);
+    expect(same.status, same.stdout + same.stderr).toBe(1);
+    expect(same.stderr).toMatch(/is the current one — a release bumps it/u);
+
+    // A new current rule is sealed, and the lint agrees.
+    const reg = JSON.parse(read()) as Reg;
+    reg.rules.push(linked("R-ZZZ-011", "current", [], null));
+    write(reg);
+    expect(lint().status, "unreleased first").toBe(1);
+    const ok = release("9.1");
+    expect(ok.status, ok.stdout + ok.stderr).toBe(0);
+    expect(ok.stdout).toMatch(/released 9\.1 · 1 rules sealed \(1 current\)/u);
+    const after = lint();
+    expect(after.status, after.stdout + after.stderr).toBe(0);
+
+    // A sealed rule rewritten under its own ID is refused, and nothing is written.
+    const edited = JSON.parse(read()) as Reg;
+    const target = edited.rules.find((r) => r["id"] === "R-SEL-005");
+    expect(target, "the rule the review rewrote").toBeDefined();
+    if (target !== undefined) target["contentDigest"] = "0".repeat(64);
+    write(edited);
+    const baselineBefore = readFileSync(join(dir, "released-baseline.json"), "utf8");
+    const refused = release("9.2");
+    expect(refused.status, refused.stdout + refused.stderr).toBe(1);
+    expect(refused.stderr).toMatch(/R-SEL-005: sealed digest changed — supersede it, do not edit it/u);
+    expect(readFileSync(join(dir, "released-baseline.json"), "utf8"), "nothing written").toBe(baselineBefore);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("A03-DSN1 fires: a link the target does not acknowledge", () => {
     const rules = [
       ...load(),

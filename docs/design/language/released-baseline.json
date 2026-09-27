@@ -1,6 +1,6 @@
 {
-"releasedAt": "2026-09-19",
-"registryRevision": "0.9",
+"releasedAt": "2026-09-26",
+"registryRevision": "0.10",
 "rules": {
 "R-SPC-001": {
 "digest": "314a86c06f57e3ce44bef033bba32eee63d3fe7b94d88b9d4933a4f62628a638",
@@ -7865,12 +7865,294 @@
 "R-REG-001"
 ],
 "supersededBy": []
+},
+"R-GLY-003": {
+"digest": "9a46840195ac5b90072411c869ffc4ce729e53d8b0f71cb68176bf91746563a8",
+"status": "current",
+"supersedes": [
+"R-GLY-001"
+],
+"supersededBy": []
+},
+"R-STR-005": {
+"digest": "2c5c4ec4a4d0fff6bd763014047f0a38cc0312e104606172776b0e5f0cb5ec14",
+"status": "current",
+"supersedes": [
+"R-STR-003"
+],
+"supersededBy": []
+},
+"R-PRG-003": {
+"digest": "79c696b5a75de5748c0dee3def7049eac9004c25e460cdf6a5daff61b9c84648",
+"status": "current",
+"supersedes": [],
+"supersededBy": []
+},
+"R-BLK-928": {
+"digest": "21439645da2c232d53a84636521ccc5eb8b558df0185113485cf9726262bd8d1",
+"status": "example",
+"supersedes": [
+"R-BLK-114"
+],
+"supersededBy": []
+},
+"R-BLK-929": {
+"digest": "9202e2857b4b48a1a04dd1425ddfd49a7ed06e4bf83286d1a40a02918ae08224",
+"status": "example",
+"supersedes": [
+"R-BLK-309"
+],
+"supersededBy": []
+},
+"R-BLK-930": {
+"digest": "d6b094ce96e044b10d33c5da38f8d0b244c46381d06cd0d16ed7a9c9bb59bab5",
+"status": "example",
+"supersedes": [
+"R-BLK-369"
+],
+"supersededBy": []
+},
+"R-BLK-931": {
+"digest": "415d0300deeba355ae1090af3bce38475924f1bc3154900e5fcce130f725ec44",
+"status": "example",
+"supersedes": [
+"R-BLK-838"
+],
+"supersededBy": []
+},
+"R-SEL-001": {
+"digest": "5bdf663a34bdf4907d6ea5fb0035a3f6d08e04faa57f2316ff7a73bedffb89ac",
+"status": "current",
+"supersedes": [],
+"supersededBy": []
+},
+"R-SEL-002": {
+"digest": "806f7d7e32499b42e8e28551542c72a127763a4b490954a1b32d5ee28dce1fb4",
+"status": "superseded",
+"supersedes": [],
+"supersededBy": [
+"R-SEL-016"
+]
+},
+"R-SEL-016": {
+"digest": "a65247ea1aab8e7cbf4ad2a2261921617056a0a724443bb32f5f5914b8e68641",
+"status": "current",
+"supersedes": [
+"R-SEL-002"
+],
+"supersededBy": []
+},
+"R-SEL-003": {
+"digest": "a47e21525fe273e0435cee13eb52e41d450c209e39e4d91fc09e40e4200d2d8d",
+"status": "current",
+"supersedes": [],
+"supersededBy": []
+},
+"R-SEL-004": {
+"digest": "9561fc7b752c488c718acf352c444a64edfc3391ca0d2702260be7e6bf8a3648",
+"status": "current",
+"supersedes": [],
+"supersededBy": []
+},
+"R-SEL-005": {
+"digest": "20f6e0724e97dfa34ad8bf98619bc4bea6807ecbc6b181107d7ddbd93c900cc5",
+"status": "current",
+"supersedes": [],
+"supersededBy": []
+},
+"R-SEL-006": {
+"digest": "f5a108df5c6157f492a170484559aa22d5d0cd213eb3e19c0208de5263397c1a",
+"status": "current",
+"supersedes": [],
+"supersededBy": []
+},
+"R-SEL-007": {
+"digest": "db504fd093457f5a25a8f38c5eab1b64e04343cc62afa357b3b0e77d1bb2e28a",
+"status": "current",
+"supersedes": [],
+"supersededBy": []
+},
+"R-SEL-008": {
+"digest": "d6d01be1ec33d3c98b694286dd7a51c14ab4af87b0d76756578b9b4a6bd6e11b",
+"status": "current",
+"supersedes": [],
+"supersededBy": []
+},
+"R-SEL-009": {
+"digest": "bbbe319c6cc12ec8f7c221b1c36ebea7e27d37b2b848e3a50da989b4661386c3",
+"status": "current",
+"supersedes": [],
+"supersededBy": []
+},
+"R-SEL-010": {
+"digest": "cff9a152d83cfe3dfed3e58939d62341b6727af9086ee7dc747367b7356eddd2",
+"status": "current",
+"supersedes": [],
+"supersededBy": []
+},
+"R-SEL-011": {
+"digest": "5cd4606c56ea9937a66ea2d4c8ba633ec6eaa40d277d380217c0d8af7f9cd149",
+"status": "current",
+"supersedes": [],
+"supersededBy": []
+},
+"R-SEL-012": {
+"digest": "aa8aec339e2d455e68c17429e082de4ceaa98d783faee9c105132c1a061a0692",
+"status": "current",
+"supersedes": [],
+"supersededBy": []
+},
+"R-SEL-013": {
+"digest": "35dae802506acae687e9d634035c04a7c0739cc9bb4a100fe66ccebefeef2b58",
+"status": "current",
+"supersedes": [],
+"supersededBy": []
+},
+"R-SEL-014": {
+"digest": "3fe1479d0ec85300e5718558cc86e8340ec3a0202c35585aa2ce62d50dc7e885",
+"status": "current",
+"supersedes": [],
+"supersededBy": []
+},
+"R-SEL-015": {
+"digest": "20deaab8a9dcf1cf8665aa2f52dbaff4148673bca86f368d7494eae25a3f3c4d",
+"status": "current",
+"supersedes": [],
+"supersededBy": []
+},
+"R-THM-002": {
+"digest": "f9bb25cf8cbcf1cc444d6204d785c07200c45e80c604c579d97b2aa2659181b6",
+"status": "current",
+"supersedes": [],
+"supersededBy": []
+},
+"R-THM-003": {
+"digest": "947f328a3748e1afc918007fa069e7bc40420a6c7f51e65403eafc12276e6fc2",
+"status": "superseded",
+"supersedes": [],
+"supersededBy": [
+"R-THM-005"
+]
+},
+"R-THM-005": {
+"digest": "01e69ec2bf18fe6df45a353ade8687766606e7bf1489b7bf0501130787b83610",
+"status": "current",
+"supersedes": [
+"R-THM-003"
+],
+"supersededBy": []
+},
+"R-THM-004": {
+"digest": "d9697b8022b51adebae7dd17d5e00dcc7cc7cbcbc94675fad1b85ed29cf4add3",
+"status": "current",
+"supersedes": [],
+"supersededBy": []
+},
+"R-STA-004": {
+"digest": "be1eb95765e80f07837bdba25e95d11dff5bcfbc9adabd8ace6c830d8599be6d",
+"status": "current",
+"supersedes": [],
+"supersededBy": []
+},
+"R-BLK-932": {
+"digest": "f9aabf1b440275023c8510b6a463dde78a1c8ee3babc9b7b04e460cf5cabc578",
+"status": "example",
+"supersedes": [
+"R-BLK-003"
+],
+"supersededBy": []
+},
+"R-BLK-933": {
+"digest": "e01055947b58ba4651c041d1b3d684ec1b8eb89158ba808a2b721b26bbe684b3",
+"status": "example",
+"supersedes": [
+"R-BLK-178"
+],
+"supersededBy": []
+},
+"R-BLK-934": {
+"digest": "2ae60fcd4ae54cb4059980dec984582566a1f391f3d27a9ff3447f71019086ef",
+"status": "example",
+"supersedes": [
+"R-BLK-502"
+],
+"supersededBy": []
+},
+"R-BLK-935": {
+"digest": "1a009cbad2cd78c198567f2a506497340b356c89b3abaf3246ba1ff9ef9722cf",
+"status": "example",
+"supersedes": [
+"R-BLK-503"
+],
+"supersededBy": []
+},
+"R-BLK-936": {
+"digest": "346a928f0f481f183e74f10dc29a88c0e11ce30bdd607b2d9950683c680f551e",
+"status": "example",
+"supersedes": [
+"R-BLK-861"
+],
+"supersededBy": []
+},
+"R-BLK-937": {
+"digest": "69b4a21daa95a4d025815ae3761dd0ae0f68a0422bda383be6d179ef8339ff52",
+"status": "example",
+"supersedes": [
+"R-BLK-179"
+],
+"supersededBy": []
+},
+"R-BLK-938": {
+"digest": "84c4b72348ddc65f4427903cffae8eeca5b3f952ea951fdf69f8999afae837cf",
+"status": "example",
+"supersedes": [
+"R-BLK-195"
+],
+"supersededBy": []
+},
+"R-BLK-939": {
+"digest": "cb112e46327ccafddbd23256b8b54cb291c2484cd3d12f5c46fce36eef2c2316",
+"status": "example",
+"supersedes": [
+"R-BLK-198"
+],
+"supersededBy": []
+},
+"R-BLK-940": {
+"digest": "030701fcde94764839ef735009c02f5d807d638cce465c7d3f461148dd49c5f7",
+"status": "example",
+"supersedes": [
+"R-BLK-281"
+],
+"supersededBy": []
+},
+"R-BLK-941": {
+"digest": "7670d1fba7695a9414b6efe31c6fc212d188290ec3d479518948cc24a7ccb81b",
+"status": "example",
+"supersedes": [
+"R-BLK-650"
+],
+"supersededBy": []
+},
+"R-BLK-942": {
+"digest": "48f7a0bdf1587038935c9c2b9b3ccff339288708b1efbcb9c577f017a8831008",
+"status": "example",
+"supersedes": [
+"R-BLK-651"
+],
+"supersededBy": []
+},
+"R-BLK-943": {
+"digest": "388802dddbf8789893644b94a5f770e11dbbe5fb49c67314f5f54bb5d1026607",
+"status": "example",
+"supersedes": [],
+"supersededBy": []
 }
 },
-"count": 1247,
+"count": 1287,
 "anchor": {
 "kind": "content-hash",
-"sha256": "45723c74435b75ae2647fb0b77e68dbc76c524ae5b9851177a3f7bbbcc52ba4e",
+"sha256": "ad9cd8633aa29f4ccd30adda273725b2ce95e18a582b7cb1facd5df5586f0e01",
 "note": "A hash stored beside the data it protects is a TRIPWIRE: it catches a careless edit, not a determined one. To make it a SEAL, publish this sha256 in a git tag or CI secret and export CALCIUM_ANCHOR before running the gate; then set claim to external-seal.",
 "claim": "local-tripwire"
 }

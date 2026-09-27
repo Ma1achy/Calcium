@@ -27,6 +27,14 @@ const rev = reg.meta?.revision;
 if (base.registryRevision && base.registryRevision !== "unknown" && rev !== base.registryRevision)
   fail(`registry revision ${rev} ≠ baseline ${base.registryRevision} — re-release, do not edit`);
 
+// **Becoming current and being released are one commit** (AUTHORITY.md §Release).
+// Every check below walks the baseline, so a current rule the baseline never held
+// was checked by nothing — 22 of them at revision 0.9, and one was rewritten under
+// its own ID with every gate green. This walks the registry instead.
+for (const r of reg.rules)
+  if (r.status === "current" && !(r.id in base.rules))
+    fail(`${r.id}: CURRENT RULE NOT RELEASED — run tools/design/release.mjs in the same commit`);
+
 const LEGAL = { current: ["current", "superseded"], superseded: ["superseded"],
                 example: ["example", "superseded"] };
 for (const [id, b] of Object.entries(base.rules)) {
