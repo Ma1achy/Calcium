@@ -99,6 +99,7 @@ Dev dependencies are looser but not free: `typescript`, `vitest`, `node-pty` (C0
 | SBOM per release | CycloneDX, attached to the release |
 | Build attestation | GitHub Actions attestation links the artefact to its commit and workflow. **Not npm `--provenance`** — that is a public-registry feature |
 | Publish from CI only, using `GITHUB_TOKEN` | No laptop holds a publish credential; the token is workflow-scoped and expires with the run |
+| **A binary fetched outside npm is pinned by version and SHA-256, in an explicit step** | `make chromium` downloads the design page's browser into `.cache/`, checks the digest before unpacking, and refuses on a mismatch; nothing fetches it implicitly. The row in `DEPENDENCIES.md` §Fetched outside npm carries both digests, and the tool asserts that it does |
 
 **`--ignore-scripts` is the one that matters most.** It is also the one that breaks builds that assumed a postinstall, which is why it is set from the first commit rather than retrofitted.
 
@@ -196,6 +197,13 @@ less clearly.
 
 Each declares its terminal as `xterm-256color` with a UTF-8 locale, and each also runs the suite under `TERM=dumb` and `LANG=C` — the degradation axes are not tested by hoping someone's laptop is misconfigured.
 
+**The design page's browser needs five system libraries and the container installs them
+by name** — `libnspr4 libnss3 libatk1.0-0t64 libatspi2.0-0t64 libxdamage1`, in
+`onCreateCommand` beside the emulator packages. Measured on 2026-09-27: the aarch64
+headless shell's `ldd` named six missing objects from those five packages, and with them
+installed it reports none. The browser itself is not in the image: `make chromium` fetches
+it, pinned, into `.cache/` (§3), so a container rebuild does not change which Chromium runs.
+
 ---
 
 ## 5. The Makefile contract
@@ -238,7 +246,7 @@ install → check → enforce → audit → test → golden → e2e → [repo-sp
 
 | Trigger | Stages |
 |---|---|
-| Every push to a branch | `install → check → enforce → audit → test` — **nine minutes on the runner, measured**, and Calcium's job adds `instruments`, `regime` and `released` to that list (F1090). `released` compares the design baseline with `origin/main`'s copy (AUTHORITY.md §Release 4) after a step fetching `main` by its full refspec — the checkout is one commit deep and holds no `origin/main`, and the check fails on a ref it cannot resolve rather than passing on nothing |
+| Every push to a branch | `install → check → enforce → audit → test` — **nine minutes on the runner, measured**, and Calcium's job adds `instruments`, `regime`, `released`, `chromium` and `design-browser` to that list (F1090). `chromium` is the pinned browser's install step and `design-browser` loads the generated design page in it and fails unless every conformance flag reads pass with no console error (AUTHORITY.md §Browser conformance). `released` compares the design baseline with `origin/main`'s copy (AUTHORITY.md §Release 4) after a step fetching `main` by its full refspec — the checkout is one commit deep and holds no `origin/main`, and the check fails on a ref it cannot resolve rather than passing on nothing |
 | **Pull request**, push to `main`, and tags | The above plus `golden → e2e → [repo-specific]`, and **`proof` in a job of its own** — the reuse claim, which is not a stage in the chain (F807, F1095) |
 | **Weekly** (Sunday 03:00 UTC), and on dispatch | `mutation-sweep` — every run under `tools/mutate/runs/` through `tools/mutate/sweep.mjs`, six shards, the anchors sweep first. A survivor, a stale exemption, an anchor miss off the debt list or a run that leaves the tree mutated is red where nobody was running the pass by hand (F952, F990) |
 

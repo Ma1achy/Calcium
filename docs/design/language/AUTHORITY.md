@@ -109,6 +109,38 @@ lacked included 22 `current` rules — every `R-SEL-*`, `R-THM-002`, `R-THM-004`
 baseline already held. A reviewer rewrote `R-SEL-005`'s behaviour under the same ID
 and every gate passed.
 
+## Browser conformance — the page's own checks, executed
+
+**The generated page carries its own conformance scripts, and a browser runs them.**
+They set five flags on `<html>` — `specCheck`, `carrierCheck`,
+`spinnerCapabilityCheck`, `cursorPhaseCheck`, `glyphGridCheck` — each to `pass` or
+`fail`, measuring what only a layout engine knows: computed keyframes, `::after`
+content, an animation's phase, a glyph's ink width. `make design-browser` loads the
+page in the pinned headless Chromium (153.0.8010.12, `DEPENDENCIES.md` §Fetched outside
+npm) and fails unless **every one of the five is present and reads `pass`, and the
+page logged no console error and threw no uncaught exception**. The set of flags is
+compared by equality, so a flag the page stops setting fails as surely as one that
+reads `fail`.
+
+**The runner proves it can see a failure before it is believed.** `--self-test`
+loads fabricated pages through the same browser — one flag reading `fail`, one flag
+absent, a `console.error`, an uncaught throw — and requires each to be refused, with
+a clean page as the control.
+
+**Text searches stay only where the subject is the page's own content.** A
+`requireText` over a generated count, a claim, a rule id or a registry-derived
+string checks what the page *says*, and stays in `check-calcium.mjs`. A search over
+the conformance scripts' source — that a script contains `range.selectNodeContents`,
+say — was standing in for running it, reads as coverage, and is removed now that
+the script runs.
+
+**Why, measured.** No browser had ever loaded the page. The first run, on
+2026-09-27, found `glyphGridCheck` reading `fail` with an uncaught *work-unit ascii
+overflows reservedCells: 67.734375px > 7.515625px*: the reservation probe wrote
+`esc(glyph.ascii)` for a record whose ASCII half is state-resolved and holds no
+character, so the one-cell slot held the nine characters of `undefined`. Every text
+search passed, because the script's source was all present.
+
 ## Fixtures — derived from the page, never kept by hand
 
 **`fixtures/` is a projection of the generated HTML, as the HTML is of the
