@@ -9,9 +9,10 @@
  * **The layer is pushed `dismissable: false` and the user can still escape it**,
  * which is not the contradiction it reads as. C15's flag says *the router may not
  * discard this layer without telling its owner* — and it may not, because
- * discarding it silently leaves the awaiting handler pending forever. `Esc` and
- * `⌃c` are escapes the **owner** performs, resolving with the default choice
- * (C23 I36). The word means two things and the layer needs opposite answers to
+ * discarding it silently leaves the awaiting handler pending forever. `Esc` is
+ * the escape the **owner** performs, resolving with the default choice (C23
+ * I36). `⌃c` is not an escape here: C16 refuses it at a question before any rung
+ * runs (C16 I62, ruling 59), and the question says so (C23 I82). The word means two things and the layer needs opposite answers to
  * them; the flag only ever answered the second. See DOCKER_TUI_COMPLETION.md
  * Ruling A, where the two were one word.
  *
@@ -22,15 +23,34 @@
 
 import { block } from "../data/viewmodel/construct.js";
 import type { Block } from "../data/viewmodel/types.js";
-import type { InputEvent } from "../interaction/router/types.js";
+import type { InputEvent, Verdict } from "../interaction/router/types.js";
 import type { Layer, OverlayManager, Placement } from "../viewport/overlay/index.js";
 import type { AskAnswer, AskOptions, Choice } from "./local/registry.js";
-import { questionNotice } from "./documents.js";
+import { questionNotice, warnNotice } from "./documents.js";
 import { questionConsumer, routingFor } from "./question-routing.js";
 import { cells } from "../presentation/text.js";
 import { createChoiceSelection, defaultStart } from "./choice-selection.js";
 
 export const CONFIRM_LAYER_ID = "confirm";
+
+/**
+ * A question's own key vocabulary — what `classify` reads (C23 I36, I82).
+ *
+ * **A record rather than four literals in `classify`**, because what a question
+ * does not classify is exactly what it refuses (C23 I82), and the set has to be
+ * readable as a set to say so.
+ */
+export const QUESTION_KEYS = Object.freeze({
+  previous: Object.freeze(["up", "left"]),
+  next: Object.freeze(["down", "right", "tab"]),
+  answer: Object.freeze(["return", "enter"]),
+  leave: Object.freeze(["escape"]),
+});
+
+/** The refusal's words (C23 I82, ruling 60). */
+const REFUSED_TEXT = "answer this first";
+
+
 /**
  * How wide the question asks to be.
  *
@@ -115,7 +135,7 @@ export interface ConfirmHost {
    * C15 `pop()` gives: a question raised over a completion menu must not be
    * answered by the menu.
    */
-  answerHandler(): ((e: InputEvent) => boolean) | null;
+  answerHandler(): ((e: InputEvent) => boolean | Verdict) | null;
   /**
    * Would this key **resolve** the open question (C16 I44, R-BLK-788)?
    *
@@ -125,6 +145,17 @@ export interface ConfirmHost {
    * whole point of asking before answering.
    */
   resolvesHandler(): ((e: InputEvent) => boolean) | null;
+  /**
+   * The open question refused an input — say so, once (C23 I82, C16 I62).
+   *
+   * Called by the question's own handler for a key it does not classify, and by
+   * L4 for a refusal the router made at `question` — the interrupt, or an event
+   * that reached a blocking top. **The first puts `answer this first` on the
+   * question's row and every later one does nothing**: no `update`, no
+   * `invalidate`. The inspection and the reply state never draw it — one is the
+   * reader reading, the other composing.
+   */
+  refuse(): void;
   /** Whether a question is open — C22 refuses a submission while one is. */
   readonly open: boolean;
   /**
@@ -155,7 +186,8 @@ export interface ConfirmHost {
 }
 
 /**
- * The choice a bare `Enter` takes, and the one `Esc` and `⌃c` resolve with.
+ * The choice a bare `Enter` takes, and the one `Esc` resolves with (`⌃c` is
+ * refused, not resolved — C16 I62).
  *
  * **Falls back to the last choice rather than the first when none is marked.**
  * For a destructive verb the safe option is conventionally last (`yes`, `no`),
@@ -287,10 +319,33 @@ function inspection(opts: AskOptions, rows: number): readonly Block[] {
   return [block({ kind: "panel", id: "confirm-panel", title: "Confirm", children })];
 }
 
-function render(opts: AskOptions, selected: number, cut = false): readonly Block[] {
-  const children: Block[] = [
-    questionNotice(opts.question, "confirm-question"),
-  ];
+/**
+ * The question's row — the question, and beside it the refusal once there has
+ * been one (C23 I82, ruling 60).
+ *
+ * **On the question's own row, not a row of its own.** A question that does not
+ * fit drops its payload for `…` and keeps its choices (`render`'s cut arm), and
+ * a notice below the question would be one more row competing with the answers
+ * for a height the region may not have. Beside it, the right cell is exactly the
+ * notice's width and the question takes the rest — `clusters`' shape in the
+ * footer.
+ */
+function questionRow(opts: AskOptions, refused: boolean): Block {
+  const question = questionNotice(opts.question, "confirm-question");
+  if (!refused) return question;
+  return block<Block>({
+    kind: "group",
+    id: "confirm-question-row",
+    direction: "row",
+    children: [question, warnNotice(REFUSED_TEXT, "confirm-refused")],
+    // The glyph and its gap are two cells at both rungs (`▲ `, `! `).
+    // narrow-ok — REFUSED_TEXT is ASCII written here, so no ambiguous-width cell.
+    flex: [1, { cells: cells(REFUSED_TEXT) + 2 }], // narrow-ok
+  });
+}
+
+function render(opts: AskOptions, selected: number, cut = false, refused = false): readonly Block[] {
+  const children: Block[] = [questionRow(opts, refused)];
   // Ruling C's payload — what the answer will affect, shown with the question
   // rather than in the entry that follows it.
   if (opts.detail !== undefined) {
@@ -355,7 +410,9 @@ function placementOf(
 type Meaning = "resolve" | "move" | "compose" | "leave" | "none";
 
 export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
-  let handler: ((e: InputEvent) => boolean) | null = null;
+  let handler: ((e: InputEvent) => boolean | Verdict) | null = null;
+  /** The open question's refusal, or `null` when none is open (C23 I82). */
+  let refuseOpen: (() => void) | null = null;
   let meaning: ((e: InputEvent) => Meaning) | null = null;
   // **The question's state, which is what the routing is derived from** (I73).
   // `null` when nothing is open; the consumer otherwise, so the table is asked
@@ -392,6 +449,10 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
       // second record of "is the question on top" is one that can disagree with
       // C15's stack, and C16 asks this on every keystroke.
       return deps.overlays.top?.id === CONFIRM_LAYER_ID ? handler : null;
+    },
+
+    refuse() {
+      refuseOpen?.();
     },
 
     resolvesHandler() {
@@ -448,9 +509,20 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
 
       const disposable = deps.overlays.push(layer);
       deps.announce?.asked(opts);
+      /**
+       * Whether the payload was dropped for `…` — **held, because every later
+       * draw has to keep it.** It was a local of the second pass below, and
+       * `redraw` and `toReply` called `render` without it, so a question that
+       * had collapsed to keep its choices un-collapsed on the first arrow and
+       * lost them again.
+       */
+      let cut = false;
+      /** The one-shot of C23 I82: whether this question has explained a refusal. */
+      let refused = false;
       // **The second pass, and it drops the payload rather than marking it**
       // (entry 16 R2). See `collapsed`.
       if (truncated(deps)) {
+        cut = true;
         deps.overlays.update(CONFIRM_LAYER_ID, { content: render(opts, selected(), true) });
       }
 
@@ -458,6 +530,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
         const settle = (key: string, text?: string): boolean => {
           deps.announce?.answered(text ?? opts.choices.find((c) => c.key === key)?.label ?? key);
           handler = null;
+          refuseOpen = null;
           meaning = null;
           consumer = null;
           replying = null;
@@ -493,7 +566,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
           deps.holdDraft();
           const at = deps.anchor();
           deps.overlays.update(CONFIRM_LAYER_ID, {
-            content: render(opts, selected()),
+            content: render(opts, selected(), cut, refused),
             placement: { kind: "anchored", row: at.row, rows: at.rows, prefer: "above" },
           });
           deps.invalidate();
@@ -526,39 +599,70 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
         };
 
         const redraw = (): boolean => {
-          deps.overlays.update(CONFIRM_LAYER_ID, { content: render(opts, selected()) });
+          deps.overlays.update(CONFIRM_LAYER_ID, { content: render(opts, selected(), cut, refused) });
           deps.invalidate();
           return true;
         };
 
-        // Both escapes resolve with the default (C23 I36). They are classified
-        // here rather than special-cased in C16 because what they mean is the
+        /**
+         * Explain a refusal, once (C23 I82, R-HON-004, R-INT-008, ruling 60).
+         *
+         * **The first changes the frame and every later one changes nothing.**
+         * A refused key that draws nothing is indistinguishable from a key that
+         * was swallowed, which is the whole of R-HON-004's complaint — and a
+         * refusal that redrew on every key would be the notice flickering on a
+         * held key. So one `update` and one `invalidate`, and a second refusal
+         * performs neither.
+         *
+         * **Silent in the inspection and while composing.** The inspection's
+         * only key is `esc`, and a reader reading is not being refused; the reply
+         * state's keys are the prompt's, and composition is never a refusal.
+         */
+        const refuse = (): void => {
+          if (refused || suspended || replying !== null) return;
+          refused = true;
+          deps.overlays.update(CONFIRM_LAYER_ID, { content: render(opts, selected(), cut, true) });
+          // **The notice can take the row the choices needed** — a long question
+          // beside it wraps once more. The same second pass as at `ask`, and the
+          // only case this spends a second update on.
+          if (!cut && truncated(deps)) {
+            cut = true;
+            deps.overlays.update(CONFIRM_LAYER_ID, { content: render(opts, selected(), true, true) });
+          }
+          deps.invalidate();
+        };
+        refuseOpen = refuse;
+
+        // `Esc` resolves with the default (C23 I36). It is classified here
+        // rather than special-cased in C16 because what it means is the
         // question's business, and a router that knew it would hold half of a
-        // rule whose other half lives two layers away (C16 I25).
+        // rule whose other half lives two layers away (C16 I25). **`⌃c` is not
+        // here** (C16 I62, ruling 59): the router refuses it at a question
+        // before this is asked, and it read `escape || ⌃c` until then.
         //
-        // Accelerators are checked last so a choice keyed `c` cannot shadow
-        // `⌃c`. Bare only: `⌥y` is not `y`.
+        // Accelerators are checked last, and bare only: `⌥y` is not `y`, and
+        // `⌃c` is not a choice keyed `c`.
         const classify = (e: InputEvent): Meaning => {
           if (e.kind !== "key") return "none";
           const { name, ctrl } = e.key;
+          const is = (set: readonly string[]): boolean => set.includes(name);
           // **An inspection owns escape and nothing else** (I75). `Esc` inside
           // it leaves the inspection and not the request, so it cannot be a
           // `resolve` here — and no accelerator answers, because the reader is
           // reading the evidence rather than choosing between answers.
-          if (suspended) return name === "escape" || (ctrl && name === "c") ? "leave" : "none";
-          if (name === "escape" || (ctrl && name === "c")) return "resolve";
+          if (suspended) return is(QUESTION_KEYS.leave) ? "leave" : "none";
+          if (is(QUESTION_KEYS.leave)) return "resolve";
           // **A bare `⏎` answers a reply; a modified one is the line's** (§052:
           // *⏎ submit   ⇧⏎ newline*, C16 I54). Before `reply…` there is no line,
           // so every `enter` still answers.
           const bare = !e.key.shift && !e.key.meta && !ctrl;
-          if ((name === "return" || name === "enter") && (bare || replying === null)) return "resolve";
+          if (is(QUESTION_KEYS.answer) && (bare || replying === null)) return "resolve";
           // **A floating reply owns two keys and no others** (I73). The reader
           // is composing text, so `y` is a letter and `↓` is a motion in the
           // line — an accelerator arm here would make a question whose choices
           // spell a word unanswerable by typing it.
           if (replying !== null) return "compose";
-          if (name === "up" || name === "left") return "move";
-          if (name === "down" || name === "right" || name === "tab") return "move";
+          if (is(QUESTION_KEYS.previous) || is(QUESTION_KEYS.next)) return "move";
           if (!ctrl && !e.key.meta && opts.choices.some((c) => c.key === name)) return "resolve";
           if (!ctrl && !e.key.meta && numberedPick(name) !== undefined) return "resolve";
           return "none";
@@ -570,10 +674,10 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
 
         handler = (e) => {
           if (e.kind !== "key") return false;
-          const { name, ctrl } = e.key;
+          const { name } = e.key;
           switch (classify(e)) {
             case "resolve":
-              if (name === "escape" || (ctrl && name === "c")) {
+              if (QUESTION_KEYS.leave.includes(name)) {
                 // **The default's key and no text, on every path** (I36). An
                 // escape from the reply state is still an escape: the reader
                 // declined, and a `text` of `""` would say they replied with
@@ -621,15 +725,20 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
               // `composing` holds.
               return false;
             case "move":
-              if (name === "up" || name === "left") selection.prev();
+              if (QUESTION_KEYS.previous.includes(name)) selection.prev();
               else selection.next();
               return redraw();
             default:
-              // **Consumed, and nothing happens.** An unbound key at an open
-              // question must not fall through — C16 I8 blocks the surface
-              // beneath, and returning false here would send the key back up the
-              // ladder to the rung that consumes `⌃c` into silence.
-              return true;
+              // **Refused, and it says so** (C23 I82, R-HON-004). An unbound key
+              // at an open question must not fall through — C16 I8 blocks the
+              // surface beneath — and it used to be consumed with nothing on
+              // screen changing, which is a key swallowed rather than refused.
+              // `reject` rather than `true`: the router reports a handler's
+              // reject no second time (C16 I62), and the stage says what it was.
+              // In the inspection it is consumed silently (ruling 60).
+              if (suspended) return true;
+              refuse();
+              return "reject";
           }
         };
 

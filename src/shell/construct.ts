@@ -1814,9 +1814,13 @@ export async function constructGraph(
   });
 
   // **Where the router's refusals are explained** (C16 I62). By rung, because
-  // the explanation is the owner's; the question's and the copy chip's sinks
-  // land with C23 I82 and C22 I133 in this round's next commits.
-  const refused = (_r: Parameters<RouterDeps["refused"]>[0]): void => undefined;
+  // the explanation is the owner's: a question says `answer this first` on its
+  // own row (C23 I82). Semantic copy mode's chip lands with C22 I133; native
+  // selection has nothing it can draw — the scheduler is suspended — and that
+  // is the stated limit (ruling 60).
+  const refused = (r: Parameters<RouterDeps["refused"]>[0]): void => {
+    if (r.rung === "question") confirm.refuse();
+  };
 
   const router = at("router", () =>
     createRouter({

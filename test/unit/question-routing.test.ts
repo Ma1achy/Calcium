@@ -94,7 +94,11 @@ const world = (): Readonly<{
     },
     line: () => draft,
     drafted: () => draft,
-    press: (name) => confirm.answerHandler()?.({ kind: "key", key: { name } } as InputEvent) ?? false,
+    // Consumed is anything but `pass`: a refusal is consumed too (C23 I82).
+    press: (name) => {
+      const answer = confirm.answerHandler()?.({ kind: "key", key: { name } } as InputEvent) ?? false;
+      return answer !== false && answer !== "pass";
+    },
   };
 };
 
