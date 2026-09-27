@@ -58,24 +58,33 @@ const entryOf = (r) => ({
 // may have moved legally since — `lint-immutable.mjs` owns that judgement — so
 // the release asserts only what can never move: that the rule is still there
 // and its content is the content that was sealed.
-const byId = new Map(registry.rules.map((r) => [r.id, r]));
-for (const [id, sealed] of Object.entries(baseline.rules)) {
-  const r = byId.get(id);
-  if (r === undefined) fail(`${id}: sealed and no longer in the registry`);
-  else if (r.contentDigest !== sealed.digest) fail(`${id}: sealed digest changed — supersede it, do not edit it`);
-}
+//
+// **Theme rules are sealed the same way, in their own map** (AUTHORITY §Release 5).
+const seal = (records, sealedMap) => {
+  const byId = new Map(records.map((r) => [r.id, r]));
+  for (const [id, sealed] of Object.entries(sealedMap)) {
+    const r = byId.get(id);
+    if (r === undefined) fail(`${id}: sealed and no longer in the registry`);
+    else if (r.contentDigest !== sealed.digest) fail(`${id}: sealed digest changed — supersede it, do not edit it`);
+  }
+  const added = records.filter((r) => !(r.id in sealedMap));
+  const out = { ...sealedMap };
+  for (const r of added) out[r.id] = entryOf(r);
+  return { added, out };
+};
+const { added, out: rules } = seal(registry.rules, baseline.rules);
+const { added: addedThemes, out: themeRules } = seal(registry.themeRules, baseline.themeRules ?? {});
 if (failed > 0) stop();
 
-const added = registry.rules.filter((r) => !(r.id in baseline.rules));
-const rules = { ...baseline.rules };
-for (const r of added) rules[r.id] = entryOf(r);
-
-const canon = JSON.stringify(Object.fromEntries(Object.keys(rules).sort().map((k) => [k, rules[k]])));
+const sorted = (m) => Object.fromEntries(Object.keys(m).sort().map((k) => [k, m[k]]));
+const canon = JSON.stringify({ rules: sorted(rules), themeRules: sorted(themeRules) });
 const released = {
   releasedAt: new Date().toISOString().slice(0, 10),
   registryRevision: revision,
   rules,
   count: Object.keys(rules).length,
+  themeRules,
+  themeCount: Object.keys(themeRules).length,
   anchor: { ...baseline.anchor, sha256: createHash("sha256").update(canon).digest("hex") },
 };
 registry.meta.revision = revision;
@@ -89,5 +98,7 @@ const reg = JSON.parse(readFileSync(registryPath, "utf8"));
 if (reg.meta.revision !== revision || after.registryRevision !== revision) fail("the two revisions do not read the new value");
 for (const r of reg.rules) if (r.status === "current" && !(r.id in after.rules)) fail(`${r.id}: current and unsealed after the release`);
 if (after.count !== reg.rules.length) fail(`sealed ${after.count} of ${reg.rules.length} rules`);
+for (const r of reg.themeRules) if (r.status === "current" && !(r.id in after.themeRules)) fail(`${r.id}: current and unsealed after the release`);
+if (after.themeCount !== reg.themeRules.length) fail(`sealed ${after.themeCount} of ${reg.themeRules.length} theme rules`);
 if (failed > 0) { console.error(`FAIL · ${failed} problems after writing — inspect both files`); process.exit(1); }
-console.log(`released ${revision} · ${added.length} rules sealed (${added.filter((r) => r.status === "current").length} current) · ${after.count} in the baseline`);
+console.log(`released ${revision} · ${added.length} rules sealed (${added.filter((r) => r.status === "current").length} current) · ${after.count} in the baseline · ${addedThemes.length} theme rules sealed · ${after.themeCount} in the baseline`);

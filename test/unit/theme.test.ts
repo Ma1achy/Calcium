@@ -899,9 +899,9 @@ describe("C10 §4b.1 — the pairing the registry declares", () => {
   const declared = (): Map<string, string> => {
     const registry = JSON.parse(
       readFileSync("docs/design/language/calcium-registry.json", "utf8"),
-    ) as { themeRules: { selector: string; declarations: string }[] };
+    ) as { themeRules: { selector: string; declarations: string; status: string }[] };
     const out = new Map<string, string>();
-    for (const rule of registry.themeRules) {
+    for (const rule of registry.themeRules.filter((r) => r.status === "current")) {
       const colour = /(?:^|;)color:(#[0-9a-fA-F]{3,8})/.exec(rule.declarations);
       if (colour === null) continue;
       for (const sel of rule.selector.split(",")) {
@@ -927,8 +927,8 @@ describe("C10 §4b.1 — the pairing the registry declares", () => {
     const firstOnly = new Set<string>();
     const registry = JSON.parse(
       readFileSync("docs/design/language/calcium-registry.json", "utf8"),
-    ) as { themeRules: { selector: string; declarations: string }[] };
-    for (const rule of registry.themeRules) {
+    ) as { themeRules: { selector: string; declarations: string; status: string }[] };
+    for (const rule of registry.themeRules.filter((r) => r.status === "current")) {
       const m = /^\[data-theme="([a-zA-Z]+)"\] \.bg-([a-zA-Z-]+) \.c-([a-zA-Z-]+)/.exec(rule.selector);
       if (m === null || HUE.test(m[2] ?? "") || HUE.test(m[3] ?? "")) continue;
       if (/(?:^|;)color:#/.test(rule.declarations)) firstOnly.add(`${m[1] ?? ""}|${m[2] ?? ""}|${m[3] ?? ""}`);

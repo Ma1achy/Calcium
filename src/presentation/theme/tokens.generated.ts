@@ -974,8 +974,8 @@ export const REGISTRY_THEMES: ThemeSet = Object.freeze({
           "error": "#e8967c",
           "info": "#81a1c1",
           "accent": "#ebae76",
-          "meta": "#ba96b3",
           "identifier": "#88c0d0",
+          "meta": "#ba96b3",
         }),
         // The 1-bit typographic fallback per slot (C10 I15), one record for every
         // theme — `terminalPalettes.classes`.

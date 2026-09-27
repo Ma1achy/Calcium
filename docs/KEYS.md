@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT. Source: docs/design/language/calcium-registry.json, rendered by build-calcium.mjs's renderKeysMarkdown; written with the key ladder below by tools/keymap-table.mjs -->
 # Calcium keys
 
-Revision 0.10 · 41 current bindings · profile: default-terminal
+Revision 0.11 · 41 current bindings · profile: default-terminal
 
 The universal set gives one purpose to each key and does not depend on what has focus; the active owner resolves that purpose.
 

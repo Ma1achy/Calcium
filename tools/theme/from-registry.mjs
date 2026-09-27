@@ -29,6 +29,11 @@ import { clearFloor, contrast, lum } from "./wcag.mjs";
 const here = dirname(fileURLToPath(import.meta.url));
 const registry = JSON.parse(readFileSync(
   resolve(here, "../../docs/design/language/calcium-registry.json"), "utf8"));
+// **The current theme rules, and only these.** A superseded record is released
+// history — the value a slot held before the one that replaced it — and it
+// keeps its selector, so a reader taking every record would read two values for
+// one slot and keep whichever came last (AUTHORITY §Release 5).
+const THEME_RULES = registry.themeRules.filter((rule) => rule.status === "current");
 // \`--check\` renders in memory and writes nothing (C10 §4b); \`--out\` points either
 // mode at another file, which is how the check's fabricated violation reaches it.
 const outAt = process.argv.indexOf("--out");
@@ -113,7 +118,7 @@ const hueName = (slot) => slot.replace(/^h-|^hi-/, "");
  */
 const HUE_ORDER = (() => {
   const out = [];
-  for (const rule of registry.themeRules) {
+  for (const rule of THEME_RULES) {
     for (const m of rule.selector.matchAll(/\.c-h-([a-z0-9]+)\b/g)) {
       if (!out.includes(m[1])) out.push(m[1]);
     }
@@ -129,7 +134,7 @@ function tokensFor(themeId) {
   const hues = {};
   const syntax = {};
   const categorical = {};
-  for (const rule of registry.themeRules) {
+  for (const rule of THEME_RULES) {
     if (SKIP_SELECTORS.test(rule.selector)) continue;
     // **Ink ON a ground** — `.bg-X .c-Y`, which the registry writes twice in one
     // selector (descendant and same-element) for the HTML's sake.
@@ -266,7 +271,7 @@ for (const [id, { tone, surfaces }] of collected) {
   if (surfaces.bg === undefined) fail(`${id} has no bg surface`);
   // **The check the user's instruction earns**: a theme whose `bg` came from a
   // `.term` rule would mean the skip failed, so assert the skip fired by value.
-  const term = registry.themeRules.find((r) =>
+  const term = THEME_RULES.find((r) =>
     r.selector === `[data-theme="${id}"] .term`);
   if (term === undefined) fail(`${id} has no .term rule — the projection changed shape`);
 }

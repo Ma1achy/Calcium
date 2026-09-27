@@ -17,7 +17,7 @@ import type { ThemeTokens } from "../../src/presentation/theme/types.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
-interface Rule { selector: string; declarations: string }
+interface Rule { selector: string; declarations: string; status: string }
 interface ThemeRecord { id: string; status: string; fourBit: string; spectrum: string }
 const registry = JSON.parse(readFileSync(resolve(root, "docs/design/language/calcium-registry.json"), "utf8")) as {
   themes: ThemeRecord[];
@@ -51,7 +51,7 @@ const FAMILY = { syn: "syntax", cat: "categorical" } as const;
 /** `family.slot` -> hex, from a theme's flat `.syn-*` and `.cat-*` rules. */
 const flatOf = (id: string): Map<string, string> => {
   const out = new Map<string, string>();
-  for (const rule of registry.themeRules) {
+  for (const rule of registry.themeRules.filter((r) => r.status === "current")) {
     const m = /^\[data-theme="([A-Za-z]+)"\] \.(syn|cat)-([A-Za-z0-9]+)$/.exec(rule.selector);
     if (m !== null && m[1] === id) out.set(`${FAMILY[m[2] as "syn" | "cat"]}.${m[3]!}`, colourOf(rule));
   }
@@ -60,7 +60,7 @@ const flatOf = (id: string): Map<string, string> => {
 /** `surface.ground|family.slot` -> hex, from a theme's `.bg-* .syn-*` rules. */
 const composedOf = (id: string): Map<string, string> => {
   const out = new Map<string, string>();
-  for (const rule of registry.themeRules) {
+  for (const rule of registry.themeRules.filter((r) => r.status === "current")) {
     for (const member of rule.selector.split(",")) {
       const m = /^\[data-theme="([A-Za-z]+)"\] \.bg-([A-Za-z-]+) \.(syn|cat)-([A-Za-z0-9]+)$/.exec(member.trim());
       if (m !== null && m[1] === id) out.set(`surface.${m[2]!}|${FAMILY[m[3] as "syn" | "cat"]}.${m[4]!}`, colourOf(rule));

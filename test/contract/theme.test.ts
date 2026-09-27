@@ -1528,13 +1528,13 @@ describe("C10 I52 — the registry's state axes and the spec's declarations", ()
   it("T2.53 (C10 I53, §070, §093): the ten hues are three tiers per theme, and the order is a sequence", () => {
     const registry = JSON.parse(
       readFileSync(new URL("../../docs/design/language/calcium-registry.json", import.meta.url), "utf8"),
-    ) as { themes: readonly { id: string }[]; themeRules: readonly { selector: string; declarations: string }[] };
+    ) as { themes: readonly { id: string }[]; themeRules: readonly { selector: string; declarations: string; status: string }[] };
 
     // The registry side, read out of the 300 tokens rather than written down here.
     // `c-h-X` is the hue's ink, `bg-h-X` its ground, `c-hi-X` the ink ON that ground.
     const expected = new Map<string, Map<string, Record<string, string>>>();
     const order: string[] = [];
-    for (const rule of registry.themeRules) {
+    for (const rule of registry.themeRules.filter((r) => r.status === "current")) {
       const colour = /(?:^|[;{\s])color:\s*(#[0-9a-fA-F]{3,8})/u.exec(rule.declarations);
       const ground = /background(?:-color)?:\s*(#[0-9a-fA-F]{3,8})/u.exec(rule.declarations);
       // The theme is in the selector and not a field — `[data-theme="dark"] .c-h-blue`.

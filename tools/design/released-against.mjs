@@ -59,17 +59,25 @@ const fail = (m) => { console.error(`  ${m}`); bad += 1; };
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const LEGAL = { current: ["current", "superseded"], example: ["example", "superseded"], superseded: ["superseded"] };
 
-for (const [id, w] of Object.entries(was.rules)) {
-  const n = now.rules[id];
-  if (n === undefined) { fail(`${id}: REMOVED — it is sealed on ${ref}`); continue; }
-  if (n.digest !== w.digest) fail(`${id}: digest changed from ${ref}'s`);
-  if (!same(n.supersedes, w.supersedes)) fail(`${id}: supersedes changed from ${ref}'s`);
-  if (!(LEGAL[w.status] ?? [w.status]).includes(n.status)) fail(`${id}: status ${w.status} → ${n.status} is not a legal transition`);
-  const linked = w.supersededBy.length === 0 && n.supersededBy.length > 0 && w.status !== "superseded" && n.status === "superseded";
-  if (!same(n.supersededBy, w.supersededBy) && !linked) fail(`${id}: supersededBy changed from ${ref}'s`);
+// **Both maps, one walk** (AUTHORITY §Release 5). A ref whose baseline predates
+// sealed theme rules holds none, and every theme rule here is an addition.
+let kept = 0;
+let added = 0;
+for (const map of ["rules", "themeRules"]) {
+  const wasMap = was[map] ?? {};
+  const nowMap = now[map] ?? {};
+  for (const [id, w] of Object.entries(wasMap)) {
+    const n = nowMap[id];
+    if (n === undefined) { fail(`${id}: REMOVED — it is sealed on ${ref}`); continue; }
+    if (n.digest !== w.digest) fail(`${id}: digest changed from ${ref}'s`);
+    if (!same(n.supersedes, w.supersedes)) fail(`${id}: supersedes changed from ${ref}'s`);
+    if (!(LEGAL[w.status] ?? [w.status]).includes(n.status)) fail(`${id}: status ${w.status} → ${n.status} is not a legal transition`);
+    const linked = w.supersededBy.length === 0 && n.supersededBy.length > 0 && w.status !== "superseded" && n.status === "superseded";
+    if (!same(n.supersededBy, w.supersededBy) && !linked) fail(`${id}: supersededBy changed from ${ref}'s`);
+  }
+  kept += Object.keys(wasMap).length;
+  added += Object.keys(nowMap).filter((id) => !(id in wasMap)).length;
 }
-const kept = Object.keys(was.rules).length;
-const added = Object.keys(now.rules).filter((id) => !(id in was.rules)).length;
 console.log(bad > 0
   ? `FAIL · ${String(bad)} changes to entries sealed on ${ref}`
   : `OK · ${String(kept)} entries sealed on ${ref} kept, ${String(added)} added`);

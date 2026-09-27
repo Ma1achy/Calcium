@@ -26,7 +26,14 @@ import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { PLOT_UNIONS } from "../../src/data/viewmodel/validate.js";
-import { validateRuleRecords, type RuleRecord } from "../../docs/design/language/build-calcium.mjs";
+import {
+  themeRuleContentDigest,
+  themeSlotsOf,
+  validateRuleRecords,
+  validateThemeRuleRecords,
+  type RuleRecord,
+  type ThemeRuleRecord,
+} from "../../docs/design/language/build-calcium.mjs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -3749,11 +3756,164 @@ describe("the design registry — supersession chains", () => {
     expect(() => { validate(rules); }).toThrow(/supersession is not reciprocal/u);
   });
 
-  it.todo("A03-DSN4 (AUTHORITY §Release 5): the checker refuses a theme rule's digest drift, a non-reciprocal link, a chain not ending current, a malformed or repeated id, and two current values for one slot — not deferred on a component: the code lands in the next commit of this round");
-  it.todo("A03-DSN4 (AUTHORITY §Release 5): lint-immutable fails a theme rule unreleased, its digest changed, its link redirected, or deleted — not deferred on a component: the code lands in the next commit of this round");
-  it.todo("A03-DSN4 (AUTHORITY §Release 5): release.mjs seals theme rules and refuses to rewrite a sealed one — not deferred on a component: the code lands in the next commit of this round");
-  it.todo("A03-DSN4 (AUTHORITY §Release 5): released-against fails a rewritten theme digest and passes a theme supersession — not deferred on a component: the code lands in the next commit of this round");
-  it.todo("A03-DSN4 (AUTHORITY §Release 5): the restored history — four band predecessors, the composed hcDark rule, mono's accent and nord's meta — each superseded and linked — not deferred on a component: the code lands in the next commit of this round");
+  // ── A03-DSN4 — theme rules, sealed like rules (AUTHORITY §Release 5) ──
+  type ThemeRule = ThemeRuleRecord & { supersedes: string[] };
+  const themeRules = (): ThemeRule[] =>
+    (JSON.parse(readFileSync("docs/design/language/calcium-registry.json", "utf8")) as { themeRules: ThemeRule[] }).themeRules;
+  const themeRule = (
+    id: string, selector: string, declarations: string, status: string, supersedes: string[], supersededBy: string | null,
+  ): ThemeRule => ({
+    id, selector, declarations, status, ruleIds: ["R-THM-001"], supersedes, supersededBy,
+    contentDigest: themeRuleContentDigest({ selector, declarations }),
+  });
+
+  it("A03-DSN4 (AUTHORITY §Release 5): the checker refuses a theme rule's digest drift, a non-reciprocal link, a chain not ending current, a malformed or repeated id, and two current values for one slot", () => {
+    // The shipped records pass, or every refusal below is about the fixture.
+    expect(validateThemeRuleRecords(themeRules()).size).toBe(themeRules().length);
+    const sel = '[data-theme="dark"] .c-zzz';
+
+    const drifted = [...themeRules(), { ...themeRule("TR-9001", sel, "color:#111111", "current", [], null), declarations: "color:#222222" }];
+    expect(() => validateThemeRuleRecords(drifted)).toThrow(/TR-9001 immutable theme rule content drifted/u);
+
+    const oneSided = [
+      ...themeRules(),
+      themeRule("TR-9001", sel, "color:#111111", "superseded", [], "TR-9002"),
+      themeRule("TR-9002", sel, "color:#222222", "current", [], null),
+    ];
+    expect(() => validateThemeRuleRecords(oneSided)).toThrow(/TR-9001 \/ TR-9002 supersession is not reciprocal/u);
+
+    const deadEnd = [
+      ...themeRules(),
+      themeRule("TR-9001", sel, "color:#111111", "superseded", [], "TR-9002"),
+      themeRule("TR-9002", sel, "color:#222222", "superseded", ["TR-9001"], null),
+    ];
+    expect(() => validateThemeRuleRecords(deadEnd)).toThrow(/TR-9001's supersession chain ends at TR-9002, which is superseded/u);
+
+    expect(() => validateThemeRuleRecords([...themeRules(), themeRule("TR-01", sel, "color:#111111", "current", [], null)]))
+      .toThrow(/invalid stable theme rule id TR-01/u);
+    const first = themeRules()[0]!;
+    expect(() => validateThemeRuleRecords([...themeRules(), themeRule(first.id, sel, "color:#111111", "current", [], null)]))
+      .toThrow(new RegExp(`duplicate stable theme rule id ${first.id}`, "u"));
+
+    // **Two current values for one slot**, reached through the expansion: one
+    // record names `nord` inside an `:is(…)` group with a comma list, the other
+    // names it plainly — nord's `.c-meta` was this shape before §Release 5.
+    const slot = [
+      ...themeRules(),
+      themeRule("TR-9001", ':is([data-theme="dark"],[data-theme="nord"]) .c-zzz, [data-theme="ink"] .c-yyy', "color:#111111", "current", [], null),
+      themeRule("TR-9002", '[data-theme="nord"]  .c-zzz', "color:#222222;background:#000000", "current", [], null),
+    ];
+    expect(() => validateThemeRuleRecords(slot)).toThrow(/TR-9001 and TR-9002 are both current for color on nord \.c-zzz/u);
+    // The control: the same pair with the first superseded by the second is history, not a collision.
+    const recorded = [
+      ...themeRules(),
+      themeRule("TR-9001", ':is([data-theme="dark"],[data-theme="nord"]) .c-zzz, [data-theme="ink"] .c-yyy', "color:#111111", "superseded", [], "TR-9002"),
+      themeRule("TR-9002", '[data-theme="nord"]  .c-zzz', "color:#222222;background:#000000", "current", ["TR-9001"], null),
+    ];
+    expect(() => validateThemeRuleRecords(recorded)).not.toThrow();
+    expect(themeSlotsOf(':is([data-theme="dark"],[data-theme="nord"]) .c-zzz, [data-theme="ink"] .c-yyy')).toEqual([
+      ["dark", ".c-zzz"], ["nord", ".c-zzz"], ["ink", ".c-yyy"],
+    ]);
+    expect(() => themeSlotsOf(".c-zzz")).toThrow(/names no theme/u);
+  });
+
+  it("A03-DSN4 (AUTHORITY §Release 5): lint-immutable fails a theme rule unreleased, its digest changed, its link redirected, or deleted", () => {
+    const dir = mkdtempSync(join(tmpdir(), "calcium-theme-immutable-"));
+    const from = "docs/design/language";
+    copyFileSync(`${from}/lint-immutable.mjs`, join(dir, "lint-immutable.mjs"));
+    copyFileSync(`${from}/released-baseline.json`, join(dir, "released-baseline.json"));
+    const fresh = () => JSON.parse(readFileSync(`${from}/calcium-registry.json`, "utf8")) as { themeRules: ThemeRule[] };
+    const lint = (reg: unknown) => {
+      writeFileSync(join(dir, "calcium-registry.json"), JSON.stringify(reg));
+      const r = spawnSync("node", [join(dir, "lint-immutable.mjs")], { encoding: "utf8" });
+      return { status: r.status, out: r.stdout + r.stderr };
+    };
+    const clean = lint(fresh());
+    expect(clean.status, clean.out).toBe(0);
+    expect(clean.out).toMatch(/and 869 released theme rules/u);
+
+    const unreleased = fresh();
+    unreleased.themeRules.push(themeRule("TR-9001", '[data-theme="dark"] .c-zzz', "color:#111111", "current", [], null));
+    expect(lint(unreleased).out).toMatch(/TR-9001: CURRENT THEME RULE NOT RELEASED/u);
+
+    const rewritten = fresh();
+    const band = rewritten.themeRules.find((r) => r.selector === '[data-theme="hcDark"] .bg-selection' && r.status === "current")!;
+    band.declarations = "background:#00405c";
+    band.contentDigest = themeRuleContentDigest(band);
+    const r1 = lint(rewritten);
+    expect(r1.status).toBe(1);
+    expect(r1.out).toMatch(new RegExp(`${band.id}: released digest changed`, "u"));
+
+    const redirected = fresh();
+    const old = redirected.themeRules.find((r) => r.id === "TR-0106")!;
+    expect(old.supersededBy, "nord's meta, the sealed link the fabrication redirects").toBe("TR-0748");
+    old.supersededBy = "TR-0001";
+    expect(lint(redirected).out).toMatch(/TR-0106: supersededBy REDIRECTED TR-0748 → TR-0001/u);
+
+    const deleted = fresh();
+    deleted.themeRules = deleted.themeRules.filter((r) => r.id !== "TR-0864");
+    expect(lint(deleted).out).toMatch(/TR-0864: RELEASED THEME RULE DELETED/u);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("A03-DSN4 (AUTHORITY §Release 5): release.mjs seals theme rules and refuses to rewrite a sealed one", () => {
+    const dir = mkdtempSync(join(tmpdir(), "calcium-theme-release-"));
+    const from = "docs/design/language";
+    for (const f of ["lint-immutable.mjs", "released-baseline.json", "calcium-registry.json"]) copyFileSync(`${from}/${f}`, join(dir, f));
+    const release = (rev: string) => spawnSync("node", ["tools/design/release.mjs", rev, "--dir", dir], { encoding: "utf8" });
+    const lint = () => spawnSync("node", [join(dir, "lint-immutable.mjs")], { encoding: "utf8" });
+    type Reg = { themeRules: ThemeRule[] };
+    const read = () => JSON.parse(readFileSync(join(dir, "calcium-registry.json"), "utf8")) as Reg;
+    const write = (r: unknown) => { writeFileSync(join(dir, "calcium-registry.json"), `${JSON.stringify(r, null, 2)}\n`); };
+
+    const reg = read();
+    reg.themeRules.push(themeRule("TR-9001", '[data-theme="dark"] .c-zzz', "color:#111111", "current", [], null));
+    write(reg);
+    expect(lint().status, "unreleased first").toBe(1);
+    const ok = release("9.1");
+    expect(ok.status, ok.stdout + ok.stderr).toBe(0);
+    expect(ok.stdout).toMatch(/1 theme rules sealed · 870 in the baseline/u);
+    expect(lint().status, "and sealed after").toBe(0);
+
+    const edited = read();
+    edited.themeRules.find((r) => r.id === "TR-0748")!.contentDigest = "0".repeat(64);
+    write(edited);
+    const before = readFileSync(join(dir, "released-baseline.json"), "utf8");
+    const refused = release("9.2");
+    expect(refused.status).toBe(1);
+    expect(refused.stderr).toMatch(/TR-0748: sealed digest changed — supersede it, do not edit it/u);
+    expect(readFileSync(join(dir, "released-baseline.json"), "utf8"), "nothing written").toBe(before);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("A03-DSN4 (AUTHORITY §Release 5): the restored history — four band predecessors, the composed hcDark rule, mono's accent and nord's meta — each superseded and linked", () => {
+    // Record by record, value by value: this is what each slot drew before the
+    // value that stands, read out of git at the commit that overwrote it.
+    const all = themeRules();
+    const byId = new Map(all.map((r) => [r.id, r]));
+    const history = all.filter((r) => r.status === "superseded");
+    const row = (r: ThemeRule) => [r.selector.split(",")[0], r.declarations, byId.get(r.supersededBy!)!.declarations];
+    expect(history.map(row)).toEqual([
+      ['[data-theme="nord"] .c-meta', "color:#b48ead", "color:#ba96b3"],
+      ['[data-theme="hcDark"] .bg-selection', "background:#00405c", "background:#efc51c;color:#000000"],
+      ['[data-theme="hcDark"] .bg-focusGround', "background:#2e2e2e", "background:#234f92;color:#ffffff"],
+      ['[data-theme="hcLight"] .bg-selection', "background:#a8ccf0", "background:#46176d;color:#ffffff"],
+      ['[data-theme="hcLight"] .bg-focusGround', "background:#c9c9c9", "background:#7face3;color:#000000"],
+      ['[data-theme="hcDark"] .bg-selection .c-dim', "color:#fff", "background:#efc51c;color:#000000"],
+      ['[data-theme="mono"] .c-accent', "color:#fff", "color:#f0f0f0"],
+    ]);
+    // The deleted composed rule is whole — nine tones, each in both forms.
+    const composed = history.find((r) => r.selector.startsWith('[data-theme="hcDark"] .bg-selection .c-dim'))!;
+    expect(themeSlotsOf(composed.selector).map(([, s]) => s)).toHaveLength(18);
+    // And every link is reciprocal, and every successor is current.
+    for (const r of history) {
+      const next = byId.get(r.supersededBy!)!;
+      expect(next.status, `${r.id}'s successor`).toBe("current");
+      expect(next.supersedes, `${next.id} acknowledges ${r.id}`).toContain(r.id);
+    }
+  });
 });
 
 /**
@@ -3768,7 +3928,7 @@ describe("the design registry — supersession chains", () => {
  */
 describe("A03-DSN3 — the released baseline against another ref's copy", () => {
   type Entry = { digest: string; status: string; supersedes: string[]; supersededBy: string[] };
-  type Baseline = { rules: Record<string, Entry>; count: number };
+  type Baseline = { rules: Record<string, Entry>; count: number; themeRules?: Record<string, Entry>; themeCount?: number };
   const real = JSON.parse(readFileSync("docs/design/language/released-baseline.json", "utf8")) as Baseline;
   const git = (repo: string, ...a: string[]) =>
     spawnSync("git", ["-C", repo, "-c", "user.email=t@t", "-c", "user.name=t", ...a], { encoding: "utf8" });
@@ -3803,7 +3963,7 @@ describe("A03-DSN3 — the released baseline against another ref's copy", () => 
   it("A03-DSN3 (AUTHORITY §Release 4): an unchanged baseline passes, and one with an entry added passes", () => {
     const same = run(() => undefined);
     expect(same.status, same.out).toBe(0);
-    expect(same.out).toMatch(new RegExp(`OK · ${String(Object.keys(real.rules).length)} entries sealed on main kept, 0 added`, "u"));
+    expect(same.out).toMatch(new RegExp(`OK · ${String(Object.keys(real.rules).length + Object.keys(real.themeRules ?? {}).length)} entries sealed on main kept, 0 added`, "u"));
     const added = run((b) => { b.rules["R-ZZZ-900"] = { digest: "a".repeat(64), status: "current", supersedes: [], supersededBy: [] }; });
     expect(added.status, added.out).toBe(0);
     expect(added.out).toMatch(/kept, 1 added/u);
@@ -3829,6 +3989,23 @@ describe("A03-DSN3 — the released baseline against another ref's copy", () => 
     const redirected = run((b) => { b.rules[someSuperseded]!.supersededBy = ["R-ZZZ-902"]; });
     expect(redirected.status, redirected.out).toBe(1);
     expect(redirected.out).toMatch(new RegExp(`${someSuperseded}: supersededBy changed`, "u"));
+  });
+
+  it("A03-DSN4 (AUTHORITY §Release 5): released-against fails a rewritten theme digest and passes a theme supersession", () => {
+    const theme = Object.keys(real.themeRules ?? {}).find((id) => real.themeRules![id]!.status === "current")!;
+    expect(theme, "the baseline seals theme rules").toBeDefined();
+    const rewritten = run((b) => { b.themeRules![theme]!.digest = "0".repeat(64); });
+    expect(rewritten.status, rewritten.out).toBe(1);
+    expect(rewritten.out).toMatch(new RegExp(`${theme}: digest changed from main's`, "u"));
+    const removed = run((b) => { delete b.themeRules![theme]; });
+    expect(removed.out).toMatch(new RegExp(`${theme}: REMOVED`, "u"));
+    const superseded = run((b) => {
+      b.themeRules![theme]!.status = "superseded";
+      b.themeRules![theme]!.supersededBy = ["TR-9999"];
+      b.themeRules!["TR-9999"] = { digest: "a".repeat(64), status: "current", supersedes: [theme], supersededBy: [] };
+    });
+    expect(superseded.status, superseded.out).toBe(0);
+    expect(superseded.out).toMatch(/kept, 1 added/u);
   });
 
   it("A03-DSN3 (AUTHORITY §Release 4): a supersession — status to superseded, a successor linked — is not a change", () => {

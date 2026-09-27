@@ -16,6 +16,9 @@ export const keysOutputPath = resolve(repoRoot, JSON.parse(readFileSync(registry
 
 const RULE_ID = /^R-[A-Z]{3}-[0-9]{3}$/;
 const BLOCK_RULE_ID = /^R-(?:BLK|BK[A-Z])-[0-9]{3}$/;
+// One flat sequence: seventeen theme rules span several themes through `:is(…)`,
+// so an id scoped to a theme would have no theme to name (AUTHORITY §Release 5).
+const THEME_RULE_ID = /^TR-[0-9]{4}$/;
 const STATUSES = new Set(['current', 'superseded', 'exploratory', 'example']);
 const STATE_FACT_KEYS = ['entry', 'carriers', 'actions', 'escape', 'motion-off', 'one-bit', 'residue'];
 const STATE_FACT_LABELS = {
@@ -38,6 +41,13 @@ export const ruleContentDigest = rule => createHash('sha256').update(JSON.string
   rule.title,
   rule.text,
   rule.sectionKey ?? null
+])).digest('hex');
+// **A theme rule's content is its value and what it applies to.** `ruleIds` are
+// citations and sit outside the digest, as a rule's `tags` do — citing a rule
+// that gives a value its reason is not a change to the value (AUTHORITY §Release 5).
+export const themeRuleContentDigest = rule => createHash('sha256').update(JSON.stringify([
+  rule.selector,
+  rule.declarations
 ])).digest('hex');
 export const barSpecimenContentDigest = specimen => createHash('sha256').update(JSON.stringify([
   specimen.id,
@@ -107,25 +117,12 @@ export function closureOf(registry, domains) {
   return out;
 }
 
-export function validateRuleRecords(ruleList) {
-  const ids = new Set();
-  const legacyIds = new Set();
-  const rules = new Map();
-  for (const rule of ruleList) {
-    if (!RULE_ID.test(rule.id)) throw new Error(`invalid stable rule id ${rule.id}`);
-    if (ids.has(rule.id)) throw new Error(`duplicate stable rule id ${rule.id}`);
-    if (!STATUSES.has(rule.status)) throw new Error(`${rule.id} has invalid status ${rule.status}`);
-    if (typeof rule.title !== 'string' || !rule.title.trim()) throw new Error(`${rule.id} has no title`);
-    if (typeof rule.text !== 'string' || !rule.text.trim()) throw new Error(`${rule.id} has no normative text`);
-    if (!Array.isArray(rule.supersedes)) throw new Error(`${rule.id} has no supersedes array`);
-    if (rule.contentDigest !== ruleContentDigest(rule)) throw new Error(`${rule.id} immutable rule content drifted`);
-    ids.add(rule.id);
-    rules.set(rule.id, rule);
-    for (const legacyId of rule.legacyIds ?? []) {
-      if (legacyIds.has(legacyId)) throw new Error(`duplicate legacy rule alias ${legacyId}`);
-      legacyIds.add(legacyId);
-    }
-  }
+/**
+ * The supersession graph over one kind of record, walked to its terminus — shared
+ * by rules and theme rules, because a second copy of this walk is a second set
+ * of ways for a chain to fail that one of them forgot.
+ */
+function validateSupersession(ruleList, rules) {
   for (const rule of ruleList) {
     if (rule.status === 'superseded') {
       if (!rule.supersededBy) throw new Error(`${rule.id} is superseded without a successor`);
@@ -173,7 +170,100 @@ export function validateRuleRecords(ruleList) {
       if (!cursor) throw new Error(`dangling supersededBy link from ${rule.id}`);
     }
   }
+}
+
+export function validateRuleRecords(ruleList) {
+  const ids = new Set();
+  const legacyIds = new Set();
+  const rules = new Map();
+  for (const rule of ruleList) {
+    if (!RULE_ID.test(rule.id)) throw new Error(`invalid stable rule id ${rule.id}`);
+    if (ids.has(rule.id)) throw new Error(`duplicate stable rule id ${rule.id}`);
+    if (!STATUSES.has(rule.status)) throw new Error(`${rule.id} has invalid status ${rule.status}`);
+    if (typeof rule.title !== 'string' || !rule.title.trim()) throw new Error(`${rule.id} has no title`);
+    if (typeof rule.text !== 'string' || !rule.text.trim()) throw new Error(`${rule.id} has no normative text`);
+    if (!Array.isArray(rule.supersedes)) throw new Error(`${rule.id} has no supersedes array`);
+    if (rule.contentDigest !== ruleContentDigest(rule)) throw new Error(`${rule.id} immutable rule content drifted`);
+    ids.add(rule.id);
+    rules.set(rule.id, rule);
+    for (const legacyId of rule.legacyIds ?? []) {
+      if (legacyIds.has(legacyId)) throw new Error(`duplicate legacy rule alias ${legacyId}`);
+      legacyIds.add(legacyId);
+    }
+  }
+  validateSupersession(ruleList, rules);
   return rules;
+}
+
+/**
+ * The (theme, selector) pairs one theme-rule selector addresses: comma lists split
+ * at the top level, `:is([data-theme="a"],[data-theme="b"]) rest` expanded to one
+ * pair per theme, whitespace normalised. A part naming no theme is refused rather
+ * than skipped — a slot the check cannot place is a slot it cannot compare.
+ */
+export function themeSlotsOf(selector) {
+  const parts = [];
+  let depth = 0;
+  let current = '';
+  for (const ch of selector) {
+    if (ch === '(') depth += 1;
+    if (ch === ')') depth -= 1;
+    if (ch === ',' && depth === 0) { parts.push(current); current = ''; } else current += ch;
+  }
+  parts.push(current);
+  const out = [];
+  for (const raw of parts) {
+    const part = raw.trim();
+    const grouped = part.match(/^:is\(((?:\[data-theme="[^"]+"\],?)+)\)(.*)$/s);
+    const single = part.match(/^\[data-theme="([^"]+)"\](.*)$/s);
+    if (grouped) {
+      for (const [, theme] of grouped[1].matchAll(/data-theme="([^"]+)"/g)) out.push([theme, grouped[2].replace(/\s+/g, ' ').trim()]);
+    } else if (single) {
+      out.push([single[1], single[2].replace(/\s+/g, ' ').trim()]);
+    } else {
+      throw new Error(`theme rule selector part names no theme: ${part}`);
+    }
+  }
+  return out;
+}
+
+/**
+ * Every theme rule checked as a released record (AUTHORITY §Release 5): a stable
+ * id, a digest over its value, the supersession graph walked as rules' is — and
+ * **one current value per slot**. Two current records setting one property for
+ * one theme and selector is a supersession nobody recorded: the later wins in the
+ * cascade and in the generator alike, so nothing on screen says so. Measured when
+ * this landed, over 863 records: one — `nord`'s `.c-meta`.
+ */
+export function validateThemeRuleRecords(list) {
+  const records = new Map();
+  for (const rule of list) {
+    if (!THEME_RULE_ID.test(rule.id)) throw new Error(`invalid stable theme rule id ${rule.id}`);
+    if (records.has(rule.id)) throw new Error(`duplicate stable theme rule id ${rule.id}`);
+    if (rule.status !== 'current' && rule.status !== 'superseded') throw new Error(`${rule.id} has invalid status ${rule.status}`);
+    if (typeof rule.selector !== 'string' || !rule.selector.trim()) throw new Error(`${rule.id} has no selector`);
+    if (typeof rule.declarations !== 'string' || !rule.declarations.trim()) throw new Error(`${rule.id} has no declarations`);
+    if (!Array.isArray(rule.supersedes)) throw new Error(`${rule.id} has no supersedes array`);
+    if (rule.contentDigest !== themeRuleContentDigest(rule)) throw new Error(`${rule.id} immutable theme rule content drifted`);
+    records.set(rule.id, rule);
+  }
+  validateSupersession(list, records);
+  const slots = new Map();
+  for (const rule of list) {
+    if (rule.status !== 'current') continue;
+    const properties = rule.declarations.split(';').filter(d => d.includes(':')).map(d => d.split(':')[0].trim());
+    for (const [theme, selector] of themeSlotsOf(rule.selector)) {
+      for (const property of properties) {
+        const key = `${theme}\u0000${selector}\u0000${property}`;
+        const held = slots.get(key);
+        if (held !== undefined) {
+          throw new Error(`${held} and ${rule.id} are both current for ${property} on ${theme} ${selector} — supersede one`);
+        }
+        slots.set(key, rule.id);
+      }
+    }
+  }
+  return records;
 }
 
 export function loadRegistry() {
@@ -237,6 +327,7 @@ function assertCurrentCitations(registry, owner, ids) {
 
 export function validateRegistry(registry) {
   const rules = validateRuleRecords(registry.rules);
+  validateThemeRuleRecords(registry.themeRules);
 
   for (const [name, source] of Object.entries(registry.countSources)) {
     const items = collectionFor(registry, name);

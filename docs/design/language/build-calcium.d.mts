@@ -20,8 +20,20 @@ export type RuleRecord = {
   contentDigest: string;
 };
 
+/** A theme rule, sealed like a rule (AUTHORITY §Release 5). */
+export type ThemeRuleRecord = {
+  id: string;
+  selector: string;
+  declarations: string;
+  status: string;
+  ruleIds: readonly string[];
+  supersedes: readonly string[];
+  supersededBy: string | null;
+  contentDigest: string;
+};
+
 /** The whole registry, unconstrained past the members these functions reach. */
-export type Registry = Record<string, unknown> & { rules: RuleRecord[] };
+export type Registry = Record<string, unknown> & { rules: RuleRecord[]; themeRules: ThemeRuleRecord[] };
 
 export const registryPath: string;
 export const outputPath: string;
@@ -31,6 +43,7 @@ export const keysOutputPath: string;
 export const isBlockRuleId: (id: string) => boolean;
 export const blockContentDigest: (renderHtml: unknown) => string;
 export const ruleContentDigest: (rule: Pick<RuleRecord, "title" | "text" | "sectionKey">) => string;
+export const themeRuleContentDigest: (rule: Pick<ThemeRuleRecord, "selector" | "declarations">) => string;
 export const barSpecimenContentDigest: (specimen: Record<string, unknown>) => string;
 
 export function nextBlockRuleId(usedIds: Iterable<string> | Set<string>): string;
@@ -48,6 +61,16 @@ export function closureOf(registry: Registry, domains: readonly string[]): Set<s
  * Throws on the first violation; returns the records by id.
  */
 export function validateRuleRecords(ruleList: readonly RuleRecord[]): Map<string, RuleRecord>;
+
+/** The (theme, selector) pairs a theme-rule selector addresses, `:is(…)` and comma lists expanded. */
+export function themeSlotsOf(selector: string): readonly (readonly [string, string])[];
+
+/**
+ * Every theme rule checked as a released record — id, digest, the supersession
+ * graph, and one current value per (theme, selector, property). Throws on the
+ * first violation; returns the records by id.
+ */
+export function validateThemeRuleRecords(list: readonly ThemeRuleRecord[]): Map<string, ThemeRuleRecord>;
 
 export function loadRegistry(): Registry;
 export function spinnerAsciiFrames(registry: Registry, spinner: unknown, seen?: Set<string>): readonly string[];
