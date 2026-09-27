@@ -1260,7 +1260,16 @@ tree is T2.48's attempt at each composition the golden file does not draw (§4k.
   `hover?: boolean` option, and `router/types.ts:312` reads a no-button move, so a pointer move
   already arrives. The mode was never the condition, and a later MR picking the row up would have
   found the transport there and drawn a frame for a fact nothing produces. The condition that can
-  change is the **field**, which is what C10 T2.48's attempt constructs. **The diff case was not that, and it is the one worth the correction above**: both
+  change is the **field**, which is what C10 T2.48's attempt constructs.
+  **And the subject was wrong, which the router framing hid** (review batch 1, item 22). The attempt
+  hovers a **table row**, and R-PTR-003 with the registry's pointer section admits hover on *links,
+  buttons and chips* only — *other surfaces do nothing*. Links do not exist in the view model, and a
+  button's focus is `focusGround` alone at the colour rungs (`controls.ts:128`), so a hover
+  previewing the same active ground would draw the same frame; R-STA-003 wants focus to hold a
+  non-colour carrier before hover can exist beside it. **Ruled: links are built first, as their
+  own MR, and case 2 is drawn on them** — the row §4k.2 names. Until then the attempt stays on a
+  table row as the watch, and a frame drawn to satisfy it on a table row would be a frame the
+  design refuses, so its `owed` says so. **The diff case was not that, and it is the one worth the correction above**: both
   facts were fully built — `patch/lines.ts` painted the grounds and the `+` / `−` marks, and
   `selectionStyle` the wash — and they could not meet, because `patch` **declared no elements and
   read `ctx.focus` nowhere**. The ground was never missing; the **addressability** was, and it is
