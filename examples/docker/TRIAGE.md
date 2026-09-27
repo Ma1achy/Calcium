@@ -329,7 +329,7 @@ together rather than patching apart.
 
 **F805** — a focused `mosaic` is invisible by C26 §7's own rule — no furniture to carry a tone; ruled, pinned structurally by T1.28 · **Closed** (F991) — C26 §7 and T1.28, which asserts byte-identity and nothing outside the rectangles
 
-**F1260** — **R-BLK-214 draws a call *blocked on you* and `CallState` has no member for it.** The registry's dot table has seven rows; the union has five, and *said something* is prose. Blocked on you is a call waiting on a question, and nothing ties a question to the call that raised it, so a blocked call draws `running` · **Open** — its subject is the question-to-call link
+**F1260** — **R-BLK-214 draws a call *blocked on you* and `CallState` has no member for it.** The registry's dot table has seven rows; the union has five, and *said something* is prose. Blocked on you is a call waiting on a question, and nothing ties a question to the call that raised it, so a blocked call draws `running` · **Open, ruled 2026-09-27** — the link lands with batch 3's M15 question queue; *waiting on you* is `warn` and blinks, static `warn` plus the words at reduced motion
 
 <a id="4"></a>
 ## 4 · A change axis distinct from `Tone` — **closed** · 5 closed · none with no verdict — C04 I35, I36 and I38 answered all five
@@ -2461,13 +2461,13 @@ already made — folding it in is cheaper than making a second one.
 
 **F795** — owed with a symbol: `toolCallHeader` renders `ps()` for a bare verb — a grammar decision that touches the agent card too · **Closed** (F991) — commits `5f91221a`, `c5c5d3e2` — ruled 2026-09-05 in C23 §3, T4.46
 
-**F1258** — **the row composer closes a dim run with `22` and never re-opens the bold beside it.** `between` (`rows.ts`) reproduces `@alcalzone/ansi-tokenize`'s `diffAnsiCodes` on purpose (C09 I72), and bold and dim are one channel: a `{bold, dim}` cell followed by `{bold}` ones reaches the terminal bold on the first cells only — six of six in the painter's bytes, two of six composed, read through `@xterm/headless`. Found reading a focused patch line at 1-bit (C25 §3d row h), which no longer paints the shape. The frame bytes the framework emits say something the painter did not · **Open** — a C09 ruling, since correcting it breaks T1.46's equality with the tokeniser by design
+**F1258** — **the row composer closes a dim run with `22` and never re-opens the bold beside it.** `between` (`rows.ts`) reproduces `@alcalzone/ansi-tokenize`'s `diffAnsiCodes` on purpose (C09 I72), and bold and dim are one channel: a `{bold, dim}` cell followed by `{bold}` ones reaches the terminal bold on the first cells only — six of six in the painter's bytes, two of six composed, read through `@xterm/headless`. Found reading a focused patch line at 1-bit (C25 §3d row h), which no longer paints the shape. The frame bytes the framework emits say something the painter did not · **Open, ruled 2026-09-27** — the terminal's meaning: re-emit bold after the `22`, and T1.46 asserts the cells rather than Ink's bytes
 
 **F796** — the command row and the header say one thing twice — `❯ /tail web.log` over `⏺ tail(web.log)`; ruled in C23 §3: the far side's call over the user's line · **Closed** (F991) — commits `5f91221a`, `c5c5d3e2` — ruled in the same paragraph as F795
 
 **F1261** — **a queued call head draws `●` wherever tone carries, and the registry reserves `○` for it** (R-BLK-220). `headMark` returned `running` above 1 bit for every state, and C09 I45 and `tool-call.test.ts` agreed with each other and not with the registry · **Closed** — `headMark` returns `CALL_HEAD_GLYPH[state]` where tone carries and the duration slot's spinner is `running`'s alone (C09 I45, C23 I81); C09 T2.187 renders it and C23 T1.76 reads the spinner
 
-**F1262** — **the design's fixtures draw the result branch two ways, and its three-rung specimen moves a column R-GLY-003 fixes.** 33 fixtures draw `⎿` with one blank before the text and 8 with two; §068 draws `⎿ let` over `` `- let ``, column 6 against 7. Ruled for the rule: the tree draws both five cells wide · **Open** — the fixtures are the design's to correct
+**F1262** — **the design's fixtures draw the result branch two ways, and its three-rung specimen moves a column R-GLY-003 fixes.** 33 fixtures draw `⎿` with one blank before the text and 8 with two; §068 draws `⎿ let` over `` `- let ``, column 6 against 7. Ruled for the rule: the tree draws both five cells wide · **Open, ruled 2026-09-27** — the 33 fixtures and §068 are corrected through successor blocks via the builder
 
 <a id="14"></a>
 ## 14 · A constant, a channel or a rule that outlived its configuration — **1 open** · 41 closed · 2 with no verdict · new at F492

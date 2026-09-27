@@ -20,7 +20,7 @@ held at the point where a choice would be mine to invent.
 
 ## Entries
 
-**Open: 18, 23, 32, 36, 37, 39, 40.** Every other entry is ruled or retracted. A ruled entry keeps its body, with the ruling directly above it and a premise note wherever the ruling rested on something the entry or the design contradicts.
+**Open: 23, 36, 37, 39, 40, 41–51.** Every other entry is ruled or retracted. *Recounted 2026-09-27 from the headings*: the line read *18, 23, 32, 36, 37, 39, 40* while 41–51 were headed OPEN below it, so eleven open questions were missing from the summary that says which are open. A ruled entry keeps its body, with the ruling directly above it and a premise note wherever the ruling rested on something the entry or the design contradicts.
 
 > **Ruled 2026-09-24.** Already answered, by the chain rule. The repo-side spec (C09 §4, I5) carries the narrowed rule and the registry does not. That assumption stands as the answer.
 
@@ -214,7 +214,9 @@ Registering it needs an ASCII rung, which is a visible choice — the same choic
 as 15 and reached by a different road. **Held.** The finding is the absence, and
 it is recorded here rather than left to the next sweep.
 
-**18 · The two normative sources disagree about the five permission postures,
+> **Ruled 2026-09-27.** **Neither list.** Postures are the agent application's concept; the framework reserves `posture.cycle` and nothing else, so it does not hard-code five. **The rule that matters is recorded instead: an application declares its postures, and a posture that skips permission checks is drawn loudest — `error` tone plus a mark — is never the default, and is never reached silently by cycling.** Both conflicting lists — §071's five with `skip` and the registry's `permissionPostures` with `ask` — are superseded by that rule, and the application (agent-tui) defines the actual five. **The rules it disposes of**: `R-PER-001` (the posture registry) becomes a registry of the application's declared postures rather than the framework's five, and `R-COL-001`'s blocked clause — *override red means unsafe override* — is answered: the skipping posture is the override, and its red is the `error` tone this ruling gives it. **Owed:** the rule registered as a successor through the builder (released records are not edited in place), the `permissionPostures` records marked superseded, and a `posture.cycle` that refuses to land on a skipping posture without saying so.
+
+**18 · RULED — The two normative sources disagree about the five permission postures,
 and about the one that matters.** §071 measures five — `manual`,
 `accept-edits`, `plan`, `auto`, **`skip`** — each with a symbol chosen against a
 stated trap (`❯ ? ❙❙ » !!`, with `⏸` rejected because *it IS an emoji — the `⏺`
@@ -724,7 +726,9 @@ The direction clause of the same rule is built and checked separately.
 
 ---
 
-**32 · Posts or slant for counted work, and no glyphs for a sub-cell braille
+> **Ruled 2026-09-27.** **Counted work uses posts**, per `R-PRG-002` (*discrete steps use posts*); the tree's `granularity: "segmented"` → slant mapping is the thing that changes, and §035/§036's slant specimens are examples (R-SEC-036). **The sub-cell braille bar is owed a proposal, drawn before anything is registered**: a ramp in eighth-cell steps — the left dot column filling bottom to top, then the right — with its ASCII fallback, shown as frames for review first. Batch 4 M16 item 3 carries the posts half.
+
+**32 · RULED — Posts or slant for counted work, and no glyphs for a sub-cell braille
 bar.** `R-PRG-002` says *discrete steps use posts* and *sub-cell progress uses
 braille*. §033 draws `▮▮▮▮▮▯▯▯ discrete steps — five of eight` in posts; §035 and
 §036 draw counted work in slant — *compacting ▰▰… 3 of 5 turns*, *indexing …
@@ -945,6 +949,24 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 **50 · OPEN — Who fills a watch, and where it is shown.** Ruling 27 built the watch as *a declaration that producers fill* (C22 I130): a streaming entry can be watched, the watch drops at settle, and its completion earns a notification always. **Nothing in the tree fills it.** §085 names two producers — `/watch` to *pin one that is not yours*, and *a long-running job you started* — and one display, the footer's watch row (`⋯ › a3f9b21 █████░ 43%`, `⇧⇥` to focus it, `←→` among watches, `⏎` to scroll to its entry and open it). **`/watch` and `/unwatch` would be the ninth and tenth framework verbs**, and C05 §3 makes each a breaking change for any app declaring the name — the process is a grep of every manifest first, and the brief puts the manifest out of scope. The row is `example` display with a binding (`watch.jump[n]`) the registry does not hold. **The one-word answers**: (a) build `/watch` and `/unwatch` as framework verbs after the grep; (b) a producer declares it — an application calling a `watch(id)` on `TuiInstance`, which is C24 surface; (c) both, and the footer row with them. **Built meanwhile**: the declaration and its earning; no producer, no row.
 
 **51 · OPEN — Where the return line goes.** §014: *when you come back, the transcript says what you missed* — `● 3 entries settled while you were away   ⌘↓ to the bottom`. The transcript holds entries, and every line in it is one: a line appended on return is either an entry the reader never ran, with a `seq` and a place in `/history`'s neighbour, or a second kind of row that §6m's stream and C13's eviction would both have to learn. Nothing in the tree counts arrivals while away — the `N waiting` chip counts what a **frozen** view holds back (C14 I34). **The one-word answers**: (a) a chip on the owner line, beside `N waiting`, shown from the focus-in until the reader reaches the bottom; (b) a transient toast (§6j's) on focus-in; (c) a notice entry, accepting that it is one. **Built meanwhile**: nothing on return; the rungs are what reached the reader.
+---
+
+> **Ruled 2026-09-27** (review batch 3, M7 item 9). **The quiet window.** An activation is refused only if it arrives within ~250 ms of the question appearing; while guarded, the guard holds for as long as activation keys keep arriving inside the window, so a held key's auto-repeat stays caught however long it is held. A deliberate `⏎` after the window answers at once. This replaces the refuse-the-first-activation rule, and it is also M7 item 3's remedy (auto-repeat defeating a guard that disarms after one refusal). **Owed:** C16's guard amended spec-first when batch 3 opens, with a 30 Hz synthetic repeat and a deliberate press after quiet as the two rows.
+
+**52 · RULED — How long a newly arrived question refuses an activation.** R-OWN-002 arms a new owner so the first activation after it is refused out loud. Refusing exactly one is defeated by a held key's repeats without key-release reporting (M7 item 3), and refusing every first `⏎` costs a deliberate reader a press on every question. Raised by review batch 3 as *for Malachy*.
+
+---
+
+> **Ruled 2026-09-27** (review batch 4, M13 item 2). **`⏎` always sends.** The chip preview takes its own registered bindings, shown in its footer: **`⌃↑` / `⌃↓` scroll** it, and **`⌥o` opens the chip in the editor** — not `⌃E`, which is the prompt's end-of-line. Both are registered as registry bindings with base-terminal routes. **Measured free on 2026-09-27**: `⌥o`, `⌃↑` and `⌃↓` have no binding in `calcium-registry.json` (41 bindings; the same search finds `⌥p` → `binding.035` and `⌥↑` → `page.up`), none in `docs/KEYS.md`, and the shipped keymap is generated from the registry through `chordOf`. `⌥o` arrives as `ESC o` and `⌃↑`/`⌃↓` as `CSI 1;5A`/`B`, so all three are deliverable without the Kitty protocol. **Owed:** the bindings through the builder, the collision gate run over them, the preview's footer, and a row that pastes a chip and presses `⏎` and asserts the prompt was sent.
+
+**53 · RULED — The chip preview's keys.** R-BLK-825's specimen shows the preview with `↑↓ scroll · ⏎ open in editor`. `chipAt()` counts a chip on either side of the caret, and the caret sits after a chip just pasted, so giving the preview `⏎` breaks paste-then-send — the commonest flow. The design's keys are a specimen (R-SEC-036); the departure is recorded here.
+
+---
+
+> **Ruled 2026-09-27** (review batch 4, M11 item 4). **A chosen choice takes its mark plus bold**, so it keeps two carriers at 1-bit — the mark and the weight — where a focused unchosen choice has `›` alone. Bold and not inverse, because inverse is selection's 1-bit rendering. **Owed:** C10's carrier table and the choice renderer, spec-first when batch 4 opens.
+
+**54 · RULED — Choice's second carrier.** R-COR-003 wants two independent carriers for every interaction distinction; at 1-bit *chosen* and *focused* were distinguished by one mark each.
+
 ---
 
 ## Not yet recovered

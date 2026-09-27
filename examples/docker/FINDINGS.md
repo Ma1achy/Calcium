@@ -56266,6 +56266,13 @@ by a `{bold}` one. **Open**, and it is a C09 ruling rather than a fix: correctin
 T1.46's equality with the tokeniser by design, so the ruling is whether the canonical form keeps
 Ink's serialiser or the terminal's meaning. Symbol: `between`.
 
+**Ruled 2026-09-27: the terminal's meaning.** When a dim run ends inside a bold run, `between`
+re-emits bold after the `22`. **T1.46 was pinning Ink's behaviour, not a property**: its equality
+with the tokeniser held the defect in place, so it is amended to assert what the terminal draws —
+the cells read back bold where the painter said bold — and to say that it no longer matches Ink's
+bytes, where and why. C09 I72's *a normaliser that corrected any of them would move a golden* is
+the cost accepted, and the moved goldens are named before the run. **Owed**, with batch 2.
+
 ---
 
 ## F1259 — a patch window ending on a collapse marker shows the next hunk's header in its place ★★★★☆
@@ -56317,6 +56324,12 @@ today draws `running`, white and still, beside a question elsewhere on screen.
 has `queued` (`○`, R-BLK-220), so that reconciliation is to keep it, and this row is what the
 reconciliation found instead. Symbol: `CallState`. Its subject is the question-to-call link.
 
+**Ruled 2026-09-27.** Build the question → call link in batch 3's M15 work, with the question
+queue and its lifecycle, since that work gives a question an owner record to carry the link.
+**Waiting on you** is `warn`-toned and blinks; **with reduced motion it is static `warn` plus the
+words *waiting on you***, so it keeps two carriers when motion is gone (R-COR-003). **Owed**: the
+`CallState` member, the link, and rows at full motion and at `reduced`.
+
 ## F1261 — a queued call head draws `●` wherever tone carries, and the registry reserves `○` for it ★★☆☆☆
 *2026-09-27 · review batch 2, M4 item 1 (C09 I45), at e1c16e7c.*
 
@@ -56353,4 +56366,9 @@ examples (R-SEC-036, *specimen values and sample content remain examples*), and 
 `current`. The tree now draws `  ⎿  ` and `` `- `` five cells wide at every rung (C09 I5, C22 I83).
 **Open**, and it is the design's to close: the fixtures are its record, and correcting them is a
 registry edit this repository does not make unasked. Symbol: `branch`.
+
+**Ruled 2026-09-27: correct them.** The fixtures disagree with each other (33 against 8), so the
+rule decides — two blanks, the same column at every rung. The 33 fixtures and §068 are corrected
+**through successor blocks via the builder**, never by editing released blocks in place, and
+`make design-check` holds the result. **Owed**, with batch 2.
 
