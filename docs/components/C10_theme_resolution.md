@@ -482,7 +482,7 @@ floor passes, and the screen is painted a colour no floor was measured against.
 
 - **The light theme's `surface` is a token change and the dark theme's is a
   decision.** Dark keeps `terminal` and keeps your transparency; that is the
-  entry's ruling and it means **the shipped default paints nothing**. The
+  entry's ruling and it means **the shipped default paints no page background**. The
   painting arm ships with `light` exercising it.
 
   **This bullet used to end *so every test that has ever run has run against the
