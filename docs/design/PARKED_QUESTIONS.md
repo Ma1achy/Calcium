@@ -730,6 +730,8 @@ The direction clause of the same rule is built and checked separately.
 
 > **Ruled 2026-09-27.** **Counted work uses posts**, per `R-PRG-002` (*discrete steps use posts*); the tree's `granularity: "segmented"` → slant mapping is the thing that changes, and §035/§036's slant specimens are examples (R-SEC-036). **The sub-cell braille bar is owed a proposal, drawn before anything is registered**: a ramp in eighth-cell steps — the left dot column filling bottom to top, then the right — with its ASCII fallback, shown as frames for review first. Batch 4 M16 item 3 carries the posts half.
 
+> **Amended 2026-09-28** (by the person). **The braille sub-cell ramp is approved and registered: `⡀⡄⡆⡇⣇⣧⣷⣿`** (U+2840, 2844, 2846, 2847, 28C7, 28E7, 28F7, 28FF) — eighth-cell steps, the left dot column filling bottom to top, then the right; an empty cell is a blank. The ASCII rung stays whole-cell `#`/`-`. **Owed:** the registry record through the builder and a release, and the bar alphabet's frames, in batch 4's M16 lane.
+
 **32 · RULED — Posts or slant for counted work, and no glyphs for a sub-cell braille
 bar.** `R-PRG-002` says *discrete steps use posts* and *sub-cell progress uses
 braille*. §033 draws `▮▮▮▮▮▯▯▯ discrete steps — five of eight` in posts; §035 and
@@ -985,11 +987,15 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 > **Ruled 2026-09-27** (review batch 3, M7 item 9). **The quiet window.** An activation is refused only if it arrives within ~250 ms of the question appearing; while guarded, the guard holds for as long as activation keys keep arriving inside the window, so a held key's auto-repeat stays caught however long it is held. A deliberate `⏎` after the window answers at once. This replaces the refuse-the-first-activation rule, and it is also M7 item 3's remedy (auto-repeat defeating a guard that disarms after one refusal). **Owed:** C16's guard amended spec-first when batch 3 opens, with a 30 Hz synthetic repeat and a deliberate press after quiet as the two rows.
 
+> **Amended 2026-09-28** (by the person), correcting the window found short by batch 3's walk. **Two numbers, not one.** Without key-release reporting, a question refuses activations during an **arrival grace of 750 ms** — at least the OS repeat delay, covering X11's 660 ms default — and then stays guarded while activation keys keep arriving **within 250 ms of each other**. Under the kitty protocol the guard uses the held-key set from release events and **no timers**. *Why the first form failed:* a 250 ms window from arrival closes before a held key's first repeat, so the commonest case — `⏎` submitting a verb that asks at once — still answered. **Owed:** C16 amended spec-first in batch 3, and a row holding a key across arrival with a 660 ms first repeat then 30 Hz repeats, where none may answer.
+
 **52 · RULED — How long a newly arrived question refuses an activation.** R-OWN-002 arms a new owner so the first activation after it is refused out loud. Refusing exactly one is defeated by a held key's repeats without key-release reporting (M7 item 3), and refusing every first `⏎` costs a deliberate reader a press on every question. Raised by review batch 3 as *for Malachy*.
 
 ---
 
 > **Ruled 2026-09-27** (review batch 4, M13 item 2). **`⏎` always sends.** The chip preview takes its own registered bindings, shown in its footer: **`⌃↑` / `⌃↓` scroll** it, and **`⌥o` opens the chip in the editor** — not `⌃E`, which is the prompt's end-of-line. Both are registered as registry bindings with base-terminal routes. **Measured free on 2026-09-27**: `⌥o`, `⌃↑` and `⌃↓` have no binding in `calcium-registry.json` (41 bindings; the same search finds `⌥p` → `binding.035` and `⌥↑` → `page.up`), none in `docs/KEYS.md`, and the shipped keymap is generated from the registry through `chordOf`. `⌥o` arrives as `ESC o` and `⌃↑`/`⌃↓` as `CSI 1;5A`/`B`, so all three are deliverable without the Kitty protocol. **Owed:** the bindings through the builder, the collision gate run over them, the preview's footer, and a row that pastes a chip and presses `⏎` and asserts the prompt was sent.
+
+> **Amended 2026-09-28** (by the person). **`⌃↑`/`⌃↓` are dropped: the preview scrolls on `⌥⇧↑`/`⌥⇧↓`**, with base-terminal routes (`CSI 1;4A`/`B`, deliverable without the protocol); `⌥o` stays for open. *Why the first pick failed:* on default macOS `⌃↑`/`⌃↓` are Mission Control and App Exposé, and the OS takes them before the terminal sees a byte. **The collision check cannot see OS-level shortcuts** — it reads the registry, the keymap and KEYS.md — **so every future chord is also checked by hand against macOS, Windows and the common Linux desktops' defaults.** Measured free on 2026-09-28: `⌥⇧↑`/`⌥⇧↓` have no current binding in `calcium-registry.json`, no row in `keymap.ts` and no entry in `docs/KEYS.md`. **Owed:** a decode row asserting `CSI 1;4A` is `{up, shift, meta}`, and the bindings through M6's supersession script.
 
 **53 · RULED — The chip preview's keys.** R-BLK-825's specimen shows the preview with `↑↓ scroll · ⏎ open in editor`. `chipAt()` counts a chip on either side of the caret, and the caret sits after a chip just pasted, so giving the preview `⏎` breaks paste-then-send — the commonest flow. The design's keys are a specimen (R-SEC-036); the departure is recorded here.
 
@@ -1100,6 +1106,12 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 > **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 4, M12). **The trust boundary.** Neutralise once, at the block registry's resolve, memoised on identity; `cat -v` notation for C0/DEL/C1 and `<U+XXXX>` for every bidi format character including LRM/RLM/ALM (C04 I110 widened to refuse them in `terminal` lines). No raw-copy action. Switching C07's ingress from strip to escape, ANSI SGR to spans, and rebuilt OSC 8 are a **follow-up lane after the core**, because escaping ingress without the colour table makes coloured CLI output worse. OSC 52 is written only through `escapes.ts`, capped near 100 KB, and the toast says *sent by OSC 52*, never *copied*. ⏎ on an empty selection stays and says so; ⌃V off discards the rectangle. *Reason:* R-TRU-001 binds (*escaped*); R-BLK-898/900 are examples. *Cost, stated:* legitimate right-to-left text shows its marks.
 
 **71 · RULED — The trust boundary's mechanism and notation, and the copy destinations.**
+
+---
+
+> **Ruled 2026-09-28** (by the person; review batch 4, M10 item 1). **The local clipboard is approved as an optional runtime tool, not a package.** Order: **OSC 52 first** (it works over SSH), then a platform tool if present — `pbcopy`; `wl-copy`, `xclip` or `xsel`; `clip.exe` — detected at runtime and never required, spawned with a **fixed argv, no shell, payload on stdin**. If none is available the reader is offered file export and told so. OSC 52's success cannot be observed, so that path is worded honestly: *sent to the terminal's clipboard*, never *copied*. **Owed:** a `DEPENDENCIES.md` row for the optional tools, with batch 4's M10 lane.
+
+**72 · RULED — The local clipboard's mechanisms.** Batch 4's M10–M12 walk found copy reaching only the kill buffer, and spawning a platform clipboard tool is a dependency in practice, so it was the person's to decide.
 
 ---
 
