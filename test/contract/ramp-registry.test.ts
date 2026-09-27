@@ -310,6 +310,8 @@ describe("C04 §3am — the ink ramps are the registry's", () => {
   });
 
 
+  it.todo("T2.117k (C04 I139): drift has no period within 100 000 ticks — not deferred on a component: the code lands in the next commit of this round");
+
   it("T2.117g (C04 I109): two one-shots in one frame time independently", () => {
     // **The half the deferral got wrong, asserted rather than argued.** §3am
     // named the missing symbol as `RenderContext.since` — one value for a whole
