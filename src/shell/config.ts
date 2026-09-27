@@ -15,6 +15,7 @@
 import { createFallbackAdapter } from "../data/adapters/index.js";
 import { DEFAULT_MAX_BLOCK_ROWS } from "../presentation/blocks/index.js";
 import { slashPolicy } from "../interaction/parser/index.js";
+import { RESERVED_ACTIONS } from "../interaction/router/keymap.js";
 import { createExecutionPipeline } from "./execution.js";
 import { makeDefaultChrome } from "./chrome.js";
 import { createRecording, recordStdin } from "./profiling/record.js";
@@ -234,6 +235,26 @@ export function validateConfig(config: TuiConfig): void {
   //
   // **The message names both fields**, because a refusal naming one reads as
   // that field being invalid and neither is.
+  // C24 I39 — a handler under an id the design did not reserve would be a key
+  // nothing resolves to it, silently. **The message names the whole set**, so
+  // a reader who misspelled one learns the spelling from the refusal, and the
+  // type refuses the same ids at compile time for a consumer who names them.
+  const keyActions = config.keyActions;
+  if (keyActions !== undefined) {
+    const reserved = Object.keys(RESERVED_ACTIONS);
+    const unknown = Object.keys(keyActions).filter((id) => !reserved.includes(id));
+    if (unknown.length > 0) {
+      throw new ConfigError(
+        "keyActions",
+        `names ${unknown.join(", ")}, which the design does not reserve — the reserved ids are ` +
+          `${reserved.join(", ")} (C24 I39)`,
+      );
+    }
+    const notCallable = Object.entries(keyActions).filter(([, h]) => typeof h !== "function");
+    if (notCallable.length > 0) {
+      throw new ConfigError("keyActions", `${notCallable.map(([id]) => id).join(", ")} must be a function`);
+    }
+  }
   const profile = config.profile;
   if (profile?.record !== undefined && profile.record === profile.replay) {
     throw new ConfigError(
@@ -373,6 +394,8 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     // I3a — registered at step 10 before `seal()`. Defaulted like every other
     // optional field, so an app with no local verbs supplies nothing.
     localHandlers: config.localHandlers ?? {},
+    // C22 I134 — empty, not absent, so `bound` asks one record and never a `?.`.
+    keyActions: config.keyActions ?? {},
     fallbackAdapter: createFallbackAdapter(),
     commandPolicy: config.commandPolicy ?? slashPolicy,
     completionSources: config.completionSources ?? [],

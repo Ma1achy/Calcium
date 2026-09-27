@@ -115,12 +115,21 @@ import {
   MENU_ID,
 } from "../interaction/completion/index.js";
 import { createFocusStore, resolveFocus } from "../interaction/router/focus.js";
-import { chordText, createKeymap, defaultKeymap } from "../interaction/router/keymap.js";
+import { chordText, createKeymap, defaultKeymap, RESERVED_ACTIONS } from "../interaction/router/keymap.js";
 import { createRouter, type RouterDeps } from "../interaction/router/router.js";
 import { createConfirmHost, type ConfirmHost } from "./confirm.js";
 import { createDecoder } from "../interaction/router/decode.js";
 import { createKeyEffects } from "./keys.js";
-import type { ElementAddress, FocusTarget, InputEvent, Key, KeyAction, Verdict } from "../interaction/router/types.js";
+import type {
+  Binding,
+  ElementAddress,
+  FocusTarget,
+  InputEvent,
+  Key,
+  KeyAction,
+  ReservedKeyAction,
+  Verdict,
+} from "../interaction/router/types.js";
 import { createNavigator, openHistory, SEARCH_ID } from "../interaction/history/index.js";
 import type { HistoryEntry, Navigator } from "../interaction/history/index.js";
 import { detectCapabilities, type CapabilitySource, type TerminalCapabilities } from "../terminal/capabilities.js";
@@ -2009,7 +2018,16 @@ export async function constructGraph(
           .entries()
           // **The design's notation, not the slot's** (C16 §6a clause 6, §019).
           // `keySlot` stays the identity and `chordText` is what a reader sees.
-          .map((b) => ({ keys: chordText(b.key, detection.capabilities.unicode !== "ascii"), does: b.action, target: b.target })),
+          // **And the effective action, not the row's** (C22 I134): a reserved
+          // row with no handler lists its fallback, or is not listed — `/help`
+          // saying `⌥⌫ queueDrop` while the key kills a word is the drift the
+          // listing exists to prevent.
+          .flatMap((b) => {
+            const does = effectiveAction(b);
+            return does === null
+              ? []
+              : [{ keys: chordText(b.key, detection.capabilities.unicode !== "ascii"), does, target: b.target }];
+          }),
       // R-KEY-005 — the reader's own rung, so `/help keys` leads with it.
       currentScope: () => router.target,
       binary: config.binary,
@@ -3427,12 +3445,75 @@ export async function constructGraph(
     withdrawBlockKeymap = keymap.mergeBlock(declared);
   };
 
+  /**
+   * The reserved actions by the name a row binds them under — `RESERVED_ACTIONS`
+   * inverted once (C16 §6c, C24 I39).
+   */
+  const reservedIdOf: ReadonlyMap<string, ReservedKeyAction> = new Map(
+    (Object.entries(RESERVED_ACTIONS) as [ReservedKeyAction, KeyAction][]).map(([id, action]) => [action, id]),
+  );
+  /** A spent key: the handler took it, and nothing else is to act. */
+  const spent = (): void => undefined;
+
+  /**
+   * What a resolved row stands for once the reservations are applied, or `null`
+   * when it resolves as though absent (C22 I134, C16 §6c table A).
+   *
+   * **One answer, read by every owner of a row**: `bound` below, the typed
+   * reply's and the field's allow-lists, and `/help keys`. Three readers
+   * asking the row's own `action` was how `⌥⌫` came to be dead in three
+   * owners for three different reasons.
+   */
+  const effectiveAction = (binding: Binding): string | null => {
+    const id = reservedIdOf.get(binding.action);
+    if (id === undefined || config.keyActions[id] !== undefined) return binding.action;
+    return binding.fallback ?? null;
+  };
+
+  /**
+   * A reserved row's effect: the handler, then the fallback, then nothing
+   * (C22 I134).
+   *
+   * **The handler is asked here, at resolution**, because whether it handled
+   * the key decides whether the rung consumes it — and every caller of
+   * `bound` runs a non-null answer at once, so asking now is asking at the
+   * keystroke. Nothing is mutated before the call, which is what makes the
+   * throw below containable: an application's hook failing leaves no half-state
+   * behind, and the read loop has no `catch` — uncontained, it would end the
+   * session (§6c S6).
+   */
+  const reservedEffect = (id: ReservedKeyAction, binding: Binding): (() => void) | null => {
+    const fallback = binding.fallback === undefined ? null : keys.table[binding.fallback];
+    const handler = config.keyActions[id];
+    if (handler === undefined) return fallback;
+    let handled: boolean | void;
+    try {
+      handled = handler();
+    } catch (cause) {
+      stores.transcript.append(
+        noticeDoc(
+          "",
+          `the key action \`${id}\` failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+          "warn",
+          { origin: "refresh" },
+        ),
+      );
+      return spent;
+    }
+    return handled === false ? fallback : spent;
+  };
+
   /** A bound action, or `null` when the key is not bound at this target. */
   const bound = (target: FocusTarget, e: InputEvent): (() => void) | null => {
     if (e.kind !== "key") return null;
     syncBlockKeymap();
     const binding = keymap.resolve(target, e.key);
     if (binding === null) return null;
+    // **A reserved row passes through** (C16 §6c, C22 I134): its handler, its
+    // fallback, or nothing — never the table's no-op, which is what made `⌥⌫`
+    // dead at the prompt.
+    const reserved = reservedIdOf.get(binding.action);
+    if (reserved !== undefined) return reservedEffect(reserved, binding);
     // **Unreachable for a merged block keymap since C16 I19's ruling** (F779):
     // `mergeBlock` refuses any action outside the union at merge time, so every
     // binding that reaches here names a built-in and the table is total over
@@ -3752,11 +3833,15 @@ export async function constructGraph(
       const composing = confirm.composing;
       if (composing && e.kind === "key") {
         const binding = keymap.resolve("prompt", e.key);
+        // **The effective action, not the row's** (C22 I134): `⌥⌫` is
+        // `killWordLeft` here while no handler is registered, and a registered
+        // `queue.drop` is the prompt's queue, which the reply does not own (I54).
+        const action = binding === null ? null : effectiveAction(binding);
         // A key the reply does not own passes, and I8's reject answers it.
-        if (binding !== null && !REPLY_ACTIONS.has(binding.action as KeyAction)) return false;
+        if (action !== null && !REPLY_ACTIONS.has(action as KeyAction)) return false;
         // ⏎ belongs to the question (C23 I73): it answers before this runs, so
         // reaching the submit arm below from a reply would be a second owner.
-        if (binding === null && e.key.name === "enter") return false;
+        if (action === null && e.key.name === "enter") return false;
       }
       const effect = bound("prompt", e);
       if (effect !== null) {
@@ -3975,7 +4060,9 @@ export async function constructGraph(
         return true;
       }
       const binding = keymap.resolve("prompt", e.key);
-      if (binding !== null && FIELD_ACTIONS.has(binding.action as KeyAction)) {
+      // The effective action, as the reply reads it (C22 I134).
+      const action = binding === null ? null : effectiveAction(binding);
+      if (action !== null && FIELD_ACTIONS.has(action as KeyAction)) {
         bound("prompt", e)?.();
         return true;
       }

@@ -21,6 +21,7 @@
 // sentence moved (I9).
 import { describe, expect, it } from "vitest";
 import { createTui, defaultTheme } from "../../src/index.js";
+import { ConfigError } from "../../src/shell/types.js";
 import { MANIFEST, buildGraph } from "../support/session.js";
 
 describe("C24 §8 — the seventh severity", () => {
@@ -125,7 +126,20 @@ describe("C24 §8 — the seventh severity", () => {
 });
 
 describe("C24 I39 — an unknown key-action id is refused at construction", () => {
-  it.todo(
-    "T3.14 (C24 I39): keyActions naming `copy` throws a ConfigError naming `copy` and every reserved id; a known id constructs — not deferred on a component: the code lands in the next commit of this round",
-  );
+  it("T3.14 (C24 I39): keyActions naming `copy` throws a ConfigError naming `copy` and every reserved id; a known id constructs", () => {
+    const config = { name: "docker", binary: "docker", manifest: MANIFEST, theme: defaultTheme };
+    let message = "";
+    try {
+      createTui({ ...config, keyActions: { copy: () => undefined } } as never);
+    } catch (e) {
+      expect(e, "a ConfigError").toBeInstanceOf(ConfigError);
+      message = (e as Error).message;
+    }
+    expect(message, "names the id it refused").toContain("copy");
+    for (const id of ["agent.next", "agent.previous", "agent.1", "agent.9", "posture.cycle", "values.toggle", "queue.drop"]) {
+      expect(message, `names ${id}`).toContain(id);
+    }
+    // The control: a reserved id constructs.
+    expect(() => createTui({ ...config, keyActions: { "queue.drop": () => undefined } } as never)).not.toThrow();
+  });
 });

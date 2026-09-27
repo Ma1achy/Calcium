@@ -8,7 +8,7 @@
 // Every component involved was finished and had its own passing suite.
 import { describe, expect, it, vi } from "vitest";
 
-import { defaultKeymap, keySlot } from "../../src/interaction/router/keymap.js";
+import { defaultKeymap, keySlot, RESERVED_ACTIONS } from "../../src/interaction/router/keymap.js";
 import { MENU_ID } from "../../src/interaction/completion/index.js";
 import { SEARCH_ID } from "../../src/interaction/history/index.js";
 import { buildGraph, COPY_MODES } from "../support/session.js";
@@ -220,7 +220,16 @@ describe("C22 §3 step 11 — the effect table", () => {
     // is the shape that let fourteen bindings go unexecuted while every test
     // passed: the list agrees with itself, and the table it was copied from is
     // free to grow a row nobody dispatches. `/help` renders that row.
-    const { graph } = await buildGraph();
+    //
+    // **Every reserved id has a handler here** (C16 §6c, C22 I134). Without
+    // one a reserved row resolves as though absent and the key passes — which
+    // is the design, and would read here as a row reaching nothing. With one,
+    // the walk also shows each reserved row reaches the application.
+    const handled = new Set<string>();
+    const keyActions = Object.fromEntries(
+      Object.keys(RESERVED_ACTIONS).map((id) => [id, () => void handled.add(id)]),
+    );
+    const { graph } = await buildGraph({ keyActions });
     graph.lifecycle.acquire();
 
     expect(defaultKeymap.length, "the table is not empty, so this is not vacuous").toBeGreaterThan(0);
@@ -285,6 +294,9 @@ describe("C22 §3 step 11 — the effect table", () => {
       COPY_MODES.semantic = false;
       graph.editor.clear();
     }
+    expect([...handled].sort(), "every reserved row reached its application handler").toEqual(
+      Object.keys(RESERVED_ACTIONS).sort(),
+    );
   });
 
   it("T2.14 (C16 I21): every editing operation C17 exposes is reached by some binding", async () => {

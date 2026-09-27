@@ -1,5 +1,6 @@
-// C16 §6c — routes by profile, where a registry-global binding fires, and the
-// copy-mode switch (review batch 2, M6 items 2–5).
+// C16 §6c — routes by profile, where a registry-global binding fires, the
+// copy-mode switch, and a reserved row passing through to the application
+// (review batch 2, M6 items 1–5; C22 I134, C24 I39).
 //
 // **Every mutation here leaves a keymap that constructs and a session that
 // runs.** A chord still resolves somewhere, `?` still opens help somewhere, and
@@ -17,9 +18,12 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/unit/router-keymap.test.ts test/integration/registry-global.test.ts " +
-  "test/unit/session-keys.test.ts test/unit/router-dispatch.test.ts";
+  "test/unit/session-keys.test.ts test/unit/router-dispatch.test.ts test/integration/key-actions.test.ts " +
+  "test/contract/public-api.test.ts test/contract/startup-validation.test.ts";
 const KEYMAP = "src/interaction/router/keymap.ts";
 const SESSION = "src/shell/session.ts";
+const CONSTRUCT = "src/shell/construct.ts";
+const CONFIG = "src/shell/config.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -80,6 +84,61 @@ const MUTATIONS = [
     from: "    this.#setNativeSelection(false);\n    const stored = graph.focus.current;\n",
     to: "    const stored = graph.focus.current;\n",
     expect: "T4.89",
+  },
+  {
+    // **T6.45 (C16 I38, C22 I134)** — the reservation as it was: `bound`
+    // returns the table's no-op for a reserved row, handler or not. The key is
+    // consumed, so every row that only asked "did something take it" stays green.
+    name: "bound runs the reserved no-op regardless of a handler",
+    file: CONSTRUCT,
+    from: "    if (reserved !== undefined) return reservedEffect(reserved, binding);\n",
+    to: "",
+    expect: "T1.38 ",
+  },
+  {
+    // **T6.49 (C16 I38, §6c table A)** — the typed reply asks the row again.
+    // `queueDrop` is not in `REPLY_ACTIONS`, so I8 rejects `⌥⌫` in a reply.
+    name: "the reply's check reads the row's own action",
+    file: CONSTRUCT,
+    from: "        const action = binding === null ? null : effectiveAction(binding);\n        // A key the reply does not own passes, and I8's reject answers it.\n",
+    to: "        const action = binding === null ? null : binding.action;\n        // A key the reply does not own passes, and I8's reject answers it.\n",
+    expect: "T4.88",
+  },
+  {
+    // The same question asked by the field, which drops the key rather than
+    // rejecting it — so the word stays and nothing says why.
+    name: "the field's check reads the row's own action",
+    file: CONSTRUCT,
+    from: "      const action = binding === null ? null : effectiveAction(binding);\n      if (action !== null && FIELD_ACTIONS.has(action as KeyAction)) {\n",
+    to: "      const action = binding === null ? null : binding.action;\n      if (action !== null && FIELD_ACTIONS.has(action as KeyAction)) {\n",
+    expect: "T4.88",
+  },
+  {
+    // **§6c S6** — an application's hook throwing into the read loop, which
+    // has no `catch`.
+    name: "a throwing handler is not contained",
+    file: CONSTRUCT,
+    from: "    } catch (cause) {\n      stores.transcript.append(",
+    to: "    } catch (cause) {\n      if (cause !== undefined) throw cause;\n      stores.transcript.append(",
+    expect: "T1.38c",
+  },
+  {
+    // **C22 I134's `/help` half** — the listing names the row, so `⌥⌫` is
+    // advertised as `queueDrop` on a session where it kills a word.
+    name: "/help keys lists the row's action, not the effective one",
+    file: CONSTRUCT,
+    from: "            const does = effectiveAction(b);\n",
+    to: "            const does: string | null = b.action;\n",
+    expect: "T1.38 ",
+  },
+  {
+    // **C24 I39** — an unknown id accepted, so a misspelt `queue_drop` is a
+    // handler nothing will ever call.
+    name: "an unknown keyActions id is accepted",
+    file: CONFIG,
+    from: "    if (unknown.length > 0) {\n",
+    to: "    if (unknown.length < 0) {\n",
+    expect: "T3.14",
   },
 ];
 

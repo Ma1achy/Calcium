@@ -939,7 +939,7 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     // the branch is unreachable while the assertion above holds, because every
     // `actionId` a row names is present. So the guard is defence for a state
     // this row makes impossible, and its only witness is that it is written —
-    // which is the shape T1.38 already uses for `keys.ts`'s reservations.
+    // which is the shape C24 T2.23 uses for `keys.ts`'s reservations.
     //
     // A fallback would be the worse failure of the two: a registry rename would
     // bind a chord nobody asked for and every row here would stay green, where a
@@ -1562,40 +1562,10 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
       .toBeGreaterThan(0);
   });
 
-  it("T1.38 (I38): every reserved chord carries an explicit no-op, and none of them acts", () => {
-    // §6's closed set makes an action with no executor uncompilable, so the
-    // alternative to a declared no-op is leaving the chord unbound — and an
-    // unbound chord is one an application takes.
-    const RESERVED = [
-      "agentNext", "agentPrevious", "agent1", "agent2", "agent3", "agent4", "agent5",
-      "agent6", "agent7", "agent8", "agent9", "postureCycle", "valuesToggle", "queueDrop",
-      // **`enterSemanticSelection` left this list in M10b** and that is what a
-      // reservation is for: it held the chord against an application taking it
-      // for the interval between the design naming the mode and the mode
-      // existing (C14 §6a). Fourteen now, and the list shrinking is the
-      // mechanism working rather than the rule weakening.
-    ] as const;
-    for (const action of RESERVED) {
-      expect(
-        defaultKeymap.some((b) => b.action === action),
-        `${action} has a chord reserved for it`,
-      ).toBe(true);
-    }
-    // **And the executor is the declared no-op, read out of L4's table** — the
-    // half that makes this a reservation rather than a list. `expect(RESERVED
-    // .length).toBe(15)` was here first and is an array literal's own length:
-    // A03 §2's vacuity class, written by hand.
-    const effects = readFileSync("src/shell/keys.ts", "utf8");
-    for (const action of RESERVED) {
-      expect(
-        new RegExp(`\\n\\s*${action}: reserved,`, "u").test(effects),
-        `${action} is bound to the declared no-op, not to an effect that happens to do nothing`,
-      ).toBe(true);
-    }
-    // The control: the pattern finds nothing for an action that *does* act, so
-    // the loop above is not satisfied by a regex that matches anything.
-    expect(/\n\s*insertNewline: reserved,/u.test(effects), "an acting effect is not reserved").toBe(false);
-  });
+  // **T1.38 moved to test/integration/key-actions.test.ts** (C16 §6c, C22 I134).
+  // It read `keys.ts` for `<action>: reserved,` and so held the no-op as the
+  // reservation's meaning; the reservation passes through now, and the row
+  // presses `⌥⌫` through a built graph. The declaration it read is C24 T2.23's.
 });
 
 describe("C16 §8 I53 — key repeat is declared per binding", () => {

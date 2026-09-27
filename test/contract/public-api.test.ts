@@ -405,7 +405,33 @@ describe("C24 §7 — the published surface answers for itself", () => {
 });
 
 describe("C24 I39 — a reserved key's handler is registered by the design's id", () => {
-  it.todo(
-    "T2.23 (C24 I39): ReservedKeyAction's members equal the reserved map's keys and the registry ids of the reserved actions, by equality, and the runtime entry exports the type — not deferred on a component: the code lands in the next commit of this round",
-  );
+  it("T2.23 (C24 I39): ReservedKeyAction's members, as the keymap's reserved map holds them, equal the registry ids of the reserved actions and nothing else — and the runtime entry exports the type", async () => {
+    const { RESERVED_ACTIONS, defaultKeymap } = await import("../../src/interaction/router/keymap.js");
+    const registry = JSON.parse(readFileSync("docs/design/language/calcium-registry.json", "utf8")) as {
+      bindings: readonly { id: string; actionId: string; status: string }[];
+    };
+    // **Which actions are reserved is `keys.ts`'s declaration**, read from the
+    // other side: the executors that are the named no-op. A fifteenth
+    // reservation the type does not name fails here, by equality.
+    const effects = readFileSync("src/shell/keys.ts", "utf8");
+    const declared = [...effects.matchAll(/\n\s*(\w+): reserved,/gu)].map((m) => m[1]).sort();
+    expect(declared.length, "the corpus: keys.ts declares reservations").toBeGreaterThan(10);
+    expect(Object.values(RESERVED_ACTIONS).sort(), "the map's actions are the declared reservations").toEqual(declared);
+
+    // And each key is the registry's id for its action's rows — the spelling
+    // an application reads in `/help`, KEYS.md and the design.
+    const idOf = new Map(registry.bindings.filter((b) => b.status === "current").map((b) => [b.id, b.actionId]));
+    for (const [id, action] of Object.entries(RESERVED_ACTIONS)) {
+      const ids = new Set(
+        defaultKeymap.filter((b) => b.action === action && b.registry !== undefined).map((b) => idOf.get(b.registry!)),
+      );
+      expect([...ids], `${action}'s rows spell the record ${id}`).toEqual([id]);
+    }
+
+    // The runtime entry exports the type: the import below is checked by `tsc`
+    // over this file, and the value is a member of it.
+    const one: import("../../src/index.js").ReservedKeyAction = "queue.drop";
+    expect(Object.keys(RESERVED_ACTIONS)).toContain(one);
+    expect(readFileSync("src/index.ts", "utf8")).toMatch(/export type \{ ReservedKeyAction \}/u);
+  });
 });

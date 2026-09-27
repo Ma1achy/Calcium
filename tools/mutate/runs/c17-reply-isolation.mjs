@@ -76,7 +76,9 @@ const results = runPass({
     {
       name: "every prompt action reaches a reply",
       file: "src/shell/construct.ts",
-      from: "        if (binding !== null && !REPLY_ACTIONS.has(binding.action as KeyAction)) return false;\n",
+      // Re-anchored for C22 I134: the check reads the effective action, and it
+      // is the same check.
+      from: "        if (action !== null && !REPLY_ACTIONS.has(action as KeyAction)) return false;\n",
       to: "",
       expect: "T4.71",
     },

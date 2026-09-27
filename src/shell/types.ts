@@ -21,7 +21,7 @@ import type { EntryId } from "../viewport/transcript/index.js";
 import type { OwnerRung } from "../interaction/router/types.js";
 import type { RefreshHost } from "./refresh.js";
 import type { CompletionSource } from "../interaction/completion/index.js";
-import type { Binding, FocusTarget, KeyAction } from "../interaction/router/types.js";
+import type { Binding, FocusTarget, KeyAction, ReservedKeyAction } from "../interaction/router/types.js";
 import type { CursorStyle } from "../terminal/escapes.js";
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore } from "../interaction/history/types.js";
@@ -877,6 +877,18 @@ export type TuiConfig = Readonly<{
    * wants launch cheap omits `every` and gets a one-shot.
    */
   greeting?: (ctx: ProducerContext) => ViewDocument | Promise<ViewDocument>;
+  /**
+   * Handlers for the chords the design reserves (C24 I39, C16 §6c, ruling 64).
+   *
+   * Keyed by the registry's id — `"queue.drop"`, `"agent.1"` — because that
+   * is the name `/help` and `docs/KEYS.md` print. A handler returning `false`
+   * has not handled the key: the row's displaced meaning runs if it has one
+   * (`⌥⌫` kills a word) and otherwise the key passes. With no handler the row
+   * resolves as though it were absent. An id outside the set is refused at
+   * construction, naming the set; a handler that throws is contained and
+   * noticed rather than ending the session (C22 I134).
+   */
+  keyActions?: Readonly<Partial<Record<ReservedKeyAction, () => boolean | void>>>;
 }>;
 
 /**
