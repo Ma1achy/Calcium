@@ -826,8 +826,32 @@ type CallState = "queued" | "running" | "succeeded" | "failed" | "cancelled";
   state?: CallState;        // present ⇒ this notice is a call's head (C09 I45)
 ```
 
-`glyph` stays the answer for the rung where tone carries — `running`, so `measure` reads
-one field and is right at every rung, since every candidate is one cell with no indent.
+`glyph` stays the answer for the rung where tone carries — `running`, and `queued` for a
+queued call, which is hollow at every rung (R-BLK-220) — so `measure` reads one field and is
+right at every rung, since every candidate is one cell with no indent.
+
+**And the tone is the state's, not the producer's** (I141, R-BLK-214). Above 1 bit the dot
+is one character and the tone is the only thing saying which state it is in, so a tone
+chosen independently of the state is a head that draws the same for all five — which is
+what shipped: `callHead` wrote `tone: "info"` for every state, and a failed call was a blue
+`●` beside a succeeded one. The map is exhaustive over `CallState` and lives here, beside
+the union, because the validator and every builder read it:
+
+```typescript
+const CALL_STATE_TONE: Readonly<Record<CallState, Tone>> = {
+  queued: "muted",      // ○ hollow, muted, still
+  running: "default",   // white, still — the duration spinner is the liveness
+  succeeded: "ok",
+  failed: "error",
+  cancelled: "muted",   // it did not finish, which is not a failure
+};
+```
+
+R-BLK-214's table has two rows this union does not: *the agent said something* is prose and
+has no state, so it is not a call head at all; *blocked on you* (`warn`, blinking) is a call
+waiting on a question, and it has no member because nothing in the tree yet ties a question
+to the call that raised it. That is recorded as owed with its subject (F1260), not folded
+into `running`.
 `state` is also what makes a notice a call head for I46 and I47: one committed row, and an
 element in the focus ring. That test used to be `glyph === "step"`, and a predicate over
 the character would now answer differently at different capabilities — a focus ring that
@@ -4102,6 +4126,7 @@ band from, and it is asserted rather than left to follow.
 - **I138** — *(R-MOT-005, I109, registry `scatter`: *one glyph at a time, irregular*)* **`scatter` lights exactly one cell on each of the first `n` ticks of an `n + 3`-tick pass and none on the last three, every cell exactly once per pass, in an order that is a deterministic permutation drawn afresh for each pass.** **Measured, the defect**: each cell took its place by hashing its index into `[0, n + 3)` independently, which is not a permutation — over widths 2–80, three passes each, **76 of 79 widths put two cells on one tick, 2 487 of 10 428 frames lit more than one cell, and one lit six at once**. Coverage held only because each cell had exactly one place; *one at a time* held for none of the widths a bar has. **A permutation by construction**: a cell's place is its rank among the extent's cells ordered by `hash(i, pass)`, and for a fixed pass the hash is a bijection on the cell index — a multiply by an odd constant, an XOR with a constant and two xorshifts, each invertible on 32 bits — so no two cells share a key and no two share a tick. *This read "ties broken by index": a mechanism that cannot fire. The mutation pass removed it and nothing failed, and two million passes of 256 cells found no tie, because there is none to find.* **Drawn afresh per pass** because *irregular* is a claim about the reader — a fixed order repeats every `n + 3` ticks and is learned inside a few seconds — and **deterministic** because a frame must be reproducible (T2.117f): the same cell at the same tick is the same value on every run.
 - **I139** — *(R-MOT-012, I109, registry `drift`: *never repeating*)* **`drift` has no period: its second term's period is an irrational multiple of its first, so over integer ticks the whole row never returns to a frame it has drawn.** **Measured, the defect**: two sines at 37 and 53 ticks share no factor and still share a period — their product, 1 961 ticks — and the row at tick 1 961 equals the row at tick 0 to 5.8 × 10⁻¹⁵. *Never repeating* was true only of sessions shorter than about two and a half minutes at the spinner's cadence, and I109's table said so in its own period column. **The second period is `37 · φ`**: `φ` is irrational, so `k / (37 φ)` never lands on an integer again and the second sine's phase never repeats, whatever the first does. **What is not claimed**: a bounded deterministic sequence comes arbitrarily close to itself, and this one does — the closest return inside 100 000 ticks is at 95 608, differing by 2.7 × 10⁻⁴, under one step of an 8-bit channel. The invariant is the absence of a period, which is what *never repeating* can mean of a deterministic function; the near-return is the figure that says how long an eye would need.
 - **I140** — *(R-STA-001, R-STA-004, §017, §105)* **A field's availability is one of the registry's three values, and only `enabled` takes input.** `FormField.availability` is `"enabled" | "readonly" | "disabled"`, absent meaning enabled — the registry's `availability` axis word for word, and no generic `active` flag (R-STA-001). A `readonly` field is still an element: it can be focused and copied, and `⏎` does not enter it, so no editor is lent. A `disabled` field is **not an element**, which is how `⇥` skips it — R-STA-004's own reason for ranking it — and **its value is not submitted**, because it is not an input anyone can change (I137). The drawing is C09 I122's. → T2.134, T2.135
+- **I141** — *(R-BLK-214, R-BLK-220, R-GLY-003)* **A notice's `state` is a member of `CallState`, and a notice carrying one carries the tone and the glyph that state names.** The tone is `CALL_STATE_TONE[state]` — `queued` and `cancelled` `muted`, `running` `default`, `succeeded` `ok`, `failed` `error` — and the glyph is the toned rung's mark, `queued` for a queued call and `running` for the other four. **A disagreement is a construction error naming the field, never a correction** — the `trail` precedent (I123): a document saying `failed` in blue would otherwise render as something its own fields contradict, with nothing reporting it. `state` outside the union is refused at validation rather than at render, where it threw. The builders derive both from the state (C09 I45), so a producer states the state and never picks a colour for it. *Blocked on you* is R-BLK-214's sixth row and has no member (F1260). → T2.136, T2.137
 
 
 ## 7. Commitments
@@ -4376,6 +4401,8 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.133** (I128, R-COL-006): `block()` refuses a trend cell carrying `glyph`, `tone`, `spark` or `bar`, and one whose `from` or `to` is not finite; a trend cell with text alone is accepted, and so is a column declaring each of the three polarities. The control is the same cell with no trend, which accepts `glyph` and `tone`.
 - **T2.134** (I140, R-STA-001): `availability` is one of `enabled`, `readonly` and `disabled` by both doors, and absent is a field that takes input.
 - **T2.135** (I137, I140): a submit writes a readonly field's value and not a disabled one's, and `formElements` lists the readonly field without `viewState` and the disabled field not at all.
+- **T2.136** (I141): `validateDocument` refuses a notice whose `state` is outside `CallState`, and one whose tone or glyph disagrees with its state, each naming the field; a notice with each of the five states and its own tone and glyph validates. **The refusal is at validation and not at render** — `state: "bogus"` validated and threw inside `headMark`, which is the failure the row exists to move.
+- **T2.137** (I141, C09 I45): `b.notice` with a `state` writes that state's tone and glyph, and refuses a stated tone that disagrees; `callHead` writes both from the state it derives. Asserted on the built block, so a builder picking its own tone fails here before any frame is drawn.
 
 ### Tier 3 — edge cases
 

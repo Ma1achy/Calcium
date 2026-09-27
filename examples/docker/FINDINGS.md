@@ -56300,3 +56300,32 @@ is not pays its header to `dropRows`. Symbol: `windowRows`.
 T2.16's window agreement is clean over the patch corpus at every offset. The comment claiming *both
 lead* is rewritten to say which header does not. `tools/mutate/runs/c25-elements.mjs` restores the
 old count and T2.16 dies on it (C25 T6.32).
+
+## F1260 — R-BLK-214 draws a call *blocked on you*, and `CallState` has no member for it ★★☆☆☆
+*2026-09-27 · review batch 2, M4 item 3 (C04 I141), at e1c16e7c.*
+
+**Expected.** Every row of the registry's dot table (R-BLK-214, §030) is a state a call head can
+be in. **Measured**, reading the table out of `calcium-registry.json`: seven rows — the agent
+working, a call running, succeeded, *the agent said something*, **blocked on you** (`warn`,
+blinking), cancelled, failed — and `○` queued. `CallState` has five members. *Said something* is
+prose and has no outcome, so it is not a call head. **Blocked on you has no member**, and it is not
+an omission a union edit fixes: the state is *this call is waiting on a question*, and nothing in
+the tree ties a question (C15, `confirm.ts`) to the call that raised it. A call that is blocked
+today draws `running`, white and still, beside a question elsewhere on screen.
+
+**Open.** The review asked to *reconcile `queued` with the registry's four states*; the registry
+has `queued` (`○`, R-BLK-220), so that reconciliation is to keep it, and this row is what the
+reconciliation found instead. Symbol: `CallState`. Its subject is the question-to-call link.
+
+## F1261 — a queued call head draws `●` wherever tone carries, and the registry reserves `○` for it ★★☆☆☆
+*2026-09-27 · review batch 2, M4 item 1 (C09 I45), at e1c16e7c.*
+
+**Measured.** `headMark("queued", caps)` returns `running` whenever `toneCarries(caps)`, so above
+1 bit a queued head is `●` — and with `callHead`'s tone fixed at `info` it was the same `●` in the
+same colour as a running call whose duration spinner had not yet ticked. R-BLK-220: *in a
+call-lifecycle gutter, `○` is reserved for queued*, and R-BLK-214 draws it *hollow, muted, still*.
+C09 I45 said `running`'s `●` for every state where tone carries, and T2.45 in `tool-call.test.ts`
+asserted `["●", "●", "●", "●", "●"]` — the spec and the row agreeing with each other and not with
+the registry. Found reading the registry's table while checking the review's premise for item 3,
+not by the review. Symbol: `headMark`.
+
