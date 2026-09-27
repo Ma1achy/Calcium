@@ -56265,3 +56265,33 @@ to hit it. **Not measured**: how many frames in the golden corpus carry a `{bold
 by a `{bold}` one. **Open**, and it is a C09 ruling rather than a fix: correcting `between` breaks
 T1.46's equality with the tokeniser by design, so the ruling is whether the canonical form keeps
 Ink's serialiser or the terminal's meaning. Symbol: `between`.
+
+---
+
+## F1259 — a patch window ending on a collapse marker shows the next hunk's header in its place ★★★★☆
+*2026-09-27 · review batch 1, item 22 (C25 I24, T2.16), at e7879b92.*
+
+**Expected.** C25 I18: a window carries the sticky headers and **declares** them through `skipRows`
+and `dropRows`, so the rows it shows are the rows `[from, to)` of the whole patch.
+
+**Measured.** `out/p22-window.mts`, `patch-three-hunks` at 20 columns, rows `[5, 7)`:
+
+    whole     5 "     19 + b: 3      "   6 "⋯ 40 unchanged lines"
+    window    skip 3 drop 0
+              0 path · 1 "@@ -18,2 +18,2 @@" · 2 "     19 + b: 3" · 3 "⋯ 40 unchanged lines" · 4 "@@ -90,1 +91,2 @@"
+
+Skipping three leaves `⋯ 40` and `@@ -90,1 +91,2 @@` — **the window is shifted by one row**: the
+added line the reader scrolled to is gone and a header from below the range is drawn at the bottom.
+`windowRows` counts every out-of-range hunk header as leading slack, and one is not: a hunk whose
+**collapse marker** is the window's last row renders its header after the marker, past `to`. The
+comment beside the return says *a patch's slack is a path header and a hunk header, and both lead*
+— true of every header above a body row, and false of the one a marker forces.
+
+**Why nothing saw it.** C09's window conformance checks `measure(window) − skip − drop = to −
+from`, and the arithmetic holds with the slack on the wrong side. It took a **consumer of positions**:
+C26 I7's window agreement maps each element of a window back through `skipRows`, and `patch` had
+no elements until C25 I24 gave it some — `:19` sat at row 5 of the block and at row 4 through the
+window. A consumer finds variance a producer cannot.
+
+**Open** — the fix is one branch in `windowRows`: a hunk whose marker is in range and whose header
+is not pays its header to `dropRows`. Symbol: `windowRows`.
