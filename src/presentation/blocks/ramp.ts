@@ -89,9 +89,15 @@ const SHIMMER_HALF_WIDTH = 1.5;
 const GLINT_REST = 60;
 /** §037's *a slow swell*: two and a half times `breathe`, so the two do not read alike. */
 const TIDE_TICKS = 50;
-/** Two periods with no common factor, which is how *never repeating* is spelled in integers. */
+/**
+ * **Two periods whose ratio is irrational**, which is how *never repeating* is
+ * spelled for a deterministic function (C04 I139). This read *two periods with
+ * no common factor* — 37 and 53 — and coprime integers still share a period,
+ * their product: the row at tick 1 961 was the row at tick 0. `φ` is
+ * irrational, so `k / DRIFT_B` never lands on an integer again.
+ */
 const DRIFT_A = 37;
-const DRIFT_B = 53;
+const DRIFT_B = 37 * ((1 + Math.sqrt(5)) / 2);
 /** §037's *unsteady, irregular, **low***: the amplitude is the word `low`. */
 const FLICKER_CEILING = 0.35;
 /** §037's *a chase of three points*. */
@@ -220,7 +226,7 @@ function shotProgress(since: number | undefined, k: number, ticks: number): numb
  * | `marquee` | a rectangular window of width `n/3` sliding and wrapping | `n` ticks |
  * | `chase` | three narrow bands evenly spaced, all moving one cell per tick | `n` ticks |
  * | `neon` | a sixteen-tick envelope: two bursts of jitter, then steady | 16 ticks |
- * | `drift` | two sines at 37 and 53 ticks — no common period inside any session | ≈37·53 ticks |
+ * | `drift` | two sines at 37 and 37·φ ticks — an irrational ratio | none |
  * | `bookend` | `converge` reversed: the edges arrive first and the centre last | `⌈n/2⌉ + 3` |
  * | `scatter` | one cell per tick in a per-pass permutation, then three dark ticks | `n + 3` ticks |
  * | `sweep` | **one-shot** — a band crosses once; after, every cell at `to` | `n + 3` then held |
@@ -331,9 +337,9 @@ export function animateT(
       // not noise: the settling is the part that reads as connecting.
       return NEON[k % NEON.length] ?? 1; // cells-ok — an envelope length
     case "drift": {
-      // Two sines whose periods share no factor. It repeats after 37·53 = 1 961
-      // ticks, which at the spinner cadence is minutes — *never repeating* for
-      // any run that will see it, and honest about being periodic underneath.
+      // Two sines whose periods have an irrational ratio (C04 I139), so the
+      // row has no period. It comes near itself — within 2.7e-4 at tick 95 608,
+      // the closest inside 100 000 — and never back.
       const a = Math.sin((2 * Math.PI * k) / DRIFT_A);
       const b = Math.sin((2 * Math.PI * k) / DRIFT_B + t * Math.PI);
       return 0.5 * (1 + (a + b) / 2);

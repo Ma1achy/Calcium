@@ -216,7 +216,7 @@ ascii #####################--------- 70%
   marquee           AAAAAAABBBBBBBBAAAAAAAAA
   chase             AAAAAAABAAAAAAABAAAAAAAB
   neon              AAAAAAAAAAAAAAAAAAAAAAAA
-  drift             ABCDEEEEDCBAFGHIJKLMNOPQ
+  drift             ABCDEFFFFGHBAIJKLMNOPQRS
   bookend           AAAAABBAAAAAAAAAABBAAAAA
   scatter           AAAAAAAAAAAAAABAAAAAAAAA
   sweep             AAAAABBAAAAAAAAAAAAAAAAA
@@ -241,7 +241,7 @@ ascii #####################--------- 70%
   marquee           AAAAABBBBBBBBAAAAAAAAAAA
   chase             AAAABAAAAAAABAAAAAAABAAA
   neon              ABCDAAAAEAAAAAAAABCDAAAA
-  drift             ABCDEFGGFHCIJKLMNOPQRSTU
+  drift             ABCDEFGGGEDCHIJKLMNOPQRS
   bookend           AAABBBBBBBBBBBBAAABBBBBB
   scatter           AAAAAAAAAAAAAABAAAAAAAAA
   sweep             AAAAAAAAAAAAABBAAAAAAAAA
@@ -934,7 +934,7 @@ ascii #################################################--------------------- 70%
   marquee           AAAAAAABBBBBBBBAAAAAAAAA
   chase             AAAAAAABAAAAAAABAAAAAAAB
   neon              AAAAAAAAAAAAAAAAAAAAAAAA
-  drift             ABCDEEEEDCBAFGHIJKLMNOPQ
+  drift             ABCDEFFFFGHBAIJKLMNOPQRS
   bookend           AAAAABBAAAAAAAAAABBAAAAA
   scatter           AAAAAAAAAAAAAABAAAAAAAAA
   sweep             AAAAABBAAAAAAAAAAAAAAAAA
@@ -959,7 +959,7 @@ ascii #################################################--------------------- 70%
   marquee           AAAAABBBBBBBBAAAAAAAAAAA
   chase             AAAABAAAAAAABAAAAAAABAAA
   neon              ABCDAAAAEAAAAAAAABCDAAAA
-  drift             ABCDEFGGFHCIJKLMNOPQRSTU
+  drift             ABCDEFGGGEDCHIJKLMNOPQRS
   bookend           AAABBBBBBBBBBBBAAABBBBBB
   scatter           AAAAAAAAAAAAAABAAAAAAAAA
   sweep             AAAAAAAAAAAAABBAAAAAAAAA
@@ -1641,7 +1641,7 @@ ascii #####################--------- 70%
   marquee           AAAAAAABBBBBBBBAAAAAAAAA
   chase             AAAAAAABAAAAAAABAAAAAAAB
   neon              AAAAAAAAAAAAAAAAAAAAAAAA
-  drift             ABCDEEEEDCBAFGHIJKLMNOPQ
+  drift             ABCDEFFFFGHBAIJKLMNOPQRS
   bookend           AAAAABBAAAAAAAAAABBAAAAA
   scatter           AAAAAAAAAAAAAABAAAAAAAAA
   sweep             AAAAABBAAAAAAAAAAAAAAAAA
@@ -1666,7 +1666,7 @@ ascii #####################--------- 70%
   marquee           AAAAABBBBBBBBAAAAAAAAAAA
   chase             AAAABAAAAAAABAAAAAAABAAA
   neon              ABCDAAAAEAAAAAAAABCDAAAA
-  drift             ABCDEFGGFHCIJKLMNOPQRSTU
+  drift             ABCDEFGGGEDCHIJKLMNOPQRS
   bookend           AAABBBBBBBBBBBBAAABBBBBB
   scatter           AAAAAAAAAAAAAABAAAAAAAAA
   sweep             AAAAAAAAAAAAABBAAAAAAAAA
@@ -2301,7 +2301,7 @@ ascii #################################################--------------------- 70%
   marquee           AAAAAAABBBBBBBBAAAAAAAAA
   chase             AAAAAAABAAAAAAABAAAAAAAB
   neon              AAAAAAAAAAAAAAAAAAAAAAAA
-  drift             ABCDEEEEDCBAFGHIJKLMNOPQ
+  drift             ABCDEFFFFGHBAIJKLMNOPQRS
   bookend           AAAAABBAAAAAAAAAABBAAAAA
   scatter           AAAAAAAAAAAAAABAAAAAAAAA
   sweep             AAAAABBAAAAAAAAAAAAAAAAA
@@ -2326,7 +2326,7 @@ ascii #################################################--------------------- 70%
   marquee           AAAAABBBBBBBBAAAAAAAAAAA
   chase             AAAABAAAAAAABAAAAAAABAAA
   neon              ABCDAAAAEAAAAAAAABCDAAAA
-  drift             ABCDEFGGFHCIJKLMNOPQRSTU
+  drift             ABCDEFGGGEDCHIJKLMNOPQRS
   bookend           AAABBBBBBBBBBBBAAABBBBBB
   scatter           AAAAAAAAAAAAAABAAAAAAAAA
   sweep             AAAAAAAAAAAAABBAAAAAAAAA
@@ -2957,7 +2957,7 @@ ascii #####################--------- 70%
   marquee           AAAAAAABBBBBBBBAAAAAAAAA
   chase             AAAAAAABAAAAAAABAAAAAAAB
   neon              AAAAAAAAAAAAAAAAAAAAAAAA
-  drift             ABCDEEEEDCBAFGHIJKLMNOPQ
+  drift             ABCDEFFFFGHBAIJKLMNOPQRS
   bookend           AAAAABBAAAAAAAAAABBAAAAA
   scatter           AAAAAAAAAAAAAABAAAAAAAAA
   sweep             AAAAABBAAAAAAAAAAAAAAAAA
@@ -2982,7 +2982,7 @@ ascii #####################--------- 70%
   marquee           AAAAABBBBBBBBAAAAAAAAAAA
   chase             AAAABAAAAAAABAAAAAAABAAA
   neon              ABCDAAAAEAAAAAAAABCDAAAA
-  drift             ABCDEFGGFHCIJKLMNOPQRSTU
+  drift             ABCDEFGGGEDCHIJKLMNOPQRS
   bookend           AAABBBBBBBBBBBBAAABBBBBB
   scatter           AAAAAAAAAAAAAABAAAAAAAAA
   sweep             AAAAAAAAAAAAABBAAAAAAAAA
@@ -3676,7 +3676,7 @@ ascii #################################################--------------------- 70%
   marquee           AAAAAAABBBBBBBBAAAAAAAAA
   chase             AAAAAAABAAAAAAABAAAAAAAB
   neon              AAAAAAAAAAAAAAAAAAAAAAAA
-  drift             ABCDEEEEDCBAFGHIJKLMNOPQ
+  drift             ABCDEFFFFGHBAIJKLMNOPQRS
   bookend           AAAAABBAAAAAAAAAABBAAAAA
   scatter           AAAAAAAAAAAAAABAAAAAAAAA
   sweep             AAAAABBAAAAAAAAAAAAAAAAA
@@ -3701,7 +3701,7 @@ ascii #################################################--------------------- 70%
   marquee           AAAAABBBBBBBBAAAAAAAAAAA
   chase             AAAABAAAAAAABAAAAAAABAAA
   neon              ABCDAAAAEAAAAAAAABCDAAAA
-  drift             ABCDEFGGFHCIJKLMNOPQRSTU
+  drift             ABCDEFGGGEDCHIJKLMNOPQRS
   bookend           AAABBBBBBBBBBBBAAABBBBBB
   scatter           AAAAAAAAAAAAAABAAAAAAAAA
   sweep             AAAAAAAAAAAAABBAAAAAAAAA
