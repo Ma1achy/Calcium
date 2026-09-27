@@ -56327,5 +56327,7 @@ call-lifecycle gutter, `○` is reserved for queued*, and R-BLK-214 draws it *ho
 C09 I45 said `running`'s `●` for every state where tone carries, and T2.45 in `tool-call.test.ts`
 asserted `["●", "●", "●", "●", "●"]` — the spec and the row agreeing with each other and not with
 the registry. Found reading the registry's table while checking the review's premise for item 3,
-not by the review. Symbol: `headMark`.
+not by the review. **And it spun**: the duration slot drew a spinner for every unsettled call, and a
+queued call has no outcome, so a head R-BLK-214 draws *still* was the one live mark on its row —
+found walking C23 I81. Symbols: `headMark`, `toolCallHeader`.
 
