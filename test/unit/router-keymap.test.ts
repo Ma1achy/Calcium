@@ -1810,3 +1810,10 @@ describe("C16 I58 — a chord has one spelling per rung", () => {
     }
   });
 });
+
+describe("C16 §6c — routes by profile and the registry-global placement (review batch 2, M6)", () => {
+  it.todo("T1.37b (C16 I37): ⌃C dispatched with an app in flight reaches the stage cancel, by dispatch rather than by a declaration — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T1.173 (C16 I66): every registry-global key record is one global row or one row at every owner its placement names, and the passes are declared, both by equality — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T1.174 (C16 I42): the supersession script refuses its own output and writes nothing, and validateRegistry refuses a binding link that is not reciprocal — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T1.175 (C16 §6a clause 5): renderKeysMarkdown carries a Profile column with the records' own values — not deferred on a component: the code lands in the next commit of this round");
+});

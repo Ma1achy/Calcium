@@ -92,7 +92,7 @@ of consistent. One constant, one behaviour, one bug report.
 
 `reset()` discards the pending bytes, the paste buffer and the escape window, and **emits nothing**: the flush rule that turns accumulated printables into keys (§7) is about a window closing, and this window did not close, it stopped mattering. The call is the shell's, on resume, because C01 delivers bytes and interprets none and C16 owns no timer — neither of them knows a suspension ended. That makes it C22's orchestration, and §4's ordering is where it is written down.
 
-**Most terminals send no key-up events and repeat held keys as fresh presses**, so there is no chord support beyond modifiers, and a keymap must not be designed around one. Under C02's `keyboardProtocol: "kitty"` (C01 pushes `CSI > 3 u`) a key arrives as `CSI code ; mods : event u` and the decoder carries the event type as an **optional** `event` field on the `kind: "key"` record — `"press"`, `"repeat"` or `"release"` when the sequence says, **absent** otherwise, so every consumer that ignores it is unchanged and `toEqual` records written before it exist unchanged. **Nothing may be reachable only through that field** (C02 I12): a binding that names an `event` filter without a fallback that fires under `"none"` is A03 SS55's violation, and the rule is vacuous today because no binding names one. The same arm decodes `CSI 27 u` as `escape` **whole** — under the protocol a lone `Esc` is never a prefix and the 50 ms window never runs — and names the modifier key codes `57441`–`57452` (`shift`, `ctrl`, `alt`, `super`) so a terminal that sends them produces a named key rather than a private-use glyph, though the flags C01 pushes do not ask for them (C02 §3's table). The arm's modifier bits are kitty's: shift 1, alt 2, ctrl 4; **bit 8 is folded into nothing** — it is xterm's Meta and kitty's Super, and `⌘` arriving as `Alt` is the live-binding class below — and kitty's meta, bit 32, joins alt in `meta` as the `CSI 1;m X` arm already folds them. Stated blind spot: an xterm at `formatOtherKeys=1` loses a Meta modifier through this arm; its default format keeps it.
+**Most terminals send no key-up events and repeat held keys as fresh presses**, so there is no chord support beyond modifiers, and a keymap must not be designed around one. Under C02's `keyboardProtocol: "kitty"` (C01 pushes `CSI > 3 u`) a key arrives as `CSI code ; mods : event u` and the decoder carries the event type as an **optional** `event` field on the `kind: "key"` record — `"press"`, `"repeat"` or `"release"` when the sequence says, **absent** otherwise, so every consumer that ignores it is unchanged and `toEqual` records written before it exist unchanged. **Nothing may be reachable only through that field** (C02 I12): a binding that names an `event` filter without a fallback that fires under `"none"` is A03 SS55's violation, and the rule is vacuous today because no binding names one. The same arm decodes `CSI 27 u` as `escape` **whole** — under the protocol a lone `Esc` is never a prefix and the 50 ms window never runs — and names the modifier key codes `57441`–`57452` (`shift`, `ctrl`, `alt`, `super`) so a terminal that sends them produces a named key rather than a private-use glyph, though the flags C01 pushes do not ask for them (C02 §3's table). The arm's modifier bits are kitty's: shift 1, alt 2, ctrl 4; ~~bit 8 is folded into nothing~~ **Superseded (I34 amended, I41):** bit 8 is `super` on this arm — kitty's own definition — and on the legacy arm when `keyboardProtocol === "kitty"`; it joins `meta` only on a terminal that reported no protocol. Kitty's meta, bit 32, joins alt in `meta` as the `CSI 1;m X` arm already folds them. Stated blind spot: an xterm at `formatOtherKeys=1` loses a Meta modifier through this arm; its default format keeps it.
 
 The application-surface boundary preserves those native phases. It also marks
 complete CSI-u keys with their wire family so a phase-less native press is not
@@ -1355,7 +1355,8 @@ forms are already pressed through the decoder for the prompt's rows.
 
 ## 6a. Two profiles, and the registry's authority over this table — M6
 
-`docs/design/language/` declares 39 actions and 39 bindings and is normative for
+`docs/design/language/` declares 40 actions and **57 current bindings** (revision 0.13; 41 before
+§6c's supersession, 39 when this was first written) and is normative for
 every chord it names (`AUTHORITY.md`). This table holds 85 rows over ~65 actions,
 so the registry is not a replacement for it: **the registry says what the design
 has ruled, and this table must agree with it wherever it speaks.** The rows it
@@ -1376,7 +1377,7 @@ modifier the keymap cannot refuse.**
 
 `Key` gains `super?: boolean`, and `BlockKeymap` and `SurfaceKeyChord` gain the
 same optional field — additive, no break. `kittyModifiersOf` sets it; the legacy
-arm keeps folding bit 8 into `meta`, deliberately, because on a terminal with no
+arm keeps folding bit 8 into `meta` **without a protocol** (I41), deliberately, because on a terminal with no
 protocol `⌘a` genuinely arrives as `Alt-a` and a decoder that guessed otherwise
 would make one wire form two bindings. That is the reason the field is safe to
 add: it can only ever be `true` where the protocol distinguished it.
@@ -1394,13 +1395,19 @@ second keymap.** A binding carries `profile?`, absent meaning *both*, and
 for one `(target, key)` remains a construction error, so a base route and an
 enhanced route may not collide after canonicalisation — which is the gate.
 
-Six actions take a second route, because `⌘` never reaches the application and
-`⇧⏎`, `⌃⇧C`, `⌃⇧V` and `⌃⇥` are byte-identical to their unshifted forms:
+**The registry holds both routes as records** (§6c, I36, I42). Eight families take a second
+route, because `⌘` never reaches the application and `⇧⏎`, `⌃⇧C`, `⌃⇧V`, `⌃⇥` and `⌃⇧⇥` are
+byte-identical to their unshifted forms on a terminal without the protocol. The enhanced
+chord is an `enhanced-terminal` record and the base chord a `default-terminal` record, and a
+row takes its profile from the record it spells (§6b, superseded paragraph). This table
+read *six actions* and listed seven while omitting `newline` — the one whose base route
+matters most, because an unbound `⇧⏎` submits (§6c table C):
 
 | Action | Enhanced | Base | Deliverable as |
 |---|---|---|---|
+| `newline` | `⇧⏎` | `⌥⏎` | `ESC CR` |
 | `copy` | `⌃⇧C` | `⌥w` | `ESC w` |
-| `paste` | `⌃⇧V` | `⌃y` | `0x19` |
+| `paste` | `⌃⇧V` | `⌃Y` | `0x19` |
 | `agent.next` | `⌃⇥` | `⌥.` | `ESC .` |
 | `agent.previous` | `⌃⇧⇥` | `⌥,` | `ESC ,` |
 | `agent.1`…`agent.9` | `⌘1`…`⌘9` | `⌥1`…`⌥9` | `ESC 1`…`ESC 9` |
@@ -1482,14 +1489,23 @@ a registry that named one of them would be wrong about the other three.
 
 **The split that makes it one record.** The chord is the registry's and appears nowhere
 else: a row that the registry names writes `key: chordOf("page.up")`, and `chordOf` reads
-the generated file. **Which verb an owner spells for a shared action is the tree's**, and
+the generated file. **Since §6c the call is `...fromRegistry("page.up", profile)`**, which
+spreads the record's id and profile onto the row with the chord — one lookup by
+`(actionId, profile)`, thrown on anything but one answer. **Which verb an owner spells for a shared action is the tree's**, and
 **the row is the join** — it supplies the `target` and the `KeyAction`, the registry
 supplies the chord. A separate `(actionId, target)` table was the first shape drafted here
 and it is a worse one: it is the same fact written in a second place, indexed differently,
 and the row already had both halves. Neither record repeats the other, which is what *two
 records* meant and this does not.
 
-**`profile` is not generated, and the reason is a finding.** Every binding in the registry
+~~**`profile` is not generated, and the reason is a finding.**~~ **Superseded (§6c, I42 amended).**
+`profile` is generated. The registry's field now records deliverability — the sixteen
+mislabelled records were superseded — so a row takes its profile from its record; the one
+exception is `⇧⏎` at `prompt` and `liveBlock`, kept in both profiles because xterm's
+`modifyOtherKeys` delivers it and an unbound `⇧⏎` submits (`construct.ts`'s prompt handler
+submits on any `enter`), listed by equality. The paragraph as it stood:
+
+*Every binding in the registry
 carries `profile: "default-terminal"` — measured, all 39 — while this table marks 15 rows
 `enhanced-terminal`. **The two fields share a name and a value space and mean different
 things.** The design's asserts the route it intends; the tree's records whether a terminal
@@ -1498,7 +1514,15 @@ does not model: `⌃⇧C`, `⇧⏎`, `⌃⇥` and `⌘n` are byte-identical to t
 Generating `profile` from the registry would bind four families of chord on terminals that
 can never send them, so it stays a row's own declaration. A field that agrees in name and
 disagrees in meaning is the kind a generator copies silently, which is why this is written
-down rather than left to the next reader.
+down rather than left to the next reader.*
+
+**What the finding was right about, and what it got wrong.** The two fields did mean
+different things, and generating one from the other would have bound four families on
+terminals that cannot send them. The remedy it chose — a second record of *deliverability*,
+kept on the row — is the two-records state §6b exists to end, one field over. The design's
+field was the one that was wrong, and it is the design's to correct: sixteen records carried
+`default-terminal` for a chord a legacy terminal cannot send, and superseding them makes the
+registry's field mean what the row's did.
 
 **The remainder, and it is the larger half.** 121 rows, of which **the chords of about
 two-thirds appear nowhere in the registry** — the editor's motions (`⌃w`, `⌃u`, `⌥d`),
@@ -1531,6 +1555,13 @@ is invented and no question is owed:
 
 ### Fifteen actions registered with a chord and no effect
 
+**Superseded by §6c: reserved actions pass through.** A reserved action with no handler
+registered through `TuiConfig.keyActions` resolves as though its row were absent — the rung
+passes — and a row that displaced a meaning names it: `fallback`, and `⌥⌫`'s is
+`killWordLeft`. The reservation still holds the chord against `mergeBlock` (I27), which is
+the half of the argument below that survives. The other half — *they are bound and they do
+nothing* — is what made `⌥⌫` dead in all three editor owners (§6c). The section as it stood:
+
 `agent.1`…`agent.9`, `agent.next`, `agent.previous`, `posture.cycle`,
 `values.toggle`, `queue.drop` — and **`selection.semantic`**, whose chord `⌥⇧V`
 the design owns and whose mode M10 builds. Reserving it is the only answer that
@@ -1551,7 +1582,15 @@ taken. A reserved name is every consumer's namespace.
 
 `R-KEY-005` and `R-KEY-007`: one resolved registry, one rendering.
 
-1. **Every current registry binding resolves**, to its action, at its scope, in
+1. **Superseded (§6c, I37 amended).** Every current registry key binding resolves **through
+   the real decoder and `createKeymap` under its own profile**, at a target its scope admits
+   and its `when` allows, to the rows carrying its id; and every row spelling a registry
+   chord in a profile it is in carries that id. The one site outside the keymap, `interrupt`,
+   is asserted by dispatch. A capture outside the scope is listed by equality with its owner.
+   The clause as it stood — one direction, by action name, with a declaration list that
+   excused a binding by prose:
+
+   *Every current registry binding resolves*, to its action, at its scope, in
    at least one profile — or is declared, in a table with the site named, as
    handled outside the keymap (`⏎`, `esc` and `⌃C` are the router's rungs and
    C22's submit) or as an owner capture under R-KEY-003.
@@ -1650,6 +1689,151 @@ taken. A reserved name is every consumer's namespace.
    `↑↓` was `arrows` on one rung and `up/down` on another — and with the design
    at the Unicode rung, where it wrote `⌃c` for the registry's `⌃C`. A key
    spelled in two places is spelled two ways.
+
+## 6c. Routes by profile, reserved pass-through, and where a global binding fires — review batch 2, M6, walked
+
+Five review items over §6a and §6b, taken together because each one's remedy moves a row the
+others read. The walk was taken against `a4502d3c` before any of it was written: a
+classification table for what holds at rest, a trace for what happens when events meet, and
+a premise check first, because four of the items' own statements were wrong in a way that
+changed what to build.
+
+### What the premise check corrected
+
+- **`⌥⌫` is dead in three owners, not one.** The reserved no-op is `keys.ts`'s `reserved`, not a
+  keymap row, and every editor owner meets it: the prompt runs the no-op; a typed reply tests
+  `REPLY_ACTIONS.has("queueDrop")`, which is false, so I8 rejects the key; a form field tests
+  `FIELD_ACTIONS` the same way and drops it. Before the reservation the row was `killWordLeft`.
+- **Sixteen registry bindings are mislabelled, not fifteen.** `binding.020` `⌃⇥` is
+  byte-identical to `⇥` on a legacy terminal and was left out of the count. All 41 records said
+  `default-terminal` except `binding.host-detach-enhanced`, and `docs/KEYS.md`'s design half —
+  one header, `profile: default-terminal`, no per-row profile — listed `⌘1` for a plain terminal.
+- **The old gate asked one question of the table.** T1.37 checked that *some* row carried an
+  action named for each binding, and ignored the chord, the target, the profile and the
+  decoder; its declaration list still named `pushedView` and said `⌘↑` had no wire form, both
+  false for some time.
+- **The comment that kept `selection.*` off `global` was false.** *A `global` row would resolve
+  almost nowhere* — but `global` is step 3 after **any** rung that passes (§4), not the idle
+  rung alone.
+- **Kitty `⌃⇧C` is `⌃C` to three predicates.** `CSI 99;6u` decodes as `{c, ctrl, shift}`, and
+  `isCtrlC`, `interceptOf` and the question's classifier each test `ctrl && name === "c"`.
+  **Measured through a built session**, a local verb in flight: `⌃⇧C` gave the stages
+  `arming, intercept:interrupt:scope:handle, cancel` and the verb was gone. *When `⌃⇧C`
+  collapses to `⌃C`, interrupt wins* is true only on the base profile, where the bytes are
+  the same.
+- **The bit-8 sentence was stale in five places**: §2, `kittyModifiersOf`'s doc comment (whose
+  body contradicts it), `Key.super`'s doc comment, T1.3q's title, and T1.34's comment.
+
+### Table A — a reserved row, at rest
+
+The structural half of item 1. Rows are owners that read a reserved row; columns are the hook.
+The two cells where two rules meet are marked: the borrowed editors' allow-lists against a
+reserved action they do not list.
+
+| owner, key | no handler | handler returns `true` / nothing | handler returns `false` |
+|---|---|---|---|
+| prompt `⌥⌫` | `killWordLeft` — the row's `fallback` | the handler; the key is spent | `killWordLeft` |
+| **typed reply `⌥⌫`** | `killWordLeft` is in `REPLY_ACTIONS` → the reply's word | `queueDrop` is not → the rung passes → I8 rejects; **the handler is not called** | as the handler column: not called |
+| **form field `⌥⌫`** | `killWordLeft` is in `FIELD_ACTIONS` → the field's word | `queueDrop` is not → passes → dropped | as the handler column |
+| prompt, liveBlock `⌥v` | as though absent → `global` binds no `⌥v` → dropped | the handler | dropped |
+| global `⌥p`, `⌥.`, `⌥,`, `⌥1`–`⌥9` (and their enhanced chords) | as though absent → dropped | the handler | dropped |
+| `mergeBlock`, a block binding `⌥p` | the row still holds the slot: the block's key is placed at `interaction` (I27) | same | same |
+
+**The ruling for the marked cells: one effective action, read by every owner.** A reserved
+row resolves to the reserved action when a handler is registered and to its `fallback` — or to
+nothing — when none is, and the reply's and the field's allow-lists read that. So a registered
+`queue.drop` is refused in a reply rather than dropping a queued message from inside a
+question, which is I54's own list — *the queue* is the prompt's — applied to a new member.
+
+### Table B — the registry-global bindings, per owner
+
+The structural half of item 4. `copy` is placed at every owner with a copy verb; `?` and
+`selection.*` are `global` rows (ruling 65). The column reads *what the key does there after
+this pass*; the notes say why.
+
+| owner | copy `⌥w` · `⌃⇧C` | `?` | `selection.native` `⌥⇧C` | `selection.semantic` `⌥⇧V` |
+|---|---|---|---|---|
+| prompt | `copySelection` | typed — printable, taken before step 3 | global → enter native | global → enter semantic |
+| panel — menu, search, preview | the prompt answers first where it does (`promptUnderMenu`); otherwise passes and `global` binds no copy | typed, or narrows the search | global | global |
+| typed reply | `copySelection`, in `REPLY_ACTIONS` | typed | the question rejects — step 3 is skipped under a blocking layer | rejected |
+| form field | `copySelection`, in `FIELD_ACTIONS` | typed | global | global |
+| liveBlock | `copyElement` | global → help | global | global |
+| interaction | `copyElement` — the focused element | global → help | global | global |
+| semanticSelection | `copySelectedEntries` | global → help | global → **switch** to native | global → **no-op**, same mode |
+| **nativeSelection** | passes to the terminal: no row, and `global` binds no copy | **captured**: `passToTerminal` — the frame is frozen, so an entry would land unseen | global → **no-op**, same mode | global → **switch** to semantic |
+| overlay, blocking question | rejected | rejected | rejected | rejected |
+| child | the child's | the child's — a surface consumes it; a shell delegation is ruling 61's | the child's | the child's |
+| ~~global, idle~~ | — | — | — | — |
+
+**What the table found.** The two **switch** cells had no mechanism: `#setNativeSelection`
+guards only its own flag and `#enterSemanticSelection` only `#semantic`, so `⌥⇧C` from semantic
+copy mode would have turned native selection on **beside** it — a held view under a suspended
+scheduler with the mouse handed to the terminal, two modes at one rung. And the **native `?`**
+cell: step 3 runs after native selection passes, so a `global` `?` row appends an entry nobody
+can see unless the rung captures it. **And the *global, idle* row was a state no input
+constructs**, found writing T4.85: `activeTarget` never answers `global` — with focus in the
+transcript and nothing live it answers `liveBlock` (R-COR-002) — so `global` is step 3's
+fallback and never a rung a key is pressed at. The row is struck rather than asserted. Neither is visible from a statement read alone: the first
+needs `global` placement *and* the two entry guards, the second needs `global` placement *and*
+§4's step 3.
+
+### Table C — the chord families, by profile
+
+The structural half of item 2: sixteen records superseded, sixteen `enhanced-terminal`
+successors carrying the same chord, sixteen `default-terminal` base records — 41 − 16 + 32 =
+**57 current bindings**.
+
+| family | enhanced record | base record | the cell that needed a ruling |
+|---|---|---|---|
+| `newline` | `⇧⏎` | `⌥⏎` | `⇧⏎` stays bound in **both** profiles: the prompt submits on any `enter` whatever its modifiers, so an enhanced-only row on an xterm sending `CSI 27;2;13~` would submit on `⇧⏎` |
+| `copy` | `⌃⇧C` | `⌥w` | — |
+| `paste` | `⌃⇧V` | `⌃Y` | written capitalised, as the registry writes control chords |
+| `agent.next` | `⌃⇥` | `⌥.` | the sixteenth record the review missed |
+| `agent.previous` | `⌃⇧⇥` | `⌥,` | — |
+| `agent.1`…`agent.9` | `⌘1`…`⌘9` | `⌥1`…`⌥9` | — |
+| `transcript.top` | `⌘↑` | `⌃home` | `home` and `end` join the generator's names, or `⌃home` cannot be spelled |
+| `transcript.bottom` | `⌘↓` | `⌃end` | — |
+
+### The sequence trace
+
+The event-mediated half. Each row is a sequence where a reserved row, a borrowed editor or the
+exact `⌃c` predicate meets something that happened in between.
+
+| # | sequence | before | after |
+|---|---|---|---|
+| S1 | `keyActions: {"queue.drop": h}`; type `git status`; `⌥⌫` | no hook existed; the no-op ran | `h` called once; the line unchanged |
+| S2 | as S1, `h` returns `false` | — | the word kill: `git ` |
+| S3 | a question with `reply…` composing; `⌥⌫`, no handler | refused (I8) | the reply's last word goes |
+| S4 | a form field being edited; `⌥⌫`, no handler | dropped | the field's last word goes |
+| S5 | `h` raises a question synchronously | — | the key is spent before the question exists; the next key meets the question's guard (I44), and nothing is replayed |
+| S6 | `h` throws | — | **the throw is contained at `bound`**: nothing was mutated before the call, the key is spent, and a `warn` notice names the action — an application's hook must not take the session down through the read loop, which has no `catch` |
+| S7 | kitty; a local verb in flight; `⌃⇧C` | cancelled (measured) | the prompt's copy; the verb still in flight |
+| S8 | kitty; empty prompt; `⌃⇧C` twice inside the window | armed, then the exit confirm | nothing arms |
+| S9 | kitty; a question open; `⌃⇧C` | the intercept's reject ran the rung, whose classifier denied | not an intercept; the question's own classifier, where it is not an answer |
+| S10 | base; a local verb in flight; `0x03` | cancelled | cancelled — the bytes are `⌃c` and interrupt wins |
+| S11 | semantic copy mode; `⌥⇧C` | no row reached it — the rows were on `prompt` and `liveBlock` | semantic exits, native enters: one mode |
+
+**S6 is the rejection path**, which neither artefact reaches by default: both index the
+accepted paths. `bound` calls the handler after resolving and before returning, and has
+mutated nothing by then, so containment leaves no half-state; a key effect throwing anywhere
+else still propagates, and that is unchanged here.
+
+### Rulings
+
+- **One effective action** (tables A's marked cells): reserved row → handler if registered,
+  else `fallback`, else as though absent; the borrowed editors read the same answer.
+- **`?` at native selection is a declared capture to `passToTerminal`**, a no-op named for what
+  it is. Ruling 65 says it *passes*; in the ladder's vocabulary a pass reaches step 3, which is
+  the unseen entry the ruling's reason forbids.
+- **The mode switch is the session's**: entering either copy mode leaves the other first, so
+  the two cannot be on together whatever routes a key there.
+- **Exact `⌃c` recognition covers the third site**: the question's classifier tests the same
+  predicate, or S9 denies on `⌃⇧C` while the router has stopped calling it an interrupt.
+- **Ids**: a successor is `binding.<action>-enhanced` and a base record `binding.<action>-base`,
+  the shape `binding.host-detach-enhanced` already has.
+- **`/help keys` shows the effective action**: a reserved row with no handler lists its
+  fallback, or is omitted when it has none; `docs/KEYS.md`, which has no session, shows
+  `queueDrop, else killWordLeft`.
 
 ## 7. State machine
 
@@ -1777,13 +1961,13 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
   So: the member is required on the owner interface rather than optional, an owner with nothing to move answers `false` exactly as an owner at its last position does, and the two are separated by what the surface says rather than by the key's return. This is I24's claim about a *target* with no vocabulary, one level in: a target can have bindings and still have an owner with nothing behind them.
 - **I34** — **A modifier the `Key` type cannot hold is a modifier the keymap cannot refuse** (§6a, M6). `Key.super` exists because `⌘↑` and `↑` were one key: two registry bindings resolved against the live table by accident, and the measurement that found it is the one that shaped §6a. **Amended (I41): bit 8 is read by protocol, not by arm.** The original clause said only the csi-u arm sets `super` and the legacy arm folds bit 8 into `meta` always — true of a terminal that reported no protocol, where `⌘a` genuinely *is* `Alt-a`, and false of one that reported Kitty, where bit 8 is Super by that encoding's own definition. The condition was the protocol all along and the arm was standing in for it.
 - **I35** — **A profile is a condition on a binding, not a second keymap** (§6a, R-CAP-001). Both profiles live in `defaultKeymap`; `resolve` refuses a binding whose profile the terminal is not in, and two bindings for one `(target, key)` remains a construction error **within a profile**. Two keymaps would be two things to keep in step and `/help` would render one of them — the drift §6 spends its opening paragraph forbidding, reintroduced by the axis rather than by an edit.
-- **I36** — **Every action has a `default-terminal` route.** An action reachable only where `keyboardProtocol === "kitty"` is an action most readers cannot reach, and the registry's chord is the enhanced route wherever `⌘`, `⇧⏎`, `⌃⇧`-letters or `⌃⇥` make it undeliverable — those four are byte-identical to their unmodified forms on a legacy terminal, so the base route is not a convenience.
-- **I37** — **A registry binding is answered, and a capture is declared with its owner** (§6a, R-KEY-003, R-KEY-007). Every `current` binding in `docs/design/language/` resolves to its action at its scope in some profile, or appears in a table naming the site that handles it outside the keymap, or is an owner capture under R-KEY-003's *unless the current owner explicitly captures the action*. The third arm is the one that needs the owner named: without it, *the design says `⇥` moves focus and the tree completes* and *the design says `⇥` moves focus and nobody noticed* read identically.
-- **I38** — **A reserved chord carries an explicit no-op, never no executor** (§6a). The fourteen agent, posture, queue and values actions are bound and do nothing. §6's closed-set argument makes an action with no executor uncompilable, so the alternative to a declared no-op is leaving the chord unbound — and an unbound chord is one an application takes, so the feature arrives needing a key that is gone. A reserved name is every consumer's namespace.
+- **I36** — **Every action has a `default-terminal` route.** An action reachable only where `keyboardProtocol === "kitty"` is an action most readers cannot reach, and the registry's chord is the enhanced route wherever `⌘`, `⇧⏎`, `⌃⇧`-letters or `⌃⇥` make it undeliverable — those four are byte-identical to their unmodified forms on a legacy terminal, so the base route is not a convenience. **Amended (§6c): a `default-terminal` record's chord is one a legacy xterm sends without a protocol or `modifyOtherKeys`** — so the registry's own field says what the row's used to, and a wire form of a base record is never csi-u or `CSI 27;…~`.
+- **I37** — **A registry binding is answered, and a capture is declared with its owner** (§6a, R-KEY-003, R-KEY-007). **Amended (§6c) to clause 1's two directions**: every current key record resolves through the real decoder and `createKeymap` under its own profile, at a target its scope admits and its `when` allows, to the rows carrying its id; every row spelling a registry chord in a profile it is in carries that id; a capture outside the scope is listed by equality with its owner; and `interrupt` is asserted by dispatch. The clause as it stood: every `current` binding in `docs/design/language/` resolves to its action at its scope in some profile, or appears in a table naming the site that handles it outside the keymap, or is an owner capture under R-KEY-003's *unless the current owner explicitly captures the action*. The third arm is the one that needs the owner named: without it, *the design says `⇥` moves focus and the tree completes* and *the design says `⇥` moves focus and nobody noticed* read identically.
+- **I38** — **Superseded (§6c): a reserved row passes through.** With no handler registered through `TuiConfig.keyActions` it resolves as though absent, or to the `fallback` its row names; with one, to the handler, and a handler returning `false` is the no-handler answer. The borrowed editors read the same effective action (→ C22 I134, C24 I39). The reservation still holds the chord against `mergeBlock`. As it stood: **A reserved chord carries an explicit no-op, never no executor** (§6a). The fourteen agent, posture, queue and values actions are bound and do nothing. §6's closed-set argument makes an action with no executor uncompilable, so the alternative to a declared no-op is leaving the chord unbound — and an unbound chord is one an application takes, so the feature arrives needing a key that is gone. A reserved name is every consumer's namespace.
 - **I39** — **A reserved route's owner-applicability is total** (§3, R-OWN-001). `INTERCEPTS[id]` is `Record<OwnerRung, Verdict>` and names every rung, because an absent row means *the ladder decides* and the ladder is precisely what a reserved route is reserved against. The partial version shipped the defect it was built to stop: `page-scroll` declared `copy` and idle, the `question` rung fell through, and a confirm's answer handler swallowed `⌥↑`. Totality is not tidiness — it is what makes a seventh rung a decision rather than an inherited default, and TypeScript is what enforces it.
 - **I40** — **`page-scroll` is `⌥↑`/`⌥↓` alone, and it scrolls the transcript whatever is focused** (§3, §103, R-BLK-112, binding.031/.032). The design reserves two chords and gives them `scope: "transcript"`; R-BLK-112 says what the scope buys — *⌥↑ ⌥↓, the wheel and the trackpad scroll WITHOUT moving focus. The prompt keeps it and you keep typing.* So the verdict routes to the transcript **before the ladder and without consulting it**, at every rung but `copy`: a question, a substate layer and a captured child are all stepped over, and so is a focused `scroll` box. The chord does not ask where you are, which is the whole of its reservation. **`PgUp`/`PgDn` are not in this table** — they appear in no binding and no rule in the registry, they are the repo's own keys, they behave like the arrows, and the ladder gives them to the viewport you are inside. Holding both on one route forced *the active viewport* to mean the focused box for one key and the transcript for the other, which is one verdict saying two things.
 - **I41** — **Bit 8 is Meta without a protocol and Super with one** (§6, R-CAP-001). `modifiersOf` takes `keyboardProtocol`: under `"kitty"` bit 8 sets `super`, otherwise it joins `meta` as before. The arm an escape sequence arrived on is not the question — `CSI 1;9A` is legal in both encodings and means different things in each, and only the negotiated protocol says which. Reading it by arm made `⌘↑` and `⌥↑` one key on a terminal that distinguishes them, and then the collision was recorded as *there is no wire form for the chord*, which is a decoder's limit written down as a fact about terminals. `⌘↑`/`⌘↓` are `transcript.top`/`transcript.bottom`'s enhanced routes, restored.
-- **I42** — **A chord the registry names is written once, and it is written there** (§6b, R-KEY-007). `registry-bindings.ts` is generated by `tools/generate-keymap.mjs` from `calcium-registry.json` and is not hand-edited; `defaultKeymap` builds its registry-owned rows from it. The hand-written table plus a sync gate that M6 landed was two records of one fact, and a gate over two records catches drift after it happens while making the copy look deliberate. **What the registry cannot supply is not copied but joined**: nine of its bindings are one verb four owners spell differently — `escape` is `dismiss`, `viewPop`, `exitNativeSelection`, `focusPrompt` — which is R-KEY-003's *unless the current owner explicitly captures the action*, and `when: "focused"` is the design saying so. That mapping is **the row itself** — it names the `target` and the `KeyAction` while `chordOf(actionId)` supplies the chord — and it is the tree's because the registry does not hold it. `profile` is not generated either: every registry binding says `default-terminal` while 15 rows here say `enhanced-terminal`, because the design's field asserts an intended route and this one records whether a base terminal can deliver the bytes (§6a). Same name, same values, different fact. Rows whose chord the registry never names stay written in the tree: it is normative where it speaks (I37), and it does not speak about `killWordLeft`.
+- **I42** — **A chord the registry names is written once, and it is written there** (§6b, R-KEY-007). `registry-bindings.ts` is generated by `tools/generate-keymap.mjs` from `calcium-registry.json` and is not hand-edited; `defaultKeymap` builds its registry-owned rows from it. The hand-written table plus a sync gate that M6 landed was two records of one fact, and a gate over two records catches drift after it happens while making the copy look deliberate. **What the registry cannot supply is not copied but joined**: nine of its bindings are one verb four owners spell differently — `escape` is `dismiss`, `viewPop`, `exitNativeSelection`, `focusPrompt` — which is R-KEY-003's *unless the current owner explicitly captures the action*, and `when: "focused"` is the design saying so. That mapping is **the row itself** — it names the `target` and the `KeyAction` while `chordOf(actionId)` — `fromRegistry(actionId, profile)` since §6c — supplies the chord — and it is the tree's because the registry does not hold it. ~~`profile` is not generated either~~ **Amended (§6c): a row carries its record's id as `registry`, and its `profile` is generated from the record** — `enhanced-terminal` for an enhanced record, absent for a base one, because a base route also works on an enhanced terminal. The one exception is `⇧⏎` at `prompt` and `liveBlock`, in both profiles and listed by equality. Rows whose chord the registry never names stay written in the tree: it is normative where it speaks (I37), and it does not speak about `killWordLeft`.
 - **I43** — **One owner epoch, and every owner change moves it** (§7, R-OWN-002). `ownerEpoch` is a single counter shared by the keyboard and the pointer, incremented whenever the rung the ladder answers with differs from the rung it answered with at the previous dispatch — a raise, a fall, and a move to or from no rung alike, which is R-BLK-786's *every owner transition increments an ownership generation* said in a counter. Nothing is replayed across it: an event armed in one epoch is dead in the next, whatever else about it still holds. It is read at the top of a dispatch and written at the bottom, because the raise is usually caused by the key being dispatched (§4a W7). Two counters, one for each input kind, would let a pointer arm survive an owner the keyboard already saw change.
 
 - **I44** — **A newly presented question is activation-guarded until a neutral or key-up boundary, and the refusal names why** (§7, R-OWN-002, R-BLK-786, R-BLK-788, R-INT-008). *Fresh and deliberate* is the design's phrase and a **question** is its subject — a raise to any other rung moves the epoch and guards nothing, because no other rung acts on a single keystroke the way an answer does. There is **no clock**. With key-release reporting the guard holds until the held key **lifts**, so every activation before the key-up is refused; without it the terminal cannot say when the key lifted, so the **first** ambiguous activation is refused and the guard ends there — and either way a **neutral** key, one the question would not take as an answer, ends it too. An ambiguous activation is a key the question's answer callback would consume; an arrow or a page key is neutral and reaches the question unrefused, because a reader who cannot look at what arrived is worse off than one who answers it early. The refusal is `reject` and not a dropped key, and it *names why*: the footer's owner line carries a guarded mark while the guard is live and loses it when the guard ends, so the refused key **changes the frame** — which is the difference between a key refused and a key swallowed, and the only part a frame-read can see. **The pointer is not guarded**: R-BLK-788's last clause is that a fresh press belongs to the new epoch and keeps ordinary one-click semantics, and a press is deliberate by construction — it cannot have been in flight when the question arrived, because a button that was already down produces a release and not a press.
@@ -1813,7 +1997,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 
   **The split was measured twice and the first measurement was wrong**, which is worth recording because the instrument was the obvious one. A regular expression over `keymap.ts` found **five** targets; the table has **eight** — `child`, `nativeSelection` and `overlay` carry one, one and two rows and the pattern walked past them. A text search answers about the prose; the gate reads `defaultKeymap`, and it failed on its first run for exactly this, before any claim reached a commit.
 
-  **Measured on the table, it holds today**: `child`, `global`, `overlay`, `panel` and `prompt` carry **zero** bare single keys between them across 83 rows, and the nine on `liveBlock` (`y [ ] { + = - r o`) and three on `semanticSelection` (`a A y`) are the rule being followed rather than broken — `R-SEL-008` names `a` and `A` for one of them on purpose. **So the exemption is compared by equality, not by subset**, for the reason C10's 4-bit skip list is: a subset check lets a scope that stopped being a typing scope keep an exemption nobody re-read, and the day `panel` moves the other way is the day this must go red.
+  **Measured on the table, it holds today**: `child`, `global`, `overlay`, `panel` and `prompt` carry **zero** bare single keys between them across 83 rows, and the nine on `liveBlock` (`y [ ] { + = - r o`) and three on `semanticSelection` (`a A y`) are the rule being followed rather than broken — `R-SEL-008` names `a` and `A` for one of them on purpose. **One exemption, by equality (§6c): `global ?`** — the registry's `help.question`, `when: non-typing`. It is safe because every typing owner takes a printable before step 3, which T4.85 proves by dispatch at each of them; a list rather than a predicate, so a second bare key on a typing scope is a decision someone takes. **So the exemption is compared by equality, not by subset**, for the reason C10's 4-bit skip list is: a subset check lets a scope that stopped being a typing scope keep an exemption nobody re-read, and the day `panel` moves the other way is the day this must go red.
 
   **A rule that is satisfied on the day it is written is the case for writing it**, not against: nothing in the tree prevented a bare `y` on `prompt`, and `liveBlock` shows exactly what a scope looks like when the constraint does not apply, so the shape was one row away the whole time.
 - **I53** — **Key repeat is declared per binding, and only the protocol's own repeats are acted on** (`R-KEY-002`, `R-DEG-002`). §020 gives two numbers and insists they are two questions — **DAS**, the delay before auto-shift, and **ARR**, the rate once running — *and both are per-BINDING*: `↑↓` in a list 170/25, `⌥↑`/`⌥↓` by the page 250/90, a 3D orbit 0/16 because it is analogue, a slider 200/40, and `⌫` in the prompt 300/30 because a mis-hold there is expensive. **The policy is the binding's that acts, found where dispatch finds it** — the active target's, then `global`'s, which is §4's order. The lookup asked the active target alone, and `scrollPageUp`/`scrollPageDown` are bound only at `global`, so `⌥↑`/`⌥↓` never met §020's 250 / 90: measured, a repeat 100 ms after the press acted, where the declared delay absorbs it. A policy table keyed by action is only as good as the resolution that names the action, and that resolution must be dispatch's own. → T1.159f
@@ -1838,6 +2022,9 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I63** — *(§3, R-QST-001, C15 I29)* **The rung is the top layer's declared owner, and there is one derivation.** `rungOfLayer(top)` answers `owner.rung` where the layer declares one, and the kind's own rung where it does not — an undeclared overlay is a `question` and an undeclared panel an unnamed `substate` (C15 I29). Every producer in `src/` declares. `activeTarget` (`question` → `overlay`, `substate` → `panel`), `rung`, the guard, the epoch, the intercept table, the mouse table and the footer read it and nothing else; `interceptRung` is deleted. → T1.167
 - **I64** — *(§3, §4, R-OWN-001, M5 item 4)* **Two verdict vocabularies, and neither holds the other's word.** An intercept declares `handle`, `reject` or `global-intercept` at each rung (`InterceptVerdict`); a handler answers `handle`, `reject` or `pass` (`Verdict`). `global-intercept` takes the intercept's declared `exception` — `page-scroll` the transcript's pager at `global`, the wheel `routeMouse` — and the ladder is not consulted; `handle` continues to the rung, which answers the route with its own verb, and only `interrupt` declares it. A handler returning `"global-intercept"` is a compile error. → T1.166, T1.168
 - **I65** — *(§4, R-OWN-002, M5 item 8)* **A key release reaches `child` and nothing else.** Native release events exist for an application surface; every other rung is edge-triggered, so a release anywhere else is dropped with the stage `release-dropped` and no handler runs. An answer callback that ignores `event` was a release answering the next question (§3b S12). → T1.169
+
+- **I66** — *(§6c table B, ruling 65, R-KEY-003, `keymapPolicy.universal`)* **A registry-`global` binding is bound at `global` or at every owner with a verb for it; a narrower placement is a declared capture.** `?`, `selection.native` and `selection.semantic` are `global` rows; `copy` is an owner row at `prompt`, `liveBlock`, `interaction` and `semanticSelection`, and native selection passes it to the terminal. `?` at `nativeSelection` is captured to `passToTerminal`. Entering one copy mode leaves the other, so from the other mode a `selection.*` chord switches and from the same mode it does nothing. *The active owner resolves that purpose* — so an owner with the verb and no row is the defect, and it was: `copy` had one owner of four, `?` one of five.
+- **I67** — *(§6c S7–S10, ruling 65, ruling 3 of the reconciliation)* **`⌃c` recognition is exact.** `isCtrlC`, `interceptOf` and the question's classifier require `ctrl` and the name `c` with no `shift`, `meta` or `super`, so kitty's `⌃⇧C` is `copy` and never interrupt, exit-arming or a question's denial. On the base profile the bytes are `0x03` and interrupt wins.
 
 ## 9. Commitments
 
@@ -1884,6 +2071,8 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 39. A repeating binding declares its own delay and rate and what a repeat is worth at each hold duration; a binding that declares nothing is worth one step at the terminal's own rate, and no repeat is ever synthesised (I53, `R-KEY-002`, `R-DEG-002`). → T1.159, T1.159f
 40. A question composing a typed reply receives the editing keys through the `prompt` rung, and a key neither answers still meets the modal reject (I54, I8, §052).
 41. No binding takes a chord the platform owns, and `⌥←`/`⌥→` mean word motion wherever they are bound (I55, §063, §019, `R-REF-002`). → T1.108
+42. A registry-`global` binding fires at every owner with a verb for it, and a narrower placement is declared (I66, §6c). → T1.173, T4.85, T4.86, T4.89
+43. `⌃c` is recognised exactly, so an enhanced `⌃⇧C` is copy and never an interrupt (I67, §6c). → T1.172, T4.87
 
 ---
 
@@ -1905,7 +2094,13 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.93** (I41): `CSI 1;9A` decodes as `{name: "up", super: true}` when `keyboardProtocol` is `"kitty"` and as `{name: "up", meta: true}` when it is not — in `router-decode.test.ts`, with `modifiersOf`, so `c16-modifiers.mjs`'s mutation run reaches it — **the same bytes, twice, through two decoders**, which is the only shape that asserts the protocol is the condition. The control is `CSI 1;3A`, which is `meta` under both and is what makes this a test of bit 8 rather than of the parameter.
 - **T1.94** (I41): under the enhanced profile `⌘↑` and `⌥↑` resolve to **different actions** — `transcript.top` and `scrollPageUp` — and under the base profile `⌘↑`'s bytes resolve to `scrollPageUp`, because there they *are* `⌥↑`. The pair that the accidental resolution I34 was written about could not distinguish.
 - **T1.95** (I42): `tools/generate-keymap.mjs` run against the registry reproduces `registry-bindings.ts` **byte for byte**. The generated file is in the tree and this is what stops it being a second hand-written record with a longer name.
-- **T1.96** (I42): every `kind: "key"` binding in the registry appears in `registry-bindings.ts`, **by equality on the set of `actionId`s** — so a binding added to the registry and not regenerated fails, which a subset check would not. It also pins `chordOf`'s throw **by source**: a mutation replacing it with a fallback key fails nothing, because the branch is unreachable while this row's equality holds — so the guard's only witness is that it is written, which is T1.38's shape. A fallback is the worse failure: a registry rename would bind a chord nobody asked for with every row green, where a throw makes the module unloadable and names the missing id.
+- **T1.96** (I42): every `kind: "key"` binding in the registry appears in `registry-bindings.ts`, **by equality on the set of `actionId`s** — so a binding added to the registry and not regenerated fails, which a subset check would not. It also pins `chordOf`'s throw — `fromRegistry`'s since §6c, which throws on any count but one — **by source**: a mutation replacing it with a fallback key fails nothing, because the branch is unreachable while this row's equality holds — so the guard's only witness is that it is written, which is T1.38's shape. A fallback is the worse failure: a registry rename would bind a chord nobody asked for with every row green, where a throw makes the module unloadable and names the missing id.
+- **T1.37** (I37, I42, I36, I66) — **replaced (§6c)**: for each current key record, decode each wire form under `"kitty"` or `"none"` by its profile, resolve through `createKeymap(defaultKeymap, profile)`, and assert **identity** with every row carrying its id; each resolving row's target is admitted by the record's scope and `when`, or is in `CAPTURES` by equality; a `default-terminal` record's wire forms contain no csi-u and no `CSI 27;`; no row without `registry` has a slot equal to a registry chord in its profile; an enhanced-only chord resolves to nothing under the default profile; the `⇧⏎` exception by equality. **T1.37b**: `⌃C` dispatched with an app in flight reaches the stage `cancel` — the site outside the keymap, by dispatch rather than by a declaration.
+- **T1.38** (I38, → C22 I134, C24 I39) — **replaced (§6c)**: through `buildGraph` — `git status`, `⌥⌫`, the line reads `git `; with `keyActions: {"queue.drop": spy}` the spy is called once and the line is unchanged; a handler returning `false` falls back to the word kill; `⌥1` with no handler ends in `dropped`, and with one the handler is called. **T1.38b** (C24 I39): a hook id outside the reserved set throws at construction and names the reserved ids. **T1.38c** (§6c S6): a handler that throws leaves the session running, spends the key and appends one `warn` notice naming the action.
+- **T1.172** (I67): the three predicates over one table of keys — `⌃c`, kitty `⌃⇧C`, `⌥⌃c`, `⌘⌃c`, `⌃C` from `0x03` — through `interceptOf`, and through dispatch's stages at a scope rung, an empty prompt and a question.
+- **T1.173** (I66): over `defaultKeymap`, every registry-`global` key record's rows are either one `global` row or one row at every owner its placement names, and the owners with no row are the declared passes — both lists by equality.
+- **T1.174** (I42, §6c table C): `tools/design/supersede-bindings.mjs` run against its own output refuses and writes nothing, naming a record that is already superseded; and `validateRegistry` refuses a binding whose supersession link is not reciprocal — the fabricated violation, on a copy.
+- **T1.175** (§6a clause 5): `renderKeysMarkdown` carries a `Profile` column whose values are the records' own, and no header claims a single profile.
 - **T1.97** (I42): `defaultKeymap` after the change is **the same 121 rows** it held before, compared as a sorted set of `(target, keyText, action, profile)`. The generation is a change of where the chords are written and of nothing else, and this is the row that says so.
 - **T1.31** (I8, C15 I26) — **amended in M8**: modality is read from `blocking`, and from neither the box nor the kind. A full-region layer declaring `blocking: false` **does not** skip step 3, and a one-row layer declaring `blocking: true` does — the pair that was inexpressible while the predicate was geometric, and the pair that fails in both directions under the old one. Hand-built `Placed` still, because the point is that the geometry is now irrelevant and a row whose boxes agree with its flags cannot show that. Originally: coverage read from the box, a non-view spanning the region skipping step 3 and a clamped view not.
 - **T1.32** (I24): every member of the `FocusTarget` union has at least one row in `defaultKeymap`. Derived from the union, not from a list written beside it — a coverage set built from the test's own table covers nothing.
@@ -2074,6 +2269,11 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T4.82** (C23 I82, R-HON-004, R-INT-008, ruling 60): the first `q` at a choice question → exactly one C15 `content` change and one `invalidate`, and the frame at 80 columns, read as text, holds `answer this first` on the question's row; the second `q` → no change, no `invalidate`, the same lines; then `n` answers. At a 12-row region the choices are still drawn after the notice lands.
 - **T4.83** (I51, ruling 59, ruling 60): through a built session — semantic copy mode, `⌃c` through stdin → the mode stays on and the owner line carries the one-shot chip; the next key clears it.
 - **T4.84** (I49, ruling 62): through a built session — a shell delegation in flight, `F1` → nothing is submitted.
+- **T4.85** (I66, I52, R-KEY-005): `?` through a real session at every cell of §6c table B's `?` column — typed at the prompt, the menu, the search, a typed reply and a field; one entry leading with `<rung> — where you are` at `liveBlock`, `interaction` and `semanticSelection`, history unchanged — there is no global rung to press it at, since `activeTarget` never answers `global`; nothing at `nativeSelection`; rejected at a blocking question; and the entry is the profile's — a kitty session's contains `⌘↑`, a default one's `⌃home` and no `⌘`. **Not `⌘1`**: the agent chords are reserved, and a reserved row with no handler is not listed (C22 I134), so its absence would say nothing about the profile.
+- **T4.86** (I66): `⌥w` copies at the prompt (the kill buffer), a focused block (`copyElement`), the inside (`copyElement`) and semantic copy (`copySelectedEntries`); under kitty `⌃⇧C` does the same at each.
+- **T4.87** (I67): under kitty, `⌃⇧C` with a verb in flight does not cancel; twice at an empty prompt raises no exit confirm; with a question open it does not deny. Under the default profile `0x03` cancels.
+- **T4.88** (I38, §6c S3–S4): with no handler, `⌥⌫` deletes a word in a typed reply and in a form field.
+- **T4.89** (I66, §6c S11): `⌥⇧C` from semantic copy switches to native selection and leaves one mode; `⌥⇧V` from native switches back; each chord from its own mode changes nothing.
 - **T4.80** (I54, I8, §052): through a built session — a question with `reply…`, the arm spent, `reply…` chosen, then letters typed: the line holds them and the answer carries them; `lastStages` for a letter names `prompt` and never `modal-blocked`. The control is the same letters before `reply…` is chosen: rejected, and the line untouched.
 
 ### Tier 5 — e2e
@@ -2161,6 +2361,14 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T4.61** (I29): `⌥⏎` re-runs the **focused** entry's command, not the live one's; **T4.61b** (I29): `⇧⏎` is the same; **T4.61c** (I29): at the prompt both insert a newline and run nothing. **T1.17b** (→ C23 I18): `⏎` on a settled row is refused with the command named.
 - **T6.x** (I27): restoring the throw → T2.4b and T2.4c fail. (I29): reading `liveId` in `rerunEntry` → T4.61 fails, because it submits `/more` where `/rows` was focused. (I28): the writer removed → C22's T4.17h–j and T4.17p fail and `plot-interaction` passes.
 
+- **T6.45** (I38): `bound()` running the reserved no-op regardless of a handler → T1.38 fails, because `git status` survives `⌥⌫`.
+- **T6.46** (I66): `?` bound at `liveBlock` alone → T4.85 fails at `semanticSelection`.
+- **T6.47** (I42): `createKeymap` ignoring the profile → T1.37 fails, because `⌘1` resolves under the default profile.
+- **T6.48** (I67): `isCtrlC` ignoring shift → T4.87 fails, because kitty `⌃⇧C` cancels the run.
+- **T6.49** (I38, §6c table A): the reply's check reading the row's own action again → T4.88 fails on the reply.
+- **T6.50** (I66): the `liveBlock` copy row deleted → T4.86 fails at the focused block.
+- **T6.51** (I67): `interceptOf` ignoring shift → T1.172 fails on the stages at the scope rung.
+- **T6.52** (I66, §6c S11): the copy-mode switch removed from the session → T4.89 fails, with both modes on.
 - **T6.33** (I44, §4a W8): the guard set on every epoch move rather than on a question arriving → T1.99c fails, and the first keystroke after a question closes is refused. The revert that reads as a simplification — one field instead of two — and whose symptom appears only across a fall.
 - **The mutation pass names where a row is blind.** *A drag no longer cancels the arm* is killed by **T1.101b** and not by T4.65, and the expectation says so: T4.65's drag extends a **selection**, and a selection never arms — so there is no arm in that row for the cancellation to be missing from, and it passes with the cancellation deleted. The session-level drag row is blind to the arm by construction, which is a fact about the row and not a gap in the code.
 - **T6.36** (I44, §4a W9): the guard given a time window instead of a boundary event → T3.20 fails. The revert that reads as the obvious implementation, and that is wrong in both directions at once — refusing a deliberate answer inside the window and admitting a still-held key outside it.

@@ -1645,3 +1645,7 @@ describe("C16 §3b — a reject consumes and explains; one rung; two verdict voc
     expect(got, "the child hears the release").toEqual(["release"]);
   });
 });
+
+describe("C16 I67 — ⌃c is recognised exactly (review batch 2, M6)", () => {
+  it.todo("T1.172 (C16 I67): the three predicates over kitty ⌃⇧C, ⌥⌃c, ⌘⌃c and 0x03, through interceptOf and through dispatch's stages — not deferred on a component: the code lands in the next commit of this round");
+});
