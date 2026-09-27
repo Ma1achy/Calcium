@@ -2614,6 +2614,83 @@ A question arriving is its own fact — *a question is waiting, always* — and 
   row §6m's stream would have to read; the placement is a visible choice the design leaves open —
   **51**.
 
+## 6o. One-shots, walked by hand — who stamps an event, and when it stops asking (review batch 1, item 3)
+
+C04 I109 admitted the five one-shots — `sweep pop wipe typewriter ripple` — on the argument that
+a render with an injected clock can time an event **if something records when it began**, and
+named `Ramp.since` as the record. The record was admitted and **nothing writes it**. A far side
+cannot: it has no tick, because the tick is this session's counter and never leaves it. So an
+adapter's `{ animate: "pop" }` is the first frame of a flash held for the life of the session,
+and it asks C03 for a tick every 80 ms to draw that same frame.
+
+### 6o.1 — measured before ruling
+
+Each against a control on the same carrier; probe in the session scratchpad, `shotprobe.ts`.
+
+- **Nothing in `src/` writes `since`.** `git grep 'since:' -- src` finds `shotProgress`'s
+  parameter and the paste decoder, and nothing that builds a ramp.
+- **The bar never reads it.** A `progress` with `{ animate: "wipe", since: 0 }` draws the same
+  frame at tick 1 and tick 200, while a `shimmer` on the same bar differs between ticks 1 and 2:
+  `simple.ts`'s call to `animateT` passes no `since`, so the bar is always frame 0. The span
+  carrier (`paint.ts`) passes it, and its stamped `wipe` does differ.
+- **A finished one-shot keeps the ticker.** `tickIntervalOf` over a `pop` stamped at 0 answers
+  **80 ms** on both carriers — `rampMoves` is `animate !== "none"`, blind to completion — and
+  `none` answers `null`.
+- **The tick is animation time, not wall time.** `#tick` advances only while something is armed,
+  and `#tickAt` is reset when nothing is (`#armSpinner`), so a stamp taken at the current tick is
+  the tick the effect's first frame is drawn on, however long the session was idle before.
+- **A cadence is gathered in one place.** `animationIntervalOf` is called from `visibleRows` and
+  `withoutAnimating` and nowhere else; an overlay or a replacing question never ticks. The
+  transcript entry is therefore the whole surface a one-shot can play on.
+
+### 6o.2 — the sequence trace: what happens when two things meet
+
+Every row is an event arriving while a one-shot is in some state. A row governed by one rule
+restates it; these are the cells where two could both apply.
+
+| # | sequence | what is drawn, and what is asked | the rule it forced |
+|---|---|---|---|
+| 1 | an adapter's document with a `pop` span arrives in a quiet transcript at tick *T* | stamped *T* on the frame that draws it; 80 ms asked; six ticks later the resting frame, and **nothing asked** | the shell stamps (I131), and completion disarms (I132) |
+| 2 | row 1, and the adapter re-emits the same document at *T* + 3 | the flash continues from *T* + 3 — not restarted | the stamp is keyed by **identity**, never by the block object or the entry's `rev`: a re-emission is the same event (I131) |
+| 3 | row 1, and a `b.live` part re-renders the same block every poll, long after *T* + 6 | the resting frame; **no tick is asked** by any poll | a completed identity never re-arms — the poll is the source the review named |
+| 4 | the re-emission changes `pop` to `sweep` on the same span | the sweep plays, stamped at the tick it is first drawn | the effect is part of the identity: a different effect is a different event |
+| 5 | a span is inserted **before** the ramped one | the ramped span replays | the address is positional (`spans.1` becomes `spans.2`); named so it is not read as a guarantee — a producer that wants a stable one-shot appends |
+| 6 | the entry is off screen when it arrives, and is scrolled to later | stamped when the entry is first drawn, and plays then | observation is the frame that draws the entry (I131). *The retired deferral named `RenderContext.since`, one value per frame — which is exactly two one-shots begun at different moments getting one stamp* |
+| 7 | a producer sets `since` itself | honoured; the shell writes nothing over it, and completion is read from it | the stamp fills an absence and never replaces a value (I131) |
+| 8 | the reader enters semantic selection mid-flash | the flash holds where it is and resumes on exit | the freeze drops the wake whole (C14 I35), so the tick does not move and neither does the effect |
+| 9 | the entry is evicted, or `/clear` runs, and the same command is re-run | the new entry's one-shot plays | the stamps leave with the entry on the subscription the five sibling stores share; a new entry is a new id |
+| 10 | depth 4 | frame 0 held, and the ticker **stops** after the duration | I132 reads the session's tick, not the effective one; *which still a one-shot shows below 8-bit* is §6o.4's residue |
+| 11 | a bar's one-shot at width 40, then the terminal is resized to 120 mid-effect | the effect runs over the new bar; the ticker stops by *since* + 123 | completion is decided **before** rendering, against a bound on the extent — for a bar the region width, for a span its `to − from` — and every duration grows with the extent, so done at the bound is done at the drawn length |
+
+### 6o.3 — the rulings
+
+1. **The shell stamps, at first observation, per identity** (I131). *First observation* is the
+   first frame that draws the entry — `visibleRows`, over the entry's document before it is
+   laid out, because that is where the tick and the entry id meet and nowhere below L4 has either.
+   The identity is `(entry id, block id, the ramp's address in the block, effect)`; the address is
+   `ramp` on a bar, `spans.i` on a span, and `rows.<row id>.<column>.spans.i` in a table cell.
+2. **The stamp is written into the ramp** the renderer receives, as `since`, and the stamped
+   document is memoised on the producer's array — so a still document is stamped once and the
+   height memo's key is stable from its second frame. `measure` never reads `since` (C04 I109),
+   so the rows C14 counted are the rows drawn.
+3. **A completed one-shot asks for no tick** (I132, C09 I120). `tickIntervalOf` takes the tick
+   and the width; a one-shot is complete when `tick − ⌊since⌋ ≥ oneShotTicks(effect, n̂)`,
+   `n̂` the bound in row 11. `oneShotTicks` is `ramp.ts`'s, and `animateT` reads its durations
+   from it — one table, so the painter's *held* and the ticker's *done* cannot disagree.
+4. **Every paint site passes `since`.** The bar's did not; that is the second half of the
+   review's *an adapter's pop does not play* and it is fixed with the first.
+
+### 6o.4 — what the rulings leave behind, named so it is not read as coverage
+
+- **Below 8-bit a one-shot holds frame 0** — for `pop`, the flash. `effectiveTick` freezes the
+  tick at 0 for every colour effect (C09 I99's rung), and frame 0 of a one-shot is its start
+  rather than its rest, where frame 0 of a periodic effect is merely a phase. Unchanged here:
+  it is C09 I99's question about what a still is, and it predates the stamp.
+- **A position-sensitive identity** (row 5).
+- **The streaming trail's `ripple` form** is minted at render with no `since` (`simple.ts`'s
+  trail), and plays frame 0 for as long as the notice streams. It has no identity in the
+  document — it is derived from `streaming` — so it is outside I131 by construction.
+
 ## 7. Health and identity
 
 **Identity comes from the app, through `config.identity`.** C22 owns the cadence
@@ -2916,6 +2993,8 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I128** — *(§6n.4 rulings 3–4, §014)* **An earning fact fires every opted rung, in the order bell, system, title**: `BEL`; `OSC 9 ; <binary>: <line> ST` only while `capabilities.notification` is `osc9`; the title `• <binary> · <word>` through C01 I24. The line is §6m.2's completion line or §6m.3's question line, control-stripped, and never opens with a number and a semicolon.
 - **I129** — *(`R-NTF-001` *without moving the reader*)* **A notification writes only its rungs' bytes.** No entry is appended, no focus moves, no viewport scrolls and no frame is scheduled for it.
 - **I130** — *(§6n.4 ruling 5, §085, §091)* **A watch is a declaration on a streaming entry, and it drops at settle.** `watch(id)` is `true` for a streaming entry the transcript holds and `false` otherwise; the entry's settle earns by I126's watched rows and ends the watch. **Ending it is not what stops a second earning** — I126's once-per-id already does, and the mutation pass showed a watch left standing after its settle fails nothing (§6n.3 row 11 attributed the effect to the wrong mechanism). The drop has no observable until something shows the watches, which is the footer row parked with its producers. Its producers — `/watch`, the footer's watch row — are parked as 50.
+- **I131** — *(§6o, C04 I109)* **The shell stamps every unstamped one-shot at the first frame that draws its entry, once per identity.** The identity is the entry id, the block id, the ramp's address in the block — `ramp` on a bar, `spans.i` on a span, `rows.<row id>.<column>.spans.i` in a table cell — and the effect; the stamp is the session's tick on that frame, written into the ramp as `since`. A producer's own `since` is never overwritten. A re-emitted document with the same identities does not replay; a changed effect does. The stamps are dropped with the entry, on the subscription the other per-entry stores share.
+- **I132** — *(§6o, C09 I120)* **A one-shot whose duration is past asks for no tick.** `visibleRows` asks `animationIntervalOf` with the session's tick and the region's width, so an entry whose only moving ramps are completed one-shots contributes no cadence, and a transcript holding nothing else disarms the ticker on the frame that draws the resting state.
 
   **The composition root owns both halves and they are separate.** *Where the blocks go* is this invariant; *who has the keyboard* is C16 I49, and the root wires the second by answering `attachedChild` from the attachment as well as from `inFlight() === "shell"`. Keeping them apart is what makes the child's ownership independent of where its output landed — which is the distinction the single `kind: "view"` flag could not hold, since a layer that filled the region carried both claims in one field and neither was declared.
 
@@ -3438,6 +3517,8 @@ PTY harness.
 - **T4.103** (I122, I124): a question in linear — its numbered line, the cue carrying `(ready in a moment)` while C16 I44's guard is armed, the first `2` refused and the cue redrawn without it, the second `2` answering the second choice, `answer: <label>`, the input line reading `answer 1 to 3:` while open; the same question on the rich route, where `2` answers nothing and the draft given back after; the question's level `assertive`.
 - **T4.104** (I125, C02 I15): `/capabilities` under `CALCIUM_RENDER_MODE=linear` — the route row first, reading `linear` and `stated`, and every capability field after it.
 - **T4.105** (I126–I129, C01 I23, C01 I24, C16 I61, C02 I16, C02 I17): bytes through stdin with `CALCIUM_NOTIFY=bell,system,title` and `TERM_PROGRAM=WezTerm` — `?1004h` taken at open; a 45 s settle before any focus report writes no rung; after `ESC [ O` it writes `BEL`, `OSC 9` naming the entry and `CSI 22;2t` then the title, a 2 s settle writes nothing, and a second long settle writes a title with no second push; `ESC [ I` writes `CSI 23;2t`; a question arriving while away writes `waiting`; the viewport's position is unchanged throughout. The same session with `CALCIUM_NOTIFY` absent writes none of those bytes and takes no `?1004h`.
+- **T4.106** (I131, C04 I109): a local handler — the far side's own route through C04's gate — emits a notice whose span carries `{ animate: "pop" }` and no `since`; the head's writes change across the effect's six ticks and then stop. Controls: the same document with `animate: "none"` writes nothing after its first frame, and a producer-supplied `since` is honoured rather than overwritten.
+- **T4.107** (I131, I132, C09 I120): a `b.live` part whose render returns a `wipe` span polls every 20 ms — the same identity re-emitted on every poll; the effect is not replayed by any poll, after its duration the ticker is disarmed while the poll keeps landing, and a bar carrying the same one-shot draws a different frame mid-effect from its held one (the bar's `since` read). Control: the same part with `shimmer` keeps the ticker armed.
 - **T4.98** (I117, C04 §3aq E5): a press on the divider's column, a motion report with button 0 held five columns to the right, then the release — the divider is five cells right on the frame and focus is where it was. A motion report after the release moves nothing.
 - **T6.113** (I101): the range split dropped from the slot → T4.89a renders every kept child; the gap row dropped from the assembly → T4.89b fails on the first `gapBefore` child.
 - **T6.114** (I100, C09 I70): the memo dropped from the window's closures in `session.ts`, or from C14's measurer in `construct.ts`, or from the profiler's wrapper round `measureSequence` → T4.88 fails; the registry ignoring a handed memo, or keeping it past the call → C09 T1.44 fails.
