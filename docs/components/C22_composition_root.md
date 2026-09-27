@@ -690,7 +690,7 @@ type Chrome = Readonly<{ header: ChromeFn; footer: ChromeFn }>;
 
 The default chrome renders name, binary and clock. Prism's renders cluster, identity, health and clock (`t01` §The header).
 
-The prompt is `❯ ` at `unicode: full` or `bmp`, `> ` at `ascii`, and its gutter is `{ first: 2, cont: 2 }`, passed to C17's `displayRows` (D24a, C17 §2). C22 owns that number because C22 owns the frame; C17 must not assume one.
+The prompt is `❯ ` at `unicode: full` or `bmp`, `$ ` at `ascii` — the registry's `reader` record (C09 I123); it was `> `, which is `focus`'s ASCII mark and the collision the design moved the reader to `$` to avoid — and its gutter is `{ first: 2, cont: 2 }`, passed to C17's `displayRows` (D24a, C17 §2). C22 owns that number because C22 owns the frame; C17 must not assume one.
 
 **Both forms are two cells, and that is a requirement rather than a coincidence** (I52, C09 I22). `commandRows` draws the prompt and `construct.ts` calls the same function for `chromeRows` — the height C14 virtualises against — so a prompt whose ASCII form were a different width would make the measurer and the composer describe the same row differently, with `PROMPT_GUTTER.first` right for one of them. That is C09 I1's divergence in the one place both sides are the framework's own, and it is why the prompt takes a **pair** rather than a free-form config field: a `TuiConfig` prompt would be a string an app supplies, unmeasured, on the row the reader types into (F122).
 
