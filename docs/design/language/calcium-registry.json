@@ -1,7 +1,7 @@
 {
   "meta": {
     "name": "Calcium design language",
-    "revision": "0.11",
+    "revision": "0.12",
     "generatedArtifact": "calcium-design-language-revised.html",
     "ruleIdPolicy": "IDs are explicit, permanent, and never derived from order.",
     "normativeSource": "calcium-registry.json",
@@ -1230,6 +1230,20 @@
       "supersededBy": "R-QST-004",
       "legacyIds": [],
       "contentDigest": "66cf2d759033e591e3b39f8c84eb3f746412a6c6926b23fba5e8b9c08bc68511"
+    },
+    {
+      "id": "R-HIS-009",
+      "title": "Mono accent was white",
+      "text": "Mono's accent was #fff, the same white as its error in another spelling, so an accent and an error drew as one colour wherever colour carries.",
+      "status": "superseded",
+      "sectionKey": "current-contract",
+      "tags": [
+        "history"
+      ],
+      "supersedes": [],
+      "supersededBy": "R-THM-006",
+      "legacyIds": [],
+      "contentDigest": "8366422003eccec7ed120ebf8f9f4342d36f2e13d848a2f494c52fa8e53e3d9a"
     },
     {
       "id": "R-EXA-001",
@@ -18760,6 +18774,22 @@
       "contentDigest": "d9697b8022b51adebae7dd17d5e00dcc7cc7cbcbc94675fad1b85ed29cf4add3"
     },
     {
+      "id": "R-THM-006",
+      "title": "Accent and error stay apart wherever colour carries",
+      "text": "Wherever colour carries (4-bit and above), accent and error render distinctly; mono's accent is #f0f0f0 and error keeps white as the loudest step. At 1-bit an error is carried by its glyph and outcome word.",
+      "status": "current",
+      "sectionKey": "current-contract",
+      "tags": [
+        "contract"
+      ],
+      "supersedes": [
+        "R-HIS-009"
+      ],
+      "supersededBy": null,
+      "legacyIds": [],
+      "contentDigest": "9cfd5e5df56f980558dbe4b1621df586de92e2c15e67f096432f27a1efb04952"
+    },
+    {
       "id": "R-STA-004",
       "title": "Availability ranks above a semantic extent",
       "text": "Availability takes its place in the one-ground precedence, above a semantic extent and below a hover preview, so that a disabled element keeps its well where an invalid one would otherwise take the error ground. The reason is that tab skips a disabled element, so it is not a thing anyone can act on, and a ground saying that something went wrong on a thing nobody can act on asks for an action the element will refuse. The displaced validity keeps its mark and its outcome word, which is two carriers and neither of them colour, so the rank costs that fact nothing. The state axes are seven and the precedence names three of them, so a composition drawn from choice or disclosure is still unruled; freshness is ruled here only in that it contests no ground at all, because a stale reading dims its content and says when it was taken rather than taking a ground, and the chrome around it does not dim.",
@@ -24055,7 +24085,8 @@
       "declarations": "color:#ffffff",
       "status": "current",
       "ruleIds": [
-        "R-THM-001"
+        "R-THM-001",
+        "R-THM-006"
       ],
       "supersedes": [],
       "supersededBy": null,
@@ -24079,7 +24110,8 @@
       "declarations": "color:#f0f0f0",
       "status": "current",
       "ruleIds": [
-        "R-THM-001"
+        "R-THM-001",
+        "R-THM-006"
       ],
       "supersedes": [
         "TR-0869"

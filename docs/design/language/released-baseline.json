@@ -1,6 +1,6 @@
 {
 "releasedAt": "2026-09-27",
-"registryRevision": "0.11",
+"registryRevision": "0.12",
 "rules": {
 "R-SPC-001": {
 "digest": "314a86c06f57e3ce44bef033bba32eee63d3fe7b94d88b9d4933a4f62628a638",
@@ -8147,9 +8147,25 @@
 "status": "example",
 "supersedes": [],
 "supersededBy": []
+},
+"R-HIS-009": {
+"digest": "8366422003eccec7ed120ebf8f9f4342d36f2e13d848a2f494c52fa8e53e3d9a",
+"status": "superseded",
+"supersedes": [],
+"supersededBy": [
+"R-THM-006"
+]
+},
+"R-THM-006": {
+"digest": "9cfd5e5df56f980558dbe4b1621df586de92e2c15e67f096432f27a1efb04952",
+"status": "current",
+"supersedes": [
+"R-HIS-009"
+],
+"supersededBy": []
 }
 },
-"count": 1287,
+"count": 1289,
 "themeRules": {
 "TR-0001": {
 "digest": "04fdf1807360bdc55d44da51e292637edcd7d7bd2640e66c581420571e7e101f",
@@ -13396,7 +13412,7 @@
 "themeCount": 869,
 "anchor": {
 "kind": "content-hash",
-"sha256": "eeb82384cec56cc63c0f031b15f91a5c324e8cdebc7d11984f8a735e09803de8",
+"sha256": "68c54d0ba027c34317d5b733599fc3b7535b753cd19f63477bc06043de35d70f",
 "note": "A hash stored beside the data it protects is a TRIPWIRE: it catches a careless edit, not a determined one. To make it a SEAL, publish this sha256 in a git tag or CI secret and export CALCIUM_ANCHOR before running the gate; then set claim to external-seal.",
 "claim": "local-tripwire"
 }
