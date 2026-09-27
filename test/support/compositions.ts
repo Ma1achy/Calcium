@@ -131,8 +131,11 @@ export const COMPOSITIONS: readonly Composition[] = [
     name: "hovering one link while another has keyboard focus",
     facts: ["hover preview", "focus"],
     ruling: "different cells, so no precedence · hover never takes ▸ · at 1-bit hover is bold and focus is ▸",
+    // The attempt stays on a table row as the watch. A table row is a surface
+    // the registry says does nothing under the pointer (R-PTR-003), so the day
+    // this goes red the answer is the link, not a golden of this table.
     owed:
-      "no render seam carries a hover: the router discards a no-button move by rule (C16 §4a row t) and RenderContext has no field for it (M7)",
+      "the subject is a link and none exists in the view model; R-PTR-003 admits hover on links, buttons and chips only, and links are built first as their own MR (C10 §4k.4)",
     width: 40,
     draw: (capabilities, on) =>
       measurable({
