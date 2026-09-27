@@ -3292,6 +3292,13 @@ export type FormField = Readonly<{
   error?: string;
   /** The flag a submit writes the value under — absent is `--<id>`, `""` is positional (C04 I137). */
   flag?: string;
+  /**
+   * Whether the field takes input (C04 I140) — the registry's `availability`
+   * axis, word for word; absent is `enabled`. `readonly` is focusable and
+   * copyable and not entered; `disabled` is no element at all, so `⇥` skips it,
+   * stands in the well (C09 I122), and is not submitted.
+   */
+  availability?: "enabled" | "readonly" | "disabled";
 }>;
 
 /** One button of a form (C04 §3ar). */

@@ -78,8 +78,10 @@ const results = runPass({
       // a fact nothing can express is an assertion over an empty set.
       name: "an axis with no subject acquires a field, and the row stays quiet",
       file: SPEC,
-      from: "| **availability** | — | — | **no subject** |",
-      to: "| **availability** | `Block.disabled` | — | **no subject** |",
+      // On `resolution`, the axis that keeps no subject longest: availability's
+      // row gained its field (C04 I140), and pointer's is next (review batch 1).
+      from: "| **resolution** | — | — | **no subject** |",
+      to: "| **resolution** | `Question.resolved` | — | **no subject** |",
       expect: "T2.57",
     },
   ],

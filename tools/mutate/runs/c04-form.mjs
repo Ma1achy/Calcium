@@ -89,8 +89,10 @@ const results = runPass({
       // C04 I137 — an empty value is omitted, not sent as an empty flag.
       name: "an empty value is sent",
       file: SUBMIT,
-      from: '.filter((f) => (f.value ?? "") !== "")',
-      to: ".filter(() => true)",
+      // Anchored on the value clause alone since the disabled clause joined the
+      // line (C04 I140), so this still mutates only the empty-value rule.
+      from: ' && (f.value ?? "") !== "")',
+      to: ")",
       expect: "T1.61",
     },
     {

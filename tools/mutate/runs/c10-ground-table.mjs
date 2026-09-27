@@ -32,7 +32,7 @@ const results = runPass({
   run,
   control: {
     file: PROJECTION,
-    from: '  Object.freeze({ ground: "bgDeep", pairing: "chip", refs: Object.freeze({ tone: Object.freeze(["meta"]) }) }),\n',
+    from: '  Object.freeze({ ground: "bgDeep", pairing: "chip", refs: Object.freeze({ tone: Object.freeze(["meta", "dim"]) }) }),\n',
     to: "",
     why: "the projection loses the chip's row that the registry still has — T2.59 reads the registry",
   },

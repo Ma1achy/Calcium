@@ -19,7 +19,9 @@ export function submitAction(form: Form, buttonId: string, action: Action): Acti
   const button = form.buttons?.find((b) => b.id === buttonId);
   if (button?.submit !== true || (action.kind !== "fill" && action.kind !== "exec")) return action;
   const args = form.fields
-    .filter((f) => (f.value ?? "") !== "")
+    // A disabled field is not an input anyone can change, so it is not an
+    // argument either (C04 I140).
+    .filter((f) => f.availability !== "disabled" && (f.value ?? "") !== "")
     .map((f) => {
       const flag = f.flag ?? `--${f.id}`;
       return flag === "" ? quote(f.value ?? "") : `${flag} ${quote(f.value ?? "")}`;

@@ -190,20 +190,24 @@ export const COMPOSITIONS: readonly Composition[] = [
     row: 5,
     name: "disabled + error",
     facts: ["availability", "validity"],
-    ruling: "the well takes the ground · the error keeps its mark and its word",
-    owed: "`disabled` is an availability fact and no block carries the field (M4)",
+    ruling: "the well takes the ground \u00b7 the error keeps its mark and its word",
     width: 40,
+    // A form field is the subject (C04 I140): it carries validity already, and
+    // `\u21e5` moving between fields is the skip R-STA-004 argues from. An
+    // enabled field beside it is the control a reader compares against.
     draw: (capabilities, on) =>
-      measurable({ capabilities, definitions: [tableDefinition] }).renderToLines(
+      measurable({ capabilities }).renderToLines(
         {
-          kind: "table",
-          id: "t",
-          columns: COLUMNS,
-          rows: [
+          kind: "form",
+          id: "f",
+          fields: [
+            { id: "name", label: "name", value: "web" },
             {
-              id: "b",
-              ...(on.has("availability") ? { disabled: true } : {}),
-              cells: { name: { text: "bravo" }, state: failed(new Set(on.has("validity") ? ["failure"] : [])) },
+              id: "port",
+              label: "port",
+              value: "80a",
+              ...(on.has("availability") ? { availability: "disabled" } : {}),
+              ...(on.has("validity") ? { error: "not a port number" } : {}),
             },
           ],
         } as never,

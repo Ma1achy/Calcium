@@ -34,9 +34,17 @@ import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
 import { checkSourceScans, checkTextGrounds, SCANS, SURFACE_ROLES } from "../../tools/enforce/source-scans.mjs";
 import * as contrastModule from "../../src/presentation/theme/contrast.js";
 import { caps, DEPTHS, store, SURFACES, SYNTAX_SLOTS, TONES } from "../support/theme.js";
-import { COMPOSITIONS, RUNGS, responds } from "../support/compositions.js";
-import { DARK_THEME, visible } from "../support/render.js";
-import { focusStyle, selectionStyle } from "../../src/presentation/blocks/paint.js";
+// **The composition harness is imported inside the rows that use it, never at
+// the top.** `render.ts` loads the shipped dark theme when it is imported, so a
+// top-level import made this whole file fail to load — zero tests, and a
+// mutation pass reading *no summary* — on exactly the mutations that stop a
+// theme loading, which are the ones this file exists to catch (review batch 1,
+// item 22: c10-ground-table went blind on both of its rows).
+const harness = async () => ({
+  ...(await import("../support/compositions.js")),
+  ...(await import("../support/render.js")),
+});
+import { background, focusStyle, selectionStyle } from "../../src/presentation/blocks/paint.js";
 import { sgr } from "../../src/terminal/escapes.js";
 
 // This file walks `src/`; `budget.ts` carries the measurement and why the 5 s
@@ -1496,7 +1504,8 @@ describe("C10 §4j — the categorical separation debt", () => {
  * the window where somebody is building painters.
  */
 describe("C10 §4k — focus, selection and the facts that contest a ground", () => {
-  it("T2.45 (I47, R-SEL-006): focused and selected take two grounds and one mark, at every rung", () => {
+  it("T2.45 (I47, R-SEL-006): focused and selected take two grounds and one mark, at every rung", async () => {
+    const { COMPOSITIONS, DARK_THEME, RUNGS, visible } = await harness();
     const c = COMPOSITIONS.find((k) => k.row === 1)!;
     // The row the head is on, and the same row with focus alone: the pair is the
     // assertion, because one ground told apart by ink satisfies any row that
@@ -1528,11 +1537,27 @@ describe("C10 §4k — focus, selection and the facts that contest a ground", ()
   it.todo(
     "T2.46 (I47, R-STA-003): hover and focus hold disjoint carrier sets at every rung — focus has `\u25b8` at all three and hover never does; at 1-bit, where hover's ground is gone, hover holds bold and focus does not. A disjointness over sets, because two rows each naming one carrier agree while the two facts render identically — not deferred on a component: it lands with §4k's resolver change, and its hover half is exercised through a constructed state until a block declares `hovered`. **This clause used to name mouse mode 1003 and that was the wrong condition** — `lifecycle.ts:125` takes 1003 behind a `hover?: boolean` option and the decoder reads a no-button move, so a pointer move already arrives; the router discards it by rule (§4a row t) and no block carries the field, which is what T2.48 watches",
   );
-  it.todo(
-    "T2.47 (I47, R-STA-004): where availability meets validity the well takes the ground and the error keeps its mark and its word, on case 5 — not deferred on a component: the code lands in the next commit of this round",
-  );
+  it("T2.47 (I47, R-STA-004): where availability meets validity the well takes the ground and the error keeps its mark and its word, on case 5", async () => {
+    const { COMPOSITIONS, DARK_THEME, RUNGS, visible } = await harness();
+    const c = COMPOSITIONS.find((k) => k.row === 5)!;
+    for (const rung of RUNGS) {
+      const lines = c.draw(rung.capabilities, new Set(c.facts));
+      const field = lines.find((l) => visible(l).includes("port"))!;
+      const error = lines.find((l) => visible(l).includes("not a port number"))!;
+      const well = background("surface.bgDeep", DARK_THEME, rung.capabilities);
+      if (well.background !== undefined) {
+        expect(field, `${rung.name}: the field stands in the well`).toContain(sgr(well));
+        expect(error, `${rung.name}: and the error row does not`).not.toContain(sgr(well));
+      }
+      // **The count, not just the winner**: the displaced fact keeps two
+      // carriers at every rung, neither of them colour.
+      const mark = rung.capabilities.unicode === "ascii" ? "x" : "\u2717";
+      expect(visible(error).trim(), `${rung.name}: mark and word`).toBe(`${mark} not a port number`);
+    }
+  });
 
-  it("T2.48 (I47, §4k.4): every composition §4k.2 rules is in one case table, every drawn case responds to both its facts, and every owed case is attempted", () => {
+  it("T2.48 (I47, §4k.4): every composition §4k.2 rules is in one case table, every drawn case responds to both its facts, and every owed case is attempted", async () => {
+    const { COMPOSITIONS, RUNGS, responds } = await harness();
     // §4k.2's rows as the document names them, bold in the first column.
     const spec = readFileSync(new URL("../../docs/components/C10_theme_resolution.md", import.meta.url), "utf8");
     const section = /### 4k\.2 [\s\S]*?\n### /u.exec(spec)?.[0] ?? "";
@@ -1560,7 +1585,7 @@ describe("C10 §4k — focus, selection and the facts that contest a ground", ()
       }
     }
     // Drawn and owed partition the six, and the golden file draws the first set.
-    expect(COMPOSITIONS.filter((c) => c.owed === undefined).map((c) => c.row), "drawn today").toEqual([1, 4, 6]);
+    expect(COMPOSITIONS.filter((c) => c.owed === undefined).map((c) => c.row), "drawn today").toEqual([1, 4, 5, 6]);
   });
 });
 

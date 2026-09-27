@@ -32682,7 +32682,7 @@
       "ruleIds": [
         "R-THM-004"
       ],
-      "note": "Every ground a theme paints text on, with the refs that land on it: the floor's whole scope (R-THM-004, C10 I60). refs 'meaning' is every slot of every palette that carries meaning. pairing names the walker that measures the row at the common floor: 'page' the palette check over the page grounds, 'diff' the diff pairing (§4a: the gutter's three tones and the text's syntax); every row is measured against a theme's declared floor. A theme lacking a ground skips its row.",
+      "note": "Every ground a theme paints text on, with the refs that land on it: the floor's whole scope (R-THM-004, C10 I60). refs 'meaning' is every slot of every palette that carries meaning. pairing names the walker that measures the row at the common floor: 'page' the palette check over the page grounds, 'diff' the diff pairing (§4a: the gutter's three tones and the text's syntax); 'chip' the well, bgDeep — a chip's meta ink and a disabled field's dim ink (C09 I122); every row is measured against a theme's declared floor. A theme lacking a ground skips its row.",
       "grounds": [
         {
           "ground": "bg",
@@ -32748,7 +32748,8 @@
           "pairing": "chip",
           "refs": {
             "tone": [
-              "meta"
+              "meta",
+              "dim"
             ]
           }
         }

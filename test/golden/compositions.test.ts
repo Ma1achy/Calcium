@@ -45,6 +45,10 @@ const GROUNDS = [
   "surface.diffAdd",
   "surface.diffRemove",
   "surface.bgElev",
+  // **The well** (C09 I122). Missing from this list, the disabled field of case 5
+  // read back as `page` — the report naming the one ground its ruling is about
+  // as absent.
+  "surface.bgDeep",
 ] as const;
 
 /** The tones a run could be inked in, so the report names one rather than a hex. */

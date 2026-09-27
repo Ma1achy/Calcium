@@ -1074,7 +1074,20 @@ describe("C04 §7 — the update model and the view state, checked rather than c
 });
 
 describe("C04 I140 — a field's availability", () => {
-  it.todo("T2.134 (C04 I140, R-STA-001): availability is one of enabled, readonly and disabled by both doors — not deferred on a component: the code lands in the next commit of this round");
+  it("T2.134 (C04 I140, R-STA-001): availability is one of enabled, readonly and disabled by both doors", () => {
+    const form = (availability?: string) => ({
+      kind: "form",
+      id: "f",
+      fields: [{ id: "port", label: "port", ...(availability === undefined ? {} : { availability }) }],
+    });
+    for (const a of [undefined, "enabled", "readonly", "disabled"]) {
+      expect(validateBlock(form(a)).ok, String(a)).toBe(true);
+      expect(() => blockOf(form(a) as never), String(a)).not.toThrow();
+    }
+    const bad = validateBlock(form("off"));
+    expect(bad.ok ? "" : bad.error.join("\n")).toMatch(/"availability" is "enabled", "readonly" or "disabled" \(C04 I140\)/u);
+    expect(() => blockOf(form("off") as never)).toThrow(/C04 I140/u);
+  });
 });
 
 describe("C04 I128 — a trend cell", () => {

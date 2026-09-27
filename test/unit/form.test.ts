@@ -17,7 +17,11 @@ import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import type { FocusState } from "../../src/presentation/blocks/types.js";
 import { submitAction } from "../../src/shell/form-submit.js";
 import { doc, ONE_PER_KIND } from "../support/blocks.js";
-import { DARK_THEME, FULL_CAPS } from "../support/render.js";
+import { DARK_THEME, FULL_CAPS, MONO_UNICODE_CAPS } from "../support/render.js";
+import { background } from "../../src/presentation/blocks/paint.js";
+import { formDefinition } from "../../src/presentation/blocks/kinds/form.js";
+import { sgr } from "../../src/terminal/escapes.js";
+import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 
 const registry = createBlockRegistry({ defaults: true });
 const SGR = /\x1b\[[0-9;]*m/gu;
@@ -148,6 +152,49 @@ describe("C04 §3ar — form", () => {
     expect(submitAction(FORM, "cancel", fill)).toBe(fill);
   });
 
-  it.todo("T2.135 (C04 I137, C04 I140): a submit writes a readonly field's value and not a disabled one's, and the element list keeps the readonly field without viewState and drops the disabled one — not deferred on a component: the code lands in the next commit of this round");
-  it.todo("T2.186 (C09 I122, C04 I140): a disabled field stands in the well in dim, and its error keeps ✗ and its message — not deferred on a component: the code lands in the next commit of this round");
+  const THREE = block({
+    kind: "form",
+    id: "f",
+    fields: [
+      { id: "a", label: "open", value: "1" },
+      { id: "b", label: "shown", value: "2", availability: "readonly" },
+      { id: "c", label: "shut", value: "3", availability: "disabled", error: "not a port number" },
+    ],
+    buttons: [{ id: "go", label: "go", submit: true, action: { kind: "exec", label: "go", command: "deploy" } }],
+  } as Form) as Form;
+
+  it("T2.135 (C04 I137, C04 I140): a submit writes a readonly field's value and not a disabled one's, and the element list keeps the readonly field without viewState and drops the disabled one", () => {
+    const sent = submitAction(THREE, "go", { kind: "exec", label: "go", command: "deploy" }) as { command: string };
+    expect(sent.command, "the enabled and readonly values, not the disabled one").toBe("deploy --a 1 --b 2");
+    const els = formDefinition.elements!(THREE, 40, () => 0, () => "");
+    expect(els.map((e) => e.id), "\u21e5 cannot land on a disabled field").toEqual(["a", "b", "go"]);
+    expect(els.find((e) => e.id === "a")?.viewState, "\u23ce enters an enabled field").toBe(true);
+    expect(els.find((e) => e.id === "b")?.viewState, "and not a readonly one").toBeUndefined();
+  });
+
+  it("T2.186 (C09 I122, C04 I140): a disabled field stands in the well in dim, and its error keeps ✗ and its message", () => {
+    const at = (caps: TerminalCapabilities) =>
+      renderSequenceToLines(registry, [THREE], 40, { theme: DARK_THEME, capabilities: caps, focus: null });
+    // The ink and the ground open as two sequences; each is asserted.
+    const ink = sgr(tone("dim", DARK_THEME, FULL_CAPS, "bgDeep"));
+    const well = sgr(background("surface.bgDeep", DARK_THEME, FULL_CAPS));
+    const rows = at(FULL_CAPS);
+    const row = (text: string) => rows.find((l) => l.replace(SGR, "").includes(text))!;
+    expect(row("shut"), "the disabled field stands in the well").toContain(well);
+    expect(row("shut"), "in dim").toContain(ink);
+    expect(row("open"), "an enabled field takes neither").not.toContain(well);
+    expect(row("shown"), "nor a readonly one").not.toContain(well);
+    const error = row("not a port number");
+    expect(error.replace(SGR, "").trim(), "the error keeps its mark and its word").toBe("\u2717 not a port number");
+    expect(error, "in error").toContain(sgr(tone("error", DARK_THEME, FULL_CAPS)));
+    // At 1-bit the well is gone and the weight is what is left: the value dims.
+    const mono = at(MONO_UNICODE_CAPS);
+    const shut = mono.find((l) => l.replace(SGR, "").includes("shut"))!;
+    expect(shut, "dim at 1-bit").toContain("\u001b[2m");
+    expect(shut.replace(SGR, "").trimEnd(), "no ground to carry").toContain("3");
+    const open = mono.find((l) => l.replace(SGR, "").includes("open"))!;
+    expect(open.endsWith("1") || /1\s*$/u.test(open.replace(SGR, "")), "the enabled value is plain").toBe(true);
+    expect(open.slice(open.indexOf("1") - 4), "and not dim").not.toMatch(/\u001b\[2m\s*1/u);
+    expect(mono.find((l) => l.includes("not a port number"))!.replace(SGR, "").trim()).toBe("\u2717 not a port number");
+  });
 });

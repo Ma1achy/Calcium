@@ -143,5 +143,5 @@ export const TEXT_GROUNDS: readonly TextGround[] = Object.freeze([
   Object.freeze({ ground: "focusGround", pairing: "page", refs: "meaning" }),
   Object.freeze({ ground: "diffAdd", pairing: "diff", refs: Object.freeze({ syntax: Object.freeze(["keyword", "string", "comment", "number", "key", "type", "function", "operator", "punctuation"]), tone: Object.freeze(["ok", "error", "muted"]) }) }),
   Object.freeze({ ground: "diffRemove", pairing: "diff", refs: Object.freeze({ syntax: Object.freeze(["keyword", "string", "comment", "number", "key", "type", "function", "operator", "punctuation"]), tone: Object.freeze(["ok", "error", "muted"]) }) }),
-  Object.freeze({ ground: "bgDeep", pairing: "chip", refs: Object.freeze({ tone: Object.freeze(["meta"]) }) }),
+  Object.freeze({ ground: "bgDeep", pairing: "chip", refs: Object.freeze({ tone: Object.freeze(["meta", "dim"]) }) }),
 ]);

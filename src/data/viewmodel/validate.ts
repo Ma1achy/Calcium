@@ -2078,6 +2078,10 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
         for (const key of ["value", "hint", "error", "flag"]) {
           if (raw[key] !== undefined && !isString(raw[key])) e.push(`${here}: "${key}" must be a string when present (C04 I135)`);
         }
+        // C04 I140 — the registry's availability axis, word for word.
+        if (raw["availability"] !== undefined && !["enabled", "readonly", "disabled"].includes(raw["availability"] as string)) {
+          e.push(`${here}: "availability" is "enabled", "readonly" or "disabled" (C04 I140)`);
+        }
         count(raw["id"]);
       });
     }

@@ -349,6 +349,17 @@ function checkShape(block: Block): void {
         }
       }
       break;
+    case "form":
+      // I140 — the registry's availability axis, word for word, at this door as
+      // at the wire; a typo here would otherwise draw an enabled field.
+      for (const field of block.fields) {
+        if (field.availability !== undefined && !["enabled", "readonly", "disabled"].includes(field.availability)) {
+          throw new BlockShapeError(
+            `form "${block.id}" field "${field.id}": "availability" is "enabled", "readonly" or "disabled" (C04 I140)`,
+          );
+        }
+      }
+      break;
     default:
       // I6 names `Notice` and `Cell`, and this implements exactly that.
       //

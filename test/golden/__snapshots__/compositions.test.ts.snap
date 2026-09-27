@@ -234,6 +234,78 @@ exports[`C10 §4k — the compositions, as frames > case 4 — focus over a heat
   nothing is contested · the border and the axes take the focus · the data keeps its reading"
 `;
 
+exports[`C10 §4k — the compositions, as frames > case 5 — disabled + error, at 1-bit 1`] = `
+"-- the frame
+  name    web
+  port    80a                             
+          ✗ not a port number
+
+-- which fact took the ground, run by run
+  dim/-:"name" page/-:"    web"
+  dim/-:"port    80a                             "
+  bold/-:"✗ not a port number"
+
+-- without availability, run by run
+  dim/-:"name" page/-:"    web"
+  dim/-:"port" page/-:"    80a"
+  bold/-:"✗ not a port number"
+
+-- without validity, run by run
+  dim/-:"name" page/-:"    web"
+  dim/-:"port    80a                             "
+
+-- the ruling (C10 §4k.2 row 5)
+  the well takes the ground · the error keeps its mark and its word"
+`;
+
+exports[`C10 §4k — the compositions, as frames > case 5 — disabled + error, at 24-bit 1`] = `
+"-- the frame
+  name    web
+  port    80a                             
+          ✗ not a port number
+
+-- which fact took the ground, run by run
+  page/muted:"name" page/default:"web"
+  bgDeep/dim:"port    80a                             "
+  page/error:"✗ not a port number"
+
+-- without availability, run by run
+  page/muted:"name" page/default:"web"
+  page/muted:"port" page/default:"80a"
+  page/error:"✗ not a port number"
+
+-- without validity, run by run
+  page/muted:"name" page/default:"web"
+  bgDeep/dim:"port    80a                             "
+
+-- the ruling (C10 §4k.2 row 5)
+  the well takes the ground · the error keeps its mark and its word"
+`;
+
+exports[`C10 §4k — the compositions, as frames > case 5 — disabled + error, at ascii 1`] = `
+"-- the frame
+  name    web
+  port    80a                             
+          x not a port number
+
+-- which fact took the ground, run by run
+  page/muted:"name" page/default:"web"
+  bgDeep/dim:"port    80a                             "
+  page/error:"x not a port number"
+
+-- without availability, run by run
+  page/muted:"name" page/default:"web"
+  page/muted:"port" page/default:"80a"
+  page/error:"x not a port number"
+
+-- without validity, run by run
+  page/muted:"name" page/default:"web"
+  bgDeep/dim:"port    80a                             "
+
+-- the ruling (C10 §4k.2 row 5)
+  the well takes the ground · the error keeps its mark and its word"
+`;
+
 exports[`C10 §4k — the compositions, as frames > case 6 — stale + running, at 1-bit 1`] = `
 "-- the frame
   ┌ ⠋ workers ────────────────── updated 4m ago ─┐
@@ -313,7 +385,5 @@ exports[`C10 §4k — the compositions, as frames > the owed compositions name t
 "2 · hovering one link while another has keyboard focus
     no render seam carries a hover: the router discards a no-button move by rule (C16 §4a row t) and RenderContext has no field for it (M7)
 3 · selection over a diff ground
-    \`patch\` declares no elements and reads ctx.focus nowhere, so no patch row can be selected (C25, M9)
-5 · disabled + error
-    \`disabled\` is an availability fact and no block carries the field (M4)"
+    \`patch\` declares no elements and reads ctx.focus nowhere, so no patch row can be selected (C25, M9)"
 `;
