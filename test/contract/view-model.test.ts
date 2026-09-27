@@ -1074,5 +1074,5 @@ describe("C04 §7 — the update model and the view state, checked rather than c
 });
 
 describe("C04 I128 — a trend cell", () => {
-  it.todo("T2.133 (C04 I128, R-COL-006): block() refuses a trend cell carrying glyph, tone, spark or bar — not deferred on a component: parked as 38, the down arrow has no ASCII half (docs/design/PARKED_QUESTIONS.md)");
+  it.todo("T2.133 (C04 I128, R-COL-006): block() refuses a trend cell carrying glyph, tone, spark or bar — not deferred on a component: the code lands in the next commit of this round");
 });

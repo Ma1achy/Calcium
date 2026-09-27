@@ -1273,7 +1273,7 @@ describe("the missing number and the trend (I29, I30)", () => {
       expect(row).not.toContain("—");
     }
   });
-  it.todo("T1.39 (C11 I30, R-COL-006): a trend cell's arrow takes its tone from the column's polarity — not deferred on a component: parked as 38, the down arrow has no ASCII half (docs/design/PARKED_QUESTIONS.md)");
+  it.todo("T1.39 (C11 I30, R-COL-006): a trend cell's arrow takes its tone from the column's polarity — not deferred on a component: the code lands in the next commit of this round");
 });
 
 describe("a number column is planned at its widest value (I31)", () => {
