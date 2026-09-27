@@ -284,6 +284,8 @@ describe("C04 §3am — the ink ramps are the registry's", () => {
     expect(late[0]!, "and reaches the ends").toBeGreaterThan(late[n / 2]!);
   });
 
+  it.todo("T2.117j (C04 I138): scatter lights one cell per frame, every cell once per pass, in a per-pass permutation — not deferred on a component: the code lands in the next commit of this round");
+
   it("T2.117g (C04 I109): two one-shots in one frame time independently", () => {
     // **The half the deferral got wrong, asserted rather than argued.** §3am
     // named the missing symbol as `RenderContext.since` — one value for a whole
