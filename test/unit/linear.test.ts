@@ -5,8 +5,8 @@
 // property like "contains the command" is satisfied by a line in any order.
 import { describe, expect, it } from "vitest";
 
-import { block } from "../../src/data/viewmodel/index.js";
-import type { Block, ViewDocument } from "../../src/data/viewmodel/index.js";
+import { CALL_HEAD_GLYPH, CALL_STATE_TONE, block } from "../../src/data/viewmodel/index.js";
+import type { Block, CallState, ViewDocument } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
@@ -44,7 +44,7 @@ const META = {
 };
 
 const head = (state: string): Block =>
-  block({ kind: "notice", id: "head", tone: "info", glyph: "running", state, text: "pytest tests/unit" } as never);
+  block({ kind: "notice", id: "head", tone: CALL_STATE_TONE[state as CallState], glyph: CALL_HEAD_GLYPH[state as CallState], state, text: "pytest tests/unit" } as never);
 
 const docOf = (blocks: readonly Block[], over: Partial<ViewDocument> = {}, meta: Partial<typeof META> = {}): ViewDocument =>
   ({ schema: "tui.view/1", command: "pytest tests/unit", status: "ok", blocks, meta: { ...META, ...meta }, ...over }) as ViewDocument;

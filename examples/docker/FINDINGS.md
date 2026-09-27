@@ -56331,3 +56331,8 @@ not by the review. **And it spun**: the duration slot drew a spinner for every u
 queued call has no outcome, so a head R-BLK-214 draws *still* was the one live mark on its row —
 found walking C23 I81. Symbols: `headMark`, `toolCallHeader`.
 
+**Closed, the same round.** `headMark` returns `CALL_HEAD_GLYPH[state]` where tone carries, so a
+queued head is `○` at every rung, and the duration slot spins for `running` alone. C09 T2.187
+renders all five states at 24-, 8- and 4-bit and reads the cell; C23 T1.76 asserts a queued head
+does not move with the tick. `tools/mutate/runs/c23-call-state.mjs` restores both and dies on each.
+

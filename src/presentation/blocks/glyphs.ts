@@ -15,6 +15,7 @@
  * has box drawing and no astral planes still gets `┌` and `✓`.
  */
 import type { CallState, Glyph, Marker3 } from "../../data/viewmodel/types.js";
+import { CALL_HEAD_GLYPH } from "../../data/viewmodel/types.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { cells } from "../text.js";
 
@@ -466,7 +467,10 @@ export function toneCarries(caps: GlyphCaps & Pick<TerminalCapabilities, "colour
  * it is not one of these, so resolving by capability moves no geometry.
  */
 export function headMark(state: CallState, caps: Parameters<typeof toneCarries>[0], onBand = false): Glyph {
-  return toneCarries(caps, onBand) ? "running" : CALL_STATE_GLYPH[state];
+  // Where tone carries, the state's toned mark — `●`, or `○` for a call that
+  // has not started (R-BLK-220). It was `running` for all five, so a queued head
+  // was a filled dot beside a running one whose spinner had not ticked (F1261).
+  return toneCarries(caps, onBand) ? CALL_HEAD_GLYPH[state] : CALL_STATE_GLYPH[state];
 }
 
 /** The pairs, for the test that asserts each is 1:1 (T2.5). */

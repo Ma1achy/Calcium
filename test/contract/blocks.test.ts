@@ -25,7 +25,7 @@ import {
 import { rowContaining, styleAt, styledScreenFrom } from "../support/styled-screen.js";
 import { CONTENT_LINE_CAP, statusRowsFor } from "../../src/presentation/blocks/kinds/status.js";
 import { background, focusStyle, tone } from "../../src/presentation/blocks/paint.js";
-import { block } from "../../src/data/viewmodel/index.js";
+import { CALL_STATE_TONE, block } from "../../src/data/viewmodel/index.js";
 import { sgr } from "../../src/terminal/escapes.js";
 import { cells, hasEmojiForm, TEXT_PRESENTATION } from "../../src/presentation/text.js";
 import { SPINNER_SETS } from "../../src/presentation/blocks/glyphs.js";
@@ -833,8 +833,13 @@ describe("C09 I83 — a notice takes the focus ground and no column", () => {
     // **Three tones, because one passes a mechanism that paints a constant.**
     // The form this replaces put `accent` on the selection ground, which could
     // not tell a focused `info` notice from an unfocused `accent` one.
-    for (const name of ["info", "error", "warn"] as const) {
-      const notice = block({ kind: "notice", id: "h", tone: name, glyph: "running", state: "running", text: `on ${name}` } as never);
+    //
+    // **Iterated over states, because a head's tone is its state's** (C04 I141):
+    // this put `info` and `warn` on a `running` head, which construction now
+    // refuses. Three states give three tones, `error` among them.
+    for (const state of ["failed", "succeeded", "running"] as const) {
+      const name = CALL_STATE_TONE[state];
+      const notice = block({ kind: "notice", id: "h", tone: name, glyph: "running", state, text: `on ${name}` } as never);
       const lines = kitAt({ blockId: "h", rowId: "h" }).renderSequence([notice], WIDTH);
       // **The slot is the notice's; the hex is the ground's answer** (C10 I48).
       // `dark` composes a nearer `error` for `focusGround`, so a row asserting

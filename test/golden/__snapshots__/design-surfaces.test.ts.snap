@@ -2872,7 +2872,7 @@ nested          ⁃
 continuation    ⎿
 ── §30 · the head mark's three rungs
 tone carries: true
-queued          ●
+queued          ○
 running         ●
 succeeded       ●
 failed          ●
@@ -3591,7 +3591,7 @@ nested          ⁃
 continuation    ⎿
 ── §30 · the head mark's three rungs
 tone carries: true
-queued          ●
+queued          ○
 running         ●
 succeeded       ●
 failed          ●

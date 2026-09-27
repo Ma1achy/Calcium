@@ -26,7 +26,7 @@ import { tableDefinition } from "../../src/presentation/table/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
 import { defaultTheme, loadTheme } from "../../src/presentation/theme/index.js";
-import { block, mosaicRects, parseAreas } from "../../src/data/viewmodel/index.js";
+import { CALL_HEAD_GLYPH, CALL_STATE_TONE, block, mosaicRects, parseAreas } from "../../src/data/viewmodel/index.js";
 import { sgr } from "../../src/terminal/escapes.js";
 import { focusKey } from "../../src/shell/render-cache.js";
 import { GUTTER_CELLS } from "../support/table-gutter.js";
@@ -708,7 +708,7 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
   // were one when this row was written, so it was reading the call head's rule
   // off the button's only instance. `state` is the other member, and it is the
   // one this invariant governs.
-  const NOTICE = block({ kind: "notice", id: "n", tone: "error", glyph: "error", text: "pull failed", state: "failed" } as never);
+  const NOTICE = block({ kind: "notice", id: "n", tone: "error", glyph: "running", text: "pull failed", state: "failed" } as never);
   const BUTTON = block({ kind: "notice", id: "n", tone: "error", glyph: "error", text: "pull failed", action: RETRY } as never);
   const PLAIN = block({ kind: "notice", id: "n", tone: "error", glyph: "error", text: "pull failed" } as never);
   const noticeAt = (b: typeof NOTICE, focus: FocusState | null, depth: 24 | 1 = 24) =>
@@ -719,7 +719,7 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
     const caps = capabilities({ colourDepth: 24 });
     const WASHED: ReadonlySet<string> = new Set(["n"]);
     const headOf = (t: typeof theme, state: (typeof STATES)[number], washed?: ReadonlySet<string>): string => {
-      const b = block({ kind: "notice", id: "n", tone: "info", glyph: "running", text: "x", state } as never);
+      const b = block({ kind: "notice", id: "n", tone: CALL_STATE_TONE[state], glyph: CALL_HEAD_GLYPH[state], text: "x", state } as never);
       const [first] = renderToLines(registry, b, 20, { theme: t, capabilities: caps, focus: null, ...(washed === undefined ? {} : { washed }) });
       return [...(first ?? "").replace(SGR, "")][0] ?? "";
     };
@@ -730,24 +730,23 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
       if (!loaded.ok) throw new Error(`${variant} must load`);
       const hc = loaded.value.current;
       expect(STATES.map((s) => headOf(hc, s, WASHED)), `${variant}: washed, the state's own mark`).toEqual(own);
-      expect(STATES.map((s) => headOf(hc, s)), `${variant}: not washed, ●`).toEqual(STATES.map(() => running));
+      expect(STATES.map((s) => headOf(hc, s)), `${variant}: not washed, the toned mark`).toEqual(STATES.map((s) => glyphFor(CALL_HEAD_GLYPH[s], caps)));
       // A washed set naming another block leaves this head alone.
       expect(headOf(hc, "failed", new Set(["other"])), `${variant}: another block's wash`).toBe(running);
     }
     // The control: `dark` does not band its selection, so `washed` moves nothing.
-    expect(STATES.map((s) => headOf(theme, s, WASHED)), "dark: washed, still ●").toEqual(STATES.map(() => running));
+    expect(STATES.map((s) => headOf(theme, s, WASHED)), "dark: washed, still the toned mark").toEqual(STATES.map((s) => glyphFor(CALL_HEAD_GLYPH[s], caps)));
   });
 
   it("T1.75 (C09 I45, C10 I45, R-THM-005): a focused call head on a band takes the state's own mark, and the page keeps ●", () => {
     const STATES = ["queued", "running", "succeeded", "failed", "cancelled"] as const;
     const caps = capabilities({ colourDepth: 24 });
     const headOf = (t: typeof theme, state: (typeof STATES)[number], focus: FocusState | null): string => {
-      const b = block({ kind: "notice", id: "n", tone: "info", glyph: "running", text: "x", state } as never);
+      const b = block({ kind: "notice", id: "n", tone: CALL_STATE_TONE[state], glyph: CALL_HEAD_GLYPH[state], text: "x", state } as never);
       const [first] = renderToLines(registry, b, 20, { theme: t, capabilities: caps, focus });
       return [...(first ?? "").replace(SGR, "")][0] ?? "";
     };
     const FOCUS = { blockId: "n", rowId: "n" };
-    const running = glyphFor("running", caps);
     for (const variant of ["hcDark", "hcLight"] as const) {
       const loaded = loadTheme(defaultTheme, variant);
       if (!loaded.ok) throw new Error(`${variant} must load`);
@@ -764,11 +763,12 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
       // card, and it is no band in either theme.
       expect(isBand(hc, "focusGround"), `${variant}: focus is a band`).toBe(true);
       expect(isBand(hc, "bgElev"), `${variant}: the elevated page is not`).toBe(false);
-      // Off the band the same theme keeps the collapse: tone still carries.
-      expect(STATES.map((s) => headOf(hc, s, null)), `${variant}: the page keeps ●`).toEqual(STATES.map(() => running));
+      // Off the band the same theme keeps the collapse: tone still carries —
+      // `●`, and `○` for a call that has not started (R-BLK-220, F1261).
+      expect(STATES.map((s) => headOf(hc, s, null)), `${variant}: the page keeps the toned mark`).toEqual(STATES.map((s) => glyphFor(CALL_HEAD_GLYPH[s], caps)));
     }
     // The control: `dark`'s focus ground is not a band, so focus moves nothing.
-    expect(STATES.map((s) => headOf(theme, s, FOCUS)), "dark: focused, still ●").toEqual(STATES.map(() => running));
+    expect(STATES.map((s) => headOf(theme, s, FOCUS)), "dark: focused, still the toned mark").toEqual(STATES.map((s) => glyphFor(CALL_HEAD_GLYPH[s], caps)));
   });
 
   it("T1.29 (C26 §7, C04 §3, C09 I83): a focused notice keeps its own tone over the focus ground — glyph and text; one without an action declares nothing and cannot move", () => {

@@ -10,7 +10,7 @@ import { block, validateDocument } from "../../src/data/viewmodel/index.js";
 import { cardBody, entryLayout } from "../../src/shell/entry-layout.js";
 import type { Action, Block, TextSpan } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry, glyphs } from "../../src/presentation/blocks/index.js";
-import { GLYPH_TOKENS, glyphCells, glyphFor, headMark } from "../../src/presentation/blocks/glyphs.js";
+import { glyphFor, headMark } from "../../src/presentation/blocks/glyphs.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { toolCallDoc, toolCallHeader } from "../../src/shell/documents.js";
 import { scrollbarSet, spinnerFrames } from "../../src/presentation/blocks/glyphs.js";
@@ -26,54 +26,17 @@ const frame = (blocks: readonly Block[], width: number, ascii = false): readonly
   renderSequenceToLines(registry, blocks, width, { theme: DARK_THEME, capabilities: ascii ? ASCII_CAPS : FULL_CAPS })
     .map((l) => visible(l).trimEnd());
 
-describe("C09 §4 — the head mark, resolved by state", () => {
-  it("T2.45 (C09 I5, I45, R-BLK-125, §030): above the monochrome rung every state draws `●`; at 1 bit and in ASCII each takes its own mark, and the geometry never moves", () => {
-    // **`step` is gone as a glyph slot.** It held one character — `⏺︎` U+23FA —
-    // for a position whose whole point is that it changes, and the design draws
-    // `●` for every call state with **tone** saying which (§030). Tone dies at
-    // 1 bit, so below that rung the shape has to carry it and the repo's
-    // distinct state marks are what it falls to. The slot is replaced by a
-    // resolution, and this is that resolution asserted at all three rungs.
-    expect(GLYPH_TOKENS as readonly string[], "the slot is retired, not renamed").not.toContain("step");
-
-    const STATES = ["queued", "running", "succeeded", "failed", "cancelled"] as const;
-    const TONED = { ...FULL_CAPS, colourDepth: 8 } as const;
-    const MONO = { ...FULL_CAPS, colourDepth: 1 } as const;
-    const ASCII_TONED = { ...ASCII_CAPS, colourDepth: 8 } as const;
-
-    // **The coloured rung: one mark for all five.** Which is §030's collapse,
-    // and it is only sound because tone is the other carrier here.
-    expect(
-      STATES.map((st) => glyphFor(headMark(st, TONED), TONED)),
-      "one `●` for every state, tone says which",
-    ).toEqual(["●", "●", "●", "●", "●"]);
-
-    // **The two rungs where shape carries it: five states, five marks, no two
-    // alike.** This is R-COR-003 holding without colour, and it is the property
-    // SS64 gates over the whole registry.
-    for (const [rung, caps, expected] of [
-      ["1 bit", MONO, ["○", "●", "✓", "✗", "⊘"]],
-      ["ASCII", ASCII_TONED, ["o", "*", "+", "x", "/"]],
-    ] as const) {
-      const marks = STATES.map((st) => glyphFor(headMark(st, caps), caps));
-      expect(marks, `${rung}: the states draw ${marks.join(" ")}`).toEqual(expected);
-      expect(new Set(marks).size, `${rung}: no two states share a mark`).toBe(STATES.length);
-    }
-
-    // **And the geometry does not move**, which is what lets `measure` stay
-    // capability-free (C04 §5) while the character changes underneath it: every
-    // candidate at every rung is one cell, and none of them carries an indent.
-    for (const caps of [TONED, MONO, ASCII_TONED]) {
-      for (const st of STATES) expect(glyphCells(headMark(st, caps)), `${st} at ${String(caps.colourDepth)}-bit`).toBe(1);
-    }
-  });
-});
+// **The head mark's row moved to `call-state.test.ts` as C09 T2.187** (C04
+// I141). It asked `headMark` for a slot name and asserted `●` for all five
+// states, which was green while every head drew `info` and a queued head drew
+// filled — a resolver asserted in isolation cannot see the tone the block
+// carries. T2.187 renders the head and reads the cell and its colour.
 
 describe("§9c — the header, the body, and the row the body already has", () => {
   it("C23 T1.50 (C23 I57, F821): entryLayout clears the body's first leading gap in the body run, keeps the rest, and the stored document keeps its blocks by identity", () => {
     const first = block({ kind: "notice", id: "a", tone: "muted", text: "first", padding: { t: 1 } });
     const second = block({ kind: "notice", id: "b", tone: "muted", text: "second", padding: { t: 1 } });
-    const step = block({ kind: "notice", id: "h", tone: "info", glyph: "running", state: "running", text: "ps · ok" });
+    const step = block({ kind: "notice", id: "h", tone: "default", glyph: "running", state: "running", text: "ps · ok" });
 
     // The body run: the first block's gap is dropped, the second keeps its gap.
     const body = cardBody([first, second]);
@@ -97,7 +60,7 @@ describe("§9c — the header, the body, and the row the body already has", () =
   });
 
   it("C22 T1.62 (C22 I107, F1203): entryLayout over one card array hands out the same body objects every call, and a fresh array a fresh body", () => {
-    const step = block({ kind: "notice", id: "h", tone: "info", glyph: "running", state: "running", text: "ps · ok" });
+    const step = block({ kind: "notice", id: "h", tone: "default", glyph: "running", state: "running", text: "ps · ok" });
     const first = block({ kind: "notice", id: "a", tone: "muted", text: "first", padding: { t: 1 } });
     const second = block({ kind: "notice", id: "b", tone: "muted", text: "second", padding: { t: 1 } });
     const card = Object.freeze([step, first, second]);
@@ -231,7 +194,7 @@ describe("C09 §4 — the head is fitted and is an element", () => {
   const LONG = "run_command(pytest tests/unit/test_something_rather_long.py --maxfail=1 -k not_slow) · 4s · exit 0";
   const ARGS = { from: LONG.indexOf("(") + 1, to: LONG.indexOf(")") };
   const head = (spans?: readonly TextSpan[], action?: Action): Block =>
-    block({ kind: "notice", id: "h", tone: "info", glyph: "running", state: "running", text: LONG, ...(spans === undefined ? {} : { spans }), ...(action === undefined ? {} : { action }) });
+    block({ kind: "notice", id: "h", tone: "default", glyph: "running", state: "running", text: LONG, ...(spans === undefined ? {} : { spans }), ...(action === undefined ? {} : { action }) });
   const rows = (b: Block, width: number, ascii = false): readonly string[] => frame([b], width, ascii);
 
   it("T2.113 (C09 I46): a step notice is one row at 80, 40 and 20 in both alphabets; the elide run gives way first and the control wraps", () => {

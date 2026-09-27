@@ -226,7 +226,9 @@ describe("SS56 — the fourteen notices draw the same bytes through the family",
       state: "error",
       message: 'output truncated: append: id "same" is already in the document (C04 I14) — ViewPatch addresses blocks by id, so a duplicate has no correct target',
     });
-    expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error"), "no error notice").toBe(false);
+    // **Other than the head** (C04 I141): a failed head is `error`-toned by
+    // design (R-BLK-214). The row guards the literal `✗` line, which has no `state`.
+    expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error" && blk.state === undefined), "no error notice").toBe(false);
   });
 
   it("N10 `execution.ts` — `shell-failed`", async () => {
@@ -252,7 +254,7 @@ describe("SS56 — the fourteen notices draw the same bytes through the family",
     // (C23 §3c). The pipe arm writes both streams into one emulator, so the
     // sentence is a terminal line — the assertion is the same fact one shape on.
     expect(JSON.stringify(blocks).includes("cat: nothing"), "stderr under it").toBe(true);
-    expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error"), "no error notice").toBe(false);
+    expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error" && blk.state === undefined), "no error notice").toBe(false);
   });
 
   it("N11 `execution.ts` — `stream-error`", async () => {
@@ -270,6 +272,6 @@ describe("SS56 — the fourteen notices draw the same bytes through the family",
     const blocks = lastBlocks(h);
     expect(blocks[0]?.kind === "notice" && blocks[0].text).toBe("tail · failed");
     expect(statusBox(blocks)).toEqual({ state: "error", message: "stream failed: Error: socket closed" });
-    expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error"), "no error notice").toBe(false);
+    expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error" && blk.state === undefined), "no error notice").toBe(false);
   });
 });

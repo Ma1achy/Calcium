@@ -37,7 +37,7 @@
  * out the same id from different modules.
  */
 
-import { HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_Y_GUTTER, HIERARCHY_ROLE, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, block, cell, hierarchyFault, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
+import { CALL_HEAD_GLYPH, HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_Y_GUTTER, HIERARCHY_ROLE, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, block, cell, hierarchyFault, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
 import { samplesChildren, samplesLayout, type Sample, type SamplesOptions, samplesScale } from "./samples.js";
 import { readFileSync } from "node:fs";
 import { digestOf, intralineLines, overlayFault, parseAreas } from "../../data/viewmodel/index.js";
@@ -202,7 +202,10 @@ function rule(label: string, meta?: string, opts?: RuleOpts): Rule {
 }
 
 function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: NoticeOpts): Notice {
-  const g = glyphFor(tone, glyph);
+  // **A call head's glyph is its state's** (C04 I141): derived here when the
+  // caller names none, so an author states the state and never the mark. A
+  // stated tone or glyph that disagrees is refused by construction, not fixed.
+  const g = opts?.state !== undefined && glyph === undefined ? CALL_HEAD_GLYPH[opts.state] : glyphFor(tone, glyph);
   return finish<Notice>(
     {
       kind: "notice",

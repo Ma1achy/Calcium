@@ -29,6 +29,9 @@ import {
   RAMP_KEYS,
   RAMP_ONE_SHOTS,
   TONES,
+  CALL_HEAD_GLYPH,
+  CALL_STATE_TONE,
+  CALL_STATES,
   HAS_CALLOUT,
   HAS_HIDEABLE_SERIES,
   HAS_DETAIL_RUNGS,
@@ -1389,6 +1392,27 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
     // The one button a notice may carry (C04 §3, arc 6 §5) — a chip's `Action`,
     // refused by the same rule as a tip's.
     if (b["action"] !== undefined) checkAction(b["action"], `${at}.action`, e);
+    // **A call head's state, and the tone and glyph it names** (C04 I141).
+    // Refused here rather than thrown at render, where `state: "bogus"` used to
+    // reach `headMark`; and a disagreement is refused rather than corrected,
+    // the `trail` precedent above — a document saying `failed` in blue would
+    // otherwise render as something its own fields contradict.
+    if (b["state"] !== undefined) {
+      const state = b["state"];
+      if (!CALL_STATES.includes(state as never)) {
+        e.push(`${at} "state" is outside its union (C04 I141) — one of ${CALL_STATES.map((s) => `"${s}"`).join(", ")}`);
+      } else {
+        const st = state as keyof typeof CALL_STATE_TONE;
+        if (b["tone"] !== CALL_STATE_TONE[st]) {
+          e.push(`${at} "tone" must be "${CALL_STATE_TONE[st]}" for state "${st}" (C04 I141) — the state names its tone`);
+        }
+        // Absent only on a running head — an operation's, whose walking mark
+        // leads its text (C23 I76). The fields cannot tell it from a call.
+        if (b["glyph"] !== CALL_HEAD_GLYPH[st] && !(b["glyph"] === undefined && st === "running")) {
+          e.push(`${at} "glyph" must be "${CALL_HEAD_GLYPH[st]}" for state "${st}" (C04 I141) — the state names its mark`);
+        }
+      }
+    }
   },
   keyValue: (b, e, at) => {
     requireArray(b, "rows", e, at);

@@ -626,7 +626,9 @@ describe("C23 — the call grammar's head states", () => {
       state: "error",
       message: "stream failed: Error: socket closed",
     });
-    expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error"), "no error notice anywhere in the card").toBe(false);
+    // **Other than the head** (C04 I141): a failed head is `error`-toned by
+    // design (R-BLK-214). The row guards the literal `✗` line, which has no `state`.
+    expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error" && blk.state === undefined), "no error notice anywhere in the card").toBe(false);
     expect(h.transcript.entries[0]?.streaming, "settled").toBe(false);
 
     // **The retry's two numbers live in two places** (C09 §3a: three numbers on
