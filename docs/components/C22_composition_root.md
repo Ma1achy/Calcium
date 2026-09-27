@@ -3015,6 +3015,8 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 
 - **I133** — *(§103, `R-KEY-004`, `R-OWN-001`, C16 I19, ruling 63)* **The owner line names no chord the session's keymap does not bind.** Every chip on it is an action looked up through `ChromeContext.hints.chord(target, action)` — the session keymap's first row for that action — or a question's own declared vocabulary; an action with no binding draws no chip, and nothing on the line spells a chord of its own. `ownerLine` called without hints reads the default keymap, which is the same answer for a session that rebinds nothing. The substate's name is the layer's declared owner (C15 I29), and the question's default label is the question's. → T1.77, C16 T1.171
 
+- **I134** — *(C16 §6c tables A and the trace, C16 I38 superseded, ruling 64)* **`bound()` resolves a reserved row to its handler, then its fallback, then nothing — and every reader of a row reads that answer.** A reserved action's handler is the one `TuiConfig.keyActions` registers under its registry id; it is asked inside `bound`, after the row resolves and before anything is mutated, because whether it handled the key decides whether the rung consumes it, and every caller runs a non-null answer at once. A handler returning `false` is the no-handler answer. With no handler the row's `fallback` runs — `⌥⌫`'s is `killWordLeft` — and a row with none resolves as though absent, so the rung passes. **The same effective action feeds the typed reply's `REPLY_ACTIONS` and the field's `FIELD_ACTIONS`**, so a borrowed editor word-kills on `⌥⌫` with no handler and refuses a registered `queue.drop` (C16 I54's *the queue* is the prompt's), **and `/help keys`**, which lists a reserved row's fallback, or omits it when it has none and no handler is registered. **A handler that throws is contained at `bound`**: the key is spent, nothing else acts, and one `warn` notice names the action — the read loop has no `catch`, so an application's hook would otherwise take the session down. → C16 T1.38, T1.38c, T4.88.
+
 ## 11. Commitments
 
 1. Four required config fields; every other has a working default, `pipeline` included (I17, I22).
@@ -3127,6 +3129,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 84. **A preview is a projection, not a mode** (I113, §6l.12, §101). The design puts a chip's preview in two places and names focus as what chooses between them, so both are derived rather than opened: the transcript's peek already is, and the prompt's panel becomes its sibling. The registry has no action and no binding for it, and that is the answer rather than the gap — a chord invented here would be a visible choice the design did not make. The two legends the specimen draws that the tree cannot yet honour land with the scrollbar and with the paste-chip editor, because a footer naming a dead key is worse than one that does not name it.
 85. **The label's ground is the application's, and it is a hue rather than a colour** (I114, §070, C10 I55, `R-COL-003`). `/colour` takes a **colour NAME, not a tone** — §070's own first line — so what crosses the seam is a name C10 resolves per theme, never a hex the application chose. A literal would be the one thing this repository refuses everywhere else, and §070 says why it is refused: *a hex cannot follow a theme change*. Where the design does take a literal it is on its own terms and behind a contrast question, which is M15's work and is named as a remainder rather than built here.
 86. **A toast's lifetime is a timer, and two timers are the interaction** (I116, §6l.13 E2). *A toast lasts two seconds* and *a newer toast replaces an older* are both true and meet once: the older timer, left armed, clears the newer early. The disposal is the ruling, and it is why the session holds the handle rather than firing and forgetting.
+87. **A reserved key resolves once, to the handler, the fallback or nothing, and every owner reads that answer** (I134, C16 §6c). A borrowed editor cannot disagree with the prompt about what `⌥⌫` is, and an application's hook cannot end the session by throwing.
 
 ---
 
@@ -3136,6 +3139,7 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 
 ### Tier 1 — unit
 
+- *(I134 — its rows are C16's, because the subject is a key reaching an owner: C16 **T1.38** — `⌥⌫` word-kills with no handler, calls a registered one once, falls back on `false`, drops `⌥1`; **T1.38c** — a throwing handler is contained and noticed; **T4.88** — the reply and the field read the effective action.)*
 - **T1.1**: `start` with valid config → running; every component constructed once.
 - **T1.2** (I1): construction order is asserted on an event log — stores and runner before lifecycle.
 - **T1.3** (I2): the lifecycle's handler registration precedes the first acquire.
