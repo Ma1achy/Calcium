@@ -30,7 +30,8 @@
  * the two wider arms are refused by measurement below.
  */
 
-import type { PaletteSpec, ThemeError, ThemeTokens } from "./types.js";
+import type { PaletteSpec, TextGround, ThemeError, ThemeTokens } from "./types.js";
+import { TEXT_GROUNDS } from "./four-bit.generated.js";
 import { ANSI16_HEX } from "./colormap.js";
 import { TONES } from "../../data/viewmodel/index.js";
 
@@ -169,23 +170,14 @@ export function floorFor(slot: string): number {
  * happens to make that ground — the class, not the instance.
  */
 export function textSurfaces(tokens: ThemeTokens): readonly (readonly [string, string])[] {
-  const focus = tokens.surfaces["focusGround"];
-  return [
-    ["bg", tokens.surfaces.bg],
-    ["bgElev", tokens.surfaces.bgElev],
-    // **The focus ground is a text surface, and leaving it out was the third
-    // instance of one class** (R-THM-004). A focused region washes its whole
-    // extent — head and body — so every meaning ink lands here, including a code
-    // body's. Measured when it was added: seven inks short across `dark` and
-    // `light`, and sixteen of nineteen in each high-contrast theme, none of it
-    // reported by anything, because a floor whose scope is a list is silent about
-    // whatever is not on the list. `nord`'s diff grounds and `hcLight`'s `bgElev`
-    // were the first two, found the same way — by widening the scope, never by a
-    // failure.
-    //
-    // `bgDeep` is still excluded and still for its own reason: no text lands on it.
-    ...(focus === undefined ? [] : [["focusGround", focus] as const]),
-  ];
+  // **The `page` rows of the registry's table** (C10 I60), and nothing named
+  // here. `focusGround` joined them as the third instance of one class
+  // (R-THM-004): a focused region washes its whole extent, so every meaning ink
+  // lands on it — seven inks short across `dark` and `light` and sixteen of
+  // nineteen in each high-contrast theme when it was added, none reported,
+  // because a floor whose scope is a list is silent about whatever is not on the
+  // list. The list is now the registry's, and this function only reads it.
+  return rowsOf("page", tokens).map(([row, hex]) => [row.ground, hex] as const);
 }
 
 /**
@@ -193,7 +185,7 @@ export function textSurfaces(tokens: ThemeTokens): readonly (readonly [string, s
  * I60, R-THM-004) — the floor's whole scope, as one table.
  *
  * `textSurfaces`' three page grounds take every meaning slot; the diff grounds
- * take §4a's twelve (`DIFF_SLOTS`); `bgDeep` takes the prompt chip's `tone.meta`
+ * take §4a's twelve (the `diff` rows); `bgDeep` takes the prompt chip's `tone.meta`
  * (`R-BLK-628`). **`bgDeep` was excluded on the premise that no text lands on it**,
  * and the chip had been painting there the whole time: 6.38 and 6.51 : 1 against
  * the high-contrast themes' 7, reported by nothing, because the scope was a list.
@@ -203,26 +195,19 @@ export function textSurfaces(tokens: ThemeTokens): readonly (readonly [string, s
 export function textGrounds(
   tokens: ThemeTokens,
 ): readonly (readonly [surface: string, ground: string, refs: readonly string[]])[] {
-  const meaning = Object.entries(tokens.palettes)
-    .filter(([, palette]) => palette.carries === "meaning")
-    .flatMap(([name, palette]) => Object.keys(palette.slots).map((slot) => `${name}.${slot}`));
-  const flatten = (slots: Readonly<Record<string, readonly string[]>>): readonly string[] =>
-    Object.entries(slots).flatMap(([palette, names]) => names.map((slot) => `${palette}.${slot}`));
-  const surfaces = tokens.surfaces as Readonly<Record<string, string | undefined>>;
-  const rows: (readonly [string, string, readonly string[]])[] = textSurfaces(tokens).map(
-    ([name, hex]) => [name, hex, meaning] as const,
+  return Object.freeze(
+    rowsOf(undefined, tokens).map(([row, hex]) => [row.ground, hex, refsOf(row, tokens)] as const),
   );
-  for (const name of DIFF_SURFACES) {
-    const hex = surfaces[name];
-    if (hex !== undefined) rows.push([name, hex, flatten(DIFF_SLOTS)]);
-  }
-  const deep = surfaces["bgDeep"];
-  if (deep !== undefined) rows.push(["bgDeep", deep, flatten(CHIP_SLOTS)]);
-  return Object.freeze(rows);
 }
 
 /**
- * §4a — the two diff surfaces, and the twelve slots that land on them.
+ * The rows of the registry's table (`terminalPalettes.textGrounds`, C10 I60) a
+ * walker selects — by pairing, or every row — each with the ground's hex, and
+ * a row whose ground the theme lacks skipped.
+ *
+ * §4a's row, the `diff` pairing — the two diff surfaces, and the twelve slots that
+ * land on them — is the one whose reasoning was written here when it was a list,
+ * and it still holds of the registry's row:
  *
  * **A separate pairing rather than two more entries in `textSurfaces`.**
  * `textSurfaces` drives *every* `meaning` slot, so adding these there would bind
@@ -246,19 +231,28 @@ export function textGrounds(
  * leave the numbers and the marker unchecked on the surface they are drawn on,
  * which is C10 T2.14b's other direction.
  */
-const DIFF_SURFACES = Object.freeze(["diffAdd", "diffRemove"]);
+function rowsOf(pairing: string | undefined, tokens: ThemeTokens): readonly (readonly [TextGround, string])[] {
+  const surfaces = tokens.surfaces as Readonly<Record<string, string | undefined>>;
+  return TEXT_GROUNDS.flatMap((row) => {
+    if (pairing !== undefined && row.pairing !== pairing) return [];
+    const hex = surfaces[row.ground];
+    return hex === undefined ? [] : [[row, hex] as const];
+  });
+}
 
-/** The prompt chip's ink on its well (`R-BLK-628`, `R-BLK-116`) — `bgDeep`'s one text slot. */
-const CHIP_SLOTS: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  tone: Object.freeze(["meta"]),
-});
-
-const DIFF_SLOTS: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  syntax: Object.freeze([
-    "keyword", "string", "comment", "number", "key", "type", "function", "operator", "punctuation",
-  ]),
-  tone: Object.freeze(["ok", "error", "muted"]),
-});
+/**
+ * A row's refs as `palette.slot` — `meaning` expanded to every slot of every
+ * palette this theme says carries meaning. One expansion for every walker, so a
+ * row the registry writes as `meaning` is never read as empty by one of them.
+ */
+function refsOf(row: TextGround, tokens: ThemeTokens): readonly string[] {
+  if (row.refs === "meaning") {
+    return Object.entries(tokens.palettes)
+      .filter(([, palette]) => palette.carries === "meaning")
+      .flatMap(([name, palette]) => Object.keys(palette.slots).map((slot) => `${name}.${slot}`));
+  }
+  return Object.entries(row.refs).flatMap(([palette, names]) => names.map((slot) => `${palette}.${slot}`));
+}
 
 /**
  * §4b — the selection wash, and the floor it always had.
@@ -374,15 +368,13 @@ function validateSurfacePairs(tokens: ThemeTokens): readonly ThemeError[] {
 /** The pairing, exposed so the suite can assert its shape rather than its results. */
 export function diffPairs(tokens: ThemeTokens): readonly (readonly [string, string, string, string])[] {
   const out: (readonly [string, string, string, string])[] = [];
-  for (const surface of DIFF_SURFACES) {
-    const hex = (tokens.surfaces as Readonly<Record<string, string>>)[surface];
-    if (hex === undefined || !isHex(hex)) continue;
-    for (const [palette, slots] of Object.entries(DIFF_SLOTS)) {
-      for (const slot of slots) {
-        const value = tokens.palettes[palette]?.slots[slot];
-        if (value === undefined || !isHex(value)) continue;
-        out.push([palette, slot, surface, hex]);
-      }
+  for (const [row, hex] of rowsOf("diff", tokens)) {
+    if (!isHex(hex)) continue;
+    for (const ref of refsOf(row, tokens)) {
+      const [palette = "", slot = ""] = ref.split(".");
+      const value = tokens.palettes[palette]?.slots[slot];
+      if (value === undefined || !isHex(value)) continue;
+      out.push([palette, slot, row.ground, hex]);
     }
   }
   return Object.freeze(out);
@@ -397,7 +389,7 @@ export function diffPairs(tokens: ThemeTokens): readonly (readonly [string, stri
  * `tone.default` must not be in the diff pairing. They were right: `diffPairs`
  * means *the diff surfaces' pairing*, and a function whose name says one thing
  * and whose contents say two is how a check stops being readable. The same
- * argument `DIFF_SLOTS` already makes about `textSurfaces`, one level down.
+ * argument the `diff` row already makes about `textSurfaces`, one level down.
  */
 export function selectionPairs(
   tokens: ThemeTokens,

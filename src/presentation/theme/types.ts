@@ -322,6 +322,19 @@ export type ThemeTokens = Readonly<{
 export type BandFourBit = Readonly<Record<string, Readonly<{ ground: number; ink: number }>>>;
 
 /**
+ * One row of the floor's scope (C10 I60, R-THM-004): a ground a theme paints text
+ * on, the walker that measures it at the common floor (`pairing`), and the refs
+ * that land on it — `"meaning"` for every slot of every palette that carries
+ * meaning, or an explicit table of palette → slots. The rows are the registry's
+ * `terminalPalettes.textGrounds`, projected as `TEXT_GROUNDS`.
+ */
+export type TextGround = Readonly<{
+  ground: string;
+  pairing: string;
+  refs: "meaning" | Readonly<Record<string, readonly string[]>>;
+}>;
+
+/**
  * The themes a session can switch between, **keyed by name** (I27).
  *
  * `dark` and `light` are names in the shipped set rather than a closed

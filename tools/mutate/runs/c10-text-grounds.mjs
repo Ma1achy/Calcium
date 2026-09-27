@@ -47,15 +47,15 @@ const MUTATIONS = [
     // **`bgDeep` excluded again**, on the premise that no text lands on it.
     name: "textGrounds drops the chip's well",
     file: CONTRAST,
-    from: '  if (deep !== undefined) rows.push(["bgDeep", deep, flatten(CHIP_SLOTS)]);',
-    to: "",
+    from: '    rowsOf(undefined, tokens).map(([row, hex]) => [row.ground, hex, refsOf(row, tokens)] as const),',
+    to: '    rowsOf(undefined, tokens).filter(([row]) => row.pairing !== "chip").map(([row, hex]) => [row.ground, hex, refsOf(row, tokens)] as const),',
     expect: "T2.59",
   },
   {
     name: "textGrounds drops the diff grounds",
     file: CONTRAST,
-    from: "    if (hex !== undefined) rows.push([name, hex, flatten(DIFF_SLOTS)]);",
-    to: "",
+    from: '    rowsOf(undefined, tokens).map(([row, hex]) => [row.ground, hex, refsOf(row, tokens)] as const),',
+    to: '    rowsOf(undefined, tokens).filter(([row]) => row.pairing !== "diff").map(([row, hex]) => [row.ground, hex, refsOf(row, tokens)] as const),',
     expect: "T2.59",
   },
   {
@@ -78,12 +78,16 @@ const MUTATIONS = [
     expect: "T2.60",
   },
   {
-    // **A registry composition reverted** in the generated tokens.
+    // **A registry composition reverted** in the generated tokens. The floor row
+    // owns this, not C25's T1.27: T1.27 reads its expected ink from the same
+    // `composed` table the mutation edits, so the edit moves its expectation with
+    // it — it asserts the renderer takes the composition, not that the composition
+    // is legible.
     name: "hcDark's tone.ok on diffAdd is the flat slot",
     file: GENERATED,
     from: '        "tone.ok": "#2fdd4c",',
     to: '        "tone.ok": "#0ab827",',
-    expect: "T1.27",
+    expect: "T2.60",
   },
   {
     name: "SS67 accepts an undispositioned ground",

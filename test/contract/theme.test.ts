@@ -53,6 +53,14 @@ const VARIANTS = Object.keys(defaultTheme);
 
 /** The tokens beside the name, so no row indexes a record and finds `undefined`. */
 const SHIPPED = Object.entries(defaultTheme);
+/** The registry's own statement of the floor's scope (C10 I60), read as JSON so a row can check the projection against it. */
+const REGISTRY = JSON.parse(
+  readFileSync(new URL("../../docs/design/language/calcium-registry.json", import.meta.url), "utf8"),
+) as {
+  terminalPalettes: {
+    textGrounds: { grounds: readonly { ground: string; pairing: string; refs: "meaning" | Record<string, string[]> }[] };
+  };
+};
 
 /**
  * Every hex a theme's palettes carry, with **every** slot that carries it — so
@@ -228,29 +236,50 @@ describe("C10 contract", () => {
    * and asserts that the failure names the *path* that has to move — which is what
    * makes the message the reason rather than the number.
    */
-  it.todo("T2.71 (C10 I60): each walker selects by pairing, and every shipped theme validates clean over the table — not deferred on a component: the code lands in the next commit of this round");
-
-  it("T2.59 (C10 I60, R-THM-004): textGrounds is the page, the diff grounds and bgDeep, each with the refs that land on it", () => {
+  /**
+   * **T2.59 — the table is the registry's, read from the registry.** Not from
+   * `TEXT_GROUNDS`: a row reading the projection it checks agrees with whatever
+   * the generator wrote. This row named `diffAdd`, `diffRemove` and `bgDeep` by
+   * hand until C10 I60 moved the table into the registry — a fourth copy.
+   */
+  it("T2.59 (C10 I60, R-THM-004): textGrounds is the registry's terminalPalettes.textGrounds, row by row, for every theme", () => {
+    const table = REGISTRY.terminalPalettes.textGrounds.grounds;
+    expect(table.map((r) => r.ground), "the registry's six").toEqual(["bg", "bgElev", "focusGround", "diffAdd", "diffRemove", "bgDeep"]);
     for (const [variant, tokens] of SHIPPED) {
-      const rows = textGrounds(tokens);
-      const names = rows.map(([n]) => n);
-      expect(names, `${variant}: every ground this theme paints text on`).toEqual([
-        ...textSurfaces(tokens).map(([n]) => n),
-        ...(["diffAdd", "diffRemove", "bgDeep"] as const).filter((n) => tokens.surfaces[n] !== undefined),
-      ]);
-      const refs = new Map(rows.map(([n, , r]) => [n, r]));
-      // The chip's well carries one ink, and a diff row the gutter's tones and the text's syntax.
-      if (refs.has("bgDeep")) expect(refs.get("bgDeep"), `${variant}: the chip's ink on its well`).toEqual(["tone.meta"]);
-      const diff = refs.get("diffAdd");
-      if (diff !== undefined) {
-        expect(diff, `${variant}: the gutter's three tones`).toEqual(expect.arrayContaining(["tone.ok", "tone.error", "tone.muted"]));
-        expect(diff.filter((r) => r.startsWith("syntax.")).length, `${variant}: the text's syntax`).toBeGreaterThan(0);
-      }
+      const meaning = Object.entries(tokens.palettes)
+        .filter(([, p]) => p.carries === "meaning")
+        .flatMap(([n, p]) => Object.keys(p.slots).map((slot) => `${n}.${slot}`));
+      const want = table
+        .filter((r) => (tokens.surfaces as Record<string, string | undefined>)[r.ground] !== undefined)
+        .map((r) => [
+          r.ground,
+          (tokens.surfaces as Record<string, string>)[r.ground],
+          r.refs === "meaning" ? meaning : Object.entries(r.refs).flatMap(([p, names]) => names.map((n) => `${p}.${n}`)),
+        ]);
+      expect(textGrounds(tokens).map((row) => [...row]), `${variant}: the registry's rows, in its order`).toEqual(want);
+      // **Every theme has all six** — a row that silently drops a ground a theme
+      // lacks would pass for a theme that forgot one.
+      expect(want, `${variant} has every ground`).toHaveLength(table.length);
     }
-    // **Every theme has all three** — a row that silently drops a ground when a
-    // theme lacks it would pass for a theme that forgot one.
+  });
+
+  it("T2.71 (C10 I60): each walker selects by pairing, and every shipped theme validates clean over the table", () => {
+    const table = REGISTRY.terminalPalettes.textGrounds.grounds;
+    const of = (pairing: string) => table.filter((r) => r.pairing === pairing).map((r) => r.ground);
+    expect(of("page"), "the control: the table has page rows").not.toEqual([]);
+    expect(of("diff"), "and diff rows").not.toEqual([]);
     for (const [variant, tokens] of SHIPPED) {
-      expect(textGrounds(tokens).length, variant).toBe(textSurfaces(tokens).length + 3);
+      expect(textSurfaces(tokens).map(([n]) => n), `${variant}: textSurfaces is the page rows`).toEqual(of("page"));
+      const pairs = diffPairs(tokens);
+      expect([...new Set(pairs.map(([, , surface]) => surface))], `${variant}: diffPairs' grounds are the diff rows`).toEqual(of("diff"));
+      const diffRefs = table.find((r) => r.pairing === "diff")!.refs as Record<string, string[]>;
+      expect(
+        [...new Set(pairs.map(([palette, slot]) => `${palette}.${slot}`))].sort(),
+        `${variant}: and its refs are theirs`,
+      ).toEqual(Object.entries(diffRefs).flatMap(([p, names]) => names.map((n) => `${p}.${n}`)).sort());
+      // **The half that makes the scope the registry's**: a ground the registry
+      // adds is measured here with no edit to the validator (C10 T6.123).
+      expect(validateTokens(tokens), `${variant} validates over the whole table`).toEqual([]);
     }
   });
 
