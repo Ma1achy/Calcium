@@ -85,6 +85,23 @@ release, and the baseline's `registryRevision` equals it.
    seals every rule the baseline lacks, refuses any edit to a sealed entry, and sets
    both revisions together. A registry edit that adds a rule is followed by a release
    in the same commit.
+4. **The seal is outside the branch.** CI compares the baseline with `origin/main`'s
+   copy (`tools/design/released-against.mjs`, `make released`): every entry sealed
+   there is present, with the same digest and the same `supersedes`; its status moves
+   only along clause 2's transitions, and its `supersededBy` only from empty, with
+   the move to `superseded`. Entries may be added. A ref holding no baseline passes
+   and says so; a ref that does not resolve fails, because a shallow clone that
+   never fetched it would otherwise pass everywhere.
+
+   **Why.** `lint-immutable.mjs` compares the registry with the baseline *in the
+   same tree*, and its anchor is recomputable by the branch that edits both — the
+   lint's own first line says *the anchor must be sealed externally*, and nothing
+   did. Measured at `fda393d4`, in a copy: `R-SEL-005`'s digest set to zeros in both
+   files and the anchor recomputed, and the lint printed *OK · 1287 released rules:
+   content, status, LINKS, membership and revision intact* and exited 0.
+   **Supersession is not a change in this sense**: it adds the successor and a
+   link and removes nothing, and forbidding it would forbid clause 2's only way a
+   released rule is ever replaced.
 
 **Why, measured.** At revision 0.9 the baseline held 1 247 of 1 287 rules. The 40 it
 lacked included 22 `current` rules — every `R-SEL-*`, `R-THM-002`, `R-THM-004`,
