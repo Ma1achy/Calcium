@@ -109,3 +109,9 @@ describe("C10 I68 — quantised contrast", () => {
     expect(FOUR_BIT_SHORTFALLS["dark"]).toContain("bg.syntax.function 2.44");
   });
 });
+
+describe("C10 I69 — the quantiser holds the floor", () => {
+  it.todo("T2.76 (C10 I69): each shape at its cell against the nearest set — hcDark's focus ground held to #005f87, dark's purple band ground to #875fd7, dark's bgElev syntax.comment clearing — and the page held as bg — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T2.77 (C10 I69, I6, I17): the only ranked pairs the floor inverts are paper's accent and ok on the page, bg and bgElev, ok and info stay apart and clear, and the ladder's second step holds on a constructed set — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T2.78 (C10 I17, R-THM-005): at 8 bits every tone on hcDark's and hcLight's focus and selection bands resolves to one index — not deferred on a component: the code lands in the next commit of this round");
+});
