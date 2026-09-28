@@ -900,7 +900,10 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
     const effects = createKeyEffects({
       editor: {},
       completion: {},
-      overlays: {},
+      // **The one read construction makes** (C15 I32): the effects subscribe to
+      // the stack to hold a displaced panel, so a stand-in without it throws
+      // before any row here runs.
+      overlays: { subscribe: () => ({ [Symbol.dispose]: () => undefined }) },
       history: { entries: [], append: () => undefined, next: () => null },
       // No reply holds the line (C23 I77).
       reply: () => null,
@@ -1048,7 +1051,10 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
     const effects = createKeyEffects({
       editor: { copyText: (t: string) => void kill.push(t) },
       completion: {},
-      overlays: {},
+      // **The one read construction makes** (C15 I32): the effects subscribe to
+      // the stack to hold a displaced panel, so a stand-in without it throws
+      // before any row here runs.
+      overlays: { subscribe: () => ({ [Symbol.dispose]: () => undefined }) },
       history: { entries: [], append: () => undefined, next: () => null },
       // No reply holds the line (C23 I77).
       reply: () => null,
@@ -1241,7 +1247,10 @@ describe("the inside (C26 I26, I27, §102)", () => {
     const effects = createKeyEffects({
       editor: {},
       completion: {},
-      overlays: {},
+      // **The one read construction makes** (C15 I32): the effects subscribe to
+      // the stack to hold a displaced panel, so a stand-in without it throws
+      // before any row here runs.
+      overlays: { subscribe: () => ({ [Symbol.dispose]: () => undefined }) },
       history: { entries: [], append: () => undefined, next: () => null },
       // No reply holds the line (C23 I77).
       reply: () => null,

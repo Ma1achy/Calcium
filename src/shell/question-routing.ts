@@ -37,7 +37,14 @@ export type QuestionRouting = Readonly<{
   dismissal: "escape" | "focus" | "answer";
 }>;
 
-const TABLE: Readonly<Record<QuestionConsumer, QuestionRouting>> = Object.freeze({
+/**
+ * **`satisfies`, not an annotation** (C15 I30). Annotated, every row widened to
+ * `blocking: boolean` and every `dismissal` to all three, and a question's layer
+ * built from its row no longer said it was the one kind of overlay C15's union
+ * admits it as. The rows are the table's literals, and `routingFor` hands back
+ * the row's own type.
+ */
+const TABLE = Object.freeze({
   // The prompt has no job — there is nothing to type — so the rows it would
   // spend are the question's. An owner is waiting, so only an answer closes it.
   approval: Object.freeze({ replaces: true, blocking: true, dismissal: "answer" as const }),
@@ -51,10 +58,10 @@ const TABLE: Readonly<Record<QuestionConsumer, QuestionRouting>> = Object.freeze
   peek: Object.freeze({ replaces: false, blocking: false, dismissal: "focus" as const }),
   completion: Object.freeze({ replaces: false, blocking: false, dismissal: "escape" as const }),
   find: Object.freeze({ replaces: false, blocking: false, dismissal: "escape" as const }),
-});
+}) satisfies Readonly<Record<QuestionConsumer, QuestionRouting>>;
 
 /** §101's table, by consumer. */
-export function routingFor(consumer: QuestionConsumer): QuestionRouting {
+export function routingFor<C extends QuestionConsumer>(consumer: C): (typeof TABLE)[C] {
   return TABLE[consumer];
 }
 
@@ -72,7 +79,7 @@ export function routingFor(consumer: QuestionConsumer): QuestionRouting {
  * naming and not a branch: both answer the same routing, and a reader looking
  * for where the difference matters should find that it does not.
  */
-export function questionConsumer(choices: readonly Choice[], replying: boolean): QuestionConsumer {
+export function questionConsumer(choices: readonly Choice[], replying: boolean): "approval" | "choice" | "reply" {
   if (replying) return "reply";
   return choices.length <= 2 ? "approval" : "choice"; // cells-ok — a choice count
 }

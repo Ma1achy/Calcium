@@ -2343,6 +2343,10 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // a feature that cannot work, and these are alternatives to a path that does.
   // **Not investigated one by one**, and saying so is the entry's honest form —
   // a reason that overstates what was checked is how a list stops being read.
+  "OverlayManager.generation":
+    "C15 I33 — the owner generation C16's epoch reads (C16's batch 3 invariant on the "
+    + "epoch). Queued: the router's pull lands in the next commits of this round, and this "
+    + "entry goes with it.",
   "HistoryStore.search":
     "C20 — the query-setting entry point; the shell drives search through `searchOpen` and " +
     "`searchOlder` instead. Unverified whether both are intended to remain. F97's group",

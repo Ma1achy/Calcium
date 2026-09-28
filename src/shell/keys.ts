@@ -1438,6 +1438,62 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     ) as Record<KeyAction, KeyEffect>,
   );
 
+  /**
+   * What a question closed and the reader has not (C15 I32, R-BLK-873).
+   *
+   * **Held, not closed.** C15 I28 dismisses every panel when a question
+   * arrives, and the reason is `displaced` — *its state is held with the
+   * prompt's*. The menu's candidates, its selection and whether `Tab` opened it
+   * are held here, and the live fields are cleared so `hasMenu()` does not
+   * answer for a layer that is not on the stack. C20 holds the search's own
+   * state, so for it the bit is enough.
+   *
+   * **Restored when no blocking layer remains, and only onto the draft it was
+   * built for.** The borrow puts a typed reply's line back before the question
+   * disposes its layer (`confirm.ts` `settle`), so the draft here is the held
+   * one on every answer. A draft that changed under the question is another
+   * line, and a menu built for the old one is dropped rather than shown against
+   * it.
+   */
+  type Held = {
+    draft: string;
+    menu: Readonly<{ candidates: readonly Candidate[]; at: number | null; requested: boolean; builtFor: string }> | null;
+    searching: boolean;
+  };
+  let held: Held | null = null;
+
+  deps.overlays.subscribe((change) => {
+    if (change.kind === "dismiss" && change.reason === "displaced") {
+      held ??= { draft: deps.editor.text, menu: null, searching: false };
+      if (change.id === MENU_ID && candidates.length > 0) {
+        held.menu = { candidates, at: selection.at, requested, builtFor };
+        candidates = [];
+        selection.reset(0, null);
+        requested = false;
+        builtFor = "";
+        remainder = 0;
+      }
+      if (change.id === SEARCH_ID) held.searching = true;
+      return;
+    }
+    if (held === null || (change.kind !== "dismiss" && change.kind !== "pop")) return;
+    if (deps.overlays.stack.some((l) => l.blocking)) return;
+    const was = held;
+    held = null;
+    if (deps.editor.text !== was.draft) {
+      if (was.searching) deps.history.searchEnd("cancel");
+      return;
+    }
+    if (was.menu !== null) {
+      showMenu(was.menu.candidates, was.menu.at, was.menu.builtFor);
+      requested = was.menu.requested;
+      countRemainder();
+    }
+    if (was.searching && deps.history.searchState !== null) {
+      deps.overlays.push(deps.history.searchLayer(deps.anchor()));
+    }
+  });
+
   return {
     table,
     afterEdit,
@@ -1465,6 +1521,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     reset: () => {
       closeMenu();
       suppressedAt = null;
+      held = null;
     },
     get selected() {
       return selection.at;
