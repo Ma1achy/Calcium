@@ -598,11 +598,14 @@ describe("A03 SP9 — every invariant is named by at least one test row", () => 
     // patch view went; C22's six and C05's one, retired by F1253 when the pushed
     // *document* view went with the route and the manifest tier that selected it;
     // C28's three view rules and C15's two, retired by F1254 when the layer kind
-    // itself went (R-EXA-082). The count is what moves when an eighteenth lands.
+    // itself went (R-EXA-082); and C24's `b.live` sameness rule under the same
+    // finding a batch later — *identically in an entry and a pushed view*, which
+    // review batch 3 replaced. Named without its number, because SP9 reads a
+    // comment as a citation. The count is what moves when a nineteenth lands.
     expect(
       checkInvariantCoverage(specFiles(), walkTests()).retired,
-      "seventeen: two of F1209's, three of F1251's, seven of F1253's, five of F1254's",
-    ).toBe(17);
+      "eighteen: two of F1209's, three of F1251's, seven of F1253's, six of F1254's",
+    ).toBe(18);
   });
 
   it("SP9: the exemption list is compared by equality, both ways", () => {

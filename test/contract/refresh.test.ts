@@ -602,9 +602,10 @@ describe("C23 §3b — part refresh", () => {
 
   // **T4.21 and T4.21b are struck with the view host** (R-EXA-082, F1254).
   //
-  // T4.21 drove `{ kind: "view" }` directly and proved C24 I12's *one loop, two
-  // hosts, no second code path*; there is one host, so the claim is a statement
-  // about a union with one member. T4.21b was its `gapBefore` half — T1.35b's
+  // T4.21 drove `{ kind: "view" }` directly and proved the public API's *one loop,
+  // two hosts, no second code path* — an invariant retired with the view, and
+  // named here without its number because SP9 reads comments as citations; there
+  // is one host kind, so the claim was a statement about a union with one member. T4.21b was its `gapBefore` half — T1.35b's
   // property on the arm that could not hold it, because the view arm rebuilt the
   // panel through `livePanel` and the entry arm reads the real block. The arm
   // that could be wrong is the one that went; T1.35b is the row that holds the
@@ -613,7 +614,7 @@ describe("C23 §3b — part refresh", () => {
   // **`release` stopping a host is not struck with them** — T2.20 below drives
   // it, and I33's release-on-a-gone-host is T3.67's.
 
-  it("T4.21 (C24 I12): `release` stops a host's parts, and a second host is untouched", async () => {
+  it("T4.21 (C23 I83, C24 I40, I32): a host is an entry and nothing wider, and `release` stops one entry's parts while a second is untouched", async () => {
     // What survives of the view row: the loop releases the host it is told to
     // and nothing else. Two entries, because *stopped* asserted over one host is
     // indistinguishable from *stopped everything*.
