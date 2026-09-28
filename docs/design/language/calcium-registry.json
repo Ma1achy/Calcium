@@ -33156,6 +33156,28 @@
       "widthClass": "ambiguous"
     },
     {
+      "id": "trend-flat",
+      "unicode": "→",
+      "ascii": "=",
+      "semanticRole": "trend held",
+      "tone": "default",
+      "widthByCapability": {
+        "unicode": 1,
+        "ascii": 1
+      },
+      "reservedCells": 1,
+      "collisionDomains": [
+        "inline"
+      ],
+      "accessibleName": "unchanged",
+      "status": "current",
+      "ruleIds": [
+        "R-COL-006"
+      ],
+      "canonical": true,
+      "widthClass": "ambiguous"
+    },
+    {
       "id": "sort-asc",
       "unicode": "▴",
       "ascii": "^",

@@ -1,12 +1,16 @@
 // C04 I128, C09 I111, C11 I30 — a trend cell's arrow is derived: its direction
 // from the readings, its tone from the column's polarity, and its ASCII half
-// `V` rather than disclosure's `v` (question 38). Mutated at each joint.
+// `V` rather than disclosure's `v` (question 38). A reading that held draws
+// `→`, `=` at ASCII, and a cell with no trend draws nothing (question 37).
+// Mutated at each joint.
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/unit/table.test.ts test/contract/blocks.test.ts test/contract/view-model.test.ts";
+const CMD =
+  "npx vitest run test/unit/table.test.ts test/contract/blocks.test.ts test/contract/view-model.test.ts " +
+  "test/contract/glyph-registry.test.ts";
 const CELLS = "src/presentation/table/cells.ts";
 const GLYPHS = "src/presentation/blocks/glyphs.ts";
 const CONSTRUCT = "src/data/viewmodel/construct.ts";
@@ -41,11 +45,34 @@ const results = runPass({
       expect: "T1.39",
     },
     {
-      name: "a reading that held draws an arrow",
+      name: "a reading that held draws a rising arrow",
       file: CELLS,
-      from: '  if (to === from) return { mark: "", tone: undefined };\n',
+      from: '  if (to === from) return { mark: g.trendFlat, tone: undefined };\n',
       to: "",
       expect: "T1.39",
+    },
+    {
+      // **As it shipped before question 37**: no arrow is taken for *flat*, so a
+      // held reading and a cell with no comparison are one picture.
+      name: "a reading that held draws no mark",
+      file: CELLS,
+      from: '  if (to === from) return { mark: g.trendFlat, tone: undefined };',
+      to: '  if (to === from) return { mark: "", tone: undefined };',
+      expect: "T1.39",
+    },
+    {
+      name: "a reading that held is inked ok, as if holding were good",
+      file: CELLS,
+      from: '  if (to === from) return { mark: g.trendFlat, tone: undefined };',
+      to: '  if (to === from) return { mark: g.trendFlat, tone: "ok" };',
+      expect: "T1.39",
+    },
+    {
+      name: "trendFlat's ASCII half is a dash",
+      file: GLYPHS,
+      from: '  trendFlat: "=",',
+      to: '  trendFlat: "-",',
+      expect: "T2.174",
     },
     {
       name: "trendDown's ASCII half back to disclosure's v",

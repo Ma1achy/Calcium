@@ -11,7 +11,7 @@ three major rules this document broke in its own examples, measured
   ▾  U+25BE   Narrow         ✓  U+2713   Narrow
   ✗  U+2717   Narrow         ›  U+203A   Narrow
 
-  TWELVE AMBIGUOUS, SIX NARROW — a mixed set, which is exactly the
+  THIRTEEN AMBIGUOUS, SIX NARROW — a mixed set, which is exactly the
   condition that sent the scrollbar to its ascii rung. At
   ambiguousWidth: wide the gutter is two cells for some marks and one
   for others, and every measured height is wrong.

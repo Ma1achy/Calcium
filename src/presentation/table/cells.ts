@@ -198,8 +198,9 @@ function integerPart(text: string): string {
  * carries a glyph or a tone, so this is the only answer there is. The arrow is
  * the sign of `to − from`; its tone is `ok` when that runs with the column's
  * polarity, `error` against it, and none in a neutral column. **A reading that
- * did not move draws no arrow** and the text alone (question 37): a flat reading
- * has no direction to be good or bad about.
+ * did not move draws `trendFlat`** in no tone (question 37): a flat reading has
+ * no direction to be good or bad about, and it is still a comparison — drawn
+ * bare, it was the same picture as a cell with no trend at all.
  */
 export function trendMark(
   cell: Cell | undefined,
@@ -208,10 +209,10 @@ export function trendMark(
 ): Readonly<{ mark: string; tone: Tone | undefined }> | undefined {
   if (cell?.trend === undefined) return undefined;
   const { from, to } = cell.trend;
-  if (to === from) return { mark: "", tone: undefined };
+  const g = glyphs(capabilities);
+  if (to === from) return { mark: g.trendFlat, tone: undefined };
   const up = to > from;
   const wants = column?.polarity ?? "neutral";
-  const g = glyphs(capabilities);
   return {
     mark: up ? g.trendUp : g.trendDown,
     tone: wants === "neutral" ? undefined : (wants === "higher") === up ? "ok" : "error",

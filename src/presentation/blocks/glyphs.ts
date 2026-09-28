@@ -205,6 +205,12 @@ export type GlyphSet = Readonly<{
    * lead, and the lead and a cell share one content row (SS64).
    */
   trendDown: string;
+  /**
+   * **A reading that held** (question 37): `→`, and `=` at ASCII, in the default
+   * tone. No mark is not *flat* — it is a cell with no comparison at all — so a
+   * held reading draws a mark of its own and an absent trend draws none.
+   */
+  trendFlat: string;
 
   // Progress.
 
@@ -316,10 +322,12 @@ const UNICODE: GlyphSet = Object.freeze({
   sortAsc: "▴",
   sortDesc: "▾",
 
-  // `↑` and `↓` — the registry's `trend-up` and `trend-down`. Both Ambiguous, so
-  // the set's collapse to ASCII at `wide` takes them with the rest (C09 I48).
+  // `↑`, `↓` and `→` — the registry's `trend-up`, `trend-down` and `trend-flat`.
+  // All three Ambiguous, so the set's collapse to ASCII at `wide` takes them with
+  // the rest (C09 I48).
   trendUp: "\u2191",
   trendDown: "\u2193",
+  trendFlat: "\u2192",
 
 });
 
@@ -391,6 +399,8 @@ const ASCII: GlyphSet = Object.freeze({
 
   trendUp: "^",
   trendDown: "V",
+  // `=` is free in the content row: its other two uses are figure marks (SS64).
+  trendFlat: "=",
 
 });
 
@@ -1505,6 +1515,7 @@ export const GLYPH_SET_DOMAINS: Readonly<Record<keyof GlyphSet, readonly string[
 
   trendUp: ["inline"],
   trendDown: ["inline"],
+  trendFlat: ["inline"],
 };
 
 /** The pairs, for the test that asserts each is 1:1 by cell count (I5). */

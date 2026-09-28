@@ -78,6 +78,7 @@ const HOMES: Readonly<Record<string, Home>> = {
   "sort-asc": set("sortAsc"),
   "trend-up": set("trendUp"),
   "trend-down": set("trendDown"),
+  "trend-flat": set("trendFlat"),
   rule: set("horizontal"),
   ellipsis: set("residue"),
   "choice-open": set("choiceOpen"),
