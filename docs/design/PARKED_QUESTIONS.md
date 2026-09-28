@@ -1115,6 +1115,18 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
+> **Ruled 2026-09-28** (by Claude under the person's standing authority; review batch 3, M9 item 1). **C07 I18 stands, and `Patch.cap` is a row budget its producer declares; the framework derives no default.** Lane b3-d measured D12's premise and it does not hold: `ProducerContext.height` is non-null only on the view route (C07 I18), and R-EXA-082 retired that route, so no framework producer can compute *one viewport*. The two remedies were to give an entry a height, or to have C22 write the cap onto a far side's block. The first is I18's own refusal — a transcript entry is windowed by rows and has no bound, and the terminal's height standing in for one is the guess I18 was written against. The second is D12's own objection, a shell rewriting another producer's block. **Tie-breaks:** the repo is right about what ships (I18's argument is measured and current), and D12 was the lone rule. So *one viewport* is a producer's choice, never the framework's guess; a patch with no `cap` draws whole, as it did.
+
+**73 · RULED — Who writes a patch's cap, when no producer can see a height.**
+
+---
+
+> **Ruled 2026-09-28** (by Claude under the person's standing authority; review batch 4, M11 item 8, folded into batch 2). **`examples/docker/FINDINGS.md` stays tracked, where it is.** The review called it an agent log and asked for it to be removed or moved out of the tree with M4 item 5's clean-up. It is also the register the gates resolve against: SP5 resolves every cited finding number against it — 7,465 citations in 832 files under `docs/`, `src/`, `test/` and `tools/` at e1a8d608 — and SP6, SP12 and SP14 gate `TRIAGE.md`'s keys, open set and tallies against its ids. Removing it deletes the evidence those citations point at; moving it changes a path and nothing about what it is. **Tie-breaks:** the repo is right about what ships, and a consistent picture beats a lone rule. **What the review's point does buy**, and is not refused: the file's size is real (56 k lines), and its growth is the thing to watch — a split by range behind the same resolver is a change SP5 can carry, if it is ever wanted.
+
+**74 · RULED — Whether the findings register leaves the tree.**
+
+---
+
 ## Not yet recovered
 
 The gap between the entries and the running count in the per-MR reports was chased and closed: some questions had been counted twice. The list is the count. **No total is stated here in prose**, because the one that used to be here said *sixteen* long after that stopped being true — this file's own subject, arriving inside it.
