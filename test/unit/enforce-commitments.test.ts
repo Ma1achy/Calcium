@@ -36,6 +36,8 @@ import {
   seamRows,
   specFiles,
   checkInvariantCoverage,
+  checkRowFiles,
+  rowIdsIn,
   tableColumn,
   testRowsOf,
   mnemonicRowsOf,
@@ -624,6 +626,76 @@ describe("A03 SP9 — every invariant is named by at least one test row", () => 
   });
 });
 
+describe("A03 SP15 — within one spec, a test row's id is titled in one file", () => {
+  const A = "test/unit/a.test.ts";
+  const B = "test/unit/b.test.ts";
+
+  /** Two test sources, each a list of lines, judged with an exemption list. */
+  function run(a: readonly string[], b: readonly string[], exempt: readonly string[] = []) {
+    const read = (f: string): string => (f === A ? a : b).join("\n");
+    return checkRowFiles([A, B], read, exempt);
+  }
+  const row = (title: string): string => `it("${title}", () => {});`;
+
+  it("SP15: the real corpus, and it is a corpus", () => {
+    // **The vacuity half first**: a reader that stopped seeing titles reports a
+    // clean corpus in the same green line the correct answer prints.
+    const r = checkRowFiles(walkTests());
+    expect(r.rows, "3952 titled rows when the rule was wired").toBeGreaterThan(3_000); // cells-ok — a row count
+    expect(r.split, "and the debt it lists is still debt").toBeGreaterThan(0);
+    expect(r.violations, "run `make enforce` for the detail").toEqual([]);
+  });
+
+  it("SP15: one id titled in two files within one spec fails, and names both files", () => {
+    // The parse first, so the judgement below is about the rule and not about
+    // a reader that saw nothing.
+    expect(rowIdsIn(A, row("T1.1 (C99 I1): text"))).toEqual([{ id: "T1.1", spec: "C99", line: 1 }]);
+    const { violations } = run([row("T1.1 (C99 I1): one thing")], [row("T1.1 (C99 I2): another")]);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("SP15");
+    expect(violations[0]?.message).toContain(`C99 T1.1 (${A}, ${B})`);
+  });
+
+  it("SP15: the controls — two specs, one file, and a deferral are not a split", () => {
+    expect(run([row("T1.1 (C99 I1): x")], [row("T1.1 (C98 I1): y")]).violations, "two specs' T1.1").toEqual([]);
+    expect(run([row("T1.1 (C99 I1): x"), row("T1.1 (C99 I2): y")], []).violations, "one file").toEqual([]);
+    expect(
+      // Spelled in two halves, because TD6 reads this file too and a deferral
+      // written whole here would be one.
+      run([row("T1.1 (C99 I1): x")], [`it.${"todo"}("T1.1 (C99 I1): the code lands next");`]).violations,
+      "an it.todo is not a row",
+    ).toEqual([]);
+    expect(
+      run([row("T1.1 (C99 I1): x")], ["/*", row("T1.1 (C99 I1): quoted in a comment"), "*/"]).violations,
+      "nor is a row a block comment quotes",
+    ).toEqual([]);
+  });
+
+  it("SP15: the attribution is SP9's — a bare title belongs to its file's owner, and a wrapped one is read", () => {
+    // `TOPICS` attributes a bare id in `plot.test.ts`, so a bare `T1.1` there and
+    // a qualified one elsewhere are one row in two files.
+    const PLOT = "test/unit/plot.test.ts";
+    const owner = rowIdsIn(PLOT, row("T1.1: bare"))[0]?.spec;
+    expect(owner, "the fixture's file has an owner").toMatch(/^C\d{2}$/u);
+    const read = (f: string): string =>
+      f === PLOT ? row("T1.1: bare") : ["it(", `  "T1.1 (${String(owner)} I1): wrapped by the formatter",`, "  () => {},", ");"].join("\n");
+    const { violations } = checkRowFiles([PLOT, B], read, []);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain(`${String(owner)} T1.1`);
+    // And a title naming a spec in its prose, after the id's own citation, is
+    // the citation's: the first parenthesis decides.
+    expect(rowIdsIn(A, row("T1.2 (C99 I1): unlike C98"))[0]?.spec).toBe("C99");
+  });
+
+  it("SP15: the debt list is compared by equality, both ways", () => {
+    const split = [[row("T1.1 (C99 I1): x")], [row("T1.1 (C99 I1): y")]] as const;
+    expect(run(...split, ["C99 T1.1"]).violations, "listed, and still split").toEqual([]);
+    const stale = run([row("T1.1 (C99 I1): x")], [], ["C99 T1.1"]);
+    expect(stale.violations).toHaveLength(1);
+    expect(stale.violations[0]?.message).toContain("titled in one file now");
+  });
+});
+
 describe("A03 SP7 — a test row's number is unique within its spec", () => {
   const FILE = "docs/components/C99_x.md";
 
@@ -883,6 +955,7 @@ describe("A03 SP10 — a mnemonic test-row label is unique within its spec", () 
       SP12: "checkOpenSet",
       SP13: "checkCommitmentOrder",
       SP14: "checkGroupTallies",
+      SP15: "checkRowFiles",
     };
 
     // Equality, so a rule added to `SPEC_RULES` without a carrier fails here

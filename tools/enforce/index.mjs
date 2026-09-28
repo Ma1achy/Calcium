@@ -39,6 +39,7 @@ import {
   checkSectionReferences,
   checkSeamFour,
   checkInvariantCoverage,
+  checkRowFiles,
   withoutTodos,
   referenceFiles,
   specFiles,
@@ -100,6 +101,9 @@ const sectionTargets = new Set(
 // SP9's own numbers, computed once and reported beside the gate — the list is
 // the evidence and the count is what a reader watches move.
 const coverage = checkInvariantCoverage(specs, walk("test"));
+// SP15's numbers, for SP9's reason: the list is the evidence and the count of
+// rows it cannot attribute is what a reader watches.
+const rowFiles = checkRowFiles(walk("test"));
 const openSet = checkOpenSet();
 const groupTallies = checkGroupTallies();
 
@@ -269,6 +273,10 @@ const violations = [
   // invariant and nothing paired an invariant to a check, so *every invariant is
   // cited* was a convention held by hand — 86 of 768 were not (F357, F361).
   ...coverage.violations,
+  // SP15 — and the test side of SP7's question: a row id titled in two files
+  // within one spec resolves to whichever a reader opens, and a mutation's
+  // `expect` is satisfied by either.
+  ...rowFiles.violations,
   ...refViolations,
 ];
 
@@ -305,6 +313,9 @@ if (violations.length === 0) {
       // retirement is the one disposition that takes an invariant out of the
       // coverage question altogether (CLAUDE.md §count an exemption).
       `${String(coverage.retired)} retired, and no row may name one${RESET}\n` +
+      `  ${DIM}row files · ${String(rowFiles.split)} ids titled in more than one file within their ` +
+      `spec, over ${String(rowFiles.rows)} titled rows, all listed (SP15, gated by equality); ` +
+      `${String(rowFiles.unowned)} rows no spec owns are not judged${RESET}\n` +
       `  ${DIM}section citations · ${String(sectionsDangling.length)} of ` +
       `${String(sectionRefs.resolved + sectionsDangling.length)} resolve to no section, across ` +
       `${String(sectionTargets)} targets; ${String(sectionsUnowned)} more name no document ` +

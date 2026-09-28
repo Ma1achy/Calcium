@@ -1834,6 +1834,210 @@ export function checkInvariantCoverage(
   return { violations, uncited: found.length, retired: retiredCount, declared: specs.reduce((n, f) => n + invariantsOf(f, readFile).size, 0) };
 }
 
+// --- SP15 — a test row's id is written in one file within its spec ----------
+//
+// **SP7 checks the spec side and nothing checked the other** (review batch 3,
+// M7 item 7). A spec declaring `T1.98` once passes SP7 while two test files
+// each title a row `T1.98` about different things: `router-dispatch.test.ts`'s
+// is C16 I43's guard and `router-keymap.test.ts`'s was §6a's chord notation,
+// which no spec row declared. A fail-on-revert row saying *→ T1.98 fails* then
+// resolves against whichever file a reader opens, and a mutation run's
+// `expect: "T1.98"` is satisfied by either — the number has stopped locating
+// the row on the side a failure is reported from.
+//
+// **The attribution is SP9's**, so the two rules cannot disagree about whose a
+// row is: the spec a title names first — `C19 T5.1 …` or `T4.94 (C22 I110 …)` —
+// else the spec that owns the file (`ownerOf`). A title the rule cannot
+// attribute is counted and not judged.
+//
+// **Per spec and one file per id, and the debt is a list compared by equality**
+// (ruling D6). A strict rule was red on arrival: counted before wiring, 97 ids
+// across 21 specs were titled in more than one file — 272 by a count that did
+// not attribute a bare title to its file's owner, which is the figure that
+// said the attribution had to be SP9's. The three this commit renumbers are not
+// listed; the rest are, so the list can only shrink.
+//
+// **Stated blind spots.** A row is an `it(`/`test(` whose title starts with its
+// id, so a title built by `it.each` or a template, or one that puts the id
+// later, is not read. An id twice in **one** file is not this rule's — it is a
+// row split across two `it`s, which reads the same from a failure report. And
+// the 137 rows no owner claims are the population this cannot see; they are
+// reported beside the gate rather than dropped.
+const ROW_OPENS = /^\s*(?:it|test)(?:\.each)?\s*\(/u;
+const ROW_TITLE = /^\s*(?:(?:it|test)(?:\.each)?\s*\(\s*)?["'`](?:(C\d{2}) )?(T\d+\.\d+[a-z0-9]*)\b\s*(?:\((C\d{2})\b)?/u;
+
+/**
+ * Every row in a test source whose title starts with a test-row id, with the
+ * spec SP9 would give it. **A deferral is not a row, twice over**: `withoutTodos`
+ * blanks it, and `ROW_OPENS` — whose only suffix is `.each` — would not open on
+ * `it.todo(` either, so neither exclusion can be tested alone. What the first
+ * call carries by itself is the comments: a row quoted in a block comment is
+ * not one. A title the formatter wrapped onto the next line is read there.
+ */
+export function rowIdsIn(file, text) {
+  const lines = withoutTodos(text).split("\n");
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!ROW_OPENS.test(lines[i])) continue;
+    const title = /\(\s*$/u.test(lines[i]) ? (lines[i + 1] ?? "") : lines[i];
+    const m = ROW_TITLE.exec(title);
+    if (m === null) continue;
+    out.push({ id: m[2], spec: m[1] ?? m[3] ?? ownerOf(file), line: i + 1 });
+  }
+  return out;
+}
+
+/**
+ * The ids SP15 found in more than one file within their spec when it was
+ * wired — **debt, compared by equality**, so an entry leaves on the commit
+ * that resolves it and a new split fails on the commit that makes it.
+ */
+const SPLIT_ROWS = Object.freeze([
+  "C01 T1.20", // unit/lifecycle.test.ts, unit/sgr.test.ts
+  "C01 T1.21", // unit/lifecycle.test.ts, unit/sgr.test.ts
+  "C01 T1.22", // unit/lifecycle.test.ts, unit/sgr.test.ts
+  "C04 T1.12b", // unit/plot.test.ts, unit/view-model.test.ts
+  "C04 T1.14", // unit/plot.test.ts, unit/view-model.test.ts
+  "C04 T1.19", // unit/plot.test.ts, unit/view-model.test.ts
+  "C04 T1.30", // contract/scroll-follow.test.ts, unit/plot.test.ts, unit/spans.test.ts
+  "C04 T1.40", // unit/execution.test.ts, unit/view-model.test.ts
+  "C04 T1.49", // unit/execution.test.ts, unit/tape.test.ts
+  "C04 T1.8b", // unit/blocks.test.ts, unit/view-model.test.ts
+  "C04 T2.127", // contract/view-model.test.ts, unit/view-model.test.ts
+  "C04 T2.28", // contract/navigation-mosaic.test.ts, contract/scroll.test.ts
+  "C04 T2.29", // contract/navigation-mosaic.test.ts, contract/scroll.test.ts
+  "C04 T2.31", // contract/scroll.test.ts, contract/spans.test.ts
+  "C04 T2.32", // contract/scroll.test.ts, contract/spans.test.ts
+  "C04 T2.35", // contract/scroll.test.ts, contract/spans.test.ts, edge/owed-gate.test.ts
+  "C04 T2.36", // contract/scroll.test.ts, contract/spans.test.ts, edge/owed-gate.test.ts, unit/spans.test.ts
+  "C04 T2.37", // contract/scroll-follow.test.ts, edge/owed-gate.test.ts
+  "C04 T2.38", // contract/scroll-follow.test.ts, edge/owed-gate.test.ts
+  "C04 T2.39", // contract/scroll-follow.test.ts, edge/image-frames.test.ts, edge/owed-gate.test.ts
+  "C04 T3.22", // contract/sequence.test.ts, edge/view-model.test.ts
+  "C04 T3.9", // contract/builders.test.ts, edge/view-model.test.ts
+  "C04 T6.15", // revert/patch.test.ts, revert/view-model.test.ts
+  "C05 T4.2", // integration/manifest.test.ts, unit/completion.test.ts
+  "C06 T4.6", // integration/fixtures.test.ts, integration/transport.test.ts
+  "C07 T3.20", // unit/adapter-registry.test.ts, unit/execution.test.ts
+  "C08 T6.3", // contract/fixtures.test.ts, revert/fixtures.test.ts
+  "C09 T1.24", // unit/blocks.test.ts, unit/text.test.ts
+  "C09 T1.28", // unit/spans.test.ts, unit/text.test.ts
+  "C09 T3.10", // edge/blocks.test.ts, unit/text.test.ts
+  "C09 T3.16", // edge/blocks.test.ts, unit/text.test.ts
+  "C09 T3.4", // edge/blocks.test.ts, unit/text.test.ts
+  "C09 T3.5", // edge/blocks.test.ts, unit/text.test.ts
+  "C09 T3.91", // edge/blocks.test.ts, edge/rows.test.ts
+  "C09 T4.2", // contract/blocks.test.ts, integration/blocks.test.ts
+  "C09 T4.57", // integration/deferred-height.test.ts, integration/emulator.test.ts
+  "C09 T6.17", // contract/sequence.test.ts, revert/blocks.test.ts
+  "C10 T1.16", // unit/sgr.test.ts, unit/theme.test.ts
+  "C10 T1.17", // unit/sgr.test.ts, unit/theme.test.ts
+  "C10 T1.19", // unit/sgr.test.ts, unit/theme.test.ts
+  "C10 T1.20", // unit/sgr.test.ts, unit/theme.test.ts
+  "C10 T1.21", // unit/sgr.test.ts, unit/theme.test.ts
+  "C10 T2.30", // contract/spans.test.ts, contract/theme-required.test.ts
+  "C11 T2.4", // contract/lifecycle.test.ts, contract/table.test.ts
+  "C12 T3.10", // edge/plot.test.ts, unit/plot.test.ts
+  "C12 T3.11", // edge/plot.test.ts, unit/plot.test.ts
+  "C12 T3.11b", // edge/plot.test.ts, unit/plot.test.ts
+  "C12 T3.11c", // edge/plot.test.ts, unit/plot.test.ts
+  "C13 T2.6", // contract/lifecycle.test.ts, contract/transcript.test.ts
+  "C13 T2.7", // contract/frame-scheduler.test.ts, contract/transcript.test.ts
+  "C13 T6.14", // revert/frame-scheduler.test.ts, revert/transcript.test.ts
+  "C14 T2.7", // contract/lifecycle.test.ts, contract/viewport.test.ts
+  "C16 T1.160", // unit/router-decode.test.ts, unit/router-dispatch.test.ts
+  "C16 T1.3p", // unit/router-decode.test.ts, unit/router-dispatch.test.ts
+  "C16 T1.3q", // unit/router-decode.test.ts, unit/router-dispatch.test.ts
+  "C16 T3.12", // unit/router-decode.test.ts, unit/router-dispatch.test.ts
+  "C16 T4.1", // integration/confirm.test.ts, integration/router.test.ts
+  "C16 T4.5", // integration/confirm.test.ts, integration/router.test.ts
+  "C16 T4.6", // integration/confirm.test.ts, integration/router.test.ts
+  "C16 T4.9", // integration/confirm.test.ts, unit/router-keymap.test.ts
+  "C19 T1.4b", // edge/completion.test.ts, unit/completion.test.ts
+  "C19 T3.6", // edge/completion.test.ts, unit/completion.test.ts
+  "C19 T4.5", // integration/completion.test.ts, integration/editor.test.ts
+  "C19 T5.4", // e2e/completion.test.ts, edge/completion.test.ts
+  "C21 T5.2", // e2e/process.test.ts, e2e/transport.test.ts
+  "C22 T1.12", // unit/session-composite.test.ts, unit/session-state.test.ts
+  "C22 T1.13", // unit/session-keys.test.ts, unit/session-state.test.ts
+  "C22 T1.22f", // unit/cursor-style.test.ts, unit/session-construct.test.ts
+  "C22 T1.55", // unit/profiler-seams.test.ts, unit/session-composite.test.ts
+  "C22 T1.5b", // unit/session-config.test.ts, unit/session-paint.test.ts
+  "C22 T1.5f", // unit/session-config.test.ts, unit/session-paint.test.ts
+  "C22 T3.10", // integration/session.test.ts, unit/session-identity.test.ts
+  "C22 T4.12", // integration/session.test.ts, unit/session-paint.test.ts
+  "C22 T4.28", // integration/session.test.ts, integration/theme.test.ts
+  "C22 T5.3", // e2e/overlay.test.ts, e2e/theme.test.ts
+  "C23 T1.4", // contract/builders.test.ts, unit/execution.test.ts
+  "C23 T2.47", // contract/emulator.test.ts, unit/emulator.test.ts
+  "C23 T3.64", // contract/refresh.test.ts, unit/emulator.test.ts
+  "C23 T4.15", // integration/confirm.test.ts, integration/notice-action.test.ts
+  "C23 T4.64", // integration/emulator.test.ts, unit/actions-expand.test.ts, unit/emulator.test.ts
+  "C24 T2.13", // contract/expect-document.test.ts, contract/public-api.test.ts
+  "C24 T2.20", // contract/expect-document.test.ts, unit/enforce-rules.test.ts
+  "C24 T2.23", // contract/expect-document.test.ts, contract/public-api.test.ts
+  "C24 T4.2", // contract/builders.test.ts, contract/expect-document.test.ts
+  "C25 T1.10", // unit/patch-intraline.test.ts, unit/patch.test.ts
+  "C25 T1.9", // unit/patch-intraline.test.ts, unit/patch.test.ts
+  "C25 T2.7", // contract/patch-intraline.test.ts, contract/patch.test.ts
+  "C25 T2.8", // contract/patch-window.test.ts, contract/patch.test.ts
+  "C26 T1.43", // unit/session-keys.test.ts, unit/table.test.ts
+  "C26 T2.34", // contract/block-elements.test.ts, contract/scroll.test.ts
+  "C26 T3.47", // contract/navigation-pills.test.ts, unit/session-navigation.test.ts
+  "C26 T3.49", // contract/block-elements.test.ts, unit/session-navigation.test.ts
+  "C28 T3.4", // edge/profiler.test.ts, unit/profiler-seams.test.ts
+  "C28 T3.5", // edge/profiler.test.ts, unit/profiler-seams.test.ts
+]);
+
+/**
+ * A03 SP15 — **within one spec, a test row's id is titled in one file.**
+ */
+export function checkRowFiles(testFiles, readFile = (f) => readFileSync(f, "utf8"), exempt = SPLIT_ROWS) {
+  const where = new Map();
+  let rows = 0;
+  let unowned = 0;
+  for (const f of testFiles) {
+    let text;
+    try { text = readFile(f); } catch { continue; }
+    for (const r of rowIdsIn(f, text)) {
+      rows++;
+      if (r.spec === null) { unowned++; continue; }
+      const key = `${r.spec} ${r.id}`;
+      if (!where.has(key)) where.set(key, new Set());
+      where.get(key).add(f);
+    }
+  }
+  const split = [...where].filter(([, files]) => files.size > 1);
+  const found = split.map(([k]) => k).sort();
+  const listed = [...exempt].sort();
+  const fresh = split.filter(([k]) => !listed.includes(k));
+  const cleared = listed.filter((k) => !found.includes(k));
+  const violations = [];
+  if (fresh.length > 0) {
+    violations.push({
+      rule: "SP15",
+      file: "test",
+      spec: "A03 §2 · A03 §7a",
+      message:
+        `${String(fresh.length)} test row id(s) titled in more than one file within their spec and ` +
+        `not on the list — ${fresh.map(([k, files]) => `${k} (${[...files].sort().join(", ")})`).join("; ")}. ` +
+        `A fail-on-revert row or a mutation's \`expect\` naming one resolves to whichever file a ` +
+        `reader opens. Renumber one, declaring it in the spec, or qualify its title with its spec.`,
+    });
+  }
+  if (cleared.length > 0) {
+    violations.push({
+      rule: "SP15",
+      file: "tools/enforce/commitments.mjs",
+      spec: "A03 §2 · A03 §7a",
+      message:
+        `${String(cleared.length)} entr(y/ies) on SP15's list are titled in one file now — ` +
+        `${cleared.join(", ")}. The list is compared by equality so it can only shrink; remove them.`,
+    });
+  }
+  return { violations, rows, unowned, split: found.length };
+}
+
 export function checkSectionReferences(
   files,
   readFile = (f) => readFileSync(f, "utf8"),
@@ -2234,5 +2438,5 @@ export function checkReferences(
 // That is A03 §2's own subject reaching the list that enforces it.
 export const SPEC_RULES = [
   "SP1", "SP2", "SP3", "SP4", "SP5", "SP6", "SP7", "SP8", "SP9", "SP10", "SP11",
-  "SP12", "SP13", "SP14",
+  "SP12", "SP13", "SP14", "SP15",
 ];

@@ -951,7 +951,7 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     ).toContain("throw new Error(`${String(found.length)} registry bindings for ${actionId} in ${profile}, not one`)");
   });
 
-  it("T1.98 (C16 §6a clause 6, R-KEY-005, §019): a chord renders in the design's notation, by equality against the registry", () => {
+  it("T1.195 (C16 §6a clause 6, R-KEY-005, §019): a chord renders in the design's notation, by equality against the registry", () => {
     // **The notation is the design's by equality and not by transcription.**
     // `chordText` reads like a table someone kept in step with §019 — eleven
     // glyphs and four modifiers, written out by hand — and a table kept in step
@@ -1014,7 +1014,7 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     expect(defaultKeymap.some((b) => !ASCII_ONLY.test(chordText(b.key)))).toBe(true);
   });
 
-  it("T1.99 (C16 §6a clause 6, I34): two keys that render one chord are still two slots", () => {
+  it("T1.196 (C16 §6a clause 6, I34): two keys that render one chord are still two slots", () => {
     // **The row a mutation asked for, and the tree could not answer.** Swapping
     // `slot` from `keySlot` to `chordText` survived a pass: both are injective
     // over the keymap that ships, so the duplicate check gives the same answer
@@ -1056,7 +1056,7 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     ).toThrow(/duplicate binding/u);
   });
 
-  it("T1.100 (C16 §6a clause 4, R-KEY-005, §022): the listing's order is the registry's, then FOCUS_ORDER — never alphabetical", () => {
+  it("T1.197 (C16 §6a clause 4, R-KEY-005, §022): the listing's order is the registry's, then FOCUS_ORDER — never alphabetical", () => {
     // **The row the first implementation would have passed.** It sorted the
     // remainder alphabetically, and §022's own picture agreed with that by
     // coincidence: it draws `global` before `transcript`, and `g` precedes `t`.
@@ -2017,10 +2017,4 @@ describe("C16 §6c — routes by profile and the registry-global placement (revi
     expect(listed, "the records' own profiles, by equality").toEqual(current.map((b) => b.profile).sort());
     expect(listed, "and both appear").toContain("enhanced-terminal");
   });
-});
-
-describe("C16 §6a — the renumbered rows (review batch 3, M7 item 7)", () => {
-  it.todo("T1.195 (C16 §6a clause 6): the chord notation row, renumbered from its second T1.98 — not deferred on a component: the code lands in the next commit of this round");
-  it.todo("T1.196 (C16 §6a clause 6): the two-slots row, renumbered from its second T1.99 — not deferred on a component: the code lands in the next commit of this round");
-  it.todo("T1.197 (C16 §6a clause 4): the listing-order row, renumbered from its second T1.100 — not deferred on a component: the code lands in the next commit of this round");
 });
