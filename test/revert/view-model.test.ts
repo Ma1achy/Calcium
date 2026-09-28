@@ -516,4 +516,5 @@ describe("C04 I6 fail-on-revert — the vocabulary is closed", () => {
     };
     expect(() => block(outside as never)).toThrow(/C04 I6, ruling 44/u);
   });
+  it.todo("T6.106 (C04 I6, ruling 77): dropping the wire's glyph check → T2.139 fails at the wire — not deferred on a component: the code lands in the next commit of this round");
 });
