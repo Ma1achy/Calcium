@@ -4565,9 +4565,9 @@ claim measures instead, and it is a *relationship between two call sites*: the o
 view ever writes is `deps.transcript.settle(settle.into, noticeDoc(line, `${verb} opened a view`
 …))` in `execution.ts` (line 983 at the time; the view route and this settlement retired under R-EXA-082), guarded by `settle.into !== null` — so a **deferred**
 invocation leaves a record because roadmap 33 gave it an entry before it ran, and a directly
-submitted one leaves none. The direct push is `pushView` (`src/shell/actions.ts:141`) and it
-appends nothing; both pop sites — `viewPop` (`src/shell/keys.ts:900`) and `cancelThis`
-(`src/shell/execution.ts:895`) — patch nothing, and the second says so in its own comment. No
+submitted one leaves none. The direct push was `pushView` (in `actions.ts` at the time) and it
+appended nothing; both pop sites — `viewPop` (in `keys.ts`) and the view route's `cancelThis`
+(in `execution.ts`), all three retired with the view route under R-EXA-082 — patched nothing, and the second said so in its own comment. No
 single name can be absent for that: `append on push, patch on pop` is a pair of missing calls, not
 a missing symbol, and `DocumentViewDeps` names no transcript at all — `transcript` occurs once in
 `src/shell/document-view.ts` and the once is a comment, which is why the gate arm strips comments

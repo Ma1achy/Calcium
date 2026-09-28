@@ -96,8 +96,10 @@ const MUTATIONS = [
   {
     name: "NO-FRAME: the return appends its notice and commits no frame",
     file: CONSTRUCT,
-    from: '      if (events.length === 0 && returned) scheduler.commit("input");\n',
-    to: "",
+    // Re-aimed at batch 3's integration, where C16 I72's focus-out joined the
+    // same commit: only the return's reason for a frame is removed.
+    from: '      if (events.length === 0 && (returned || guardMoved)) scheduler.commit("input");\n',
+    to: '      if (events.length === 0 && guardMoved) scheduler.commit("input");\n',
     expect: "T4.84",
   },
   {

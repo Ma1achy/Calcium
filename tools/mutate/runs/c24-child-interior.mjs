@@ -76,6 +76,7 @@ const results = await runPass({
       file: SURFACE,
       from:
         "      current = null;\n" +
+        "      generation += 1;\n" +
         "      closeCurrent = null;\n" +
         "      options.attachment.closed(entryId, outcome.reason);\n" +
         "      // **The frame after ownership returns, not before** (C22 I110). The\n" +
@@ -86,6 +87,7 @@ const results = await runPass({
       to:
         "      options.invalidate();\n" +
         "      current = null;\n" +
+        "      generation += 1;\n" +
         "      closeCurrent = null;\n" +
         "      options.attachment.closed(entryId, outcome.reason);\n",
       expect: "T4.94c",
