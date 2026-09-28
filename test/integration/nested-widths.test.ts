@@ -65,6 +65,47 @@ const text = (c: string): unknown => ({ kind: "notice", id: c, tone: "info", tex
 /** A run of `c` long enough to be only that notice's, and short enough to sit inside one of its rows. */
 const FILL = (c: string): string => c.repeat(40);
 
+const DOWN = "\u001b[B";
+const UP = "\u001b[A";
+const PAGE_DOWN = "\u001b[6~";
+
+/**
+ * A painting session at 81 columns — a region of 80, and a card body of 75 —
+ * whose `/box` answers a 76-cell notice per id in a box of `height`.
+ *
+ * **Every offset a row reaches is a child boundary**, deliberately: a notice
+ * declares no `window`, so a child the window cuts is drawn whole and pushes
+ * the residue row out of the box's measured height (C09 I58's `null` arm) —
+ * the frame then says nothing about the offset this file is reading.
+ *
+ * **A real session, because the pull is the read loop's** (C26 I24): it runs
+ * after the keys a stdin chunk carried, and `buildGraph`'s router dispatch
+ * never reaches it. The local route's card is what puts the box in a body.
+ */
+async function boxSession(height: number, ids: readonly string[] = ["a", "b", "c"]) {
+  const BOX = { kind: "scroll", id: "s", height, children: ids.map(text) };
+  const stdin = fakeStdin();
+  const session = await buildSession(
+    {
+      stdin: stdin as never,
+      manifest: {
+        schema: "tui.manifest/1",
+        binary: "prism",
+        version: "1.0.0",
+        tools: [{ name: "box", local: true, summary: "a box in a card", args: [], flags: [] }],
+      },
+      localHandlers: { box: () => ({ schema: "tui.view/1", command: "box", status: "ok", blocks: [BOX] }) as never },
+    },
+    { columns: REGION.width + 1, rows: 30 },
+  );
+  const type = async (bytes: string): Promise<void> => {
+    stdin.emit(bytes);
+    for (let i = 0; i < 8; i += 1) await Promise.resolve();
+  };
+  const frame = (): string => session.screen().rows.join("\n");
+  return { session, type, frame };
+}
+
 /** A settled call head, which makes the entry a card whose body sits a gutter in (C22 I83). */
 const HEAD = { kind: "notice", id: "h", text: "head", state: "succeeded", tone: "ok", glyph: "work-unit" };
 
@@ -132,38 +173,11 @@ describe("C09 I126 — the shell asks a box's questions at the box's width", () 
   });
 
   it("T4.61 (C09 I126, C22 I83, C26 I24, C04 I48): in a card's body — ↓ pulls the next child into the box, and a page moves it by its drawn height, read off the frame", async () => {
-    // **A real session, because the pull is the read loop's** (C26 I24): it runs
-    // after the keys a stdin chunk carried, and `buildGraph`'s router dispatch
-    // never reaches it. 81 columns is a region of 80, and the local route's
-    // card puts the body at 75 (C22 I83).
-    //
     // Three 76-cell notices at 75: two rows each, so a box of two overflows and
     // its bar takes a column — still two rows each at 74. Content 6, ceiling 4,
     // height 3 with the residue row. At the region's 80 each is one row:
     // content 3, ceiling 1 — the numbers the shell used to clamp against.
-    const BOX = { kind: "scroll", id: "s", height: 2, children: [text("a"), text("b"), text("c")] };
-    const stdin = fakeStdin();
-    const session = await buildSession(
-      {
-        stdin: stdin as never,
-        manifest: {
-          schema: "tui.manifest/1",
-          binary: "prism",
-          version: "1.0.0",
-          tools: [{ name: "box", local: true, summary: "a box in a card", args: [], flags: [] }],
-        },
-        localHandlers: { box: () => ({ schema: "tui.view/1", command: "box", status: "ok", blocks: [BOX] }) as never },
-      },
-      { columns: REGION.width + 1, rows: 30 },
-    );
-    const type = async (bytes: string): Promise<void> => {
-      stdin.emit(bytes);
-      for (let i = 0; i < 8; i += 1) await Promise.resolve();
-    };
-    const frame = (): string => session.screen().rows.join("\n");
-    const DOWN = "\u001b[B";
-    const UP = "\u001b[A";
-    const PAGE_DOWN = "\u001b[6~";
+    const { session, type, frame } = await boxSession(2);
 
     await type("/box\r");
     await type(DOWN); // the card's head (C09 I47)
@@ -190,6 +204,24 @@ describe("C09 I126 — the shell asks a box's questions at the box's width", () 
     expect(frame()).toContain(FILL("b"));
     expect(frame()).not.toContain(FILL("c"));
     await session.tui.stop("exit");
+  });
+
+  it("T4.61 (C09 I126, C22 I83, C04 I48): in a card's body — a box that fits at the region's width and overflows at the body's pages by the height it is drawn at", async () => {
+    // **The page's own height, which the box above cannot see** (T6.148). Three
+    // notices in a box of 2 overflow at 80 and at 75 alike, so the box measures
+    // 3 at both and pages by 2 either way. Two notices in a box of 2 fit at 80 —
+    // one row each, content 2, measured 2, a page of 1 — and overflow at 75,
+    // where the box measures 3 with its residue row: a page of 2, which is its
+    // ceiling (4 − 2), so the residue reads `2 above, 0 below`.
+    const two = await boxSession(2, ["a", "b"]);
+    await two.type("/box\r");
+    await two.type(DOWN);
+    await two.type(DOWN);
+    expect(two.frame(), "the box opens on a").toContain("0 above, 2 below");
+    await two.type(PAGE_DOWN);
+    expect(two.frame(), "one page of two rows, to the ceiling").toContain("2 above, 0 below");
+    expect(two.frame()).toContain(FILL("b"));
+    await two.session.tui.stop("exit");
   });
 
   it("T4.62 (C09 I126, C16 I48, R-SEL-012): three boxes deep in a card's body — the wheel on the middle box's own child moves the middle box", async () => {

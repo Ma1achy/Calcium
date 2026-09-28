@@ -35,11 +35,15 @@ const results = runPass({
   read,
   write,
   run,
+  // **Not the bar's own width, which was the first draft and survived.** A bar
+  // two columns wide moves the renderer and `childWidthsOf` together, because
+  // both read `barOf` — which is I126 holding, and C09 I115's rows are where
+  // the bar's width is watched. A control must be a change this corpus can see.
   control: {
-    file: CONTAINERS,
-    from: "  const narrow = width - 1; // cells-ok — a width less its bar\n",
-    to: "  const narrow = width - 2; // cells-ok — a width less its bar\n",
-    why: "the bar takes two columns — every width T1.88 reads through a scroll's bar is one narrower than the frame's",
+    file: REGISTRY,
+    from: "      if (!hasChildren(block)) return [];\n      const w = contentWidth(block, normaliseWidth(width));\n",
+    to: "      if (hasChildren(block)) return [];\n      const w = contentWidth(block, normaliseWidth(width));\n",
+    why: "no container answers a child's width — blockWidthInEntry finds no nested block, and every T1.88 arrangement fails",
   },
   mutations: [
     {
