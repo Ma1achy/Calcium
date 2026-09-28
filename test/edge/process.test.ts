@@ -391,8 +391,22 @@ describe("C21 the clipboard tool, at its edges (I20)", () => {
       try {
         stub(early, "pbcopy", "#!/bin/sh\nexit 0\n");
         const big = "y".repeat(1024 * 1024);
-        const wrote = await writeClipboard(findClipboardTool({ PATH: early })!, big, { ...deps, env: { PATH: runPath(early) } });
-        expect(wrote).toEqual({ ok: true, tool: "pbcopy" });
+        // **Trapped rather than trusted to the runner.** An unhandled `EPIPE` is an
+        // uncaught exception, which vitest reports beside the rows and not as a
+        // failed one — so a row that only awaited the answer passed with the
+        // listener gone, and the mutation pass is what showed it.
+        const uncaught: unknown[] = [];
+        const trap = (error: unknown): void => void uncaught.push(error);
+        process.on("uncaughtException", trap);
+        try {
+          const wrote = await writeClipboard(findClipboardTool({ PATH: early })!, big, { ...deps, env: { PATH: runPath(early) } });
+          expect(wrote).toEqual({ ok: true, tool: "pbcopy" });
+          // The pipe's error lands after the exit; give it the turn it needs.
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        } finally {
+          process.off("uncaughtException", trap);
+        }
+        expect(uncaught, "no EPIPE escaped").toEqual([]);
       } finally {
         removeDir(early);
       }
