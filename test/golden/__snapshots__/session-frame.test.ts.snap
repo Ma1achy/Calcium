@@ -1120,7 +1120,7 @@ BBBBB......................................................................BBBBB
 BBBBBB..BBBBBBBBBB..BBBBBBBBBB..BBBBBBBBBBBBB...................................
 
 A = fg 38;5;254  bg —  attrs —
-B = fg 38;5;246  bg —  attrs —"
+B = fg 38;5;247  bg —  attrs —"
 `;
 
 exports[`golden frames — a composed session, not a block > SF2 · boot · paper — the styles 1`] = `
@@ -1514,7 +1514,7 @@ CCCCCCBBCCCCCCCCCCBBCCCCCCCCCCBBCCCCCCCCCCCCCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 A = fg 38;5;237  bg 48;5;231  attrs —
 B = fg —  bg 48;5;231  attrs —
 C = fg 38;5;242  bg 48;5;231  attrs —
-D = fg 38;5;65  bg 48;5;231  attrs —"
+D = fg 38;5;29  bg 48;5;231  attrs —"
 `;
 
 exports[`golden frames — a composed session, not a block > SF2 · transcript · mono — the styles 1`] = `
@@ -1576,9 +1576,9 @@ BBBBB......................................................................BBBBB
 BBBBBB..BBBBBBBBBB..BBBBBBBBBB..BBBBBBBBBBBBB...................................
 
 A = fg 38;5;254  bg —  attrs —
-B = fg 38;5;246  bg —  attrs —
-C = fg 38;5;108  bg —  attrs —
-D = fg 38;5;247  bg —  attrs —"
+B = fg 38;5;247  bg —  attrs —
+C = fg 38;5;151  bg —  attrs —
+D = fg 38;5;145  bg —  attrs —"
 `;
 
 exports[`golden frames — a composed session, not a block > SF2 · transcript · paper — the styles 1`] = `
@@ -1610,7 +1610,7 @@ CCCCCCBBCCCCCCCCCCBBCCCCCCCCCCBBCCCCCCCCCCCCCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 A = fg 38;5;236  bg 48;5;255  attrs —
 B = fg —  bg 48;5;255  attrs —
 C = fg 38;5;242  bg 48;5;255  attrs —
-D = fg 38;5;65  bg 48;5;255  attrs —
+D = fg 38;5;22  bg 48;5;255  attrs —
 E = fg 38;5;241  bg 48;5;255  attrs —"
 `;
 
@@ -2725,15 +2725,15 @@ ESC[38;5;254m
 «calcium»
 ESC[39m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «prism»
 ESC[39m
 «» +58sp
-ESC[38;5;246m
+ESC[38;5;247m
 «22:13:20»
 ESC[39m
 CRLF
-ESC[38;5;246m
+ESC[38;5;247m
 «────────────────────────────────────────────────────────────────────────────────»
 ESC[0m
 CRLF
@@ -2771,37 +2771,37 @@ CRLF
 CRLF
 «» +80sp
 CRLF
-ESC[38;5;246m
+ESC[38;5;247m
 «────────────────────────────────────────────────────────────────────────────────»
 ESC[0m
 CRLF
 «❯» +79sp
 CRLF
-ESC[38;5;246m
+ESC[38;5;247m
 «────────────────────────────────────────────────────────────────────────────────»
 ESC[0m
 CRLF
-ESC[38;5;246m
+ESC[38;5;247m
 «/help»
 ESC[39m
 «» +70sp
-ESC[38;5;246m
+ESC[38;5;247m
 «/work»
 ESC[39m
 CRLF
-ESC[38;5;246m
+ESC[38;5;247m
 «⏎ send»
 ESC[39m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «⇧⏎ newline»
 ESC[39m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «⇥ complete»
 ESC[39m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «⇧⇥ transcript»
 ESC[39m
 «» +35sp
@@ -4348,7 +4348,7 @@ ESC[0m
 ESC[4;1H
 ESC[0m
 ESC[48;5;231m
-ESC[38;5;65m
+ESC[38;5;29m
 «● help»
 ESC[39m
 «» +74sp
@@ -4797,32 +4797,32 @@ ESC[0m
 «❯ /help» +73sp
 ESC[4;1H
 ESC[0m
-ESC[38;5;108m
+ESC[38;5;151m
 «● help»
 ESC[39m
 «» +74sp
 ESC[5;1H
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «⎿»
 ESC[0m
 «» +77sp
 ESC[6;1H
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «│»
 ESC[0m
 «» +77sp
 ESC[7;1H
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «│»
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «/help» +8sp
 ESC[39m
 «» +2sp
@@ -4833,11 +4833,11 @@ ESC[39m
 ESC[8;1H
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «│»
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «/capabilities»
 ESC[39m
 «» +2sp
@@ -4848,11 +4848,11 @@ ESC[39m
 ESC[9;1H
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «│»
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «/clear» +7sp
 ESC[39m
 «» +2sp
@@ -4863,11 +4863,11 @@ ESC[39m
 ESC[10;1H
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «│»
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «/theme» +7sp
 ESC[39m
 «» +2sp
@@ -4878,11 +4878,11 @@ ESC[39m
 ESC[11;1H
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «│»
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «/history» +5sp
 ESC[39m
 «» +2sp
@@ -4893,11 +4893,11 @@ ESC[39m
 ESC[12;1H
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «│»
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «/exit» +8sp
 ESC[39m
 «» +2sp
@@ -4908,11 +4908,11 @@ ESC[39m
 ESC[13;1H
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «│»
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «/profile» +5sp
 ESC[39m
 «» +2sp
@@ -4923,11 +4923,11 @@ ESC[39m
 ESC[14;1H
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «│»
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «/config» +6sp
 ESC[39m
 «» +2sp
@@ -4968,18 +4968,18 @@ ESC[39m
 ESC[17;1H
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «│»
 ESC[0m
 «» +77sp
 ESC[18;1H
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «│»
 ESC[0m
 «» +2sp
-ESC[38;5;247m
+ESC[38;5;145m
 «/help keys   Use»
 ESC[39m
 «» +59sp
@@ -5003,7 +5003,7 @@ ESC[0m
 ESC[4;1H
 ESC[0m
 ESC[48;5;255m
-ESC[38;5;65m
+ESC[38;5;22m
 «● help»
 ESC[39m
 «» +74sp

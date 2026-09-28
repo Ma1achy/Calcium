@@ -116,7 +116,7 @@ describe("C10 §2 / C09 §4 — the curated tables", () => {
     // initialiser shape, so an answer of nothing — or of literals only, which is
     // what the regex saw — is a failure rather than a green run.
     for (const [shape, name] of [
-      ["literal", "ANSI16_HEX"],
+      ["literal", "ANSI16_WINDOWS_HEX"],
       ["identifier", "defaultTheme"],
       ["member", "DARK_FOUR_BIT"],
       ["constructor", "FREE_WIDTH_SLOTS"],

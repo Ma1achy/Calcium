@@ -12,6 +12,11 @@
 // **And the floor at the rungs the table serves** (C10 I68, T6.134–T6.135):
 // `quantisedShortfalls` measures the quantised ink on the quantised ground, and
 // its two lists are held by equality in `test/contract/quantised-contrast.test.ts`.
+//
+// **And the quantiser holding it** (C10 I69, T6.136–T6.141): the floor as an
+// admission on the DP, the ground arm, the yield ladder, the band's one ink,
+// the page and the infeasible arm — each hand-mutated on landing first, which
+// is how T6.138's survivor was found and T2.77 gained its constructed set.
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
@@ -19,9 +24,10 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD = "npx vitest run test/unit/theme.test.ts test/contract/quantised-contrast.test.ts";
 const Q = "src/presentation/theme/quantise.ts";
+const R = "src/presentation/theme/resolve.ts";
 const TABLE = "src/presentation/theme/quantised.generated.ts";
-// The instrument lives beside its rows: nothing in `src/` may call it until
-// its 8-bit list is empty (C10 I68).
+// The instrument lives beside its rows (C10 I68). Its 8-bit list is empty since
+// C10 I69, and the move to a load gate is a question of its own.
 const INSTRUMENT = "test/support/quantised-contrast.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -134,6 +140,62 @@ const results = runPass({
       from: "?? (depth === 4 ? page : null);",
       to: "?? (depth === 4 ? null : page);",
       expect: "T2.75",
+    },
+    {
+      // **T6.136 — the nearest-entry pick restored.** The set's nearest picks
+      // are served without asking whether a floor refuses one: C10 I68's 193 cells.
+      name: "T6.136: holdFloor answers the nearest set unasked",
+      file: R,
+      from: "  return refused ? computeQuantisation(slots, admits) : nearest;",
+      to: "  return nearest;",
+      expect: "T2.74",
+    },
+    {
+      // **T6.137 — the ground arm removed.** The surfaces take their nearest
+      // entries, and hcDark's focus band is back on #005faf, where no ink the
+      // cube has reaches 7.
+      name: "T6.137: the surfaces quantised with no admission",
+      file: R,
+      from: 'return quantisedFor(theme, "surface", surfaces, () => groundAdmits(theme.tokens));',
+      to: 'return quantisedFor(theme, "surface", surfaces);',
+      expect: "T2.74",
+    },
+    {
+      // **T6.138 — the ladder's second step removed.** No shipped set reaches
+      // it; the first hand mutation here survived, and T2.77's constructed set
+      // is the answer to that survivor.
+      name: "T6.138: the distinctness repair skips a free entry outside its window",
+      file: Q,
+      from: "      closest(entry.lab, free) ??\n",
+      to: "",
+      expect: "T2.77",
+    },
+    {
+      // **T6.139 — a band split again.** Two slots given one value treated as
+      // a collision: hcDark's black selection ink becomes five near-blacks.
+      name: "T6.139: the same-value exemption removed from the repair",
+      file: Q,
+      from: "if (holder === undefined || holder === entry.hex) {",
+      to: "if (holder === undefined) {",
+      expect: "T2.78",
+    },
+    {
+      // **T6.140 — the page held against nothing.** An absent ground looked up
+      // under a name no ground has, so the page's painters get the nearest set.
+      name: "T6.140: the page passes no admission",
+      file: R,
+      from: '  const ground = on ?? "bg";',
+      to: '  const ground = on ?? "";',
+      expect: "T2.76",
+    },
+    {
+      // **T6.141 — the infeasible arm removed.** A set with no assignment keeps
+      // the DP's initial picks, every one the cube's first entry.
+      name: "T6.141: a set with no assignment is left at its initial picks",
+      file: Q,
+      from: "    for (const member of chosen) member.pick = nearest(member.lab, (c) => member.admits(c.hex));\n",
+      to: "",
+      expect: "T2.74",
     },
   ],
 });

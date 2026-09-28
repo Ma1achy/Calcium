@@ -32,7 +32,7 @@
 
 import type { PaletteSpec, TextGround, ThemeError, ThemeTokens } from "./types.js";
 import { TEXT_GROUNDS } from "./four-bit.generated.js";
-import { ANSI16_HEX } from "./colormap.js";
+import { ANSI16_WINDOWS_HEX } from "./colormap.js";
 import { TONES } from "../../data/viewmodel/index.js";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -825,7 +825,8 @@ export function validateBands(tokens: ThemeTokens): readonly ThemeError[] {
  * reference palette (C10 I61).
  *
  * Not part of `validateTokens`, and on purpose: the ratios are a claim about the
- * xterm defaults and not about any terminal a theme loads in, so a shortfall is
+ * reference palette — the legacy Windows console's sixteen, `ANSI16_WINDOWS_HEX`
+ * — and not about any terminal a theme loads in, so a shortfall is
  * a fact T2.64 holds to a named list rather than a reason to refuse the theme.
  * The page is `fourBit["surface.bg"]`, as the resolver draws it.
  */
@@ -835,7 +836,7 @@ export function bandFourBitShortfalls(
   const pairs = tokens.bandFourBit;
   const pageIndex = tokens.fourBit["surface.bg"];
   if (pairs === undefined || pageIndex === undefined) return Object.freeze([]);
-  const hex = (i: number): string => ANSI16_HEX[i] ?? "#000000";
+  const hex = (i: number): string => ANSI16_WINDOWS_HEX[i] ?? "#000000";
   const page = hex(pageIndex);
   const promised = tokens.floor ?? DEFAULT_FLOOR;
   const out: { path: string; measured: number; need: number }[] = [];

@@ -810,13 +810,13 @@ exports[`§079, §074 — tones, surfaces and weight, across ten themes > at 8-b
   default       x237     plain
   dim           x242     plain
   muted         x242     plain
-  ok            x65      plain
+  ok            x29      plain
   warn          x94      plain
   error         x124     plain
   info          x24      plain
   accent        x27      plain
   meta          x90      plain
-  identifier    x31      plain
+  identifier    x24      plain
   · surfaces
   bg            x231     plain
   bgElev        x255     plain
@@ -849,7 +849,7 @@ exports[`§079, §074 — tones, surfaces and weight, across ten themes > at 8-b
   dim           x251     plain
   muted         x247     plain
   ok            x34      plain
-  warn          x136     plain
+  warn          x178     plain
   error         x203     plain
   info          x75      plain
   accent        x141     plain
@@ -871,7 +871,7 @@ exports[`§079, §074 — tones, surfaces and weight, across ten themes > at 8-b
   mPlan         x39      plain
   mManual       x247     plain
   skipGround    x196     plain
-  focusGround   x25      plain
+  focusGround   x24      plain
   errorInk      x16      plain
   mInk          x16      plain
   skipInk       x16      plain
@@ -998,15 +998,15 @@ exports[`§079, §074 — tones, surfaces and weight, across ten themes > at 8-b
 ── nord (dark)
   · tones
   default       x254     plain
-  dim           x247     plain
-  muted         x246     plain
-  ok            x108     plain
-  warn          x222     plain
-  error         x173     plain
-  info          x67      plain
-  accent        x216     plain
+  dim           x145     plain
+  muted         x247     plain
+  ok            x151     plain
+  warn          x223     plain
+  error         x216     plain
+  info          x110     plain
+  accent        x222     plain
   meta          x139     plain
-  identifier    x109     plain
+  identifier    x152     plain
   · surfaces
   bg            x235     plain
   bgElev        x238     plain
@@ -1114,10 +1114,10 @@ exports[`§079, §074 — tones, surfaces and weight, across ten themes > at 8-b
   default       x236     plain
   dim           x241     plain
   muted         x242     plain
-  ok            x65      plain
+  ok            x22      plain
   warn          x94      plain
   error         x124     plain
-  info          x31      plain
+  info          x242     plain
   accent        x26      plain
   meta          x53      plain
   identifier    x23      plain

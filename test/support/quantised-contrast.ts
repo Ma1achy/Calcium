@@ -1,7 +1,7 @@
 // C10 I68 — the floor measured below 24-bit, ink and ground as the resolver
 // paints them. The instrument T2.74 and T2.75 read; the lists they hold it to
 // are `quantised-shortfalls.ts`.
-import { ANSI16_HEX } from "../../src/presentation/theme/colormap.js";
+import { ANSI16_WINDOWS_HEX } from "../../src/presentation/theme/colormap.js";
 import { DEFAULT_FLOOR, decorationTextPairs, floorFor, ratio, textGrounds } from "../../src/presentation/theme/contrast.js";
 import { cubeHexOf } from "../../src/presentation/theme/quantise.js";
 import { resolve, resolveBackground, resolveHueBand } from "../../src/presentation/theme/resolve.js";
@@ -24,7 +24,7 @@ import type { ColourRef, ColourValue, ResolvedTheme } from "../../src/presentati
  * screen: the ink through `resolve(ref, theme, caps, ground)`, composed on its
  * ground (C10 I48) and a band's one ink where there is one (C10 I61), and the ground
  * through `resolveBackground`. At 8-bit an index maps back through the cube the
- * standard fixes; at 4-bit through `ANSI16_HEX`, the reference palette C10 I61
+ * standard fixes; at 4-bit through `ANSI16_WINDOWS_HEX`, the reference palette C10 I61
  * measures bands against, since a terminal's low sixteen are the user's.
  *
  * **A ground the resolver does not paint at 4-bit is the page**, because that
@@ -32,13 +32,17 @@ import type { ColourRef, ColourValue, ResolvedTheme } from "../../src/presentati
  * every theme without a 4-bit band the ink lands on the page's index. An ink or
  * a page with no colour at all is the terminal's own pair and is not a cell.
  *
- * **Here and not in `src/`, because nothing in `src/` may call it yet.** It is
- * not part of `validateTokens`: at 4-bit for `bandFourBitShortfalls`' reason —
- * the ratios are a claim about a reference palette — and at 8-bit because the
- * list is not empty, and a load gate over it would refuse every shipped theme.
- * C10 I68 holds both lists by equality instead (T2.74, T2.75). The day the
- * 8-bit list is empty it can become a load gate, and then it moves to
- * `resolve.ts` beside `validatePaintedFloors` with a caller.
+ * **Here and not in `src/`, because nothing in `src/` calls it.** It is not
+ * part of `validateTokens`: at 4-bit for `bandFourBitShortfalls`' reason — the
+ * ratios are a claim about a reference palette — and at 8-bit because the list
+ * was not empty, and a load gate over it would have refused every shipped
+ * theme. C10 I68 holds both lists by equality instead (T2.74, T2.75).
+ *
+ * **That condition was met by C10 I69, and the move was not made with it.** The
+ * 8-bit list is empty, so this could become a load gate beside
+ * `validatePaintedFloors`; I69's ruling was the quantiser, not the gate, and
+ * the move is a question of its own — named here so the next reader of this
+ * comment is not told it is still blocked.
  */
 export function quantisedShortfalls(
   theme: ResolvedTheme,
@@ -48,7 +52,7 @@ export function quantisedShortfalls(
   const caps = Object.freeze({ colourDepth: depth });
   const hexOf = (colour: ColourValue | undefined): string | null => {
     if (colour === undefined) return null;
-    if (depth === 4) return colour.kind === "ansi16" ? (ANSI16_HEX[colour.index] ?? null) : null;
+    if (depth === 4) return colour.kind === "ansi16" ? (ANSI16_WINDOWS_HEX[colour.index] ?? null) : null;
     return colour.kind === "ansi256" ? cubeHexOf(colour.index) : null;
   };
   const page = hexOf(resolveBackground("surface.bg", theme, caps).background);
