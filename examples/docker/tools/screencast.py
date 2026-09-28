@@ -107,7 +107,7 @@ def build() -> list[Beat]:
     return to an unchanged frame is what read as a bounce.
 
     **`⌃Home` appears once, at the end, on purpose.** The previous script
-    pressed it mid-recording to "reach the patch's first hunk", but `/config` is
+    pressed it mid-recording to "reach the patch's first hunk", but `/filediff` is
     `local: true` — its output is a transcript entry, not a view — so `⌃Home`
     at `global` is `scrollTop` over the whole transcript and scrolled to the
     banner every time. Moving within a patch is `PageUp`.
@@ -192,7 +192,7 @@ def build() -> list[Beat]:
     # 8 — **the third app source, and the one that needs argument one to answer
     #     argument two.** `/etc/ng` completes to `/etc/nginx/` with no delimiter
     #     — a directory continues (C19 I16) — so the next `Tab` lists inside it.
-    part, t = typed(b"/config dtui-cfg /etc/ng", t); b += part
+    part, t = typed(b"/filediff dtui-cfg /etc/ng", t); b += part
     t += 0.6
     b.append((round(t, 3), TAB)); t += 1.6
     b.append((round(t, 3), TAB)); t += 2.4

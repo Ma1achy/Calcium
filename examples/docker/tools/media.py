@@ -52,7 +52,7 @@ TRUE = {**UTF8, "COLORTERM": "truecolor"}
 # is the weaker fix the call-site note names, moved by a measurement.
 #
 # **F813's mechanism is settled and it is F158's** (F1024). Eighteen captures at
-# 120x40 through `bin/docker-tui.js`, typing `/config` at four moments: the diff
+# 120x40 through `bin/docker-tui.js`, typing `/filediff` at four moments: the diff
 # is in the byte stream in *every* one, including the shots whose final frame has
 # no sign of it, and three PageUps find it as the transcript's **first** entry
 # with the banner below. So the verb's result is not lost — the greeting appended
@@ -161,7 +161,7 @@ SHOTS: list[tuple[str, int, int, bytes, float, dict[str, str], float | None]] = 
     ("depth-ascii", 100, 34, b"/container stats dtui-load", 14.0, {"LANG": "C", "DOCKER_TUI_DEPTH": "1"}, 12.0),
 
     # 4 — the block vocabulary, at its least table-like.
-    ("config-diff", 120, 40, b"/config dtui-cfg /etc/nginx/conf.d/default.conf", 16.0, TRUE, 13.0),
+    ("config-diff", 120, 40, b"/filediff dtui-cfg /etc/nginx/conf.d/default.conf", 16.0, TRUE, 13.0),
 
     # 5 — the comparison block: two sources, one row per field, verdict-toned.
     ("drift", 120, 34, b"/drift dtui-web", 12.0, TRUE, 10.0),

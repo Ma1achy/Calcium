@@ -10,7 +10,7 @@ findings ledger recording every place the framework did not reach.
 beats against real containers: the landing dashboard, `/ps` and its rows under
 the arrow keys, a completion menu that opens as the verb is typed, image and
 container names answered by the app's own sources, the dive into the live view
-filling its plot, `/drift`, `/config`'s unified diff with its path completed
+filling its plot, `/drift`, `/filediff`'s unified diff with its path completed
 inside the container, two short verbs, and then the whole session scrolled back
 to the banner.
 
@@ -186,7 +186,7 @@ found three defects, F70 to F72.
 | `/ps` | the table, and the columns it drops as the terminal narrows |
 | ⏎ on a row | **the live single-container view** — the headline |
 | `/drift <c>` | the container against the image it came from, verdict-toned |
-| `/config <c> <path>` | a real unified diff with hunks, context and syntax |
+| `/filediff <c> <path>` | a real unified diff with hunks, context and syntax |
 | `/logs <c>` | streaming into a pushed view; `⌃c` leaves it |
 | `/inspect` `/diff` `/images` `/top` `/port` `/events` `/compare` | the rest of the read side |
 | `/rm <c>` | **the confirm** — a question carrying what it will destroy, and a refusal passed through with a `fill` |

@@ -199,7 +199,7 @@ consumer proving it is needed.
 2. landing dashboard                                            (S1) — first b.live, entry host
 3. ⏎ live single-container view                                 (S3) — HEADLINE, gap 7, the plot
 4. /drift, then /compare                                        (S7, S6) — comparison at its best
-5. /config, then /inspect --raw                                 (S8, S5) — real patch, syntax
+5. /filediff, then /inspect --raw                                 (S8, S5) — real patch, syntax
 6. /logs, /diff, the smaller verbs                              (S9-S11)
 7. degradation showcase — the S3 view at five depths            (S12)
 8. whatever gaps 1-7 turned out to be, each with a consumer

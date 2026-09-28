@@ -241,7 +241,7 @@ export const lineOf = (event: Seen): EventLine => ({
  * `eventsDefinition.measure` is `atLeastOne(length)`, so a `b.events` block with
  * no events occupies a row and draws **blank**: the exact frame that reads as a
  * broken fetch. Walk E6, and the empty-block class a **sixth** time — `/drift`,
- * `/config`, `/logs`, `/diff`, `/port`, this. It read *fifth* until the roadmap
+ * `/filediff`, `/logs`, `/diff`, `/port`, this. It read *fifth* until the roadmap
  * counted them, because `/port`'s instance (walk A4) never claimed an ordinal:
  * it was filed as a variant rather than a member, and a variant still happened.
  */

@@ -159,8 +159,8 @@ const compare: ToolDef = {
  * lets the verb run and answer, rather than refusing before it can say what it
  * would have needed.
  */
-const config: ToolDef = {
-  name: "config",
+const filediff: ToolDef = {
+  name: "filediff",
   local: true,
   summary: "A config file as the container has it, against the image's original",
   args: [
@@ -293,4 +293,4 @@ const events: ToolDef = {
   flags: [],
 };
 
-export const READ_TOOLS: readonly ToolDef[] = [ps, dashboard, containerStats, inspect, logs, drift, compare, config, diff, images, top, port, events];
+export const READ_TOOLS: readonly ToolDef[] = [ps, dashboard, containerStats, inspect, logs, drift, compare, filediff, diff, images, top, port, events];
