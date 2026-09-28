@@ -1,6 +1,7 @@
 // C16 §6c — routes by profile, where a registry-global binding fires, the
 // copy-mode switch, and a reserved row passing through to the application
-// (review batch 2, M6 items 1–5; C22 I134, C24 I39).
+// (review batch 2, M6 items 1–5; C22 I134, C24 I39) — and the palette's way in
+// (C16 I68, ruling 45).
 //
 // **Every mutation here leaves a keymap that constructs and a session that
 // runs.** A chord still resolves somewhere, `?` still opens help somewhere, and
@@ -19,11 +20,14 @@ const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/unit/router-keymap.test.ts test/integration/registry-global.test.ts " +
   "test/unit/session-keys.test.ts test/unit/router-dispatch.test.ts test/integration/key-actions.test.ts " +
-  "test/contract/public-api.test.ts test/contract/startup-validation.test.ts";
+  "test/contract/public-api.test.ts test/contract/startup-validation.test.ts " +
+  "test/integration/palette.test.ts test/contract/completion.test.ts";
 const KEYMAP = "src/interaction/router/keymap.ts";
 const SESSION = "src/shell/session.ts";
 const CONSTRUCT = "src/shell/construct.ts";
 const CONFIG = "src/shell/config.ts";
+const CONTEXT = "src/interaction/completion/context.ts";
+const KEYS = "src/shell/keys.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -139,6 +143,86 @@ const MUTATIONS = [
     from: "    if (unknown.length > 0) {\n",
     to: "    if (unknown.length < 0) {\n",
     expect: "T3.14",
+  },
+  {
+    // **C22 T6.132 (C16 I68)** — the submit arm's guard gone. `> notes` reaches
+    // C23, C18 classifies it rule 3, and the shell truncates `notes`.
+    name: "a >-led line is submitted",
+    file: CONSTRUCT,
+    from: '      if (line.startsWith(">")) return void submitPaletteLine(line);\n',
+    to: '      if (line.startsWith("\\u0000>")) return void submitPaletteLine(line);\n',
+    expect: "T4.109",
+  },
+  {
+    // **§6c P8 (C16 I68)** — the guard reading the buffer rather than what would
+    // be submitted: a chip whose content begins `>` goes through.
+    name: "the guard reads the buffer, not the resolved line",
+    file: CONSTRUCT,
+    from: "      const line = stores.editor.resolved;\n      if (line.startsWith(",
+    to: "      const line = stores.editor.text;\n      if (line.startsWith(",
+    expect: "T4.109",
+  },
+  {
+    // **C16 I68** — the palette asked after the tokeniser, which is where C18
+    // has already made `> notes` a redirect.
+    name: "contextAt no longer tests the leading >",
+    file: CONTEXT,
+    from: '  if (input.startsWith(">")) {\n    if (cursor < 1) return Object.freeze(empty);\n',
+    to: '  if (input.startsWith("\\u0000")) {\n    if (cursor < 1) return Object.freeze(empty);\n',
+    expect: "T1.176",
+  },
+  {
+    // **§6c Q2** — an action row accepted as text: the line reads `>agent.1`
+    // and nothing runs.
+    name: "an accepted action row is inserted, not run",
+    file: KEYS,
+    from: '    if (ctx.slot.kind === "action") {\n      closeMenu();\n',
+    to: '    if (ctx.slot.kind === ("never" as string)) {\n      closeMenu();\n',
+    expect: "T1.177",
+  },
+  {
+    // **C22 I134 in the palette** — a reserved action offered under its own
+    // name while its row falls back to a word kill.
+    name: "the palette offers a reserved action with no handler",
+    file: CONSTRUCT,
+    from: "        if (reserved !== undefined && config.keyActions[reserved] === undefined) continue;\n",
+    to: "",
+    expect: "T1.178",
+  },
+  {
+    // **§6c palette rulings, after C22 I133** — `confirm` is the prompt's
+    // `submit` row, and offered it would send an emptied line.
+    name: "the palette offers submit",
+    file: CONSTRUCT,
+    from: '        if (id === undefined || does === null || does === "submit") continue;\n',
+    to: "        if (id === undefined || does === null) continue;\n",
+    expect: "T1.178",
+  },
+  {
+    // **§6c palette rulings** — the prompt's printable arm forgotten, so `?`
+    // is offered as `help.question` though at the prompt it is typed.
+    name: "the palette ignores what the prompt types",
+    file: CONSTRUCT,
+    from: "b.key.super !== true && [...b.key.name].length === 1);",
+    to: "b.key.super !== true && false);",
+    expect: "T1.178",
+  },
+  {
+    // **§6c Q3** — a space after the name, so `Tab`'s insertion is not the
+    // name alone.
+    name: "the palette's delimiter is a space",
+    file: CONSTRUCT,
+    from: '({ value: r.id, detail: r.keys.join(" · "), delimiter: "" })',
+    to: '({ value: r.id, detail: r.keys.join(" · "), delimiter: " " })',
+    expect: "T1.177",
+  },
+  {
+    // **§6c Q6** — the row found and never run through `bound`.
+    name: "a palette row is found and not run",
+    file: CONSTRUCT,
+    from: '    bound(row.binding.target, { kind: "key", key: pressOf(row.binding.key) })?.();\n',
+    to: "",
+    expect: "T1.177",
   },
 ];
 

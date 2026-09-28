@@ -399,6 +399,7 @@ describe("C22 §3 step 11 — the effect table", () => {
       // line it sends is the composition root's to resolve, and nothing here is.
       submitPrompt: () => undefined,
       keepField: () => undefined,
+      runAction: () => undefined,
       focusTranscript: () => undefined,
       // C16 I49 — the child's one exit. Counted here rather than stubbed
       // silent, because this harness is the one that walks every action.

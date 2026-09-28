@@ -96,6 +96,12 @@ export type KeyDeps = Readonly<{
    * (C16 I57, C23 I79) — no clear, no history, no queue. `?` and `F1`.
    */
   emit: (line: string) => void;
+  /**
+   * Runs the palette's action by its registry id (C16 I68, §6c Q2) — the
+   * composition root's, because which row an id names depends on the
+   * keymap's profile and the application's handlers, and neither is here.
+   */
+  runAction: (id: string) => void;
   /** Move focus into the transcript, for `⇧⇥` (`focus.previous`, §6a). */
   focusTranscript: () => void;
   /**
@@ -620,7 +626,19 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     const at = selection.at;
     const candidate = at === null ? undefined : candidates[at];
     if (candidate === undefined) return;
-    applyEdit(ctxNow(), candidate, whole);
+    const ctx = ctxNow();
+    // **An action row runs; it is never inserted** (C16 I68, §6c Q2). The
+    // line was only ever the query, so it goes before the action runs — an
+    // action that reads the prompt reads an empty one, as it would from its
+    // chord at an empty prompt.
+    if (ctx.slot.kind === "action") {
+      closeMenu();
+      suppressedAt = null;
+      deps.editor.clear();
+      deps.runAction(candidate.value);
+      return;
+    }
+    applyEdit(ctx, candidate, whole);
     closeMenu();
   }
 

@@ -24,6 +24,7 @@ import {
 import type { Acceptance, Candidate, CompletionContext, Slot } from "./types.js";
 
 const NONE: Slot = Object.freeze({ kind: "none" });
+const ACTION: Slot = Object.freeze({ kind: "action" });
 
 /**
  * The word before this one, skipping nothing.
@@ -131,6 +132,24 @@ export function contextAt(
     tool: null,
     slot: NONE,
   } as const;
+
+  // **The palette is decided before the tokeniser is asked** (C16 I68, §6c
+  // P1–P9). C18 reads a leading `>` as a redirect, so `> notes` is
+  // `[operator, word]` and no question put to the token list can find the
+  // palette. The first code unit is the whole test: ` > notes` and
+  // `ls > notes` are C18's, as they were. A cursor before the `>` completes
+  // nothing — the line is still an action's, and there is no slot there.
+  if (input.startsWith(">")) {
+    if (cursor < 1) return Object.freeze(empty);
+    let start = 1;
+    while (start < cursor && input[start] === " ") start += 1;
+    return Object.freeze({
+      ...empty,
+      prefix: input.slice(start, cursor),
+      replace: Object.freeze({ start, end: cursor }),
+      slot: ACTION,
+    });
+  }
 
   const result = tokenise(input);
   // Unbalanced quotes offer nothing rather than something wrong (T3.16). The

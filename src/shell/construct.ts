@@ -116,6 +116,7 @@ import {
 } from "../interaction/completion/index.js";
 import { createFocusStore, resolveFocus } from "../interaction/router/focus.js";
 import { chordText, createKeymap, defaultKeymap, RESERVED_ACTIONS } from "../interaction/router/keymap.js";
+import { REGISTRY_BINDINGS } from "../interaction/router/registry-bindings.js";
 import { createRouter, type RouterDeps } from "../interaction/router/router.js";
 import { createConfirmHost, type ConfirmHost } from "./confirm.js";
 import { createDecoder } from "../interaction/router/decode.js";
@@ -3271,6 +3272,8 @@ export async function constructGraph(
     // **An emission, not a submission** (C16 I57, C23 I79): the draft stands,
     // history is untouched, and a running verb does not queue it.
     emit: (line) => void pipeline?.emitLocal(line),
+    // Late for the same reason: the rows read `bound`, built below.
+    runAction: (id) => void runPaletteAction(id),
     // **The one exit from the `child` rung** (C16 I49, R-BLK-908). Late for the
     // same reason `submit` is: the host is built below, and this is only ever
     // called from a keystroke.
@@ -3282,7 +3285,13 @@ export async function constructGraph(
     // far side. `keys` is read when a key arrives, after it exists.
     submitPrompt: () => {
       keys.reset();
-      pipeline?.submit(stores.editor.resolved);
+      // **A `>`-led line is never a command** (C16 I68, §6c P1–P9). C18
+      // classifies `> notes` rule 3 and the shell truncates `notes`, so this is
+      // a guard before it is a palette. The **resolved** line, because that is
+      // what C18 would be handed — a chip whose content begins `>` is P8.
+      const line = stores.editor.resolved;
+      if (line.startsWith(">")) return void submitPaletteLine(line);
+      pipeline?.submit(line);
     },
     keepField: () => void commitField(),
     focusTranscript: () => {
@@ -3522,6 +3531,106 @@ export async function constructGraph(
     // nobody seeing the refusal. No C23 §3a route exists; `blockActionRoute` is owed.
     return keys.table[binding.action as KeyAction] ?? null;
   };
+
+  /**
+   * The palette's rows: the registry's actions the prompt reaches (C16 I68, §6c
+   * palette rulings).
+   *
+   * **In the order the prompt reaches them**: a `prompt` row, else a `global`
+   * row the prompt does not take first. The prompt takes a key it binds, `⏎`
+   * and a printable character (the insert arm) — so `?` is not offered, and
+   * `confirm`, which is the prompt's `submit`, has nothing to send once the
+   * query is cleared. **The effective action decides**, as it
+   * does for `/help keys` (C22 I134): a reserved action with no handler is not
+   * the design's action and is not listed under its name.
+   *
+   * `keys` is every chord reaching the chosen row's action at its target, so
+   * a kitty session's `transcript.top` carries `⌘↑` beside `⌃home`.
+   */
+  /** A row's chord as the key that presses it — the decoder's shape, with no bytes. */
+  const pressOf = (k: Binding["key"]): Key => ({
+    name: k.name,
+    ctrl: k.ctrl === true,
+    meta: k.meta === true,
+    shift: k.shift === true,
+    ...(k.super === true ? { super: true } : {}),
+    sequence: "",
+  });
+  const paletteRows = (): readonly Readonly<{ id: string; binding: Binding; keys: readonly string[] }>[] => {
+    const unicode = detection.capabilities.unicode !== "ascii";
+    const actionOf = new Map(REGISTRY_BINDINGS.map((r) => [r.id, r.actionId]));
+    const promptTakes = (b: Binding): boolean =>
+      keymap.resolve("prompt", pressOf(b.key)) !== null ||
+      b.key.name === "enter" ||
+      (b.key.ctrl !== true && b.key.meta !== true && b.key.super !== true && [...b.key.name].length === 1);
+    const rows = new Map<string, { id: string; binding: Binding; keys: string[] }>();
+    for (const target of ["prompt", "global"] as const) {
+      for (const b of keymap.entries()) {
+        if (b.target !== target || b.registry === undefined) continue;
+        const id = actionOf.get(b.registry);
+        const does = effectiveAction(b);
+        // **`submit` is not an action the palette can run**: the palette's line
+        // is its query and is cleared before the row runs, so `confirm` at the
+        // prompt — a row since C22 I133 — would send nothing.
+        if (id === undefined || does === null || does === "submit") continue;
+        // **A reserved action is the application's** (C22 I134): with no handler
+        // its row falls back to something else, which is not what its name says.
+        const reserved = reservedIdOf.get(b.action);
+        if (reserved !== undefined && config.keyActions[reserved] === undefined) continue;
+        if (target === "global" && promptTakes(b)) continue;
+        const held = rows.get(id);
+        if (held === undefined) rows.set(id, { id, binding: b, keys: [chordText(b.key, unicode)] });
+        else if (held.binding.target === b.target && held.binding.action === b.action) {
+          held.keys.push(chordText(b.key, unicode));
+        }
+      }
+    }
+    return [...rows.values()];
+  };
+
+  /**
+   * Run a palette row by its registry id — through `bound`, the effect a key
+   * reaches, never a second table (C16 I68, §6c Q6). `false` when the id is not
+   * a row: the caller says so rather than guessing a nearest match.
+   */
+  const runPaletteAction = (id: string): boolean => {
+    const row = paletteRows().find((r) => r.id === id);
+    if (row === undefined) return false;
+    bound(row.binding.target, { kind: "key", key: pressOf(row.binding.key) })?.();
+    return true;
+  };
+  /**
+   * A `>`-led line's `⏎` (C16 I68, §6c P1–P5): an exact name runs, and anything
+   * else keeps the line and says why — the reader's text is not thrown away for
+   * a typo, and a prefix is a query, not a command.
+   */
+  const submitPaletteLine = (line: string): void => {
+    const name = line.slice(1).trim();
+    if (name !== "" && paletteRows().some((r) => r.id === name)) {
+      stores.editor.clear();
+      runPaletteAction(name);
+      return;
+    }
+    stores.transcript.append(
+      noticeDoc(
+        "",
+        name === ""
+          ? "`>` opens the action palette — type an action's name after it"
+          : `no action is named \`${name}\` — a line starting with \`>\` is an action's name, never a command`,
+        "warn",
+        { origin: "refresh" },
+      ),
+    );
+  };
+  built.completion.register({
+    id: "actions",
+    slots: ["action"],
+    dynamic: false,
+    // The delimiter is empty: an action's name ends the line, and a space after
+    // it would make `⏎` look for a name with a space in it (§6c Q3).
+    complete: () =>
+      paletteRows().map((r) => ({ value: r.id, detail: r.keys.join(" · "), delimiter: "" })),
+  });
 
   /**
    * The pointer's gesture table, onto the key effects (C16 §4a, I31).
