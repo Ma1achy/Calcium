@@ -147,3 +147,8 @@ async function firstChunk(source: AsyncIterable<string>): Promise<string> {
   for await (const chunk of source) return chunk;
   return "";
 }
+
+describe("C21 the clipboard tool (I20)", () => {
+  it.todo("T1.14 (I20): found by walking PATH in code, gated by display and by SSH, never in a relative entry — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T1.15 (I20, I1): a fixed argv and the text on stdin, byte-identical, with no shell — not deferred on a component: the code lands in the next commit of this round");
+});

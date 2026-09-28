@@ -209,3 +209,9 @@ describe("C21 fail-on-revert", () => {
     expect(outputs).toEqual(children.map((_unused, n) => `line-${n}\n`));
   });
 });
+
+describe("C21 fail-on-revert, the clipboard tool (I20)", () => {
+  it.todo("T6.20 (I20): searching a relative PATH entry → T1.14's working-directory arm finds the planted tool — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T6.21 (I20): dropping the SSH gate → T1.14's SSH arms offer pbcopy — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T6.22 (I20): piping stderr and resolving when it closes → T3.20's forking arm never resolves — not deferred on a component: the code lands in the next commit of this round");
+});

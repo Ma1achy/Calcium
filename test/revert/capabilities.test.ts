@@ -247,3 +247,7 @@ describe("C02 fail-on-revert", () => {
     expect(degrade).not.toContain("kittyKeyboard");
   });
 });
+
+describe("C02 fail-on-revert, the clipboard (I18)", () => {
+  it.todo("T6.17 (I18, I11): reading clipboard from the ungated identification → T1.29's tmux arm fails — not deferred on a component: the code lands in the next commit of this round");
+});

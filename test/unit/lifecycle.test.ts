@@ -720,3 +720,7 @@ describe("C01 focus reporting and the title stack (I23, I24)", () => {
     expect(count(tail, POP), "popped at release").toBe(1);
   });
 });
+
+describe("C01 the clipboard's OSC 52 (I25)", () => {
+  it.todo("T1.32 (I25): clipboardWrite is base64, write-only, never empty and capped at CLIPBOARD_LIMIT — not deferred on a component: the code lands in the next commit of this round");
+});

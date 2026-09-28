@@ -356,3 +356,7 @@ describe("C21 failure paths", () => {
     expect(await collect(next.stdout)).toBe("still here\n");
   });
 });
+
+describe("C21 the clipboard tool, at its edges (I20)", () => {
+  it.todo("T3.20 (I20, I13): empty, failing, early-exiting, vanished and forking tools all resolve — not deferred on a component: the code lands in the next commit of this round");
+});

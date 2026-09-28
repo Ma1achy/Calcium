@@ -37,6 +37,31 @@ being derived rather than written, and SS31 still is not the thing that would de
 | `esbuild` | **What it does**: the second half of `npm run build` — `tools/bundle.mjs` runs it over the six entries `tsc` emitted, code-split into one chunk graph with every package external, into `dist/bundle/`, which is what `exports` resolves to (A04 §5, C24 I38, F1193). **Why internal is worse**: the alternative to a bundler is not bundling, and the loader over 820 files was two thirds of a cold import; a hand-rolled concatenation would have to re-implement ESM scope hoisting, live bindings and chunk splitting for a dynamic import, which is the program. **Dependency count**: zero runtime dependencies; one platform binary package per target, installed as an optional dependency. **Maintenance signal**: the bundler under `vite`, which `vitest` already brings into this tree — the pin follows the copy `tsx` resolves, so the tree carries one version rather than a third. **Development, not runtime**: nothing shipped imports it; it runs at build time and its output is what ships. **Owner**: the build (A04 §5). |
 | `tsx` | **What it does**: runs a `.mjs` tool whose imports name `../src/*.js` — the generators and probes under `tools/` (`plot-catalogue`, `status-proof`, `interaction-catalogue`, `animation-proof`, `catalogue-hash`, `terminal-baseline`, `svg-baseline`, `keymap-table`, `refdiff/pair`, `refdiff/export-fixtures` and the rest) read the TypeScript source the tests read, not `dist/`, and Node resolves neither the `.js`-to-`.ts` specifier nor the types. **It was already the loader, unpinned**: ten files under `tools/` say `npx tsx …` in their headers and the `refdiff` target says it in the Makefile, so each run took whatever version `npx` had cached — 4.23.13 in the container, and on a CI runner a fresh download at every job. Pinned here on the day `make catalogue` joined CI, because a target CI runs cannot depend on a tool no lockfile names. **Why internal is worse**: the alternative is re-pointing every generator at `dist/` — nine files, a build before each run, and the documentation frames rendered from a compiled tree while the tests render from source, which is the drift `cells()` exists to prevent arriving at the catalogue. Node's own type stripping does not map `.js` specifiers to `.ts` files and would not help. **Weight**: 533 KB itself, MIT, 4.23.13 published 2026-08-30, one maintainer's project, releasing under this name since 3.0.0 in 2022-05. **Transitive count**: 1 direct — `esbuild ~0.28.0` — and it is a **second esbuild**, because `vite` pins 0.25.12: 147 KB plus one `@esbuild/<platform>` binary of its 26 (10.3 MB aarch64, 11.4 MB x64), so **3 packages and about 11 MB installed**, none of it in a consumer's graph — a devDependency, the same clause `sharp` rests on. `fsevents` is an optional macOS extra. **Owner**: — |
 
+## Optional system tools, spawned at runtime
+
+*Ruling 72 (the person's, 2026-09-28): **the local clipboard is an optional runtime tool, not a
+package.** SS31 reads the two tables above and nothing else, so nothing here is in `package.json` and
+nothing is installed by `npm install`. They are here because a spawned binary is a dependency in
+practice — it is code the framework runs — and a dependency with no row is the thing this file
+exists to prevent.*
+
+**What they do**: put a copy on the reader's system clipboard when OSC 52 does not reach it (C21
+§2b, I20). **Why internal is worse**: there is no internal alternative — the system clipboard is
+the window system's, and every route to it from a terminal process is either one of these or OSC 52,
+which is tried first. **Never required**: each is found at runtime by walking `PATH` in code, and
+its absence is a sentence to the reader and an offer of a file, never an error. **Never through a
+shell**: a fixed argv per tool, the text on stdin only. **Transitive count**: 0 — nothing is
+installed. **Maintenance signal**: each ships with, or is packaged by, the platform it serves.
+**Owner**: C21.
+
+| Tool | Platform | argv after the path | Offered when |
+|---|---|---|---|
+| `pbcopy` | macOS, in the base system | — | found, and not over SSH |
+| `wl-copy` | Wayland, `wl-clipboard` | — | found, and `WAYLAND_DISPLAY` set |
+| `xclip` | X11 | `-selection clipboard` | found, and `DISPLAY` set |
+| `xsel` | X11 | `--clipboard --input` | found, and `DISPLAY` set |
+| `clip.exe` | Windows and WSL, in the base system | — | found, and not over SSH; stdin is UTF-16LE after a byte-order mark |
+
 ## Fetched outside npm
 
 *SS31 reads the two tables above and nothing else, so a row here is not gated by it.

@@ -278,3 +278,8 @@ describe("C01 fail-on-revert", () => {
     expect(debug.lines).toEqual(["stray"]);
   });
 });
+
+describe("C01 fail-on-revert, the clipboard (I25)", () => {
+  it.todo("T6.23 (I25): passing the text through oscText → T1.32's round trip loses ESC and the newline — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T6.24 (I25): dropping the empty-text refusal → T1.32's empty arm clears the selection — not deferred on a component: the code lands in the next commit of this round");
+});

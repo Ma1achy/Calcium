@@ -172,6 +172,116 @@ Each of the three has a specific payoff here, and the middle one is the reason t
 
 ---
 
+## 2b. The clipboard tool — found without a shell, fed on stdin
+
+*(ruling 72, review batch 4 M10 item 1; → C01 I25, → C02 I18)* A copy reaches the reader's clipboard
+by one of two mechanisms, and **the order between them is the person's, applied by L4, not by this
+component**: OSC 52 first, which C01 builds and C02 says the terminal takes; then a platform tool,
+which is this section; and when neither takes the text the reader is offered a file and told so
+(→ C14 §6a). C21 answers the two questions only a process can: *which tool is here*, and *did it
+take the text*.
+
+```typescript
+type ClipboardToolName = "pbcopy" | "wl-copy" | "xclip" | "xsel" | "clip.exe";
+
+type ClipboardTool = Readonly<{
+  name: ClipboardToolName;
+  path: string;                    // absolute — resolved against PATH in code, never through a shell
+  args: readonly string[];         // the table's literal, per tool
+  encoding: "utf-8" | "utf-16le";  // what the tool reads on stdin
+}>;
+
+type ClipboardWrite =
+  | Readonly<{ ok: true; tool: ClipboardToolName }>
+  | Readonly<{ ok: false; tool: ClipboardToolName; reason: string }>;
+
+function findClipboardTool(env: Readonly<NodeJS.ProcessEnv>): ClipboardTool | null;
+function writeClipboard(
+  tool: ClipboardTool,
+  text: string,
+  deps: Readonly<{ env: Readonly<NodeJS.ProcessEnv>; cwd: () => string }>,
+): Promise<ClipboardWrite>;
+```
+
+| order | tool | argv after the path | offered when | stdin |
+|---|---|---|---|---|
+| 1 | `pbcopy` | — | on `PATH`, and not over SSH | UTF-8 |
+| 2 | `wl-copy` | — | on `PATH`, and `WAYLAND_DISPLAY` set | UTF-8 |
+| 3 | `xclip` | `-selection clipboard` | on `PATH`, and `DISPLAY` set | UTF-8 |
+| 4 | `xsel` | `--clipboard --input` | on `PATH`, and `DISPLAY` set | UTF-8 |
+| 5 | `clip.exe` | — | on `PATH`, and not over SSH | UTF-16LE after a byte-order mark |
+
+**Detection walks `PATH` in code and spawns nothing.** Each **absolute** directory of the injected
+`PATH` is asked, in order, whether it holds a regular file of the candidate's name that this process
+may execute; the first candidate the table's order reaches wins. No `which` and no `command -v` —
+both are a shell or a subprocess, and the ruling is *no shell*. **A relative entry — `.`, or the
+empty entry POSIX reads as the working directory — is never searched**, so a file named `pbcopy` in
+the directory the app was launched from is never executed.
+
+**Found is not reachable, and the gates are the difference** (walk rows W6–W8). The three
+display-bound tools write to whichever display their variable names — which `ssh -X` forwards to the
+reader — and fail without one. The other two write to *this host's* clipboard, which is the reader's
+only when the session is local: over SSH, `pbcopy` on a remote Mac exits `0` having filled the wrong
+machine's pasteboard, which is a success the reader never sees. **Over SSH** means `SSH_CONNECTION`
+or `SSH_TTY` is set in the injected record.
+
+**Writing is `spawn` with a fixed argv and no shell (I1)**: the path found, the table's literal
+arguments, and **the text on stdin — never in argv, never in the environment**. Detached, as every
+spawn here is (I2), so a server the tool forks keeps serving the selection after the session exits.
+**stdout and stderr are ignored, not piped**: `xclip`, `xsel` and `wl-copy` fork a server that holds
+the parent's descriptors for as long as it serves, and a server holding our pipe would hold our
+event loop with it — and would hold forever any reader that waited for the pipe to close. So the
+answer is the **parent's exit**: `0` is `ok`; a non-zero code, a signal or a spawn error is
+`ok: false` with a reason naming which. **It never throws** (I13's rule, carried over), an early exit
+that closes stdin before reading does not surface as an unhandled `EPIPE`, and **the empty text is
+refused before anything is spawned** — `pbcopy` given nothing empties the pasteboard, a destructive
+answer to a copy of nothing.
+
+**`ok: true` is observable where OSC 52 is not** — a process on the reader's machine said it took
+the text — which is why L4 words the two differently (ruling 72): a tool's success may be called
+*copied*, OSC 52's is *sent to the terminal's clipboard*.
+
+**No timer, even here** (I8). A tool that never exits leaves the promise pending, and the deadline
+that turns a pending copy into a sentence belongs to L4, which holds the only scheduler (→ C14 §6a).
+`clip.exe`'s encoding is by its documented behaviour and **unmeasured here**: it reads stdin in the
+console's code page unless the bytes open with a UTF-16LE byte-order mark.
+
+### Walk — a classification table
+
+Capability (C02 I18) × tool presence (this section) × payload (C01 I25) × transport. Only the cells
+where two rules meet are rows; a row governed by one rule restates it. **L4 applies the order** —
+these rows are what each layer must hand up for the order to be applicable at all.
+
+| # | `clipboard` | tool | payload | the rules that meet | ruled |
+|---|---|---|---|---|---|
+| W1 | `osc52` | any | empty | *OSC 52 first* × xterm reads an empty payload as *clear* | `clipboardWrite` returns `null`, and `writeClipboard` refuses without spawning. Empty reaches no mechanism; L4 says *nothing selected* |
+| W2 | `osc52` | found | past the cap | *OSC 52 first* × the cap | `null`, and the order goes on to the tool, which has no cap. **The `null` is a refusal of one mechanism, not of the copy** |
+| W3 | `osc52` | none | past the cap | the cap × *none available → a file* | the reader is offered a file and told the text was too large for the terminal — a different sentence from *no clipboard* |
+| W4 | `osc52` | found | within | *OSC 52 first* × a tool's success is observable | OSC 52, as the person ruled; worded *sent*, never *copied* |
+| W5 | `none`, `unreachable` (tmux) | `pbcopy`, local | within | the tmux gate × a spawned tool | the tool: tmux sits between us and the terminal, not between us and a process |
+| W6 | `none` | `pbcopy`, over SSH | within | *found* × the host's clipboard is not the reader's | **not offered** — it would exit `0` on the wrong machine. A file, and told |
+| W7 | `none` | `xclip`, `DISPLAY` set, over SSH | within | the SSH gate × `ssh -X` forwards the display | offered: the variable names the reader's display |
+| W8 | `none` | `xclip` found, no `DISPLAY` | within | *found* × *cannot open display* | not offered; the next candidate is asked |
+| W9 | `none` | `wl-copy` and `clip.exe` (WSLg) | within | two candidates found | the table's order: `wl-copy` |
+| W10 | `none` | found, exits non-zero | within | *found* × failure is observable | `ok: false` naming the code; L4 offers the file. Never silent |
+| W11 | `none` | removed between find and write | within | detection × spawn | the spawn error resolves `ok: false`; never a throw |
+| W12 | `none` | exits without reading | 1 MiB | our stdin write × a closed pipe | the `EPIPE` is swallowed; the exit decides |
+| W13 | `none` | a `pbcopy` in `.` or an empty `PATH` entry | — | `PATH` lookup × the working directory | relative entries are never searched |
+| W14 | `osc52`, `declared`, inside tmux | — | within | the override × the tmux gate | the declaration wins (C02 I4): the reader set `set-clipboard on` |
+| W15 | `osc52` | — | holds `ESC`, `BEL`, a newline | the OSC terminator × the content | base64 carries them whole, and nothing is stripped — `oscText`'s rule would change the copy |
+| W16 | `none` | a server-forking tool | within | *resolve on exit* × a server holding the pipes | stdout and stderr ignored; the parent's exit is the answer |
+| W17 | `none` | `clip.exe` | non-ASCII | the console code page × UTF-8 | UTF-16LE after a byte-order mark; unmeasured |
+| W18 | `none` | found, never exits | within | C21 has no timer (I8) × *never silent* | pending; L4's deadline says so (→ C14 §6a) |
+
+**What the walk changed.** W6 and W13 are gates the first draft did not have: *found on `PATH`* read
+as *available*, and both cells are ones where a found tool is the wrong answer — one succeeds on
+another machine, the other runs a file the reader never chose. W16 turned *read stderr for the
+reason* into *ignore it*, because the reason is unreadable in exactly the cells that fork. W2 fixed
+what `null` means: one mechanism declining, not the copy failing — so the order continues rather than
+reaching for the file.
+
+---
+
 ## 3. Process groups
 
 A child spawned `detached` leads its own process group, and signals are sent to the group (`kill(-pid)`), not the leader alone.
@@ -248,6 +358,7 @@ Per child handle.
 - **I17** — A PTY child is signalled by group, counted by `killAll`, and ignores writes after exit, exactly as a piped child is.
 - **I18** — `hasPty` is true exactly when a PTY factory was injected, so an arm can be chosen without calling `spawnPty` and catching.
 - **I19** — **A PTY child's `Exit` has the same shape a piped child's does: `signal` is `null` when no signal killed it, and the signal's *name* when one did.** A PTY port reports the signal as a number and uses **0 for none**, so the two facts a caller reads — *did it die of a signal* and *which one* — both arrive in a form the pipe arm never produces. Every reader downstream compares `signal !== null`, so a clean exit reported as `SIG0` makes every successful command on this arm an error, and a `SIGTERM` reported as `SIG15` makes the two arms disagree about a string nobody normalises again (F924).
+- **I20** — *(ruling 72, → C01 I25, → C02 I18)* **A clipboard tool is found by walking the injected `PATH` in code, and written to by `spawn` with the table's fixed argv, the text on stdin only, and no shell.** Candidates are asked in one fixed order — `pbcopy`, `wl-copy`, `xclip`, `xsel`, `clip.exe` — and one is offered only where it reaches the reader: the three display-bound tools when their display variable is set, the other two only outside SSH. Relative `PATH` entries are never searched. The empty text spawns nothing. `writeClipboard` resolves on the tool's own exit, never throws, and holds none of its output pipes, so a server the tool forks outlives it holding nothing of ours.
 
 ---
 
@@ -269,6 +380,7 @@ Per child handle.
 13. `exited` always resolves, spawn failure included (I13).
 14. The environment, the raw-mode probe and the warning sink are injected, so I6 can be asserted without a test mutating the terminal it runs in (I14).
 15. A PTY child's `Exit` is normalised to the piped child's shape at the port, so no caller has to know which arm produced it (I19).
+16. A platform clipboard tool is optional and found at runtime — never required, never a package, never reached through a shell — and a found tool is offered only where it writes the reader's clipboard; its answer is its own exit status (I20, I1).
 
 ---
 
@@ -291,6 +403,8 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 - **T1.11** (I15, I16): `spawnPty` with no `pty` in the deps throws, and the message names `pty`; with a fake factory it calls `spawn` once with the given `cols`, `rows`, `cwd` and `env`.
 - **T1.13** (I18): a runner built with no `pty` in its deps reports `hasPty === false` and `spawnPty` throws; one built with a fake factory reports `true` and `spawnPty` returns a handle — the flag and the throw are asserted against the same runner, so a flag that answers independently of the deps fails.
 - **T1.12** (I17): a fake PTY child that has exited → `signal` returns false, `write` is a no-op, and `exited` has resolved.
+- **T1.14** (I20): detection over a temporary `PATH` of stub executables — an empty directory → `null`; `pbcopy` → `pbcopy`, its `path` absolute; `pbcopy` with `SSH_CONNECTION` set → `null`, and with `SSH_TTY` → `null`; `xclip` without `DISPLAY` → `null`, with it → `xclip`, and with it over SSH → `xclip`; `wl-copy` and `xclip` with both displays → `wl-copy`; `xclip` and `xsel` → `xclip`; a non-executable file and a directory named `pbcopy` → `null`; **a `pbcopy` reached only through a relative entry — `.` or the empty entry, run from its directory — → `null`**. No tool need be installed: every present case is a stub the test writes.
+- **T1.15** (I20, I1): a stub recording its argv and its stdin → the argv after the path is the table's literal, and stdin is **byte-identical** to the text — which holds `;`, `|`, `$(touch pwned)`, backticks, a newline, `ESC` and an emoji — no file `pwned` appears, and neither the argv nor the environment the stub sees carries the text. `clip.exe`'s stub receives `FF FE` and then UTF-16LE.
 
 ### Tier 2 — contract / interface
 
@@ -308,6 +422,8 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 
 - **T2.10** (I7): a real handed-off child is asked two questions the OS answers — which process group it is in, and what its descriptor 1 points at. `nodeSpawn` is imported rather than injected, so a spy would assert the options object this file wrote, which is the test agreeing with itself. The child's `pgid` equals ours and its fd 1's `dev`/`ino`/`rdev` are this process's, so it was handed *our* descriptor rather than a pipe. The contrast is the point: C21's other spawn is `detached` on purpose (I2, T6.1), so *shares our group* is a decision this route makes rather than a default it inherited.
 - **T2.10b** (I7): over `handoff`'s own body rather than the file — `spawn` and `spawnPty` are detached or piped by design, so a scan for `detached` across C21 reports them and says nothing about this route.
+- **T2.11** (I20, I1): a source scan over `process/clipboard.ts` finds no `shell` option, no `spawnShell`, no `exec`, exactly one spawn, and that spawn's stdio ignores stdout and stderr; the argv's tail comes from the one table.
+
 ### Tier 3 — edge cases
 
 - **T3.1** (I2, the important one): `spawnShell("sleep 30 | cat")` then `SIGTERM` → **both** processes die; nothing is left orphaned. Verified by checking the group after exit.
@@ -329,6 +445,7 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 - **T3.17**: output containing a null byte → passed through the decoder without truncating the stream.
 - **T3.18**: fifty short-lived children spawned at once → every one of them yields its whole output. Node's `exit` can fire before the stdio `data` events are delivered, so a runner that ends its streams on exit drops output still in flight — and the failure appears only under enough load to reorder the two.
 - **T3.19** (I16): `spawnPty` throwing leaves no child, no handle and no listener — asserted by a spy on the factory that is never called.
+- **T3.20** (I20, I13): the edges of a write — empty text → `ok: false` and the stub never ran; a stub exiting 3 → `ok: false` naming 3; a stub that exits without reading, given 1 MiB → resolves, and no unhandled error; a tool deleted between `findClipboardTool` and `writeClipboard` → `ok: false`, never a throw; **a stub that forks a sleeping child holding its stdout and stderr** → `writeClipboard` resolves on the parent's exit, while the child still lives.
 
 ### Tier 4 — integration
 
@@ -371,6 +488,9 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 - **T6.16** (I15): importing `node-pty` in `runner.ts` → T2.8's scan fails and the package becomes a runtime dependency by accident.
 - **T6.18** (I15): restoring `readonly` to `PtyFactory.spawn`'s `args` → T2.8's factory half fails, and the port refuses the one package it was cut from while every test in this repo keeps passing, because each builds a fresh array (F920).
 - **T6.19** (I19): passing the port's `signal` through as `SIG${n}` → T5.6's clean-exit arm reports `SIG0`, every successful PTY command settles as an error, and the two arms disagree about a name nothing normalises again (F924).
+- **T6.20** (I20): searching a relative `PATH` entry → T1.14's working-directory arm finds the planted `pbcopy` and would execute it.
+- **T6.21** (I20): dropping the SSH gate → T1.14's SSH arms offer `pbcopy`, which exits `0` on the far host and is reported as a copy.
+- **T6.22** (I20): piping stderr to report a reason and resolving when it closes → T3.20's forking arm never resolves: the forked server holds the pipe for as long as it serves the selection.
 
 ---
 
@@ -384,3 +504,4 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 | Parsing anything the child emits | C06, C07 |
 | Windows non-VT console support | Out of scope — Windows Terminal and WSL only |
 | A warm process pool | Parking lot — measure first |
+| The clipboard's order, its wording and its deadline — OSC 52 first, then a tool, then a file | L4 (C14 §6a) |

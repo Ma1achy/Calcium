@@ -500,3 +500,7 @@ describe("C02 notifications (I16, I17)", () => {
     expect(bad.warnings).toHaveLength(1);
   });
 });
+
+describe("C02 the clipboard (I18)", () => {
+  it.todo("T1.29 (I18, I11, I4): clipboard from the one identification, gated by tmux, declared over the top — not deferred on a component: the code lands in the next commit of this round");
+});

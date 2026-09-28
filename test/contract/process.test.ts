@@ -246,3 +246,7 @@ describe("C21 §4 — handoff's stdio and its process group", () => {
     expect(/\bdetached\b/.test(src), "the corpus is not empty").toBe(true);
   });
 });
+
+describe("C21 the clipboard tool, by source (I20)", () => {
+  it.todo("T2.11 (I20, I1): one spawn, no shell, stdout and stderr ignored — not deferred on a component: the code lands in the next commit of this round");
+});
