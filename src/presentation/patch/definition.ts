@@ -19,7 +19,8 @@ import { NO_SPAN } from "../../data/viewmodel/index.js";
 import { rows } from "../blocks/paint.js";
 import { cells } from "../text.js";
 import { atLeastOne, changedRuns, normaliseWidth, type ChangedRun } from "../../data/viewmodel/index.js";
-import { collapseText } from "./collapse.js";
+import { capOf, foldPatch, shownBlock } from "./cap.js";
+import { collapseText, moreText } from "./collapse.js";
 import { hunkRows, isCollapsed, layoutFor, patchHeight, type Layout } from "./height.js";
 import { planFrom, windowRows } from "./window.js";
 import { blankSide, dress, gutterSpans, line, REST, textSpans, type Mark } from "./lines.js";
@@ -238,11 +239,21 @@ export const patchDefinition: BlockDefinition<Patch> = {
   // C25 I24, §3d — every numbered line, where `render` draws it.
   elements: (block: Patch, width: number) => patchElements(block, width),
 
+  // C09 I124, C25 I14 — `expanded` toggled where a `cap` withholds hunks.
+  fold: foldPatch,
+
   // Exact at every width, constant within a layout, and it never tokenises (I3).
   // `collapsedBefore` is a field, so measuring a collapsed region reads it rather
   // than deriving anything — which is what keeps this cheap enough for C14 to call
   // per block per frame.
-  measure: (block: Patch, width: number): number => atLeastOne(patchHeight(block, normaliseWidth(width))),
+  //
+  // **The cap is read here and never a viewport** (C25 I14, D12): capped, the
+  // admitted hunks and the marker row; expanded or uncapped, the whole block.
+  measure: (block: Patch, width: number): number => {
+    const w = normaliseWidth(width);
+    const capped = capOf(block, w);
+    return atLeastOne(capped === null ? patchHeight(block, w) : patchHeight(shownBlock(block, capped), w) + 1);
+  },
 
   /**
    * C09 I25 — rows `[from, to)`, as a smaller `patch` plus leading slack.
@@ -257,14 +268,34 @@ export const patchDefinition: BlockDefinition<Patch> = {
    * than a budget the caller never asked to spend. The gutter travels pinned
    * (C25 I21a), which is what stops the window narrowing it from its own slice.
    */
-  window: (block: Patch, width: number, from: number, to: number, _measure, scratch) =>
+  window: (block: Patch, width: number, from: number, to: number, _measure, scratch) => {
+    const w = normaliseWidth(width);
+    const capped = capOf(block, w);
     // **The plan from the caller's scratch** (I22, C09 I76): derived once per
     // block and width and read back at every window after — F1191 measured
     // the derivation at 2.2 ms a frame beside a 20,000-line patch.
-    windowRows(block, normaliseWidth(width), from, to, planFrom(scratch, block, normaliseWidth(width))),
+    if (capped === null) return windowRows(block, w, from, to, planFrom(scratch, block, w));
+    // **Capped (C25 I14): a range above the marker is a window of the body,
+    // and one reaching it is the whole capped form with its head as slack.**
+    // The body is an ordinary patch — its gutter pinned from the block — so
+    // `windowRows` takes it unchanged. The marker is not a row that model
+    // knows, and a piece carrying it has to be the block itself; the cost is
+    // the capped form, which is the cap's rows and no more. C09 I26's equality
+    // holds either way: the range reaching the marker ends at the last row.
+    const body = shownBlock(block, capped);
+    const bodyRows = patchHeight(body, w);
+    if (to > bodyRows) return Object.freeze({ block, skipRows: Math.max(0, Math.trunc(from)), dropRows: 0 });
+    return windowRows(body, w, from, to);
+  },
 
-  render(block: Patch, ctx: RenderContext): Rendered {
+  render(whole: Patch, ctx: RenderContext): Rendered {
     const width = normaliseWidth(ctx.width);
+    // **The capped form draws its body and then its marker** (C25 I14): the
+    // body is an ordinary patch, so everything below reads it unchanged and the
+    // marker row is the one addition — measured by `measure` from the same
+    // `capOf`, which is what keeps the two agreeing.
+    const capped = capOf(whole, width);
+    const block = capped === null ? whole : shownBlock(whole, capped);
     const probe = ctx.probe;
     // **F134's kind, and the split that says which half.** A 5,000-line diff
     // takes 3.7 s to open against `logs`'s 85.9 ms under identical load. The
@@ -297,6 +328,12 @@ export const patchDefinition: BlockDefinition<Patch> = {
       out.push(
         line([{ text: collapseText(block.collapsedAfter as number, ctx.capabilities) }], "context", columns, ctx),
       );
+    }
+
+    // The cap's marker, in the tail's place (C25 I14): the body carries no
+    // tail, because the tail sits below hunks this form does not draw.
+    if (capped !== null) {
+      out.push(line([{ text: moreText(capped.dropped, ctx.capabilities) }], "context", columns, ctx));
     }
 
     return rows(out);

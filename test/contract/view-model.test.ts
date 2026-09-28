@@ -645,7 +645,7 @@ describe("C04 §7 — the update model and the view state, checked rather than c
      * arriving somewhere else, and a fifth arriving somewhere else is the only
      * way this invariant can be false.
      */
-    const MOVES: readonly [string, AnyBlock, AnyBlock, number, number][] = [
+    const MOVES: readonly [string, AnyBlock, AnyBlock, number, number, number?][] = [
       ["TableRow.expanded", tableWith({ expanded: false }), tableWith({ expanded: true }), 3, 4],
       [
         "Scroll.collapsed",
@@ -677,16 +677,36 @@ describe("C04 §7 — the update model and the view state, checked rather than c
         { kind: "tip", id: "x", text: "a", padding: { t: 1, b: 2 } } as never,
         1, 4,
       ],
+      // **The sixth and seventh, from ruling 42 and C25 I14** (review batch 3).
+      // A patch's `expanded` moves nothing without a `cap` that drops a hunk, and
+      // a shedding kind's moves nothing at a width that sheds nothing — so each
+      // is measured where it bites, which is the width the tuple carries.
+      [
+        "Patch.expanded",
+        { kind: "patch", id: "p", path: "f", language: "ts", cap: 4, hunks: [{ header: "@@ -1 +1 @@", lines: [{ kind: "add", text: "x" }] }, { header: "@@ -9 +9 @@", lines: [{ kind: "add", text: "y" }] }] } as never,
+        { kind: "patch", id: "p", path: "f", language: "ts", cap: 4, expanded: true, hunks: [{ header: "@@ -1 +1 @@", lines: [{ kind: "add", text: "x" }] }, { header: "@@ -9 +9 @@", lines: [{ kind: "add", text: "y" }] }] } as never,
+        4, 5,
+      ],
+      [
+        "KeyValue.expanded",
+        { kind: "keyValue", id: "k", rows: [{ label: "endpoint", value: "https://api.internal.example/v2" }] } as never,
+        { kind: "keyValue", id: "k", expanded: true, rows: [{ label: "endpoint", value: "https://api.internal.example/v2" }] } as never,
+        1, 2, 9,
+      ],
     ];
 
     const moved: string[] = [];
-    for (const [name, before, after, wasRows, isRows] of MOVES) {
-      expect(kit.measure(before, 60), `${name}: off`).toBe(wasRows);
-      expect(kit.measure(after, 60), `${name}: on`).toBe(isRows);
+    for (const [name, before, after, wasRows, isRows, width = 60] of MOVES) {
+      expect(kit.measure(before, width), `${name}: off`).toBe(wasRows);
+      expect(kit.measure(after, width), `${name}: on`).toBe(isRows);
       moved.push(name);
     }
-    expect(moved, "the whole set, so a sixth fails here").toEqual([
+    // `KeyValue.expanded` stands for the four shedding kinds' one field (C09
+    // I124): one flag, one fold, measured through one kind here and through all
+    // four by C09 T2.190.
+    expect(moved, "the whole set, so an eighth fails here").toEqual([
       "TableRow.expanded", "Scroll.collapsed", "Floor.minHeight", "Patch.collapsedAfter", "Padded.padding",
+      "Patch.expanded", "KeyValue.expanded",
     ]);
 
     // **The counter-example that remains, and it is a different kind of field.**

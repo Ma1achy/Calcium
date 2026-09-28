@@ -661,6 +661,17 @@ export const BUILDER_OMISSIONS = Object.freeze({
     "the block it came from rather than the slice it shows; a hand-built keyValue setting it " +
     "would assert a column its own labels do not justify. `window` is the one writer",
 
+  "keyValue.expanded":
+    "C09 I124, C25 I11 — reader state the fold writes: `true` on the first `⏎` and removed on the second, so collapsing gives back the block the producer made. A producer shipping a block already expanded is setting aside the cap or the shed it chose to write, which it can do by not writing them; the registry's `fold` is the one writer",
+  "steps.expanded":
+    "C09 I124, C25 I11 — reader state the fold writes: `true` on the first `⏎` and removed on the second, so collapsing gives back the block the producer made. A producer shipping a block already expanded is setting aside the cap or the shed it chose to write, which it can do by not writing them; the registry's `fold` is the one writer",
+  "events.expanded":
+    "C09 I124, C25 I11 — reader state the fold writes: `true` on the first `⏎` and removed on the second, so collapsing gives back the block the producer made. A producer shipping a block already expanded is setting aside the cap or the shed it chose to write, which it can do by not writing them; the registry's `fold` is the one writer",
+  "comparison.expanded":
+    "C09 I124, C25 I11 — reader state the fold writes: `true` on the first `⏎` and removed on the second, so collapsing gives back the block the producer made. A producer shipping a block already expanded is setting aside the cap or the shed it chose to write, which it can do by not writing them; the registry's `fold` is the one writer",
+  "patch.expanded":
+    "C09 I124, C25 I11 — reader state the fold writes: `true` on the first `⏎` and removed on the second, so collapsing gives back the block the producer made. A producer shipping a block already expanded is setting aside the cap or the shed it chose to write, which it can do by not writing them; the registry's `fold` is the one writer",
+
   // **`plot.camera` was here and is gone**, on the commit that built
   // `plot3d`. Its reason was sharper than *not yet built* — a plot declaring
   // a camera becomes focusable (C12 I85), so exposing it earlier handed callers

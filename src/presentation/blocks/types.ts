@@ -720,6 +720,29 @@ export interface BlockDefinition<B extends Block = Block> {
    * genuinely uncopyable and declare nothing.
    */
   copy?: (block: B, copyChild: CopyFn) => string;
+  /**
+   * The block with its fold toggled, or `null` where it declares none (I124,
+   * C23 I84, ruling 42).
+   *
+   * **What lets `actions.ts` name no kind.** `expand` resolves a row first and
+   * a block's fold second, and the second arm was a `kind === "scroll"` test —
+   * a patch's cap and four shedding kinds would have been four more, and an
+   * app kind with a fold would have needed an edit to L4 to be reachable. The
+   * fold is the kind's to declare, so it is declared here.
+   *
+   * **`null` rather than an absent member for a block that has no fold today**,
+   * because whether it has one is a property of the block: a `scroll` folds only
+   * where it declares `collapsed` (C04 I98) and a `patch` only where it carries
+   * a `cap` (C25 I14). **No width**: a fold is a document edit, not a layout, so
+   * the four shedding kinds fold at every width and draw nothing where they
+   * shed nothing. Pure — the result is a new block, and the caller writes it as
+   * a shell-origin `replace`.
+   *
+   * **`Block` and not `B` in the result**, for `window`'s reason above: `B`
+   * sits in parameter position only, or a `BlockDefinition<Table>` stops being
+   * a member of `AnyBlockDefinition`'s registration surface.
+   */
+  fold?: (block: B) => Block | null;
 }
 
 
@@ -797,6 +820,12 @@ export interface BlockRegistry {
    * causes.
    */
   windowChild(block: Block, width: number, from: number, to: number): Windowed | null;
+  /**
+   * The kind's `fold` of this block, or `null` where the kind declares none or
+   * the block has nothing to fold (I124). C23's `expand` reads this and nothing
+   * else (C23 I84).
+   */
+  fold(block: Block): Block | null;
   readonly kinds: readonly string[];
   readonly sealed: boolean;
 }

@@ -726,6 +726,18 @@ class Registry implements BlockRegistry {
    * are dropped rather than joined as empty, which is the same sentence from
    * the caller's side.
    */
+  /**
+   * The kind's fold, asked of the block itself (I124, C23 I84).
+   *
+   * **Through the definitions and never through `#resolve`**: an unregistered
+   * kind resolves to `raw`'s fallback with a `raw` block standing in, and a
+   * fold of the stand-in would hand the dispatcher a `raw` to write over the
+   * block it named. A kind nobody registered has no fold.
+   */
+  fold = (block: Block): Block | null => {
+    return this.#definitions.get(block.kind)?.fold?.(block) ?? null;
+  };
+
   copySequence = (blocks: readonly Block[]): string =>
     blocks
       .map((b) => this.copyOf(b))

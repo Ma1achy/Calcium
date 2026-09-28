@@ -457,6 +457,12 @@ function joinChildren(children: readonly Block[], copyChild: CopyFn): string {
 export const scrollDefinition: BlockDefinition<Scroll> = {
   kind: "scroll",
 
+  // C09 I124, C04 I98 — the fold is the flag inverted, and only where the box
+  // declares one: a scroll without `collapsed` has no collapsed form, so there
+  // is nothing to toggle and `expand` naming it says so (C23 I84). This was the
+  // dispatcher's `kind === "scroll"` arm, moved to the kind that owns the flag.
+  fold: (block) => (block.collapsed === undefined ? null : { ...block, collapsed: !block.collapsed }),
+
   // §7a — the children that answered, one newline apart (I86). **Not two**:
   // two is `R-SEL-004`'s entry separator and this is inside one entry. A child
   // that declines is dropped rather than joined as empty, which is the whole of

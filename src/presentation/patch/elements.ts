@@ -13,6 +13,7 @@
  * callers ask on navigation and for the selection spans, not per frame.
  */
 import { changedRuns, normaliseWidth } from "../../data/viewmodel/index.js";
+import { capPlan, shownBlock } from "./cap.js";
 import { isCollapsed, layoutFor } from "./height.js";
 import { MARKERS } from "./lines.js";
 import type { Hunk, Patch } from "../../data/viewmodel/index.js";
@@ -40,8 +41,28 @@ export function lineId(line: Line): string | null {
     : `${String(line.oldNo)}:${String(line.newNo)}`;
 }
 
-export function patchElements(block: Patch, width: number): readonly NavElement[] {
+/** The cap's marker row's element id — every line id carries a colon, so it cannot collide (I24). */
+const MORE_HUNKS = "more-hunks";
+
+export function patchElements(whole: Patch, width: number): readonly NavElement[] {
   const w = Math.max(1, Math.floor(normaliseWidth(width)));
+  // **The toggle is offered wherever the cap bites at this width** (C25 I14,
+  // I24): capped it says `expand`, expanded `collapse`, and it rides on every
+  // line as a scroll's fold rides on every child (C04 I98) — so `⏎` anywhere
+  // in the diff answers, and the marker is where the capped form points.
+  const plan = capPlan(whole, w);
+  const capped = whole.expanded === true ? null : plan;
+  const block = capped === null ? whole : shownBlock(whole, capped);
+  const toggle =
+    plan === null
+      ? {}
+      : {
+          activate: Object.freeze({
+            kind: "expand" as const,
+            label: capped === null ? "collapse" : "expand",
+            target: whole.id,
+          }),
+        };
   const layout = layoutFor(block, w);
   // `patchLayout`'s `perSide`: the separator is the cell at `side`. **The right
   // half stops at `2 · side + 1`**, not at `w` — at an even width the last cell
@@ -68,6 +89,7 @@ export function patchElements(block: Patch, width: number): readonly NavElement[
         cols: Object.freeze({ ...cols }),
         // As unified diff, the block's own copy one line at a time (C09 I86).
         copy: `${MARKERS[line.kind]}${line.text}`,
+        ...toggle,
       }),
     );
   };
@@ -93,6 +115,20 @@ export function patchElements(block: Patch, width: number): readonly NavElement[
         row += 1;
       }
     }
+  }
+  // **The marker row is an element** (I24, amended): the body carries no tail,
+  // so the row after the last admitted hunk is the marker's. No `copy` — the
+  // block's copy is every hunk already, and the marker is not source.
+  if (capped !== null) {
+    out.push(
+      Object.freeze({
+        id: MORE_HUNKS,
+        level: "row" as const,
+        rows: Object.freeze({ from: row, to: row + 1 }),
+        cols: Object.freeze({ from: 0, to: w }),
+        ...toggle,
+      }),
+    );
   }
   return Object.freeze(out);
 }

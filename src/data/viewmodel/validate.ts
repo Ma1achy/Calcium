@@ -862,6 +862,20 @@ function requireArray(b: Record<string, unknown>, key: string, e: string[], at: 
   requireField(b, key, isArray, "an array", e, `${at}: "${key}"`);
 }
 
+/**
+ * `expanded` on a block, **a boolean when present** (C09 I124, C25 I11).
+ *
+ * The four shedding kinds and `patch` carry it, and a non-boolean would draw
+ * the expanded form from a value that says neither state — `"false"` is truthy
+ * to nothing here, since the kinds compare with `=== true`, so it would read as
+ * collapsed while declaring otherwise.
+ */
+function checkExpanded(b: Record<string, unknown>, e: string[], at: string): void {
+  if (b["expanded"] !== undefined && typeof b["expanded"] !== "boolean") {
+    e.push(`${at}: "expanded" must be a boolean when present (C09 I124) — got ${JSON.stringify(b["expanded"])}`);
+  }
+}
+
 /** A finite number — not clamped here, because clamping is the renderer's (C09 I28). */
 function requireNumber(b: Record<string, unknown>, key: string, e: string[], at: string): void {
   requireField(b, key, (v) => typeof v === "number" && Number.isFinite(v), "a finite number", e, `${at}: "${key}"`);
@@ -1416,6 +1430,7 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
   },
   keyValue: (b, e, at) => {
     requireArray(b, "rows", e, at);
+    checkExpanded(b, e, at);
     if (!isArray(b["rows"])) return;
     for (const row of b["rows"]) {
       if (!isRecord(row) || !isRecord(row["bar"])) continue;
@@ -1595,9 +1610,15 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
       );
     }
   },
-  steps: (b, e, at) => requireArray(b, "steps", e, at),
+  steps: (b, e, at) => {
+    requireArray(b, "steps", e, at);
+    checkExpanded(b, e, at);
+  },
   logs: (b, e, at) => requireArray(b, "lines", e, at),
-  events: (b, e, at) => requireArray(b, "events", e, at),
+  events: (b, e, at) => {
+    requireArray(b, "events", e, at);
+    checkExpanded(b, e, at);
+  },
   plot: (b, e, at) => {
     // **Before every form rule** (C04 I118). A rule that reads a member's value
     // and finds it outside the union would otherwise report a second fault about
@@ -1822,9 +1843,19 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
       e.push(`${at}: "spans" is refused on code — its syntax tokens are already a run stream over the text (C04 I88)`);
     }
   },
-  comparison: (b, e, at) => requireArray(b, "rows", e, at),
+  comparison: (b, e, at) => {
+    requireArray(b, "rows", e, at);
+    checkExpanded(b, e, at);
+  },
   patch: (b, e, at) => {
     requireString(b, "path", e, at);
+    checkExpanded(b, e, at);
+    // C25 I14 — the collapsed form's row budget. **At least 1**: the path header
+    // alone is a row, and a cap of zero is a budget nothing can be drawn inside.
+    const cap = b["cap"];
+    if (cap !== undefined && (typeof cap !== "number" || !Number.isInteger(cap) || cap < 1)) {
+      e.push(`${at}: "cap" must be a positive integer (C25 I14) — got ${JSON.stringify(cap)}`);
+    }
     requireString(b, "language", e, at);
     requireArray(b, "hunks", e, at);
     checkActions(b, e, at);

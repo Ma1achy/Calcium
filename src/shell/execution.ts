@@ -1820,6 +1820,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     refuse,
 
     notify: (text) => void appendAndCommit(noticeDoc("", text, "warn", { origin: "action" })),
+
+    // The registry's fold hook and nothing wider (C23 I84, C09 I124): the
+    // dispatcher asks a block whether it folds, and never what kind it is.
+    fold: (block) => deps.blocks.fold(block),
   });
 
   /**

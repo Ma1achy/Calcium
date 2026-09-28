@@ -354,14 +354,16 @@ describe("C25 §7 — the invariants that had no row", () => {
     expect(isCollapsed(expanded.hunks[0]?.collapsedBefore), "and the rewritten block is not collapsed").toBe(false);
   });
 
-  it("T2.9 (C25 I14, C25 I15, C25 I16): maxExpandHeight is in no source file, and this row expires when it is", () => {
+  it("T2.9 (C25 I15, C25 I16): maxExpandHeight is in no source file, and this row expires when it is", () => {
     /**
      * **A watch, not a coverage row.** §3a records all three as *specified and
      * unbuilt*: the thresholds are multiples of a viewport height and C25 cannot
      * see a viewport, so the invariants have nothing to be false about — A03 §2's
      * vacuity class holding three of them open. A row asserting the behaviour
      * would assert nothing; this one asserts the absence and fails the day the
-     * field lands, which is when I14, I15 and I16 owe real rows.
+     * field lands, which is when I15 and I16 owe real rows. **I14 left the watch
+     * in review batch 3**: its cap was built as `Patch.cap`, data on the block,
+     * which is not the field this watches for — T2.18 and T3.10 are its rows.
      */
     const sources = globSync("src/**/*.ts").filter((f) => !f.endsWith(".d.ts"));
     expect(sources.length, "over a non-empty tree").toBeGreaterThan(100);
@@ -390,41 +392,6 @@ describe("C25 §7 — the invariants that had no row", () => {
     expect([...measure.matchAll(/^ {2}(\w+)\??:/gmu)].map((m) => m[1])).toEqual([
       "block", "width", "measureChild", "probe",
     ]);
-  });
-
-  it("T2.12 (C25 I17, R-EXA-082): the deletion is pure — a patch renders every hunk it carries, and the pushed view showed no more", () => {
-    // **Measured before the code was written, and it is why no expand arm was
-    // added for a patch.** §82 says a run's detail expands in place, and the
-    // obvious reading is that `⏎` unfolds something. A patch has nothing to
-    // unfold: `collapsedBefore` and `collapsedAfter` are *counts of context the
-    // block does not carry* (§3b), and the hunk **cap** that I14 specifies —
-    // the only thing that ever dropped a hunk — is unbuilt, which T2.9 asserts
-    // over `src/` beside this.
-    //
-    // So the pushed view's *every hunk, uncollapsed* was every hunk the block
-    // already renders in the transcript, at the same width. The surface added a
-    // hole and nothing else, which is R-EXA-082 exactly.
-    for (const width of [UNIFIED, SPLIT]) {
-      const drawn = windowRows(THREE, width, 0, totalRows(THREE, width));
-      expect(
-        drawn.block.hunks.map((h) => h.header),
-        `every hunk at ${String(width)}`,
-      ).toEqual(THREE.hunks.map((h) => h.header));
-      expect(
-        drawn.block.hunks.map((h) => h.lines.length),
-        "and every line of each",
-      ).toEqual(THREE.hunks.map((h) => h.lines.length));
-    }
-
-    // **The control**: the elision counts are carried, not resolved — without
-    // it the row above passes for a block that had nothing elided to begin
-    // with, and *there is nothing to expand* would be a statement about the
-    // fixture rather than about the kind.
-    expect(THREE.hunks[0]?.collapsedBefore, "context is elided").toBeGreaterThan(0);
-    expect(
-      THREE.hunks[0]?.lines.some((l) => l.kind === "context" && l.oldNo === 1),
-      "and the elided lines are not in the block",
-    ).toBe(false);
   });
 
   it("T2.11 (C25 I19a): a row-wise cut of a run is additive, over every run up to 4×4 at every cut point", () => {
@@ -671,9 +638,128 @@ describe("C25 I22 — the plan travels through the seam, and a planned window co
   });
 });
 
-describe("C25 I14 — the cap, built, and expanded in place", () => {
-  it.todo(
-    "T2.18 (C25 I14, C25 I11, C25 I24, C25 I17): a capped patch expands in place, and measure equals the rows drawn in both forms — not deferred on a component: the code lands in the next commit of this round",
-  );
-  it.todo("T3.10 (C25 I14): forty single-line hunks under a cap of 24 stop at a hunk boundary and state how many were dropped — not deferred on a component: the code lands in the next commit of this round");
+describe("C25 I14 — the cap, built, and expanded in place (review batch 3, M9 item 1, ruling 42)", () => {
+  /** A four-row hunk in unified layout, three rows in split: a context line, then one line changed. */
+  const four = (at: number): Hunk => ({
+    header: `@@ -${String(at)},3 +${String(at)},3 @@`,
+    lines: [
+      { kind: "context", text: `line ${String(at)}`, oldNo: at, newNo: at },
+      { kind: "remove", text: `old ${String(at + 1)}`, oldNo: at + 1 },
+      { kind: "add", text: `new ${String(at + 1)}`, newNo: at + 1 },
+    ],
+  });
+  const capped = (cap: number | undefined, hunks: readonly Hunk[], after?: number): Patch =>
+    block({
+      kind: "patch",
+      id: "cp",
+      path: "src/a.ts",
+      language: "typescript",
+      hunks,
+      ...(cap === undefined ? {} : { cap }),
+      ...(after === undefined ? {} : { collapsedAfter: after }),
+    } as Patch);
+  const kit = measurable({ definitions: [patchDefinition as unknown as BlockDefinition<never>] });
+  const SGR = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "gu");
+  const plain = (l: string): string => l.replace(SGR, "").trimEnd();
+  const drawn = (b: Patch, w: number): readonly string[] => kit.renderToLines(b, w).map(plain);
+  const fold = (b: Patch): Patch => {
+    const next = kit.registry.fold(b);
+    if (next === null) throw new Error("the patch declared no fold");
+    return next as Patch;
+  };
+  const FIVE = [four(1), four(9), four(20), four(40), four(1000)];
+
+  it("T2.18 (C25 I14, C25 I11, C25 I24, C25 I17): a capped patch expands in place, and measure equals the rows drawn in both forms", () => {
+    // Walked by hand before the code (the lane's walk): cap 12, unified, each
+    // hunk four rows — 1 + 4 + 4 = 9, and a third hunk would reach 13 with the
+    // marker. Split, three rows each — 1 + 3 + 3 + 3 = 10, and a fourth 14.
+    for (const [width, shown, perHunk] of [[UNIFIED, 2, 4], [SPLIT, 3, 3]] as const) {
+      for (const after of [undefined, 40]) {
+        const producer = capped(12, FIVE, after);
+        const collapsed = drawn(producer, width);
+        expect(kit.measure(producer, width), `capped at ${String(width)}: measure is what is drawn`).toBe(collapsed.length);
+        expect(collapsed.length, "the path header, the admitted hunks and the marker").toBe(1 + shown * perHunk + 1);
+        expect(collapsed.at(-1), "the marker states the dropped count, in the tail's place").toBe(`⋯ ${String(5 - shown)} more hunks`);
+        expect(collapsed.some((l) => l.includes("unchanged")), "no tail below hunks this form does not draw").toBe(false);
+
+        const els = kit.registry.elementsOf(producer, width);
+        const marker = els.find((e) => e.id === "more-hunks");
+        expect(marker?.rows, "the marker is an element on the marker's row").toEqual({ from: collapsed.length - 1, to: collapsed.length });
+        expect(marker?.activate).toEqual({ kind: "expand", label: "expand", target: "cp" });
+        expect(els.every((e) => e.activate?.kind === "expand" && e.activate.label === "expand"), "every line carries the toggle").toBe(true);
+
+        const open = fold(producer);
+        expect(open.expanded, "the fold writes the flag").toBe(true);
+        const whole = drawn(open, width);
+        expect(kit.measure(open, width), "expanded: measure is what is drawn").toBe(whole.length);
+        expect(
+          whole.length - collapsed.length,
+          "grows by the dropped hunks' rows, plus the tail where there is one, less the marker",
+        ).toBe((5 - shown) * perHunk + (after === undefined ? 0 : 1) - 1);
+        expect(whole.some((l) => l.includes("more hunk")), "no marker drawn").toBe(false);
+        const openEls = kit.registry.elementsOf(open, width);
+        expect(openEls.some((e) => e.id === "more-hunks"), "and none declared").toBe(false);
+        expect(openEls.every((e) => e.activate?.label === "collapse"), "the lines say collapse").toBe(true);
+        expect(collapsed.slice(0, -1), "the admitted hunks are drawn the same in both forms, gutter pinned").toEqual(whole.slice(0, collapsed.length - 1));
+
+        // **The round trip is the identity, by equality on the object** — the
+        // toggle removes the flag rather than writing `false`.
+        expect(fold(open), "folded twice, the producer's block").toEqual(producer);
+      }
+    }
+
+    // **The controls.** No cap: every hunk, no toggle, no fold.
+    const uncapped = capped(undefined, FIVE);
+    expect(drawn(uncapped, UNIFIED)).toHaveLength(1 + 5 * 4);
+    expect(kit.registry.elementsOf(uncapped, UNIFIED).some((e) => e.activate !== undefined)).toBe(false);
+    expect(kit.registry.fold(uncapped), "a patch with no cap has nothing to fold").toBeNull();
+    // A cap every hunk fits under: whole, no marker, no toggle.
+    const roomy = capped(21, FIVE);
+    expect(drawn(roomy, UNIFIED)).toHaveLength(21);
+    expect(kit.registry.elementsOf(roomy, UNIFIED).some((e) => e.activate !== undefined)).toBe(false);
+    // A lone hunk taller than the cap: drawn whole, because the first is always admitted.
+    const lone = capped(3, [four(1)]);
+    expect(drawn(lone, UNIFIED)).toHaveLength(5);
+    expect(kit.measure(lone, UNIFIED)).toBe(5);
+    // The first hunk admitted even where it alone overruns the cap.
+    const tall = capped(3, [four(1), four(9)]);
+    expect(drawn(tall, UNIFIED), "the first hunk and the marker").toEqual([
+      ...drawn(capped(undefined, [four(1), four(9)]), UNIFIED).slice(0, 5),
+      "⋯ 1 more hunk",
+    ]);
+  });
+
+  it("T2.18 (C25 I14, C09 I26): a capped patch windows with C09 I26's equality, and the pieces draw the rows the whole draws", () => {
+    for (const width of [UNIFIED, SPLIT]) {
+      const producer = capped(12, FIVE, 40);
+      const whole = drawn(producer, width);
+      const total = kit.measure(producer, width);
+      for (let from = 0; from < total; from += 1) {
+        for (let to = from + 1; to <= total; to += 1) {
+          const w = patchDefinition.window!(producer, width, from, to, (b, wd) => kit.measure(b, wd));
+          expect(kit.measure(w.block, width) - w.skipRows - w.dropRows, `[${String(from)}, ${String(to)})`).toBe(to - from);
+          const piece = drawn(w.block as Patch, width);
+          expect(piece.slice(w.skipRows, piece.length - w.dropRows), `rows [${String(from)}, ${String(to)})`).toEqual(whole.slice(from, to));
+        }
+      }
+    }
+  });
+
+  it("T3.10 (C25 I14): forty single-line hunks under a cap of 24 stop at a hunk boundary and state how many were dropped", () => {
+    const single = (at: number): Hunk => ({
+      header: `@@ -${String(at)} +${String(at)} @@`,
+      lines: [{ kind: "add", text: `x${String(at)}`, newNo: at }],
+    });
+    const forty = capped(24, Array.from({ length: 40 }, (_, i) => single(i * 10 + 1)));
+    const rows = drawn(forty, UNIFIED);
+    expect(rows.length, "within the cap").toBeLessThanOrEqual(24);
+    expect(kit.measure(forty, UNIFIED)).toBe(rows.length);
+    // 1 + 11 × 2 + 1 = 24: eleven hunks, and a twelfth would make 26.
+    expect(rows.at(-1)).toBe("⋯ 29 more hunks");
+    // **No hunk half-rendered**: every header drawn is followed by its line.
+    for (const [i, row] of rows.entries()) {
+      if (!row.startsWith("@@")) continue;
+      expect(rows[i + 1], `the hunk opened at row ${String(i)} is drawn whole`).toMatch(/\+ x\d+$/u);
+    }
+  });
 });

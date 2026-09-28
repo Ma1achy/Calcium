@@ -24,9 +24,10 @@
  * two records of one decision.
  */
 
-import type { KeyValue } from "../../data/viewmodel/index.js";
-import { cells } from "../text.js";
-import type { NavElement } from "./types.js";
+import { insetWidth, type KeyValue } from "../../data/viewmodel/index.js";
+import { cells, stripControl, truncate } from "../text.js";
+import { background, based, clampSpans, groundSequence, paint, tone, type Span } from "./paint.js";
+import type { NavElement, RenderContext } from "./types.js";
 
 /**
  * The shed mark's lead (C09 I108, §104, parked 19) — `+`, at every rung.
@@ -314,48 +315,151 @@ export const naturalSpan = (parts: readonly Part[], gap: number): number =>
 export type Withheld = readonly Readonly<{ label: string; value: string }>[];
 
 /**
- * C09 I113 — the rows that shed, as targets whose peek holds what they withheld.
+ * C09 I113, I124 — what each item's row withheld, **or `null` where the block
+ * drew no mark**.
  *
  * **Keyed on the drawn mark and not on the shed alone.** A plan that shed with
  * no room for the mark (`second.clipped`) draws no `+n`, and a target on a row
  * that says nothing about withholding is a stop the reader cannot account for.
+ *
+ * **One answer, three readers** (I124, I125): the elements, the expanded
+ * form's `measure` and its render each take the lists from here, over the same
+ * plan — so the rows an expansion adds and the rows it draws cannot be two
+ * answers to *what did this row withhold*.
+ */
+export function withheldBy(
+  plan: ShedResult | null,
+  parts: readonly Part[],
+  items: number,
+  withheld: (index: number, gone: ReadonlySet<string>) => Withheld,
+): readonly Withheld[] | null {
+  if (plan === null || plan.mark === null) return null;
+  const kept = new Set(plan.kept.map((k) => k.id));
+  const gone: ReadonlySet<string> = new Set(parts.filter((p) => !kept.has(p.id)).map((p) => p.id));
+  return Object.freeze(Array.from({ length: items }, (_, i) => withheld(i, gone)));
+}
+
+/**
+ * C09 I124, I125 — the rows an expansion adds: **one per withheld part**, and
+ * none where the block is not expanded or withheld nothing. A detail line is
+ * one row whatever its width, so this is a count and never a measurement.
+ */
+export function expansionRows(lists: readonly Withheld[] | null, expanded: boolean | undefined): number {
+  if (expanded !== true || lists === null) return 0;
+  return lists.reduce((sum, list) => sum + list.length, 0); // cells-ok — a count of withheld parts
+}
+
+/**
+ * C09 I124 — the fold of a kind that sheds: `expanded` written as `true` and
+ * then **removed**, so collapsing restores the block its producer made rather
+ * than one carrying `expanded: false`. No width and no plan: whether the block
+ * sheds is the width's question, and a fold at a width that sheds nothing draws
+ * nothing (I124).
+ */
+export function foldExpanded<B extends Readonly<{ expanded?: boolean }>>(block: B): B {
+  if (block.expanded !== true) return { ...block, expanded: true };
+  const { expanded: _expanded, ...rest } = block;
+  return rest as B;
+}
+
+/** Two cells between a withheld part's label and its value, the kinds' own gap. */
+const DETAIL_GAP = 2;
+
+/**
+ * C09 I124 — one item's withheld parts, drawn beneath its row as `label  value`
+ * — **the form a table row's dropped columns take** (C11 §3): indented by
+ * C04's inset, on `surface.bgElev`, one row per part.
+ *
+ * **A value is never shed a second time**, and that is the ruling the frame
+ * made. The parts were withheld because the row could not fit them, so a detail
+ * line holding the label and the value is the same fit one indent narrower — a
+ * `keyValue` sheds its value exactly where key and value do not fit, and the
+ * expansion would shed it again. So the value truncates, and where the label
+ * would leave it fewer than `minValue` cells the **label** gives way and the
+ * value takes the line: the value is what the reader expanded to see.
+ *
+ * **The ground as the table lays it** — padded to the width only where there is
+ * a ground to paint, and nothing where the rung has none (C11 I25's guard).
+ */
+export function withheldLines(
+  list: Withheld,
+  width: number,
+  minValue: number,
+  ctx: RenderContext,
+): readonly string[] {
+  if (list.length === 0) return []; // cells-ok — a count of withheld parts
+  const inner = insetWidth(width);
+  const indent = " ".repeat(Math.max(0, width - inner)); // cells-ok — the inset's own cells
+  const ambiguous = ctx.capabilities.ambiguousWidth;
+  const muted = tone("muted", ctx.theme, ctx.capabilities);
+  const plain = tone("default", ctx.theme, ctx.capabilities);
+  const elev = background("surface.bgElev", ctx.theme, ctx.capabilities);
+  const base = elev.background === undefined ? "" : groundSequence("surface.bgElev", ctx.theme, ctx.capabilities);
+  return list.map((part) => {
+    const label = stripControl(part.label);
+    const value = stripControl(part.value);
+    const labelled = cells(label, ambiguous) + DETAIL_GAP + minValue <= inner;
+    const spans: Span[] = labelled
+      ? [
+          { text: indent },
+          { text: label, style: muted },
+          { text: " ".repeat(DETAIL_GAP) },
+          { text: truncate(value, inner - cells(label, ambiguous) - DETAIL_GAP, ctx.capabilities), style: plain },
+        ]
+      : [{ text: indent }, { text: truncate(value, inner, ctx.capabilities), style: plain }];
+    if (base === "") return paint(clampSpans(spans, width, ctx.capabilities));
+    const used = spans.reduce((sum, span) => sum + cells(span.text, ambiguous), 0); // cells-ok — a sum of measured spans
+    const filled = [...spans, { text: " ".repeat(Math.max(0, width - used)) }];
+    return based([paint(clampSpans(filled, width, ctx.capabilities))], base)[0] ?? "";
+  });
+}
+
+/**
+ * C09 I113, I124 — the rows that shed, as targets whose peek holds what they
+ * withheld, and whose `⏎` expands the block in place.
  *
  * **One element per item, at the full width, and `detail` only where the item
  * lost something** — `tableElements`' shape (C26 §5), because a dropped part
  * here and a dropped column there are one subject. A `steps` row with no
  * detail draws the block's mark and withheld nothing of its own, so it is a
  * target with no peek, exactly as a table row that fits is.
+ *
+ * **Every element carries `expand` on the block** (I124, ruling 42): the plan
+ * is block-wide, so the expansion is too. **Expanded**, each element spans its
+ * row and the parts drawn beneath it — a table's expanded row's shape — and the
+ * peek goes, because nothing it would list is withheld from view.
  */
 export function shedElements(
   blockId: string,
-  plan: ShedResult | null,
-  parts: readonly Part[],
+  lists: readonly Withheld[] | null,
   width: number,
-  items: number,
   firstRow: number,
-  withheld: (index: number, gone: ReadonlySet<string>) => Withheld,
   copy: (index: number) => string,
+  expanded: boolean | undefined,
 ): readonly NavElement[] {
-  if (plan === null || plan.mark === null) return Object.freeze([]);
-  const kept = new Set(plan.kept.map((k) => k.id));
-  const gone: ReadonlySet<string> = new Set(parts.filter((p) => !kept.has(p.id)).map((p) => p.id));
+  if (lists === null) return Object.freeze([]);
+  const open = expanded === true;
+  const activate = Object.freeze({ kind: "expand" as const, label: open ? "collapse" : "expand", target: blockId });
   const out: NavElement[] = [];
-  for (let i = 0; i < items; i += 1) {
-    const rows = withheld(i, gone);
+  let row = firstRow;
+  for (const [i, rows] of lists.entries()) {
+    const height = 1 + (open ? rows.length : 0); // cells-ok — a row count
     const detail: KeyValue | null =
-      rows.length === 0 // cells-ok — a count of withheld parts
+      open || rows.length === 0 // cells-ok — a count of withheld parts
         ? null
         : Object.freeze({ kind: "keyValue", id: `${blockId}-shed-${String(i)}-detail`, rows: Object.freeze(rows) });
     out.push(
       Object.freeze({
         id: `shed-${String(i)}`,
         level: "row" as const,
-        rows: Object.freeze({ from: firstRow + i, to: firstRow + i + 1 }),
+        rows: Object.freeze({ from: row, to: row + height }),
         cols: Object.freeze({ from: 0, to: width }),
+        activate,
         copy: copy(i),
         ...(detail === null ? {} : { detail }),
       }),
     );
+    row += height;
   }
   return Object.freeze(out);
 }

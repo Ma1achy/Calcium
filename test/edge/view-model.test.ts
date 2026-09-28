@@ -1031,6 +1031,8 @@ describe("C04 §4a — every op that names a block finds it wherever it lives", 
   });
 
   it("T3.83 (C04 I98, §3c S5, F1015): the dispatcher finds the block holding a row at any depth", () => {
+    // The registry's fold hook, which the fold arm reads since C23 I84.
+    const kit = measurable({});
     // **The dispatcher's half of the same rule, and it lives here because C04
     // I98 is the invariant that states the search** — rows first, then blocks,
     // both at any depth. Driven through a real `TranscriptStore`, so the
@@ -1068,6 +1070,7 @@ describe("C04 §4a — every op that names a block finds it wherever it lives", 
       submit: () => undefined,
       refuse: (_from, text) => said.push(text),
       notify: (text) => said.push(text),
+      fold: (b) => kit.registry.fold(b),
     });
 
     dispatch({ kind: "expand", label: "open", target: "r1" }, id);
@@ -1112,6 +1115,7 @@ describe("C04 §4a — every op that names a block finds it wherever it lives", 
       submit: () => undefined,
       refuse: () => undefined,
       notify: (text) => said.push(text),
+      fold: (b) => kit.registry.fold(b),
     });
     dispatch2({ kind: "expand", label: "open", target: "fold" }, id2);
     const after = store2.entries.find((e) => e.id === id2)?.doc;
