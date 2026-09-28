@@ -192,8 +192,9 @@ const results = runPass({
       // C16 I61 — never routed.
       name: "a focus report reaches the router's walk",
       file: ROUTER,
-      from: '    if (e.kind === "focus") return false;\n',
-      to: "",
+      // Re-anchored 2026-09-28 (review batch 3, M7): a focus-out is read before the report returns (C16 I72); the mutation is unchanged.
+      from: "        if (guard?.arm === \"held\") guard = null;\n      }\n      return false;\n    }\n",
+      to: "        if (guard?.arm === \"held\") guard = null;\n      }\n    }\n",
       expect: "T1.160",
     },
     {

@@ -42,8 +42,9 @@ const results = runPass({
     {
       name: "rowActivate takes liveId as the origin",
       file: "src/shell/keys.ts",
-      from: "      const from = deps.focusedEntryId();\n      if (action === undefined || from === null) return;",
-      to: "      const from = deps.liveEntryId();\n      if (action === undefined || from === null) return;",
+      // Re-anchored 2026-09-28 (review batch 3, M7): rowActivate's body moved into `activationOf` (C16 I71); the mutation is unchanged.
+      from: "      activationOf(deps.focusedEntryId(), elements[i])?.();",
+      to: "      activationOf(deps.liveEntryId(), elements[i])?.();",
       expect: "T3.41",
     },
     {

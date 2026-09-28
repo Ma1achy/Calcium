@@ -20,6 +20,9 @@ import type { TransportRouter } from "../data/transport/index.js";
 import type { Action, Block, ViewDocument } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
 import type { OwnerRung } from "../interaction/router/types.js";
+
+/** What C16 I70 names: the refused chord, and whether the way out is its release or a pause. */
+export type GuardRefusal = Readonly<{ key: Binding["key"]; untilRelease: boolean }>;
 import type { RefreshHost } from "./refresh.js";
 import type { CompletionSource } from "../interaction/completion/index.js";
 import type { Binding, FocusTarget, KeyAction, ReservedKeyAction } from "../interaction/router/types.js";
@@ -125,8 +128,22 @@ export type ChromeContext = Readonly<{
    *
    * Optional on the same terms as `owner`: `compose` runs before the session
    * graph exists, and absent is *no arm*.
+   *
+   * *(C16 I70: the mark no longer goes at the refusal — under ruling 52 a
+   * refusal extends the guard — so the change is `ownerRefused` below.)*
    */
   ownerArmed?: boolean;
+  /**
+   * The key the guard refused first, and the way out on this terminal (C16 I70,
+   * C22 §6). Absent until the first refusal, and absent again when the guard
+   * ends.
+   *
+   * **The refused key's change to the frame.** `ownerArmed` alone could not be
+   * it: the mark is there before the refusal and after it, so a refusal that
+   * only extended the guard left the frame as it was. The owner line names this
+   * chord, once, and the linear cue says the same words.
+   */
+  ownerRefused?: GuardRefusal;
   /**
    * Entries the record holds and the frame is not showing (C14 I34, `R-SEL-010`).
    *

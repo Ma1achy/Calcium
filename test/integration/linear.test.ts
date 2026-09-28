@@ -132,7 +132,7 @@ describe("C22 §6m — a linear session", () => {
     }
   });
 
-  it("T4.103 (C22 I122, C22 I124, C16 I44): a numbered question, its guard stated, answered by its number", async () => {
+  it("T4.103 (C22 I122, C22 I124, C16 I44, C16 I70): a numbered question, its guard stated, answered by its number", async () => {
     const s = await linear();
     try {
       // Submitting takes the line (C23 I28); what is typed while the verb runs
@@ -147,11 +147,18 @@ describe("C22 §6m — a linear session", () => {
       const cue = "answer 1 to 3 (ready in a moment): ";
       expect(s.stdout.output.endsWith(`\r\n${cue}${ESC}[${String(cue.length + 1)}G`), "the cue, armed").toBe(true);
 
-      // The first `2` is refused, and the refusal is the cue losing its clause.
+      // The first `2` is refused, and the refusal is the cue naming it and the
+      // way out (C16 I70) — the clause going was the old explanation, and under
+      // I69 a refusal extends the guard rather than ending it.
       const refused = s.stdout.output.length;
       await s.type("2");
       await s.step(50);
-      expect(s.lines(s.since(refused)), "refused, and said so").toEqual(["answer 1 to 3: "]);
+      expect(s.lines(s.since(refused)), "refused, and said so").toEqual([
+        "answer 1 to 3 (2 refused: pause, then press 2): ",
+      ]);
+
+      // A pause past the grace and the gap, as the cue asks.
+      await s.step(1_000);
 
       // `2` answers the second choice — not `b`, which is main's own key.
       const mark = s.stdout.output.length;

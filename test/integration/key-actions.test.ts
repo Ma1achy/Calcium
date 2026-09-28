@@ -142,8 +142,9 @@ describe("C16 §6c — reserved actions pass through (review batch 2, M6 item 1)
       const w = await world();
       void w.graph.confirm.ask({ question: "why?", choices: REPLYABLE });
       await new Promise((r) => setTimeout(r, 0));
-      // At most twice: a newly raised owner refuses its first activation (C16 I44).
-      for (let i = 0; i < 2 && w.graph.confirm.replacing !== null; i += 1) await w.type("r");
+      // A neutral `→` ends the arrival guard (C16 I44, I69), so `r` answers.
+      await w.type("\u001b[C");
+      await w.type("r");
       expect(w.graph.confirm.replacing, "reply… chosen").toBeNull();
       await w.type("fix the bug");
       await w.type(ALT_BACKSPACE);

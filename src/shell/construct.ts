@@ -26,7 +26,7 @@
 
 import { createAdapterRegistry } from "../data/adapters/index.js";
 import { blankRowsAbove, commandRows } from "./paint.js";
-import { childBorderLegend } from "./chrome.js";
+import { childBorderLegend, guardRefusal } from "./chrome.js";
 import { compose, noticeDoc, settledDoc } from "./documents.js";
 import {
   answerEvent,
@@ -1724,12 +1724,18 @@ export async function constructGraph(
         input: () => {
           const { text, cursor } = stores.editor;
           if (asking !== null && !confirm.composing) {
-            // **Armed, it says so in the footer's own words** (I122, R-OWN-002):
-            // the key the guard refuses redraws the cue without them, which
-            // is the refusal stated where rich mode states it in a chip.
+            // **Armed, it says so in the footer's own words** (I122, R-OWN-002,
+            // C16 I70): the first key the guard refuses redraws the cue naming
+            // it and the way out, which is the refusal stated where rich mode
+            // states it in a chip — the same sentence, from the same function.
             // `router` is built below and read only when the line is drawn —
             // the temporal dead zone, as `pipeline`'s thunk, not a quiet default.
-            const ready = router.ownerArmed ? " (ready in a moment)" : "";
+            const refusedKey = router.ownerRefused;
+            const ready = !router.ownerArmed
+              ? ""
+              : refusedKey === null
+                ? " (ready in a moment)"
+                : ` (${guardRefusal(refusedKey, detection.capabilities)})`;
             return { label: `answer 1 to ${String(Math.min(9, asking.choices.length))}${ready}: `, text: "", cursor: 0 };
           }
           if (asking !== null) return { label: `${asking.question}: `, text, cursor };
@@ -1895,6 +1901,7 @@ export async function constructGraph(
           (row) => entryAtRegionRow(row),
           () => detection.capabilities.keyboardProtocol === "kitty",
           () => surface.attached,
+          () => surface.generation,
           (r) => refused(r),
         ),
         // C28 I39 — the `handler` span. Spread in here rather than threaded
@@ -3858,27 +3865,35 @@ export async function constructGraph(
     // complementary cells of one layout — so at most one of `sample` and
     // `series` answers, and the focus call below is shared by both.
     const series = sample === null ? legendUnder(hit.id, under, e.col) : null;
-    const aim = sample !== null
+    const crosshair = sample !== null
       ? (): void => {
           stores.cursorPositions.set(hit.id, under.block.id, sample);
           scheduler.commit("input");
         }
-      : series !== null
-        // **The legend's toggle is an activation and waits for the release**
-        // (C16 I45, §4a's legend row). The press below still carries the focus
-        // call, so the plot is focused in the press's frame and the swatch goes
-        // hollow in the release's: one gesture, one effect, each half drawn in
-        // the half of the gesture that caused it.
-        ? armActivation(armId(hit.id, under.block.id, under.element.id), (): void =>
-            toggleSeriesIn(hit.id, under.block as Plot, series),
-          )
-        : null;
+      : null;
+    const aim = crosshair ?? (series !== null
+      // **The legend's toggle is an activation and waits for the release**
+      // (C16 I45, §4a's legend row). The press below still carries the focus
+      // call, so the plot is focused in the press's frame and the swatch goes
+      // hollow in the release's: one gesture, one effect, each half drawn in
+      // the half of the gesture that caused it.
+      ? armActivation(armId(hit.id, under.block.id, under.element.id), (): void =>
+          toggleSeriesIn(hit.id, under.block as Plot, series),
+        )
+      : null);
 
     if (e.motion || e.shift) {
       // **Over the focused plot, motion is the crosshair's** (§4a row o): the
       // anchor and the head would be one block-level element, which is no
       // selection in any case, so nothing is lost by not calling `extendRow`.
-      if (onFocused && aim !== null) return aim;
+      //
+      // **The crosshair's and never the legend's** (C16 I71, §3c S2). `aim` is
+      // the legend's arming thunk where the pointer is over an entry, so a drag
+      // off the entry and back re-armed it and the release toggled — trace 15's
+      // *only a press arms*, true of a row and false of a legend. Over the
+      // legend, motion does nothing: the drag has already cancelled the arm.
+      if (onFocused && crosshair !== null) return crosshair;
+      if (onFocused && series !== null) return null;
       // A drag and a shift-click are both `⇧↓` (C16 §4a): the head lands on the
       // element under the pointer and the anchor is placed on the first
       // extension, so click `a` then shift-click `c` selects `a..c`. Within the
@@ -3898,7 +3913,12 @@ export async function constructGraph(
       // keys (C26 I14) and the framework fires nothing, so there is nothing to
       // arm either.
       if (at.mode === "interact") return null;
-      return armActivation(armId(hit.id, address.blockId, address.elementId), keys.table.rowActivate);
+      // **The activation is captured here, at the press** (C16 I71, §3c S1).
+      // `rowActivate` reads focus when it runs, so a `↓` between the press and
+      // the release fired the row focus had moved to — under the identity of the
+      // row the reader pressed. What the release commits is what was pressed.
+      const activation = keys.activationAt(hit.id, address);
+      return armActivation(armId(hit.id, address.blockId, address.elementId), activation ?? ((): void => undefined));
     }
     // A click is a way in exactly as `↓` is, so from the prompt it takes the
     // same call; from a row it is a move, and `focusRow` collapses a selection
@@ -4360,14 +4380,22 @@ export async function constructGraph(
       reconcileField();
     };
 
-    const deliver = (batch: readonly InputEvent[]): void => {
+    const deliver = (batch: readonly InputEvent[], lapsed = false): void => {
       // **A focus report is read here and routed nowhere** (C16 I61, C22 I129):
-      // it moves no focus, and it commits a frame only when the return has
-      // something to say (C23 I86) — the record changed, which the rungs'
-      // bytes never do.
+      // it moves no focus. It commits a frame only when something drawn moved:
+      // the return has something to say (C23 I86) — the record changed, which
+      // the rungs' bytes never do — or a guard ended.
+      //
+      // **But the router reads a focus-out too** (C16 I72): the keys it saw go
+      // down may be released in another window, and a guard waiting on one of
+      // them ends here — the owner line's mark moves, so the commit is owed.
       let returned = false;
+      let guardMoved = lapsed;
       const events = batch.filter((e) => {
         if (e.kind !== "focus") return true;
+        const was = router.ownerArmed;
+        router.dispatch(e);
+        if (router.ownerArmed !== was) guardMoved = true;
         if (notifier === null) return false;
         notifier.focus(e.focused);
         // **The away mark** (C23 I85): opened by the leaving, closed by the
@@ -4378,7 +4406,7 @@ export async function constructGraph(
         else if (sayLedger("away", ledger.close("away"))) returned = true;
         return false;
       });
-      if (events.length === 0 && returned) scheduler.commit("input");
+      if (events.length === 0 && (returned || guardMoved)) scheduler.commit("input");
       if (events.length > 0) {
         for (const e of events) routed(e);
         // After the keys and before the frame: the peek follows the focus the
@@ -4429,22 +4457,33 @@ export async function constructGraph(
       }, CURSOR_BLINK_MS);
     };
 
-    // The three timeouts C16 reports and does not fire: the escape window, the
-    // paste heuristic, the exit arming. Without this a lone `Esc` is delivered
-    // when the *next* key arrives — a key that appears to do nothing until you
-    // press another one.
+    // The timeouts C16 reports and does not fire: the escape window, the paste
+    // heuristic, the exit arming — and the question guard's (C16 I70). Without
+    // this a lone `Esc` is delivered when the *next* key arrives — a key that
+    // appears to do nothing until you press another one — and a guard that
+    // lapsed with no input keeps its mark on screen until one does.
     function arm(): void {
       wake?.[Symbol.dispose]();
       wake = null;
-      const at = decoder.nextDeadline();
-      if (at === null) return;
+      const decoderAt = decoder.nextDeadline();
+      const guardAt = router.nextDeadline();
+      const at = decoderAt === null ? guardAt : guardAt === undefined ? decoderAt : Math.min(decoderAt, guardAt);
+      if (at === undefined) return;
       wake = config.schedule(() => {
         wake = null;
-        deliver(decoded(() => decoder.poll()));
+        // **The guard's lapse is a frame nobody else draws** (C16 I70, §3c S6):
+        // no key arrived, so no batch commits, and the mark would stay.
+        deliver(decoded(() => decoder.poll()), guardAt !== undefined && config.clock() >= guardAt);
       }, Math.max(0, at - config.clock()));
     }
 
     lifecycle.onInput((chunk) => void deliver(decoded(() => decoder.push(chunk))));
+    // **A question arrives on no input of its own** (C16 I69, I70): a verb asks
+    // from a promise, and the guard's grace is timed from when the router first
+    // sees it. Re-arming on every overlay change is what stamps the arrival at
+    // the push and schedules the wake for its lapse; the router's read is a pull
+    // either way (C16 §4), so this is L4 asking, not C16 subscribing.
+    stores.overlays.subscribe(() => arm());
   });
 
   /**
@@ -4723,6 +4762,8 @@ function routerDeps(
   keyReleasesReported: () => boolean,
   /** The `child` rung's second source, late because the host is built after the router (C16 I49). */
   childAttached: () => boolean,
+  /** The surface host's half of `ownerGeneration`, late for `childAttached`'s reason (C16 I73). */
+  surfaceGeneration: () => number,
   /** Where a refusal is explained, by rung (C16 I62). L4's, because the explanation is the owner's. */
   refused: RouterDeps["refused"],
 ): RouterDeps {
@@ -4774,6 +4815,11 @@ function routerDeps(
     // inside `construct`, after the router that takes these deps — the same
     // lateness `pipeline` is threaded as a thunk for.
     childAttached,
+    // **Every owner raised or removed, counted where it happens** (C16 I73,
+    // C15 I33): the stack's keyed pushes and removals and the surface host's
+    // attachments. The rung alone missed an owner raised and gone between two
+    // of the router's reads.
+    ownerGeneration: () => stores.overlays.generation + surfaceGeneration(),
     // §5's subscription rung. Read through the same accessor as `inFlight`,
     // because the pipeline is constructed after the router and a captured
     // reference here would be the null one.

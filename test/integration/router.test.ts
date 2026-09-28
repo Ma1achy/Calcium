@@ -41,6 +41,8 @@ function world() {
     // **The `child` rung's second source** (C16 I49). Required rather than
     // optional, so a harness that means to attach one has to say so.
     childAttached: () => false,
+    // C16 I73 — the stack's own count; no surface host here.
+    ownerGeneration: () => overlays.generation,
     overlayWouldResolve: () => null,
     overlayAnswerCallback: () => null,
     overlayTop: () => {

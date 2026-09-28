@@ -66,7 +66,8 @@ const results = runPass({
     {
       name: "the click-again branch dropped — a row can be reached and never acted on",
       file: "src/shell/construct.ts",
-      from: "      return armActivation(armId(hit.id, address.blockId, address.elementId), keys.table.rowActivate);\n",
+      // Re-anchored 2026-09-28 (review batch 3, M7): the press now captures the activation (C16 I71); the mutation is unchanged.
+      from: "      return armActivation(armId(hit.id, address.blockId, address.elementId), activation ?? ((): void => undefined));\n",
       to: "      return () => focus.focusRow(hit.id, address);\n",
       expect: "T4.64",
     },

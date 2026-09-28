@@ -91,8 +91,9 @@ const MUTATIONS = [
     // `liveRowAction` had when it took a bare id into its own walk.
     name: "⏎ fires the first element's action rather than the focused one",
     file: KEYS,
-    from: "      const action = elements[i]?.element.activate;",
-    to: "      const action = elements.find((p) => p.element.activate !== undefined)?.element.activate;",
+    // Re-anchored 2026-09-28 (review batch 3, M7): rowActivate's body moved into `activationOf` (C16 I71); the mutation is unchanged.
+    from: "      activationOf(deps.focusedEntryId(), elements[i])?.();",
+    to: "      activationOf(deps.focusedEntryId(), elements.find((p) => p.element.activate !== undefined))?.();",
     expect: "T1.16",
   },
   {

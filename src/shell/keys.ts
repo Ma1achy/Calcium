@@ -391,6 +391,18 @@ export interface KeyEffects {
    */
   searchTyped(text: string | null): void;
   /**
+   * What `⏎` on the element at `address` in `entryId` would do, resolved now
+   * and run later — or `null` where it would do nothing (C16 I71, §3c S1).
+   *
+   * **The pointer's press captures this, and its release runs it.** The arm
+   * held `table.rowActivate`, which reads `focus.current` when it runs — so a
+   * press on row A, `↓` to row B with the button down, and a release over A
+   * fired B's action. The identity the router compares is A's, so the effect
+   * has to be A's too. Asked of the focused entry, because a press only arms
+   * on the focused element.
+   */
+  activationAt(entryId: EntryId, address: ElementAddress): KeyEffect | null;
+  /**
    * The region changed — re-place whatever is anchored to the prompt.
    *
    * **Placement is live in C15's type and nothing was keeping it current.** The
@@ -1057,26 +1069,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       const elements = deps.focusedElements();
       const i = resolveFocus(current.element, elements);
       if (i === null) return;
-      // **The way IN** (C26 I26, §102: *focused — the way IN — ⏎ enter*). An
-      // element that declares view state is entered rather than activated, and
-      // the two are disjoint by §018 — *direct-action toggles and choices act
-      // without an inside state* — so this is a ruling read off the element and
-      // not a precedence between two meanings of one key.
-      if (elements[i]?.element.viewState === true) {
-        deps.focus.setMode("interact");
-        return;
-      }
-      // `activate` is the element's own, declared by the kind (C26 §5), rather
-      // than a row shape this layer would otherwise have to know.
-      const action = elements[i]?.element.activate;
-      // **The focused entry, which is the origin C23 I18 reads** (C26 §4g row
-      // e). A settled row's action arrives here for the first time, and it is
-      // refused there — with `liveId` as the origin it would have fired against
-      // the live entry's document instead and been refused by nothing.
-      const from = deps.focusedEntryId();
-      if (action === undefined || from === null) return;
-      const fired = elements[i];
-      deps.onAction(action, from, fired === undefined ? undefined : addressOf(fired));
+      activationOf(deps.focusedEntryId(), elements[i])?.();
     },
     rowUp: () => {
       const elements = deps.focusedElements();
@@ -1439,6 +1432,46 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   );
 
   /**
+   * What activating `fired` in `entry` does (C16 I71) — `rowActivate`'s body,
+   * resolved without running so the pointer can capture it at the press.
+   */
+  function activationOf(entry: EntryId | null, fired: PlacedNavElement | undefined): KeyEffect | null {
+    if (fired === undefined) return null;
+    const address = addressOf(fired);
+    // **The way IN** (C26 I26, §102: *focused — the way IN — ⏎ enter*). An
+    // element that declares view state is entered rather than activated, and
+    // the two are disjoint by §018 — *direct-action toggles and choices act
+    // without an inside state* — so this is a ruling read off the element and
+    // not a precedence between two meanings of one key.
+    //
+    // **Focused first where focus has gone elsewhere** (C16 I71): a captured
+    // entry runs after focus may have moved, and `interact` on another element
+    // would hand that element the keys.
+    if (fired.element.viewState === true) {
+      const enter = (): void => deps.focus.setMode("interact");
+      return () => {
+        const now = deps.focus.current;
+        const here =
+          now.at === "liveBlock" &&
+          deps.focusedEntryId() === entry &&
+          now.element?.blockId === address.blockId &&
+          now.element.elementId === address.elementId;
+        if (!here && entry !== null) deps.focus.focusRow(entry, address);
+        enter();
+      };
+    }
+    // `activate` is the element's own, declared by the kind (C26 §5), rather
+    // than a row shape this layer would otherwise have to know.
+    const action = fired.element.activate;
+    // **The focused entry, which is the origin C23 I18 reads** (C26 §4g row
+    // e). A settled row's action arrives here for the first time, and it is
+    // refused there — with `liveId` as the origin it would have fired against
+    // the live entry's document instead and been refused by nothing.
+    if (action === undefined || entry === null) return null;
+    return () => deps.onAction(action, entry, address);
+  }
+
+  /**
    * What a question closed and the reader has not (C15 I32, R-BLK-873).
    *
    * **Held, not closed.** C15 I28 dismisses every panel when a question
@@ -1506,6 +1539,11 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       if (text === null) deps.history.searchBackspace();
       else deps.history.searchType(text);
       refreshSearchLayer();
+    },
+    activationAt: (entryId, address) => {
+      const elements = deps.focusedElements();
+      const i = resolveFocus(address, elements);
+      return i === null ? null : activationOf(entryId, elements[i]);
     },
     refreshAnchors: () => {
       const at = deps.anchor();

@@ -18,7 +18,7 @@ import { block } from "../data/viewmodel/index.js";
 import type { Block, Pills } from "../data/viewmodel/index.js";
 import { glyphFor, glyphs } from "../presentation/blocks/index.js";
 import { cells } from "../presentation/text.js";
-import type { ChromeContext, ChromeFn, CopyState, OwnerHints } from "./types.js";
+import type { ChromeContext, ChromeFn, CopyState, GuardRefusal, OwnerHints } from "./types.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Binding, FocusTarget, KeyAction, OwnerRung } from "../interaction/router/types.js";
 import { chordText, defaultKeymap } from "../interaction/router/keymap.js";
@@ -333,6 +333,19 @@ export function childBorderLegend(caps: TerminalCapabilities): string {
   ].join(sep);
 }
 
+/**
+ * C16 I70's sentence: the chord a guarded question refused, and the way out on
+ * this terminal — its release where releases are reported, a pause where they
+ * are not. The owner line's chip and the linear cue both say this, so it is
+ * spelled once.
+ *
+ * **Words, not a dash**, because the ASCII rung has no dash to draw.
+ */
+export function guardRefusal(refused: GuardRefusal, caps: TerminalCapabilities): string {
+  const chord = chordText(refused.key, caps.unicode !== "ascii");
+  return refused.untilRelease ? `release ${chord} to answer` : `${chord} refused: pause, then press ${chord}`;
+}
+
 export function ownerLine(
   rung: OwnerRung | null,
   caps: TerminalCapabilities,
@@ -341,19 +354,30 @@ export function ownerLine(
   copy?: CopyState,
   field = false,
   hints: OwnerHints = DEFAULT_HINTS,
+  refused?: GuardRefusal,
 ): readonly Chip[] {
   const chips = ownerChips(rung, caps, buffered, copy, field, hints);
   // **The armed mark, and it is a chip rather than a decoration** (C16 I44,
-  // C22 §6, R-INT-008). A newly raised owner refuses one activation so a key
-  // already in flight cannot answer a question that arrived under it, and a
-  // rejected command has to explain. This is the explanation: it is drawn while
-  // the arm is live and gone after the refusal, so the refused key changes the
-  // frame — which is the whole difference between refused and swallowed.
+  // I70, C22 §6, R-INT-008). A newly raised question refuses activations so a
+  // key already in flight cannot answer it, and a rejected command has to
+  // explain. This is the explanation: `ready in a moment` while nothing has
+  // been refused, and from the first refusal the refused key and the way out —
+  // so the refused key changes the frame, which is the whole difference between
+  // refused and swallowed. **Once**: a second refusal draws the same chip.
+  //
+  // It used to be the mark *going* at the refusal, and under ruling 52 a
+  // refusal extends the guard rather than ending it, so the mark stayed and the
+  // refusal changed nothing (C16 §3c S7).
   //
   // `ownerLine(null)` stays the empty line. No owner raised is no row, and an
   // arm with no owner is not a state the router can reach.
   if (!armed || chips.length === 0) return chips;
-  return [...chips, { label: "ready in a moment", tone: "muted" }];
+  return [
+    ...chips,
+    refused === undefined
+      ? { label: "ready in a moment", tone: "muted" }
+      : { label: guardRefusal(refused, caps), tone: "warn" },
+  ];
 }
 
 /** `1 row`, `9 rows` — the count's three nouns (C14 I55). */
@@ -576,6 +600,7 @@ const footer = (ctx: ChromeContext): readonly Block[] => [
               ctx.copy,
               ctx.editingField === true,
               ctx.hints,
+              ctx.ownerRefused,
             ),
             ctx.columns,
             ctx.capabilities,

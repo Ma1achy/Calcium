@@ -93,6 +93,13 @@ export type SurfaceHost = Readonly<{
   close(reason: "session" | "detach"): Promise<SurfaceCloseOutcome | null>;
   /** Whether a child holds the keyboard — C16's second source for `attachedChild` (I49). */
   readonly attached: boolean;
+  /**
+   * How many times a child has attached or let go — the surface half of C16's
+   * `ownerGeneration` (C16 I73). `attached` answers *now*; this answers *did it
+   * change between two reads*, which a child opened and closed inside one
+   * gesture leaves `attached` unable to say.
+   */
+  readonly generation: number;
 }>;
 
 export type SurfaceHostOptions = Readonly<{
@@ -177,6 +184,7 @@ function fault(stage: SurfaceFault["stage"], cause: unknown): SurfaceFault {
 
 export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
   let current: ChildSurfaceHandle | null = null;
+  let generation = 0;
   let closeCurrent: ((outcome: SurfaceCloseOutcome) => Promise<SurfaceCloseOutcome>) | null = null;
 
   function open(surface: ChildSurface): ChildSurfaceHandle {
@@ -388,6 +396,7 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
       // back — and a detach that swept it would be the pushed view's hole
       // arriving by another name.
       current = null;
+      generation += 1;
       closeCurrent = null;
       options.attachment.closed(entryId, outcome.reason);
       // **The frame after ownership returns, not before** (C22 I110). The
@@ -424,6 +433,7 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
       close: () => beginClose({ reason: "application" }),
     });
     current = handle;
+    generation += 1;
     closeCurrent = beginClose;
     options.invalidate();
     return handle;
@@ -440,6 +450,9 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
     // answer able to disagree with this one for the length of a promise.
     get attached() {
       return current !== null;
+    },
+    get generation() {
+      return generation;
     },
   });
 }

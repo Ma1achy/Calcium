@@ -120,8 +120,9 @@ async function inside(w: Awaited<ReturnType<typeof world>>): Promise<void> {
 async function replying(graph: Graph, type: (b: string) => Promise<void>): Promise<void> {
   void graph.confirm.ask({ question: "why?", choices: REPLYABLE });
   await new Promise((r) => setTimeout(r, 0));
-  // At most twice: a newly raised owner refuses its first activation (C16 I44).
-  for (let i = 0; i < 2 && graph.confirm.replacing !== null; i += 1) await type("r");
+  // A neutral `→` ends the arrival guard (C16 I44, I69), so `r` answers.
+  await type("\u001b[C");
+  await type("r");
   expect(graph.confirm.replacing, "reply… chosen").toBeNull();
 }
 

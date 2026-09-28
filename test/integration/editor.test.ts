@@ -48,6 +48,8 @@ function wire(editor: LineEditor): {
     // **The `child` rung's second source** (C16 I49). Required rather than
     // optional, so a harness that means to attach one has to say so.
     childAttached: () => false,
+    // C16 I73 — no stack and no surface host, so nothing is ever raised.
+    ownerGeneration: () => 0,
     overlayWouldResolve: () => null,
     overlayAnswerCallback: () => null,
     overlayTop: () => null,

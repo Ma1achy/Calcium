@@ -1973,6 +1973,8 @@ class Session implements TuiInstance {
       // line and the dispatch that honours it must not be able to disagree.
       owner: () => this.#graph?.router.rung ?? null,
       ownerArmed: () => this.#graph?.router.ownerArmed ?? false,
+      // C16 I70 — what the guard refused, named on the owner line once.
+      ownerRefused: () => this.#graph?.router.ownerRefused ?? null,
       // C14 I34 — the hold's only observable, read per frame from the graph
       // where the subtraction lives. Zero on every frame outside the mode.
       bufferedEntries: () => this.#graph?.bufferedEntries ?? 0,

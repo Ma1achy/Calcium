@@ -290,6 +290,74 @@ describe("C16 §4a — a click lands where the keys would", () => {
     expect(graph.focus.current, "focus survives the refusal").toEqual(AT(settled, "a1", "t1"));
   });
 
+  it("T4.75 (C16 I43, I46, I73, R-OWN-002): a question raised between press and release commits nothing, and nor does one raised and answered between them", async () => {
+    const YES_NO = [
+      { key: "y", label: "yes" },
+      { key: "n", label: "no", default: true as const },
+    ];
+    // Trace 16: raised between the halves, and still open at the release.
+    {
+      const { graph, term } = await twoEntries(true);
+      const a2 = term(10); // T4.64's geometry
+      click(graph.router, a2, 2);
+      graph.router.dispatch(mouse(a2, 2));
+      void graph.confirm.ask({ question: "stop it?", choices: YES_NO });
+      await new Promise((r) => setTimeout(r, 0));
+      graph.router.dispatch(mouse(a2, 2, { press: false }));
+      expect(graph.editor.text, "nothing activated").toBe("");
+      expect(graph.confirm.open, "and the question is open and unanswered").toBe(true);
+    }
+    // §3c S9: raised **and answered** between them — the rung the same at both
+    // ends, so only the owner generation can see it (C16 I73).
+    {
+      const { graph, term, clock } = await twoEntries(true);
+      const a2 = term(10);
+      click(graph.router, a2, 2);
+      const rung = graph.router.rung;
+      graph.router.dispatch(mouse(a2, 2));
+      const answer = graph.confirm.ask({ question: "stop it?", choices: YES_NO });
+      await new Promise((r) => setTimeout(r, 0));
+      clock.advance(1_000); // past the arrival guard (C16 I69)
+      graph.router.dispatch(press("y"));
+      await expect(answer).resolves.toEqual({ key: "y" });
+      expect(graph.router.rung, "the same owner at both ends").toBe(rung);
+      graph.router.dispatch(mouse(a2, 2, { press: false }));
+      expect(graph.editor.text, "the arm died with the owners between").toBe("");
+    }
+    // The control: the same pair with nothing between activates.
+    {
+      const { graph, term } = await twoEntries(true);
+      const a2 = term(10);
+      click(graph.router, a2, 2);
+      click(graph.router, a2, 2);
+      expect(graph.editor.text).toBe("pick 2");
+    }
+  });
+
+  it("T4.90 (C16 I71, §3c): press on row A, ↓ to row B with the button down, release over A — A's action fires and B's does not", async () => {
+    const { graph, term } = await graphAt80();
+    const both = {
+      kind: "table",
+      id: "t",
+      columns: [{ key: "name", label: "Name", align: "left", priority: 10, minWidth: 12, sortable: false }],
+      rows: [
+        { id: "a", cells: { name: { text: "alpha" } }, actions: [{ kind: "fill", label: "pick a", command: "pick a" }] },
+        { id: "b", cells: { name: { text: "beta" } }, actions: [{ kind: "fill", label: "pick b", command: "pick b" }] },
+      ],
+    };
+    const live = graph.transcript.append(doc("/rows", [both]) as never);
+    // Command line 0, header 1, `a` 2, `b` 3 — shown before it is asserted.
+    const a = term(2);
+    click(graph.router, a, 2);
+    expect(graph.focus.current).toEqual(AT(live, "a", "t"));
+
+    graph.router.dispatch(mouse(a, 2));
+    graph.router.dispatch(press("down"));
+    expect(graph.focus.current, "focus moved under the held button").toEqual(AT(live, "b", "t"));
+    graph.router.dispatch(mouse(a, 2, { press: false }));
+    expect(graph.editor.text, "what was pressed is what fires").toBe("pick a");
+  });
+
   it("T4.64b (C16 I31, §4a trace 3; C26 I14): in interaction the second click is the block's, and the framework fires nothing", async () => {
     const { graph, live, term } = await twoEntries(true);
     graph.router.dispatch(mouse(term(10), 2)); // `a2` — T4.64's geometry
@@ -1104,6 +1172,42 @@ describe("C16 §4a — the legend clicks (C12 I117, C22 I78)", () => {
     // reaches it: the third writer and the first share one store.
     await type("2");
     expect(plotRows()).toBe(hidden);
+  });
+
+  it("T4.77 (C16 I45, I71, §4a's legend row): a legend press focuses an unfocused plot and its release toggles; a drag off, and off and back, toggle nothing", async () => {
+    const { row, col } = secondEntryAt(80);
+    /** One plot entry, and the legend entry's terminal cell. */
+    const plot = async () => {
+      const built = await graphAt80();
+      const entry = built.graph.transcript.append(doc("/plot", [TWO()]) as never);
+      return { ...built, entry, at: built.term(1 + row) };
+    };
+    const off = col - 6; // inside the area, clear of the legend
+
+    // Press, then release on the entry: the press focuses and shows; the release toggles.
+    {
+      const { graph, entry, at } = await plot();
+      graph.router.dispatch(mouse(at, col));
+      expect(graph.focus.current, "the press focuses the plot").toEqual(AT(entry, "p", "p"));
+      expect(graph.seriesVisibility.get(entry, "p", 1) === true, "and leaves the series shown").toBe(false);
+      graph.router.dispatch(mouse(at, col, { press: false }));
+      expect(graph.seriesVisibility.get(entry, "p", 1) === true, "the release toggles it").toBe(true);
+    }
+    // The control: the pointer leaves the entry before the release.
+    const { graph, entry, at } = await plot();
+    graph.router.dispatch(mouse(at, col));
+    graph.router.dispatch(mouse(at, off, { motion: true }));
+    graph.router.dispatch(mouse(at, off, { press: false }));
+    expect(graph.focus.current).toEqual(AT(entry, "p", "p"));
+    expect(graph.seriesVisibility.get(entry, "p", 1) === true, "still shown").toBe(false);
+
+    // **Off and back** (§3c S2), on the plot the control just focused: the drag
+    // cancelled the arm, and motion over the legend does not restore it.
+    graph.router.dispatch(mouse(at, col));
+    graph.router.dispatch(mouse(at, off, { motion: true }));
+    graph.router.dispatch(mouse(at, col, { motion: true }));
+    graph.router.dispatch(mouse(at, col, { press: false }));
+    expect(graph.seriesVisibility.get(entry, "p", 1) === true, "only a press arms").toBe(false);
   });
 
   it("T4.73b (C16 §4a row y; C23 I47): through the graph — a settled entry's legend writes that entry's store; the live entry's is untouched", async () => {
