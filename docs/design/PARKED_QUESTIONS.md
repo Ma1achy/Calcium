@@ -1127,6 +1127,12 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
+> **Ruled 2026-09-28** (by Claude under the person's standing authority; review batch 3, F1284). **The wire enforces C04 I6's glyph rule exactly as `block()` does.** A `warn` or `error` cell, or a notice, that carries no glyph is refused by `validateDocument`, unless its text is a word of its column's declared closed vocabulary (ruling 44). Lane b3-g probed the wire and found it accepting a colour-only document that the builder refuses — one document with two verdicts, and the far side is the producer the rule exists for (D29). **Tie-breaks:** a consistent picture beats a lone rule, and the design's two-carrier rule (R-COR-003) is normative. **The cost, stated:** a far side sending a colour-only warning is refused where it passed; the refusal names the rule, and the adapters and fixtures in this repository are measured before it lands. It refuses more and approves nothing, so it weakens no safety default.
+
+**77 · RULED — Whether the wire enforces the glyph a builder requires.**
+
+---
+
 ## Not yet recovered
 
 The gap between the entries and the running count in the per-MR reports was chased and closed: some questions had been counted twice. The list is the count. **No total is stated here in prose**, because the one that used to be here said *sixteen* long after that stopped being true — this file's own subject, arriving inside it.
