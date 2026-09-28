@@ -128,6 +128,44 @@ export const windowTitle = (text: string): string => `\x1b]2;${oscText(text)}\x0
 export const systemNotification = (text: string): string =>
   `\x1b]9;${oscText(text).replace(/^(\d+);/u, "$1 ;")}\x07`;
 
+// --- the clipboard ----------------------------------------------------------
+
+/**
+ * The most base64 one OSC 52 write carries (C01 I25, D-M10-3): 100 000 bytes,
+ * which is 75 000 bytes of UTF-8.
+ *
+ * **On the payload, not the text**, because the payload is what a terminal
+ * counts and base64 grows in steps of four — a cap compared against the text's
+ * length passes every case except the ones near the edge. Terminals truncate or
+ * drop a long OSC string without a word, so past this the caller is told by a
+ * `null` and says so rather than sending it.
+ */
+export const CLIPBOARD_LIMIT = 100_000;
+
+/**
+ * OSC 52 — put `text` on the terminal's clipboard (C01 I25, ruling 72).
+ *
+ * **Write-only**: the payload is base64 and never `?`, so this can never ask the
+ * terminal to report its clipboard — a reply would arrive as typed input.
+ * **Nothing is stripped**, unlike the two OSC strings above: base64's alphabet
+ * holds no control byte, so the copy survives whole — `ESC`, newlines and all —
+ * and still cannot end the string early.
+ *
+ * `null` means *write nothing*, in two cases. The empty text, because xterm reads
+ * an empty payload as *clear the selection*, which is a destructive answer to a
+ * copy of nothing. And a payload past `CLIPBOARD_LIMIT`. **It declines this
+ * mechanism, not the copy**: the caller goes on to the next one.
+ *
+ * Stateless, like the bell. Whether it worked cannot be observed — nothing
+ * comes back — so no caller calls it *copied*.
+ */
+export function clipboardWrite(text: string): string | null {
+  if (text === "") return null;
+  const payload = Buffer.from(text, "utf8").toString("base64");
+  if (payload.length > CLIPBOARD_LIMIT) return null;
+  return `\x1b]52;c;${payload}\x07`;
+}
+
 // --- settings ---------------------------------------------------------------
 
 /** The three shapes `DECSCUSR` can name (C01 I20, C22 §6f). */

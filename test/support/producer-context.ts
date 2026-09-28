@@ -30,6 +30,7 @@ export const FULL_CAPABILITIES: TerminalCapabilities = Object.freeze({
   altScreen: true,
   renderMode: "rich",
   notification: "none",
+  clipboard: "none",
   notify: [],
 });
 

@@ -3726,6 +3726,25 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
   // **`toolCallDoc` left here on 2026-09-05** (Lane P, C23 I54): the expiry was
   // *the first `src/` call*, and `execution.ts` step 3 is it — the pending entry
   // is the card. The entry was self-expiring by the equality arm, as written.
+
+  // --- groundwork landed ahead of its queued consumer -----------------------
+  //
+  // **The clipboard's two L0 mechanisms (ruling 72) are review batch 4's lane
+  // b4-l0; the copy that calls them is lane C's M10.1 wiring**, which applies the
+  // person's order — OSC 52 first, then a tool, then a file — from L4, the only
+  // layer that sees both halves of L0. Queued in an approved plan, which is the
+  // scoped rule's whole difference. The equality arm removes all three the day
+  // `session.ts` names them, as it did `toolCallDoc`.
+  clipboardWrite:
+    "C01 I25 — the OSC 52 write, built by escapes.ts and written through the lifecycle's writer "
+    + "by lane C's copy (review batch 4, M10.1); T1.32 holds the payload, the refusals and the cap",
+  findClipboardTool:
+    "C21 I20 — the platform tool found on PATH in code, called by lane C's copy when OSC 52 "
+    + "declines (review batch 4, M10.1); T1.14 holds the order and the SSH, display and relative-"
+    + "entry gates",
+  writeClipboard:
+    "C21 I20 — the tool written on stdin with a fixed argv, called by lane C's copy "
+    + "(review batch 4, M10.1); T1.15 and T3.20 hold the argv, the bytes and every way it resolves",
 });
 
 /**

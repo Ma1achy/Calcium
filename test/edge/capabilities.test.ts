@@ -26,6 +26,7 @@ describe("C02 edge cases", () => {
       altScreen: false,
       renderMode: "rich",
       notification: "none",
+      clipboard: "none",
       notify: [],
     });
     expect(isUsable(capabilities)).toBe(false);
@@ -51,7 +52,7 @@ describe("C02 edge cases", () => {
     } as unknown as Partial<TerminalCapabilities>);
 
     expect(capabilities.colourDepth).toBe(24);
-    expect(Object.keys(capabilities)).toHaveLength(13);
+    expect(Object.keys(capabilities)).toHaveLength(14);
     expect(warnings).toEqual([]);
   });
 

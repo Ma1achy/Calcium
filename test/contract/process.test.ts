@@ -248,5 +248,20 @@ describe("C21 §4 — handoff's stdio and its process group", () => {
 });
 
 describe("C21 the clipboard tool, by source (I20)", () => {
-  it.todo("T2.11 (I20, I1): one spawn, no shell, stdout and stderr ignored — not deferred on a component: the code lands in the next commit of this round");
+  it("T2.11 (I20, I1): one spawn, no shell, stdout and stderr ignored", () => {
+    // Comments stripped first: the file's prose names the shell it refuses, and a scan
+    // over prose measures the prose (CLAUDE.md, *a source assertion measures the prose*).
+    const raw = readFileSync("src/data/process/clipboard.ts", "utf8");
+    const code = raw.replace(/\/\*[\s\S]*?\*\//gu, "").replace(/^\s*\/\/.*$/gmu, "");
+    expect(code.length, "the corpus is not empty").toBeGreaterThan(1000);
+    expect(raw, "and the stripped words are there to strip").toMatch(/\bshell\b/u);
+
+    expect(code).not.toMatch(/\bshell\s*:/u);
+    expect(code).not.toMatch(/\bspawnShell\b|\bexec(?:Sync|File|FileSync)?\s*\(/u);
+    expect(code.match(/\bnodeSpawn\s*\(/gu) ?? [], "exactly one spawn").toHaveLength(1);
+    expect(code).toMatch(/stdio:\s*\[\s*"pipe",\s*"ignore",\s*"ignore"\s*\]/u);
+    // The argv's tail is the tool's own `args`, which only the one table fills.
+    expect(code).toMatch(/nodeSpawn\(tool\.path,\s*\[\.\.\.tool\.args\]/u);
+    expect(code.match(/\bcandidate\(\s*"/gu) ?? [], "five rows in the one table").toHaveLength(5);
+  });
 });

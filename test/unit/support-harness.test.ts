@@ -80,6 +80,7 @@ describe("harness parameters — fake-terminal", () => {
       renderMode: "linear",
       notification: "osc9",
       notify: ["title"],
+      clipboard: "osc52",
     });
     expect(all).toEqual({
       colourDepth: 1,
@@ -95,6 +96,7 @@ describe("harness parameters — fake-terminal", () => {
       renderMode: "linear",
       notification: "osc9",
       notify: ["title"],
+      clipboard: "osc52",
     });
     // And the defaults are not the override values, or the assertion above
     // would hold for a helper that ignored its argument entirely.

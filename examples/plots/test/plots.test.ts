@@ -545,7 +545,7 @@ describe("every command composes a document the transcript would accept", () => 
     colourDepth: 24, unicode: "full", ambiguousWidth: "narrow",
     backgroundPolarity: "dark", synchronisedUpdate: true, bracketedPaste: true,
     mouse: true, imageProtocol: "none", keyboardProtocol: "none", altScreen: true,
-    renderMode: "rich", notification: "none", notify: [],
+    renderMode: "rich", notification: "none", notify: [], clipboard: "none",
   } as const satisfies TerminalCapabilities;
 
   // **The row was named for coverage it did not have** (F415). It said *on both

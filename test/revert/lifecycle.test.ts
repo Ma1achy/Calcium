@@ -6,6 +6,7 @@ import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { SCANS } from "../../tools/enforce/source-scans.mjs";
 import { createTerminalLifecycle, type TerminalLifecycle } from "../../src/terminal/lifecycle.js";
 import { capabilities, fakeDebug, fakeStdin, fakeStdout } from "../support/fake-terminal.js";
+import { clipboardWrite, windowTitle } from "../../src/terminal/escapes.js";
 
 const live: TerminalLifecycle[] = [];
 
@@ -280,6 +281,18 @@ describe("C01 fail-on-revert", () => {
 });
 
 describe("C01 fail-on-revert, the clipboard (I25)", () => {
-  it.todo("T6.23 (I25): passing the text through oscText → T1.32's round trip loses ESC and the newline — not deferred on a component: the code lands in the next commit of this round");
-  it.todo("T6.24 (I25): dropping the empty-text refusal → T1.32's empty arm clears the selection — not deferred on a component: the code lands in the next commit of this round");
+  it("T6.23 (I25): passing the text through oscText → T1.32's round trip loses ESC and the newline", () => {
+    // `windowTitle` strips controls, and it is right to: a title is text. A copy is
+    // the reader's text, and base64 already makes it safe inside the string.
+    const text = "\x1b[1mbold\x1b[0m\nsecond line";
+    const payload = clipboardWrite(text)?.slice("\x1b]52;c;".length, -1) ?? "";
+    expect(Buffer.from(payload, "base64").toString("utf8")).toBe(text);
+    // The control: the title path does strip, so the two are not one rule applied twice.
+    expect(windowTitle(text)).not.toContain("\n");
+  });
+
+  it("T6.24 (I25): dropping the empty-text refusal → T1.32's empty arm clears the selection", () => {
+    expect(clipboardWrite("")).toBeNull();
+    expect(clipboardWrite(" "), "control: a space is a copy").not.toBeNull();
+  });
 });

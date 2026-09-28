@@ -14,6 +14,7 @@ import {
   type FakeStdout,
 } from "../support/fake-terminal.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
+import { CLIPBOARD_LIMIT, clipboardWrite } from "../../src/terminal/escapes.js";
 
 type Harness = {
   lifecycle: TerminalLifecycle;
@@ -722,5 +723,36 @@ describe("C01 focus reporting and the title stack (I23, I24)", () => {
 });
 
 describe("C01 the clipboard's OSC 52 (I25)", () => {
-  it.todo("T1.32 (I25): clipboardWrite is base64, write-only, never empty and capped at CLIPBOARD_LIMIT — not deferred on a component: the code lands in the next commit of this round");
+  /** The payload between the introducer and the terminator, or null for any other shape. */
+  const payloadOf = (sequence: string): string | null =>
+    /^\x1b\]52;c;([A-Za-z0-9+/=]*)\x07$/u.exec(sequence)?.[1] ?? null;
+
+  it("T1.32 (I25): clipboardWrite is base64, write-only, never empty and capped at CLIPBOARD_LIMIT", () => {
+    const text = "a; b\nline \x1b[31mred\x1b[0m bell\x07 é 🦀";
+    const sequence = clipboardWrite(text);
+    expect(sequence).not.toBeNull();
+    expect(sequence!.startsWith("\x1b]52;c;"), "the introducer and the clipboard selection").toBe(true);
+    expect(sequence!.endsWith("\x07")).toBe(true);
+    expect(sequence!.indexOf("\x07"), "one BEL, the terminator").toBe(sequence!.length - 1);
+    const payload = payloadOf(sequence!);
+    expect(payload, "the payload is base64 and nothing else").not.toBeNull();
+    // Byte for byte: ESC, BEL and the newline survive, because nothing is stripped.
+    expect(Buffer.from(payload!, "base64")).toEqual(Buffer.from(text, "utf8"));
+    expect([...payload!].some((c) => c.charCodeAt(0) < 0x20), "no control between the brackets").toBe(false);
+    // Write-only: the payload is never the query.
+    expect(payload).not.toBe("?");
+
+    // W1: the empty text writes nothing — xterm reads an empty payload as *clear*.
+    expect(clipboardWrite("")).toBeNull();
+
+    // The cap is on the payload. 75 000 bytes of text encode to exactly the limit;
+    // one more byte crosses it by a whole step of four.
+    expect(CLIPBOARD_LIMIT).toBe(100_000);
+    const atLimit = clipboardWrite("x".repeat(75_000));
+    expect(payloadOf(atLimit ?? "")?.length).toBe(CLIPBOARD_LIMIT);
+    expect(clipboardWrite("x".repeat(75_001))).toBeNull();
+    // And it is bytes, not characters: 37 500 two-byte characters are the same 75 000.
+    expect(clipboardWrite("é".repeat(37_500))).not.toBeNull();
+    expect(clipboardWrite("é".repeat(37_501))).toBeNull();
+  });
 });

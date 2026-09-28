@@ -6,7 +6,10 @@
 // is for, and it is the one that cannot be checked by reading the code — the
 // difference between `kill(pid)` and `kill(-pid)` is one character and every
 // single-process test passes either way.
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { findClipboardTool, writeClipboard } from "../../src/data/process/clipboard.js";
+import { recorded, removeDir, runPath, stub, toolDir } from "../support/clipboard-tools.js";
 import { tmpdir } from "node:os";
 import { describe, expect, it, vi } from "vitest";
 import { CORPUS_BUDGET_MS } from "../support/budget.js";
@@ -358,5 +361,82 @@ describe("C21 failure paths", () => {
 });
 
 describe("C21 the clipboard tool, at its edges (I20)", () => {
-  it.todo("T3.20 (I20, I13): empty, failing, early-exiting, vanished and forking tools all resolve — not deferred on a component: the code lands in the next commit of this round");
+  it("T3.20 (I20, I13): empty, failing, early-exiting, vanished and forking tools all resolve", async () => {
+    const dir = toolDir();
+    const deps = { env: { PATH: runPath(dir) }, cwd: () => dir };
+    try {
+      // W1: the empty text spawns nothing — pbcopy given nothing empties the pasteboard.
+      stub(dir, "pbcopy");
+      const tool = findClipboardTool({ PATH: dir })!;
+      const empty = await writeClipboard(tool, "", deps);
+      expect(empty.ok).toBe(false);
+      expect(recorded(dir, "pbcopy", "stdin"), "the stub never ran").toBeNull();
+      // The control: the same stub, given text, does run.
+      expect((await writeClipboard(tool, "x", deps)).ok).toBe(true);
+      expect(recorded(dir, "pbcopy", "stdin")?.toString()).toBe("x");
+
+      // W10: a non-zero exit is observable, and named.
+      const failing = toolDir();
+      try {
+        stub(failing, "pbcopy", "#!/bin/sh\ncat > /dev/null\nexit 3\n");
+        const wrote = await writeClipboard(findClipboardTool({ PATH: failing })!, "x", { ...deps, env: { PATH: runPath(failing) } });
+        expect(wrote).toEqual({ ok: false, tool: "pbcopy", reason: "exited with code 3" });
+      } finally {
+        removeDir(failing);
+      }
+
+      // W12: a tool that exits without reading, handed a mebibyte. The EPIPE on our end
+      // is not the answer and must not surface; the exit status is.
+      const early = toolDir();
+      try {
+        stub(early, "pbcopy", "#!/bin/sh\nexit 0\n");
+        const big = "y".repeat(1024 * 1024);
+        const wrote = await writeClipboard(findClipboardTool({ PATH: early })!, big, { ...deps, env: { PATH: runPath(early) } });
+        expect(wrote).toEqual({ ok: true, tool: "pbcopy" });
+      } finally {
+        removeDir(early);
+      }
+
+      // W11: found, then gone before the write. A resolution, never a throw.
+      const gone = toolDir();
+      try {
+        stub(gone, "pbcopy");
+        const found = findClipboardTool({ PATH: gone })!;
+        rmSync(found.path);
+        const wrote = await writeClipboard(found, "x", { ...deps, env: { PATH: runPath(gone) } });
+        expect(wrote.ok).toBe(false);
+        expect(wrote.ok === false ? wrote.reason : "", "the reason is the spawn's").toMatch(/ENOENT/u);
+      } finally {
+        removeDir(gone);
+      }
+
+      // W16: a tool that forks a server holding its descriptors, as xclip, xsel and
+      // wl-copy do. The write resolves on the parent's exit while the server lives.
+      const forking = toolDir();
+      let server = 0;
+      try {
+        stub(forking, "xclip", '#!/bin/sh\nd=$(dirname "$0")\ncat > "$d/xclip.stdin"\nsleep 30 &\necho $! > "$d/server.pid"\nexit 0\n');
+        const tool = findClipboardTool({ PATH: forking, DISPLAY: ":0" })!;
+        const answer = await Promise.race([
+          writeClipboard(tool, "held", { ...deps, env: { PATH: runPath(forking) } }),
+          new Promise<"pending">((resolve) => setTimeout(() => resolve("pending"), 5000)),
+        ]);
+        expect(answer).toEqual({ ok: true, tool: "xclip" });
+        server = Number(readFileSync(join(forking, "server.pid"), "utf8").trim());
+        expect(server).toBeGreaterThan(0);
+        expect(() => process.kill(server, 0), "the server outlived the answer").not.toThrow();
+      } finally {
+        if (server > 0) {
+          try {
+            process.kill(server, "SIGKILL");
+          } catch {
+            // already gone
+          }
+        }
+        removeDir(forking);
+      }
+    } finally {
+      removeDir(dir);
+    }
+  }, 15_000);
 });

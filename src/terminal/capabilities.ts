@@ -86,6 +86,12 @@ export type TerminalCapabilities = Readonly<{
    * by default, so nothing rings unasked.
    */
   notify: readonly NotifyRung[];
+  /**
+   * Whether the terminal takes an OSC 52 clipboard write (I18, ruling 72), read
+   * from the one identification. **Taken, never worked**: nothing comes back, so
+   * a consumer says *sent to the terminal's clipboard* and not *copied*.
+   */
+  clipboard: "none" | "osc52";
 }>;
 
 /** §014's three rungs (C22 I128). */
@@ -216,6 +222,11 @@ export const DEGRADATION: Readonly<
   notify: Object.freeze({
     behaviour: "Nothing is opted in, so no rung fires and focus reporting is not taken",
     owner: "C01 L4",
+  }),
+  clipboard: Object.freeze({
+    behaviour:
+      "A copy goes to a platform clipboard tool when one is found (C21 I20); otherwise the reader is offered a file and told so. Nothing is ever claimed as copied that was not",
+    owner: "L4",
   }),
 });
 
@@ -578,6 +589,9 @@ function detect(env: Readonly<NodeJS.ProcessEnv>): Answers {
     // The same `terminal`, so the same gate (I11, I16).
     notification: fromIdentity(identified, terminal, NOTIFICATION, "none"),
     notify: detectNotify(read(env, NOTIFY)),
+    // The same `terminal`, so the same gate (I11, I18): tmux's default
+    // `set-clipboard external` ignores an application's OSC 52.
+    clipboard: fromIdentity(identified, terminal, CLIPBOARD, "none"),
   };
 }
 
@@ -595,6 +609,24 @@ const NOTIFICATION: Readonly<Record<TerminalName, "none" | "osc9">> = {
   wezterm: "osc9",
   foot: "osc9",
   windowsterminal: "none",
+};
+
+/**
+ * **By each terminal's own documentation, unmeasured here** (I18, ruling 72),
+ * as `NOTIFICATION` is. kitty's `clipboard_control` and Ghostty's
+ * `clipboard-write` allow a write by default; WezTerm, foot and Windows Terminal
+ * take one. **iTerm2 is `none` on a default, not on an absence**: it takes the
+ * sequence only once the reader enables *Applications in terminal may access
+ * clipboard*, which ships off — and a reader who has declares `clipboard:
+ * "osc52"`, which is the override D-M10-3 asks for (I4).
+ */
+const CLIPBOARD: Readonly<Record<TerminalName, "none" | "osc52">> = {
+  kitty: "osc52",
+  ghostty: "osc52",
+  iterm2: "none",
+  wezterm: "osc52",
+  foot: "osc52",
+  windowsterminal: "osc52",
 };
 
 /** §014's opt-in (I17). */
@@ -652,6 +684,7 @@ const VALIDATORS: Readonly<Record<keyof TerminalCapabilities, (v: unknown) => bo
     notification: oneOf("none", "osc9"),
     notify: (v: unknown) =>
       Array.isArray(v) && v.every((r) => (NOTIFY_RUNGS as readonly unknown[]).includes(r)),
+    clipboard: oneOf("none", "osc52"),
   });
 
 const FIELDS = Object.keys(VALIDATORS) as (keyof TerminalCapabilities)[];
