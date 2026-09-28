@@ -56567,3 +56567,88 @@ recorded in the run.
 After an application called its own `close()`, the footer kept showing `attached · keys → child`
 until the next key: the close's frame was committed before `current = null`. Now it is committed
 after ownership returns, as C22 I110 amended says (lane b3-e).
+
+## F1277 — the peek band could not be reached by the pointer ★★★☆☆
+
+Found by the router lane's M8 walk. L4's `placed` was `layout(…).filter(takesInput)`, and a peek takes no input,
+so the layer order `overlay › panel › peek › base` stopped one band short for the pointer: the one gesture a
+peek exists for, the wheel, scrolled the transcript beneath it. C16 I48 says the topmost layer under the pointer
+takes the gesture. **Two predicates were one**: *takes keys* and *takes the pointer* answered by the same
+field. Closed by C15 I31, a pointer predicate of its own, and C16 I74, the topmost layer that takes its
+gesture — built in lane b3-router.
+
+## F1278 — a layer's rung handler acts on the top layer, not the one under the pointer ★★☆☆☆
+
+Found with F1277. The rung handler at `question`/`panel` reads `stores.overlays.top`, not the layer the pointer
+hit. It was latent while no pointer gesture reached a layer below the top, and F1277's fix is what made it
+reachable: the wheel was routed by id instead (`deps.scrollLayer(id, rows)`). **Owed**: a press over a lower,
+non-blocking layer still acts on the top one. Lane ruling: presses keep the rung handler until a layer below the
+top can take a press, which no shipped layer does — the subject to grep for is a second pointer-taking layer
+kind.
+
+## F1279 — ruling 52's first quiet window closed before the first key repeat ★★★☆☆
+
+Ruling 52's first form measured its 250 ms window from the question's arrival. X11's default key-repeat delay
+is 660 ms, so a `⏎` held across a question's arrival sent its first repeat after the window had closed, and the
+repeat answered the question — the exact failure the guard exists for. Found by the router lane's sequence
+trace; closed by the person's amendment (recorded in f8fd47bb) and built as C16 I69.
+
+## F1280 — the quiet window removed the guard's explanation ★★☆☆☆
+
+I44's mark explained an armed owner and was taken down at the first refusal. Once a refusal *extended* the
+guard (ruling 52), every later refusal was silent — a refusal with no reason, against R-HON-004. Closed by C16
+I70; the chip is spelt with a colon so the ASCII rung draws it.
+
+## F1281 — the held-key set goes stale on focus-out ★★☆☆☆
+
+Under kitty the guard keys on the held set. A key released while another window had focus never reports its
+release here, so `held` kept it and every later `⏎` was refused until a neutral key. Closed by C16 I72; the
+composition root now routes a focus report to the router as well as to the away ledger (C23 I85), which is the
+merge taken at batch 3's integration.
+
+## F1282 — the owner epoch compared only the rung ★★☆☆☆
+
+A pointer arm recorded `(stableId, rung)`. An owner raised and dismissed between the press and the release left
+the rung unchanged, so the arm survived an ownership change it should not have (R-OWN-003). Closed by C16 I73:
+the epoch is the rung plus a generation pulled from C15 I33 and the surface host.
+
+## F1283 — keys.ts drew a stale menu after a question displaced it ★★☆☆☆
+
+C15 I28 dismisses the menu layer when a question arrives, and `keys.ts` kept its `candidates`: `hasMenu()`
+stayed true, `redrawMenu()` updated nothing, and the next keystroke pushed the old menu back. C20's search state
+was left the same way. Closed by C15 I32.
+
+## F1343 — the host escape was safe only by call order ★★★☆☆
+
+`⌃]` at `child` reached the host through a consuming wrapper registered first; any `child` handler registered
+ahead of it swallowed the escape (§3e H2), and a release of `⌃]` was handed to the child — half a chord the host
+had taken (§3e H6). **A safety route that holds by registration order is held by nothing.** Closed by C16 I75:
+the escape is a reserved route in the intercept table, and the composition root registers no handler for it.
+
+## F1344 — a mutation's expected id matched a row in another file ★★☆☆☆
+
+`c16-chord-text`'s `expect: "T1.98"` and `c16-scope-order`'s `"T1.100"` were each satisfied by a row of the
+same id in a different file — `router-dispatch.test.ts`, about the question guard and pointer commit — so a kill
+could be credited to a row that never saw the mutation. Found by the router lane; A03 SP15 (built there) refuses
+an id titled in more than one file within one spec, gated by equality over a debt list of 94. The rule ledger's
+R-KEY-005 cited the same two ids bare and resolved to the wrong file (755c44c6).
+
+## F1326 — SS47 reads literals lexically, so an escaped mark passes ★★☆☆☆
+
+Found by lane b3-res fixing F1313. `src/presentation/patch/definition.ts` held the split separator as a
+`\u2502` escape, and SS47 checks a literal's *source characters*, so the escape reads as ASCII and the rule
+has nothing to be wrong about. Its exemption for the file described only the header rule's ternary. Measured
+by hand with the exemption gone: a literal `│` fires SS47 and the same code point escaped does not. **63
+escaped non-ASCII literals** sit in `src` outside `glyphs.ts`, across 10 files — ramp 22, scatter3 16,
+linedraw 15, text 3, field 2, and one each in expect-document, svg, plot/definition, annotate and graphemes —
+and scatter3, field, annotate and svg are not on SS47's exemption list. **A gate phrased over spellings is
+blind to every other spelling of the same value.** The instance is fixed (007e4c8d); the class — SS47
+decoding escapes before it judges — is owed to batch 3's tail lane.
+
+## F1327 — the pane helper `profileDeck` lost its framework consumer when the pushed view retired ★☆☆☆☆
+
+Found by lane b3-res correcting `/profile`'s prose (R-EXA-082). C24 I33 says a published pane helper must have
+a consumer. `/profile <section>` walks `deckOf` and draws with `profileCard`; nothing in `src`, `examples` or
+`tools` calls `profileDeck`, and only C24 T1.11 names it. The export outlived the view it was published for.
+Ruling 78 unpublishes it. Residue found beside it: C25 T4.10 and T4.11 are test rows with no spec rows, and
+`local-profile.test.ts`'s "T1.96 (C23 I69 …)" resolves to C28's T1.96, not to any C23 row.
