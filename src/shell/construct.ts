@@ -3628,6 +3628,8 @@ export async function constructGraph(
     dynamic: false,
     // The delimiter is empty: an action's name ends the line, and a space after
     // it would make `⏎` look for a name with a space in it (§6c Q3).
+    // A row's chords are joined with the separator slot, never a literal `·`
+    // (C09 I49, F828): the literal is non-ASCII at the ASCII rung (T2.116).
     complete: () =>
       paletteRows().map((r) => ({ value: r.id, detail: r.keys.join(` ${chipLook.separator} `), delimiter: "" })),
   });
