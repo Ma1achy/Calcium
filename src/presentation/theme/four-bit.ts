@@ -89,10 +89,16 @@ export const DARK_FOUR_BIT: FourBitMap = FOUR_BIT.dark;
 export const LIGHT_FOUR_BIT: FourBitMap = FOUR_BIT.light;
 
 /**
- * The tones whose confusion would be misleading rather than merely dull. `dim`,
- * `muted` and `default` are free to collapse: losing the difference between two
- * quiet greys costs nothing, while `ok` and `error` landing on one colour is a
- * failed row that reads as a passing one.
+ * The tones whose confusion would be misleading rather than merely dull. `dim`
+ * and `default` are free to collapse: losing the difference between two quiet
+ * greys costs nothing, while `ok` and `error` landing on one colour is a failed
+ * row that reads as a passing one.
+ *
+ * **`muted` is in the set and is the one grey that is** (C10 I17, PARKED 79):
+ * `info` rendered as `muted` reads as *nothing to see*, and where the theme
+ * authors both greys, as `paper` does, the index is the only thing that tells
+ * the two facts apart at 8-bit. The three 4-bit maps already keep it apart —
+ * index 8 in each, which none of the five takes.
  */
 export const MUST_STAY_DISTINCT: readonly string[] = Object.freeze([
   "ok",
@@ -100,6 +106,7 @@ export const MUST_STAY_DISTINCT: readonly string[] = Object.freeze([
   "error",
   "info",
   "accent",
+  "muted",
 ]);
 
 /**

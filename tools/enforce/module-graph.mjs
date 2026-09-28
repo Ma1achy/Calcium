@@ -3582,7 +3582,8 @@ export function checkExportedArguments(files, readFile = (f) => readFileSync(f, 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
   // **`bandFourBitShortfalls` measures a curation, not a terminal** (C10 I61).
-  // It scores the curated 4-bit band pairs on xterm's default sixteen — and a
+  // It scores the curated 4-bit band pairs on the reference sixteen — the legacy
+  // Windows console's, `ANSI16_WINDOWS_HEX`, not xterm's defaults — and a
   // running terminal's sixteen are its own and unknowable, so no load-time
   // caller could measure anything real with it. Its subject is the table, as
   // C10 I44's pin's is, and T2.64 holds it by equality. It goes the day a

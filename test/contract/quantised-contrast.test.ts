@@ -11,6 +11,7 @@ import {
   defaultTheme,
   floorFor,
   inkOn,
+  loadTheme,
   luminance,
   quantisedHex,
   ratio,
@@ -22,7 +23,7 @@ import {
 import { ANSI16_WINDOWS_HEX } from "../../src/presentation/theme/colormap.js";
 import { computeQuantisation, cubeHexOf, quantiseSet } from "../../src/presentation/theme/quantise.js";
 import type { ColourRef, ResolvedTheme, Style, ThemeTokens } from "../../src/presentation/theme/types.js";
-import { quantisedShortfalls } from "../support/quantised-contrast.js";
+import { quantisedShortfalls, validateQuantisedFloors } from "../../src/presentation/theme/resolve.js";
 import { EIGHT_BIT_SHORTFALLS, FOUR_BIT_SHORTFALLS } from "../support/quantised-shortfalls.js";
 import { TONES, caps, store } from "../support/theme.js";
 
@@ -30,6 +31,27 @@ const listed = (theme: ResolvedTheme, depth: 8 | 4): readonly string[] =>
   quantisedShortfalls(theme, depth).map((e) => `${e.path} ${e.measured.toFixed(2)}`);
 
 const NAMES = Object.keys(defaultTheme).sort();
+
+/**
+ * **A ground no cube entry admits** (C10 §4c.4, what the rulings leave behind):
+ * a floor of 7, a mid-grey focus ground and a black ink composed on it beside
+ * the light ones. White needs the ground below 0.1 luminance and black needs it
+ * above 0.3, so its cells are short at 8 bits — and at 24, where the gate
+ * refuses it too.
+ */
+const unholdable = (tokens: ThemeTokens): ThemeTokens => {
+  const focus = "surface.focusGround";
+  return {
+    ...tokens,
+    floor: 7,
+    surfaces: { ...tokens.surfaces, focusGround: "#777777" },
+    composed: { ...tokens.composed, [focus]: { ...tokens.composed?.[focus], "tone.default": "#000000" } },
+  };
+};
+
+/** The gate's own errors, told from the 24-bit validators' by their wording. */
+const at256 = (errors: readonly { path: string; message: string }[]): readonly { path: string; message: string }[] =>
+  errors.filter((e) => e.message.includes("as a 256-colour terminal paints"));
 
 /** The hex an 8-bit style paints, through the cube the standard fixes. */
 const painted = (style: Style, channel: "colour" | "background" = "colour"): string => {
@@ -61,13 +83,7 @@ describe("C10 I68 — quantised contrast", () => {
     // `loadTheme`, under its own name because the resolver's memo is keyed on it.
     const dark = store("dark").current;
     const focus = "surface.focusGround";
-    const unholdable: ThemeTokens = {
-      ...dark.tokens,
-      floor: 7,
-      surfaces: { ...dark.tokens.surfaces, focusGround: "#777777" },
-      composed: { ...dark.tokens.composed, [focus]: { ...dark.tokens.composed?.[focus], "tone.default": "#000000" } },
-    };
-    const control: ResolvedTheme = { ...dark, name: "dark/quantised-control", tokens: unholdable };
+    const control: ResolvedTheme = { ...dark, name: "dark/quantised-control", tokens: unholdable(dark.tokens) };
     const paths = quantisedShortfalls(control, 8).map((e) => e.path);
     expect(paths, "the unholdable ground's cells are reported").toContain("focusGround.tone.default");
     expect(paths.filter((p) => !p.startsWith("focusGround.")), "and only that ground's").toEqual([]);
@@ -230,6 +246,81 @@ describe("C10 I69 — the quantiser holds the floor", () => {
 });
 
 describe("C10 I17 and I70 — muted kept apart, and the 8-bit floor as a load gate", () => {
-  it.todo("T2.79 (C10 I17, PARKED 79): at 8 bits no tone of the five shares muted's index on any shipped ground unless the two carry one value, paper's page gives info 242 and muted 243, and a constructed pair each at 242 alone splits — not deferred on a component: the code lands in the next commit of this round");
-  it.todo("T2.80 (C10 I70, I4, I11): loadTheme and applyOverrides refuse the 256-colour cells beside the 24-bit reasons, the shipped set loads, the verdict is kept only for a frozen token set, and the scratch name is forgotten — not deferred on a component: the code lands in the next commit of this round");
+  it("T2.79 (C10 I17, PARKED 79, §4c.4 row 12): at 8 bits no tone of the five shares muted's index on any shipped ground unless the two carry one value", () => {
+    // The five by name and not read from `MUST_STAY_DISTINCT`: the subject is
+    // what the resolver paints, and the membership is the curated pin's.
+    const five = ["ok", "warn", "error", "info", "accent"];
+
+    let cells = 0;
+    for (const name of NAMES) {
+      const theme = store(name).current;
+      for (const on of [undefined, ...textGrounds(theme.tokens).map(([ground]) => ground)]) {
+        const at = (tone: string, depth: 8 | 24) => resolve(`tone.${tone}`, theme, caps(depth), on).colour;
+        const muted = at("muted", 8);
+        for (const tone of five) {
+          // A set giving the two one value is one ink, not a collision (row 6).
+          if (JSON.stringify(at(tone, 24)) === JSON.stringify(at("muted", 24))) continue;
+          expect(at(tone, 8), `${name} on ${on ?? "the page"}: tone.${tone} against muted`).not.toEqual(muted);
+          cells += 1;
+        }
+      }
+    }
+    // Ten themes, the page and every text ground, five tones: not an empty agreement.
+    expect(cells, "measured when PARKED 79 landed").toBe(340);
+
+    // **The case the ruling was written for**, and which of the two moves: the
+    // repair walks the set darkest first, so the lighter claimant yields and
+    // `info` keeps the grey the floor gave it.
+    const paper = store("paper").current;
+    expect(resolve("tone.info", paper, caps(8)).colour, "paper's info on its page").toEqual({ kind: "ansi256", index: 242 });
+    expect(resolve("tone.muted", paper, caps(8)).colour, "paper's muted on its page").toEqual({ kind: "ansi256", index: 243 });
+
+    // **A constructed pair, and its control.** Alone, each is nearest 242; in
+    // one set they part; given one value they are one ink again.
+    expect(computeQuantisation({ info: "#6c6c6c" })["info"], "info alone").toBe(242);
+    expect(computeQuantisation({ muted: "#6c6c6d" })["muted"], "muted alone").toBe(242);
+    const pair = computeQuantisation({ info: "#6c6c6c", muted: "#6c6c6d" });
+    expect(pair["info"], "together, they part").not.toBe(pair["muted"]);
+    const one = computeQuantisation({ info: "#6c6c6c", muted: "#6c6c6c" });
+    expect(one["info"], "one value is one ink").toBe(one["muted"]);
+  });
+
+  it("T2.80 (C10 I70, I4, I11, §4c.4 row 13): loadTheme and applyOverrides refuse the 256-colour cells beside the 24-bit reasons, and the verdict is kept only for a frozen set", () => {
+    // The shipped set loads, and the gate is part of what it passed.
+    expect(loadTheme(defaultTheme).ok, "defaultTheme loads").toBe(true);
+    for (const name of NAMES) expect(validateQuantisedFloors(defaultTheme[name]!), name).toEqual([]);
+
+    // **`loadTheme`**: T2.74's control, refused at 24 bits too — which is the
+    // only kind of theme the gate can refuse (C10 I70), so its cells arrive beside
+    // those reasons, one per ink on the ground no cube entry admits.
+    const dark = defaultTheme["dark"]!;
+    const loaded = loadTheme({ dark: unholdable(dark) });
+    const errors = loaded.ok ? [] : loaded.error;
+    const cells = at256(errors);
+    expect(cells, "a 256-colour cell for every ink on the focus ground").toHaveLength(19);
+    expect(cells.filter((e) => !e.message.includes(" on focusGround as ")), "and on no other ground").toEqual([]);
+    expect(cells.map((e) => e.path), "named by the slot").toContain("dark.palettes.tone.default");
+    expect(errors.length, "beside the 24-bit reasons").toBeGreaterThan(cells.length);
+
+    // **`applyOverrides`**: a black `ok` on a mid-grey page puts inks on both
+    // sides of `bg` at hcDark's 7. Refused whole, and nothing moves (C10 I4).
+    const hc = store("hcDark");
+    const before = hc.current;
+    const refused = at256(hc.applyOverrides({ palettes: { tone: { ok: "#000000" } }, surfaces: { bg: "#777777" } }));
+    expect(refused, "every ink on the page").toHaveLength(19);
+    expect(refused.filter((e) => !e.message.includes(" on bg as ")), "and only there").toEqual([]);
+    expect(hc.current, "the theme is the one it was").toBe(before);
+
+    // **The verdict is kept for a frozen set, and only for one.**
+    expect(validateQuantisedFloors(dark), "the shipped set's answer, once").toBe(validateQuantisedFloors(dark));
+    const mutable = structuredClone(dark) as { -readonly [K in keyof ThemeTokens]: ThemeTokens[K] };
+    expect(validateQuantisedFloors(mutable), "a mutable copy of dark").toEqual([]);
+    Object.assign(mutable, unholdable(mutable));
+    expect(validateQuantisedFloors(mutable), "mutated into the control, it is measured again").toHaveLength(19);
+
+    // **The scratch name is forgotten** (C10 I11): a set measured after the
+    // control reads its own picks, not the control's.
+    expect(validateQuantisedFloors(unholdable(dark))).toHaveLength(19);
+    expect(validateQuantisedFloors(structuredClone(dark)), "dark after the control").toEqual([]);
+  });
 });

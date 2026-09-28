@@ -11,7 +11,7 @@
 
 import type { Result } from "../../data/viewmodel/index.js";
 import { isHex, validateTokens } from "./contrast.js";
-import { clearResolutionCache, validatePaintedFloors } from "./resolve.js";
+import { clearResolutionCache, validatePaintedFloors, validateQuantisedFloors } from "./resolve.js";
 import type { ResolvedTheme, ThemeError, ThemeSet, ThemeTokens } from "./types.js";
 
 export type Overrides = Readonly<{
@@ -87,6 +87,24 @@ function resolved(tokens: ThemeTokens, serial: number): ResolvedTheme {
 }
 
 /**
+ * **Every gate a theme passes, at load and at an override** (I26, I27, C10 I70):
+ * the two 24-bit validators and the 8-bit one beside them, which reads any
+ * theme whose values are hexes and passes the rest to `validateTokens`.
+ *
+ * **What the 8-bit gate can add is narrow, and that is measured rather than
+ * hoped** (C10 I70): every colour clears √21 (4.58 : 1) against black or
+ * against white, so an ink held to √21 or less always has an extreme to take,
+ * and above it the 24-bit gate already refuses a ground carrying inks on both
+ * sides. So on a theme the 24-bit gates pass it answers nothing unless the
+ * quantiser is wrong, and on one they refuse it names the 256-colour cells
+ * beside their reasons. Beside and not after, because a gate that ran only on
+ * themes it could never refuse would be a gate no input reaches.
+ */
+function gates(tokens: ThemeTokens): readonly ThemeError[] {
+  return [...validateTokens(tokens), ...validatePaintedFloors(tokens), ...validateQuantisedFloors(tokens)];
+}
+
+/**
  * **Both variants are validated at load**, not the one being opened. A session
  * that starts dark and fails the moment someone types `/theme light` has
  * validated nothing useful — the point of checking at load rather than at render
@@ -107,10 +125,7 @@ export function loadTheme(
   // off the set's own keys, which is what makes a theme added later join the
   // checks rather than pass them by.
   const names = Object.keys(set);
-  const errors = names.flatMap((name) => [
-    ...validateTokens(set[name]!).map((e) => ({ ...e, path: `${name}.${e.path}` })),
-    ...validatePaintedFloors(set[name]!).map((e) => ({ ...e, path: `${name}.${e.path}` })),
-  ]);
+  const errors = names.flatMap((name) => gates(set[name]!).map((e) => ({ ...e, path: `${name}.${e.path}` })));
 
   // **The set itself, not a theme in it.** An empty set has no theme to open and
   // no error a token check could produce, so it is refused here — the one
@@ -184,11 +199,7 @@ export function loadTheme(
       // Validated as a set, not per field (T3.3): an override that changes `bg`
       // can put previously-valid tones under the floor, and applying the good
       // half of it would leave a theme nobody authored.
-      const failures = [
-        ...validateTokens(patched).map((e) => ({ ...e, path: `${active}.${e.path}` })),
-        ...validatePaintedFloors(patched).map((e) => ({ ...e, path: `${active}.${e.path}` })),
-        ...malformed(overrides),
-      ];
+      const failures = [...gates(patched).map((e) => ({ ...e, path: `${active}.${e.path}` })), ...malformed(overrides)];
 
       // I4 — the current theme is left exactly as it was, reference and all.
       // Silently accepting an override that makes `error` invisible produces a

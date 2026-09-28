@@ -1151,7 +1151,7 @@ CCCCCCBBCCCCCCCCCCBBCCCCCCCCCCBBCCCCCCCCCCCCCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 
 A = fg 38;5;236  bg 48;5;255  attrs —
 B = fg —  bg 48;5;255  attrs —
-C = fg 38;5;242  bg 48;5;255  attrs —"
+C = fg 38;5;243  bg 48;5;255  attrs —"
 `;
 
 exports[`golden frames — a composed session, not a block > SF2 · boot · viol — the styles 1`] = `
@@ -1609,7 +1609,7 @@ CCCCCCBBCCCCCCCCCCBBCCCCCCCCCCBBCCCCCCCCCCCCCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 
 A = fg 38;5;236  bg 48;5;255  attrs —
 B = fg —  bg 48;5;255  attrs —
-C = fg 38;5;242  bg 48;5;255  attrs —
+C = fg 38;5;243  bg 48;5;255  attrs —
 D = fg 38;5;22  bg 48;5;255  attrs —
 E = fg 38;5;241  bg 48;5;255  attrs —"
 `;
@@ -2832,17 +2832,17 @@ ESC[38;5;236m
 «calcium»
 ESC[39m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «prism»
 ESC[39m
 «» +58sp
-ESC[38;5;242m
+ESC[38;5;243m
 «22:13:20»
 ESC[39m
 ESC[0m
 CRLF
 ESC[48;5;255m
-ESC[38;5;242m
+ESC[38;5;243m
 «────────────────────────────────────────────────────────────────────────────────»
 ESC[0m
 ESC[48;5;255m
@@ -2917,7 +2917,7 @@ ESC[48;5;255m
 ESC[0m
 CRLF
 ESC[48;5;255m
-ESC[38;5;242m
+ESC[38;5;243m
 «────────────────────────────────────────────────────────────────────────────────»
 ESC[0m
 ESC[48;5;255m
@@ -2928,36 +2928,36 @@ ESC[48;5;255m
 ESC[0m
 CRLF
 ESC[48;5;255m
-ESC[38;5;242m
+ESC[38;5;243m
 «────────────────────────────────────────────────────────────────────────────────»
 ESC[0m
 ESC[48;5;255m
 ESC[0m
 CRLF
 ESC[48;5;255m
-ESC[38;5;242m
+ESC[38;5;243m
 «/help»
 ESC[39m
 «» +70sp
-ESC[38;5;242m
+ESC[38;5;243m
 «/work»
 ESC[39m
 ESC[0m
 CRLF
 ESC[48;5;255m
-ESC[38;5;242m
+ESC[38;5;243m
 «⏎ send»
 ESC[39m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «⇧⏎ newline»
 ESC[39m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «⇥ complete»
 ESC[39m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «⇧⇥ transcript»
 ESC[39m
 «» +35sp
@@ -5012,7 +5012,7 @@ ESC[5;1H
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «⎿»
 ESC[0m
 ESC[48;5;255m
@@ -5022,7 +5022,7 @@ ESC[6;1H
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «│»
 ESC[0m
 ESC[48;5;255m
@@ -5032,12 +5032,12 @@ ESC[7;1H
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «│»
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «/help» +8sp
 ESC[39m
 «» +2sp
@@ -5050,12 +5050,12 @@ ESC[8;1H
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «│»
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «/capabilities»
 ESC[39m
 «» +2sp
@@ -5068,12 +5068,12 @@ ESC[9;1H
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «│»
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «/clear» +7sp
 ESC[39m
 «» +2sp
@@ -5086,12 +5086,12 @@ ESC[10;1H
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «│»
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «/theme» +7sp
 ESC[39m
 «» +2sp
@@ -5104,12 +5104,12 @@ ESC[11;1H
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «│»
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «/history» +5sp
 ESC[39m
 «» +2sp
@@ -5122,12 +5122,12 @@ ESC[12;1H
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «│»
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «/exit» +8sp
 ESC[39m
 «» +2sp
@@ -5140,12 +5140,12 @@ ESC[13;1H
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «│»
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «/profile» +5sp
 ESC[39m
 «» +2sp
@@ -5158,12 +5158,12 @@ ESC[14;1H
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «│»
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «/config» +6sp
 ESC[39m
 «» +2sp
@@ -5212,7 +5212,7 @@ ESC[17;1H
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «│»
 ESC[0m
 ESC[48;5;255m
@@ -5222,7 +5222,7 @@ ESC[18;1H
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «│»
 ESC[0m
 ESC[48;5;255m

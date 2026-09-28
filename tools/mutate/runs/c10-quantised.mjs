@@ -12,23 +12,30 @@
 // **And the floor at the rungs the table serves** (C10 I68, T6.134–T6.135):
 // `quantisedShortfalls` measures the quantised ink on the quantised ground, and
 // its two lists are held by equality in `test/contract/quantised-contrast.test.ts`.
+// It lives in the resolver since C10 I70 made it the 8-bit load gate.
 //
 // **And the quantiser holding it** (C10 I69, T6.136–T6.141): the floor as an
 // admission on the DP, the ground arm, the yield ladder, the band's one ink,
 // the page and the infeasible arm — each hand-mutated on landing first, which
 // is how T6.138's survivor was found and T2.77 gained its constructed set.
+//
+// **And `muted` kept apart, and the load gate** (C10 I17, I70, T6.142–T6.148):
+// the sixth member of the distinctness set, the gate at both store sites and
+// beside the 24-bit validators, the scratch name forgotten, the two memos kept
+// for frozen sets only, and the precondition that keeps a malformed hex out of
+// the quantiser. Hand-mutated first; T2.79's first draft died on a membership
+// assertion, a proxy, and now dies on `hcDark`'s `error` and `muted` on one index.
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/unit/theme.test.ts test/contract/quantised-contrast.test.ts";
+const CMD = "npx vitest run test/unit/theme.test.ts test/contract/quantised-contrast.test.ts test/edge/theme.test.ts";
 const Q = "src/presentation/theme/quantise.ts";
 const R = "src/presentation/theme/resolve.ts";
 const TABLE = "src/presentation/theme/quantised.generated.ts";
-// The instrument lives beside its rows (C10 I68). Its 8-bit list is empty since
-// C10 I69, and the move to a load gate is a question of its own.
-const INSTRUMENT = "test/support/quantised-contrast.ts";
+const FOUR = "src/presentation/theme/four-bit.ts";
+const STORE = "src/presentation/theme/store.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -126,7 +133,7 @@ const results = runPass({
       // band's one ink both become the flat slot, so the measurement is of a
       // pair the resolver never paints on that ground.
       name: "T6.134: quantisedShortfalls resolves the ink without its ground",
-      file: INSTRUMENT,
+      file: R,
       from: "    const ink = hexOf(resolve(ref, theme, caps, ground).colour);",
       to: "    const ink = hexOf(resolve(ref, theme, caps).colour);",
       expect: "T2.74",
@@ -136,7 +143,7 @@ const results = runPass({
       // At 4 bits `focusGround` has no curated index on eight themes, and the
       // ink lands on the page; without the fallback those 216 cells vanish.
       name: "T6.135: the 4-bit fallback to the page removed",
-      file: INSTRUMENT,
+      file: R,
       from: "?? (depth === 4 ? page : null);",
       to: "?? (depth === 4 ? null : page);",
       expect: "T2.75",
@@ -196,6 +203,70 @@ const results = runPass({
       from: "    for (const member of chosen) member.pick = nearest(member.lab, (c) => member.admits(c.hex));\n",
       to: "",
       expect: "T2.74",
+    },
+    {
+      // **T6.142 — `muted` free to collapse again.** `hcDark`'s `error` and
+      // `muted` share white on `diffAdd`, and `paper`'s `info` and `muted` one
+      // grey on its page.
+      name: "T6.142: muted out of the distinctness set",
+      file: FOUR,
+      from: '  "accent",\n  "muted",\n]);',
+      to: '  "accent",\n]);',
+      expect: "T2.79",
+    },
+    {
+      // **T6.143 — `loadTheme` with the 24-bit validators alone.**
+      name: "T6.143: loadTheme without the 8-bit gate",
+      file: STORE,
+      from: "  const errors = names.flatMap((name) => gates(set[name]!).map(",
+      to: "  const errors = names.flatMap((name) => [...validateTokens(set[name]!), ...validatePaintedFloors(set[name]!)].map(",
+      expect: "T2.80",
+    },
+    {
+      // **T6.144 — `applyOverrides` with the 24-bit validators alone.**
+      name: "T6.144: applyOverrides without the 8-bit gate",
+      file: STORE,
+      from: "const failures = [...gates(patched).map(",
+      to: "const failures = [...[...validateTokens(patched), ...validatePaintedFloors(patched)].map(",
+      expect: "T2.80",
+    },
+    {
+      // **T6.145 — the first draft: the gate only after the others pass.** No
+      // theme reaching it that way has a short cell (C10 I70), so it is a gate
+      // no input reaches.
+      name: "T6.145: the gate run only on themes the 24-bit gates pass",
+      file: STORE,
+      from: "  return [...validateTokens(tokens), ...validatePaintedFloors(tokens), ...validateQuantisedFloors(tokens)];",
+      to: "  const found = [...validateTokens(tokens), ...validatePaintedFloors(tokens)];\n  return found.length > 0 ? found : validateQuantisedFloors(tokens);",
+      expect: "T2.80",
+    },
+    {
+      // **T6.146 — the scratch name's picks left in the memo.** Every set
+      // measured after another reads that set's picks.
+      name: "T6.146: the scratch name not forgotten",
+      file: R,
+      from: "    forget(SCRATCH);\n",
+      to: "",
+      expect: "T2.80",
+    },
+    {
+      // **T6.147 — the verdict kept for a set that can still change.**
+      name: "T6.147: the verdict kept for a token object that is not frozen",
+      file: R,
+      from: "  if (frozenThrough(tokens)) verdicts.set(tokens, verdict);",
+      to: "  verdicts.set(tokens, verdict);",
+      expect: "T2.80",
+    },
+    {
+      // **T6.148 — a malformed hex reaches the quantiser** and throws where
+      // `validateTokens` would have named it.
+      name: "T6.148: the gate run on a theme whose values are not all hexes",
+      file: R,
+      from: "  if (!quantisable(tokens)) return Object.freeze([]);\n",
+      to: "",
+      // The title's colon: the match is a substring, and `T3.2` is a prefix of
+      // any T3.2x row these files gain.
+      expect: "T3.2:",
     },
   ],
 });

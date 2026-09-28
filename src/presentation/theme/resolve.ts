@@ -17,6 +17,7 @@
 
 import type { Tone } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
+import { ANSI16_WINDOWS_HEX } from "./colormap.js";
 import { DEFAULT_FLOOR, decorationTextPairs, floorFor, inkOn, isHex, luminance, ratio, textGrounds } from "./contrast.js";
 import { computeQuantisation, cubeHexOf, quantiseSet, type Admits } from "./quantise.js";
 import {
@@ -154,7 +155,10 @@ function floorsOn(tokens: ThemeTokens): ReadonlyMap<string, ReadonlyMap<string, 
     for (const ref of refs) need(ground, ref, Math.max(floorFor(ref.slice(ref.indexOf(".") + 1)), tokens.floor ?? 0));
   }
   for (const [palette, slot, ground] of decorationTextPairs(tokens)) need(ground, `${palette}.${slot}`, DEFAULT_FLOOR);
-  scopes.set(tokens, out);
+  // Kept only for a set frozen throughout, as the gate's verdict is (C10 I70):
+  // a token object mutated between two measurements was held to its first
+  // shape's needs — 61 cells refused where a fresh copy of it has 19.
+  if (frozenThrough(tokens)) scopes.set(tokens, out);
   return out;
 }
 
@@ -521,6 +525,167 @@ export function validatePaintedFloors(tokens: ThemeTokens): readonly ThemeError[
   }
 
   return Object.freeze(errors);
+}
+
+/**
+ * **The floor measured at the rungs below 24-bit, ink and ground both as the
+ * resolver paints them** (C10 I68). The scope is the 24-bit gate's, cell for
+ * cell: every `textGrounds` row held to `max(floorFor(slot), floor)` as
+ * `validateHighContrast` holds it, every `decorationTextPairs` cell to
+ * `DEFAULT_FLOOR` as `validateDecorationText` does, and at 8-bit each hue
+ * band's ink on its ground to `DEFAULT_FLOOR` (I54). A cell the gate does not
+ * check at 24-bit is not checked here either, so a shortfall is always the
+ * rung's doing and never a wider scope's.
+ *
+ * **Both halves come from `resolve`**, because that is what reaches the screen,
+ * and **the needs are computed here and not read from `floorsOn`**: the hold and
+ * its measurement are two readings of one scope, and a measurement that asked
+ * the hold what to measure would agree with it by construction. At 8-bit an
+ * index maps back through the cube the standard fixes; at 4-bit through
+ * `ANSI16_WINDOWS_HEX`, the reference palette I61 measures bands against. **A
+ * ground the resolver does not paint at 4-bit is the page**, because that is
+ * what shows through. An ink or a page with no colour at all is the terminal's
+ * own pair and is not a cell.
+ *
+ * Moved here from `test/support` when its 8-bit list emptied (C10 I69, I70): its
+ * caller is `validateQuantisedFloors`, and T2.74 and T2.75 read both depths.
+ */
+export function quantisedShortfalls(
+  theme: ResolvedTheme,
+  depth: 8 | 4,
+): readonly Readonly<{ path: string; measured: number; need: number }>[] {
+  const tokens = theme.tokens;
+  const caps = Object.freeze({ colourDepth: depth });
+  const hexOf = (colour: ColourValue | undefined): string | null => {
+    if (colour === undefined) return null;
+    if (depth === 4) return colour.kind === "ansi16" ? (ANSI16_WINDOWS_HEX[colour.index] ?? null) : null;
+    return colour.kind === "ansi256" ? cubeHexOf(colour.index) : null;
+  };
+  const page = hexOf(resolveBackground("surface.bg", theme, caps).background);
+  const out: { path: string; measured: number; need: number }[] = [];
+  const hold = (ground: string, ref: ColourRef, need: number): void => {
+    const ink = hexOf(resolve(ref, theme, caps, ground).colour);
+    const under = hexOf(resolveBackground(`surface.${ground}`, theme, caps).background) ?? (depth === 4 ? page : null);
+    if (ink === null || under === null) return;
+    const measured = ratio(ink, under);
+    if (measured < need) out.push({ path: `${ground}.${ref}`, measured: Math.round(measured * 100) / 100, need });
+  };
+
+  for (const [ground, , refs] of textGrounds(tokens)) {
+    for (const ref of refs) {
+      hold(ground, ref as ColourRef, Math.max(floorFor(ref.slice(ref.indexOf(".") + 1)), tokens.floor ?? 0));
+    }
+  }
+  for (const [palette, slot, ground] of decorationTextPairs(tokens)) hold(ground, `${palette}.${slot}`, DEFAULT_FLOOR);
+
+  // A hue band has no 4-bit form (C10 I55, PARKED 21), so it is an 8-bit cell only.
+  if (depth === 8) {
+    for (const name of Object.keys(tokens.hues ?? {})) {
+      const band = resolveHueBand(theme, name, caps);
+      const ink = hexOf(band?.ink.colour);
+      const ground = hexOf(band?.ground.background);
+      if (ink === null || ground === null) continue;
+      const measured = ratio(ink, ground);
+      if (measured < DEFAULT_FLOOR) out.push({ path: `hueBand.${name}`, measured: Math.round(measured * 100) / 100, need: DEFAULT_FLOOR });
+    }
+  }
+  return Object.freeze(out);
+}
+
+/**
+ * The name a theme is measured under at load — no theme's identity, because
+ * `identity` joins a name and a variant with `/` and this has no `/`.
+ */
+const SCRATCH = "quantised-floor-gate";
+
+/**
+ * **The 8-bit floor as a load gate** (C10 I70): a theme whose quantised cells
+ * break the floor is refused at load, as `validateHighContrast` refuses one
+ * whose authored cells do. **On a theme the 24-bit gates pass it is empty
+ * unless the quantiser is wrong**, and that is arithmetic rather than a
+ * sample: every colour clears √21 (4.58 : 1) against `#000000` or `#ffffff`,
+ * so I69's fallback always has an extreme for an ink held to √21 or less, and
+ * above it no ground holds inks on both sides at 24 bits either. What it
+ * refuses is a ground whose inks sit on both sides at a need above √21 — a
+ * theme the 24-bit gate refuses too, and this names its 256-colour cells.
+ *
+ * **8-bit only.** The 4-bit ratios are a claim about a reference palette and
+ * not about the user's sixteen, so they stay an exemption list (T2.75), and a
+ * gate over them would refuse every shipped theme.
+ *
+ * **Measured under a scratch name that is forgotten after**, because the
+ * resolver memoises on the name: under the theme's own identity, an override
+ * validated before its serial moves would read the unpatched theme's picks.
+ */
+export function validateQuantisedFloors(tokens: ThemeTokens): readonly ThemeError[] {
+  if (!quantisable(tokens)) return Object.freeze([]);
+  const held = verdicts.get(tokens);
+  if (held !== undefined) return held;
+  const verdict = measureQuantisedFloors(tokens);
+  if (frozenThrough(tokens)) verdicts.set(tokens, verdict);
+  return verdict;
+}
+
+/**
+ * **The verdict, once per token set** — because the measurement is the held
+ * DP for every refused set on every ground, 12–40 ms a theme once warm and
+ * ten themes a `loadTheme`, and the shell and every `expectDocument` load the
+ * same frozen `defaultTheme`. Kept only for a set frozen all the way down,
+ * so a consumer's token object mutated between two loads is measured again
+ * rather than answered from its first shape.
+ */
+const verdicts = new WeakMap<ThemeTokens, readonly ThemeError[]>();
+
+/**
+ * **Every value the gate quantises is a hex**, and nothing more: a value that is
+ * not has no cube entry nearest it, and `validateTokens` already names it. So
+ * the gate runs beside the 24-bit ones on any theme it can read, rather than
+ * after them on the themes they pass — the only themes it can say nothing about.
+ */
+function quantisable(tokens: ThemeTokens): boolean {
+  const values = [
+    ...Object.values(tokens.surfaces),
+    ...Object.values(tokens.palettes).flatMap((palette) => Object.values(palette.slots)),
+    ...Object.values(tokens.composed ?? {}).flatMap((inks) => Object.values(inks)),
+    ...Object.values(tokens.bandInk ?? {}),
+    ...Object.values(tokens.hues ?? {}).flatMap((hue) => [hue.ink, hue.ground, hue.on]),
+  ];
+  return values.every((value) => typeof value === "string" && isHex(value)) && (tokens.floor === undefined || Number.isFinite(tokens.floor));
+}
+
+function frozenThrough(value: unknown): boolean {
+  return value === null || typeof value !== "object" || (Object.isFrozen(value) && Object.values(value).every(frozenThrough));
+}
+
+function measureQuantisedFloors(tokens: ThemeTokens): readonly ThemeError[] {
+  const theme: ResolvedTheme = Object.freeze({ name: SCRATCH, variant: tokens.variant, tokens });
+  try {
+    return Object.freeze(
+      quantisedShortfalls(theme, 8).map(({ path, measured, need }) => {
+        if (path.startsWith("hueBand.")) {
+          const name = path.slice("hueBand.".length);
+          return {
+            path: `hues.${name}`,
+            message: `the "${name}" band is ${measured.toFixed(2)} : 1 as a 256-colour terminal paints it, below ${need} : 1 — no cube entry holds this ground and its ink together`,
+          };
+        }
+        const ground = path.slice(0, path.indexOf("."));
+        const ref = path.slice(ground.length + 1);
+        return {
+          path: `palettes.${ref}`,
+          message: `"${ref}" is ${measured.toFixed(2)} : 1 on ${ground} as a 256-colour terminal paints the pair, below ${need} : 1 — no cube entry holds this ground for every ink on it`,
+        };
+      }),
+    );
+  } finally {
+    forget(SCRATCH);
+  }
+}
+
+/** Every memo entry resolved under `name` — the scratch gate's, and nobody else's. */
+function forget(name: string): void {
+  for (const key of [...styles.keys()]) if (key.split("|")[1] === name) styles.delete(key);
+  for (const key of [...quantised.keys()]) if (key.startsWith(`${name}|`)) quantised.delete(key);
 }
 
 /** The ergonomic form. `tone` is the overwhelmingly common case (§2). */

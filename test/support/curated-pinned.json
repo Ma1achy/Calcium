@@ -1195,7 +1195,8 @@
   "warn",
   "error",
   "info",
-  "accent"
+  "accent",
+  "muted"
  ],
  "OKABE_ITO_CANONICAL": {
   "black": "#000000",
