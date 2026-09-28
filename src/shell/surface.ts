@@ -208,9 +208,9 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
     }
 
     // **The reservation is refusable or it is a sentence** (C16 I49,
-    // R-BLK-908). The failure this catches is the one the handler order cannot:
-    // the host's `host.detach` handler runs in front of the child's, so an
-    // application binding `⌃]` is not shadowing the escape — it is declaring a
+    // R-BLK-908). The failure this catches is the one the intercept cannot:
+    // the host's `host.detach` is read before the child's handler (C16 I75), so
+    // an application binding `⌃]` is not shadowing the escape — it is declaring a
     // key it will never be given, and silently never receiving one is worse
     // than being told at the attach. Refused with the chord named, because the
     // application's own remedy is to choose another and it cannot without it.
@@ -352,19 +352,16 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
     // into a prompt the reader cannot see while a PTY holds the terminal. So the
     // fall-through is closed here rather than inside `onInput`, which keeps
     // `onInput` a statement about the child's own bindings.
-    // **Registered ordinarily, and `first: true` is what had to go** (C16 I49,
-    // R-BLK-908). At `pushedView` it was right: that target carried eleven view
-    // rows and a surface had to beat them. At `child` the target carries two,
-    // both `host.detach`, and the composition root registers their handler when
-    // the graph is built — so an ordinary registration puts this **behind** it,
-    // which is exactly the order *takes all but host.detach* asks for. With
-    // `first: true` the consuming wrapper below swallowed the host escape and
-    // the one key out of capture did nothing; T1.4h is what found it.
+    // **Registered ordinarily, and the order no longer matters** (C16 I49,
+    // I75, R-BLK-908). With `first: true` the consuming wrapper below once
+    // swallowed the host escape, because the escape was a handler at this rung
+    // that the composition root registered first; T1.4h found it. The escape
+    // is the intercept table's now and is read before any handler here is
+    // offered a key, so the wrapper cannot take it from either side.
     //
-    // The wrapper is why the order matters at all: `onInput` answers `false`
-    // for an unbound key and this turns that into `true`, because a key that
-    // fell past a captured child would be the host typing into a line the
-    // reader cannot see.
+    // The wrapper turns `onInput`'s `false` for an unbound key into `true`,
+    // because a key that fell past a captured child would be the host typing
+    // into a line the reader cannot see.
     const routerDisposable = options.router.register("child", (event) =>
       onInput(event) ? true : event.kind === "key",
     );

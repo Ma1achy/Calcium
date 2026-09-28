@@ -74,6 +74,8 @@ function harness(over: Partial<RouterDeps> = {}, start = 1_000, keymap = createK
     placed: () => layer.placed,
     // C16 I74 — each layer's scroller, logged; `false` is *nothing to scroll*.
     scrollLayer: (id, notches) => (calls.push(`scroll:${id}:${String(notches)}`), true),
+    // C16 I75 — the escape's detach, logged.
+    detachChild: () => void calls.push("detach"),
     popLayer: () => void calls.push("pop"),
     nativeSelection: () => false,
     semanticSelection: () => false,
@@ -2054,10 +2056,93 @@ describe("C16 I74, I47 — the pointer over layers (review batch 3, M8)", () => 
 });
 
 describe("C16 I75 — the host escape is a reserved route (review batch 3, M9 item 4)", () => {
-  it.todo(
-    "T1.193 (I75, §3e): a child handler consuming every key, registered either side of another: the escape detaches and neither is offered it; its release is consumed; at the prompt it takes handle — not deferred on a component: the code lands in the next commit of this round",
-  );
-  it.todo(
-    "T1.194 (I75, I64, §3e): the chord is the keymap's: a rebound host.detach row moves the intercept; the enhanced profile adds the meta escape; the table row — not deferred on a component: the code lands in the next commit of this round",
-  );
+  const ESCAPE = key("]", { ctrl: true });
+  const TAKES_ALL = (): boolean => true;
+
+  it("T1.193 (I75, §3e): a child handler consuming every key, registered either side of another: the escape detaches and neither is offered it; its release is consumed; at the prompt it takes handle", () => {
+    // **Both registration orders** (§3e H1, H2). The composition root's
+    // handler stood ahead of the surface host's and the escape held by that
+    // order alone; a consuming handler registered first took it.
+    for (const order of ["consumer first", "consumer second"] as const) {
+      const h = harness({ childAttached: () => true }, 1_000, createKeymap(defaultKeymap));
+      const offered: string[] = [];
+      const consumer = (e: InputEvent): boolean => {
+        if (e.kind === "key") offered.push(`consumer:${e.key.name}`);
+        return TAKES_ALL();
+      };
+      const other = (e: InputEvent): boolean => {
+        if (e.kind === "key") offered.push(`other:${e.key.name}`);
+        return false;
+      };
+      if (order === "consumer first") {
+        h.router.register("child", consumer);
+        h.router.register("child", other);
+      } else {
+        h.router.register("child", other);
+        h.router.register("child", consumer);
+      }
+      expect(h.router.target, `${order}: the child holds the keys`).toBe("child");
+
+      expect(h.router.dispatch(ESCAPE), `${order}: consumed`).toBe(true);
+      expect(h.calls, `${order}: detached once`).toEqual(["detach"]);
+      expect(offered, `${order}: and no handler at the rung it escapes was offered it`).toEqual([]);
+      expect(h.router.lastStages).toContain("intercept:host-detach:child:global-intercept");
+      expect(h.router.lastStages).toContain("intercept:detach");
+
+      // H6: the release — its press was the host's, so the child is not
+      // handed the other half.
+      expect(h.router.dispatch({ ...ESCAPE, event: "release" } as InputEvent), `${order}: the release, consumed`).toBe(true);
+      expect(h.calls, `${order}: and it detaches nothing`).toEqual(["detach"]);
+      expect(offered, `${order}: nor reaches a handler`).toEqual([]);
+
+      // The control: an ordinary key is the child's, and the first handler
+      // registered takes it — the rung is unchanged for every other key.
+      h.router.dispatch(key("a"));
+      expect(offered[0], `${order}: \`a\` reaches the rung`).toBe(order === "consumer first" ? "consumer:a" : "other:a");
+      expect(h.calls).toEqual(["detach"]);
+    }
+
+    // H7: no child. `handle`, and the ladder runs as for any key.
+    const idle = harness({}, 1_000, createKeymap(defaultKeymap));
+    const prompt: string[] = [];
+    idle.router.register("prompt", (e) => (e.kind === "key" && void prompt.push(e.key.name), false));
+    idle.router.dispatch(ESCAPE);
+    expect(idle.router.lastStages).toContain("intercept:host-detach:scope:handle");
+    expect(idle.calls, "nothing to detach").toEqual([]);
+    expect(prompt, "the prompt's rung was offered it").toEqual(["]"]);
+  });
+
+  it("T1.194 (I75, I64, §3e): the chord is the keymap's: a rebound host.detach row moves the intercept; the enhanced profile adds the meta escape; the table row", () => {
+    // The keymap's `child` rows, asked the way the router asks them.
+    const detachesIn = (bindings: Parameters<typeof createKeymap>[0], profile?: "enhanced-terminal") => {
+      const km = createKeymap(bindings, profile);
+      return (k: Key): boolean => km.resolve("child", k)?.action === "hostDetach";
+    };
+    const base = detachesIn(defaultKeymap);
+    expect(interceptOf(key("]", { ctrl: true }), base), "⌃] under the base profile").toBe("host-detach");
+    expect(interceptOf(key("escape", { meta: true }), base), "⌥esc is not a chord here (T1.106b)").toBeNull();
+    expect(interceptOf(key("]", { ctrl: true })), "no keymap asked: no escape").toBeNull();
+
+    const enhanced = detachesIn(defaultKeymap, "enhanced-terminal");
+    expect(interceptOf(key("escape", { meta: true }), enhanced), "⌥esc under the enhanced profile").toBe("host-detach");
+
+    // **Rebound**: the intercept follows the row, so the border and `/help`,
+    // which read the same rows, cannot name a chord the router does not take.
+    const rebound = detachesIn([
+      ...defaultKeymap.filter((b) => b.action !== "hostDetach"),
+      { target: "child", key: { name: "g", ctrl: true }, action: "hostDetach" },
+    ]);
+    expect(interceptOf(key("g", { ctrl: true }), rebound)).toBe("host-detach");
+    expect(interceptOf(key("]", { ctrl: true }), rebound), "the old chord is an ordinary key").toBeNull();
+
+    // `⌃c` is still the interrupt whatever the escape is: the ⌃c arm is read first.
+    expect(interceptOf(ctrlC, () => true)).toBe("interrupt");
+
+    // The table row: the detach at `child`, `handle` everywhere else.
+    for (const rung of OWNER_RUNGS) {
+      expect(interceptVerdict("host-detach", rung), rung).toBe(rung === "child" ? "global-intercept" : "handle");
+    }
+    expect(interceptVerdict("host-detach", null), "idle").toBe("handle");
+    expect(INTERCEPTS["host-detach"].exception).toBe("detach");
+  });
 });

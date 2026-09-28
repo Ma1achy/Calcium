@@ -40,6 +40,8 @@ function routerDeps(overlays: OverlayManager): RouterDeps {
     // C16 I73 — the stack's own count; no surface host here.
     // C16 I74 — no layer here has anything to scroll.
     scrollLayer: () => false,
+    // C16 I75 — the escape's detach; nothing here attaches a child.
+    detachChild: () => undefined,
     ownerGeneration: () => overlays.generation,
     overlayWouldResolve: () => null,
     overlayAnswerCallback: () => null,

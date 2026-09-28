@@ -197,6 +197,12 @@ export type RouterDeps = Readonly<{
    */
   childAttached: () => boolean;
   /**
+   * End the captured child's attachment (C16 I75). The `host-detach`
+   * intercept's exception, called at the `child` rung and nowhere else; a
+   * shell delegation has nothing here to close.
+   */
+  detachChild: () => void;
+  /**
    * C23's, for the same reason. `runner.killAll()` kills the child and leaves the
    * entry streaming forever; C23 I10 settles it `partial` with output retained,
    * and only C23 can do that.
@@ -1081,7 +1087,9 @@ export function createRouter(
     // not `pass`: passing is a decision an owner took, and this is the absence of
     // one. The ladder then runs normally, which is how `interrupt` still reaches
     // §5's own rungs below.
-    const intercept = interceptOf(e);
+    // **The child's escape is asked of the keymap** (I75): its `child` rows are
+    // the chords the border and `/help` name, so the three cannot disagree.
+    const intercept = interceptOf(e, (key) => keymap.resolve("child", key)?.action === "hostDetach");
     if (intercept !== null) {
       // **The rung every other reader reads** (I63). An `interceptRung` asked
       // whether an answer callback was registered and answered `scope` where
@@ -1112,6 +1120,15 @@ export function createRouter(
       // it asked `intercept !== "interrupt"` while `handle` meant two things,
       // and `handle` now means only *continue to this rung* (I64).
       if (declared === "global-intercept") {
+        // **The escape, ahead of every handler at the rung it escapes** (I75,
+        // §3e H1, H2). A release is consumed and detaches nothing: the press
+        // detached, and the child is not handed half of a chord the host took
+        // (H6).
+        if (INTERCEPTS[intercept].exception === "detach") {
+          stages.push("intercept:detach");
+          if (!(e.kind === "key" && e.event === "release")) deps.detachChild();
+          return true;
+        }
         if (INTERCEPTS[intercept].exception === "pointer") {
           stages.push("intercept:wheel");
           return e.kind === "mouse" ? routeMouse(e) : false;

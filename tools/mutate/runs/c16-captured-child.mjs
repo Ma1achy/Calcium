@@ -51,16 +51,14 @@ const results = runPass({
       to: "    const routerDisposable = options.router.register(\"child\", (event) => onInput(event));\n",
       expect: "T1.106",
     },
-    {
-      // The order, and it is the one that reads as a safety measure. `first`
-      // puts the consuming wrapper in front of the host's own `child` handler,
-      // so the escape is swallowed by the thing it is meant to escape.
-      name: "`first: true` restored — the consuming wrapper runs in front of the host escape",
-      file: "src/shell/surface.ts",
-      from: "    const routerDisposable = options.router.register(\"child\", (event) =>\n      onInput(event) ? true : event.kind === \"key\",\n    );\n",
-      to: "    const routerDisposable = options.router.register(\n      \"child\",\n      (event) => (onInput(event) ? true : event.kind === \"key\"),\n      { first: true },\n    );\n",
-      expect: "T1.106b",
-    },
+    // **`first: true` restored — retired 2026-09-28 (review batch 3, M9 item
+    // 4).** It put the consuming wrapper in front of the host's own `child`
+    // handler, so the escape was swallowed by the thing it is meant to escape.
+    // C16 I75 moved the escape into the intercept table, read before any
+    // handler at the rung, so the mutation is now a change with no effect —
+    // the property I75 exists to give. `c16-host-detach` holds the order
+    // instead: T4.94 registers its consumer `first: true` on purpose, and its
+    // control removes the intercept.
     {
       // *May never leave capture without a visible, reachable host escape.*
       // Without the collision test the attach succeeds and the application's

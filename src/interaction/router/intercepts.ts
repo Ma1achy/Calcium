@@ -19,8 +19,11 @@
 
 import type { InputEvent, InterceptVerdict, Key, OwnerRung } from "./types.js";
 
-/** The intercepts §103 names. An app-registered one joins this union (M7). */
-export type InterceptId = "interrupt" | "page-scroll" | "wheel";
+/**
+ * The intercepts §103 names, and the child's escape (C16 I75). An
+ * app-registered one joins this union (M7).
+ */
+export type InterceptId = "interrupt" | "page-scroll" | "wheel" | "host-detach";
 
 /**
  * What one intercept does at one rung.
@@ -56,8 +59,9 @@ export type OwnerApplicability = Readonly<Record<OwnerRung, InterceptVerdict>> &
      * - `transcript` — the transcript's pager at `global`, whatever is focused
      *   (I40, R-BLK-112).
      * - `pointer` — the wheel's pointer-hit owner, through `routeMouse`.
+     * - `detach` — the captured child's detach, through `detachChild` (I75).
      */
-    exception: "transcript" | "pointer" | null;
+    exception: "transcript" | "pointer" | "detach" | null;
     /** Prose, because a declared override that nobody can read is a special case with a table around it. */
     why: string;
   }>;
@@ -132,6 +136,31 @@ export const INTERCEPTS: Readonly<Record<InterceptId, OwnerApplicability>> = Obj
     exception: "pointer",
     why: "tracking-off is a terminal fact and handled before decode; in native selection the wheel would move a screen that is deliberately still",
   },
+  /**
+   * R-BLK-908: *a captured child reserves one `host.detach` action because a
+   * `/command` cannot reach the host while capture is active* (C16 I75, §3e).
+   *
+   * **The escape was read inside the ladder**, by a handler at the rung it
+   * escapes, registered by the composition root ahead of the surface host's.
+   * It held because two calls ran in the right order: a consuming handler
+   * registered first took `⌃]` and the one key out of capture did nothing
+   * (§3e H2). A reserved route is read before the ladder, so no registration
+   * order can take it.
+   *
+   * `handle` everywhere else: with no child there is nothing to escape, and
+   * the rung answers the chord as it answers any key (§3e H7).
+   */
+  "host-detach": {
+    child: "global-intercept",
+    copy: "handle",
+    question: "handle",
+    substate: "handle",
+    inside: "handle",
+    scope: "handle",
+    idle: "handle",
+    exception: "detach",
+    why: "a captured child takes every key, so the one that leaves cannot be a key the child's rung is offered",
+  },
 });
 
 /**
@@ -186,10 +215,17 @@ export function isExactCtrlC(key: Key): boolean {
   return key.ctrl && key.name === "c" && !key.shift && !key.meta && key.super !== true;
 }
 
-export function interceptOf(e: InputEvent): InterceptId | null {
+/**
+ * `detaches` is the keymap's answer for the child's escape (C16 I75): the
+ * chords are the `child` rows' `hostDetach`, profile-filtered, so a rebinding
+ * moves the intercept with the border and `/help`. Absent, no key is the
+ * escape — a caller asking only about the other three routes.
+ */
+export function interceptOf(e: InputEvent, detaches?: (key: Key) => boolean): InterceptId | null {
   if (e.kind === "mouse") return e.button.startsWith("wheel") ? "wheel" : null;
   if (e.kind !== "key") return null;
   const { key } = e;
   if (isExactCtrlC(key)) return "interrupt";
+  if (detaches?.(key) === true) return "host-detach";
   return key.meta && (key.name === "up" || key.name === "down") ? "page-scroll" : null;
 }

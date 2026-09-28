@@ -1906,6 +1906,7 @@ export async function constructGraph(
           () => surface.generation,
           (r) => refused(r),
           (id, notches) => scrollLayer(id, notches),
+          () => void surface.close("detach"),
         ),
         // C28 I39 — the `handler` span. Spread in here rather than threaded
         // through `routerDeps`, whose seven parameters are all C16's own and
@@ -4178,19 +4179,11 @@ export async function constructGraph(
       return false;
     });
 
-    // **The captured child's one key, registered before any child exists**
-    // (C16 I49, R-BLK-908). *A captured child reserves one `host.detach`
-    // action* — reserving it at construction is what makes it a reservation:
-    // the surface host registers its consuming handler at attach time and
-    // lands behind this one, so the escape is in front of the capture rather
-    // than inside it. An ordinary key resolves to nothing here and falls to
-    // the child's handler, which is the rest of *takes all but host.detach*.
-    router.register("child", (e) => {
-      const effect = bound("child", e);
-      if (effect === null) return false;
-      effect();
-      return true;
-    });
+    // **No handler at `child` for the escape** (C16 I75, §3e). One stood here,
+    // registered before any attach so the surface host's consuming handler
+    // landed behind it — a reservation held by call order. `host.detach` is
+    // the intercept table's now, read before the ladder, and the router calls
+    // `detachChild` itself.
 
     // **An escapable overlay still needs its `esc` run** (C16 I26). The menu
     // and the search moved to `panel` above and took `bound` with them, and
@@ -4806,6 +4799,8 @@ function routerDeps(
   refused: RouterDeps["refused"],
   /** Each layer's scroller, late for `childAttached`'s reason (C16 I74). */
   scrollLayer: RouterDeps["scrollLayer"],
+  /** The escape's detach, late for `childAttached`'s reason (C16 I75). */
+  detachChild: RouterDeps["detachChild"],
 ): RouterDeps {
   const top = (): ReturnType<RouterDeps["overlayTop"]> => {
     const layer = stores.overlays.top;
@@ -4859,6 +4854,9 @@ function routerDeps(
     // inside `construct`, after the router that takes these deps — the same
     // lateness `pipeline` is threaded as a thunk for.
     childAttached,
+    // **The escape is the intercept table's** (C16 I75): the router calls this
+    // before any handler at `child` is offered the chord.
+    detachChild,
     // **Every owner raised or removed, counted where it happens** (C16 I73,
     // C15 I33): the stack's keyed pushes and removals and the surface host's
     // attachments. The rung alone missed an owner raised and gone between two

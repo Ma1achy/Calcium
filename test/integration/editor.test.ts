@@ -51,6 +51,8 @@ function wire(editor: LineEditor): {
     // C16 I73 — no stack and no surface host, so nothing is ever raised.
     // C16 I74 — no layer here has anything to scroll.
     scrollLayer: () => false,
+    // C16 I75 — the escape's detach; nothing here attaches a child.
+    detachChild: () => undefined,
     ownerGeneration: () => 0,
     overlayWouldResolve: () => null,
     overlayAnswerCallback: () => null,
