@@ -56652,3 +56652,32 @@ a consumer. `/profile <section>` walks `deckOf` and draws with `profileCard`; no
 `tools` calls `profileDeck`, and only C24 T1.11 names it. The export outlived the view it was published for.
 Ruling 78 unpublishes it. Residue found beside it: C25 T4.10 and T4.11 are test rows with no spec rows, and
 `local-profile.test.ts`'s "T1.96 (C23 I69 …)" resolves to C28's T1.96, not to any C23 row.
+
+## F1335 — C22 T4.33 passed with the anchor refresh deleted ★★★☆☆
+
+Found by lane b3-mut from c19-menu-window's two unexpected survivors. With `refreshAnchors()` deleted the menu
+stayed at rows 11–18 over sixteen blank rows, the prompt at 36 — the defect reproduces. T4.33 checked that the
+last non-blank row above `❯` was the row directly above it, and since 2026-09-05 (63257076, C22 I81) that row
+always holds the frame's own rule, so the check passed whatever the menu did. The row was written 2026-08-14
+(69d764d5), before the rule existed. **A later landing made an earlier row vacuous without touching it.** The row
+now checks the rule above the prompt, the menu's bottom edge above the rule, and a candidate's distance from the
+prompt across the resize; under the mutation it fails `expected 18 to be 34`. C22 T4.33 amended in place.
+
+## F1336 — a mutation that a later scheduler change made equivalent ★★☆☆☆
+
+The second c19-menu-window survivor. *The anchors are refreshed after the commit* was written 2026-08-14,
+when `resize` committed a frame immediately. Since 2026-09-01 (66f0a4e6, C03 I15) a resize commit only sets a
+flag and schedules the frame 16 ms later (`frame-scheduler.ts:314`), so a refresh moved after the commit still
+runs first and nothing can tell the orders apart. The survivor indicted the mutation, not T4.33. Retired with the
+reason; the comment in `construct.ts` says the order is kept and is not what makes the frame correct. **Owed**:
+`construct.ts` makes the same kind of claim for `pipeline.resized()` running before the frame, and the delay may
+make it unobservable too — measured by nobody.
+
+## F1337 — the surface's consuming wrapper was a second copy of the child rung ★★☆☆☆
+
+c16-captured-child's survivor, read by the router lane and measured by b3-mut: with the router's rung removed
+and the wrapper kept, T4.84 fails; with both removed, T1.106 and T4.84 fail; with the wrapper alone removed,
+nothing fails (172 passed). `onInput(event) ? true : event.kind === "key"` restated ruling 62's rule in the surface.
+The one difference is an unclaimed key release at `child`: the wrapper answered `true`, the router's release
+branch answers `false` and records `release-dropped`, and the composition root ignores `dispatch`'s return
+(`construct.ts:4415`). C16 I49 and its W5 row amended to name the rung; the surface registers `onInput` alone.
