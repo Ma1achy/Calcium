@@ -605,7 +605,7 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T4.5** (with C06): `streams: true` selects the streaming transport path.
 - **T4.6** (with C04): a validation failure renders as an ordinary error document — same blocks as a far-side failure, no special case.
 - **T4.7** (with L4): help output is generated wholly from the manifest; no verb text is hardcoded.
-- **T4.9** (§3, with C23 I80, ruling 43): `/config` is a framework row — `local`, no arguments, not `hidden` — and an app tool named `config` is now refused as a shipped verb (*a verb Calcium ships*), not as a reservation. In a session built with `motion: "reduced"`, submitting `/config` appends one entry whose one block is C23 I80's table: a row per setting of `ResolvedConfig.settings` in its order, the `motion` row reading `reduced` and `default`. **The control is the value**: `reduced` is not `motion`'s framework default, so a handler drawing a table of defaults rather than the resolved record fails on that cell.
+- **T4.9** (§3, with C23 I80, ruling 43): `/config` is a framework row — `local`, no arguments, not `hidden` — and an app tool named `config` is now refused as a shipped verb (*a verb Calcium ships*), not as a reservation. In a session built with `motion: "reduced"`, submitting `/config` appends one entry holding the call's head and then C23 I80's table, and nothing else: a row per setting of `ResolvedConfig.settings` in its order, the `motion` row reading `reduced` and `default`. **The control is the value**: `reduced` is not `motion`'s framework default, so a handler drawing a table of defaults rather than the resolved record fails on that cell.
 
 ### Tier 5 — e2e
 
