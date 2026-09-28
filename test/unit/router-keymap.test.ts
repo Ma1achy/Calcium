@@ -2018,3 +2018,9 @@ describe("C16 §6c — routes by profile and the registry-global placement (revi
     expect(listed, "and both appear").toContain("enhanced-terminal");
   });
 });
+
+describe("C16 §6a — the renumbered rows (review batch 3, M7 item 7)", () => {
+  it.todo("T1.195 (C16 §6a clause 6): the chord notation row, renumbered from its second T1.98 — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T1.196 (C16 §6a clause 6): the two-slots row, renumbered from its second T1.99 — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T1.197 (C16 §6a clause 4): the listing-order row, renumbered from its second T1.100 — not deferred on a component: the code lands in the next commit of this round");
+});
