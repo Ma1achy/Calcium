@@ -6,7 +6,7 @@
   "title": "Current contract — the rules implementations targetcurrent · R-SPC-001 · example R-EXA-001",
   "cols": 1244,
   "rows": 125,
-  "sha": "7d2850c72951eac5",
+  "sha": "981d411d52fb0787",
   "ruleIds": [
    "R-SPC-001",
    "R-EXA-001"
@@ -33,7 +33,7 @@
   "title": "The agent at work — five regions, activity presentcurrent · R-STR-001 R-STR-002 R-MOT-008 · retained example blocks generated from registry · example R-EXA-003",
   "cols": 78,
   "rows": 41,
-  "sha": "73ea21092462fdd2",
+  "sha": "b22252893de9b4e1",
   "ruleIds": [
    "R-STR-001",
    "R-STR-002",
@@ -48,7 +48,7 @@
   "title": "Idle — the activity region and its rule are gonecurrent · R-STR-001 R-MOT-007 · retained example blocks generated from registry · example R-EXA-004",
   "cols": 78,
   "rows": 17,
-  "sha": "f70c6862bea89ae3",
+  "sha": "caff0847fcfd4bb5",
   "ruleIds": [
    "R-STR-001",
    "R-MOT-007",
@@ -62,7 +62,7 @@
   "title": "Cancelled — the spinner stops, the region stayscurrent · R-STR-001 R-MOT-002 · retained example blocks generated from registry · example R-EXA-005",
   "cols": 78,
   "rows": 24,
-  "sha": "6dca22d23c8f6f7e",
+  "sha": "2bcdc6a24023d585",
   "ruleIds": [
    "R-STR-001",
    "R-MOT-002",
@@ -90,7 +90,7 @@
   "title": "Subagentscurrent · R-COR-001 R-STR-001 · retained example blocks generated from registry · example R-EXA-007",
   "cols": 78,
   "rows": 137,
-  "sha": "3d5181c47e4ae2fd",
+  "sha": "247b8122022501c5",
   "ruleIds": [
    "R-COR-001",
    "R-STR-001",
@@ -118,7 +118,7 @@
   "title": "The queuecurrent · R-COR-001 R-STA-001 · retained example blocks generated from registry · example R-EXA-009",
   "cols": 78,
   "rows": 56,
-  "sha": "d5f249b08f2d94d4",
+  "sha": "1f5502e1a3bffcc6",
   "ruleIds": [
    "R-COR-001",
    "R-STA-001",
@@ -132,7 +132,7 @@
   "title": "Startup and resumecurrent · R-COR-001 R-HON-003 · retained example blocks generated from registry · example R-EXA-010",
   "cols": 78,
   "rows": 31,
-  "sha": "0d144f06f3a1fb08",
+  "sha": "28682045d2689ad7",
   "ruleIds": [
    "R-COR-001",
    "R-HON-003",
@@ -174,7 +174,7 @@
   "title": "Review what auto wrotecurrent · R-OWN-001 R-HON-004 · retained example blocks generated from registry · example R-EXA-013",
   "cols": 67,
   "rows": 24,
-  "sha": "a192eb90c9e9a12d",
+  "sha": "55238dd3d413e4ba",
   "ruleIds": [
    "R-OWN-001",
    "R-HON-004",
@@ -232,7 +232,7 @@
   "title": "Focus — the focus treatment follows the shapecurrent · R-COL-005 R-STA-003 · retained example blocks generated from registry · example R-EXA-017",
   "cols": 84,
   "rows": 81,
-  "sha": "c32683c55dfcdd72",
+  "sha": "1727df683a1a5851",
   "ruleIds": [
    "R-COL-005",
    "R-STA-003",
@@ -291,7 +291,7 @@
   "title": "The scrollbarcurrent · R-INT-003 R-INT-004 R-HON-003 · retained example blocks generated from registry · example R-EXA-021",
   "cols": 72,
   "rows": 88,
-  "sha": "219e3d9a533db6d9",
+  "sha": "1ff0d97ab1b8148c",
   "ruleIds": [
    "R-INT-003",
    "R-INT-004",
@@ -320,7 +320,7 @@
   "title": "At 40 columnscurrent · R-STR-005 R-STR-004 R-CAP-001 · retained example blocks generated from registry · example R-EXA-023",
   "cols": 66,
   "rows": 29,
-  "sha": "7fe1c2ccde50c242",
+  "sha": "a3262eca3b243381",
   "ruleIds": [
    "R-STR-005",
    "R-STR-004",
@@ -493,7 +493,7 @@
   "title": "The operation and budget presetscurrent · R-PRG-001 · retained example blocks generated from registry · example R-EXA-036",
   "cols": 84,
   "rows": 94,
-  "sha": "e8c214265cc05680",
+  "sha": "119f8fc560af6b88",
   "ruleIds": [
    "R-PRG-001",
    "R-EXA-036"
@@ -605,7 +605,7 @@
   "title": "The live terminal blockcurrent · R-TRU-001 R-OWN-002 R-INT-007 · retained example blocks generated from registry · example R-EXA-045",
   "cols": 71,
   "rows": 20,
-  "sha": "c131a0688dff5bfc",
+  "sha": "a17ca2d1304b2540",
   "ruleIds": [
    "R-TRU-001",
    "R-OWN-002",
@@ -680,7 +680,7 @@
   "title": "The tool-result gallerycurrent · R-STR-001 R-HON-004 · retained example blocks generated from registry · example R-EXA-050",
   "cols": 74,
   "rows": 28,
-  "sha": "d1088b0403174800",
+  "sha": "54f261a8c93b39f3",
   "ruleIds": [
    "R-STR-001",
    "R-HON-004",
@@ -812,7 +812,7 @@
   "title": "Findcurrent · R-TXT-001 R-INT-004 · retained example blocks generated from registry · example R-EXA-059",
   "cols": 83,
   "rows": 25,
-  "sha": "3b3aa2049853340c",
+  "sha": "7c5a3495298fa1a7",
   "ruleIds": [
    "R-TXT-001",
    "R-INT-004",
@@ -888,7 +888,7 @@
   "title": "Undocurrent · R-QST-003 R-HON-007 · retained example blocks generated from registry · example R-EXA-064",
   "cols": 67,
   "rows": 22,
-  "sha": "fa09fec12f6b35fb",
+  "sha": "fe1c20a550c25a84",
   "ruleIds": [
    "R-QST-003",
    "R-HON-007",
@@ -902,7 +902,7 @@
   "title": "Compaction — which turns gocurrent · R-COR-001 R-HON-007 · retained example blocks generated from registry · example R-EXA-065",
   "cols": 77,
   "rows": 23,
-  "sha": "34b9bb77941920da",
+  "sha": "e5dbe9ccd691656f",
   "ruleIds": [
    "R-COR-001",
    "R-HON-007",
@@ -916,7 +916,7 @@
   "title": "Tool failures against model failurescurrent · R-COL-001 R-HON-004 · retained example blocks generated from registry · example R-EXA-066",
   "cols": 77,
   "rows": 26,
-  "sha": "8a99ecff6e7a3433",
+  "sha": "fab32f8ae033753b",
   "ruleIds": [
    "R-COL-001",
    "R-HON-004",
@@ -930,7 +930,7 @@
   "title": "Scrolled back while a turn runscurrent · R-COR-001 R-INT-008 · retained example blocks generated from registry · example R-EXA-067",
   "cols": 78,
   "rows": 101,
-  "sha": "f0816b508e2af5e2",
+  "sha": "a022811e95a5a5d3",
   "ruleIds": [
    "R-COR-001",
    "R-INT-008",
@@ -944,7 +944,7 @@
   "title": "Degradation — one exchange, three rungscurrent · R-DEG-001 R-DEG-002 R-DEG-003 · retained example blocks generated from registry · example R-EXA-068",
   "cols": 80,
   "rows": 28,
-  "sha": "87f9782a9605d6af",
+  "sha": "88012a1cd3bbed21",
   "ruleIds": [
    "R-DEG-001",
    "R-DEG-002",
@@ -1162,7 +1162,7 @@
   "title": "Prism — submitcurrent · R-QST-001 R-PER-001 · retained example blocks generated from registry · example R-EXA-083",
   "cols": 82,
   "rows": 25,
-  "sha": "ad9b83058007217c",
+  "sha": "32550a3fd29615ec",
   "ruleIds": [
    "R-QST-001",
    "R-PER-001",
@@ -1176,7 +1176,7 @@
   "title": "Prism — logs, as a blockcurrent · R-COR-001 R-HON-003 · retained example blocks generated from registry · example R-EXA-084",
   "cols": 72,
   "rows": 29,
-  "sha": "caefe102db71a147",
+  "sha": "620b5483c19e9689",
   "ruleIds": [
    "R-COR-001",
    "R-HON-003",
@@ -1190,7 +1190,7 @@
   "title": "Prism — the six-hour runcurrent · R-PRG-001 R-MOT-002 R-NTF-001 · retained example blocks generated from registry · example R-EXA-085",
   "cols": 79,
   "rows": 61,
-  "sha": "4ae5fed8d8e65cae",
+  "sha": "cc00dd04b06be3fc",
   "ruleIds": [
    "R-PRG-001",
    "R-MOT-002",
@@ -1347,7 +1347,7 @@
   "title": "A status has three parts, and a frame is separatecurrent · R-PRI-001 R-COR-003 · retained example blocks generated from registry · example R-EXA-096",
   "cols": 81,
   "rows": 37,
-  "sha": "b9b9967c4e0338d5",
+  "sha": "f860eb078fa3c2e9",
   "ruleIds": [
    "R-PRI-001",
    "R-COR-003",

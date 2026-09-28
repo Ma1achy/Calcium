@@ -12,7 +12,7 @@ shows every match at once:
 
   ● The depth counter replaces inQuote here.
   ● search("inQuote") · 3 files   ← the current one
-    ⎿ parse.ts:41  let inQuote = false;
+    ⎿  parse.ts:41  let inQuote = false;
 
   EVERY match takes the distinct match ground plus underline. The CURRENT one takes
   the focus ground, edge and bold — separate from copy selection — and they answer

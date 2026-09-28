@@ -37,11 +37,11 @@ transcript. Selecting one scrolls to its entry and expands it.
 what a run's ENTRY looks like while it runs, six hours in
 
 ● submit digit-classifier · 6h 02m · ep 17/40
-  ⎿ a3f9b21 · gpu-04 · 2×A100 · !1248
-    ██████████░░░░░░░░░░░░░░  43%   ep 17 of 40   ~7h 48m left
-    val loss  █▇▆▅▄▃▃▂▂▂▁▁  0.0372   ↓ from 0.41
-    gpu       ▅▇█▇██▇██▇██  94%
-    ≡ logs   ⚡ events   ⊘ cancel   ⏎ the full view
+  ⎿  a3f9b21 · gpu-04 · 2×A100 · !1248
+     ██████████░░░░░░░░░░░░░░  43%   ep 17 of 40   ~7h 48m left
+     val loss  █▇▆▅▄▃▃▂▂▂▁▁  0.0372   ↓ from 0.41
+     gpu       ▅▇█▇██▇██▇██  94%
+     ≡ logs   ⚡ events   ⊘ cancel   ⏎ the full view
 
 five rows, not a dashboard. An identity/provenance row, a progress bar,
 a metric sparkline, a utilisation sparkline and a verb row — it PATCHES

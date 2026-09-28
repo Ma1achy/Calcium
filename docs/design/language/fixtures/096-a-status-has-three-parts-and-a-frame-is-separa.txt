@@ -15,9 +15,9 @@ A STATUS HAS THREE PARTS, and each degrades its own way
   └──────────────────────────────────────────────┘   framed — a plot HAS a border
 
   ● read_image(loss-curve.png) · failed
-    ⎿ ────────── ERROR ──────────
-      ✗ decode failed: truncated PNG    the GUTTER is the
-                                        containment
+    ⎿  ────────── ERROR ──────────
+       ✗ decode failed: truncated PNG    the GUTTER is the
+                                         containment
 
   ────────────── ERROR ──────────────
   ✗ context exhausted at 50,000 tokens

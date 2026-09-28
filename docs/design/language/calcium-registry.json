@@ -1,7 +1,7 @@
 {
   "meta": {
     "name": "Calcium design language",
-    "revision": "0.14",
+    "revision": "0.15",
     "generatedArtifact": "calcium-design-language.html",
     "ruleIdPolicy": "IDs are explicit, permanent, and never derived from order.",
     "normativeSource": "calcium-registry.json",
@@ -4555,7 +4555,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-944",
       "legacyIds": [],
       "contentDigest": "1a7ae19d249da2e391ed61897877196459c850335f75860b0c9d9d459191caec"
     },
@@ -4585,7 +4585,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-945",
       "legacyIds": [],
       "contentDigest": "b1a65d476a828cde18077379a20ebc84d86d32f2304c78f88c84bbcf459955c7"
     },
@@ -4630,7 +4630,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-946",
       "legacyIds": [],
       "contentDigest": "403e6f3116d8bf250b22f9f7b957a048e041f75639cdc3266312f3f2844b4f5b"
     },
@@ -4720,7 +4720,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-947",
       "legacyIds": [],
       "contentDigest": "a142461935ba86baa04d90e10e4d0ed629580fe778a7be1b887841bf929735ed"
     },
@@ -4735,7 +4735,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-948",
       "legacyIds": [],
       "contentDigest": "428477e523ffd680afe43023c0fea66e92912f84235d62d54e32b1097bc3e6d6"
     },
@@ -4960,7 +4960,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-949",
       "legacyIds": [],
       "contentDigest": "970e57026db454031a2f6f9076ec81f691faa544541dffef9a824a1149a37ba2"
     },
@@ -5350,7 +5350,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-950",
       "legacyIds": [],
       "contentDigest": "940d490ee43c42db33d981bdba33e20d55c66ddd87b4689eb3ce0d727bc357c0"
     },
@@ -5590,7 +5590,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-951",
       "legacyIds": [],
       "contentDigest": "807fa17e8db4b82cec0253bd16bef20aba8fdfa43829879aed2f232ef1f67392"
     },
@@ -5830,7 +5830,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-952",
       "legacyIds": [],
       "contentDigest": "e8ec2b056041c9dd6482e8a65873ceb7a35b6262deae16d67f00eaea63c78c13"
     },
@@ -6355,7 +6355,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-953",
       "legacyIds": [],
       "contentDigest": "2defbd0946695385b6e3bef3743e3f720975b054a2174d315b615b51a8c9ae6e"
     },
@@ -6760,7 +6760,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-954",
       "legacyIds": [],
       "contentDigest": "942168c771e63b358429c807e9cef8abb6dc781f1e09e0a02fb6e42683ceeda0"
     },
@@ -7075,7 +7075,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-955",
       "legacyIds": [],
       "contentDigest": "1ebfa222e0389c6ee70d702000e5ade5525fc36cf8558c2a58478b6dada2becd"
     },
@@ -8455,7 +8455,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-956",
       "legacyIds": [],
       "contentDigest": "f77da86f4ed7635b3eaf4f3837ce0a397771b3ea8a617c10e9256d4db732babf"
     },
@@ -9145,7 +9145,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-957",
       "legacyIds": [],
       "contentDigest": "74f226f926f85fd1bb9036874a100ed139bb819b974ae00461904e38f6873259"
     },
@@ -9580,7 +9580,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-958",
       "legacyIds": [],
       "contentDigest": "bf1712a7b8a0c7a13c3aa8a7e9be37c8e77739ab42b4c603525ddabecacde6d4"
     },
@@ -9595,7 +9595,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-959",
       "legacyIds": [],
       "contentDigest": "b8b96615be66d92a7baea2194ad4b52479072287d4a4d73c4491e828b6f30291"
     },
@@ -9610,7 +9610,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-960",
       "legacyIds": [],
       "contentDigest": "0da9f51beea34de8a7e765e993191e7f7d19191930f9c134605c11310a9d7089"
     },
@@ -10795,7 +10795,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-961",
       "legacyIds": [],
       "contentDigest": "c81ed248379a8203a61b218d5895a980f8b1e207796b9ae50210983ec99ecd09"
     },
@@ -11410,7 +11410,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-962",
       "legacyIds": [],
       "contentDigest": "4caa9a9efa7ee268470673878801858b08f8095536c68d3dff0dd403b8f3a08f"
     },
@@ -11560,7 +11560,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-963",
       "legacyIds": [],
       "contentDigest": "98a24bac6dbfd0cc8fc447b264a612909ed43a7bc374933eb735f0fe77f26905"
     },
@@ -11605,7 +11605,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-964",
       "legacyIds": [],
       "contentDigest": "42f4f3f95b6d604eb67c60bb2735d4635e5ebcd79d90bfe3dd2a27c3b2f7f502"
     },
@@ -11740,7 +11740,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-965",
       "legacyIds": [],
       "contentDigest": "e4a072043f35fe7ed90436d699ab40c826934a3ffa698053aa94980d58ab7cf8"
     },
@@ -14290,7 +14290,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-968",
       "legacyIds": [],
       "contentDigest": "2ca5b5575c4ecfd15df2b22c4fa511edfa6ab199be968d7158fd819be972b56c"
     },
@@ -14365,7 +14365,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-969",
       "legacyIds": [],
       "contentDigest": "a98e3890f55b1a2040a40c5695cf94fcc8dad914b3e38a5ca594f7d76b0779e6"
     },
@@ -14560,7 +14560,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-970",
       "legacyIds": [],
       "contentDigest": "51fff865a0d8533b1680840b242f4f12136ddd98de7c1ca528bf0fe3bccdc6a2"
     },
@@ -16018,7 +16018,7 @@
         "specimen"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-971",
       "legacyIds": [],
       "contentDigest": "d7bebac3cbd5f7a842e89ea27043c520de197efac6745557a4a9b9e000ab046a"
     },
@@ -18850,7 +18850,7 @@
       "supersedes": [
         "R-BLK-502"
       ],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-966",
       "legacyIds": [],
       "contentDigest": "2ae60fcd4ae54cb4059980dec984582566a1f391f3d27a9ff3447f71019086ef"
     },
@@ -18867,7 +18867,7 @@
       "supersedes": [
         "R-BLK-503"
       ],
-      "supersededBy": null,
+      "supersededBy": "R-BLK-967",
       "legacyIds": [],
       "contentDigest": "1a009cbad2cd78c198567f2a506497340b356c89b3abaf3246ba1ff9ef9722cf"
     },
@@ -19009,6 +19009,454 @@
       "contentDigest": "388802dddbf8789893644b94a5f770e11dbbe5fb49c67314f5f54bb5d1026607"
     },
     {
+      "id": "R-BLK-944",
+      "title": "The agent at work — five regions, activity present · ● read_file(src/interaction/parser/parse.ts) ⎿ 184 lines · 6.2 KB",
+      "text": "● read_file(src/interaction/parser/parse.ts)\n    ⎿  184 lines · 6.2 KB",
+      "status": "example",
+      "sectionKey": "the-agent-at-work-five-regions-activity-present-003",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-005"
+      ],
+      "legacyIds": [],
+      "contentDigest": "a7cfca26568dc371b4ce7bb52cf60ceaf7d8f64f743ce0f703df3785c0dcc761"
+    },
+    {
+      "id": "R-BLK-945",
+      "title": "The agent at work — five regions, activity present · ● edit(src/interaction/parser/parse.ts) ⎿ ── src/interaction/parser/parse.ts…",
+      "text": "● edit(src/interaction/parser/parse.ts)\n    ⎿\n    ── src/interaction/parser/parse.ts +2 −2 ────────────────────────────────\n    ⋯ 39 unchanged lines\n    @@ -40,4 +40,4 @@\n       40     const out = [];\n       41 -   let inQuote = false;\n       41 +   let depth = 0;\n       46       if (esc) { esc = false; continue; }\n       47 -     if (ch === '\"') inQuote = !inQuote;\n       47 +     if (ch === '\"') depth += (ch === q) ? (esc ? 0 : 1) : 0;\n       48       out.push(ch);\n    ⋯ 136 unchanged lines\n   updating the tests                       12s · 1.4k tok\n  ⎿  todo  3/5\n     ◼ read the current implementation\n     ◼ find where quotes are tracked\n     ◼ add a depth counter\n      update the tests\n     ◻ run the suite\n──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ████████████████░░░░░░░░░░  62%  31k/50k   step ████░░░░░░ 4/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m",
+      "status": "example",
+      "sectionKey": "the-agent-at-work-five-regions-activity-present-003",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-007"
+      ],
+      "legacyIds": [],
+      "contentDigest": "5f1127c3c4259ca5b51ff0e10888642fa32201661f362d00fb6593be582e7bbc"
+    },
+    {
+      "id": "R-BLK-946",
+      "title": "Idle — the activity region and its rule are gone · ● Done. The parser tracks depth now and the suite passes. ⎿ 118 passed, 2 to…",
+      "text": "● Done. The parser tracks depth now and the suite passes.\n    ⎿  118 passed, 2 todo · exit 0",
+      "status": "example",
+      "sectionKey": "idle-the-activity-region-and-its-rule-are-gone-004",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-010"
+      ],
+      "legacyIds": [],
+      "contentDigest": "b688939ad166adc20b4a1100967ab80fe75067a16389a5b527408218eba7cf7e"
+    },
+    {
+      "id": "R-BLK-947",
+      "title": "Cancelled — the spinner stops, the region stays · ● edit(src/interaction/parser/parse.ts) · 2.1s · cancelled ⎿ 1 of 2 hunks ap…",
+      "text": "● edit(src/interaction/parser/parse.ts) · 2.1s · cancelled\n    ⎿  1 of 2 hunks applied\n    ── src/interaction/parser/parse.ts +1 −1 ────────────────────────────────\n    ⋯ 40 unchanged lines\n    @@ -41,1 +41,1 @@\n       41 - let inQuote = false;\n       41 + let depth = 0;\n    ⋯ 143 unchanged lines\n    ⎿  ▲ stopped before the second hunk · ↺ revert   ⏎ resume",
+      "status": "example",
+      "sectionKey": "cancelled-the-spinner-stops-the-region-stays-005",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-016"
+      ],
+      "legacyIds": [],
+      "contentDigest": "8f5a71566f9b4e11682bc48d38611d7114ea865998987e8724a9e77745a746dc"
+    },
+    {
+      "id": "R-BLK-948",
+      "title": "Cancelled — the spinner stops, the region stays · and the activity region STAYS, stopped — an empty region says nothing happen…",
+      "text": "and the activity region STAYS, stopped — an empty region says nothing happened\n  ● updating the tests  12s · 1.4k tok  ·  stopped\n  ⎿  todo  3/5  ·  ◻ update the tests  ·  2 left",
+      "status": "example",
+      "sectionKey": "cancelled-the-spinner-stops-the-region-stays-005",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-017"
+      ],
+      "legacyIds": [],
+      "contentDigest": "88b6798e1e980324fdf82aad8be59d939faa1c9796629e53eef7041de323eeee"
+    },
+    {
+      "id": "R-BLK-949",
+      "title": "Subagents · calcium/count verify the refusal count ✦ qwen3-coder-next 22:19 ────────────…",
+      "text": "calcium/count   verify the refusal count    ✦ qwen3-coder-next  22:19\n  ────────────────────────────────────────────────────────────────────────────\n\n ❯ count the refusals three ways and compare\n\n  ● I'll grep the prose, the register and the roadmap separately.\n\n  ● search(\"refus\") · 1.2s · 1,204 matches\n    ⎿  +1,204 more · ⏎ expand\n\n    cross-checking the register  4m 02s · 46k tok\n  ────────────────────────────────────────────────────── calcium/count ─\n  ❯ ▌\n  ────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ██████████████████████░░  92%  46k/50k   step █████████░ 18/20   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m\n  ⋯   main    seams  2:53 ✓   arm  3:46 ✓ › count   4:02    ⌃⇥ switch",
+      "status": "example",
+      "sectionKey": "subagents-007",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-032"
+      ],
+      "legacyIds": [],
+      "contentDigest": "4f3cfa139dce4b5ec499d5a7b1ebdba8688e03fa95f305da44abd13b77216884"
+    },
+    {
+      "id": "R-BLK-950",
+      "title": "The queue · ❯ refactor the parser to handle nested quotes ● I'll look at the current imp…",
+      "text": "❯ refactor the parser to handle nested quotes\n\n● I'll look at the current implementation first.\n\n    editing parse.ts  41s · 3.2k tok\n  ⎿  todo  4/5  ·  ◻ run the suite\n\n─────────────────────────────── 2 queued ─────────────────────────────────────\n ❯ also add a test for escaped quotes\n ❯ then run the full suite\n──────────────────────────────────────────────────────────────────────────────\n❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n⏎ send   ⌥↑ edit the last   ⌥⌫ drop the last   ⌥⏎ send all now",
+      "status": "example",
+      "sectionKey": "the-queue-009",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-058"
+      ],
+      "legacyIds": [],
+      "contentDigest": "885b9288899b833f767e60df61b78e3fa4a8c88585f6f014f58a8058a4358546"
+    },
+    {
+      "id": "R-BLK-951",
+      "title": "Startup and resume · ● resumed · 14 turns · 2h ago · 31k tok restored ⎿ last: edited parse.ts, ra…",
+      "text": "● resumed · 14 turns · 2h ago · 31k tok restored\n  ⎿  last: edited parse.ts, ran the suite, 2 failing\n\n ❯ what was failing again?",
+      "status": "example",
+      "sectionKey": "startup-and-resume-010",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-074"
+      ],
+      "legacyIds": [],
+      "contentDigest": "df7da2c130db64c70dca0f234a84533f004bf2f0b92c71717972c5807aed00a2"
+    },
+    {
+      "id": "R-BLK-952",
+      "title": "Review what auto wrote · ● done · 4m 12s · 3 files · +124 −18 ⎿ src/interaction/parser/parse.ts +18 −…",
+      "text": "● done · 4m 12s · 3 files · +124 −18\n  ⎿  src/interaction/parser/parse.ts    +18 −4\n     src/interaction/parser/tokens.ts   +94 −2\n     test/unit/parser.test.ts           +12 −12\n     ⏎ review   d full diff   ↺ revert all",
+      "status": "example",
+      "sectionKey": "review-what-auto-wrote-013",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-090"
+      ],
+      "legacyIds": [],
+      "contentDigest": "bda4af3aed076eb89c53006a75b22c4d2db8d56f8dd28c1a2362cf5440161ad2"
+    },
+    {
+      "id": "R-BLK-953",
+      "title": "Focus — the focus treatment follows the shape · ▸ ● search(\"inQuote\") · 1.2s · 3 files ⎿ parse.ts:41 let inQuote = false; to…",
+      "text": "▸ ● search(\"inQuote\") · 1.2s · 3 files\n      ⎿  parse.ts:41    let inQuote = false;\n         tokens.ts:88   if (inQuote) continue;\n  transcript scope — you have the BLOCK\n\n  ▸ ● search(\"inQuote\") · 1.2s · 3 files\n      ⎿  parse.ts:41    let inQuote = false;\n         tokens.ts:88   if (inQuote) continue;\n  block scope — the entry settles back and the ROW paints",
+      "status": "example",
+      "sectionKey": "focus-the-focus-treatment-follows-the-shape-017",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-125"
+      ],
+      "legacyIds": [],
+      "contentDigest": "827baa77fc6e5dcd7014da11c9aee50550f70adec3d715bf2b6ce155a2fbf849"
+    },
+    {
+      "id": "R-BLK-954",
+      "title": "The scrollbar · ● pytest tests/unit · 4.2s · 1,204 passed ⎿ ============== test session star…",
+      "text": "● pytest tests/unit · 4.2s · 1,204 passed\n    ⎿  ============== test session starts =========\n       collected 1204 items                            ╽\n       tests/unit/plot.py ........................   ┃\n       tests/unit/table.py ...................... ┃\n       tests/unit/patch.py ......................     ╿\n       +1,136 more",
+      "status": "example",
+      "sectionKey": "the-scrollbar-021",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-152"
+      ],
+      "legacyIds": [],
+      "contentDigest": "e530a53f6b666aea1b3bd0db03a50f0f4ca6dac8e92991ba8d162296fb501261"
+    },
+    {
+      "id": "R-BLK-955",
+      "title": "At 40 columns · calcium ✦ qwen3 22:13 ────────────────────────────────────── ❯ refactor the …",
+      "text": "calcium      ✦ qwen3     22:13\n  ──────────────────────────────────────\n\n   ❯ refactor the parser\n\n  ● read_file(parse.ts)\n    ⎿  184 lines\n\n   editing   41s · 3.2k\n  ⎿  4/5  ·  ◻ run the suite\n  ──────────────────────────────────────\n  ❯ ▌\n  ──────────────────────────────────────\n  » auto  ███████░░░░░  ctx 62% · step 4/10",
+      "status": "example",
+      "sectionKey": "at-40-columns-023",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-173"
+      ],
+      "legacyIds": [],
+      "contentDigest": "b48b8501405b27b346bf589db4efbf23d733e73a1235d60888545c10cf4826c7"
+    },
+    {
+      "id": "R-BLK-956",
+      "title": "The operation and budget presets · ● compacting · 2m 10s · cancelled nothing was summarised ● compacting · 2m 1…",
+      "text": "● compacting · 2m 10s · cancelled   nothing was summarised\n  ● compacting · 2m 10s · failed\n  ⎿  ✗ the summariser returned no content\n  muted for cancelled, error for failed — and in both the bar goes,\n  because a stopped bar is a claim about progress that is not being\n  made any more.",
+      "status": "example",
+      "sectionKey": "the-operation-and-budget-presets-036",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-265"
+      ],
+      "legacyIds": [],
+      "contentDigest": "d352dfa5272302aa2b0f02109e520ea80869ae5f6664faf0e7821d140b8948f6"
+    },
+    {
+      "id": "R-BLK-957",
+      "title": "The live terminal block · ● pytest tests/ · 12s ⎿ ============== test session starts ============== co…",
+      "text": "● pytest tests/ ·  12s\n  ⎿  ============== test session starts ==============\n     collected 1204 items\n     tests/unit/plot.py ........................      [ 12%]\n     tests/unit/table.py ..........F............    [ 31%]\n     +1,157 more · ⏎ attach   ⌃c cancel",
+      "status": "example",
+      "sectionKey": "the-live-terminal-block-045",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-311"
+      ],
+      "legacyIds": [],
+      "contentDigest": "9ac5c0fd3aeb85ca6c5d9dc68fe7917b1afbb2d07f82a928187ab7de275b1d4a"
+    },
+    {
+      "id": "R-BLK-958",
+      "title": "The tool-result gallery · ● run_command(npm test) · 4.1s · exit 0 ⎿ 118 passed, 2 todo +1,204 more · ⏎…",
+      "text": "● run_command(npm test) · 4.1s · exit 0\n  ⎿  118 passed, 2 todo\n     +1,204 more · ⏎ expand",
+      "status": "example",
+      "sectionKey": "the-tool-result-gallery-050",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-340"
+      ],
+      "legacyIds": [],
+      "contentDigest": "dc82d2408b1ecf616e4edba9a436a27e1badc22554146b27d482d96fcfddfbab"
+    },
+    {
+      "id": "R-BLK-959",
+      "title": "The tool-result gallery · ● read_image(loss-curve.png) · 512×384 ⎿ ⣿⣿⣷⣤⣄⡀ ⢀⣠⣤⣶⣿⣿⣿⣷⣤⣀ ⣿⣿⣿⣿⣿⣿⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿…",
+      "text": "● read_image(loss-curve.png) · 512×384\n  ⎿  ⣿⣿⣷⣤⣄⡀  ⢀⣠⣤⣶⣿⣿⣿⣷⣤⣀\n     ⣿⣿⣿⣿⣿⣿⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿",
+      "status": "example",
+      "sectionKey": "the-tool-result-gallery-050",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-341"
+      ],
+      "legacyIds": [],
+      "contentDigest": "78207826b46e1ade80ca713aa0112bbdb0e9ac8e4a32a2b52fd85af8ce81e845"
+    },
+    {
+      "id": "R-BLK-960",
+      "title": "The tool-result gallery · ● query(select p50, p99 from latency) · 2 metrics ⎿ p50 ▓▓▓▓▓▓▓▓░░░░ 18ms p9…",
+      "text": "● query(select p50, p99 from latency) · 2 metrics\n  ⎿  p50 ▓▓▓▓▓▓▓▓░░░░ 18ms\n     p99 ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 290ms",
+      "status": "example",
+      "sectionKey": "the-tool-result-gallery-050",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-342"
+      ],
+      "legacyIds": [],
+      "contentDigest": "c02514899fe6448c6b2e5368e9b64be24650546ff4d75a45f73fe6c365f0268d"
+    },
+    {
+      "id": "R-BLK-961",
+      "title": "Find · ● The depth counter replaces inQuote here. ● search(\"inQuote\") · 3 files ← t…",
+      "text": "● The depth counter replaces inQuote here.\n  ● search(\"inQuote\") · 3 files   ← the current one\n    ⎿  parse.ts:41  let inQuote = false;",
+      "status": "example",
+      "sectionKey": "find-059",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-421"
+      ],
+      "legacyIds": [],
+      "contentDigest": "9169ed9be37a304ae7782d245d79cd9a97816ed6fdbb2e8c4f5d22ef9eeb6c42"
+    },
+    {
+      "id": "R-BLK-962",
+      "title": "Undo · ● edit(parse.ts) · 0.3s · +2 −2 ● reverted · parse.ts · +2 −2 undone ↺ redo …",
+      "text": "● edit(parse.ts) · 0.3s · +2 −2\n\n● reverted · parse.ts · +2 −2 undone   ↺ redo\n  ⎿  the file is back to what it was before the edit above",
+      "status": "example",
+      "sectionKey": "undo-064",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-462"
+      ],
+      "legacyIds": [],
+      "contentDigest": "33d75dc7ca3ee3aad39d88bcfdc752a19a2fb0fce0c0d0d3fe57a666568f9fc5"
+    },
+    {
+      "id": "R-BLK-963",
+      "title": "Compaction — which turns go · compacting ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱ 3 of 5 turns ● 3 turns compacted · 10.7k…",
+      "text": "compacting   ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱  3 of 5 turns\n\n  ● 3 turns compacted · 10.7k → 0.9k tok · ⏎ read the summary\n  ⎿  read construct.ts, searched for elementsIn, discussed the span\n     prerequisite. No edits were made.",
+      "status": "example",
+      "sectionKey": "compaction-which-turns-go-065",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-472"
+      ],
+      "legacyIds": [],
+      "contentDigest": "ca827ea3bac63fca11e1ec442beef110f7bec63b9ae7661e3ee781334a5afdd5"
+    },
+    {
+      "id": "R-BLK-964",
+      "title": "Tool failures against model failures · a TOOL failure is a result — it hangs under its own call and the turn goes o…",
+      "text": "a TOOL failure is a result — it hangs under its own call and the turn goes on\n  ● read_file(missing.ts) · 0.1s · failed\n    ⎿  ✗ ENOENT: no such file\n  ● I'll check the directory listing instead.     ← the turn continues",
+      "status": "example",
+      "sectionKey": "tool-failures-against-model-failures-066",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-475"
+      ],
+      "legacyIds": [],
+      "contentDigest": "755f02dfdfd817fbf8f3cf56fff1f44b3659cffab7790e88c2e0a707f83cc674"
+    },
+    {
+      "id": "R-BLK-965",
+      "title": "Scrolled back while a turn runs · editing parse.ts 41s · 3.2k tok ⎿ todo 4/5 · ◻ run the suite ↓ 3 new message…",
+      "text": "editing parse.ts  41s · 3.2k tok\n  ⎿  todo  4/5  ·  ◻ run the suite\n\n   ↓ 3 new messages ⏎\n──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ███████████████████░░░░░  78%  39k/50k   step ███████░░░ 7/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m",
+      "status": "example",
+      "sectionKey": "scrolled-back-while-a-turn-runs-067",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-484"
+      ],
+      "legacyIds": [],
+      "contentDigest": "285ab3b1d5e5a6acddcd7d9d213e5286729eaa7a7402cb3292ff0afd36b7172a"
+    },
+    {
+      "id": "R-BLK-966",
+      "title": "Degradation — one exchange, three rungs · 24-bit ● I'll check the parser first. ● read_file(parse.ts) · 0.2s · 184 lin…",
+      "text": "24-bit\n  ● I'll check the parser first.\n  ● read_file(parse.ts) · 0.2s · 184 lines\n    ⎿  let inQuote = false;\n  ▹ thinking · 4s",
+      "status": "example",
+      "sectionKey": "degradation-one-exchange-three-rungs-068",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-934"
+      ],
+      "legacyIds": [],
+      "contentDigest": "5fbc1f147d30e462bcbf4d0318686f3bd1a1b03708b96f7cc0265516f465c4b2"
+    },
+    {
+      "id": "R-BLK-967",
+      "title": "Degradation — one exchange, three rungs · 1-bit — tone becomes weight, and the marks are unchanged ● I'll check the pa…",
+      "text": "1-bit — tone becomes weight, and the marks are unchanged\n  ● I'll check the parser first.\n  ● read_file(parse.ts) · 0.2s · 184 lines\n    ⎿  let inQuote = false;\n  ▹ thinking · 4s",
+      "status": "example",
+      "sectionKey": "degradation-one-exchange-three-rungs-068",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-935"
+      ],
+      "legacyIds": [],
+      "contentDigest": "d1f3faaa921aebea9abbcdbab40b7e0b89f55cf08f0ef38994a6561f47dda318"
+    },
+    {
+      "id": "R-BLK-968",
+      "title": "Prism — submit · ❯ /submit fmx_models.jobs.training:job ● submit · 4s ⎿ ✓ clean working tree …",
+      "text": "❯ /submit fmx_models.jobs.training:job\n\n● submit ·  4s\n  ⎿  ✓ clean working tree              HEAD a3f9b21\n     ✓ tier-1 rules                    22 rules · 0 errors\n      generating manifest              jobs/a3f9b21.yaml\n     ○ open merge request",
+      "status": "example",
+      "sectionKey": "prism-submit-083",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-654"
+      ],
+      "legacyIds": [],
+      "contentDigest": "26698fe754bc3bf434076fe89cc6b5394d25e61b850e2b647f0acd323ca3f6b0"
+    },
+    {
+      "id": "R-BLK-969",
+      "title": "Prism — logs, as a block · ❯ /logs a3f9b21 --follow ● logs a3f9b21 · 1,204 lines · ● following ⎿ 14:23:…",
+      "text": "❯ /logs a3f9b21 --follow\n\n● logs a3f9b21 · 1,204 lines · ● following\n  ⎿  14:23:01.882  INFO   [trainer] epoch 17 started\n     14:23:02.104  INFO   [dataloader] batch 41/256         ╽\n     14:23:02.339  DEBUG  [memory] gpu_mem=52GiB/80GiB      ┃\n     14:23:02.551  WARN   [dataloader] slow batch (87ms)    ┃\n     14:23:02.774  INFO   [trainer] step 2417 · loss=0.0372 ╿\n     14:23:03.001  ERROR  [checkpoint] write failed, retrying\n     1,204 lines · at 1,198 · 2 warnings · 1 error   l level  ⌃s pause\n\n ❯ what was the checkpoint error?\n\n● It failed writing to the shared volume and retried once.",
+      "status": "example",
+      "sectionKey": "prism-logs-as-a-block-084",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-659"
+      ],
+      "legacyIds": [],
+      "contentDigest": "7bc4d1564fc17cd40c597704940a10e9b21a37104e58da177b4b2cca28346aa7"
+    },
+    {
+      "id": "R-BLK-970",
+      "title": "Prism — the six-hour run · ● submit digit-classifier · 6h 02m · ep 17/40 ⎿ a3f9b21 · gpu-04 · 2×A100 · …",
+      "text": "● submit digit-classifier · 6h 02m · ep 17/40\n  ⎿  a3f9b21 · gpu-04 · 2×A100 · !1248\n     ██████████░░░░░░░░░░░░░░  43%   ep 17 of 40   ~7h 48m left\n     val loss  █▇▆▅▄▃▃▂▂▂▁▁  0.0372   ↓ from 0.41\n     gpu       ▅▇█▇██▇██▇██  94%\n     ≡ logs   ⚡ events   ⊘ cancel   ⏎ the full view",
+      "status": "example",
+      "sectionKey": "prism-the-six-hour-run-085",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-672"
+      ],
+      "legacyIds": [],
+      "contentDigest": "7e528b26674c1a3555f30ae1673d20fa4f811efb61990ec67ca128f79a018d8c"
+    },
+    {
+      "id": "R-BLK-971",
+      "title": "A status has three parts, and a frame is separate · ┌ val loss ──────────────────────────────────── ┐ │ ────────────── ERROR ───…",
+      "text": "┌ val loss ──────────────────────────────────── ┐\n  │ ────────────── ERROR ────────────── │\n  │ ✗ plot failed to render                        │\n  └──────────────────────────────────────────────┘   framed — a plot HAS a border\n\n  ● read_image(loss-curve.png) · failed\n    ⎿  ────────── ERROR ──────────\n       ✗ decode failed: truncated PNG    the GUTTER is the\n                                         containment\n\n  ────────────── ERROR ──────────────\n  ✗ context exhausted at 50,000 tokens\n   retrying in 8s · attempt 2       bare — the prompt rules\n                                        are the containment",
+      "status": "example",
+      "sectionKey": "a-status-has-three-parts-and-a-frame-is-separate-096",
+      "tags": [
+        "section-block",
+        "specimen"
+      ],
+      "supersedes": [
+        "R-BLK-769"
+      ],
+      "legacyIds": [],
+      "contentDigest": "ca08e2a4bf39c3538ea57dc7a354de1d8ebfd93b41ac2f44978682a36642b943"
+    },
+    {
       "id": "R-KEY-008",
       "title": "The palette opens on a leading >, and a >-led line is never a command",
       "text": "A > typed as the first character of the line switches the prompt's menu from verbs to actions, and the query is the text after it; a > anywhere else is text and means what the shell means by it. A line whose first character is > is never handed to the parser or the shell: it runs the action it names, or says there is none and keeps the line.",
@@ -19072,12 +19520,12 @@
         "R-BLK-002",
         "R-BLK-932",
         "R-BLK-004",
-        "R-BLK-005",
+        "R-BLK-944",
         "R-BLK-006",
-        "R-BLK-007"
+        "R-BLK-945"
       ],
       "sourceBlockCount": 7,
-      "sourceDigest": "b131511ed50a7daadaf082e9cdf9a85c16367385ef8d825489cb74e0ad56040e"
+      "sourceDigest": "018c984260279dc0af43a9da48b6f46b0da47ed241db7d71a0f96ab9d2bda987"
     },
     {
       "key": "idle-the-activity-region-and-its-rule-are-gone-004",
@@ -19095,14 +19543,14 @@
       "blockIds": [
         "R-BLK-008",
         "R-BLK-009",
-        "R-BLK-010",
+        "R-BLK-946",
         "R-BLK-011",
         "R-BLK-012",
         "R-BLK-013",
         "R-BLK-014"
       ],
       "sourceBlockCount": 7,
-      "sourceDigest": "c9b7b831c04678724582c6ccb564c10f1bcb2d6e93df3dcf6b789ef001df47b5"
+      "sourceDigest": "44383e9deb9923d7d549819271948d68e22d5e1c7bd239a0b7594a4c7b5832f8"
     },
     {
       "key": "cancelled-the-spinner-stops-the-region-stays-005",
@@ -19119,13 +19567,13 @@
       ],
       "blockIds": [
         "R-BLK-015",
-        "R-BLK-016",
-        "R-BLK-017",
+        "R-BLK-947",
+        "R-BLK-948",
         "R-BLK-018",
         "R-BLK-019"
       ],
       "sourceBlockCount": 5,
-      "sourceDigest": "68dc13b08438f964f61334a4d1937985406e5e0a3e978297009a7ae83ac7b498"
+      "sourceDigest": "b801ba24f025182d30f8b7319b10afc007fce597a833c383e748bbd84391ecf9"
     },
     {
       "key": "the-mark-vocabulary-twelve-canonical-glyphs-006",
@@ -19168,7 +19616,7 @@
         "R-BLK-029",
         "R-BLK-030",
         "R-BLK-031",
-        "R-BLK-032",
+        "R-BLK-949",
         "R-BLK-033",
         "R-BLK-034",
         "R-BLK-035",
@@ -19187,7 +19635,7 @@
         "R-BLK-048"
       ],
       "sourceBlockCount": 29,
-      "sourceDigest": "938ce635af25e0ee7b2c985e6c44b8b06ba2a306844137e60e77bd0865d72ca9"
+      "sourceDigest": "6c967018c81cdb39ebef70e01f4badd328900f2ffe09e7dcaf600c3b8f494c05"
     },
     {
       "key": "a-message-you-sent-008",
@@ -19230,7 +19678,7 @@
       "blockIds": [
         "R-BLK-056",
         "R-BLK-057",
-        "R-BLK-058",
+        "R-BLK-950",
         "R-BLK-059",
         "R-BLK-060",
         "R-BLK-061",
@@ -19241,7 +19689,7 @@
         "R-BLK-066"
       ],
       "sourceBlockCount": 11,
-      "sourceDigest": "3fc11bba3a2912032a256c52d5de2f3eb00b6940dba6074c14c33f6ceade2c84"
+      "sourceDigest": "c0dd5bf989b3e17c02ceb3c7ac54806399a48391c3effc034bb1da3b569f1730"
     },
     {
       "key": "startup-and-resume-010",
@@ -19264,11 +19712,11 @@
         "R-BLK-071",
         "R-BLK-072",
         "R-BLK-073",
-        "R-BLK-074",
+        "R-BLK-951",
         "R-BLK-075"
       ],
       "sourceBlockCount": 9,
-      "sourceDigest": "58f04e3e98eb722a1713920e2137f0d8142a625ab156e42f1dcbc591bb272bd8"
+      "sourceDigest": "b97fbe0ac410c39b470aab8266475689b67f0003ca4e8dfb046280505d39fa1f"
     },
     {
       "key": "mentions-011",
@@ -19334,13 +19782,13 @@
       "blockIds": [
         "R-BLK-088",
         "R-BLK-089",
-        "R-BLK-090",
+        "R-BLK-952",
         "R-BLK-091",
         "R-BLK-092",
         "R-BLK-093"
       ],
       "sourceBlockCount": 6,
-      "sourceDigest": "8c1d162bff1637f4f35b5b5d410a1a328b65914452378d936c9aa8eb18393cae"
+      "sourceDigest": "537528aeac4ed935263069f8f12629e768ce636d788311a341ef0d19a7c9efbe"
     },
     {
       "key": "when-you-are-away-014",
@@ -19444,7 +19892,7 @@
         "R-BLK-122",
         "R-BLK-123",
         "R-BLK-124",
-        "R-BLK-125",
+        "R-BLK-953",
         "R-BLK-126",
         "R-BLK-127",
         "R-BLK-128",
@@ -19455,7 +19903,7 @@
         "R-BLK-133"
       ],
       "sourceBlockCount": 19,
-      "sourceDigest": "4b7c6c983738508e1626cbe9a1375a92f809edaa88df534ced180cbd1b63cd64"
+      "sourceDigest": "a8bab795d593bd724cc0550abbfa01bef53259d6713a2a5686fab9ad07fddba6"
     },
     {
       "key": "focus-on-things-that-are-not-rows-018",
@@ -19545,7 +19993,7 @@
       ],
       "blockIds": [
         "R-BLK-151",
-        "R-BLK-152",
+        "R-BLK-954",
         "R-BLK-153",
         "R-BLK-154",
         "R-BLK-155",
@@ -19567,7 +20015,7 @@
         "R-BLK-171"
       ],
       "sourceBlockCount": 21,
-      "sourceDigest": "3dbc7edecbf88d6f397b9bcdd8a6b4983404d4f1777af1a970b6c4fc183b40bd"
+      "sourceDigest": "5ede1aff09a4cb3530a425bce10de9297e841edd017066a5b0273c9dec064ae3"
     },
     {
       "key": "the-help-view-022",
@@ -19600,14 +20048,14 @@
       ],
       "blockIds": [
         "R-BLK-172",
-        "R-BLK-173",
+        "R-BLK-955",
         "R-BLK-174",
         "R-BLK-175",
         "R-BLK-176",
         "R-BLK-177"
       ],
       "sourceBlockCount": 6,
-      "sourceDigest": "5f832ae7d8b50a7683ef9d6c467c10e7dd982ef9eb46f5a7dc1f3dc2dfe2a4ea"
+      "sourceDigest": "01273dddf530859d9b37228a7f3526ce2f5c96edc3ff8ba5b4f32e0a00932016"
     },
     {
       "key": "reasoning-024",
@@ -19924,12 +20372,12 @@
         "R-BLK-262",
         "R-BLK-263",
         "R-BLK-264",
-        "R-BLK-265",
+        "R-BLK-956",
         "R-BLK-266",
         "R-BLK-267"
       ],
       "sourceBlockCount": 23,
-      "sourceDigest": "ec81520be00f020b99056f793298ff9a22b66dd047e6e307d6c513d75cfe9e51"
+      "sourceDigest": "8a2d7e94aab507f7e1776a4f8221a700823f97da86a078175888066a966e4d1a"
     },
     {
       "key": "ink-ramps-every-effect-037",
@@ -20131,13 +20579,13 @@
       ],
       "blockIds": [
         "R-BLK-310",
-        "R-BLK-311",
+        "R-BLK-957",
         "R-BLK-312",
         "R-BLK-313",
         "R-BLK-314"
       ],
       "sourceBlockCount": 5,
-      "sourceDigest": "89b0adae01b8681d0c303f8a8a982e170a093d0dfd588c44509598c2540113df"
+      "sourceDigest": "db7cf91ea21fafd4db17b8f7256c36983902041beab84f772bd6e40c4722e1b8"
     },
     {
       "key": "history-search-and-ghost-text-046",
@@ -20254,13 +20702,13 @@
         "R-BLK-337",
         "R-BLK-338",
         "R-BLK-339",
-        "R-BLK-340",
-        "R-BLK-341",
-        "R-BLK-342",
+        "R-BLK-958",
+        "R-BLK-959",
+        "R-BLK-960",
         "R-BLK-343"
       ],
       "sourceBlockCount": 7,
-      "sourceDigest": "ca5c1b6e087d42a26df7be70f886fb41c7ffd3a7d908982cac5406aec2328471"
+      "sourceDigest": "fdb09e8945de5a724211e8a9c8756f86f3b1f76a3eadf67afee27503bafe6180"
     },
     {
       "key": "approval-overflow-inspection-is-not-an-answer-051",
@@ -20504,13 +20952,13 @@
         "R-BLK-418",
         "R-BLK-419",
         "R-BLK-420",
-        "R-BLK-421",
+        "R-BLK-961",
         "R-BLK-422",
         "R-BLK-423",
         "R-BLK-424"
       ],
       "sourceBlockCount": 7,
-      "sourceDigest": "b25cf0a9e6d440bb06f7c2e606baf90557670f8cccb0d301766db74309ec34f8"
+      "sourceDigest": "cbaf51c0c73fde4afde6d41057c8485a8b957cf5e9f7d96c74b29866712b1645"
     },
     {
       "key": "resize-060",
@@ -20642,14 +21090,14 @@
       ],
       "blockIds": [
         "R-BLK-461",
-        "R-BLK-462",
+        "R-BLK-962",
         "R-BLK-463",
         "R-BLK-464",
         "R-BLK-465",
         "R-BLK-466"
       ],
       "sourceBlockCount": 6,
-      "sourceDigest": "2ede3b51b3c6588c2c2b1f5a3e7ad57327808aedabd662612b6ef07c286aa33c"
+      "sourceDigest": "a182c6a2dc32f8151060612fdb16aa7eadf5bf244f5e8c021df94898a8561a9a"
     },
     {
       "key": "compaction-which-turns-go-065",
@@ -20670,11 +21118,11 @@
         "R-BLK-469",
         "R-BLK-470",
         "R-BLK-471",
-        "R-BLK-472",
+        "R-BLK-963",
         "R-BLK-473"
       ],
       "sourceBlockCount": 7,
-      "sourceDigest": "26b765ad98143b4c241d915df4818ba3827f8610a240317e7b9fda32b6316b40"
+      "sourceDigest": "fe534e8a8063463ce51173056b73eea2d40ab7cbe8994365ec6a795985cb6ddd"
     },
     {
       "key": "tool-failures-against-model-failures-066",
@@ -20691,7 +21139,7 @@
       ],
       "blockIds": [
         "R-BLK-474",
-        "R-BLK-475",
+        "R-BLK-964",
         "R-BLK-476",
         "R-BLK-477",
         "R-BLK-478",
@@ -20699,7 +21147,7 @@
         "R-BLK-480"
       ],
       "sourceBlockCount": 7,
-      "sourceDigest": "e25ae274359daecec7da4338936e7edb4d291c264bb617d61ccb3291beb5493e"
+      "sourceDigest": "9320495e17ba7fb6069f3b7dc45abc44a905f16973865e39f50e6ab4ecd3e01e"
     },
     {
       "key": "scrolled-back-while-a-turn-runs-067",
@@ -20718,7 +21166,7 @@
         "R-BLK-481",
         "R-BLK-482",
         "R-BLK-483",
-        "R-BLK-484",
+        "R-BLK-965",
         "R-BLK-485",
         "R-BLK-486",
         "R-BLK-487",
@@ -20737,7 +21185,7 @@
         "R-BLK-500"
       ],
       "sourceBlockCount": 20,
-      "sourceDigest": "7e6fe125c00472f495d2344d73786dc3e59a94c0c50dc68145c98afe0cb019d6"
+      "sourceDigest": "51eb55b2ab437485e496a4b7138befa894752b1aaf6d5da7f3c4f3e4a1a384d0"
     },
     {
       "key": "degradation-one-exchange-three-rungs-068",
@@ -20755,14 +21203,14 @@
       ],
       "blockIds": [
         "R-BLK-501",
-        "R-BLK-934",
-        "R-BLK-935",
+        "R-BLK-966",
+        "R-BLK-967",
         "R-BLK-504",
         "R-BLK-505",
         "R-BLK-506"
       ],
       "sourceBlockCount": 6,
-      "sourceDigest": "4af324fb75aa1bc1bada5cbb4ef7c608a84d8a69851aa6ecaf82451f5939e996"
+      "sourceDigest": "e7efd034e6c99c5e1beeb5033987e2034df3c3dd34a6d2c1e5e947ed516e9040"
     },
     {
       "key": "the-labelled-rule-069",
@@ -21185,13 +21633,13 @@
       ],
       "blockIds": [
         "R-BLK-653",
-        "R-BLK-654",
+        "R-BLK-968",
         "R-BLK-655",
         "R-BLK-656",
         "R-BLK-657"
       ],
       "sourceBlockCount": 5,
-      "sourceDigest": "88b161fefc43bc22d2470fb2f9e3a1dec969efcb6461d964744a542f5233f302"
+      "sourceDigest": "60023148ce31d2e05016d8b1cd3c79688d982fe7621181f459a650ebeb404c6c"
     },
     {
       "key": "prism-logs-as-a-block-084",
@@ -21208,12 +21656,12 @@
       ],
       "blockIds": [
         "R-BLK-658",
-        "R-BLK-659",
+        "R-BLK-969",
         "R-BLK-660",
         "R-BLK-661"
       ],
       "sourceBlockCount": 4,
-      "sourceDigest": "facdde6ba5c3da7f192a3e2acde78c0af90b7a4a508551a816af159241648890"
+      "sourceDigest": "e27eecfd5ad22d01c74f313d6c17103f32b96ec808df6181d0fa89cf20c790d6"
     },
     {
       "key": "prism-the-six-hour-run-085",
@@ -21240,14 +21688,14 @@
         "R-BLK-669",
         "R-BLK-670",
         "R-BLK-671",
-        "R-BLK-672",
+        "R-BLK-970",
         "R-BLK-673",
         "R-BLK-674",
         "R-BLK-675",
         "R-BLK-676"
       ],
       "sourceBlockCount": 15,
-      "sourceDigest": "48c63bd0d205afdc26922f5b5494ed867b2136fe195b950bc11cbc6965da85c3"
+      "sourceDigest": "6f5a926758e0e308bea64ad936fff30b57293e7a0467d7c043723679b03c5b43"
     },
     {
       "key": "prism-which-plots-it-actually-needs-086",
@@ -21532,13 +21980,13 @@
         "R-BLK-766",
         "R-BLK-767",
         "R-BLK-768",
-        "R-BLK-769",
+        "R-BLK-971",
         "R-BLK-770",
         "R-BLK-771",
         "R-BLK-772"
       ],
       "sourceBlockCount": 8,
-      "sourceDigest": "79198c5d2df5dda0d93f68fc4f114082f3d4abb1fa3ef1c73bce4608e9f3243f"
+      "sourceDigest": "e18545379ad8c6af191fb5a4a4882e9358d4fc4974f727ee52c09f1b5ff26c82"
     },
     {
       "key": "a-transient-panel-floats-between-two-rules-097",
@@ -39515,15 +39963,18 @@
       ]
     },
     {
-      "id": "R-BLK-005",
+      "id": "R-BLK-944",
       "sectionKey": "the-agent-at-work-five-regions-activity-present-003",
       "position": 5,
-      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-ok\">● </span><span class=\"c-default\">read_file</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">src/interaction/parser/parse.ts</span><span class=\"c-muted\">)</span>\n<span class=\"c-muted\">    ⎿ </span><span class=\"c-muted\">184 lines · 6.2 KB</span>\n",
-      "contentDigest": "cd1f39ee3315c1bfc1553aad7ad35cb89b99bf27b18f554e16dad319a84b06ee",
-      "text": "● read_file(src/interaction/parser/parse.ts)\n    ⎿ 184 lines · 6.2 KB",
+      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-ok\">● </span><span class=\"c-default\">read_file</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">src/interaction/parser/parse.ts</span><span class=\"c-muted\">)</span>\n<span class=\"c-muted\">    ⎿  </span><span class=\"c-muted\">184 lines · 6.2 KB</span>\n",
+      "contentDigest": "c08e2cb58732a05b43690409ea79c27b1b723ced8b6eb49a3aca0fd45756a306",
+      "text": "● read_file(src/interaction/parser/parse.ts)\n    ⎿  184 lines · 6.2 KB",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-944"
+      ],
+      "supersedes": [
         "R-BLK-005"
       ]
     },
@@ -39541,15 +39992,18 @@
       ]
     },
     {
-      "id": "R-BLK-007",
+      "id": "R-BLK-945",
       "sectionKey": "the-agent-at-work-five-regions-activity-present-003",
       "position": 7,
-      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-ok\">● </span><span class=\"c-default\">edit</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">src/interaction/parser/parse.ts</span><span class=\"c-muted\">)</span>\n<span class=\"c-muted\">    ⎿</span>\n<span class=\"c-default\">    </span><span class=\"c-default\">── src/interaction/parser/parse.ts </span><span class=\"c-ok\">+2</span><span class=\"c-default\"> </span><span class=\"c-error\">−2</span><span class=\"c-default\"> </span><span class=\"c-muted\">────────────────────────────────</span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">⋯ 39 unchanged lines</span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">@@ -40,4 +40,4 @@</span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">   40   </span><span class=\"c-default\">  const out = [];                                                 </span>\n<span class=\"c-default\">    </span><span class=\"c-error bg-diffRemove\">   41 - </span><span class=\"c-default bg-diffRemove\">  let inQuote = false;                                            </span>\n<span class=\"c-default\">    </span><span class=\"c-ok bg-diffAdd\">   41 + </span><span class=\"c-default bg-diffAdd\">  let depth = 0;                                                  </span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">   46   </span><span class=\"c-default\">    if (esc) { esc = false; continue; }                           </span>\n<span class=\"c-default\">    </span><span class=\"c-error bg-diffRemove\">   47 - </span><span class=\"c-default bg-diffRemove\">    if (ch === &#x27;&quot;&#x27;) inQuote = !inQuote;                           </span>\n<span class=\"c-default\">    </span><span class=\"c-ok bg-diffAdd\">   47 + </span><span class=\"c-default bg-diffAdd\">    if (ch === &#x27;&quot;&#x27;) depth += (ch === q) ? (esc ? 0 : 1) : 0;      </span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">   48   </span><span class=\"c-default\">    out.push(ch);                                                 </span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">⋯ 136 unchanged lines</span>\n<span class=\"c-default\">  </span><span class=\"c-accent sp sp-agent\"></span><span class=\"c-default\"> </span><span class=\"c-accent rmp rmp-shimmer\"><span style=\"--i:0\">u</span><span style=\"--i:1\">p</span><span style=\"--i:2\">d</span><span style=\"--i:3\">a</span><span style=\"--i:4\">t</span><span style=\"--i:5\">i</span><span style=\"--i:6\">n</span><span style=\"--i:7\">g</span><span style=\"--i:8\"> </span><span style=\"--i:9\">t</span><span style=\"--i:10\">h</span><span style=\"--i:11\">e</span><span style=\"--i:12\"> </span><span style=\"--i:13\">t</span><span style=\"--i:14\">e</span><span style=\"--i:15\">s</span><span style=\"--i:16\">t</span><span style=\"--i:17\">s</span></span><span class=\"c-default\">                       </span><span class=\"c-muted\">12s · 1.4k tok</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-muted\">todo  3/5</span>\n<span class=\"c-default\">    </span><span class=\"c-ok\">◼ </span><span class=\"c-muted\">read the current implementation</span>\n<span class=\"c-default\">    </span><span class=\"c-ok\">◼ </span><span class=\"c-muted\">find where quotes are tracked</span>\n<span class=\"c-default\">    </span><span class=\"c-ok\">◼ </span><span class=\"c-muted\">add a depth counter</span>\n<span class=\"c-default\">    </span><span class=\"c-ok sp sp-agent\"></span><span class=\"c-default\"> </span><span class=\"c-ok rmp rmp-shimmer\"><span style=\"--i:0\">u</span><span style=\"--i:1\">p</span><span style=\"--i:2\">d</span><span style=\"--i:3\">a</span><span style=\"--i:4\">t</span><span style=\"--i:5\">e</span><span style=\"--i:6\"> </span><span style=\"--i:7\">t</span><span style=\"--i:8\">h</span><span style=\"--i:9\">e</span><span style=\"--i:10\"> </span><span style=\"--i:11\">t</span><span style=\"--i:12\">e</span><span style=\"--i:13\">s</span><span style=\"--i:14\">t</span><span style=\"--i:15\">s</span></span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">◻ </span><span class=\"c-muted\">run the suite</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">  ❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">██████</span><span class=\"c-meta\">████</span><span class=\"c-ok\">██████</span><span class=\"c-muted\">░░░░░░░░░░</span><span class=\"c-muted\">  62%  31k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\">████</span><span class=\"c-muted\">░░░░░░</span><span class=\"c-muted\"> 4/10</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-muted\">          malachy</span><span class=\"c-muted\">   31m</span></pre>",
-      "contentDigest": "d6e879d268ea81cc33bd0ad4db5f29bb20927aaf5337a7161a10876a19dd6359",
-      "text": "● edit(src/interaction/parser/parse.ts)\n    ⎿\n    ── src/interaction/parser/parse.ts +2 −2 ────────────────────────────────\n    ⋯ 39 unchanged lines\n    @@ -40,4 +40,4 @@\n       40     const out = [];\n       41 -   let inQuote = false;\n       41 +   let depth = 0;\n       46       if (esc) { esc = false; continue; }\n       47 -     if (ch === '\"') inQuote = !inQuote;\n       47 +     if (ch === '\"') depth += (ch === q) ? (esc ? 0 : 1) : 0;\n       48       out.push(ch);\n    ⋯ 136 unchanged lines\n   updating the tests                       12s · 1.4k tok\n  ⎿ todo  3/5\n    ◼ read the current implementation\n    ◼ find where quotes are tracked\n    ◼ add a depth counter\n     update the tests\n    ◻ run the suite\n──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ████████████████░░░░░░░░░░  62%  31k/50k   step ████░░░░░░ 4/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m",
+      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-ok\">● </span><span class=\"c-default\">edit</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">src/interaction/parser/parse.ts</span><span class=\"c-muted\">)</span>\n<span class=\"c-muted\">    ⎿</span>\n<span class=\"c-default\">    </span><span class=\"c-default\">── src/interaction/parser/parse.ts </span><span class=\"c-ok\">+2</span><span class=\"c-default\"> </span><span class=\"c-error\">−2</span><span class=\"c-default\"> </span><span class=\"c-muted\">────────────────────────────────</span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">⋯ 39 unchanged lines</span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">@@ -40,4 +40,4 @@</span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">   40   </span><span class=\"c-default\">  const out = [];                                                 </span>\n<span class=\"c-default\">    </span><span class=\"c-error bg-diffRemove\">   41 - </span><span class=\"c-default bg-diffRemove\">  let inQuote = false;                                            </span>\n<span class=\"c-default\">    </span><span class=\"c-ok bg-diffAdd\">   41 + </span><span class=\"c-default bg-diffAdd\">  let depth = 0;                                                  </span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">   46   </span><span class=\"c-default\">    if (esc) { esc = false; continue; }                           </span>\n<span class=\"c-default\">    </span><span class=\"c-error bg-diffRemove\">   47 - </span><span class=\"c-default bg-diffRemove\">    if (ch === &#x27;&quot;&#x27;) inQuote = !inQuote;                           </span>\n<span class=\"c-default\">    </span><span class=\"c-ok bg-diffAdd\">   47 + </span><span class=\"c-default bg-diffAdd\">    if (ch === &#x27;&quot;&#x27;) depth += (ch === q) ? (esc ? 0 : 1) : 0;      </span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">   48   </span><span class=\"c-default\">    out.push(ch);                                                 </span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">⋯ 136 unchanged lines</span>\n<span class=\"c-default\">  </span><span class=\"c-accent sp sp-agent\"></span><span class=\"c-default\"> </span><span class=\"c-accent rmp rmp-shimmer\"><span style=\"--i:0\">u</span><span style=\"--i:1\">p</span><span style=\"--i:2\">d</span><span style=\"--i:3\">a</span><span style=\"--i:4\">t</span><span style=\"--i:5\">i</span><span style=\"--i:6\">n</span><span style=\"--i:7\">g</span><span style=\"--i:8\"> </span><span style=\"--i:9\">t</span><span style=\"--i:10\">h</span><span style=\"--i:11\">e</span><span style=\"--i:12\"> </span><span style=\"--i:13\">t</span><span style=\"--i:14\">e</span><span style=\"--i:15\">s</span><span style=\"--i:16\">t</span><span style=\"--i:17\">s</span></span><span class=\"c-default\">                       </span><span class=\"c-muted\">12s · 1.4k tok</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-muted\">todo  3/5</span>\n<span class=\"c-default\">    </span><span class=\"c-ok\"> ◼ </span><span class=\"c-muted\">read the current implementation</span>\n<span class=\"c-default\">    </span><span class=\"c-ok\"> ◼ </span><span class=\"c-muted\">find where quotes are tracked</span>\n<span class=\"c-default\">    </span><span class=\"c-ok\"> ◼ </span><span class=\"c-muted\">add a depth counter</span>\n<span class=\"c-default\">    </span> <span class=\"c-ok sp sp-agent\"></span><span class=\"c-default\"> </span><span class=\"c-ok rmp rmp-shimmer\"><span style=\"--i:0\">u</span><span style=\"--i:1\">p</span><span style=\"--i:2\">d</span><span style=\"--i:3\">a</span><span style=\"--i:4\">t</span><span style=\"--i:5\">e</span><span style=\"--i:6\"> </span><span style=\"--i:7\">t</span><span style=\"--i:8\">h</span><span style=\"--i:9\">e</span><span style=\"--i:10\"> </span><span style=\"--i:11\">t</span><span style=\"--i:12\">e</span><span style=\"--i:13\">s</span><span style=\"--i:14\">t</span><span style=\"--i:15\">s</span></span>\n<span class=\"c-default\">    </span><span class=\"c-muted\"> ◻ </span><span class=\"c-muted\">run the suite</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">  ❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">██████</span><span class=\"c-meta\">████</span><span class=\"c-ok\">██████</span><span class=\"c-muted\">░░░░░░░░░░</span><span class=\"c-muted\">  62%  31k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\">████</span><span class=\"c-muted\">░░░░░░</span><span class=\"c-muted\"> 4/10</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-muted\">          malachy</span><span class=\"c-muted\">   31m</span></pre>",
+      "contentDigest": "a8f1085f436e0ba76d06a7c33dfc980476d70e514652dc06a00c25be51b85348",
+      "text": "● edit(src/interaction/parser/parse.ts)\n    ⎿\n    ── src/interaction/parser/parse.ts +2 −2 ────────────────────────────────\n    ⋯ 39 unchanged lines\n    @@ -40,4 +40,4 @@\n       40     const out = [];\n       41 -   let inQuote = false;\n       41 +   let depth = 0;\n       46       if (esc) { esc = false; continue; }\n       47 -     if (ch === '\"') inQuote = !inQuote;\n       47 +     if (ch === '\"') depth += (ch === q) ? (esc ? 0 : 1) : 0;\n       48       out.push(ch);\n    ⋯ 136 unchanged lines\n   updating the tests                       12s · 1.4k tok\n  ⎿  todo  3/5\n     ◼ read the current implementation\n     ◼ find where quotes are tracked\n     ◼ add a depth counter\n      update the tests\n     ◻ run the suite\n──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ████████████████░░░░░░░░░░  62%  31k/50k   step ████░░░░░░ 4/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-945"
+      ],
+      "supersedes": [
         "R-BLK-007"
       ]
     },
@@ -39580,15 +40034,18 @@
       ]
     },
     {
-      "id": "R-BLK-010",
+      "id": "R-BLK-946",
       "sectionKey": "idle-the-activity-region-and-its-rule-are-gone-004",
       "position": 3,
-      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-default\">● </span><span class=\"c-default\">Done. The parser tracks depth now and the suite passes.</span>\n<span class=\"c-muted\">    ⎿ </span><span class=\"c-muted\">118 passed, 2 todo · exit 0</span>\n",
-      "contentDigest": "52f696446fa96f4eaeedbc6e1cfb5a8a7b3b48b5ab971a414137f71263f360d4",
-      "text": "● Done. The parser tracks depth now and the suite passes.\n    ⎿ 118 passed, 2 todo · exit 0",
+      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-default\">● </span><span class=\"c-default\">Done. The parser tracks depth now and the suite passes.</span>\n<span class=\"c-muted\">    ⎿  </span><span class=\"c-muted\">118 passed, 2 todo · exit 0</span>\n",
+      "contentDigest": "76b443e1b8252543951ea1e6f2c0f1a02bc70b922902e5bf55eab46dc47b17e3",
+      "text": "● Done. The parser tracks depth now and the suite passes.\n    ⎿  118 passed, 2 todo · exit 0",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-946"
+      ],
+      "supersedes": [
         "R-BLK-010"
       ]
     },
@@ -39658,28 +40115,34 @@
       ]
     },
     {
-      "id": "R-BLK-016",
+      "id": "R-BLK-947",
       "sectionKey": "cancelled-the-spinner-stops-the-region-stays-005",
       "position": 2,
-      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-muted\">● </span><span class=\"c-default\">edit</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">src/interaction/parser/parse.ts</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">2.1s</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">cancelled</span>\n<span class=\"c-muted\">    ⎿ </span><span class=\"c-muted\">1 of 2 hunks applied</span>\n<span class=\"c-default\">    </span><span class=\"c-default\">── src/interaction/parser/parse.ts </span><span class=\"c-ok\">+1</span><span class=\"c-default\"> </span><span class=\"c-error\">−1</span><span class=\"c-default\"> </span><span class=\"c-muted\">────────────────────────────────</span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">⋯ 40 unchanged lines</span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">@@ -41,1 +41,1 @@</span>\n<span class=\"c-default\">    </span><span class=\"c-error bg-diffRemove\">   41 - </span><span class=\"c-default bg-diffRemove\">let inQuote = false;                                              </span>\n<span class=\"c-default\">    </span><span class=\"c-ok bg-diffAdd\">   41 + </span><span class=\"c-default bg-diffAdd\">let depth = 0;                                                    </span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">⋯ 143 unchanged lines</span>\n<span class=\"c-muted\">    ⎿ </span><span class=\"c-warn\">▲ </span><span class=\"c-muted\">stopped before the second hunk · </span><span class=\"c-accent\">↺</span><span class=\"c-muted\"> revert   </span><span class=\"c-accent\">⏎</span><span class=\"c-muted\"> resume</span>\n",
-      "contentDigest": "949813c7497467b8bcf4827cc5534e2ddbf30e9c9b4aff271fe2d444f6d4b755",
-      "text": "● edit(src/interaction/parser/parse.ts) · 2.1s · cancelled\n    ⎿ 1 of 2 hunks applied\n    ── src/interaction/parser/parse.ts +1 −1 ────────────────────────────────\n    ⋯ 40 unchanged lines\n    @@ -41,1 +41,1 @@\n       41 - let inQuote = false;\n       41 + let depth = 0;\n    ⋯ 143 unchanged lines\n    ⎿ ▲ stopped before the second hunk · ↺ revert   ⏎ resume",
+      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-muted\">● </span><span class=\"c-default\">edit</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">src/interaction/parser/parse.ts</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">2.1s</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">cancelled</span>\n<span class=\"c-muted\">    ⎿  </span><span class=\"c-muted\">1 of 2 hunks applied</span>\n<span class=\"c-default\">    </span><span class=\"c-default\">── src/interaction/parser/parse.ts </span><span class=\"c-ok\">+1</span><span class=\"c-default\"> </span><span class=\"c-error\">−1</span><span class=\"c-default\"> </span><span class=\"c-muted\">────────────────────────────────</span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">⋯ 40 unchanged lines</span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">@@ -41,1 +41,1 @@</span>\n<span class=\"c-default\">    </span><span class=\"c-error bg-diffRemove\">   41 - </span><span class=\"c-default bg-diffRemove\">let inQuote = false;                                              </span>\n<span class=\"c-default\">    </span><span class=\"c-ok bg-diffAdd\">   41 + </span><span class=\"c-default bg-diffAdd\">let depth = 0;                                                    </span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">⋯ 143 unchanged lines</span>\n<span class=\"c-muted\">    ⎿  </span><span class=\"c-warn\">▲ </span><span class=\"c-muted\">stopped before the second hunk · </span><span class=\"c-accent\">↺</span><span class=\"c-muted\"> revert   </span><span class=\"c-accent\">⏎</span><span class=\"c-muted\"> resume</span>\n",
+      "contentDigest": "06222bc3f441d63af46a6fa39eed4add6750fe97b2a1d9ab02768cd8ec3deccf",
+      "text": "● edit(src/interaction/parser/parse.ts) · 2.1s · cancelled\n    ⎿  1 of 2 hunks applied\n    ── src/interaction/parser/parse.ts +1 −1 ────────────────────────────────\n    ⋯ 40 unchanged lines\n    @@ -41,1 +41,1 @@\n       41 - let inQuote = false;\n       41 + let depth = 0;\n    ⋯ 143 unchanged lines\n    ⎿  ▲ stopped before the second hunk · ↺ revert   ⏎ resume",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-947"
+      ],
+      "supersedes": [
         "R-BLK-016"
       ]
     },
     {
-      "id": "R-BLK-017",
+      "id": "R-BLK-948",
       "sectionKey": "cancelled-the-spinner-stops-the-region-stays-005",
       "position": 3,
-      "renderHtml": "\n<span class=\"c-muted\">and the activity region STAYS, stopped — an empty region says nothing happened</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">● </span><span class=\"c-muted\">updating the tests</span><span class=\"c-default\">  </span><span class=\"c-muted\">12s · 1.4k tok</span><span class=\"c-muted\">  ·  </span><span class=\"c-muted\">stopped</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-muted\">todo  3/5  ·  </span><span class=\"c-muted\">◻ </span><span class=\"c-muted\">update the tests</span><span class=\"c-muted\">  ·  </span><span class=\"c-warn\">2 left</span>\n",
-      "contentDigest": "0f586036ec05a7369364500a4170555358e6843a60d00c9f130a8efe0f1b30fd",
-      "text": "and the activity region STAYS, stopped — an empty region says nothing happened\n  ● updating the tests  12s · 1.4k tok  ·  stopped\n  ⎿ todo  3/5  ·  ◻ update the tests  ·  2 left",
+      "renderHtml": "\n<span class=\"c-muted\">and the activity region STAYS, stopped — an empty region says nothing happened</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">● </span><span class=\"c-muted\">updating the tests</span><span class=\"c-default\">  </span><span class=\"c-muted\">12s · 1.4k tok</span><span class=\"c-muted\">  ·  </span><span class=\"c-muted\">stopped</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-muted\">todo  3/5  ·  </span><span class=\"c-muted\">◻ </span><span class=\"c-muted\">update the tests</span><span class=\"c-muted\">  ·  </span><span class=\"c-warn\">2 left</span>\n",
+      "contentDigest": "7830ce96d07b66fd6d928dcc7b4268fec0fd93c0e34a7dfc31b8c8f6ea3fa7d1",
+      "text": "and the activity region STAYS, stopped — an empty region says nothing happened\n  ● updating the tests  12s · 1.4k tok  ·  stopped\n  ⎿  todo  3/5  ·  ◻ update the tests  ·  2 left",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-948"
+      ],
+      "supersedes": [
         "R-BLK-017"
       ]
     },
@@ -39866,15 +40329,18 @@
       ]
     },
     {
-      "id": "R-BLK-032",
+      "id": "R-BLK-949",
       "sectionKey": "subagents-007",
       "position": 13,
-      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-hi-cyan bg-h-cyan\"> calcium/count </span><span class=\"c-default\">  verify the refusal count</span><span class=\"c-meta\">    ✦ qwen3-coder-next</span><span class=\"c-muted\">  22:19</span>\n<span class=\"c-muted\">  </span><span class=\"c-h-cyan\">────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default bg-bgElev\"> ❯ count the refusals three ways and compare                                  </span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">  </span><span class=\"c-default\">● </span><span class=\"c-default\">I&#x27;ll grep the prose, the register and the roadmap separately.</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">  </span><span class=\"c-ok\">● </span><span class=\"c-default\">search</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">&quot;refus&quot;</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">1.2s</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">1,204 matches</span>\n<span class=\"c-muted\">    ⎿ </span><span class=\"c-muted\">+1,204 more</span><span class=\"c-muted\"> · </span><span class=\"c-h-cyan\">⏎</span><span class=\"c-muted\"> expand</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">  </span><span class=\"c-h-cyan sp sp-agent\"></span><span class=\"c-default\">  </span><span class=\"c-h-cyan rmp rmp-scatter\"><span style=\"--i:0\">c</span><span style=\"--i:1\">r</span><span style=\"--i:2\">o</span><span style=\"--i:3\">s</span><span style=\"--i:4\">s</span><span style=\"--i:5\">-</span><span style=\"--i:6\">c</span><span style=\"--i:7\">h</span><span style=\"--i:8\">e</span><span style=\"--i:9\">c</span><span style=\"--i:10\">k</span><span style=\"--i:11\">i</span><span style=\"--i:12\">n</span><span style=\"--i:13\">g</span><span style=\"--i:14\"> </span><span style=\"--i:15\">t</span><span style=\"--i:16\">h</span><span style=\"--i:17\">e</span><span style=\"--i:18\"> </span><span style=\"--i:19\">r</span><span style=\"--i:20\">e</span><span style=\"--i:21\">g</span><span style=\"--i:22\">i</span><span style=\"--i:23\">s</span><span style=\"--i:24\">t</span><span style=\"--i:25\">e</span><span style=\"--i:26\">r</span></span><span class=\"c-default\">  </span><span class=\"c-muted\">4m 02s · 46k tok</span>\n<span class=\"c-default\">  </span><span class=\"c-h-cyan\">──────────────────────────────────────────────────────</span><span class=\"c-hi-cyan bg-h-cyan\"> calcium/count </span><span class=\"c-h-cyan\">─</span>\n<span class=\"c-muted\">  ❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-default\">  </span><span class=\"c-h-cyan\">────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">██████</span><span class=\"c-meta\">████</span><span class=\"c-ok\">████████████</span><span class=\"c-muted\">░░</span><span class=\"c-muted\">  92%  46k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\">█████████</span><span class=\"c-muted\">░</span><span class=\"c-muted\"> 18/20</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-muted\">          malachy</span><span class=\"c-muted\">   31m</span>\n<span class=\"c-muted\">  ⋯ </span><span class=\"c-default\"> </span><span class=\"c-dim bg-bgElev\"> main </span><span class=\"c-default\"> </span><span class=\"c-default\"> </span><span class=\"c-hi-blue bg-h-blue\"> seams </span><span class=\"c-default\"> </span><span class=\"c-muted\">2:53</span><span class=\"c-default\"> </span><span class=\"c-ok\">✓</span><span class=\"c-default\"> </span><span class=\"c-default\"> </span><span class=\"c-hi-orange bg-h-orange\"> arm </span><span class=\"c-default\"> </span><span class=\"c-muted\">3:46</span><span class=\"c-default\"> </span><span class=\"c-ok\">✓</span><span class=\"c-default\"> </span><span class=\"c-accent\">›</span><span class=\"c-hi-cyan bg-h-cyan\"> count </span><span class=\"c-default\"> </span><span class=\"c-muted sp sp-braille\"></span><span class=\"c-default\"> </span><span class=\"c-accent\">4:02</span><span class=\"c-default\"> </span><span class=\"c-muted\">   ⌃⇥ switch</span>\n",
-      "contentDigest": "86775b389ff506c9d2694864b0767846c9b41dbaaa9e0ae7a5580413ec2a9010",
-      "text": "calcium/count   verify the refusal count    ✦ qwen3-coder-next  22:19\n  ────────────────────────────────────────────────────────────────────────────\n\n ❯ count the refusals three ways and compare\n\n  ● I'll grep the prose, the register and the roadmap separately.\n\n  ● search(\"refus\") · 1.2s · 1,204 matches\n    ⎿ +1,204 more · ⏎ expand\n\n    cross-checking the register  4m 02s · 46k tok\n  ────────────────────────────────────────────────────── calcium/count ─\n  ❯ ▌\n  ────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ██████████████████████░░  92%  46k/50k   step █████████░ 18/20   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m\n  ⋯   main    seams  2:53 ✓   arm  3:46 ✓ › count   4:02    ⌃⇥ switch",
+      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-hi-cyan bg-h-cyan\"> calcium/count </span><span class=\"c-default\">  verify the refusal count</span><span class=\"c-meta\">    ✦ qwen3-coder-next</span><span class=\"c-muted\">  22:19</span>\n<span class=\"c-muted\">  </span><span class=\"c-h-cyan\">────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default bg-bgElev\"> ❯ count the refusals three ways and compare                                  </span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">  </span><span class=\"c-default\">● </span><span class=\"c-default\">I&#x27;ll grep the prose, the register and the roadmap separately.</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">  </span><span class=\"c-ok\">● </span><span class=\"c-default\">search</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">&quot;refus&quot;</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">1.2s</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">1,204 matches</span>\n<span class=\"c-muted\">    ⎿  </span><span class=\"c-muted\">+1,204 more</span><span class=\"c-muted\"> · </span><span class=\"c-h-cyan\">⏎</span><span class=\"c-muted\"> expand</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">  </span><span class=\"c-h-cyan sp sp-agent\"></span><span class=\"c-default\">  </span><span class=\"c-h-cyan rmp rmp-scatter\"><span style=\"--i:0\">c</span><span style=\"--i:1\">r</span><span style=\"--i:2\">o</span><span style=\"--i:3\">s</span><span style=\"--i:4\">s</span><span style=\"--i:5\">-</span><span style=\"--i:6\">c</span><span style=\"--i:7\">h</span><span style=\"--i:8\">e</span><span style=\"--i:9\">c</span><span style=\"--i:10\">k</span><span style=\"--i:11\">i</span><span style=\"--i:12\">n</span><span style=\"--i:13\">g</span><span style=\"--i:14\"> </span><span style=\"--i:15\">t</span><span style=\"--i:16\">h</span><span style=\"--i:17\">e</span><span style=\"--i:18\"> </span><span style=\"--i:19\">r</span><span style=\"--i:20\">e</span><span style=\"--i:21\">g</span><span style=\"--i:22\">i</span><span style=\"--i:23\">s</span><span style=\"--i:24\">t</span><span style=\"--i:25\">e</span><span style=\"--i:26\">r</span></span><span class=\"c-default\">  </span><span class=\"c-muted\">4m 02s · 46k tok</span>\n<span class=\"c-default\">  </span><span class=\"c-h-cyan\">──────────────────────────────────────────────────────</span><span class=\"c-hi-cyan bg-h-cyan\"> calcium/count </span><span class=\"c-h-cyan\">─</span>\n<span class=\"c-muted\">  ❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-default\">  </span><span class=\"c-h-cyan\">────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">██████</span><span class=\"c-meta\">████</span><span class=\"c-ok\">████████████</span><span class=\"c-muted\">░░</span><span class=\"c-muted\">  92%  46k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\">█████████</span><span class=\"c-muted\">░</span><span class=\"c-muted\"> 18/20</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-muted\">          malachy</span><span class=\"c-muted\">   31m</span>\n<span class=\"c-muted\">  ⋯ </span><span class=\"c-default\"> </span><span class=\"c-dim bg-bgElev\"> main </span><span class=\"c-default\"> </span><span class=\"c-default\"> </span><span class=\"c-hi-blue bg-h-blue\"> seams </span><span class=\"c-default\"> </span><span class=\"c-muted\">2:53</span><span class=\"c-default\"> </span><span class=\"c-ok\">✓</span><span class=\"c-default\"> </span><span class=\"c-default\"> </span><span class=\"c-hi-orange bg-h-orange\"> arm </span><span class=\"c-default\"> </span><span class=\"c-muted\">3:46</span><span class=\"c-default\"> </span><span class=\"c-ok\">✓</span><span class=\"c-default\"> </span><span class=\"c-accent\">›</span><span class=\"c-hi-cyan bg-h-cyan\"> count </span><span class=\"c-default\"> </span><span class=\"c-muted sp sp-braille\"></span><span class=\"c-default\"> </span><span class=\"c-accent\">4:02</span><span class=\"c-default\"> </span><span class=\"c-muted\">   ⌃⇥ switch</span>\n",
+      "contentDigest": "748b3eb315ac29b154966b630412666c3e472082803c8f4cdad96fcf9ebd0446",
+      "text": "calcium/count   verify the refusal count    ✦ qwen3-coder-next  22:19\n  ────────────────────────────────────────────────────────────────────────────\n\n ❯ count the refusals three ways and compare\n\n  ● I'll grep the prose, the register and the roadmap separately.\n\n  ● search(\"refus\") · 1.2s · 1,204 matches\n    ⎿  +1,204 more · ⏎ expand\n\n    cross-checking the register  4m 02s · 46k tok\n  ────────────────────────────────────────────────────── calcium/count ─\n  ❯ ▌\n  ────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ██████████████████████░░  92%  46k/50k   step █████████░ 18/20   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m\n  ⋯   main    seams  2:53 ✓   arm  3:46 ✓ › count   4:02    ⌃⇥ switch",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-949"
+      ],
+      "supersedes": [
         "R-BLK-032"
       ]
     },
@@ -40204,15 +40670,18 @@
       ]
     },
     {
-      "id": "R-BLK-058",
+      "id": "R-BLK-950",
       "sectionKey": "the-queue-009",
       "position": 3,
-      "renderHtml": "\n<span class=\"c-default bg-bgElev\"> ❯ refactor the parser to handle nested quotes                                </span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">● </span><span class=\"c-default\">I&#x27;ll look at the current implementation first.</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">  </span><span class=\"c-accent sp sp-agent\"></span><span class=\"c-default\">  </span><span class=\"c-accent rmp rmp-chase\"><span style=\"--i:0\">e</span><span style=\"--i:1\">d</span><span style=\"--i:2\">i</span><span style=\"--i:3\">t</span><span style=\"--i:4\">i</span><span style=\"--i:5\">n</span><span style=\"--i:6\">g</span><span style=\"--i:7\"> </span><span style=\"--i:8\">p</span><span style=\"--i:9\">a</span><span style=\"--i:10\">r</span><span style=\"--i:11\">s</span><span style=\"--i:12\">e</span><span style=\"--i:13\">.</span><span style=\"--i:14\">t</span><span style=\"--i:15\">s</span></span><span class=\"c-default\">  </span><span class=\"c-muted\">41s · 3.2k tok</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-muted\">todo  4/5  ·  </span><span class=\"c-muted\">◻ </span><span class=\"c-muted\">run the suite</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-muted\">───────────────────────────────</span><span class=\"c-warn\"> 2 queued </span><span class=\"c-muted\">─────────────────────────────────────</span>\n<span class=\"c-dim bg-bgElev\"> ❯ also add a test for escaped quotes                                         </span>\n<span class=\"c-dim bg-bgElev\"> ❯ then run the full suite                                                    </span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">⏎ send   ⌥↑ edit the last   ⌥⌫ drop the last   ⌥⏎ send all now</span>\n",
-      "contentDigest": "4e51a1abcc5540f7d3f07c29ed7793af40fb6e68b11891c2ad9ad20473c6c679",
-      "text": "❯ refactor the parser to handle nested quotes\n\n● I'll look at the current implementation first.\n\n    editing parse.ts  41s · 3.2k tok\n  ⎿ todo  4/5  ·  ◻ run the suite\n\n─────────────────────────────── 2 queued ─────────────────────────────────────\n ❯ also add a test for escaped quotes\n ❯ then run the full suite\n──────────────────────────────────────────────────────────────────────────────\n❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n⏎ send   ⌥↑ edit the last   ⌥⌫ drop the last   ⌥⏎ send all now",
+      "renderHtml": "\n<span class=\"c-default bg-bgElev\"> ❯ refactor the parser to handle nested quotes                                </span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">● </span><span class=\"c-default\">I&#x27;ll look at the current implementation first.</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">  </span><span class=\"c-accent sp sp-agent\"></span><span class=\"c-default\">  </span><span class=\"c-accent rmp rmp-chase\"><span style=\"--i:0\">e</span><span style=\"--i:1\">d</span><span style=\"--i:2\">i</span><span style=\"--i:3\">t</span><span style=\"--i:4\">i</span><span style=\"--i:5\">n</span><span style=\"--i:6\">g</span><span style=\"--i:7\"> </span><span style=\"--i:8\">p</span><span style=\"--i:9\">a</span><span style=\"--i:10\">r</span><span style=\"--i:11\">s</span><span style=\"--i:12\">e</span><span style=\"--i:13\">.</span><span style=\"--i:14\">t</span><span style=\"--i:15\">s</span></span><span class=\"c-default\">  </span><span class=\"c-muted\">41s · 3.2k tok</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-muted\">todo  4/5  ·  </span><span class=\"c-muted\">◻ </span><span class=\"c-muted\">run the suite</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-muted\">───────────────────────────────</span><span class=\"c-warn\"> 2 queued </span><span class=\"c-muted\">─────────────────────────────────────</span>\n<span class=\"c-dim bg-bgElev\"> ❯ also add a test for escaped quotes                                         </span>\n<span class=\"c-dim bg-bgElev\"> ❯ then run the full suite                                                    </span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">⏎ send   ⌥↑ edit the last   ⌥⌫ drop the last   ⌥⏎ send all now</span>\n",
+      "contentDigest": "423af9c9bb6450ebfe4f419662d3f273b189883e410a9e20f656810dcc75a349",
+      "text": "❯ refactor the parser to handle nested quotes\n\n● I'll look at the current implementation first.\n\n    editing parse.ts  41s · 3.2k tok\n  ⎿  todo  4/5  ·  ◻ run the suite\n\n─────────────────────────────── 2 queued ─────────────────────────────────────\n ❯ also add a test for escaped quotes\n ❯ then run the full suite\n──────────────────────────────────────────────────────────────────────────────\n❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n⏎ send   ⌥↑ edit the last   ⌥⌫ drop the last   ⌥⏎ send all now",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-950"
+      ],
+      "supersedes": [
         "R-BLK-058"
       ]
     },
@@ -40412,15 +40881,18 @@
       ]
     },
     {
-      "id": "R-BLK-074",
+      "id": "R-BLK-951",
       "sectionKey": "startup-and-resume-010",
       "position": 8,
-      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-muted\">● </span><span class=\"c-muted\">resumed</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">14 turns</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">2h ago</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">31k tok restored</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-dim\">last: edited parse.ts, ran the suite, 2 failing</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default bg-bgElev\"> ❯ what was failing again?                                                    </span>\n",
-      "contentDigest": "59039df6e5d8af728ec07705d3c7f41b47a347239ba59b684ea63093169afc5d",
-      "text": "● resumed · 14 turns · 2h ago · 31k tok restored\n  ⎿ last: edited parse.ts, ran the suite, 2 failing\n\n ❯ what was failing again?",
+      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-muted\">● </span><span class=\"c-muted\">resumed</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">14 turns</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">2h ago</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">31k tok restored</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-dim\">last: edited parse.ts, ran the suite, 2 failing</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default bg-bgElev\"> ❯ what was failing again?                                                    </span>\n",
+      "contentDigest": "fb13da82e95cd9a85e575d54af6db3d9f0a862092287a1c949b07252cd0c09f1",
+      "text": "● resumed · 14 turns · 2h ago · 31k tok restored\n  ⎿  last: edited parse.ts, ran the suite, 2 failing\n\n ❯ what was failing again?",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-951"
+      ],
+      "supersedes": [
         "R-BLK-074"
       ]
     },
@@ -40620,15 +41092,18 @@
       ]
     },
     {
-      "id": "R-BLK-090",
+      "id": "R-BLK-952",
       "sectionKey": "review-what-auto-wrote-013",
       "position": 3,
-      "renderHtml": "\n<span class=\"c-ok\">● </span><span class=\"c-default\">done</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">4m 12s</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">3 files</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">+124</span><span class=\"c-muted\"> </span><span class=\"c-error\">−18</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-default\">src/interaction/parser/parse.ts    </span><span class=\"c-ok\">+18</span><span class=\"c-muted\"> </span><span class=\"c-error\">−4</span>\n<span class=\"c-muted\">    </span><span class=\"c-default\">src/interaction/parser/tokens.ts   </span><span class=\"c-ok\">+94</span><span class=\"c-muted\"> </span><span class=\"c-error\">−2</span>\n<span class=\"c-muted\">    </span><span class=\"c-default\">test/unit/parser.test.ts           </span><span class=\"c-ok\">+12</span><span class=\"c-muted\"> </span><span class=\"c-error\">−12</span>\n<span class=\"c-muted\">    </span><span class=\"c-accent\">⏎</span><span class=\"c-muted\"> review   </span><span class=\"c-accent\">d</span><span class=\"c-muted\"> full diff   </span><span class=\"c-accent\">↺</span><span class=\"c-muted\"> revert all</span>\n",
-      "contentDigest": "01de96d9107d598340106a6a67d2a5f53754d9ba22223f4836c80af119057435",
-      "text": "● done · 4m 12s · 3 files · +124 −18\n  ⎿ src/interaction/parser/parse.ts    +18 −4\n    src/interaction/parser/tokens.ts   +94 −2\n    test/unit/parser.test.ts           +12 −12\n    ⏎ review   d full diff   ↺ revert all",
+      "renderHtml": "\n<span class=\"c-ok\">● </span><span class=\"c-default\">done</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">4m 12s</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">3 files</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">+124</span><span class=\"c-muted\"> </span><span class=\"c-error\">−18</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-default\">src/interaction/parser/parse.ts    </span><span class=\"c-ok\">+18</span><span class=\"c-muted\"> </span><span class=\"c-error\">−4</span>\n<span class=\"c-muted\">    </span><span class=\"c-default\"> src/interaction/parser/tokens.ts   </span><span class=\"c-ok\">+94</span><span class=\"c-muted\"> </span><span class=\"c-error\">−2</span>\n<span class=\"c-muted\">    </span><span class=\"c-default\"> test/unit/parser.test.ts           </span><span class=\"c-ok\">+12</span><span class=\"c-muted\"> </span><span class=\"c-error\">−12</span>\n<span class=\"c-muted\">    </span><span class=\"c-accent\"> ⏎</span><span class=\"c-muted\"> review   </span><span class=\"c-accent\">d</span><span class=\"c-muted\"> full diff   </span><span class=\"c-accent\">↺</span><span class=\"c-muted\"> revert all</span>\n",
+      "contentDigest": "d8f32d67cccb35e4278b98fedab2d9633033f21b536de558b58d79b2dfa31e8a",
+      "text": "● done · 4m 12s · 3 files · +124 −18\n  ⎿  src/interaction/parser/parse.ts    +18 −4\n     src/interaction/parser/tokens.ts   +94 −2\n     test/unit/parser.test.ts           +12 −12\n     ⏎ review   d full diff   ↺ revert all",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-952"
+      ],
+      "supersedes": [
         "R-BLK-090"
       ]
     },
@@ -41062,15 +41537,18 @@
       ]
     },
     {
-      "id": "R-BLK-125",
+      "id": "R-BLK-953",
       "sectionKey": "focus-the-focus-treatment-follows-the-shape-017",
       "position": 11,
-      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-default bg-focusGround\">▸ ● search(&quot;inQuote&quot;) · 1.2s · 3 files                                    </span>\n<span class=\"c-default\">  </span><span class=\"c-dim bg-focusGround\">    ⎿ parse.ts:41    let inQuote = false;                                 </span>\n<span class=\"c-default\">  </span><span class=\"c-dim bg-focusGround\">      tokens.ts:88   if (inQuote) continue;                               </span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">transcript scope — you have the BLOCK</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-muted bg-bgElev\">▸ ● search(&quot;inQuote&quot;) · 1.2s · 3 files                                    </span>\n<span class=\"c-default\">  </span><span class=\"c-dim bg-bgElev\">    ⎿ parse.ts:41    let inQuote = false;                                 </span>\n<span class=\"c-default\">  </span><span class=\"c-pickInk bold bg-pick\">      tokens.ts:88   if (inQuote) continue;                               </span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">block scope — the entry settles back and the ROW paints</span>\n",
-      "contentDigest": "372c533c67b42be443b44e99f5c002d19b52a55f407b095a0d586bf4325b1a83",
-      "text": "▸ ● search(\"inQuote\") · 1.2s · 3 files\n      ⎿ parse.ts:41    let inQuote = false;\n        tokens.ts:88   if (inQuote) continue;\n  transcript scope — you have the BLOCK\n\n  ▸ ● search(\"inQuote\") · 1.2s · 3 files\n      ⎿ parse.ts:41    let inQuote = false;\n        tokens.ts:88   if (inQuote) continue;\n  block scope — the entry settles back and the ROW paints",
+      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-default bg-focusGround\">▸ ● search(&quot;inQuote&quot;) · 1.2s · 3 files                                    </span>\n<span class=\"c-default\">  </span><span class=\"c-dim bg-focusGround\">    ⎿  parse.ts:41    let inQuote = false;                                </span>\n<span class=\"c-default\">  </span><span class=\"c-dim bg-focusGround\">       tokens.ts:88   if (inQuote) continue;                              </span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">transcript scope — you have the BLOCK</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-muted bg-bgElev\">▸ ● search(&quot;inQuote&quot;) · 1.2s · 3 files                                    </span>\n<span class=\"c-default\">  </span><span class=\"c-dim bg-bgElev\">    ⎿  parse.ts:41    let inQuote = false;                                </span>\n<span class=\"c-default\">  </span><span class=\"c-pickInk bold bg-pick\">       tokens.ts:88   if (inQuote) continue;                              </span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">block scope — the entry settles back and the ROW paints</span>\n",
+      "contentDigest": "98cf74fd39bf3a540daf9fadd0816101de4bbac4f8af50a804cb0e0beef281eb",
+      "text": "▸ ● search(\"inQuote\") · 1.2s · 3 files\n      ⎿  parse.ts:41    let inQuote = false;\n         tokens.ts:88   if (inQuote) continue;\n  transcript scope — you have the BLOCK\n\n  ▸ ● search(\"inQuote\") · 1.2s · 3 files\n      ⎿  parse.ts:41    let inQuote = false;\n         tokens.ts:88   if (inQuote) continue;\n  block scope — the entry settles back and the ROW paints",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-953"
+      ],
+      "supersedes": [
         "R-BLK-125"
       ]
     },
@@ -41413,15 +41891,18 @@
       ]
     },
     {
-      "id": "R-BLK-152",
+      "id": "R-BLK-954",
       "sectionKey": "the-scrollbar-021",
       "position": 2,
-      "renderHtml": "\n<span class=\"c-ok\">  ● </span><span class=\"c-default\">pytest </span><span class=\"c-identifier\">tests/unit</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">4.2s</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">1,204 passed</span><span class=\"c-default\">                        </span>\n<span class=\"c-muted\">    ⎿ </span><span class=\"c-dim\">============== test session starts =========</span><span class=\"c-default\">    </span>\n<span class=\"c-muted\">      </span><span class=\"c-dim\">collected 1204 items</span><span class=\"c-default\">                            </span><span class=\"c-accent\">╽</span>\n<span class=\"c-muted\">      </span><span class=\"c-dim\">tests/unit/plot.py </span><span class=\"c-ok\">........................</span><span class=\"c-default\">   </span><span class=\"c-accent\">┃</span>\n<span class=\"c-muted\">      </span><span class=\"c-dim\">tests/unit/table.py </span><span class=\"c-ok\">......................</span><span class=\"c-default\"> </span><span class=\"c-accent\">┃</span>\n<span class=\"c-muted\">      </span><span class=\"c-dim\">tests/unit/patch.py </span><span class=\"c-ok\">......................</span><span class=\"c-default\">     </span><span class=\"c-accent\">╿</span>\n<span class=\"c-muted\">      </span><span class=\"c-muted\">+1,136 more</span><span class=\"c-default\">                                     </span>\n",
-      "contentDigest": "9360d2dad7986cae43a08d0d8cf8b34b41f52f9516132acee94c901ef0a85b87",
-      "text": "● pytest tests/unit · 4.2s · 1,204 passed\n    ⎿ ============== test session starts =========\n      collected 1204 items                            ╽\n      tests/unit/plot.py ........................   ┃\n      tests/unit/table.py ...................... ┃\n      tests/unit/patch.py ......................     ╿\n      +1,136 more",
+      "renderHtml": "\n<span class=\"c-ok\">  ● </span><span class=\"c-default\">pytest </span><span class=\"c-identifier\">tests/unit</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">4.2s</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">1,204 passed</span><span class=\"c-default\">                        </span>\n<span class=\"c-muted\">    ⎿  </span><span class=\"c-dim\">============== test session starts =========</span><span class=\"c-default\">    </span>\n<span class=\"c-muted\">      </span><span class=\"c-dim\"> collected 1204 items</span><span class=\"c-default\">                            </span><span class=\"c-accent\">╽</span>\n<span class=\"c-muted\">      </span><span class=\"c-dim\"> tests/unit/plot.py </span><span class=\"c-ok\">........................</span><span class=\"c-default\">   </span><span class=\"c-accent\">┃</span>\n<span class=\"c-muted\">      </span><span class=\"c-dim\"> tests/unit/table.py </span><span class=\"c-ok\">......................</span><span class=\"c-default\"> </span><span class=\"c-accent\">┃</span>\n<span class=\"c-muted\">      </span><span class=\"c-dim\"> tests/unit/patch.py </span><span class=\"c-ok\">......................</span><span class=\"c-default\">     </span><span class=\"c-accent\">╿</span>\n<span class=\"c-muted\">      </span><span class=\"c-muted\"> +1,136 more</span><span class=\"c-default\">                                     </span>\n",
+      "contentDigest": "1e900e2af1d0f055548da5b8a3818d82845818ef033fe23cbc4a5c8c44d613ff",
+      "text": "● pytest tests/unit · 4.2s · 1,204 passed\n    ⎿  ============== test session starts =========\n       collected 1204 items                            ╽\n       tests/unit/plot.py ........................   ┃\n       tests/unit/table.py ...................... ┃\n       tests/unit/patch.py ......................     ╿\n       +1,136 more",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-954"
+      ],
+      "supersedes": [
         "R-BLK-152"
       ]
     },
@@ -41686,15 +42167,18 @@
       ]
     },
     {
-      "id": "R-BLK-173",
+      "id": "R-BLK-955",
       "sectionKey": "at-40-columns-023",
       "position": 2,
-      "renderHtml": "\n<span class=\"c-muted\">  calcium      ✦ qwen3     22:13</span>\n<span class=\"c-muted\">  </span><span class=\"c-muted\">──────────────────────────────────────</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default bg-bgElev\">   ❯ refactor the parser              </span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-ok\">● </span><span class=\"c-default\">read_file</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">parse.ts</span><span class=\"c-muted\">)</span>\n<span class=\"c-muted\">    ⎿ </span><span class=\"c-muted\">184 lines</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-accent sp sp-agent\"></span><span class=\"c-default\"> </span><span class=\"c-accent rmp rmp-chase\"><span style=\"--i:0\">e</span><span style=\"--i:1\">d</span><span style=\"--i:2\">i</span><span style=\"--i:3\">t</span><span style=\"--i:4\">i</span><span style=\"--i:5\">n</span><span style=\"--i:6\">g</span></span><span class=\"c-muted\">   41s · 3.2k</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-muted\">4/5  ·  </span><span class=\"c-muted\">◻ run the suite</span>\n<span class=\"c-muted\">  </span><span class=\"c-muted\">──────────────────────────────────────</span>\n<span class=\"c-muted\">  ❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-muted\">  </span><span class=\"c-muted\">──────────────────────────────────────</span>\n<span class=\"c-warn bold\">  » auto</span><span class=\"c-info\">  ███████</span><span class=\"c-muted\">░░░░░</span><span class=\"c-muted\">  ctx 62% · step 4/10</span>\n",
-      "contentDigest": "ee6728b61f46c805ab05c6a97a094c6845cbb0c884045f86f52c6e4fa1f528fc",
-      "text": "calcium      ✦ qwen3     22:13\n  ──────────────────────────────────────\n\n   ❯ refactor the parser\n\n  ● read_file(parse.ts)\n    ⎿ 184 lines\n\n   editing   41s · 3.2k\n  ⎿ 4/5  ·  ◻ run the suite\n  ──────────────────────────────────────\n  ❯ ▌\n  ──────────────────────────────────────\n  » auto  ███████░░░░░  ctx 62% · step 4/10",
+      "renderHtml": "\n<span class=\"c-muted\">  calcium      ✦ qwen3     22:13</span>\n<span class=\"c-muted\">  </span><span class=\"c-muted\">──────────────────────────────────────</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default bg-bgElev\">   ❯ refactor the parser              </span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-ok\">● </span><span class=\"c-default\">read_file</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">parse.ts</span><span class=\"c-muted\">)</span>\n<span class=\"c-muted\">    ⎿  </span><span class=\"c-muted\">184 lines</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-accent sp sp-agent\"></span><span class=\"c-default\"> </span><span class=\"c-accent rmp rmp-chase\"><span style=\"--i:0\">e</span><span style=\"--i:1\">d</span><span style=\"--i:2\">i</span><span style=\"--i:3\">t</span><span style=\"--i:4\">i</span><span style=\"--i:5\">n</span><span style=\"--i:6\">g</span></span><span class=\"c-muted\">   41s · 3.2k</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-muted\">4/5  ·  </span><span class=\"c-muted\">◻ run the suite</span>\n<span class=\"c-muted\">  </span><span class=\"c-muted\">──────────────────────────────────────</span>\n<span class=\"c-muted\">  ❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-muted\">  </span><span class=\"c-muted\">──────────────────────────────────────</span>\n<span class=\"c-warn bold\">  » auto</span><span class=\"c-info\">  ███████</span><span class=\"c-muted\">░░░░░</span><span class=\"c-muted\">  ctx 62% · step 4/10</span>\n",
+      "contentDigest": "c18e6db65aad782546515ba131fbfee28cebf6b7a22c89767a78dcf3f4e6c722",
+      "text": "calcium      ✦ qwen3     22:13\n  ──────────────────────────────────────\n\n   ❯ refactor the parser\n\n  ● read_file(parse.ts)\n    ⎿  184 lines\n\n   editing   41s · 3.2k\n  ⎿  4/5  ·  ◻ run the suite\n  ──────────────────────────────────────\n  ❯ ▌\n  ──────────────────────────────────────\n  » auto  ███████░░░░░  ctx 62% · step 4/10",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-955"
+      ],
+      "supersedes": [
         "R-BLK-173"
       ]
     },
@@ -42882,15 +43366,18 @@
       ]
     },
     {
-      "id": "R-BLK-265",
+      "id": "R-BLK-956",
       "sectionKey": "the-operation-and-budget-presets-036",
       "position": 21,
-      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-muted\">● </span><span class=\"c-muted\">compacting</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">2m 10s</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">cancelled</span><span class=\"c-default\">   </span><span class=\"c-muted\">nothing was summarised</span>\n<span class=\"c-default\">  </span><span class=\"c-error\">● </span><span class=\"c-default\">compacting</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">2m 10s</span><span class=\"c-muted\"> · </span><span class=\"c-error\">failed</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-error\">✗ </span><span class=\"c-error\">the summariser returned no content</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">muted for cancelled, error for failed — and in both the bar goes,</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">because a stopped bar is a claim about progress that is not being</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">made any more.</span>\n",
-      "contentDigest": "e18e046da79c855e1f3c3465469efb69a012d33ae0e4e7f5b8712bfd471a98ed",
-      "text": "● compacting · 2m 10s · cancelled   nothing was summarised\n  ● compacting · 2m 10s · failed\n  ⎿ ✗ the summariser returned no content\n  muted for cancelled, error for failed — and in both the bar goes,\n  because a stopped bar is a claim about progress that is not being\n  made any more.",
+      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-muted\">● </span><span class=\"c-muted\">compacting</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">2m 10s</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">cancelled</span><span class=\"c-default\">   </span><span class=\"c-muted\">nothing was summarised</span>\n<span class=\"c-default\">  </span><span class=\"c-error\">● </span><span class=\"c-default\">compacting</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">2m 10s</span><span class=\"c-muted\"> · </span><span class=\"c-error\">failed</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-error\">✗ </span><span class=\"c-error\">the summariser returned no content</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">muted for cancelled, error for failed — and in both the bar goes,</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">because a stopped bar is a claim about progress that is not being</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">made any more.</span>\n",
+      "contentDigest": "7f0f8c8feefd53a34b75af84e5cf2ac036d2ca24f180fd9ca5c8c02d18b728e3",
+      "text": "● compacting · 2m 10s · cancelled   nothing was summarised\n  ● compacting · 2m 10s · failed\n  ⎿  ✗ the summariser returned no content\n  muted for cancelled, error for failed — and in both the bar goes,\n  because a stopped bar is a claim about progress that is not being\n  made any more.",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-956"
+      ],
+      "supersedes": [
         "R-BLK-265"
       ]
     },
@@ -43483,15 +43970,18 @@
       ]
     },
     {
-      "id": "R-BLK-311",
+      "id": "R-BLK-957",
       "sectionKey": "the-live-terminal-block-045",
       "position": 2,
-      "renderHtml": "\n<span class=\"c-ok\">● </span><span class=\"c-default\">pytest </span><span class=\"c-identifier\">tests/</span><span class=\"c-muted\"> · </span><span class=\"c-muted sp sp-braille\"></span><span class=\"c-muted\"> 12s</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-dim\">============== test session starts ==============</span>\n<span class=\"c-muted\">    </span><span class=\"c-dim\">collected 1204 items</span>\n<span class=\"c-muted\">    </span><span class=\"c-dim\">tests/unit/plot.py </span><span class=\"c-ok\">........................</span><span class=\"c-dim\">      [ 12%]</span>\n<span class=\"c-muted\">    </span><span class=\"c-dim\">tests/unit/table.py </span><span class=\"c-ok\">..........</span><span class=\"c-error\">F</span><span class=\"c-ok\">............</span><span class=\"c-dim\">    [ 31%]</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\">+1,157 more</span><span class=\"c-muted\"> · </span><span class=\"c-accent\">⏎</span><span class=\"c-muted\"> attach   </span><span class=\"c-accent\">⌃c</span><span class=\"c-muted\"> cancel</span>\n",
-      "contentDigest": "aa0b8d336b5c6a40144339483e4032a34f1580450a994204f8d2d12cf2276d23",
-      "text": "● pytest tests/ ·  12s\n  ⎿ ============== test session starts ==============\n    collected 1204 items\n    tests/unit/plot.py ........................      [ 12%]\n    tests/unit/table.py ..........F............    [ 31%]\n    +1,157 more · ⏎ attach   ⌃c cancel",
+      "renderHtml": "\n<span class=\"c-ok\">● </span><span class=\"c-default\">pytest </span><span class=\"c-identifier\">tests/</span><span class=\"c-muted\"> · </span><span class=\"c-muted sp sp-braille\"></span><span class=\"c-muted\"> 12s</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-dim\">============== test session starts ==============</span>\n<span class=\"c-muted\">    </span><span class=\"c-dim\"> collected 1204 items</span>\n<span class=\"c-muted\">    </span><span class=\"c-dim\"> tests/unit/plot.py </span><span class=\"c-ok\">........................</span><span class=\"c-dim\">      [ 12%]</span>\n<span class=\"c-muted\">    </span><span class=\"c-dim\"> tests/unit/table.py </span><span class=\"c-ok\">..........</span><span class=\"c-error\">F</span><span class=\"c-ok\">............</span><span class=\"c-dim\">    [ 31%]</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\"> +1,157 more</span><span class=\"c-muted\"> · </span><span class=\"c-accent\">⏎</span><span class=\"c-muted\"> attach   </span><span class=\"c-accent\">⌃c</span><span class=\"c-muted\"> cancel</span>\n",
+      "contentDigest": "bc606c86d9f8f3a00378a1fb412c23c8bbc680fcb87f755ef8d04732770a03fa",
+      "text": "● pytest tests/ ·  12s\n  ⎿  ============== test session starts ==============\n     collected 1204 items\n     tests/unit/plot.py ........................      [ 12%]\n     tests/unit/table.py ..........F............    [ 31%]\n     +1,157 more · ⏎ attach   ⌃c cancel",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-957"
+      ],
+      "supersedes": [
         "R-BLK-311"
       ]
     },
@@ -43860,41 +44350,50 @@
       ]
     },
     {
-      "id": "R-BLK-340",
+      "id": "R-BLK-958",
       "sectionKey": "the-tool-result-gallery-050",
       "position": 4,
-      "renderHtml": "\n<span class=\"c-ok\">● </span><span class=\"c-default\">run_command</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">npm test</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">4.1s</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">exit 0</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-dim\">118 passed, 2 todo</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\">+1,204 more</span><span class=\"c-muted\"> · </span><span class=\"c-accent\">⏎</span><span class=\"c-muted\"> expand</span>\n",
-      "contentDigest": "8fc8698e7af6368281342154bc67e6a7ba89b7def2a5f045cd65698b7ff5f85b",
-      "text": "● run_command(npm test) · 4.1s · exit 0\n  ⎿ 118 passed, 2 todo\n    +1,204 more · ⏎ expand",
+      "renderHtml": "\n<span class=\"c-ok\">● </span><span class=\"c-default\">run_command</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">npm test</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">4.1s</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">exit 0</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-dim\">118 passed, 2 todo</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\"> +1,204 more</span><span class=\"c-muted\"> · </span><span class=\"c-accent\">⏎</span><span class=\"c-muted\"> expand</span>\n",
+      "contentDigest": "980dd2256badf6569216d9bb09f40e490d402027dd7ca06fe3624a160dcc04a9",
+      "text": "● run_command(npm test) · 4.1s · exit 0\n  ⎿  118 passed, 2 todo\n     +1,204 more · ⏎ expand",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-958"
+      ],
+      "supersedes": [
         "R-BLK-340"
       ]
     },
     {
-      "id": "R-BLK-341",
+      "id": "R-BLK-959",
       "sectionKey": "the-tool-result-gallery-050",
       "position": 5,
-      "renderHtml": "\n<span class=\"c-ok\">● </span><span class=\"c-default\">read_image</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">loss-curve.png</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">512×384</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-dim\">⣿⣿⣷⣤⣄⡀  ⢀⣠⣤⣶⣿⣿⣿⣷⣤⣀</span>\n<span class=\"c-muted\">    </span><span class=\"c-dim\">⣿⣿⣿⣿⣿⣿⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿</span>\n",
-      "contentDigest": "7e9d3adeb881f7cd87e177d81d5d67a2d7aa7cd95178271ae0bf743a31f58f1d",
-      "text": "● read_image(loss-curve.png) · 512×384\n  ⎿ ⣿⣿⣷⣤⣄⡀  ⢀⣠⣤⣶⣿⣿⣿⣷⣤⣀\n    ⣿⣿⣿⣿⣿⣿⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿",
+      "renderHtml": "\n<span class=\"c-ok\">● </span><span class=\"c-default\">read_image</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">loss-curve.png</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">512×384</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-dim\">⣿⣿⣷⣤⣄⡀  ⢀⣠⣤⣶⣿⣿⣿⣷⣤⣀</span>\n<span class=\"c-muted\">    </span><span class=\"c-dim\"> ⣿⣿⣿⣿⣿⣿⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿</span>\n",
+      "contentDigest": "9dd8863429506c1f00779f1d787294e1f88678691c63303083eb7ac30b897472",
+      "text": "● read_image(loss-curve.png) · 512×384\n  ⎿  ⣿⣿⣷⣤⣄⡀  ⢀⣠⣤⣶⣿⣿⣿⣷⣤⣀\n     ⣿⣿⣿⣿⣿⣿⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-959"
+      ],
+      "supersedes": [
         "R-BLK-341"
       ]
     },
     {
-      "id": "R-BLK-342",
+      "id": "R-BLK-960",
       "sectionKey": "the-tool-result-gallery-050",
       "position": 6,
-      "renderHtml": "\n<span class=\"c-ok\">● </span><span class=\"c-default\">query</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">select p50, p99 from latency</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">2 metrics</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-muted\">p50 </span><span class=\"c-accent\">▓▓▓▓▓▓▓▓</span><span class=\"c-muted\">░░░░</span><span class=\"c-default\"> 18ms</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\">p99 </span><span class=\"c-warn\">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class=\"c-muted\">░░</span><span class=\"c-default\"> 290ms</span>\n",
-      "contentDigest": "54f9a89f05b8c1e9185f14dfaacb9cdc8a39a5f5715f07c60c96bc05652dd032",
-      "text": "● query(select p50, p99 from latency) · 2 metrics\n  ⎿ p50 ▓▓▓▓▓▓▓▓░░░░ 18ms\n    p99 ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 290ms",
+      "renderHtml": "\n<span class=\"c-ok\">● </span><span class=\"c-default\">query</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">select p50, p99 from latency</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">2 metrics</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-muted\">p50 </span><span class=\"c-accent\">▓▓▓▓▓▓▓▓</span><span class=\"c-muted\">░░░░</span><span class=\"c-default\"> 18ms</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\"> p99 </span><span class=\"c-warn\">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class=\"c-muted\">░░</span><span class=\"c-default\"> 290ms</span>\n",
+      "contentDigest": "1c79c7ae8f01d843fe9ac7f2037c90bd8b6cb1f8db1bfeeb0d73abaa01252c27",
+      "text": "● query(select p50, p99 from latency) · 2 metrics\n  ⎿  p50 ▓▓▓▓▓▓▓▓░░░░ 18ms\n     p99 ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 290ms",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-960"
+      ],
+      "supersedes": [
         "R-BLK-342"
       ]
     },
@@ -44916,15 +45415,18 @@
       ]
     },
     {
-      "id": "R-BLK-421",
+      "id": "R-BLK-961",
       "sectionKey": "find-059",
       "position": 4,
-      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-default\">● </span><span class=\"c-default\">The depth counter replaces </span><span class=\"c-default bold ul bg-match\">inQuote</span><span class=\"c-default\"> here.</span>\n<span class=\"c-default\">  </span><span class=\"c-ok\">● </span><span class=\"c-default\">search</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">&quot;</span><span class=\"c-identifier bold ul bg-focusGround focus-indicator\">inQuote</span><span class=\"c-identifier\">&quot;</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">3 files</span><span class=\"c-default\">   </span><span class=\"c-muted\">← the current one</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">  ⎿ </span><span class=\"c-dim\">parse.ts:41  let </span><span class=\"c-dim bold ul bg-match\">inQuote</span><span class=\"c-dim\"> = false;</span>\n",
-      "contentDigest": "5b351f2bbdfb086bc8ecf343b7092e75b176c9599dd14cc5b68baac40440acc4",
-      "text": "● The depth counter replaces inQuote here.\n  ● search(\"inQuote\") · 3 files   ← the current one\n    ⎿ parse.ts:41  let inQuote = false;",
+      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-default\">● </span><span class=\"c-default\">The depth counter replaces </span><span class=\"c-default bold ul bg-match\">inQuote</span><span class=\"c-default\"> here.</span>\n<span class=\"c-default\">  </span><span class=\"c-ok\">● </span><span class=\"c-default\">search</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">&quot;</span><span class=\"c-identifier bold ul bg-focusGround focus-indicator\">inQuote</span><span class=\"c-identifier\">&quot;</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">3 files</span><span class=\"c-default\">   </span><span class=\"c-muted\">← the current one</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">  ⎿  </span><span class=\"c-dim\">parse.ts:41  let </span><span class=\"c-dim bold ul bg-match\">inQuote</span><span class=\"c-dim\"> = false;</span>\n",
+      "contentDigest": "b1f9866159e271e456530e7d6d337f4d6e81693c808bb01a5aefe3ebc67ccafd",
+      "text": "● The depth counter replaces inQuote here.\n  ● search(\"inQuote\") · 3 files   ← the current one\n    ⎿  parse.ts:41  let inQuote = false;",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-961"
+      ],
+      "supersedes": [
         "R-BLK-421"
       ]
     },
@@ -45449,15 +45951,18 @@
       ]
     },
     {
-      "id": "R-BLK-462",
+      "id": "R-BLK-962",
       "sectionKey": "undo-064",
       "position": 2,
-      "renderHtml": "\n<span class=\"c-ok\">● </span><span class=\"c-default\">edit</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">parse.ts</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">0.3s</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">+2 −2</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-muted\">● </span><span class=\"c-muted\">reverted</span><span class=\"c-muted\"> · </span><span class=\"c-identifier\">parse.ts</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">+2 −2 undone</span><span class=\"c-default\">   </span><span class=\"c-accent\">↺</span><span class=\"c-muted\"> redo</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-dim\">the file is back to what it was before the edit above</span>\n",
-      "contentDigest": "78edb17d544c825d8166a8078d07c946a745552805afb11522d9751b9e7f0de2",
-      "text": "● edit(parse.ts) · 0.3s · +2 −2\n\n● reverted · parse.ts · +2 −2 undone   ↺ redo\n  ⎿ the file is back to what it was before the edit above",
+      "renderHtml": "\n<span class=\"c-ok\">● </span><span class=\"c-default\">edit</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">parse.ts</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">0.3s</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">+2 −2</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-muted\">● </span><span class=\"c-muted\">reverted</span><span class=\"c-muted\"> · </span><span class=\"c-identifier\">parse.ts</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">+2 −2 undone</span><span class=\"c-default\">   </span><span class=\"c-accent\">↺</span><span class=\"c-muted\"> redo</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-dim\">the file is back to what it was before the edit above</span>\n",
+      "contentDigest": "301bbe6989491d377c2afd2a9293721ef5ae0b6f645fd59c5a5380ec24ef0586",
+      "text": "● edit(parse.ts) · 0.3s · +2 −2\n\n● reverted · parse.ts · +2 −2 undone   ↺ redo\n  ⎿  the file is back to what it was before the edit above",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-962"
+      ],
+      "supersedes": [
         "R-BLK-462"
       ]
     },
@@ -45579,15 +46084,18 @@
       ]
     },
     {
-      "id": "R-BLK-472",
+      "id": "R-BLK-963",
       "sectionKey": "compaction-which-turns-go-065",
       "position": 6,
-      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-accent sp sp-fullramp\"></span><span class=\"c-default\"> </span><span class=\"c-accent rmp rmp-chase\"><span style=\"--i:0\">c</span><span style=\"--i:1\">o</span><span style=\"--i:2\">m</span><span style=\"--i:3\">p</span><span style=\"--i:4\">a</span><span style=\"--i:5\">c</span><span style=\"--i:6\">t</span><span style=\"--i:7\">i</span><span style=\"--i:8\">n</span><span style=\"--i:9\">g</span></span><span class=\"c-default\">   </span><span class=\"c-accent rmp rmp-shimmer\"><span style=\"--i:0\">▰</span><span style=\"--i:1\">▰</span><span style=\"--i:2\">▰</span><span style=\"--i:3\">▰</span><span style=\"--i:4\">▰</span><span style=\"--i:5\">▰</span><span style=\"--i:6\">▰</span><span style=\"--i:7\">▰</span><span style=\"--i:8\">▰</span><span style=\"--i:9\">▰</span><span style=\"--i:10\">▰</span><span style=\"--i:11\">▰</span><span style=\"--i:12\">▰</span><span style=\"--i:13\">▰</span></span><span class=\"c-muted\">▱▱▱▱▱▱▱▱▱▱</span><span class=\"c-muted\">  3 of 5 turns</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">● </span><span class=\"c-muted\">3 turns compacted</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">10.7k → 0.9k tok</span><span class=\"c-muted\"> · </span><span class=\"c-accent\">⏎</span><span class=\"c-muted\"> read the summary</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-dim\">read construct.ts, searched for elementsIn, discussed the span</span>\n<span class=\"c-muted\">    </span><span class=\"c-dim\">prerequisite. No edits were made.</span>\n",
-      "contentDigest": "f27f7e93d42c0bb9d9f8d76fa4dbb6eb639dd87c73ec8d4c16a2c1d93df7a413",
-      "text": "compacting   ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱  3 of 5 turns\n\n  ● 3 turns compacted · 10.7k → 0.9k tok · ⏎ read the summary\n  ⎿ read construct.ts, searched for elementsIn, discussed the span\n    prerequisite. No edits were made.",
+      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-accent sp sp-fullramp\"></span><span class=\"c-default\"> </span><span class=\"c-accent rmp rmp-chase\"><span style=\"--i:0\">c</span><span style=\"--i:1\">o</span><span style=\"--i:2\">m</span><span style=\"--i:3\">p</span><span style=\"--i:4\">a</span><span style=\"--i:5\">c</span><span style=\"--i:6\">t</span><span style=\"--i:7\">i</span><span style=\"--i:8\">n</span><span style=\"--i:9\">g</span></span><span class=\"c-default\">   </span><span class=\"c-accent rmp rmp-shimmer\"><span style=\"--i:0\">▰</span><span style=\"--i:1\">▰</span><span style=\"--i:2\">▰</span><span style=\"--i:3\">▰</span><span style=\"--i:4\">▰</span><span style=\"--i:5\">▰</span><span style=\"--i:6\">▰</span><span style=\"--i:7\">▰</span><span style=\"--i:8\">▰</span><span style=\"--i:9\">▰</span><span style=\"--i:10\">▰</span><span style=\"--i:11\">▰</span><span style=\"--i:12\">▰</span><span style=\"--i:13\">▰</span></span><span class=\"c-muted\">▱▱▱▱▱▱▱▱▱▱</span><span class=\"c-muted\">  3 of 5 turns</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">● </span><span class=\"c-muted\">3 turns compacted</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">10.7k → 0.9k tok</span><span class=\"c-muted\"> · </span><span class=\"c-accent\">⏎</span><span class=\"c-muted\"> read the summary</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-dim\">read construct.ts, searched for elementsIn, discussed the span</span>\n<span class=\"c-muted\">    </span><span class=\"c-dim\"> prerequisite. No edits were made.</span>\n",
+      "contentDigest": "44e38bb90ecdf0a9cb4ff7bdcf0ae2aaa23785b37f3a7a15a9675e3373ffd101",
+      "text": "compacting   ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱  3 of 5 turns\n\n  ● 3 turns compacted · 10.7k → 0.9k tok · ⏎ read the summary\n  ⎿  read construct.ts, searched for elementsIn, discussed the span\n     prerequisite. No edits were made.",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-963"
+      ],
+      "supersedes": [
         "R-BLK-472"
       ]
     },
@@ -45618,15 +46126,18 @@
       ]
     },
     {
-      "id": "R-BLK-475",
+      "id": "R-BLK-964",
       "sectionKey": "tool-failures-against-model-failures-066",
       "position": 2,
-      "renderHtml": "\n<span class=\"c-muted\">a TOOL failure is a result — it hangs under its own call and the turn goes on</span>\n<span class=\"c-default\">  </span><span class=\"c-error\">● </span><span class=\"c-default\">read_file</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">missing.ts</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">0.1s</span><span class=\"c-muted\"> · </span><span class=\"c-error\">failed</span>\n<span class=\"c-muted\">    ⎿ </span><span class=\"c-error\">✗ </span><span class=\"c-error\">ENOENT: no such file</span>\n<span class=\"c-default\">  </span><span class=\"c-default\">● </span><span class=\"c-default\">I&#x27;ll check the directory listing instead.</span><span class=\"c-default\">     </span><span class=\"c-muted\">← the turn continues</span>\n",
-      "contentDigest": "3d3398a0a1a9a5f192b85975989c0340f48cca88c4343aadeb0f75614449cf1a",
-      "text": "a TOOL failure is a result — it hangs under its own call and the turn goes on\n  ● read_file(missing.ts) · 0.1s · failed\n    ⎿ ✗ ENOENT: no such file\n  ● I'll check the directory listing instead.     ← the turn continues",
+      "renderHtml": "\n<span class=\"c-muted\">a TOOL failure is a result — it hangs under its own call and the turn goes on</span>\n<span class=\"c-default\">  </span><span class=\"c-error\">● </span><span class=\"c-default\">read_file</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">missing.ts</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">0.1s</span><span class=\"c-muted\"> · </span><span class=\"c-error\">failed</span>\n<span class=\"c-muted\">    ⎿  </span><span class=\"c-error\">✗ </span><span class=\"c-error\">ENOENT: no such file</span>\n<span class=\"c-default\">  </span><span class=\"c-default\">● </span><span class=\"c-default\">I&#x27;ll check the directory listing instead.</span><span class=\"c-default\">     </span><span class=\"c-muted\">← the turn continues</span>\n",
+      "contentDigest": "9cdb4c4acff18baa34afdef32d679aae961dc00d9f8f9ee7a8ae4e75bc375115",
+      "text": "a TOOL failure is a result — it hangs under its own call and the turn goes on\n  ● read_file(missing.ts) · 0.1s · failed\n    ⎿  ✗ ENOENT: no such file\n  ● I'll check the directory listing instead.     ← the turn continues",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-964"
+      ],
+      "supersedes": [
         "R-BLK-475"
       ]
     },
@@ -45735,15 +46246,18 @@
       ]
     },
     {
-      "id": "R-BLK-484",
+      "id": "R-BLK-965",
       "sectionKey": "scrolled-back-while-a-turn-runs-067",
       "position": 4,
-      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-accent sp sp-agent\"></span><span class=\"c-default\">  </span><span class=\"c-accent rmp rmp-chase\"><span style=\"--i:0\">e</span><span style=\"--i:1\">d</span><span style=\"--i:2\">i</span><span style=\"--i:3\">t</span><span style=\"--i:4\">i</span><span style=\"--i:5\">n</span><span style=\"--i:6\">g</span><span style=\"--i:7\"> </span><span style=\"--i:8\">p</span><span style=\"--i:9\">a</span><span style=\"--i:10\">r</span><span style=\"--i:11\">s</span><span style=\"--i:12\">e</span><span style=\"--i:13\">.</span><span style=\"--i:14\">t</span><span style=\"--i:15\">s</span></span><span class=\"c-default\">  </span><span class=\"c-muted\">41s · 3.2k tok</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-muted\">todo  4/5  ·  </span><span class=\"c-muted\">◻ </span><span class=\"c-muted\">run the suite</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">  </span><span class=\"c-default bg-bgElev\"> ↓ 3 new messages </span><span class=\"c-muted bg-bgElev\">⏎ </span><span class=\"c-default\"> </span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">  ❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">██████</span><span class=\"c-meta\">████</span><span class=\"c-ok\">█████████</span><span class=\"c-muted\">░░░░░</span><span class=\"c-muted\">  78%  39k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\">███████</span><span class=\"c-muted\">░░░</span><span class=\"c-muted\"> 7/10</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-muted\">          malachy</span><span class=\"c-muted\">   31m</span>\n",
-      "contentDigest": "a8f8ed43468942ac3cca86389e31cde9bd20c524bc656d6aed6493c3f1bfb142",
-      "text": "editing parse.ts  41s · 3.2k tok\n  ⎿ todo  4/5  ·  ◻ run the suite\n\n   ↓ 3 new messages ⏎\n──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ███████████████████░░░░░  78%  39k/50k   step ███████░░░ 7/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m",
+      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-accent sp sp-agent\"></span><span class=\"c-default\">  </span><span class=\"c-accent rmp rmp-chase\"><span style=\"--i:0\">e</span><span style=\"--i:1\">d</span><span style=\"--i:2\">i</span><span style=\"--i:3\">t</span><span style=\"--i:4\">i</span><span style=\"--i:5\">n</span><span style=\"--i:6\">g</span><span style=\"--i:7\"> </span><span style=\"--i:8\">p</span><span style=\"--i:9\">a</span><span style=\"--i:10\">r</span><span style=\"--i:11\">s</span><span style=\"--i:12\">e</span><span style=\"--i:13\">.</span><span style=\"--i:14\">t</span><span style=\"--i:15\">s</span></span><span class=\"c-default\">  </span><span class=\"c-muted\">41s · 3.2k tok</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-muted\">todo  4/5  ·  </span><span class=\"c-muted\">◻ </span><span class=\"c-muted\">run the suite</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">  </span><span class=\"c-default bg-bgElev\"> ↓ 3 new messages </span><span class=\"c-muted bg-bgElev\">⏎ </span><span class=\"c-default\"> </span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">  ❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">██████</span><span class=\"c-meta\">████</span><span class=\"c-ok\">█████████</span><span class=\"c-muted\">░░░░░</span><span class=\"c-muted\">  78%  39k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\">███████</span><span class=\"c-muted\">░░░</span><span class=\"c-muted\"> 7/10</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-muted\">          malachy</span><span class=\"c-muted\">   31m</span>\n",
+      "contentDigest": "3cf432708c75fe67154f40225bafcf0043264ffcd9e38b6fd31a604df460ad19",
+      "text": "editing parse.ts  41s · 3.2k tok\n  ⎿  todo  4/5  ·  ◻ run the suite\n\n   ↓ 3 new messages ⏎\n──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ███████████████████░░░░░  78%  39k/50k   step ███████░░░ 7/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-965"
+      ],
+      "supersedes": [
         "R-BLK-484"
       ]
     },
@@ -45969,28 +46483,34 @@
       ]
     },
     {
-      "id": "R-BLK-934",
+      "id": "R-BLK-966",
       "sectionKey": "degradation-one-exchange-three-rungs-068",
       "position": 2,
-      "renderHtml": "\n<span class=\"c-muted\">24-bit</span>\n<span class=\"c-default\">  </span><span class=\"c-default\">● </span><span class=\"c-default\">I&#x27;ll check the parser first.</span>\n<span class=\"c-default\">  </span><span class=\"c-ok\">● </span><span class=\"c-default\">read_file</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">parse.ts</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">0.2s</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">184 lines</span>\n<span class=\"c-muted\">    ⎿ </span><span class=\"c-meta\">let </span><span class=\"c-identifier\">inQuote</span><span class=\"c-default\"> = </span><span class=\"c-warn\">false</span><span class=\"c-default\">;</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">▹ </span><span class=\"c-muted\">thinking · 4s</span>\n",
-      "contentDigest": "cb79954bbf42f515f42734539f29c98a01dd4014f862cb767ed527ed17791a7b",
-      "text": "24-bit\n  ● I'll check the parser first.\n  ● read_file(parse.ts) · 0.2s · 184 lines\n    ⎿ let inQuote = false;\n  ▹ thinking · 4s",
+      "renderHtml": "\n<span class=\"c-muted\">24-bit</span>\n<span class=\"c-default\">  </span><span class=\"c-default\">● </span><span class=\"c-default\">I&#x27;ll check the parser first.</span>\n<span class=\"c-default\">  </span><span class=\"c-ok\">● </span><span class=\"c-default\">read_file</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">parse.ts</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">0.2s</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">184 lines</span>\n<span class=\"c-muted\">    ⎿  </span><span class=\"c-meta\">let </span><span class=\"c-identifier\">inQuote</span><span class=\"c-default\"> = </span><span class=\"c-warn\">false</span><span class=\"c-default\">;</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">▹ </span><span class=\"c-muted\">thinking · 4s</span>\n",
+      "contentDigest": "3a17b7356b53f76382f5b0c8fdfeb97236337387759ef907a337629e3f11d844",
+      "text": "24-bit\n  ● I'll check the parser first.\n  ● read_file(parse.ts) · 0.2s · 184 lines\n    ⎿  let inQuote = false;\n  ▹ thinking · 4s",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-966"
+      ],
+      "supersedes": [
         "R-BLK-934"
       ]
     },
     {
-      "id": "R-BLK-935",
+      "id": "R-BLK-967",
       "sectionKey": "degradation-one-exchange-three-rungs-068",
       "position": 3,
-      "renderHtml": "\n<span class=\"c-muted\">1-bit — tone becomes weight, and the marks are unchanged</span>\n<span class=\"c-default\">  </span><span class=\"c-default\">● </span><span class=\"c-default\">I&#x27;ll check the parser first.</span>\n<span class=\"c-default\">  </span><span class=\"c-default\">● </span><span class=\"c-default\">read_file</span><span class=\"c-default\">(</span><span class=\"c-default bold\">parse.ts</span><span class=\"c-default\">)</span><span class=\"c-default\"> · </span><span class=\"c-default\">0.2s</span><span class=\"c-default\"> · </span><span class=\"c-default bold\">184 lines</span>\n<span class=\"c-default\">    ⎿ </span><span class=\"c-default bold\">let </span><span class=\"c-default\">inQuote</span><span class=\"c-default\"> = </span><span class=\"c-default\">false</span><span class=\"c-default\">;</span>\n<span class=\"c-default\">  </span><span class=\"c-default\">▹ </span><span class=\"c-default\">thinking · 4s</span>\n",
-      "contentDigest": "1e662540387d9db240a2d203546e1de442be3c6c34ec45cfa4f76fa653f29c2c",
-      "text": "1-bit — tone becomes weight, and the marks are unchanged\n  ● I'll check the parser first.\n  ● read_file(parse.ts) · 0.2s · 184 lines\n    ⎿ let inQuote = false;\n  ▹ thinking · 4s",
+      "renderHtml": "\n<span class=\"c-muted\">1-bit — tone becomes weight, and the marks are unchanged</span>\n<span class=\"c-default\">  </span><span class=\"c-default\">● </span><span class=\"c-default\">I&#x27;ll check the parser first.</span>\n<span class=\"c-default\">  </span><span class=\"c-default\">● </span><span class=\"c-default\">read_file</span><span class=\"c-default\">(</span><span class=\"c-default bold\">parse.ts</span><span class=\"c-default\">)</span><span class=\"c-default\"> · </span><span class=\"c-default\">0.2s</span><span class=\"c-default\"> · </span><span class=\"c-default bold\">184 lines</span>\n<span class=\"c-default\">    ⎿  </span><span class=\"c-default bold\">let </span><span class=\"c-default\">inQuote</span><span class=\"c-default\"> = </span><span class=\"c-default\">false</span><span class=\"c-default\">;</span>\n<span class=\"c-default\">  </span><span class=\"c-default\">▹ </span><span class=\"c-default\">thinking · 4s</span>\n",
+      "contentDigest": "14b414c353c33ad9357db6e045dba9baa87b295b597f0c29a5970bb35691265f",
+      "text": "1-bit — tone becomes weight, and the marks are unchanged\n  ● I'll check the parser first.\n  ● read_file(parse.ts) · 0.2s · 184 lines\n    ⎿  let inQuote = false;\n  ▹ thinking · 4s",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-967"
+      ],
+      "supersedes": [
         "R-BLK-935"
       ]
     },
@@ -47945,15 +48465,18 @@
       ]
     },
     {
-      "id": "R-BLK-654",
+      "id": "R-BLK-968",
       "sectionKey": "prism-submit-083",
       "position": 2,
-      "renderHtml": "\n<span class=\"c-default bg-bgElev\"> ❯ /submit fmx_models.jobs.training:job                                       </span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">● </span><span class=\"c-default\">submit</span><span class=\"c-muted\"> · </span><span class=\"c-muted sp sp-braille\"></span><span class=\"c-muted\"> 4s</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-ok\">✓ </span><span class=\"c-default\">clean working tree</span><span class=\"c-default\">              </span><span class=\"c-muted\">HEAD a3f9b21</span>\n<span class=\"c-muted\">    </span><span class=\"c-ok\">✓ </span><span class=\"c-default\">tier-1 rules</span><span class=\"c-default\">                    </span><span class=\"c-muted\">22 rules · 0 errors</span>\n<span class=\"c-muted\">    </span><span class=\"c-accent sp sp-triangle\"></span><span class=\"c-default\"> </span><span class=\"c-accent rmp rmp-shimmer\"><span style=\"--i:0\">g</span><span style=\"--i:1\">e</span><span style=\"--i:2\">n</span><span style=\"--i:3\">e</span><span style=\"--i:4\">r</span><span style=\"--i:5\">a</span><span style=\"--i:6\">t</span><span style=\"--i:7\">i</span><span style=\"--i:8\">n</span><span style=\"--i:9\">g</span><span style=\"--i:10\"> </span><span style=\"--i:11\">m</span><span style=\"--i:12\">a</span><span style=\"--i:13\">n</span><span style=\"--i:14\">i</span><span style=\"--i:15\">f</span><span style=\"--i:16\">e</span><span style=\"--i:17\">s</span><span style=\"--i:18\">t</span></span><span class=\"c-default\">              </span><span class=\"c-identifier\">jobs/a3f9b21.yaml</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\">○ </span><span class=\"c-muted\">open merge request</span>\n<span class=\"c-default\"> </span>\n",
-      "contentDigest": "a61ccf27b68035ec7af5be70bbcec2d80a2babf71e6a6673787e743533bbe83e",
-      "text": "❯ /submit fmx_models.jobs.training:job\n\n● submit ·  4s\n  ⎿ ✓ clean working tree              HEAD a3f9b21\n    ✓ tier-1 rules                    22 rules · 0 errors\n     generating manifest              jobs/a3f9b21.yaml\n    ○ open merge request",
+      "renderHtml": "\n<span class=\"c-default bg-bgElev\"> ❯ /submit fmx_models.jobs.training:job                                       </span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">● </span><span class=\"c-default\">submit</span><span class=\"c-muted\"> · </span><span class=\"c-muted sp sp-braille\"></span><span class=\"c-muted\"> 4s</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-ok\">✓ </span><span class=\"c-default\">clean working tree</span><span class=\"c-default\">              </span><span class=\"c-muted\">HEAD a3f9b21</span>\n<span class=\"c-muted\">    </span><span class=\"c-ok\"> ✓ </span><span class=\"c-default\">tier-1 rules</span><span class=\"c-default\">                    </span><span class=\"c-muted\">22 rules · 0 errors</span>\n<span class=\"c-muted\">    </span> <span class=\"c-accent sp sp-triangle\"></span><span class=\"c-default\"> </span><span class=\"c-accent rmp rmp-shimmer\"><span style=\"--i:0\">g</span><span style=\"--i:1\">e</span><span style=\"--i:2\">n</span><span style=\"--i:3\">e</span><span style=\"--i:4\">r</span><span style=\"--i:5\">a</span><span style=\"--i:6\">t</span><span style=\"--i:7\">i</span><span style=\"--i:8\">n</span><span style=\"--i:9\">g</span><span style=\"--i:10\"> </span><span style=\"--i:11\">m</span><span style=\"--i:12\">a</span><span style=\"--i:13\">n</span><span style=\"--i:14\">i</span><span style=\"--i:15\">f</span><span style=\"--i:16\">e</span><span style=\"--i:17\">s</span><span style=\"--i:18\">t</span></span><span class=\"c-default\">              </span><span class=\"c-identifier\">jobs/a3f9b21.yaml</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\"> ○ </span><span class=\"c-muted\">open merge request</span>\n<span class=\"c-default\"> </span>\n",
+      "contentDigest": "a231ddac6a2e2448d4ae3204dc286e1f773985ae7a3cd80e9980e6bb144002cc",
+      "text": "❯ /submit fmx_models.jobs.training:job\n\n● submit ·  4s\n  ⎿  ✓ clean working tree              HEAD a3f9b21\n     ✓ tier-1 rules                    22 rules · 0 errors\n      generating manifest              jobs/a3f9b21.yaml\n     ○ open merge request",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-968"
+      ],
+      "supersedes": [
         "R-BLK-654"
       ]
     },
@@ -48010,15 +48533,18 @@
       ]
     },
     {
-      "id": "R-BLK-659",
+      "id": "R-BLK-969",
       "sectionKey": "prism-logs-as-a-block-084",
       "position": 2,
-      "renderHtml": "\n<span class=\"c-default bg-bgElev\"> ❯ /logs a3f9b21 --follow                                                     </span>\n<span class=\"c-default\"> </span>\n<span class=\"c-ok\">● </span><span class=\"c-default\">logs</span><span class=\"c-muted\"> </span><span class=\"c-identifier\">a3f9b21</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">1,204 lines</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">● following</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-muted\">14:23:01.882  </span><span class=\"c-info\">INFO </span><span class=\"c-default\">  [trainer] epoch 17 started</span><span class=\"c-default\">        </span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\">14:23:02.104  </span><span class=\"c-info\">INFO </span><span class=\"c-default\">  [dataloader] batch 41/256</span><span class=\"c-default\">         </span><span class=\"c-accent\">╽</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\">14:23:02.339  </span><span class=\"c-muted\">DEBUG</span><span class=\"c-muted\">  [memory] gpu_mem=52GiB/80GiB</span><span class=\"c-default\">      </span><span class=\"c-accent\">┃</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\">14:23:02.551  </span><span class=\"c-warn\">WARN </span><span class=\"c-warn\">  [dataloader] slow batch (87ms)</span><span class=\"c-default\">    </span><span class=\"c-accent\">┃</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\">14:23:02.774  </span><span class=\"c-info\">INFO </span><span class=\"c-default\">  [trainer] step 2417 · loss=</span><span class=\"c-warn\">0.0372</span><span class=\"c-default\"> </span><span class=\"c-accent\">╿</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\">14:23:03.001  </span><span class=\"c-error\">ERROR</span><span class=\"c-error\">  [checkpoint] write failed, retrying</span><span class=\"c-default\"> </span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\">1,204 lines · at 1,198</span><span class=\"c-muted\"> · </span><span class=\"c-warn\">2 warnings</span><span class=\"c-muted\"> · </span><span class=\"c-error\">1 error</span><span class=\"c-default\">   </span><span class=\"c-accent\">l</span><span class=\"c-muted\"> level  </span><span class=\"c-accent\">⌃s</span><span class=\"c-muted\"> pause</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default bg-bgElev\"> ❯ what was the checkpoint error?                                             </span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">● </span><span class=\"c-default\">It failed writing to the shared volume and retried once.</span>\n",
-      "contentDigest": "dbc2f26f84379f9ddd935bee78a69ecfbfcb710fb17c2fb4252bae9056e6729b",
-      "text": "❯ /logs a3f9b21 --follow\n\n● logs a3f9b21 · 1,204 lines · ● following\n  ⎿ 14:23:01.882  INFO   [trainer] epoch 17 started\n    14:23:02.104  INFO   [dataloader] batch 41/256         ╽\n    14:23:02.339  DEBUG  [memory] gpu_mem=52GiB/80GiB      ┃\n    14:23:02.551  WARN   [dataloader] slow batch (87ms)    ┃\n    14:23:02.774  INFO   [trainer] step 2417 · loss=0.0372 ╿\n    14:23:03.001  ERROR  [checkpoint] write failed, retrying\n    1,204 lines · at 1,198 · 2 warnings · 1 error   l level  ⌃s pause\n\n ❯ what was the checkpoint error?\n\n● It failed writing to the shared volume and retried once.",
+      "renderHtml": "\n<span class=\"c-default bg-bgElev\"> ❯ /logs a3f9b21 --follow                                                     </span>\n<span class=\"c-default\"> </span>\n<span class=\"c-ok\">● </span><span class=\"c-default\">logs</span><span class=\"c-muted\"> </span><span class=\"c-identifier\">a3f9b21</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">1,204 lines</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">● following</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-muted\">14:23:01.882  </span><span class=\"c-info\">INFO </span><span class=\"c-default\">  [trainer] epoch 17 started</span><span class=\"c-default\">        </span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\"> 14:23:02.104  </span><span class=\"c-info\">INFO </span><span class=\"c-default\">  [dataloader] batch 41/256</span><span class=\"c-default\">         </span><span class=\"c-accent\">╽</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\"> 14:23:02.339  </span><span class=\"c-muted\">DEBUG</span><span class=\"c-muted\">  [memory] gpu_mem=52GiB/80GiB</span><span class=\"c-default\">      </span><span class=\"c-accent\">┃</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\"> 14:23:02.551  </span><span class=\"c-warn\">WARN </span><span class=\"c-warn\">  [dataloader] slow batch (87ms)</span><span class=\"c-default\">    </span><span class=\"c-accent\">┃</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\"> 14:23:02.774  </span><span class=\"c-info\">INFO </span><span class=\"c-default\">  [trainer] step 2417 · loss=</span><span class=\"c-warn\">0.0372</span><span class=\"c-default\"> </span><span class=\"c-accent\">╿</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\"> 14:23:03.001  </span><span class=\"c-error\">ERROR</span><span class=\"c-error\">  [checkpoint] write failed, retrying</span><span class=\"c-default\"> </span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\"> 1,204 lines · at 1,198</span><span class=\"c-muted\"> · </span><span class=\"c-warn\">2 warnings</span><span class=\"c-muted\"> · </span><span class=\"c-error\">1 error</span><span class=\"c-default\">   </span><span class=\"c-accent\">l</span><span class=\"c-muted\"> level  </span><span class=\"c-accent\">⌃s</span><span class=\"c-muted\"> pause</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default bg-bgElev\"> ❯ what was the checkpoint error?                                             </span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">● </span><span class=\"c-default\">It failed writing to the shared volume and retried once.</span>\n",
+      "contentDigest": "b01b959ce88d74486d3a0651c448e067076fd6b253809e2e6af314744090811b",
+      "text": "❯ /logs a3f9b21 --follow\n\n● logs a3f9b21 · 1,204 lines · ● following\n  ⎿  14:23:01.882  INFO   [trainer] epoch 17 started\n     14:23:02.104  INFO   [dataloader] batch 41/256         ╽\n     14:23:02.339  DEBUG  [memory] gpu_mem=52GiB/80GiB      ┃\n     14:23:02.551  WARN   [dataloader] slow batch (87ms)    ┃\n     14:23:02.774  INFO   [trainer] step 2417 · loss=0.0372 ╿\n     14:23:03.001  ERROR  [checkpoint] write failed, retrying\n     1,204 lines · at 1,198 · 2 warnings · 1 error   l level  ⌃s pause\n\n ❯ what was the checkpoint error?\n\n● It failed writing to the shared volume and retried once.",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-969"
+      ],
+      "supersedes": [
         "R-BLK-659"
       ]
     },
@@ -48179,15 +48705,18 @@
       ]
     },
     {
-      "id": "R-BLK-672",
+      "id": "R-BLK-970",
       "sectionKey": "prism-the-six-hour-run-085",
       "position": 11,
-      "renderHtml": "\n<span class=\"c-default\">● </span><span class=\"c-default\">submit</span><span class=\"c-muted\"> </span><span class=\"c-identifier\">digit-classifier</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">6h 02m</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">ep 17/40</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-identifier\">a3f9b21</span><span class=\"c-muted\"> · gpu-04 · 2×A100 · </span><span class=\"c-identifier ul\">!1248</span>\n<span class=\"c-muted\">    </span><span class=\"c-accent\">██████████</span><span class=\"c-muted\">░░░░░░░░░░░░░░</span><span class=\"c-muted\">  43%   ep 17 of 40   ~7h 48m left</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\">val loss  </span><span class=\"c-accent\">█▇▆▅▄▃▃▂▂▂▁▁</span><span class=\"c-default\">  0.0372</span><span class=\"c-ok\">   ↓ from 0.41</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\">gpu       </span><span class=\"c-ok\">▅▇█▇██▇██▇██</span><span class=\"c-default\">  94%</span>\n<span class=\"c-muted\">    </span><span class=\"c-accent\">≡</span><span class=\"c-muted\"> logs   </span><span class=\"c-accent\">⚡</span><span class=\"c-muted\"> events   </span><span class=\"c-accent\">⊘</span><span class=\"c-muted\"> cancel   </span><span class=\"c-accent\">⏎</span><span class=\"c-muted\"> the full view</span>\n",
-      "contentDigest": "ddd2c19dabe667d4f6d2cfd617335b8ce38e50e938eeae07fc52eb661482f16d",
-      "text": "● submit digit-classifier · 6h 02m · ep 17/40\n  ⎿ a3f9b21 · gpu-04 · 2×A100 · !1248\n    ██████████░░░░░░░░░░░░░░  43%   ep 17 of 40   ~7h 48m left\n    val loss  █▇▆▅▄▃▃▂▂▂▁▁  0.0372   ↓ from 0.41\n    gpu       ▅▇█▇██▇██▇██  94%\n    ≡ logs   ⚡ events   ⊘ cancel   ⏎ the full view",
+      "renderHtml": "\n<span class=\"c-default\">● </span><span class=\"c-default\">submit</span><span class=\"c-muted\"> </span><span class=\"c-identifier\">digit-classifier</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">6h 02m</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">ep 17/40</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-identifier\">a3f9b21</span><span class=\"c-muted\"> · gpu-04 · 2×A100 · </span><span class=\"c-identifier ul\">!1248</span>\n<span class=\"c-muted\">    </span><span class=\"c-accent\"> ██████████</span><span class=\"c-muted\">░░░░░░░░░░░░░░</span><span class=\"c-muted\">  43%   ep 17 of 40   ~7h 48m left</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\"> val loss  </span><span class=\"c-accent\">█▇▆▅▄▃▃▂▂▂▁▁</span><span class=\"c-default\">  0.0372</span><span class=\"c-ok\">   ↓ from 0.41</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\"> gpu       </span><span class=\"c-ok\">▅▇█▇██▇██▇██</span><span class=\"c-default\">  94%</span>\n<span class=\"c-muted\">    </span><span class=\"c-accent\"> ≡</span><span class=\"c-muted\"> logs   </span><span class=\"c-accent\">⚡</span><span class=\"c-muted\"> events   </span><span class=\"c-accent\">⊘</span><span class=\"c-muted\"> cancel   </span><span class=\"c-accent\">⏎</span><span class=\"c-muted\"> the full view</span>\n",
+      "contentDigest": "216b35a292423bd6d2c215347f649495f0e7e49e71f249fb291f001b6c6d775f",
+      "text": "● submit digit-classifier · 6h 02m · ep 17/40\n  ⎿  a3f9b21 · gpu-04 · 2×A100 · !1248\n     ██████████░░░░░░░░░░░░░░  43%   ep 17 of 40   ~7h 48m left\n     val loss  █▇▆▅▄▃▃▂▂▂▁▁  0.0372   ↓ from 0.41\n     gpu       ▅▇█▇██▇██▇██  94%\n     ≡ logs   ⚡ events   ⊘ cancel   ⏎ the full view",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-970"
+      ],
+      "supersedes": [
         "R-BLK-672"
       ]
     },
@@ -49453,15 +49982,18 @@
       ]
     },
     {
-      "id": "R-BLK-769",
+      "id": "R-BLK-971",
       "sectionKey": "a-status-has-three-parts-and-a-frame-is-separate-096",
       "position": 5,
-      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-muted\">┌ </span><span class=\"c-muted\">val loss </span><span class=\"c-muted\">────────────────────────────────────</span><span class=\"c-muted\"> ┐</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">│ </span><span class=\"c-error\">──────────────</span><span class=\"c-errorInk bold bg-errorGround\"> ERROR </span><span class=\"c-error\">──────────────</span><span class=\"c-muted\"> │</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">│ </span><span class=\"c-error\">✗ </span><span class=\"c-error\">plot failed to render</span><span class=\"c-muted\">                        │</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">└</span><span class=\"c-muted\">──────────────────────────────────────────────</span><span class=\"c-muted\">┘</span><span class=\"c-muted\">   framed — a plot HAS a border</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-error\">● </span><span class=\"c-default\">read_image</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">loss-curve.png</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-error\">failed</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">  ⎿ </span><span class=\"c-error\">──────────</span><span class=\"c-errorInk bold bg-errorGround\"> ERROR </span><span class=\"c-error\">──────────</span>\n<span class=\"c-default\">  </span><span class=\"c-error\">    ✗ </span><span class=\"c-error\">decode failed: truncated PNG</span><span class=\"c-muted\">    the GUTTER is the</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">                                      containment</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-error\">──────────────</span><span class=\"c-errorInk bold bg-errorGround\"> ERROR </span><span class=\"c-error\">──────────────</span>\n<span class=\"c-default\">  </span><span class=\"c-error\">✗ </span><span class=\"c-error\">context exhausted at 50,000 tokens</span>\n<span class=\"c-default\">  </span><span class=\"c-muted sp sp-braille\"></span><span class=\"c-default\"> retrying in 8s · attempt 2</span><span class=\"c-muted\">       bare — the prompt rules</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">                                      are the containment</span>\n",
-      "contentDigest": "9c6bb45230288a97688bc958180bbb66d1c4c4d3bf866f97fe8707f98fed504f",
-      "text": "┌ val loss ──────────────────────────────────── ┐\n  │ ────────────── ERROR ────────────── │\n  │ ✗ plot failed to render                        │\n  └──────────────────────────────────────────────┘   framed — a plot HAS a border\n\n  ● read_image(loss-curve.png) · failed\n    ⎿ ────────── ERROR ──────────\n      ✗ decode failed: truncated PNG    the GUTTER is the\n                                        containment\n\n  ────────────── ERROR ──────────────\n  ✗ context exhausted at 50,000 tokens\n   retrying in 8s · attempt 2       bare — the prompt rules\n                                        are the containment",
+      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-muted\">┌ </span><span class=\"c-muted\">val loss </span><span class=\"c-muted\">────────────────────────────────────</span><span class=\"c-muted\"> ┐</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">│ </span><span class=\"c-error\">──────────────</span><span class=\"c-errorInk bold bg-errorGround\"> ERROR </span><span class=\"c-error\">──────────────</span><span class=\"c-muted\"> │</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">│ </span><span class=\"c-error\">✗ </span><span class=\"c-error\">plot failed to render</span><span class=\"c-muted\">                        │</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">└</span><span class=\"c-muted\">──────────────────────────────────────────────</span><span class=\"c-muted\">┘</span><span class=\"c-muted\">   framed — a plot HAS a border</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-error\">● </span><span class=\"c-default\">read_image</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">loss-curve.png</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-error\">failed</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">  ⎿  </span><span class=\"c-error\">──────────</span><span class=\"c-errorInk bold bg-errorGround\"> ERROR </span><span class=\"c-error\">──────────</span>\n<span class=\"c-default\">  </span><span class=\"c-error\">     ✗ </span><span class=\"c-error\">decode failed: truncated PNG</span><span class=\"c-muted\">    the GUTTER is the</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">                                       containment</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-error\">──────────────</span><span class=\"c-errorInk bold bg-errorGround\"> ERROR </span><span class=\"c-error\">──────────────</span>\n<span class=\"c-default\">  </span><span class=\"c-error\">✗ </span><span class=\"c-error\">context exhausted at 50,000 tokens</span>\n<span class=\"c-default\">  </span><span class=\"c-muted sp sp-braille\"></span><span class=\"c-default\"> retrying in 8s · attempt 2</span><span class=\"c-muted\">       bare — the prompt rules</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">                                      are the containment</span>\n",
+      "contentDigest": "a66afeef3b29ad8c78744b3db772eae4e2083d8abfc2c0c88ec69979e7113439",
+      "text": "┌ val loss ──────────────────────────────────── ┐\n  │ ────────────── ERROR ────────────── │\n  │ ✗ plot failed to render                        │\n  └──────────────────────────────────────────────┘   framed — a plot HAS a border\n\n  ● read_image(loss-curve.png) · failed\n    ⎿  ────────── ERROR ──────────\n       ✗ decode failed: truncated PNG    the GUTTER is the\n                                         containment\n\n  ────────────── ERROR ──────────────\n  ✗ context exhausted at 50,000 tokens\n   retrying in 8s · attempt 2       bare — the prompt rules\n                                        are the containment",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
+        "R-BLK-971"
+      ],
+      "supersedes": [
         "R-BLK-769"
       ]
     },

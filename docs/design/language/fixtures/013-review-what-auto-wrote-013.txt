@@ -4,10 +4,10 @@ That is the point of the mode and it is also its one real hazard.
 so the turn ends with what it did to the tree
 
 ● done · 4m 12s · 3 files · +124 −18
-  ⎿ src/interaction/parser/parse.ts    +18 −4
-    src/interaction/parser/tokens.ts   +94 −2
-    test/unit/parser.test.ts           +12 −12
-    ⏎ review   d full diff   ↺ revert all
+  ⎿  src/interaction/parser/parse.ts    +18 −4
+     src/interaction/parser/tokens.ts   +94 −2
+     test/unit/parser.test.ts           +12 −12
+     ⏎ review   d full diff   ↺ revert all
 
 one row per file, the stat coloured, and the edits revertible.
 

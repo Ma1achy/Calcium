@@ -4,7 +4,7 @@ twice
 ● edit(parse.ts) · 0.3s · +2 −2
 
 ● reverted · parse.ts · +2 −2 undone   ↺ redo
-  ⎿ the file is back to what it was before the edit above
+  ⎿  the file is back to what it was before the edit above
 
 it is muted, because nothing went wrong and nothing is pending — it
 is a fact about history, and history is what the transcript IS.

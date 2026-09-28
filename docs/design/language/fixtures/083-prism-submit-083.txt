@@ -3,10 +3,10 @@ a submit is a call with steps; its choice-only question replaces the prompt
  ❯ /submit fmx_models.jobs.training:job
 
 ● submit · ✦ 4s
-  ⎿ ✓ clean working tree              HEAD a3f9b21
-    ✓ tier-1 rules                    22 rules · 0 errors
-    ✦ generating manifest              jobs/a3f9b21.yaml
-    ○ open merge request
+  ⎿  ✓ clean working tree              HEAD a3f9b21
+     ✓ tier-1 rules                    22 rules · 0 errors
+     ✦ generating manifest              jobs/a3f9b21.yaml
+     ○ open merge request
 
 
 ──────────────────────────────────────────────────────────────────────────────

@@ -16,8 +16,8 @@ after compaction the transcript says so, in place
   ✦ compacting   ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱  3 of 5 turns
 
   ● 3 turns compacted · 10.7k → 0.9k tok · ⏎ read the summary
-  ⎿ read construct.ts, searched for elementsIn, discussed the span
-    prerequisite. No edits were made.
+  ⎿  read construct.ts, searched for elementsIn, discussed the span
+     prerequisite. No edits were made.
 
   it is an ENTRY, not a gap — because a conversation that silently
   forgets is one you cannot reason about.

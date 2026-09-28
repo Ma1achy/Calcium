@@ -6,10 +6,10 @@ at 40 columns the drill survives; the composition does not
    ❯ refactor the parser
 
   ● read_file(parse.ts)
-    ⎿ 184 lines
+    ⎿  184 lines
 
   ✦ editing   41s · 3.2k
-  ⎿ 4/5  ·  ◻ run the suite
+  ⎿  4/5  ·  ◻ run the suite
   ──────────────────────────────────────
   ❯ ▌
   ──────────────────────────────────────

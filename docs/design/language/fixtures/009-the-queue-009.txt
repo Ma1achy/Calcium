@@ -8,7 +8,7 @@ messages typed while a turn runs are QUEUED — yours, and not sent yet
 ● I'll look at the current implementation first.
 
   ✦  editing parse.ts  41s · 3.2k tok
-  ⎿ todo  4/5  ·  ◻ run the suite
+  ⎿  todo  4/5  ·  ◻ run the suite
 
 ─────────────────────────────── 2 queued ─────────────────────────────────────
  ❯ also add a test for escaped quotes
