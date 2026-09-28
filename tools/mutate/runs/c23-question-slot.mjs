@@ -143,8 +143,8 @@ const results = runPass({
       // checking *the reply is up* cannot see it.
       name: "THE DEFECT: choosing reply… opens a second question rather than moving the first",
       file: CONFIRM,
-      from: "          deps.overlays.update(CONFIRM_LAYER_ID, {\n            content: render(opts, selected()),\n            placement:",
-      to: "          disposable[Symbol.dispose]();\n          deps.overlays.push({ ...layer, blocking: false });\n          deps.overlays.update(CONFIRM_LAYER_ID, {\n            content: render(opts, selected()),\n            placement:",
+      from: "          deps.overlays.update(CONFIRM_LAYER_ID, {\n            content: render(opts, selected(), cut, refused),\n            placement:",
+      to: "          disposable[Symbol.dispose]();\n          deps.overlays.push({ ...layer, blocking: false });\n          deps.overlays.update(CONFIRM_LAYER_ID, {\n            content: render(opts, selected(), cut, refused),\n            placement:",
       expect: "T1.69",
     },
     {
@@ -254,7 +254,7 @@ const results = runPass({
       // still reading — and reads on screen as the box simply closing.
       name: "escape inside an inspection resolves the question",
       file: CONFIRM,
-      from: '          if (suspended) return name === "escape" || (ctrl && name === "c") ? "leave" : "none";',
+      from: '          if (suspended) return is(QUESTION_KEYS.leave) ? "leave" : "none";',
       to: '          if (false) return "leave";',
       expect: "T1.70",
     },
@@ -264,8 +264,8 @@ const results = runPass({
       // moment it matters.
       name: "a key that is not a choice opens the source",
       file: CONFIRM,
-      from: "          if (suspended) return",
-      to: '          if (!suspended && e.key.name === "tab") { suspend(); return "none"; }\n          if (suspended) return',
+      from: "          if (suspended) return is(",
+      to: '          if (!suspended && e.key.name === "tab") { suspend(); return "none"; }\n          if (suspended) return is(',
       expect: "T1.70b",
     },
     {

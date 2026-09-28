@@ -1295,7 +1295,7 @@ describe("C22 I133 — the owner line's chords are the keymap's (review batch 2,
     // top layer's declared owner — `find` was all it ever said.
     const { graph } = await buildGraph();
     graph.lifecycle.acquire();
-    const substate = (name: "find" | "complete" | "preview"): string | undefined => {
+    const substate = (name: "find" | "complete" | "preview"): readonly string[] => {
       graph.overlays.push({
         id: `probe-${name}`,
         kind: "panel",
@@ -1305,13 +1305,17 @@ describe("C22 I133 — the owner line's chords are the keymap's (review batch 2,
         blocking: false,
         dismissal: "escape",
       });
-      const first = ownerLine("substate", FULL_CAPS, false, 0, undefined, false, graph.ownerHints())[0]?.label;
+      const line = ownerLine("substate", FULL_CAPS, false, 0, undefined, false, graph.ownerHints()).map((c) => c.label);
       graph.overlays.dismiss(`probe-${name}`);
-      return first;
+      return line;
     };
-    expect(substate("complete")).toBe("complete");
-    expect(substate("find")).toBe("find");
-    expect(substate("preview")).toBe("preview");
+    expect(substate("complete")[0]).toBe("complete");
+    expect(substate("preview")[0]).toBe("preview");
+    // **§103's find line, word for word** — and the keys are the panel's first
+    // rows, so this is also what holds `↓` ahead of `⇥` for `menuNext`: the
+    // other order spells `↑⇥ hits`, which every row asserting against the
+    // table alone would accept.
+    expect(substate("find")).toEqual(["find", "↑↓ hits", "⏎ open", "esc close"]);
     expect(graph.ownerHints().substate, "and nothing named with no panel up").toBeUndefined();
 
     // **A question's line ends on its default's label** — a different default
