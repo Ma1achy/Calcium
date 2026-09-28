@@ -1,7 +1,7 @@
 // C05 tier 1 — unit. The loader's transition table, the parser's structural
 // rules, longest-match resolution, and every validation row in §3.
 import { describe, expect, it } from "vitest";
-import { FRAMEWORK_TOOLS } from "../../src/data/manifest/framework.js";
+import { FRAMEWORK_NAMES, FRAMEWORK_TOOLS, RESERVED_VERBS } from "../../src/data/manifest/framework.js";
 import {
   ARG_TYPES,
   createManifestStore,
@@ -712,11 +712,72 @@ function tools0(source: Bag): Bag {
   return (source["tools"] as Bag[])[0]!;
 }
 
-describe("C05 I27, I28 — a retired key and a reserved name, owed at the spec commit", () => {
-  it.todo(
-    "T1.24 (I27): view on a tool, on a flag, and view: false are refused at parse naming the retirement; the manifest without it parses and an unknown viewport key is still dropped — not deferred on a component: the code lands in the next commit of this round",
-  );
-  it.todo(
-    "T1.25 (I28): an app tool named watch, unwatch or config is refused naming the reservation; RESERVED_VERBS is disjoint from FRAMEWORK_NAMES; the --watch flag and a watching tool parse — not deferred on a component: the code lands in the next commit of this round",
-  );
+describe("C05 I27, I28 — a retired key and a reserved name", () => {
+  it("T1.24 (I27): a retired `view` is refused on a tool and on a flag, whatever its value, naming the retirement", () => {
+    // **Dropped, it said nothing**: an author still declaring `view` went on
+    // believing the verb opened a view. `false` is refused too — the key
+    // retired, not the value `true`.
+    const cases: readonly (readonly [string, (ps: Record<string, unknown>) => void, string])[] = [
+      ["on the tool", (ps) => { ps["view"] = true; }, "tools[0].view"],
+      ["on the tool, false", (ps) => { ps["view"] = false; }, "tools[0].view"],
+      ["on a flag", (ps) => { (ps["flags"] as Record<string, unknown>[])[0]!["view"] = true; }, "tools[0].flags[0].view"],
+    ];
+    for (const [label, declare, path] of cases) {
+      const source = raw();
+      declare((source["tools"] as Record<string, unknown>[])[0]!);
+      const errors = errorsOf(parseManifest(source));
+      expect(errors, label).toHaveLength(1);
+      expect(errors[0]?.startsWith(`${path}: "view" retired with the pushed view (C05 I27`), `${label}: ${errors[0]}`).toBe(true);
+      expect(errors[0], "and it says what replaced the tier").toContain("a transcript entry");
+    }
+
+    // **The controls.** The same manifest without the key parses, and an unknown
+    // key beside where `view` stood is still dropped — so the refusal is about
+    // the retired key and not a parser that stopped being lenient (I3, T6.2).
+    expect(errorsOf(parseManifest(raw()))).toEqual([]);
+    const lenient = raw();
+    const ps = (lenient["tools"] as Record<string, unknown>[])[0]!;
+    ps["viewport"] = true;
+    (ps["flags"] as Record<string, unknown>[])[0]!["viewport"] = true;
+    const parsed = parseManifest(lenient);
+    expect(errorsOf(parsed)).toEqual([]);
+    if (!parsed.ok) return;
+    expect("viewport" in parsed.value.tools[0]!, "an unknown key is dropped").toBe(false);
+  });
+
+  it("T1.25 (I28): a name reserved for a verb not yet built is refused, naming the reservation", () => {
+    // **Written out, not derived** — a list computed from `RESERVED_VERBS`
+    // agrees with itself whatever it holds.
+    expect(Object.keys(RESERVED_VERBS).sort(), "ruling 50's two and ruling 43's one").toEqual(["config", "unwatch", "watch"]);
+
+    const parsedTools = fixture().tools.map((t) => t.name);
+    for (const name of ["watch", "unwatch", "config"]) {
+      expect(FRAMEWORK_NAMES, `${name} is on one list, never both`).not.toContain(name);
+      expect(parsedTools, `${name} has no row until it is built`).not.toContain(name);
+
+      const source = raw();
+      (source["tools"] as Record<string, unknown>[]).push({ name, local: false, summary: "mine", args: [], flags: [] });
+      const errors = errorsOf(parseManifest(source));
+      expect(errors, name).toHaveLength(1);
+      expect(
+        errors[0]?.startsWith(`tools[9].name: "${name}" is reserved for a framework verb not yet built (C05 I28, ruling `),
+        `${name}: ${errors[0]}`,
+      ).toBe(true);
+      // Not the shipped-verb message: the author is not shadowing anything they
+      // can see in `/help`, and a message saying so sends them looking for it.
+      expect(errors[0], "not the collision with a shipped verb").not.toContain("a verb Calcium ships");
+    }
+
+    // **The controls.** A flag named `watch` is not a verb — the fixture's
+    // `ps --watch` parses, which is every call to `fixture()` above — and the
+    // reservation is by exact name, so `watching` parses (I28's stated limit).
+    expect(toolNamed("ps").flags.some((f) => f.name === "watch"), "the fixture's --watch survives").toBe(true);
+    // And `constructor` parses: the reservation is a record, and a lookup that
+    // read its prototype would refuse a name nothing reserved.
+    for (const name of ["watching", "constructor"]) {
+      const near = raw();
+      (near["tools"] as Record<string, unknown>[]).push({ name, local: false, summary: "mine", args: [], flags: [] });
+      expect(errorsOf(parseManifest(near)), name).toEqual([]);
+    }
+  });
 });

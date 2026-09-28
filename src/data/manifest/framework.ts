@@ -182,6 +182,29 @@ export const FRAMEWORK_NAMES: readonly string[] = Object.freeze(
 );
 
 /**
+ * The verbs ruled and not yet built, whose names are reserved now (C05 I28,
+ * ruling 50).
+ *
+ * **Reserved before built, because the collision is the breaking change** (C05
+ * §3): an app declaring one of these fails at parse, and the only moment that
+ * breaks nobody is before any app has. Each carries the ruling that made it, so
+ * the refusal can say why rather than only that.
+ *
+ * **Disjoint from `FRAMEWORK_NAMES`** — building a verb moves its name from
+ * here to `FRAMEWORK_TOOLS`, and a name on both would be a verb with two
+ * statuses. It has no row, so it is neither completable nor invocable until it
+ * is built.
+ */
+export const RESERVED_VERBS: Readonly<Record<string, string>> = Object.freeze({
+  // §085: `/watch` pins a streaming entry that is not yours, `/unwatch` lets go.
+  watch: "ruling 50, §085",
+  unwatch: "ruling 50, §085",
+  // §075's configuration table (C23 I80); docker-tui's own `config` was renamed
+  // `filediff` first (ruling 43), which is the grep this reservation rests on.
+  config: "ruling 43, §075",
+});
+
+/**
  * The flags Calcium reserves on **every** tool, appended as the six verbs above
  * are appended to every manifest (C05 I22, F92).
  *

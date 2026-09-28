@@ -164,11 +164,25 @@ describe("C05 fail-on-revert", () => {
   // names.
 });
 
-describe("C05 I27, I28 fail-on-revert, owed at the spec commit", () => {
-  it.todo(
-    "T6.17 (I27): deleting the view refusal from parseTool and parseFlag → T1.24 fails — not deferred on a component: the code lands in the next commit of this round",
-  );
-  it.todo(
-    "T6.18 (I28): seeding the collision set from FRAMEWORK_NAMES alone → T1.25 fails — not deferred on a component: the code lands in the next commit of this round",
-  );
+describe("C05 I27, I28 fail-on-revert", () => {
+  it("T6.17 (I27): deleting the `view` refusal from parseTool and parseFlag → T1.24 fails", () => {
+    // The drop is what shipped: a manifest declaring a pushed view parsed into
+    // an ordinary verb, and nothing on either side said so.
+    for (const at of ["tool", "flag"] as const) {
+      const source = raw();
+      const ps = (source["tools"] as Record<string, unknown>[])[0]!;
+      if (at === "tool") ps["view"] = true;
+      else (ps["flags"] as Record<string, unknown>[])[0]!["view"] = true;
+      expect(parseManifest(source).ok, `view on the ${at}`).toBe(false);
+    }
+  });
+
+  it("T6.18 (I28): seeding the collision set from FRAMEWORK_NAMES alone → T1.25 fails", () => {
+    // Without the reservation an app declaring `watch` parses, and the day
+    // `/watch` ships that app stops starting — the break §3 describes, moved
+    // from now, when it costs nothing, to then.
+    const source = raw();
+    (source["tools"] as Record<string, unknown>[]).push({ name: "watch", local: false, summary: "mine", args: [], flags: [] });
+    expect(parseManifest(source).ok).toBe(false);
+  });
 });
