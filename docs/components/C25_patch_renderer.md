@@ -195,6 +195,8 @@ Within a line, the `syntax` palette highlights the language — so a changed YAM
 
 `unicode: "ascii"` replaces the collapse marker's `⋯` with `...`. **This changes the cell count**, so unlike C09's 1:1 substitution rule the collapse marker's *content budget* changes at measure time instead — the marker is a fixed one row either way, so height is unaffected and C09 I1 holds. This is the "adding a kind whose measurer needs capabilities" case C09 commitment 11 names as a design decision, and it is made here deliberately: the alternative is a three-cell `⋯` that is one cell wide, which would drift every truncation point on the row.
 
+**Every other glyph a patch draws is C09's table's, and 1:1** (C09 §4, F1313): the split separator is `vertical` and the path header's rule is `horizontal`, resolved through `glyphs(capabilities)` — so `│` and `─` fall to `|` and `-` under `unicode: "ascii"`, and to the same pair on a terminal that draws ambiguous glyphs wide, where `─ │` are two cells. *As it stood:* ~~the separator was a literal `│` and the rule an ascii-only ternary~~ — the split drew `│` at the ASCII rung, and no row saw it because T4.4 renders at 80, where the layout is unified and there is no separator.
+
 ---
 
 ## 3a. Three levels, and both thresholds
@@ -721,6 +723,7 @@ Six tiers. No state machine, so no transition table (A02 §7).
 - **T4.8** (with C10, I12): every `syntax` slot and every gutter tone clears its contrast floor against all four diff backgrounds, in both variants. C10's check, asserted from the patch side because C25 is the consumer that made the surfaces text-bearing.
 - **T4.9** (with C10): the background covers the row to the full width, so a short line's padding carries it too. A background that stopped at the text would be ragged, and the row is the unit the reader sees.
 - **T4.12** (I10, with C04, C10): `b.patch` over a three-line hunk with one changed word, read as a frame — unified at 60 and split at 120 — carries SGR 4 on that word alone: not on the gutter, not on the rest of the line, not on the context line, and on both halves of the split row. At 1-bit the underline is still there, which is the reason §6 chose it.
+- **T4.13** (with C09, ascii, F1313): the same patch at 120 columns, where the layout is split, under `ASCII_CAPS` → every visible code point is below U+0080, and **the separator column reads `|` on every split row** — the cell at `s = ⌊(w − 1) / 2⌋`, read by column rather than searched for, so a `|` elsewhere on the row cannot stand in for it. The control is the same render under `FULL_CAPS`, whose separator column reads `│` on the same rows — without it the row passes for a layout that drew no separator at all. T4.4's twin at the width where the separator exists.
 
 ### Tier 5 — e2e
 
@@ -757,6 +760,7 @@ Six tiers. No state machine, so no transition table (A02 §7).
 - **T6.30** (I22): the plan's start rows built from every row rather than the unit-first rows → T1.24's clamp arm, a window beginning inside a paired run; the bottom search probing from the row after the start → T1.24's bottom arm against `clampOffset`; the plan's gutter width derived from the window's slice → T3.20; the plan built afresh inside `build` on every probe → **nothing fails, recorded**: byte-identical and fifteen times the walks, which is the bench's to see (`tools/bench/patch-window.mjs`) and not a row's. `tools/mutate/runs/c25-window-plan.mjs`.
 - **T6.31** (I22, F1191): `windowRows` restored to its walk over every row → T1.25's proxy records an index outside the window; `bodyStarts` taken from the last body row rather than the first → T1.25's byte equality; the plan read back without the `patch` check → T1.26's shared-`hunks` arm shows the other patch's rows. `tools/mutate/runs/c25-window-plan.mjs`.
 - **T6.32** (I24, I25): the id made positional → T2.16's window agreement; the split right half starting at `s` rather than `s + 1` → T1.28; selection losing to the diff ground → T2.17 row b; the head's bold dropped → T2.17's 1-bit arm, where the head and the extent become one frame; the dim kept beside the bold → T2.17 row h, four cells of a focused context line read as normal weight; the hunk header a trailing collapse marker forces counted as leading slack rather than trailing → T2.16's window agreement on `patch-three-hunks` (F1259); the extent filtered by the head's block rather than its own → T2.17's sibling arm. `tools/mutate/runs/c25-elements.mjs`.
+- **T6.33** (§3's ASCII fallback, F1313): the split separator restored to a literal `│` → T4.13's separator column; the header rule taken from the Unicode set whatever the rung → T4.13's code-point sweep. `tools/mutate/runs/c25-ascii-glyphs.mjs`.
 
 ---
 

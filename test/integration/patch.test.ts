@@ -77,6 +77,8 @@ describe("C25 integration", () => {
     }
   });
 
+  it.todo("T4.13 (with C09, ascii, F1313): split at 120 under ASCII — every code point below U+0080, and the separator column reads `|` — not deferred on a component: the code lands in the next commit of this round");
+
   it("T4.6 (with C04, C24): a constructed patch validates and renders, both ways in", async () => {
     // **Both constructors, and they must agree.** This asserted through
     // `block()` alone while C24's `b` did not exist, with a comment saying
