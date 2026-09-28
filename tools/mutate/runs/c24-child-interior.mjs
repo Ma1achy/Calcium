@@ -74,6 +74,7 @@ const results = await runPass({
     {
       name: "STALE-OWNER: the close's frame is committed before ownership returns (C22 T6.133)",
       file: SURFACE,
+      // Re-anchored when C16 I73's generation joined the close (df1658a2).
       from:
         "      current = null;\n" +
         "      generation += 1;\n" +
