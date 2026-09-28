@@ -2052,3 +2052,12 @@ describe("C16 I74, I47 — the pointer over layers (review batch 3, M8)", () => 
     expect(calls).toEqual(["pop"]);
   });
 });
+
+describe("C16 I75 — the host escape is a reserved route (review batch 3, M9 item 4)", () => {
+  it.todo(
+    "T1.193 (I75, §3e): a child handler consuming every key, registered either side of another: the escape detaches and neither is offered it; its release is consumed; at the prompt it takes handle — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T1.194 (I75, I64, §3e): the chord is the keymap's: a rebound host.detach row moves the intercept; the enhanced profile adds the meta escape; the table row — not deferred on a component: the code lands in the next commit of this round",
+  );
+});

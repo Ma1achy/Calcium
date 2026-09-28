@@ -377,6 +377,17 @@ that returned it was consumed silently with no stage and nothing acting (§3b S1
 is a handler's three and `InterceptVerdict` is an intercept's three, and a handler naming
 the intercept's is a compile error.
 
+**Amended in review batch 3 — a fourth reserved route, and it is the child's escape** (I75,
+§3e, M9 item 4). R-BLK-908 reserves `host.detach` for exactly the reason §103 reserves the
+other three: *a `/command` cannot reach the host while capture is active*. It was read
+inside the ladder, by a handler at the `child` rung registered ahead of the surface's, so
+the one key out of capture depended on two calls running in the right order. `host-detach`
+is now in the table: `global-intercept` at `child`, whose exception is **the detach**, and
+`handle` at every other rung, where there is nothing to escape and the rung answers the
+chord as any key. The chords are the keymap's `child` rows, asked through `keymap.resolve`
+so a rebinding moves the intercept, the border and `/help` together; and a **release** of
+the chord at `child` is consumed and detaches nothing (§3e H6).
+
 **The rung is one function of the top layer, and it is the layer's declared owner** (I63,
 R-QST-001, C15 I29, M5 item 3). A layer says `owner: { rung: "question" }` or
 `owner: { rung: "substate", name }`, and `rungOfLayer` answers from that; an overlay that
@@ -600,7 +611,7 @@ declaration was stale rather than deleted — it is kept above, marked.
 | S8c | A question composing a reply; a letter | `compose`, forwarded to the prompt | **unchanged, and never a refusal** — composition is what the reply state is for |
 | S8d | A question suspended in an inspection; a letter | consumed silently | **silent** (ruling 60): its only key is `esc`, which leaves, and the inspection is the reader reading |
 | S9 | Guard live; `q`, then `y` | `q` neutral, ends the guard; `y` answers | `q` is also the first refusal and draws the notice. The notice keys on **classification**, not on the guard (S1b) |
-| S10 | A surface child attached and a question raised; `⌃c` | the `⌃c` branch saw the answer callback and answered the question; the child never saw `⌃c` | the branch goes (it is dead once S1 holds). *Whether a question may be raised over an attached child is owed to batch 3's M9 item 4* (ruling 62), whose symbol is `interceptOf`'s `host.detach` arm |
+| S10 | A surface child attached and a question raised; `⌃c` | the `⌃c` branch saw the answer callback and answered the question; the child never saw `⌃c` | the branch goes (it is dead once S1 holds). ~~*Whether a question may be raised over an attached child is owed to batch 3's M9 item 4* (ruling 62), whose symbol is `interceptOf`'s `host.detach` arm~~ — **answered in M9 item 4** (I75, §3e H8): the question waits beneath the child, `⌃]` detaches whatever the handler order, and the question takes the keys with its guard armed from the detach |
 | S11 | A shell delegation; `F1` | target `child`, no child handler, `pass`, then `global` submitted `/help keys` | **consumed at the `child` rung** (I49, ruling 62). Forwarding the bytes to the child's stdin is a C21/C23 mechanism that does not exist — a finding, not built |
 | S12 | Releases reported. `y` answers Q1, the verb chains Q2, then `y`'s release | `held` emptied, the guard cleared, and the release path ran `activeTarget`'s handlers: the answer callback, whose `classify` ignores `event`, settled Q2 with `y` | **A release reaches `child` and nothing else** (I65). T1.99d/e could not see it: their callback accepted every key and asserted nothing about answering |
 | S13 | A blocking overlay with no answer callback; `⌃c` | the footer, the guard and the epoch said `question`; the intercept said `scope` and cancelled a verb beneath it | **one derivation** (I63). The only such layer, `history-clear-confirm`, is retired (ruling 61) |
@@ -764,6 +775,51 @@ nothing to scroll) traced after it.
   and the first one that did would have acted on the wrong layer. The wheel goes by id instead.
 - **Any button closed a panel** (P8): the rule was written for the primary click and the
   predicate named every button.
+
+---
+
+## 3e. The host escape, walked — review batch 3, M9 item 4
+
+**Walked against the tree after M8 landed, before any code.** The escape has a structural
+half — which chord, at which rung, with which handlers registered in which order — and one
+event-mediated interaction, a question raised while a child holds the keys. So the artefact
+is a **classification table** of chord × rung × registration order, with the one sequence
+traced after it.
+
+### The premises, re-checked
+
+| # | the review's claim | at this base | |
+|---|---|---|---|
+| 1 | the detach depends on handler order | **holds.** The composition root registers a `child` handler at build that runs the keymap's `host.detach` rows, and the surface host registers its consuming wrapper at attach, **behind** it. The escape works because of the order two calls happen to run in; `surface.ts` records the one time the order was reversed (`first: true`) and the escape did nothing, found by T1.4h | H1, H2 |
+| 2 | the escape is a reserved route | **holds, and it is not in the table.** R-BLK-908: *a captured child reserves one `host.detach` action because a `/command` cannot reach the host while capture is active.* §103 reads reserved routes before the ladder (I39); this one was read **inside** the ladder, at the rung it escapes | H1–H3 |
+| 3 | a question can be raised over an attached child | **holds** (§3b S10). `activeTarget` answers `child` above `overlay`, so the question waits beneath the child and is unanswerable until the detach — ruling 62's question, and this walk's H8 | H8 |
+
+### The classification table — structural
+
+| # | chord | rung, subject | registration order | the rules that meet | at this base | ruling |
+|---|---|---|---|---|---|---|
+| H1 | `⌃]` | `child`, a surface | the host's handler first | R-BLK-908 × *first registered, first offered* | detaches | detaches, **read before the ladder** — the handler is never offered it |
+| H2 | `⌃]` | `child`, a surface | any consuming handler ahead of the host's | R-BLK-908 × I49 *the child consumes what it does not bind* | **consumed by the child; no detach** | detaches: the escape is not a handler at the rung it escapes |
+| H3 | `⌥esc`, enhanced profile | `child`, a surface | either | §6a profiles × H1 | detaches | detaches — the chord comes from the keymap's `child` rows, profile-filtered, so a rebinding moves the intercept with `/help` and the border |
+| H4 | `⌥esc`, base profile; a bare `esc` | `child` | either | §6a × I49's `esc` row | the child's | unchanged: under the base profile `ESC ESC` is the lone-`Esc` window and not a chord (T1.106b) |
+| H5 | `⌃]` | `child`, a shell delegation | — | raw mode suspended × H1 | no key arrives | unchanged. If one did, `detachChild` has no surface to close and the key is consumed |
+| H6 | `⌃]` release (kitty) | `child` | either | I65 *a release reaches `child`* × H1 | the child is handed a release whose press it never saw | **consumed, nothing detaches** — the child is not handed half of a chord the host took |
+| H7 | `⌃]` | any rung but `child` | — | I64 `handle` × *no child to detach* | the ladder | unchanged: `handle`, the rung answers it as any key — at a question the classifier refuses it, at the prompt it is unbound |
+
+### The one sequence the table does not reach
+
+| # | sequence | at this base | ruling |
+|---|---|---|---|
+| H8 | a surface attached → the verb asks a question (it waits beneath the child) → `⌃]` → `⏎` | detaches (H1) | detaches; the rung falls to `question` and the **guard arms at that observation** (I69, I73 — the surface generation moved), so a `⏎` still held from the child is refused and a deliberate one answers. Accepted: the question could not be seen while the child held the screen, which is the case the guard exists for |
+
+### What the walk found
+
+- **The escape was safe by call order, not by rule** (H2). Nothing in the router forbade a
+  handler ahead of the host's; the reservation held because the composition root happens
+  to register before any attach. The remedy is the design's own mechanism — a reserved
+  route, read before the ladder — and it retires the handler and the order argument together.
+- **A release at `child` handed the child half a chord** (H6): I65 routes every release to
+  the child, and the one chord the host takes is the one whose release it should keep.
 
 ---
 
@@ -2173,7 +2229,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 
   **The child takes every key but one.** `esc` and `⌃c` are the child's (R-INT-007; R-BLK-842's interrupt row, *CHILD handles*), which is the whole of W5 and is why an unbound key may not fall through to a lower rung: a key that reached the prompt while a PTY held the terminal is the host typing into a line the reader cannot see. The handler therefore **consumes what it does not bind**, which is the one place in this component where declining is not passing.
 
-  **The escape is reserved at attach time, not hoped for at keystroke time.** *A captured child reserves one `host.detach` action because a `/command` cannot reach the host while capture is active… may never leave capture without a visible, reachable host escape.* Base candidate `⌃]`, `⌥esc` the enhancement, both registered as `host.detach`; an attach whose reserved chord collides with nothing reachable is **refused**, because the alternative is a session with no way out of a child that has stopped answering. Visible is the other half and it is not decoration: the block's border carries the legend (R-BLK-312) and the footer's owner line reads `attached · keys → child · ⌃] host escape` (R-BLK-844), so the one key that works is on screen the whole time the rest do not.
+  **The escape is reserved at attach time, not hoped for at keystroke time.** *A captured child reserves one `host.detach` action because a `/command` cannot reach the host while capture is active… may never leave capture without a visible, reachable host escape.* Base candidate `⌃]`, `⌥esc` the enhancement, both registered as `host.detach`; an attach whose reserved chord collides with nothing reachable is **refused**, because the alternative is a session with no way out of a child that has stopped answering. Visible is the other half and it is not decoration: the block's border carries the legend (R-BLK-312) and the footer's owner line reads `attached · keys → child · ⌃] host escape` (R-BLK-844), so the one key that works is on screen the whole time the rest do not. **And it is read before the ladder** (I75): the reservation is the intercept table's, not a handler registered ahead of the surface's, so no registration order can take it.
 
   **What this retires**: an application-owned surface was a `kind: "view"` layer filling the region and answering at `pushedView` — *a pushed view takes the screen, you do something, you come back, and the transcript has a HOLE where that work was.* The child owns the keyboard and owns nothing else; the transcript stays, and the entries that settle while it is attached are there when it detaches (R-BLK-314).
 
@@ -2209,7 +2265,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 
 - **I62** — *(§3, §4, §103, R-OWN-001, R-HON-004, R-INT-009, ruling 59)* **A reject consumes and explains; it never performs.** On an intercept's `reject`, or at a blocking top no rung took, **no handler runs for the event**: the router pushes `reject` and calls `refused({ rung, cause })` exactly once — `cause` is `intercept` or `blocked`; which intercept it was is in the stages, and no sink needs it. A handler that answers `reject` has decided and explained for itself and is not reported again. **The guard's refusal does not call `refused`** — I44's armed mark is its explanation, and I70 is what it says — which keeps the notice keyed on what an owner classified rather than on the guard, so batch 3's quiet window replaced the one without the other (§3b S1b, S9, §3c). L4 routes `refused` by rung: `question` to the question (C23 I82), `copy` to semantic copy mode's one-shot chip (C22 I133); native selection has nothing it can draw, and that is the stated limit. → T1.164, T1.165, T4.81
 - **I63** — *(§3, R-QST-001, C15 I29)* **The rung is the top layer's declared owner, and there is one derivation.** `rungOfLayer(top)` answers `owner.rung` where the layer declares one, and the kind's own rung where it does not — an undeclared overlay is a `question` and an undeclared panel an unnamed `substate` (C15 I29). Every producer in `src/` declares. `activeTarget` (`question` → `overlay`, `substate` → `panel`), `rung`, the guard, the epoch, the intercept table, the mouse table and the footer read it and nothing else; `interceptRung` is deleted. → T1.167
-- **I64** — *(§3, §4, R-OWN-001, M5 item 4)* **Two verdict vocabularies, and neither holds the other's word.** An intercept declares `handle`, `reject` or `global-intercept` at each rung (`InterceptVerdict`); a handler answers `handle`, `reject` or `pass` (`Verdict`). `global-intercept` takes the intercept's declared `exception` — `page-scroll` the transcript's pager at `global`, the wheel `routeMouse` — and the ladder is not consulted; `handle` continues to the rung, which answers the route with its own verb, and only `interrupt` declares it. A handler returning `"global-intercept"` is a compile error. → T1.166, T1.168
+- **I64** — *(§3, §4, R-OWN-001, M5 item 4)* **Two verdict vocabularies, and neither holds the other's word.** An intercept declares `handle`, `reject` or `global-intercept` at each rung (`InterceptVerdict`); a handler answers `handle`, `reject` or `pass` (`Verdict`). `global-intercept` takes the intercept's declared `exception` — `page-scroll` the transcript's pager at `global`, the wheel `routeMouse` — and the ladder is not consulted; `handle` continues to the rung, which answers the route with its own verb, and `interrupt` declares it, as does `host-detach` at every rung but `child` (I75); `host-detach`'s `global-intercept` takes **the detach**. A handler returning `"global-intercept"` is a compile error. → T1.166, T1.168
 - **I65** — *(§4, R-OWN-002, M5 item 8)* **A key release reaches `child` and nothing else.** Native release events exist for an application surface; every other rung is edge-triggered, so a release anywhere else is dropped with the stage `release-dropped` and no handler runs. An answer callback that ignores `event` was a release answering the next question (§3b S12). → T1.169
 
 - **I66** — *(§6c table B, ruling 65, R-KEY-003, `keymapPolicy.universal`)* **A registry-`global` binding is bound at `global` or at every owner with a verb for it; a narrower placement is a declared capture.** `?`, `selection.native` and `selection.semantic` are `global` rows; `copy` is an owner row at `prompt`, `liveBlock`, `interaction` and `semanticSelection`, and native selection passes it to the terminal. `?` at `nativeSelection` is captured to `passToTerminal`. Entering one copy mode leaves the other, so from the other mode a `selection.*` chord switches and from the same mode it does nothing. *The active owner resolves that purpose* — so an owner with the verb and no row is the defect, and it was: `copy` had one owner of four, `?` one of five.
@@ -2221,6 +2277,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I72** — *(§3c S8, S8b, I61, C22 I129)* **A focus-out clears the held keys and the pointer arm, and ends a guard waiting on a key-up.** It is read before routing and routed nowhere (I61): no stage, no rung, and the last dispatch's stages stand. A timed guard is left to its clock, because its numbers are about repeats and a focus-out stops none that matter. Reports arrive only where the application opted in (C22 I129); without them nothing here happens, and that is the stated limit. → T1.186
 - **I73** — *(§3c S9, S10b, I43, → C15 I33)* **The epoch moves when the rung changes or the owner generation does.** The generation is a pull (`ownerGeneration`) summing C15's count of keyed pushes and removals and the surface host's attachments, so a question raised and answered between two reads — the rung the same at both — still kills an arm taken before it. **A generation change at the `question` rung is a question arriving**, and is guarded as one: a question replaced by a question within one dispatch. The counter is private to `router.ts`; its readers are `commitPointer` and the guard. → T1.187, T1.188
 - **I74** — *(§3d, I48, → C15 I31, R-BLK-779, R-SEL-012)* **The pointer reaches the topmost layer that takes its gesture.** `placed` is asked per gesture — C15's `takesPointer`, so a peek takes the wheel and no press — and the router takes the **last** hit, because C15's `layout` is draw order. **A wheel over a layer goes to that layer's scroller by id** (`scrollLayer(id, notches)`), never through a rung handler that reads `top`: a keyed layer consumes the wheel whether or not it moved, and a peek that has nothing to scroll **declines** it to the base, as a `scroll` that cannot move does. The menu's scroller is a window offset held beside its selection and independent of it — the wheel changes what is shown and never what is chosen (C19 I20), and the next key that moves the selection brings the window back to it. Any other layer's scroller is a row offset into its own rendered lines, clamped to them at write and dropped when the layer goes. → T1.189, T1.190, T1.191, T4.92, T4.93
+- **I75** — *(§3e, §103, I49, I64, I65, R-BLK-908, R-OWN-002, ruling 62)* **The host escape is a reserved route, read before the ladder.** `interceptOf` answers `host-detach` for a key the keymap's `child` rows resolve to `hostDetach` — `⌃]`, and `⌥esc` under the enhanced profile — and the table declares `global-intercept` at `child`, whose exception calls `detachChild`, and `handle` at every other rung. **No handler at `child` is offered the chord**, so the detach does not depend on which handler registered first, and the composition root registers none for it. A **release** of the chord at `child` is consumed and detaches nothing — the child is not handed half a chord the host took. A question raised over an attached child waits beneath it and takes the keys at the detach, guarded from that observation (I69, I73). → T1.193, T1.194, T4.94
 
 ## 9. Commitments
 
@@ -2277,6 +2334,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 49. The epoch sees every owner change, including one raised and gone between two reads (I73). → T1.187
 50. The pointer reaches the topmost layer that takes its gesture, a peek included for the wheel, and a wheel over a layer goes to that layer's scroller by id (I74). → T1.189, T1.190, T1.191, T4.92, T4.93
 51. Only an unmodified primary press dismisses an escapable layer; every other press or drag beside it is inert (I47). → T1.192
+52. The host escape is a reserved route read before the ladder, so no handler registered at the child's rung can take it (I75). → T1.193, T1.194, T4.94
 
 ---
 
@@ -2386,6 +2444,8 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.190** (I74, §3d P2–P4): a wheel over a keyed layer is consumed whether `scrollLayer` answers `true` or `false`; a horizontal wheel over it is consumed and asks no scroller; no rung handler is reached in any of the three.
 - **T1.191** (I74, C15 I31, §3d P5–P7): over a peek, a wheel asks `scrollLayer` for the peek and is consumed when it answers `true`; when it answers `false` the base takes the wheel — the entry under the pointer. A press there reaches the entry beneath, because `placed("press")` does not hold the peek.
 - **T1.192** (I47, §3d P8–P10): beside an escapable panel, a right press, a middle press, a ⇧-, ⌃- and ⌥-press and a drag each answer `true`, pop nothing and reach no target; the control, an unmodified primary press, pops it.
+- **T1.193** (I75, §3e H1, H2, H6, H7): a `child` handler that consumes every key, registered **before** a second and **after** it in two routers: `⌃]` at `child` calls `detachChild` once and neither handler is offered it, with the stages `intercept:host-detach:child:global-intercept` and `intercept:detach`; its release at `child` is consumed, calls nothing and reaches no handler; at the prompt with no child, `⌃]` takes `handle` and the ladder runs. The control is `a` at `child`, which the first handler takes.
+- **T1.194** (I75, I64, §3e H3): the chord is the keymap's — `interceptOf` over a keymap whose `host.detach` row is rebound answers `host-detach` for the new chord and `null` for `⌃]`; under the enhanced profile `⌥esc` is the escape and under the base profile it is not. `INTERCEPTS["host-detach"]` is `global-intercept` at `child` and `handle` at every other rung and idle.
 - **T1.188** (I73, §3c S10b): at the `question` rung, a dispatch that moves the generation leaves the router guarded afresh; the same dispatch with the generation still leaves it unguarded.
 
 ### Tier 2 — contract / interface
@@ -2487,6 +2547,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T4.90** (I71, §3c S1): through the graph — press on focused row A, `↓` moves focus to row B while the button is down, release over A: A's action fires and B's does not.
 - **T4.92** (I74, C19 I20, §3d Q2): through the graph — a typed menu truncated by its placement; a wheel down over it moves its window, so the first candidate shown changes, while `selected` stays `null` and the transcript's `topRow` does not move; `↓` then selects and the window follows the selection.
 - **T4.93** (I74, C15 I31, §3d P5, P6): through the graph — a peek truncated by its placement; a wheel over it moves the peek's rows and not the transcript's `topRow`; over a peek that fits, the same wheel moves the transcript.
+- **T4.94** (I75, I49, §3e H2, H8): through the graph — a surface attached and a second `child` handler registered **`first: true`** that consumes every key; `⌃]` as bytes closes the surface with reason `detach` and neither the child nor the handler saw it. Then a verb that asks while a surface is attached: the question waits, `⌃]` detaches, and the question is answered by a deliberate `⏎`.
 - **T4.91** (I69, I70, C22 §6): through a built session on a terminal with no release reporting — a question arrives: the owner line reads `ready in a moment`; a `⏎` at +100 is refused and the line names `⏎ refused: pause, then press ⏎`; a second at +200 is refused and **the frame does not change**; with no input, the frame at the deadline has no mark, because the wake drew it.
 - **T4.81** (I62, C23 I36, ruling 59): through the confirm host — `⌃c` at an open question: the promise is unsettled, the layer is open, and the notice is drawn. **T4.81b**: the same with `inFlight: "local"` — `cancels() === 0`.
 - **T4.82** (C23 I82, R-HON-004, R-INT-008, ruling 60): the first `q` at a choice question → exactly one C15 `content` change and one `invalidate`, and the frame at 80 columns, read as text, holds `answer this first` on the question's row; the second `q` → no change, no `invalidate`, the same lines; then `n` answers. At a 12-row region the choices are still drawn after the notice lands.
@@ -2597,6 +2658,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.60** (I74): the router's hit test back to `find` → T1.189 fails, and the overlap reaches the lower layer.
 - **T6.61** (I74, C15 I31): L4's `placed` filtered by `takesInput` again → T4.93 fails, and the wheel over a truncated peek scrolls the transcript.
 - **T6.62** (I47): the dismissal back to any non-wheel press → T1.192 fails on the right press.
+- **T6.63** (I75): `interceptOf`'s `host-detach` arm removed and the composition root's `child` handler restored → T4.94 fails, and the handler registered ahead takes `⌃]`: the surface stays attached.
 - ~~**T6.36**~~ — **retired with T3.20** (ruling 52 as amended, I69). It read *the guard given a time window instead of a boundary event → T3.20 fails*, and the arm without releases is given two windows by the person's ruling. The objection it carried — a single window is wrong in both directions — is kept by I69's grace and T6.54.
 - **T6.53** (I69): the gap no longer restarted by a refusal — the guard ends when its grace does → T1.181 fails on the repeat after the grace.
 - **T6.54** (I69): the arrival grace dropped, leaving the 250 ms gap from the arrival alone — ruling 52's first form → T1.182 fails at the 660 ms repeat.
