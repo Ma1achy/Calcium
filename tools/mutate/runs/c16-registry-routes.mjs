@@ -28,6 +28,8 @@ const CONSTRUCT = "src/shell/construct.ts";
 const CONFIG = "src/shell/config.ts";
 const CONTEXT = "src/interaction/completion/context.ts";
 const KEYS = "src/shell/keys.ts";
+const ROUTER = "src/interaction/router/router.ts";
+const INTERCEPTS = "src/interaction/router/intercepts.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -223,6 +225,25 @@ const MUTATIONS = [
     from: '    bound(row.binding.target, { kind: "key", key: pressOf(row.binding.key) })?.();\n',
     to: "",
     expect: "T1.177",
+  },
+  {
+    // **T6.48 (C16 I67)** — the ladder's `⌃c` ignoring shift. The intercept
+    // table is still exact, so a stage read at the intercept sees nothing; the
+    // cancel rung is the ladder's, and kitty `⌃⇧C` cancels the verb in flight.
+    name: "the router's isCtrlC ignores shift",
+    file: ROUTER,
+    from: 'const isCtrlC = (e: InputEvent): boolean => e.kind === "key" && isExactCtrlC(e.key);\n',
+    to: 'const isCtrlC = (e: InputEvent): boolean => e.kind === "key" && e.key.ctrl && e.key.name === "c";\n',
+    expect: "T4.87",
+  },
+  {
+    // **T6.51 (C16 I67)** — the intercept table's `⌃c` ignoring shift: kitty
+    // `⌃⇧C` takes the interrupt stage at every rung.
+    name: "interceptOf ignores shift",
+    file: INTERCEPTS,
+    from: '  if (isExactCtrlC(key)) return "interrupt";\n',
+    to: '  if (key.ctrl && key.name === "c") return "interrupt";\n',
+    expect: "T1.172",
   },
 ];
 

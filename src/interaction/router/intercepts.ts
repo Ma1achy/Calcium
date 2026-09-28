@@ -17,7 +17,7 @@
  * live in one.
  */
 
-import type { InputEvent, InterceptVerdict, OwnerRung } from "./types.js";
+import type { InputEvent, InterceptVerdict, Key, OwnerRung } from "./types.js";
 
 /** The intercepts §103 names. An app-registered one joins this union (M7). */
 export type InterceptId = "interrupt" | "page-scroll" | "wheel";
@@ -167,10 +167,29 @@ export function interceptVerdict(id: InterceptId, rung: OwnerRung | null): Inter
  * into a compromise: *the active viewport* had to mean the focused box for
  * `PgUp` and the transcript for `⌥↑`, and one verdict cannot say both.
  */
+/**
+ * `⌃c`, exactly (C16 I67, §6c S7–S10): `ctrl` and the name `c`, and no
+ * `shift`, `meta` or `super`.
+ *
+ * **Kitty's `⌃⇧C` is `CSI 99;6u`** — the name `c` with `shift` — and it is the
+ * enhanced profile's `copy`. Read loosely it was an interrupt at every reader:
+ * it cancelled a running verb (measured), armed the exit and denied a question.
+ * On the base profile the bytes are `0x03`, which decodes with no `shift`, so
+ * interrupt still wins there.
+ *
+ * **One predicate for both readers** — this table and the router's ladder. The
+ * question's classifier was the third and read the same loose test; it stopped
+ * reading `⌃c` at all with ruling 59 (C16 I62), since the router refuses it at a
+ * question before the classifier is asked.
+ */
+export function isExactCtrlC(key: Key): boolean {
+  return key.ctrl && key.name === "c" && !key.shift && !key.meta && key.super !== true;
+}
+
 export function interceptOf(e: InputEvent): InterceptId | null {
   if (e.kind === "mouse") return e.button.startsWith("wheel") ? "wheel" : null;
   if (e.kind !== "key") return null;
   const { key } = e;
-  if (key.ctrl && key.name === "c") return "interrupt";
+  if (isExactCtrlC(key)) return "interrupt";
   return key.meta && (key.name === "up" || key.name === "down") ? "page-scroll" : null;
 }

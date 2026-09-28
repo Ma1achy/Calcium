@@ -16,9 +16,12 @@
 //     block: the kill buffer holds nothing.
 //   - The copy-mode switch removed from `session.ts` (T6.52) → T4.89 fails with
 //     both modes on: `COPY` survives native selection's exit.
+//   - `isCtrlC` in the router ignoring shift again (T6.48) → T4.87 fails: kitty
+//     `⌃⇧C` cancels the verb in flight.
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { buildGraph, buildSession, COPY_MODES, FRAME } from "../support/session.js";
+import { buildGraph, buildSession, COPY_MODES, FRAME, MANIFEST } from "../support/session.js";
+import type { ManifestDocument } from "../../src/data/manifest/types.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 import { MENU_ID } from "../../src/interaction/completion/index.js";
 import { SEARCH_ID } from "../../src/interaction/history/index.js";
@@ -27,6 +30,9 @@ import type { Graph } from "../../src/shell/construct.js";
 const ESC = "\u001b";
 const DOWN = `${ESC}[B`;
 const ALT_W = `${ESC}w`;
+/** Kitty's `⌃⇧C`: codepoint 99, modifiers 1 + shift + ctrl. */
+const KITTY_CTRL_SHIFT_C = `${ESC}[99;6u`;
+const CTRL_C = "\u0003";
 
 const META = {
   adapter: "passthrough", exitCode: 0, durationMs: 0, truncated: false,
@@ -217,11 +223,10 @@ describe("C16 §6c — the registry-global bindings, per owner (review batch 2, 
   });
 
   it("T4.86 (C16 I66): ⌥w and kitty ⌃⇧C copy at the prompt, a focused block, the inside and semantic copy", async () => {
-    // **The kitty arm needs `isCtrlC` to be exact** (I67): until it is, the
-    // intercept reads `CSI 99;6u` as `⌃c` and interrupts before any owner is
-    // asked — §6c S7, measured. It joins this list in the commit that makes
-    // the three predicates exact.
-    const CHORDS: readonly (readonly [boolean, string])[] = [[false, ALT_W]];
+    // **The kitty arm rests on I67**: read loosely, the intercept took
+    // `CSI 99;6u` as `⌃c` and interrupted before any owner was asked — §6c S7,
+    // measured.
+    const CHORDS: readonly (readonly [boolean, string])[] = [[false, ALT_W], [true, KITTY_CTRL_SHIFT_C]];
     for (const [kitty, chord] of CHORDS) {
       const label = kitty ? "⌃⇧C" : "⌥w";
       {
@@ -252,6 +257,8 @@ describe("C16 §6c — the registry-global bindings, per owner (review batch 2, 
         // function onto its effect deps at construction, so a spy installed
         // after it watches a function nothing calls.
         const copied = vi.spyOn(FRAME, "copySelectedEntries");
+        // Spying twice returns the same spy, so the previous chord's call is on it.
+        copied.mockClear();
         const w = await world(kitty);
         COPY_MODES.semantic = true;
         await w.type(chord);
@@ -261,7 +268,79 @@ describe("C16 §6c — the registry-global bindings, per owner (review batch 2, 
     }
   });
 
-  it.todo("T4.87 (C16 I67): kitty ⌃⇧C neither cancels a verb, arms the exit nor denies a question; 0x03 cancels on the base profile — not deferred on a component: the code lands in the next commit of this round");
+  it("T4.87 (C16 I67): kitty ⌃⇧C neither cancels a verb, arms the exit nor denies a question; 0x03 cancels on the base profile", async () => {
+    /** A session with a local verb that never settles, so one can be in flight. */
+    const slowWorld = async (kitty: boolean) => {
+      const built = await buildGraph({
+        manifest: {
+          ...(MANIFEST as ManifestDocument),
+          tools: [
+            ...(MANIFEST as ManifestDocument).tools,
+            { name: "slow", local: true, summary: "never settles", args: [], flags: [] },
+          ],
+        } as never,
+        localHandlers: { slow: () => new Promise<never>(() => undefined) },
+        ...(kitty ? { capabilities: { keyboardProtocol: "kitty" } as never } : {}),
+      });
+      built.graph.lifecycle.acquire();
+      const type = async (bytes: string): Promise<void> => {
+        built.stdin.emit(bytes);
+        for (let i = 0; i < 3; i += 1) await new Promise((r) => setTimeout(r, 0));
+      };
+      return { graph: built.graph, type };
+    };
+    {
+      // S7: a verb in flight survives the copy.
+      const w = await slowWorld(true);
+      await w.type("/slow\r");
+      expect(w.graph.pipeline.inFlight, "the control: a verb is in flight").not.toBeNull();
+      await w.type(KITTY_CTRL_SHIFT_C);
+      expect(w.graph.router.lastStages, "no cancel").not.toContain("cancel");
+      expect(w.graph.pipeline.inFlight, "and the verb is still running").not.toBeNull();
+    }
+    {
+      // S8: twice at an empty prompt arms nothing. Spied before the build, as
+      // T4.86's copy spy is: the root copies the frame's function at construction.
+      const exit = vi.spyOn(FRAME, "raiseExitConfirm");
+      const w = await world(true);
+      await w.type(KITTY_CTRL_SHIFT_C);
+      await w.type(KITTY_CTRL_SHIFT_C);
+      expect(exit, "no exit confirm").not.toHaveBeenCalled();
+      // The control: the same two presses of `⌃c` do raise it.
+      await w.type(CTRL_C);
+      await w.type(CTRL_C);
+      expect(exit, "while ⌃c twice does").toHaveBeenCalledTimes(1);
+    }
+    {
+      // S9: at a question a copy is not an interrupt. **Since ruling 59 neither
+      // answers the question** — the router refuses `⌃c` there and the
+      // classifier stopped reading it (C16 I62) — so what differs is the stage:
+      // `⌃c` takes the intercept, and `⌃⇧C` reaches the question as the key it is.
+      const w = await world(true);
+      let answered: unknown = null;
+      void w.graph.confirm.ask({ question: "delete?", choices: REPLYABLE }).then((a) => (answered = a));
+      await new Promise((r) => setTimeout(r, 0));
+      const interrupts = () => w.graph.router.lastStages.filter((s) => s.startsWith("intercept:interrupt"));
+      // Twice: a newly raised owner refuses its first activation (C16 I44).
+      await w.type(KITTY_CTRL_SHIFT_C);
+      await w.type(KITTY_CTRL_SHIFT_C);
+      expect(interrupts(), "no interrupt stage").toEqual([]);
+      expect(w.graph.confirm.open, "the question is still open").toBe(true);
+      expect(answered, "and unanswered").toBeNull();
+      // The control: `⌃c` takes the intercept at the question's rung.
+      await w.type(CTRL_C);
+      expect(interrupts(), "⌃c is the interrupt").toEqual([expect.stringMatching(/^intercept:interrupt:question:/u)]);
+    }
+    {
+      // S10: on the base profile the bytes are `0x03`, and interrupt wins.
+      const w = await slowWorld(false);
+      await w.type("/slow\r");
+      expect(w.graph.pipeline.inFlight).not.toBeNull();
+      await w.type(CTRL_C);
+      expect(w.graph.router.lastStages, "0x03 cancels").toContain("cancel");
+      expect(w.graph.pipeline.inFlight).toBeNull();
+    }
+  });
 
   it("T4.89 (C16 I66, §6c S11): a selection chord from the other copy mode switches and leaves one mode; from its own mode it changes nothing", async () => {
     // **A real session, because the switch is the session's** (§6c rulings):

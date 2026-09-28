@@ -24,7 +24,7 @@ import {
   type OwnerRung,
   type Verdict,
 } from "./types.js";
-import { INTERCEPTS, interceptOf, interceptVerdict } from "./intercepts.js";
+import { INTERCEPTS, interceptOf, interceptVerdict, isExactCtrlC } from "./intercepts.js";
 import { repeatFor, repeatSteps } from "./repeat.js";
 
 const EXIT_ARM_MS = 500;
@@ -277,8 +277,8 @@ export interface InputRouter {
   readonly lastStages: readonly string[];
 }
 
-const isCtrlC = (e: InputEvent): boolean =>
-  e.kind === "key" && e.key.ctrl && e.key.name === "c";
+/** The ladder's `⌃c`, which is the intercept table's (C16 I67). */
+const isCtrlC = (e: InputEvent): boolean => e.kind === "key" && isExactCtrlC(e.key);
 
 export function createRouter(
   opts: Readonly<{ focus: FocusStore; keymap: Keymap; now: () => number; deps: RouterDeps }>,

@@ -10,7 +10,14 @@ import { createFocusStore } from "../../src/interaction/router/focus.js";
 import { createKeymap, defaultKeymap } from "../../src/interaction/router/keymap.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { block, type Plot } from "../../src/data/viewmodel/index.js";
-import { INTERCEPTS, interceptVerdict, type InterceptId } from "../../src/interaction/router/intercepts.js";
+import { createDecoder } from "../../src/interaction/router/decode.js";
+import {
+  INTERCEPTS,
+  interceptOf,
+  interceptVerdict,
+  isExactCtrlC,
+  type InterceptId,
+} from "../../src/interaction/router/intercepts.js";
 import { createRouter, type Placed, type Refusal, type RouterDeps } from "../../src/interaction/router/router.js";
 import { OWNER_RUNGS, type InputEvent, type Key } from "../../src/interaction/router/types.js";
 import { addr } from "../support/focus.js";
@@ -1650,5 +1657,66 @@ describe("C16 §3b — a reject consumes and explains; one rung; two verdict voc
 });
 
 describe("C16 I67 — ⌃c is recognised exactly (review batch 2, M6)", () => {
-  it.todo("T1.172 (C16 I67): the three predicates over kitty ⌃⇧C, ⌥⌃c, ⌘⌃c and 0x03, through interceptOf and through dispatch's stages — not deferred on a component: the code lands in the next commit of this round");
+  it("T1.172 (C16 I67): the predicate over kitty ⌃⇧C, ⌥⌃c, ⌘⌃c and 0x03, through interceptOf and through dispatch's stages at a scope rung, an empty prompt and a question", () => {
+    // **Decoded, not written by hand**, for the two chords whose shape is the
+    // claim: kitty's `⌃⇧C` is `CSI 99;6u` and base `⌃c` is `0x03`, and a row
+    // that built `{ shift: true }` itself would assert the predicate against a
+    // key no terminal sends.
+    const decoded = (bytes: string, keyboardProtocol: "kitty" | "none"): InputEvent => {
+      const d = createDecoder({
+        capabilities: { bracketedPaste: true, mouse: true, keyboardProtocol },
+        now: () => 0,
+      });
+      const [e] = d.push(new TextEncoder().encode(bytes));
+      if (e === undefined) throw new Error(`no event for ${JSON.stringify(bytes)}`);
+      return e;
+    };
+    const KITTY_CTRL_SHIFT_C = decoded("\u001b[99;6u", "kitty");
+    const BASE_CTRL_C = decoded("\u0003", "none");
+    expect(KITTY_CTRL_SHIFT_C, "the fixture is the chord: `c` with ctrl and shift").toMatchObject({
+      kind: "key",
+      key: { name: "c", ctrl: true, shift: true },
+    });
+    const KEYS: readonly (readonly [string, InputEvent, boolean])[] = [
+      ["⌃c", ctrlC, true],
+      ["0x03", BASE_CTRL_C, true],
+      ["kitty ⌃⇧C", KITTY_CTRL_SHIFT_C, false],
+      ["⌥⌃c", key("c", { ctrl: true, meta: true }), false],
+      ["⌘⌃c", key("c", { ctrl: true, super: true }), false],
+    ];
+    for (const [label, e, interrupt] of KEYS) {
+      expect(interceptOf(e), `${label} through interceptOf`).toBe(interrupt ? "interrupt" : null);
+
+      // An empty prompt: the arming machine's rung.
+      {
+        const { router, calls } = harness();
+        router.dispatch(e);
+        const stages = router.lastStages.filter((s) => s.startsWith("intercept:interrupt"));
+        expect(stages.length > 0, `${label} at an empty prompt: an interrupt stage`).toBe(interrupt);
+        if (!interrupt) expect(calls, `${label} arms nothing`).toEqual([]);
+      }
+      // A scope rung: focus in the transcript, a block owning the keys.
+      {
+        const { router, focus } = harness();
+        focus.enterLiveBlock("e1", null);
+        router.dispatch(e);
+        const stages = router.lastStages.filter((s) => s.startsWith("intercept:interrupt"));
+        expect(stages.length > 0, `${label} at a scope rung`).toBe(interrupt);
+      }
+      // A question: the intercept's reject is what reaches it for `⌃c`.
+      {
+        // An answer callback is what makes the top a question's rung (T1.40).
+        const { router, layer } = harness({ overlayAnswerCallback: () => () => false });
+        layer.top = { id: "confirm", kind: "overlay", blocking: true, dismissal: "answer" };
+        router.dispatch(e);
+        expect(
+          router.lastStages.includes("intercept:interrupt:question:reject"),
+          `${label} at a question`,
+        ).toBe(interrupt);
+      }
+    }
+    // **The predicate is the table's**, so the ladder and the classifier cannot
+    // hold a different answer for the same key.
+    expect(isExactCtrlC({ name: "c", ctrl: true, meta: false, shift: false, sequence: "" })).toBe(true);
+  });
 });
