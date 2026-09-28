@@ -163,3 +163,12 @@ describe("C05 fail-on-revert", () => {
   // T6.8 is written, in test/integration/transport.test.ts, beside the T4.4 it
   // names.
 });
+
+describe("C05 I27, I28 fail-on-revert, owed at the spec commit", () => {
+  it.todo(
+    "T6.17 (I27): deleting the view refusal from parseTool and parseFlag → T1.24 fails — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T6.18 (I28): seeding the collision set from FRAMEWORK_NAMES alone → T1.25 fails — not deferred on a component: the code lands in the next commit of this round",
+  );
+});

@@ -711,3 +711,12 @@ function promoteArg(source: Bag): Bag {
 function tools0(source: Bag): Bag {
   return (source["tools"] as Bag[])[0]!;
 }
+
+describe("C05 I27, I28 — a retired key and a reserved name, owed at the spec commit", () => {
+  it.todo(
+    "T1.24 (I27): view on a tool, on a flag, and view: false are refused at parse naming the retirement; the manifest without it parses and an unknown viewport key is still dropped — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T1.25 (I28): an app tool named watch, unwatch or config is refused naming the reservation; RESERVED_VERBS is disjoint from FRAMEWORK_NAMES; the --watch flag and a watching tool parse — not deferred on a component: the code lands in the next commit of this round",
+  );
+});
