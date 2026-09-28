@@ -210,3 +210,9 @@ describe("C05 integration", () => {
     expect(keys, "and the verb list is not repeated there").not.toContain("/promote");
   });
 });
+
+describe("C05 §3 — `/config`, the ninth verb, owed at the spec commit", () => {
+  it.todo(
+    "T4.9 (C05 §3, C23 I80): /config is a local framework row, an app tool named config is refused as a shipped verb, and submitting it appends C23 I80's table over ResolvedConfig.settings with motion reading reduced — not deferred on a component: the code lands in the next commit of this round",
+  );
+});
