@@ -56372,3 +56372,68 @@ rule decides — two blanks, the same column at every rung. The 33 fixtures and 
 **through successor blocks via the builder**, never by editing released blocks in place, and
 `make design-check` holds the result. **Owed**, with batch 2.
 
+
+## F1263 — `isBand` asked the theme, not the resolver, and disagreed at 1 bit ★★☆☆☆
+
+**Measured over every shipped theme × surface × {1, 4, 8, 24} (1100 cells)**: `isBand`
+disagreed with what the resolver paints in exactly the 1-bit band cells of both HC themes (and
+the `high-contrast` alias). `toneCarries`' own depth clause masked it for the head mark; what
+leaked was `RenderContext.washed` keying the render cache at 1 bit, where selecting and clearing
+cost two `focus` misses for an unchanged picture. Two latent cells — a band with no 4-bit pair,
+and an orphan pair — are closed in the resolver and the validator (rulings 55, 56). Closed by
+C10 I66: `bandAt` is the resolver's answer, and `isBand` delegates to it. Measured on landing:
+T6.130's mutation fails T1.51 **and** the written-out band lists in T2.72 and C09 T1.84, so the
+spec's "only T1.51" was corrected (433f2555's successor on the batch 2 branch). Ruling 56's
+premise was measured before building: in a stale panel, the four started states drew `●` in one
+dim ink in dark, hcDark and light at 24, 8 and 4 bits.
+
+## F1264 — a golden prediction's grep saw one spelling of the token ★☆☆☆☆
+
+M4 item 9's prediction said zero golden movers for the `running` → `work-unit` rename; six lines
+moved, all in `design-surfaces` (the vocabulary table at dark-unicode, dark-mono-unicode and
+dark-ascii, 40 and 80). The grep behind the prediction matched `"running"` and `glyph…running`;
+the surface prints the vocabulary as bare token names. The same class as *a matcher that sees one
+encoding*: the instrument that names the movers saw one form of the subject.
+
+## F1265 — `c23-operation-head`'s "stopped head composed as running" mutation survives ★☆☆☆☆
+
+`const running = true;` in `operationHead` survives T1.71, identically before this batch
+(f8fd47bb). From reading, not measured: the run's comment says every settled line would start
+with a spinner frame, but `operationHeader` asks `operationRunning` itself, so the text does not
+move; what the mutation changes is the settled head's `state`, `tone` and gutter glyph, which
+T1.71 does not read. **Owed**: a row reading the settled head's mark and tone, or a corrected
+run comment. Symbol: `operationHead`.
+
+## F1266 — C15 I29 is built in its narrow form ★☆☆☆☆
+
+A declared layer owner must agree with its layer's fields, but an **undeclared** keyed layer is
+still admitted and reads as `question` (overlay) or `substate` (panel). The strict form — every
+keyed layer declares an owner — rewrites 52 layer-pushing rows across 11 test files that are not
+M5's subject. **Owed** as its own change. Symbol: `LayerOwner`.
+
+## F1267 — a shell delegation forwards no key to its child ★★☆☆☆
+
+Ruling 62 made the `child` rung consume keys nobody binds, so F1 during `!cmd` no longer submits
+`/help keys`; but a delegated `vim` never receives F1 or anything else the rung consumes.
+Forwarding bytes to the delegated child's stdin needs a C21/C23 mechanism that does not exist.
+A question raised under an attached surface child is owed to batch 3's M9 item 4.
+
+## F1268 — a truncated question redrew untruncated after a selection move ★☆☆☆☆
+
+The confirm layer's `cut` flag was lost on redraw, so a question truncated to fit redrew at full
+length once the reader moved the selection. Found and fixed while building C23 I82: `cut` is held
+across redraws.
+
+## F1269 — `/history clear` was never wired ★☆☆☆☆
+
+`clearConfirmLayer` pushed a blocking layer with no answer callback, and no `src` path pushed it
+at all; under a declared `question` owner nothing could have answered it. Retired with its
+module-graph exemption and SS56 allow entry (ruling 61).
+
+## F1270 — stale `OWNER_ACTIONS` references, and an overlay row that no longer fires ★☆☆☆☆
+
+`registry-bindings.ts` and `generate-keymap.mjs` still name `OWNER_ACTIONS`, which does not
+exist. The overlay `escape → dismiss` row is dead in practice: the only blocking overlay is a
+question, whose own handler takes `esc`. Also recorded: a refused `⌃c` during a semantic drag no
+longer stops the autoscroll (C14 I48, consistent with R-SEL-013); C22 T4.49 and T4.53 are
+load-sensitive at the base as well as after M5.
