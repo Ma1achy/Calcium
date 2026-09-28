@@ -214,8 +214,8 @@ const MUTATIONS = [
     // name alone.
     name: "the palette's delimiter is a space",
     file: CONSTRUCT,
-    from: '({ value: r.id, detail: r.keys.join(" · "), delimiter: "" })',
-    to: '({ value: r.id, detail: r.keys.join(" · "), delimiter: " " })',
+    from: 'separator} `), delimiter: "" })',
+    to: 'separator} `), delimiter: " " })',
     expect: "T1.177",
   },
   {
