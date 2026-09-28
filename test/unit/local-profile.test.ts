@@ -240,6 +240,10 @@ describe("C23 — /profile, the local route", () => {
     expect(cardIds.length, "and every card framed one").toBe(cardsOf("framework").length);
   });
 
+  it.todo(
+    "T1.66d (C23 I69, C09 I49): the cards are drawn with the context's capabilities, never the deck's ASCII default — not deferred on a component: the code lands in the next commit of this round",
+  );
+
   it("T1.96 (C23 I69, C09 I49): the cards are drawn with the context's capabilities, never the deck's ASCII default", async () => {
     // **The view handed `detection.capabilities` whole and the handler does
     // now** (R-EXA-082, F1254). The seam moved and the claim did not: the deck
