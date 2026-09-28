@@ -1116,8 +1116,46 @@ describe("C04 I128 — a trend cell", () => {
   });
 });
 
-describe("C04 I6 — a closed vocabulary carries its own fact (ruling 44), owed at the spec commit", () => {
-  it.todo(
-    "T2.139 (C04 I6, ruling 44): a column declaring vocabulary lets env warn and flag error stand with no glyph at both doors; envx, an empty vocabulary, an empty word and a repeated word are refused; the same cell with no vocabulary and a warn notice still need a glyph — not deferred on a component: the code lands in the next commit of this round",
-  );
+describe("C04 I6 — a closed vocabulary carries its own fact (ruling 44)", () => {
+  const WORDS = ["default", "config", "env", "flag"];
+  // `null` is *declares none* — an `undefined` would take the default.
+  const table = (cells: readonly Record<string, unknown>[], vocabulary: unknown = WORDS): Record<string, unknown> => ({
+    kind: "table",
+    id: "settings",
+    columns: [{ key: "source", label: "source", priority: 1, minWidth: 7, sortable: false, ...(vocabulary === null ? {} : { vocabulary }) }],
+    rows: cells.map((cell, i) => ({ id: `r${String(i)}`, cells: { source: cell } })),
+  });
+  const wire = (b: Record<string, unknown>): string => {
+    const r = validateBlock(b);
+    return r.ok ? "" : r.error.join("\n");
+  };
+
+  it("T2.139 (C04 I6, ruling 44): a declared vocabulary lets its words carry warn and error with no glyph, and nothing else", () => {
+    // **The ladder's two loud rungs, on the word alone**, by both doors.
+    const loud = table([{ text: "env", tone: "warn" }, { text: "flag", tone: "error" }, { text: "default", tone: "muted" }]);
+    expect(() => blockOf(loud as never), "construction").not.toThrow();
+    expect(wire(loud), "the wire").toBe("");
+
+    // **Closed**: a word outside the set is refused whatever its tone — or
+    // free text would take the exemption by being put in the column.
+    for (const cell of [{ text: "envx", tone: "warn" }, { text: "envx" }]) {
+      const outside = table([cell]);
+      expect(() => blockOf(outside as never), JSON.stringify(cell)).toThrow(/"envx" is not a word of column "source"'s vocabulary \(C04 I6, ruling 44\)/u);
+      expect(wire(outside), `${JSON.stringify(cell)} at the wire`).toMatch(/"envx" is not a word of column "source"'s vocabulary \(C04 I6, ruling 44\)/u);
+    }
+
+    // **A set that cannot be checked against is refused**: empty, an empty
+    // word, a word twice.
+    for (const vocabulary of [[], ["env", ""], ["env", "env"]]) {
+      const bad = table([{ text: "env", tone: "warn" }], vocabulary);
+      expect(() => blockOf(bad as never), JSON.stringify(vocabulary)).toThrow(/"vocabulary" is a non-empty list of distinct, non-empty words \(C04 I6, ruling 44\)/u);
+      expect(wire(bad), `${JSON.stringify(vocabulary)} at the wire`).toMatch(/"vocabulary" is a non-empty list/u);
+    }
+
+    // **The controls.** The same `warn` cell in a column declaring nothing still
+    // owes its glyph, and so does a `warn` notice — the exemption is the
+    // declaration's, and I6 still fires everywhere else.
+    expect(() => blockOf(table([{ text: "env", tone: "warn" }], null) as never), "no vocabulary").toThrow(/requires a non-empty glyph \(C04 I6/u);
+    expect(() => blockOf({ kind: "notice", id: "n", tone: "warn", text: "env" } as never), "a notice").toThrow(/requires a non-empty glyph \(C04 I6/u);
+  });
 });

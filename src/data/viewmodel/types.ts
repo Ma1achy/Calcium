@@ -656,6 +656,17 @@ export type ColumnDef = Readonly<{
    * neutral column draws its arrow in the cell's default tone.
    */
   polarity?: "higher" | "lower" | "neutral";
+  /**
+   * The closed set of words this column's cells are drawn from (I6, ruling 44).
+   *
+   * **What lets a word carry a tone without a glyph.** §075's source column is
+   * the case — `env` is `warn`, `flag` is `error` — and the word *is* the fact,
+   * so the tone is its second carrier and colour is not alone (tie-break 4
+   * counts carriers per fact). **Declared, never inferred from the text**: a
+   * cell outside the set is refused, so a cell cannot opt itself out by
+   * spelling. Absent, the column is held to I6's glyph exactly as before.
+   */
+  vocabulary?: readonly string[];
 }>;
 
 export type TableRow = Readonly<{

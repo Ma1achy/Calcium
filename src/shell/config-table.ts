@@ -24,6 +24,9 @@ export const PROVENANCE_TONE: Readonly<Record<Provenance, Tone>> = Object.freeze
   flag: "error",
 });
 
+/** The ladder's keys, as the source column's vocabulary (C04 I6, ruling 44). */
+const PROVENANCE_WORDS: readonly string[] = Object.freeze(Object.keys(PROVENANCE_TONE));
+
 /**
  * One `table` block, one row per setting in the order given. **No `⏎ edit`
  * and no `r reset`** (§075 draws both): nothing writes a setting, and an
@@ -38,7 +41,10 @@ export function configBlock(settings: readonly Setting[], id: string): Block {
     columns: [
       { key: "key", label: "key", align: "left", priority: 3, minWidth: 3, sortable: false },
       { key: "value", label: "value", align: "left", priority: 1, minWidth: 5, flex: true, sortable: false },
-      { key: "source", label: "source", align: "left", priority: 2, minWidth: 7, sortable: false },
+      // **The ladder's four words, declared as the column's closed vocabulary**
+      // (C04 I6, ruling 44): `env` and `flag` carry `warn` and `error` on the
+      // word itself, which is the fact, so no glyph is owed beside it.
+      { key: "source", label: "source", align: "left", priority: 2, minWidth: 7, sortable: false, vocabulary: PROVENANCE_WORDS },
     ],
     rows: settings.map((s) => ({
       id: `config-${s.key}`,

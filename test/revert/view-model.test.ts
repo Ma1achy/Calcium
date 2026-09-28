@@ -503,8 +503,17 @@ describe("C04 §3 both axes — fail-on-revert", () => {
   });
 });
 
-describe("C04 I6 fail-on-revert — the vocabulary is closed, owed at the spec commit", () => {
-  it.todo(
-    "T6.105 (C04 I6, ruling 44): dropping the membership check → T2.139 fails on envx, free text carrying warn with no glyph — not deferred on a component: the code lands in the next commit of this round",
-  );
+describe("C04 I6 fail-on-revert — the vocabulary is closed", () => {
+  it("T6.105 (C04 I6, ruling 44): dropping the membership check → T2.139 fails on envx", () => {
+    // Without it the column's declaration exempts every cell under it, and a
+    // cell whose text is no word of the set carries `warn` with no glyph —
+    // free text opting itself out, the case the ruling says must not happen.
+    const outside = {
+      kind: "table",
+      id: "settings",
+      columns: [{ key: "source", label: "source", priority: 1, minWidth: 7, sortable: false, vocabulary: ["env", "flag"] }],
+      rows: [{ id: "r", cells: { source: { text: "envx", tone: "warn" } } }],
+    };
+    expect(() => block(outside as never)).toThrow(/C04 I6, ruling 44/u);
+  });
 });

@@ -1458,12 +1458,30 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
     requireArray(b, "columns", e, at);
     requireArray(b, "rows", e, at);
     // I128 — a column's polarity is one of three words, or absent for neutral.
+    // I6 (ruling 44) — a declared vocabulary is a closed set a cell can be
+    // checked against, collected here for the cell walk below.
+    const closed = new Map<string, ReadonlySet<string>>();
     if (isArray(b["columns"])) {
       for (const column of b["columns"]) {
-        if (!isRecord(column) || column["polarity"] === undefined) continue;
-        if (!["higher", "lower", "neutral"].includes(column["polarity"] as string)) {
+        if (!isRecord(column)) continue;
+        if (column["polarity"] !== undefined && !["higher", "lower", "neutral"].includes(column["polarity"] as string)) {
           e.push(`${at} column "${String(column["key"])}": "polarity" is "higher", "lower" or "neutral" (C04 I128)`);
         }
+        const words = column["vocabulary"];
+        if (words === undefined) continue;
+        if (
+          !isArray(words) ||
+          words.length === 0 ||
+          new Set(words).size !== words.length ||
+          words.some((w) => !isString(w) || w.length === 0)
+        ) {
+          e.push(
+            `${at} column "${String(column["key"])}": "vocabulary" is a non-empty list of distinct, ` +
+              `non-empty words (C04 I6, ruling 44)`,
+          );
+          continue;
+        }
+        closed.set(String(column["key"]), new Set(words as readonly string[]));
       }
     }
     // The other half of I6's glyph rule. A `Cell` carries one too, and a table
@@ -1487,6 +1505,15 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
         for (const [key, cell] of Object.entries(row["cells"])) {
           if (!isRecord(cell)) continue;
           requireGlyph(cell["glyph"], e, `${at} cell "${key}"`);
+          // I6, ruling 44 — the vocabulary is closed at the wire as at
+          // construction, or a far side's free text would take the exemption.
+          const words = closed.get(key);
+          if (words !== undefined && !words.has(cell["text"] as string)) {
+            e.push(
+              `${at} cell "${key}": ${JSON.stringify(cell["text"])} is not a word of column "${key}"'s ` +
+                `vocabulary (C04 I6, ruling 44) — the set is closed`,
+            );
+          }
           checkSpans(cell, "text", e, `${at} cell "${key}"`);
           // I46 — the second numeric array, and the one no round trip would
           // have surfaced: a sparkline drawn from a cell's own numbers.

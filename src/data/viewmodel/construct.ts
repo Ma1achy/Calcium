@@ -32,6 +32,7 @@ import {
   type Notice,
   type Plot,
   type PlotForm,
+  type Table,
   type Tone,
   type ViewDocument,
   IS_MATRIX,
@@ -111,6 +112,31 @@ function requireGlyph(tone: Tone | undefined, glyph: Glyph | undefined, where: s
     `${where}: tone "${tone}" requires a non-empty glyph (C04 I6, D29) — ` +
       `colour alone does not survive 1-bit or a colour-blind reader`,
   );
+}
+
+/**
+ * I6's exemption (ruling 44) — the columns that declare a closed vocabulary,
+ * each as its set of words.
+ *
+ * **The set is refused unless it can be closed**: empty, an empty word or a
+ * word twice, and the declaration says nothing a reader could check a cell
+ * against. The same refusal `validateDocument` makes at the wire.
+ */
+function vocabularies(table: Table): ReadonlyMap<string, ReadonlySet<string>> {
+  const out = new Map<string, ReadonlySet<string>>();
+  for (const column of table.columns) {
+    const words = column.vocabulary;
+    if (words === undefined) continue;
+    const set = new Set(words);
+    if (words.length === 0 || set.size !== words.length || words.some((w) => typeof w !== "string" || w.length === 0)) {
+      throw new BlockShapeError(
+        `table "${table.id}" column "${column.key}": "vocabulary" is a non-empty list of distinct, ` +
+          `non-empty words (C04 I6, ruling 44)`,
+      );
+    }
+    out.set(column.key, set);
+  }
+  return out;
 }
 
 /**
@@ -371,14 +397,28 @@ function checkShape(block: Block): void {
       checkPlotFormat(block);
       checkOrientation(block);
       break;
-    case "table":
+    case "table": {
+      const closed = vocabularies(block);
       for (const row of block.rows) {
         for (const [key, cell] of Object.entries(row.cells)) {
-          requireGlyph(cell.tone, cell.glyph, `table "${block.id}" row "${row.id}" cell "${key}"`);
-          checkCellContent(cell, `table "${block.id}" row "${row.id}" cell "${key}"`);
+          const where = `table "${block.id}" row "${row.id}" cell "${key}"`;
+          // **The exemption is the column's, and it holds only for its words**
+          // (ruling 44). A cell outside the set is refused whatever its tone:
+          // a closed vocabulary a cell could leave is free text by another name.
+          const words = closed.get(key);
+          if (words === undefined) {
+            requireGlyph(cell.tone, cell.glyph, where);
+          } else if (!words.has(cell.text)) {
+            throw new BlockShapeError(
+              `${where}: "${cell.text}" is not a word of column "${key}"'s vocabulary (C04 I6, ruling 44) — ` +
+                `the set is closed, and only its words may carry a tone without a glyph`,
+            );
+          }
+          checkCellContent(cell, where);
         }
       }
       break;
+    }
     case "form":
       // I140 — the registry's availability axis, word for word, at this door as
       // at the wire; a typo here would otherwise draw an enabled field.
