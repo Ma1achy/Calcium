@@ -1809,7 +1809,7 @@ exact `⌃c` predicate meets something that happened in between.
 | S6 | `h` throws | — | **the throw is contained at `bound`**: nothing was mutated before the call, the key is spent, and a `warn` notice names the action — an application's hook must not take the session down through the read loop, which has no `catch` |
 | S7 | kitty; a local verb in flight; `⌃⇧C` | cancelled (measured) | the prompt's copy; the verb still in flight |
 | S8 | kitty; empty prompt; `⌃⇧C` twice inside the window | armed, then the exit confirm | nothing arms |
-| S9 | kitty; a question open; `⌃⇧C` | the intercept's reject ran the rung, whose classifier denied | not an intercept; the question's own classifier, where it is not an answer |
+| S9 | kitty; a question open; `⌃⇧C` | the intercept's reject ran the rung, whose classifier denied | not an intercept; the question's own classifier, where it is not an answer. **Since ruling 59 (I62) neither path answers** — the classifier no longer reads `⌃c` — so the difference is the stage alone |
 | S10 | base; a local verb in flight; `0x03` | cancelled | cancelled — the bytes are `⌃c` and interrupt wins |
 | S11 | semantic copy mode; `⌥⇧C` | no row reached it — the rows were on `prompt` and `liveBlock` | semantic exits, native enters: one mode |
 
@@ -1827,8 +1827,9 @@ else still propagates, and that is unchanged here.
   the unseen entry the ruling's reason forbids.
 - **The mode switch is the session's**: entering either copy mode leaves the other first, so
   the two cannot be on together whatever routes a key there.
-- **Exact `⌃c` recognition covers the third site**: the question's classifier tests the same
-  predicate, or S9 denies on `⌃⇧C` while the router has stopped calling it an interrupt.
+- **Exact `⌃c` recognition is one predicate** (`isExactCtrlC`), read by the router's ladder and
+  the intercept table. The question's classifier was the third site when this was walked; ruling
+  59 removed `⌃c` from it (I62), so it has nothing to make exact.
 - **Ids**: a successor is `binding.<action>-enhanced` and a base record `binding.<action>-base`,
   the shape `binding.host-detach-enhanced` already has.
 - **`/help keys` shows the effective action**: a reserved row with no handler lists its
@@ -2089,7 +2090,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I65** — *(§4, R-OWN-002, M5 item 8)* **A key release reaches `child` and nothing else.** Native release events exist for an application surface; every other rung is edge-triggered, so a release anywhere else is dropped with the stage `release-dropped` and no handler runs. An answer callback that ignores `event` was a release answering the next question (§3b S12). → T1.169
 
 - **I66** — *(§6c table B, ruling 65, R-KEY-003, `keymapPolicy.universal`)* **A registry-`global` binding is bound at `global` or at every owner with a verb for it; a narrower placement is a declared capture.** `?`, `selection.native` and `selection.semantic` are `global` rows; `copy` is an owner row at `prompt`, `liveBlock`, `interaction` and `semanticSelection`, and native selection passes it to the terminal. `?` at `nativeSelection` is captured to `passToTerminal`. Entering one copy mode leaves the other, so from the other mode a `selection.*` chord switches and from the same mode it does nothing. *The active owner resolves that purpose* — so an owner with the verb and no row is the defect, and it was: `copy` had one owner of four, `?` one of five.
-- **I67** — *(§6c S7–S10, ruling 65, ruling 3 of the reconciliation)* **`⌃c` recognition is exact.** `isCtrlC`, `interceptOf` and the question's classifier require `ctrl` and the name `c` with no `shift`, `meta` or `super`, so kitty's `⌃⇧C` is `copy` and never interrupt, exit-arming or a question's denial. On the base profile the bytes are `0x03` and interrupt wins.
+- **I67** — *(§6c S7–S10, ruling 65, ruling 3 of the reconciliation)* **`⌃c` recognition is exact.** `isCtrlC` and `interceptOf` read one predicate, `isExactCtrlC`, which requires `ctrl` and the name `c` with no `shift`, `meta` or `super` — so kitty's `⌃⇧C` is `copy` and never interrupt or exit-arming, and at a question it takes no interrupt stage. On the base profile the bytes are `0x03` and interrupt wins. **Two readers, not three**: the question's classifier was the third and stopped reading `⌃c` at all under ruling 59 (I62), because the router refuses it at a question before the classifier is asked.
 - **I68** — *(§6c "The palette's way in", ruling 45, ruling 67, R-KEY-008)* **`>` opens the palette only as the line's first character, and a `>`-led line never reaches C18.** C19's `contextAt` tests `input[0] === ">"` before tokenising and answers the `action` slot with the text after it; a `>` anywhere else is classified as C18 reads it. On `⏎`, a line whose **resolved** text begins with `>` runs the action it names exactly, or appends a `warn` notice and keeps the line — it is never submitted, so `> notes` cannot truncate a file.
 
 ## 9. Commitments
@@ -2341,7 +2342,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T4.84** (I49, ruling 62): through a built session — a shell delegation in flight, `F1` → nothing is submitted.
 - **T4.85** (I66, I52, R-KEY-005): `?` through a real session at every cell of §6c table B's `?` column — typed at the prompt, the menu, the search, a typed reply and a field; one entry leading with `<rung> — where you are` at `liveBlock`, `interaction` and `semanticSelection`, history unchanged — there is no global rung to press it at, since `activeTarget` never answers `global`; nothing at `nativeSelection`; rejected at a blocking question; and the entry is the profile's — a kitty session's contains `⌘↑`, a default one's `⌃home` and no `⌘`. **Not `⌘1`**: the agent chords are reserved, and a reserved row with no handler is not listed (C22 I134), so its absence would say nothing about the profile.
 - **T4.86** (I66): `⌥w` copies at the prompt (the kill buffer), a focused block (`copyElement`), the inside (`copyElement`) and semantic copy (`copySelectedEntries`); under kitty `⌃⇧C` does the same at each.
-- **T4.87** (I67): under kitty, `⌃⇧C` with a verb in flight does not cancel; twice at an empty prompt raises no exit confirm; with a question open it does not deny. Under the default profile `0x03` cancels.
+- **T4.87** (I67): under kitty, `⌃⇧C` with a verb in flight does not cancel; twice at an empty prompt raises no exit confirm; with a question open it takes no interrupt stage where `⌃c` does. Under the default profile `0x03` cancels.
 - **T4.88** (I38, §6c S3–S4): with no handler, `⌥⌫` deletes a word in a typed reply and in a form field.
 - **T4.89** (I66, §6c S11): `⌥⇧C` from semantic copy switches to native selection and leaves one mode; `⌥⇧V` from native switches back; each chord from its own mode changes nothing.
 - **T4.80** (I54, I8, §052): through a built session — a question with `reply…`, the arm spent, `reply…` chosen, then letters typed: the line holds them and the answer carries them; `lastStages` for a letter names `prompt` and never `modal-blocked`. The control is the same letters before `reply…` is chosen: rejected, and the line untouched.
