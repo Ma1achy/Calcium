@@ -168,12 +168,14 @@ const results = runPass({
       // the line would say `↑⇥ hits`.
       name: "menuNext's rows back in their old order",
       file: KEYMAP,
+      // Re-anchored for C16 §6c: the rows spread `fromRegistry` where they
+      // called `chordOf`.
       from:
-        '  { target: "panel", key: chordOf("move.down"), action: "menuNext" },\n' +
-        '  { target: "panel", key: chordOf("focus.next"), action: "menuNext" },\n',
+        '  { target: "panel", ...fromRegistry("move.down"), action: "menuNext" },\n' +
+        '  { target: "panel", ...fromRegistry("focus.next"), action: "menuNext" },\n',
       to:
-        '  { target: "panel", key: chordOf("focus.next"), action: "menuNext" },\n' +
-        '  { target: "panel", key: chordOf("move.down"), action: "menuNext" },\n',
+        '  { target: "panel", ...fromRegistry("focus.next"), action: "menuNext" },\n' +
+        '  { target: "panel", ...fromRegistry("move.down"), action: "menuNext" },\n',
       expect: "T1.77",
     },
   ],
