@@ -1780,6 +1780,35 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     ).toBe(true);
   });
 
+  it("SS47 judges a literal's value, not its spelling: an escaped mark fires (F1326)", () => {
+    // **The fabricated violation is the shipped defect.** `patch/definition.ts`
+    // held the split separator as `"│"`, and a scan of the source
+    // characters read six ASCII characters. Every spelling of `│` must fire, and
+    // the literal one is the control: it fired before the change, so a row
+    // where the escapes fire and the literal does not has a broken fixture, not
+    // a working rule.
+    const spellings: Readonly<Record<string, string>> = {
+      "src/literal.ts": 'const sep = "│";',
+      "src/four.ts": String.raw`const sep = "│";`,
+      "src/braced.ts": String.raw`const sep = "\u{2502}";`,
+      "src/template.ts": String.raw`const row = ` + "`${a}\\u2502${b}`;",
+    };
+    const files = Object.keys(spellings);
+    const fired = checkMarks(files, (f) => spellings[f] ?? "", {});
+    expect(fired.map((v) => v.file).sort(), "every spelling of one value is one mark").toEqual([...files].sort());
+    expect(fired.every((v) => v.rule === "SS47")).toBe(true);
+
+    // **`\xNN` is a spelling too**, and U+00B6 is a mark — not prose, not a letter.
+    expect(checkMarks(["src/byte.ts"], () => String.raw`const p = "\xb6";`, {}), "a byte escape").toHaveLength(1);
+
+    // **Decoded from the left, one escape at a time.** `"\\u2502"` is a backslash
+    // and six ASCII characters: a decoder run as a bare `\\u` regex would call it
+    // `│`. And an escaped prose mark stays prose — the rule judges the value both
+    // ways, so `—` passes exactly as `—` does.
+    expect(checkMarks(["src/slash.ts"], () => String.raw`const s = "\\u2502";`, {}), "an escaped backslash").toEqual([]);
+    expect(checkMarks(["src/dash.ts"], () => String.raw`const d = "a — b";`, {}), "an escaped em dash is prose").toEqual([]);
+  });
+
   it("MG27 reads every builder file, not a pair named by hand (F1028)", () => {
     // **The rule opened `types.ts` and `builders/index.ts`, and `figure.ts` is a
     // builder.** What that cost is F263: ten `BUILDER_OMISSIONS` entries whose
