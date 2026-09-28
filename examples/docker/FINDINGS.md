@@ -56437,3 +56437,42 @@ exist. The overlay `escape → dismiss` row is dead in practice: the only blocki
 question, whose own handler takes `esc`. Also recorded: a refused `⌃c` during a semantic drag no
 longer stops the autoscroll (C14 I48, consistent with R-SEL-013); C22 T4.49 and T4.53 are
 load-sensitive at the base as well as after M5.
+
+## F1271 — `⌥⌫` was dead in three owners, for three different reasons ★★☆☆☆
+
+At the prompt the reserved no-op ran; in a typed reply the key was refused; in a form field it
+was dropped. Three readers each asked the binding row directly, and each answered the missing
+handler its own way. Closed by C22 I134: a reserved key resolves once — to the application's
+handler, the row's fallback, or nothing — and every owner reads that answer. The premise also
+miscounted: sixteen bindings were mislabelled `default-terminal`, not fifteen (lane m6).
+
+## F1272 — kitty `⌃⇧C` was read as `⌃c` ★★☆☆☆
+
+`CSI 99;6u` satisfied both `isCtrlC` and `interceptOf`. Measured: it cancelled a running verb
+(stages `arming, intercept:interrupt:scope:handle, cancel`) and armed the exit — copy, the chord's
+registry meaning, never ran. When C16 §6c was walked the question's classifier was a third loose
+reader; ruling 59 has since taken `⌃c` out of it. Closed by C16 I67: `isExactCtrlC` is the one
+predicate, read by `interceptOf` and the router.
+
+## F1273 — `> notes` then ⏎ truncated the file `notes` ★★★☆☆
+
+C18 classifies a `>`-led line as rule 3 and delegates it to the shell, which opens the file for
+writing. The palette guard (C16 I68) reads the *resolved* line, so a pasted chip that begins with
+`>` is caught too; a `>`-led line now runs the action it names or says there is none and keeps the
+line. **Residue**: `rerunFocused` still submits `entry.doc.command` without the guard. No `>`-led
+command can be recorded after this change, so it reaches only transcripts persisted before it.
+
+## F1274 — two walk artefacts named states that cannot be constructed ★☆☆☆☆
+
+C16 §6c table B's cell *`?` at global, idle* has no construction: `activeTarget` never answers
+`global`. And `⌘1` as the profile witness cannot be observed, because `/help` omits reserved rows
+with no handler; the witness is now `⌘↑`/`⌃home`. Both cells read as coverage and were corrected
+before code.
+
+## F1275 — two instruments undercounted what they claimed to count ★★☆☆☆
+
+T1.97's registry-chord metric was keyed by action id, so it kept the last record per action — 68
+where the table has 89. T4.101 read whichever `/help` row came last by name. Both repaired on the
+lane. The walk also found three gaps before code: the copy-mode switch had no mechanism, a global
+`?` reached step 3 in native selection, and a throwing application handler would end the read loop
+(now contained with a warn notice).
