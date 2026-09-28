@@ -792,6 +792,13 @@ export interface BlockRegistry {
    */
   elementsIn(blocks: readonly Block[], width: number): readonly PlacedElement[];
   /**
+   * The widths a container's children are drawn at, `[]` for a leaf (I126).
+   * `width` is the container's own, padding included; the answer is after
+   * every narrowing its renderer takes — a scroll's bar, a right pane's bar, a
+   * cell aligned off `left`. The shell asks this and never re-derives it.
+   */
+  childWidthsOf(block: Block, width: number): readonly number[];
+  /**
    * Rows `[from, to)` of a *sequence*, as a smaller sequence plus an offset
    * (C09 §2a, I25).
    *

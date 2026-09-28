@@ -136,7 +136,7 @@ import { createNavigator, openHistory, SEARCH_ID } from "../interaction/history/
 import type { HistoryEntry, Navigator } from "../interaction/history/index.js";
 import { detectCapabilities, type CapabilitySource, type TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Motion } from "../presentation/blocks/index.js";
-import { defaultButton, glyphFor, glyphs, panelInterior, tapeStart } from "../presentation/blocks/index.js";
+import { barOf, defaultButton, glyphFor, glyphs, interiorOf, panelInterior, tapeStart } from "../presentation/blocks/index.js";
 import { submitAction } from "./form-submit.js";
 import { createFrameScheduler, type CommitReason } from "../terminal/frame-scheduler.js";
 import type { CaptureResult, Profiler, ProfileReport, TraceFn } from "./profiling/types.js";
@@ -2465,11 +2465,16 @@ export async function constructGraph(
     const found = focusedBlock();
     if (found === null) return;
     const { entryId, block } = found;
+    const entry = stores.transcript.entries.find((e) => e.id === entryId);
+    const drawn = entry === undefined ? null : widthIn(entry, block.id);
+    if (entry === undefined || drawn === null) return;
 
     // One row of overlap, which is what lets a reader join two screens — and
-    // a floor of one, so a box of a single row still moves.
-    const height = built.blocks.measure(block, deps.frame.overlayRegion().width);
-    stores.scrollOffsets.nudge(entryId, block.id, direction * Math.max(1, height - 1), scrollBox(block));
+    // a floor of one, so a box of a single row still moves. **Measured at the
+    // box's own width** (C09 I126): in a card's body that is five columns
+    // narrower than the region, and the residue row is decided there.
+    const height = built.blocks.measure(block, drawn.outer);
+    stores.scrollOffsets.nudge(entryId, block.id, direction * Math.max(1, height - 1), scrollBox(entry, block));
     scheduler.commit("input");
   };
 
@@ -2479,15 +2484,29 @@ export async function constructGraph(
    * The store spells *following* as `TAIL` and cannot resolve it — it does not
    * know the width — so the caller who measured the content hands over the
    * ceiling, and whether the block asked to follow. Without it `⇞` on a followed
-   * box is `∞ + δ`, a no-op (Lane B's T7). The sum is `childRanges`'s: every child
-   * of a scroll gets the full width, and `gapBefore` is not counted.
+   * box is `∞ + δ`, a no-op (Lane B's T7).
+   *
+   * **The content is the kind's own answer, at the box's own width** (C09
+   * I126). This summed the children at the region's width, which is right for
+   * exactly one box — top level, not in a card, no bar — and a box in a card's
+   * body clamped against a ceiling of 1 where the frame's was 4. `barOf` is
+   * what the renderer asks, so the two cannot be describing different content.
    */
-  const scrollBox = (block: Block): { ceiling: number; follow?: boolean } | undefined => {
+  const scrollBox = (entry: TranscriptEntry, block: Block): { ceiling: number; follow?: boolean } | undefined => {
     if (block.kind !== "scroll") return undefined;
-    const width = deps.frame.overlayRegion().width;
-    const content = block.children.reduce((n, c) => n + built.blocks.measure(c, width), 0);
+    const at = widthIn(entry, block.id);
+    if (at === null) return undefined;
+    const { content } = barOf(block, at.inner, built.blocks.measure);
     return { ceiling: Math.max(0, content - block.height), follow: block.follow === true };
   };
+
+  /**
+   * The width block `id` is handed in `entry`, and the width inside its
+   * padding (C09 I126, C22 I117) — asked of the block library, never
+   * re-derived. `null` where the entry holds no such block.
+   */
+  const widthIn = (entry: TranscriptEntry, id: string): Readonly<{ outer: number; inner: number }> | null =>
+    blockWidthInEntry(built.blocks, entry.doc.blocks, deps.frame.overlayRegion().width, id);
 
   /**
    * A split of an entry by id, and the width it is drawn at (C22 I117).
@@ -2505,8 +2524,8 @@ export async function constructGraph(
     if (entry === undefined) return null;
     const found = blockIn(entry, id);
     if (found === null || found.kind !== "split") return null;
-    const width = blockWidthInEntry(entry.doc.blocks, deps.frame.overlayRegion().width, id);
-    return width === null ? null : { entry, split: found, width };
+    const at = widthIn(entry, id);
+    return at === null ? null : { entry, split: found, width: at.inner };
   };
 
   /** The box a split pane's offset is clamped against — `scrollBox`'s, per pane. */
@@ -2732,7 +2751,7 @@ export async function constructGraph(
    * focus, and the move is what brings it back.
    */
   let pulledTo: string | null = null;
-  const pullScroll = (entry: TranscriptEntry, width: number): void => {
+  const pullScroll = (entry: TranscriptEntry): void => {
     const at = focus.current;
     if (at.at !== "liveBlock" || at.entryId !== entry.id) return;
     const where = `${entry.id}/${at.element?.blockId ?? ""}/${at.element?.elementId ?? ""}`;
@@ -2765,24 +2784,33 @@ export async function constructGraph(
     // element's `blockId` names the box itself rather than the child.
     const box = blockIn(entry, found.blockId);
     if (box === null || box.kind !== "scroll") return;
-    const geometry = scrollBox(box);
-    if (geometry === undefined) return;
-    const interior = box.collapsed === true ? 0 : box.height; // cells-ok — a row count
+    const geometry = scrollBox(entry, box);
+    const drawn = widthIn(entry, box.id);
+    if (geometry === undefined || drawn === null) return;
+    const interior = interiorOf(box);
     // **The box's own coordinates.** The placed element's rows are in entry
     // space and the offset is in the box's content, so the rows are re-asked of
-    // the box alone at the width the frame laid it out at.
-    const local = built.blocks.elementsOf(box, width).find((e) => e.id === found.element.id);
+    // the box alone at the width the frame laid it out at — **the box's**, and
+    // not the region's (C09 I126): in a card's body the region's width is five
+    // columns too wide, a child is a row shorter there, and `↓` focused a child
+    // this pull then left out of view.
+    const local = built.blocks.elementsOf(box, drawn.outer).find((e) => e.id === found.element.id);
     if (local === undefined) return;
     const held = stores.scrollOffsets.resolved(entry.id, box.id, geometry);
     const next = pullIntoView(held, local.rows.from, local.rows.to, interior);
     if (next !== held) stores.scrollOffsets.set(entry.id, box.id, next, geometry);
   };
-  const pullTapes = (entry: TranscriptEntry, width: number): void => {
+  const pullTapes = (entry: TranscriptEntry): void => {
     for (const top of entry.doc.blocks) {
       for (const block of [top, ...descendants(top)]) {
         if (block.kind !== "tape") continue;
+        // **The width the tape is drawn at** (C09 I126) — inside its padding,
+        // which is what `layout` is handed at render. At the region's width a
+        // tape in a card's body persisted a start the frame did not draw.
+        const at = widthIn(entry, block.id);
+        if (at === null) continue;
         const held = stores.scrollOffsets.get(entry.id, block.id);
-        const next = tapeStart(block, width, detection.capabilities, held);
+        const next = tapeStart(block, at.inner, detection.capabilities, held);
         // **No `box`**, because a tape has no ceiling to follow: `TAIL` on this
         // axis would mean *the last member*, and the window that reaches it is
         // the one `tapeWindow` already computed. The store holds the number.
@@ -2791,15 +2819,14 @@ export async function constructGraph(
     }
   };
   const syncPull = (): void => {
-    const width = deps.frame.overlayRegion().width;
     // **The entries the frame is showing**, which is the peek's own bound: a
     // container nobody can see has no window to pull, and walking the whole
     // transcript would make one key cost the scrollback.
     for (const ve of stores.viewport.visible().entries) {
       const entry = stores.transcript.entries.find((e) => e.id === ve.id);
       if (entry === undefined) continue;
-      pullScroll(entry, width);
-      pullTapes(entry, width);
+      pullScroll(entry);
+      pullTapes(entry);
     }
   };
   stores.viewport.subscribe(() => syncPull());
@@ -2816,7 +2843,7 @@ export async function constructGraph(
   const nudgeScroll = (entryId: EntryId, blockId: string, rows: number): void => {
     const entry = stores.transcript.entries.find((e) => e.id === entryId);
     const block = entry === undefined ? null : blockIn(entry, blockId);
-    stores.scrollOffsets.nudge(entryId, blockId, rows, block === null ? undefined : scrollBox(block));
+    stores.scrollOffsets.nudge(entryId, blockId, rows, block === null || entry === undefined ? undefined : scrollBox(entry, block));
     scheduler.commit("input");
   };
 
@@ -3106,7 +3133,7 @@ export async function constructGraph(
     entryId: EntryId,
     start: Readonly<{ block: Block; element: NavElement; row: number }>,
   ): Block => {
-    const width = deps.frame.overlayRegion().width;
+    const entry = stores.transcript.entries.find((e) => e.id === entryId);
     let box = start.block;
     let elementId = start.element.id;
     let rowInChild = start.row;
@@ -3116,8 +3143,14 @@ export async function constructGraph(
       if (child === undefined || child.kind !== "scroll") return box;
 
       // Inside `child`'s box now. Its content rows are measured from the box's
-      // top and never from the offset (C26 I3), so the offset is added here.
-      const els = built.blocks.elementsOf(child, width);
+      // top and never from the offset (C26 I3), so the offset is added here —
+      // **at the width the child is drawn at** (C09 I126), which is inside the
+      // outer's bar and a card's gutter. At the region's width a child that
+      // wraps there is a row shorter, and the wheel on its second row fell
+      // through to the box below it.
+      const drawn = entry === undefined ? null : widthIn(entry, child.id);
+      if (drawn === null) return box;
+      const els = built.blocks.elementsOf(child, drawn.outer);
       const content = els.reduce((n, el) => Math.max(n, el.rows.to), 0);
       const held = stores.scrollOffsets.get(entryId, child.id);
       const contentRow =

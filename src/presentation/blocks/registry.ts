@@ -30,6 +30,7 @@ import { clampSpans, paint, rows, tone } from "./paint.js";
 import { truncate } from "../text.js";
 import { fitRow } from "../rows.js";
 import { statusDefinition, statusRowsFor } from "./kinds/status.js";
+import { barOf } from "./kinds/containers.js";
 import type {
   MeasureMemo,
   RenderScratch,
@@ -698,6 +699,45 @@ class Registry implements BlockRegistry {
     this.#scoped(() => this.#elements(block, normaliseWidth(width)).elements);
 
   /**
+   * The widths a container's children are drawn at (I126) — `[]` for a leaf.
+   *
+   * **The renderers' own functions, each read once**: `barOf` for a scroll's
+   * bar, `splitPanes` for a right pane's, `groupPlacements` for a cell aligned
+   * off `left` (C04 I101), and C04's `childWidths` for everything those do not
+   * narrow. `width` is the container's own, padding included, which is what
+   * every other member here takes; the padding comes off first, as it does
+   * before a definition sees its width (I80).
+   *
+   * **Why the library answers and the shell does not** (§7i). All three
+   * narrowings are this layer's and none was published, so the shell asked
+   * every nested question at the region's width, the only one it held — and a
+   * box in a card's body clamped against a ceiling of 1 where the frame's was 4.
+   */
+  childWidthsOf = (block: Block, width: number): readonly number[] =>
+    this.#scoped((): readonly number[] => {
+      if (!hasChildren(block)) return [];
+      const w = contentWidth(block, normaliseWidth(width));
+      const shares = childWidths(block, w);
+      const share = (i: number): number => shares[i] ?? shares[0] ?? w;
+      switch (block.kind) {
+        case "scroll": {
+          const at = barOf(block, w, this.#measureChild).contentWidth;
+          return block.children.map(() => at);
+        }
+        case "split": {
+          const panes = splitPanes(block, w, this.#measureChild);
+          return block.children.map((_c, i) => panes.find((p) => p.side === i)?.width ?? share(i));
+        }
+        case "group": {
+          const placements = groupPlacements(block, w, this.#measureChild, this.width);
+          return block.children.map((_c, i) => placements[i]?.width ?? share(i));
+        }
+        default:
+          return block.children.map((_c, i) => share(i));
+      }
+    });
+
+  /**
    * What a block copies as, or `null` when its kind declines (§7a, I86,
    * `R-SEL-004`).
    *
@@ -864,8 +904,9 @@ class Registry implements BlockRegistry {
         }
         case "scroll":
           // Content rows from the box's top (C26 I3 — never the offset), which
-          // is where `childRanges` puts them.
-          sequence(block.children, top, left, widths[0] ?? 1);
+          // is where `childRanges` puts them — at the width the bar leaves
+          // (I126), which is the width `render` draws them at.
+          sequence(block.children, top, left, barOf(block, normaliseWidth(atWidth), this.#measureChild).contentWidth);
           return;
         case "split":
           // **Each pane at the column and width the renderer draws it at**

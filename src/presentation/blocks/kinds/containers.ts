@@ -349,8 +349,11 @@ function scrollMeasureBox(block: Scroll, width: number, measureChild: MeasureFn)
  * (C04 I98). The residue row is chrome on top of this in both cases, which is
  * what makes a collapsed box *the residue row and nothing else* without a second
  * rule about what it draws.
+ *
+ * **Exported for the shell's pull** (I126), which had its own copy of this
+ * line: a box's window is asked of the kind that draws it.
  */
-function interiorOf(block: Scroll): number {
+export function interiorOf(block: Scroll): number {
   return block.collapsed === true ? 0 : block.height; // cells-ok — a row count
 }
 
@@ -376,8 +379,14 @@ function contentHeight(block: Scroll, width: number, measureChild: MeasureFn): n
  * on `content > interior` at the full width, which is the same test that puts
  * the bar there. The re-measure can only grow the content, so the residue row
  * it decides does not move either.
+ *
+ * **Exported because the shell asks it too** (I126). A box's ceiling is its
+ * content less its height, and the content is the children measured at the
+ * width this function answers — so a shell clamping a scroll against its
+ * children at the box's full width clamped against a different document from
+ * the one drawn. `width` is the box's content width, as a definition sees it.
  */
-function barOf(
+export function barOf(
   block: Scroll,
   width: number,
   measureChild: MeasureFn,
@@ -489,6 +498,13 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
   /** One per child, at block level — which is what makes C04 I47's refusal expressible. */
   elements(block: Scroll, width: number, measureChild: MeasureFn, copyChild: CopyFn): readonly NavElement[] {
     const w = normaliseWidth(width);
+    // **The rows at the width the children are drawn at** (I126). `render`
+    // lays them out at `barOf`'s content width, one column in from a bar, and
+    // a child that wraps at that column is a row taller than it is at `w` — so
+    // rows taken at `w` put the second child on the first one's second row, and
+    // the pointer and the pull both believed it. The columns stay the box's
+    // whole width below: the bar is the box's, and a pointer on it is in the box.
+    const { contentWidth: laidAt } = barOf(block, w, measureChild);
     // **A block declaring a collapsed form carries the toggle on every element**
     // (C04 I98). Declared by presence: a scroll without the field has no fold
     // and no affordance. The target is the block, because `expand`'s dispatcher
@@ -504,7 +520,7 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
             }),
           };
     return Object.freeze(
-      childRanges(block, w, measureChild).map((r) =>
+      childRanges(block, laidAt, measureChild).map((r) =>
         Object.freeze({
           id: r.child.id,
           level: "block" as const,
