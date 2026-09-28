@@ -41,9 +41,13 @@ const MUTATIONS = [
     // shipped in. `menuWindow` still exists and still computes the right
     // answer; nothing hands it to the blocks. Every assertion about the
     // remainder passes, because the number was always right.
+    //
+    // Re-anchored 2026-09-28 (review batch 3, M8): the slice starts at a
+    // wheeled start when the reader has scrolled the menu (C16 I74); the
+    // mutation is unchanged.
     name: "the menu hands over every candidate again",
     file: KEYS,
-    from: "    const slice = candidates.slice(w.start, w.start + w.shown);",
+    from: "    const slice = candidates.slice(start, start + w.shown);",
     to: "    const slice = candidates;",
     expect: "T4.9",
   },
@@ -91,10 +95,14 @@ const MUTATIONS = [
     //
     // **Re-anchored** (F1118): `selected` became `selection.at`, a rename with
     // nothing to re-derive — the argument the mutation is about is the third.
+    //
+    // Re-anchored 2026-09-28 (review batch 3, M8): the wheel's `scrollMenu`
+    // computes the same window, so the anchor carries the comment after it to
+    // name the drawing one; the mutation is unchanged.
     name: "the window takes one row more than the placement holds",
     file: KEYS,
-    from: "    const w = menuWindow(candidates.length, selection.at, fits);",
-    to: "    const w = menuWindow(candidates.length, selection.at, fits + 1);",
+    from: "    const w = menuWindow(candidates.length, selection.at, fits);\n    // **The keys own",
+    to: "    const w = menuWindow(candidates.length, selection.at, fits + 1);\n    // **The keys own",
     expect: "T4.9",
   },
   {

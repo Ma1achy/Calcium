@@ -70,8 +70,16 @@ type Guard = {
 const deadlineOf = (g: Guard): number => Math.max(g.arrivedAt + GUARD_GRACE_MS, g.lastAt + GUARD_GAP_MS);
 
 
+/**
+ * A placed layer as the pointer sees it (C16 I74).
+ *
+ * **A peek is one of them now**, for the wheel alone (C15 I31): it has no rung,
+ * so its `kind` is outside `KeyedTop`, and the router never runs a handler for
+ * it — the wheel goes to its scroller by id.
+ */
 export type Placed = Readonly<{
-  layer: KeyedTop & Readonly<{ id: string; blocking: boolean; dismissal: "escape" | "focus" | "answer" }>;
+  layer: (KeyedTop | Readonly<{ kind: "peek"; owner?: undefined }>) &
+    Readonly<{ id: string; blocking: boolean; dismissal: "escape" | "focus" | "answer" }>;
   top: number;
   left: number;
   height: number;
@@ -132,7 +140,23 @@ export type RouterDeps = Readonly<{
    * callback is a refusal the question has already explained (C23 I82).
    */
   overlayAnswerCallback: () => ((e: InputEvent) => boolean | Verdict) | null;
-  placed: () => readonly Placed[];
+  /**
+   * The layers under the pointer's reach for this gesture, in draw order —
+   * C15's `takesPointer` applied by L4, so a peek is here for the wheel and not
+   * for a press (C16 I74, C15 I31). One predicate, stated once, in the
+   * component that owns the layer.
+   */
+  placed: (gesture: "wheel" | "press") => readonly Placed[];
+  /**
+   * Move a layer's own scroller by `notches` wheel steps — negative is up — and
+   * answer whether the layer has anything to scroll (C16 I74).
+   *
+   * **By id, and that is the point** (§3d P2). The layer's rung handler reads
+   * `top`, so a wheel routed through it over a lower layer would move the upper
+   * one. `false` is *nothing to scroll here*: a keyed layer still consumes the
+   * wheel, and a peek declines it to the base.
+   */
+  scrollLayer: (id: string, notches: number) => boolean;
   popLayer: () => void;
   nativeSelection: () => boolean;
   /**
@@ -598,7 +622,17 @@ export function createRouter(
     const region = deps.region();
     const regionRow = e.row - region.top;
 
-    const covering = deps.placed().find(
+    // **Every direction is a wheel** (I30, §4a row j). This named two of the
+    // four, so the day the decoder produced `wheelLeft` a horizontal wheel fell
+    // through to the entry rung and was routed as a click on the block under
+    // the pointer.
+    const wheel = e.button.startsWith("wheel");
+
+    // **The topmost that takes this gesture** (I74, §3d P1). C15's `layout` is
+    // draw order, bottom first, and `find` took the bottom one — invisible
+    // while the only overlap was two panels answering one handler, and the
+    // wrong layer the day either of them took a gesture of its own.
+    const covering = [...deps.placed(wheel ? "wheel" : "press")].reverse().find(
       (p) =>
         regionRow >= p.top &&
         regionRow < p.top + p.height &&
@@ -606,12 +640,18 @@ export function createRouter(
         e.col < p.left + p.width,
     );
 
-    // **Every direction is a wheel** (I30, §4a row j). This named two of the
-    // four, so the day the decoder produced `wheelLeft` a horizontal wheel fell
-    // through to the entry rung and was routed as a click on the block under
-    // the pointer.
-    const wheel = e.button.startsWith("wheel");
-    if (covering !== undefined) {
+    if (covering !== undefined && wheel) {
+      stages.push(`layer:${covering.layer.id}`);
+      // **The layer's scroller, by id** (I74, §3d P2–P6). A vertical wheel asks
+      // it; a horizontal one has nothing to ask (§4a row j). A keyed layer
+      // consumes the wheel whether or not it moved — it is between the pointer
+      // and the base — and a peek with nothing to scroll declines it, as a
+      // `scroll` that cannot move does below.
+      const notches = e.button === "wheelUp" ? -1 : e.button === "wheelDown" ? 1 : 0;
+      if (notches !== 0 && deps.scrollLayer(covering.layer.id, notches)) return true;
+      if (covering.layer.kind !== "peek") return true;
+      stages.push("layer:declined");
+    } else if (covering !== undefined && covering.layer.kind !== "peek") {
       stages.push(`layer:${covering.layer.id}`);
       // **Two kinds, two targets** (I48, C15 I23, R-BLK-779). *The layer order
       // is the scroll order*, so a mouse event over a panel is the panel's
@@ -640,6 +680,11 @@ export function createRouter(
     // A wheel is carved out for I40's reason and a hover for §4a row t's: a
     // hand resting on the mouse under mode 1003 would close every panel it
     // reported over.
+    //
+    // **The primary click, and only it** (I47, §3d P8, ruling D7). Any button
+    // closed the layer; a right or a middle press, a modified press and a drag
+    // beside it are now consumed and do nothing — the thing beneath was covered
+    // a moment ago, so nothing beneath may act, and closing is the click's.
     const escapable = deps.overlayTop();
     if (
       escapable !== null &&
@@ -648,6 +693,11 @@ export function createRouter(
       !wheel &&
       e.button !== "none"
     ) {
+      const primary = e.button === "button0" && !e.motion && !e.shift && !e.ctrl && !e.meta;
+      if (!primary) {
+        stages.push("dismiss:inert");
+        return true;
+      }
       stages.push("dismiss");
       deps.popLayer();
       return true;

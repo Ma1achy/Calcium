@@ -403,6 +403,16 @@ export interface KeyEffects {
    */
   activationAt(entryId: EntryId, address: ElementAddress): KeyEffect | null;
   /**
+   * The wheel over the menu: move its window by `rows` candidates, and answer
+   * whether it has a window to move (C16 I74, §3d Q2).
+   *
+   * **What is shown, never what is chosen** (C19 I20). A menu holding no
+   * selection is a display, and `⏎` still submits under it — so a wheel that
+   * selected as it scrolled would turn the reader's next `⏎` into an accept.
+   * The window follows the selection again the moment a key moves it.
+   */
+  scrollMenu(rows: number): boolean;
+  /**
    * The region changed — re-place whatever is anchored to the prompt.
    *
    * **Placement is live in C15's type and nothing was keeping it current.** The
@@ -458,6 +468,12 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
    * nowhere.
    */
   let fits = 0;
+  /**
+   * Where the wheel put the window, and the selection it was put against
+   * (C16 I74). `null` is *the selection places the window*, which is every
+   * menu nobody has wheeled; a selection that has moved since reads as `null`.
+   */
+  let wheeled: Readonly<{ start: number; at: number | null }> | null = null;
   let seq = 0;
 
   /** The focused element's placed record, or `null` (C26 I10). */
@@ -527,8 +543,14 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // actually cut*, and where nothing was, there is nothing to window.
     if (remainder <= 0) return menuBlocks(candidates, selection.at, 0);
     const w = menuWindow(candidates.length, selection.at, fits);
-    const slice = candidates.slice(w.start, w.start + w.shown);
-    return menuBlocks(slice, selection.at === null ? null : selection.at - w.start, remainder);
+    // **The keys own the window again once they move the selection** (§3d Q2).
+    if (wheeled !== null && wheeled.at !== selection.at) wheeled = null;
+    const start = wheeled === null ? w.start : Math.min(wheeled.start, candidates.length - w.shown);
+    const slice = candidates.slice(start, start + w.shown);
+    const at = selection.at === null ? null : selection.at - start;
+    // A selection the wheel scrolled out of view is drawn as none on screen,
+    // and is still the selection: `⏎` accepts it, as it would have.
+    return menuBlocks(slice, at === null || at < 0 || at >= w.shown ? null : at, remainder);
   }
 
   function redrawMenu(): void {
@@ -564,6 +586,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // the state, not the code could not reach it — and the two dead clamps
     // beside it were the first disposition. They read identically in a report.
     fits = 0;
+    wheeled = null;
     const layer = menuLayer(candidates, selection.at, remainder, deps.anchor());
     if (deps.overlays.update(MENU_ID, { content: layer.content, placement: layer.placement })) {
       return;
@@ -577,6 +600,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   }
 
   function closeMenu(): void {
+    wheeled = null;
     candidates = [];
     selection.reset(0, null);
     requested = false;
@@ -1539,6 +1563,17 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       if (text === null) deps.history.searchBackspace();
       else deps.history.searchType(text);
       refreshSearchLayer();
+    },
+    scrollMenu: (rows) => {
+      // **Only a window that cuts something moves** — `windowedBlocks`' own
+      // guard, for its reason: `remainder` is what says something was cut.
+      if (candidates.length === 0 || remainder <= 0) return false;
+      const w = menuWindow(candidates.length, selection.at, fits);
+      const from = wheeled === null || wheeled.at !== selection.at ? w.start : wheeled.start;
+      const start = Math.min(Math.max(0, from + rows), candidates.length - w.shown);
+      wheeled = { start, at: selection.at };
+      redrawMenu();
+      return true;
     },
     activationAt: (entryId, address) => {
       const elements = deps.focusedElements();

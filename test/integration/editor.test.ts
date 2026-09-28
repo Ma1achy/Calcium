@@ -49,6 +49,8 @@ function wire(editor: LineEditor): {
     // optional, so a harness that means to attach one has to say so.
     childAttached: () => false,
     // C16 I73 — no stack and no surface host, so nothing is ever raised.
+    // C16 I74 — no layer here has anything to scroll.
+    scrollLayer: () => false,
     ownerGeneration: () => 0,
     overlayWouldResolve: () => null,
     overlayAnswerCallback: () => null,

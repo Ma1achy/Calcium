@@ -1450,6 +1450,8 @@ class Session implements TuiInstance {
       // I74, §7f). It stays on the stack — C16's ladder reads the stack, and a
       // question nothing routes keys to is not a question — so what changes is
       // where it is painted and nothing else.
+      // C16 I74 — where the wheel left each layer.
+      layerScroll: (id) => graph.layerScroll(id),
       overlays: () => {
         const replacing = graph.confirm.replacing;
         const placed = graph.overlays.layout(frame.overlayRegion);

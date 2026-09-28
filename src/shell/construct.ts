@@ -78,7 +78,7 @@ import { RenderScratchStore } from "./render-scratch.js";
 import type { BoxSpan, DragContainer } from "./drag-selection.js";
 import { pullIntoView } from "./pull.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
-import { createOverlayManager, takesInput } from "../viewport/overlay/index.js";
+import { createOverlayManager, takesPointer } from "../viewport/overlay/index.js";
 import { chipLabel, createEditor } from "../interaction/editor/index.js";
 import type { Chip, ChipLook, HeldLine, LineState } from "../interaction/editor/index.js";
 
@@ -631,6 +631,8 @@ export type Graph = Readonly<{
   rendered: RenderCache;
   /** C22 I102 — header, footer and layer lines held per content, one session's worth. */
   chrome: ChromeCache;
+  /** C16 I74 — a layer's own row offset, as the wheel left it; 0 for a layer never wheeled. */
+  layerScroll: (id: string) => number;
   scrollOffsets: ScrollOffsets;
   cameras: Cameras;
   /** C22 I77 — the frame each animated image is on, keyed like the two above and dropped with them. */
@@ -1903,6 +1905,7 @@ export async function constructGraph(
           () => surface.attached,
           () => surface.generation,
           (r) => refused(r),
+          (id, notches) => scrollLayer(id, notches),
         ),
         // C28 I39 — the `handler` span. Spread in here rather than threaded
         // through `routerDeps`, whose seven parameters are all C16's own and
@@ -2234,6 +2237,8 @@ export async function constructGraph(
   };
   let peekKey: string | null = null;
   let peekRow: number | null = null;
+  /** C16 I74 — each non-menu layer's row offset; `scrollLayer` below writes it. */
+  const layerScroll = new Map<string, number>();
   const syncPeek = (): void => {
     const want = peekWanted();
     const have = stores.overlays.stack.some((l) => l.id === PEEK_ID);
@@ -2244,6 +2249,8 @@ export async function constructGraph(
       return;
     }
     if (have && want.key === peekKey && want.row === peekRow) return;
+    // Another element's detail opens at its top (C16 I74).
+    if (want.key !== peekKey) layerScroll.delete(PEEK_ID);
     // A panel, so the peek is delimited by its rails rather than by a dim the
     // terminal cannot draw (C15 I11). Anchored below and flipped by C15 when
     // there is no room (I17); the width is the region's on the confirm's
@@ -3416,6 +3423,36 @@ export async function constructGraph(
   });
   // Step 8's handler reaches the anchors through this, declared above it.
   refreshAnchors = () => void keys.refreshAnchors();
+
+  /**
+   * Each layer's own scroller, as C16's `scrollLayer` asks for it (C16 I74,
+   * §3d P2–P6).
+   *
+   * **The menu's is its window** — `keys.ts` holds the candidates and the
+   * selection, and a window offset beside them is the only form that cannot
+   * select (C19 I20). **Every other layer's is a row offset into its own
+   * rendered lines**, which the compositor reads (`layerRows`): a truncated
+   * peek shows the rows the wheel moved it to, and one that fits answers
+   * `false` so the base takes the wheel. Clamped at write against the layer's
+   * measure — the same function that sized it — so a wheel held past the end
+   * does not bank rows the way back has to spend. The map is declared with
+   * the peek, which resets it.
+   */
+  const scrollLayer = (id: string, notches: number): boolean => {
+    if (id === MENU_ID) return keys.scrollMenu(notches * WHEEL_ROWS);
+    const placed = stores.overlays.layout(deps.frame.overlayRegion()).find((p) => p.layer.id === id);
+    if (placed === undefined || !placed.truncated) return false;
+    const rows = built.blocks.measureSequence(placed.layer.content, placed.width, stores.measures);
+    const most = Math.max(0, rows - placed.height);
+    const held = Math.min(layerScroll.get(id) ?? 0, most);
+    layerScroll.set(id, Math.min(most, Math.max(0, held + notches * WHEEL_ROWS)));
+    return true;
+  };
+  // **A layer that goes takes its offset with it**, and one pushed again under
+  // the same id opens at its top — the peek is pushed per element.
+  stores.overlays.subscribe((change) => {
+    if (change.kind !== "content") layerScroll.delete(change.id);
+  });
 
   /**
    * When the last input batch landed, for the cursor's blink edge (C22 I64).
@@ -4691,6 +4728,7 @@ export async function constructGraph(
     get bufferedEntries() {
       return stores.bufferedEntries;
     },
+    layerScroll: (id: string) => layerScroll.get(id) ?? 0,
     semanticCaretAt,
     scrollBoxSpans,
     scrollContainerBy,
@@ -4766,6 +4804,8 @@ function routerDeps(
   surfaceGeneration: () => number,
   /** Where a refusal is explained, by rung (C16 I62). L4's, because the explanation is the owner's. */
   refused: RouterDeps["refused"],
+  /** Each layer's scroller, late for `childAttached`'s reason (C16 I74). */
+  scrollLayer: RouterDeps["scrollLayer"],
 ): RouterDeps {
   const top = (): ReturnType<RouterDeps["overlayTop"]> => {
     const layer = stores.overlays.top;
@@ -4787,8 +4827,12 @@ function routerDeps(
     overlayAnswerCallback: confirm.answerHandler,
     overlayWouldResolve: confirm.resolvesHandler,
     overlayRegion: frame.overlayRegion,
-    // A peek is not hit-tested (C15 I21): a click on it reaches the row beneath.
-    placed: () => stores.overlays.layout(frame.overlayRegion()).filter(takesInput),
+    // **Per gesture, through C15's own predicate** (C16 I74, C15 I31): a peek
+    // takes the wheel and no press, so a click on it still reaches the row
+    // beneath (C15 I21). Filtering by `takesInput` left the peek band of the
+    // scroll order unreachable by the one gesture it is for (§3d P5).
+    placed: (gesture) => stores.overlays.layout(frame.overlayRegion()).filter((p) => takesPointer(p, gesture)),
+    scrollLayer,
     popLayer: () => void stores.overlays.pop(),
     nativeSelection: frame.nativeSelection,
     semanticSelection: frame.semanticSelection,

@@ -60,7 +60,7 @@ function harness(over: Partial<RouterDeps> = {}, start = 1_000, keymap = createK
   const refusals: Refusal[] = [];
   // `generation` is C16 I73's pull, moved by a row that raises or removes an
   // owner the rung cannot see.
-  const layer = { top: null as Placed["layer"] | null, placed: [] as Placed[], generation: 0 };
+  const layer = { top: null as ReturnType<RouterDeps["overlayTop"]>, placed: [] as Placed[], generation: 0 };
   const deps: RouterDeps = {
     keyReleasesReported: () => false,
     ownerGeneration: () => layer.generation,
@@ -72,6 +72,8 @@ function harness(over: Partial<RouterDeps> = {}, start = 1_000, keymap = createK
     overlayTop: () => layer.top,
     overlayRegion: () => ({ width: 80, height: 24 }),
     placed: () => layer.placed,
+    // C16 I74 — each layer's scroller, logged; `false` is *nothing to scroll*.
+    scrollLayer: (id, notches) => (calls.push(`scroll:${id}:${String(notches)}`), true),
     popLayer: () => void calls.push("pop"),
     nativeSelection: () => false,
     semanticSelection: () => false,
@@ -1057,7 +1059,7 @@ describe("C16 §5 — Ctrl-D, and the one thing C16 stores", () => {
     // again with nothing stored having changed. A cached resolution would give
     // the old answer here and no assertion above would notice.
     const before = h.focus.current;
-    h.layer.top = { id: "L1" } as unknown as Placed["layer"];
+    h.layer.top = { id: "L1" } as unknown as ReturnType<RouterDeps["overlayTop"]>;
     expect(h.focus.current, "the store did not move").toEqual(before);
 
     // And the structural half: one stored field, over the declaration, so a
@@ -1470,10 +1472,15 @@ describe("C16 §4a — the dismissing click and the scroll order (M8)", () => {
     expect(router.lastStages).toEqual(["arming", "mouse", "modal"]);
   });
 
-  it("T1.104 (I48, C15 I23, R-BLK-779): a wheel over a panel is the panel's, and over nothing is the viewport's", () => {
+  it("T1.104 (I48, I74, C15 I23, R-BLK-779): a wheel over a panel is its scroller's, and over nothing is the viewport's", () => {
     // *One ordering does both jobs*: the layer order decides which viewport a
     // wheel moves exactly as it decides which layer a key reaches.
-    const { router, layer } = harness();
+    //
+    // **The panel's scroller, by id, and no handler** (I74, §3d P2). This row
+    // registered a `panel` handler answering `true` and read that as the panel
+    // taking the wheel; the tree's handler answers `false` for every pointer
+    // event, so the wheel was dropped. A fixture that supplied the behaviour.
+    const { router, layer, calls } = harness();
     const seen: string[] = [];
     router.register("panel", () => (seen.push("panel"), true));
     router.register("liveBlock", () => (seen.push("liveBlock"), true));
@@ -1483,7 +1490,8 @@ describe("C16 §4a — the dismissing click and the scroll order (M8)", () => {
     layer.placed = [{ layer: PANEL, top: 5, left: 10, height: 3, width: 20 }];
 
     expect(router.dispatch(click(7, 12, "wheelDown")), "consumed").toBe(true);
-    expect(seen, "the panel's, and the transcript beneath it does not move").toEqual(["panel"]);
+    expect(calls, "the panel's own scroller, one notch down").toEqual(["scroll:menu:1"]);
+    expect(seen, "no rung handler, and the transcript beneath it does not move").toEqual([]);
     expect(router.lastStages).toContain("layer:menu");
 
     // **The control is one row outside it**, which is what makes the row about
@@ -1493,12 +1501,7 @@ describe("C16 §4a — the dismissing click and the scroll order (M8)", () => {
     expect(router.dispatch(click(4, 12, "wheelDown")), "consumed").toBe(true);
     expect(seen, "outside the panel: the entry under the pointer").toEqual(["liveBlock"]);
 
-    // **A peek is not a third case at this seam, and the spec row said it
-    // was.** C15 I21 keeps a peek out of `top` and L4 filters it out of
-    // `placed` before the router is handed either, so *the wheel falls past a
-    // peek* is byte-identical here to *no layer is open* — an assertion about
-    // it would be an assertion about the fixture. Where it is observable is
-    // C15's own `top` row (T1.23) and the filter in `construct.ts`.
+    // The peek is a third case now (C15 I31): T1.191 is its row.
   });
 });
 
@@ -1947,16 +1950,105 @@ describe("C16 I69–I73 — the timed guard, its explanation, focus-out and the 
 });
 
 describe("C16 I74, I47 — the pointer over layers (review batch 3, M8)", () => {
-  it.todo(
-    "T1.189 (I74, §3d): two overlapping layers: a press and a wheel over the overlap go to the top one; the lower alone reaches the lower — not deferred on a component: the code lands in the next commit of this round",
-  );
-  it.todo(
-    "T1.190 (I74, §3d): a wheel over a keyed layer is consumed whether scrollLayer answers true or false; a horizontal wheel asks no scroller — not deferred on a component: the code lands in the next commit of this round",
-  );
-  it.todo(
-    "T1.191 (I74, C15 I31, §3d): over a peek a wheel asks scrollLayer and the base takes it when the peek declines; a press reaches the entry beneath — not deferred on a component: the code lands in the next commit of this round",
-  );
-  it.todo(
-    "T1.192 (I47, §3d): beside an escapable panel a right, middle, modified press and a drag are inert; the unmodified primary press dismisses — not deferred on a component: the code lands in the next commit of this round",
-  );
+  const PANEL = { id: "menu", kind: "panel", blocking: false, dismissal: "escape" } as const;
+  const SEARCH = { id: "search", kind: "panel", blocking: false, dismissal: "escape" } as const;
+  const PEEK = { id: "peek", kind: "peek", blocking: false, dismissal: "focus" } as const;
+  const mouseAt = (row: number, col: number, over: Partial<Extract<InputEvent, { kind: "mouse" }>>): InputEvent => ({
+    ...(click(row, col) as Extract<InputEvent, { kind: "mouse" }>),
+    ...over,
+  });
+
+  it("T1.189 (I74, §3d): two overlapping layers — a press and a wheel over the overlap go to the top one; the lower alone reaches the lower", () => {
+    const { router, layer, calls } = harness();
+    const seen: string[] = [];
+    router.register("panel", () => (seen.push("panel"), true));
+    layer.top = SEARCH;
+    // Draw order, bottom first: the menu, then the search over its right half.
+    // Region top is 1, so terminal row 7 is region row 6 — inside both.
+    layer.placed = [
+      { layer: PANEL, top: 5, left: 10, height: 3, width: 20 },
+      { layer: SEARCH, top: 5, left: 20, height: 3, width: 20 },
+    ];
+
+    router.dispatch(click(7, 25));
+    expect(router.lastStages, "the press names the top one").toContain("layer:search");
+    router.dispatch(click(7, 25, "wheelDown"));
+    expect(calls, "and the wheel asks the top one's scroller").toEqual(["scroll:search:1"]);
+
+    calls.length = 0;
+    router.dispatch(click(7, 12, "wheelUp"));
+    expect(calls, "where only the lower covers, the lower").toEqual(["scroll:menu:-1"]);
+  });
+
+  it("T1.190 (I74, §3d): a wheel over a keyed layer is consumed whether scrollLayer answers true or false; a horizontal wheel asks no scroller", () => {
+    for (const answers of [true, false]) {
+      const asked: string[] = [];
+      const { router, layer } = harness({ scrollLayer: (id) => (asked.push(id), answers) });
+      const seen: string[] = [];
+      for (const t of ["panel", "liveBlock", "global"] as const) router.register(t, () => (seen.push(t), true));
+      layer.top = PANEL;
+      layer.placed = [{ layer: PANEL, top: 5, left: 10, height: 3, width: 20 }];
+
+      expect(router.dispatch(click(7, 12, "wheelDown")), `consumed, scroller answering ${String(answers)}`).toBe(true);
+      expect(asked).toEqual(["menu"]);
+      expect(seen, "no rung handler and nothing beneath").toEqual([]);
+
+      asked.length = 0;
+      expect(router.dispatch(click(7, 12, "wheelLeft")), "a horizontal wheel is consumed").toBe(true);
+      expect(asked, "and asks no scroller").toEqual([]);
+      expect(seen).toEqual([]);
+    }
+  });
+
+  it("T1.191 (I74, C15 I31, §3d): over a peek a wheel asks its scroller, and the base takes it when the peek declines; a press reaches the entry beneath", () => {
+    for (const answers of [true, false]) {
+      const asked: string[] = [];
+      const { router } = harness({
+        scrollLayer: (id) => (asked.push(id), answers),
+        // L4's seam, as `construct.ts` builds it: the peek for the wheel only.
+        placed: (gesture) => (gesture === "wheel" ? [{ layer: PEEK, top: 2, left: 0, height: 3, width: 40 }] : []),
+      });
+      const seen: string[] = [];
+      router.register("liveBlock", () => (seen.push("liveBlock"), true));
+
+      expect(router.dispatch(click(3, 5, "wheelDown"))).toBe(true);
+      expect(asked, "the peek's own scroller").toEqual(["peek"]);
+      expect(seen, answers ? "a peek that scrolled keeps the wheel" : "a peek that declined leaves it to the entry beneath").toEqual(
+        answers ? [] : ["liveBlock"],
+      );
+
+      seen.length = 0;
+      asked.length = 0;
+      router.dispatch(click(3, 5));
+      expect(seen, "a press over the peek is the row's").toEqual(["liveBlock"]);
+      expect(asked).toEqual([]);
+    }
+  });
+
+  it("T1.192 (I47, §3d): beside an escapable panel a right, a middle, a modified press and a drag are inert; the unmodified primary press dismisses", () => {
+    const cases: readonly [string, Partial<Extract<InputEvent, { kind: "mouse" }>>][] = [
+      ["right", { button: "button2" }],
+      ["middle", { button: "button1" }],
+      ["⇧", { shift: true }],
+      ["⌃", { ctrl: true }],
+      ["⌥", { meta: true }],
+      ["drag", { motion: true }],
+    ];
+    for (const [name, over] of cases) {
+      const { router, layer, calls } = harness();
+      const seen: string[] = [];
+      for (const t of ["panel", "liveBlock", "global"] as const) router.register(t, () => (seen.push(t), true));
+      layer.top = PANEL;
+      layer.placed = [{ layer: PANEL, top: 5, left: 10, height: 3, width: 20 }];
+      expect(router.dispatch(mouseAt(3, 0, over)), `${name}: consumed`).toBe(true);
+      expect(calls, `${name}: closes nothing`).toEqual([]);
+      expect(seen, `${name}: reaches nothing`).toEqual([]);
+    }
+    // The control: the primary click.
+    const { router, layer, calls } = harness();
+    layer.top = PANEL;
+    layer.placed = [{ layer: PANEL, top: 5, left: 10, height: 3, width: 20 }];
+    router.dispatch(click(3, 0));
+    expect(calls).toEqual(["pop"]);
+  });
 });

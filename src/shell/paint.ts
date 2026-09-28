@@ -99,6 +99,11 @@ export type PaintDeps = Readonly<{
    * §3 already produced once.
    */
   overlays: () => readonly Placed[];
+  /**
+   * A layer's own row offset, as the wheel left it (C16 I74). Optional: absent
+   * is *every layer at its top*, which is every frame nobody has wheeled.
+   */
+  layerScroll?: (id: string) => number;
   /** C17's cursor as a cell in the prompt's own layout (C17 §2). */
   promptCursor: () => Cell;
   /** The session's render scratch (C12 I107), for a 3D plot inside a layer. */
@@ -917,6 +922,7 @@ export function paint(
       // to what the paint built them at.
       columns: width,
       ...(deps.scratch === undefined ? {} : { scratch: deps.scratch }),
+      ...(deps.layerScroll === undefined ? {} : { layerScroll: deps.layerScroll }),
     });
   }
 

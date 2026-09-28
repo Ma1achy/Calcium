@@ -55,6 +55,12 @@ export type CompositeDeps = Readonly<{
   /** C22 I102 — a layer's lines held by its content's identity. */
   chrome?: ChromeCache;
   /**
+   * A layer's own row offset (C16 I74). The lines are rendered whole and cut to
+   * the placed height, so scrolling a truncated layer is where the cut starts —
+   * clamped here to the lines there are, as `offsetOf` clamps a `scroll` box.
+   */
+  layerScroll?: (id: string) => number;
+  /**
    * C28's seam (I30). Absent is not recording, and that is the usual case.
    */
   probe?: Probe;
@@ -172,8 +178,9 @@ function layerRows(p: Placed, deps: CompositeDeps): readonly string[] {
         ? render(p.layer.content, p.width)
         : deps.chrome.layer(p.layer.content, p.width, deps.theme.name, render);
 
+  const from = Math.min(deps.layerScroll?.(p.layer.id) ?? 0, Math.max(0, lines.length - p.height));
   const out: string[] = [];
-  for (let i = 0; i < p.height; i += 1) out.push(exact(lines[i] ?? "", p.width));
+  for (let i = 0; i < p.height; i += 1) out.push(exact(lines[from + i] ?? "", p.width));
   return out;
 }
 

@@ -140,6 +140,8 @@ function world(
     // `TypeError` at the first dispatch rather than an error at the build.
     childAttached: () => false,
     // C16 I73 — the stack's own count, for the cast's reason above.
+    // C16 I74 — no layer here has anything to scroll.
+    scrollLayer: () => false,
     ownerGeneration: () => overlays.generation,
     overlayTop: () => {
       const top = overlays.top;
