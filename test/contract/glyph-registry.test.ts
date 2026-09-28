@@ -18,6 +18,10 @@ import * as configModule from "../../src/shell/config.js";
 import { ASCII_CAPS, FULL_CAPS, measurable, visible } from "../support/render.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
+// **The design's own resolver for a set's ASCII frames** (C09 I98): a pattern
+// fitted to the frame count, or a composite of other sets — read through the
+// function the page is built with, never re-derived here.
+import { loadRegistry, spinnerAsciiFrames } from "../../docs/design/language/build-calcium.mjs";
 
 type Caps = typeof FULL_CAPS;
 type RegistryGlyph = {
@@ -203,5 +207,49 @@ describe("C09 I123 — registry ↔ runtime glyphs", () => {
     }
   });
 
-  it.todo("T2.190 (C09 I98, question 39, R-MOT-010): no spinner set's ASCII rung is one repeated character, over SPINNER_SETS and the registry's resolved ASCII frames; downsampling is counted and let through; a fabricated constant set is named — not deferred on a component: the code lands in the next commit of this round");
+  it("T2.190 (C09 I98, question 39, R-MOT-010): no spinner set's ASCII rung is one repeated character, in the tree or in the registry; downsampling is let through", () => {
+    // **Within a set, the ASCII rung must move** (question 39, ruled (a)). A set
+    // whose ASCII frames are all one character is a still mark in a slot that
+    // says *live*: the fallback froze the animation. Several Unicode frames onto
+    // one ASCII frame is allowed — `braille`'s ten dots onto four rotation frames
+    // — and that is exactly what SS64's static test fires on, which is why the
+    // rule is here and not there: inside a set the static question is the wrong one.
+    const still = (sets: Readonly<Record<string, readonly string[]>>): readonly string[] =>
+      Object.entries(sets).filter(([, ascii]) => new Set(ascii).size < 2).map(([name]) => name).sort();
+
+    // **The control first — the check can see the thing it refuses.** A set
+    // whose ASCII half is `| | | |` is named, and one whose half holds two
+    // characters is not: a rule that answered `[]` to both would pass the corpus
+    // below for the wrong reason.
+    expect(still({ frozen: ["|", "|", "|", "|"], held: ["|", "|", "/", "/"] }), "the fabricated still set").toEqual(["frozen"]);
+
+    // The tree: every set's ASCII rung, as `spinnerFrames` answers it.
+    const tree = Object.fromEntries(
+      glyphModule.spinnerSetNames().map((name) => [name, glyphModule.spinnerFrames(ASCII_CAPS, name)]),
+    );
+    expect(still(tree), "a set whose ASCII rung is one character, in the tree").toEqual([]);
+
+    // The registry: the same question of the design's own resolved frames, so a
+    // record added with a constant pattern fails here before it is ported.
+    const REG = loadRegistry();
+    const spinners = (REG["spinners"] as readonly { id: string; status?: string; frames: readonly string[] }[])
+      .filter((sp) => sp.status === "current");
+    const design = Object.fromEntries(spinners.map((sp) => [sp.id, spinnerAsciiFrames(REG, sp as never) as readonly string[]]));
+    expect(still(design), "a set whose ASCII rung is one character, in the registry").toEqual([]);
+    expect(Object.keys(design).sort(), "the two catalogues are one set").toEqual(Object.keys(tree).sort());
+
+    // **Downsampling is let through, and the corpus holds it** — one ASCII frame
+    // under two different Unicode frames. Question 39 measured twelve of
+    // twenty-seven; the row asserts some rather than twelve, so a set re-fitted
+    // does not turn it red, and none would mean the fixture stopped holding the
+    // case the rule must not refuse.
+    const downsampled = glyphModule.spinnerSetNames().filter((name) => {
+      const set = glyphModule.SPINNER_SETS[name];
+      if (set === undefined) return false;
+      const under = new Map<string, Set<string>>();
+      set.ascii.forEach((a, i) => under.set(a, (under.get(a) ?? new Set()).add(set.frames[i] ?? "")));
+      return [...under.values()].some((u) => u.size > 1);
+    });
+    expect(downsampled.length, `sets downsampling at ASCII: ${downsampled.join(" ")}`).toBeGreaterThan(0);
+  });
 });
