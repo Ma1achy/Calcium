@@ -713,6 +713,60 @@ the question's arrival.
 
 ---
 
+## 3d. The pointer over layers, walked — review batch 3, M8
+
+**Walked against the tree after M7 landed, before any code.** The pointer's layer rung is
+structural: a gesture, and what lies under it. So the artefact is a **classification table**
+of gesture × layer, with the one event-mediated interaction (a wheel over a peek that has
+nothing to scroll) traced after it.
+
+### The premises, re-checked
+
+| # | the review's claim | at this base | |
+|---|---|---|---|
+| 1 | the hit test picks the bottom layer | holds — `deps.placed().find(…)` over C15's `layout`, which is bottom-first. Invisible today only because the two layers that can overlap (a search over a menu) are both panels and reach one handler, so the difference is a stage id | P1 |
+| 2 | a peek is left out of the pointer | holds, **and it contradicts I48**: L4's `placed` is `layout(…).filter(takesInput)`, so the peek band of `overlay › panel › peek › base` was unreachable by the one gesture it is for | P5, P6 |
+| 3 | a wheel over a panel does nothing | holds — it runs the panel's rung handler, which answers `false` for every pointer event, so the wheel is dropped rather than passed or used. T1.104 asserted a spy handler at that rung and read the drop as the panel's | P3 |
+| 5 | any button dismisses | holds — `e.press && !wheel && e.button !== "none"`. R-PTR-006's text covers a context click; the wider reading rests on R-BLK-854/855, *the thing you meant to hit was covered* | P8–P10 |
+| — | the handler at a layer's rung acts on `top` | holds, **latent**: the panel handler reads `stores.overlays.top` for its forward and its search keys, so a gesture over a lower layer would act on the upper one. No pointer arm in either handler reaches it today; the wheel, the only pointer gesture a layer acts on, would have been the first | P2 |
+
+### The classification table — structural
+
+| # | gesture | under the pointer | the rules that meet | at this base | ruling |
+|---|---|---|---|---|---|
+| P1 | an unmodified primary press | a panel over a lower panel | *topmost is the owner* × `find` is bottom-first | the lower id | the **topmost** placed layer that takes the gesture (C15 I31) |
+| P2 | a wheel | a panel, top or not | I48 *the layer order is the scroll order* × the rung handler reads `top` | dropped | the wheel goes to **that layer's scroller by id** — `scrollLayer(id, notches)` — and never through a handler that reads `top` |
+| P3 | a wheel | a keyed layer that cannot scroll (fits, or a question) | I48 × *nothing to scroll* | dropped | **consumed and inert**: the layer is between the pointer and the base, and a wheel through a question is I40's to give, not this rung's |
+| P4 | a horizontal wheel | a keyed layer | §4a row j × I48 | dropped | consumed and inert, as P3; no scroller is asked |
+| P5 | a wheel | a truncated peek | I48's peek band × C15 I21 *a peek takes no input* | the transcript row beneath scrolls | **the peek scrolls** (C15 I31: a peek takes the wheel) |
+| P6 | a wheel | a peek that fits | I48 × *an element that declines leaves the wheel to the container above it* | the transcript | the peek **declines** and the base takes it, exactly as a `scroll` that cannot move does below it |
+| P7 | a press or a release | a peek | C15 I21 × I48 | the row beneath | unchanged: the row beneath, which is what the peek describes |
+| P8 | a right or middle press, a modified press, a drag | beside an escapable top | I47 *the click that dismisses* × *one gesture, one effect* | **dismisses** | **consumed and inert** (ruling D7): the thing beneath was covered, so nothing beneath acts — and closing is the primary click's, so no other gesture closes |
+| P9 | an unmodified primary press | beside an escapable top | I47 | dismisses | dismisses (the control) |
+| P10 | a hover, or a wheel | beside an escapable top | §4a row t, I40 | passes | unchanged |
+| P11 | anything but a wheel | beside a blocking top | I8 | `modal` | unchanged |
+
+### The one sequence the table does not reach
+
+| # | sequence | at this base | ruling |
+|---|---|---|---|
+| Q1 | a peek that fits → the wheel over it → the focused element grows and the peek truncates → the wheel again | the transcript both times | the first declines to the transcript (P6), the second scrolls the peek (P5). **The answer is asked of the placement at the event**, never cached with the layer |
+| Q2 | a menu window scrolled by the wheel → `↓` | — | the window follows the **selection** again: the wheel moves what is shown and never what is chosen (C19 I20), and the keys own the choice |
+
+### What the walk found
+
+- **The peek band was specified and unreachable** (P5, P6): one predicate answered for keys and
+  for the pointer, and the peek is the layer where the two differ. C15 I31 is the split.
+- **A wheel over a panel was dropped, and the row said the panel took it** (P2): T1.104's spy
+  handler at `panel` returned `true`, which the tree's own handler never does for a pointer
+  event. A fixture that supplied the behaviour it was checking for.
+- **The rung handler acts on `top`** (P2): harmless while no layer takes a pointer gesture,
+  and the first one that did would have acted on the wrong layer. The wheel goes by id instead.
+- **Any button closed a panel** (P8): the rule was written for the primary click and the
+  predicate named every button.
+
+---
+
 ## 4. Dispatch
 
 Handlers register against a target and return a **verdict** (W6).
@@ -2110,7 +2164,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I45** — **The pointer press arms an identity and the release commits it** (§4a, R-OWN-003, R-PTR-005). A press on the **focused** element arms `(entryId, blockId, elementId, ownerEpoch)` and does nothing; the release commits when the pointer is still over that same identity in that same epoch, and the two effects that commit are `rowActivate` and the legend's `toggleSeriesIn`. The identity is those three ids and never the cell — a live block re-renders under a held button, and a release comparing positions activates whatever slid beneath the pointer. **Focus does not move to the release**: R-PTR-001 separates focus from activation, so a press on an element that is *not* focused lands focus at once, and the arm is decided against the focus state before that press rather than after it. The crosshair stays on the press for R-PTR-003's own reason — it is the hover's equal and a hover commits no value — and the drag and the wheel are not activations.
 
 - **I46** — **Five things cancel an arm, and a cancelled arm is silent** (§7, R-OWN-003, R-INT-008). A drag, a second press, a release anywhere but the armed identity, an owner change, and `resetFocus()`. A drag cancels even when the pointer returns to where it started, which is where the arm parts company with a selection: a selection is resolved afresh on every motion and survives an excursion, and an activation is a commitment a drag revokes. No cancellation says anything — R-INT-008's *passive untargeted pointer events may remain silent* — where I44's **refusal** must explain, because it answers a command the reader gave.
-- **I47** — **The click that dismisses does not also act** (§4a, R-BLK-854, R-BLK-855, R-INT-008). A press outside the topmost `escape` layer closes it and is **consumed there**: *the thing you meant to hit was covered a moment ago, so a press that closed the panel AND activated what was underneath would be acting on something you could not see when you decided to press.* One gesture, one effect — the same shape as `esc` popping one rung, on the pointer instead of the keyboard. It is the press and not the release that closes, because closing is not an activation and nothing about it is taken back by moving the pointer; the arm the release commits (I45) is cancelled by the press as any other press cancels one. A **blocking** top layer is not this rule's subject and keeps I8's answer, which is that the click does nothing at all.
+- **I47** — **The click that dismisses does not also act** (§4a, §3d P8–P10, R-BLK-854, R-BLK-855, R-INT-008). An **unmodified primary press** — `button0`, not motion, no ⇧, ⌃ or ⌥ — outside the topmost `escape` layer closes it and is **consumed there**; every other press or drag beside it is consumed and does nothing (ruling D7). *(Amended in review batch 3: any button closed it.)* A hover and a wheel pass, as before. The primary click is consumed there: *the thing you meant to hit was covered a moment ago, so a press that closed the panel AND activated what was underneath would be acting on something you could not see when you decided to press.* One gesture, one effect — the same shape as `esc` popping one rung, on the pointer instead of the keyboard. It is the press and not the release that closes, because closing is not an activation and nothing about it is taken back by moving the pointer; the arm the release commits (I45) is cancelled by the press as any other press cancels one. A **blocking** top layer is not this rule's subject and keeps I8's answer, which is that the click does nothing at all.
 - **I48** — **The layer order is the scroll order** (C15 I23, R-BLK-779, R-SEL-012). `overlay › panel › peek › base` decides which viewport a wheel moves exactly as it decides which layer a key reaches — *one ordering does both jobs*, and a wheel over a panel moves the panel rather than the transcript behind it for the same reason a key over a panel is the panel's. Beneath the layers the walk continues into the region: R-SEL-012's *the wheel takes the innermost scrollable under the pointer*, so a `scroll` inside a `scroll` takes it at the depth the pointer is actually in, and an element that declines leaves the wheel to the container above it. The rung used to stop at one level, which is correct for exactly as long as no `scroll` contains another.
 
 - **I49** — **The captured child is a rung with a subject, and its host escape is reserved, visible and refusable** (§5, §103, R-BLK-711, R-BLK-838, R-BLK-908, R-BLK-312, R-INT-007). `attachedChild` has **two** sources and they are one fact: a shell delegation in flight (`inFlight() === "shell"`), and an application's child attached over its own block. *An attached PTY transfers ownership without becoming a substate; only `host.detach` returns ownership* — so the rung is not entered by focus moving and is not left by `esc`.
@@ -2166,6 +2220,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I71** — *(§3c S1, S2, §4a, R-OWN-003, R-PTR-005)* **Only a press arms, and it arms what it will do.** The press on the focused element captures that element's activation — its entry and its address — and the release over the armed identity in the armed epoch commits exactly that, wherever focus went in between. **Motion never arms and never re-arms**: a motion report over the focused plot aims the crosshair and does nothing to a legend. → T4.90, T4.77
 - **I72** — *(§3c S8, S8b, I61, C22 I129)* **A focus-out clears the held keys and the pointer arm, and ends a guard waiting on a key-up.** It is read before routing and routed nowhere (I61): no stage, no rung, and the last dispatch's stages stand. A timed guard is left to its clock, because its numbers are about repeats and a focus-out stops none that matter. Reports arrive only where the application opted in (C22 I129); without them nothing here happens, and that is the stated limit. → T1.186
 - **I73** — *(§3c S9, S10b, I43, → C15 I33)* **The epoch moves when the rung changes or the owner generation does.** The generation is a pull (`ownerGeneration`) summing C15's count of keyed pushes and removals and the surface host's attachments, so a question raised and answered between two reads — the rung the same at both — still kills an arm taken before it. **A generation change at the `question` rung is a question arriving**, and is guarded as one: a question replaced by a question within one dispatch. The counter is private to `router.ts`; its readers are `commitPointer` and the guard. → T1.187, T1.188
+- **I74** — *(§3d, I48, → C15 I31, R-BLK-779, R-SEL-012)* **The pointer reaches the topmost layer that takes its gesture.** `placed` is asked per gesture — C15's `takesPointer`, so a peek takes the wheel and no press — and the router takes the **last** hit, because C15's `layout` is draw order. **A wheel over a layer goes to that layer's scroller by id** (`scrollLayer(id, notches)`), never through a rung handler that reads `top`: a keyed layer consumes the wheel whether or not it moved, and a peek that has nothing to scroll **declines** it to the base, as a `scroll` that cannot move does. The menu's scroller is a window offset held beside its selection and independent of it — the wheel changes what is shown and never what is chosen (C19 I20), and the next key that moves the selection brings the window back to it. Any other layer's scroller is a row offset into its own rendered lines, clamped to them at write and dropped when the layer goes. → T1.189, T1.190, T1.191, T4.92, T4.93
 
 ## 9. Commitments
 
@@ -2220,6 +2275,8 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 47. A pointer press captures the activation its release commits, and motion never arms (I71). → T4.90
 48. A focus-out clears held keys and the pointer arm (I72). → T1.186
 49. The epoch sees every owner change, including one raised and gone between two reads (I73). → T1.187
+50. The pointer reaches the topmost layer that takes its gesture, a peek included for the wheel, and a wheel over a layer goes to that layer's scroller by id (I74). → T1.189, T1.190, T1.191, T4.92, T4.93
+51. Only an unmodified primary press dismisses an escapable layer; every other press or drag beside it is inert (I47). → T1.192
 
 ---
 
@@ -2299,7 +2356,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.102** (I45): the armed identity is compared by ids and not by cell — the same row and column with a changed `elementId` does not commit, and a changed cell with the same ids does not either, since the release must still be over the element. Both halves, because either alone is passed by comparing the wrong thing.
 
 - **T1.103** (I47, R-BLK-855): with a **panel** up, a press beside it closes the panel and reaches no target — the stages end at the dismissal and the entry under the pointer is not focused. **T1.103b**: the control, a press *on* the panel, which is the panel's; and a press beside a **blocking** layer, which is I8's `modal` and closes nothing. The three cells are what separate *dismisses* from *acts* from *does neither*.
-- **T1.104** (I48, C15 I23): a wheel over a placed **panel** is the panel's and the transcript's `topRow` does not move; the control is the same wheel one row outside it, which the entry under the pointer takes. **The peek clause is not asserted here and the row says why**: C15 I21 keeps a peek out of `top` and L4 filters it out of `placed`, so at this seam *the wheel falls past a peek* is byte-identical to *no layer is open*, and a row about it would be a row about its own fixture. It is observable at C15's `top` (T1.23) and at the filter in `construct.ts`.
+- **T1.104** (I48, I74, C15 I23): a wheel over a placed **panel** is the panel's scroller's — `scrollLayer("menu", 1)` — and reaches no rung handler; the control is the same wheel one row outside it, which the entry under the pointer takes. *(Amended in review batch 3: the row asserted a spy handler at `panel` returning `true`, which the tree's handler never does for a pointer event (§3d P2), and its peek clause was not asserted because L4 filtered the peek out; T1.191 now asserts it.)*
 - **T1.105** (I48, R-SEL-012): a `scroll` inside a `scroll` takes the wheel at the depth the pointer is in — the inner box's offset moves and the outer's does not — and a pointer in the outer box but outside the inner one moves the outer. **Three** counters after each step, the transcript's included, because a version that moved two of them passes any assertion written about one. **In `test/unit/session-mouse.test.ts` rather than beside T1.103**: the router hands the region to L4 and the descent is L4's, because a `scroll` owns one element per child and the element walk does not descend past it (C26 §4b cell 3) — so the deepest *element* under the pointer belongs to the outermost box, and only the composition root can read the child block that element names. **Both ceilings are non-zero**, or the control is satisfied by an implementation that moves nothing.
 - **T1.106** (I49, R-INT-007, R-BLK-838): with a child attached, `esc` and `⌃c` reach the child's handler, and a key the child binds **nothing** to is consumed at the `child` rung and reaches no lower one. The control is the same three keys with nothing attached, each of which reaches its ordinary rung — without it the row is passed by a router that drops every key.
 - **T1.109** (I57, R-KEY-005, C23 I79): through the graph — with `git st` in the prompt, `F1` appends one entry leading with `prompt — where you are`, the prompt still reads `git st`, and history has no `/help keys`; the control types `/help keys` and ⏎, which clears the line and records it. With a transcript entry focused, `?` appends an entry whose first scope is `liveBlock — where you are` — the ordering driven from a rung other than `prompt`, which no harness had done, since each stubbed the scope.
@@ -2325,6 +2382,10 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.185** (I70): the router's `ownerRefused` is `undefined` while guarded before any refusal, is the refused key after the first, and is **the same value** after the second; `nextDeadline()` is `750` at the arrival and `max(750, t + 250)` after a refusal at `t`, and `undefined` with releases reported or with no guard.
 - **T1.186** (I72, §3c S8, S8b): releases reported; `enter` down, then `{ kind: "focus", focused: false }` → a question arriving later is guarded by nothing held, so a deliberate `⏎` answers it; and a pointer arm taken before a focus-out does not commit at the release. The dispatch of the focus report answers `false` with no stages.
 - **T1.187** (I73, §3c S9): a pointer arm; the injected `ownerGeneration` moves twice with the rung `scope` at both reads → `commitPointer` refuses. The control: the generation still → it commits.
+- **T1.189** (I74, §3d P1): two overlapping layers; a press and a wheel over the overlap go to the **top** one — the stages name its id and `scrollLayer` is asked for it — and a point covered by the lower one alone reaches the lower.
+- **T1.190** (I74, §3d P2–P4): a wheel over a keyed layer is consumed whether `scrollLayer` answers `true` or `false`; a horizontal wheel over it is consumed and asks no scroller; no rung handler is reached in any of the three.
+- **T1.191** (I74, C15 I31, §3d P5–P7): over a peek, a wheel asks `scrollLayer` for the peek and is consumed when it answers `true`; when it answers `false` the base takes the wheel — the entry under the pointer. A press there reaches the entry beneath, because `placed("press")` does not hold the peek.
+- **T1.192** (I47, §3d P8–P10): beside an escapable panel, a right press, a middle press, a ⇧-, ⌃- and ⌥-press and a drag each answer `true`, pop nothing and reach no target; the control, an unmodified primary press, pops it.
 - **T1.188** (I73, §3c S10b): at the `question` rung, a dispatch that moves the generation leaves the router guarded afresh; the same dispatch with the generation still leaves it unguarded.
 
 ### Tier 2 — contract / interface
@@ -2424,6 +2485,8 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T4.78** (I44, R-BLK-786, R-BLK-788): through the confirm host — a newly presented question is guarded, the first `y` is refused with the stages `["arming", "question-guard", "reject"]`, the question is **still open and still unanswered**, the guard is spent, and the second `y` answers it. **T4.79** (I44): the control — an arrow is neutral, reaches the question, moves its selection, leaves it open, and the `y` after it is unrefused. Without the pair the guard is equally passed by a router that refuses everything and by one that refuses nothing.
 - **T4.77** (I45, I71, §4a's legend row): press on a legend entry of an unfocused plot focuses the plot and leaves the series shown; the release toggles it. The control is a press with the pointer moved off the entry before the release: focused, and still shown. **And off and back again** (§3c S2): press on the focused plot's entry, drag off it, drag back, release — still shown, because only a press arms.
 - **T4.90** (I71, §3c S1): through the graph — press on focused row A, `↓` moves focus to row B while the button is down, release over A: A's action fires and B's does not.
+- **T4.92** (I74, C19 I20, §3d Q2): through the graph — a typed menu truncated by its placement; a wheel down over it moves its window, so the first candidate shown changes, while `selected` stays `null` and the transcript's `topRow` does not move; `↓` then selects and the window follows the selection.
+- **T4.93** (I74, C15 I31, §3d P5, P6): through the graph — a peek truncated by its placement; a wheel over it moves the peek's rows and not the transcript's `topRow`; over a peek that fits, the same wheel moves the transcript.
 - **T4.91** (I69, I70, C22 §6): through a built session on a terminal with no release reporting — a question arrives: the owner line reads `ready in a moment`; a `⏎` at +100 is refused and the line names `⏎ refused: pause, then press ⏎`; a second at +200 is refused and **the frame does not change**; with no input, the frame at the deadline has no mark, because the wake drew it.
 - **T4.81** (I62, C23 I36, ruling 59): through the confirm host — `⌃c` at an open question: the promise is unsettled, the layer is open, and the notice is drawn. **T4.81b**: the same with `inFlight: "local"` — `cancels() === 0`.
 - **T4.82** (C23 I82, R-HON-004, R-INT-008, ruling 60): the first `q` at a choice question → exactly one C15 `content` change and one `invalidate`, and the frame at 80 columns, read as text, holds `answer this first` on the question's row; the second `q` → no change, no `invalidate`, the same lines; then `n` answers. At a 12-row region the choices are still drawn after the notice lands.
@@ -2531,6 +2594,9 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.52** (I66, §6c S11): the copy-mode switch removed from the session → T4.89 fails, with both modes on.
 - **T6.33** (I44, §4a W8): the guard set on every epoch move rather than on a question arriving → T1.99c fails, and the first keystroke after a question closes is refused. The revert that reads as a simplification — one field instead of two — and whose symptom appears only across a fall.
 - **The mutation pass names where a row is blind.** *A drag no longer cancels the arm* is killed by **T1.101b** and not by T4.65, and the expectation says so: T4.65's drag extends a **selection**, and a selection never arms — so there is no arm in that row for the cancellation to be missing from, and it passes with the cancellation deleted. The session-level drag row is blind to the arm by construction, which is a fact about the row and not a gap in the code.
+- **T6.60** (I74): the router's hit test back to `find` → T1.189 fails, and the overlap reaches the lower layer.
+- **T6.61** (I74, C15 I31): L4's `placed` filtered by `takesInput` again → T4.93 fails, and the wheel over a truncated peek scrolls the transcript.
+- **T6.62** (I47): the dismissal back to any non-wheel press → T1.192 fails on the right press.
 - ~~**T6.36**~~ — **retired with T3.20** (ruling 52 as amended, I69). It read *the guard given a time window instead of a boundary event → T3.20 fails*, and the arm without releases is given two windows by the person's ruling. The objection it carried — a single window is wrong in both directions — is kept by I69's grace and T6.54.
 - **T6.53** (I69): the gap no longer restarted by a refusal — the guard ends when its grace does → T1.181 fails on the repeat after the grace.
 - **T6.54** (I69): the arrival grace dropped, leaving the 250 ms gap from the arrival alone — ruling 52's first form → T1.182 fails at the 660 ms repeat.

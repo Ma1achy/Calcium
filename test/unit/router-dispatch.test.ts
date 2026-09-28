@@ -1945,3 +1945,18 @@ describe("C16 I69–I73 — the timed guard, its explanation, focus-out and the 
     return { ...h, q };
   }
 });
+
+describe("C16 I74, I47 — the pointer over layers (review batch 3, M8)", () => {
+  it.todo(
+    "T1.189 (I74, §3d): two overlapping layers: a press and a wheel over the overlap go to the top one; the lower alone reaches the lower — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T1.190 (I74, §3d): a wheel over a keyed layer is consumed whether scrollLayer answers true or false; a horizontal wheel asks no scroller — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T1.191 (I74, C15 I31, §3d): over a peek a wheel asks scrollLayer and the base takes it when the peek declines; a press reaches the entry beneath — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T1.192 (I47, §3d): beside an escapable panel a right, middle, modified press and a drag are inert; the unmodified primary press dismisses — not deferred on a component: the code lands in the next commit of this round",
+  );
+});
