@@ -362,11 +362,13 @@ have its own **prompt** and its own **context**?* — and a reading of the profi
 navigation calls*, and the transcript is that consumer. The deck's own window, header and timer go;
 what is left is the composer, which is the part every row about a card was written against.
 
-**Its content is `profileDeck(report, section, index, region, caps)` with the terminal's
-capabilities, whole** (C09 I49, F828): `·` is `East_Asian_Width=Ambiguous`, so the ASCII default the
+**Its content is `profileCard(report, id, region, caps, seq)` for each entry `deckOf` lists, with
+the terminal's capabilities, whole** (C09 I49, F828) — *as it stood:* ~~`profileDeck(report,
+section, index, region, caps)`~~, one card at a time for a view that walked them: `·` is `East_Asian_Width=Ambiguous`, so the ASCII default the
 deck carries for a caller with no terminal is the one arm a real terminal must never get. The cards
-are drawn from `profiler.report()`, which is a pull — nothing tells the view a report changed, which
-is why the cadence below is a timer and not an event.
+are drawn from `profiler.report()`, which is a pull, once, when the verb runs — a section's entry is
+stamped rather than refreshed, and currency is `/profile live`'s part. *As it stood:* ~~nothing
+tells the view a report changed, which is why the cadence below is a timer and not an event~~.
 
 **The region is an argument and not a discovery**, which is the half of the signature the first
 draft did not have. A card solves for the height whose `plotHeight` fits (below), so the deck cannot
@@ -834,7 +836,7 @@ histograms describes neither, and the report states the point at which it was re
 - **I20** — `mark` records an instant on the session timeline and never inside a `FrameRecord`.
 - **I21** — `src/shell/profiling/node.ts` is the only file under `src/` naming `process.memoryUsage`, `process.cpuUsage`, `monitorEventLoopDelay`, `PerformanceObserver`, `node:inspector` or `node:v8`.
 - **I22** — `dispose` is idempotent; after it every operation is a no-op except `capture`, which throws.
-- **I23** — Opening the profiler view raises the tier and closing it restores the tier that was set before; a pane with no data draws a notice and never an empty plot, because an empty plot reads as *measured, and zero*.
+- **I23** — *As it stood:* ~~Opening the profiler view raises the tier and closing it restores the tier that was set before;~~ — retired with the view, as I50 was (R-EXA-082, F1254): nothing in a running session raises a tier. A card with no data draws a notice and never an empty plot, because an empty plot reads as *measured, and zero*.
 - **I24** — `byEntry` and `byKind` are **work** histograms and are named as such; `wait` is a property of a frame and is never attributed to an entry or a kind.
 - **I25** — The user-timing entry count is reported as a count with no attribution, and labelled so: the profiler raises no marks of its own, so it cannot say whose entries these are.
 - **I26** — A span open across a resize records the width it opened at and is tagged as having crossed one; it is not silently attributed to the new width. The width is **told** rather than read — SS42 keeps the terminal's dimensions in `lifecycle.ts` and C01 I13 hands them down, so the root calls `profiler.resized(columns)` from the same `onResize` the recorder taps, and takes the initial one from `lifecycle.size()` because `onResize` fires on `SIGWINCH` and on nothing else. **The tag rather than a corrected width is the whole ruling**: width decides how much work a measure or a paint does, so a span filed under the width in force when it *closed* is a cost attributed to geometry that did not produce it — and it is silent, because the number is a plausible width and the duration is real.

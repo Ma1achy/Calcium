@@ -127,7 +127,7 @@ rather than a second mechanism here.** The layer is pushed with
 it takes a key. See I36 for why that flag is `false` on a layer the user can
 plainly escape.
 
-Calcium ships handlers for the concerns it owns — `/help` renders from the manifest (C16 §6, so documentation cannot drift), `/clear` empties C13, `/theme` switches C10, `/history` reads C20, `/debug` reads an entry's invocation record, `/exit` calls `C22.stop`, and `/profile` opens C28's view (below). An app registers its own alongside them.
+Calcium ships handlers for the concerns it owns — `/help` renders from the manifest (C16 §6, so documentation cannot drift), `/clear` empties C13, `/theme` switches C10, `/history` reads C20, `/debug` reads an entry's invocation record, `/exit` calls `C22.stop`, and `/profile` appends C28's deck as an entry (below). An app registers its own alongside them.
 
 **The six are rows in every manifest (C05 §3), and that is what makes them reachable.** C18 classifies `local` from the manifest, so a handler for a verb the manifest does not declare is one nothing can ever route to — which is exactly what I27's reconciliation reports. Registering the handlers without the rows was tried and failed construction on all six, correctly.
 
@@ -150,85 +150,104 @@ Renders a `keyValue` of `argv`, `transport`, `origin`, `exitCode`, `durationMs` 
 
 This is also what distinguishes `/debug` from `{ } json`, which several surfaces offer. `{ } json` **re-runs** the command with `--json` — honest, and what the command says, but on a `--watch` or a changing cluster it returns different data than the block it was opened from. `/debug` describes the entry in front of you.
 
-#### `/profile` — the profiler's view
+#### `/profile` — the profiler's deck, as entries
 
 ```
-/profile                 open the profiler view on its first card
-/profile <section>       open it on that section
-/profile snapshot [card] append the card on screen, stamped, once
-/profile live [card]     append the card as a part that refreshes itself
+/profile                  append the verdict section's cards, stamped
+/profile <section>        append that section's cards, stamped
+/profile snapshot [card]  append one card, stamped, once
+/profile live [card]      append one card as a part that refreshes itself
+/profile capture [ms]     take a CPU profile and append where it was written
 ```
 
-**Opening appends a notice and never the live panes** (I68, I69). The cards are C28's
-(`profileDeck`, C28 §3c), drawn in a `kind: "view"` layer the view refreshes on a timer, and the
-entry `/profile` appends says which section opened and nothing more — the entry sits under the
-view anyway, read after `Esc`.
+**Every arm composes a document, and none raises a layer** (I68, I69; C28 §3c, R-EXA-082,
+F1254). A section is an entry: one `b.panel` per deck entry, in `deckOf`'s order — so a per-frame
+card is one panel per retained frame (C28 I58) — each titled with the stamp `snapshot` carries and
+holding that card's blocks from `profileCard`, drawn at the context's width, `SNAPSHOT_ROWS` tall and
+with the context's capabilities whole (C09 I49). Bare `/profile` is `/profile verdict`, and the
+entry's command says so. The transcript holds the entry, C14 scrolls it, C26 focuses it and `y`
+copies it; there are no deck keys, because there is no deck to walk that the transcript does not
+already scroll. *As it stood:* ~~**Opening appends a notice and never the live panes** (I68, I69).
+The cards are C28's (`profileDeck`, C28 §3c), drawn in a `kind: "view"` layer the view refreshes on
+a timer, and the entry `/profile` appends says which section opened and nothing more — the entry
+sits under the view anyway, read after `Esc`.~~
 
-**The other two put figures in the transcript, and what makes that safe is not the view** (I69,
-amended). The objection this rule was written against is a reading that *claims* to be current:
-a document holding a report would be stale on the next frame, which is I18's shape with the
-framework's own figures inside it. That is true of an unstamped, never-refreshed document, and it
-is the only document the rule considered. The framework has two answers to it and this verb used
-neither.
+**What makes a figure in the transcript safe is its stamp or its cadence** (I69, amended). The
+objection this rule was written against is a reading that *claims* to be current: a document holding
+a report would be stale on the next frame, which is I18's shape with the framework's own figures
+inside it. That is true of an unstamped, never-refreshed document, and it is the only document the
+rule first considered. The framework has two answers to it, and every arm now uses one.
 
-- **`/profile snapshot [card]`** appends the card **stamped** — the frame range, the elapsed time
-  it was taken at, the tier and the ring's reset point, in the panel's own title. It claims the
-  opposite of current, on its face, for as long as it exists.
-- **`/profile live [card]`** appends it as a `b.live` part on the sampler's cadence, so it is
-  current because it is refreshed, which is the same answer the view gives.
+- **A section, and `/profile snapshot [card]`**, append cards **stamped** — the frame range, the
+  elapsed time it was taken at, the tier and the ring's reset point, in each panel's own title. A
+  stamp claims the opposite of current, on its face, for as long as it exists.
+- **`/profile live [card]`** appends one card as a `b.live` part on the sampler's one-second
+  cadence, so it is current because it is refreshed, and carries no stamp — a stamp beside a
+  refetch would be two claims about one fact, disagreeing between ticks.
 
-**The hazard that replaces staleness is the tier.** A view raises to `spans` on open and restores
-on close (C28 I50); **a transcript part has no close**. So a live card that raised the tier would
-pin it for the rest of the session, and a raise resets the ring (C28 I18) — a verb that quietly
-turns the profiler on and empties what was already recorded. A live card therefore **never calls
-`setTier`**: it draws what the session is already recording, and where that is nothing it draws
-C28's *raise the tier* notice rather than raising it.
+**The hazard that replaces staleness is the tier.** A transcript entry has no close, so any arm
+that raised the tier would pin it for the rest of the session, and a raise resets the ring (C28
+I18) — a verb that quietly turns the profiler on and empties what was already recorded. **No arm
+calls `setTier`, and none can**: the handler holds a reader, `() => ProfileReport | null`, and
+never the recorder. A live card below `spans` draws a notice naming the tier it found and the
+config to change — `profile: { tier: "spans" }` and a restart — rather than a figure; `capture`
+below `deep` answers the same way for `deep`. *As it stood:* ~~A view raises to `spans` on open and
+restores on close (C28 I50); **a transcript part has no close**.~~ — C28 I50 retired with the view,
+and with it the one path in a running session that raised a tier.
 
-The overlay is one screen and does not scroll, which is the whole reason these exist: an icicle of
-a 47 ms frame or an `ecdf` over 512 samples is cramped in the view and right in scrollback, where
-two can be compared and one can go in a bug report.
+**`capture` is C28 I64's verb.** It samples for the window asked in the `card` slot — 400 ms when
+none is, clamped to 50 ms – 10 s — and appends an `info` notice with the **measured** window, the
+time on the stack, the time in synthetic frames and the path written, or a `warn` notice when
+nothing was sampled. It blocks the prompt for the window, which is why the default is short.
 
-**Three arms, and each answers through the local route rather than throwing** (I2). With no profiler
+**Every refusal is a document on the route rather than a throw** (I2). With no profiler
 configured — a session built without `TuiConfig.profile`, which is every session that did not ask
-(C28 T4.1) — the handler answers a `warn` notice naming `TuiConfig.profile` and opens nothing; there
-is no recorder whose tier could be raised, and C28 §3's *a tier is raised by `/profile`* was a
-sentence with no mechanism behind it (F946). With a token that is neither one of C28's `SECTIONS`
-nor one of the two document verbs, validation fails, the handler runs with `args` empty (a local
-verb is not gated on validation), and it answers a usage notice naming the five and the token typed
-— `/theme`'s arm, one verb over. With
-another layer up, it answers the view's own refusal string, *close what is open*, as `document-view`
-does (C15 I1's refusal is a throw, and a handler is nowhere to report one).
+(C28 T4.1) — each arm answers a `warn` notice naming `TuiConfig.profile`; there is no recorder
+whose tier could be raised, and C28 §3's *a tier is raised by `/profile`* was a sentence with no
+mechanism behind it (F946). With a token that is neither one of C28's `SECTIONS` nor one of the
+three verbs, validation fails, the handler runs with `args` empty (a local verb is not gated on
+validation), and it answers a usage notice naming all six and the token typed — `/theme`'s arm,
+one verb over. *As it stood:* ~~With another layer up, it answers the view's own refusal string,
+*close what is open*, as `document-view` does (C15 I1's refusal is a throw, and a handler is nowhere
+to report one).~~ — nothing is pushed, so an occupied stack is not a state this verb meets.
 
 **The section comes from `ctx.args`, never from `argv[0]`** (C22 I66), for `/theme`'s reason: C05
 parsed and enum-checked it, and a second reader of one fact drifts from the first. `argv[0]` is read
 on the failure arm alone, to quote the token.
 
-**The handler reaches the view through `HandlerDeps`, the way `/exit` reaches `stop`**, and the view
-is C22's to build: it holds the overlay manager, the scheduler's commit, the profiler and the
-terminal's capabilities, all of which are the root's. `LocalContext.profile` — the report — stays a
-function, because a consumer's own handler reading it is the case that seam was published for (C28
-§4); opening the framework's view is not a consumer's operation and does not join the published
-context.
+**The handler reaches the profiler through two `HandlerDeps` members, the way `/exit` reaches
+`stop`**: `profileReport`, the reader, and `profileCapture`, `capture`'s one operation. Both are
+required, and where no profiler exists the reader answers `null` and the capture is `null` —
+`execution.ts` folds an absent `PipelineDeps.profile` or `profileCapture` to exactly that — because a wiring site that may omit a member
+is one that will, and the verb would then answer *no profiler* in a session that has one.
+`LocalContext.profile` — the report — stays a function, because a consumer's own handler reading it
+is the case that seam was published for (C28 §4); the framework's verb reads the same report and
+publishes nothing new. *As it stood:* ~~**The handler reaches the view through `HandlerDeps`**, and
+the view is C22's to build: it holds the overlay manager, the scheduler's commit, the profiler and
+the terminal's capabilities, all of which are the root's. Opening the framework's view is not a
+consumer's operation and does not join the published context.~~
 
 **The seventh row, and the reconciliation that holds it.** `/profile` is a framework verb: its row is
 in `FRAMEWORK_TOOLS` (C05 §3) with `section` as an optional `enum` and `card` as an optional string.
-The enum's values are C28's three `SECTIONS` **and the two document verbs** — `snapshot` and `live`
-(I69, amended) — written at L0, because the manifest may not import the shell; T1.67 holds the list
-equal to `SECTIONS` plus those two rather than to `SECTIONS` alone, since an equality against the
-sections would go green the day a verb was dropped from the enum and left the completion menu short
-of it. And
-`execution.ts` hands the root's view to `shippedHandlers`. I27 refuses a handler with no row and a row
-with no handler, in either order, so `HandlerDeps.profileView` is required and the view arrives
-whether or not a recorder does; with none it refuses through the route (T4.67). The handler was
-included only when a view was handed in for the one round in which the row and the call site were
-outside the files being edited, so that a tree with neither was exactly the six; T4.66 and T4.67 went
-live when the row landed and that conditional went with it.
+The enum's values are C28's three `SECTIONS` **and the three verbs** — `snapshot`, `live` and
+`capture` (I69, amended; C28 I64) — written at L0, because the manifest may not import the shell;
+T1.67 holds the list equal to `SECTIONS` plus those three rather than to `SECTIONS` alone, since an
+equality against the sections would go green the day a verb was dropped from the enum and left the
+completion menu short of it. I27 refuses a handler with no row and a row with no handler, in either
+order, so the handler is registered whether or not a recorder exists; with none it refuses through
+the route (T4.67). *As it stood:* ~~`execution.ts` hands the root's view to `shippedHandlers`, so
+`HandlerDeps.profileView` is required and the view arrives whether or not a recorder does. The
+handler was included only when a view was handed in for the one round in which the row and the call
+site were outside the files being edited, so that a tree with neither was exactly the six; T4.66 and
+T4.67 went live when the row landed and that conditional went with it.~~
 
-Inside the view, `n`/`p` walk the deck a card at a time and cross the group boundaries, `Tab`/`⇧Tab`
-move a whole group, `g`/`G` and the page keys move the window, `Esc` closes and the ⌃c ladder pops it
-— C16's `pushedView` bindings, **one gesture added** and added at the target rather than for the
-profiler: `Tab` means *the next section* to all three owners, a file to the patch view and a heading
-to the document view (C16 I33, C28 §3c).
+*As it stood:* ~~Inside the view, `n`/`p` walk the deck a card at a time and cross the group
+boundaries, `Tab`/`⇧Tab` move a whole group, `g`/`G` and the page keys move the window, `Esc` closes
+and the ⌃c ladder pops it — C16's `pushedView` bindings, **one gesture added** and added at the
+target rather than for the profiler: `Tab` means *the next section* to all three owners, a file to
+the patch view and a heading to the document view (C16 I33, C28 §3c).~~ — **Superseded with the
+pushed view** (R-EXA-082, F1254): the target retired, and an entry is walked by C26's element
+motions like any other.
 
 ---
 
@@ -1195,8 +1214,8 @@ Per submission.
 - **I65** — **A width change tells the child and the emulator the same number, computed once, from one signal.** Not an order: the child's repaint reaches the emulator through the write queue, so it cannot arrive between the two calls however they are sequenced, and an ordering claim here constrains nothing. What can be wrong is the figure — the region's width where the body's belongs, or two computations that disagree by `BODY_INDENT` — and a child wrapping at a column the grid does not have puts every line after the first in the wrong place.
 - **I66** — **The shell route registers a cancel, and the screen survives it.** The ladder's first rung signals the child's group and the card settles `cancelled` holding what it had drawn.
 - **I67** — **Every chunk the child wrote before it exited has reached the screen before the final snapshot is taken, and a settled terminal block carries no cursor, and what it keeps is decided by the screen flag: the scrollback in `lines` mode, the grid in `grid` mode.** Two artefacts, and the flag the child itself set says which one it left behind. **The first clause used to read *every write is awaited*, and the defect it was written against satisfied that exactly** (F1096): the route awaits a chain of links, each link re-checked a gate that closes *before* the drain, and a link whose gate had shut returned without writing. Every write was awaited and none of them wrote — the drain drained nothing, and the screen kept whatever had got through. Measured on a runner at `46 → 46 numbered lines of 200 in 5013 ms, 1 patches, grew by 0`, with the cut point moving between runs because it is wherever the exit caught the chain, and never reproducible on a machine where a `seq` finishes before the exit is observed. **A wording that names the mechanism is satisfied by a mechanism that does nothing**, which is A03 §2's vacuity class arriving in an invariant: *awaited* is true of a no-op, and *has reached the screen* is not. The clause now names the observable.
-- **I68** — **`/profile [pane]` opens C28's view through the local route, and every refusal is a document on that route rather than a throw**: a `warn` notice naming `TuiConfig.profile` when no profiler exists, a usage notice naming C28's four panes and the token typed when the pane is not one of them, and the view's own *close what is open* when another layer is up. The pane is read from `ctx.args` and never from `argv[0]`, except to quote the token on the failure arm (C22 I66). The view is reached through `HandlerDeps`, as `/exit` reaches `stop`, and `LocalContext.profile` stays the report and only the report.
-- **I69** — **A profile document is stamped or live; it is never a reading presented as current, and a live one never raises the tier.** `/profile` itself appends a notice naming the section and never the live panes — those are drawn in the view and refreshed there. The rule read *never the panes* until the amendment, and the sentence behind it was true about the only document it considered: an unstamped, never-refreshed copy of a report reads as current on every later frame, which is I18's stale-data shape with the framework's own figures inside it. **What it forbade was the capability rather than the defect**, and the framework already answers the defect twice — a `b.live` part is current because it is refreshed, and a stamp naming the frame range, the elapsed time, the tier and the ring's reset point claims the opposite of current on its face. So `/profile snapshot` and `/profile live` are admitted and the constraint moves to where the real hazard is: **a transcript part has no close**, so a live card that raised the tier would pin it for the session and reset the ring doing it (C28 I50, C28 I18). A live card calls no `setTier` — it draws what is already being recorded, and draws the *raise the tier* notice where that is nothing.
+- **I68** — **`/profile [section]` composes C28's deck into a document on the local route, and every refusal is a document on that route rather than a throw** (amended, R-EXA-082, F1254): a section is one stamped `b.panel` per `deckOf` entry, each drawn by `profileCard`, and bare `/profile` is the `verdict` section; a `warn` notice naming `TuiConfig.profile` answers every arm when no profiler exists, and a usage notice naming C28's three `SECTIONS`, the three verbs and the token typed answers a token that is none of them. No arm pushes a layer. The section is read from `ctx.args` and never from `argv[0]`, except to quote the token on the failure arm (C22 I66). The profiler is reached through `HandlerDeps.profileReport` — a reader, never the recorder — and `HandlerDeps.profileCapture`, both required — the reader answering `null` and the capture `null` where no profiler exists — as `/exit` reaches `stop`; `LocalContext.profile` stays the report and only the report. *As it stood:* ~~`/profile [pane]` opens C28's view through the local route … and the view's own *close what is open* when another layer is up. … The view is reached through `HandlerDeps`~~.
+- **I69** — **A profile document is stamped or live; it is never a reading presented as current, and a live one never raises the tier.** A section's cards are stamped, each on its own panel's title, as `snapshot`'s one card is (amended, R-EXA-082, F1254). *As it stood:* ~~`/profile` itself appends a notice naming the section and never the live panes — those are drawn in the view and refreshed there.~~ The rule read *never the panes* until the first amendment, and the sentence behind it was true about the only document it considered: an unstamped, never-refreshed copy of a report reads as current on every later frame, which is I18's stale-data shape with the framework's own figures inside it. **What it forbade was the capability rather than the defect**, and the framework already answers the defect twice — a `b.live` part is current because it is refreshed, and a stamp naming the frame range, the elapsed time, the tier and the ring's reset point claims the opposite of current on its face. So `/profile snapshot` and `/profile live` are admitted and the constraint moves to where the real hazard is: **a transcript part has no close**, so a live card that raised the tier would pin it for the session and reset the ring doing it (C28 I18). No arm calls `setTier` — the handler holds a reader and no recorder — so a live card draws what is already being recorded, and where that is below `spans` draws a notice naming the config to change rather than a figure.
 - **I70** — **A refused patch stops the part and never the host, and a refusal the host still holds the block for is recorded as a fault.** `PatchOutcome`'s arms answer two different questions — *is the host gone* and *was the patch refused* — and a driver reading `outcome.ok` answers only the first, so the shell building a patch C04 cannot take took the same silent teardown as an evicted entry: every sibling part on that host and the entry's elapsed readout (I53) stopped with it, and the exact diagnosis was discarded at the one place that could report it (§8h, F1002). A refused part is given the dead source I43 already defines, so it stops **without a second teardown path** (I32) and the host is released by the sweep once nothing on it still polls. **The report is a fault and not the part's own panel**, which is §5a's first sentence one component along — the reporting path is the path that failed, and I43's refusal can draw in the panel only because it is refused *before* a patch is needed.
 - **I71** — **The emulator is loaded by the shell route, on demand, and never by the package's import.** `@xterm/headless` is 35 ms of a cold start on a native filesystem and no first frame draws a terminal (F1164); the route is `async` before it spawns, so the module arrives through a dynamic import awaited where `createEmulator` was called, and a session that never runs a shell command never loads it. **Behaviour is unchanged by construction**: the block, its snapshots, its resize and its disposal are the same code reached one microtask later on the first shell command of a session, and T5.21 is the row that shows the terminal still streams. The observable is the module graph, not a timing: a child process that imports `dist/index.js` and lists what it loaded holds nothing from the emulator's package, and a test that read a duration instead would pass on a fast machine with the import back on the barrel. C24 T5.8 runs the same child through the bundled entry, where the dynamic import is its own chunk (F1193).
 - **I72** — **A source's next deadline is one interval after the last deadline, not one interval after the fetch that settled.** `settleSource` dates `dueAt` from the deadline the poll was woken for, and from the settle only when the settle is more than one **declared** interval past it — a far side slower than its own cadence, which must not build a backlog of overdue polls and so restarts from where it finished. **The bound is `intervalMs` and the step is the backoff**, and the two must not be the same number: the step is `backoffOf` (§7's one rule), so a failing source waits its doubled interval from the deadline it already had; but a source woken a full interval late has not been keeping up, and measuring its lateness against a backoff that has already doubled would call it current and retry it early — half the doubled interval after a failure, on the first failure of every source declared before anyone ticked. **This is C22 I105's rule at the other cadence and it was written the other way**: the wake fires late by the timer's granularity and the fetch takes what it takes, so dating the next deadline from the settle adds both to every period and never recovers them — a part declared `every: 16` polled every 18 ms and a screen of them drew 55 frames a second against the sixty A02 §7 budgets (F1206). The observable is the deadline sequence under a fast source: ten polls woken late leave the tenth deadline exactly ten intervals after the first, and a poll a full interval behind is dated from its settle (T2.48).
@@ -1347,8 +1366,8 @@ a menu and guessing one is how the two were conflated in the first place.
 55. **Failure is a box under a kept head, and one file composes notices** (I61). F406's class closed by a scan widened to the builder call rather than by twelve repairs.
 56. **A parent's head is written by nobody** (I62). Derived from the children in start order, its own `elapsed` figure, and never the sum.
 57. **A command's output is a screen, live** (I63, I64, I66, I67). One arm chosen and kept, one snapshot per frame, a cancel that works, and a settled block that keeps what the child left rather than what the route captured.
-58. **`/profile` opens the profiler's view, and refuses in a document** (I68). No profiler, an unknown pane and an occupied stack each answer through the route the verb came in on.
-59. **A figure reaching the transcript says when it was taken or keeps itself current, and never raises the tier to do either** (I69). `/profile` still records that the view opened and nothing more; `snapshot` stamps and `live` refreshes.
+58. **`/profile` appends the profiler's deck as an entry, and refuses in a document** (I68). No profiler and an unknown token each answer through the route the verb came in on. *As it stood:* ~~`/profile` opens the profiler's view … an occupied stack~~ — nothing is pushed (R-EXA-082, F1254).
+59. **A figure reaching the transcript says when it was taken or keeps itself current, and never raises the tier to do either** (I69). A section and `snapshot` stamp, and `live` refreshes. *As it stood:* ~~`/profile` still records that the view opened and nothing more~~.
 60. **A refused patch stops the part, not the host, and says what was refused** (I70). Three arms, two questions: the host is released when C13 has dropped the entry, and the part alone when the document refuses what the shell built — with `applyPatch`'s message on §5a's two channels.
 61. **The shell route imports the emulator when it runs, not when the package loads** (I71). `test/support/import-trace.mjs` is the instrument: a `--import` hook that lists every module a child resolved, so T5.22 reads the startup graph as a corpus rather than timing it.
 62. **A poll's cadence is the interval, not the interval plus the work** (I72, F1206). The next deadline was dated from the fetch that had just settled, so the timer's lateness and the fetch's duration joined every period and a 16 ms part polled every 18 — 55 frames a second on a screen of live parts. The deadline chain is now the spinner's, which C22 I105 takes from the stamp and never from the paint, with the settle taken only when the far side is slower than its declared cadence.
@@ -2272,12 +2291,12 @@ Fake transport, fake stores.
 - **T1.61** (C23 I24): no `raw` block with empty or newline-only text is composed in `execution.ts` or `refresh.ts`, with a control showing the pattern fires on one. **The rule has teeth in one direction only** — C23 may not *add* rhythm — so the positive half is asserted too: `gapBefore` is set where documents are composed, in the local handlers, and nowhere in the routing, which is the division the invariant describes.
 - **T1.62** (C23 I23): `/debug`'s body reaches no transport — asserted on a **reach** (`deps.transport`, `.invoke(`, `.stream(`, `.submit(`) rather than on the noun, because the handler reads `entry.doc.meta` and prints `transport` as a row label, which is the one thing I23 says it *should* do. A `/debug` that re-invoked would produce a document agreeing with itself and disagreeing with the entry it claims to describe, and every assertion about its contents would pass.
 - **T1.63** (C23 I13): MG23 is run over the real `src/shell` tree and reports nothing. Its fabricated violation is asserted in `enforce-rules.test.ts`; what is owed here is that the rule is **live on the tree**, because a rule that fires on a fabrication and is scoped to nothing reports zero for both reasons.
-- **T1.64** (I68, I27): `shippedHandlers` with a view handed in whose `open` refuses naming `TuiConfig.profile` → `/profile` answers a `warn` notice carrying that name, and the view's `open` was called once with `verdict`, the deck's first section. **And the map holds nine whatever the view answers**: the row is in `FRAMEWORK_TOOLS` and I27 refuses a row with no handler at every startup, so `HandlerDeps.profileView` is required and a map that dropped `profile` on any condition is unconstructible. The second arm watched the transitional conditional that preceded that — a birthday clause, now gone with it.
-- **T1.65** (I68, C22 I66): `/profile framework` with `args: { section: "framework" }` → the view opened on `framework` and the notice names it; `/profile foo` with `args` empty and `argv: ["foo"]` → a usage notice naming C28's three `SECTIONS`, the two document verbs and the token `foo`, and the view's `open` was not called. **The section is asserted to come from `args`**: a handler reading `argv[0]` passes the first arm and is caught by the second only because the usage text quotes the token — so the row also feeds `argv: ["framework"]` with `args: { section: "app" }` and expects `app`.
-- **T1.66** (I69): the document bare `/profile` appends holds one `notice` and no card — no block whose id carries a card's prefix and no `plot` — asserted over the document's block tree rather than its length, because a notice wrapping a panel of plots is one block too.
+- **T1.64** (I68, I27): `shippedHandlers` with a reader answering `null` → bare `/profile` answers one `warn` notice carrying *no profiler to show* and `TuiConfig.profile`, on an entry whose command is `/profile verdict`, the default section. **And the map holds nine whatever the reader answers**: the row is in `FRAMEWORK_TOOLS` and I27 refuses a row with no handler at every startup, so a map that dropped `profile` on any condition is unconstructible. *As it stood:* ~~with a view handed in whose `open` refuses … the view's `open` was called once with `verdict` … `HandlerDeps.profileView` is required~~ (R-EXA-082, F1254).
+- **T1.65** (I68, C22 I66): `/profile framework` with `args: { section: "framework" }` → an entry whose command is `/profile framework` and whose panels are the `framework` section's deck, id for id; `/profile foo` with `args` empty and `argv: ["foo"]` → one usage notice naming C28's three `SECTIONS` and the token `foo`, and no panel drawn. **The section is asserted to come from `args`**: a handler reading `argv[0]` passes the first arm and is caught by the second only because the usage text quotes the token — so the row also feeds `argv: ["verdict"]` with `args: { section: "framework" }` and expects `framework`'s deck. *As it stood:* ~~the view opened on `framework` and the notice names it … the view's `open` was not called~~ (R-EXA-082, F1254).
+- **T1.66** (I69, C28 §3c): **inverted with the pushed view** (R-EXA-082, F1254) — `/profile framework` appends no notice and one panel per deck entry, in deck order, and every card of the section frames one `card-` block, counted from the register rather than by a prefix. *As it stood:* ~~the document bare `/profile` appends holds one `notice` and no card — no block whose id carries a card's prefix and no `plot` — asserted over the document's block tree rather than its length, because a notice wrapping a panel of plots is one block too.~~
 - **T1.66b** (I69): `/profile snapshot` appends a document whose panel title carries all four stamp fields — the frame range, the elapsed time, the tier and the ring's reset point — and which holds no live part; `/profile live` appends one that is a live part with a cadence and **no** stamp. Asserted by reading the title's fields rather than by matching the rendered string, so a reworded stamp fails only when a field goes missing.
-- **T1.66c** (I69): `/profile live` at every tier calls `setTier` zero times, and at `off` the appended part's first render is C28's *raise the tier* notice rather than a figure. The second half is what makes the first testable — a verb that raises nothing and also draws nothing would satisfy the count and answer nobody.
-- **T1.67** (I68, C05 §3): `FRAMEWORK_TOOLS`' `profile` row is `local` and takes two optional arguments — `section`, an `enum`, and `card`, a string — and the enum's `values` equal C28's `SECTIONS` followed by `snapshot` and `live`, member for member; and the nine names are the six, `profile`, `capabilities` (C22 I125) and `config` (I80, ruling 43). The L0 copy of an L4 list, held equal by the only file that may import both. **The two verbs are in the equality and not excused from it**: the enum holds two kinds of value, and a row asserting the sections alone passes on a menu that has lost a verb.
+- **T1.66c** (I69): `/profile live` at every tier calls `setTier` zero times, and at every tier below `spans` the appended part's first render is a notice naming the tier it found and the config to change, rather than a figure. The second half is what makes the first testable — a verb that raises nothing and also draws nothing would satisfy the count and answer nobody.
+- **T1.67** (I68, C05 §3): `FRAMEWORK_TOOLS`' `profile` row is `local` and takes two optional arguments — `section`, an `enum`, and `card`, a string — and the enum's `values` equal C28's `SECTIONS` followed by `snapshot`, `live` and `capture` (C28 I64), member for member; and the nine names are the six, `profile`, `capabilities` (C22 I125) and `config` (I80, ruling 43). The L0 copy of an L4 list, held equal by the only file that may import both. **The three verbs are in the equality and not excused from it**: the enum holds two kinds of value, and a row asserting the sections alone passes on a menu that has lost a verb.
 - **T1.97** (I85, I86, I87): the ledger alone, stepped — one mark: open, a command entry settles, close → one record with its line; open, close → nothing; a notice with command `""` and an excluded id settle inside a mark → nothing recorded; two overlapping marks with one settlement between both opens → the first close reports it and the second reports nothing; a settlement with the entry since gone → still reported, by its line; `failed` lines ordered first.
 
 ### Tier 2 — contract / interface
@@ -2426,10 +2445,10 @@ Fake transport, fake stores.
 - **T4.64** (I65, with C27): a width change mid-run → the child's `resize` spy records the width it was given, the settled block's `cols` records the emulator's, and the two are the same number and equal to the body's inner width. **Two spies, because one cannot see an agreement**: the first version of this row watched only the child, and every ordering mutation survived it.
 - **T4.65** (I63, I67, with C21, C27): the same byte script on both arms → both settle with the **same** screen: the same lines, the same mode, the colours the bytes carried, and neither with a cursor.
   **The colour difference is not the framework's and cannot be asserted here.** `env` is computed once above the arm choice and one emulator parses both, so nothing in this route treats the arms differently about colour — a real child calls `isatty` and decides. With a fake on both sides the fixture would supply exactly the behaviour under test, so that claim is **T5.6's**, where a real `node-pty` makes it a fact a fake cannot have (F923).
-- **T4.66** (I68, I27, with C05, C22): a real pipeline over a manifest carrying the framework's rows, `pipeline.submit("/profile frame")` → the view is open on `frame`, the transcript gained one entry whose blocks are a notice and nothing of the panes, and `seal()` accepted the seven. Constructing the harness is the I27 half: `seal()` runs inside it and refuses a row without a handler or a handler without a row, so a red T4.66 with no assertion reached is the reconciliation refusing.
+- **T4.66** (I68, I27, with C05, C22): a real pipeline over a manifest carrying the framework's rows, handed a report and no view, `pipeline.submit("/profile framework")` → the transcript gained one entry whose panels are the `framework` section's deck, each card framed, and `seal()` accepted the nine. *As it stood:* ~~`/profile frame` → the view is open on `frame`, the transcript gained one entry whose blocks are a notice and nothing of the panes, and `seal()` accepted the seven~~ (R-EXA-082, F1254). Constructing the harness is the I27 half: `seal()` runs inside it and refuses a row without a handler or a handler without a row, so a red T4.66 with no assertion reached is the reconciliation refusing.
 - **T4.69** (I70, I48, §8h H4): from the public entry — a `b.live` part whose `render` gives its child the panel's id, five ticks, and the message on the **restored primary screen** after `stop`. The contract rows construct the state; this one is the only thing that fails when the pipeline builds the driver with a sink that reports nowhere.
 - **T4.68** (I54, F973): `/ps` gated on a held invoke, three seconds of wall skew and two of `elapsed` → the running head reads `· ⠙ 2s`, and on release the settled head reads `ps · 2s`; the wall clock's five are not the call's. Under `tick` the two clocks agree, so every card row above passes on either axis — `skew` is what separates them.
-- **T4.67** (I68, with C22): the same pipeline built from a session with no `profile` → `/profile` appends the refusal notice naming `TuiConfig.profile`, the stack is empty afterwards, and `seal()` accepted the eight — the handler exists whether or not a recorder does, and refuses rather than vanishing. The refusal is the view's own string, so a session that grows a recorder later changes nothing here.
+- **T4.67** (I68, with C22): the same pipeline built from a session with no `profile` → `/profile` appends one entry holding the handler's `warn` notice naming `TuiConfig.profile` and no deck — the handler exists whether or not a recorder does, and refuses rather than vanishing; `execution.ts` folds the absent reader to `() => null`. *As it stood:* ~~the stack is empty afterwards, and `seal()` accepted the eight … The refusal is the view's own string~~ (R-EXA-082, F1254).
 - **T3.55b** (I52): `elapsedNeeded` refuses a `null` panel, a non-`status` block, and a `retrying` box — **the arms the sweep cannot reach**, since the caller has just checked the block is a loading `status`. §8a-bis B3's ruling asked directly.
 - **T3.55c** (I52, F234): the comparison is the **rendered figure** and never the clock — nothing under a second, nothing across 1000→1900 ms, a write at 2000, and `1m 40s` → `1m 41s` past ninety-nine. The range where a clock comparison and a figure comparison disagree, which is the mutation that survived the first pass.
 - **T3.56** (I52): the elapsed figure advances while the first fetch is in flight, driven through `declare` and the sweep rather than by calling the writer — a row that reached in and computed a duration would pass on the day nothing armed a timer, which is F227 one layer up.

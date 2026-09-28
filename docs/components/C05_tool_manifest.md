@@ -190,10 +190,12 @@ view *and* an entry nothing can withdraw. `runLocal` has no transport and append
 advance — it appends **once**, after the handler has returned. So a local verb may decide on
 seeing its own result, and needs no declaration to do it.
 
-**And it already does.** `/profile` is the framework's own local verb whose summary reads
-*open the profiler's view*: its handler calls `view.open(pane)` and returns a transcript
-notice as the record. That is a different tier from this field — the transcript is *not*
-untouched — and it is the shape a local verb has.
+**And it already does.** `/profile` is the framework's own local verb: its handler reads
+the profiler's report, decides from it — a section's deck, a usage notice, or *no profiler* —
+and returns one document, appended once (C23 §2). That is the shape a local verb has, and no
+tier field would add to it. *As it stood:* ~~its handler calls `view.open(pane)` and returns a
+transcript notice as the record. That is a different tier from this field — the transcript is
+*not* untouched~~ — the view retired, and the deck is the entry (R-EXA-082, F1254).
 
 **What the refusal forecloses was measured, not assumed** — F23 filed this rather than
 fixing it *"because `/dashboard` is local and S6/S7 will want views"*. Going to find where
