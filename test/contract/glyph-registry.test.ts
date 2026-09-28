@@ -201,4 +201,6 @@ describe("C09 I123 — registry ↔ runtime glyphs", () => {
       expect(row.includes(`${open} linear`), `the unchosen option at ${caps.unicode}: ${JSON.stringify(row)}`).toBe(true);
     }
   });
+
+  it.todo("T2.190 (C09 I98, question 39, R-MOT-010): no spinner set's ASCII rung is one repeated character, over SPINNER_SETS and the registry's resolved ASCII frames; downsampling is counted and let through; a fabricated constant set is named — not deferred on a component: the code lands in the next commit of this round");
 });

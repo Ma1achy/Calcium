@@ -141,6 +141,8 @@ describe("C09 I72 — normaliseRow", () => {
     }
     expect(fuzzMoved).toBeGreaterThan(5000);
   });
+  it.todo("T1.85 (C09 I72, F1258): {bold, dim} then {bold} re-opens the bold after the shared 22, {bold, dim} then {dim} re-opens the dim, and @xterm/headless reads every cell back as painted; the control {dim} then {bold} is unchanged — not deferred on a component: the code lands in the next commit of this round");
+
   it("T1.47 (C09 I73): composeRow pads from where the row ends — cells of the tokeniser's visible characters — over every corpus row and ten thousand seeded rows, and a wide character ends two cells on, a combining mark none, an SGR-only row at zero", () => {
     // **The width is read through the pad**: a second piece at a known column
     // makes the pad `x − rowCells(row)` spaces, and `rowCells` is what the
