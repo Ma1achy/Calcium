@@ -145,17 +145,21 @@ const MUTATIONS = [
     to: "",
     expect: "T4.33",
   },
-  {
-    // **Refreshed after the frame is asked for.** The ordering that reads as a
-    // preference: the commit composes from the stale placement and the fresh
-    // one lands on the frame after it, so the wrong position is drawn once and
-    // corrected by whatever comes next.
-    name: "the anchors are refreshed after the commit",
-    file: CONSTRUCT,
-    from: "      pipeline.resized();\n      scheduler.commit(\"resize\");",
-    to: "      scheduler.commit(\"resize\");\n      refreshAnchors();",
-    expect: "T4.33",
-  },
+  // **Refreshed after the commit — retired 2026-09-28 (review batch 3,
+  // b3-mut).** Its premise was that "the commit composes from the stale
+  // placement and the fresh one lands on the frame after it". That held while
+  // `resize` was an immediate reason, as it was when this run was written
+  // (2026-08-14), and stopped holding when C03 I15 made it coalesced
+  // (2026-09-01, roadmap 19): `commit("resize")` sets contamination, arms a 16 ms timer and
+  // returns, so a refresh moved after it in the same synchronous handler still
+  // runs before anything is composed. The mutation is a change with no effect,
+  // and no row can be written against it — the survivor indicted the mutation,
+  // not T4.33. `construct.ts` says the order is kept and is not load-bearing.
+  //
+  // Its sibling above did survive for a reason about the row: T4.33 read "the
+  // row above the prompt is not blank", and C22 I81's rule, added after the
+  // row, sits on that row whatever the menu does. The row now reads the menu's
+  // distance from the prompt, and that mutation fails it at 18 against 34.
 ];
 
 /**

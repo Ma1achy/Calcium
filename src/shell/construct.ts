@@ -1661,6 +1661,14 @@ export async function constructGraph(
       // anchored to the previous region height until the next character. C15
       // clamps, so nothing faults and no number disagrees; the menu is simply
       // in the wrong place, which is a frame's finding and not an assertion's.
+      //
+      // **The order against the commit is kept and is not what holds it.** A
+      // `resize` commit is coalesced (C03 I15): it sets contamination, arms a
+      // 16 ms timer and returns, so a refresh after it in this synchronous
+      // handler still lands before anything is composed. The mutation that
+      // swaps the two survived for that reason and is retired in
+      // `c19-menu-window`; what the frame depends on is that the refresh runs
+      // on the signal at all, which T4.33 reads.
       refreshAnchors();
       // **A live child is told, before the frame** (C23 I65). The route resizes
       // its child and then its emulator; composing first would draw one frame

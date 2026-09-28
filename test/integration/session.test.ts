@@ -130,6 +130,15 @@ describe("C22 §6b — the write is a difference", () => {
     // The assertion is where the menu sits **relative to the prompt**: it is
     // chrome for the prompt and belongs immediately above it, which is the one
     // relation a stale anchor breaks and the only one a reader would name.
+    //
+    // **Never the row adjacent to the prompt**, which is what this row first
+    // asserted and what let it pass with the refresh deleted: C22 I81 put a
+    // rule directly above `❯` after this row was written, so "the last
+    // non-blank row above the prompt is the one above it" was satisfied by the
+    // frame's own rule while the menu sat stranded at rows 11–18 over sixteen
+    // blank rows. So the row reads two things the rule cannot supply: a
+    // candidate's distance from the prompt, which must survive the resize, and
+    // the row above I81's rule, which must be the menu's bottom edge.
     const stdin = fakeStdin();
     const { screen, resize } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 24 });
     await settle();
@@ -140,17 +149,33 @@ describe("C22 §6b — the write is a difference", () => {
     const rowOf = (needle: string, rows: readonly string[]): number =>
       rows.findIndex((r) => r.includes(needle));
 
-    /** The last row with anything on it above `at` — the menu's bottom edge. */
+    /** The last row with anything on it above `at`. */
     const bottomAbove = (rows: readonly string[], at: number): number => {
       for (let i = at - 1; i >= 0; i -= 1) if ((rows[i] ?? "").trim() !== "") return i;
       return -1;
     };
 
-    const before = screen().rows;
-    const promptBefore = rowOf("❯", before);
-    expect(bottomAbove(before, promptBefore), "the menu sits directly above the prompt").toBe(
-      promptBefore - 1,
-    );
+    /**
+     * The menu against the prompt: I81's rule is the row directly above `❯`,
+     * so the menu's bottom edge is the last non-blank row above **that**, and
+     * a candidate's row is the menu's position. `/capabilities` and not
+     * `/help`, which the footer also names.
+     */
+    const read = (rows: readonly string[]) => {
+      const prompt = rowOf("❯", rows);
+      const rule = prompt - 1;
+      return {
+        prompt,
+        rule: rows[rule] ?? "",
+        edge: bottomAbove(rows, rule),
+        candidate: rowOf("/capabilities", rows.slice(0, prompt)),
+      };
+    };
+
+    const before = read(screen().rows);
+    expect(before.candidate, "the menu is open").toBeGreaterThanOrEqual(0);
+    expect(before.rule.trim(), "the row above the prompt is I81's rule").toMatch(/^─+$/u);
+    expect(before.edge, "the menu sits directly above the prompt's rule").toBe(before.prompt - 2);
 
     // **Taller, not shorter, and the direction is the whole row.** On a shrink
     // the clamp pushes a stale anchor to the bottom of the region — which is
@@ -165,10 +190,13 @@ describe("C22 §6b — the write is a difference", () => {
     // read as a fresh one, exactly the confusion this row exists to catch.
     await new Promise((done) => setTimeout(done, 40));
 
-    const after = screen().rows;
-    const promptAfter = rowOf("❯", after);
-    expect(promptAfter, "the prompt moved with the region").toBeGreaterThan(promptBefore);
-    expect(bottomAbove(after, promptAfter), "and the menu came with it").toBe(promptAfter - 1);
+    const after = read(screen().rows);
+    expect(after.prompt, "the prompt moved with the region").toBeGreaterThan(before.prompt);
+    expect(after.rule.trim(), "the row above the prompt is I81's rule").toMatch(/^─+$/u);
+    expect(after.edge, "and the menu came with it, with no gap beneath").toBe(after.prompt - 2);
+    expect(after.candidate - after.prompt, "at the distance from the prompt it had before").toBe(
+      before.candidate - before.prompt,
+    );
   });
 
   it("T4.34 (C19 I23, entry 16): the truncated menu's indicator is on the screen", async () => {
