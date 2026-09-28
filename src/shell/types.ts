@@ -12,6 +12,7 @@
 
 import type { CaptureResult, ProfileOptions, ProfileReport, TraceFn } from "./profiling/types.js";
 import type { ConfirmHost } from "./confirm.js";
+import type { Setting } from "./config.js";
 import type { Adapter, AdapterRegistry, ProducerContext } from "../data/adapters/index.js";
 import type { ManifestDocument, ManifestStore } from "../data/manifest/index.js";
 import type { ProcessRunner, PtyFactory } from "../data/process/types.js";
@@ -525,6 +526,12 @@ export type PipelineDeps = Readonly<{
   profile?: () => ProfileReport;
   /** How each field of `capabilities` was answered (C02 I13), for `/capabilities` (C22 I125). */
   capabilitySources: Readonly<Record<keyof TerminalCapabilities, CapabilitySource>>;
+  /**
+   * `ResolvedConfig.settings` (C22 I115), for `/config` (C23 I80, ruling 43) —
+   * handed down as `capabilitySources` is, so the verb draws the record the
+   * session was built from rather than resolving it a second time.
+   */
+  settings: readonly Setting[];
   /**
    * One operation from C28's recorder, for `/profile capture` (C28 I64).
    *

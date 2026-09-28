@@ -1,5 +1,6 @@
 /**
- * C05 §3 — the six verbs Calcium ships, as rows in every parsed manifest.
+ * C05 §3 — the verbs Calcium ships, as rows in every parsed manifest (§3
+ * holds the count; nothing here repeats it).
  *
  * **They are verbs.** They have names, take arguments, complete, validate and
  * appear in help; everything the manifest exists to describe is true of them,
@@ -174,6 +175,17 @@ export const FRAMEWORK_TOOLS: readonly ToolDef[] = Object.freeze([
     ],
     flags: [],
   }),
+  // **The ninth, and the first to arrive through a reservation** (C05 I28,
+  // ruling 43). §075's configuration table (C23 I80): every reader-facing value
+  // with where it came from. docker-tui's own `config` was renamed `filediff`,
+  // the name was reserved, and building the verb moved it here.
+  Object.freeze({
+    name: "config",
+    local: true,
+    summary: "every setting, its value, and where the value came from",
+    args: [],
+    flags: [],
+  }),
 ] satisfies readonly ToolDef[]);
 
 /** The names, for the collision message and for tests that must not derive them. */
@@ -199,9 +211,6 @@ export const RESERVED_VERBS: Readonly<Record<string, string>> = Object.freeze({
   // §085: `/watch` pins a streaming entry that is not yours, `/unwatch` lets go.
   watch: "ruling 50, §085",
   unwatch: "ruling 50, §085",
-  // §075's configuration table (C23 I80); docker-tui's own `config` was renamed
-  // `filediff` first (ruling 43), which is the grep this reservation rests on.
-  config: "ruling 43, §075",
 });
 
 /**

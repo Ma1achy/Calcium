@@ -748,10 +748,12 @@ describe("C05 I27, I28 — a retired key and a reserved name", () => {
   it("T1.25 (I28): a name reserved for a verb not yet built is refused, naming the reservation", () => {
     // **Written out, not derived** — a list computed from `RESERVED_VERBS`
     // agrees with itself whatever it holds.
-    expect(Object.keys(RESERVED_VERBS).sort(), "ruling 50's two and ruling 43's one").toEqual(["config", "unwatch", "watch"]);
+    // `config` left the list when its verb was built (ruling 43) — the path
+    // every reserved name takes, and T4.9 holds the other end of it.
+    expect(Object.keys(RESERVED_VERBS).sort(), "ruling 50's two").toEqual(["unwatch", "watch"]);
 
     const parsedTools = fixture().tools.map((t) => t.name);
-    for (const name of ["watch", "unwatch", "config"]) {
+    for (const name of ["watch", "unwatch"]) {
       expect(FRAMEWORK_NAMES, `${name} is on one list, never both`).not.toContain(name);
       expect(parsedTools, `${name} has no row until it is built`).not.toContain(name);
 

@@ -1922,6 +1922,8 @@ export async function constructGraph(
       scheduler,
       // C22 I125 — `/capabilities` reads how the record the session opened on was answered.
       capabilitySources: detection.sources,
+      // C22 I115 — `/config` reads where each value came from (C23 I80).
+      settings: config.settings,
       // **The report reaches a surface through the local route and no other**
       // (C24 I31, C22 I93). A `/profile` verb is where it is wanted, and
       // `LocalContext` is L4; `ProducerContext` is L0 and putting it there

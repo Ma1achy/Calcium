@@ -197,6 +197,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       profileReport: () => deps.profile?.() ?? null,
       // C22 I125 — the record and its sources, as C02 resolved them.
       capabilities: () => ({ values: deps.capabilities, sources: deps.capabilitySources }),
+      // C22 I115 — the record `/config` draws (C23 I80, ruling 43).
+      settings: () => deps.settings,
       // **The one operation, `null` where there is no profiler** (C28 I64).
       // Required rather than optional for the same reason `profileReport` is:
       // a wiring site that may omit a member is a wiring site that will, and

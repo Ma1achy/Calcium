@@ -32,6 +32,8 @@ import type { LocalHandler } from "./registry.js";
 import type { StopReason } from "../types.js";
 import type { CapabilitySource, TerminalCapabilities } from "../../terminal/capabilities.js";
 import { scopesInReadingOrder } from "../../interaction/router/keymap.js";
+import { configBlock } from "../config-table.js";
+import type { Setting } from "../config.js";
 
 export type HandlerDeps = Readonly<{
   manifest: () => Manifest | null;
@@ -99,6 +101,12 @@ export type HandlerDeps = Readonly<{
    * off the report's own `regime.tier` and nothing here can change it.
    */
   profileCapture: ((ms: number) => Promise<CaptureResult>) | null;
+  /**
+   * `ResolvedConfig.settings` — every reader-facing value and where it came
+   * from (C22 I115), for `/config` (C23 I80, ruling 43). The resolved record,
+   * never a second derivation of it.
+   */
+  settings: () => readonly Setting[];
 }>;
 
 const isSection = (x: unknown): x is ProfileSection =>
@@ -681,5 +689,12 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
         }),
       ]);
     },
+
+    /**
+     * **The ninth** (C23 I80, §075, ruling 43) — *the commonest question is not
+     * what is it, it is WHY is it that*. One table, one row per setting, the
+     * source column toned by §075's ladder.
+     */
+    config: () => doc("/config", [configBlock(deps.settings(), blockId("config"))]),
   };
 }
