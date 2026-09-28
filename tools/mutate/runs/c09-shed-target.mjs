@@ -41,22 +41,22 @@ const MUTATIONS = [
     // header of a comparison, one row above the item they describe.
     name: "the elements ignore the kind's first item row",
     file: SHED,
-    from: "        rows: Object.freeze({ from: firstRow + i, to: firstRow + i + 1 }),",
-    to: "        rows: Object.freeze({ from: i, to: i + 1 }),",
+    from: "  let row = firstRow;",
+    to: "  let row = 0;",
     expect: "T1.81",
   },
   {
     name: "events withholds its type and the peek does not say so",
     file: KINDS,
-    from: '          ...(gone.has("type") ? [{ label: "type", value: event.type }] : []),',
-    to: "          ...[],",
+    from: '      ...(gone.has("type") ? [{ label: "type", value: event.type }] : []),',
+    to: "      ...[],",
     expect: "T1.81",
   },
   {
     name: "steps withholds its detail and the peek does not say so",
     file: KINDS,
-    from: '        return step?.detail === undefined || !gone.has("detail") ? [] : [{ label: step.label, value: step.detail }];',
-    to: "        return [];",
+    from: '    return step?.detail === undefined || !gone.has("detail") ? [] : [{ label: step.label, value: step.detail }];',
+    to: "    return [];",
     expect: "T1.81",
   },
   {
@@ -65,8 +65,8 @@ const MUTATIONS = [
     // know went — the direction C09 I113 chose `wide` to rule out.
     name: "keyValue's elements plan at `narrow`",
     file: KINDS,
-    from: '    const parts = keyValueParts(block, w, "wide");',
-    to: '    const parts = keyValueParts(block, w, "narrow");',
+    from: '  const parts = keyValueParts(block, width, "wide");\n  const plan = naturalSpan(parts, 0)',
+    to: '  const parts = keyValueParts(block, width, "narrow");\n  const plan = naturalSpan(parts, 0)',
     expect: "T1.82",
   },
 ];
@@ -79,8 +79,8 @@ const results = await runPass({
     // **A change the corpus can see** (F1254): no element is ever published,
     // so the rows are atomic at every width — the state before I113.
     file: SHED,
-    from: "  if (plan === null || plan.mark === null) return Object.freeze([]);",
-    to: "  return Object.freeze([]);",
+    from: "  if (plan === null || plan.mark === null) return null;",
+    to: "  return null;",
     why: "no shedding row is a target — if this survives, nothing reads the elements",
   },
   mutations: MUTATIONS,

@@ -110,8 +110,8 @@ const MUTATIONS = [
     // reasoning-panel row dies because its target is a block and not a row.
     name: "expand searches rows and never blocks",
     file: ACTIONS,
-    from: "        if (folded !== undefined) {",
-    to: "        if (folded !== undefined && (false as boolean)) {",
+    from: "          if (folded === null) continue;",
+    to: "          continue;",
     expect: "T4.62",
   },
   {
