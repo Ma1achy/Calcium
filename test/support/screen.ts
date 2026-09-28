@@ -26,6 +26,17 @@ const ESC = "\u001b";
 const HOME = `${ESC}[H`;
 /** Anything that is not a cursor move: SGR, modes, hide/show. */
 const OTHER_ESCAPE = /\u001b\[[0-9;?]*[A-Za-z]/g;
+/**
+ * **An operating-system command draws nothing**, and the model drew its payload.
+ * `OSC 9` and a title push are written at the cursor between frames (C22 I128),
+ * so a screen read before the next frame held `]9;prism: entry 4…` on the prompt
+ * row — a harness artefact that read as the rung having painted (C22 T4.105,
+ * found when that row began comparing screens between two frames). Terminated by
+ * `BEL` or `ESC \`, as C01's writers terminate them; a lone `BEL` draws nothing
+ * either.
+ */
+const OSC = /\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)/g;
+const BEL = "\u0007";
 const CUP = /^\u001b\[(\d+);(\d+)H/;
 
 export type Screen = Readonly<{
@@ -93,6 +104,12 @@ export function screenFrom(
         continue;
       }
       if (chunk.startsWith(ESC, i)) {
+        OSC.lastIndex = i;
+        const osc = OSC.exec(chunk);
+        if (osc !== null && osc.index === i) {
+          i += osc[0].length;
+          continue;
+        }
         OTHER_ESCAPE.lastIndex = i;
         const m = OTHER_ESCAPE.exec(chunk);
         if (m !== null && m.index === i) {
@@ -108,9 +125,13 @@ export function screenFrom(
         i += 2;
         continue;
       }
-      // A run of ordinary text, up to the next escape or newline.
+      if (chunk[i] === BEL) {
+        i += 1;
+        continue;
+      }
+      // A run of ordinary text, up to the next escape, bell or newline.
       let j = i;
-      while (j < chunk.length && chunk[j] !== ESC && !chunk.startsWith("\r\n", j)) j += 1; // cells-ok
+      while (j < chunk.length && chunk[j] !== ESC && chunk[j] !== BEL && !chunk.startsWith("\r\n", j)) j += 1; // cells-ok
       put(chunk.slice(i, j));
       i = j;
     }

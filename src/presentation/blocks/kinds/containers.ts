@@ -1044,6 +1044,27 @@ function panelMeasureBox(block: Panel, width: number, own: Size, measureChild?: 
 }
 
 /**
+ * The room a panel gives its children at an outer size — **the same box**,
+ * asked for its padding rather than solved (C09 I1, the `panel` row: *children
+ * + 2, measured at `w - 2`*).
+ *
+ * For a producer that is told a size and draws inside a panel it does not
+ * build: a captured child's blocks are framed by the shell (C22 I110), so what
+ * it is told is this less the entry around it (C24 I41). A second subtraction
+ * written at that call site would agree today and drift the day the border
+ * does, which is `childWidths`' argument one layer out. **Both axes floor at
+ * one**, as every width here does.
+ */
+export function panelInterior(width: number, height: number): Readonly<{ width: number; height: number }> {
+  const box = panelMeasureBox({ kind: "panel", id: "", title: "", children: [] }, width, { kind: "grow" });
+  const rails = (box.padding?.t ?? 0) + (box.padding?.b ?? 0);
+  return Object.freeze({
+    width: insetWidth(normaliseWidth(width)),
+    height: Math.max(1, Math.floor(height) - rails),
+  });
+}
+
+/**
  * A group's own measured height (C04 I102) — **the one computation, so
  * `measure` and `window`'s decline branch cannot drift** (C09 I69). A column is
  * a C29 box and takes `measure`; a row takes its tallest placed child and

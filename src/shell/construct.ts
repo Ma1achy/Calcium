@@ -27,7 +27,7 @@
 import { createAdapterRegistry } from "../data/adapters/index.js";
 import { blankRowsAbove, commandRows } from "./paint.js";
 import { childBorderLegend } from "./chrome.js";
-import { compose, noticeDoc } from "./documents.js";
+import { compose, noticeDoc, settledDoc } from "./documents.js";
 import {
   answerEvent,
   createLinearOutput,
@@ -38,11 +38,12 @@ import {
   type BodyDeps,
 } from "./linear.js";
 import { createNotifier } from "./notify.js";
+import { createLedger, summaryOf, type MarkKind, type Settlement } from "./away.js";
 import { BELL, systemNotification } from "../terminal/escapes.js";
 import type { AskOptions } from "./local/registry.js";
 import type { MeasureMemo, NavElement, PaneRef, PlacedElement } from "../presentation/blocks/index.js";
 import { initialRegionHeight } from "./frame.js";
-import { blockWidthInEntry, elementsOfEntry, measureEntry } from "./entry-layout.js";
+import { blockWidthInEntry, elementsOfEntry, ENTRY_GAP, measureEntry } from "./entry-layout.js";
 import { createManifestStore, parseManifest, withThemeNames } from "../data/manifest/index.js";
 import type { ManifestError } from "../data/manifest/index.js";
 import { NO_SPAN, block as makeBlock, descendants, splitColumns, splitPaneKey, splitPanes } from "../data/viewmodel/index.js";
@@ -135,7 +136,7 @@ import { createNavigator, openHistory, SEARCH_ID } from "../interaction/history/
 import type { HistoryEntry, Navigator } from "../interaction/history/index.js";
 import { detectCapabilities, type CapabilitySource, type TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Motion } from "../presentation/blocks/index.js";
-import { defaultButton, glyphFor, glyphs, tapeStart } from "../presentation/blocks/index.js";
+import { defaultButton, glyphFor, glyphs, panelInterior, tapeStart } from "../presentation/blocks/index.js";
 import { submitAction } from "./form-submit.js";
 import { createFrameScheduler, type CommitReason } from "../terminal/frame-scheduler.js";
 import type { CaptureResult, Profiler, ProfileReport, TraceFn } from "./profiling/types.js";
@@ -1775,6 +1776,35 @@ export async function constructGraph(
       if (change.kind === "append" || change.kind === "settle") notifier.settled(change.id);
     });
   }
+
+  /**
+   * **The away ledger** (C23 I84–I86, ruling 51, R-BLK-314): what settled while
+   * the reader was not watching, said once when they come back. Always built —
+   * its attached mark needs nothing opted in — and its away mark opens only
+   * on a focus report, which arrives only when a rung is (C22 §6n.4 ruling 2).
+   */
+  const ledger = createLedger();
+  stores.transcript.subscribe((change) => {
+    if (change.kind !== "append" && change.kind !== "settle") return;
+    const entry = stores.transcript.entries.find((e) => e.id === change.id);
+    if (entry !== undefined) ledger.settled(entry);
+  });
+  /**
+   * A close's notice, appended — `true` when there was one (C23 I85). The chord
+   * is the session keymap's `scrollBottom` row at this terminal's profile,
+   * spelled by `chordText` (C16 I58), so a rebinding moves it with `/help`.
+   */
+  const sayLedger = (kind: MarkKind, settlements: readonly Settlement[]): boolean => {
+    const bottom = keymap.entries().find((b) => b.target === "global" && b.action === "scrollBottom")?.key;
+    const said = summaryOf(kind, settlements, {
+      separator: glyphs(detection.capabilities).separator,
+      bottom: bottom === undefined ? null : chordText(bottom, detection.capabilities.unicode !== "ascii"),
+    });
+    if (said === null) return false;
+    // A system notice with no user behind it (C23 §3a): the reader's return.
+    stores.transcript.append(settledDoc(said.head, said.lines, { origin: "refresh" }));
+    return true;
+  };
 
   const confirm = createConfirmHost({
     overlays: stores.overlays,
@@ -4332,13 +4362,23 @@ export async function constructGraph(
 
     const deliver = (batch: readonly InputEvent[]): void => {
       // **A focus report is read here and routed nowhere** (C16 I61, C22 I129):
-      // it moves no focus and commits no frame, so a batch holding only one is
-      // an empty batch below.
+      // it moves no focus, and it commits a frame only when the return has
+      // something to say (C23 I85) — the record changed, which the rungs'
+      // bytes never do.
+      let returned = false;
       const events = batch.filter((e) => {
         if (e.kind !== "focus") return true;
-        notifier?.focus(e.focused);
+        if (notifier === null) return false;
+        notifier.focus(e.focused);
+        // **The away mark** (C23 I84): opened by the leaving, closed by the
+        // return — and only where the report was asked for. With no rung opted
+        // in `?1004h` was never taken, so a report that arrives anyway is not
+        // one this session can vouch for, and it is read as the rungs read it.
+        if (!e.focused) ledger.open("away");
+        else if (sayLedger("away", ledger.close("away"))) returned = true;
         return false;
       });
+      if (events.length === 0 && returned) scheduler.commit("input");
       if (events.length > 0) {
         for (const e of events) routed(e);
         // After the keys and before the frame: the peek follows the focus the
@@ -4422,6 +4462,11 @@ export async function constructGraph(
    * an entry it holds is the other claim, and a captured child is exactly that —
    * nothing is streaming, the host is rewriting a block it owns.
    */
+  /** The child's entry's command line — one spelling, read by the append and by the room it leaves (C24 I41). */
+  const childCommand = (id: string): string => `child ${id}`;
+  /** The hold on the attached child's entry (C14 I56), while there is one. */
+  let childHold: Disposable | null = null;
+
   const childBlock = (id: string, blocks: readonly Block[]): Block =>
     Object.freeze({
       kind: "panel",
@@ -4435,7 +4480,7 @@ export async function constructGraph(
     entry: {
       append: (id, blocks) =>
         stores.transcript.append(
-          compose({ command: `child ${id}`, blocks: [childBlock(id, blocks)] }),
+          compose({ command: childCommand(id), blocks: [childBlock(id, blocks)] }),
         ),
       replace: (entryId, id, blocks) => {
         stores.transcript.patch(
@@ -4445,14 +4490,40 @@ export async function constructGraph(
         );
       },
     },
+    // **The attachment's edges** (C23 I84, C14 I56). The child's entry is
+    // counted by no mark and kept whole while it holds the keyboard; the
+    // detach says what settled — unless the session is what closed it, when
+    // nobody comes back to read it (L9).
+    attachment: {
+      opened: (entryId) => {
+        ledger.exclude(entryId);
+        ledger.open("attached");
+        childHold?.[Symbol.dispose]();
+        childHold = stores.viewport.keepWhole(entryId);
+      },
+      closed: (_entryId, reason) => {
+        childHold?.[Symbol.dispose]();
+        childHold = null;
+        const settlements = ledger.close("attached");
+        if (reason !== "session") sayLedger("attached", settlements);
+      },
+    },
     router,
     lifecycle,
-    context: () => {
+    // **The room inside the entry, not the region** (C24 I41). The child's
+    // blocks sit in a panel in an entry, so it is told the panel's interior
+    // at the region's width, less the entry's command rows — the measurer's
+    // own `chromeRowsOf` — and its closing blank. Told the region, a child that
+    // filled it lost its command row, top border and first body rows off the
+    // screen, and every row two cells to the panel's rails.
+    context: (id) => {
       const region = deps.frame.overlayRegion();
+      const chrome = chromeRowsOf({ doc: { command: childCommand(id) } }, region.width) + ENTRY_GAP;
+      const room = panelInterior(region.width, region.height - chrome);
       return Object.freeze({
         ...pipeline.producerContext(),
-        width: region.width,
-        height: region.height,
+        width: room.width,
+        height: room.height,
       });
     },
     now: config.clock,

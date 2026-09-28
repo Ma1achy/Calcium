@@ -86,6 +86,10 @@ async function script(s: Awaited<ReturnType<typeof session>>) {
   await s.step(45_000);
   marks.second = s.since(at);
 
+  // **The screen while the reader is away**, before the return appends
+  // anything: the rungs' own comparison is taken here (C22 I129), because the
+  // return is not a notification and does append (C23 I85).
+  const away = s.screen();
   at = s.stdout.output.length;
   await s.send(IN);
   marks.back = s.since(at);
@@ -95,7 +99,7 @@ async function script(s: Awaited<ReturnType<typeof session>>) {
   await s.type("/branch\r");
   await s.step(50);
   marks.question = s.since(at);
-  return marks;
+  return { marks, away };
 }
 
 describe("C22 §6n — a session that reaches a reader who left", () => {
@@ -104,7 +108,7 @@ describe("C22 §6n — a session that reaches a reader who left", () => {
       const s = await session("bell,system,title");
       const opened = s.stdout.output;
       expect(opened, "focus reporting, because a rung is opted in").toContain(FOCUS_ON);
-      const m = await script(s);
+      const { marks: m, away } = await script(s);
 
       expect(m.beforeFocus, "no report yet, so the reader may be looking").not.toContain(BEL);
       expect(m.beforeFocus).not.toContain(`${ESC}]9;`);
@@ -126,13 +130,18 @@ describe("C22 §6n — a session that reaches a reader who left", () => {
       vi.useRealTimers();
       const q = await session(undefined);
       expect(q.stdout.output).not.toContain(FOCUS_ON);
-      const quiet = await script(q);
+      const { marks: quiet, away: quietAway } = await script(q);
       for (const [k, bytes] of Object.entries(quiet)) {
         expect(bytes, k).not.toContain(`${ESC}]9;`);
         expect(bytes, k).not.toContain(`${ESC}]2;`);
         expect(bytes, k).not.toContain(PUSH);
       }
-      expect(q.screen(), "the same screen, rung or no rung").toEqual(painted);
+      expect(quietAway, "the same screen while away, rung or no rung").toEqual(away);
+      // **The return is where they part** (C23 I84, I85): the opted-in session
+      // had an away mark and says what settled in it; the quiet one had none.
+      const back = "3 entries settled while you were away";
+      expect(painted.rows.join("\n"), "the return says what settled").toContain(back);
+      expect(q.screen().rows.join("\n"), "and with no report there was no absence").not.toContain(back);
     } finally {
       vi.useRealTimers();
     }

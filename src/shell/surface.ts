@@ -114,9 +114,26 @@ export type SurfaceHostOptions = Readonly<{
     append(id: string, blocks: readonly Block[]): string;
     replace(entryId: string, id: string, blocks: readonly Block[]): void;
   }>;
+  /**
+   * The attachment's two edges, for what the host keeps beside the keyboard
+   * (C23 I84, C14 I56).
+   *
+   * `opened` runs **after** the child's entry is appended, and `closed` after
+   * ownership has returned and **before** the close's frame is committed — so
+   * whatever it appends is in the frame that ends the capture.
+   */
+  attachment: Readonly<{
+    opened(entryId: string): void;
+    closed(entryId: string, reason: SurfaceCloseOutcome["reason"]): void;
+  }>;
   router: InputRouter;
   lifecycle: TerminalLifecycle;
-  context: () => Omit<ProducerContext, "width" | "height"> &
+  /**
+   * The context a render is handed — **the room inside the child's entry**, not
+   * the region (C24 I41). Asked with the surface's id, because the entry's
+   * command row is `child <id>` and it is part of what the room is less.
+   */
+  context: (id: string) => Omit<ProducerContext, "width" | "height"> &
     Readonly<{ width: number; height: number }>;
   now: () => number;
   schedule: Schedule;
@@ -222,7 +239,7 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
     >();
 
     const context = (): SurfaceContext =>
-      Object.freeze({ ...options.context(), inputFidelity: fidelity });
+      Object.freeze({ ...options.context(surface.id), inputFidelity: fidelity });
 
     const render = (): readonly Block[] => {
       try {
@@ -239,6 +256,7 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
     // still there afterwards — a captured child is a thing that happened in this
     // session, and a layer is a thing that was covering it.
     const entryId = options.entry.append(surface.id, render());
+    options.attachment.opened(entryId);
 
     const emit = (
       action: string,
@@ -369,9 +387,14 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
       // rendered, which is the record of what was on screen when ownership came
       // back — and a detach that swept it would be the pushed view's hole
       // arriving by another name.
-      options.invalidate();
       current = null;
       closeCurrent = null;
+      options.attachment.closed(entryId, outcome.reason);
+      // **The frame after ownership returns, not before** (C22 I110). The
+      // commit composes at once, so above `current = null` it drew `attached`
+      // and `keys → child` into the frame that ended the capture — and an
+      // application's own `close()` has no key behind it to draw another.
+      options.invalidate();
 
       void actionQueue
         .catch(() => undefined)

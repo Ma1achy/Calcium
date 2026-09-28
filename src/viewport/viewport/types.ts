@@ -131,6 +131,17 @@ export interface Viewport {
   pageUp(): void;
   pageDown(): void;
 
+  /**
+   * Keep an entry whole under appends until the handle is disposed (I56).
+   *
+   * **A limit on following, never a scroll of its own**: a viewport following
+   * the tail stops where the tail would carry the entry's first row off the top,
+   * and detaches there. The reader moving the viewport ends the hold for it; the
+   * release returns a viewport the hold detached, and the reader did not move,
+   * to the tail. One hold at a time — a second replaces the first.
+   */
+  keepWhole(id: EntryId): Disposable;
+
   /** Width invalidates every height; height invalidates none (I8). */
   resize(size: Readonly<{ width: number; height: number }>): void;
 
