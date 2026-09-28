@@ -1356,7 +1356,7 @@ one more line on §3's list.
 - **T4.6** (with C07): an adapter written using only the public surface produces a document indistinguishable from one written against internals.
 - **T4.8** (§4b, C09 §3a-quater, C04 I66): **through `b.status`**, at 80 and 40 columns — a 158-cell message with two `details` draws the banner, **every word of the message** and **both detail lines**, and `measure` equals the rows drawn; the same at `ASCII` and 1-bit, where the words are the check because the furniture differs. A one-row message draws border, banner and message: four rows. The builder's block carries no `height`, asserted on the object, because a declared one is the defect.
 - **T4.7** (with the reference app): the docker app compiles against the public entry only — no deep imports.
-- **T4.22** (I41, C22 I110): `SurfaceContext` through a real session — at 60×20 the child is told `{ width: 57, height: 9 }` where the region is 59 × 13, and after a resize to 80×24 it is re-rendered with the new interior; a surface id long enough to wrap its command row takes one row more off the height. The context equals `panelInterior` at the region's width less the entry's chrome, read from the frame's own region rather than restated.
+- **T4.22** (I41, C22 I110): `SurfaceContext` through a real session — at 60×20 the child is told `{ width: 57, height: 9 }` where the region is 59 × 13, and after a resize to 80×24 it is re-rendered with the new interior; a surface id long enough to wrap its command row takes one row more off the height, and its last body row and top border are both on screen.
 
 ### Tier 5 — e2e
 

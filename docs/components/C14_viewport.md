@@ -1181,7 +1181,7 @@ Fake heights, no rendering.
 - **T4.6** (with C02, C09): a `unicode: "ascii"` session measures identically to UTF-8 at every width.
 - **T4.7** (with C01): a `SIGWINCH` snapshot drives one resize; the anchor is captured before the cache is dropped.
 - **T4.8** (with C03, L4): a scroll causes **L4** to issue one `commit("input")` — immediate, never coalesced. A spy asserts C14 never calls the scheduler itself, matching the C01 and C10 orchestration pattern. **Driven through L4's read loop rather than by dispatching to the handler**, because the commit is the loop's (C22 I27): a test that dispatched directly would assert the mechanism it happened to find, and it passed while the handler and the loop would both have committed.
-- **T4.38** (I56, C22 I110, C24 I41): a real session at 60×20 — a child rendering exactly its `SurfaceContext.height` rows attaches, a command entry settles under it → the frame still shows the entry's command row, both borders and every body row; after the detach the frame reaches the tail and shows the entry that settled.
+- **T4.38** (I56, C22 I110, C24 I41): a real session at 60×20 with `CALCIUM_NOTIFY=bell` — `/slow` runs, a child rendering exactly its `SurfaceContext.height` rows attaches, the reader leaves, `/slow` settles and the reader returns, so two entries append under the child (the local route appends a settled document, and the return appends its notice) → the frame still shows the child's command row, both borders and every body row; after the detach the frame reaches the tail and shows the return's notice.
 
 ### Tier 5 — e2e
 
