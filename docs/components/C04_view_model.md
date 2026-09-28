@@ -96,14 +96,17 @@ type Rule     = Readonly<{ kind: "rule"; id: string; label: string;
 type Notice   = Readonly<{ kind: "notice"; id: string; tone: Tone; glyph?: Glyph; text: string;
                            action?: Action }> & Gap;   // one button, the whole notice (arc 6 §5)
 type KeyValue = Readonly<{ kind: "keyValue"; id: string;
-                           rows: readonly Readonly<{ label: string; value: string; tone?: Tone }>[] }> & Gap;
+                           rows: readonly Readonly<{ label: string; value: string; tone?: Tone }>[];
+                           expanded?: boolean }> & Gap;   // the shed parts drawn under each row — C09 I124
 type Steps    = Readonly<{ kind: "steps"; id: string;
                            steps: readonly Readonly<{ label: string; detail?: string;
-                             state: "pending" | "active" | "done" | "failed" }>[] }> & Gap;
+                             state: "pending" | "active" | "done" | "failed" }>[];
+                           expanded?: boolean }> & Gap;   // C09 I124
 type Logs     = Readonly<{ kind: "logs"; id: string;
                            lines: readonly Readonly<{ ts: string; level: string; message: string }>[] }> & Gap;
 type Events   = Readonly<{ kind: "events"; id: string;
-                           events: readonly Readonly<{ ts: string; type: string; message: string }>[] }> & Gap;
+                           events: readonly Readonly<{ ts: string; type: string; message: string }>[];
+                           expanded?: boolean }> & Gap;   // C09 I124
 type Progress = Readonly<{ kind: "progress"; id: string; label: string;
                            current: number; total: number; ramp?: Ramp }> & Gap;   // `ramp`: §3am.2
 type Code     = Readonly<{ kind: "code"; id: string; language: string; text: string;
@@ -112,12 +115,15 @@ type Code     = Readonly<{ kind: "code"; id: string; language: string; text: str
                            // view state: source lines `[from, to)` a window keeps (§3d, I82)
 type Comparison = Readonly<{ kind: "comparison"; id: string;
                            rows: readonly Readonly<{ field: string; a: string; b: string;
-                             comparison?: "same" | "better" | "worse" | "changed" }>[] }> & Gap;
+                             comparison?: "same" | "better" | "worse" | "changed" }>[];
+                           expanded?: boolean }> & Gap;   // C09 I124
 type Patch    = Readonly<{ kind: "patch"; id: string;
                            path: string;               // the file, for the header
                            language: string;           // syntax palette, per hunk line
                            hunks: readonly Hunk[];
                            collapsedAfter?: number;
+                           cap?: number;               // the collapsed form's row budget, the producer's (C25 I14, D12)
+                           expanded?: boolean;         // the cap set aside — C25 I11, I14, D13
   /** The gutter width, pinned when this block is a window of a larger one (C25 I21a). */
   numberWidth?: number;    // elided below the last hunk
                            actions?: readonly Action[];
@@ -4397,7 +4403,7 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.118** (I110, §5a): a `terminal` carrying every run field and both modes round-trips through `JSON.parse(JSON.stringify(...))` deep-equal, and `TERMINAL_KEYS` refuses a **tenth** block key and `TERMINAL_RUN_KEYS` an eleventh run key by name.
   The count was written as *a seventh* when the kind had six members and was three behind by the time the row
   was implemented — the row asserts the measured sizes (9 and 10) so the number cannot drift again unread.
-- **T2.119** (I18): every view-state field that changes a height is enumerated and each is shown to move the measurement — `TableRow.expanded` 3 → 4, `Scroll.collapsed` 5 → 1, `Floor.minHeight` 1 → 7, `Patch.collapsedAfter` 4 → 5 — compared **by equality**, so a fifth arriving outside the block fails here. With the complement measured rather than argued: the same block measured twice, an unrelated block measured between, gives the same number, so nothing accumulated anywhere else. `Gap.gapBefore` is deliberately not in the set — it is composition's, and `measure` returns 1 either way, which is what makes the list a measurement rather than a list of optional fields.
+- **T2.119** (I18): every view-state field that changes a height is enumerated and each is shown to move the measurement — `TableRow.expanded` 3 → 4, `Scroll.collapsed` 5 → 1, `Floor.minHeight` 1 → 7, `Patch.collapsedAfter` 4 → 5 — compared **by equality**, so a fifth arriving outside the block fails here. *(Amended, review batch 3: `Patch.expanded` under a `cap` and the four shedding kinds' `expanded` (C25 I14, C09 I124) join the set, each measured moving its height — the flags are fields of the block, which is the whole of I18.)* With the complement measured rather than argued: the same block measured twice, an unrelated block measured between, gives the same number, so nothing accumulated anywhere else. `Gap.gapBefore` is deliberately not in the set — it is composition's, and `measure` returns 1 either way, which is what makes the list a measurement rather than a list of optional fields.
 - **T2.120** (I20): six 10-wide chips are **two rows at `w = 40` and six at `w = 20`**, and `ceil(totalWidth / w)` says two and three — so the row is asserted against the packing and not against the formula this document used to carry (F928). A chip wider than the width gets its own row rather than being split, which is the observable difference between a packing and a wrap, and the frame is read beside the number so the two cannot drift.
 - **T2.121** (I21): a merge naming one row of two leaves the other **reference-identical**, and `MergeRow` is `Omit<TableRow, "expanded">` — no arm of it can remove a row. The structural half is what makes the behavioural half a rule rather than a sample: a delete marker would make a dropped row and an unmentioned row indistinguishable in the payload, and there is no marker to add.
 - **T2.122** (I22, I9): `replace` drops `expanded` and `merge` keeps it, asserted in one row because the pair **is** the update model and either alone reads as a sample. The merge arm also shows the incoming row cannot forge it: `stripViewState` removes `expanded` from the payload before it lands, so view state survives only where it already was.

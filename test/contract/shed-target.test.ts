@@ -188,3 +188,12 @@ describe("C09 I113 — a shed row is a target", () => {
     expect(overListed, "the narrow render over-lists at 8 and 9, as stated").toBe(4);
   });
 });
+
+describe("C09 I124, I125 — ruling 42: a shed row expands its block in place", () => {
+  it.todo(
+    "T1.85 (C09 I124, I113, ruling 42): each shedding kind's shed elements carry expand on the block, the registry's fold sets and removes expanded, and expanded draws each item's withheld parts beneath its row as label and value — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T2.190 (C09 I125, I124, I1, I26): the four kinds expanded measure exactly the rows they draw from 4 to 80 columns at both rungs and wide, and keyValue's window keeps I26's equality — not deferred on a component: the code lands in the next commit of this round",
+  );
+});

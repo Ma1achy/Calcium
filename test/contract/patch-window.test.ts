@@ -670,3 +670,10 @@ describe("C25 I22 — the plan travels through the seam, and a planned window co
     expect(sets + gets).toBe(before);
   });
 });
+
+describe("C25 I14 — the cap, built, and expanded in place", () => {
+  it.todo(
+    "T2.18 (C25 I14, C25 I11, C25 I24, C25 I17): a capped patch expands in place, and measure equals the rows drawn in both forms — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo("T3.10 (C25 I14): forty single-line hunks under a cap of 24 stop at a hunk boundary and state how many were dropped — not deferred on a component: the code lands in the next commit of this round");
+});
