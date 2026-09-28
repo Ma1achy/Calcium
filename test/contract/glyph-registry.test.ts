@@ -64,7 +64,7 @@ const set = (key: keyof ReturnType<typeof glyphModule.glyphs>): Home => ({
 });
 
 const HOMES: Readonly<Record<string, Home>> = {
-  "work-unit": vocab("running"),
+  "work-unit": vocab("work-unit"),
   branch: vocab("continuation"),
   attention: vocab("warn"),
   success: vocab("ok"),

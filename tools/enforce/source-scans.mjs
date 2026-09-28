@@ -890,7 +890,7 @@ export const SCANS = [
   // a glyph position, so it needs no exemption — and an exemption nobody needs
   // is a door left open.
   { id: "SS39", spec: "C04 I6 · C09 §4",
-    pattern: /\bglyph\s*:\s*["'`](?!(?:ok|warn|error|info|pending|working|running|queued|cancelled|expand|collapse|live|bullet|quote|nested|continuation|step)["'`])/,
+    pattern: /\bglyph\s*:\s*["'`](?!(?:question|current|ok|warn|error|info|pending|working|work-unit|queued|cancelled|expand|collapse|focus|bullet|quote|nested|continuation)["'`])/,
     scope: "src/", allow: [],
     why: "a block names a glyph slot; C09 §4 owns both renderings and the 1:1 width rule" },
 
@@ -1474,26 +1474,53 @@ export function checkMarks(files, readFile = (f) => readFileSync(f, "utf8"), exe
  * Shape: `token: ["row-lead"],` — one line per token, beside the table it
  * classifies, so a new glyph that forgets its domain is a parse gap the scan
  * reports rather than a mark it silently exempts.
+ *
+ * **A quoted key as well as a bare one** (question 57). `work-unit` is the first
+ * hyphenated token and is written `"work-unit": […]`, which a `(\w+)` key never
+ * matched — so it dropped out of the corpus with nothing reporting it: the
+ * empty-parse control sees a whole table vanish, not one key. The suite holds
+ * the parsed keys equal to `GLYPH_TOKENS`, which is what sees one.
  */
 export function parseDomainTable(source, name) {
   const start = source.indexOf(`export const ${name}`);
   if (start < 0) return {};
   const end = source.indexOf("\n};", start);
   const out = {};
-  for (const m of source.slice(start, end).matchAll(/^ {2}(\w+): \[([^\]]*)\],/gmu)) {
-    out[m[1]] = [...m[2].matchAll(/"([^"]+)"/gu)].map((d) => d[1]);
+  for (const m of source.slice(start, end).matchAll(/^ {2}(?:"(?<quoted>[\w-]+)"|(?<bare>\w+)): \[([^\]]*)\],/gmu)) {
+    out[m.groups.quoted ?? m.groups.bare] = [...m[3].matchAll(/"([^"]+)"/gu)].map((d) => d[1]);
   }
   return out;
 }
 
-/** One `Record<string, string>` of ASCII halves, read out of a frozen object literal. */
+/**
+ * One `Record<string, string>` of halves, read out of a frozen object literal —
+ * the value is the pattern's last group, and the key its `quoted` or `bare`
+ * group where it names them, else its first.
+ */
 function parseAsciiPairs(source, opener, pattern) {
   const start = source.indexOf(opener);
   if (start < 0) return {};
   const body = source.slice(start, source.indexOf("\n});", start));
   const out = {};
-  for (const m of body.matchAll(pattern)) out[m[1]] = JSON.parse(`"${m[m.length - 1]}"`);
+  for (const m of body.matchAll(pattern)) {
+    out[m.groups?.quoted ?? m.groups?.bare ?? m[1]] = JSON.parse(`"${m[m.length - 1]}"`);
+  }
   return out;
+}
+
+/**
+ * `GLYPH_TABLE`'s two halves, keyed by token, as SS64 reads them (question 57).
+ *
+ * Exported so the suite can hold the keys equal to `GLYPH_TOKENS`: a key this
+ * parse cannot read is a mark SS64 never compares, and no count it prints moves.
+ */
+export function parseGlyphTable(glyphSource) {
+  return {
+    ascii: parseAsciiPairs(glyphSource, "const GLYPH_TABLE",
+      /^ {4}(?:"(?<quoted>[\w-]+)"|(?<bare>\w+)): \["(?:[^"\\]|\\.)*", "((?:[^"\\]|\\.)*)"\],/gmu),
+    unicode: parseAsciiPairs(glyphSource, "const GLYPH_TABLE",
+      /^ {4}(?:"(?<quoted>[\w-]+)"|(?<bare>\w+)): \["((?:[^"\\]|\\.)*)", "(?:[^"\\]|\\.)*"\],/gmu),
+  };
 }
 
 /**
@@ -1543,10 +1570,7 @@ export function checkMarkDomains(
   }
   const tableDomains = parseDomainTable(glyphSource, "GLYPH_DOMAINS");
   const setDomains = parseDomainTable(glyphSource, "GLYPH_SET_DOMAINS");
-  const table = parseAsciiPairs(glyphSource, "const GLYPH_TABLE",
-    /^ {4}(\w+): \["((?:[^"\\]|\\.)*)", "((?:[^"\\]|\\.)*)"\],/gmu);
-  const tableUnicode = parseAsciiPairs(glyphSource, "const GLYPH_TABLE",
-    /^ {4}(\w+): \["((?:[^"\\]|\\.)*)", "(?:[^"\\]|\\.)*"\],/gmu);
+  const { ascii: table, unicode: tableUnicode } = parseGlyphTable(glyphSource);
   const set = parseAsciiPairs(glyphSource, "const ASCII: GlyphSet", /^ {2}(\w+): "((?:[^"\\]|\\.)*)",/gmu);
   // **The Unicode half, read rather than stubbed.** A placeholder here made every
   // `GlyphSet` member differ from every other and from `GLYPH_TABLE`, so `ok ✓`

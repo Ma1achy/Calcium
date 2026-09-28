@@ -212,9 +212,16 @@ export type Glyph =
   | "error"
   | "info"
   | "pending"
-  /** Starting, connecting, installing. Distinct from `running`: S11, S15. */
+  /** Starting, connecting, installing. Distinct from `work-unit`: S11, S15. */
   | "working"
-  | "running"
+  /**
+   * A unit of work under way, steady — `●` / `*`, the registry's `work-unit`
+   * (R-GLY-003, C04 §Glyph). **It was `running`**, which is also `CallState`'s
+   * word for the state that draws it, so `CALL_HEAD_GLYPH` read
+   * `running: "running"` and a reader could not tell the key from the value.
+   * The slot takes the registry's name and `CallState` keeps its own.
+   */
+  | "work-unit"
   | "queued"
   | "cancelled"
   | "expand"
@@ -847,10 +854,10 @@ export const CALL_STATE_TONE: Readonly<Record<CallState, Tone>> = Object.freeze(
  */
 export const CALL_HEAD_GLYPH: Readonly<Record<CallState, Glyph>> = Object.freeze({
   queued: "queued",
-  running: "running",
-  succeeded: "running",
-  failed: "running",
-  cancelled: "running",
+  running: "work-unit",
+  succeeded: "work-unit",
+  failed: "work-unit",
+  cancelled: "work-unit",
 });
 
 /** The states, in the order a call passes through them — for the validator's union check. */

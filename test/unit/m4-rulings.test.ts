@@ -70,11 +70,11 @@ describe("M4 — the six rulings, against the tree", () => {
     // and the duration spinner beside it, which is two carriers rather than
     // one: above 1-bit the mark is the constant and tone says the state, and
     // below it the mark is the state (C09 I45, SS64).
-    expect(headMark("running", { ...FULL_CAPS }), "coloured: the constant mark").toBe("running");
+    expect(headMark("running", { ...FULL_CAPS }), "coloured: the constant mark").toBe("work-unit");
     expect(
       headMark("running", { ...FULL_CAPS, colourDepth: 1 }),
       "1-bit: the mark is the state, which is what survives when tone is gone",
-    ).toBe("running");
+    ).toBe("work-unit");
     expect(
       headMark("queued", { ...FULL_CAPS, colourDepth: 1 }),
       "and a different state is a different mark, or the carrier is not one",

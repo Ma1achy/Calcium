@@ -139,11 +139,11 @@ describe("C04 I141 — a notice's state names its tone and its glyph", () => {
     // `headMark`, which is the failure this row exists to move.
     expect(errors(docWith({ state: "bogus" }))).toMatch(/"state" is outside its union \(C04 I141\)/u);
     // The shipped defect as a document: a failed head in `info`.
-    expect(errors(docWith({ state: "failed", tone: "info", glyph: "running" }))).toMatch(/"tone" must be "error" for state "failed"/u);
+    expect(errors(docWith({ state: "failed", tone: "info", glyph: "work-unit" }))).toMatch(/"tone" must be "error" for state "failed"/u);
     // A queued head drawn filled.
-    expect(errors(docWith({ state: "queued", tone: "muted", glyph: "running" }))).toMatch(/"glyph" must be "queued" for state "queued"/u);
+    expect(errors(docWith({ state: "queued", tone: "muted", glyph: "work-unit" }))).toMatch(/"glyph" must be "queued" for state "queued"/u);
     // And without a state, a notice is an ordinary line and neither is checked.
-    const plain = docWith({ tone: "info", glyph: "running" }) as { blocks: Record<string, unknown>[] };
+    const plain = docWith({ tone: "info", glyph: "work-unit" }) as { blocks: Record<string, unknown>[] };
     delete plain.blocks[0]!["state"];
     expect(errors(plain), "no state, no claim").toBe("");
   });
@@ -157,13 +157,26 @@ describe("C04 I141 — a notice's state names its tone and its glyph", () => {
     }
     // Refused, never corrected — at construction, by `block()` as by the builder.
     expect(() => b.notice("info", "grep x", undefined, { state: "failed" })).toThrow(/"tone" must be "error" for state "failed"/u);
-    expect(() => block({ kind: "notice", id: "h", tone: "muted", glyph: "running", state: "queued", text: "x" } as Block)).toThrow(
+    expect(() => block({ kind: "notice", id: "h", tone: "muted", glyph: "work-unit", state: "queued", text: "x" } as Block)).toThrow(
       /"glyph" must be "queued"/u,
     );
   });
-  it.todo(
-    "T2.138 (C04 I141, I6, question 57): validateDocument accepts glyph work-unit on each of the four states that are not queued, and refuses glyph running on a plain notice as outside the vocabulary — not deferred on a component: the code lands in the next commit of this round",
-  );
+
+  it("T2.138 (C04 I141, I6, question 57): the four started states carry `work-unit`, and `running` is a state and not a glyph", () => {
+    // `work-unit` is the registry's id for `●` / `*`, and `CallState` keeps
+    // `running`: a validator taking one for the other would admit a head the
+    // renderer's table has no row for.
+    const started = CALL_STATES.filter((s) => s !== "queued");
+    expect(started, "four states draw the slot").toHaveLength(4);
+    for (const state of started) {
+      expect(CALL_HEAD_GLYPH[state], `${state}'s head glyph`).toBe("work-unit");
+      expect(errors(docWith({ state, tone: CALL_STATE_TONE[state], glyph: "work-unit" })), state).toBe("");
+    }
+    const plain = docWith({ tone: "info", glyph: "running" }) as { blocks: Record<string, unknown>[] };
+    delete plain.blocks[0]!["state"];
+    expect(errors(plain), "the retired slot, on a plain notice").toMatch(/"glyph" must be one of [^(]*\bwork-unit\b[^(]*\(C04 I6\)/u);
+    expect(errors(plain), "and the message does not offer it").not.toMatch(/must be one of [^(]*\brunning\b/u);
+  });
 });
 
 describe("C09 I45 — the call head, rendered", () => {

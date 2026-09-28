@@ -203,7 +203,7 @@ describe("C04 §3am.1 — `elide`", () => {
 
     // **On a fitted token the marked run gives way first** (C09 I46): the run
     // carries the marker inside it and the runs outside it are byte-identical.
-    const head = block({ kind: "notice", id: "h", tone: "default", glyph: "running", state: "running", text: TEXT, spans: [ARG] });
+    const head = block({ kind: "notice", id: "h", tone: "default", glyph: "work-unit", state: "running", text: TEXT, spans: [ARG] });
     const wide = rows(head, 80)[0] ?? "";
     const narrow = rows(head, 40)[0] ?? "";
     expect(wide).toBe(`● ${TEXT}`);

@@ -331,7 +331,7 @@ describe("C22 §6l — the frame's default look", () => {
   });
 
   it("T1.41 (C22 I83, §6l.2 rows 11, 13, 14): entryLayout renders a card's header at the width and its body at width − BODY_INDENT under the hook; other documents lay out whole", () => {
-    const step = block({ kind: "notice", id: "h", tone: "default", glyph: "running", state: "running", text: "ps(--all) · 0.4s · ok" });
+    const step = block({ kind: "notice", id: "h", tone: "default", glyph: "work-unit", state: "running", text: "ps(--all) · 0.4s · ok" });
     const body = block({ kind: "notice", id: "b", tone: "muted", text: "the body row" });
     const other = block({ kind: "notice", id: "o", tone: "muted", text: "another" });
     const options = { theme: DARK_THEME, capabilities: FULL_CAPS };
@@ -370,7 +370,7 @@ describe("C22 §6l — the frame's default look", () => {
   });
 
   it("T1.44 (C22 I84, §6l.6 row 16): the card's hook and C09's continuation mark are one column — compared as two rendered forms, not two constants", () => {
-    const step = block({ kind: "notice", id: "h", tone: "default", glyph: "running", state: "running", text: "ps · ok" });
+    const step = block({ kind: "notice", id: "h", tone: "default", glyph: "work-unit", state: "running", text: "ps · ok" });
     const body = block({ kind: "notice", id: "b", tone: "muted", text: "the body row" });
     const queued = block({ kind: "notice", id: "q", tone: "muted", glyph: "continuation", text: "queued behind /logs" });
     const options = { theme: DARK_THEME, capabilities: FULL_CAPS };
@@ -437,7 +437,7 @@ describe("C22 §6l — the frame's default look", () => {
   });
 
   it("T1.42 (C22 I83, §6l.2 row 12): a body that wraps once more at width − BODY_INDENT is measured and rendered with the same extra row", () => {
-    const step = block({ kind: "notice", id: "h", tone: "default", glyph: "running", state: "running", text: "ps" });
+    const step = block({ kind: "notice", id: "h", tone: "default", glyph: "work-unit", state: "running", text: "ps" });
     // 39 cells of prose: one row at 40, two at 35.
     const body = block({ kind: "notice", id: "b", tone: "muted", text: "a".repeat(39) });
     const options = { theme: DARK_THEME, capabilities: FULL_CAPS };
@@ -505,7 +505,7 @@ describe("C22 §6l — the frame's default look", () => {
 
 describe("C22 §6l.8 — the gutter carries the call", () => {
   const WIDE_CAPS = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
-  const head = (id: string, text: string): Block => block({ kind: "notice", id, tone: "default", glyph: "running", state: "running", text });
+  const head = (id: string, text: string): Block => block({ kind: "notice", id, tone: "default", glyph: "work-unit", state: "running", text });
   const body = (id: string, text: string): Block => block({ kind: "notice", id, tone: "muted", text });
   const card = (id: string, text: string, ...rest: Block[]): Block =>
     block({ kind: "group", id: `g-${id}`, direction: "column", children: [head(id, text), ...rest] });

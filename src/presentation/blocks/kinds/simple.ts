@@ -99,7 +99,7 @@ const GLYPH_RAIL: ReadonlySet<Glyph> = new Set<Glyph>(["quote"]);
  *
  * **The test is the call state, not the glyph token.** It used to be
  * `glyph === "step"`, and that slot is gone: above the monochrome rung the head
- * mark is `running`'s `●` for every state, which a muted `running` notice could
+ * mark is `work-unit`'s `●` for every state, which a muted `work-unit` notice could
  * also hold, and at 1 bit it is five different tokens. A predicate over the
  * character would have answered differently at different capabilities, which is
  * a focus ring that changes shape when the terminal does. `state` is on the

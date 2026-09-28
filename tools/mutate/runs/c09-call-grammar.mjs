@@ -32,7 +32,7 @@ const results = runPass({
   control: {
     file: GLYPHS,
     from: '  succeeded: "ok",',
-    to: '  succeeded: "running",',
+    to: '  succeeded: "work-unit",',
     why:
       "T2.187 asserts the five marks the states take where shape has to carry them; a succeeded call " +
       "drawing `\u25cf` collides with running at 1 bit and in ASCII, so a pass where this survives " +

@@ -119,7 +119,7 @@ error           x
 info            i
 pending         .
 working         %
-running         *
+work-unit       *
 queued          o
 cancelled       /
 expand          (
@@ -839,7 +839,7 @@ error           x
 info            i
 pending         .
 working         %
-running         *
+work-unit       *
 queued          o
 cancelled       /
 expand          (
@@ -1548,7 +1548,7 @@ error           ✗
 info            ⓘ
 pending         ◌
 working         ◐
-running         ●
+work-unit       ●
 queued          ○
 cancelled       ⊘
 expand          ▹
@@ -2210,7 +2210,7 @@ error           ✗
 info            ⓘ
 pending         ◌
 working         ◐
-running         ●
+work-unit       ●
 queued          ○
 cancelled       ⊘
 expand          ▹
@@ -2868,7 +2868,7 @@ error           ✗
 info            ⓘ
 pending         ◌
 working         ◐
-running         ●
+work-unit       ●
 queued          ○
 cancelled       ⊘
 expand          ▹
@@ -3589,7 +3589,7 @@ error           ✗
 info            ⓘ
 pending         ◌
 working         ◐
-running         ●
+work-unit       ●
 queued          ○
 cancelled       ⊘
 expand          ▹

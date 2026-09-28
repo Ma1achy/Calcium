@@ -62,10 +62,13 @@ import {
   checkMarkDomains,
   checkMarks,
   checkSourceScans,
+  parseDomainTable,
   parseEmojiBases,
+  parseGlyphTable,
   RAMP_VOCABULARIES,
   SCANS,
 } from "../../tools/enforce/source-scans.mjs";
+import { GLYPH_TOKENS } from "../../src/presentation/blocks/glyphs.js";
 import { hasEmojiForm } from "../../src/presentation/text.js";
 import type { Scan } from "../../tools/enforce/source-scans.d.mts";
 import {
@@ -1639,6 +1642,35 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       checkMarkDomains().filter((v) => v.message.includes("border")),
       "box drawing collapsing to `+` is not a collision",
     ).toEqual([]);
+  });
+
+  it("SS64 reads every key: the parsed GLYPH_TABLE and GLYPH_DOMAINS keys equal GLYPH_TOKENS, by equality (question 57)", () => {
+    // **The control neither of SS64's own controls is.** An empty parse is a
+    // violation and a mark with no domain is reported, and both see a whole
+    // table vanish; one key dropping out moves no count anyone reads.
+    // `"work-unit"` is quoted because it is hyphenated, and a `(\w+)` key parse
+    // passed it by — so the rule compared seventeen marks and said so nowhere.
+    const glyphSource = readFileSync("src/presentation/blocks/glyphs.ts", "utf8");
+    const tokens = [...GLYPH_TOKENS].sort();
+    const { ascii, unicode } = parseGlyphTable(glyphSource);
+    expect(Object.keys(ascii).sort(), "GLYPH_TABLE's ASCII halves, by key").toEqual(tokens);
+    expect(Object.keys(unicode).sort(), "GLYPH_TABLE's Unicode halves, by key").toEqual(tokens);
+    expect(Object.keys(parseDomainTable(glyphSource, "GLYPH_DOMAINS")).sort(), "GLYPH_DOMAINS, by key").toEqual(tokens);
+    // The row responds: the quoted key is one the parse reads, with its halves.
+    expect([ascii["work-unit"], unicode["work-unit"]], "the hyphenated token's pair").toEqual(["*", "●"]);
+  });
+
+  it("SS39's alternation is GLYPH_TOKENS, by equality (question 57, F661)", () => {
+    // A stale list fails loudly for a token it lacks and silently for a token
+    // it keeps after retirement — it had both, `live` and `step` kept and
+    // `question`, `current` and `focus` missing.
+    const rule = SCANS.find((r) => r.id === "SS39");
+    const alternation = /\(\?!\(\?:([\w|-]+)\)/u.exec(rule?.pattern.source ?? "")?.[1];
+    expect(alternation, "SS39's negative lookahead, read").toBeDefined();
+    expect((alternation ?? "").split("|").sort()).toEqual([...GLYPH_TOKENS].sort());
+    // And it responds in both directions on a real glyph position.
+    expect(rule?.pattern.test('glyph: "work-unit"'), "a current token passes").toBe(false);
+    expect(rule?.pattern.test('glyph: "running"'), "the retired slot is refused").toBe(true);
   });
 
   it("SS57 fires: the shipped head mark, the info glyph, and not the keycap bases", () => {

@@ -103,7 +103,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     expect(entry()?.streaming, "step 3 appended a streaming entry").toBe(true);
     // First assertion — the card, not `blocks: []` (T6.80).
     expect(headerOf(entry()?.doc.blocks ?? []), "the header is a `step` notice, the spinner alone below one second (C23 I58)").toEqual({
-      glyph: "running", state: "running",
+      glyph: "work-unit", state: "running",
       text: `tail(web.log) · ${SPIN(0)}`,
     });
 
@@ -187,7 +187,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     const routed = h.transcript.entries[1];
     expect(routed?.id, "same entry").toBe(queued?.id);
     expect(routed?.doc.blocks, "one block: the header replaced the notice").toHaveLength(1);
-    expect(headerOf(routed?.doc.blocks ?? [])).toEqual({ glyph: "running", state: "running", text: `tail(web.log) · ${SPIN(0)}` });
+    expect(headerOf(routed?.doc.blocks ?? [])).toEqual({ glyph: "work-unit", state: "running", text: `tail(web.log) · ${SPIN(0)}` });
     seconds(h, 2);
     expect(headerOf(h.transcript.entries[1]?.doc.blocks ?? [])?.text).toBe(`tail(web.log) · ${SPIN(2)} 2s`);
 
@@ -226,7 +226,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     h.pipeline.submit("/ps --quiet");
     await settled(h.pipeline);
 
-    expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])).toEqual({ glyph: "running", state: "running", text: `ps(--quiet) · ${SPIN(0)}` });
+    expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])).toEqual({ glyph: "work-unit", state: "running", text: `ps(--quiet) · ${SPIN(0)}` });
     seconds(h, 2);
     expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text).toBe(`ps(--quiet) · ${SPIN(2)} 2s`);
 
@@ -238,7 +238,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     // **Reversed 2026-09-05** (C23 I55): this read *no header survives a replacement*
     // and the card is now composed over the replacement — one header, block 0.
     // No count in the result and no failure: `verb · duration`, never `ok` (C23 I59).
-    expect(headerOf(entry?.doc.blocks ?? []), "and the header is composed over it").toEqual({ glyph: "running", state: "succeeded", text: "ps(--quiet) · 2s" });
+    expect(headerOf(entry?.doc.blocks ?? []), "and the header is composed over it").toEqual({ glyph: "work-unit", state: "succeeded", text: "ps(--quiet) · 2s" });
     expect((entry?.doc.blocks ?? []).filter((blk) => blk.kind === "notice" && blk.state !== undefined), "exactly one").toHaveLength(1);
   });
 
@@ -249,7 +249,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     });
     h.pipeline.submit("/ps");
     await settled(h.pipeline);
-    expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? []), "no arguments, no parentheses").toEqual({ glyph: "running", state: "running", text: `ps · ${SPIN(0)}` });
+    expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? []), "no arguments, no parentheses").toEqual({ glyph: "work-unit", state: "running", text: `ps · ${SPIN(0)}` });
     seconds(h, 2);
     expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text).toBe(`ps · ${SPIN(2)} 2s`);
     // The control is T4.43 above: `ps(--quiet)` keeps its parentheses.
@@ -370,7 +370,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     held.release?.();
     await settled(h.pipeline);
     const blocks = h.transcript.entries[0]?.doc.blocks ?? [];
-    expect(headerOf(blocks), "the header is block 0, with the duration; no count, so no outcome (C23 I59)").toEqual({ glyph: "running", state: "succeeded", text: "ps · 2s" });
+    expect(headerOf(blocks), "the header is block 0, with the duration; no count, so no outcome (C23 I59)").toEqual({ glyph: "work-unit", state: "succeeded", text: "ps · 2s" });
     expect(blocks.slice(1).map((blk) => blk.id), "the result's own blocks follow it, in order").toEqual(["r1", "r2"]);
     expect(blocks.slice(1).some((blk) => blk.kind === "notice" && blk.state !== undefined), "one header, not two").toBe(false);
     expect(atSettle, "one settle change, and the document it wrote carries the header").toHaveLength(1);
@@ -382,7 +382,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     await settled(h2.pipeline);
     await settled(h2.pipeline);
     const failed = h2.transcript.entries[0]?.doc.blocks ?? [];
-    expect(headerOf(failed)).toEqual({ glyph: "running", state: "failed", text: "ps(--quiet) · failed" });
+    expect(headerOf(failed)).toEqual({ glyph: "work-unit", state: "failed", text: "ps(--quiet) · failed" });
     expect(failed[1]?.kind, "the status box is the body").toBe("status");
     expect(h2.transcript.entries[0]?.doc.status).toBe("error");
 
@@ -391,7 +391,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     h3.pipeline.submit("/guide");
     await settled(h3.pipeline);
     const local = h3.transcript.entries[0]?.doc.blocks ?? [];
-    expect(headerOf(local), "a local verb below one second with no count: the verb alone").toEqual({ glyph: "running", state: "succeeded", text: "guide" });
+    expect(headerOf(local), "a local verb below one second with no count: the verb alone").toEqual({ glyph: "work-unit", state: "succeeded", text: "guide" });
     expect(h3.transcript.entries[0]?.doc.meta.transport, "a local document's verdict is its status").toBe("local");
   });
 

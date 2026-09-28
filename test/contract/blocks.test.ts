@@ -606,7 +606,7 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
     expect(offenders).toEqual([]);
     // **The controls, so an empty table cannot pass the row**: the two marks
     // the table found on its first run are in it, and the keycap base `*` —
-    // `step`'s and `running`'s ASCII rung — is excluded by the row's own guard.
+    // `step`'s and `work-unit`'s ASCII rung — is excluded by the row's own guard.
     expect(hasEmojiForm(0x23fa), "⏺︎ U+23FA, the mark F823 is about").toBe(true);
     expect(hasEmojiForm(0x2139), "ℹ U+2139, the mark F832 found").toBe(true);
     expect(hasEmojiForm(0x2b24), "⬤ U+2B24, which held the slot between F823 and F854").toBe(false);
@@ -619,14 +619,14 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
     }
     expect(bare, "a bare base is still a violation — the remedy is the selector, not the exemption").toEqual(["\u23fa"]);
     expect(hasEmojiForm(0x2a), "* is a keycap base in the Unicode file and excluded by construction (F832)").toBe(false);
-    expect(glyphFor("running", ASCII_CAPS), "so the ASCII rung is still *").toBe("*");
+    expect(glyphFor("work-unit", ASCII_CAPS), "so the ASCII rung is still *").toBe("*");
   });
 
   it("T2.115 (C09 I48, I5): every `Glyph` is its reservation's width at BOTH conventions, through `glyphFor`", () => {
     // T2.5b asserted the rule at `narrow` alone, and ten of seventeen members
     // broke it at `wide` while it was green (F825). The two named sets are
     // compared by equality so a member moving between them fails the row.
-    const AMBIGUOUS = new Set(["warn", "info", "pending", "working", "running", "queued", "cancelled", "expand", "collapse", "focus", "bullet"]);
+    const AMBIGUOUS = new Set(["warn", "info", "pending", "working", "work-unit", "queued", "cancelled", "expand", "collapse", "focus", "bullet"]);
     // `question` `⟩` and `current` `›` join NEUTRAL, measured rather than
     // assumed: both are one cell at either convention, so neither takes a wide
     // fallback and both are `steady`. They arrived with M11's carrier matrix —
@@ -847,7 +847,7 @@ describe("C09 contract — the slice seam", () => {
  * the ground and nothing else, and the assertion is the geometry.
  */
 describe("C09 I83 — a notice takes the focus ground and no column", () => {
-  const HEAD = block({ kind: "notice", id: "h", tone: "default", glyph: "running", state: "running", text: "ps · ok" } as never);
+  const HEAD = block({ kind: "notice", id: "h", tone: "default", glyph: "work-unit", state: "running", text: "ps · ok" } as never);
   const BODY = block({ kind: "notice", id: "b", tone: "muted", glyph: "continuation", text: "one row" } as never);
   const WIDTH = 40;
   const kitAt = (focus: RenderContext["focus"], caps = FULL_CAPS) =>
@@ -912,7 +912,7 @@ describe("C09 I83 — a notice takes the focus ground and no column", () => {
     // refuses. Three states give three tones, `error` among them.
     for (const state of ["failed", "succeeded", "running"] as const) {
       const name = CALL_STATE_TONE[state];
-      const notice = block({ kind: "notice", id: "h", tone: name, glyph: "running", state, text: `on ${name}` } as never);
+      const notice = block({ kind: "notice", id: "h", tone: name, glyph: "work-unit", state, text: `on ${name}` } as never);
       const lines = kitAt({ blockId: "h", rowId: "h" }).renderSequence([notice], WIDTH);
       // **The slot is the notice's; the hex is the ground's answer** (C10 I48).
       // `dark` composes a nearer `error` for `focusGround`, so a row asserting

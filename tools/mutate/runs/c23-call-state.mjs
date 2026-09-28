@@ -48,10 +48,10 @@ const results = runPass({
       expect: "T1.76",
     },
     {
-      name: "the toned rung's mark constant `running`, as shipped (F1261)",
+      name: "the toned rung's mark constant `work-unit`, as shipped (F1261)",
       file: GLYPHS,
       from: "  return toneCarries(caps, onBand) ? CALL_HEAD_GLYPH[state] : CALL_STATE_GLYPH[state];",
-      to: '  return toneCarries(caps, onBand) ? "running" : CALL_STATE_GLYPH[state];',
+      to: '  return toneCarries(caps, onBand) ? "work-unit" : CALL_STATE_GLYPH[state];',
       expect: "T2.187",
     },
     {

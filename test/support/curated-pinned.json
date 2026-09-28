@@ -43,7 +43,7 @@
   "cancelled": "cancelled",
   "failed": "error",
   "queued": "queued",
-  "running": "running",
+  "running": "work-unit",
   "succeeded": "ok"
  },
  "CATEGORY_REFS": [
@@ -860,10 +860,10 @@
   "quote": [
    "row-lead"
   ],
-  "running": [
+  "warn": [
    "row-lead"
   ],
-  "warn": [
+  "work-unit": [
    "row-lead"
   ],
   "working": [
@@ -1100,7 +1100,7 @@
   "info",
   "pending",
   "working",
-  "running",
+  "work-unit",
   "queued",
   "cancelled",
   "expand",

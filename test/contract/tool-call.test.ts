@@ -36,7 +36,7 @@ describe("§9c — the header, the body, and the row the body already has", () =
   it("C23 T1.50 (C23 I57, F821): entryLayout clears the body's first leading gap in the body run, keeps the rest, and the stored document keeps its blocks by identity", () => {
     const first = block({ kind: "notice", id: "a", tone: "muted", text: "first", padding: { t: 1 } });
     const second = block({ kind: "notice", id: "b", tone: "muted", text: "second", padding: { t: 1 } });
-    const step = block({ kind: "notice", id: "h", tone: "default", glyph: "running", state: "running", text: "ps · ok" });
+    const step = block({ kind: "notice", id: "h", tone: "default", glyph: "work-unit", state: "running", text: "ps · ok" });
 
     // The body run: the first block's gap is dropped, the second keeps its gap.
     const body = cardBody([first, second]);
@@ -60,7 +60,7 @@ describe("§9c — the header, the body, and the row the body already has", () =
   });
 
   it("C22 T1.62 (C22 I107, F1203): entryLayout over one card array hands out the same body objects every call, and a fresh array a fresh body", () => {
-    const step = block({ kind: "notice", id: "h", tone: "default", glyph: "running", state: "running", text: "ps · ok" });
+    const step = block({ kind: "notice", id: "h", tone: "default", glyph: "work-unit", state: "running", text: "ps · ok" });
     const first = block({ kind: "notice", id: "a", tone: "muted", text: "first", padding: { t: 1 } });
     const second = block({ kind: "notice", id: "b", tone: "muted", text: "second", padding: { t: 1 } });
     const card = Object.freeze([step, first, second]);
@@ -131,7 +131,7 @@ describe("§9c — the header, the body, and the row the body already has", () =
     const failed = toolCallDoc("run_command", { name: "run_command", args: "npm test", outcome: "exit 1" }, META, FULL_CAPS, "error");
     for (const doc of [running, settled, folded, failed]) expect(validateDocument(doc).ok, doc.command).toBe(true);
     expect(failed.error?.message).toBe("run_command(npm test) · exit 1");
-    expect(running.blocks[0]?.kind === "notice" && running.blocks[0].glyph).toBe("running");
+    expect(running.blocks[0]?.kind === "notice" && running.blocks[0].glyph).toBe("work-unit");
     expect(settled.blocks[1]?.kind === "notice" && settled.blocks[1].glyph).toBe("continuation");
     expect(running.blocks[1]?.kind === "scroll" && running.blocks[1].follow).toBe(true);
   });
@@ -196,7 +196,7 @@ describe("C09 §4 — the head is fitted and is an element", () => {
   const LONG = "run_command(pytest tests/unit/test_something_rather_long.py --maxfail=1 -k not_slow) · 4s · exit 0";
   const ARGS = { from: LONG.indexOf("(") + 1, to: LONG.indexOf(")") };
   const head = (spans?: readonly TextSpan[], action?: Action): Block =>
-    block({ kind: "notice", id: "h", tone: "default", glyph: "running", state: "running", text: LONG, ...(spans === undefined ? {} : { spans }), ...(action === undefined ? {} : { action }) });
+    block({ kind: "notice", id: "h", tone: "default", glyph: "work-unit", state: "running", text: LONG, ...(spans === undefined ? {} : { spans }), ...(action === undefined ? {} : { action }) });
   const rows = (b: Block, width: number, ascii = false): readonly string[] => frame([b], width, ascii);
 
   it("T2.113 (C09 I46): a call head is one row at 80, 40 and 20 in both alphabets; the elide run gives way first and the control wraps", () => {

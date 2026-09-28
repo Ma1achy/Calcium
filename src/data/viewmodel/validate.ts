@@ -95,7 +95,7 @@ const STATUSES: ReadonlySet<string> = new Set<DocumentStatus>([
  */
 const GLYPH_MEMBERS = {
   ok: true, warn: true, error: true, info: true, pending: true,
-  working: true, running: true, queued: true, cancelled: true,
+  working: true, "work-unit": true, queued: true, cancelled: true,
   expand: true, collapse: true, focus: true, bullet: true,
   quote: true, nested: true,
   continuation: true,

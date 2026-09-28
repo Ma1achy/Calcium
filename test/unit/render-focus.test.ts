@@ -708,7 +708,7 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
   // were one when this row was written, so it was reading the call head's rule
   // off the button's only instance. `state` is the other member, and it is the
   // one this invariant governs.
-  const NOTICE = block({ kind: "notice", id: "n", tone: "error", glyph: "running", text: "pull failed", state: "failed" } as never);
+  const NOTICE = block({ kind: "notice", id: "n", tone: "error", glyph: "work-unit", text: "pull failed", state: "failed" } as never);
   const BUTTON = block({ kind: "notice", id: "n", tone: "error", glyph: "error", text: "pull failed", action: RETRY } as never);
   const PLAIN = block({ kind: "notice", id: "n", tone: "error", glyph: "error", text: "pull failed" } as never);
   const noticeAt = (b: typeof NOTICE, focus: FocusState | null, depth: 24 | 1 = 24) =>
@@ -723,7 +723,7 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
       const [first] = renderToLines(registry, b, 20, { theme: t, capabilities: caps, focus: null, ...(washed === undefined ? {} : { washed }) });
       return [...(first ?? "").replace(SGR, "")][0] ?? "";
     };
-    const running = glyphFor("running", caps);
+    const running = glyphFor("work-unit", caps);
     const own = STATES.map((s) => glyphFor(headMark(s, capabilities({ colourDepth: 1 })), caps));
     for (const variant of ["hcDark", "hcLight"] as const) {
       const loaded = loadTheme(defaultTheme, variant);

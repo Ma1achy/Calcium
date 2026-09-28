@@ -220,8 +220,8 @@ describe("C09 §7e — the band", () => {
     // two cells of text and a three-cell band there is nothing the band could
     // stop at, so a derivation measuring over the prefix would reach the mark.
     for (const [width, text] of [[40, "ab"], [40, "the parser tracks quotes"], [12, "ab"]] as const) {
-      const marked = notice({ glyph: "running", state: "running", text, streaming: true });
-      const bare = notice({ glyph: "running", state: "running", text });
+      const marked = notice({ glyph: "work-unit", state: "running", text, streaming: true });
+      const bare = notice({ glyph: "work-unit", state: "running", text });
       const a = bytesOf(marked, width);
       const b = bytesOf(bare, width);
       expect(withoutMark(visible(a)), `the text at ${String(width)} is unchanged`).toBe(visible(b).trimEnd());
@@ -533,7 +533,7 @@ describe("C09 §099 — an elided run shortens from its middle", () => {
       kind: "notice",
       id: "e",
       tone: "default",
-      glyph: "running",
+      glyph: "work-unit",
       state: "running",
       text,
       spans: [{ from: head.length, to: head.length + PATH.length, elide: true }],

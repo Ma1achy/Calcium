@@ -337,7 +337,7 @@ carried meaning in colour at all, which is why it is the one element that barely
 changes. `examples/docker/DEGRADATION.md` has the byte counts and the three
 places something *was* lost.
 
-**An adapter writes `tone: "ok"` and `glyph: "running"` once.** What those become
+**An adapter writes `tone: "ok"` and `glyph: "work-unit"` once.** What those become
 on each of these terminals is not its problem, and that is the entire argument for
 naming palette slots rather than colours.
 
@@ -538,7 +538,7 @@ const list: Adapter = {
               state: {
                 text: String(r["state"]),
                 tone: r["state"] === "running" ? "ok" : "muted",
-                glyph: r["state"] === "running" ? "running" : "queued",
+                glyph: r["state"] === "running" ? "work-unit" : "queued",
               },
               replicas: { text: String(r["replicas"]) },
             },
@@ -577,7 +577,7 @@ cron                                                                    ○ stop
 ```
 
 The glyphs, the tones, the column widths, the header and the prompt are all the
-framework's. The adapter said `tone: "ok"` and `glyph: "running"`; what those
+framework's. The adapter said `tone: "ok"` and `glyph: "work-unit"`; what those
 become on a 256-colour terminal, a 16-colour one, or an ASCII one is not its
 problem.
 

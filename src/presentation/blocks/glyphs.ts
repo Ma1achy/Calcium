@@ -439,7 +439,7 @@ export const FREE_WIDTH_SLOTS: ReadonlySet<keyof GlyphSet> = new Set<keyof Glyph
  */
 export const CALL_STATE_GLYPH: Readonly<Record<CallState, Glyph>> = Object.freeze({
   queued: "queued",
-  running: "running",
+  running: "work-unit",
   succeeded: "ok",
   failed: "error",
   cancelled: "cancelled",
@@ -478,7 +478,7 @@ export function toneCarries(caps: GlyphCaps & Pick<TerminalCapabilities, "colour
  */
 export function headMark(state: CallState, caps: Parameters<typeof toneCarries>[0], onBand = false): Glyph {
   // Where tone carries, the state's toned mark — `●`, or `○` for a call that
-  // has not started (R-BLK-220). It was `running` for all five, so a queued head
+  // has not started (R-BLK-220). It was `work-unit`'s for all five, so a queued head
   // was a filled dot beside a running one whose spinner had not ticked (F1261).
   return toneCarries(caps, onBand) ? CALL_HEAD_GLYPH[state] : CALL_STATE_GLYPH[state];
 }
@@ -1332,7 +1332,7 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     info: ["\u24d8", "i"],
     pending: ["◌", "."],
     working: ["◐", "%"],
-    running: ["●", "*"],
+    "work-unit": ["●", "*"],
     queued: ["○", "o"],
     cancelled: ["⊘", "/"],
     // **`▹` U+25B9 HOLLOW, and the ASCII half is `(`** — a collapsed row
@@ -1413,7 +1413,7 @@ export const GLYPH_DOMAINS: Readonly<Record<Glyph, readonly string[]>> = {
   question: ["row-lead"],
   // **Not `row-lead`, and the registry's own record is the measurement**: over
   // every `›` in the design not one is a transcript gutter. Recording it here
-  // would spend `*` against the running head mark for a position `›` never
+  // would spend `*` against `work-unit`'s head mark for a position `›` never
   // occupies.
   // **And a form's default button** (C09 I119): §105 draws `› save`.
   current: ["chooser-row", "tape", "form"],
@@ -1425,7 +1425,7 @@ export const GLYPH_DOMAINS: Readonly<Record<Glyph, readonly string[]>> = {
   info: ["row-lead"],
   pending: ["row-lead"],
   working: ["row-lead"],
-  running: ["row-lead"],
+  "work-unit": ["row-lead"],
   queued: ["row-lead"],
   cancelled: ["row-lead"],
   // **And a tree's twisty** (C04 I131): the same pair in the tree's own indent
@@ -1541,7 +1541,7 @@ export function glyphFor(token: Glyph, caps: Pick<TerminalCapabilities, "unicode
   if (caps.unicode === "ascii") return pair[1];
   // **The whole vocabulary, not the Ambiguous members** (I48, §093). A set is
   // legible because its members were drawn by one hand; resolving per token
-  // drew `*` for running beneath a `⎿` continuation with `✓` and `✗` as
+  // drew `*` for `work-unit` beneath a `⎿` continuation with `✓` and `✗` as
   // outcomes — eleven of eighteen fallen and seven still Unicode, which is C02
   // I9's *mostly ASCII dressed as Unicode* inside one alphabet. The rule the
   // old line implemented was about **width**, and it was right about width:

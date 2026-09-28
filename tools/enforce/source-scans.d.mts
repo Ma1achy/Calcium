@@ -151,6 +151,14 @@ export declare function checkGlyphWidthClass(
 
 /** SS64 — a domain table in `glyphs.ts`, read as `token: ["domain", …],` lines (R-GLY-003). */
 export declare function parseDomainTable(source: string, name: string): Record<string, string[]>;
+/**
+ * `GLYPH_TABLE`'s two halves keyed by token, as SS64 reads them — exported so
+ * the suite holds the keys equal to `GLYPH_TOKENS` (question 57).
+ */
+export declare function parseGlyphTable(glyphSource: string): {
+  ascii: Record<string, string>;
+  unicode: Record<string, string>;
+};
 
 /**
  * SS64 — a mark unique inside the domains it appears in, across the registry,
