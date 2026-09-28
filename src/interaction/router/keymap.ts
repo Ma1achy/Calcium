@@ -800,9 +800,9 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
 
   // --- the captured child's one key (I49, R-BLK-908) ---------------------
   //
-  // **Every other key is the child's, and that is the handler's doing rather
-  // than the table's**: the child's handler consumes what it does not bind, so
-  // there is nothing here to list. What the table owns is the exception — *a
+  // **Every other key is the child's, and that is the router's doing rather
+  // than the table's**: the `child` rung consumes what no handler at it takes
+  // (I49, ruling 62), so there is nothing here to list. What the table owns is the exception — *a
   // captured child reserves one `host.detach` action because a `/command`
   // cannot reach the host while capture is active.*
   //

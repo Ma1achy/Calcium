@@ -343,28 +343,24 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
       return true;
     };
 
-    // **The `child` rung, and the handler consumes what it does not bind** (C16
-    // I49, R-BLK-838: *takes all but host.detach*). `onInput` answers `false`
-    // for an unbound key, and at `pushedView` that was right — a view was a
-    // substate and a key it did not want belonged to the rung below (the target
-    // has since retired with its layer kind, R-EXA-082). A captured
-    // child is not a substate: a key that fell through would be the host typing
-    // into a prompt the reader cannot see while a PTY holds the terminal. So the
-    // fall-through is closed here rather than inside `onInput`, which keeps
-    // `onInput` a statement about the child's own bindings.
-    // **Registered ordinarily, and the order no longer matters** (C16 I49,
-    // I75, R-BLK-908). With `first: true` the consuming wrapper below once
-    // swallowed the host escape, because the escape was a handler at this rung
-    // that the composition root registered first; T1.4h found it. The escape
-    // is the intercept table's now and is read before any handler here is
-    // offered a key, so the wrapper cannot take it from either side.
+    // **The `child` rung, and `onInput` answers for the child's own bindings
+    // and nothing more** (C16 I49, R-BLK-838: *takes all but host.detach*). A
+    // key it does not bind comes back `false`, and **the rung** consumes it
+    // (ruling 62) — for this source and for a shell delegation, which
+    // registers no handler at all, so the rule has one carrier for both.
     //
-    // The wrapper turns `onInput`'s `false` for an unbound key into `true`,
-    // because a key that fell past a captured child would be the host typing
-    // into a line the reader cannot see.
-    const routerDisposable = options.router.register("child", (event) =>
-      onInput(event) ? true : event.kind === "key",
-    );
+    // This registration used to wrap `onInput` and turn that `false` into
+    // `true` for every key. Once the rung consumed for both sources the wrapper
+    // was a second carrier no row could tell from the first: deleting it
+    // failed nothing, and deleting the rung failed T4.84 with the wrapper
+    // still in place. It went in review batch 3. The one event they treated
+    // differently is a key release, which I65's branch drops rather than
+    // consumes; no rung below `child` is offered one either way.
+    //
+    // **Registered ordinarily, and the order does not matter** (C16 I75,
+    // R-BLK-908): the host escape is the intercept table's and is read before
+    // any handler here is offered a key.
+    const routerDisposable = options.router.register("child", (event) => onInput(event));
     const resizeDisposable = options.lifecycle.onResize(() => invalidate());
 
     function invalidate(): void {

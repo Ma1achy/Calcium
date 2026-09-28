@@ -213,7 +213,10 @@ describe("C16 §5 — the captured child owns the keyboard (M9)", () => {
     // consumed it. `F1` is bound at `global` to `/help keys`, and it is a key a
     // full-screen child uses: without the consuming turn, pressing it inside a
     // PTY submits a host command the reader cannot see being typed. Measured —
-    // the mutation deleting the wrapper survived this row until it read `F1`.
+    // the mutation deleting the handler's consuming wrapper survived this row
+    // until it read `F1`. **The turn is the router's `child` rung now, and
+    // only that** (ruling 62): the wrapper went in review batch 3, and this
+    // row fails when the rung is removed.
     const entriesBefore = h.graph.transcript.entries.length;
     h.stdin.emit("\u001bOP");
     await tick();

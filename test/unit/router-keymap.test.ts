@@ -1112,8 +1112,8 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     // the 122nd: `escape → dismiss` is bound at both, because a panel is
     // escapable by its kind and an overlay by its `dismissal` (C15 I26, I27).
     // **124 from M9**: the captured child's `host.detach`, once per profile.
-    // They are the only two rows at `child`, because the child's handler
-    // consumes what it does not bind and there is nothing else to list.
+    // They are the only two rows at `child`, because the `child` rung
+    // consumes what no handler takes and there is nothing else to list.
     // **113 from M9d** (R-EXA-082, F1254): the eleven `pushedView` rows went
     // with the target — `n`, `p`, `g`, `G`, `pageup`, `pagedown`, `tab`,
     // `⇧tab` and `escape`, plus the two that were written once per profile.

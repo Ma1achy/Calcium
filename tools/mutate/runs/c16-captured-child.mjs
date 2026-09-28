@@ -41,14 +41,33 @@ const results = runPass({
     why: "the shipped line before M9 knew one source of capture — a surface attaches and the ladder still answers `prompt`, so every row below is asserting against a rung nothing reaches",
   },
   mutations: [
+    // **The child's handler stops consuming what it does not bind — retired
+    // 2026-09-28 (review batch 3, b3-mut), and the wrapper with it.** The
+    // comment here said *the wrapper is the whole of it*, and it stopped being
+    // true at ruling 62, when the router's own `child` rung began consuming
+    // whatever no handler at it took, for both sources. From then the mutation
+    // was a change with no effect: it survived T1.106 and every other row in
+    // the set. Measured before deleting anything:
+    //
+    //   rung removed, wrapper kept   T4.84 fails (a shell delegation has no handler)
+    //   both removed                 T1.106 and T4.84 fail
+    //   wrapper removed alone        nothing fails
+    //
+    // So the survivor indicted the code, not T1.106: a second carrier no row
+    // could tell from the first. The one event the two treated differently is a
+    // key release, which C16 I65's branch drops rather than consumes, and no rung
+    // below `child` is offered a release either way. The registration is now
+    // `onInput` alone, and the rung is held by the mutation below.
     {
-      // C16 I49's *consumes what it does not bind*. The wrapper is the whole of it:
-      // `onInput` answers `false` for an unbound key, and without the turn that
-      // `false` is a fall-through to the prompt underneath a full-region child.
-      name: "the child's handler stops consuming what it does not bind",
-      file: "src/shell/surface.ts",
-      from: "    const routerDisposable = options.router.register(\"child\", (event) =>\n      onInput(event) ? true : event.kind === \"key\",\n    );\n",
-      to: "    const routerDisposable = options.router.register(\"child\", (event) => onInput(event));\n",
+      // **The rung, which is now the only carrier** (C16 I49, ruling 62).
+      // Without it an unbound key at an attached surface passes the `child`
+      // rung and falls to `global`: `F1` submits `/help keys` behind the child.
+      // `c16-ownership` mutates the same line for the delegation source and
+      // expects T4.84; this one is the surface source, which T1.106 reads.
+      name: "the child rung stops consuming what no handler at it takes",
+      file: "src/interaction/router/router.ts",
+      from: "    if (target === \"child\") {\n      stages.push(\"child:consumed\");\n      return true;\n    }\n",
+      to: "",
       expect: "T1.106",
     },
     // **`first: true` restored — retired 2026-09-28 (review batch 3, M9 item

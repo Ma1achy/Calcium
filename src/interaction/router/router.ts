@@ -1235,9 +1235,11 @@ export function createRouter(
     // **The child consumes what nothing at its rung took** (I49, ruling 62).
     // *Takes all but host.detach*: a shell delegation registers no handler, so
     // every key passed here and fell to `global` — `F1` at a delegated `vim`
-    // submitted `/help keys` behind it. An attached surface's handler already
-    // consumes what it does not bind; this is the rung saying so for both
-    // sources. Forwarding the bytes to the delegation's stdin is a C21/C23
+    // submitted `/help keys` behind it. **This is the only carrier, for both
+    // sources**: an attached surface's handler answers for its own bindings
+    // and passes the rest here — the wrapper that also consumed them was
+    // removed in review batch 3, because nothing could tell it from this.
+    // Forwarding the bytes to the delegation's stdin is a C21/C23
     // mechanism that does not exist, and is not built here.
     if (target === "child") {
       stages.push("child:consumed");
