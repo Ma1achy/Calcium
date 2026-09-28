@@ -1,7 +1,7 @@
 {
   "meta": {
     "name": "Calcium design language",
-    "revision": "0.13",
+    "revision": "0.14",
     "generatedArtifact": "calcium-design-language.html",
     "ruleIdPolicy": "IDs are explicit, permanent, and never derived from order.",
     "normativeSource": "calcium-registry.json",
@@ -19007,6 +19007,20 @@
         "R-BLK-742"
       ],
       "contentDigest": "388802dddbf8789893644b94a5f770e11dbbe5fb49c67314f5f54bb5d1026607"
+    },
+    {
+      "id": "R-KEY-008",
+      "title": "The palette opens on a leading >, and a >-led line is never a command",
+      "text": "A > typed as the first character of the line switches the prompt's menu from verbs to actions, and the query is the text after it; a > anywhere else is text and means what the shell means by it. A line whose first character is > is never handed to the parser or the shell: it runs the action it names, or says there is none and keeps the line.",
+      "status": "current",
+      "sectionKey": "five-primitives-the-harness-never-needed-105",
+      "tags": [
+        "interaction"
+      ],
+      "supersedes": [],
+      "supersededBy": null,
+      "legacyIds": [],
+      "contentDigest": "e5d49976ed4a735b355cb612debe50bf35f2c36e1a8fe2e20771c7fd9f3347c3"
     }
   ],
   "sections": [

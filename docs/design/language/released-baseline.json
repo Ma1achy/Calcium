@@ -1,6 +1,6 @@
 {
-"releasedAt": "2026-09-27",
-"registryRevision": "0.13",
+"releasedAt": "2026-09-28",
+"registryRevision": "0.14",
 "rules": {
 "R-SPC-001": {
 "digest": "314a86c06f57e3ce44bef033bba32eee63d3fe7b94d88b9d4933a4f62628a638",
@@ -8163,9 +8163,15 @@
 "R-HIS-009"
 ],
 "supersededBy": []
+},
+"R-KEY-008": {
+"digest": "e5d49976ed4a735b355cb612debe50bf35f2c36e1a8fe2e20771c7fd9f3347c3",
+"status": "current",
+"supersedes": [],
+"supersededBy": []
 }
 },
-"count": 1289,
+"count": 1290,
 "themeRules": {
 "TR-0001": {
 "digest": "04fdf1807360bdc55d44da51e292637edcd7d7bd2640e66c581420571e7e101f",
@@ -13412,7 +13418,7 @@
 "themeCount": 869,
 "anchor": {
 "kind": "content-hash",
-"sha256": "68c54d0ba027c34317d5b733599fc3b7535b753cd19f63477bc06043de35d70f",
+"sha256": "9e148b4c90a7415ff57f7829f7ade8e2e9ff9b356337539defcdc3218d43b43a",
 "note": "A hash stored beside the data it protects is a TRIPWIRE: it catches a careless edit, not a determined one. To make it a SEAL, publish this sha256 in a git tag or CI secret and export CALCIUM_ANCHOR before running the gate; then set claim to external-seal.",
 "claim": "local-tripwire"
 }

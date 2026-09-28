@@ -128,6 +128,10 @@ released:           ## the released baseline against origin/main's copy — adde
 design:             ## regenerate the HTML, KEYS.md and the fixtures from the registry
 	node docs/design/language/build-calcium.mjs
 	npx tsx tools/design/fixtures.ts
+	@# KEYS.md's first half is the registry's projection and check-calcium compares
+	@# it by prefix; build-calcium does not write it, so a release that only ran
+	@# the two lines above left the revision stale and design-check refused it.
+	npx tsx tools/keymap-table.mjs
 
 # **The types are a gate, and they were not one.** `make enforce` ran 402 files
 # of source scans, the suite ran 6 416 rows, golden 528, tier 5 136 and three

@@ -5,8 +5,8 @@
   "id": "current-contract",
   "title": "Current contract — the rules implementations targetcurrent · R-SPC-001 · example R-EXA-001",
   "cols": 1244,
-  "rows": 124,
-  "sha": "d741f70bb1a3d459",
+  "rows": 125,
+  "sha": "7d2850c72951eac5",
   "ruleIds": [
    "R-SPC-001",
    "R-EXA-001"
