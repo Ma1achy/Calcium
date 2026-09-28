@@ -1127,6 +1127,18 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
+> **Ruled 2026-09-28** (by Claude under the person's standing authority; review batch 4, M11 item 7). **The quantiser holds the contrast floor, as it already holds rank (C10 I6); the registry's values do not move.** Lane b4-contrast measured 193 text cells across all ten themes below their floor at 8 bits, every one clearing it at 24: the quantiser takes the nearest cube entry and nearness ignores the floor. For 167 a clearing entry exists near the authored ink; for hcDark's focus band (`#234f92` → `#005faf`, white at 6.45 against 7) no cube ink clears on the quantised ground. So an ink whose nearest entry misses its floor takes the nearest entry that clears, and a ground takes the nearest entry on which its declared inks clear. **Tie-breaks:** a consistent picture beats a lone rule — the quantiser already holds one property of the authored palette, and this is the same mechanism holding a second; the 24-bit values are the design's and are right, so 193 value edits would move the design to suit a terminal's limit. Closing the class in the mechanism is also the only remedy the next theme inherits.
+
+**75 · RULED — Whether an 8-bit shortfall moves the token or the quantiser.**
+
+---
+
+> **Ruled 2026-09-28** (by Claude under the person's standing authority; review batch 4, M11 item 7). **`ANSI16_HEX` is labelled as the VGA palette it is, and the 4-bit reference does not change.** Lane b4-contrast found the table that C10 I61 and `colormap.ts` call *the xterm defaults* holds the VGA/Windows values; xterm's own differ at indices 1, 4, 7, 8 and 12. Any 4-bit reference is a stand-in for a palette the terminal owns, so which one is measured matters less than that it is named truly. **Tie-break:** structured data beats prose — the table is the fact and the label is the error. Changing the reference would move T2.64's list and both 4-bit lists for no gain in truth.
+
+**76 · RULED — Which palette the 4-bit reference is.**
+
+---
+
 > **Ruled 2026-09-28** (by Claude under the person's standing authority; review batch 3, F1284). **The wire enforces C04 I6's glyph rule exactly as `block()` does.** A `warn` or `error` cell, or a notice, that carries no glyph is refused by `validateDocument`, unless its text is a word of its column's declared closed vocabulary (ruling 44). Lane b3-g probed the wire and found it accepting a colour-only document that the builder refuses — one document with two verdicts, and the far side is the producer the rule exists for (D29). **Tie-breaks:** a consistent picture beats a lone rule, and the design's two-carrier rule (R-COR-003) is normative. **The cost, stated:** a far side sending a colour-only warning is refused where it passed; the refusal names the rule, and the adapters and fixtures in this repository are measured before it lands. It refuses more and approves nothing, so it weakens no safety default.
 
 **77 · RULED — Whether the wire enforces the glyph a builder requires.**
