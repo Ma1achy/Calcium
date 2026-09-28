@@ -553,7 +553,7 @@ population rather than for their shape.
 
 **A card that shows one frame is addressed by that frame's `seq`** (I58). `report()` recomputes
 `worst` on every call, which I32 requires — *which frames are worst is not known until later* — and
-the view refreshes every second. A card addressed as *the third worst frame* is therefore a
+a live card refetches every second (*as it stood:* ~~the view refreshes every second~~). A card addressed as *the third worst frame* is therefore a
 different frame at the next tick whenever a slower one arrives or an older one leaves the ring, and
 the reader watching a flame graph of a 31 ms frame is shown a 28 ms one with nothing changed on
 screen but the numbers. The index is the obvious address and it is stable in every fixture with
@@ -565,24 +565,14 @@ reading.
 throws rather than degrades on a `violin` under two rows per band, a `boxplot` with fewer rows than
 bands, a ninth series off a matrix form, a second series on a `bubble`, and thirty-five more — every
 one a function of the region, the report's shape, or both, and the region is not bounded below.
-`profile-view.ts` has no `try` and no `catch`, and `arm` is the last statement of its own callback,
-so a throw from `paneBlocks` stops the refresh with the tier still raised and leaves a frozen pane
+`profile-view.ts` — the view, retired since (R-EXA-082, F1254) — had no `try` and no `catch`, and `arm` was the last statement of its own callback,
+so a throw from `paneBlocks` stopped the refresh with the tier still raised and left a frozen pane
 indistinguishable from a quiet session (F1130). So each card declares the floor its form needs, the
 kit compares it to the region before building, and the card that cannot be drawn says which floor it
 missed. A `try` is the second line of defence and not the first: a caught throw one second later is
 still a pane that cannot draw itself, and the notice is the honest version of that.
 
-#### The window, the budget, and the cadence
-
-**A window on block boundaries, measured through the registry.** The view holds an offset in blocks,
-takes blocks from it while the registry's `measureSequence` of the candidate sequence fits the
-region, and always shows at least one; a single block taller than the region is shown under a notice
-saying how many rows are hidden. The same `measureSequence` C15 places with, for `document-view.ts`'s
-reason: a window measured by anything else is C09 I1's divergence with a whole view behind it.
-
-**The verdict card fits the region it opens in** (I52). The pane a reader opens first is the one
-that must not page, and the number is **23 rows at 80 columns** — a 24-row terminal minus the view's
-one-row header. Every other card pages, and a card is one figure, so most do not.
+#### The budget, and the cadence
 
 **Every figure in this deck is measured through the registry `construct.ts` builds**, at 80 and at
 120 columns, on the four report fixtures. F959 is why the sentence is here: the figure that condemned
@@ -590,51 +580,74 @@ the first overview was taken through a registry with no `plot` and no `table` re
 fall to `raw` and a plot measures as the wrapped lines of its own JSON — 26 rows there against 40
 through the real one.
 
-**When it redraws** (I51). On the injected timer — `Ambient.schedule`, the seam the sampler already
+**The verdict card fits 23 rows at 80 columns** (I52) — kept as a measured property of its closed
+parts now that an entry scrolls, rather than as the bound a one-screen view imposed.
+
+**There is no window, no redraw, no tier handling and no keys** (R-EXA-082, F1254; I49, I50 and I51
+retired). A section is composed once, inside the submission that asked for it, so the frame that
+draws it is the reader's and I12 excludes nothing; the transcript scrolls the entry, C26 focuses
+it, and currency is `/profile live`'s part, on the sampler's one-second cadence. No arm raises the
+tier (C23 I69). *As it stood* — the view's window, its budget, its cadence, its tier, its teardown
+and its keys:
+
+~~**A window on block boundaries, measured through the registry.** The view holds an offset in blocks,
+takes blocks from it while the registry's `measureSequence` of the candidate sequence fits the
+region, and always shows at least one; a single block taller than the region is shown under a notice
+saying how many rows are hidden. The same `measureSequence` C15 places with, for `document-view.ts`'s
+reason: a window measured by anything else is C09 I1's divergence with a whole view behind it.~~
+
+~~**The verdict card fits the region it opens in** (I52). The pane a reader opens first is the one
+that must not page, and the number is **23 rows at 80 columns** — a 24-row terminal minus the view's
+one-row header. Every other card pages, and a card is one figure, so most do not.~~
+
+~~**When it redraws** (I51). On the injected timer — `Ambient.schedule`, the seam the sampler already
 uses (§4) — every `VIEW_REFRESH_MS = 1000` ms, which is the sampler's default cadence
 (`ProfileOptions.sampleMs`) and the 1 Hz readout C23 I64 already runs, so the memory cards are never
 more than one sample behind; and on a key. **Never per frame**: a view that redrew on every frame
 would raise the frame that redraws it, and the loop would be the profiler measuring itself. A redraw
 is `overlays.update` on the one id followed by a commit — `stream` from the timer, `input` from a key
 — and every one runs inside `profiler.own(() => …)` (I49), so the frame it raises is `selfInflicted`
-and excluded (I12) while the commit seam in `construct.ts` stays exactly as it was.
+and excluded (I12) while the commit seam in `construct.ts` stays exactly as it was.~~
 
-**The tier** (I50). Opening raises to `spans` only when the tier is below it, and remembers the tier
+~~**The tier** (I50). Opening raises to `spans` only when the tier is below it, and remembers the tier
 it found. Closing calls `setTier` only if opening did — a view opened at `alloc` or `deep` touches
 the tier on neither side, and a view opened at `spans` does not call `setTier("spans")` on close and
 lean on the recorder's *unchanged tier* short-circuit one component away. Where it did raise, the
 raise resets the ring (I18) and the deck opens on the *no frame has been recorded yet* notice rather
 than a zero plot (I23); the integer counters survive the reset, so the cards over `counters` show the
-session so far and the verdict names the count and points at them.
+session so far and the verdict names the count and points at them.~~
 
-**Closing reaches the owner through C15's change stream, whichever caller removed the layer**
+~~**Closing reaches the owner through C15's change stream, whichever caller removed the layer**
 (C15 I25). `Esc` is `viewPop`, which asks the owners in turn and calls this one's `pop()`; but C16's
 ladder answers `⌃c` on a pushed view with `overlays.pop()` and never calls an owner. The view
 therefore subscribes at construction and runs its teardown — timer disposed, tier restored, one
 redraw — from any `pop` or `dismiss` change carrying its id, and `pop()` is `overlays.dismiss(id)`
-followed by that same teardown, once.
+followed by that same teardown, once.~~
 
-**At `stop()`** the view's `dispose()` stops the timer and leaves the tier where it is. The session's
+~~**At `stop()`** the view's `dispose()` stops the timer and leaves the tier where it is. The session's
 order is `pipeline.dispose()`, drain, `onReport(report())`, `profiler.dispose()`, then release and
 the graph's cleanup, so by the time cleanup runs `setTier` is a no-op (§7) — and a caller disposing
-the view against a live profiler would otherwise reset a ring nobody has read.
+the view against a live profiler would otherwise reset a ring nobody has read.~~
 
-**Keys.** The `pushedView` target's bindings are shared by every view owner (C16 I24, I33), and this
+~~**Keys.** The `pushedView` target's bindings are shared by every view owner (C16 I24, I33), and this
 is the third owner: `n`/`p` move by the view's own unit — a hunk on a patch, a block on a document,
 and here a **card**; `tab`/`⇧tab` move by its **section**, which here is a group; `g`/`G` and the four
 page keys move the window; `Esc` closes. A card switch resets the offset and redraws with reason
 `input`. The section gesture is new to the keymap and `/help keys` gains its two rows with it — the
 ruling that nothing would be added held while a view had four panes and is withdrawn at thirty cards
 (C16 §6). The prompt takes no keys while a view is top, so `/profile frame` cannot be typed at an
-open view and the keys are the only way to move without closing.
+open view and the keys are the only way to move without closing.~~
 
-**What `/profile` answers with** is C23 §2's: a muted notice naming the section that opened, appended
+**What `/profile` answers with** is C23 §2's: a section's cards, one stamped `b.panel` per deck
+entry; one stamped card for `/profile snapshot`, one live card for `/profile live`, a capture's
+notice for `/profile capture` (I64); a `warn` notice naming `TuiConfig.profile` when no profiler
+exists, and a usage line when the token is none of `SECTIONS` and none of the three verbs. No arm
+raises the tier (C23 I68, C23 I69). *As it stood:* ~~a muted notice naming the section that opened, appended
 under the view — never the cards themselves (C23 I69) — or a refusal when no profiler exists, a usage
 line when the section is not one of `SECTIONS`, and `document-view.ts`'s *close what is open* when
 another layer is up. **`/profile snapshot` and `/profile live` are the two verbs that do put a card in
 the transcript**, stamped and refreshed respectively, and a live card never raises the tier (C23 I69,
-amended).
-
+amended).~~
 
 ---
 
