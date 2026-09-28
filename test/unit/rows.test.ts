@@ -9,6 +9,7 @@
 // combining text, a hyperlink, and trailing blanks styled and plain.
 import { describe, expect, it } from "vitest";
 import { styledCharsFromTokens, styledCharsToString, tokenize } from "@alcalzone/ansi-tokenize";
+import xterm from "@xterm/headless";
 import { composeRow, normaliseRow } from "../../src/presentation/rows.js";
 import { cells } from "../../src/presentation/text.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
@@ -19,6 +20,54 @@ import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_CAPS } from "../support/render.
 /** The row as Ink's `Output.get` writes it: the dependency's own three calls, then the trim. */
 const reference = (row: string): string =>
   styledCharsToString(styledCharsFromTokens(tokenize(row))).trimEnd();
+
+/** The intensity codes, which share one close — `22` ends both (F1258). */
+const BOLD = "\x1b[1m";
+const DIM = "\x1b[2m";
+
+/**
+ * A row as the terminal holds it, a visible character at a time: each
+ * character's codes after the tokeniser's reduction, split into its intensity
+ * and the rest (C09 I72, F1258). **The reduction is the terminal's meaning where
+ * the serialiser is not**: it drops both intensity codes on `22`, which is what
+ * a terminal does, and the diff the serialiser writes forgot it.
+ */
+const readBack = (row: string): readonly Readonly<{ intensity: string; rest: string }>[] =>
+  styledCharsFromTokens(tokenize(row)).map((c) => {
+    const codes = c.styles.map((st) => st.code).sort();
+    return {
+      intensity: codes.filter((x) => x === BOLD || x === DIM).join(""),
+      rest: `${c.value}\u0000${codes.filter((x) => x !== BOLD && x !== DIM).join("")}`,
+    };
+  });
+
+/**
+ * **One row's verdict against the dependency** (T1.46): the same bytes, or the
+ * one correction and nothing else. A row where the two differ must be a row
+ * where the serialiser strands an intensity code — its output reads back with
+ * less bold or dim than the row painted — while `normaliseRow`'s reads back with
+ * exactly the row's, and every other code on every character is the same in the
+ * two. So a normaliser that diverged from the tokeniser anywhere else fails
+ * here, and so does one that corrected the wrong thing.
+ */
+function verdict(row: string, got: string): "same" | "corrected" {
+  const ref = reference(row);
+  if (got === ref) return "same";
+  const painted = readBack(row);
+  const ours = readBack(got);
+  const theirs = readBack(ref);
+  expect(ours.map((c) => c.rest), `outside intensity the bytes read back as Ink's: ${JSON.stringify([row, ref, got])}`).toEqual(
+    theirs.map((c) => c.rest),
+  );
+  expect(ours.map((c) => c.intensity), `the correction reads back as painted: ${JSON.stringify([row, got])}`).toEqual(
+    painted.slice(0, ours.length).map((c) => c.intensity),
+  );
+  expect(
+    theirs.some((c, i) => c.intensity !== painted[i]?.intensity),
+    `and Ink's did not — a divergence with nothing to correct: ${JSON.stringify([row, ref])}`,
+  ).toBe(true);
+  return "corrected";
+}
 
 const WIDTHS = [20, 40, 80, 120] as const;
 const CAPS = [FULL_CAPS, ASCII_CAPS, MONO_CAPS] as const;
@@ -101,12 +150,19 @@ function seededRow(rand: () => number): string {
 }
 
 describe("C09 I72 — normaliseRow", () => {
-  it("T1.46 (C09 I72): normaliseRow equals the tokeniser's serialiser byte for byte over every corpus row at four widths under three capability sets and over ten thousand seeded rows of random text and SGR", () => {
+  it("T1.46 (C09 I72, F1258): normaliseRow equals the tokeniser's serialiser byte for byte, but for re-opening an intensity code a shared 22 closed, over every corpus row at four widths under three capability sets, ten thousand seeded rows of random text and SGR and two thousand dense in the intensity codes", () => {
+    // **This row pinned the defect, and it was the equality that did it**
+    // (F1258). It held `normaliseRow` to Ink's serialiser byte for byte, and
+    // Ink's `diffAnsiCodes` closes a dim run inside a bold one with `22` and
+    // never re-opens the bold — so the equality was what kept the copy
+    // faithful to the bug. It now asserts the terminal's meaning where the two
+    // part, and Ink's bytes everywhere else (`verdict` above).
     const registry = createBlockRegistry();
     const blocks = [...Object.values(ONE_PER_KIND), ...CORPUS];
     let corpusRows = 0;
     let corpusMoved = 0; // rows the normaliser changed — the fixture responding, not merely agreeing
     let styled = 0;
+    let corpusCorrected = 0;
     for (const block of blocks) {
       for (const width of WIDTHS) {
         for (const capabilities of CAPS) {
@@ -115,7 +171,7 @@ describe("C09 I72 — normaliseRow", () => {
           if (!Array.isArray(rendered)) continue;
           for (const row of rendered as readonly string[]) {
             const got = normaliseRow(row);
-            expect(got, `${block.kind} at ${String(width)}: ${JSON.stringify(row)}`).toBe(reference(row));
+            if (verdict(row, got) === "corrected") corpusCorrected += 1;
             corpusRows += 1;
             if (got !== row) corpusMoved += 1;
             if (row.includes(ESC)) styled += 1;
@@ -130,18 +186,78 @@ describe("C09 I72 — normaliseRow", () => {
     expect(corpusRows).toBeGreaterThan(800);
     expect(styled).toBeGreaterThan(400);
     expect(corpusMoved).toBeGreaterThan(400);
+    // **No block in the corpus paints a bold run through a dim one**, measured
+    // when F1258 landed: the block corpus is byte-identical to Ink's.
+    expect(corpusCorrected, "block-corpus rows the correction moved").toBe(0);
 
     const rand = lcg(0x5eed_c09);
     let fuzzMoved = 0;
+    let fuzzCorrected = 0;
     for (let i = 0; i < 10_000; i += 1) {
       const row = seededRow(rand);
       const got = normaliseRow(row);
-      expect(got, `seeded row ${String(i)}: ${JSON.stringify(row)}`).toBe(reference(row));
+      if (verdict(row, got) === "corrected") fuzzCorrected += 1;
       if (got !== row) fuzzMoved += 1;
     }
     expect(fuzzMoved).toBeGreaterThan(5000);
+
+    // **The seeded corpus never builds the case** — measured: none of its ten
+    // thousand rows holds `1` and `2` on one character and `1` alone on the
+    // next, which takes `22` then a re-opened code between them. So a corpus
+    // dense in the intensity codes is what shows the correction responds:
+    // without it the row would pass with the fix reverted.
+    const dense = lcg(0x1d_22);
+    const INTENSE = ["0", "1", "2", "22", "31", "39", "1;2", "2;1"];
+    let denseCorrected = 0;
+    for (let i = 0; i < 2000; i += 1) {
+      let row = "";
+      const n = 2 + Math.floor(dense() * 10);
+      for (let j = 0; j < n; j += 1) row += dense() < 0.5 ? `${ESC}[${pick(dense, INTENSE)}m` : pick(dense, ["a", "b"]);
+      if (verdict(row, normaliseRow(row)) === "corrected") denseCorrected += 1;
+    }
+    expect(fuzzCorrected, "random seeded rows the correction moved").toBe(0);
+    expect(denseCorrected, "intensity-dense rows the correction moved").toBeGreaterThan(0);
   });
-  it.todo("T1.85 (C09 I72, F1258): {bold, dim} then {bold} re-opens the bold after the shared 22, {bold, dim} then {dim} re-opens the dim, and @xterm/headless reads every cell back as painted; the control {dim} then {bold} is unchanged — not deferred on a component: the code lands in the next commit of this round");
+
+  it("T1.85 (C09 I72, F1258): {bold, dim} then {bold} re-opens the bold after the shared 22, and {bold, dim} then {dim} the dim; the terminal reads every cell back as painted", async () => {
+    // F1258's own row: a `{bold, dim}` span, then `{bold}` spans, as `paint`
+    // writes them — each its own sequence and reset.
+    const boldBeside = `${ESC}[1;2m18${ESC}[0m${ESC}[1m ${ESC}[0m${ESC}[1mctx${ESC}[0m`;
+    expect(normaliseRow(boldBeside), "the bold re-opened after the shared 22").toBe(
+      `${ESC}[1m${ESC}[2m18${ESC}[22m${ESC}[1m ctx${ESC}[22m`,
+    );
+    // Ink's bytes, which the row above no longer equals — the defect, kept in
+    // view so the difference is one code and that code.
+    expect(reference(boldBeside)).toBe(`${ESC}[1m${ESC}[2m18${ESC}[22m ctx${ESC}[22m`);
+    const dimBeside = `${ESC}[1;2m18${ESC}[0m${ESC}[2m ctx${ESC}[0m`;
+    expect(normaliseRow(dimBeside), "the dim re-opened after the shared 22").toBe(
+      `${ESC}[1m${ESC}[2m18${ESC}[22m${ESC}[2m ctx${ESC}[22m`,
+    );
+    // **The control**: dim then bold closes the dim and opens the bold, which
+    // Ink already wrote — the correction changes no byte of it.
+    const dimThenBold = `${ESC}[2m18${ESC}[0m${ESC}[1m ctx${ESC}[0m`;
+    expect(normaliseRow(dimThenBold)).toBe(reference(dimThenBold));
+
+    // **And the terminal's reading, a cell at a time** — F1258 was found this
+    // way and the bytes above are a claim about it.
+    const cellsOf = async (bytes: string): Promise<string> => {
+      const term = new xterm.Terminal({ cols: 20, rows: 1, allowProposedApi: true });
+      await new Promise<void>((done) => term.write(bytes, done));
+      const line = term.buffer.active.getLine(0);
+      let out = "";
+      for (let x = 0; x < 6; x += 1) {
+        const cell = line?.getCell(x);
+        out += `${cell?.getChars() || " "}:${cell?.isBold() ? "B" : "-"}${cell?.isDim() ? "D" : "-"} `;
+      }
+      term.dispose();
+      return out.trim();
+    };
+    const painted = await cellsOf(boldBeside);
+    expect(painted, "the painter's own bytes").toBe("1:BD 8:BD  :B- c:B- t:B- x:B-");
+    expect(await cellsOf(normaliseRow(boldBeside)), "the normalised row reads back as painted").toBe(painted);
+    expect(await cellsOf(reference(boldBeside)), "Ink's did not").toBe("1:BD 8:BD  :-- c:-- t:-- x:--");
+    expect(await cellsOf(normaliseRow(dimBeside))).toBe(await cellsOf(dimBeside));
+  });
 
   it("T1.47 (C09 I73): composeRow pads from where the row ends — cells of the tokeniser's visible characters — over every corpus row and ten thousand seeded rows, and a wide character ends two cells on, a combining mark none, an SGR-only row at zero", () => {
     // **The width is read through the pad**: a second piece at a known column
