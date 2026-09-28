@@ -502,3 +502,9 @@ describe("C04 §3 both axes — fail-on-revert", () => {
     expect(drawn, "and the frame is F816's").toBe(3);
   });
 });
+
+describe("C04 I6 fail-on-revert — the vocabulary is closed, owed at the spec commit", () => {
+  it.todo(
+    "T6.105 (C04 I6, ruling 44): dropping the membership check → T2.139 fails on envx, free text carrying warn with no glyph — not deferred on a component: the code lands in the next commit of this round",
+  );
+});

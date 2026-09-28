@@ -1115,3 +1115,9 @@ describe("C04 I128 — a trend cell", () => {
     expect(bad.ok ? "" : bad.error.join("\n")).toMatch(/"polarity" is "higher", "lower" or "neutral" \(C04 I128\)/u);
   });
 });
+
+describe("C04 I6 — a closed vocabulary carries its own fact (ruling 44), owed at the spec commit", () => {
+  it.todo(
+    "T2.139 (C04 I6, ruling 44): a column declaring vocabulary lets env warn and flag error stand with no glyph at both doors; envx, an empty vocabulary, an empty word and a repeated word are refused; the same cell with no vocabulary and a warn notice still need a glyph — not deferred on a component: the code lands in the next commit of this round",
+  );
+});
