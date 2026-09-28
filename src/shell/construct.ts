@@ -3629,7 +3629,7 @@ export async function constructGraph(
     // The delimiter is empty: an action's name ends the line, and a space after
     // it would make `⏎` look for a name with a space in it (§6c Q3).
     complete: () =>
-      paletteRows().map((r) => ({ value: r.id, detail: r.keys.join(" · "), delimiter: "" })),
+      paletteRows().map((r) => ({ value: r.id, detail: r.keys.join(` ${chipLook.separator} `), delimiter: "" })),
   });
 
   /**

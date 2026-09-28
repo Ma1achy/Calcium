@@ -2612,7 +2612,7 @@ sites and every one of them would need its own answer:
 at `437aaa79`, the commit that wrote this table: nine reader sites, of which the table listed
 eight and the prose above it said seven. Nine again today — **the population never moved; the
 count was wrong on the day and the citations drifted around it.** The member that has never
-been in the table is `keys.ts:491` (`:397` then), which reads the buffer and writes it back
+been in the table is `keys.ts:619` (`:397` then), which reads the buffer and writes it back
 through `setText` — an **edit round-trip**, so a sentinel plus a side map has to survive a
 write and not only a read. That is the strongest row here and it was the missing one. F1092.
 
@@ -3718,7 +3718,7 @@ PART  30 paste as a chip          Claude Code's idea; Calcium can reference a BL
                                    RESOLVING IN THE `text` GETTER, which is §8a's correction:
                                    FIVE OF THE NINE READ A BUFFER INDEX ALONGSIDE THE STRING
                                    (`contextAt` three times, `selectionSpans`, and `applyEdit`
-                                   at `keys.ts:491`), so a resolving getter disagrees with
+                                   at `keys.ts:619`), so a resolving getter disagrees with
                                    `cursor`, `anchor` and `head` the moment a chip precedes one
                                    — completion at the wrong offset and the wash on the wrong
                                    run, both only in a frame. THE FIFTH IS THE DANGEROUS ONE and
