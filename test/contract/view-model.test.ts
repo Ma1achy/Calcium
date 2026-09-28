@@ -703,7 +703,7 @@ describe("C04 §7 — the update model and the view state, checked rather than c
     }
     // `KeyValue.expanded` stands for the four shedding kinds' one field (C09
     // I124): one flag, one fold, measured through one kind here and through all
-    // four by C09 T2.190.
+    // four by C09 T2.191.
     expect(moved, "the whole set, so an eighth fails here").toEqual([
       "TableRow.expanded", "Scroll.collapsed", "Floor.minHeight", "Patch.collapsedAfter", "Padded.padding",
       "Patch.expanded", "KeyValue.expanded",

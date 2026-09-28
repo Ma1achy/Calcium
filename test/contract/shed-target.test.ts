@@ -206,7 +206,7 @@ describe("C09 I124, I125 — ruling 42: a shed row expands its block in place", 
     return cut.length > 0 && part.value.startsWith(cut);
   };
 
-  it("T1.85 (C09 I124, I113, ruling 42): each shedding kind's shed elements carry expand on the block, the registry's fold sets and removes expanded, and expanded draws each item's withheld parts beneath its row as label and value", () => {
+  it("T1.86 (C09 I124, I113, ruling 42): each shedding kind's shed elements carry expand on the block, the registry's fold sets and removes expanded, and expanded draws each item's withheld parts beneath its row as label and value", () => {
     for (const c of CASES) {
       // `⏎` on any shed row expands the whole block (ruling 42 (a)).
       const collapsedEls = registry().elementsOf(c.block, c.narrow);
@@ -261,7 +261,7 @@ describe("C09 I124, I125 — ruling 42: a shed row expands its block in place", 
     expect(r.fold(block({ kind: "scroll", id: "sc", height: 2, children: [block({ kind: "raw", id: "x", text: "a" })] }))).toBeNull();
   });
 
-  it("T2.190 (C09 I125, I124, I1, I26): the four kinds expanded measure exactly the rows they draw from 4 to 80 columns at both rungs and wide, and keyValue's window keeps I26's equality", () => {
+  it("T2.191 (C09 I125, I124, I1, I26): the four kinds expanded measure exactly the rows they draw from 4 to 80 columns at both rungs and wide, and keyValue's window keeps I26's equality", () => {
     const WIDE = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
     const ambiguous = block({
       kind: "keyValue",

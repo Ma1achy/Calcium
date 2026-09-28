@@ -1,5 +1,5 @@
 // C09 I124, I125 · C23 I84 — expand in place, through the registry's fold
-// (ruling 42). Mutated at each joint (C09 T6.142, C23 T6.103).
+// (ruling 42). Mutated at each joint (C09 T6.144, C23 T6.103).
 //
 // **The first mutation is the one the plan named**: the dispatcher's fold arm
 // put back to the scroll test it replaced. The scroll still folds under it, so
@@ -36,7 +36,7 @@ const results = runPass({
     file: SHED,
     from: "  if (block.expanded !== true) return { ...block, expanded: true };",
     to: "  if (block.expanded !== true) return block;",
-    why: "the shedding kinds' fold writes nothing — T1.85 asserts the flag written",
+    why: "the shedding kinds' fold writes nothing — T1.86 asserts the flag written",
   },
   mutations: [
     {
@@ -49,46 +49,46 @@ const results = runPass({
       expect: "T4.76",
     },
     {
-      name: "the shed elements' activate removed (C09 T6.142)",
+      name: "the shed elements' activate removed (C09 T6.144)",
       file: SHED,
       from: "        activate,\n        copy: copy(i),\n",
       to: "        copy: copy(i),\n",
-      expect: "T1.85",
+      expect: "T1.86",
     },
     {
-      name: "expanded ignored by keyValue's render (C09 T6.142)",
+      name: "expanded ignored by keyValue's render (C09 T6.144)",
       file: STRUCTURED,
       from: "    const opened = block.expanded === true ? keyValueWithheld(block, width) : null;",
       to: "    const opened = null;",
-      expect: "T1.85",
+      expect: "T1.86",
     },
     {
-      name: "the expanded rows left out of measure (C09 T6.142)",
+      name: "the expanded rows left out of measure (C09 T6.144)",
       file: SHED,
       from: "  if (expanded !== true || lists === null) return 0;\n  return lists.reduce(",
       to: "  return 0;\n  return lists.reduce(",
-      expect: "T2.190",
+      expect: "T2.191",
     },
     {
-      name: "the detail plan taken at narrow rather than wide (C09 T6.142)",
+      name: "the detail plan taken at narrow rather than wide (C09 T6.144)",
       file: STRUCTURED,
       from: '  const parts = keyValueParts(block, width, "wide");\n  const plan = naturalSpan(parts, 0)',
       to: '  const parts = keyValueParts(block, width, "narrow");\n  const plan = naturalSpan(parts, 0)',
-      expect: "T2.190",
+      expect: "T2.191",
     },
     {
-      name: "scroll's fold removed (C09 T6.142)",
+      name: "scroll's fold removed (C09 T6.144)",
       file: CONTAINERS,
       from: "  fold: (block) => (block.collapsed === undefined ? null : { ...block, collapsed: !block.collapsed }),\n",
       to: "",
       expect: "T4.76",
     },
     {
-      name: "the label kept where the value would shed (C09 T6.142)",
+      name: "the label kept where the value would shed (C09 T6.144)",
       file: SHED,
       from: "    const labelled = cells(label, ambiguous) + DETAIL_GAP + minValue <= inner;",
       to: "    const labelled = true;",
-      expect: "T1.85",
+      expect: "T1.86",
     },
   ],
 });
