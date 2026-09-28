@@ -132,8 +132,8 @@ const walk = (node: unknown, out: { kind: string; id?: string }[] = []): { kind:
  *
  * The spy delegates rather than replacing: `tier` and `own` are closure-backed
  * getters on the recorder, so a prototype view reads them live and only the
- * member a row counts is shadowed — the shape `profile-view.test.ts`'s rig uses,
- * reduced to the one member these rows read.
+ * member a row counts is shadowed — the shape the deleted `profile-view.test.ts`'s
+ * rig used, reduced to the one member these rows read.
  */
 const spiedProfiler = (tier: Tier): { profiler: Profiler; setTierCalls: Tier[] } => {
   let t = 0;

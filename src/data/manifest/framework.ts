@@ -131,7 +131,7 @@ export const FRAMEWORK_TOOLS: readonly ToolDef[] = Object.freeze([
     flags: [],
   }),
   // **The seventh, and the one whose handler needs the root** (C23 §2, C23 I68).
-  // `/profile` opens C28's view; the section is an `enum` so C05 parses and
+  // `/profile` appends C28's deck as an entry; the section is an `enum` so C05 parses and
   // checks it before the handler sees it, and `/profile foo` reaches the handler
   // with `args` empty and answers a usage notice (C22 I66's reason: one reader
   // of one fact). The three values are C28's `SECTIONS` written down at L0,
@@ -154,12 +154,12 @@ export const FRAMEWORK_TOOLS: readonly ToolDef[] = Object.freeze([
         required: false,
         // **Three sections and two document verbs in one enum**, because they
         // occupy one positional slot and C05 has to accept both: `/profile app`
-        // opens the view on a group and `/profile snapshot` appends a stamped
-        // card (C23 I69, amended). The alternative was a flag, which would make
+        // appends a group's deck and `/profile snapshot` one stamped card
+        // (C23 I69, amended). The alternative was a flag, which would make
         // `/profile --snapshot` the spelling of a verb and read as a modifier of
-        // an open that does not happen.
+        // a section that is not being drawn.
         values: Object.freeze(["verdict", "app", "framework", "snapshot", "live", "capture"]),
-        summary: "`verdict`, `app` or `framework` to open the view; `snapshot` or `live` to append a card; `capture` takes a CPU profile",
+        summary: "`verdict`, `app` or `framework` to append that section's cards; `snapshot` or `live` to append one; `capture` takes a CPU profile",
       }),
       Object.freeze({
         name: "card",

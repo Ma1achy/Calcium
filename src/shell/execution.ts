@@ -186,14 +186,13 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       bindings: () => deps.bindings(),
       currentScope: () => deps.currentScope(),
       stop: deps.stop,
-      // C28 §3c's view, for `/profile` (C23 I68) — the row is in
-      // `FRAMEWORK_TOOLS`, so a handler missing here is what `seal()` refuses.
-      // C23 I69's amended pair — `/profile snapshot` and `/profile live` read
-      // the same reader `LocalContext.profile` carries, and `null` where that
-      // is absent. **The reader, never the recorder**: the two verbs put a card
-      // in the transcript and a transcript part has no close, so a tier raise
-      // from here would pin the tier for the session and reset the ring doing
-      // it (C28 I50, I18). There is nothing to reach it with.
+      // `/profile`'s reader (C23 I68) — the row is in `FRAMEWORK_TOOLS`, so a
+      // handler missing here is what `seal()` refuses. Every arm reads the same
+      // reader `LocalContext.profile` carries, and `null` where that is absent.
+      // **The reader, never the recorder**: every arm puts cards in the
+      // transcript and a transcript entry has no close, so a tier raise from
+      // here would pin the tier for the session and reset the ring doing it
+      // (C28 I18). There is nothing to reach it with.
       profileReport: () => deps.profile?.() ?? null,
       // C22 I125 — the record and its sources, as C02 resolved them.
       capabilities: () => ({ values: deps.capabilities, sources: deps.capabilitySources }),

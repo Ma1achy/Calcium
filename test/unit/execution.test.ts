@@ -279,15 +279,11 @@ function harness(script: Scripted = {}) {
     // what `as unknown as PipelineDeps` buys and costs — `overlays` and `confirm`
     // are the two the comment above already records.
     visible: () => true,
-    // The seventh shipped verb's seam (C23 I68); `seal()` refuses the row without it.
-    profileView: {
-      open: () => "no profiler to show — this session was built without `TuiConfig.profile`",
-      switchPane: () => false,
-      move: () => false,
-      pop: () => false,
-      dispose: () => undefined,
-      pane: null,
-    },
+    // **No `profile` and no `profileCapture`**, which is a session built without
+    // `TuiConfig.profile`: `execution.ts` folds both to `null` and `/profile`
+    // answers its own notice (C23 I68). A `profileView` stood here after the
+    // view retired (R-EXA-082, F1254) — a field no reader had, kept alive by
+    // the cast — the missing-field case above, in the other direction.
   } as unknown as PipelineDeps;
 
   const pipeline = createExecutionPipeline(deps);

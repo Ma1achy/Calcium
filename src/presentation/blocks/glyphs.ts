@@ -512,8 +512,9 @@ export const SUBSTITUTIONS: readonly (readonly [string, string])[] = Object.free
  * any more: `profileCard` takes one and is exported, and MG29 is right that a
  * consumer with no name for a parameter's type cannot supply it. Every existing
  * caller hands over a whole capability record, which this still accepts — the
- * in-tree caller is `shell/profile-view.ts`, handing `detection.capabilities`
- * whole, since the drawing round (C28 §3c).
+ * in-tree caller of `profileCard` is `/profile`'s handler, handing the local
+ * context's `capabilities` whole (C23 §2, C28 §3c); it was `profile-view.ts`
+ * until the pushed view retired (R-EXA-082, F1254).
  */
 export type GlyphCaps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
 

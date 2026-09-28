@@ -1558,12 +1558,14 @@ export async function constructGraph(
         // origin travels with the *call* instead: a surface brackets its
         // refresh in `profiler.own`, and `commit` reads the bracket.
         //
-        // `profile-view.ts` is the one surface that brackets — every redraw
-        // it raises, on the timer and on a key, runs inside `profiler.own`
-        // (C28 I49) — so this line is unchanged from the day it passed `false`
-        // unconditionally and now means what it says: the seam's own answer,
-        // with the bracket's read on top. C28 T4.4 drives it through this
-        // scheduler; T1.92 asserts it at the view.
+        // **No surface brackets any more.** `profile-view.ts` was the one that
+        // did — every redraw it raised ran inside `profiler.own` (C28 I49) —
+        // and it retired with the pushed view (R-EXA-082, F1254): `/profile`
+        // composes its deck once, in the reader's own submission, so the frame
+        // that draws it is the reader's. This line is unchanged from the day it
+        // passed `false` unconditionally: the seam's own answer, with the
+        // bracket's read on top for any surface that brackets. C28 T4.4 drives
+        // it through this scheduler.
         prof.commit(reason, false);
         inner.commit(reason);
       },

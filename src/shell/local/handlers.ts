@@ -113,14 +113,14 @@ const isSection = (x: unknown): x is ProfileSection =>
   typeof x === "string" && (SECTIONS as readonly string[]).includes(x);
 
 /**
- * `/profile [section]` — open C28's view (C23 I68, I69).
+ * `/profile [section]` — compose C28's deck into an entry (C23 I68, I69).
  *
- * **It appends a notice and never the cards.** The deck is drawn in the layer
- * the view refreshes; a document holding a report would freeze one reading into
- * the transcript's record and read as current on every later frame, which is
- * I18's stale-data shape with the framework's own figures inside it. The two
- * verbs that *do* put a card in the transcript — `snapshot` and `live` — carry a
- * stamp or a cadence for exactly that reason (C23 I69, amended).
+ * **Every card that reaches the transcript is stamped or live.** A document
+ * holding a report would freeze one reading into the transcript's record and
+ * read as current on every later frame, which is I18's stale-data shape with
+ * the framework's own figures inside it — so a section's cards and
+ * `snapshot`'s one card carry a stamp, and `live`'s carries a cadence
+ * (C23 I69, amended).
  *
  * **The section comes from `ctx.args`, never from `argv[0]`** (C22 I66), for
  * `/theme`'s reason: C05 parsed and enum-checked it, and a second reader of one
@@ -128,9 +128,10 @@ const isSection = (x: unknown): x is ProfileSection =>
  * is empty there, because a local verb is not gated on validation — to quote
  * the token that was typed, and to tell *no argument* from *a bad one*.
  *
- * Every refusal is a document on this route rather than a throw (C23 I2): the
- * view's own strings for *no profiler* and *something is open*, and a usage
- * line for a section that is not one of C28's three.
+ * Every refusal is a document on this route rather than a throw (C23 I2): a
+ * `warn` notice naming `TuiConfig.profile` on every arm when there is no
+ * profiler, and a usage line for a token that is none of C28's three sections
+ * and none of the three verbs.
  */
 /**
  * The stamp (C23 I69, amended).
@@ -167,17 +168,17 @@ const stampOf = (r: ProfileReport, card: string, caps: GlyphCaps): string => {
   ].join(sep);
 };
 
-/** How often a live card refetches — the view's cadence, for the view's reasons. */
+/** How often a live card refetches — the sampler's cadence (C23 §2). */
 const LIVE_EVERY_MS = 1000;
 
 /**
  * The rows a snapshot card is drawn at.
  *
- * **A figure and not the region**, which is the whole of why the verb exists:
- * the overlay is one screen and does not scroll, so an icicle of a 47 ms frame
- * is cramped there and right in scrollback, where it can be scrolled past and
- * compared with the next one. `ctx.height` is the *viewport's* height and would
- * reproduce the cramping in the one place that is not bound by it.
+ * **A figure and not the region.** An entry is as tall as its blocks and the
+ * transcript scrolls it, so an icicle of a 47 ms frame is drawn at a height it
+ * reads at, where it can be scrolled past and compared with the next one.
+ * `ctx.height` is the *viewport's* height and would reproduce a one-screen
+ * cramping in the one place that is not bound by it.
  *
  * The width is `ctx.width` — that one is a real constraint, and a card drawn
  * wider than the transcript wraps (C01's width rule, the direction that
@@ -188,11 +189,9 @@ const SNAPSHOT_ROWS = 32;
 /**
  * The card a document verb draws, named or defaulted.
  *
- * **The verdict rather than whatever the view is showing**, and the difference
- * matters: the prompt takes no keys while a view is top (C16 §3), so a reader
- * who has walked to `frame on a clock` has to close the view before they can
- * type `/profile snapshot` — and by then there is no open card to mean. The
- * card is named on the line or it is the verdict.
+ * **Named on the line or the verdict**, and never *the card on screen*: there
+ * is no open card to mean — the deck is entries in the transcript, several of
+ * which may be visible at once (C23 §2).
  */
 const cardFor = (wanted: unknown): string =>
   typeof wanted === "string" && CARDS.some((c) => c.id === wanted) ? wanted : "verdict";
