@@ -516,5 +516,12 @@ describe("C04 I6 fail-on-revert — the vocabulary is closed", () => {
     };
     expect(() => block(outside as never)).toThrow(/C04 I6, ruling 44/u);
   });
-  it.todo("T6.106 (C04 I6, ruling 77): dropping the wire's glyph check → T2.139 fails at the wire — not deferred on a component: the code lands in the next commit of this round");
+  it("T6.106 (C04 I6, ruling 77): dropping the wire's glyph check → T2.139 fails at the wire", () => {
+    // Without it the wire accepts what `block()` throws on — one document, two
+    // verdicts, and the far side is the producer D29 exists for (F1284).
+    const colourOnly = { kind: "notice", id: "n", tone: "error", text: "failed" };
+    expect(() => block(colourOnly as never), "the builder").toThrow(/C04 I6/u);
+    const wire = validateBlock(colourOnly);
+    expect(wire.ok ? "" : wire.error.join("\n"), "the wire").toMatch(/requires a glyph \(C04 I6, D29\)/u);
+  });
 });

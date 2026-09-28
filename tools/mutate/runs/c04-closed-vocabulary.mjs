@@ -1,5 +1,6 @@
 // C04 I6's exemption, mutated (ruling 44): a column's declared closed vocabulary
-// lets its words carry `warn` and `error` without a glyph.
+// lets its words carry `warn` and `error` without a glyph — and, since ruling 77,
+// the glyph rule under it at the wire, where it had been the builder's alone.
 //
 // **Two doors and three clauses**: the set must be checkable (non-empty,
 // distinct, non-empty words), a cell must be one of its words, and only then is
@@ -82,6 +83,42 @@ const results = runPass({
       file: VALIDATE,
       from: "          !isArray(words) ||\n          words.length === 0 ||",
       to: "          !isArray(words) ||",
+      expect: "T2.139",
+    },
+    {
+      // **The wire stops asking a notice** (ruling 77, F1284) — a colour-only
+      // error notice the builder refuses is one the far side can send.
+      name: "the wire asks a notice for no glyph",
+      file: VALIDATE,
+      from: "    requireToneGlyph(b[\"tone\"], b[\"glyph\"], e, at);",
+      to: "",
+      expect: "T2.139",
+    },
+    {
+      // **The wire stops asking a cell** — the free-text column's `warn`
+      // passes at the wire and throws at construction.
+      name: "the wire asks a cell for no glyph",
+      file: VALIDATE,
+      from: "          if (words === undefined) requireToneGlyph(",
+      to: "          if (false) requireToneGlyph(",
+      expect: "T2.139",
+    },
+    {
+      // **The exemption withdrawn at the wire** — ruling 44's words owe a
+      // glyph again, and §075's ladder is refused from the far side.
+      name: "the wire ignores the vocabulary and asks for a glyph",
+      file: VALIDATE,
+      from: "          if (words === undefined) requireToneGlyph(",
+      to: "          if (true) requireToneGlyph(",
+      expect: "T2.139",
+    },
+    {
+      // **The glyph test inverted** — a present glyph refused, an absent one
+      // accepted; the row's with-glyph controls are what see it.
+      name: "the wire's glyph test inverted",
+      file: VALIDATE,
+      from: "!(GLYPH_REQUIRED_TONES as ReadonlySet<unknown>).has(tone) || glyph !== undefined) return;",
+      to: "!(GLYPH_REQUIRED_TONES as ReadonlySet<unknown>).has(tone) || glyph === undefined) return;",
       expect: "T2.139",
     },
     {

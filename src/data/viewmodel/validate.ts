@@ -24,6 +24,7 @@ import {
   type Glyph,
   type RampAnimation,
   COLORMAP_NAMES,
+  GLYPH_REQUIRED_TONES,
   RAMP_ANIMATIONS,
   RAMP_FILLS,
   RAMP_KEYS,
@@ -1387,6 +1388,8 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
     requireString(b, "text", e, at);
     requireString(b, "tone", e, at);
     requireGlyph(b["glyph"], e, at);
+    // I6 (ruling 77) — a notice has no column and no exemption.
+    requireToneGlyph(b["tone"], b["glyph"], e, at);
     checkColormapName(b, e, at);
     checkSpans(b, "text", e, at);
     // **A misspelled trail is refused, not defaulted** (C04 I123, §5c). Falling
@@ -1523,6 +1526,10 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
           // I6, ruling 44 — the vocabulary is closed at the wire as at
           // construction, or a far side's free text would take the exemption.
           const words = closed.get(key);
+          // I6 (ruling 77) — the glyph a `warn` or `error` cell carries, held
+          // here as `block()` holds it; a word of a declared vocabulary is the
+          // exemption, and a cell outside the set is refused below either way.
+          if (words === undefined) requireToneGlyph(cell["tone"], cell["glyph"], e, `${at} cell "${key}"`);
           if (words !== undefined && !words.has(cell["text"] as string)) {
             e.push(
               `${at} cell "${key}": ${JSON.stringify(cell["text"])} is not a word of column "${key}"'s ` +
@@ -3463,6 +3470,24 @@ function requireGlyph(value: unknown, e: string[], at: string): void {
   e.push(
     `${at}: "glyph" must be one of ${[...GLYPHS].join(", ")} (C04 I6) — ` +
       `got ${JSON.stringify(value)}; a character has no ASCII fallback and no width guarantee`,
+  );
+}
+
+/**
+ * I6's first half, at the wire — a tone that says *something is wrong* carries
+ * a glyph, so colour is never the only carrier (D29, ruling 77).
+ *
+ * `block()` throws on exactly this, and until ruling 77 the wire did not look:
+ * a far side emitting `tui.view/1` could send a colour-only warning that the
+ * builder refuses, one document with two verdicts — and the far side is the
+ * producer the rule exists for. A glyph that is present but not a slot is
+ * `requireGlyph`'s refusal, not this one.
+ */
+function requireToneGlyph(tone: unknown, glyph: unknown, e: string[], at: string): void {
+  if (!(GLYPH_REQUIRED_TONES as ReadonlySet<unknown>).has(tone) || glyph !== undefined) return;
+  e.push(
+    `${at}: tone "${String(tone)}" requires a glyph (C04 I6, D29) — ` +
+      `colour alone does not survive 1-bit or a colour-blind reader`,
   );
 }
 

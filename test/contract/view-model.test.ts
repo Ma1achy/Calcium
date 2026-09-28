@@ -1177,5 +1177,15 @@ describe("C04 I6 — a closed vocabulary carries its own fact (ruling 44)", () =
     // declaration's, and I6 still fires everywhere else.
     expect(() => blockOf(table([{ text: "env", tone: "warn" }], null) as never), "no vocabulary").toThrow(/requires a non-empty glyph \(C04 I6/u);
     expect(() => blockOf({ kind: "notice", id: "n", tone: "warn", text: "env" } as never), "a notice").toThrow(/requires a non-empty glyph \(C04 I6/u);
+
+    // **And the same two at the wire** (ruling 77, F1284) — a document the
+    // builder refuses is not one the far side can send. Each with its glyph
+    // validates, so the refusal is the glyph's and not the fixture's.
+    for (const tone of ["warn", "error"]) {
+      expect(wire(table([{ text: "env", tone }], null)), `a ${tone} cell, no vocabulary, at the wire`).toMatch(/cell "source": tone "(warn|error)" requires a glyph \(C04 I6, D29\)/u);
+      expect(wire({ kind: "notice", id: "n", tone, text: "env" }), `a ${tone} notice at the wire`).toMatch(/tone "(warn|error)" requires a glyph \(C04 I6, D29\)/u);
+      expect(wire(table([{ text: "env", tone, glyph: tone }], null)), `a ${tone} cell with its glyph`).toBe("");
+      expect(wire({ kind: "notice", id: "n", tone, glyph: tone, text: "env" }), `a ${tone} notice with its glyph`).toBe("");
+    }
   });
 });
