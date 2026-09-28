@@ -958,6 +958,8 @@ describe("C10 §4b.1 — the pairing the registry declares", () => {
     expect(missing, "every declared composition, at the value declared").toEqual([]);
   });
 
+  it.todo("T1.44 (C10 I67): the registry themes ids, Object.keys(defaultTheme) and the themeRules data-theme ids are one set by equality before any value is read, and a theme with no tokens is reported rather than skipped — not deferred on a component: the code lands in the next commit of this round");
+
   it("T1.45 (C10 I49, §4b.1): the selection pairing is derived, and every pair clears its floor", () => {
     // **Green before the seven values landed and green after, and that is the
     // row's stated limit** (§4b.1). What it buys is the next failure: a composed
