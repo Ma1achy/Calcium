@@ -16,6 +16,7 @@ expectations, which is the same reason C02 takes its `env` by injection.
 | `startup-graph-child.mjs` | The child T5.22 spawns under it: imports `dist/`, lists the graph, runs one shell command through the route over the bench's fakes, lists it again; two JSON lines appended to the file named by its argument |
 | `code-graph-child.mjs` | The child T5.6 spawns under `import-trace.mjs`: imports `dist/presentation/blocks/kinds/code.js`, lists the graph, registers a seventeenth grammar and lists it again — the row that reads what the code block loads (C09 I71). | C09 T5.6 |
 
+| `quantised-contrast.ts`, `quantised-shortfalls.ts` | `quantisedShortfalls()` — the floor measured at 8 and 4 bits, ink and ground as the resolver paints them — and the two lists C10 T2.74 and T2.75 hold it to by equality. The instrument lives here and not in `src/` because nothing there may call it until the 8-bit list is empty (C10 I68) |
 | `world.ts` | `fakeWorld()`, `worldResult()`, `steppableClock()` — a constant `WorldDriver` double for C08's resolver, which is not "the world" for I14's purposes |
 
 **Two files left this directory for `src/testing/`** — `measurement-conformance.ts`

@@ -913,12 +913,34 @@ describe("C10 §4b.1 — the pairing the registry declares", () => {
     return out;
   };
 
-  it("T1.44 (C10 I49, §4b.1): every registry composition reaches the token set at the value it declares", () => {
+  it("T1.44 (C10 I49, I67, §4b.1): every registry composition reaches the token set at the value it declares", () => {
     // **The only row in this tree that can see a value go missing** (§4b.1).
     // T1.45 derives its pairing from `composed`, so a composition the generator
     // drops takes its own pair with it and the scope is green about the loss.
     // This reads the design instead, which is the corpus the loss is absent from.
     const want = declared();
+
+    // **The corpus is the whole theme set, compared before a value is read**
+    // (I67). This row looked each theme up by name and skipped one the set did
+    // not carry, so a theme the generator dropped took every composition it
+    // declares out of the row with it — the one row that sees a value go
+    // missing, blind to a whole theme going missing. Three sets, one by
+    // equality: a theme renamed away in `tokens.generated.ts` fails here.
+    const record = JSON.parse(readFileSync("docs/design/language/calcium-registry.json", "utf8")) as {
+      themes: { id: string; status: string }[];
+      themeRules: { selector: string; status: string }[];
+    };
+    const registryIds = record.themes.filter((t) => t.status === "current").map((t) => t.id).sort();
+    const ruleIds = [
+      ...new Set(
+        record.themeRules
+          .filter((r) => r.status === "current")
+          .flatMap((r) => [...r.selector.matchAll(/\[data-theme="([a-zA-Z]+)"\]/g)].map((m) => m[1] ?? "")),
+      ),
+    ].sort();
+    expect(Object.keys(defaultTheme).sort(), "the token set carries exactly the registry's themes").toEqual(registryIds);
+    expect(ruleIds, "and the themeRules name exactly those themes").toEqual(registryIds);
+    expect(registryIds.length, "ten, as measured when I67 landed").toBe(10);
 
     // The control, and it is the defect restated: the reading that shipped took
     // one pairing per rule, anchored at the selector's start. Six registry rules
@@ -951,14 +973,11 @@ describe("C10 §4b.1 — the pairing the registry declares", () => {
     for (const [key, hex] of want) {
       const [theme = "", ground = "", tone = ""] = key.split("|");
       const tokens = (defaultTheme as Record<string, ThemeTokens | undefined>)[theme];
-      if (tokens === undefined) continue;
-      const got = inkOn(tokens, `tone.${tone}`, ground).toLowerCase();
+      const got = tokens === undefined ? "(no theme)" : inkOn(tokens, `tone.${tone}`, ground).toLowerCase();
       if (got !== hex) missing.push(`${key} · design ${hex} · tree ${got || "(none)"}`);
     }
     expect(missing, "every declared composition, at the value declared").toEqual([]);
   });
-
-  it.todo("T1.44 (C10 I67): the registry themes ids, Object.keys(defaultTheme) and the themeRules data-theme ids are one set by equality before any value is read, and a theme with no tokens is reported rather than skipped — not deferred on a component: the code lands in the next commit of this round");
 
   it("T1.45 (C10 I49, §4b.1): the selection pairing is derived, and every pair clears its floor", () => {
     // **Green before the seven values landed and green after, and that is the

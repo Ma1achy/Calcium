@@ -8,14 +8,21 @@
 // from the generated file is a theme quietly back on the DP; a DP that drifts
 // from the table is a shipped constant that is no longer the computation's
 // output. Each is a reading T3.73 takes and nothing else does.
+//
+// **And the floor at the rungs the table serves** (C10 I68, T6.134–T6.135):
+// `quantisedShortfalls` measures the quantised ink on the quantised ground, and
+// its two lists are held by equality in `test/contract/quantised-contrast.test.ts`.
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/unit/theme.test.ts";
+const CMD = "npx vitest run test/unit/theme.test.ts test/contract/quantised-contrast.test.ts";
 const Q = "src/presentation/theme/quantise.ts";
 const TABLE = "src/presentation/theme/quantised.generated.ts";
+// The instrument lives beside its rows: nothing in `src/` may call it until
+// its 8-bit list is empty (C10 I68).
+const INSTRUMENT = "test/support/quantised-contrast.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -107,6 +114,26 @@ const results = runPass({
       from: "  return CUBE.find((entry) => entry.index === index)?.hex ?? null;",
       to: "  return CUBE.find((entry) => entry.index === index + 1)?.hex ?? null;",
       expect: "T3.73",
+    },
+    {
+      // **T6.134 — the ink measured with no ground.** A composed ink and a
+      // band's one ink both become the flat slot, so the measurement is of a
+      // pair the resolver never paints on that ground.
+      name: "T6.134: quantisedShortfalls resolves the ink without its ground",
+      file: INSTRUMENT,
+      from: "    const ink = hexOf(resolve(ref, theme, caps, ground).colour);",
+      to: "    const ink = hexOf(resolve(ref, theme, caps).colour);",
+      expect: "T2.74",
+    },
+    {
+      // **T6.135 — a ground the resolver does not paint stops being a cell.**
+      // At 4 bits `focusGround` has no curated index on eight themes, and the
+      // ink lands on the page; without the fallback those 216 cells vanish.
+      name: "T6.135: the 4-bit fallback to the page removed",
+      file: INSTRUMENT,
+      from: "?? (depth === 4 ? page : null);",
+      to: "?? (depth === 4 ? null : page);",
+      expect: "T2.75",
     },
   ],
 });

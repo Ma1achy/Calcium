@@ -105,6 +105,18 @@ const results = runPass({
       to: "",
       expect: "T1.44",
     },
+    {
+      // **T6.133 — a whole theme's tokens vanish under its registry name**
+      // (C10 I67). The row skipped a theme the set did not carry, so this
+      // passed it; measured by hand on landing, the pre-I67 row is green here
+      // and the id equality is red. A rename rather than a deletion, so the set
+      // keeps ten entries and only the names disagree.
+      name: "T6.133: paper renamed away in the generated set, so its tokens vanish",
+      file: GENERATED,
+      from: '  "paper": Object.freeze({',
+      to: '  "retiredPaper": Object.freeze({',
+      expect: "T1.44",
+    },
   ],
 });
 
