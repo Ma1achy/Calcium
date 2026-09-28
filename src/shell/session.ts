@@ -2303,7 +2303,9 @@ function visibleRows(
 
     // **With the tick and the width** (C22 I132, C09 I120): a one-shot that has
     // run its course asks for nothing, so a finished `pop` disarms the ticker.
-    const cadence = animationIntervalOf(windowed.blocks, { tick, width });
+    // **And the capabilities** (C09 I112): the rung the spinners are drawn at
+    // decides how fast they turn — every ASCII rung at one cadence.
+    const cadence = animationIntervalOf(windowed.blocks, { tick, width }, graph.capabilities);
     if (cadence !== null && (fastest === null || cadence < fastest)) fastest = cadence;
     // **The tick is its own axis, not a suffix of the slot** (C22 I103, F1189).
     // Folded into the slot every spinner tick was a `focus` miss, which drops

@@ -14,7 +14,7 @@
  * ramp carries an `animate` (C09 I54) — and `tickIntervalOf` answers for both;
  * this record stays what it was, the kinds that animate by nature.
  */
-import { spinnerIntervalMs } from "./glyphs.js";
+import { spinnerIntervalMs, type GlyphCaps } from "./glyphs.js";
 import { animatesByContent, rampCadenceMs, type TickAt } from "./ramp.js";
 import type { Block, BlockKind, KnownBlockKind, Notice, Status } from "../../data/viewmodel/index.js";
 
@@ -85,20 +85,27 @@ function childrenOf(block: Block): readonly Block[] {
  * transcript whose only motion was a finished `pop` disarms. Without it the
  * answer is I54's — a caller with no tick cannot know an effect has ended.
  */
-export function tickIntervalOf(block: Block, at?: TickAt): number | null {
+export function tickIntervalOf(
+  block: Block,
+  at?: TickAt,
+  caps?: GlyphCaps,
+): number | null {
   // **Read through a widening cast, for the reason `rampExtentOf` states**
   // (C04 I119): the declaration is the exhaustiveness assertion and the read is
   // total. `=== true` was already the right comparison — an app's kind answers
   // `undefined` and is not animated by nature.
   if ((ANIMATES as Readonly<Partial<Record<BlockKind, boolean>>>)[block.kind] === true) {
-    return block.kind === "status" ? spinnerIntervalMs((block as Status).spinner) : spinnerIntervalMs();
+    // **At the rung the frames are drawn at** (C09 I112, question 40): given the
+    // capabilities, a set's ASCII rung asks for its one cadence, so a set slower
+    // than it is woken at the rate its ASCII frames turn.
+    return block.kind === "status" ? spinnerIntervalMs((block as Status).spinner, caps) : spinnerIntervalMs(undefined, caps);
   }
   // **A streaming notice animates by nature too, and did not** (C09 I101,
   // §026). `ANIMATES` says `notice: false` and `animatesByContent` reads a
   // *span's* ramp — the trail's is derived at render from `streaming` and never
   // reaches a span — so neither carrier has ever asked C03 for a tick. The set
   // is named, because the cadence has to be the mark's own.
-  if (block.kind === "notice" && (block as Notice).streaming === true) return spinnerIntervalMs("agent");
+  if (block.kind === "notice" && (block as Notice).streaming === true) return spinnerIntervalMs("agent", caps);
   // By content (C09 I54): a moving ramp asks for the default set's cadence
   // through the lookup the kinds use; its periods are counted in the ticks C03
   // then delivers.
@@ -112,10 +119,14 @@ export function tickIntervalOf(block: Block, at?: TickAt): number | null {
  * is exactly where a live part puts one — a scan of the top level only would
  * answer *nothing animates* for the arrangement the framework itself builds.
  */
-export function animationIntervalOf(blocks: readonly Block[], at?: TickAt): number | null {
+export function animationIntervalOf(
+  blocks: readonly Block[],
+  at?: TickAt,
+  caps?: GlyphCaps,
+): number | null {
   let fastest: number | null = null;
   const visit = (block: Block): void => {
-    const own = tickIntervalOf(block, at);
+    const own = tickIntervalOf(block, at, caps);
     if (own !== null && (fastest === null || own < fastest)) fastest = own;
     for (const child of childrenOf(block)) visit(child);
   };

@@ -54,8 +54,8 @@ const results = await runPass({
       // as its first frame repeated, which no single set's record shows.
       name: "the ASCII rung answers its first frame for every frame",
       file: GLYPHS,
-      from: '  if (caps.unicode === "ascii") return set.ascii;\n',
-      to: '  if (caps.unicode === "ascii") return set.ascii.map(() => set.ascii[0] ?? "");\n',
+      from: "  return atAsciiRung(caps, set) ? set.ascii : set.frames;",
+      to: '  return atAsciiRung(caps, set) ? set.ascii.map(() => set.ascii[0] ?? "") : set.frames;',
       expect: "T2.190",
     },
     {

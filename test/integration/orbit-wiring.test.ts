@@ -340,6 +340,33 @@ describe("C22 §6i — the ticker is the second writer", () => {
 
       expect((b.ticks().at(-1) ?? 0) - b0, "beside an 80 ms spinner").toBe(SPAN / 80);
       expect((a.ticks().at(-1) ?? 0) - a0, "and with the 120 ms mark alone").toBe(SPAN / 80);
+
+      // **The wake is the rung's, given the capabilities** (C09 I112, question
+      // 40). A `toggle` status turns every 400 ms at the Unicode rung and every
+      // 120 at ASCII, so the session must ask for 120 there — a wake armed at
+      // the set's own 400 samples its ASCII frames at a third of their rate.
+      // **Counted in frames written**, T4.17u's measure: I103 keeps a block that
+      // does not animate out of a tick's render, so the watcher's renders read
+      // one whatever the ticker does.
+      const TOGGLE = { kind: "status", id: "t", state: "loading", message: "waiting", height: 1, spinner: "toggle" };
+      const SYNC_BRACKETS = new Set(["\u001b[?2026h", "\u001b[?2026l"]);
+      const written = async (unicode: "full" | "ascii"): Promise<number> => {
+        const w = watching();
+        const built = await session(w.definition, [{ kind: "count", id: "c" }, TOGGLE], {
+          capabilities: { unicode, synchronisedUpdate: true },
+        });
+        const before = built.stdout.chunks.length;
+        await wake(built, SPAN);
+        return built.stdout.chunks.slice(before).filter((c) => !SYNC_BRACKETS.has(c)).length;
+      };
+      const unicode = await written("full");
+      const ascii = await written("ascii");
+      // Measured on landing: 2 and 14, and 2 and 2 with the session's
+      // capabilities dropped from the cadence it asks for. The bounds are the
+      // arithmetic — three 400 ms steps, ten 120 ms ones — with the room a
+      // write count needs, since a frame can be more than one chunk.
+      expect(unicode, "a toggle at the Unicode rung wakes at its own 400 ms").toBeLessThanOrEqual(3);
+      expect(ascii, "and at ASCII at the rung's 120").toBeGreaterThanOrEqual(9);
     } finally {
       vi.useRealTimers();
     }

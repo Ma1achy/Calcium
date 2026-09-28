@@ -51545,8 +51545,10 @@
     "explicitAsciiQuery": "ascii",
     "measuredQuery": "auto",
     "terminalResolution": "A real terminal resolves each registered set against measured cell widths. The browser specimen defaults to rich Unicode; ASCII is an explicit degradation preview, not a global browser-font guess.",
+    "asciiIntervalMs": 120,
     "ruleIds": [
-      "R-MOT-005"
+      "R-MOT-005",
+      "R-MOT-011"
     ]
   },
   "barSpecimens": [

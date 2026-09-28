@@ -564,10 +564,14 @@ export function glyphs(caps: GlyphCaps): GlyphSet {
  * four- or five-frame pattern at the *same interval*, so `braille` — ten frames
  * at 80 ms, an 800 ms cycle — spun at 320 ms in ASCII, two and a half times
  * faster. The registry fits its pattern to the set's own frame count
- * (`asciiTrajectory: "fit-cycle"`), which holds each glyph longer and keeps the
- * cycle, and that is what `R-MOT-010`'s *shape of its motion* means. `R-MOT-011`
- * — one alphabet, one cadence — was green on the collapse the whole time, with
- * three consistent families and no mismatch.
+ * (`asciiTrajectory: "fit-cycle"`), which holds each glyph longer, and that is
+ * what `R-MOT-010`'s *shape of its motion* means. `R-MOT-011` — one alphabet,
+ * one cadence — was green on the collapse the whole time, with three consistent
+ * families and no mismatch.
+ *
+ * **The fitted rung no longer keeps the set's cycle** (question 40): every ASCII
+ * rung steps at `ASCII_INTERVAL_MS`, so the nine sets sharing `|/-\` turn it at
+ * one rate. The pattern's shape is kept; its duration is the rung's.
  *
  * **`narrowOnly` is a tier and not a refusal**, which is what `ambiguousWidth`
  * changed. Every frame of these sets is `East_Asian_Width=Ambiguous` — the
@@ -934,6 +938,28 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
 /** The default, and the set this returned before it took a name. */
 const DEFAULT_SET = "braille";
 
+/**
+ * The ASCII rung's one cadence, in milliseconds — the registry's
+ * `spinnerPolicy.asciiIntervalMs` (C09 I112, question 40, `R-MOT-011`).
+ *
+ * **One number for the rung, not one per set.** Nine sets share `|/-\` at nine
+ * intervals between 80 and 140 ms, six share `.oO@Oo` and two share `0–f`; a
+ * shared alphabet at several rates is two spinners that look alike and disagree
+ * about how busy the machine is. 120 is the mode of the one, the median of the
+ * other and a member of the third, and §039 says *nothing varies its rate*.
+ * T2.73 holds this equal to the registry's.
+ */
+const ASCII_INTERVAL_MS = 120;
+
+/**
+ * Whether a set draws its ASCII frames at these capabilities — the one test
+ * `spinnerFrames` and `spinnerIntervalMs` both ask, so the frames and the
+ * cadence cannot come from two different rungs.
+ */
+function atAsciiRung(caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">, set: SpinnerSet): boolean {
+  return caps.unicode === "ascii" || (set.narrowOnly === true && caps.ambiguousWidth === "wide");
+}
+
 function setFor(name: string): SpinnerSet {
   return SPINNER_SETS[name] ?? SPINNER_SETS[DEFAULT_SET] ?? { frames: [], intervalMs: 80, ascii: [] };
 }
@@ -956,8 +982,7 @@ export function spinnerFrames(
   name: string = DEFAULT_SET,
 ): readonly string[] {
   const set = setFor(name);
-  if (caps.unicode === "ascii") return set.ascii;
-  return set.narrowOnly === true && caps.ambiguousWidth === "wide" ? set.ascii : set.frames;
+  return atAsciiRung(caps, set) ? set.ascii : set.frames;
 }
 
 /**
@@ -1268,9 +1293,17 @@ export const spinnerSetNames = (): readonly string[] => Object.freeze(Object.key
  * **The interval belongs to the set**, so this is the same lookup rather than a
  * second table: a caller holding frames from one set and an interval from
  * another is the drift the pairing exists to prevent.
+ *
+ * **And to the rung, given the capabilities** (C09 I112, question 40): where the
+ * set draws its ASCII frames every set steps at `ASCII_INTERVAL_MS`. With no
+ * capabilities the answer is the Unicode rung's, which is the set's own.
  */
-export function spinnerIntervalMs(name: string = DEFAULT_SET): number {
-  return setFor(name).intervalMs;
+export function spinnerIntervalMs(
+  name: string = DEFAULT_SET,
+  caps?: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+): number {
+  const set = setFor(name);
+  return caps !== undefined && atAsciiRung(caps, set) ? ASCII_INTERVAL_MS : set.intervalMs;
 }
 
 /**
@@ -1299,7 +1332,7 @@ export function spinnerFrameAt(
   const frames = spinnerFrames(caps, name);
   const count = frames.length; // cells-ok — a frame count
   if (count === 0) return "";
-  const step = Math.floor((tick * TICK_MS) / spinnerIntervalMs(name));
+  const step = Math.floor((tick * TICK_MS) / spinnerIntervalMs(name, caps));
   return frames[step % count] ?? "";
 }
 

@@ -520,6 +520,11 @@ export function validateRegistry(registry) {
   if (!registry.spinnerPolicy?.previewDefault || !registry.spinnerPolicy?.previewDefaultSource || !registry.spinnerPolicy?.measuredQuery) {
     throw new Error('spinner preview policy is incomplete');
   }
+  // **One cadence for the ASCII rung** (question 40): every set's ASCII frames
+  // step at this interval, whatever the set's own — `R-MOT-011` per rung.
+  if (!Number.isInteger(registry.spinnerPolicy.asciiIntervalMs) || registry.spinnerPolicy.asciiIntervalMs <= 0) {
+    throw new Error('spinner policy records no ASCII interval');
+  }
   if (!registry.barPolicy?.indeterminate || !Array.isArray(registry.barPolicy.placementOrder)) throw new Error('bar placement policy is incomplete');
   const currentBars = active(registry.bars);
   const currentBarIds = currentBars.map(bar => bar.id);
@@ -1044,12 +1049,13 @@ function renderSpinnerFallbackTable(registry) {
   const rows = active(registry.spinners).map(item => {
     const asciiFrames = spinnerAsciiFrames(registry, item);
     const descriptor = spinnerPatternDescriptor(registry, item);
-    return `<span data-spinner-fallback="${esc(item.id)}" data-ascii-motion="${esc(item.asciiMotion)}" data-ascii-trajectory="${esc(item.asciiTrajectory.type)}" data-ascii-pattern="${esc(descriptor.attribute)}" data-ascii-resolved="${esc(asciiFrames.join(''))}" data-glyph-capability="ascii"><span class="c-accent sp sp-${esc(item.id)}"></span><span class="c-default">  ${esc(item.id.padEnd(16))}</span><span class="c-muted">${esc(item.asciiMotion.padEnd(17))}</span><span class="c-default">${esc(descriptor.visible.padEnd(34))}</span><span class="c-muted">${String(item.intervalMs).padStart(4)}ms · ${String(item.frames.length).padStart(2)} frames</span></span>`;
+    return `<span data-spinner-fallback="${esc(item.id)}" data-ascii-motion="${esc(item.asciiMotion)}" data-ascii-trajectory="${esc(item.asciiTrajectory.type)}" data-ascii-pattern="${esc(descriptor.attribute)}" data-ascii-resolved="${esc(asciiFrames.join(''))}" data-glyph-capability="ascii"><span class="c-accent sp sp-${esc(item.id)}"></span><span class="c-default">  ${esc(item.id.padEnd(16))}</span><span class="c-muted">${esc(item.asciiMotion.padEnd(17))}</span><span class="c-default">${esc(descriptor.visible.padEnd(34))}</span><span class="c-muted">${String(registry.spinnerPolicy.asciiIntervalMs).padStart(4)}ms · ${String(item.frames.length).padStart(2)} frames</span></span>`;
   }).join('\n');
   return `<span class="c-default bold" data-generated-spinner-fallbacks="current">SEMANTIC ASCII FALLBACKS · GENERATED FROM THE SPINNER REGISTRY [${refs(['R-MOT-005'])}]</span>
 <span class="c-muted">  sample  primary           motion           fitted trajectory                   interval · resolved length</span>
 ${rows}
-<span class="c-muted">Each base pattern is fitted once across the primary trajectory; composite sets concatenate named source trajectories. The same resolved frames generate the ASCII CSS.</span>`;
+<span class="c-muted">Each base pattern is fitted once across the primary trajectory; composite sets concatenate named source trajectories. The same resolved frames generate the ASCII CSS.</span>
+<span class="c-muted">Every ASCII rung steps at ${String(registry.spinnerPolicy.asciiIntervalMs)}ms, whatever its set's own interval: sets sharing an ASCII alphabet share its cadence [${refs(['R-MOT-011'])}].</span>`;
 }
 
 const cssString = value => `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
@@ -1061,7 +1067,10 @@ function spinnerCss(registry) {
     const asciiKeyframe = `${spinner.keyframe}-ascii`;
     const ascii = asciiFrames.map((frame, index) => `${percent(index, asciiFrames.length)}{content:${cssString(frame)}}`).join('');
     const phase = spinner.id === 'agent' ? ' var(--phase,0ms)' : '';
-    return `@keyframes ${spinner.keyframe}{${frames}}\n@keyframes ${asciiKeyframe}{${ascii}}\n.sp-${spinner.id}::after{content:${cssString(spinner.initial)};animation:${spinner.keyframe} ${spinner.cycleMs}ms steps(1,end)${phase} infinite}\n[data-glyph-capability="ascii"] .sp-${spinner.id}::after,.sp-${spinner.id}[data-spinner-capability="ascii"]::after,[data-spinner-capability="ascii"] .sp-${spinner.id}::after{content:${cssString(asciiFrames[0])};animation-name:${asciiKeyframe}}`;
+    // The ASCII rung's cycle is its resolved frames at the policy's one cadence
+    // (question 40), not the set's own cycle: fit-cycle keeps the pattern's shape.
+    const asciiCycleMs = registry.spinnerPolicy.asciiIntervalMs * asciiFrames.length;
+    return `@keyframes ${spinner.keyframe}{${frames}}\n@keyframes ${asciiKeyframe}{${ascii}}\n.sp-${spinner.id}::after{content:${cssString(spinner.initial)};animation:${spinner.keyframe} ${spinner.cycleMs}ms steps(1,end)${phase} infinite}\n[data-glyph-capability="ascii"] .sp-${spinner.id}::after,.sp-${spinner.id}[data-spinner-capability="ascii"]::after,[data-spinner-capability="ascii"] .sp-${spinner.id}::after{content:${cssString(asciiFrames[0])};animation-name:${asciiKeyframe};animation-duration:${asciiCycleMs}ms}`;
   });
   return `/* GENERATED SPINNER CSS · current R-MOT-002 and R-MOT-005 records only */\n${blocks.join('\n')}`;
 }

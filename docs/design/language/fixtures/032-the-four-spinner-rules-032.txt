@@ -14,33 +14,34 @@ four rules the sets obey, and every one is asserted rather than commented
 SEMANTIC ASCII FALLBACKS · GENERATED FROM THE SPINNER REGISTRY [R-MOT-005]
   sample  primary           motion           fitted trajectory                   interval · resolved length
 ✦  agent           composite bloom  fullramp(. o O @ O o) + grow(. o O @ O o) + bloom(. o O @ O o) + starfield(. + * @ * +) + pulse(. o O @ O o) 120ms · 82 frames
-✦  braille         rotation         | / - \                             80ms · 10 frames
-✦  bounce          vertical bounce  _ - ^ -                            130ms ·  4 frames
-✦  orbit           orbit            | / - \                             90ms ·  8 frames
+✦  braille         rotation         | / - \                            120ms · 10 frames
+✦  bounce          vertical bounce  _ - ^ -                            120ms ·  4 frames
+✦  orbit           orbit            | / - \                            120ms ·  8 frames
 ✦  grow            growth           . o O @ O o                        120ms · 12 frames
 ✦  bloom           bloom            . o O @ O o                        120ms · 14 frames
 ✦  starfield       twinkle          . + * @ * +                        120ms ·  8 frames
 ✦  fullramp        intensity ramp   . o O @ O o                        120ms · 42 frames
-✦  hex             count            0 1 2 3 4 5 6 7 8 9 a b c d e f    110ms · 16 frames
-✦  toggle          alternation      < >                                400ms ·  2 frames
-✦  circleQuarters  rotation         | / - \                            140ms ·  4 frames
-✦  boxBounce       orbit            | / - \                            140ms ·  4 frames
-✦  growVertical    growth           . o O @ O o                        100ms · 10 frames
+✦  hex             count            0 1 2 3 4 5 6 7 8 9 a b c d e f    120ms · 16 frames
+✦  toggle          alternation      < >                                120ms ·  2 frames
+✦  circleQuarters  rotation         | / - \                            120ms ·  4 frames
+✦  boxBounce       orbit            | / - \                            120ms ·  4 frames
+✦  growVertical    growth           . o O @ O o                        120ms · 10 frames
 ✦  growHorizontal  growth           . o O @ O o                        120ms · 12 frames
-✦  noise           dissolve         # * .                              100ms ·  3 frames
+✦  noise           dissolve         # * .                              120ms ·  3 frames
 ✦  boxBounce2      rotation         | / - \                            120ms ·  4 frames
 ✦  triangle        rotation         v < ^ >                            120ms ·  4 frames
 ✦  circleHalves    rotation         | / - \                            120ms ·  4 frames
-✦  pipe            rotation         | / - \                            100ms ·  8 frames
-✦  arrow           rotation         < ^ > v                            200ms ·  4 frames
+✦  pipe            rotation         | / - \                            120ms ·  8 frames
+✦  arrow           rotation         < ^ > v                            120ms ·  4 frames
 ✦  pulse           pulse            . o O @ O o                        120ms ·  6 frames
-✦  braille2        rotation         | / - \                            110ms ·  8 frames
-✦  decimal         count            0 1 2 3 4 5 6 7 8 9                140ms · 10 frames
+✦  braille2        rotation         | / - \                            120ms ·  8 frames
+✦  decimal         count            0 1 2 3 4 5 6 7 8 9                120ms · 10 frames
 ✦  binary4         count            0 1 2 3 4 5 6 7 8 9 a b c d e f    120ms · 16 frames
-✦  line            rotation         - \ | /                            130ms ·  4 frames
-✦  balloon         growth           . o O @ *                          160ms ·  5 frames
-✦  arc             rotation         | / - \                            130ms ·  6 frames
+✦  line            rotation         - \ | /                            120ms ·  4 frames
+✦  balloon         growth           . o O @ *                          120ms ·  5 frames
+✦  arc             rotation         | / - \                            120ms ·  6 frames
 Each base pattern is fitted once across the primary trajectory; composite sets concatenate named source trajectories. The same resolved frames generate the ASCII CSS.
+Every ASCII rung steps at 120ms, whatever its set's own interval: sets sharing an ASCII alphabet share its cadence [R-MOT-011].
 
 2 · WORK FRAMES ARE 80–200 ms. Deliberate WAIT sets may be slower. [R-MOT-002]
   ✦  braille      80ms ·  10 frames
