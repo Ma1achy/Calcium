@@ -1720,3 +1720,30 @@ describe("C16 I67 — ⌃c is recognised exactly (review batch 2, M6)", () => {
     expect(isExactCtrlC({ name: "c", ctrl: true, meta: false, shift: false, sequence: "" })).toBe(true);
   });
 });
+
+describe("C16 I69–I73 — the timed guard, its explanation, focus-out and the generation (review batch 3, M7)", () => {
+  it.todo(
+    "T1.181 (I69, §3c): activations each within 250 ms of the last are refused past the grace; one after a 300 ms gap answers — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T1.182 (I69, §3c): ruling 52's row — a key held across the arrival, a 660 ms first repeat, then 30 Hz repeats: none answers; the gap alone answers at 660 — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T1.183 (I69, §3c): a first ⏎ at +2000 answers; at +400 and +700 refused, at +1000 answers — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T1.184 (I69, §3c): a neutral arrow ends the timed guard, and so does ⌃c, which still meets its intercept's reject — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T1.185 (I70): ownerRefused is undefined before a refusal and the same key after the first and the second; nextDeadline follows the grace and the gap — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T1.186 (I72, §3c): a focus-out clears held keys and the pointer arm, with no stages — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T1.187 (I73, §3c): the generation moving twice with the rung the same at both reads kills a pointer arm; the control commits — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T1.188 (I73, §3c): at the question rung, a generation change within one dispatch guards afresh — not deferred on a component: the code lands in the next commit of this round",
+  );
+});
