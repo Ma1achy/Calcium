@@ -2611,7 +2611,7 @@ A question arriving is its own fact — *a question is waiting, always* — and 
    question line (`prism: question: which branch? 1 feat/c26, 2 main`); control-stripped, and
    never opening with a number and a semicolon, which Ghostty reserves for ConEmu. The title is
    §014's as drawn: `• <binary> · <word>`.
-5. **The watch is a declaration, and its producers arrive later** (ruling 27's first sentence).
+5. **The watch is a declaration, and its producers arrive later** (ruling 27's first sentence). *Built by ruling 50 in §6p: the set is the session's (I135), `/watch` and `/unwatch` fill it (I136) and the footer's row shows it (I137).*
    A streaming entry can be watched; the watch drops at settle and its completion earns always.
    **Nothing in the tree fills it today**: `/watch` is a ninth framework verb, which C05 §3 makes
    a breaking change, and the footer's watch row (§085) is `example` display — both parked as
@@ -2623,7 +2623,7 @@ A question arriving is its own fact — *a question is waiting, always* — and 
   The one that takes 777 alone is urxvt, through a Perl extension whose presence nothing in the
   environment reports — an arm no detection could select, so it is not built.
 - **Windows Terminal is `none`**: its OSC 9 is ConEmu's family of sub-commands, unmeasured here.
-- **The watch's producers and its footer row** — **50**.
+- ~~**The watch's producers and its footer row** — **50**.~~ — **built by ruling 50** (§6p, I135–I140).
 - **The rate of repeated rungs** — **49**.
 - ~~**The return line** — §014's *the transcript says what you missed*. The transcript holds
   entries, and a line appended to it is either an entry the reader never ran or a second kind of
@@ -2708,6 +2708,144 @@ restates it; these are the cells where two could both apply.
 - **The streaming trail's `ripple` form** is minted at render with no `since` (`simple.ts`'s
   trail), and plays frame 0 for as long as the notice streams. It has no identity in the
   document — it is derived from `streaming` — so it is outside I131 by construction.
+
+## 6p. Watches, walked by hand — who fills one, and where it is shown (ruling 50, §085, `R-NTF-001`, `R-TAB-001`)
+
+*A watch is not a tab and not a push — it is a pointer INTO the transcript. Selecting one scrolls
+to its entry and expands it* (§085). Ruling 27 built the watch as a declaration that producers
+fill (I130) and parked both producers and the display as 50; ruling 50 (the person, 2026-09-27)
+made `/watch` a reserved framework verb and said *watches get built*. **Owed, and built here**:
+`/watch` and `/unwatch`, the footer's watch row, and `watch.jump[n]`. The registry's state-table
+record for A WATCH (`R-TAB-001`) is the structured half of §085 and is read before its prose:
+*entry* — a long-running job you started, or `/watch`; *carriers* — the footer row, a bar, the
+entry it points at; *actions* — `←→` along the row, `⏎` scrolls to its entry and opens it;
+*escape* — nothing, the footer is not a scope; *motion-off* — the bar stops shimmering, the
+percentage stays; *one-bit* — the bar is `##` against `..`, the name carries identity;
+*residue* — it drops itself, and the completion earns a notification.
+
+### 6p.1 — measured before ruling
+
+- **The verbs are the tenth and eleventh, not the ninth and tenth.** Ruling 50 counted from eight;
+  `/config` (ruling 43) was built after the entry was written and is the ninth (C05 §3).
+- **The grep, run again at the build** (C05 §3's process): no manifest in the tree declares
+  `watch` or `unwatch` as a tool. `test/support/manifest.fixture.json`'s `watch` is `ps`'s
+  **flag**; the one tool so named is C05 T6.18's own probe.
+- **The watch set cannot stay in the notifier.** `createNotifier` is built only when a rung is
+  opted in (`construct.ts`: *with nothing opted in there is no notifier*), so a session that never
+  set `CALCIUM_NOTIFY` — every session by default (C01 I23) — would have nowhere to hold a watch
+  the footer must show. The set moves to the session and the notifier reads it.
+- **A streaming entry is never evicted** (C13 I6: `sweep` skips `live` and `streaming`), and a
+  watch lives only on a streaming entry and drops at its settle (I130). **Eviction of a watched
+  entry is therefore unreachable**; `clear` is the one change that removes a streaming entry
+  (§6n.3 row 10), and it is where a watch can lose its subject.
+- **A subscription releases the guard and an invoke does not** (C23 I6, `execution.ts`: *a
+  subscription does not hold the guard*). While an invoke runs, every submitted line queues —
+  *everything queues, strictly* (C23 I5) — so `/watch` typed during a long invoke runs after it
+  settles. §6p.3 row 6 is what that leaves.
+- **Who owns an entry is its document's `meta.origin`** — `user`, `agent`, `action`, `refresh`
+  or `defect` (C04). §085's *pin one that is not yours* names the use the verb exists for.
+- **A progress fact already has a shape**: C04's `progress` block, `current` and `total`, drawn
+  by C09 with `barStyle` — `█`/`░` and `#`/`.` at ASCII, which is the one-bit form the record
+  names.
+- **The queued line's entry is `streaming` and `transport: "local"`** (`documents.ts`'s
+  `noticeDoc`, C23 roadmap 33), as is the handler route's before it settles — so *the newest
+  streaming entry* would name `/watch`'s own queued line when it drains.
+
+### 6p.2 — the classification table: verb × entry state × who owns it
+
+The rows are the cells where two rules could both claim an answer. *Default* is the verb with no
+argument; *named* is `/watch <back>`, counted from the end as `/debug` counts (C23 §2).
+
+| verb | entry | owner | answer | the rules that meet |
+|---|---|---|---|---|
+| `/watch` default | a stream running | `user` | watched; `watching <name>` | the default target × I130's streaming gate |
+| `/watch` default | a stream running | `agent`, `action`, `refresh` | watched, the same words | *pin one that is not yours* names a use, not a gate — **origin never refuses** |
+| `/watch` default | only a queued line is streaming | any | refused: `nothing is running to watch` | the default skips `transport: "local"` × a queued line is `streaming` — a queued line is not a run, and the one the verb would find first is its own (§6p.1) |
+| `/watch` named | a queued line | any | watched | a named target is the reader's choice, and §085 draws `f410d99 queued` as a watch; the queued line keeps its id when it runs (C23 I54), so the watch carries into the run |
+| `/watch` named | settled | any | refused: `<name> has settled — nothing left to watch` | I130's `false` × a refusal states its reason (`R-HON-004`) |
+| `/watch` named | past the transcript | — | refused: `no entry <n> back — the transcript holds <m>` | `/debug`'s words, one counting for both verbs |
+| `/watch` either | already watched | any | kept; `already watching <name>`, order unchanged | idempotent × the row's order is when each was watched |
+| `/unwatch` default | at least one watch | any | the **newest** released; `stopped watching <name>` | a verb with no argument acts on the thing it would most recently have affected |
+| `/unwatch` default | no watch | — | refused: `nothing is watched` | |
+| `/unwatch` named | not watched | any | refused: `<name> is not watched` | a release of nothing is not silently a success |
+| `/unwatch` named | watched | any | released | the settle then earns by the unwatched rows of §6n.2 — releasing withdraws the *always* |
+| either | a local verb's entry | `user` | default skips it; named refuses it as settled | a local verb's entry settles in the call that appends it (C23 §2) — only its queued line is ever `streaming`, and that row is above |
+
+### 6p.3 — the sequence trace: what happens when two things meet
+
+| # | sequence | what is on screen | the rule it forced |
+|---|---|---|---|
+| 1 | `ps --watch` streaming (guard released, C23 I6); `/watch` | a settled `/watch` entry reading `watching ps --watch`; the footer gains one row above the owner line, `⋯ ps --watch`; the transcript region is one row shorter; focus stays at the prompt and the owner line reads `⇧⇥ watches` | the row is the footer's content (I82) and is measured like it; the prompt's `⇧⇥` now names where it goes (I139, C16 I76) |
+| 2 | row 1, and the stream patches a `progress` block to 43 / 100 | the chip reads `ps --watch ███░░░ 43%` on the next frame | the chip reads the entry **as the transcript holds it now**, per frame — no copy of the progress is taken at `/watch` (I137) |
+| 3 | row 2; the reader is here; the entry settles | the chip and the row are gone; no rung fires (I127) | *it drops itself* (I130) |
+| 4 | row 2; `ESC [ O`; the entry settles after 2 s | every opted rung, `done` — the watched row of §6n.2 — and the row is gone | **the notifier reads the watch before the drop.** Two subscribers on one change is an order nothing states; one subscription calls the notifier, then the store (I135) |
+| 5 | row 2; `/unwatch`; later the entry settles after 2 s, away | `stopped watching ps --watch`; the row goes at once; the settle earns **nothing** — a short, unwatched end | releasing a watch withdraws §6n.2's *always*, and nothing else remembers it |
+| 6 | `train` (an invoke, holding the guard) running; `/watch` | `/watch` shows `queued behind train`; at the settle it drains and answers `nothing is running to watch` | **C23 I5 stands, and the verb cannot pin the one run most worth pinning** — a long invoke. Recorded in §6p.5; the keys are not submissions, so the row itself is unaffected |
+| 7 | `/watch 3` naming an entry that settled a minute ago | `ps has settled — nothing left to watch`, `warn` | §6n.3 row 12's `false`, now with words |
+| 8 | the watch row focused; a question arrives | the question takes the keys (`overlay` is above `scope`, C16 `FOCUS_ORDER`); the row stays drawn **without** its `›`; the owner line is the question's | the selection mark is the row's focus, and focus is not the row's while a question owns the keys (I137) |
+| 9 | row 8; the question is answered | the `›` returns on the watch it was on; `←→` move it again | stored focus was never moved — a question is a layer, not a focus change (C16 I1) |
+| 10 | the watch row focused on the only watch; it settles | the row stays, reading `⋯ nothing watched`; the keys stay the row's; `esc` or `⇥` returns to the prompt and the row goes | **a content arrival never moves keyboard ownership** (`R-COR-002`, C16 §3a W1) — the row is kept rather than focus moved (C16 I76) |
+| 11 | the row focused on the second of three; the second settles | the `›` is on what is now second — the old third | stored by id with its index; a missing id resolves to the index, clamped — `resolveFocus`'s *nearest survivor forward* (C26 I10) on a row |
+| 12 | three watches at 80, 60, 40 and 20 columns | 80: every chip whole; 60: bars shed, names and percentages kept; 40: watches shed from the right behind `+2`; 20: the kept name truncated | one row at every width — the footer never wraps (I138) |
+| 13 | `/clear` with a watch standing | the row goes with the entry | `clear` removes a streaming entry (§6p.1), so the store drops every watch on it (I135) |
+| 14 | a watched entry and the transcript at its block cap | the entry is not evicted — nothing to trace | C13 I6: the eviction row is unreachable, and no arm is written for it (§6p.5) |
+| 15 | the row focused; `⏎` | focus lands on the watched entry (C16 `enterLiveBlock`), the viewport pulls it in by the minimum (C26 I24); the watch stands | *opening is not releasing* — the row stays, and `⇧⇥` from the prompt returns to it (I140) |
+| 16 | the row focused, two watches; `2`, then `5` | `2` opens the second as `⏎` would; `5` is consumed and nothing moves | `watch.jump[n]` (C16 I77); a digit past the count names no watch, and passing it would reach no row either |
+
+### 6p.4 — the rulings
+
+1. **Scope: the verbs, the row and the jump; no `watch(id)` on `TuiInstance`.** Ruling 50's
+   answers were (a) the verbs, (b) an application producer on C24, (c) both with the row; the
+   person's ruled blockquote lists what is owed — *`/watch` and `/unwatch` themselves, the footer
+   watch row and `watch.jump[n]`* — and that list is the structured half of *watches get built*.
+   **Structured data beats prose.** §085's second producer, *a long-running job you started*, is
+   (b)'s shape — the application knows what a job is and Calcium does not — and stays parked.
+2. **The set is the session's** (I135). One ordered set per session, oldest first, held whether or
+   not any rung is opted in; the notifier asks it, and one subscription calls the notifier and then
+   the store, so a watched settle is read as watched before it drops.
+3. **The verbs are local framework verbs** (I136, C05 §3). Each takes one optional `int`,
+   `back`, counted as `/debug` counts. The default `/watch` is the newest `streaming` entry whose
+   document is not `transport: "local"`; the default `/unwatch` is the newest watch. Every answer
+   is a notice naming the entry by its command line; refusals are `warn`. **Origin never gates.**
+   **C23 I5 is not reopened**: the queue is the repo's shipped answer, and row 6 is a finding,
+   not a ruling.
+4. **The row is a footer row above the owner line** (I137). §085's specimen puts it last and
+   §103 puts the owner line last; `R-OWN-001` is a current rule and the specimen is `example`,
+   so **the rule decides**. The lead is the residue mark (`⋯`, `...` at ASCII); each watch is one
+   chip — its name, then a six-cell bar and a percentage when its entry holds a `progress` block
+   (the first, depth first); the watch the row is on is marked `›` (`*` at ASCII, the `current`
+   glyph) and toned `accent` **only while the row has the keys**. The bar does not animate: the
+   chip is text, the record's motion-off form is the only form, and the percentage carries it.
+5. **One row at every width** (I138). Bars shed first, then watches from the right behind a `+N`
+   chip — the one the row is on is never shed — then the kept name truncates. The footer's height
+   is its content (I82), and a wrap would spend a transcript row twice.
+6. **Opening is focus** (I140). `⏎` and `watch.jump[n]` put focus on the entry, as `⇧⇥` from
+   the prompt does for the live one (`focusTranscript`), and the pull brings it into view. There
+   is no *expand* of an entry to perform — C13 has none, and `op: "expand"` is a row's — so *and
+   opens it* is the focus landing on it. The watch stands.
+7. **`esc` at the row returns to the prompt.** The record's *escape: nothing — the footer is not a
+   scope* is right that the row raises no owner rung; `R-KEY-003` — *escape backs out* — is a
+   current rule and the row is a position of the `scope` rung, as `liveBlock` is, whose `esc` is
+   `focusPrompt`. **A consistent picture beats a lone rule**: the row's `esc` is `liveBlock`'s.
+8. **`ChromeContext.watches` is handed to an application's own chrome** (I139), as `copy` and
+   `toast` are: a footer an application supplies draws the row or does not, and the fact is not
+   the default footer's alone.
+
+### 6p.5 — what the rulings leave behind, named so it is not read as coverage
+
+- **`/watch` during an invoke** (a finding for the ledger). Row 6: the verb queues behind the run it would watch and
+  answers when there is nothing left to watch. The remedy is the *who is writing* axis C23 I5
+  leaves open, and a third case of it is the moment to stop and ask rather than add an arm.
+- **The eviction row has no arm.** C13 I6 makes it unreachable; R-BLK-879's *a watch retains a
+  stable event id … ⏎ rehydrates the watched event* is `example` prose about a durable record
+  Calcium does not keep. A watch never outlives its streaming entry here.
+- **§085's second producer** — *a long-running job you started* — is (b), parked with ruling 50's
+  unchosen answer.
+- **The status line's `⋯ 2 watching`** is not drawn; the row itself is the count.
+- **A pointer on the row** does nothing: C16 §4's mouse table reaches chrome last and has no
+  chrome target, and the keys are the route the record names.
+- **An entry with no `progress` block shows its name alone** — §036's elapsed carrier is the
+  entry's own card head, which the row does not repeat.
 
 ## 7. Health and identity
 
@@ -3010,7 +3148,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I127** — *(§6n.4 ruling 2, §014 *detected, not assumed*)* **Nothing earns while the reader may be looking.** *Unfocused* is the terminal's last focus report being `ESC [ O` (C16 I61); a session that has never had one is focused, and a fact that arose while focused earns nothing when the reader later leaves.
 - **I128** — *(§6n.4 rulings 3–4, §014)* **An earning fact fires every opted rung, in the order bell, system, title**: `BEL`; `OSC 9 ; <binary>: <line> ST` only while `capabilities.notification` is `osc9`; the title `• <binary> · <word>` through C01 I24. The line is §6m.2's completion line or §6m.3's question line, control-stripped, and never opens with a number and a semicolon.
 - **I129** — *(`R-NTF-001` *without moving the reader*)* **A notification writes only its rungs' bytes.** No entry is appended, no focus moves, no viewport scrolls and no frame is scheduled for it. **The return is not a notification**: the reader coming back closes C23 I85's away mark, and the notice that appends is the ledger's (C23 I86), on `ESC [ I` and never on a settle — so row 13 of §6n.3 holds as written.
-- **I130** — *(§6n.4 ruling 5, §085, §091)* **A watch is a declaration on a streaming entry, and it drops at settle.** `watch(id)` is `true` for a streaming entry the transcript holds and `false` otherwise; the entry's settle earns by I126's watched rows and ends the watch. **Ending it is not what stops a second earning** — I126's once-per-id already does, and the mutation pass showed a watch left standing after its settle fails nothing (§6n.3 row 11 attributed the effect to the wrong mechanism). The drop has no observable until something shows the watches, which is the footer row parked with its producers. Its producers — `/watch`, the footer's watch row — are parked as 50.
+- **I130** — *(§6n.4 ruling 5, §085, §091)* **A watch is a declaration on a streaming entry, and it drops at settle.** `watch(id)` is `true` for a streaming entry the transcript holds and `false` otherwise; the entry's settle earns by I126's watched rows and ends the watch. **Ending it is not what stops a second earning** — I126's once-per-id already does, and the mutation pass showed a watch left standing after its settle fails nothing (§6n.3 row 11 attributed the effect to the wrong mechanism). The drop has no observable until something shows the watches — **the footer's row is that observable now** (I137, §6p.3 row 3). **Amended by ruling 50**: the set is the session's rather than the notifier's (I135), because a notifier exists only while a rung is opted in; `watch(id)` is `WatchStore.watch` and answers as it did. Its producers — `/watch` and the row — are I136 and I137.
 - **I131** — *(§6o, C04 I109)* **The shell stamps every unstamped one-shot at the first frame that draws its entry, once per identity.** The identity is the entry id, the block id, the ramp's address in the block — `ramp` on a bar, `spans.i` on a span, `rows.<row id>.<column>.spans.i` in a table cell — and the effect; the stamp is the session's tick on that frame, written into the ramp as `since`. A producer's own `since` is never overwritten. A re-emitted document with the same identities does not replay; a changed effect does. The stamps are dropped with the entry, on the subscription the other per-entry stores share.
 - **I132** — *(§6o, C09 I120)* **A one-shot whose duration is past asks for no tick.** `visibleRows` asks `animationIntervalOf` with the session's tick and the region's width, so an entry whose only moving ramps are completed one-shots contributes no cadence, and a transcript holding nothing else disarms the ticker on the frame that draws the resting state.
 
@@ -3021,6 +3159,18 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I133** — *(§103, `R-KEY-004`, `R-OWN-001`, C16 I19, ruling 63)* **The owner line names no chord the session's keymap does not bind.** Every chip on it is an action looked up through `ChromeContext.hints.chord(target, action)` — the session keymap's first row for that action — or a question's own declared vocabulary; an action with no binding draws no chip, and nothing on the line spells a chord of its own. `ownerLine` called without hints reads the default keymap, which is the same answer for a session that rebinds nothing. The substate's name is the layer's declared owner (C15 I29), and the question's default label is the question's. → T1.77, C16 T1.171
 
 - **I134** — *(C16 §6c tables A and the trace, C16 I38 superseded, ruling 64)* **`bound()` resolves a reserved row to its handler, then its fallback, then nothing — and every reader of a row reads that answer.** A reserved action's handler is the one `TuiConfig.keyActions` registers under its registry id; it is asked inside `bound`, after the row resolves and before anything is mutated, because whether it handled the key decides whether the rung consumes it, and every caller runs a non-null answer at once. A handler returning `false` is the no-handler answer. With no handler the row's `fallback` runs — `⌥⌫`'s is `killWordLeft` — and a row with none resolves as though absent, so the rung passes. **The same effective action feeds the typed reply's `REPLY_ACTIONS` and the field's `FIELD_ACTIONS`**, so a borrowed editor word-kills on `⌥⌫` with no handler and refuses a registered `queue.drop` (C16 I54's *the queue* is the prompt's), **and `/help keys`**, which lists a reserved row's fallback, or omits it when it has none and no handler is registered. **A handler that throws is contained at `bound`**: the key is spent, nothing else acts, and one `warn` notice names the action — the read loop has no `catch`, so an application's hook would otherwise take the session down. → C16 T1.38, T1.38c, T4.88.
+
+- **I135** — *(§6p.4 ruling 2, I130, §085)* **The watch set is the session's, and a watched settle is read as watched before it drops.** `createWatches` holds one ordered set per session, oldest first, whether or not any rung is opted in. `watch(id)` adds a streaming entry the transcript holds and answers `true`; for one already watched it answers `true` and changes nothing, order included; for anything else it answers `false`. `unwatch(id)` answers whether it removed one. **One transcript subscription carries both readers**: on an `append` or `settle` whose entry is no longer streaming it calls the notifier — which asks the set — and then drops the id; on `clear` it drops every watch. `evict` has no arm, because a streaming entry is never evicted (C13 I6). → T1.79, T4.111
+
+- **I136** — *(§6p.2, §6p.4 ruling 3, C05 §3, C23 §2)* **`/watch` and `/unwatch` are local framework verbs, and every answer names the entry.** Each takes one optional `int`, `back`, counted from the transcript's end as `/debug` counts. With no argument `/watch` takes the newest `streaming` entry whose document is not `transport: "local"`, and `/unwatch` the newest watch. The answer is one notice — `watching <name>`, `already watching <name>` and `stopped watching <name>` muted; `nothing is running to watch`, `<name> has settled — nothing left to watch`, `nothing is watched`, `<name> is not watched` and `no entry <n> back — the transcript holds <m>` as `warn` — where `<name>` is the entry's command line. **`meta.origin` decides nothing.** Both are submissions and queue as every line does (C23 I5), which §6p.5 records. → T1.80, T4.110, T4.112
+
+- **I137** — *(§6p.4 ruling 4, §085, `R-TAB-001`, `R-OWN-001`)* **The default footer draws the watch row above the owner line while a watch stands or the row has focus.** One `pills` block, `chrome.watches`: the residue mark (`⋯`, `...` at ASCII), then one chip per watch, oldest first — its name, and, where its entry holds a `progress` block (the first, depth first), a six-cell bar in `barStyle`'s glyphs and the percentage C09 prints for it. The watch the row is on leads with the `current` glyph (`›`, `*` at ASCII) and is `accent` **only while the row is the active target**; every other chip is `muted`. With focus on the row and no watch it reads `nothing watched`. **The chip reads the entry as the transcript holds it on this frame**, so a patch is on the next frame and nothing is copied at `/watch`. → T1.78, T4.110, T4.113
+
+- **I138** — *(§6p.4 ruling 5, I82, §103's narrow ladder)* **The watch row is one row at every width.** It is measured as the owner line is — the session's ambiguous-width convention and C09's chip gap — and sheds in order: every bar at once; then watches from the right, never the one the row is on, behind a `+N` chip counting what went; then the kept name truncates to what is left. → T1.78
+
+- **I139** — *(§6p.4 ruling 8, I133, C16 I76)* **`ChromeContext.watches` carries the set and the row's selection to any chrome, and the owner line names the row's keys.** Present while a watch stands or the row has focus: the watches in order, each `{ id, name, progress? }`, and `selected` — the row's index while `watchRow` is the active target, else `null`. `OwnerHints.watchRow` says which of `present` or `focused` holds. The scope rung's line names `focusPrevious` as `watches` while a watch stands and `transcript` otherwise; at the row it names `watchPrev`/`watchNext` `move`, `watchOpen` `open` and `focusPrompt` `prompt` — each through `hints.chord` (I133). → T1.78, T4.110
+
+- **I140** — *(§6p.4 ruling 6, §085, C26 I24, C16 I76, C16 I77)* **Opening a watch is focus landing on its entry.** `watchOpen` at the row, and `watchJump<n>` for the *n*th watch, call `enterLiveBlock(id, null)`; the pull brings the entry into view by the minimum, and the watch stands. A jump past the count is consumed and changes nothing. → T4.110
 
 ## 11. Commitments
 
@@ -3135,6 +3285,10 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 85. **The label's ground is the application's, and it is a hue rather than a colour** (I114, §070, C10 I55, `R-COL-003`). `/colour` takes a **colour NAME, not a tone** — §070's own first line — so what crosses the seam is a name C10 resolves per theme, never a hex the application chose. A literal would be the one thing this repository refuses everywhere else, and §070 says why it is refused: *a hex cannot follow a theme change*. Where the design does take a literal it is on its own terms and behind a contrast question, which is M15's work and is named as a remainder rather than built here.
 86. **A toast's lifetime is a timer, and two timers are the interaction** (I116, §6l.13 E2). *A toast lasts two seconds* and *a newer toast replaces an older* are both true and meet once: the older timer, left armed, clears the newer early. The disposal is the ruling, and it is why the session holds the handle rather than firing and forgetting.
 87. **A reserved key resolves once, to the handler, the fallback or nothing, and every owner reads that answer** (I134, C16 §6c). A borrowed editor cannot disagree with the prompt about what `⌥⌫` is, and an application's hook cannot end the session by throwing.
+88. **A watch is the session's, and its settle is read before it goes** (I135). The notifier exists only for a reader who opted in; the footer's row exists for every reader, so the set cannot be the notifier's.
+89. **`/watch` and `/unwatch` answer in words, and whose the entry is decides nothing** (I136). *Pin one that is not yours* names the use the verb was drawn for; a reader's own run is as watchable.
+90. **The watch row is one footer row above the owner line, and it sheds rather than wraps** (I137, I138). The owner line keeps §103's *last line*, which is a current rule where §085's placement is a specimen.
+91. **Opening a watch moves focus to it and nothing else** (I139, I140). The row stays, and the keys it names are the keymap's.
 
 ---
 
@@ -3478,6 +3632,9 @@ PTY harness.
 - **T1.74** (I120, I121, I124): §6m.2's table, row by row, through the event function alone — each change kind against a streaming and a settled entry, an appended refusal after settle, a replace after settle writing nothing, a second settle writing nothing, and the number reading `seq` after an eviction.
 - **T1.75** (I121): every kind of `ONE_PER_KIND` through the body function — role, name and value text, a table's header before its rows, a choice without its radio glyph, nothing for a figure but its name, a notice's text once, and no SGR or glyph in any line — through the registry a session builds, with C11's, C12's and C25's kinds registered.
 - **T1.77** (I133, C16 I19): a session keymap binding `insertNewline` to `⌃j` alone draws `⌃j newline` on the scope rung's line and not `⇧⏎`; a keymap with `complete` unbound draws no `complete` chip; the substate line says `complete` for a completion panel and `find` for a search; a question's line ends with its default's label.
+- **T1.78** (I137, I138, I139): the default footer given `watches` holding three, the second a `progress` block at 43 / 100, at 80, 60, 40 and 20 columns — one `chrome.watches` row every time, directly above `chrome.owner`; at 80 the second chip is `ps --watch ███░░░ 43%`; at 60 no bar glyph is drawn and every percentage is; at 40 a `+N` chip stands and the selected watch is kept; at 20 the kept name is truncated and the row still measures one. At ASCII the lead is `...`, the bar `###...` and the selected mark `*`. `selected: null` draws no `›` and no `accent` chip; the row focused on no watch reads `nothing watched`. The scope line names `⇧⇥ watches` with one watch and `⇧⇥ transcript` with none. **Measured under `wide` as well**, where `›` and `⋯` are two cells.
+- **T1.79** (I135): the store alone over a real transcript — a streaming entry is watched (`true`), a settled one and an unknown id are not (`false`); watching the first again answers `true` and leaves the order; `unwatch` answers whether it removed one; a `clear` drops every watch and a settle drops that one alone.
+- **T1.80** (I136): the two handlers over a real transcript and store, one row per line of §6p.2 — the notice's text and tone for each, a default `/watch` skipping a `transport: "local"` streaming entry (a queued line) for the stream beneath it, and an `agent`-origin stream watched with the same words as a `user` one.
 - **T1.76** (I126, I127, I130): §6n.2's seven rows through the earning function alone — watched × failed × a duration either side of 30 000 ms — each giving exactly its row's word or nothing; a **long** entry settled twice fires once — a short one earns nothing either way, so repeating one proves nothing about the dedup; a watch on a settled or unknown id is `false`.
 - **T1.65c** (I111, §6l.10): the ground reader sees a background that is not the sequence's first parameter, and does not read a 256-colour or rgb *foreground* whose index spells `4x` or `10x` as one. The reader's own fabricated violation, and it earned its place: the first draft matched only at the head of the sequence, so a rule that was painting `38;5;188;48;5;235` was reported as painting nothing — a defect of the instrument that reads exactly like a defect of the code.
 - **T1.65d** (I111, §6l.10): a supplied string that strips to nothing — `""`, spaces, a tab — leaves the frame that shipped, and a padded name still draws. The narrowing belongs to the frame because an application computing its label may return a blank on some frames, and a one-cell ground floating in the rule is not a name.
@@ -3545,6 +3702,10 @@ PTY harness.
 - **T4.106** (I131, I132, C04 I109): a local handler — the far side's own route through C04's gate — emits a notice whose span carries `{ animate: "pop" }` and no `since`; the head is rewritten while the flash runs and not after, and **the session's pending timers fall to the `animate: "none"` control's** once it has — the ticker is disarmed, not merely redrawing an identical frame, which the writes cannot tell apart. Controls: `shimmer` on the same carrier keeps writing and holds more timers than `none`; a producer's `since` of 1 000 000 is honoured — the effect has not begun, so it still holds the shimmer's count.
 - **T4.107** (I131): a `b.live` part polls every 500 ms and renders its span with a counter beside it, so every poll really re-emits the document; the span's `wipe` (sixteen clusters, sixteen ticks) rewrites the text after its first draw, **no poll after it has finished rewrites the text**, and when a later poll changes the effect to `sweep` on the same span **the sweep starts from the inline-start edge** — a frame with the accent on the text's first cell and not its last. *Rewritten again* was the first wording and the mutation pass showed it too weak: the tick advances only while something animates, so by the switch it stood at 16 of the sweep's 19, and a sweep inheriting the wipe's stamp still drew its last frames — the band at the end — and satisfied it. The polls are slower than the effect on purpose: a restamp at a 20 ms poll pins the effect at frame 0, which draws nothing new and passes a *no replay* assertion exactly as the fix does — the mutation pass found it. *The ticker is not this row's*: a live part animates by nature — its title's poll spinner — so it holds the same timers under `none`, `wipe` and `shimmer`, measured; the disarm is T4.106's.
 - **T4.108** (I131, §6o.3 ruling 2): the stamps join the eviction subscription — a stamped entry leaves `oneShots.size` at 1, **an append past C13's cap that evicts it** takes it to 0 while a stamped neighbour survives, and `clear` takes the rest; *the evict branch was the mutation pass's last survivor, and T4.18g drives `clear` alone for the five sibling stores, so their evict branch is unrowed too*; stamping one array twice returns **the same array**, at the first stamp's tick, and a document with no one-shot is returned as it came — the memo's claim, which no behaviour shows, because a stamp remembered by the store draws the same frame with or without it.
+- **T4.110** (I135, I136, I137, I139, I140, C16 I76): through a built session with a streaming fixture verb — `/watch` appends `watching …` and the footer gains `chrome.watches` above the owner line, which reads `⇧⇥ watches`; the stream patches its `progress` block and the chip's percentage follows on the next frame; `⇧⇥` puts `›` on the chip and the owner line names `move`, `open` and `prompt`; `⏎` puts focus on the watched entry and the row stays; the settle removes the row.
+- **T4.111** (I135, I126, C01 I23): `CALCIUM_NOTIFY=bell`, `ESC [ O`, a watched entry settling after 2 s — `BEL` once; the same with no `/watch` — nothing (**the control**: the watched row, not the duration, rang). A session with nothing opted in still draws the row after `/watch`: the set is the session's.
+- **T4.112** (I136, C23 I5, §6p.5): an invoke holding the guard; `/watch` shows `queued behind`; after the invoke settles it answers `nothing is running to watch` and the footer never drew a row.
+- **T4.113** (I137, C16 I76, `R-COR-002`): the row focused on its only watch; the entry settles — the active target is still `watchRow`, the row reads `nothing watched`, `esc` returns to the prompt and the row goes. A question raised over the focused row takes the keys and the row draws no `›` until it is answered.
 - **T4.109** (C16 I68): through a built graph, `> notes` `⏎` submits nothing — no entry is appended for it and the runner is never called — appends one `warn` notice and keeps the line; `ls > notes` `⏎` is submitted. **The control is the second half**: a guard that refused every line containing `>` passes the first alone.
 - **T4.98** (I117, C04 §3aq E5): a press on the divider's column, a motion report with button 0 held five columns to the right, then the release — the divider is five cells right on the frame and focus is where it was. A motion report after the release moves nothing.
 - **T6.113** (I101): the range split dropped from the slot → T4.89a renders every kept child; the gap row dropped from the assembly → T4.89b fails on the first `gapBefore` child.
@@ -3585,6 +3746,9 @@ PTY harness.
 - **T6.131** (I132): `animationIntervalOf` asked without `{ tick, width }` → **T4.106** fails: the finished pop keeps the shimmer's timers. `tools/mutate/runs/c22-one-shots.mjs`.
 - **T6.132** (C16 I68): the submit arm's `>` guard removed → **T4.109** fails: `> notes` reaches the pipeline. `tools/mutate/runs/c16-registry-routes.mjs`.
 - **T6.133** (I110, C24 I41): the context handed the region again — `width: region.width, height: region.height` in the surface host's `context` → **T4.94c** fails with the command row, the top border and body rows 0–1 off the screen and every body row cut by two cells; and `options.invalidate()` moved back above `current = null` in `beginClose` → T4.94c's footer still reads `attached`.
+- **T6.134** (I135): the store's drop called before the notifier's read → **T4.111** fails: the watched short settle rings nothing.
+- **T6.135** (I138): the bar-shedding step removed → **T1.78** fails at 60 columns, where the row no longer fits one line.
+- **T6.136** (I136): the default target's `transport: "local"` filter removed → **T1.80** fails: `/watch` names the queued line.
 
 ---
 

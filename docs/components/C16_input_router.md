@@ -2078,6 +2078,41 @@ menu reads the buffer the reader sees, and the guard reads what would be submitt
   action's name and never a command — the reader's text is not thrown away for a typo.
 - **The rule is R-KEY-008**, registered through `tools/design/release.mjs` with its ledger row.
 
+## 6d. The watch row — a target at the `scope` rung (ruling 50, §085, C22 §6p)
+
+§085 gives the row three keys and a verb: *`⇧⇥` focus the watch row, `←→` move among watches,
+`⏎` scroll to its entry and open it*, and *`watch.jump[n]` remains an action and receives a direct
+chord only when the resolved profile can assign one without a collision*. The row is in the
+footer, and a footer is not a scope (`R-TAB-001`'s A WATCH record); so it is a **position** of the
+`scope` rung, as `liveBlock` is, and not a rung of its own.
+
+| at | key | action | why |
+|---|---|---|---|
+| `prompt` | `⇧⇥` | `focusPrevious` | the row while a watch stands, the transcript otherwise — `focusTranscript`'s row, renamed because it no longer always goes there |
+| `watchRow` | `←` `→` | `watchPrev` `watchNext` | *move among watches*, clamped at the ends |
+| `watchRow` | `⏎` | `watchOpen` | *scroll to its entry and open it* (C22 I140) |
+| `watchRow` | `1`–`9` | `watchJump1`–`watchJump9` | `watch.jump[n]`, from the registry (I77) |
+| `watchRow` | `⇧⇥` | `focusTranscript` | backward past the row, so the transcript is still reachable: prompt → row → transcript |
+| `watchRow` | `⇥` | `focusPrompt` | forward is where the reader came from |
+| `watchRow` | `esc` | `focusPrompt` | `R-KEY-003`, and `liveBlock`'s `esc` — C22 §6p.4 ruling 7 |
+| `watchRow` | `⌃c` | the ladder's rung: to the prompt | `liveBlock`'s rung, one position over |
+
+**Walked with C22 §6p.3.** Rows 8–11 are this component's: a question over the focused row takes
+the keys because `overlay` is above every `scope` target, and the stored position outlives it; the
+last watch settling leaves focus where it was (`R-COR-002`, §3a W1's rule — *a render event may
+change drawing but never keyboard ownership*); the selection is stored **by id with its index**,
+so a watch settling ahead of the selection does not move it and one settling under it resolves
+forward, as `resolveFocus` does for an element (C26 I10).
+
+**`watch.jump[n]` has no direct chord in either profile, which is the design's own condition
+answered.** `⌥1`–`9` (default) and `⌘1`–`9` (enhanced) are the agent jumps; `⌃1`–`9` is not a
+key a terminal without the protocol can send — `⌃3` is `ESC` and `⌃2` is `NUL` — and with the
+protocol it is macOS's *Switch to Desktop n* (`R-REF-002`, platform chords remain owned). So the
+action's route is the row: the registry binds `1`–`9` in the `default-terminal` profile, `global`
+when `focused` — *within the focused thing*, `move.left`'s convention — and this table binds them
+at `watchRow` alone, where nothing types. **A capability makes an action better, never possible**
+(§108): the row is the route every terminal has. The rule is `R-KEY-009`.
+
 ## 7. State machine
 
 Two small machines, both with an injected clock.
@@ -2278,6 +2313,8 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I73** — *(§3c S9, S10b, I43, → C15 I33)* **The epoch moves when the rung changes or the owner generation does.** The generation is a pull (`ownerGeneration`) summing C15's count of keyed pushes and removals and the surface host's attachments, so a question raised and answered between two reads — the rung the same at both — still kills an arm taken before it. **A generation change at the `question` rung is a question arriving**, and is guarded as one: a question replaced by a question within one dispatch. The counter is private to `router.ts`; its readers are `commitPointer` and the guard. → T1.187, T1.188
 - **I74** — *(§3d, I48, → C15 I31, R-BLK-779, R-SEL-012)* **The pointer reaches the topmost layer that takes its gesture.** `placed` is asked per gesture — C15's `takesPointer`, so a peek takes the wheel and no press — and the router takes the **last** hit, because C15's `layout` is draw order. **A wheel over a layer goes to that layer's scroller by id** (`scrollLayer(id, notches)`), never through a rung handler that reads `top`: a keyed layer consumes the wheel whether or not it moved, and a peek that has nothing to scroll **declines** it to the base, as a `scroll` that cannot move does. The menu's scroller is a window offset held beside its selection and independent of it — the wheel changes what is shown and never what is chosen (C19 I20), and the next key that moves the selection brings the window back to it. Any other layer's scroller is a row offset into its own rendered lines, clamped to them at write and dropped when the layer goes. → T1.189, T1.190, T1.191, T4.92, T4.93
 - **I75** — *(§3e, §103, I49, I64, I65, R-BLK-908, R-OWN-002, ruling 62)* **The host escape is a reserved route, read before the ladder.** `interceptOf` answers `host-detach` for a key the keymap's `child` rows resolve to `hostDetach` — `⌃]`, and `⌥esc` under the enhanced profile — and the table declares `global-intercept` at `child`, whose exception calls `detachChild`, and `handle` at every other rung. **No handler at `child` is offered the chord**, so the detach does not depend on which handler registered first, and the composition root registers none for it. A **release** of the chord at `child` is consumed and detaches nothing — the child is not handed half a chord the host took. A question raised over an attached child waits beneath it and takes the keys at the detach, guarded from that observation (I69, I73). → T1.193, T1.194, T4.94
+- **I76** — *(§6d, §085, ruling 50, `R-COR-002`, C22 I137)* **The watch row is a position of the `scope` rung, and a content change never takes focus off it.** `StoredFocus` gains `{ at: "watches"; id; index }` and `activeTarget` answers `watchRow` for it, below `interaction` and every layer; `RUNG_OF.watchRow` is `scope`. `⇧⇥` at the prompt is `focusPrevious`: the row while a watch stands, else the transcript. At the row `←`/`→` move among watches (clamped), `⏎` opens, `⇥` and `esc` return to the prompt, `⇧⇥` goes to the transcript and `⌃c`'s rung returns to the prompt. The selection resolves by id, and a missing id by its index clamped to the row. **When the last watch drops, focus stays**, and the row reads `nothing watched` until the reader leaves. → T1.198, T4.95
+- **I77** — *(§6d, §085, `R-KEY-009`, `R-REF-002`, `R-KEY-006`)* **`watch.jump[n]` is reached from the row in both profiles and has no direct chord.** The registry's `watch.jump.1`–`watch.jump.9` bind `1`–`9`, `default-terminal`, `global` when `focused`, and the keymap binds them at `watchRow` alone. No direct chord is assigned because neither profile has one free — `⌥1`–`9` and `⌘1`–`9` are the agent jumps, and `⌃1`–`9` is unsendable without the protocol and the platform's with it. → T1.199
 
 ## 9. Commitments
 
@@ -2335,6 +2372,8 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 50. The pointer reaches the topmost layer that takes its gesture, a peek included for the wheel, and a wheel over a layer goes to that layer's scroller by id (I74). → T1.189, T1.190, T1.191, T4.92, T4.93
 51. Only an unmodified primary press dismisses an escapable layer; every other press or drag beside it is inert (I47). → T1.192
 52. The host escape is a reserved route read before the ladder, so no handler registered at the child's rung can take it (I75). → T1.193, T1.194, T4.94
+53. The watch row is a position of the scope rung, reached by `⇧⇥` while a watch stands, and nothing that arrives moves focus off it (I76). → T1.198, T4.95
+54. `watch.jump[n]` is the row's `1`–`9` in both profiles, because no direct chord is free in either (I77). → T1.199
 
 ---
 
@@ -2449,6 +2488,8 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.195** (§6a clause 6, R-KEY-005, §019): `chordText` renders every chord in the design's notation, by equality against the registry record each `REGISTRY_BINDINGS` row names. *(Written in `router-keymap.test.ts` as a second T1.98, and renumbered in review batch 3 — the id this spec's T1.98, I43, holds.)*
 - **T1.196** (§6a clause 6, I34): two keys that render one chord are still two slots — the duplicate check compares `keySlot`, not `chordText`. *(The second T1.99, renumbered in review batch 3.)*
 - **T1.197** (§6a clause 4, R-KEY-005, §022): the listing's order is the registry's, then `FOCUS_ORDER` — never alphabetical. *(The second T1.100, renumbered in review batch 3.)*
+- **T1.198** (I76): `activeTarget` answers `watchRow` for `{ at: "watches" }` and `prompt` after `reset()`; `RUNG_OF.watchRow` is `scope`; `FOCUS_ORDER` holds `watchRow` between `prompt` and `liveBlock`. The focus store's selection: `toWatches("b", 1)` stores both, and resolution over `["a", "c"]` answers index 1 (`c`), over `["a", "b", "c"]` index 1, over `["a"]` index 0.
+- **T1.199** (I77, I76): the keymap's `watchRow` rows are exactly §6d's — `←`, `→`, `⏎`, `esc`, `⇥`, `⇧⇥` and `1`–`9` — with no duplicate slot in either profile; the registry's nine `watch.jump.*` records are `default-terminal`, `global`, `focused`, chords `1`–`9`, with no `enhanced-terminal` record; and no keymap row at `global` or `prompt` binds a bare digit.
 - **T1.188** (I73, §3c S10b): at the `question` rung, a dispatch that moves the generation leaves the router guarded afresh; the same dispatch with the generation still leaves it unguarded.
 
 ### Tier 2 — contract / interface
@@ -2552,6 +2593,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T4.92** (I74, C19 I20, §3d Q2): through the graph — a typed menu truncated by its placement; a wheel down over it moves its window, so the first candidate shown changes, while `selected` stays `null` and the transcript's `topRow` does not move; `↓` then selects and the window follows the selection.
 - **T4.93** (I74, C15 I31, §3d P5, P6): through the graph — a peek truncated by its placement; a wheel over it moves the peek's rows and not the transcript's `topRow`; over a peek that fits, the same wheel moves the transcript.
 - **T4.94** (I75, I49, §3e H2, H8): through the graph — a surface attached and a second `child` handler registered **`first: true`** that consumes every key; `⌃]` as bytes closes the surface with reason `detach` and neither the child nor the handler saw it. Then a verb that asks while a surface is attached: the question waits, `⌃]` detaches, and the question is answered by a deliberate `⏎`.
+- **T4.95** (I76): through a built session — `⇧⇥` with no watch focuses the transcript; after `/watch` on a stream, `⇧⇥` focuses `watchRow`, a second `⇧⇥` the transcript; back at the row, `⇥` returns to the prompt and `⌃c` does too.
 - **T4.91** (I69, I70, C22 §6): through a built session on a terminal with no release reporting — a question arrives: the owner line reads `ready in a moment`; a `⏎` at +100 is refused and the line names `⏎ refused: pause, then press ⏎`; a second at +200 is refused and **the frame does not change**; with no input, the frame at the deadline has no mark, because the wake drew it.
 - **T4.81** (I62, C23 I36, ruling 59): through the confirm host — `⌃c` at an open question: the promise is unsettled, the layer is open, and the notice is drawn. **T4.81b**: the same with `inFlight: "local"` — `cancels() === 0`.
 - **T4.82** (C23 I82, R-HON-004, R-INT-008, ruling 60): the first `q` at a choice question → exactly one C15 `content` change and one `invalidate`, and the frame at 80 columns, read as text, holds `answer this first` on the question's row; the second `q` → no change, no `invalidate`, the same lines; then `n` answers. At a 12-row region the choices are still drawn after the notice lands.
@@ -2663,6 +2705,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.61** (I74, C15 I31): L4's `placed` filtered by `takesInput` again → T4.93 fails, and the wheel over a truncated peek scrolls the transcript.
 - **T6.62** (I47): the dismissal back to any non-wheel press → T1.192 fails on the right press.
 - **T6.63** (I75): `interceptOf`'s `host-detach` arm removed and the composition root's `child` handler restored → T4.94 fails, and the handler registered ahead takes `⌃]`: the surface stays attached.
+- **T6.64** (I76): `focusPrevious` sending focus to the transcript whatever the watches → **T4.95** fails on the second press.
 - ~~**T6.36**~~ — **retired with T3.20** (ruling 52 as amended, I69). It read *the guard given a time window instead of a boundary event → T3.20 fails*, and the arm without releases is given two windows by the person's ruling. The objection it carried — a single window is wrong in both directions — is kept by I69's grace and T6.54.
 - **T6.53** (I69): the gap no longer restarted by a refusal — the guard ends when its grace does → T1.181 fails on the repeat after the grace.
 - **T6.54** (I69): the arrival grace dropped, leaving the 250 ms gap from the arrival alone — ruling 52's first form → T1.182 fails at the 660 ms repeat.
