@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 
 import { createRefreshDriver, elapsedNeeded, STALL_MS } from "../../src/shell/refresh.js";
 import type { RefreshHost, ViewRefresh } from "../../src/shell/refresh.js";
+import type { RefreshHost as PublishedHost } from "../../src/index.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { SESSION_BLOCK_CAP } from "../../src/viewport/transcript/cap.js";
 import { block } from "../../src/data/viewmodel/index.js";
@@ -615,6 +616,15 @@ describe("C23 §3b — part refresh", () => {
   // it, and I33's release-on-a-gone-host is T3.67's.
 
   it("T4.21 (C23 I83, C24 I40, I32): a host is an entry and nothing wider, and `release` stops one entry's parts while a second is untouched", async () => {
+    // **The kind, at the type** (C23 I83, C24 I40). Read off the published
+    // `RefreshHost`, because I40 is the public surface's promise: a second member
+    // of the union turns this `false` and `make typecheck` fails on the line
+    // below. The runtime half cannot see a kind nobody declares, which is why
+    // the assertion is a type and the `expect` only keeps the binding used.
+    type OnlyEntry = PublishedHost["kind"] extends "entry" ? true : false;
+    const onlyEntry: OnlyEntry = true;
+    expect(onlyEntry).toBe(true);
+
     // What survives of the view row: the loop releases the host it is told to
     // and nothing else. Two entries, because *stopped* asserted over one host is
     // indistinguishable from *stopped everything*.

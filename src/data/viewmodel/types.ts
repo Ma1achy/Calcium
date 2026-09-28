@@ -3122,11 +3122,15 @@ export type Patch = Readonly<{
    */
   collapsedAfter?: number;
   /**
-   * The affordances this patch offers — `view` for fullscreen (C25 §3b).
+   * The affordances this patch offers (C25 §3b). It read *`view` for
+   * fullscreen*; the kind and the screen went with the pushed view (R-EXA-082).
+   * **No kind unfolds a patch yet**: `actions.ts`' `expand` resolves a row or a
+   * folded `scroll`, so one naming a patch answers *nothing to expand* until a
+   * patch arm exists there.
    *
    * On the block rather than as an unconditional key binding: the offer is data
-   * the producer supplies, so a patch that should not offer fullscreen simply
-   * does not carry the action. A binding that applied to every patch would give
+   * the producer supplies, so a patch that should not offer one simply does not
+   * carry the action. A binding that applied to every patch would give
    * the block no way to decline (C04 §3).
    */
   actions?: readonly Action[];
