@@ -161,6 +161,9 @@ describe("C04 I141 — a notice's state names its tone and its glyph", () => {
       /"glyph" must be "queued"/u,
     );
   });
+  it.todo(
+    "T2.138 (C04 I141, I6, question 57): validateDocument accepts glyph work-unit on each of the four states that are not queued, and refuses glyph running on a plain notice as outside the vocabulary — not deferred on a component: the code lands in the next commit of this round",
+  );
 });
 
 describe("C09 I45 — the call head, rendered", () => {
