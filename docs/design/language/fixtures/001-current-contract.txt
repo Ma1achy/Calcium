@@ -1,4 +1,4 @@
-CURRENT CONTRACT · revision 0.16
+CURRENT CONTRACT · revision 0.17
 Generated from the registry. IDs are permanent; only CURRENT records are normative.
 Every repetition below is rendered from or cites one of these records. EXAMPLE sections cannot create a requirement.
 

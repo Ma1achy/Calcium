@@ -1,7 +1,7 @@
 {
   "meta": {
     "name": "Calcium design language",
-    "revision": "0.16",
+    "revision": "0.17",
     "generatedArtifact": "calcium-design-language.html",
     "ruleIdPolicy": "IDs are explicit, permanent, and never derived from order.",
     "normativeSource": "calcium-registry.json",
@@ -33015,7 +33015,7 @@
     "ruleIds": [
       "R-THM-001"
     ],
-    "note": "What a theme carries that is not CSS, or not a theme's own (C10 I62). A theme record names its fourBit map and its spectrum; a theme with no .syn-* or .cat-* rules derives those palettes from its own tones by paletteDerivation. The ANSI indices are curated for the sixteen-colour rung and measured against the xterm defaults (C10 I61).",
+    "note": "What a theme carries that is not CSS, or not a theme's own (C10 I62). A theme record names its fourBit map and its spectrum; a theme with no .syn-* or .cat-* rules derives those palettes from its own tones by paletteDerivation. The ANSI indices are curated for the sixteen-colour rung and measured against a reference palette, the legacy Windows console's sixteen; a running terminal's sixteen are its own (C10 I61).",
     "fourBit": {
       "dark": {
         "tone.default": 15,

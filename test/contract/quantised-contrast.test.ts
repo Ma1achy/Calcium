@@ -228,3 +228,8 @@ describe("C10 I69 — the quantiser holds the floor", () => {
     }
   });
 });
+
+describe("C10 I17 and I70 — muted kept apart, and the 8-bit floor as a load gate", () => {
+  it.todo("T2.79 (C10 I17, PARKED 79): at 8 bits no tone of the five shares muted's index on any shipped ground unless the two carry one value, paper's page gives info 242 and muted 243, and a constructed pair each at 242 alone splits — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T2.80 (C10 I70, I4, I11): loadTheme and applyOverrides refuse the 256-colour cells beside the 24-bit reasons, the shipped set loads, the verdict is kept only for a frozen token set, and the scratch name is forgotten — not deferred on a component: the code lands in the next commit of this round");
+});

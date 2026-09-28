@@ -1149,6 +1149,12 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
+> **Ruled 2026-09-28** (by Claude under the person's standing authority; review batch 4). **No fact shares an index with `muted`.** C10 I17's distinctness set gains `muted`: the kept-distinct set is the five meaning tones plus `muted`. **The yield ladder stays** — the floor, then distinctness, then rank (C10 §4c.4 row 4). *Reason:* carrier rules count per fact. On `paper`, `info` rendered as `muted` loses the one carrier that tells a notice from nothing to see at 8-bit, and a consistent picture beats rank. It is a mechanism answer inside the quantiser, so no registry value moves. *Rejected:* CIEDE2000 as the quantiser's distance, and re-valuing `paper` — each changes more than the one collision. **Premise note, measured after building** (C10 §4c.4 row 12): the ladder moves the lighter claimant, so on `paper`'s page it is `muted` that moves (242 → 243, `#767676`, 3.91 : 1) and `info` keeps its grey (242, `#6c6c6c`, ΔE76 30.1 from `#1f6b94`, 4.53 : 1). The two indices are 1.16 : 1 apart, so the carrier the ruling protects is distinct by index and close by eye. Eight picks move across the shipped set; three take a hue that belongs to another fact, reported with lane b4-quant's hand-back.
+
+**79 · RULED — Whether `muted` is kept apart from the meaning tones at 8-bit.** Review batch 4 found that C10 I17 kept `{ok, warn, error, info, accent}` apart and left `muted` free to collapse, and on `paper`'s page the floor turned `info` into `muted`'s grey, so the two facts rendered as one colour.
+
+---
+
 ## Not yet recovered
 
 The gap between the entries and the running count in the per-MR reports was chased and closed: some questions had been counted twice. The list is the count. **No total is stated here in prose**, because the one that used to be here said *sixteen* long after that stopped being true — this file's own subject, arriving inside it.
