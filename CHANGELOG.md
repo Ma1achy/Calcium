@@ -35,9 +35,35 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   dependencies are removed.
 - **A key release reaches an attached child only** (M5).
 - **`clearConfirmLayer` and `history-clear-confirm` are removed** (M5).
+- **`TuiConfig.keyActions` is keyed by the design registry's action id** (4a2019ed, M6), and
+  an id outside the reserved set is a construction error (C24 I39).
+- **Sixteen bindings are split by keyboard profile** (5ccc3676, M6). A chord only a Kitty-protocol
+  terminal can send (`⌘1`…`⌘9`, `⌘↑`/`⌘↓`, `⌃⇧C`, `⌃⇧V`, `⌃⇧⇥`) is bound under
+  `enhanced-terminal`; a plain terminal gets the base route (`⌥1`…`⌥9`, `⌃home`/`⌃end`, `⌥w`,
+  `⌃y`, `⌥,`/`⌥.`). `docs/KEYS.md` lists both.
+- **Kitty `⌃⇧C` is copy, never an interrupt** (601310a3, M6, C16 I67).
+- **A line whose first character is `>` is never submitted** (c810c521, M6, C16 I68). It opens
+  the action palette; `> notes` no longer reaches the shell as a redirect.
+- **`PushedSurface` is `ChildSurface`, `PushedSurfaceHandle` is `ChildSurfaceHandle`, and the
+  schema string `"calcium.pushed-surface/1"` is `"calcium.child-surface/1"`** (M9; record restored
+  in 36761bc5). No aliases are exported.
+- **`RefreshHost` has one kind, `{ kind: "entry"; id }`** (36761bc5, C24 I40). `b.live` is driven
+  only in a transcript entry.
+- **A manifest declaring `view` is refused** (f10e7a3f, C05 I27), naming its retirement — on a
+  tool or a flag, `true` or `false`.
+- **`watch`, `unwatch` and `config` are reserved verb names** (f10e7a3f, C05 I28); a manifest
+  declaring one is refused. `config` is now the framework's ninth verb (70913a44).
+- **A child surface is told the panel's interior** (de2fcd48, C24 I41): `SurfaceContext.width`
+  and `height` exclude the entry's chrome and the panel border, where they were the whole region.
 
 ### Added
 
+- **`ColumnDef.vocabulary`** (7003e78f, C04 I6). A column's closed set of words, which may
+  carry their tone without a glyph; a cell outside it is refused.
+- **`Patch.cap` and `expanded`** on `Patch`, `keyValue`, `events`, `comparison` and `steps`
+  (94331d36, C25 I14, C09 I124). A producer declares a patch's row budget; `⏎` expands in place.
+  `BlockDefinition.fold?` and `BlockRegistry.fold` carry a kind's fold.
+- **The framework's `/config` verb** (70913a44): every setting, its value, and where it came from.
 - **`Glyph`: `focus`** (73c01458). The focus gutter's mark, `▸` / `>`, as a slot of its
   own. It was drawn with `expand`'s, which is now the hollow `▹` / `(`.
 - **`Glyph`: `question` and `current`** (70f4acc8). A question's mark, `⟩` / `?`, and the

@@ -56502,3 +56502,68 @@ every seeded row — was falsified by measurement: 82 of 10,000 rows fail it for
 normaliser, on faithful oddities, while the random corpus holds **no** bold-beside-dim case at all.
 The row now asserts intensity and carries a dense corpus built to hold the case (0fdcddee).
 
+## F1276 — a rename that rewrote its own record ★★☆☆☆
+
+`b8bbacda` renamed `PushedSurface` to `ChildSurface` across the tree, and C24 §3's record of that
+rename was in the tree too. It came out as *`ChildSurface` → `ChildSurface`, `ChildSurfaceHandle` →
+`ChildSurfaceHandle`, `"calcium.child-surface/1"` → `"calcium.child-surface/1"`* — grammatical, well
+formed, and missing the old name, which is the one part a porter needs. The paragraph's own
+justification still read correctly, which is how it survived review. **A record of a change is the
+one text a find-and-replace for that change must not touch**, and nothing marks it as such; the
+same class sits wherever a document quotes a retired identifier as history (`MILESTONES.md` M9,
+C10 T2.58's fabricated row, `c10-landing-record.mjs`), surviving only because they were outside the
+rename's files. Restored verbatim by lane b3-f (review batch 3, M9 item 5). **Owed**: the class check —
+an arrow between two identical code spans in `docs/` has no legitimate reading.
+
+## F1284 — the wire validator accepts a warn or error cell with no glyph ★★☆☆☆
+
+Probed by lane b3-g: `validateDocument` / `validateBlock` return `{"ok":true}` for a `warn` or `error`
+cell, and for a notice, carrying no glyph. C04 I6's glyph requirement is worded as a lint over block
+construction and is enforced only in `block()`, so a far side emitting `tui.view/1` can draw
+colour-only — the case D29 exists to prevent. Ruling 44's closed vocabulary is enforced at both
+`block()` and the wire; the glyph requirement underneath it is not. Not fixed: enforcing it at the
+wire refuses far-side documents that currently pass, which is a change of contract and wants a
+ruling.
+
+## F1311 — the patch cap's decision named a writer that no route has ★★☆☆☆
+
+Plan decision D12 had the producer compute a patch's cap from `ProducerContext.height`. C07 I18
+makes `height` non-null only on the view route, and R-EXA-082 retired that route, so no framework
+producer can compute *one viewport*; only an application writing `cap` itself can. Measured by lane
+b3-d before the code landed. Closed by ruling 73: I18 stands, and `Patch.cap` is a row budget its
+producer declares, with no framework default.
+
+## F1312 — T2.116's red, measured from batch 3's side ★☆☆☆☆
+
+The same defect as F1317, which is its record. Lane b3-d met it as a harness refusal: `c09-shed`
+stopped with *the unmutated suite already fails*, so its re-anchored mutation (*a kind drops a row it
+cannot draw*, now on events' `flatMap`) could not be verified. After batch 3 took batch 2's fix, the
+run is green: caught 10, survived 0.
+
+## F1313 — the patch split view draws `│` at the ASCII rung ★☆☆☆☆
+
+Reading the split view's frames at 120 columns, lane b3-d found its separator drawn as `│` under
+`ASCII_CAPS`. Not fixed; the site is in `src/presentation/patch/`.
+
+## F1314 — a child surface was told the whole region, not the room inside its entry ★★☆☆☆
+
+At 60×20 the child was told 59×13. The entry's command row, both panel borders and the closing gap
+pushed rows R00–R01 and the command row off-screen, and every visible row was cut to the rails. The
+context, the entry's measurement and the viewport agreed with each other, and the frame was still
+wrong — found by reading it. Closed by C24 I41: the child is told
+`panelInterior(width, height − chrome − gap)`, 57×9 at 60×20, and the whole entry fits in 13 rows.
+
+## F1315 — ordering the mark after the append cannot keep the child's entry out of the ledger ★☆☆☆☆
+
+The plan's mechanism was to open the attached mark after the child's entry is appended. The walk's
+row L11 defeats it: an away mark is already open when the child attaches, and C13 emits the
+append's change inside `append`, before the id is returned. Lane b3-e excludes the entry by id,
+including a record already made; with that in place the order of opening the attached mark makes
+no difference, so `c23-away-ledger`'s MARK-BEFORE-APPEND is an expected survivor, its reason
+recorded in the run.
+
+## F1316 — the footer said a child still held the keys after the app closed it ★☆☆☆☆
+
+After an application called its own `close()`, the footer kept showing `attached · keys → child`
+until the next key: the close's frame was committed before `current = null`. Now it is committed
+after ownership returns, as C22 I110 amended says (lane b3-e).
