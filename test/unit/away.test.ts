@@ -1,4 +1,4 @@
-// C23 I84–I86 — the away ledger, alone (ruling 51).
+// C23 I85–I87 — the away ledger, alone (ruling 51).
 //
 // **Stepped, and the whole state asserted after each step.** The ledger is a
 // sequence machine with two kinds of mark that overlap, so the row walks one
@@ -26,8 +26,8 @@ const entry = (id: string, command: string, opts: { failed?: boolean; streaming?
   };
 };
 
-describe("C23 I84–I86 — the away ledger, alone (ruling 51)", () => {
-  it("T1.97 (C23 I84, I85, I86): the ledger stepped by hand — one record per settlement inside a mark, nothing for an empty close, exclusions, first close wins, a gone entry still named, failures first, and the notice it closes to", () => {
+describe("C23 I85–I87 — the away ledger, alone (ruling 51)", () => {
+  it("T1.97 (C23 I85, I86, I87): the ledger stepped by hand — one record per settlement inside a mark, nothing for an empty close, exclusions, first close wins, a gone entry still named, failures first, and the notice it closes to", () => {
     const ledger = createLedger();
 
     // **Before any mark** a settlement is nobody's.
@@ -89,7 +89,7 @@ describe("C23 I84–I86 — the away ledger, alone (ruling 51)", () => {
     expect(closed.map((s) => s.id)).toEqual(["bad", "ok1", "ok2"]);
     expect(closed[0]).toEqual({ id: "bad", line: `entry ${String(bad.seq)}: /second — failed`, failed: true });
 
-    // **The notice (C23 I85)** — nothing for nothing, a count and one line
+    // **The notice (C23 I86)** — nothing for nothing, a count and one line
     // each, and the chord only on a return.
     const words = { separator: "·", bottom: "⌃end" };
     expect(summaryOf("attached", [], words), "zero settlements append nothing").toBeNull();

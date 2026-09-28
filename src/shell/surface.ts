@@ -116,7 +116,7 @@ export type SurfaceHostOptions = Readonly<{
   }>;
   /**
    * The attachment's two edges, for what the host keeps beside the keyboard
-   * (C23 I84, C14 I56).
+   * (C23 I85, C14 I56).
    *
    * `opened` runs **after** the child's entry is appended, and `closed` after
    * ownership has returned and **before** the close's frame is committed — so

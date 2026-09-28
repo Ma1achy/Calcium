@@ -1778,7 +1778,7 @@ export async function constructGraph(
   }
 
   /**
-   * **The away ledger** (C23 I84–I86, ruling 51, R-BLK-314): what settled while
+   * **The away ledger** (C23 I85–I87, ruling 51, R-BLK-314): what settled while
    * the reader was not watching, said once when they come back. Always built —
    * its attached mark needs nothing opted in — and its away mark opens only
    * on a focus report, which arrives only when a rung is (C22 §6n.4 ruling 2).
@@ -1790,7 +1790,7 @@ export async function constructGraph(
     if (entry !== undefined) ledger.settled(entry);
   });
   /**
-   * A close's notice, appended — `true` when there was one (C23 I85). The chord
+   * A close's notice, appended — `true` when there was one (C23 I86). The chord
    * is the session keymap's `scrollBottom` row at this terminal's profile,
    * spelled by `chordText` (C16 I58), so a rebinding moves it with `/help`.
    */
@@ -4363,14 +4363,14 @@ export async function constructGraph(
     const deliver = (batch: readonly InputEvent[]): void => {
       // **A focus report is read here and routed nowhere** (C16 I61, C22 I129):
       // it moves no focus, and it commits a frame only when the return has
-      // something to say (C23 I85) — the record changed, which the rungs'
+      // something to say (C23 I86) — the record changed, which the rungs'
       // bytes never do.
       let returned = false;
       const events = batch.filter((e) => {
         if (e.kind !== "focus") return true;
         if (notifier === null) return false;
         notifier.focus(e.focused);
-        // **The away mark** (C23 I84): opened by the leaving, closed by the
+        // **The away mark** (C23 I85): opened by the leaving, closed by the
         // return — and only where the report was asked for. With no rung opted
         // in `?1004h` was never taken, so a report that arrives anyway is not
         // one this session can vouch for, and it is read as the rungs read it.
@@ -4490,7 +4490,7 @@ export async function constructGraph(
         );
       },
     },
-    // **The attachment's edges** (C23 I84, C14 I56). The child's entry is
+    // **The attachment's edges** (C23 I85, C14 I56). The child's entry is
     // counted by no mark and kept whole while it holds the keyboard; the
     // detach says what settled — unless the session is what closed it, when
     // nobody comes back to read it (L9).

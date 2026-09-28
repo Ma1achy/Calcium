@@ -1,5 +1,5 @@
 /**
- * C23 I84–I86 — the away ledger: what settled while the reader was not watching
+ * C23 I85–I87 — the away ledger: what settled while the reader was not watching
  * (ruling 51, §014, `R-BLK-314`).
  *
  * *When you come back, the transcript says what you missed.* Two absences say
@@ -19,31 +19,31 @@ import { completionLine, failed, type LinearEntry } from "./linear.js";
 /** Who opened the mark: a child attaching, or the terminal losing focus. */
 export type MarkKind = "attached" | "away";
 
-/** One settlement, as it read when it settled (I84) — the entry may be gone by the close. */
+/** One settlement, as it read when it settled (I85) — the entry may be gone by the close. */
 export type Settlement = Readonly<{ id: string; line: string; failed: boolean }>;
 
 export type Ledger = Readonly<{
-  /** Open a mark; a mark of that kind already open stays as it is (I84). */
+  /** Open a mark; a mark of that kind already open stays as it is (I85). */
   open: (kind: MarkKind) => void;
   /** An entry that may have settled — C13's settled `append` or `settle`. */
   settled: (entry: LinearEntry) => void;
   /**
-   * An entry no mark counts: the surface host wrote it, and it is live (I84).
+   * An entry no mark counts: the surface host wrote it, and it is live (I85).
    * **Retroactive**, because the id exists only once the append has returned —
    * and the append's own change has reached `settled` by then.
    */
   exclude: (id: string) => void;
   /**
    * Close a mark, and what it has to report — **failures first**, otherwise in
-   * the order they settled (I85). Empty for a mark that is not open or that
-   * saw nothing another mark had not already reported (I86).
+   * the order they settled (I86). Empty for a mark that is not open or that
+   * saw nothing another mark had not already reported (I87).
    */
   close: (kind: MarkKind) => readonly Settlement[];
 }>;
 
 /**
  * **A command entry**: one with a command line that the surface host did not
- * write (I84). The command line is the condition C09 §4 already reads for a
+ * write (I85). The command line is the condition C09 §4 already reads for a
  * notice's continuation mark — a shell-origin notice has `command: ""`, and
  * this ledger's own notice is one, so it can never report itself to a second
  * open mark.
@@ -70,7 +70,7 @@ export function createLedger(): Ledger {
     },
     settled(entry) {
       if (!counts(entry, excluded)) return;
-      // **Taken now** (I84): the line an evicted entry would have read at the
+      // **Taken now** (I85): the line an evicted entry would have read at the
       // close is the one it read here, and after an eviction there is no other.
       const settlement: Settlement = Object.freeze({
         id: entry.id,
@@ -89,7 +89,7 @@ export function createLedger(): Ledger {
       const held = marks.get(kind);
       if (held === undefined) return [];
       marks.delete(kind);
-      // **The first close reports it, and the others forget it** (I86) —
+      // **The first close reports it, and the others forget it** (I87) —
       // dropped from every mark still open rather than remembered as said, so
       // what the ledger holds is only ever what is still owed.
       const ids = new Set(held.map((s) => s.id));
@@ -108,7 +108,7 @@ export type SummaryWords = Readonly<{
 }>;
 
 /**
- * The close's words (I85): a head — the count, and for a return of focus the
+ * The close's words (I86): a head — the count, and for a return of focus the
  * way to the bottom — then one line per settlement, in the order given. `null`
  * for nothing to report, so an empty close cannot append by accident. The
  * entry is `documents.ts`'s to compose (C23 I61): this file says what, not how.

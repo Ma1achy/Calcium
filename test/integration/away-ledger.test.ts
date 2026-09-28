@@ -1,4 +1,4 @@
-// C23 I84–I86 — the away ledger through the graph (ruling 51, R-BLK-314).
+// C23 I85–I87 — the away ledger through the graph (ruling 51, R-BLK-314).
 //
 // **The wiring, which T1.97 cannot see.** The ledger alone is stepped in
 // `test/unit/away.test.ts`; these rows reach it the way a session does — a
@@ -55,8 +55,8 @@ async function graph(notify = true) {
   return { ...h, t, said, settle };
 }
 
-describe("C23 I84–I86 — the away ledger through the graph (ruling 51, R-BLK-314)", () => {
-  it("T4.83 (C23 I84, I85, R-BLK-314): a detach says what settled while attached, and nothing when nothing did", async () => {
+describe("C23 I85–I87 — the away ledger through the graph (ruling 51, R-BLK-314)", () => {
+  it("T4.83 (C23 I85, I86, R-BLK-314): a detach says what settled while attached, and nothing when nothing did", async () => {
     const h = await graph(false);
 
     // **L2** — attach, nothing, detach: no entry at all.
@@ -89,7 +89,7 @@ describe("C23 I84–I86 — the away ledger through the graph (ruling 51, R-BLK-
     h.graph.lifecycle.release();
   });
 
-  it("T4.84 (C23 I84, I85, C16 I58): a return of focus says what settled while away, with the chord from the keymap", async () => {
+  it("T4.84 (C23 I85, I86, C16 I58): a return of focus says what settled while away, with the chord from the keymap", async () => {
     const h = await graph();
     const row = defaultKeymap.find((b) => b.target === "global" && b.action === "scrollBottom" && b.profile !== "enhanced-terminal");
     const chord = chordText(row?.key ?? { name: "?" }, h.graph.capabilities.unicode !== "ascii");
@@ -164,7 +164,7 @@ describe("C23 I84–I86 — the away ledger through the graph (ruling 51, R-BLK-
     }
   });
 
-  it("T4.85 (C23 I84, I86): overlapping marks report each settlement once, by the first to close", async () => {
+  it("T4.85 (C23 I85, I87): overlapping marks report each settlement once, by the first to close", async () => {
     const h = await graph();
     // **L5** — attach, away, X, return, Y, detach.
     const handle = h.graph.surface.open(child());
@@ -191,7 +191,7 @@ describe("C23 I84–I86 — the away ledger through the graph (ruling 51, R-BLK-
     k.graph.lifecycle.release();
   });
 
-  it("T4.86 (C23 I84): the child's entry and shell-origin notices are counted by no mark", async () => {
+  it("T4.86 (C23 I85): the child's entry and shell-origin notices are counted by no mark", async () => {
     const h = await graph();
     // **L11** — an away mark open across the attach: the child's entry is a
     // settled append with a command line, and it is still not a settlement.
@@ -210,14 +210,14 @@ describe("C23 I84–I86 — the away ledger through the graph (ruling 51, R-BLK-
     const again = h.graph.surface.open(child());
     h.stdin.emit(OUT);
     const x = h.settle("/x");
-    // The detach reports X first (C23 I86) and appends its notice inside the absence.
+    // The detach reports X first (C23 I87) and appends its notice inside the absence.
     await again.close();
     h.stdin.emit(IN);
     expect(h.said()).toEqual([["1 entry settled while attached", `entry ${String(x.seq)}: /x — succeeded`]]);
     h.graph.lifecycle.release();
   });
 
-  it("T4.87 (C23 I84, I85): a settlement gone from the transcript is still counted, and a session close says nothing", async () => {
+  it("T4.87 (C23 I85, I86): a settlement gone from the transcript is still counted, and a session close says nothing", async () => {
     const h = await graph(false);
     // **L8** — X settles and is gone before the detach: `/clear`'s store call.
     // C13's cap is a hundred thousand blocks, and the ledger's answer is the

@@ -88,7 +88,7 @@ async function script(s: Awaited<ReturnType<typeof session>>) {
 
   // **The screen while the reader is away**, before the return appends
   // anything: the rungs' own comparison is taken here (C22 I129), because the
-  // return is not a notification and does append (C23 I85).
+  // return is not a notification and does append (C23 I86).
   const away = s.screen();
   at = s.stdout.output.length;
   await s.send(IN);
@@ -137,7 +137,7 @@ describe("C22 §6n — a session that reaches a reader who left", () => {
         expect(bytes, k).not.toContain(PUSH);
       }
       expect(quietAway, "the same screen while away, rung or no rung").toEqual(away);
-      // **The return is where they part** (C23 I84, I85): the opted-in session
+      // **The return is where they part** (C23 I85, I86): the opted-in session
       // had an away mark and says what settled in it; the quiet one had none.
       const back = "3 entries settled while you were away";
       expect(painted.rows.join("\n"), "the return says what settled").toContain(back);

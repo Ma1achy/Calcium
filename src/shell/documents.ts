@@ -229,7 +229,7 @@ export function noticeDoc(
 }
 
 /**
- * A count and what it counted, as one entry — C23 I85's ledger notice.
+ * A count and what it counted, as one entry — C23 I86's ledger notice.
  *
  * **A `work-unit` head and one `continuation` line per item**: the head is a
  * fact for the reader in `info`, and each line is subordinate to it inside the

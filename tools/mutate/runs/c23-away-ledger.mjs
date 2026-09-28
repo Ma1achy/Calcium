@@ -1,4 +1,4 @@
-// C23 I84–I86 — the away ledger, and its wiring in the composition root
+// C23 I85–I87 — the away ledger, and its wiring in the composition root
 // (ruling 51, R-BLK-314). Mutated (C23 T6.103).
 //
 // **One expected survivor, and it is the plan's own target.** Review batch 3's
