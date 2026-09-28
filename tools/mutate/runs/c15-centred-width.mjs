@@ -67,10 +67,13 @@ const MUTATIONS = [
   {
     // I27 — the triple stops being the kind's name and becomes a convention.
     // A panel free to vary them is a fourth kind wearing a third one's name.
+    //
+    // **Re-anchored in review batch 3** (C15 I30): the two fields are the
+    // panel's row of the §2d table now, so the mutation widens the row.
     name: "a panel may declare any blocking and any dismissal",
     file: MANAGER,
-    from: '    if (layer.blocking || layer.dismissal !== "escape") {',
-    to: "    if (false) {",
+    from: '  panel: Object.freeze(["false/escape"]),',
+    to: '  panel: Object.freeze(["false/escape", "true/escape", "false/answer", "true/answer", "false/focus"]),',
     expect: "T1.31",
   },
   {
@@ -79,8 +82,9 @@ const MUTATIONS = [
     // dashboard with it, and every row about panels still passes.
     name: "a blocking arrival closes every escape layer, views included",
     file: MANAGER,
-    from: '        if (open.kind === "panel") this.dismiss(open.id);',
-    to: '        if (open.dismissal === "escape") this.dismiss(open.id);',
+    // Re-anchored in review batch 3: the dismissal carries `displaced` (C15 I32).
+    from: '        if (open.kind === "panel") this.dismiss(open.id, "displaced");',
+    to: '        if (open.dismissal === "escape") this.dismiss(open.id, "displaced");',
     expect: "T4.2",
   },
   {
@@ -223,8 +227,10 @@ const MUTATIONS = [
     // centred panel is a confirm's placement with a panel's kind.
     name: "a panel may be centred",
     file: MANAGER,
-    from: '    if (layer.placement.kind !== "anchored") {\n      throw new OverlayError(\n        `panel ${layer.id}',
-    to: '    if (false) {\n      throw new OverlayError(\n        `panel ${layer.id}',
+    // Re-anchored in review batch 3: the panel's placement clause stands alone
+    // since its fields became the §2d table's row (C15 I30).
+    from: '  if (layer.kind === "panel" && layer.placement.kind !== "anchored") {',
+    to: "  if (false) {",
     expect: "T1.31",
   },
 ];

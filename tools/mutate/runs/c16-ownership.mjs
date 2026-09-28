@@ -94,8 +94,10 @@ const results = runPass({
       // T6.43 (C15 I29) — a declared owner its fields contradict is placed.
       name: "the owner check deleted from assertPlaceable",
       file: MANAGER,
-      from: "  if (layer.owner !== undefined) {\n    const { owner } = layer;\n",
-      to: "  if (layer.owner !== undefined && layer.id === \"\") {\n    const { owner } = layer;\n",
+      // Re-anchored in review batch 3: the owner is read off a widened view,
+      // because the union types a peek's owner as absent (C15 I30).
+      from: "  if (owner !== undefined) {\n    const agrees =\n",
+      to: "  if (owner !== undefined && layer.id === \"\") {\n    const agrees =\n",
       expect: "T1.34",
     },
     {
