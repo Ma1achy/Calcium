@@ -95,10 +95,11 @@ describe("C23 I84–I86 — the away ledger through the graph (ruling 51, R-BLK-
     const chord = chordText(row?.key ?? { name: "?" }, h.graph.capabilities.unicode !== "ascii");
     expect(chord, "the keymap's row, spelled at this rung — the registry's `⌃end`").toBe("⌃end");
 
-    // Two `ESC [ O` before the return are one absence (L4).
-    h.stdin.emit(OUT);
+    // Two `ESC [ O` before the return are one absence (L4): the second keeps
+    // what settled after the first.
     h.stdin.emit(OUT);
     const x = h.settle("/build");
+    h.stdin.emit(OUT);
     h.stdin.emit(IN);
     expect(h.said()).toEqual([
       [`1 entry settled while you were away · ${chord} to the bottom`, `entry ${String(x.seq)}: /build — succeeded`],

@@ -200,7 +200,7 @@ const results = runPass({
       // C22 I127 — the report reaches the notifier.
       name: "L4 drops the focus report without reading it",
       file: CONSTRUCT,
-      from: "        notifier?.focus(e.focused);\n",
+      from: "        notifier.focus(e.focused);\n",
       to: "",
       expect: "T4.105",
     },

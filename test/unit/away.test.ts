@@ -67,10 +67,11 @@ describe("C23 I84–I86 — the away ledger, alone (ruling 51)", () => {
     // closes first and reports it; Y settles under `attached` alone.
     ledger.open("attached");
     ledger.open("away");
-    // A second `ESC [ O` is not a second absence.
-    ledger.open("away");
     const a = entry("a", "/a");
     ledger.settled(a);
+    // A second `ESC [ O` is not a second absence — so it keeps what the first
+    // has recorded, and the settlement between the two is still reported.
+    ledger.open("away");
     expect(ledger.close("away").map((s) => s.id), "the first close reports it").toEqual(["a"]);
     const b = entry("b", "/b");
     ledger.settled(b);
