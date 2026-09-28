@@ -531,3 +531,15 @@ describe("C15 I29 — a keyed layer declares its owner (review batch 2, M5 item 
     m.update("q", { owner: { rung: "substate", name: "find" } });
   });
 });
+
+describe("C15 I30, I31, I33 — the layer's shape, its pointer and its generation (review batch 3, M7 item 5, M8 items 2 and 6)", () => {
+  it.todo(
+    "T1.35 (C15 I30): the §2d table both ways, at push and at update, and each refused literal a compile error — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T1.36 (C15 I31): takesPointer admits a peek for the wheel and not for a press, and takesInput never — not deferred on a component: the code lands in the next commit of this round",
+  );
+  it.todo(
+    "T1.37 (C15 I33): generation moves on keyed pushes and removals and on nothing else, asserted after every step — not deferred on a component: the code lands in the next commit of this round",
+  );
+});
