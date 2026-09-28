@@ -369,7 +369,7 @@ describe("C28 — profiler, tier 4 spec-first rows", () => {
   //
   // T4.9 asserted the view drew with `detection.capabilities` after the
   // overrides rather than with the deck's ASCII default. **That claim moved
-  // with the seam**: the verb hands `ctx.capabilities` and the row is T1.96 in
+  // with the seam**: the verb hands `ctx.capabilities` and the row is C23 T1.66d in
   // `test/unit/local-profile.test.ts`, with the deck's own arm at T1.119 in
   // `test/unit/profile-deck.test.ts`.
 

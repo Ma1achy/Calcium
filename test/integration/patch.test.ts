@@ -194,7 +194,7 @@ describe("C25 integration", () => {
     expect(BACKGROUND.test(leftHalf as string), "the blank side is unpainted").toBe(false);
   });
 
-  it("T4.11: both variants render, and only the styling differs", () => {
+  it("T4.11 (with C10): both variants render, and only the styling differs", () => {
     const dark = raw(80, FULL_CAPS, DARK_THEME);
     const light = raw(80, FULL_CAPS, LIGHT_THEME);
 
