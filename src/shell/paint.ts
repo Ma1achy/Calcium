@@ -630,7 +630,7 @@ export function washRow(
   // selection, the wash carries the band's ink as well as its ground, so a
   // page ink never lands on the band. `tone(…, "selection")` is the one path
   // to that ink — `inkOn` answers the band before any slot.
-  const band = isBand(theme, "selection") ? tone("default", theme, capabilities, "selection") : {};
+  const band = isBand(theme, "selection", capabilities) ? tone("default", theme, capabilities, "selection") : {};
   const wash = sgr({ ...selectionStyle(theme, capabilities), ...band });
   // **Fitted by display cells, escapes whole** (C09 I63). `cells` counts an
   // escape's bytes, so a styled row measured wider than it was and got no pad —

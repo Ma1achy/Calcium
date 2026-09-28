@@ -667,13 +667,17 @@ export const noticeDefinition: BlockDefinition<Notice> = {
                     // function of whether tone can carry it. Geometry is
                     // untouched — every candidate is one cell with no indent.
                     // On a band the tone is spent per cell (C10 I45), so a focused
-                    // head in a high-contrast theme takes the 1-bit rung's mark.
+                    // head in a high-contrast theme takes the 1-bit rung's mark —
+                    // where the band is painted at this depth (C10 I66). And on a
+                    // receded panel it is spent per panel (I110, question 56):
+                    // every ink there is `dim`, so five states would be one.
                     block.state !== undefined
                       ? headMark(
                           block.state,
                           ctx.capabilities,
-                          (focused && isBand(ctx.theme, "focusGround")) ||
-                            (ctx.washed?.has(block.id) === true && isBand(ctx.theme, "selection")),
+                          (focused && isBand(ctx.theme, "focusGround", ctx.capabilities)) ||
+                            (ctx.washed?.has(block.id) === true && isBand(ctx.theme, "selection", ctx.capabilities)) ||
+                            ctx.theme.recedes !== undefined,
                         )
                       : block.glyph,
                     ctx.capabilities,

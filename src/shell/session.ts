@@ -2052,11 +2052,12 @@ function washSelected(
 /**
  * The entry's blocks under a **banded** selection (C14 I54), or `undefined`.
  *
- * Undefined on a theme without a selection band and for an entry with nothing
- * selected, so both key and render exactly as they did before the field.
+ * Undefined where the selection is not painted as a band — a theme without
+ * one, or any theme at 1 bit (C10 I66) — and for an entry with nothing
+ * selected, so each keys and renders exactly as it did before the field.
  */
 function washedBlocksOf(graph: Graph, entryId: string, selection: SelectionWash | null): ReadonlySet<string> | undefined {
-  if (selection === null || !isBand(graph.theme.current, "selection")) return undefined;
+  if (selection === null || !isBand(graph.theme.current, "selection", graph.capabilities)) return undefined;
   const ids = new Set<string>();
   for (const key of selection.blocks) {
     if (semantic.entryOf(key) === entryId) ids.add(key.slice(key.indexOf("\u0000") + 1));
@@ -2281,9 +2282,9 @@ function visibleRows(
     // **The range is its own axis, beside the stable key** (C22 I101): a miss
     // on it alone keeps the parts, and the render below assembles from them.
     // **The tenth axis, and only where the picture depends on it** (C14 I54).
-    // On a theme that bands its selection a washed call head draws its state's
-    // own mark, so the selection changes what is rendered there — and only
-    // there. Everywhere else it is absent and keys nothing, which keeps I40's
+    // Where the selection is painted as a band — a theme that declares one, above
+    // 1 bit (C10 I66) — a washed call head draws its state's own mark, so the
+    // selection changes what is rendered there, and only there. Everywhere else it is absent and keys nothing, which keeps I40's
     // reason for refusing the axis true on every theme it was written about.
     const washed = washedBlocksOf(graph, entry.id, selection);
     const washedKey = washed === undefined ? "" : `\u0000${[...washed].sort().join("\u0001")}`;

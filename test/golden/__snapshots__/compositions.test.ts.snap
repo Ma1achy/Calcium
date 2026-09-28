@@ -454,7 +454,7 @@ exports[`C10 §4k — the compositions, as frames > case 6 — stale + running, 
 
 -- without liveness, run by run
   page/dim:"┌" page/accent:" ⠋ workers " page/dim:"──────────────────" page/warn:" updated 4m ago " page/dim:"─┐"
-  page/dim:"│● pytest(tests/unit) · 4s · 47 passed" page/dim:"│"
+  page/dim:"│✓ pytest(tests/unit) · 4s · 47 passed" page/dim:"│"
   page/dim:"└──────────────────────────────────────────────┘"
 
 -- the ruling (C10 §4k.2 row 6)

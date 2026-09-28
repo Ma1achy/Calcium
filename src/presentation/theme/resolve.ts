@@ -40,6 +40,26 @@ type Depth = TerminalCapabilities["colourDepth"];
  */
 type Caps = Readonly<Pick<TerminalCapabilities, "colourDepth">>;
 
+const FOUR_BIT: Caps = Object.freeze({ colourDepth: 4 });
+
+/**
+ * Whether `surface` is painted as a band at these capabilities (I66): a
+ * ground, and one ink for every slot drawn on it.
+ *
+ * **The resolver's answer, and the resolver reads it.** At 24 and 8 bits the
+ * band is the theme's `bandInk` entry, composed through `inkOn` (I48); at 4
+ * bits it is that **and** the curated pair (I61), since the flat map spreads a
+ * band's one ink across one index per tone; at 1 bit no surface is painted at
+ * all (I8). `isBand` asked the tokens alone and said *band* at 1 bit where
+ * nothing is — which the head mark's own depth clause hid, and the render
+ * cache's `washed` axis did not (C14 I54).
+ */
+export function bandAt(theme: ResolvedTheme, surface: string, caps: Caps): boolean {
+  if (caps.colourDepth === 1) return false;
+  if (theme.tokens.bandInk?.[surface] === undefined) return false;
+  return caps.colourDepth !== 4 || theme.tokens.bandFourBit?.[surface] !== undefined;
+}
+
 
 // --- 1-bit ------------------------------------------------------------------
 
@@ -182,7 +202,9 @@ function compute(ref: ColourRef, theme: ResolvedTheme, depth: Depth, on?: string
     // **A band binds at 4-bit** (I61): its one ink for every ref drawn on it,
     // read before the flat map, which is per ref and would spread that one ink
     // across as many indices as there are tones.
-    const band = on === undefined ? undefined : theme.tokens.bandFourBit?.[on];
+    // Only where `bandAt` says so (I66): a pair with no `bandInk` partner is
+    // not a band, and the painters, who ask `bandAt`, must not see one here.
+    const band = on !== undefined && bandAt(theme, on, FOUR_BIT) ? theme.tokens.bandFourBit?.[on] : undefined;
     if (band !== undefined) return styleOf({ kind: "ansi16", index: band.ink });
     const index = theme.tokens.fourBit[ref];
     return index === undefined ? NO_STYLE : styleOf({ kind: "ansi16", index });
@@ -210,7 +232,7 @@ function surface(ref: ColourRef, slot: string, theme: ResolvedTheme, depth: Dept
 
   if (depth === 4) {
     // A band's curated ground (I61) — the flat map has no entry for either band.
-    const band = theme.tokens.bandFourBit?.[slot];
+    const band = bandAt(theme, slot, FOUR_BIT) ? theme.tokens.bandFourBit?.[slot] : undefined;
     if (band !== undefined) return styleOf({ kind: "ansi16", index: band.ground });
     const index = theme.tokens.fourBit[ref];
     return index === undefined ? NO_STYLE : styleOf({ kind: "ansi16", index });

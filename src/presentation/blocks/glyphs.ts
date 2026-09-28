@@ -461,7 +461,9 @@ export const CALL_STATE_GLYPH: Readonly<Record<CallState, Glyph>> = Object.freez
  * **And per cell, on a band** (C10 I45, R-THM-005). A band's ink is total, so a
  * cell on one has spent its tone exactly as a 1-bit terminal has. `onBand` is
  * the ground's answer and the capability record cannot give it: in `hcDark` a
- * focused head is on a band and every other head on the page is not.
+ * focused head is on a band and every other head on the page is not. The
+ * caller also passes it for a head on a receded panel (I110, question 56),
+ * where every ink is `dim` and the tone is spent per panel rather than per cell.
  */
 export function toneCarries(caps: GlyphCaps & Pick<TerminalCapabilities, "colourDepth">, onBand = false): boolean {
   return caps.colourDepth > 1 && caps.unicode !== "ascii" && !onBand;

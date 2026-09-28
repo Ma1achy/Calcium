@@ -37,8 +37,8 @@ const MUTATIONS = [
     // ink for every state under the selection.
     name: "a washed head is not counted as on a band",
     file: NOTICE,
-    from: '                            (ctx.washed?.has(block.id) === true && isBand(ctx.theme, "selection")),',
-    to: "                            false,",
+    from: '                            (ctx.washed?.has(block.id) === true && isBand(ctx.theme, "selection", ctx.capabilities)) ||',
+    to: "                            false ||",
     expect: "T1.75b",
   },
   {
@@ -78,8 +78,8 @@ const results = await runPass({
     // **A change the run's own corpus can see** (F1254): every head in a
     // banded theme counts as washed, so the page loses its `●`.
     file: NOTICE,
-    from: '                            (ctx.washed?.has(block.id) === true && isBand(ctx.theme, "selection")),',
-    to: '                            isBand(ctx.theme, "selection"),',
+    from: '                            (ctx.washed?.has(block.id) === true && isBand(ctx.theme, "selection", ctx.capabilities)) ||',
+    to: '                            isBand(ctx.theme, "selection", ctx.capabilities) ||',
     why:
       "every head on a banded theme takes its state's mark, so the rows " +
       "asserting the page keeps ● fail — if this survives, nothing reaches the head",

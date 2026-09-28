@@ -11,7 +11,7 @@
  */
 import type { AmbiguousWidth } from "../text.js";
 import { SGR_RESET, sgr, toTerminalDefault } from "../../terminal/escapes.js";
-import { resolve, resolveBackground, resolveTone, type Style } from "../theme/index.js";
+import { bandAt, resolve, resolveBackground, resolveTone, type Style } from "../theme/index.js";
 import type { ColourRef, ColourValue, ResolvedTheme } from "../theme/index.js";
 import { COLORMAPS, continuousColour } from "../theme/colormap.js";
 import type { ColormapName, Tone } from "../../data/viewmodel/index.js";
@@ -274,11 +274,16 @@ export function focusShapeStyle(theme: ResolvedTheme, caps: TerminalCapabilities
 }
 
 /**
- * Whether `surface` is a band in this theme (C10 I45): a ground whose one ink
- * answers for every slot drawn on it, so tone carries nothing there.
+ * Whether `surface` is painted as a band at these capabilities (C10 I45, I66):
+ * a ground whose one ink answers for every slot drawn on it, so tone carries
+ * nothing there.
+ *
+ * **The resolver's answer and not the theme's.** This read `bandInk` alone and
+ * said *band* at 1 bit, where no surface is painted — so a painter asking it
+ * disagreed with the frame it was painting. One predicate, so the two cannot.
  */
-export function isBand(theme: ResolvedTheme, surface: string): boolean {
-  return theme.tokens.bandInk?.[surface] !== undefined;
+export function isBand(theme: ResolvedTheme, surface: string, caps: Pick<TerminalCapabilities, "colourDepth">): boolean {
+  return bandAt(theme, surface, caps);
 }
 
 export function selectionStyle(theme: ResolvedTheme, caps: TerminalCapabilities): Style {

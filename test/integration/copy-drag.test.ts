@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { buildSession } from "../support/session.js";
 import { fakeStdin } from "../support/fake-terminal.js";
+import type { ProfileReport } from "../../src/index.js";
 import type { TuiConfig } from "../../src/shell/types.js";
 
 const settle = async (): Promise<void> => {
@@ -215,9 +216,81 @@ describe("C14 §6f — the drag in a real session", () => {
     }
   });
 
-  it.todo(
-    "T4.37h (C14 I54, C10 I66): in hcDark at colourDepth 1 selecting the failed head and clearing it with esc costs the render cache no focus miss; at 24 bits each misses — not deferred on a component: the code lands in the next commit of this round",
-  );
+  it("T4.37h (C14 I54, C10 I66): in hcDark at 1 bit selecting the failed head and clearing it costs the render cache no focus miss; at 24 bits each misses", async () => {
+    // **The only row that sees the 1-bit half of C10 I66.** At 1 bit every
+    // head already takes its state's mark, so the frame is the same whether or
+    // not `washed` keys the cache; what differs is whether the entry is
+    // rendered again for a picture that did not change. The profiler's miss
+    // counts are that reading — the cache's own, over the whole session.
+    vi.useFakeTimers();
+    try {
+      const run = async (depth: 1 | 24): Promise<{ marks: readonly string[]; focusMisses: number }> => {
+        const stdin = fakeStdin();
+        let seen: ProfileReport | null = null;
+        const { screen, clock, tui } = await buildSession({
+          manifest: {
+            ...(MANIFEST as Exclude<typeof MANIFEST, string>),
+            tools: [{ name: "heads", local: true, summary: "one failed call head", args: [], flags: [] }],
+          },
+          localHandlers: {
+            heads: () =>
+              ({
+                schema: "tui.view/1",
+                command: "heads",
+                status: "ok",
+                blocks: [{ kind: "notice", id: "h", tone: "error", glyph: "running", text: "HEADTEXT", state: "failed" }],
+              }) as never,
+          },
+          capabilities: { colourDepth: depth },
+          profile: { tier: "counters", onReport: (r: ProfileReport) => void (seen = r) },
+          stdin: stdin as never,
+        });
+        const step = async (ms = 0): Promise<void> => {
+          clock.advance(ms);
+          await vi.advanceTimersByTimeAsync(ms);
+          await settle();
+        };
+        const mark = (): string => {
+          const row = screen().rows.find((r) => r.includes("HEADTEXT")) ?? "";
+          return [...row.slice(0, row.indexOf("HEADTEXT"))].at(-2) ?? "";
+        };
+        await step();
+        stdin.emit("/theme hcDark\r");
+        await step();
+        stdin.emit("/heads\r");
+        await step();
+        const at = screen().rows.findIndex((r) => r.includes("HEADTEXT")) + 1;
+        stdin.emit("\u001bV");
+        await step();
+        const marks = [mark()];
+        stdin.emit(press(6, at));
+        await step();
+        stdin.emit(moveTo(7, at));
+        await step();
+        stdin.emit(release(7, at));
+        await step();
+        marks.push(mark());
+        // One lone byte, past the disambiguation window: it clears the selection (C14 I48).
+        stdin.emit("\u001b");
+        await step(100);
+        marks.push(mark());
+        await tui.stop("exit");
+        const report = seen as ProfileReport | null;
+        if (report === null) throw new Error("no report arrived");
+        return { marks, focusMisses: report.misses["render"]?.focus ?? 0 };
+      };
+      const mono = await run(1);
+      expect(mono.marks, "1 bit: the state's own mark throughout").toEqual(["✗", "✗", "✗"]);
+      expect(mono.focusMisses, "1 bit: the selection keys nothing").toBe(0);
+      // The control: at 24 bits the band is painted, the mark moves, and the
+      // selection and its clearing each miss — the counter responds.
+      const truecolour = await run(24);
+      expect(truecolour.marks, "24 bits: ●, then the state's mark under the band, then ●").toEqual(["●", "✗", "●"]);
+      expect(truecolour.focusMisses, "24 bits: the selection and its clearing").toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it("T4.37 (C14 I44, I45): a drag past the region autoscrolls, and keeps going with the pointer still", async () => {
     vi.useFakeTimers();
