@@ -16,6 +16,7 @@
  * so a row built any other way is both unclamped and ragged.
  */
 import { NO_SPAN } from "../../data/viewmodel/index.js";
+import { glyphs } from "../blocks/glyphs.js";
 import { rows } from "../blocks/paint.js";
 import { cells } from "../text.js";
 import { atLeastOne, changedRuns, normaliseWidth, type ChangedRun } from "../../data/viewmodel/index.js";
@@ -61,8 +62,13 @@ function marksFor(block: Patch, ctx: RenderContext): MarkOf {
   };
 }
 
-/** The one cell split spends on telling the two halves apart. */
-const SEPARATOR = "\u2502";
+/**
+ * The one cell split spends on telling the two halves apart — C09's `vertical`,
+ * so it degrades with every other rule on the screen: `|` at the ASCII rung and
+ * on a terminal that draws `│` two cells wide (C25 §3, F1313). It was a literal
+ * `│`, and the split drew it at the rung no row rendered wide enough to reach.
+ */
+const separator = (ctx: RenderContext): string => glyphs(ctx.capabilities).vertical;
 
 /**
  * A run of consecutive changed lines, and the rows it pairs into. **C04's
@@ -80,7 +86,9 @@ type Run = ChangedRun;
  * the block dropping its header (C25 §9's Q1, settled that way).
  */
 function header(block: Patch, layout: PatchLayout, ctx: RenderContext): string {
-  const rule = ctx.capabilities.unicode === "ascii" ? "-" : "─";
+  // C09's `horizontal`, for the separator's reason — an ascii-only ternary here
+  // drew `─` on a wide-ambiguous terminal, two cells a glyph (C25 §3, F1313).
+  const rule = glyphs(ctx.capabilities).horizontal;
   const label = ` ${block.path} `;
   const lead = `${rule}${rule}${label}`;
 
@@ -150,7 +158,7 @@ function splitRows(run: Run, block: Patch, layout: PatchLayout, ctx: RenderConte
       line(
         [
           ...dress(padTo(leftSpans, layout), left === undefined ? "context" : "remove", ctx, leftMark),
-          { text: SEPARATOR },
+          { text: separator(ctx) },
           ...dress(padTo(rightSpans, layout), right === undefined ? "context" : "add", ctx, rightMark),
         ],
         "context",
@@ -200,7 +208,7 @@ function hunkLines(hunk: Hunk, block: Patch, layout: PatchLayout, ctx: RenderCon
               ],
               layout,
             ),
-            { text: SEPARATOR },
+            { text: separator(ctx) },
             ...gutterSpans(group, layout, ctx, "new", mark),
             ...textSpans(group.text, block.language, layout.text, ctx, undefined, "context", mark),
           ],

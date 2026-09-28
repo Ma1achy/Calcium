@@ -77,7 +77,29 @@ describe("C25 integration", () => {
     }
   });
 
-  it.todo("T4.13 (with C09, ascii, F1313): split at 120 under ASCII — every code point below U+0080, and the separator column reads `|` — not deferred on a component: the code lands in the next commit of this round");
+  it("T4.13 (with C09, ascii, F1313): split at 120 under ASCII — every code point below U+0080, and the separator column reads `|`", () => {
+    // **T4.4's twin at the width where the separator exists.** T4.4 renders at
+    // 80, which is unified, so its sweep had nothing to find; the split drew a
+    // literal `│` at the ASCII rung and every row about ASCII passed (F1313).
+    const width = 120;
+    const at = (caps: TerminalCapabilities): readonly string[] => raw(width, caps).map(visible);
+    const full = at(FULL_CAPS);
+    const ascii = at(ASCII_CAPS);
+    expect(ascii).toHaveLength(full.length); // cells-ok — a row count
+
+    for (const row of ascii) {
+      for (const ch of row) expect(ch.codePointAt(0), JSON.stringify(row)).toBeLessThan(0x80);
+    }
+
+    // **The column, not a search** (§3b's table): the separator is the cell at
+    // `s = ⌊(w − 1) / 2⌋`, and a `|` elsewhere on a row cannot stand in for it.
+    // The rows are the ones whose separator the Unicode render draws — the
+    // control, without which a split that drew no separator at all would pass.
+    const s = Math.floor((width - 1) / 2);
+    const split = full.flatMap((row, i) => ([...row][s] === "│" ? [i] : []));
+    expect(split.length, "the illustration has split rows at 120").toBeGreaterThan(3);
+    for (const i of split) expect([...(ascii[i] as string)][s], JSON.stringify(ascii[i])).toBe("|");
+  });
 
   it("T4.6 (with C04, C24): a constructed patch validates and renders, both ways in", async () => {
     // **Both constructors, and they must agree.** This asserted through

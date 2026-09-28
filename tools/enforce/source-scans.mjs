@@ -1296,8 +1296,6 @@ export const MARK_EXEMPTIONS = Object.freeze({
     "carries its own `[unicode, ascii]` pair; the marker is a whole row, so the ASCII form's three cells cost nothing",
   "src/interaction/router/keymap.ts":
     "`chordText` resolves against the capability on the line it is written (`if (!unicode) return chordName(key)`), which is `text.ts`'s form and `chrome.ts`'s subject — key names, which no `Glyph` slot holds because a chord is text and not a mark. The eleven glyphs are the design's own (§019, the binding registry) and the registry declares no ASCII rung for any of them, so the fallback is `keySlot`'s shorthand rather than eleven spellings chosen here (C16 §6a clause 6, parked). T1.98 asserts the ASCII arm is ASCII-renderable for every binding and that the chords equal the registry's by equality, so the premise is re-checked rather than inherited",
-  "src/presentation/patch/definition.ts":
-    "picks its rule character from the capability in the expression that draws it",
   "src/presentation/plot/ramp.ts":
     "`RAMP_UNICODE` beside `RAMP_ASCII` — the ramp is the vocabulary for a plot cell",
   "src/presentation/plot/marks.ts":
