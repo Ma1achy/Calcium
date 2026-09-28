@@ -802,7 +802,7 @@ make. **Proposed, (a) recommended**:
   beside the `v`/`V` the mode already takes. One new chord, delivered as `0x16` on
   every terminal, and free in the registry and the repo at that rung.
 
-> **Ruled 2026-09-27** (by the person). **A flat trend gets `→` (ASCII `=`); an absent trend stays `-`. No arrow is not *flat*.** A reading that held is a fact with a direction of its own, and leaving it unmarked makes it indistinguishable from a reading with no comparison at all. The registry gains the mark through the builder. **Built in:** review batch 2 (M4).
+> **Ruled 2026-09-27** (by the person). **A flat trend gets `→` (ASCII `=`); an absent trend stays `-`. No arrow is not *flat*.** A reading that held is a fact with a direction of its own, and leaving it unmarked makes it indistinguishable from a reading with no comparison at all. The registry gains the mark through the builder. **Built in:** review batch 2 (M4). **Built** in 8fd66890 (C11 I30, C09 I111): a reading that held draws `→`, `=` at ASCII, through a registered `trend-flat` glyph; a cell with no trend draws nothing.
 
 **37 · RULED — A trend with no movement.** §088 §4 draws a trend going down and a
 trend going up, and `R-COL-006` gives each a tone from the metric's polarity. It
@@ -835,7 +835,7 @@ alone, because a glyph slot is a pair and has no ASCII half to ship without.
 
 ---
 
-> **Ruled 2026-09-27** (by the person). **A set's ASCII frames must not all be one character.** The within-set rule is that the ASCII rung *moves*; downsampling several Unicode frames onto one ASCII frame is allowed, which is what the 12 of 27 SS64 hits are. A set whose ASCII rung is a single repeated character is a still mark in a slot that says *live*. **Built in:** review batch 2 (M4, with item 7's glyph gate).
+> **Ruled 2026-09-27** (by the person). **A set's ASCII frames must not all be one character.** The within-set rule is that the ASCII rung *moves*; downsampling several Unicode frames onto one ASCII frame is allowed, which is what the 12 of 27 SS64 hits are. A set whose ASCII rung is a single repeated character is a still mark in a slot that says *live*. **Built in:** review batch 2 (M4, with item 7's glyph gate). **Built** in 07746cc2 (C09 I98): T2.190 beside the glyph gate checks the tree's sets and the registry's — a set whose ASCII frames are all one character fails it.
 
 **39 · RULED — What a collision inside a spinner set is.** Ruling 11 put spinner frames
 in their own domain, the duration slot, and said collisions are checked only within a
@@ -861,7 +861,7 @@ because a set compared with nothing is a rule with nothing to be wrong about.
 
 ---
 
-> **Ruled 2026-09-27** (by the person). **120 ms for every ASCII alphabet.** One cadence for the ASCII rung — the entry's proposal (a) — which is §039's *nothing varies its rate*. **Built in:** review batch 2 (M4).
+> **Ruled 2026-09-27** (by the person). **120 ms for every ASCII alphabet.** One cadence for the ASCII rung — the entry's proposal (a) — which is §039's *nothing varies its rate*. **Built in:** review batch 2 (M4). **Built** in 729ca488 and 0bd29cc9 (C09 I112): the registry records `spinnerPolicy.asciiIntervalMs = 120` and every ASCII rung steps at it. **The cost, measured:** fit-cycle is lost at ASCII, and `toggle` turns in 240 ms.
 
 **40 · RULED — Which interval a shared ASCII alphabet takes.** Ruling 30 applies
 `R-MOT-011` per rung — sets that collapse to one ASCII alphabet share an interval at

@@ -50005,9 +50005,9 @@ the row arm and a `minRows` column decline. Byte-identical: `make golden` moved
 
 ```
                         before (open)      after (Phase A)
-frame work  p50           479 ms             27 ms      17.7× 
-frame work  p95           680 ms             85 ms       8.0× 
-frame work  max         1 020 ms            272 ms       3.8× 
+frame work  p50           479 ms             27 ms      17.7×
+frame work  p95           680 ms             85 ms       8.0×
+frame work  max         1 020 ms            272 ms       3.8×
 react renders / frame       ~145             ~3         a subsequence, kept whole
 ```
 
@@ -56476,3 +56476,29 @@ where the table has 89. T4.101 read whichever `/help` row came last by name. Bot
 lane. The walk also found three gaps before code: the copy-mode switch had no mechanism, a global
 `?` reached step 3 in native selection, and a throwing application handler would end the read loop
 (now contained with a warn notice).
+
+## F1317 — C09 T2.116 was red at the batch 2 tip, and it blinded every mutation run that reads it ★★☆☆☆
+
+c810c521 (M6's `>` palette) joined a row's chords with a literal `" · "`, which T2.116's walk
+over `src/shell` refuses (C09 I49, F828: the literal is non-ASCII at the ASCII rung). Nothing ran
+the suite between the lane's landing and f593c4c1, so the red reached the branch tip. **The cost
+was not the row**: every mutation run whose command includes `test/contract/blocks.test.ts`
+refuses to start on an unmutated suite that already fails, so two lanes lost their runs to it —
+b2-res until it fixed the site itself, and b3-d's `c09-shed`, whose re-anchored mutation is
+unverified until batch 3 takes the fix (b3-d filed the same observation for batch 3). Closed by
+4fdbcdea: the detail joins with `chipLook.separator`.
+
+## F1318 — the duration slot's spinner never reaches ruling 40 ★★☆☆☆
+
+`spin()` in `src/shell/documents.ts` indexes the frame by the readout tick and bypasses
+`spinnerFrameAt`, so the ASCII rung's 120 ms (C09 I112) does not apply to the call head's
+duration spinner. Found by b2-res while building question 40; not fixed. Symbol: `spin`.
+
+## F1319 — two item premises counted the wrong unit ★☆☆☆☆
+
+F1262's *33* counted fixture lines, and fixtures repeat blocks: the unit the supersession acts on
+is 28 blocks and 31 branch lines. And C09 T1.46's first specced premise — a full read-back of
+every seeded row — was falsified by measurement: 82 of 10,000 rows fail it for both Ink and the
+normaliser, on faithful oddities, while the random corpus holds **no** bold-beside-dim case at all.
+The row now asserts intensity and carries a dense corpus built to hold the case (0fdcddee).
+
