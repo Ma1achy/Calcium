@@ -56748,3 +56748,31 @@ green, they failed too, alternating between the two rows. So it is not a landing
 frame whose verdict depends on load asserts something about the scheduler's timing that the invariant does not
 state. **Owed**: find what load changes (a coalesced wake landing inside the measured frame is the first
 candidate) and either state it in C22 I69 or remove it from the row.
+
+## F1338 — `/watch` cannot pin a long invoke ★★☆☆☆
+
+Found by lane b3-watch. `/watch` typed while a guard-holding invoke runs is queued behind that invoke by C23 I5, and
+runs after the settle — where it answers *nothing is running to watch*. The verb exists to pin a long-running
+call, and it cannot reach the one it was typed during. C22 T4.112 asserts the present behaviour and C22 §6p.5
+records it. The remedy is the axis C23 I5 leaves open: a framework verb that only reads the session is not a
+writer and need not queue.
+
+## F1339 — a focus target whose keymap rows were bound and never consulted, a third time ★★★☆☆
+
+Found by lane b3-watch's walk over the effect table (C16 T1.4h) once the fixture focused the row. The router
+registered only the `⌃c` rung for the new `watchRow` target, so every keymap row bound at the row resolved and was
+never consulted — keys that `/help` lists and nothing runs. **This is F765's `nativeSelection` defect a third
+time.** Three instances of one class want a check, not a fourth fix: *every focus target that has keymap rows
+registers a rung handler that consults them*, as an A03 scan or a C16 contract row over `FOCUS_ORDER`.
+
+## F1340 — the watch trace missed a submission settling while the reader is on the row ★☆☆☆☆
+
+C22 §6p.3's sequence trace had no row for a verb submitted before `⇧⇥` that settles while the reader sits on the
+watch row; C23's `resetFocus()` at every submission's end sends focus to the prompt. The build found it, not the
+walk. Ruled the same as `liveBlock`.
+
+## F1341 — spec row T1.78 was written from the design specimen, not the glyph table ★☆☆☆☆
+
+Two clauses of C22 T1.78 came from §085's specimen: an ASCII bar `###...` (C09's table draws `###---`) and a wide
+rung drawing Unicode (C09 draws its ASCII set where ambiguous-width glyphs render wide). The row's first run found
+both. **A specimen is an example (R-SEC-036)**; the table is what ships.

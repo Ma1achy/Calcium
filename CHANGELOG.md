@@ -62,6 +62,10 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
 
 ### Added
 
+- **`/watch` and `/unwatch`, the footer's watch row and `watch.jump[n]`** (1004d067, ruling 50, C22 I135–I140,
+  C16 I76–I77, registry 0.16). `ChromeContext.watches?: WatchRowState` and `OwnerHints.watchRow?:
+  "present" | "focused"` carry the session's watches and the row's selection, so an application's own footer
+  can draw the row; `WatchItem` and `WatchRowState` are exported.
 - **`ColumnDef.vocabulary`** (7003e78f, C04 I6). A column's closed set of words, which may
   carry their tone without a glyph; a cell outside it is refused.
 - **`Patch.cap` and `expanded`** on `Patch`, `keyValue`, `events`, `comparison` and `steps`
