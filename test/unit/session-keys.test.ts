@@ -588,6 +588,10 @@ describe("C22 §3 step 11 — the effect table", () => {
     expect(graph.router.target, "and a table is entered").toBe("liveBlock");
   });
 
+  it.todo(
+    "T2.17 (C16 I78): every focus target with keymap rows has a rung handler that consumes them — not deferred on a component: the row lands in the next commit, with the spec it is written against",
+  );
+
   it("T1.4h2 (C22 I26): the effects that are observable from outside, each asserted", async () => {
     const { graph } = await buildGraph();
     graph.lifecycle.acquire();
