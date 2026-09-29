@@ -115,7 +115,8 @@ picture would not.
   checks, and a framed row without one has nothing to be compared against.
 - **The frame** is located by its heading, `── §N · …`, in the target's golden snapshot, at
   the `dark-unicode` rung — the rung the fixtures are drawn at — and at the narrowest
-  golden width not narrower than the figure, **measured with `cells()`**. Every line under
+  golden width not narrower than the figure, **measured with `cells()`** (T1.10, which
+  constructs a wide glyph because no framed figure in the corpus holds one). Every line under
   the heading is the frame, a section drawn twice is both, and a line opening `· ` is the
   pass's caption rather than the drawing. A target with no heading for the section is
   **unlocated**.
@@ -130,7 +131,8 @@ picture would not.
   section whose frame now agrees, or whose marks moved. `npx tsx
   tools/design/figures.ts --write` re-derives it in one command, and carries a section's
   reason across only while its entry keeps its kind — an entry that became locatable,
-  or stopped being, is left with an empty reason, which T1.8 refuses.
+  or stopped being, is left with an empty reason, which T1.8 refuses. T1.9 holds that
+  carrying rule.
 
 **The walk, as a classification table** — the cells where two of those rules meet, which
 is where each ruling below was taken. Counts are at the lane's tree.

@@ -56990,6 +56990,9 @@ run, 85 s alone, 162 s with one worker, against 30 s. contract/theme T2.62 (the 
 beside six other files, against 15 s. Neither reads anything the round changed. The blocks lane saw T1.5 at 38.5 s
 alone (F1385). F1351's class — a row whose verdict depends on the machine — in two rows that only read files.
 
+**2026-09-29.** design-fixtures T1.5 is retired and its source walk deleted (M16.6, lane b4-fixtures). The figure
+comparison that replaced it parses each golden once and T1.8 takes about 0.5 s. contract/theme T2.62 stands.
+
 ## F1352 — a sixth `overlayRegion` site told a PTY child one column too many ★★★☆☆
 
 Found by lane C running the tier-5 rows M11.1's rail reservation reaches: T5.3a and T5.5 failed with the
@@ -57692,3 +57695,39 @@ Found by lane b4-classes extending ruling 71's bidi clause to OSC 2 and OSC 9 (C
 ## F1459 — `make test` read `dist/` through `example-bins` without building it ★★☆☆☆
 
 Found integrating lane b4-classes. The rebased lane's chain failed the three *F56: executing it reaches the application* rows in `test/contract/example-bins.test.ts`. Each example's launcher imports `calcium-tui`, which resolves to the worktree's `dist/`, and that was still the pre-rebase build: `make test` ran before anything rebuilt it. The same file passed 16 of 16 twice once `e2e` had built `dist/` at 20:30. The shell lane saw the same three reds and attributed them to a stale `dist/`. CI was never exposed, because `make check` builds first (F447) and runs before `make test`. That is the ordering hiding the dependency, not satisfying it. **F447's class at a second gate**: a target that reads a generated artefact generates it. `make test` now runs `npm run build` first.
+
+## F1460 — §097 is compared against the panel block where the design draws the panel layer ★★☆☆☆
+
+Found by lane b4-fixtures building the figure comparison (M16.1). §097's frame in `design-surfaces` draws the `panel` block kind: a titled box headed *Confirm*, with box corners. §097 specifies the panel **layer**, a menu floating between two rules above the prompt (M8). The probe `kind: "panel"` names the block, so the row compares the right name against the wrong thing, and its listed difference (`│ ┌ ┐ └ ┘` only in the frame, `— › ▌ ● ❯` only in the figure) is that confusion measured. **Owed**: a frame of the panel layer under §097's heading.
+
+## F1461 — the design leads every error with ✗ and the tree's status block leads with ▲, the warning mark ★★☆☆☆
+
+Found by lane b4-fixtures. Every ERROR in the design's figures (§048, §061, §066, §096) opens its message with ✗. The tree's `status` block opens an error with ▲, which is the `warning` mark, so at 1-bit and in monochrome an error and a warning share their only non-colour carrier. `status.ts` cites a design drawing of `[▲ plot failed…]` that no current fixture contains, which is a citation into a picture the design no longer has. **Owed**: a ruling. The registry is normative on appearance, so the expected answer is ✗, with the golden movers named before the change.
+
+## F1462 — §019's hand-written counts were stale three ways, and so was the census prose ★★☆☆☆
+
+Found by lane b4-fixtures (M16.7). `test/support/design-surfaces.ts` said 121 bindings, eight scopes and the registry's 39. Measured, they were 154, 10 and 66, and after the shell lane's preview keys they are 157, 10 and 69. They are now derived into §19's heading rather than written by hand, so the heading moves when the keymap does, which it did at this integration. DESIGN_FIXTURES.md's *seven surface rows carry no probe* was likewise out of date (there are ten, and §035 is built again) and is corrected. Closed in a37abceb and at integration.
+
+## F1463 — no golden draws a reasoning block, so §024 has nothing to be compared against ★★☆☆☆
+
+Found by lane b4-fixtures. §024's target is `states.test.ts`, which has no reasoning block at any rung, so the fixture's regenerated ▹/▿ (batch 1) agree with the tree's `expand`/`collapse` glyphs only in the glyph table. No frame shows them.
+
+## F1464 — §035's parked ASCII rung was already settled by R-PRG-003 ★★☆☆☆
+
+Found by lane b4-fixtures (M16.8). §035's own picture draws `[#][.]` for the ASCII bar and its question was parked. R-PRG-003, in §001's current contract, rules one `#`/`-` pair at every granularity, and the golden already follows the rule. Pictures disagree, so the rule decides; the listed difference records it.
+
+## F1465 — §006's census is the tree's `GLYPH_TOKENS`, not the registry's canonical set ★★☆☆☆
+
+Found by lane b4-fixtures. §006 counts the glyphs the tree names. Nine of the registry's canonical marks are missing from `GLYPH_TOKENS` and seven tree-only marks are present, so the census agrees with itself and not with the design. **Owed**: the two sets compared by equality, with each side's extras either registered or retired.
+
+## F1466 — 36 of the 58 framed fixtures have no frame to be compared against ★★☆☆☆
+
+Found by lane b4-fixtures. The figure comparison (M16.1) locates a frame by its `── §N ·` heading in the target's own snapshot. 36 of the 58 framed rows are *unlocated*, because their goldens are indexed by kind, state or scene, or keep no golden at all (§028, §051, §052 and §101 in `question-slot.test.ts`). Each is a listed difference with a reason, so the gate is honest, but for those 36 it records an absence rather than checking a picture. **Owed**: headed frames for them, surface by surface. The shell lane's F1445 (no golden draws the transcript bar, the chip preview or an inspection) is the same gap from the other side.
+
+## F1467 — the `cells()` clause is vacuous over the current corpus ★★☆☆☆
+
+Found by lane b4-fixtures. No framed figure's widest line holds a wide glyph, so `.length` and `cells()` agree on all 58 and a mutation to `.length` would survive every corpus row. T1.10 constructs the case, a figure with a wide glyph, and catches the mutation (m16-fixtures).
+
+## F1468 — §018's `built` is `no` although its row says `choice` and `control` landed ★★☆☆☆
+
+Noticed by lane b4-fixtures and not ruled, because it belongs to M16.5's focus-shape work. §018 is excluded from `framed` by its `built: no`, and its own row text says two of its subjects shipped. Either the column or the prose is stale.
