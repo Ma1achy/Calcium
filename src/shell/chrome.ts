@@ -557,7 +557,16 @@ function ownerChips(
         ),
         // `⏎` copies and leaves (C14 I59); §103 draws it `⏎ copy`, and `y` —
         // the copy that stays — is a bare keycap undrawn, as `a` and `A` are.
-        ...keyed(hints, "semanticSelection", ["copyAndLeaveSemanticSelection"], "copy", caps),
+        // **The file offered** (C14 I61, `R-SEL-011`'s *offers a file instead*):
+        // the key named by where the text goes. The absence it follows from is
+        // stated as `no clipboard`, ranked after the frozen screen — see below.
+        ...keyed(
+          hints,
+          "semanticSelection",
+          ["copyAndLeaveSemanticSelection"],
+          semantic?.offersFile === true ? "to file" : "copy",
+          caps,
+        ),
         // **Two chips, not one label with a `·` in it.** The separator is the
         // cluster's to draw (C09 I49) — a literal one in a string is the head's
         // unresolved join F828 found, and T2.116 is right to refuse it here too.
@@ -593,6 +602,11 @@ function ownerChips(
         ...(buffered > 0
           ? [{ label: `${String(buffered)} waiting`, tone: "muted" as const }]
           : []),
+        // **No clipboard, stated at rest** (C14 I61, `R-SEL-011`'s *the mode
+        // states it*): the last of the facts. Before the key it qualifies it
+        // shed the count at 100 columns in the rectangle, and `⏎ to file` already
+        // says where the text goes when the line is too narrow for both.
+        ...(semantic?.offersFile === true ? [{ label: "no clipboard", tone: "warn" as const }] : []),
         // **After the facts, the two the line sheds first** (C14 I55). The line
         // sheds from the right (§103), so what is last goes first: the count,
         // the frozen screen and the waiting notice are `R-SEL-009`'s and

@@ -112,6 +112,13 @@ export type CopyState =
        * Zero by zero where it resolves to no block.
        */
       rect: Readonly<{ columns: number; rows: number }> | null;
+      /**
+       * No clipboard at rest — C02 says `none` and no tool was found — so a copy
+       * goes to a file, and the footer says so before the press (C14 I61,
+       * `R-SEL-011`'s *states it and offers a file*). Absent is a chrome composed
+       * without a session, which cannot know and draws `⏎ copy`.
+       */
+      offersFile?: boolean;
     }>;
 
 export type ChromeContext = Readonly<{

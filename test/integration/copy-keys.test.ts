@@ -186,7 +186,9 @@ describe("C14 §6a — the keys in a real session", () => {
       await s.press("a");
       await s.press("\r");
       expect(s.inMode(), "⏎ left the mode").toBe(false);
-      expect(s.screen().rows.some((r) => r.includes("copied to the kill buffer")), "and said where the text went").toBe(true);
+      // **Where it went is this session's truth** (C14 I61): no OSC 52 and no
+      // tool on an empty `PATH`, so the file, by name.
+      expect(s.screen().rows.some((r) => r.includes("no clipboard here — saved to /state/copy.txt")), "and said where the text went").toBe(true);
       expect(await s.yanked()).toContain("two words");
 
       // `y` — the same copy, and the mode stays.
@@ -196,7 +198,7 @@ describe("C14 §6a — the keys in a real session", () => {
       await y.press("a");
       await y.press("y");
       expect(y.inMode(), "y stays").toBe(true);
-      expect(y.screen().rows.some((r) => r.includes("copied to the kill buffer"))).toBe(true);
+      expect(y.screen().rows.some((r) => r.includes("saved to /state/copy.txt"))).toBe(true);
       await y.press(ESC, 100);
       await y.press(ESC, 100);
       expect(await y.yanked()).toContain("two words");

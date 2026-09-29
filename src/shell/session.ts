@@ -59,6 +59,8 @@ import { PROMPT_GUTTER, regionWidth, transcriptWidth } from "./config.js";
 import { cursorStyleFor, steadyWhileTyping } from "./cursor-style.js";
 import { autoscrollFor, beginDrag, clampToContainer, type Drag } from "./drag-selection.js";
 import { createIdentityLoop } from "./identity.js";
+import { copyFilePath, createCopier, type Copier } from "./clipboard.js";
+import { findClipboardTool, writeClipboard } from "../data/process/clipboard.js";
 import {
   SessionStateError,
   UnusableTerminalError,
@@ -836,6 +838,9 @@ class Session implements TuiInstance {
     this.#toastTimer = null;
     this.#toast = null;
     this.#animation = NOTHING_ANIMATES;
+    // C14 §6e *Where the copy goes* row 10 — a pending copy's deadline, on the
+    // toast's terms. The tool is detached and runs to its end (C21 I2).
+    this.#copier?.[Symbol.dispose]();
     this.#tickAt = null;
     this.#motionAt = null;
     // **Here, not in `beforeRelease`** (C23 I12). The flag `beginStopping` sets
@@ -1896,10 +1901,9 @@ class Session implements TuiInstance {
    * record. **Never silent** (ruling 71): nothing selected, and a selection
    * whose copy is empty, each say so and stay — `⏎` leaving on an empty copy
    * would discard the mode for nothing — and neither calls `copyText("")`.
-   * A copy says where it went, and where it went is the kill buffer: `⌃y`
-   * yanks it back, which is a true statement about it. The system clipboard
-   * and OSC 52 are `R-SEL-011`'s two mechanisms, and they are wired next
-   * (review batch 4, M10 item 1).
+   * **The kill buffer first, then one clipboard** (C17 I31, C14 I61): `⌃y`
+   * yanks what the clipboard received, and the copier says where that was in
+   * words that are true — it is the only sentence a copy raises.
    */
   #copySelectedEntries(leave: boolean): void {
     const graph = this.#graph;
@@ -1916,7 +1920,30 @@ class Session implements TuiInstance {
     }
     graph.editor.copyText(text);
     if (leave) this.#exitSemanticSelection();
-    this.#raiseToast("copied to the kill buffer");
+    this.#copierOf(graph).copy(text);
+  }
+
+  /**
+   * The one copier, built on first use (C14 I61, ruling 72).
+   *
+   * **The tool is found once**: `findClipboardTool` walks the injected `PATH`
+   * with a `stat` per directory, and the footer asks `hasClipboard` on every
+   * frame. A tool installed mid-session is not seen, which is the cost.
+   */
+  #copier: Copier | null = null;
+
+  #copierOf(graph: Graph): Copier {
+    this.#copier ??= createCopier({
+      clipboard: graph.capabilities.clipboard,
+      tool: findClipboardTool(this.config.env),
+      send: (bytes) => void graph.lifecycle.writer.write(bytes),
+      write: (tool, text) => writeClipboard(tool, text, { env: this.config.env, cwd: () => this.config.cwd }),
+      writeFile: (path, text) => this.config.fs.writeFile(path, text),
+      path: copyFilePath(this.config.stateDir),
+      schedule: this.config.schedule,
+      say: (text) => this.#raiseToast(text),
+    });
+    return this.#copier;
   }
 
   /**
@@ -2019,6 +2046,7 @@ class Session implements TuiInstance {
       clears: semantic.hasSelection(mode),
       all: semantic.selectsAll(mode, spans),
       rect,
+      offersFile: !this.#copierOf(graph).hasClipboard,
     };
   }
 
