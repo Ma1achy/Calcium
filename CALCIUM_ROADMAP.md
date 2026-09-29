@@ -2605,7 +2605,7 @@ sites and every one of them would need its own answer:
 | `shell/keys.ts:586` | `const before = deps.editor.text`, then `setText` — an **edit round-trip** through a plain string |
 | `shell/keys.ts:829`, `:1106` | `history.previous(text)`, `searchOpen(text)` — **C20 stores strings** |
 | `shell/session.ts:1242` | `selectionSpans(text, …)` — C09's wash |
-| `shell/session.ts:1282` | `contextAt(text, cursor, …)` inside `completion.ghost(…)` — C19 again, from the shell (`:579` when this was written) |
+| `shell/session.ts:1448` | `contextAt(text, cursor, …)` inside `completion.ghost(…)` — C19 again, from the shell (`:579` when this was written, `:1282` until review batch 4) |
 | `shell/construct.ts:4342` | `promptHasText` |
 
 **The count read *seven* until 2026-09-10 and the population has never been seven.** Measured
@@ -2629,7 +2629,7 @@ it was answering. **Four of the nine pass a buffer index alongside it**:
 ```
 keys.ts:382     contextAt(editor.text, editor.cursor, manifest)
 keys.ts:652     contextAt(editor.text, editor.cursor, manifest)
-session.ts:1282 contextAt(editor.text, editor.cursor, manifest)   — the ghost
+session.ts:1448 contextAt(editor.text, editor.cursor, manifest)   — the ghost
 session.ts:1242 selectionSpans(editor.text, sel.anchor, sel.head, …)
 ```
 
