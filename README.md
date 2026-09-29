@@ -48,6 +48,29 @@ model, and it is where an app spends nearly all of its effort.
 
 ---
 
+## Installing
+
+The package is **`calcium-tui`**, and it is **not on a registry yet** (A04 §9). Build a
+clone and depend on the folder:
+
+```sh
+git clone https://github.com/Ma1achy/Calcium.git calcium
+cd calcium && npm install && npm run build
+```
+
+```json
+{ "dependencies": { "calcium-tui": "file:../calcium" } }
+```
+
+Node 22.22.1 or a later 22 (`engines`). The entry points are `calcium-tui`,
+`calcium-tui/testing`, `calcium-tui/fixtures`, `calcium-tui/profiling` and
+`calcium-tui/mermaid`. Coming from the previous scoped name, [`MIGRATION.md`](MIGRATION.md)
+has the rewrite, and [`CHANGELOG.md`](CHANGELOG.md) names every breaking change.
+
+Not a git dependency: building one needs an install script, and A04 §3 allows none.
+
+---
+
 ## The block vocabulary
 
 An adapter never draws. It returns blocks, and the framework renders them — so

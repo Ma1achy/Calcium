@@ -6,6 +6,8 @@ until a generator exists** (A04 §9), and every breaking change is named as one.
 This is 0.x: a minor version may break the API with no deprecation cycle (README, *This is
 0.x, deliberately*). Pin an exact version and read this file before moving it.
 
+Moving an existing consumer across the breaking list below is [`MIGRATION.md`](MIGRATION.md).
+
 Each entry names the commit or lane that made the change, so the reasoning is one
 `git show` away. New entries are appended to the section they belong in; when a version is
 tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
@@ -14,6 +16,11 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
 
 ### Breaking
 
+- **The package is `calcium-tui`** (169f8cc8). It had a scoped name before. Change the
+  dependency and every import, the four subpaths included: `calcium-tui/testing`,
+  `/fixtures`, `/profiling` and `/mermaid`. It is **not published yet** (A04 §9): depend on a
+  built clone with `file:` (README, *Installing*), and drop any `.npmrc` scope line you
+  added for it. `MIGRATION.md` has the rewrite.
 - **`Glyph`: `live` is removed** (81aa90eb). A live panel's title takes a spinner frame
   instead of a mark, and `quote`'s ASCII rail, which `live` held, is now `|`.
 - **`Glyph`: `step` is removed** (263a10cc). A call head carries `Notice.state` and the

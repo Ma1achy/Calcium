@@ -50,16 +50,23 @@ npm run build >/dev/null
 
 # ── 2. Publish is not refused, and it goes where we say
 #
-# **`--registry` does not work here and fails silently**, which is why this
-# asserts the line rather than passing a flag and trusting it. `publishConfig.registry`
-# in package.json beats both `--registry` and `npm_config_registry`, and npm
-# reports the override as accepted while publishing to the configured host. The
-# scoped form is the one that wins. A CI job wiring a local registry with
-# `--registry` would have aimed at the real one and read the auth failure as a
-# problem with the local one. FINDINGS F12.
+# **This asserts the line rather than passing a flag and trusting it.** A
+# `publishConfig.registry` in package.json beats both `--registry` and
+# `npm_config_registry`, and npm reports the override as accepted while
+# publishing to the configured host — so a CI job wiring a local registry would
+# aim at the real one and read the auth failure as a problem with the local one.
+# FINDINGS F12. The scoped `--@scope:registry=` form was the one that won, and
+# only for a scoped name.
+#
+# **The package is unscoped (`calcium-tui`) and carries no `publishConfig`**
+# (A04 §9, not published yet), so the plain `--registry` is the override that
+# takes. If a `publishConfig` comes back with a registry choice, the grep below
+# goes red on the first run rather than the flag lying. The scrub that renamed
+# the package rewrote the scoped flag to `--@calcium-tui:registry=`, a scope no
+# package has, which npm accepts and ignores — F1469.
 say "publish --dry-run, registry override asserted"
 LOCAL="http://localhost:4873"
-OUT="$(npm publish --dry-run "--@calcium-tui:registry=$LOCAL" 2>&1)" || die "npm publish --dry-run refused: $OUT"
+OUT="$(npm publish --dry-run "--registry=$LOCAL" 2>&1)" || die "npm publish --dry-run refused: $OUT"
 grep -q "Publishing to $LOCAL" <<<"$OUT" \
   || die "the registry override did not take — npm reports: $(grep -i 'publishing to' <<<"$OUT")"
 

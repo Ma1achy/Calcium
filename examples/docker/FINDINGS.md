@@ -57731,3 +57731,20 @@ Found by lane b4-fixtures. No framed figure's widest line holds a wide glyph, so
 ## F1468 — §018's `built` is `no` although its row says `choice` and `control` landed ★★☆☆☆
 
 Noticed by lane b4-fixtures and not ruled, because it belongs to M16.5's focus-shape work. §018 is excluded from `framed` by its `built: no`, and its own row text says two of its subjects shipped. Either the column or the prose is stale.
+
+## F1469 — the scrub rewrote proof's registry override to a scope no package has, and the local chain never runs `make proof` ★★★☆☆
+
+Found while completing the rename (169f8cc8). `tools/proof.sh` passed `--@<scope>:registry=$LOCAL`, the scoped override F12 chose because `publishConfig.registry` beats the bare `--registry`. The scrub's mapping turned it into `--@calcium-tui:registry=`, and `calcium-tui` is unscoped. So the flag names a scope no package has, and npm accepts and ignores it. Measured in the devcontainer on 2026-09-29, with `publishConfig` removed:
+
+```
+npm publish --dry-run --@calcium-tui:registry=http://localhost:4873
+npm notice Publishing to https://registry.npmjs.org/ with tag latest and default access (dry-run)
+npm publish --dry-run --registry=http://localhost:4873
+npm notice Publishing to http://localhost:4873/ with tag latest and default access (dry-run)
+```
+
+The scrub's line aimed the dry-run at **the public registry**. `proof.sh`'s grep for `Publishing to $LOCAL` would have stopped the gate, which is F12's guard doing its job, but no local run had ever reached it. PG3 checked that the script *contained* the scoped string, and the scrub rewrote that string in both files at once, so the fixture agreed with the defect.
+
+**Why nothing saw it**: the scrub's own chain was enforce, test, golden, check and e2e. `make proof` runs only in CI. It is the one gate that publishes and installs, and it was the one gate the change could break. This is *a gate that exists and is not run*, in the form where the gate's CI-only placement matches the one change it covers.
+
+**Closed.** A04 §9 now holds the package unpublished with no `publishConfig` (the person's ruling), so the bare `--registry` is the override that takes, and `proof.sh` passes it. PG3 now asserts the bare flag, no scoped override, and no `publishConfig`: one fact, since the bare flag is right exactly while `publishConfig` is absent. Reverting `proof.sh` to the scrub's line fails PG3, measured at 1 failed / 7 passed. `make proof` is green on the fixed tree, and the lanes' chain script runs it from now on.
