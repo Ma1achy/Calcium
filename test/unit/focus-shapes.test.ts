@@ -140,3 +140,9 @@ describe("C09 I106 — a continuous control has three states and the value is no
     );
   });
 });
+
+describe("C09 I132 — a chosen option carries its mark and its weight", () => {
+  it.todo(
+    "T1.90 (C09 I132, I105, I121, ruling 54): every chosen option's mark and label are bold at every rung, focused or not, and nothing else is; measure, width and elements do not move — not deferred on a component: the code lands in the next commit of this round",
+  );
+});

@@ -1261,7 +1261,7 @@ A carrier **survives 1-bit** or it does not, and that is the whole of *independe
 | **ownership** | the router's owner rung | the footer's owner line (`chrome.ts:97`, `R-KEY-004`) | word + border | both |
 | **focus** | `RenderContext.focus` | `▸` (`glyphs.ts:1270`) and `focusGround` | mark + ground | mark — §4k.3 ruling 2: *`▸` is the whole of focus at 1-bit* |
 | **selection** | `surface.selection` | the wash, `inverse` at 1-bit (`paint.ts:250`) | **ground alone** | inverse — see the exception below |
-| **choice** | `Choice.chosen` | `markOf` (`controls.ts:37`) | mark alone | mark |
+| **choice** | `Choice.chosen` | `markOf` and the option's style (`controls.ts:39`, C09 I132) | mark + weight | both — the mark, and bold, an attribute at 1-bit (ruling 54) |
 | **disclosure** | `TableRow.expanded` | `▹` / `▿` (`glyphs.ts:1260`, `:1265`) | mark | mark |
 | **validity** | the error mark and its word | T2.47's pair | mark + word | both |
 | **resolution** | — | — | **no subject** | a question's *open* is the layer's presence, not a drawn distinction |
@@ -1269,7 +1269,7 @@ A carrier **survives 1-bit** or it does not, and that is the whole of *independe
 | **availability** | `FormField.availability` (C04 I140) | the well and the dim weight, and no element for a disabled field (`form.ts`, C09 I122) | ground + weight | weight — the label and value dim where the well is gone |
 | **freshness** | `Panel.staleForMs` (C04 I127) | `recede` over the body and `staleNotice` in the rule (`containers.ts:226`, `:157`) | weight + word | both — the body recedes to `dim`, an attribute at 1-bit (C10 I59), and the notice is text (C09 I110) |
 
-**Two exceptions, and both are declared in the tree rather than granted here.**
+**Two exceptions were declared in the tree rather than granted here, and choice has since left** (C09 I132).
 
 **Selection has one carrier and says so**: `paint.ts:250` reads *`inverse` because the ground is
 selection's only carrier; focus has `▸`*. `R-SEL-006` gives selection the ground and focus the
@@ -1283,9 +1283,10 @@ the second: the `▌` selection rail, §017's gutter mark. This paragraph used t
 would have to be a mark *in the cell C11 I14 forbids* — true of a mark inside a table cell, and not
 where §017 draws the rail, which is the gutter left of the row. The row above stays *ground alone*
 because that is what the tree draws; **which column the rail takes is parked as 41**, since the
-first column of a selected row holds the head mark that carries a call's state at 1-bit. **Choice is the same shape from the other side**: the mark carries *chosen* and the wash
-carries *focused* (`controls.ts:32`), one carrier each, and the mark survives 1-bit where the wash
-does not — so the fact that needs the rung has it.
+first column of a selected row holds the head mark that carries a call's state at 1-bit. **Choice was the same shape from the other side, and is not an exception any more** (ruling 54,
+C09 I132): the mark carried *chosen* and the wash *focused*, one carrier each. A chosen option now
+draws its mark and its label bold, so *chosen* has two carriers that both survive 1-bit, and bold
+rather than `inverse` because `inverse` is focus's and selection's rung there.
 
 **The gate's own control found a defect in the gate**, which is the reason a control is a change the corpus must not survive rather than a change that looks large. T2.57 located this section with `/### 4k\.5[\s\S]*?/`, and `4k.5` is a prefix of `4k.5x` — so renaming the heading, written as the one mutation nothing could survive, **survived**: the regex found the renamed section and parsed its table happily. A control that cannot fail reports thoroughness. Anchored on the space after the number now.
 
