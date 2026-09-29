@@ -25,9 +25,11 @@ import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
 import type { LocalDocument, Block, ComparisonRow } from "@fmx/calcium";
 import type { Row } from "./ndjson.ts";
+import type { Runner } from "./mutation.ts";
 
 import type { LocalContext } from "@fmx/calcium";
 const run = promisify(execFile);
+const realRunner: Runner = async (args) => await run("docker", [...args], { maxBuffer: 8 << 20 });
 
 /** One `docker inspect` object — a container's or an image's. */
 type Insp = Row;
@@ -281,16 +283,25 @@ export function compareRows(left: Insp, right: Insp): ComparisonRow[] {
 
 // ── The far side ────────────────────────────────────────────────────────────
 
-async function inspectOne(kind: "container" | "image", ref: string): Promise<Insp | null> {
-  const argv = kind === "image" ? ["image", "inspect", ref] : ["inspect", ref];
-  try {
-    const { stdout } = await run("docker", argv, { maxBuffer: 8 << 20 });
-    const parsed: unknown = JSON.parse(stdout);
-    return Array.isArray(parsed) ? (obj(parsed[0]) as Insp) : null;
-  } catch {
-    return null;
-  }
-}
+/**
+ * `docker inspect` over a runner — the daemon by default, the demo world when
+ * `app.ts` is handed one. `Lookup` below was already the seam; this is what
+ * builds one from a runner rather than from the process.
+ */
+export const inspectWith =
+  (docker: Runner): Lookup =>
+  async (kind, ref) => {
+    const argv = kind === "image" ? ["image", "inspect", ref] : ["inspect", ref];
+    try {
+      const { stdout } = await docker(argv);
+      const parsed: unknown = JSON.parse(stdout);
+      return Array.isArray(parsed) ? (obj(parsed[0]) as Insp) : null;
+    } catch {
+      return null;
+    }
+  };
+
+const inspectOne: Lookup = inspectWith(realRunner);
 
 /**
  * **`error` is required when `status` is `"error"`** (C04 I3), and omitting it
@@ -392,7 +403,9 @@ export function createDriftHandler(
   };
 }
 
-export function createCompareHandler(): (
+export function createCompareHandler(
+  lookup: Lookup = inspectOne,
+): (
   argv: readonly string[],
   ctx: LocalContext,
 ) => Promise<LocalDocument> {
@@ -403,8 +416,8 @@ export function createCompareHandler(): (
     }
 
     const [a, bb] = await Promise.all([
-      inspectOne("container", left),
-      inspectOne("container", right),
+      lookup("container", left),
+      lookup("container", right),
     ]);
     const absent = [a === null ? left : "", bb === null ? right : ""].filter((x) => x !== "");
     if (a === null || bb === null) {

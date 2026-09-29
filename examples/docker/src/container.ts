@@ -40,8 +40,12 @@ import { axisCaption, capFor, createRing, TICK_MS } from "./history.ts";
 import type { Ring } from "./history.ts";
 import { parseNdjson, str } from "./ndjson.ts";
 import type { Row } from "./ndjson.ts";
+import type { Runner } from "./mutation.ts";
 
 const run = promisify(execFile);
+
+/** The far side by default; the demo world stands in through the adapter's parameter. */
+const realRunner: Runner = async (args) => await run("docker", [...args], { maxBuffer: 1 << 20 });
 
 /** The plot's body. Eight rows of curve, plus C12's axes. */
 const PLOT_HEIGHT = 8;
@@ -55,12 +59,8 @@ const PLOT_HEIGHT = 8;
  * this verb, and the parts supply it themselves because they are not going
  * through the shim at all.
  */
-async function readStats(id: string): Promise<Row | null> {
-  const { stdout } = await run(
-    "docker",
-    ["container", "stats", "--no-stream", "--format", "json", id],
-    { maxBuffer: 1 << 20 },
-  );
+async function readStats(docker: Runner, id: string): Promise<Row | null> {
+  const { stdout } = await docker(["container", "stats", "--no-stream", "--format", "json", id]);
   return parseNdjson(stdout).rows[0] ?? null;
 }
 
@@ -74,12 +74,8 @@ async function readStats(id: string): Promise<Row | null> {
  * result and cannot make a second call, and these four fields are not in the
  * one it was handed.
  */
-async function readDetails(id: string): Promise<Row | null> {
-  const { stdout } = await run(
-    "docker",
-    ["ps", "-a", "--no-trunc", "--filter", `id=${id}`, "--format", "json"],
-    { maxBuffer: 1 << 20 },
-  );
+async function readDetails(docker: Runner, id: string): Promise<Row | null> {
+  const { stdout } = await docker(["ps", "-a", "--no-trunc", "--filter", `id=${id}`, "--format", "json"]);
   return parseNdjson(stdout).rows[0] ?? null;
 }
 
@@ -318,7 +314,12 @@ export function cpuFold(ring: Ring): (data: unknown) => Ring {
  * The verb's own result seeds the first sample, so the opening frame draws a
  * point rather than an empty axis.
  */
-export function containerView(row: Row, width: number, unicode = true): readonly Block[] {
+export function containerView(
+  row: Row,
+  width: number,
+  unicode = true,
+  docker: Runner = realRunner,
+): readonly Block[] {
   /**
    * **`ID`, not `Container` — and the frame is what said so.**
    *
@@ -351,7 +352,7 @@ export function containerView(row: Row, width: number, unicode = true): readonly
    * history.
    */
   const source = `container-stats:${id}`;
-  const fetch = (): Promise<Row | null> => readStats(id);
+  const fetch = (): Promise<Row | null> => readStats(docker, id);
 
   return [
     b.kv({ CONTAINER: name || id, ID: id }, { id: "container-head" }),
@@ -393,7 +394,7 @@ export function containerView(row: Row, width: number, unicode = true): readonly
       // No `every` — one-shot. Rendered once, never retried, never re-titled.
       id: "details",
       title: "DETAILS",
-      fetch: () => readDetails(id),
+      fetch: () => readDetails(docker, id),
       render: (data) => detailsBlock(data as Row | null),
       // **Supplied, and the reason is an ellipsis.** Left out, C24's default
       // renders `loading…` — U+2026, a framework string constant with no
@@ -426,7 +427,7 @@ export function containerView(row: Row, width: number, unicode = true): readonly
  * no capabilities; `ctx.capabilities` is the resolved record now, so the adapter
  * asks rather than being told by an app that computed it wrongly.
  */
-export function createContainerAdapter(): Adapter {
+export function createContainerAdapter(docker: Runner = realRunner): Adapter {
   return {
     schema: "tui.view/1",
     adapt(result, ctx): AdapterDocument {
@@ -442,7 +443,7 @@ export function createContainerAdapter(): Adapter {
       const blocks: readonly Block[] =
         row === null
           ? [b.notice.error(failure)]
-          : containerView(row, ctx.width, ctx.capabilities.unicode !== "ascii");
+          : containerView(row, ctx.width, ctx.capabilities.unicode !== "ascii", docker);
 
       return {
         schema: "tui.view/1",
