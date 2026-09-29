@@ -177,3 +177,11 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
 - **A borrowed line numbers its own chips** (dfef2062, C17 I33, I34). A typed reply or a form
   field counts its chips from `#1`, and the prompt's numbering comes back when the borrow ends; a
   chip yanked across owners takes the line's next number.
+- **`BlockDefinition.focusShape`: `"box" | "control" | "row" | "frame"`** (0af676a8, C09 I137). A kind
+  that publishes `elements` declares what focus paints; an undeclared app kind reads as none and is
+  not refused. `RenderContext.focusShapeOf(block)` and an optional `focus` argument on
+  `renderChild` are supplied by the registry.
+- **Focus now shows where it was invisible** (0af676a8, C09 I137): a focused shed row in `keyValue`,
+  `events`, `comparison` or `steps`; a focused `form` field or button at 1-bit, which inverts; and a
+  `mosaic` or `split` pane holding a plot, which lights the plot's frame instead of painting a ground
+  across it.

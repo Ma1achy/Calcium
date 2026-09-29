@@ -57445,3 +57445,42 @@ Found by the editor lane's C17 §5f table (row `loadField`). `endField` and `⏎
 editor: kill a chip, `hold()`, `yank()`, and `text` is U+E001, so a chip yanked into a field reaches C04 form data
 as a private-use character. A field refuses a multi-line paste, so `yank` is the only way in. The remedy is the
 shell's — write `resolved`, or refuse to adopt a chip into a field — and it belongs to the shell lane.
+
+## F1396 — the four shedding kinds published focus targets and drew no focus ★★★☆☆
+
+Found by the focus lane declaring shapes for M16.5. `keyValue`, `events`, `comparison` and `steps` publish a `row`
+element wherever a row sheds (C09 I113) and drew nothing for it at any depth: at c8c7a77e the focused frame was
+byte-identical to the resting one at 24-bit and at 1-bit (keyValue at 8 columns, events at 12, comparison at 8,
+steps at 9). A reader landed on a target and saw nothing — the defect I100 was written against for `mosaic`.
+Closed by C09 I137: the shed row takes the focus ground and bold, gated on the plan `elements` reads (0af676a8).
+
+## F1397 — a focused form control lost weight at 1-bit instead of gaining a carrier ★★☆☆☆
+
+Found by the focus lane. `form` read `focusStyle`, which answers nothing at 1-bit, so focus there removed a field
+label's dim, and a focused non-default button differed from the resting one by bold on two blank cells —
+identical to the eye. C09 I121 says one function answers for every shape *so a fifth shape cannot choose a
+different fallback*, and its hand list of five never held `form`; `form` did differ at 1-bit, by losing weight,
+so the census passed it. Closed by C09 I137: `form` reads `focusShapeStyle` and inverts at 1-bit (0af676a8).
+
+## F1398 — C09 I121's census could not see a shed row or a picture in a pane ★★★☆☆
+
+Found by the focus lane. T2.183 ran at 80 columns, where no row sheds, over a bare `createBlockRegistry()`, where
+`table`, `plot` and `patch` fall back to `raw` — F1286's and C09 I130's class. Its subject set held neither F1396
+nor the mosaic-over-plot case, so it passed over both. T2.228 and T2.229 now run over the session's `graph.blocks`
+at the first width where each kind publishes (0af676a8).
+
+## F1399 — a split pane painted the focus ground across a framed plot, as the mosaic did ★★☆☆☆
+
+Found by the focus lane. RULE_LEDGER recorded `R-FOC-004` unmet for `mosaic` only; `split` had the same defect — a
+pane holding a framed plot painted the focus ground across the figure and left the frame muted. Closed for both
+containers by `paneFocus` (`src/presentation/blocks/paint.ts`): a `frame` child takes the focus and no ground
+(C09 I137, 0af676a8).
+
+## F1400 — C09 I100 held two false sentences, and the ledger carried one ★★☆☆☆
+
+Found by the focus lane. I100 said *the RUN and FRAME rungs have no subject in this tree* — plot's single element
+(C12 I142) and scroll's children are FRAME subjects — and *at 1-bit focusGround answers inverse, so the pane
+inverts*, when it answers nothing and I121 exempts `mosaic` for exactly that reason, so the two invariants
+contradicted each other. Both corrected in C09 (69094db4). The first sentence, with a count of 17 carried from an
+older census of 23 kinds (12 of 28, counted), was also RULE_LEDGER R-FOC-005's reasoning; corrected there
+with this entry.
