@@ -112,7 +112,10 @@ describe("C22 §6f — the style resolves per focus target (C22 I63)", () => {
     // `semanticSelection` brings it back — a different member at the same
     // count, which is exactly why the figure is pinned as well as the loop:
     // the loop above is satisfied by a `FOCUS_ORDER` that swapped a member.
-    expect(FOCUS_ORDER, "and there are nine of them").toHaveLength(9);
+    // **Ten** since ruling 50's `watchRow` (C16 I76): this pin went red at
+    // batch 3's integration, which is its job — the lane that added the target
+    // never ran this file, and the loop above had already accepted it.
+    expect(FOCUS_ORDER, "and there are ten of them").toHaveLength(10);
   });
 
   it("T1.22c (C22 I63): shape and blink are one wire parameter", () => {
