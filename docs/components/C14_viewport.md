@@ -1077,7 +1077,7 @@ no route exists, and pressing the offer is the only thing that writes it. OSC 52
 success cannot be detected, so a copy sent by it counts as done, not failed. The old
 paragraph read *the reader asked for a copy, the file is the destination the rule names
 when the clipboard fails* — true of the rule's text and not of the reader: a copy is
-not a request for a file, and the rule says *offers*. A finding recorded with this lane.
+not a request for a file, and the rule says *offers*. F1425.
 
 #### Where the copy goes — a classification table
 
@@ -1114,14 +1114,14 @@ rules holding at once rather than an event between them:
 - **K3's offer is a property of the text, not of the session.** The old footer asked
   `hasClipboard` — true wherever OSC 52 exists — so a selection past the cap with no
   tool drew `⏎ copy`, and the press then wrote a file under the label `copy`. The offer
-  and the press now read one function over the selection's text.
+  and the press now read one function over the selection's text (F1429).
 - **K12 has no surface.** The per-copy offer lives in the mode's footer, and `⏎`
   leaves the mode before a tool can answer. Nothing in the registry is a save action,
   so the row states the failure and where the text is (the kill buffer), and the gap is
-  reported rather than bound. A finding recorded with this lane.
+  reported rather than bound (F1426); ruling 83 keeps it unbound.
 - **K16: the default `stateDir` is relative**, so the old toast read `saved to
   .calcium/copy.txt` — a path the reader cannot open from anywhere but the working
-  directory. The person's form is *the full path*. A finding recorded with this lane.
+  directory. The person's form is *the full path*. F1427.
 
 ---
 
@@ -1522,7 +1522,7 @@ Fake heights, no rendering.
 - **T5.3**: a live `--logs` tail at 1,000 lines/s while scrolled up reading → the view does not move.
 - **T5.4**: the same, then `End` → snaps to the bottom and resumes following.
 - **T5.5**: dragging the terminal edge from 160 to 60 and back while scrolled to the middle → the same content is on screen at both ends, no blank frames.
-- **T4.44** (I61, review batch 4; **amended 2026-09-29**): a real session whose `pbcopy` takes the text and does not exit for three seconds, with an injected `schedule` that records each timer → `y` toasts `copying with pbcopy` and arms one timer at `COPY_DEADLINE_MS`; the session stops, and that timer has been disposed. *It read* past `COPY_DEADLINE_MS` `<stateDir>/copy.txt` does not exist — *a proxy for the disposal that became vacuous the moment the deadline stopped writing files*: with no automatic write, an undisposed deadline leaves no file either, so the row would pass with the dispose removed. A finding recorded with this lane. T3.26's `dispose` arm is the copier's half of this row, and this row is the session's half: T3.26 cannot see whether anything calls `dispose`. Removing `this.#copier?.[Symbol.dispose]()` from the session's stop → this row fails.
+- **T4.44** (I61, review batch 4; **amended 2026-09-29**): a real session whose `pbcopy` takes the text and does not exit for three seconds, with an injected `schedule` that records each timer → `y` toasts `copying with pbcopy` and arms one timer at `COPY_DEADLINE_MS`; the session stops, and that timer has been disposed. *It read* past `COPY_DEADLINE_MS` `<stateDir>/copy.txt` does not exist — *a proxy for the disposal that became vacuous the moment the deadline stopped writing files*: with no automatic write, an undisposed deadline leaves no file either, so the row would pass with the dispose removed. F1428. T3.26's `dispose` arm is the copier's half of this row, and this row is the session's half: T3.26 cannot see whether anything calls `dispose`. Removing `this.#copier?.[Symbol.dispose]()` from the session's stop → this row fails.
 - **T5.6** (I61, §6a, R-SEL-004, R-SEL-011): a PTY session with `clipboard: "osc52"` declared — three entries, `A`, `y` → the OSC 52 payload **decoded from the PTY's bytes** is the three entries' copy text, plain, in document order with a blank line between entries, and the toast reads `sent to the terminal's clipboard`. *Amended (review batch 4, M10 item 1):* it read *forty rows*; the count is the fixture's and not the claim, and the claim — what the clipboard holds — had no instrument until the payload could be read off the wire.
 
 - **T4.11** (I24, with C13 and C09): a viewport over a transcript whose entry holds a 25-line `logs` block under `maxBlockRows: 10` → `totalRows` is `chrome + 11`, `visible()` at the foot selects the marker row, and the frame's last block row reads `… 10 of 25 rows`.

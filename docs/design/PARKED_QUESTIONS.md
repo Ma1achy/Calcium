@@ -1109,7 +1109,7 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
-> **Ruled 2026-09-28** (by the person; review batch 4, M10 item 1). **The local clipboard is approved as an optional runtime tool, not a package.** Order: **OSC 52 first** (it works over SSH), then a platform tool if present — `pbcopy`; `wl-copy`, `xclip` or `xsel`; `clip.exe` — detected at runtime and never required, spawned with a **fixed argv, no shell, payload on stdin**. If none is available the reader is offered file export and told so. OSC 52's success cannot be observed, so that path is worded honestly: *sent to the terminal's clipboard*, never *copied*. **Owed:** a `DEPENDENCIES.md` row for the optional tools, with batch 4's M10 lane.
+> **Ruled 2026-09-28** (by the person; review batch 4, M10 item 1). **The local clipboard is approved as an optional runtime tool, not a package.** Order: **OSC 52 first** (it works over SSH), then a platform tool if present — `pbcopy`; `wl-copy`, `xclip` or `xsel`; `clip.exe` — detected at runtime and never required, spawned with a **fixed argv, no shell, payload on stdin**. If none is available the reader is offered file export and told so. OSC 52's success cannot be observed, so that path is worded honestly: *sent to the terminal's clipboard*, never *copied*. **Owed:** a `DEPENDENCIES.md` row for the optional tools, with batch 4's M10 lane. **Amended 2026-09-29 by the person:** never write a file the reader did not ask for. The automatic write after a failed copy is removed. Where a clipboard route exists (OSC 52, or a platform tool detected at runtime), the copy takes it and says where it went — *copied via pbcopy*, *sent to the terminal's clipboard* — and the footer offers no file. *Save to file* is offered only where no route exists, and pressing it writes the file and states the full path. OSC 52's success cannot be detected, so a copy via OSC 52 counts as done, not failed. *Claude's ruling on the case the amendment leaves open:* a tool that exits non-zero or does not answer within `COPY_DEADLINE_MS` says it failed and why, and the file is offered for that copy (`⏎ to file`), never written; a payload over OSC 52's limit with no tool is no route for that payload — offered, not written. Built in df142006 (spec) and 9e2f1983 (code); C14 §6e K1–K16. The one case with no offer is ruling 83's.
 
 **72 · RULED — The local clipboard's mechanisms.** Batch 4's M10–M12 walk found copy reaching only the kill buffer, and spawning a platform clipboard tool is a dependency in practice, so it was the person's to decide.
 
@@ -1181,6 +1181,11 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 **82 · RULED — Where ruling 69's disclosure count gets its width.** Lane C stopped at M11.2: the `+N` ruling 69 gives disclosure could not be drawn in any shipping table, and C11 I15 forbade the planner from reading `role` to make room for it.
 
+---
+
+> **Ruled 2026-09-29** (by Claude under the person's standing authority; review batch 4, the correction to ruling 72, F1426). **A tool that fails after `⏎` has left copy mode is stated, not offered: no save action is added outside the mode.** The toast says the tool failed and why and that the kill buffer holds the text, and nothing is written. The offer is held against the copy's text, so re-entering copy mode over the same selection draws `⏎ to file` again. **Why:** the offer lives in the mode's footer and toasts take no keys (§105); a key outside the mode would be a global binding the registry does not carry, invented for one path of one failure — and *the repo is right about what ships* (the registry has no save or export action). Stating it keeps the person's rule whole: nothing the reader did not ask for is written, and the reader is told where the text is. **Revisit** if the registry gains a save action. Built by 9e2f1983 (C14 §6e K12).
+
+**83 · RULED — Whether a copy that fails after copy mode has closed is offered a file.** The b4-clip lane stopped at K12 of C14 §6e's table: the failure arrives after `⏎` has left the mode, where no surface can hold the offer.
 ---
 
 ## Not yet recovered

@@ -133,15 +133,21 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   layer's own fields contradict is refused at push.
 - **Keymap: `prompt ⏎ → submit` and `interaction ⏎ → keepField`** (M5). `ownerLine` takes
   a seventh argument, `hints`, which defaults to the default keymap.
-- **Copy reaches the system clipboard** (d59839b5, ruling 72, C14 I61, C17 I31, C01 I25, C21
-  I20). A copy goes to the kill buffer first, then to one clipboard in the person's order:
-  OSC 52 where the terminal takes it (up to 100 000 bytes of base64), then a platform tool
-  found on `PATH` at runtime — `pbcopy`; `wl-copy`, `xclip` or `xsel`; `clip.exe` — spawned
-  with a fixed argv, no shell, and the text on stdin, then a file,
-  `<stateDir>/copy.txt`. The toast says where it went: OSC 52 is *sent to the terminal's
-  clipboard*, never *copied*, and only a tool's exit 0 says *copied*. With no clipboard the
-  footer says `no clipboard` and `⏎ to file` before the press. No tool is required, and none
-  is a package dependency; `DEPENDENCIES.md` lists them under *Optional system tools*.
+- **Copy reaches the system clipboard, and never writes a file on its own** (d59839b5,
+  9e2f1983; ruling 72 as the person amended it, ruling 83; C14 I61, C17 I31, C01 I25, C21
+  I20). A copy goes to the kill buffer first, then to one clipboard in the person's order: OSC
+  52 where the terminal takes it (up to 100 000 bytes of base64) — *sent to the terminal's
+  clipboard*, counted as done since nothing comes back — otherwise a platform tool found on
+  `PATH` at runtime (`pbcopy`; `wl-copy`, `xclip` or `xsel`; `clip.exe`), spawned with a fixed
+  argv, no shell, and the text on stdin: *copying with pbcopy*, then *copied via pbcopy*.
+  Where no route takes the text — no clipboard, a payload past OSC 52's limit with no tool, or
+  a tool that exits non-zero or does not answer within two seconds — the toast says why and
+  that the kill buffer holds it, and **nothing is written**. Copy mode's footer then offers
+  the file, `⏎ to file` in place of `⏎ copy` with the reason as its last fact; pressing it
+  writes `<stateDir>/copy.txt` and toasts `saved to` its full path. `y` never writes. A tool
+  that fails after `⏎` has left the mode is stated and not offered (ruling 83). No tool is
+  required, and none is a package dependency; `DEPENDENCIES.md` lists them under *Optional
+  system tools*.
 - **Copy mode: `⏎` copies and leaves, `⌃V` toggles a rectangle** (f2bf2500, C14 I59–I60).
   `y` copies and stays; a copy with nothing selected, or no text, toasts and does not leave.
   `⌃V` selects a rectangle of cells (`⇧←`/`⇧→` move its column, clamped to the block); `a`

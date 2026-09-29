@@ -57484,3 +57484,41 @@ inverts*, when it answers nothing and I121 exempts `mosaic` for exactly that rea
 contradicted each other. Both corrected in C09 (69094db4). The first sentence, with a count of 17 carried from an
 older census of 23 kinds (12 of 28, counted), was also RULE_LEDGER R-FOC-005's reasoning; corrected there
 with this entry.
+
+## F1425 — C14 §6e ruled the automatic write after a failed copy acceptable ★★★☆☆
+
+Found by the b4-clip lane applying the person's correction to ruling 72. §6e's closing paragraph said a copy that
+fell through to a file was what the reader asked for — *the file is the destination the rule names*. True of the
+rule's wording and false of the reader: the rule says *offers*, and a copy is not a request for a file. Lane C
+built the write on that sentence. Closed by the correction: nothing is written without a press (df142006,
+9e2f1983).
+
+## F1426 — a copy whose tool fails after copy mode has closed has nowhere to offer the file ★★☆☆☆
+
+Found by the b4-clip lane's C14 §6e table, row K12. `⏎` leaves copy mode before a tool can answer; the offer lives
+in the mode's footer and toasts take no keys, and the registry has no save action. Ruled (83): stated, not offered
+— the toast says the tool failed and that the kill buffer holds the text, nothing is written, and the offer,
+held against the copy's text, returns on re-entering the mode over the same selection.
+
+## F1427 — the copy file's path was relative, and resolved against a different directory from the state dir ★★☆☆☆
+
+Found by the b4-clip lane at C14 §6e K16. The default `stateDir` is relative, so the toast read `saved to
+.calcium/copy.txt` — openable only from the working directory, where the person asked for *the full path*. And
+C22 I67 resolves `stateDir` against the process cwd while the copy path resolves against `config.cwd`; the two
+differ when an app passes `cwd`. The toast now states an absolute path, and the save runs `mkdir` on its directory
+first (9e2f1983). The two resolutions still differ; the save no longer depends on their agreeing.
+
+## F1428 — C14 T4.44 watched disposal through a file that no longer exists ★★☆☆☆
+
+Found by the b4-clip lane. T4.44 checked *no `copy.txt` after the deadline* as its stand-in for the copier being
+disposed on stop; once nothing wrote files, that check passed with the dispose removed. The row now spies the
+ambient `setTimeout`/`clearTimeout` and requires every 2 000 ms timer the `y` armed to be cleared by stop (the
+toast's expiry is the same length and cannot be told apart, which the row says). Caught by the lane's mutation
+run.
+
+## F1429 — the footer offered `⏎ copy` for a text the press then wrote to a file ★★★☆☆
+
+Found by the b4-clip lane's C14 §6e table, row K3. The footer asked `hasClipboard` — true wherever OSC 52 exists —
+so with OSC 52, no tool and a selection past the cap it drew `⏎ copy`, and the press wrote a file under that
+label. The offer is now a property of the selection's text: the footer and the press read one function,
+`fileOffer(() => text)`, and cannot disagree (9e2f1983).
