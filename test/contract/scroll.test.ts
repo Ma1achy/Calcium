@@ -627,9 +627,9 @@ describe("C09 §6b — the second caller, and the bound it applies", () => {
     expect(strip(held), "the tone is the only difference").toEqual(strip(loose));
   });
 
-  it("T3.76 (C09 I134, I59, §6b): an atomic child taller than the box is cropped — measures 3 and paints 3", () => {
+  it("T3.76 (C09 I135, I59, §6b): an atomic child taller than the box is cropped — measures 3 and paints 3", () => {
     // **`plot` declares no `window`** and C12 I1 makes that permanent, so
-    // `windowChild` returns `null` — and since C09 I134 the box crops the whole
+    // `windowChild` returns `null` — and since C09 I135 the box crops the whole
     // render to the rows the window holds. This row asserted the disagreement,
     // 3 measured against 9 painted, and was green for exactly as long as the
     // defect (F856); it now asserts the equality.
@@ -744,8 +744,8 @@ describe("C29 1.5 — what the content column declares", () => {
   });
 });
 
-describe("C09 I134 — a bounded box crops what it cannot slice (review batch 4 M14.6)", () => {
-  it("T3.130 (C09 I134, F1334): three 76-cell notices in a box of 3 at 75 columns keep their residue row inside the box at every offset", () => {
+describe("C09 I135 — a bounded box crops what it cannot slice (review batch 4 M14.6)", () => {
+  it("T3.130 (C09 I135, F1334): three 76-cell notices in a box of 3 at 75 columns keep their residue row inside the box at every offset", () => {
     // **F1334's frame.** Each notice wraps to two rows at the box's content
     // width, so the content is 6 against an interior of 3 and every offset but
     // the even ones cuts a notice — which `windowChild` refuses for an atomic

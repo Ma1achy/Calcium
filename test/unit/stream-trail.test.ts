@@ -116,7 +116,7 @@ const liftFg = (fg: string, f: number): string =>
 /**
  * The rendered row as clusters with their style — **by grapheme, not by code
  * unit**, because the rows it reads carry combining marks, families and flags,
- * which `styledScreenFrom`'s one-index-per-cell model splits (C09 I133).
+ * which `styledScreenFrom`'s one-index-per-cell model splits (C09 I134).
  */
 const clustersOf = (b: Notice, width = 40): readonly { g: string; style: CellStyle }[] => {
   const line = measurable({ capabilities: FULL_CAPS }).renderToLines(b as never, width)[0] ?? "";
@@ -240,7 +240,7 @@ describe("C09 §7e — the band", () => {
     const grid = gridOf(b, 20);
     const newest = grid[1]!.filter((c) => c.ch === "f").at(-1)!;
     const accent = gridOf(notice({ text: "x", tone: "accent" }))[0]![0]!.style.fg;
-    expect(newest.style.fg, "the head across a wrap is the lifted accent (C09 I132)").toBe(liftFg(accent, 1.35));
+    expect(newest.style.fg, "the head across a wrap is the lifted accent (C09 I133)").toBe(liftFg(accent, 1.35));
   });
 
   it("T1.77 (C09 I90, §7e, §026): the head is the hot end of the band", () => {
@@ -250,7 +250,7 @@ describe("C09 §7e — the band", () => {
     const row = gridOf(notice({ text: "abcdefghijklmnopqrstu", streaming: true, trail: "hotEdge" }))[0]!;
     const at = (ch: string) => row.find((c) => c.ch === ch)!;
     const accent = gridOf(notice({ text: "x", tone: "accent" }))[0]![0]!.style.fg;
-    expect(at("u").style.fg, "the newest character is the accent lifted ×1.35 (C09 I132)").toBe(liftFg(accent, 1.35));
+    expect(at("u").style.fg, "the newest character is the accent lifted ×1.35 (C09 I133)").toBe(liftFg(accent, 1.35));
     expect(at("h").style.fg, "and the band's oldest is not").not.toBe(accent);
     // **The control: outside the band the text is its own ink**, so the two
     // reads above are about the band and not about the whole row being accent.
@@ -296,7 +296,7 @@ describe("C09 §7e — the band", () => {
 
   it("T1.56 (C09 I90, C04 I123, §7e): the target is the run's own ink, not a fixed colour", () => {
     // **Inside the band, where the target is the only difference.** The two
-    // rows below compare whole frames, and since C09 I132 gave hotEdge its lift
+    // rows below compare whole frames, and since C09 I133 gave hotEdge its lift
     // and hue none, the second differs at the head whatever the target — a
     // fixed target survived it. `x y` is all band, so every cell is a ramp
     // sample and the run's tone reaches the bytes only through `from`.
@@ -632,7 +632,7 @@ describe("C09 §099 — an elided run shortens from its middle", () => {
   });
 });
 
-describe("C04 I148 and C09 I132, I133 — the hot edge's overshoot and the band by grapheme (review batch 4 M13.4, M13.5)", () => {
+describe("C04 I148 and C09 I133, I134 — the hot edge's overshoot and the band by grapheme (review batch 4 M13.4, M13.5)", () => {
   it("T1.82 (C04 I148, C10 I36): overshoot samples lift the head at 24-bit, quantise at 8-bit, and change nothing at 4 and 1", () => {
     const stop = { lift: 1.35, share: 0.35 };
     const plain: Ramp = { fill: "gradient", from: "default", to: "accent" };
@@ -665,7 +665,7 @@ describe("C04 I148 and C09 I132, I133 — the hot edge's overshoot and the band 
     expect(at(lifted, 1, 8)).not.toEqual(at(plain, 1, 8));
   });
 
-  it("T1.150 (C09 I132, §7e): each form's head, middle, tail and first cell outside, as colours", () => {
+  it("T1.150 (C09 I133, §7e): each form's head, middle, tail and first cell outside, as colours", () => {
     // Twenty-one narrow cells: the band is `h`..`u`, so `u` is the head, `r`
     // the fourth-newest, `h` the oldest and `g` the first cell outside.
     const text = "abcdefghijklmnopqrstu";
@@ -699,7 +699,7 @@ describe("C04 I148 and C09 I132, I133 — the hot edge's overshoot and the band 
     expect(hue.oldest.fg, "cooling toward the warn body tone").not.toBe(accent);
     expect(hue.outside, "and outside it the warn notice's own ink").toEqual(warnInk);
 
-    // **The ripple runs once from its arrival and holds** (C09 I132, C04 I109;
+    // **The ripple runs once from its arrival and holds** (C09 I133, C04 I109;
     // ruling 81). The shell stamps `trailSince` at the frame that draws the
     // arrival; here it is stamped by hand at 0, so the ring crosses the band
     // over ticks 1–11 and rests on its final frame — the ink — from 12 on.
@@ -733,7 +733,7 @@ describe("C04 I148 and C09 I132, I133 — the hot edge's overshoot and the band 
     expect(weight.outside.attrs, "and not outside").not.toContain(1);
   });
 
-  it("T3.129 (C09 I133, §7e): a cluster at the band's edge is wholly in or out, a combining mark is never dropped, and the newest cluster is the head", () => {
+  it("T3.129 (C09 I134, §7e): a cluster at the band's edge is wholly in or out, a combining mark is never dropped, and the newest cluster is the head", () => {
     const lifted = liftFg(fgOf(hexOf("accent")), 1.35);
     const settled = (text: string) => textClusters(notice({ text }));
     const streaming = (text: string) => textClusters(notice({ text, streaming: true, trail: "hotEdge" }));
@@ -787,7 +787,7 @@ describe("C04 I148 and C09 I132, I133 — the hot edge's overshoot and the band 
 });
 
 describe("C22 I131 — the trail's one-shot is stamped by the shell, per arrival (ruling 81)", () => {
-  it("T1.78 (C22 I131, C04 I109, C09 I132): a streaming ripple notice is stamped at the first frame, keeps its stamp on a re-emission, is re-stamped on a new arrival, and a producer's trailSince is kept", () => {
+  it("T1.78 (C22 I131, C04 I109, C09 I133): a streaming ripple notice is stamped at the first frame, keeps its stamp on a re-emission, is re-stamped on a new arrival, and a producer's trailSince is kept", () => {
     const shots = new OneShots();
     /** The stamp on the entry's one notice after a frame at `tick`, over a fresh array each time — a re-emission. */
     const frame = (over: Partial<Notice>, tick: number, entry = "e1"): Notice =>

@@ -107,7 +107,7 @@ describe("C23 I76 — an operation's head brackets while it runs and flattens wh
     // Running, there is a bar.
     const live = linesOf(operationRows(compacting({}), FULL_CAPS), 56);
     expect(live.length, "a head and a bar").toBe(2);
-    expect(live[1], "counted work draws posts (C09 I135)").toContain("▮");
+    expect(live[1], "counted work draws posts (C09 I136)").toContain("▮");
 
     // **Three stopped states, asserted separately.** Two arguments end with no
     // bar and neither substitutes for the other — *a 100% bar on a finished
@@ -122,7 +122,7 @@ describe("C23 I76 — an operation's head brackets while it runs and flattens wh
       // **And the head is a stopped one**: it leads with its settled mark, not
       // the walking frame the running head leads with. This was caught only by
       // accident while the bar was `▰` — the spinner's frames share the glyph —
-      // and C09 I135's posts took the accident away.
+      // and C09 I136's posts took the accident away.
       const spinning = live[0]!.trimStart().split(" ")[0]!;
       expect(rows[0]!.trimStart().startsWith(spinning), `${state} draws no walking frame`).toBe(false);
       expect(rows[0]!.trimStart(), `${state} leads with its settled mark`).toMatch(/^● /u);
@@ -154,7 +154,7 @@ describe("C09 I104 — a meter's label column costs nothing when there is no lab
     // **Read the BAR's length, not the absence of text** — a row asserting *no
     // label is drawn* is satisfied by nineteen spaces, which is what the tree
     // drew: `width / 3` was reserved unconditionally.
-    const cellsOf = (line: string): number => (line.match(/[▮▯]/gu) ?? []).length; // posts, since C09 I135
+    const cellsOf = (line: string): number => (line.match(/[▮▯]/gu) ?? []).length; // posts, since C09 I136
     expect(cellsOf(none), "the unlabelled bar is longer").toBeGreaterThan(cellsOf(some));
     expect(cellsOf(none) - cellsOf(some), "by the column and its gap").toBe(19);
 

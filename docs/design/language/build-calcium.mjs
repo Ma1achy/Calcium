@@ -534,7 +534,7 @@ export function validateRegistry(registry) {
   for (const bar of currentBars) {
     if (typeof bar.placement !== 'string' || !bar.placement.trim()) throw new Error(`${bar.id} lacks a placement`);
     if (!bar.ruleIds.includes('R-PRG-002')) throw new Error(`${bar.id} omits placement rule`);
-    // **A sub-cell alphabet carries its steps** (ruling 32's amendment, C09 I135):
+    // **A sub-cell alphabet carries its steps** (ruling 32's amendment, C09 I136):
     // eight single characters, the full cell last, and only where the placement
     // says sub-cell — a whole-cell texture with steps would be drawn in eighths.
     const subCell = /sub-cell/u.test(bar.placement);

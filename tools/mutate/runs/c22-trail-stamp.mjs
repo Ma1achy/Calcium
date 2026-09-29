@@ -1,4 +1,4 @@
-// C22 I131, C04 I109, C09 I132 — the trail's one-shot, stamped by the shell per
+// C22 I131, C04 I109, C09 I133 — the trail's one-shot, stamped by the shell per
 // arrival and read by the band (ruling 81; review batch 4, round 2). Mutated
 // (C09 T6.188, C22 T6.134–T6.137).
 //
@@ -49,7 +49,7 @@ const results = runPass({
   },
   mutations: [
     {
-      // **THE DEFECT (C09 I132)**: the band's ramp carries no `since`, so the
+      // **THE DEFECT (C09 I133)**: the band's ramp carries no `since`, so the
       // ripple holds its not-started frame — what the tree drew before ruling 81.
       name: "THE DEFECT: the trail's ramp is built without since",
       file: TRAIL,

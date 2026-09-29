@@ -1,4 +1,4 @@
-// C04 I145, C04 I146 and C09 I135 — the finished bar, its gate, and its alphabet
+// C04 I145, C04 I146 and C09 I136 — the finished bar, its gate, and its alphabet
 // (review batch 4, M16.2, M16.3, M16.4).
 //
 // **Each defect draws a bar that reads as a bar.** A finished bar measuring 1
@@ -117,7 +117,7 @@ const results = runPass({
       expect: "T2.151",
     },
     {
-      // **THE DEFECT (C09 I135)**: segmented back to slant, §035's specimens
+      // **THE DEFECT (C09 I136)**: segmented back to slant, §035's specimens
       // over the registry's rule.
       name: "THE DEFECT: segmented work draws slant",
       file: KIND,

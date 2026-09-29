@@ -1,4 +1,4 @@
-// C04 I148, C09 I132, I133 — the hot edge's overshoot and the band by grapheme (review batch 4, M13.4, M13.5).
+// C04 I148, C09 I133, I134 — the hot edge's overshoot and the band by grapheme (review batch 4, M13.4, M13.5).
 //
 // **Each defect here draws a plausible band.** A trail without its lift is the
 // gradient the tree drew for a year; a band counted in code points is right for
@@ -84,7 +84,7 @@ const results = runPass({
       expect: "T1.82",
     },
     {
-      // **THE DEFECT at the trail (C09 I132)**: hotEdge drawn as the plain
+      // **THE DEFECT at the trail (C09 I133)**: hotEdge drawn as the plain
       // gradient, the head at the accent — what every frame showed before.
       name: "THE DEFECT: hotEdge carries no overshoot",
       file: TRAIL,
@@ -102,7 +102,7 @@ const results = runPass({
       expect: "T1.150",
     },
     {
-      // **THE DEFECT at the walk (C09 I133)**, by code point — which still
+      // **THE DEFECT at the walk (C09 I134)**, by code point — which still
       // makes a combining mark a step of its own and cuts it from its base.
       name: "THE DEFECT: the band walks back by code point rather than by grapheme",
       file: TRAIL,

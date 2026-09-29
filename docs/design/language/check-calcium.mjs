@@ -313,7 +313,7 @@ function checkStructuredCoverageAndRetention(registry, html) {
       requireText(html, htmlEsc(bar.placement), `primary bar placement use ${bar.id}`);
     }
   }
-  // **The sub-cell steps and their frames** (ruling 32's amendment, C09 I135): the
+  // **The sub-cell steps and their frames** (ruling 32's amendment, C09 I136): the
   // braille record carries eight, and the page draws the cell and the 23/24 frame.
   const braille = currentBars.find(item => item.id === 'braille');
   if (!Array.isArray(braille?.steps) || braille.steps.length !== 8) fail('braille carries no sub-cell steps');

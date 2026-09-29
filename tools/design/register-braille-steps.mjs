@@ -1,5 +1,5 @@
 // Records the braille alphabet's sub-cell steps — eighths of a cell (ruling 32's
-// amendment of 2026-09-28; C09 I135, §7j; `R-PRG-002`).
+// amendment of 2026-09-28; C09 I136, §7j; `R-PRG-002`).
 //
 //     node tools/design/register-braille-steps.mjs [--dir <dir>]
 //

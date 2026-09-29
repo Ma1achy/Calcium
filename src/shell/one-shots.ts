@@ -24,7 +24,7 @@
  * A document with nothing to stamp is returned as it came.
  *
  * **The streaming trail is stamped here too, per arrival** (C22 I131, C04 I109,
- * C09 I132; ruling 81). Its ramp is derived at render and has no address, so the
+ * C09 I133; ruling 81). Its ramp is derived at render and has no address, so the
  * stamp is written on the notice as `trailSince`, and its identity is the block
  * and the effect with the **arrival** — the text's length — beside it: a new
  * arrival re-takes the stamp and the ring plays again; a re-emission of the same

@@ -465,7 +465,7 @@ describe("C09 contract — measurement", () => {
     // **An exemption list held by equality, not by membership** — a kind that
     // gains a `window` has to move this list, and a new kind that cannot be
     // bounded has to fail here rather than join a subset quietly. Inside a
-    // `scroll` these kinds are cropped rather than sliced (C09 I134), so the
+    // `scroll` these kinds are cropped rather than sliced (C09 I135), so the
     // list no longer names an overrun: `plot` is atomic permanently (I27, C12
     // I1) and the rest simply have no window yet.
     const kit = measurable({
@@ -1304,11 +1304,11 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
 
     // **Granularity picks the alphabet, and `style` outranks it.** `block` for
     // continuous and `posts` for segmented — `R-PRG-002`'s *discrete steps use
-    // posts*, which ruling 32 took over §035's `slant` specimens (C09 I135) —
+    // posts*, which ruling 32 took over §035's `slant` specimens (C09 I136) —
     // and the registry's own deferral for the rest: *use only when its texture
     // is declared by the component*.
     expect(at({ granularity: "continuous" }), "continuous is the block alphabet").toContain("█");
-    expect(at({ granularity: "segmented" }), "segmented is posts (C09 I135)").toContain("▮");
+    expect(at({ granularity: "segmented" }), "segmented is posts (C09 I136)").toContain("▮");
     expect(at({ granularity: "segmented", style: "beads" }), "a declared style outranks it").toContain("•");
 
     // **Quantity picks the readout, and it is the one axis that moves a frame
@@ -1362,7 +1362,7 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
     const training = at({ quantity: "progress", granularity: "continuous", liveness: "active", ramp });
     expect(budget, "BUDGET is continuous and carries its pair").toContain("█");
     expect(budget, "BUDGET reads both").toContain("60%  6/10");
-    expect(operation, "OPERATION is segmented, and counted work draws posts (C09 I135)").toContain("▮");
+    expect(operation, "OPERATION is segmented, and counted work draws posts (C09 I136)").toContain("▮");
     expect(operation, "and reads its share alone").not.toContain("6/10");
     expect(training, "the third triple is expressible and is neither preset").toContain("█");
     expect(training, "and it is a progress, not a capacity").not.toContain("6/10");

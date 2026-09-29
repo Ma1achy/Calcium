@@ -547,7 +547,7 @@ export const TRAIL_FORMS: readonly TrailForm[] = Object.freeze([
 
 /**
  * The effect each trail form animates its band with, for the forms that animate
- * (C09 I132). A form absent here draws a still band.
+ * (C09 I133). A form absent here draws a still band.
  *
  * **One table for three readers**: C09 builds the band's ramp from it, the gate
  * refuses `trailSince` on a form whose effect is not a one-shot, and the shell
@@ -829,7 +829,7 @@ export type Notice = Readonly<{
   trail?: TrailForm;
   /**
    * The tick the trail's one-shot began on, when `trail` names one (C04 I109,
-   * C09 I132; ruling 81) — `Ramp.since` for a ramp the document cannot address,
+   * C09 I133; ruling 81) — `Ramp.since` for a ramp the document cannot address,
    * because C09 derives the band at render.
    *
    * **A producer need not supply it and usually cannot**: the shell stamps it at

@@ -89,7 +89,7 @@ describe("roadmap 51 — bar styles, and ambiguous width is a tier", () => {
   // assertion is satisfied by any one-cell glyph, so `ascii` drew `#`/`.`
   // against the registry's `#`/`-` under a file whose whole subject is this
   // table. §033's fixture is what found it.
-  it("T2.158 (C09 I94, I135, R-PRG-001): the registry's bars are the tree's, by equality both ways — and the steps", () => {
+  it("T2.158 (C09 I94, I136, R-PRG-001): the registry's bars are the tree's, by equality both ways — and the steps", () => {
     // **Equality on the names, not containment.** A subset check in either
     // direction is satisfied by the failure it exists to catch: a style the
     // registry does not register reads as covered, and a registered alphabet
@@ -116,7 +116,7 @@ describe("roadmap 51 — bar styles, and ambiguous width is a tier", () => {
     // the row compares characters and does not require two visible ones.
     expect(barStyle(NARROW, "braille").off, "braille's empty is the design's space").toBe(" ");
 
-    // **And the steps by equality** (C09 I135, review batch 4 M16.3): a record
+    // **And the steps by equality** (C09 I136, review batch 4 M16.3): a record
     // carrying `steps` is the tree's alphabet carrying the same eight, and one
     // without has none — both directions, so a step added on one side fails.
     const treeSteps = Object.fromEntries(barStyleNames().map((n) => [n, barStyle(NARROW, n).steps ?? null]));
@@ -141,7 +141,7 @@ describe("roadmap 51 — bar styles, and ambiguous width is a tier", () => {
   });
 });
 
-describe("C09 I135 — counted work uses posts, and braille draws eighths (review batch 4 M16.3)", () => {
+describe("C09 I136 — counted work uses posts, and braille draws eighths (review batch 4 M16.3)", () => {
   /** A bar's cells alone: the row between the label's gap and the readout. */
   const barOf = (spec: Record<string, unknown>, width = 40, caps = FULL_CAPS): string => {
     const row = measurable({ theme: DARK_THEME, capabilities: caps })
@@ -152,7 +152,7 @@ describe("C09 I135 — counted work uses posts, and braille draws eighths (revie
   };
   const glyphsIn = (bar: string): string => [...new Set([...bar].filter((c) => c !== " "))].sort().join("");
 
-  it("T2.226 (C09 I135, §7j): the granularity × style table, drawn", () => {
+  it("T2.226 (C09 I136, §7j): the granularity × style table, drawn", () => {
     const table: readonly (readonly [Record<string, unknown>, string])[] = [
       [{ granularity: "segmented" }, "▮▯"],
       [{ granularity: "segmented", style: "braille" }, "▮▯"],
@@ -179,7 +179,7 @@ describe("C09 I135 — counted work uses posts, and braille draws eighths (revie
     }
   });
 
-  it("T2.227 (C09 I135, §7j): the braille frames — one cell through eight steps, three cells at seven fractions, painted and ASCII whole", () => {
+  it("T2.227 (C09 I136, §7j): the braille frames — one cell through eight steps, three cells at seven fractions, painted and ASCII whole", () => {
     // A label-less bar's cells are `width − readout − 1`; the readout is `NN%`,
     // so a width is chosen per bar length. `n` cells at `current/total`.
     const cellsAt = (n: number, current: number, total: number, extra: Record<string, unknown> = {}, caps = FULL_CAPS): string => {

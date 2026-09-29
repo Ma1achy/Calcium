@@ -1161,7 +1161,7 @@ type BarStyle = Readonly<{
   off: string;
   narrowOnly?: boolean;
   /**
-   * **A cell's eighths, emptiest first** (C09 I135, §7j) — the partial cell a
+   * **A cell's eighths, emptiest first** (C09 I136, §7j) — the partial cell a
    * sub-cell alphabet draws between its full cells and its blanks. `braille`'s
    * alone: every other texture steps a whole cell at a time.
    */
@@ -1218,7 +1218,7 @@ const BAR_STYLES: Readonly<Record<string, BarStyle>> = Object.freeze({
   // one cell under both conventions — which is what makes it the style a wide
   // terminal keeps rather than the one it loses.
   //
-  // **And it steps in eighths** (C09 I135, §7j, ruling 32's amendment): the left
+  // **And it steps in eighths** (C09 I136, §7j, ruling 32's amendment): the left
   // dot column fills bottom to top, then the right — U+2840, 2844, 2846, 2847,
   // 28C7, 28E7, 28F7, 28FF — the registry's `steps`, character for character.
   braille: Object.freeze({

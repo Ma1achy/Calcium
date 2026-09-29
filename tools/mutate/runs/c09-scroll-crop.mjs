@@ -1,4 +1,4 @@
-// C09 I134 — a bounded box crops what it cannot slice (review batch 4, M14.6, D16).
+// C09 I135 — a bounded box crops what it cannot slice (review batch 4, M14.6, D16).
 //
 // **Each defect draws a box that looks like a box.** A refused child kept
 // whole over-draws by a few rows and pushes the residue down; a crop taken
@@ -88,7 +88,7 @@ const EXPECTED_SURVIVORS = new Map([
     "a sliceable child is cropped rather than sliced",
     "**equivalent in every frame, by C09 I58 itself**: a kind's slice is exact, so its render is " +
       "the whole render's rows [from, to) and the crop draws the same bytes. What the slice buys " +
-      "since I134 is cost — a 2 000-line `logs` in a six-row box renders six rows rather than two " +
+      "since I135 is cost — a 2 000-line `logs` in a six-row box renders six rows rather than two " +
       "thousand — and no row in this repository measures what a box renders to draw itself",
   ],
 ]);

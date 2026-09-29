@@ -594,7 +594,7 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
     // never applied (F855). `windowChild` returns `null` where the slice would
     // cost the container something — an atomic kind, a floor, a cap, a residual.
     //
-    // **And a refused child is cropped, not kept whole** (C09 I134, D16). A row
+    // **And a refused child is cropped, not kept whole** (C09 I135, D16). A row
     // is a string, so cutting the whole render to `[from, to)` is exact where a
     // kind declines to slice itself — which is what `split`'s `paneRows` already
     // did. Kept whole, three 76-cell notices in a box of 3 drew the second
@@ -672,10 +672,10 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
     // two is what said so.
     //
     // **A child taller than the box is sliced, or cropped where it refuses the
-    // slice** (C09 I58, I134) — the seam this paragraph once said was missing is
+    // slice** (C09 I58, I135) — the seam this paragraph once said was missing is
     // `windowChild`, and the crop covers what it declines.
     //
-    // **The pads are counted from the rows drawn, not the rows measured** (I134).
+    // **The pads are counted from the rows drawn, not the rows measured** (I135).
     // Counting from `measureChild` charged a cut child its whole height, so a box
     // whose pieces drew fewer rows than their measures was short of `interior`.
     const drawn = pieces.reduce((n, p) => n + p.rendered.length, 0); // cells-ok — a row count

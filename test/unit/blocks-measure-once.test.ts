@@ -211,7 +211,7 @@ describe("C09 §6 — a (block, width) is answered once per registry call (I61)"
         // Two rows hold `a` and the top of `b`; `c` is below the box and is
         // measured for the content height without being drawn. `raw` here
         // declares no `window`, so `b` is rendered whole and cropped to its top
-        // row (C09 I134) — it over-drew by one row before, and I1 is asserted
+        // row (C09 I135) — it over-drew by one row before, and I1 is asserted
         // for this box now like every other.
         drawn: ["a", "b"],
       },

@@ -406,7 +406,7 @@ describe("C09 §2c width — fail-on-revert", () => {
     ).toBe(30);
   });
 
-describe("C09 I132–I135 — tier 6 (review batch 4)", () => {
+describe("C09 I133–I136 — tier 6 (review batch 4)", () => {
   /** The last cluster of a rendered notice's text and the SGR before it, read by grapheme. */
   const streamed = (text: string): { frame: string; headSgr: string } => {
     const line = measurable({ capabilities: FULL_CAPS }).renderToLines(
@@ -418,7 +418,7 @@ describe("C09 I132–I135 — tier 6 (review batch 4)", () => {
     return { frame: visible(line), headSgr: sgrs.at(-1) ?? "" };
   };
 
-  it("T6.184 (C09 I132): hotEdge without its overshoot → T1.150 fails at the head", () => {
+  it("T6.184 (C09 I133): hotEdge without its overshoot → T1.150 fails at the head", () => {
     // **The plain gradient's head is the accent** (#e8a87c); the overshoot's is
     // every channel ×1.35 clamped (#ffe3a7). Drawing hotEdge without the stop
     // puts the first where T1.150 asserts the second.
@@ -427,7 +427,7 @@ describe("C09 I132–I135 — tier 6 (review batch 4)", () => {
     expect(headSgr, "and not the plain accent").not.toContain("38;2;232;168;124");
   });
 
-  it("T6.185 (C09 I133): the band walk by code unit → T3.129 fails on the dropped mark", () => {
+  it("T6.185 (C09 I134): the band walk by code unit → T3.129 fails on the dropped mark", () => {
     // **A zero-width mark is a step of its own to a code-unit walk**: it stops
     // between `k` and U+0301, and the cut split the cluster out of the frame.
     // The grapheme walk keeps it — T3.129's first row.
@@ -439,7 +439,7 @@ describe("C09 I132–I135 — tier 6 (review batch 4)", () => {
     expect([...family.slice(-8)].length, "five code points, one cluster").toBe(5);
     expect(streamed(family).headSgr, "the family is the head").toContain("38;2;255;227;167");
   });
-  it("T6.186 (C09 I134): the crop removed → T3.76 and T3.130 fail", () => {
+  it("T6.186 (C09 I135): the crop removed → T3.76 and T3.130 fail", () => {
     // **What the kept-whole arm drew, from its parts**: at offset 1 the first
     // notice is cut (its second row only) and the second is whole, so a box
     // keeping the cut one whole paints 2 + 2 interior rows and the residue — 5
@@ -461,7 +461,7 @@ describe("C09 I132–I135 — tier 6 (review batch 4)", () => {
     expect(lines.length, "the crop paints the measure").toBe(kit.registry.measure(box, 75));
     expect(lines.at(-1), "with the residue last").toMatch(/1 above, 2 below/u);
   });
-  it("T6.187 (C09 I135): segmented mapped back to slant → T2.226 fails", () => {
+  it("T6.187 (C09 I136): segmented mapped back to slant → T2.226 fails", () => {
     // **Two reverts, each against the row that names it**: `segmented` drawing
     // `▰` rather than `▮`, and the braille steps dropped, which draws a bar at
     // 1/8 of a cell as a blank where T2.227 wants `⡀`.
