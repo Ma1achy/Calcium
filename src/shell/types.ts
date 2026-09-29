@@ -113,12 +113,14 @@ export type CopyState =
        */
       rect: Readonly<{ columns: number; rows: number }> | null;
       /**
-       * No clipboard at rest — C02 says `none` and no tool was found — so a copy
-       * goes to a file, and the footer says so before the press (C14 I61,
-       * `R-SEL-011`'s *states it and offers a file*). Absent is a chrome composed
-       * without a session, which cannot know and draws `⏎ copy`.
+       * Why the file is offered for this selection's text — `no clipboard`,
+       * `too large for the terminal`, `pbcopy failed`, `pbcopy did not answer` —
+       * so `⏎` reads `to file` and the reason is the last of the facts (C14 I61,
+       * §6e K3, K7, K8, K13; `R-SEL-011`'s *states it and offers a file*).
+       * Absent where a route takes the text, and in a chrome composed without a
+       * session, which cannot know and draws `⏎ copy`.
        */
-      offersFile?: boolean;
+      fileOffer?: string;
     }>;
 
 export type ChromeContext = Readonly<{

@@ -7,8 +7,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   COPY_DEADLINE_MS,
+  copyFilePath,
   copyToast,
   createCopier,
+  offerFact,
   routeCopy,
   type CopierDeps,
   type CopyOutcome,
@@ -66,36 +68,82 @@ describe("C14 §6e — where the copy goes", () => {
       tool: PBCOPY,
     });
     expect(routeCopy(LARGE, "osc52", null), "W3: too large, which is not no clipboard").toEqual({
-      kind: "file",
+      kind: "none",
       why: "too-large",
     });
     expect(routeCopy("two words", "none", PBCOPY), "a terminal that does not take it").toEqual({ kind: "tool", tool: PBCOPY });
-    expect(routeCopy("two words", "none", null)).toEqual({ kind: "file", why: "no-clipboard" });
+    expect(routeCopy("two words", "none", null)).toEqual({ kind: "none", why: "no-clipboard" });
     // A large text with no OSC 52 is not *too large* — nothing had a cap.
-    expect(routeCopy(LARGE, "none", null)).toEqual({ kind: "file", why: "no-clipboard" });
+    expect(routeCopy(LARGE, "none", null)).toEqual({ kind: "none", why: "no-clipboard" });
 
     // **The words, every outcome** — the ruling's substance is which one says
-    // *copied*.
-    const path = "/state/copy.txt";
+    // *copied*, and the correction's is which one says *saved*.
+    const path = "/work/.calcium/copy.txt";
     const outcomes: readonly [CopyOutcome, string][] = [
       [{ kind: "sent" }, "sent to the terminal's clipboard"],
       [{ kind: "pending", tool: "pbcopy" }, "copying with pbcopy"],
-      [{ kind: "copied", tool: "pbcopy" }, "copied to the clipboard by pbcopy"],
-      [{ kind: "file", path, why: { kind: "no-clipboard" }, written: true }, `no clipboard here — saved to ${path}`],
-      [{ kind: "file", path, why: { kind: "too-large" }, written: true }, `too large for the terminal's clipboard — saved to ${path}`],
+      [{ kind: "copied", tool: "pbcopy" }, "copied via pbcopy"],
+      [{ kind: "unrouted", why: { kind: "no-clipboard" } }, "no clipboard here — the kill buffer holds it"],
+      [{ kind: "unrouted", why: { kind: "too-large" } }, "too large for the terminal's clipboard — the kill buffer holds it"],
       [
-        { kind: "file", path, why: { kind: "failed", tool: "xclip", reason: "exited with code 1" }, written: true },
-        `xclip failed (exited with code 1) — saved to ${path}`,
+        { kind: "unrouted", why: { kind: "failed", tool: "xclip", reason: "exited with code 1" } },
+        "xclip failed (exited with code 1) — the kill buffer holds it",
       ],
-      [{ kind: "file", path, why: { kind: "silent", tool: "pbcopy" }, written: true }, `pbcopy did not answer — saved to ${path}`],
-      [
-        { kind: "file", path, why: { kind: "no-clipboard" }, written: false },
-        `no clipboard, and ${path} could not be written — the kill buffer holds it`,
-      ],
+      [{ kind: "unrouted", why: { kind: "silent", tool: "pbcopy" } }, "pbcopy did not answer — the kill buffer holds it"],
+      [{ kind: "saved", path, written: true }, `saved to ${path}`],
+      [{ kind: "saved", path, written: false }, `${path} could not be written — the kill buffer holds it`],
     ];
     for (const [outcome, text] of outcomes) expect(copyToast(outcome), outcome.kind).toBe(text);
     const copied = outcomes.filter(([, text]) => /\bcopied\b/u.test(text)).map(([o]) => o.kind);
     expect(copied, "only a tool's exit 0 says copied").toEqual(["copied"]);
+    const saved = outcomes.filter(([, text]) => /\bsaved\b/u.test(text)).map(([o]) => o.kind);
+    expect(saved, "only the offer taken says saved — no outcome of a copy does").toEqual(["saved"]);
+  });
+
+  it("T1.82 (C14 I61, §6e K1–K3, K7, K8, K10, K13, K16): fileOffer over the table's at-rest cells, and copyFilePath resolves a relative stateDir", async () => {
+    const small = (): string => "two words";
+    const large = (): string => LARGE;
+    // **K1, K2 — OSC 52 within the cap is a route**, a tool or not.
+    expect(harness({ clipboard: "osc52", tool: null }).copier.fileOffer(small), "K1").toBeNull();
+    expect(harness({ clipboard: "osc52" }).copier.fileOffer(small), "K2").toBeNull();
+    // **K3 — the offer is a property of the text**: the same session offers
+    // for a payload past the cap and not for one within it.
+    const o = harness({ clipboard: "osc52", tool: null });
+    expect(o.copier.fileOffer(large), "K3: past the cap, no tool").toEqual({ kind: "too-large" });
+    expect(o.copier.fileOffer(() => ""), "the empty text is I59's, never too large").toBeNull();
+    expect(harness({ clipboard: "osc52" }).copier.fileOffer(large), "past the cap, the tool is the route").toBeNull();
+    // **K13 — no route at all**, whatever the text.
+    expect(harness({ tool: null }).copier.fileOffer(small), "K13").toEqual({ kind: "no-clipboard" });
+    expect(harness({ tool: null }).copier.fileOffer(large)).toEqual({ kind: "no-clipboard" });
+    // **K5, K6 — a tool is a route**, pending included.
+    const t = harness();
+    expect(t.copier.fileOffer(small), "K5: a tool").toBeNull();
+    t.copier.copy("two words");
+    expect(t.copier.fileOffer(small), "K6: pending has not failed").toBeNull();
+    // **K7 — failed, for that copy**; K10 — not for another text.
+    t.answers[0]?.({ ok: false, tool: "pbcopy", reason: "exited with code 1" });
+    await t.flush();
+    expect(t.copier.fileOffer(small), "K7").toEqual({ kind: "failed", tool: "pbcopy", reason: "exited with code 1" });
+    expect(t.copier.fileOffer(() => "other words"), "K10").toBeNull();
+    expect(offerFact({ kind: "failed", tool: "pbcopy", reason: "exited with code 1" }), "the footer's fact").toBe("pbcopy failed");
+    // **K11 — a later copy withdraws it**, before its own answer is in.
+    t.copier.copy("two words");
+    expect(t.copier.fileOffer(small), "K11").toBeNull();
+    // **K8 — silent, for that copy.**
+    t.fire();
+    await t.flush();
+    expect(t.copier.fileOffer(small), "K8").toEqual({ kind: "silent", tool: "pbcopy" });
+    expect(offerFact({ kind: "silent", tool: "pbcopy" })).toBe("pbcopy did not answer");
+    expect(offerFact({ kind: "no-clipboard" })).toBe("no clipboard");
+    expect(offerFact({ kind: "too-large" })).toBe("too large for the terminal");
+    // **K1 again, after a copy** — OSC 52 counts as done, never as failed.
+    const s = harness({ clipboard: "osc52", tool: null });
+    s.copier.copy("two words");
+    expect(s.copier.fileOffer(small), "a sent copy is not offered").toBeNull();
+
+    // **K16 — the full path.** The default `stateDir` is relative.
+    expect(copyFilePath(".calcium", "/work")).toBe("/work/.calcium/copy.txt");
+    expect(copyFilePath("/state", "/work"), "an absolute stateDir as it is").toBe("/state/copy.txt");
   });
 
   it("T3.26 (C14 I61, §6e trace rows 7–10): a tool that never answers meets the deadline, a late answer is dropped, a second copy supersedes the first", async () => {
@@ -106,8 +154,8 @@ describe("C14 §6e — where the copy goes", () => {
     expect(h.timers.map((t) => t.ms), "one deadline, at the constant").toEqual([COPY_DEADLINE_MS]);
     h.fire();
     await h.flush();
-    expect(h.files.get("/state/copy.txt"), "the file holds the text").toBe("first");
-    expect(h.said.at(-1)).toBe("pbcopy did not answer — saved to /state/copy.txt");
+    expect(h.files.size, "the deadline writes nothing").toBe(0);
+    expect(h.said.at(-1)).toBe("pbcopy did not answer — the kill buffer holds it");
     // **Row 8** — its late exit 0 says nothing.
     h.answers[0]?.({ ok: true, tool: "pbcopy" });
     await h.flush();
@@ -123,8 +171,8 @@ describe("C14 §6e — where the copy goes", () => {
     expect(g.said, "the first's answer is dropped").toEqual(["copying with pbcopy", "copying with pbcopy"]);
     g.answers[1]?.({ ok: false, tool: "pbcopy", reason: "exited with code 1" });
     await g.flush();
-    expect(g.files.get("/state/copy.txt"), "row 6: the second's failure writes the second's text").toBe("second");
-    expect(g.said.at(-1)).toBe("pbcopy failed (exited with code 1) — saved to /state/copy.txt");
+    expect(g.files.size, "row 6: the second's failure writes nothing").toBe(0);
+    expect(g.said.at(-1)).toBe("pbcopy failed (exited with code 1) — the kill buffer holds it");
     g.fire();
     await g.flush();
     expect(g.said, "a settled copy's deadline is disarmed").toHaveLength(3);
@@ -137,18 +185,48 @@ describe("C14 §6e — where the copy goes", () => {
     d.answers[0]?.({ ok: true, tool: "pbcopy" });
     await d.flush();
     expect(d.said, "nothing after the session stops").toEqual(["copying with pbcopy"]);
-
-    // **Row 12** — the file cannot be written, and the sentence says where the text is.
-    const f = harness({ tool: null, writeFile: () => Promise.reject(new Error("EACCES")) });
-    f.copier.copy("first");
-    await f.flush();
-    expect(f.said).toEqual(["no clipboard, and /state/copy.txt could not be written — the kill buffer holds it"]);
-    expect(f.copier.hasClipboard, "no tool and no OSC 52 is the footer's no clipboard").toBe(false);
-    expect(h.copier.hasClipboard).toBe(true);
   });
-});
 
-describe("C14 §6e — the classification table, owed at the spec commit", () => {
-  it.todo("T1.82 (C14 I61, K1–K3, K7, K8, K10, K13, K16): fileOffer over the table's at-rest cells, and copyFilePath resolves a relative stateDir — owed at the spec commit (the person's correction 2026-09-29, C14 §6e's classification table); not deferred on a component: `fileOffer` and `save` land with the code commit that follows");
-  it.todo("T3.27 (C14 I61, K4, K7–K9, K11, K13–K15): no copy writes a file; save writes and says the path — owed at the spec commit (the person's correction 2026-09-29, C14 §6e's classification table); not deferred on a component: `fileOffer` and `save` land with the code commit that follows");
+  it("T3.27 (C14 I61, §6e K4, K7–K9, K11, K13–K15, trace rows 6, 11a, 13): no copy writes a file; save writes and says the path", async () => {
+    // **Every way a copy can miss a route**, and the file system after each.
+    const fail = harness();
+    fail.copier.copy("failed");
+    fail.answers[0]?.({ ok: false, tool: "pbcopy", reason: "exited with code 1" });
+    await fail.flush();
+    const silent = harness();
+    silent.copier.copy("silent");
+    silent.fire();
+    await silent.flush();
+    const none = harness({ tool: null });
+    none.copier.copy("none");
+    await none.flush();
+    const large = harness({ clipboard: "osc52", tool: null });
+    large.copier.copy(LARGE);
+    await large.flush();
+    for (const [name, h, said] of [
+      ["K7, row 6", fail, "pbcopy failed (exited with code 1) — the kill buffer holds it"],
+      ["K8, row 7", silent, "pbcopy did not answer — the kill buffer holds it"],
+      ["K13, row 11a", none, "no clipboard here — the kill buffer holds it"],
+      ["row 13", large, "too large for the terminal's clipboard — the kill buffer holds it"],
+    ] as const) {
+      expect(h.files.size, `${name}: nothing written`).toBe(0);
+      expect(h.said.at(-1), name).toBe(said);
+    }
+
+    // **K9 — the offer taken** writes that text and names the path.
+    fail.copier.save("failed");
+    await fail.flush();
+    expect(fail.files.get("/state/copy.txt")).toBe("failed");
+    expect(fail.said.at(-1)).toBe("saved to /state/copy.txt");
+    expect(fail.copier.fileOffer(() => "failed"), "the save is a new action, and the offer is spent").toBeNull();
+    // **K14** — no route, the offer taken.
+    none.copier.save("none");
+    await none.flush();
+    expect(none.files.get("/state/copy.txt")).toBe("none");
+    // **K15** — the write rejects, and the sentence says where the text is.
+    const f = harness({ tool: null, writeFile: () => Promise.reject(new Error("EACCES")) });
+    f.copier.save("first");
+    await f.flush();
+    expect(f.said).toEqual(["/state/copy.txt could not be written — the kill buffer holds it"]);
+  });
 });

@@ -43,12 +43,60 @@ describe("C14 §6e — where the copy goes, tier 6", () => {
     // the text, which T4.43 and C17's T4.8 read at `⌃y`; a copier that never
     // reached the buffer is not a thing this module can show, because the
     // buffer is not its to write.
-    expect(copyToast({ kind: "file", path: "/p", why: { kind: "no-clipboard" }, written: false })).toMatch(/kill buffer holds it/u);
+    expect(copyToast({ kind: "saved", path: "/p", written: false })).toMatch(/kill buffer holds it/u);
   });
-});
 
-describe("C14 §6e — the correction's tier 6, owed at the spec commit", () => {
-  it.todo("T6.39 (C14 I61): the automatic write on a failed tool restored → T3.27 fails — owed at the spec commit (the person's correction 2026-09-29, C14 §6e's classification table); not deferred on a component: `fileOffer` and `save` land with the code commit that follows");
-  it.todo("T6.40 (C14 I61): the offer drawn while a route exists → T1.82 fails — owed at the spec commit (the person's correction 2026-09-29, C14 §6e's classification table); not deferred on a component: `fileOffer` and `save` land with the code commit that follows");
-  it.todo("T6.41 (C14 I61): OSC 52 treated as failed → T1.82 fails — owed at the spec commit (the person's correction 2026-09-29, C14 §6e's classification table); not deferred on a component: `fileOffer` and `save` land with the code commit that follows");
+  /** A copier whose tool answers as the row says, and whose file system is a map. */
+  function copier(clipboard: "none" | "osc52", answer: ClipboardWrite | null) {
+    const files = new Map<string, string>();
+    const said: string[] = [];
+    const c = createCopier({
+      clipboard,
+      tool: answer === null ? null : { name: "pbcopy", path: "/usr/bin/pbcopy", args: [], encoding: "utf-8" },
+      send: () => undefined,
+      write: () => Promise.resolve(answer ?? { ok: true, tool: "pbcopy" }),
+      writeFile: (path, text) => {
+        files.set(path, text);
+        return Promise.resolve();
+      },
+      path: "/state/copy.txt",
+      schedule: () => ({ [Symbol.dispose]: () => undefined }),
+      say: (t) => void said.push(t),
+    });
+    return { c, files, said };
+  }
+
+  it("T6.39 (C14 I61, the person's correction 2026-09-29): the automatic write on a failed tool restored → T3.27 fails", async () => {
+    // **The defect, as a file nobody asked for**: the tool fails, and a
+    // `copy.txt` appears in the state directory — replacing whatever the reader
+    // saved there last. Restoring the write in `unrouted` is what T3.27's
+    // `nothing written` rows catch; here, the tree's copier writes nothing.
+    const h = copier("none", { ok: false, tool: "pbcopy", reason: "exited with code 1" });
+    h.c.copy("text");
+    await new Promise((r) => setImmediate(r));
+    expect(h.said.at(-1)).toBe("pbcopy failed (exited with code 1) — the kill buffer holds it");
+    expect([...h.files.keys()], "no file until the reader takes the offer").toEqual([]);
+  });
+
+  it("T6.40 (C14 I61, K5, K6): the offer drawn while a route exists → T1.82 fails", async () => {
+    // **The defect, as a footer that offers a file over a copy that worked**:
+    // `⏎ to file` beside a tool that just said `copied via pbcopy`, and the
+    // press writing a file the reader did not need.
+    const h = copier("none", { ok: true, tool: "pbcopy" });
+    expect(h.c.fileOffer(() => "text"), "a route, before any copy").toBeNull();
+    h.c.copy("text");
+    await new Promise((r) => setImmediate(r));
+    expect(h.said.at(-1)).toBe("copied via pbcopy");
+    expect(h.c.fileOffer(() => "text"), "and after one that worked").toBeNull();
+  });
+
+  it("T6.41 (C14 I61, K1): OSC 52 treated as failed → T1.82 fails", () => {
+    // **The defect, as an offer for the text just sent**: OSC 52 has no reply,
+    // so an implementation that records it as the failed copy offers a file for
+    // every OSC 52 copy — the person's ruling is that it counts as done.
+    const h = copier("osc52", null);
+    h.c.copy("text");
+    expect(h.said).toEqual(["sent to the terminal's clipboard"]);
+    expect(h.c.fileOffer(() => "text")).toBeNull();
+  });
 });

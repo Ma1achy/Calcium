@@ -1,9 +1,11 @@
 /**
  * Where a copy goes, and what it says about it (C14 I61, ruling 72).
  *
- * The person's order: **the kill buffer, then OSC 52, then a platform tool,
- * then a file** — and the kill buffer is the caller's, written before this is
- * reached (C17 I31). C01 builds the bytes, C02 says the terminal takes them and
+ * The person's order: **the kill buffer, then OSC 52, then a platform tool** —
+ * and the kill buffer is the caller's, written before this is reached (C17
+ * I31). **A file is never a route** (corrected 2026-09-29): it is offered where
+ * no route takes the text, and written only by `save`, which is the reader
+ * taking the offer (§6e's classification table). C01 builds the bytes, C02 says the terminal takes them and
  * C21 finds and runs the tool; each answers for its own layer, and the order
  * between them is L4's because L4 is the only layer that sees both halves of L0
  * and the only one with a scheduler (C21 W18).
@@ -15,14 +17,17 @@
  *     *sent*, because nothing comes back; only a tool's exit `0` is *copied*.
  *   - `createCopier` holds the one pending copy, its deadline and its
  *     generation (§6e *Where the copy goes*, rows 4–10), so a late answer and
- *     a superseded one say nothing.
+ *     a superseded one say nothing — and the latest copy's failure, which is
+ *     what the offer for that copy reads (K7–K11).
  */
+
+import { isAbsolute, join } from "node:path";
 
 import { clipboardWrite } from "../terminal/escapes.js";
 import type { ClipboardTool, ClipboardWrite } from "../data/process/clipboard.js";
 
 /**
- * How long a tool has to answer before the copy goes to a file (§6e row 7).
+ * How long a tool has to answer before the copy is said to have failed (§6e row 7).
  *
  * **2 000 ms and unmeasured.** A tool that answers at all answers in
  * milliseconds; the figure bounds how long `copying with <tool>` stays up over a
@@ -30,14 +35,20 @@ import type { ClipboardTool, ClipboardWrite } from "../data/process/clipboard.js
  */
 export const COPY_DEADLINE_MS = 2_000;
 
-/** The file a copy lands in when no clipboard takes it — replaced, not appended. */
-export const copyFilePath = (stateDir: string): string => `${stateDir}/copy.txt`;
+/**
+ * The file the offer writes — replaced, not appended — **as an absolute path**
+ * (§6e K16). The default `stateDir` is `.calcium`, relative, and the toast
+ * states the full path, so it is resolved against the session's working
+ * directory here rather than left for the reader to guess.
+ */
+export const copyFilePath = (stateDir: string, cwd: string): string =>
+  isAbsolute(stateDir) ? join(stateDir, "copy.txt") : join(cwd, stateDir, "copy.txt");
 
 /** Which mechanism, decided before anything is written (C21 W1–W4). */
 export type CopyRoute =
   | Readonly<{ kind: "osc52"; bytes: string }>
   | Readonly<{ kind: "tool"; tool: ClipboardTool }>
-  | Readonly<{ kind: "file"; why: "no-clipboard" | "too-large" }>;
+  | Readonly<{ kind: "none"; why: "no-clipboard" | "too-large" }>;
 
 /**
  * The person's order over what the layers below hand up.
@@ -45,13 +56,35 @@ export type CopyRoute =
  * **A `null` from `clipboardWrite` declines one mechanism, not the copy** (C21
  * W2): past the cap the order goes on to the tool, and only with no tool is the
  * reason *too large* rather than *no clipboard* (W3). The empty text never
- * arrives — C14 I59 toasts it before a copy is attempted.
+ * arrives — C14 I59 toasts it before a copy is attempted. `none` writes
+ * nothing: it is what the offer is drawn from (K3, K13).
  */
 export function routeCopy(text: string, clipboard: "none" | "osc52", tool: ClipboardTool | null): CopyRoute {
   const bytes = clipboard === "osc52" ? clipboardWrite(text) : null;
   if (bytes !== null) return Object.freeze({ kind: "osc52", bytes });
   if (tool !== null) return Object.freeze({ kind: "tool", tool });
-  return Object.freeze({ kind: "file", why: clipboard === "osc52" ? "too-large" : "no-clipboard" });
+  return Object.freeze({ kind: "none", why: clipboard === "osc52" ? "too-large" : "no-clipboard" });
+}
+
+/** Why no route took a copy — the offer's reason, and the toast's (K3, K7, K8, K13). */
+export type NoRoute =
+  | Readonly<{ kind: "no-clipboard" }>
+  | Readonly<{ kind: "too-large" }>
+  | Readonly<{ kind: "failed"; tool: string; reason: string }>
+  | Readonly<{ kind: "silent"; tool: string }>;
+
+/** The footer's fact for an offer, last of the facts (C14 §6e's footer table). */
+export function offerFact(why: NoRoute): string {
+  switch (why.kind) {
+    case "no-clipboard":
+      return "no clipboard";
+    case "too-large":
+      return "too large for the terminal";
+    case "failed":
+      return `${why.tool} failed`;
+    case "silent":
+      return `${why.tool} did not answer`;
+  }
 }
 
 /** What happened to one copy, in the terms its sentence needs. */
@@ -59,24 +92,18 @@ export type CopyOutcome =
   | Readonly<{ kind: "sent" }>
   | Readonly<{ kind: "pending"; tool: string }>
   | Readonly<{ kind: "copied"; tool: string }>
-  | Readonly<{
-      kind: "file";
-      path: string;
-      why:
-        | Readonly<{ kind: "no-clipboard" }>
-        | Readonly<{ kind: "too-large" }>
-        | Readonly<{ kind: "failed"; tool: string; reason: string }>
-        | Readonly<{ kind: "silent"; tool: string }>;
-      written: boolean;
-    }>;
+  | Readonly<{ kind: "unrouted"; why: NoRoute }>
+  | Readonly<{ kind: "saved"; path: string; written: boolean }>;
 
 /**
- * The toast for an outcome (§6e rows 2–13).
+ * The toast for an outcome (§6e rows 2–13, K1–K16).
  *
  * **`copied` is said once, for the one outcome a process on the reader's
- * machine reported** — a tool's exit `0`. OSC 52 is `sent`, never `copied`
- * (ruling 72). A file names its path, and a file that could not be written
- * says where the text still is, which C17 I31 makes true.
+ * machine reported** — a tool's exit `0`, in the person's form `copied via
+ * <tool>`. OSC 52 is `sent`, never `copied` (ruling 72). A copy no route took
+ * says why and where the text is — the kill buffer, which C17 I31 makes true —
+ * and never *saved*: only the offer taken writes, and it names the absolute
+ * path.
  */
 export function copyToast(outcome: CopyOutcome): string {
   switch (outcome.kind) {
@@ -85,23 +112,27 @@ export function copyToast(outcome: CopyOutcome): string {
     case "pending":
       return `copying with ${outcome.tool}`;
     case "copied":
-      return `copied to the clipboard by ${outcome.tool}`;
-    case "file": {
-      if (!outcome.written) return `no clipboard, and ${outcome.path} could not be written — the kill buffer holds it`;
-      const where = `saved to ${outcome.path}`;
-      switch (outcome.why.kind) {
+      return `copied via ${outcome.tool}`;
+    case "saved":
+      return outcome.written ? `saved to ${outcome.path}` : `${outcome.path} could not be written — ${HELD}`;
+    case "unrouted": {
+      const why = outcome.why;
+      switch (why.kind) {
         case "no-clipboard":
-          return `no clipboard here — ${where}`;
+          return `no clipboard here — ${HELD}`;
         case "too-large":
-          return `too large for the terminal's clipboard — ${where}`;
+          return `too large for the terminal's clipboard — ${HELD}`;
         case "failed":
-          return `${outcome.why.tool} failed (${outcome.why.reason}) — ${where}`;
+          return `${why.tool} failed (${why.reason}) — ${HELD}`;
         case "silent":
-          return `${outcome.why.tool} did not answer — ${where}`;
+          return `${why.tool} did not answer — ${HELD}`;
       }
     }
   }
 }
+
+/** Where the text is when no route took it (C17 I31: the kill buffer, first, always). */
+const HELD = "the kill buffer holds it";
 
 export type CopierDeps = Readonly<{
   clipboard: "none" | "osc52";
@@ -117,9 +148,19 @@ export type CopierDeps = Readonly<{
 }>;
 
 export type Copier = Readonly<{
-  /** `false` where no mechanism exists at rest — the footer's `no clipboard` (§6e table). */
-  hasClipboard: boolean;
+  /**
+   * Why the file is offered for this text, or `null` where a route takes it
+   * (§6e K1–K16) — the footer's `⏎ to file` and `⏎`'s meaning, from one call.
+   *
+   * **The text is a thunk** because the commonest answers never need it: no
+   * route at all is a property of the session, and a tool with no failure
+   * standing answers `null` without it. The copy text is the most expensive
+   * thing the footer could ask for (a rectangle renders its entry).
+   */
+  fileOffer: (text: () => string) => NoRoute | null;
   copy: (text: string) => void;
+  /** The offer taken: the one thing that writes the file (K4, K9, K14, K15). */
+  save: (text: string) => void;
   [Symbol.dispose]: () => void;
 }>;
 
@@ -134,37 +175,55 @@ export type Copier = Readonly<{
 export function createCopier(deps: CopierDeps): Copier {
   let generation = 0;
   let deadline: Disposable | null = null;
+  /**
+   * **The latest copy, if its tool did not take it** (K7, K8). Cleared by the
+   * next copy or save, so the offer is for *that* copy: a later copy of any text
+   * withdraws it (K11), and a different selection does not match it (K10).
+   */
+  let failed: Readonly<{ text: string; why: NoRoute }> | null = null;
 
   const disarm = (): void => {
     deadline?.[Symbol.dispose]();
     deadline = null;
   };
 
-  const toFile = (mine: number, text: string, why: Extract<CopyOutcome, { kind: "file" }>["why"]): void => {
-    const done = (written: boolean): void => {
-      if (mine !== generation) return;
-      deps.say(copyToast({ kind: "file", path: deps.path, why, written }));
-    };
-    deps.writeFile(deps.path, text).then(
-      () => done(true),
-      () => done(false),
-    );
+  /** A tool that did not take this copy: said, and offered — never written (K7, K8). */
+  const unrouted = (text: string, why: NoRoute): void => {
+    failed = Object.freeze({ text, why });
+    deps.say(copyToast({ kind: "unrouted", why }));
+  };
+
+  const begin = (): number => {
+    disarm();
+    generation += 1;
+    failed = null;
+    return generation;
   };
 
   return Object.freeze({
-    hasClipboard: deps.clipboard === "osc52" || deps.tool !== null,
+    fileOffer(text: () => string): NoRoute | null {
+      if (deps.clipboard === "none" && deps.tool === null) return Object.freeze({ kind: "no-clipboard" });
+      if (failed !== null && failed.text === text()) return failed.why;
+      if (deps.tool !== null) return null;
+      // Past the cap (K3). **Not the empty text**, which `clipboardWrite` also
+      // declines (C21 W1) and which C14 I59 says before any copy is attempted.
+      const t = text();
+      if (t !== "" && clipboardWrite(t) === null) return Object.freeze({ kind: "too-large" });
+      return null;
+    },
     copy(text: string): void {
-      disarm();
-      generation += 1;
-      const mine = generation;
+      const mine = begin();
       const route = routeCopy(text, deps.clipboard, deps.tool);
       switch (route.kind) {
         case "osc52":
+          // **Done, not failed** (K1): nothing comes back, so nothing is offered.
           deps.send(route.bytes);
           deps.say(copyToast({ kind: "sent" }));
           return;
-        case "file":
-          toFile(mine, text, Object.freeze({ kind: route.why }));
+        case "none":
+          // **Said, not written** (K13, trace rows 11a and 13): the offer was
+          // already on the footer, and it is `⏎`'s to take.
+          deps.say(copyToast({ kind: "unrouted", why: Object.freeze({ kind: route.why }) }));
           return;
         case "tool": {
           const name = route.tool.name;
@@ -174,22 +233,34 @@ export function createCopier(deps: CopierDeps): Copier {
             deadline = null;
             if (settled || mine !== generation) return;
             settled = true;
-            toFile(mine, text, Object.freeze({ kind: "silent", tool: name }));
+            unrouted(text, Object.freeze({ kind: "silent", tool: name }));
           }, COPY_DEADLINE_MS);
           void deps.write(route.tool, text).then((answer) => {
             if (settled || mine !== generation) return;
             settled = true;
             disarm();
             if (answer.ok) deps.say(copyToast({ kind: "copied", tool: name }));
-            else toFile(mine, text, Object.freeze({ kind: "failed", tool: name, reason: answer.reason }));
+            else unrouted(text, Object.freeze({ kind: "failed", tool: name, reason: answer.reason }));
           });
           return;
         }
       }
     },
+    save(text: string): void {
+      const mine = begin();
+      const done = (written: boolean): void => {
+        if (mine !== generation) return;
+        deps.say(copyToast({ kind: "saved", path: deps.path, written }));
+      };
+      deps.writeFile(deps.path, text).then(
+        () => done(true),
+        () => done(false),
+      );
+    },
     [Symbol.dispose](): void {
       disarm();
       generation += 1;
+      failed = null;
     },
   });
 }

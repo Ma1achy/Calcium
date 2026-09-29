@@ -59,7 +59,7 @@ import { PROMPT_GUTTER, regionWidth, transcriptWidth } from "./config.js";
 import { cursorStyleFor, steadyWhileTyping } from "./cursor-style.js";
 import { autoscrollFor, beginDrag, clampToContainer, type Drag } from "./drag-selection.js";
 import { createIdentityLoop } from "./identity.js";
-import { copyFilePath, createCopier, type Copier } from "./clipboard.js";
+import { copyFilePath, createCopier, offerFact, type Copier } from "./clipboard.js";
 import { findClipboardTool, writeClipboard } from "../data/process/clipboard.js";
 import {
   SessionStateError,
@@ -1919,15 +1919,21 @@ class Session implements TuiInstance {
       return;
     }
     graph.editor.copyText(text);
+    // **`⏎` takes the offer where the footer drew one** (C14 I61, §6e K4, K9,
+    // K14) — the same call over the same text, so the label and the press
+    // cannot disagree. `y` is never the offer (K13).
+    const copier = this.#copierOf(graph);
+    const save = leave && copier.fileOffer(() => text) !== null;
     if (leave) this.#exitSemanticSelection();
-    this.#copierOf(graph).copy(text);
+    if (save) copier.save(text);
+    else copier.copy(text);
   }
 
   /**
    * The one copier, built on first use (C14 I61, ruling 72).
    *
    * **The tool is found once**: `findClipboardTool` walks the injected `PATH`
-   * with a `stat` per directory, and the footer asks `hasClipboard` on every
+   * with a `stat` per directory, and the footer asks `fileOffer` on every
    * frame. A tool installed mid-session is not seen, which is the cost.
    */
   #copier: Copier | null = null;
@@ -1938,8 +1944,11 @@ class Session implements TuiInstance {
       tool: findClipboardTool(this.config.env),
       send: (bytes) => void graph.lifecycle.writer.write(bytes),
       write: (tool, text) => writeClipboard(tool, text, { env: this.config.env, cwd: () => this.config.cwd }),
-      writeFile: (path, text) => this.config.fs.writeFile(path, text),
-      path: copyFilePath(this.config.stateDir),
+      // **Its directory first** (§6e K16): the path is resolved against the
+      // session's `cwd`, and C22 I67 made `stateDir` against the process's —
+      // the same directory unless the app passed a `cwd`. `mkdir` is recursive.
+      writeFile: (path, text) => this.config.fs.mkdir(dirname(path)).then(() => this.config.fs.writeFile(path, text)),
+      path: copyFilePath(this.config.stateDir, this.config.cwd),
       schedule: this.config.schedule,
       say: (text) => this.#raiseToast(text),
     });
@@ -2025,14 +2034,16 @@ class Session implements TuiInstance {
     // and the count over its cells, never the block set kept underneath.
     let rect: Readonly<{ columns: number; rows: number }> | null = null;
     let size: Readonly<{ chars: number; rows: number; entries: number }> | null;
+    let text = (): string => this.#copyText(graph, mode);
     if (mode.rect !== null) {
       const cells = semantic.rectOf(mode, spans, this.#selectionOrder());
-      const text = cells === null ? "" : this.#rectText(graph, cells, width);
+      const cellText = cells === null ? "" : this.#rectText(graph, cells, width);
+      text = () => cellText;
       rect =
         cells === null
           ? { columns: 0, rows: 0 }
           : { columns: cells.toColumn - cells.fromColumn + 1, rows: cells.toRow - cells.fromRow + 1 };
-      size = semantic.textSize(text, 1);
+      size = semantic.textSize(cellText, 1);
     } else {
       size = semantic.sizeOf(
         mode,
@@ -2040,13 +2051,16 @@ class Session implements TuiInstance {
         graph.blocks.copySequence,
       );
     }
+    // C14 I61, §6e K1–K16: the reason the file is offered for this text, or
+    // nothing where a route takes it.
+    const offer = this.#copierOf(graph).fileOffer(text);
     return {
       mode: "semantic",
       size,
       clears: semantic.hasSelection(mode),
       all: semantic.selectsAll(mode, spans),
       rect,
-      offersFile: !this.#copierOf(graph).hasClipboard,
+      ...(offer === null ? {} : { fileOffer: offerFact(offer) }),
     };
   }
 

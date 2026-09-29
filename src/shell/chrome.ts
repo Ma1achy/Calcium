@@ -558,13 +558,14 @@ function ownerChips(
         // `⏎` copies and leaves (C14 I59); §103 draws it `⏎ copy`, and `y` —
         // the copy that stays — is a bare keycap undrawn, as `a` and `A` are.
         // **The file offered** (C14 I61, `R-SEL-011`'s *offers a file instead*):
-        // the key named by where the text goes. The absence it follows from is
-        // stated as `no clipboard`, ranked after the frozen screen — see below.
+        // the key named by where the text goes, drawn only where no route takes
+        // this text (§6e K3, K7, K13). The reason is stated after the frozen
+        // screen — see below.
         ...keyed(
           hints,
           "semanticSelection",
           ["copyAndLeaveSemanticSelection"],
-          semantic?.offersFile === true ? "to file" : "copy",
+          semantic?.fileOffer === undefined ? "copy" : "to file",
           caps,
         ),
         // **Two chips, not one label with a `·` in it.** The separator is the
@@ -602,11 +603,13 @@ function ownerChips(
         ...(buffered > 0
           ? [{ label: `${String(buffered)} waiting`, tone: "muted" as const }]
           : []),
-        // **No clipboard, stated at rest** (C14 I61, `R-SEL-011`'s *the mode
-        // states it*): the last of the facts. Before the key it qualifies it
-        // shed the count at 100 columns in the rectangle, and `⏎ to file` already
-        // says where the text goes when the line is too narrow for both.
-        ...(semantic?.offersFile === true ? [{ label: "no clipboard", tone: "warn" as const }] : []),
+        // **Why the file is offered, stated at rest** (C14 I61, `R-SEL-011`'s
+        // *the mode states it*): `no clipboard`, `too large for the terminal`,
+        // `pbcopy failed`, `pbcopy did not answer` — the last of the facts.
+        // Before the key it qualifies it shed the count at 100 columns in the
+        // rectangle, and `⏎ to file` already says where the text goes when the
+        // line is too narrow for both.
+        ...(semantic?.fileOffer === undefined ? [] : [{ label: semantic.fileOffer, tone: "warn" as const }]),
         // **After the facts, the two the line sheds first** (C14 I55). The line
         // sheds from the right (§103), so what is last goes first: the count,
         // the frozen screen and the waiting notice are `R-SEL-009`'s and
