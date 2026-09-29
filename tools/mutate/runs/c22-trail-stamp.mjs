@@ -1,9 +1,9 @@
 // C22 I131, C04 I109, C09 I133 — the trail's one-shot, stamped by the shell per
 // arrival and read by the band (ruling 81; review batch 4, round 2). Mutated
-// (C09 T6.188, C22 T6.134–T6.137).
+// (C09 T6.188, C22 T6.138–T6.141).
 //
 // **Two halves, two rows, on purpose.** C09's T1.150 stamps `trailSince` by hand
-// and reads the band; C22's T1.78 drives the store and reads the stamp. A row
+// and reads the band; C22's T1.173 drives the store and reads the stamp. A row
 // through the whole session would pass a store that never stamps as long as the
 // band read something else that moved — so each half is asked by name.
 //
@@ -40,12 +40,12 @@ const results = runPass({
   run,
   control: {
     // **A change both halves can see**: every stamp a thousand ticks late, so
-    // T1.78's ticks are all wrong. T1.150 stamps by hand and does not see it,
+    // T1.173's ticks are all wrong. T1.150 stamps by hand and does not see it,
     // which is the separation the header argues for.
     file: STORE,
     from: "  return { ...notice, trailSince: held.since };",
     to: "  return { ...notice, trailSince: held.since + 1000 };",
-    why: "every trail stamp is a thousand ticks late, so each of T1.78's stamps is wrong",
+    why: "every trail stamp is a thousand ticks late, so each of T1.173's stamps is wrong",
   },
   mutations: [
     {
@@ -71,7 +71,7 @@ const results = runPass({
       file: STORE,
       from: "      if (next.kind === \"notice\") next = stampTrail(next as Notice, stamps, tick);",
       to: "",
-      expect: "T1.78",
+      expect: "T1.173",
     },
     {
       // **The arrival dropped from the identity**: the first stamp is kept for
@@ -80,7 +80,7 @@ const results = runPass({
       file: STORE,
       from: "  if (held === undefined || held.arrival !== arrival) {",
       to: "  if (held === undefined) {",
-      expect: "T1.78",
+      expect: "T1.173",
     },
     {
       // **Re-taken on every new array** — a poll re-emitting the same text
@@ -89,7 +89,7 @@ const results = runPass({
       file: STORE,
       from: "  if (held === undefined || held.arrival !== arrival) {",
       to: "  if (true) {",
-      expect: "T1.78",
+      expect: "T1.173",
     },
     {
       // **A producer's stamp overwritten** (§6o.2 row 7's rule for the trail).
@@ -97,7 +97,7 @@ const results = runPass({
       file: STORE,
       from: "  if (notice.streaming !== true || notice.trailSince !== undefined || notice.trail === undefined) return notice;",
       to: "  if (notice.streaming !== true || notice.trail === undefined) return notice;",
-      expect: "T1.78",
+      expect: "T1.173",
     },
     {
       // **A settled notice stamped** — inert on screen, and a stamp nothing reads.
@@ -105,7 +105,7 @@ const results = runPass({
       file: STORE,
       from: "  if (notice.streaming !== true || notice.trailSince !== undefined || notice.trail === undefined) return notice;",
       to: "  if (notice.trailSince !== undefined || notice.trail === undefined) return notice;",
-      expect: "T1.78",
+      expect: "T1.173",
     },
     {
       // **The gate's form check gone**: a stamp on a still trail passes.

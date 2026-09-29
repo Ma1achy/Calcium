@@ -787,7 +787,7 @@ describe("C04 I148 and C09 I133, I134 — the hot edge's overshoot and the band 
 });
 
 describe("C22 I131 — the trail's one-shot is stamped by the shell, per arrival (ruling 81)", () => {
-  it("T1.78 (C22 I131, C04 I109, C09 I133): a streaming ripple notice is stamped at the first frame, keeps its stamp on a re-emission, is re-stamped on a new arrival, and a producer's trailSince is kept", () => {
+  it("T1.173 (C22 I131, C04 I109, C09 I133): a streaming ripple notice is stamped at the first frame, keeps its stamp on a re-emission, is re-stamped on a new arrival, and a producer's trailSince is kept", () => {
     const shots = new OneShots();
     /** The stamp on the entry's one notice after a frame at `tick`, over a fresh array each time — a re-emission. */
     const frame = (over: Partial<Notice>, tick: number, entry = "e1"): Notice =>
