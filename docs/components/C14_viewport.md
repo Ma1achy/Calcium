@@ -1468,7 +1468,7 @@ Fake heights, no rendering.
 - **T6.29** (I58): the rail drawn inside the wash, taking `inverse` at 1-bit → **T3.25** fails at both 1-bit rungs.
 - **T6.30** (I34): the waiting count taken as `record.length − held.length` → **T1.78** fails on the patch rows and on both eviction rows, and T1.34's appends-only sequence still passes.
 - **T6.31** (I59): `⏎` bound back to `copySelectedEntries`, copying and staying → **T4.40** fails on the mode still being up, and T1.47 on the action.
-- **T6.32** (I59, I55): the `esc` label read from `size === null` again → **T1.80** fails on the *only blocks that copy nothing* row, where `escape()` clears and the label says `out`.
+- **T6.32** (I59, I55): the `esc` label read from `size === null` again → **T3.15** fails on its rule-alone half, where `escape()` clears and the footer says `esc out`. *Corrected on landing:* it named T1.80, whose *only blocks that copy nothing* row hands the footer a `CopyState` with `clears` already decided — so it checks the chip against the field and cannot see the session computing the field from `size`. The mutation pass measured it: T1.80 green, T3.15 red.
 - **T6.33** (I60): `rectBetween` ignoring a span's columns → **T1.79** fails on the forty presses and on the narrowed span, and the copy reaches into the gutter.
 - **T6.34** (I37): the edge scroll removed from the keyboard move → **T3.14** fails at the press past the last row, where the view stays put and the caret is off the screen.
 - **T6.35** (I60): the autoscroll tick extending the block selection in the rectangle, as it did → **T4.42** fails: the rectangle's head never leaves the press, and the copy is one cell.
