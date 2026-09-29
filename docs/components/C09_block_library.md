@@ -3521,7 +3521,7 @@ the first width in 80, 40, 24, 16, 12, 8 where it publishes an element, focused 
 | `mosaic`, a pane holding any other child | block | frame | I100 | `focusGround` | identical | I100 kept; I121's `{mosaic}` exemption kept |
 | `split`, a pane holding a `frame` child | block, placed by the walk | — | I100, `R-FOC-004` | `focusGround` across the figure; the divider's accent | the divider bold | as `mosaic` |
 
-The seventeen kinds that publish no element declare no shape: nothing can put focus on them.
+The twelve kinds that declare no `elements` declare no shape — `rule`, `logs`, `progress`, `code`, `split`, `tip`, `panel`, `group`, `image`, `terminal`, `status`, `raw`, measured over the 28 a constructed session registers (a first draft of this sentence said *seventeen*, carried from I100's census of 23 kinds rather than counted). `split`'s panes are placed by the walk (C04 I134) and lit by the pane rule above, so its row in the table is a container's and not a declaration's.
 
 **The cells where two rules meet**, and what each ruled:
 
