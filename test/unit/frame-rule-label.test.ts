@@ -304,4 +304,6 @@ describe("C22 §6l.10 — the labelled rule", () => {
       "a label with no room for a rule is shed whole",
     ).toEqual(await framesAt(100, null));
   });
+
+  it.todo("T1.178 (C22 I147, I111, §6r): at 1-bit the label is drawn as `[name]`, unstyled, and shed by width alone");
 });
