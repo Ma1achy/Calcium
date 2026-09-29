@@ -140,6 +140,22 @@ export declare function checkTextGrounds(
   roles?: Readonly<Record<string, SurfaceRole>>,
 ): (Violation & { line: number })[];
 
+/** SS68 — the directories whose `R-XXX-NNN` citations must resolve against the design registry. */
+export declare const RULE_CITATION_DIRS: readonly string[];
+
+/** SS68 — the Markdown files under `RULE_CITATION_DIRS`, sorted. */
+export declare function ruleCitationCorpus(dirs?: readonly string[]): string[];
+
+/**
+ * SS68 — every `R-XXX-NNN` a spec cites is a rule id the registry holds, in any
+ * status; a corpus citing nothing or a registry holding nothing is reported.
+ */
+export declare function checkRuleCitations(
+  docs?: readonly string[],
+  readFile?: (file: string) => string,
+  registrySource?: string,
+): (Violation & { line: number })[];
+
 /** SS63 — the hex ranges of a named table in `text.ts`, parsed out of its source (C09 I48). */
 export declare function parseRangeTable(textSource: string, name: string): number[];
 

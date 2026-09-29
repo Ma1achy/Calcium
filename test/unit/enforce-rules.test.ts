@@ -61,11 +61,13 @@ import {
   checkGlyphWidthClass,
   checkMarkDomains,
   checkMarks,
+  checkRuleCitations,
   checkSourceScans,
   parseDomainTable,
   parseEmojiBases,
   parseGlyphTable,
   RAMP_VOCABULARIES,
+  ruleCitationCorpus,
   SCANS,
 } from "../../tools/enforce/source-scans.mjs";
 import { GLYPH_TOKENS } from "../../src/presentation/blocks/glyphs.js";
@@ -788,7 +790,9 @@ const scanIds = SCANS.map((s) => s.id);
 // **SS67 is a membership with a bidirectional arm** — every surface a renderer
 // names against `SURFACE_ROLES` — so it is SS65's shape and not a `SCANS` row.
 // Its fabrication is C10's T2.62, in `theme.test.ts`.
-const STANDALONE_SCANS = ["SS47", "SS52", "SS53", "SS54", "SS57", "SS63", "SS64", "SS65", "SS67"];
+// **SS68 reads the specs against the registry** — a citation against a JSON
+// document, SS63's shape — and fabricates in its own row below.
+const STANDALONE_SCANS = ["SS47", "SS52", "SS53", "SS54", "SS57", "SS63", "SS64", "SS65", "SS67", "SS68"];
 
 const implemented = [
   ...scanIds,
@@ -905,6 +909,9 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // SS67's fabrication is C10's T2.62, in `theme.test.ts`, and the arm
       // below reads it for SS65's reason.
       "SS67",
+      // SS68 reads Markdown against the registry, which `FABRICATED`'s one
+      // `src/` file cannot hold; its row is "SS68 fires" below.
+      "SS68",
     ]);
     expect([...implemented].sort()).toEqual([...covered].sort());
   });
@@ -1564,6 +1571,42 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       s.cleared + s.candidates.length + s.testOnly,
       "every member lands in exactly one bucket",
     ).toBe(s.members);
+  });
+
+  it("SS68 fires: a spec citing a design rule the registry has never held", () => {
+    // **The fabrication is the defect that was found by hand**: C26 I24 cited
+    // `R-NAV-004`, and the registry has no `R-NAV` family. Two documents, so a
+    // row that fired on anything would also fire on the control file.
+    const docs: Record<string, string> = {
+      "docs/components/C98_fabricated.md": "a sentence on keys *(R-NAV-004)* moving focus.\n",
+      "docs/components/C99_control.md":
+        // A current id, an example and a superseded one — every status
+        // resolves, because specs cite history on purpose.
+        "focus *(R-INT-003)*.\nthe band *(R-BLK-191, an example)*.\nhistory *(R-REG-001, superseded)*.\n",
+    };
+    const read = (f: string): string => docs[f] ?? "";
+    const fired = checkRuleCitations(Object.keys(docs), read);
+    expect(fired.map((v) => [v.rule, v.file, v.line]), "the dangling id fires, once, where it is").toEqual([
+      ["SS68", "docs/components/C98_fabricated.md", 1],
+    ]);
+    expect(fired[0]?.message).toContain("R-NAV-004");
+
+    // **The control**: the same corpus with the citation fixed is clean — so
+    // the row is about the id and not about the file.
+    docs["docs/components/C98_fabricated.md"] = "a sentence on keys *(R-INT-004)* moving focus.\n";
+    expect(checkRuleCitations(Object.keys(docs), read)).toEqual([]);
+
+    // **The vacuity controls** (A03 §2): a registry parsed as no rules, or a
+    // corpus citing nothing, would pass every citation — so each is the
+    // violation, reported alone.
+    const empty = checkRuleCitations(Object.keys(docs), read, JSON.stringify({ rules: [] }));
+    expect(empty.map((v) => v.rule), "an empty registry").toEqual(["SS68"]);
+    expect(empty[0]?.message).toMatch(/did not read/u);
+    expect(checkRuleCitations(["docs/components/C97_silent.md"], () => "no citations here\n").map((v) => v.rule), "a silent corpus").toEqual(["SS68"]);
+
+    // And the real tree, which must be green — both directories read.
+    expect(ruleCitationCorpus().some((f) => f.startsWith("docs/architecture/")), "the architecture documents are in scope").toBe(true);
+    expect(checkRuleCitations()).toEqual([]);
   });
 
   it("SS63 fires: a recorded width class that disagrees with what `cells()` measures", () => {

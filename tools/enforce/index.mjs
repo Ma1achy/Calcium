@@ -16,7 +16,7 @@ import {
   nameExactnessSignal,
   publicSurfaceUseSignal,
 } from "./module-graph.mjs";
-import { checkSourceScans, checkMarks, checkControlBytes, checkAllowLists, checkEmojiBases, checkGlyphWidthClass, checkMarkDomains, checkGlyphPresence, checkTextGrounds } from "./source-scans.mjs";
+import { checkSourceScans, checkMarks, checkControlBytes, checkAllowLists, checkEmojiBases, checkGlyphWidthClass, checkMarkDomains, checkGlyphPresence, checkTextGrounds, checkRuleCitations } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
 import { checkWorkflows } from "./workflows.mjs";
 import { checkRefusals, REFUSALS, unverifiableRefusals } from "./refusals.mjs";
@@ -214,6 +214,11 @@ const violations = [
   // table. Its own function for SS65's reason: the subject is a membership with
   // a bidirectional arm, not a line against a regex.
   ...checkTextGrounds(files),
+  // SS68 — every `R-XXX-NNN` a spec cites resolves in the design registry. Its
+  // own function for SS63's reason: the subject is a citation against a JSON
+  // document, not a `src/` line against a regex. SP3 and SP8 resolve the
+  // other two citation forms; this was the third, and nothing read it.
+  ...checkRuleCitations(),
   ...checkDependencies(),
   ...checkPhantomImports(files),
   // SS62 — the workflows against their record. Its own function rather than a

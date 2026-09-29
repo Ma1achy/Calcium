@@ -1,7 +1,7 @@
 // A03 §4 — the implemented subset of SS1..SS37. Forbidden patterns, scoped by
 // directory. A row here is a rule that can fire; A03 inventories the rest, each
 // waiting on the component that creates its scope.
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 /**
  * The encoding vocabularies SS51 forbids reading directly — see that rule.
@@ -1924,6 +1924,82 @@ export function checkTextGrounds(files, readFile = (f) => readFileSync(f, "utf8"
       message: `SURFACE_ROLES names ${name}, which no renderer names — remove the entry: an exemption that outlives its subject is how the list stops being read`,
       spec: "C10 I60",
     });
+  }
+  return violations;
+}
+
+/**
+ * **SS68 — every design rule a spec cites is a rule the registry holds** (A03
+ * commitment 14).
+ *
+ * The specs cite the design registry by id — `R-BLK-191`, `R-MOT-012` — 1 042
+ * times when this rule landed, and nothing resolved a single one. SP3 resolves
+ * every `I`/`T`/`F` number and SP8 every `§`, and an `R-` id was the one citation
+ * form with no reader: C26 I24 cited `R-NAV-004` for a keyboard ruling, the
+ * registry has no `R-NAV` family at all, and it was found by a person following
+ * the link. A citation that resolves to nothing reads exactly like one that
+ * resolves, which is how it survived review.
+ *
+ * **Current, example or superseded all resolve.** The specs cite history on
+ * purpose — an amendment names the rule it narrowed — and a superseded rule is
+ * still in the registry with its successor linked, so the id still says where
+ * to look. Only an id the registry has never held fires.
+ *
+ * **The control** (F1246's): a corpus read as empty, or a registry parsed as
+ * no rules, passes every citation vacuously — so a corpus citing nothing, or a
+ * registry holding nothing, is reported and nothing else is.
+ *
+ * **Stated blind spot.** It checks that a cited rule **exists**, never that it
+ * says what the sentence citing it claims — a citation resolving against the
+ * wrong rule is the class `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass
+ * argues no mechanism should be built for, and this one does not try. It reads
+ * the text shape `R-XXX-NNN` alone: a range written `R-BLK-182–190` checks only
+ * its first end (none in the corpus today); a mention and a citation are one
+ * thing to it; and it reads `docs/components/` and `docs/architecture/` only —
+ * code comments, tests and the other documents cite ids too, and measured when
+ * this rule landed none of theirs dangled outside the enforce suite's own
+ * fabrications.
+ */
+export const RULE_CITATION_DIRS = Object.freeze(["docs/components", "docs/architecture"]);
+
+export function ruleCitationCorpus(dirs = RULE_CITATION_DIRS) {
+  return dirs
+    .flatMap((dir) => readdirSync(dir).filter((f) => f.endsWith(".md")).map((f) => `${dir}/${f}`))
+    .sort();
+}
+
+export function checkRuleCitations(
+  docs = ruleCitationCorpus(),
+  readFile = (f) => readFileSync(f, "utf8"),
+  registrySource = readFileSync("docs/design/language/calcium-registry.json", "utf8"),
+) {
+  const violations = [];
+  const known = new Set((JSON.parse(registrySource).rules ?? []).map((r) => r.id));
+  let cited = 0;
+  for (const file of docs) {
+    readFile(file).split("\n").forEach((line, i) => {
+      for (const m of line.matchAll(/\bR-[A-Z]{3}-\d{3}\b/gu)) {
+        cited += 1;
+        if (known.has(m[0])) continue;
+        violations.push({
+          rule: "SS68", file, line: i + 1,
+          message:
+            `cites \`${m[0]}\`, which the design registry has never held — current, example and `
+            + "superseded ids all resolve, so this one names nothing. Cite the rule the sentence means; "
+            + "if the id is history the registry never recorded, strike the citation the way the specs "
+            + "strike history rather than leaving a live one",
+          spec: "A03 SS68",
+        });
+      }
+    });
+  }
+  if (known.size === 0 || cited === 0) {
+    return [{
+      rule: "SS68", file: "docs/design/language/calcium-registry.json", line: 1,
+      message: `the registry parsed as ${String(known.size)} rules and the corpus cited ${String(cited)} ids — `
+        + "one of the two did not read, and every citation would pass against it",
+      spec: "A03 SS68",
+    }];
   }
   return violations;
 }
