@@ -1670,9 +1670,15 @@ export async function constructGraph(
       // `c19-menu-window`; what the frame depends on is that the refresh runs
       // on the signal at all, which T4.33 reads.
       refreshAnchors();
-      // **A live child is told, before the frame** (C23 I65). The route resizes
-      // its child and then its emulator; composing first would draw one frame
-      // from a grid that is about to be reflowed.
+      // **A live child is told on the signal** (C23 I65). The order against the
+      // commit is the refresh's case again and is not what holds it (F1336): a
+      // `resize` commit is coalesced (C03 I15), and nothing a resize listener
+      // calls commits an immediate frame — the emulator reflows in place and
+      // the child's repaint arrives later through the write queue — so the
+      // frame is composed after both lines whichever runs first. Measured by
+      // swapping them: the 24 test files that drive a resize through the graph
+      // pass either way. What the frame depends on is I65's figure — the child
+      // and the emulator told one width — and not this line's position.
       pipeline.resized();
       scheduler.commit("resize");
     });

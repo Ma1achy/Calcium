@@ -393,9 +393,12 @@ export interface Pipeline {
    * **Heard rather than polled, for the same reason `visibilityChanged` is.** A
    * live child holds a grid whose width came from the body, and a child that has
    * gone quiet has nothing left to notice the change on — polling on the next
-   * chunk resizes only the children that were about to redraw anyway. The order
-   * inside is the invariant: the child first, so its SIGWINCH names a size the
-   * emulator has already taken by the time the repaint arrives.
+   * chunk resizes only the children that were about to redraw anyway. **The
+   * figure is the invariant, not the order** (C23 I65): the child's repaint
+   * reaches the emulator through the write queue, so it cannot land between the
+   * two calls however they are sequenced — and the listener resizes the emulator
+   * first. *As it stood:* ~~the child first, so its SIGWINCH names a size the
+   * emulator has already taken~~ — an ordering I65 rules vacuous (F1336).
    */
   resized(): void;
   /**

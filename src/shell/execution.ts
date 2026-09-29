@@ -2037,8 +2037,9 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     },
     identityNotice: (text) => void refresh.identityNotice(text),
     visibilityChanged: () => void refresh.visibilityChanged(),
-    // C23 I65 — the listeners resize the child first and the emulator second;
-    // this is only the delivery.
+    // C23 I65 — each listener tells the emulator and then the child one width,
+    // computed once; the order between them is not the invariant (F1336). This
+    // is only the delivery.
     resized: () => {
       for (const listener of [...resizeListeners]) listener();
     },
