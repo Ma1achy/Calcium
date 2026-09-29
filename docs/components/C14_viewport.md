@@ -45,7 +45,7 @@ type VisibleRange = Readonly<{
 }>;
 ```
 
-`live` is carried per entry so the frame can draw the **live gutter** (`▌`, D6) beside the live block's rows without re-consulting C13 per row. **C14 marks; S01 draws.** The live gutter is frame chrome, not block content — putting it in a block would make it part of every measurement and every theme.
+`live` is carried per entry so the frame can draw the **live gutter** (`▌`, D6) beside the live block's rows without re-consulting C13 per row. **C14 marks; S01 draws.** The live gutter is frame chrome, not block content — putting it in a block would make it part of every measurement and every theme. **Superseded as a drawing by ruling 68 (review batch 4, M11 item 1)**: no live gutter was ever drawn — liveness is the spinner (`R-GLY-003`, M4) — and the column it described belongs to the selection rail (§6d, I57, I58). `live` is still carried; nothing in the frame reads it for a mark.
 
 **"The live gutter", never "the marker".** C13's eviction marker is an ordinary entry that costs the rows it measures (I13); this costs none. Calling both of them the marker left T1.17 reading as a claim about the eviction one, distinguishable only by which invariant it cited — which is precisely the citation defect class the audit records, arriving through a name rather than a number.
 
@@ -725,6 +725,69 @@ and the focus mark `▸` survives with it. So at 1-bit a selected row is reverse
 video and a focused one is a mark, which is `R-SEL-006`'s last sentence with
 nothing added: **neither fact rests on colour alone.**
 
+### The rail — column 0, and selection's second carrier (I57, I58; rulings 41, 68)
+
+The ground was selection's only carrier, and `inverse` at 1-bit is the same
+channel at a rung where colour is gone rather than a second one. `R-THM-005`
+names the second: **the `▌` selection rail**, a mark in the gutter's domain.
+Ruling 41 put it in *the live gutter's column*; ruling 68 measured that no such
+column existed — nothing drew a live gutter and nothing reserved a column, and
+SF1's `● help` stood in column 0 — and ruled that **the frame reserves column 0 of
+the transcript region on every row**. The cost is stated: every composed-session
+frame moves one column right.
+
+**The classification table** — which rows take the rail, and in what (read off the
+frame at every rung, not derived from prose):
+
+| row | column 0 | the rest of the row | at 1-bit | ASCII |
+|---|---|---|---|---|
+| the first row of a selected block (semantic copy mode) | `▌` in `accent` on the selection ground | washed (I39) | `▌` upright, **not** inverted; the row inverts from column 1 | `\|` |
+| a selected block's other rows, and a wrapped continuation | blank (`R-SEL-016`, `R-SEL-003`) | unwashed | blank | blank |
+| the first row of a selected element (`focus.selected`, drawn by the block) | `▌`, the same cell | the block's own ground | the same | `\|` |
+| selected **and** focused (a table row with `▸`) | `▌` | `▸` stays in the block's lead; selection wins the ground | the same | `\|`, `>` |
+| a banded theme (`hcDark`, `hcLight`) | `▌` in the band's ink on the band (C10 I45, I53) | the band | no band at 1-bit (C10 I66) | `\|` |
+| an unselected row, a command echo, a blank row | blank | — | blank | blank |
+| the prompt's selection | none — `▌` is the caret there (ruling 69's exception) | the prompt's own | — | — |
+| native copy mode | none: nothing is selected semantically | — | — | — |
+
+**The sequence trace** — enter semantic copy mode, `⇧↓` twice, resize while
+frozen, `esc`, `esc`:
+
+| # | event | rules meeting | column 0 after |
+|---|---|---|---|
+| 1 | `⌥⇧V` | the freeze (I31), the caret seeded, nothing selected | blank on every row |
+| 2 | `⇧↓` | I37 re-derives the set; I39 washes each block's first row | `▌` on the one selected block's first row |
+| 3 | `⇧↓` | the same | `▌` on both first rows, and on nothing between |
+| 4 | a resize while frozen | the held document re-laid at the new width (I31); the spans recomputed | `▌` on the first rows **at the new width**, from the new spans — never from the old row numbers |
+| 5 | `esc` | the first press clears (C16 I51) | blank everywhere; the frame is still held |
+| 6 | `esc` | the second leaves | blank; the live frame |
+
+**What the walk found before any code, all structural** (two rules that hold at rest):
+
+1. **The region's width was also the prompt's.** `#paintDeps` lays the prompt out
+   at `frame.region.width`, and `composeFrame` counts the prompt's rows at the
+   region's content width. Reserving the column by narrowing the region alone
+   narrows the prompt by one as well, and at a wrap boundary the paint's own
+   check — *composed from N rows, painting N+1* — throws. So the prompt keeps the
+   content width (`columns − CONTENT_MARGIN_R`) and the transcript takes one less.
+2. **Five element lookups laid out at `overlayRegion().width`** on the strength of
+   `frame.ts` making it identical to the transcript's. The reservation ends the
+   identity, so each reads the transcript's width by name.
+3. **The pointer translated the row and not the column.** Every mouse row was
+   `e.row − region.top`, and every column was `e.col` as it arrived — correct only
+   while the region started at column 0. A click must subtract `region.left` once,
+   at the top of the pointer path, or every hit lands one column off.
+4. **The wash cannot carry the rail.** `washRow` re-opens `selectionStyle` after
+   every sequence (I52), and at 1-bit that is `inverse` — which turns `▌` into a
+   right-half block. The rail is drawn beside the washed row, never inside it.
+5. **Element selection is a block's ground and the frame's rail.** A table row in
+   `focus.selected` is washed by C11 with no knowledge of the frame, so its rail is
+   the frame's, placed from the entry's elements (`elementsOfEntry`), on the
+   element's first row.
+6. **A command echo no longer lines up with the prompt.** `❯ /help` in the
+   transcript moves to column 1 while the prompt's `❯` stays at column 0. The cost
+   of ruling 68, stated rather than repaired.
+
 ---
 
 ## 6e. The rectangle — cells, clipped to the block it started in
@@ -938,9 +1001,9 @@ than stranding the user.
 - **I15** — Cache invalidation is incremental, driven by C13's granular `Change`. An append invalidates nothing already measured; a patch invalidates one entry through its `rev`. Dropping the cache on every change would make the Fenwick tree pointless.
 - **I16** — There is no overscan in v1. Rows outside the viewport are not measured or rendered ahead, and adding it is a measurable change against M-T3's baseline rather than a default nobody chose.
 - **I17** — A page movement is exactly `viewportHeight − 1` rows, in both directions. The overlap is the point: a full-height page turn leaves a reader with no anchor in what they just read, and the off-by-one is the difference between the two.
-- **I18** — `VisibleRange` carries `live` per entry; the gutter marker is frame chrome and never enters a block or a measurement.
+- **I18** — `VisibleRange` carries `live` per entry; the gutter marker is frame chrome and never enters a block or a measurement. **The gutter it names is superseded as a drawing** (ruling 68): no live gutter is drawn, liveness is the spinner, and the column is the selection rail's (I57, I58). `live` stays on `VisibleRange`.
 - **I19** — `entryAtRow` is pure and total: it reads the index and the current scroll, stores nothing, and returns `null` for any row the transcript does not occupy. It is the **only** place a region row becomes an entry — C16 routes mouse events by position and does not recompute the mapping, because two components computing where a row is will agree until one of them learns about a height change and the other does not. **The region row reaches it through one translation** — `paint.ts`'s `blankRowsAbove`, the bottom alignment the composer draws with — which L4 reads from the exported function rather than restating, so the painted row and the clicked row cannot drift apart separately (F755).
-- **I20** — **Chrome that occupies rows enters the height; chrome that occupies columns does not.** I18's live gutter is the second kind, and that is *why* it may stay out of every measurement — not because it is chrome. The command line each entry is drawn with is the first kind: it is not a block, so it is never adapter output and never counts toward C13's cap, but it takes a row and may wrap, so an entry's height is `chromeRows(entry, width) + measureSequence(entry.doc.blocks, width)`. `chromeRows` is injected beside `measureSequence` and defaults to none, so C14 still knows nothing about what the chrome says. **Composing the two in different places is the whole hazard**: the composer draws `chrome ++ blocks` and the index measures `blocks`, and a viewport that is arithmetically self-consistent then describes a document it is not showing.
+- **I20** — **Chrome that occupies rows enters the height; chrome that occupies columns does not.** I57's reserved column — once I18's live gutter, now the selection rail — is the second kind, and that is *why* it may stay out of every measurement — not because it is chrome. The command line each entry is drawn with is the first kind: it is not a block, so it is never adapter output and never counts toward C13's cap, but it takes a row and may wrap, so an entry's height is `chromeRows(entry, width) + measureSequence(entry.doc.blocks, width)`. `chromeRows` is injected beside `measureSequence` and defaults to none, so C14 still knows nothing about what the chrome says. **Composing the two in different places is the whole hazard**: the composer draws `chrome ++ blocks` and the index measures `blocks`, and a viewport that is arithmetically self-consistent then describes a document it is not showing.
 - **I21** — `resize` to the size already held is a no-op: nothing is captured, nothing is restored, and **no `Change` is emitted**. The emit is the load-bearing half — a change reports that the view moved, and a view that did not move must not report one, whatever the caller intended by the call. C01 delivers a `SIGWINCH` whenever the size *may* have changed and holds no previous size to compare against, so this component is the first one that can tell.
 - **I22** — The height **and the width** handed to `resize` are the **transcript region's**, not the terminal's. C14 holds no geometry above itself and cannot derive one from the other — the difference includes the prompt, whose height varies with what is typed — so the caller composing the frame owns the value (C22 I34). The failure is silent in both directions: too tall and `#maxTop()` leaves the document's last rows unreachable by any key, while the surplus rows `visible()` selects are discarded by the paint, so no count downstream is ever surprised. I10 holds throughout, because it compares the viewport with itself. **The width is the same sentence and landed later** (→ C22 I109, F1227): the region is one column narrower than the terminal, because `APPEARANCE.md` §15 rule 8 stops content one column before the right edge, and C14 cannot derive that number any more than it can derive the height — the margin is a decision about the frame's look, taken where the three rule rows and the chrome are exempted from it. The failure is silent in this direction too and in the safe sense C09 names: measured a column wide, every wrapping block answers one row too few and the paint pads the surplus column, so the frame is short rather than overrun. Both axes are therefore one rule — **the caller composing the frame owns the region's geometry** — and the two used to be one number and one guess.
 - **I23** — **The render path draws at most the region's rows of any one block, plus a residue.** Every kind whose rows are its lines declares a `window` (C09 I25) — `logs`, `patch`, `table`, `keyValue`, and `code` and `raw` since §4a landed — and a window that must pin what the whole block derived carries the pin as view state (`presorted`, `lineRange`). Kinds that are atomic by ruling (`plot`, C12 I1; `scroll`, C04 §3c) are the stated exceptions and are bounded by their own height. A frame's paint cost is then linear in the region, not in the document, which is the property D40 was mistaken for providing.
@@ -982,6 +1045,8 @@ than stranding the user.
 - **I54** — **Under a banded selection, a call head draws its state's own mark** (`R-THM-005`, C09 I45, C14 I53). The band's ink is total, so a head under it has spent its tone exactly as a focused one has (C09 I45's per-cell rule). The head is resolved at render, though, and the wash is laid after the cache (I40), so the renderer never learned that the head was washed: it drew `●` in the band's one ink for every state. **`RenderContext.washed`** carries the ids of the entry's blocks under the selection, **and only where the selection is painted as a band at this depth** (C10 I66) — so at 1 bit, where no band is painted and every head already takes its state's mark, it is absent and keys nothing. It keys the cache slot as an axis only when present, so a theme without a band pays nothing and keeps I40's reasoning intact: the tenth axis I40 refused is taken on exactly the themes where the picture depends on it. The wash itself stays outside the cache; only the resolution of the head's glyph moves inside. → T1.75b, T4.37f, T4.37h
 - **I55** — **The copy rung's footer says which mode, how much, and what the next `esc` does** (`R-SEL-005`, `R-SEL-009`, `R-SEL-015`, questions 4 and 35). `ChromeContext.copy` is `{ mode: "native" }` or `{ mode: "semantic", size }`, where `size` is `null` with nothing selected and otherwise `{ chars, rows, entries }` over the copy text (I38). Semantic mode's owner line is `copy`, `↑↓ extend`, `⏎ copy`, then **`esc clear` while a selection exists and `esc out` when none does** — the first press clears and the second leaves (C16 I51), and a footer saying `esc out` over a selection labels the clearing press as the leaving one — then the count as **one chip**, its three parts joined by the resolved separator (`glyphs(caps).separator`, C09 I49), so it reads as ruled and sheds as a unit; the pill's own gap is two spaces and would draw `418 chars  9 rows  2 entries` — then `the screen is frozen` and `N waiting`. Native mode's is `native`, `mouse tracking off`, `the terminal owns the mouse`, `esc out`, `the screen is frozen`. The header draws `COPY` or `NATIVE` by the same field. Absent `copy`, a `copy` rung reads as semantic mode with no selection, which is what a chrome composed without a session graph can know. → T1.50, T1.51, T4.37g
 - **I56** — *(M9 item 3, L10, → C22 I110, C24 I41)* **While L4 keeps an entry whole, an append below it does not move it.** `keepWhole(id)` returns a `Disposable`. While it is held, a viewport following the tail follows it only as far as the held entry's first row: where the tail would carry that row off the top, the viewport stops with it on the top row, **detaches**, and anchors there — so I5 holds, because a viewport short of the bottom is not following, and I4 and I6 keep it there through every later append. **The reader moving the viewport ends the hold for it** — a scroll, a page, the top or the bottom — because a hold that pulled a reader back after they had scrolled past it would be fighting them. **The release returns a viewport the hold detached, and the reader has not moved, to the tail**: the detach was the hold's and not the reader's, so ending it gives back what the reader had. A held id the store no longer holds is inert. L4 holds a child surface's entry for as long as the child is attached, sized so that it fits (C24 I41): a full-size child is exactly the region, so any entry appended under it — a settlement, a notice — would otherwise scroll its top rows off the screen while it holds the keyboard.
+- **I57** — *(ruling 68, ruling 41, `R-THM-005`, `R-SEL-016`, C22 I109; review batch 4 M11 item 1)* **The frame reserves column 0 of the transcript region on every row, and no measurement includes it.** `Composed.region` is the transcript's box: `left` is `1`, and `width` is the terminal's less `CONTENT_MARGIN_R` and less that column, floored at 1 (`transcriptWidth`). The transcript is resized to that width, and every block in it is measured, windowed, rendered, hit-tested and copied at it. Every element lookup L4 makes for the transcript reads it by name. The pointer's column is translated by `region.left` once, where its row is translated by `region.top`, so a press on column 0 is on no element. **Two things keep the content width** (`regionWidth`, one column wider): the prompt, whose rows the frame composes at that width, and the layer region (C22 I28), which floats over the whole region including the rail's column. Column 0 is blank on every row the rail does not take (I58), including a continuation row, a command echo and the blank rows above a short transcript. **Why a whole column and not a cell borrowed from the row's lead**: the lead's first cell is the call head's state mark, which carries lifecycle at 1-bit (C10 §4k.5), and a rail drawn over it would spend one carrier to add another. **Cost, stated (ruling 68):** every composed-session frame moves one column right, and a command echo no longer lines up with the prompt's `❯`. → T1.77, T4.39, T6.28
+- **I58** — *(ruling 68, `R-THM-005`, `R-SEL-003`, `R-SEL-006`, `R-SEL-016`, ruling 69)* **The rail is selection's second carrier, drawn by the frame in column 0 beside every selected row's first row, at every rung.** A row takes the rail if it is the first row of a block in the semantic copy selection (the rows I39 washes), or the first row of an element in `focus.selected`. No other row does: not a continuation, not a selected block's body, not the prompt's selection, whose `▌` is its caret (ruling 69's exception), and nothing in native copy mode. **The glyph is the registry's** (`selection-rail`, `▌`, ASCII `|`, collision domain `gutter`), read through `glyphs(caps).rail`. **Its ink is `accent` resolved against the selection ground**, so on a banded theme it is the band's ink (C10 I45, I53). **Its ground is the selection ground where that ground is a background, and never `inverse`**: at 1-bit the row inverts from column 1 and the rail stays upright, because an inverted `▌` is a right-half block. It is drawn beside the washed row, never inside the wash, since the wash re-opens `inverse` after every sequence (I52). **No block draws it and no block knows it**: it is not in the render cache (I40), and the rows C09 renders are byte-identical with and without it. → T1.77, T3.25, T4.39, T6.29
 
 ---
 
@@ -1002,10 +1067,10 @@ than stranding the user.
 13. Summed visible rows equal the viewport height exactly (I10).
 14. C14 never calls C03; scrolling reports a change and L4 commits (I12).
 15. The eviction marker is an ordinary entry and needs no special handling (I13).
-16. `VisibleRange` marks the live entry; the frame draws the live gutter, and no measurement includes it (I18).
+16. `VisibleRange` marks the live entry (I18); the frame reserves column 0 of the transcript region and draws the selection rail there, and no measurement includes it (I57, I58).
 17. An entry's height is `measureSequence`, and a block's own spacing is inside each `measure` rather than added between them (I1, → C09 I17, → C09 I80).
 18. A region row resolves to an entry and a row within it here, once, and C16 does not recompute the mapping (I19).
-19. Row-occupying chrome is measured and column-occupying chrome is not; the command line is the first and the live gutter is the second (I20, I18).
+19. Row-occupying chrome is measured and column-occupying chrome is not; the command line is the first and the reserved rail column is the second (I20, I57).
 20. A resize to the size already held does nothing and emits nothing (I21).
 21. The height and the width `resize` is given are the transcript region's, and the caller that composed the frame owns both (I22).
 22. One block's rows on the render path are bounded by the region plus a residue, through the window seam and not through a cap on content (I23, §4a).
@@ -1109,6 +1174,7 @@ Fake heights, no rendering.
 - **T1.51** (I38, I55, R-SEL-015): `sizeOf` over a held view — two entries, one selecting a block that copies nothing — counts code points of the copy text with its line breaks, its lines, and only the entries contributing text; one of each is singular; an empty selection is `null`.
 - **T4.37g** (I55, R-SEL-005, R-SEL-009): a session in semantic copy mode, `a` pressed → the footer carries the count and `esc clear`; `esc` → the count is gone and it reads `esc out`, still in the mode; `esc` again → the mode is left. The control is the frame before `a`, which reads `esc out` and no count.
 - **T1.76** (I56, I5, I6): a viewport of 10 rows following a transcript whose last entry is 10 rows high, that entry held → an append of 3 rows leaves `topRow` on the held entry's first row, `followTail` false and the anchor `{ id, 0 }`; two more appends do not move it; the release returns it to the tail with `followTail` true. The same append with nothing held moves `topRow` by 3 — the control. A scroll while held, then the release → the viewport stays where the reader put it; an append first, when the held entry is short enough that the tail keeps it whole → the viewport follows the tail and the hold never acts.
+- **T1.77** (I57, I58, I39): `railRowsOf` over a transcript window equals `washedRowsOf`'s rows unioned with each `focus.selected` element's first row, **as a set** — a selected block of three rows gives one row, a block whose first row is above the window gives none, and a selected table row inside a card body gives that row's first row in entry space less the window's start. Every other row's column 0 is a blank. The control: with nothing selected the set is empty and every row is blank-led.
 
 ### Tier 2 — contract / interface
 
@@ -1164,6 +1230,7 @@ Fake heights, no rendering.
 - **T3.22** (I24, C13 I14): a transcript at the session block cap whose surviving entry holds a capped block → two markers on screen, D40's notice above and the row cap's beneath the block, and evicting further changes neither.
 - **T3.23** (I24, C25 I18): a `patch` over the cap → the piece is a valid `Patch` carrying its path header and `collapsedBefore` markers inside `shown`, and the registry's `capped` survives `windowRows` building a fresh block.
 - **T3.24** (I24, C09 I11): a kind whose `measure` throws on a block over the cap → contained exactly as before, one row, the fault reported once for `measure`; the cap adds no second report.
+- **T3.25** (I58, I53, C10 I45, C10 I66): a selected block's first row at 24-bit, 8-bit, 4-bit, 1-bit with Unicode and 1-bit ASCII, on `dark` and on `hcDark`. Column 0 is `▌` (`|` in ASCII); its ink is `accent` against the selection ground, and the band's ink on `hcDark` above 1-bit; it never carries `inverse`, and at 1-bit the row's cells from column 1 do. The cell is the rail's alone: no block span reaches column 0.
 
 ### Tier 4 — integration
 
@@ -1182,6 +1249,7 @@ Fake heights, no rendering.
 - **T4.7** (with C01): a `SIGWINCH` snapshot drives one resize; the anchor is captured before the cache is dropped.
 - **T4.8** (with C03, L4): a scroll causes **L4** to issue one `commit("input")` — immediate, never coalesced. A spy asserts C14 never calls the scheduler itself, matching the C01 and C10 orchestration pattern. **Driven through L4's read loop rather than by dispatching to the handler**, because the commit is the loop's (C22 I27): a test that dispatched directly would assert the mechanism it happened to find, and it passed while the handler and the loop would both have committed.
 - **T4.38** (I56, C22 I110, C24 I41): a real session at 60×20 with `CALCIUM_NOTIFY=bell` — `/slow` runs, a child rendering exactly its `SurfaceContext.height` rows attaches, the reader leaves, `/slow` settles and the reader returns, so two entries append under the child (the local route appends a settled document, and the return appends its notice) → the frame still shows the child's command row, both borders and every body row; after the detach the frame reaches the tail and shows the return's notice.
+- **T4.39** (I57, I58, C22 I109): a real session at 80 columns — every transcript row's column 0 is blank and `● help` stands in column 1; `⌥⇧V` then `⇧↓` puts `▌` in column 0 of the selected block's first row and nowhere else, the head mark still in column 1; the viewport's width is 78 and the prompt's content width 79; a press on the column a block's element begins at, plus one, focuses it, and a press on column 0 focuses nothing. The measured heights are equal to a session that never entered the mode.
 
 ### Tier 5 — e2e
 
@@ -1227,6 +1295,8 @@ Fake heights, no rendering.
 - **T6.23** (I26): consulting a list of kinds instead of `definition.window !== undefined` → T1.19's `panel` child row passes and the row for a test kind that declares `window` fails, because the list did not know it.
 - **T6.16** (I1, C09 I80): reading a block's `padding` at the sequence — adding `t + b` between the children — instead of letting `measure` return it → every padded block is counted twice and T2.9 fails. **This row replaces the one it is numbered after**, which reverted `measureSequence` to `Σ measure(b, w)`: under C09 I17 as it now reads those are the same fold, so that revert changes no number and the row could no longer fail. The defect moved with the rule, and this is where it went — the spacing is applied once, inside the block, and a second application is what a reader adding it back at the composer would write. C04_PADDING_WALK A9a has the finding.
 - **T6.27** (I56): following the tail past the held entry — `#follow` ignoring the hold → **T1.76** fails at the first append and **T4.38** loses the child's command row and top border off the top of the screen.
+- **T6.28** (I57): the transcript laid out at the content width rather than `transcriptWidth` → **T4.39** fails on the viewport's width and every row's column 0.
+- **T6.29** (I58): the rail drawn inside the wash, taking `inverse` at 1-bit → **T3.25** fails at both 1-bit rungs.
 
 ---
 

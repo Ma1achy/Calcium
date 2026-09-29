@@ -1260,7 +1260,7 @@ A carrier **survives 1-bit** or it does not, and that is the whole of *independe
 | **outcome** | `ToolCallSpec.outcome` | `callState`, `FAILURE_WORDS` (`documents.ts:378`, `:561`) | word + tone | word |
 | **ownership** | the router's owner rung | the footer's owner line (`chrome.ts:97`, `R-KEY-004`) | word + border | both |
 | **focus** | `RenderContext.focus` | `▸` (`glyphs.ts:1270`) and `focusGround` | mark + ground | mark — §4k.3 ruling 2: *`▸` is the whole of focus at 1-bit* |
-| **selection** | `surface.selection` | the wash, `inverse` at 1-bit (`paint.ts:250`) | **ground alone** | inverse — see the exception below |
+| **selection** | `surface.selection` | the wash, `inverse` at 1-bit (`paint.ts:250`), and the rail in column 0 (`shell/paint.ts`, C14 I58) | ground + mark | both — the rail's `▌` upright, and the row's `inverse` (ruling 68) |
 | **choice** | `Choice.chosen` | `markOf` and the option's style (`controls.ts:39`, C09 I132) | mark + weight | both — the mark, and bold, an attribute at 1-bit (ruling 54) |
 | **disclosure** | `TableRow.expanded` | `▹` / `▿` (`glyphs.ts:1260`, `:1265`) | mark | mark |
 | **validity** | the error mark and its word | T2.47's pair | mark + word | both |
@@ -1271,7 +1271,7 @@ A carrier **survives 1-bit** or it does not, and that is the whole of *independe
 
 **Two exceptions were declared in the tree rather than granted here, and choice has since left** (C09 I132).
 
-**Selection has one carrier and says so**: `paint.ts:250` reads *`inverse` because the ground is
+**Selection had one carrier and said so, and has two since ruling 68** (C14 I57, I58): the frame reserves column 0 of the transcript and draws the `▌` rail there beside each selected row, never inverted. What follows is the record of the exception. `paint.ts:250` read *`inverse` because the ground is
 selection's only carrier; focus has `▸`*. `R-SEL-006` gives selection the ground and focus the
 mark, so the pair is across two facts and not within one. `inverse` is not a second carrier: it is
 the same channel at a rung where colour is gone, which is exactly why it is the honest answer and
