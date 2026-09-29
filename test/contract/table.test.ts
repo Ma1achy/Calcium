@@ -105,6 +105,8 @@ describe("C11 tier 2 — planColumns as an interface", () => {
     expect(combined.failures, formatReport(combined)).toEqual([]);
   });
 
+  it.todo("T2.3a (C11 I9, C11 I15, C11 I32): measure equals the rendered rows at every width from 20 to 170, every row expanded — not deferred on a component: the code lands in the next commit of this round");
+
   it("T2.4 (I2): a dropped column's key reaches every row's expanded detail", () => {
     const r = measurable({ definitions: [tableDefinition] });
     const columns = psColumns();
