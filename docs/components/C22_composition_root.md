@@ -2493,8 +2493,17 @@ is held under it exactly as C17 I29 holds it under a field.
    radio glyph its block copy does not. **A `figure` reads its name and nothing else** — §107's
    *a figure owes a summary and a data view* has no field to carry either yet (§6m.5). A
    container reads its children's bodies in order.
-6. **Never a glyph, never an SGR sequence, never a control character** in an event — the copy
-   source is already control-stripped (C09 I18) and nothing in this renderer paints.
+6. **Never a glyph, never an SGR sequence, never a raw control or bidi format character** in an
+   event (I149). Every string linear writes is in C09 I128's **shown** form: `^[` for an escape,
+   `<U+202E>` for an override. That covers the name, the value, the source, the command, a question
+   and its choices, and the input line. The copy source arrives in that form from the registry's
+   resolve. Everything else is put into it here. *Amended by F1470:* this row used to say
+   *control-stripped (C09 I18)*. `clean` deleted C0 and C1 and passed every bidi format character
+   whole, so a far-side notice named `invoice`, U+202E, `fdp.exe` was written with the override
+   raw, on the one surface C09 T4.107's site set never read. Its copy line was neutralised, so the
+   two stopped comparing equal and the name/source dedupe wrote the fact twice. **The cost is
+   ruling 71's, carried into speech:** a screen reader speaks the form, and legitimate
+   right-to-left text reads its marks.
 7. **A question is numbered** (I122). `1`–`9` answer it, a choice's own key still answers it,
    and `reply…` turns the input line into §107's *labelled line editor*. **The cue's range is
    words, `answer 1 to N:`, as `entry N of M` is** — row 6 holds for the input line too, and
@@ -2614,7 +2623,7 @@ A question arriving is its own fact — *a question is waiting, always* — and 
    answered each fact rings once.
 4. **The words are linear's** — a consistent picture beats a single rule. The system body is the
    binary's name, then §6m.2's completion line (`prism: entry 3: pytest — failed, 4s`) or the
-   question line (`prism: question: which branch? 1 feat/c26, 2 main`); control-stripped, and
+   question line (`prism: question: which branch? 1 feat/c26, 2 main`); in §6m.4 row 6's shown form (I149), and
    never opening with a number and a semicolon, which Ghostty reserves for ConEmu. The title is
    §014's as drawn: `• <binary> · <word>`.
 5. **The watch is a declaration, and its producers arrive later** (ruling 27's first sentence). *Built by ruling 50 in §6p: the set is the session's (I135), `/watch` and `/unwatch` fill it (I136) and the footer's row shows it (I137).*
@@ -3409,6 +3418,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I146** — *(C26 §8c.4, `R-BLK-363`, C09 §7f, C14 I63; review batch 4 M14.3)* **A primary press on a scroll box's bar jumps that box, and focus does not move.** The bar is the column beside the interior at the box's content width, drawn only while the content overflows. It is resolved before the element under the pointer, because a child's element covers the box's whole width, and at most one box's bar is at a given column, so the innermost box whose bar is drawn there answers. Row *r* of an *h*-row bar sets the offset to `round(r × ceiling / (h − 1))`: the transcript's arithmetic (C14 I63), and one function for both. The jump latches the box (C26 I32). → T4.118, T6.147
 - **I147** — *(§6r, I111, C17 I25, C09 I102, `R-COL-003`; review batch 4 M13.6)* **At 1-bit the prompt rule's label is drawn as `[name]`, the unpainted rung, and shed by width alone.** The brackets take the two cells the ground's padding takes, so every threshold is the painted rung's: shed at `MIN_COLUMNS`, and shed whenever it would leave no rule glyph. No span of the rule carries a style at 1-bit, and a named hue changes nothing there. The bracket is the design's answer for a painted word with no ground, already shipped by the chip (C17 I25) and the button (C09 I102), and the separation `R-COL-003` asks for is carried by the glyphs. → T1.178, T6.148
 - **I148** — *(I118, C04 §3ar F9, C17 §5f `loadField`, C17 I33, I34; F1395)* **A field's written value is the editor's `resolved`, never its `text`, and a value holding a line break is refused, not written.** Both paths that write a borrowed field go through this: `⏎` (`commitField`), and the write that ends a borrow when focus has moved on (`endField`). Writing `text` put a chip's private-use sentinel into C04 form data, where no reader resolves it, so a submit sent one unprintable character where the reader saw a paste. `yank` is the only way a chip enters a field, because a field refuses a multi-line paste, and it adopts a foreign chip (C17 §5f). **Walked before ruling: `resolved` alone is F9's defect by another door.** A chip is minted for a paste of five lines or more (`CHIP_LINES`) or for a file, so its content usually holds line breaks, and writing it would put five lines into a one-line field. F9's rule is *a field is one line*, and it is applied at the write in F9's words: the value is refused whole and the refusal says why. On `⏎` the borrow stays open, so the reader can delete the chip, which is one grapheme. On a blur nothing is written and the field keeps its value. A chip whose content is one line (a one-line file) writes that line. **Not at the yank**, because the editor exposes no way to see what the kill buffer holds before it inserts, and that seam would be C17's. → T4.119, T6.149
+- **I149** — *(§6m.4 row 6, C09 I128, ruling 71, `R-TRU-001`, C23 I90; F1470)* **Every string linear writes is in the shown form, never raw and never deleted.** `clean` is `neutraliseControl` followed by tab expansion and trimming. The name, the value, the source, the command, a question and its choices, and the answer all pass through it, and so does the notification body that repeats them (§6n.4 row 4). `windowLine` draws each grapheme of the draft in that form and measures the form, so the caret stands on the cell the reader sees. C23 I90's `drawn` already arrives in the form, and `clean` is idempotent on it. The buffer is untouched: the answer's `text` and the command a verb is handed keep the character as typed (C17 I36).
 
 ## 11. Commitments
 
@@ -4016,6 +4026,9 @@ PTY harness.
 - **T6.149** (I148): the `⏎` write taking `stores.editor.text` → **T4.119** fails on the second arm: the value is one private-use character. The blur write taking `text` → the third arm fails the same way. The line-break refusal removed → **T4.119** fails: `port` holds five lines.
 - **T1.179** (I33, C17 I36, F1401): `commandRows` of `/show a`, U+2066, `b`, U+202E, `c` → `❯ /show a<U+2066>b<U+202E>c`, and no row holds a bidi format character. At a width where the raw line fits one row and the neutralised line needs two, it is two rows — the height counts the forms' cells. The control: a clean command's rows are unchanged.
 - **T6.150** (I33): `commandRows` wrapping the raw line → **T1.179** fails on the row and the count, and C09 **T4.107** on the echo's bytes. `tools/mutate/runs/c17-bidi-display.mjs`.
+- **T1.180** (I149, F1470): `blockLines` of a notice whose text is `invoice`, U+202E, `fdp.exe`, then ESC `[2J` → the head reads `note: invoice<U+202E>fdp.exe^[[2J`, no line holds U+202E or ESC, and the source line equal to the name is not written again. The same text as a question and a choice label, and as a document's `command`, read in the form in `questionLine` and the completion line. The notification body carries the form.
+- **T1.181** (I149): `windowLine` of `a`, U+202E, `b` with the caret after `b`, at 40 columns → the text is `a<U+202E>b` behind the label, and the caret is the label's cells plus 10. With the caret before U+202E it is the label's cells plus 1.
+- **T6.151** (I149): `clean` returned to `stripControl` → **T1.180** fails on the raw override and on the duplicated source line. `windowLine` joining the raw segments → **T1.181** fails on the text and the caret. `tools/mutate/runs/c22-linear-form.mjs`.
 - **T6.141** (I131; ruling 81): a producer's `trailSince` overwritten → **T1.173** fails on the producer's stamp. `tools/mutate/runs/c22-trail-stamp.mjs`.
 
 ---

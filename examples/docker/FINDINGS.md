@@ -57357,6 +57357,8 @@ the writer neutralised, but two shell-drawn rows write the reader's own typed li
 editor measured it at zero width. Neither is a block, so neither reaches the registry's resolve. `commandRows` in
 `shell/paint.ts` still does not neutralise at 86fcb10c.
 
+**Closed by lane b4-bidi** (d746cd27 spec, 26dcbbb6 code): C17 I36 draws the form through the walk, and C22 I33's `commandRows` neutralises before it wraps. **A second cost besides reordering, measured before the fix** through `@xterm/headless` at 80 columns: with U+2066 and U+202E typed, every caret position after U+2066 stood one cell left of the glyph it named, and the two positions either side of U+202E were one cell. That is where F1403's width disagreement met the prompt. Linear mode's half is F1470.
+
 ## F1402 — nothing refuses a literal bidi character in a tracked file ★★☆☆☆
 
 Found by lane b4-m12. `trust-boundary.test.ts` landed in 1ef3b4d1 with its twelve bidi characters as literal code
@@ -57748,3 +57750,20 @@ The scrub's line aimed the dry-run at **the public registry**. `proof.sh`'s grep
 **Why nothing saw it**: the scrub's own chain was enforce, test, golden, check and e2e. `make proof` runs only in CI. It is the one gate that publishes and installs, and it was the one gate the change could break. This is *a gate that exists and is not run*, in the form where the gate's CI-only placement matches the one change it covers.
 
 **Closed.** A04 §9 now holds the package unpublished with no `publishConfig` (the person's ruling), so the bare `--registry` is the override that takes, and `proof.sh` passes it. PG3 now asserts the bare flag, no scoped override, and no `publishConfig`: one fact, since the bare flag is right exactly while `publishConfig` is absent. Reverting `proof.sh` to the scrub's line fails PG3, measured at 1 failed / 7 passed. `make proof` is green on the fixed tree, and the lanes' chain script runs it from now on.
+
+## F1470 — linear writes far-side and typed text with bidi raw, and a name and its copy stop matching ★★★★☆
+
+Reported by lane b4-bidi as *linear mode writes the typed command and its input line raw*. Measured, it is wider than that. linear's `clean` is `stripControl`, which deletes C0 and C1 and passes every bidi format character whole. `blockLines` reads a node's name from `semanticsOf`, which reads the raw block, while the source comes through `copyOf`, which passes the registry's resolve and is neutralised. For a notice whose text is `invoice`, U+202E, `fdp.exe` (`npx tsx out/b4-bidi-probe/linear-name.ts` at 543d554d):
+
+```
+"note: invoice\u202Efdp.exe" raw U+202E: true form: false   (the override written here as an escape, SS69)
+"invoice<U+202E>fdp.exe" raw U+202E: false form: true
+```
+
+There are two defects. **The override reaches the stream raw**, which is `R-TRU-001` on the one surface M12's suite never read: C09 T4.107 holds its site set by equality over the frame's writers, and linear composes no frame. **And the fact is written twice**, because the dedupe compares a stripped name with a neutralised source line. The same holds for a C0 escape, stripped in the name and shown as `^[` in the copy. §6n.4 row 4 routes the system notification body through the same words, so an OSC 9 body carries the override too.
+
+**Ruled (C22 §6m.4 row 6, I149):** linear takes C09 I128's shown form for every string it writes. C23 I90 already announces a reply *as drawn*, in the form, so linear had two conventions in one stream. The cost is ruling 71's, carried into speech: a screen reader speaks `<U+202E>`, and right-to-left text reads its marks. `windowLine` also builds its own `Intl.Segmenter`, and draws and measures the draft raw.
+
+## F1471 — no row reaches the real C23 I90 `drawn` ★★☆☆☆
+
+Found by lane b4-bidi. `construct.ts` builds a reply's announcement from `stores.editor.drawAs(ch) ?? neutraliseControl(ch)`. C23 T1.100's test world supplies its own `drawn`, so the lane's one-line change there is covered by no row. A mutation of that line would survive by construction, so the lane left it out of `c17-bidi-display.mjs` rather than record a survivor it had arranged. **Owed**: a row through a built session in linear mode that answers a reply holding U+202E and a chip, and reads the `answered` event's line.

@@ -141,4 +141,7 @@ describe("C22 §6m — linear events", () => {
       }
     }
   });
+
+  it.todo("T1.180 (C22 I149, F1470): far-side and typed text reach the linear stream in the shown form — not deferred on a component: lands with the F1470 code commit of review batch 4");
+  it.todo("T1.181 (C22 I149): the input line windows the shown form, and the caret stands on its cell — not deferred on a component: lands with the F1470 code commit of review batch 4");
 });
