@@ -37,7 +37,7 @@ import {
   type ViewDocument,
   IS_MATRIX,
 } from "./types.js";
-import { childBlocks } from "./tree.js";
+import { childBlocks, hasChildren } from "./tree.js";
 
 /**
  * I1 — freeze at every nesting depth. A shallow `Object.freeze` on a document
@@ -547,6 +547,52 @@ export function* descendants(b: Block, seen: WeakSet<object> = new WeakSet()): G
     yield child;
     yield* descendants(child, seen);
   }
+}
+
+/**
+ * The document with every block's `streaming: true` removed, at any depth — or
+ * **the same value** when no block carries it (C13 I22).
+ *
+ * **Settling ends the stream in the document too.** `settle` flipped the entry's
+ * flag and left the blocks as given, so a notice a producer marked streaming kept
+ * the agent's mark and its two reserved cells on a settled entry for the rest of
+ * the session, and on disk. The store calls this in the one change that settles.
+ *
+ * **Identity is the answer to *did anything change*.** `patch.ts`'s `rewrite`
+ * shape: a subtree with nothing to strip is returned as itself, so the store can
+ * compare by reference and leave `rev` alone where the document did not move
+ * (C13 I13). The walk is `hasChildren` and a table row's `detail` — `rewrite`'s
+ * two arms, and the same two `childBlocks` answers.
+ *
+ * The flag is read off the record rather than off `Notice`, because it is a
+ * fact about streaming and not about one kind: a kind that gains the member is
+ * stripped without this function learning its name.
+ */
+export function withoutStreaming(doc: ViewDocument): ViewDocument {
+  const strip = (b: Block): Block => {
+    let next: Block = b;
+    if ((b as { readonly streaming?: unknown }).streaming === true) {
+      const { streaming: _dropped, ...rest } = b as Block & { readonly streaming?: boolean };
+      next = rest as Block;
+    }
+    if (hasChildren(next)) {
+      const container = next;
+      const children = container.children.map(strip);
+      if (children.some((c, i) => c !== container.children[i])) next = { ...container, children } as Block;
+    } else if (next.kind === "table") {
+      const table = next;
+      const rows = table.rows.map((row) => {
+        if (row.detail === undefined) return row;
+        const detail = row.detail.map(strip);
+        return detail.some((d, i) => d !== row.detail?.[i]) ? { ...row, detail } : row;
+      });
+      if (rows.some((r, i) => r !== table.rows[i])) next = { ...table, rows };
+    }
+    return next;
+  };
+  const blocks = doc.blocks.map(strip);
+  if (blocks.every((b, i) => b === doc.blocks[i])) return doc;
+  return deepFreeze({ ...doc, blocks });
 }
 
 /**

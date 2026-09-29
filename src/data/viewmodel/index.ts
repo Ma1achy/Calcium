@@ -114,7 +114,7 @@ export { TRAIL_COLOUR_FORMS, TRAIL_FORMS } from "./types.js";
 export type { TrailForm } from "./types.js";
 export { ACTION_KINDS, CALL_HEAD_GLYPH, CALL_STATE_TONE, CALL_STATES, CAMERA_DEFAULT, COLORMAP_NAMES, GLYPH_REQUIRED_TONES, HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_HIDEABLE_SERIES, HAS_X_TITLE, HAS_Y_GUTTER, HIERARCHY_MAX_DEPTH, HIERARCHY_ROLE, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, RAMP_ONE_SHOTS, SCHEMA, STYLE_ARMS, TONES } from "./types.js";
 
-export { BlockShapeError, block, cell, deepFreeze, descendants, document, rebuild } from "./construct.js";
+export { BlockShapeError, block, cell, deepFreeze, descendants, document, rebuild, withoutStreaming } from "./construct.js";
 
 // `absentMessage` and `wrongTypeMessage` travel because C05's parser checks required fields
 // too, and C04 I114 is one ruling rather than two copies of a sentence (F995).
