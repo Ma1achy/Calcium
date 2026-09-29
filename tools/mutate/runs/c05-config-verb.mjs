@@ -60,8 +60,10 @@ const results = runPass({
       // declaring `config` is told the verb is not built while it is.
       name: "config stays on RESERVED_VERBS after it is built",
       file: FRAMEWORK,
-      from: '  unwatch: "ruling 50, §085",\n});',
-      to: '  unwatch: "ruling 50, §085",\n  config: "ruling 43, §075",\n});',
+      // Re-anchored when ruling 50 emptied the record: the mutation is the
+      // same one-entry reservation, now the record's only entry.
+      from: "  // `unwatch` when §085's were. The next ruled verb is reserved here first.\n});",
+      to: "  // `unwatch` when §085's were. The next ruled verb is reserved here first.\n  config: \"ruling 43, §075\",\n});",
       expect: "T4.9",
     },
   ],

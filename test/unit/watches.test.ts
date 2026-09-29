@@ -99,8 +99,15 @@ describe("C22 §6p — watches, each piece alone (ruling 50)", () => {
         }
         if (columns === 60) {
           expect(text.join(" "), "no bar glyph is drawn").not.toContain(bar.on.repeat(3));
-          expect(text, "and every percentage is").toContain("ps --watch 43%");
-          expect(text).toHaveLength(4);
+          // **Every watch still stands, and no `+N`**: bars are the first thing
+          // given up (C22 I138). A length check alone passed a row that shed a watch
+          // instead — lead, two chips and a `+1` is also four (the mutation pass).
+          expect(text, "and every percentage is, with every watch").toEqual([
+            lead,
+            "make build --all",
+            "ps --watch 43%",
+            "tail -f /var/log/app",
+          ]);
         }
         if (columns === 40) {
           expect(text.some((l) => /^\+\d+$/u.test(l)), "a `+N` chip stands").toBe(true);

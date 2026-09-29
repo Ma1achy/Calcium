@@ -52,10 +52,14 @@ const results = runPass({
       expect: "T4.111",
     },
     {
-      name: "T6.135: the bar-shedding step removed — watches go before bars",
+      // **One span, because the order lives in two lines** (T6.135): the step
+      // removed alone is equivalent — the ladder below draws its chips bare,
+      // so with nothing to shed it returns the bare row. The first pass on
+      // landing survived that single-line form.
+      name: "T6.135: watches shed before bars — the bar step removed and the ladder keeping bars",
       file: CHROME,
-      from: "  const bare = all(false);",
-      to: "  const bare = all(true);",
+      from: "  const bare = all(false);\n  if (width(bare) <= columns) return bare;\n\n  // Watches from the right, never the one the row is on — or, with no\n  // selection, the first, which is the oldest and the one `⇧⇥` lands on.\n  const keep = state.selected ?? 0;\n  const kept = state.items.map((_, i) => i);\n  let shed = 0;\n  const line = (): Chip[] => [\n    lead,\n    ...kept.map((i) => chipOf(i, false)),",
+      to: "  const keep = state.selected ?? 0;\n  const kept = state.items.map((_, i) => i);\n  let shed = 0;\n  const line = (): Chip[] => [\n    lead,\n    ...kept.map((i) => chipOf(i, true)),",
       expect: "T1.78",
     },
     {
