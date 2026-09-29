@@ -2880,12 +2880,30 @@ export async function constructGraph(
   const loadField = (value: string): void =>
     stores.editor.restore({ text: value, cursor: value.length, selection: null }); // cells-ok — code units, the editor's measure
 
+  /**
+   * C22 I148 — what a borrowed field writes: the line as it resolves, or
+   * nothing, refused.
+   *
+   * **`resolved`, not `text`** (F1395): a chip yanked into the field is a
+   * private-use sentinel in `text`, and C04 form data has no reader that
+   * resolves it. **And refused on a line break**, because a chip stands for
+   * five lines or a file, so its content is usually lines. F9's rule is *a
+   * field is one line*, and it is applied here in F9's words.
+   */
+  const fieldValue = (entryId: EntryId): string | null => {
+    const value = stores.editor.resolved;
+    if (!/[\r\n]/u.test(value)) return value;
+    pipeline.refuse(entryId, "A field is one line, and its value held a line break — nothing was written.");
+    return null;
+  };
+
   /** Give the line back, writing the draft first where `commit` says so. */
   const endField = (commit: boolean): void => {
     const b = fieldBorrow;
     if (b === null) return;
     fieldBorrow = null;
-    if (commit) writeField(b.entryId, b.formId, b.fieldId, stores.editor.text);
+    const value = commit ? fieldValue(b.entryId) : null;
+    if (value !== null) writeField(b.entryId, b.formId, b.fieldId, value);
     stores.editor.resume(b.held);
   };
 
@@ -2925,7 +2943,10 @@ export async function constructGraph(
   const commitField = (): void => {
     const b = fieldBorrow;
     if (b === null) return;
-    writeField(b.entryId, b.formId, b.fieldId, stores.editor.text);
+    // Refused: the borrow stays open, so the reader can delete the chip.
+    const value = fieldValue(b.entryId);
+    if (value === null) return;
+    writeField(b.entryId, b.formId, b.fieldId, value);
     const form = formIn(b.entryId, b.formId);
     const fields = form?.fields ?? [];
     const next = fields[fields.findIndex((f) => f.id === b.fieldId) + 1];

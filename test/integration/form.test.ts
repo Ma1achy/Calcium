@@ -278,7 +278,80 @@ describe("C22 I118 — a form in a session", () => {
     }
   });
 
-  it.todo(
-    "T4.119 (C22 I148, I118, C04 §3ar F9, F1395): a chip yanked into a field is written as its content, and refused when that content holds a line break — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, F1395",
-  );
+  it("T4.119 (C22 I148, I118, C04 §3ar F9, F1395): a chip yanked into a field is written as its content, and refused when that content holds a line break", async () => {
+    const CTRL_U = "\u0015";
+    const CTRL_Y = "\u0019";
+    /** The editor's private-use sentinels (C17 I34), which no form reader resolves. */
+    const PUA = /[\uE000-\uF8FF]/u;
+    const REFUSED = "A field is one line, and its value held a line break";
+    const FIVE = "a1\na2\na3\na4\na5";
+    /** A chip killed at the prompt, then `port` entered and emptied, then the chip yanked. */
+    const yankedInto = async (chip: "paste" | "file") => {
+      const s = await seeded();
+      if (chip === "paste") s.type(paste(FIVE));
+      else s.graph.editor.insertChip({ kind: "file", name: "host.txt", content: "db.local" });
+      expect(s.graph.editor.text, "the prompt holds a chip").not.toBe(s.graph.editor.resolved);
+      s.type(CTRL_U);
+      expect(s.graph.editor.text, "⌃U killed it to the buffer").toBe("");
+      s.type(DOWN);
+      s.type(DOWN);
+      s.type("\r");
+      expect(s.focused()).toBe("port");
+      expect(s.inside(), "inside `port`").toBe(true);
+      s.type(BACKSPACE);
+      s.type(BACKSPACE);
+      s.type(CTRL_Y);
+      return s;
+    };
+    const said = (s: Awaited<ReturnType<typeof seeded>>): string => JSON.stringify(s.entry()?.doc.blocks ?? []);
+    /**
+     * Off the field without a key the field would take: focus moved, then a
+     * bare pointer motion. **Not a focus report**, which the first draft used:
+     * it is read and routed nowhere (C16 I61), so no reconcile ran and the row
+     * measured a blur that never happened.
+     */
+    const blur = (s: Awaited<ReturnType<typeof seeded>>): void => {
+      const entryId = s.entry()?.id;
+      if (entryId === undefined) throw new Error("no entry");
+      s.graph.focus.focusRow(entryId, { blockId: "f", elementId: "save" });
+      s.type(`${ESC}[<35;1;1M`);
+    };
+
+    // ---- a five-line chip, ⏎ ------------------------------------------------
+    const five = await yankedInto("paste");
+    // **The control: the two readings of the line differ here**, so a row that
+    // passes cannot be passing because they agree.
+    expect(PUA.test(five.graph.editor.text), "text holds the sentinel").toBe(true);
+    expect(five.graph.editor.resolved, "resolved holds the lines").toBe(FIVE);
+    five.type("\r");
+    expect(five.value("port"), "refused: port keeps its value").toBe("80");
+    expect(said(five), "and the refusal says why").toContain(REFUSED);
+    expect(five.inside() && five.focused() === "port", "the borrow stays open").toBe(true);
+    five.type(BACKSPACE);
+    expect(five.graph.editor.text, "the chip is one grapheme").toBe("");
+    five.type("8080");
+    five.type("\r");
+    expect(five.value("port"), "and the field writes once it is one line").toBe("8080");
+    expect(PUA.test(said(five)), "no sentinel anywhere in the form").toBe(false);
+
+    // ---- a one-line chip, ⏎ -------------------------------------------------
+    const one = await yankedInto("file");
+    expect(PUA.test(one.graph.editor.text), "text holds the sentinel").toBe(true);
+    one.type("\r");
+    expect(one.value("port"), "written as its content").toBe("db.local");
+
+    // ---- a one-line chip, blurred -------------------------------------------
+    const off = await yankedInto("file");
+    blur(off);
+    expect(off.focused(), "focus left the field").toBe("save");
+    expect(off.value("port"), "the blur writes the content").toBe("db.local");
+
+    // ---- a five-line chip, blurred ------------------------------------------
+    const offFive = await yankedInto("paste");
+    blur(offFive);
+    expect(offFive.focused()).toBe("save");
+    expect(offFive.value("port"), "nothing written").toBe("80");
+    expect(said(offFive), "and the refusal says why").toContain(REFUSED);
+    expect(offFive.graph.fieldHeld(), "the line was given back").toBeNull();
+  });
 });
