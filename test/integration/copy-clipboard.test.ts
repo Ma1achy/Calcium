@@ -105,6 +105,8 @@ describe("C14 §6a — the clipboard in a real session", () => {
     }
   });
 
+  it.todo("T4.44 (C14 I61): a pending copy's deadline is disposed when the session stops — not deferred on a component: the code lands in the next commit of this round");
+
   it("T4.8 (C17 I31): a copy sent by OSC 52, then ⌃y → the prompt holds the text the payload decodes to", async () => {
     const o = await session({ capabilities: { clipboard: "osc52" } });
     await o.press("/note\r");
