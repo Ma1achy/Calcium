@@ -1379,3 +1379,7 @@ describe("C22 I33 — a command of several lines", () => {
     }
   });
 });
+
+describe("C22 I33 — the echo neutralised (F1401)", () => {
+  it.todo("T1.179 (C22 I33, C17 I36): commandRows draws U+2066 and U+202E as their forms, no row holds a bidi format character, and the height counts the forms' cells — not deferred on a component: lands with the F1401 code commit of review batch 4");
+});

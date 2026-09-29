@@ -1051,3 +1051,8 @@ describe("C17 I35 — a chip is edited by re-minting it, owed at the spec commit
     expect(e.chipAt()?.lines, "redo reaches the re-mint, so the refusal pushed no unit").toBe(2);
   });
 });
+
+describe("C17 I36 — the reader's own bidi characters, drawn visible and kept as typed (§5g, F1401)", () => {
+  it.todo("T1.61 (C17 I36, I18, I4, I26): the walk draws U+2066 and U+202E as their forms, the caret either side of each is eight cells apart, no chip span, the wash covers the form, and the buffer keeps both raw — not deferred on a component: lands with the F1401 code commit of review batch 4");
+  it.todo("T1.62 (C17 I36, I25, I32): a file chip whose name holds U+202E draws the form in its label, elided exactly to its limit, and chipAt keeps the name raw — not deferred on a component: lands with the F1401 code commit of review batch 4");
+});
