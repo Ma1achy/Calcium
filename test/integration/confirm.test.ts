@@ -969,3 +969,18 @@ describe("C23 I88 — the inspection scrolls in a built session", () => {
     expect(answered, "the question is unresolved").toBeNull();
   });
 });
+
+describe("C23 §7g — a question's life in a built session, owed at the spec commit", () => {
+  it.todo(
+    "T4.89 (C23 I89): r, type, esc, r — the prompt holds the composed text again, and enter answers with it — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group B (C23 §7g)",
+  );
+  it.todo(
+    "T4.90 (C23 I90): a reply with a pasted chip reaches the handler as the paste — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group B (C23 §7g)",
+  );
+  it.todo(
+    "T4.91 (C23 I91): two local verbs ask at once; one question on screen titled · 1 more; a menu open before them comes back after the second answer — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group B (C23 §7g)",
+  );
+  it.todo(
+    "T4.92 (C23 I94, I60): an approval's esc settles the card denied and runs nothing; an aborted signal settles it cancelled — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group B (C23 §7g)",
+  );
+});

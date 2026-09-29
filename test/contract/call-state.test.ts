@@ -221,3 +221,9 @@ describe("C09 I45 — the call head, rendered", () => {
     expect(visible(renderSequenceToLines(registry, [callHead(call({ outcome: "exit 1" }), FULL_CAPS)], 60, { theme: DARK_THEME, capabilities: FULL_CAPS })[0] ?? "")).toMatch(/^● grep\(x\) · exit 1/u);
   });
 });
+
+describe("C04 I149 — waiting, owed at the spec commit", () => {
+  it.todo(
+    "T2.154 (C04 I149, I141): waiting is warn with work-unit, and a notice claiming it in another tone is refused naming the field — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group B (C23 §7g)",
+  );
+});

@@ -2286,6 +2286,11 @@ prompt composing*. Naming that is this section; landing it is a change to
 C15's `Layer` and to the three sites, and it is deliberately not bundled with
 the walk that found it.
 
+**Landed in review batch 4 (ruling 23, I145).** Ruling 61 had already moved two of the three
+sites off ids and onto the declared owner. The remaining property — *whether the prompt is drawn
+under* — is C15 I34's `promptLive`, which the menu's owner updates with its selection;
+`promptUnderMenu` reads the top layer's field and no longer reads `keys.selected`.
+
 ### 6l.10 — the label on the prompt's rule (§069, `R-COL-003`)
 
 **The rules already exist, so a label in one costs no rows.** That is the
@@ -3357,6 +3362,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I143** — *(§6q.4 ruling 5, §6l.12, I113, ruling 53, `R-BLK-825`)* **The chip preview is a bounded box with keys of its own, and `⏎` is never one of them.** The preview's content is a `scroll` box whose height is the smaller of the content's rows and `floor(region.height / 2) − 3`, floored at 1 — C15's default fraction less the panel's two borders and the key row — so the layer is never cut. A new chip or a new region height rebuilds it at its top. `⌥⇧↑`/`⌥⇧↓` move the box one row (`previewScrollUp`/`previewScrollDown`, registry `preview.scroll.up`/`preview.scroll.down`), `⌥o` opens the chip (I144, `preview.open`), and every other key is the prompt's first (I51) — so `⏎` sends. **The panel's last row names the chords from the session keymap** (C16 I58): scrolling only while the box overflows, opening always; the owner line names the same. → T1.175, T4.116, T6.144
 
 - **I144** — *(§6q.4 ruling 6, ruling 53, C02 I19, C17 I35, C21 I6, C23 §4)* **`⌥o` opens a chip in the reader's editor, and an edited paste comes back as one edit.** The editor is C02's `editor` — `$VISUAL`, else `$EDITOR`. A chip carrying a `target` opens it and nothing comes back. Any other chip's content is written to a file in a fresh private temporary directory, the editor runs through the handoff sequence (C23 §4: suspend, C21 `handoff`, resume, reset the decoder, invalidate), and the file is read back: a changed content re-mints the chip in place with its `lines` recounted (C17 I35), and an unchanged one changes nothing. The directory is removed on every path. The command is `sh -c '<editor> "$1"' sh <path>`, so the path is an argument and never text in the command. **Refused visibly, with nothing run**: with no editor (`no editor — set $VISUAL or $EDITOR`), and while a verb holds C23's guard (`<verb> is still running, and <chord> waits for it`) — each a `warn` notice on the transcript, never a toast (§6q.4 ruling 8). **One final newline the editor added is dropped** before the comparison, so a file written back unchanged by `vi` is unchanged (ruling 9). → T1.176, T4.117, T6.145
+- **I145** — *(ruling 23, §6l.9b, C15 I34, I51)* **`promptUnderMenu` reads the top layer's `promptLive`.** A replacing question still answers `false` first (C23 I73). The chip preview pushes `promptLive: true`; the completion menu pushes and updates it as `selection === null` on every change to its selection, so the field is never a state behind the menu. → T1.177, T6.146
 
 ## 11. Commitments
 
@@ -3952,8 +3958,10 @@ PTY harness.
 - **T4.116** (I143, I51, ruling 53): a paste chip, `⏎` → the prompt is submitted with the chip's content, and the preview is gone; `⌥⇧↓` with the preview up moves its box one row and leaves the prompt's caret where it was.
 - **T6.144** (I143): the preview's content reverted to the bare `code` block → **T1.175** fails, and T4.116's `⌥⇧↓` moves nothing.
 - **T1.176** (I144, C02 I19): `openChipInEditor` with no editor → the refusal's words, and no handoff; with an editor and a fake runner that rewrites the file → `editChip` is called once with the new content and its line count; with a runner that leaves it → not called; the temporary directory is gone on all three paths; the argv is `sh -c '<editor> "$1"' sh <path>`.
+- **T1.177** (I145, C15 I34): a menu with no selection → the top layer's `promptLive` is `true` and a printable key reaches the editor; `↓` → `false` on the same layer, before the next key; a chip preview → `true`; a reverse search → `false`.
 - **T4.117** (I144, C23 §4): through a built session with a fake runner, `⌥o` on a chip suspends and resumes the lifecycle once each, resets the decoder and re-mints the chip; with a verb holding the guard it runs nothing and says so.
 - **T6.145** (I144): the read-back dropped, so the edit never returns → **T1.176**'s rewrite arm fails.
+- **T6.146** (I145): the menu's selection update dropping `promptLive` → **T1.177** fails at `↓`: the layer still reads `true`.
 - **T6.141** (I131; ruling 81): a producer's `trailSince` overwritten → **T1.173** fails on the producer's stamp. `tools/mutate/runs/c22-trail-stamp.mjs`.
 
 ---

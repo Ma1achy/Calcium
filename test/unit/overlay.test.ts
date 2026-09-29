@@ -653,3 +653,9 @@ describe("C15 I30, I31, I33 — the layer's shape, its pointer and its generatio
     ]);
   });
 });
+
+describe("C15 I34 — promptLive, owed at the spec commit", () => {
+  it.todo(
+    "T1.38 (C15 I34): promptLive on push reads on top; an update changes it alone; absent reads false — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group B (C23 §7g)",
+  );
+});

@@ -208,3 +208,9 @@ describe("C24 T2.21 (I34) — a consumer does not index for a name src/ declares
     ]);
   });
 });
+
+describe("C24 I42, I43 — the question's public types, owed at the spec commit", () => {
+  it.todo(
+    "T2.34 (C24 I42, I43): the entry's declaration names AskAnswer, QuestionOutcome and AskOptions; signal and expiresAfterMs optional; outcome the three words — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group B (C23 §7g)",
+  );
+});
