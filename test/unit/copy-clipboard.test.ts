@@ -147,3 +147,8 @@ describe("C14 §6e — where the copy goes", () => {
     expect(h.copier.hasClipboard).toBe(true);
   });
 });
+
+describe("C14 §6e — the classification table, owed at the spec commit", () => {
+  it.todo("T1.82 (C14 I61, K1–K3, K7, K8, K10, K13, K16): fileOffer over the table's at-rest cells, and copyFilePath resolves a relative stateDir — owed at the spec commit (the person's correction 2026-09-29, C14 §6e's classification table); not deferred on a component: `fileOffer` and `save` land with the code commit that follows");
+  it.todo("T3.27 (C14 I61, K4, K7–K9, K11, K13–K15): no copy writes a file; save writes and says the path — owed at the spec commit (the person's correction 2026-09-29, C14 §6e's classification table); not deferred on a component: `fileOffer` and `save` land with the code commit that follows");
+});

@@ -497,12 +497,15 @@ the same mark.
 from the other side. The system clipboard and OSC 52 are the rule's two mechanisms,
 and **both are built** (ruling 72, I61): the kill buffer first, always, then OSC 52
 where C02 says the terminal takes it, then a platform tool where C21 finds one that
-reaches the reader, then a file. *Corrected on review batch 4 (M10 item 1):* this
+reaches the reader. **A file is never a destination the copy chooses** — it is an
+action the reader takes, offered only where no route took the text (*corrected
+2026-09-29*, §6e's classification table). *Corrected on review batch 4 (M10 item 1):* this
 paragraph deferred the refusal on *the same parked word the label is* — and the label
 was ruled on 2026-09-24 (questions 4 and 35), four days before the deferral was
 re-read. The condition was met in the section below it. The rule's last sentence —
 *if neither is available the mode states it and offers a file instead* — is the
-footer's `no clipboard` and `⏎ to file` (§6e's table), because the mode's statement
+footer's `no clipboard` and `⏎ to file` (§6e's table), and the offer is taken only by
+the press it names, because the mode's statement
 surface is the footer and a notice on every `y` is noise on the key a reader presses
 most. §6e's *Where the copy goes* walks the order.
 
@@ -1022,7 +1025,7 @@ Structural: every cell is a state at rest. Mode × selection × the waiting coun
 | rect | resolved | `copy` · `RECT w×h` · `cells, not source` · … `esc clear` · the count over the cells · `the screen is frozen` · `⌃V blocks` |
 | rect | blocks also selected underneath | as *rect*: never `all loaded entries`, and the count is the rectangle's |
 | any semantic | waiting > 0 | … `N waiting` straight after `the screen is frozen` |
-| any semantic | no clipboard — C02 `none` and no tool (I61) | `⏎ to file` in place of `⏎ copy`, and `no clipboard` last of the facts, after `the screen is frozen` and `N waiting`. *Amended on landing:* it stood before the key it qualifies, and at 100 columns in the rectangle it shed the count — the rank paragraph below, a third time. `⏎ to file` already says where the text goes when the line is too narrow for both |
+| any semantic | no route for this copy — C02 `none` and no tool; or `osc52`, no tool and the selection's text past the cap; or the latest copy's tool failed or went silent and the selection's text is that copy's (I61, §6e's classification table) | `⏎ to file` in place of `⏎ copy`, and the reason last of the facts — `no clipboard`, `too large for the terminal`, `pbcopy failed` or `pbcopy did not answer` — after `the screen is frozen` and `N waiting`. *Amended on landing:* it stood before the key it qualifies, and at 100 columns in the rectangle it shed the count — the rank paragraph below, a third time. `⏎ to file` already says where the text goes when the line is too narrow for both |
 
 The table found one row the trace did not: **the rectangle over a full block
 set** (row 9 of the table). `all loaded entries` computed from the block set
@@ -1052,24 +1055,73 @@ so a trace; the structural cells are C21's W1–W18 and are not restated.
 | 2 | `osc52`, within the cap | `y` | *OSC 52 first* × its success cannot be observed | `clipboardWrite(text)` on the writer, and the toast reads `sent to the terminal's clipboard` — never *copied* |
 | 3 | `osc52`, past the cap, a tool found | `y` | C21 W2 — `null` is one mechanism declining | the tool, as row 4 |
 | 4 | `none`, a tool found | `y` | a tool answers later × *never silent* | the toast reads `copying with pbcopy` at once; the answer replaces it |
-| 5 | a tool pending | it exits `0` | an observable success | `copied to the clipboard by pbcopy` |
-| 6 | a tool pending | it fails — a code, a signal, a spawn error | C21 W10, W11 | the file, as row 11, and the toast names the failure: `pbcopy failed (exited with code 1) — saved to <path>` |
-| 7 | a tool pending | the deadline, `COPY_DEADLINE_MS` | C21 W18 — C21 has no timer | the file, and `pbcopy did not answer — saved to <path>`. **2 000 ms and unmeasured**; a tool that answers at all answers in milliseconds |
-| 8 | the deadline fired | the tool exits `0` late | one copy, one sentence | **dropped.** The toast already named where the text is sure to be, and a second sentence would contradict the first |
+| 5 | a tool pending | it exits `0` | an observable success | `copied via pbcopy` |
+| 6 | a tool pending | it fails — a code, a signal, a spawn error | C21 W10, W11 | **nothing is written**: `pbcopy failed (exited with code 1) — the kill buffer holds it`, and the file is offered for that copy (classification rows K7–K9) |
+| 7 | a tool pending | the deadline, `COPY_DEADLINE_MS` | C21 W18 — C21 has no timer | **nothing is written**: `pbcopy did not answer — the kill buffer holds it`, and the file is offered as row 6. **2 000 ms and unmeasured**; a tool that answers at all answers in milliseconds |
+| 8 | the deadline fired | the tool exits `0` late | one copy, one sentence | **dropped.** The toast already named where the text is sure to be — the kill buffer — and a second sentence would contradict the first. The offer stands: offering a save writes nothing |
 | 9 | a tool pending | a second copy | two answers × one toast line | **the second supersedes the first**: the first's deadline is disposed and its answer, when it comes, is dropped. Without this the first copy's `copied` lands over the second's `copying…` and names the wrong text |
 | 10 | a tool pending | the session stops | the deadline × stop | the deadline is disposed with the toast's; the tool is detached (C21 I2) and runs to its end, and nothing is said, because nothing can be drawn |
-| 11 | `none`, no tool | `⏎` or `y` | *states it and offers a file* | the footer already read `no clipboard` and `⏎ to file` before the press; the press writes `<stateDir>/copy.txt`, replacing the last, and the toast names the path |
-| 12 | a file | the write rejects | *never silent* × the kill buffer | `no clipboard, and <path> could not be written — the kill buffer holds it`, which row 1 makes true |
-| 13 | `osc52`, past the cap, no tool | `y` | C21 W3 | the file, and `too large for the terminal's clipboard — saved to <path>` |
+| 11 | `none`, no tool | `⏎` | *states it and offers a file* | the footer already read `no clipboard` and `⏎ to file` before the press; `⏎` is the offer taken, and writes `<stateDir>/copy.txt` resolved against the working directory, replacing the last, toasted `saved to <absolute path>` |
+| 11a | `none`, no tool | `y` | *offers a file* × *never write a file the reader did not ask for* | **nothing is written**: `no clipboard here — the kill buffer holds it`. `y` is undrawn and the offer is `⏎`'s (classification row K13) |
+| 12 | the offer taken | the write rejects | *never silent* × the kill buffer | `<absolute path> could not be written — the kill buffer holds it`, which row 1 makes true |
+| 13 | `osc52`, past the cap, no tool | `y` | C21 W3 | **nothing is written**: `too large for the terminal's clipboard — the kill buffer holds it`, and the footer already offered `⏎ to file` for this text (K3) |
 | 14 | `⏎` left the mode | a tool answers | the mode's end × the answer | the toast is the session's, not the mode's, so it is drawn |
 
 **The walk found row 9**, which no layer below could: C21 resolves each write on its
 own exit and is right to, and two correct answers to two copies arrive in an order
-nothing controls. It also found that **rows 6, 7 and 13 write a file the reader was not
-offered at rest** — the footer offers one only where no mechanism exists. That is the
-rule's fallback applied after the fact: the reader asked for a copy, the file is the
-destination the rule names when the clipboard fails, and the toast says so. It is
-the ruling, and it is stated here because it reads as more than *offers*.
+nothing controls. It also found that rows 6, 7 and 13 wrote a file the reader was not
+offered at rest, and **ruled that acceptable — which was wrong.** *Corrected
+2026-09-29 by the person:* **never write a file the reader did not ask for.** Where a
+route exists the copy takes it and says where it went; the file is offered only where
+no route exists, and pressing the offer is the only thing that writes it. OSC 52's
+success cannot be detected, so a copy sent by it counts as done, not failed. The old
+paragraph read *the reader asked for a copy, the file is the destination the rule names
+when the clipboard fails* — true of the rule's text and not of the reader: a copy is
+not a request for a file, and the rule says *offers*. A finding recorded with this lane.
+
+#### Where the copy goes — a classification table
+
+*(the person's correction, 2026-09-29; the orchestrator's ruling on the tool that
+fails)* The trace above indexes events; the correction is **structural** — which
+route exists × the payload × how the tool answered × whether the reader takes the
+offer — and three of its rules meet at rest with no event between them: *OSC 52
+counts as done*, *offer only where no route exists*, and *the offer is taken, never
+assumed*. So a table. "Offered" is the footer's `⏎ to file` in place of `⏎ copy`;
+"file" is whether `copy.txt` exists after the row. Columns not named are any value.
+
+| # | route | payload | tool answers | reader | the rules that meet | toast | offered | file |
+|---|---|---|---|---|---|---|---|---|
+| K1 | OSC 52 only | within | — | `y` / `⏎` | *OSC 52 counts as done* × *no success is observable* | `sent to the terminal's clipboard` | no | no |
+| K2 | OSC 52 and a tool | within | — (never run) | `y` / `⏎` | *OSC 52 first* × a tool whose success *is* observable | `sent to …` — the tool is not a check on OSC 52, and running it too would be a second clipboard | no | no |
+| K3 | OSC 52 only | past the cap | — | at rest | the cap × *offer only where no route exists* | — | **yes, for this text**: `too large for the terminal`. The offer is a property of the selection's text, so an extend across the cap moves the label and the press both, because both read one function | no |
+| K4 | OSC 52 only | past the cap | — | `⏎` | the offer × the key that names it | `saved to <absolute path>` | — | **yes** |
+| K5 | a tool (with or without OSC 52 past the cap) | any | exit `0` | `y` / `⏎` | an observable success | `copying with pbcopy`, then `copied via pbcopy` | no | no |
+| K6 | a tool | any | pending | at rest | a route exists × its answer is not yet in | `copying with pbcopy` | **no** — a pending copy has not failed, so `⏎` is still a copy, and pressing it supersedes (trace row 9) | no |
+| K7 | a tool | any | non-zero, a signal, a spawn error | `y`, then at rest | *a route exists* × *that route did not take this copy* | `pbcopy failed (exited with code 1) — the kill buffer holds it` | **yes, while the selection's text is that copy's**: `pbcopy failed` | **no** |
+| K8 | a tool | any | silent past `COPY_DEADLINE_MS` | `y`, then at rest | as K7 × C21 has no timer | `pbcopy did not answer — the kill buffer holds it` | yes, as K7: `pbcopy did not answer` | **no** |
+| K9 | K7 or K8 standing | same text | — | `⏎` | the offer × `⏎` otherwise copying | `saved to <absolute path>` — the offer taken, **not** a retry | — | **yes** |
+| K10 | K7 or K8 standing | the selection extended | — | at rest | *for that copy* × a different text | — | **no** — the offer was for that copy; `⏎` is a copy again | no |
+| K11 | K7 or K8 standing | same text | — | `y` | *for that copy* × a new copy | the tool again, from `copying with` | withdrawn at the press; returns only if this copy fails too | no |
+| K12 | a tool | any | fails or goes silent after **`⏎` left the mode** | — | the offer × a mode that is gone | as K7 / K8 | **no surface to draw it on**: the footer is the mode's. It stands for the text, so re-entering the mode over the same selection draws it; no key outside the mode reaches it, and the registry has no save action to bind — reported, not invented | no |
+| K13 | none (`none`, no tool) | any | — | `y` | *offers a file* × *never write a file the reader did not ask for* | `no clipboard here — the kill buffer holds it` | yes, at rest before the press: `no clipboard` | **no** — `y` is undrawn and is not the offer |
+| K14 | none | any | — | `⏎` | the offer taken | `saved to <absolute path>` | — | **yes** |
+| K15 | K4, K9 or K14 | — | — | the write rejects | *never silent* × C17 I31 | `<absolute path> could not be written — the kill buffer holds it` | unchanged | no |
+| K16 | any | — | — | `stateDir` relative (the default `.calcium`) | *states the full path* × a relative default | the path is resolved against the session's working directory: `saved to /work/.calcium/copy.txt`, never `saved to .calcium/copy.txt` | — | — |
+
+**What the table found.** Three things the trace could not reach, because each is two
+rules holding at once rather than an event between them:
+
+- **K3's offer is a property of the text, not of the session.** The old footer asked
+  `hasClipboard` — true wherever OSC 52 exists — so a selection past the cap with no
+  tool drew `⏎ copy`, and the press then wrote a file under the label `copy`. The offer
+  and the press now read one function over the selection's text.
+- **K12 has no surface.** The per-copy offer lives in the mode's footer, and `⏎`
+  leaves the mode before a tool can answer. Nothing in the registry is a save action,
+  so the row states the failure and where the text is (the kill buffer), and the gap is
+  reported rather than bound. A finding recorded with this lane.
+- **K16: the default `stateDir` is relative**, so the old toast read `saved to
+  .calcium/copy.txt` — a path the reader cannot open from anywhere but the working
+  directory. The person's form is *the full path*. A finding recorded with this lane.
 
 ---
 
@@ -1245,7 +1297,7 @@ than stranding the user.
 - **I58** — *(ruling 68, `R-THM-005`, `R-SEL-003`, `R-SEL-006`, `R-SEL-016`, ruling 69)* **The rail is selection's second carrier, drawn by the frame in column 0 beside every selected row's first row, at every rung.** A row takes the rail if it is the first row of a block in the semantic copy selection (the rows I39 washes), or the first row of an element in `focus.selected`. No other row does: not a continuation, not a selected block's body, not the prompt's selection, whose `▌` is its caret (ruling 69's exception), and nothing in native copy mode. **The glyph is the registry's** (`selection-rail`, `▌`, ASCII `|`, collision domain `gutter`), read through `glyphs(caps).rail`. **Its ink is `accent` resolved against the selection ground**, so on a banded theme it is the band's ink (C10 I45, I53). **Its ground is the selection ground where that ground is a background, and never `inverse`**: at 1-bit the row inverts from column 1 and the rail stays upright, because an inverted `▌` is a right-half block. It is drawn beside the washed row, never inside the wash, since the wash re-opens `inverse` after every sequence (I52). **No block draws it and no block knows it**: it is not in the render cache (I40), and the rows C09 renders are byte-identical with and without it. → T1.77, T3.25, T4.39, T6.29
 - **I59** — *(review batch 4, M10 items 5 and 6; ruling 71, `R-SEL-005`, `R-SEL-011`, R-BLK-838)* **One predicate says a selection exists, and `⏎` leaves by copying.** `hasSelection(mode)` is *the rectangle is up, or the block set is not empty*; `escape()` clears on it and leaves without it, and the footer's `esc clear` / `esc out` is the same call — two predicates each correct alone disagreed over a selection that copies no text (§6e trace row 2). `⏎` copies and leaves the mode; `y` and the registry's `copy` copy and stay; each raises a toast naming where the text went. **An empty copy is never silent and never leaves**: nothing selected toasts `nothing selected`, a selection whose copy is empty toasts `the selection copies no text`, the mode stays up, and nothing is written to any buffer — `copyText("")` is not called. → T1.80, T3.15, T4.40
 - **I60** — *(review batch 4, M10 item 2; rulings 36, 70, 71, `R-SEL-007`)* **`⌃V` toggles the rectangle, and rectangle mode is `rect !== null`.** On, it seeds anchor and head at the caret's row and the first column of the caret's block; off, it discards the rectangle and leaves the block set as it was. `⇧←`/`⇧→` move the head's column and `⇧↑`/`⇧↓` its row, the anchor fixed; a plain arrow moves both; a press plants both at the pointer's cell and a drag moves the head, and an autoscroll tick moves the head to the edge row at the drag's last column. At block granularity `⇧←`/`⇧→` do nothing. **The column is clamped to the anchor's block** — its span's columns, the run's indent to the run's edge — both when the head is stored and when `rectBetween` derives the rectangle, so a resize narrowing the block narrows the rectangle. While it is up the copy, the count, the wash and the rail are the rectangle's: `cellTextOf` over the entry's lines rendered with the frame's per-entry options, the wash over exactly its cells, the rail on its first row; the block set is neither washed nor counted. `a` and `A` discard it. `CellRect`, `rectBetween` and `cellTextOf` are consumed, and their allow-list entries are removed. → T1.79, T4.41
-- **I61** — *(review batch 4, M10 item 1; ruling 72, `R-SEL-011`, → C01 I25, C02 I18, C21 I20, C17 I31)* **A copy goes to the kill buffer, then to one clipboard by the person's order, and says where it went in words that are true.** The kill buffer takes the text first, every time (C17 I31). Then: OSC 52 when C02's `clipboard` is `osc52` and `clipboardWrite` returns bytes, toasted `sent to the terminal's clipboard` and **never** *copied*, because nothing comes back; otherwise the tool `findClipboardTool` found, toasted `copying with <tool>` and then `copied to the clipboard by <tool>` on its exit `0`; otherwise, or when the tool fails or has not answered by `COPY_DEADLINE_MS`, `<stateDir>/copy.txt`, toasted with the path and the reason. **One copy speaks once**: a copy supersedes an earlier one still pending, whose deadline is disposed and whose answer is dropped, and an answer after the deadline is dropped. The footer states the absence at rest — `⏎ to file` in place of `⏎ copy`, and `no clipboard` after the waiting notice, where C02 says `none` and no tool was found (§6e's table). The routing, the wording and the pending copy are one module, `shell/clipboard.ts`; C14 performs none of it (I11). **The session disposes the copier on stop**, alongside the toast's timer, so a pending copy's deadline neither holds the process open nor writes a file for a session that has gone. → T1.81, T3.26, T4.43, T4.44, T5.6
+- **I61** — *(review batch 4, M10 item 1; ruling 72, `R-SEL-011`, → C01 I25, C02 I18, C21 I20, C17 I31)* **A copy goes to the kill buffer, then to one clipboard by the person's order, and says where it went in words that are true.** The kill buffer takes the text first, every time (C17 I31). Then: OSC 52 when C02's `clipboard` is `osc52` and `clipboardWrite` returns bytes, toasted `sent to the terminal's clipboard` and **never** *copied*, because nothing comes back — and counted as done, never as failed; otherwise the tool `findClipboardTool` found, toasted `copying with <tool>` and then `copied via <tool>` on its exit `0`. **A copy never writes a file** *(corrected 2026-09-29 by the person — it wrote `<stateDir>/copy.txt` when the tool failed or went silent, and past the cap with no tool)*: where no route takes the text the toast says why and that the kill buffer holds it — `no clipboard here`, `too large for the terminal's clipboard`, `<tool> failed (<reason>)`, `<tool> did not answer`. **The file is offered, and written only when the reader takes the offer**: the footer reads `⏎ to file` in place of `⏎ copy` exactly when no route exists for the selection's text, or the latest copy's tool failed or went silent and the selection's text is that copy's; `⏎` then writes `<stateDir>/copy.txt`, resolved against the working directory, and toasts `saved to <absolute path>`. `y` is never the offer. Where a route exists and has not failed for this text, nothing offers a file (§6e's classification table). **One copy speaks once**: a copy supersedes an earlier one still pending, whose deadline is disposed and whose answer is dropped, and an answer after the deadline is dropped. The footer states the reason at rest, after the waiting notice — `no clipboard`, `too large for the terminal`, `<tool> failed`, `<tool> did not answer` — beside the offer it qualifies (§6e's footer table). The routing, the wording and the pending copy are one module, `shell/clipboard.ts`; C14 performs none of it (I11). **The session disposes the copier on stop**, alongside the toast's timer, so a pending copy's deadline does not hold the process open for a session that has gone. → T1.81, T1.82, T3.26, T3.27, T4.43, T4.44, T4.45, T5.6
 
 ---
 
@@ -1377,7 +1429,8 @@ Fake heights, no rendering.
 - **T1.78** (I34, §6b *The count*): `waitingEntries(record, held)` over a real C13 store with a cap of a few blocks, frozen by copying its `entries`, for every row of §6b's table — an append is 1 and not 2, a patch to a held live entry is 1 and a second patch to it still 1, a malformed patch 0, a bare settle 1, a settle with a document 1, an append evicting an entry is 2 on the first eviction (the entry and the marker) and 1 once the marker is held, and a write with a marker held adds nothing for the marker. The control: the length difference, computed over the same two lists, is 0 in the patch and eviction rows, so the fixture reaches the cells length gets wrong. **The wiring**, because the function can be right while the footer still subtracts: through a graph, `bufferedEntries` after a patch to the held live entry is 1.
 - **T1.79** (I60, I42, rulings 36, 70, 71): the rectangle's model over spans that carry columns — `⌃V` seeds anchor and head at the caret and the block's first column; `⇧→` forty times stops at the block's last column and one `⇧←` moves back one; `⇧↓` past the block clips and the rectangle survives; a plain arrow moves a 1×1; `⌃V` off leaves the block set it found, by equality; `esc` clears both; `a` and `A` discard it; and `rectBetween` over spans narrowed by a resize clamps a stored column. The control is T1.42's spans, which carry no columns and clamp none.
 - **T1.80** (I55, I59, §6e's footer table): `ownerLine` for every row of the classification table, asserted as the whole line — including *only blocks that copy nothing*, which reads `esc clear` with no count, *every span* with `all loaded entries`, *the empty transcript* without it, and *the rectangle over a full block set* without it. And `hasSelection` against `escape()` over the same states: `esc clear` exactly where `escape()` keeps the mode.
-- **T1.81** (I61, §6e *Where the copy goes*, C21 W1–W4): `routeCopy` over each capability × tool × payload cell — `osc52` within → the bytes `clipboardWrite` builds; `osc52` past the cap with a tool → the tool; without → the file, *too large*; `none` with a tool → the tool; without → the file, *no clipboard* — and `copyToast` over every outcome: only a tool's `ok` says *copied*, and OSC 52's says *sent*.
+- **T1.81** (I61, §6e *Where the copy goes*, C21 W1–W4; **amended 2026-09-29**): `routeCopy` over each capability × tool × payload cell — `osc52` within → the bytes `clipboardWrite` builds; `osc52` past the cap with a tool → the tool; without → **no route**, *too large*; `none` with a tool → the tool; without → no route, *no clipboard* — and `copyToast` over every outcome: only a tool's `ok` says *copied* (`copied via pbcopy`), OSC 52's says *sent*, and no outcome of a copy says *saved* — only the offer taken does, with an absolute path.
+- **T1.82** (I61, §6e classification table K1–K3, K7, K8, K10, K13, K16): `fileOffer` over the table's at-rest cells — OSC 52 within, with a tool or not → none; OSC 52 past the cap and no tool → *too large*; a tool → none; no route → *no clipboard*; after a failed or silent copy → that reason for that copy's text and none for another text; after a later copy of any text → none. OSC 52 is never an offer. And `copyFilePath` resolves a relative `stateDir` against the working directory to an absolute path, leaving an absolute one as it is.
 
 ### Tier 2 — contract / interface
 
@@ -1434,7 +1487,8 @@ Fake heights, no rendering.
 - **T3.23** (I24, C25 I18): a `patch` over the cap → the piece is a valid `Patch` carrying its path header and `collapsedBefore` markers inside `shown`, and the registry's `capped` survives `windowRows` building a fresh block.
 - **T3.24** (I24, C09 I11): a kind whose `measure` throws on a block over the cap → contained exactly as before, one row, the fault reported once for `measure`; the cap adds no second report.
 - **T3.25** (I58, I53, C10 I45, C10 I66): a selected block's first row at 24-bit, 8-bit, 4-bit, 1-bit with Unicode and 1-bit ASCII, on `dark` and on `hcDark`. Column 0 is `▌` (`|` in ASCII); its ink is `accent` against the selection ground, and the band's ink on `hcDark` above 1-bit; it never carries `inverse`, and at 1-bit the row's cells from column 1 do. The cell is the rail's alone: no block span reaches column 0.
-- **T3.26** (I61, trace rows 7–10): a copier over a tool that never answers → the deadline writes the file and toasts `did not answer`; a late `ok` after it says nothing; a second copy while the first is pending → the first's answer is dropped and only the second speaks; `dispose` → the deadline never fires.
+- **T3.26** (I61, trace rows 7–10; **amended 2026-09-29**): a copier over a tool that never answers → the deadline toasts `did not answer — the kill buffer holds it` and writes nothing; a late `ok` after it says nothing; a second copy while the first is pending → the first's answer is dropped and only the second speaks; `dispose` → the deadline never fires.
+- **T3.27** (I61, §6e classification table K4, K7–K9, K11, K13–K15, trace rows 6, 11a, 13): **no copy writes a file** — a failed tool, a silent one, no route, and past the cap with no tool each leave the file system untouched and toast the reason with `the kill buffer holds it`; `save(text)` writes the text to the path and toasts `saved to <path>`; a rejected write toasts `<path> could not be written — the kill buffer holds it`; a later copy withdraws a failed copy's offer.
 
 ### Tier 4 — integration
 
@@ -1457,16 +1511,18 @@ Fake heights, no rendering.
 - **T4.40** (I59, I47, R-BLK-838): a real session — `a` then `⏎` → the kill buffer holds the entry, the mode is left, and the toast names the destination; `a` then `y` → the same text, the mode still up, a toast; the control is `⏎` with nothing selected, which stays up and toasts `nothing selected`.
 - **T4.41** (I60, I43, I55): a real session over a block of known cells — `⌃V`, `⇧→` ×3, `⇧↓` → the footer reads `RECT 4×2` and `cells, not source`, the rows are washed over four cells and the rail leads the first; `y` → the kill buffer holds those eight cells as two lines with no escape; `⌃V` → the footer is block mode's again with the earlier block count restored.
 - **T4.42** (I60, I49, §6e trace row 14): a real session over a block taller than the region — `⌃V`, a press on a cell, the pointer dragged four cells right and far below the region and held → the view scrolls, and `y` copies one text whose every line is the same four cells and which has more lines than the pointer crossed: only the ticks' extend can take the rows scrolled in after it left.
-- **T4.43** (I61, C17 I31): three real sessions. `clipboard: "osc52"` declared → the terminal receives `ESC ] 52 ; c ; <base64> BEL` of exactly the copied text, the toast reads `sent to the terminal's clipboard`, and `⌃y` yanks the same text. A `PATH` holding a `pbcopy` that writes its stdin to a file → that file holds the text and the toast reads `copied to the clipboard by pbcopy`. Neither → the footer reads `no clipboard` and `⏎ to file`, `⏎` writes `/state/copy.txt` with the text, and the toast names it.
+- **T4.43** (I61, C17 I31): three real sessions. `clipboard: "osc52"` declared → the terminal receives `ESC ] 52 ; c ; <base64> BEL` of exactly the copied text, the toast reads `sent to the terminal's clipboard`, and `⌃y` yanks the same text. A `PATH` holding a `pbcopy` that writes its stdin to a file → that file holds the text and the toast reads `copied to the clipboard by pbcopy`. Neither → the footer reads `no clipboard` and `⏎ to file`, `y` writes nothing and toasts `no clipboard here — the kill buffer holds it`, and `⏎` writes `/state/copy.txt` with the text and toasts `saved to /state/copy.txt`. In the OSC 52 and tool sessions the footer never offers a file.
 
 ### Tier 5 — e2e
+
+- **T4.45** (I61, §6e classification table K7, K9, K10, K16): a real session whose `pbcopy` exits `1`, with a relative `stateDir` → `y` toasts `pbcopy failed (exited with code 1) — the kill buffer holds it`, no `copy.txt` exists, and the footer reads `⏎ to file` and `pbcopy failed`; an extend withdraws the offer and a shrink back restores it; `⏎` writes the file at `<cwd>/<stateDir>/copy.txt` and toasts that absolute path.
 
 - **T5.1**: a 10,000-block transcript scrolled top to bottom → on-screen rows match measured heights at every screenful.
 - **T5.2**: Page Down through 10,000 blocks → under 50 ms per page (A02 §7).
 - **T5.3**: a live `--logs` tail at 1,000 lines/s while scrolled up reading → the view does not move.
 - **T5.4**: the same, then `End` → snaps to the bottom and resumes following.
 - **T5.5**: dragging the terminal edge from 160 to 60 and back while scrolled to the middle → the same content is on screen at both ends, no blank frames.
-- **T4.44** (I61, review batch 4): a real session whose `pbcopy` takes the text and does not exit for three seconds → `y` toasts `copying with pbcopy`, the session stops, and past `COPY_DEADLINE_MS` `<stateDir>/copy.txt` does not exist. The deadline was disposed with the session, so it did not fire. T3.26's `dispose` arm is the copier's half of this row, and this row is the session's half: T3.26 cannot see whether anything calls `dispose`. Removing `this.#copier?.[Symbol.dispose]()` from the session's stop → this row fails.
+- **T4.44** (I61, review batch 4; **amended 2026-09-29**): a real session whose `pbcopy` takes the text and does not exit for three seconds, with an injected `schedule` that records each timer → `y` toasts `copying with pbcopy` and arms one timer at `COPY_DEADLINE_MS`; the session stops, and that timer has been disposed. *It read* past `COPY_DEADLINE_MS` `<stateDir>/copy.txt` does not exist — *a proxy for the disposal that became vacuous the moment the deadline stopped writing files*: with no automatic write, an undisposed deadline leaves no file either, so the row would pass with the dispose removed. A finding recorded with this lane. T3.26's `dispose` arm is the copier's half of this row, and this row is the session's half: T3.26 cannot see whether anything calls `dispose`. Removing `this.#copier?.[Symbol.dispose]()` from the session's stop → this row fails.
 - **T5.6** (I61, §6a, R-SEL-004, R-SEL-011): a PTY session with `clipboard: "osc52"` declared — three entries, `A`, `y` → the OSC 52 payload **decoded from the PTY's bytes** is the three entries' copy text, plain, in document order with a blank line between entries, and the toast reads `sent to the terminal's clipboard`. *Amended (review batch 4, M10 item 1):* it read *forty rows*; the count is the fixture's and not the claim, and the claim — what the clipboard holds — had no instrument until the payload could be read off the wire.
 
 - **T4.11** (I24, with C13 and C09): a viewport over a transcript whose entry holds a 25-line `logs` block under `maxBlockRows: 10` → `totalRows` is `chrome + 11`, `visible()` at the foot selects the marker row, and the frame's last block row reads `… 10 of 25 rows`.
@@ -1515,6 +1571,9 @@ Fake heights, no rendering.
 - **T6.36** (I61, ruling 72): OSC 52's toast worded *copied* → **T1.81** fails. The defect is the one the ruling was written against: a copy that appears to work, on the one path whose success nothing reports.
 - **T6.37** (I61, trace rows 7–9): the pending copy's deadline removed → **T3.26** fails: a `pbcopy` that never exits leaves `copying with pbcopy` up until the toast expires, and then nothing — silent, which R-SEL-011 calls the worst outcome available.
 - **T6.38** (C17 I31): the kill buffer skipped when a clipboard took the text → **T4.43** fails at `⌃y`, which yanks the previous kill.
+- **T6.39** (I61, the person's correction 2026-09-29): the automatic write on a failed or silent tool restored → **T3.27** fails: the file system holds `copy.txt` after a copy nobody asked to save.
+- **T6.40** (I61, K5, K6): the offer drawn while a route exists — `fileOffer` answering for every copy → **T1.82** fails, and **T4.43**'s OSC 52 session reads `⏎ to file` over a copy that went to the terminal.
+- **T6.41** (I61, K1): OSC 52 treated as failed — its copy recorded as the failed copy → **T1.82** fails: the OSC 52 session offers a file for the text it just sent.
 
 ---
 

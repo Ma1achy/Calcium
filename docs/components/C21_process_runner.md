@@ -259,11 +259,11 @@ these rows are what each layer must hand up for the order to be applicable at al
 | W3 | `osc52` | none | past the cap | the cap × *none available → a file* | the reader is offered a file and told the text was too large for the terminal — a different sentence from *no clipboard* |
 | W4 | `osc52` | found | within | *OSC 52 first* × a tool's success is observable | OSC 52, as the person ruled; worded *sent*, never *copied* |
 | W5 | `none`, `unreachable` (tmux) | `pbcopy`, local | within | the tmux gate × a spawned tool | the tool: tmux sits between us and the terminal, not between us and a process |
-| W6 | `none` | `pbcopy`, over SSH | within | *found* × the host's clipboard is not the reader's | **not offered** — it would exit `0` on the wrong machine. A file, and told |
+| W6 | `none` | `pbcopy`, over SSH | within | *found* × the host's clipboard is not the reader's | **not offered** — it would exit `0` on the wrong machine. No route: told, and offered a file (C14 I61) |
 | W7 | `none` | `xclip`, `DISPLAY` set, over SSH | within | the SSH gate × `ssh -X` forwards the display | offered: the variable names the reader's display |
 | W8 | `none` | `xclip` found, no `DISPLAY` | within | *found* × *cannot open display* | not offered; the next candidate is asked |
 | W9 | `none` | `wl-copy` and `clip.exe` (WSLg) | within | two candidates found | the table's order: `wl-copy` |
-| W10 | `none` | found, exits non-zero | within | *found* × failure is observable | `ok: false` naming the code; L4 offers the file. Never silent |
+| W10 | `none` | found, exits non-zero | within | *found* × failure is observable | `ok: false` naming the code; L4 says so and offers the file for that copy, writing nothing until the reader takes it (C14 I61). Never silent |
 | W11 | `none` | removed between find and write | within | detection × spawn | the spawn error resolves `ok: false`; never a throw |
 | W12 | `none` | exits without reading | 1 MiB | our stdin write × a closed pipe | the `EPIPE` is swallowed; the exit decides |
 | W13 | `none` | a `pbcopy` in `.` or an empty `PATH` entry | — | `PATH` lookup × the working directory | relative entries are never searched |

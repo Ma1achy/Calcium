@@ -146,3 +146,7 @@ describe("C14 §6a — the clipboard in a real session", () => {
     }
   });
 });
+
+describe("C14 §6e — the offer for a failed copy, owed at the spec commit", () => {
+  it.todo("T4.45 (C14 I61, K7, K9, K10, K16): a pbcopy exiting 1 offers the file for that copy and writes nothing until ⏎ — owed at the spec commit (the person's correction 2026-09-29, C14 §6e's classification table); not deferred on a component: `fileOffer` and `save` land with the code commit that follows");
+});

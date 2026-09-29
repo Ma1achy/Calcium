@@ -46,3 +46,9 @@ describe("C14 §6e — where the copy goes, tier 6", () => {
     expect(copyToast({ kind: "file", path: "/p", why: { kind: "no-clipboard" }, written: false })).toMatch(/kill buffer holds it/u);
   });
 });
+
+describe("C14 §6e — the correction's tier 6, owed at the spec commit", () => {
+  it.todo("T6.39 (C14 I61): the automatic write on a failed tool restored → T3.27 fails — owed at the spec commit (the person's correction 2026-09-29, C14 §6e's classification table); not deferred on a component: `fileOffer` and `save` land with the code commit that follows");
+  it.todo("T6.40 (C14 I61): the offer drawn while a route exists → T1.82 fails — owed at the spec commit (the person's correction 2026-09-29, C14 §6e's classification table); not deferred on a component: `fileOffer` and `save` land with the code commit that follows");
+  it.todo("T6.41 (C14 I61): OSC 52 treated as failed → T1.82 fails — owed at the spec commit (the person's correction 2026-09-29, C14 §6e's classification table); not deferred on a component: `fileOffer` and `save` land with the code commit that follows");
+});
