@@ -9,10 +9,10 @@ with a scrollable transcript, history and live views.
 
 You do not write a terminal.
 
-![docker-tui, the reference application: a landing dashboard refreshing in place with CPU and memory bars per container, then a table of containers, then a single container's live view where a CPU plot fills one sample at a time, then a comparison, a unified diff and a streaming log tail](examples/docker/demo.gif)
+![docker-tui, the reference application, against an invented host: a landing dashboard refreshing in place with CPU and memory bars per container, then a table of containers, then a single container's stats where a CPU plot fills one sample at a time, then a comparison of a container against its image, a unified config diff and two short verbs](examples/docker/demo.gif)
 
-*[`docker-tui`](examples/docker/README.md) — the reference application, driven
-against real containers. Everything in it is blocks; none of its adapters draws.*
+*[`docker-tui`](examples/docker/README.md) — the reference application, recorded
+against an invented host so no real machine is shown. Everything in it is blocks; none of its adapters draws.*
 
 ---
 
@@ -312,7 +312,7 @@ no adapter knows which terminal it is on.
 
 Truecolour:
 
-![The live container view in truecolour: a braille CPU curve in olive green, a shaded memory bar, and panels bordered with box-drawing characters](docs/media/depth-24.gif)
+![/container stats worker in truecolour: a braille CPU curve in green between two dotted threshold lines, a shaded memory bar, and panels bordered with box-drawing characters](docs/media/depth-24.gif)
 
 256 colours:
 
@@ -344,7 +344,7 @@ naming palette slots rather than colours.
 The same is true of the variant. `/theme light` is one command, and no adapter
 knows it happened:
 
-![The same dashboard in the light variant on a light terminal: dark text on a pale background, container names and bars in green, the busy container's CPU bar in red, blue accents in the panel title](docs/media/theme-light.gif)
+![The same dashboard in the light variant on a light terminal: dark text on a pale background, container names in green, the busy container's CPU bar in amber with a warning mark, and the CPU history heatmap below](docs/media/theme-light.gif)
 
 **A theme decides whether it paints the page, and the two shipped ones decide
 differently.** `dark` takes `background: "terminal"` and emits nothing behind the
@@ -385,14 +385,14 @@ and the plots demo's `/spinners` and `/bars` are the first two.
 proved against. Twelve surfaces, every block type, and sixty-nine findings logged
 while building it.
 
-![docker-tui: a six-beat screencast — the landing dashboard refreshing in place, the /ps table, drilling into a container where a CPU plot fills one sample at a time, a comparison of container against image, a unified config diff, and a streaming log tail](examples/docker/demo.gif)
+![docker-tui against an invented host: an eleven-beat screencast — the landing dashboard refreshing in place, the /ps table walked with the arrow keys, a completion menu, /container stats worker where a CPU plot fills one sample at a time, a comparison of web against its image, a unified config diff of proxy's nginx config, /port and /top, and the session scrolled back to the banner](examples/docker/demo.gif)
 
 The same table at 120 columns and at 80. `PORTS` is dropped by declared priority
 and `USAGE` leaves the dashboard above it, neither of which the adapter asked for:
 
-![docker-tui at 120 columns: the tail of the live dashboard showing CPU, MEM and USAGE columns per container, and below it a /ps table of five containers with NAME, IMAGE, STATUS and PORTS](docs/media/ps-120.gif)
+![docker-tui at 120 columns: the tail of the live dashboard — the busy container's CPU, MEM and USAGE — and its CPU history heatmap, and below it a /ps table of six containers with NAME, IMAGE, STATUS and PORTS](docs/media/ps-120.gif)
 
-![docker-tui at 80 columns: the same dashboard with the USAGE column gone, and the same /ps table reduced to NAME, IMAGE and STATUS](docs/media/ps-80.gif)
+![docker-tui at 80 columns: the same dashboard with the USAGE column gone, and the same /ps table of six reduced to NAME, IMAGE and STATUS](docs/media/ps-80.gif)
 
 [`examples/docker/`](examples/docker/README.md) has the recording, how to run it,
 and the ledger. [`docs/ROADMAP.md`](docs/ROADMAP.md) is what the ledger turned
