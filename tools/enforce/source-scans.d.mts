@@ -184,3 +184,26 @@ export declare function checkMarkDomains(
   registrySource?: string,
   glyphSource?: string,
 ): Violation[];
+
+/** SS69 — the files allowed to hold a literal bidi format character, each with its reason. */
+export declare const BIDI_LITERAL_EXEMPTIONS: Readonly<Record<string, string>>;
+
+/** SS69 — the code points `text.ts`'s `isBidiFormat` answers true for, parsed from its source, sorted. */
+export declare function bidiFormatCodePoints(textSource?: string): number[];
+
+/** SS69 — the tracked text files holding any of `codePoints`, by `git grep`, and the tracked count. */
+export declare function trackedBidiCandidates(
+  codePoints: readonly number[],
+  cwd?: string,
+): { tracked: number; files: string[] };
+
+/**
+ * SS69 — a literal bidi format character in a tracked text file, with the
+ * exemptions compared by equality; an unread set or corpus is reported alone.
+ */
+export declare function checkBidiLiterals(options?: {
+  codePoints?: readonly number[];
+  candidates?: { tracked: number; files: readonly string[] };
+  readFile?: (file: string) => string;
+  exemptions?: Readonly<Record<string, string>>;
+}): (Violation & { line: number })[];

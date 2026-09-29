@@ -1,6 +1,7 @@
 // A03 §4 — the implemented subset of SS1..SS37. Forbidden patterns, scoped by
 // directory. A row here is a rule that can fire; A03 inventories the rest, each
 // waiting on the component that creates its scope.
+import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 
 /**
@@ -2350,6 +2351,138 @@ export function checkControlBytes(files, readFile = (f) => readFileSync(f, "utf8
         spec: "C16 T2.10 · F236",
       });
     }
+  }
+  return violations;
+}
+
+/**
+ * **SS69 — a literal bidi format character in a tracked text file** (F1402,
+ * ruling 71, A03 commitment 14).
+ *
+ * An override is invisible and reorders every character after it on the line,
+ * so a file holding U+202E reads one way to a reviewer and another to the
+ * compiler — the class published as *Trojan Source*. Ruling 71 escapes the
+ * twelve everywhere a block is drawn and C01 I26 in the two OSC sinks; nothing
+ * looked at the repository's own files. `trust-boundary.test.ts` landed with
+ * its twelve as literal code points, a file write having turned the escapes
+ * into characters, and enforce was green. **The first run found a second**:
+ * `test/contract/image-path.test.ts` wrote its poisoned filename with a literal
+ * U+202E where every sibling wrote an escape.
+ *
+ * **The set is `text.ts`'s, parsed out of `isBidiFormat`** rather than restated
+ * here — the function ruling 71's mechanism reads, so a character added there
+ * joins this scan. The control is that the parse found U+202E: a rewrite of the
+ * function into another shape parses as nothing, and a scan over an empty set
+ * passes every file.
+ *
+ * **Every tracked text file, not a directory list**: `git ls-files` is the
+ * corpus and `git grep -I -F` finds the candidates, because reading 6 500 files
+ * through the bind mount takes seconds and the grep under one. The control is
+ * that the tracked set is not empty and that `git` answered at all — exit 1 is
+ * *no match*, anything else is a scan that did not run.
+ *
+ * **Exemptions by equality, both directions** (`BIDI_LITERAL_EXEMPTIONS`): a
+ * file that must hold a literal is named with its reason, and an entry whose
+ * file holds none is itself a violation. Empty at landing — the one file that
+ * fired had no reason to hold the character literally.
+ *
+ * **Stated blind spot.** An untracked file is not read: a commit cannot carry
+ * one past the pre-commit hook, which runs after staging, but `make enforce` on
+ * a tree with new unstaged files says nothing about them. The working copy is
+ * read, not the index, so a partially staged file is judged by what is on disk.
+ * `git grep -I` skips a file it classes as binary. An escape — `\u202E` — is the
+ * remedy and is not read, so a file that *builds* the character at run time is
+ * outside the rule by construction. Every other invisible or confusable
+ * character — U+2028, a zero-width joiner, a homoglyph — is outside the set.
+ */
+export const BIDI_LITERAL_EXEMPTIONS = Object.freeze({});
+
+/** The bidi format code points `text.ts`'s `isBidiFormat` answers true for, parsed from its source. */
+export function bidiFormatCodePoints(textSource = readFileSync("src/data/text.ts", "utf8")) {
+  const start = textSource.indexOf("export function isBidiFormat(");
+  if (start < 0) return [];
+  const body = textSource.slice(start, textSource.indexOf("\n}", start));
+  const out = [];
+  for (const m of body.matchAll(/cp\s*===\s*0x([0-9a-f]+)|cp\s*>=\s*0x([0-9a-f]+)\s*&&\s*cp\s*<=\s*0x([0-9a-f]+)/giu)) {
+    if (m[1] !== undefined) out.push(Number.parseInt(m[1], 16));
+    else for (let cp = Number.parseInt(m[2], 16); cp <= Number.parseInt(m[3], 16); cp += 1) out.push(cp);
+  }
+  return out.sort((x, y) => x - y);
+}
+
+/**
+ * The tracked text files holding any of `codePoints` literally, and the count of
+ * tracked files — `git grep` narrows, so the count is the only evidence the
+ * corpus was there to narrow.
+ */
+export function trackedBidiCandidates(codePoints, cwd = process.cwd()) {
+  const git = (args) => execFileSync("git", args, { cwd, encoding: "utf8", maxBuffer: 1 << 28 });
+  const tracked = git(["ls-files", "-z"]).split("\0").filter((f) => f !== "").length;
+  const patterns = codePoints.flatMap((cp) => ["-e", String.fromCodePoint(cp)]);
+  let listed = "";
+  try {
+    listed = git(["grep", "-I", "-l", "-z", "-F", ...patterns]);
+  } catch (e) {
+    // Exit 1 is *nothing matched*; anything else is a scan that did not run.
+    if (e.status !== 1) throw e;
+  }
+  return { tracked, files: listed.split("\0").filter((f) => f !== "").sort() };
+}
+
+export function checkBidiLiterals({
+  codePoints = bidiFormatCodePoints(),
+  candidates = undefined,
+  readFile = (f) => readFileSync(f, "utf8"),
+  exemptions = BIDI_LITERAL_EXEMPTIONS,
+} = {}) {
+  if (!codePoints.includes(0x202e)) {
+    return [{
+      rule: "SS69", file: "src/data/text.ts", line: 1,
+      message: `\`isBidiFormat\` parsed as ${String(codePoints.length)} code points without U+202E — the set did not `
+        + "read, and a scan over it passes every file. Keep the function's `cp === 0x…` / range shape or teach "
+        + "`bidiFormatCodePoints` the new one",
+      spec: "A03 SS69 · F1402",
+    }];
+  }
+  const { tracked, files } = candidates ?? trackedBidiCandidates(codePoints);
+  if (tracked === 0) {
+    return [{
+      rule: "SS69", file: ".", line: 1,
+      message: "`git ls-files` listed no file — the corpus did not read, and every file would pass",
+      spec: "A03 SS69 · F1402",
+    }];
+  }
+  const set = new Set(codePoints);
+  const violations = [];
+  const holding = new Set();
+  for (const file of files) {
+    readFile(file).split("\n").forEach((line, i) => {
+      let col = 0;
+      for (const ch of line) {
+        col += 1;
+        const cp = ch.codePointAt(0) ?? 0;
+        if (!set.has(cp)) continue;
+        holding.add(file);
+        if (Object.hasOwn(exemptions, file)) continue;
+        violations.push({
+          rule: "SS69", file: `${file}:${String(i + 1)}`, line: i + 1,
+          message:
+            `a literal U+${cp.toString(16).toUpperCase().padStart(4, "0")} at column ${String(col)} — a bidi format `
+            + "character reorders what a reviewer reads against what the compiler reads. Write it as an escape "
+            + "(`\\u202E`), or name the file in `BIDI_LITERAL_EXEMPTIONS` with the reason it must hold one",
+          spec: "A03 SS69 · F1402 · ruling 71",
+        });
+      }
+    });
+  }
+  for (const file of Object.keys(exemptions)) {
+    if (holding.has(file)) continue;
+    violations.push({
+      rule: "SS69", file: "tools/enforce/source-scans.mjs", line: 1,
+      message: `\`BIDI_LITERAL_EXEMPTIONS\` names \`${file}\`, which holds no literal bidi character — remove the `
+        + "entry; the list is compared by equality on purpose",
+      spec: "A03 SS69 · F1402",
+    });
   }
   return violations;
 }

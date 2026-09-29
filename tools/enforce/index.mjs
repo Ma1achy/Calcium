@@ -16,7 +16,7 @@ import {
   nameExactnessSignal,
   publicSurfaceUseSignal,
 } from "./module-graph.mjs";
-import { checkSourceScans, checkMarks, checkControlBytes, checkAllowLists, checkEmojiBases, checkGlyphWidthClass, checkMarkDomains, checkGlyphPresence, checkTextGrounds, checkRuleCitations } from "./source-scans.mjs";
+import { checkSourceScans, checkMarks, checkControlBytes, checkAllowLists, checkEmojiBases, checkGlyphWidthClass, checkMarkDomains, checkGlyphPresence, checkTextGrounds, checkRuleCitations, checkBidiLiterals } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
 import { checkWorkflows } from "./workflows.mjs";
 import { checkRefusals, REFUSALS, unverifiableRefusals } from "./refusals.mjs";
@@ -219,6 +219,11 @@ const violations = [
   // document, not a `src/` line against a regex. SP3 and SP8 resolve the
   // other two citation forms; this was the third, and nothing read it.
   ...checkRuleCitations(),
+  // SS69 — a literal bidi format character in any tracked text file (F1402).
+  // Its own function for SS52's reason and one more: the corpus is `git
+  // ls-files` rather than any walk here, because the subject is a file a
+  // reviewer reads, and that is every file, not the three trees `walk` visits.
+  ...checkBidiLiterals(),
   ...checkDependencies(),
   ...checkPhantomImports(files),
   // SS62 — the workflows against their record. Its own function rather than a

@@ -47,7 +47,7 @@ describe("C04 I142 — b.image({ path }) keeps the path", () => {
 
     // **Content like any other field** (C09 I127): a path is a filename, and a
     // filename can hold an escape.
-    const poisoned = join(dir, `evil${ESC}[2J‮.png`);
+    const poisoned = join(dir, `evil${ESC}[2J\u202E.png`);
     writeFileSync(poisoned, PNG);
     const copied = kit.registry.copyOf(b.image({ path: poisoned, height: 3, alt: "a" }) as Block) ?? "";
     expect(copied, "the path's escape, shown").toContain("evil^[[2J<U+202E>.png");
