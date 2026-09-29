@@ -30,6 +30,7 @@ const FIELDS: readonly (keyof TerminalCapabilities)[] = [
   "notification",
   "notify",
   "clipboard",
+  "editor",
 ];
 
 /** The same fixtures tier 1 walks, so the shape claims cover every rule branch. */
@@ -51,7 +52,7 @@ const FIXTURES: readonly NodeJS.ProcessEnv[] = [
 ];
 
 describe("C02 contract", () => {
-  it("T2.1 (I1): exactly the fourteen documented keys, all present, for every fixture", () => {
+  it("T2.1 (I1): exactly the fifteen documented keys, all present, for every fixture", () => {
     for (const env of FIXTURES) {
       const { capabilities } = detectCapabilities(env);
       expect(Object.keys(capabilities).sort(), JSON.stringify(env)).toEqual([...FIELDS].sort());

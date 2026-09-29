@@ -267,6 +267,8 @@ describe("C02 detection", () => {
       notification: "inferred",
       notify: "assumed",
       clipboard: "inferred",
+      // Neither `VISUAL` nor `EDITOR` in this environment (I19).
+      editor: "assumed",
     });
 
     // **`COLORTERM` moves `colourDepth` from `inferred` to `stated` and the
@@ -384,6 +386,7 @@ describe("C02 detection", () => {
       notification: "osc9",
       notify: ["system", "title"],
       clipboard: "osc52",
+      editor: "code -w",
     };
     // TERM=dumb detects every field at its floor; the overrides must win anyway.
     expect(caps({ TERM: "dumb" }, overrides)).toEqual(overrides);
@@ -403,6 +406,7 @@ describe("C02 detection", () => {
       notification: "none",
       notify: [],
       clipboard: "none",
+      editor: null,
     } as const;
 
     expect(isUsable({ ...worst, altScreen: true, renderMode: "rich" })).toBe(true);
@@ -425,6 +429,7 @@ describe("C02 detection", () => {
         notification: "osc9",
         notify: ["bell", "system", "title"],
         clipboard: "osc52",
+        editor: "vi",
       }),
     ).toBe(false);
   });
@@ -539,7 +544,25 @@ describe("C02 the clipboard (I18)", () => {
 });
 
 describe("C02 I19 — the reader's editor, owed at the spec commit", () => {
-  it.todo(
-    "T1.30 (C02 I19): VISUAL over EDITOR, stated; EDITOR alone; neither is null and assumed; an empty VISUAL falls to EDITOR; a declared command wins and is declared; a declared empty string is refused with a warning — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
-  );
+  it("T1.30 (C02 I19): the editor is VISUAL over EDITOR, stated when either speaks and assumed null when neither does", () => {
+    const editor = (env: NodeJS.ProcessEnv, overrides?: Parameters<typeof detectCapabilities>[1]) => {
+      const d = detectCapabilities({ TERM: "xterm", ...env }, overrides);
+      return [d.capabilities.editor, d.sources.editor, d.warnings.length];
+    };
+    expect(editor({ VISUAL: "code -w", EDITOR: "vi" }), "VISUAL wins").toEqual(["code -w", "stated", 0]);
+    expect(editor({ EDITOR: "vi" }), "EDITOR alone").toEqual(["vi", "stated", 0]);
+    expect(editor({}), "neither").toEqual([null, "assumed", 0]);
+    expect(editor({ VISUAL: "", EDITOR: "nano" }), "an empty VISUAL is unset").toEqual(["nano", "stated", 0]);
+    // **Not gated by TERM** (§3's boundary): a dumb terminal still has an editor.
+    expect(detectCapabilities({ TERM: "dumb", EDITOR: "vi" }).capabilities.editor).toBe("vi");
+
+    // Declared over the top (I4); a declared null is a declared "none".
+    expect(editor({ EDITOR: "vi" }, { editor: "hx" })).toEqual(["hx", "declared", 0]);
+    expect(editor({ EDITOR: "vi" }, { editor: null })).toEqual([null, "declared", 0]);
+    // The domain is a non-empty command line or null — an empty string is refused.
+    const refused = detectCapabilities({ TERM: "xterm", EDITOR: "vi" }, { editor: "  " });
+    expect([refused.capabilities.editor, refused.sources.editor]).toEqual(["vi", "stated"]);
+    expect(refused.warnings).toHaveLength(1);
+    expect(refused.warnings[0]).toContain("editor");
+  });
 });

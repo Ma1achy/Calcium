@@ -1012,7 +1012,42 @@ describe("C17 §5b — the region's cells (roadmap entry 23)", () => {
 });
 
 describe("C17 I35 — a chip is edited by re-minting it, owed at the spec commit", () => {
-  it.todo(
-    "T1.60 (C17 I35, I34): editChip on a chip in the buffer answers true, draws the new line count under the same ordinal, resolves to the new content; undo brings the old chip back; a chip not in the buffer answers false and nothing changes — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
-  );
+  it("T1.60 (C17 I35, I34): editChip re-mints a chip in place under its ordinal, as one undo unit, and refuses a chip the buffer does not hold", () => {
+    const GUTTER = { first: 0, cont: 0 } as const;
+    const e = createEditor();
+    e.insert("read ");
+    e.insertChip({ kind: "file", name: "a.ts", lines: 1, content: "first" });
+    e.insert(" and ");
+    e.insertChip({ kind: "file", name: "b.ts", lines: 3, content: "one\ntwo\nthree" });
+    e.move("charLeft");
+    const old = e.chipAt();
+    expect(old?.ordinal, "the second chip").toBe(2);
+    const [text, cursor, resolved] = [e.text, e.cursor, e.resolved];
+    const drawn = e.layout(200, GUTTER).join("");
+
+    expect(e.editChip(old!, { kind: "file", name: "b.ts", lines: 2, content: "one\nthree" })).toBe(true);
+    const fresh = e.chipAt();
+    expect([fresh?.ordinal, fresh?.lines, fresh?.content], "same ordinal, new count and content").toEqual([2, 2, "one\nthree"]);
+    expect(e.cursor, "one grapheme for one: the caret is where it was").toBe(cursor);
+    expect(e.text, "a fresh sentinel, never the old one rebound (I34)").not.toBe(text);
+    expect(e.resolved).toBe("read first and one\nthree");
+    const redrawn = e.layout(200, GUTTER).join("");
+    expect([drawn, redrawn], "the label is drawn anew, and only it").toEqual([
+      "read  a.ts · 1L  and  b.ts · 3L ",
+      "read  a.ts · 1L  and  b.ts · 2L ",
+    ]);
+
+    // **One undo unit** (I5): the old chip, its content and its sentinel.
+    e.undo();
+    expect([e.text, e.cursor, e.resolved]).toEqual([text, cursor, resolved]);
+    expect(e.chipAt()?.lines).toBe(3);
+    expect(e.layout(200, GUTTER).join("")).toBe(drawn);
+
+    // **A chip not in the buffer** — the re-minted one, now undone — answers
+    // false and moves nothing: not the text, not the history.
+    expect(e.editChip(fresh!, { kind: "file", name: "b.ts", lines: 9, content: "x" })).toBe(false);
+    expect([e.text, e.resolved]).toEqual([text, resolved]);
+    e.redo();
+    expect(e.chipAt()?.lines, "redo reaches the re-mint, so the refusal pushed no unit").toBe(2);
+  });
 });

@@ -219,6 +219,13 @@ const hint = (keys: readonly Binding["key"][], does: string, caps: TerminalCapab
 };
 
 /**
+ * `hint`, for a row outside the owner line that names keys — the chip
+ * preview's (C22 I143) — so a chord is spelled one way wherever it is named:
+ * `⌥⇧↑⌥⇧↓ scroll`, as the owner line writes `⇧↑⇧↓ extend`.
+ */
+export const keyHint = hint;
+
+/**
  * `shedToWidth`'s way out, found by its spelling (C16 I58). The one key this
  * file still names, and it names it to recognise a chip rather than to draw one.
  */
@@ -632,8 +639,12 @@ function ownerChips(
       const k = QUESTION_KEYS.shown;
       const key = (name: string): Binding["key"] => ({ name });
       if (q?.state === "inspection") {
+        // **An inspection owns its payload's scrolling** (C23 I88): the line
+        // names it as the panel's last row does, from the same vocabulary.
+        const scroll = QUESTION_KEYS.scroll;
         return [
           { label: "question", tone: "warn" },
+          { label: hint([key(scroll.up), key(scroll.down)], "scroll", caps), tone: "muted" },
           { label: hint([key(k.leave)], "back", caps), tone: "muted" },
         ];
       }
@@ -660,8 +671,17 @@ function ownerChips(
           ];
         case "preview":
           // The preview composes nothing and the prompt keeps its keys
-          // (`promptUnderMenu`), so the only key the layer owns is its way out.
-          return [{ label: "preview", tone: "accent" }, ...one("panel", "dismiss", "close")];
+          // (`promptUnderMenu`); what the layer owns is its three chords and
+          // its way out — **the panel's own key row, named the same** (C22
+          // I143): scrolling only while the box overflows.
+          return [
+            { label: "preview", tone: "accent" },
+            ...(hints.previewScrolls === true
+              ? keyed(hints, "panel", ["previewScrollUp", "previewScrollDown"], "scroll", caps)
+              : []),
+            ...one("panel", "previewOpen", "open in editor"),
+            ...one("panel", "dismiss", "close"),
+          ];
         default:
           // §103's specimen, word for word; the keys are the panel's rows.
           return [

@@ -1195,6 +1195,26 @@ describe("C16 §3a — the global-intercept table and the child rung (M5)", () =
     }
   });
 
+  it("T1.200 (I40, C22 I143): the page-scroll intercept is ⌥↑/⌥↓ exactly — ⌥⇧ and ⌃⌥ arrows are the ladder's at every rung", () => {
+    // **The predicate read *meta and an arrow***, so `⌥⇧↓` — the chip
+    // preview's own scroll chord (`R-KEY-010`) — paged the transcript and never
+    // reached the panel (a finding recorded with this lane). The row is the
+    // pair: the exact chord still intercepts, so the refusal below is not a
+    // route that intercepts nothing.
+    const stage = (rung: string, e: InputEvent): string | undefined => {
+      const { router } = atRung(rung);
+      router.dispatch(e);
+      return router.lastStages.find((st) => st.startsWith("intercept:"));
+    };
+    for (const rung of OWNER_RUNGS.filter((r) => r !== "copy")) {
+      for (const name of ["up", "down"]) {
+        expect(stage(rung, key(name, { meta: true })), `⌥${name} at ${rung}`).toMatch(/^intercept:page-scroll\b/u);
+        expect(stage(rung, key(name, { meta: true, shift: true })), `⌥⇧${name} at ${rung}`).toBeUndefined();
+        expect(stage(rung, key(name, { meta: true, ctrl: true })), `⌃⌥${name} at ${rung}`).toBeUndefined();
+      }
+    }
+  });
+
 
   it("T1.33 (R-OWN-002, §103): a bare esc reaches the child; only ⌥esc detaches", () => {
     // **The row that decides whether a full-screen program in a child is usable.**

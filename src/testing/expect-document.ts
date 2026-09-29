@@ -272,6 +272,7 @@ const TRUECOLOUR: TerminalCapabilities = Object.freeze({
   renderMode: "rich",
   notification: "none",
   clipboard: "none",
+  editor: null,
   notify: [],
 });
 

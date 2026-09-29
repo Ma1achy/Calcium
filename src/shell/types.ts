@@ -15,7 +15,7 @@ import type { ConfirmHost } from "./confirm.js";
 import type { Setting } from "./config.js";
 import type { Adapter, AdapterRegistry, ProducerContext } from "../data/adapters/index.js";
 import type { ManifestDocument, ManifestStore } from "../data/manifest/index.js";
-import type { ProcessRunner, PtyFactory } from "../data/process/types.js";
+import type { Exit, ProcessRunner, PtyFactory } from "../data/process/types.js";
 import type { TransportRouter } from "../data/transport/index.js";
 import type { Action, Block, ViewDocument } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
@@ -277,6 +277,8 @@ export type WatchRowState = Readonly<{
 export type OwnerHints = Readonly<{
   chord(target: FocusTarget, action: KeyAction): Binding["key"] | undefined;
   substate?: "find" | "complete" | "preview";
+  /** Whether the chip preview's box overflows — the owner line's scroll chip (C22 I143). */
+  previewScrolls?: boolean;
   question?: Readonly<{ state: "choice" | "reply" | "inspection"; resolvesTo: string }>;
   refused?: boolean;
   /**
@@ -365,6 +367,15 @@ export interface FileSystem {
    * `node:fs` (I10) — a second filesystem route would put two in the graph.
    */
   readDir(path: string): Promise<readonly Readonly<{ name: string; directory: boolean }>[]>;
+  /**
+   * A fresh directory only this user can read, under the system's temporary
+   * one, named from `prefix` (C22 I144) — where `⌥o` writes a chip for the
+   * reader's editor. Optional, so a filesystem an application supplies need not
+   * have one; `⌥o` then refuses and says so.
+   */
+  makeTempDir?(prefix: string): Promise<string>;
+  /** Remove a directory and everything in it (C22 I144). Optional with `makeTempDir`. */
+  removeDir?(path: string): Promise<void>;
 }
 
 /**
@@ -409,6 +420,21 @@ export interface Pipeline {
   cancelNewestStream(): boolean;
   /** Cancel what is in flight, settling the entry `partial` (C23 I10). */
   cancel(): void;
+  /**
+   * The terminal, lent to a program that is not a verb — C22 I144's editor —
+   * through the handoff's own sequence (C23 §4: suspend, C21 `handoff`,
+   * resume, reset the decoder, invalidate), **appending nothing**: what comes
+   * back is the caller's to say. `busy` names the verb holding the guard, and
+   * nothing is run then — a suspended terminal would take that verb's frames.
+   * The guard is held for the handoff, so a submission in the meantime queues.
+   *
+   * Optional, so a pipeline a harness supplies need not lend the terminal; C22
+   * refuses the editor with none.
+   */
+  borrowTerminal?(
+    argv: readonly string[],
+    label: string,
+  ): Promise<Readonly<{ kind: "ran"; exit: Exit }> | Readonly<{ kind: "busy"; verb: string | null }>>;
   /**
    * Where Calcium's own local handlers and the app's arrive (C23 §2).
    *

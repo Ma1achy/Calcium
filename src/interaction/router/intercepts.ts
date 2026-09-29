@@ -227,5 +227,17 @@ export function interceptOf(e: InputEvent, detaches?: (key: Key) => boolean): In
   const { key } = e;
   if (isExactCtrlC(key)) return "interrupt";
   if (detaches?.(key) === true) return "host-detach";
-  return key.meta && (key.name === "up" || key.name === "down") ? "page-scroll" : null;
+  return isPageScroll(key) ? "page-scroll" : null;
+}
+
+/**
+ * `⌥↑`/`⌥↓`, exactly (I40): `meta` and the arrow, and no `shift` or `ctrl`.
+ *
+ * **`isExactCtrlC`'s lesson, a second time.** Read as *meta and an arrow* the
+ * route also took `⌥⇧↑`/`⌥⇧↓` — the chip preview's own chords (C22 I143,
+ * `R-KEY-010`) — so the preview's scroll paged the transcript and never reached
+ * the panel. I40 says *`⌥↑`/`⌥↓` alone*; the predicate now says it too.
+ */
+export function isPageScroll(key: Key): boolean {
+  return key.meta && !key.shift && !key.ctrl && (key.name === "up" || key.name === "down");
 }

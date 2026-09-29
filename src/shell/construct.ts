@@ -26,7 +26,7 @@
 
 import { createAdapterRegistry } from "../data/adapters/index.js";
 import { blankRowsAbove, commandRows } from "./paint.js";
-import { childBorderLegend, guardRefusal } from "./chrome.js";
+import { childBorderLegend, guardRefusal, keyHint } from "./chrome.js";
 import { compose, noticeDoc, settledDoc } from "./documents.js";
 import {
   answerEvent,
@@ -80,7 +80,8 @@ import type { BoxSpan, DragContainer } from "./drag-selection.js";
 import { pullIntoView } from "./pull.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
 import { waitingEntries } from "./semantic-selection.js";
-import { createOverlayManager, takesPointer } from "../viewport/overlay/index.js";
+import { createOverlayManager, takesPointer, type Layer, type Placed } from "../viewport/overlay/index.js";
+import type { LayerView } from "./composite.js";
 import { chipLabel, createEditor } from "../interaction/editor/index.js";
 import type { Chip, ChipLook, HeldLine, LineState } from "../interaction/editor/index.js";
 
@@ -121,7 +122,8 @@ import { createFocusStore, resolveFocus, resolveWatch } from "../interaction/rou
 import { chordText, createKeymap, defaultKeymap, RESERVED_ACTIONS } from "../interaction/router/keymap.js";
 import { REGISTRY_BINDINGS } from "../interaction/router/registry-bindings.js";
 import { createRouter, type RouterDeps } from "../interaction/router/router.js";
-import { createConfirmHost, type ConfirmHost } from "./confirm.js";
+import { CONFIRM_LAYER_ID, createConfirmHost, type ConfirmHost } from "./confirm.js";
+import { openChipInEditor } from "./chip-editor.js";
 import { createDecoder } from "../interaction/router/decode.js";
 import { createKeyEffects } from "./keys.js";
 import type {
@@ -162,7 +164,7 @@ import {
   persistPolicy,
   persists,
 } from "./transcript-persist.js";
-import { transcriptWidth } from "./config.js";
+import { RULE_ROWS, transcriptWidth } from "./config.js";
 import type { ResolvedConfig } from "./config.js";
 import { anyBlinking, CURSOR_BLINK_MS } from "./cursor-style.js";
 import { createSessionStore, type SessionStore } from "./state.js";
@@ -441,6 +443,12 @@ export type FrameQueries = Readonly<{
    * C15 I17's self-consistent-but-wrong placement.
    */
   promptAnchor: () => Readonly<{ row: number; rows: number }>;
+  /**
+   * The most rows the prompt's slot can take (`promptCap`, S01 §3) — where a
+   * replacing question is drawn, so what its inspection's box is sized to
+   * (C23 I88, C22 I142).
+   */
+  promptCap: () => number;
   /** Raises the Ctrl-C / Ctrl-D confirm — a layer over C15, composed by C22. */
   raiseExitConfirm: () => void;
 }>;
@@ -649,6 +657,11 @@ export type Graph = Readonly<{
   chrome: ChromeCache;
   /** C16 I74 — a layer's own row offset, as the wheel left it; 0 for a layer never wheeled. */
   layerScroll: (id: string) => number;
+  /**
+   * C22 I141 — a layer's boxes' offsets under `layer:<id>` and the box its
+   * keys move, for both of the layer's painters.
+   */
+  layerView: (id: string) => LayerView;
   scrollOffsets: ScrollOffsets;
   cameras: Cameras;
   /** C22 I77 — the frame each animated image is on, keyed like the two above and dropped with them. */
@@ -1952,6 +1965,7 @@ export async function constructGraph(
     // The same anchor C19's menu takes, read at `ask` time (C15 I17).
     anchor: deps.frame.promptAnchor,
     overlayRegion: deps.frame.overlayRegion,
+    slotRows: deps.frame.promptCap,
     // **The one editor, and not one owner.** §052: *no second implementation*
     // — the reply borrows the editor's code, so paste rules, `⇧⏎` and word
     // motion are shared — and *the question gets its OWN buffer, selection,
@@ -1978,6 +1992,13 @@ export async function constructGraph(
       replyHistory = null;
     },
     invalidate: () => void scheduler.commit("input"),
+    // C23 I88 — the inspection's box, in the one store under the layer's
+    // namespace (C22 I141). Late-bound: the measurer is built further down.
+    inspectionBox: {
+      by: (boxId, rows) => moveLayerBox(CONFIRM_LAYER_ID, boxId, rows),
+      reset: () => stores.scrollOffsets.delete(layerKey(CONFIRM_LAYER_ID)),
+    },
+    unicode: () => detection.capabilities.unicode !== "ascii",
   });
 
   // **Where the router's refusals are explained** (C16 I62). By rung, because
@@ -2415,21 +2436,72 @@ export async function constructGraph(
    * prompt cannot spell the same chip two ways.
    */
   const CHIP_PREVIEW_ID = "chip-preview";
-  const chipPreviewContent = (chip: Chip): readonly Block[] => [
+  /** The preview's box — the one its keys and the wheel move (C22 I143, I141). */
+  const PREVIEW_BOX_ID = "chip-preview-box";
+  /** The session keymap's chord for a preview action, at `panel` (C16 I58, C22 I143). */
+  const previewChord = (action: KeyAction): Binding["key"] | undefined =>
+    keymap.entries().find((b) => b.target === "panel" && b.action === action)?.key;
+  /**
+   * The panel's last row, named from the keymap (C22 I143): scrolling only
+   * while the box overflows — a chord that moves nothing is not offered — and
+   * opening always. Spelled by the owner line's own `keyHint`, so the two
+   * cannot name one chord two ways.
+   */
+  const previewKeyRow = (scrolls: boolean): string => {
+    const caps = detection.capabilities;
+    const pair = (["previewScrollUp", "previewScrollDown"] as const).flatMap((a) => previewChord(a) ?? []);
+    const open = previewChord("previewOpen");
+    return [
+      ...(scrolls && pair.length > 0 ? [keyHint(pair, "scroll", caps)] : []),
+      ...(open === undefined ? [] : [keyHint([open], "open in editor", caps)]),
+    ].join("  ");
+  };
+  /**
+   * The preview at a box height (C22 I143): the panel, a `scroll` box holding
+   * the content, and the key row. `code` rather than prose, because a paste is
+   * text whose line breaks are its own.
+   */
+  const previewBox = (chip: Chip, height: number): Block =>
+    makeBlock({
+      kind: "scroll",
+      id: PREVIEW_BOX_ID,
+      height,
+      children: [makeBlock({ kind: "code", id: "chip-preview-content", language: "text", text: chip.content })],
+    });
+  const chipPreviewBlocks = (chip: Chip, box: Block, scrolls: boolean): readonly Block[] => [
     makeBlock({
       kind: "panel",
       id: "chip-preview-panel",
       title: chipLabel(chip, chipLook),
-      // **No scroll box and no declared height**, which is the peek's shape
-      // too: C15 clamps a layer to the room it has, and a row count invented
-      // here would be a number §101 does not give. The box, its keys and its
-      // bar are §021's and arrive with the scrollbar.
-      children: [
-        makeBlock({ kind: "code", id: "chip-preview-content", language: "text", text: chip.content }),
-      ],
+      children: [box, makeBlock({ kind: "raw", id: "chip-preview-keys", text: previewKeyRow(scrolls) })],
     }),
   ];
+  /**
+   * The preview's content for this region (C22 I143, F1307). **The box is
+   * bounded so the layer is never cut**: C15's default fraction of the region,
+   * less the panel's two borders and the key row — `floor(h / 2) − 3`, floored
+   * at 1 — and no taller than the content, so a short paste draws no blank
+   * rows. The content's rows are asked of the box at the width the layer is
+   * drawn at, through `boxGeometry`, which is the clamp the keys use.
+   */
+  const chipPreviewContent = (chip: Chip): Readonly<{ blocks: readonly Block[]; scrolls: boolean }> => {
+    const region = deps.frame.overlayRegion();
+    const cap = Math.max(1, Math.floor(region.height / 2) - 3);
+    const box = previewBox(chip, cap);
+    const probe = chipPreviewBlocks(chip, box, true);
+    const ceiling = boxGeometry(probe, region.width, PREVIEW_BOX_ID)?.ceiling ?? 0;
+    if (ceiling > 0) return { blocks: probe, scrolls: true };
+    // It fits in the cap: the box is exactly its rows.
+    const at = blockWidthInEntry(built.blocks, probe, region.width, PREVIEW_BOX_ID);
+    const rows = at === null || box.kind !== "scroll" ? cap : barOf(box, at.inner, built.blocks.measure).content;
+    const fitted = previewBox(chip, Math.max(1, Math.min(rows, cap)));
+    return { blocks: chipPreviewBlocks(chip, fitted, false), scrolls: false };
+  };
   let previewed: Chip | null = null;
+  /** The region height the preview was built at — a new one rebuilds it (C22 I143). */
+  let previewedHeight: number | null = null;
+  /** Whether the preview's box overflows, for the owner line's scroll chip (C22 I143). */
+  let previewScrolls = false;
   const syncChipPreview = (): void => {
     const have = stores.overlays.stack.some((l) => l.id === CHIP_PREVIEW_ID);
     // **Focus, not the router's target**, and the first draft read the target.
@@ -2442,11 +2514,18 @@ export async function constructGraph(
     const blocked = stores.overlays.stack.some((l) => l.id !== CHIP_PREVIEW_ID);
     if (chip === null || blocked) {
       previewed = null;
+      previewedHeight = null;
+      previewScrolls = false;
       if (have) stores.overlays.dismiss(CHIP_PREVIEW_ID);
       return;
     }
-    if (have && chip === previewed) return;
-    const content = chipPreviewContent(chip);
+    const height = deps.frame.overlayRegion().height;
+    if (have && chip === previewed && height === previewedHeight) return;
+    // **A new chip, or a new region height, is a new document** (C22 I143,
+    // §6q.3 row 3): it opens at its top. A content update keeps the layer's
+    // namespace (I141), so the owner drops it here.
+    stores.scrollOffsets.delete(layerKey(CHIP_PREVIEW_ID));
+    const { blocks: content, scrolls } = chipPreviewContent(chip);
     const anchor = deps.frame.promptAnchor();
     const placement = { kind: "anchored" as const, row: anchor.row, rows: anchor.rows, prefer: "above" as const };
     if (have) {
@@ -2465,7 +2544,56 @@ export async function constructGraph(
       });
     }
     previewed = chip;
+    previewedHeight = height;
+    previewScrolls = scrolls;
   };
+  // **A resize is a new region height** (C22 I143): C14 emits on it, and the
+  // preview is rebuilt at its top rather than cut by C15 at the old size.
+  stores.viewport.subscribe(() => syncChipPreview());
+
+  /**
+   * The preview's three keys (C22 I143, I144). Each asks whether the preview is
+   * the panel on top — a `panel` row resolves over a menu or a search too, and
+   * there it is consumed and nothing moves (§6q.2).
+   */
+  const previewKeys = Object.freeze({
+    scroll: (rows: 1 | -1): void => {
+      if (stores.overlays.top?.id !== CHIP_PREVIEW_ID) return;
+      moveLayerBox(CHIP_PREVIEW_ID, PREVIEW_BOX_ID, rows);
+    },
+    open: (): void => {
+      const chip = previewed;
+      if (stores.overlays.top?.id !== CHIP_PREVIEW_ID || chip === null) return;
+      // **Settles after its batch, so it commits its own frame** (I31).
+      const said = (text: string): void => {
+        stores.transcript.append(noticeDoc("", text, "warn", { origin: "user" }));
+      };
+      void openChipInEditor(chip, {
+        editor: detection.capabilities.editor,
+        fs: config.fs,
+        borrow: pipeline.borrowTerminal,
+        chord: (() => {
+          const key = previewChord("previewOpen");
+          return key === undefined ? "the open key" : chordText(key, detection.capabilities.unicode !== "ascii");
+        })(),
+      }).then(
+        (result) => {
+          if (result.kind === "refused") said(result.text);
+          if (result.kind === "changed") {
+            // **In place, one undo unit, the ordinal kept** (C17 I35).
+            const { ordinal: _ordinal, ...parts } = chip;
+            stores.editor.editChip(chip, { ...parts, content: result.content, lines: result.lines });
+            syncChipPreview();
+          }
+          scheduler.commit("input");
+        },
+        (cause: unknown) => {
+          said(`the editor could not be opened: ${String(cause)}`);
+          scheduler.commit("input");
+        },
+      );
+    },
+  });
 
   /**
    * The nearest entry in `direction` that declares an element, and its first
@@ -3538,6 +3666,8 @@ export async function constructGraph(
     keepField: () => void commitField(),
     focusTranscript,
     watchKeys,
+    // C22 I143, I144 — the chip preview's three chords.
+    previewKeys,
     editor: stores.editor,
     completion: built.completion,
     overlays: stores.overlays,
@@ -3621,6 +3751,80 @@ export async function constructGraph(
   refreshAnchors = () => void keys.refreshAnchors();
 
   /**
+   * A layer's first `scroll` box, in document order, that overflows at the
+   * width the layer is drawn at (C22 I141) — with the geometry `ScrollOffsets`
+   * clamps against, which is `scrollBox`'s own: `barOf` at the width
+   * `blockWidthInEntry` hands the box, less its interior.
+   */
+  const firstOverflowingBox = (
+    content: readonly Block[],
+    width: number,
+  ): Readonly<{ id: string; geometry: { ceiling: number; follow?: boolean } }> | null => {
+    for (const top of content) {
+      for (const block of [top, ...descendants(top)]) {
+        if (block.kind !== "scroll") continue;
+        const geometry = boxGeometry(content, width, block.id);
+        if (geometry !== null && geometry.ceiling > 0) return { id: block.id, geometry };
+      }
+    }
+    return null;
+  };
+
+  /** One `scroll` box's clamp in a layer's content at `width`, or `null` where there is none. */
+  const boxGeometry = (
+    content: readonly Block[],
+    width: number,
+    boxId: string,
+  ): { ceiling: number; follow?: boolean } | null => {
+    for (const top of content) {
+      for (const block of [top, ...descendants(top)]) {
+        if (block.kind !== "scroll" || block.id !== boxId) continue;
+        const at = blockWidthInEntry(built.blocks, content, width, block.id);
+        if (at === null) return null;
+        const { content: rows } = barOf(block, at.inner, built.blocks.measure);
+        return { ceiling: Math.max(0, rows - interiorOf(block)), follow: block.follow === true };
+      }
+    }
+    return null;
+  };
+
+  /**
+   * Move box `boxId` in layer `layerId` by `rows`, clamped to its ceiling at
+   * the width the layer is drawn at (C22 I141, C23 I88). The keys' route to
+   * the store the wheel writes, so the two cannot disagree about the clamp.
+   */
+  const moveLayerBox = (layerId: string, boxId: string, rows: number): void => {
+    const placed = layersAsDrawn(
+      stores.overlays.layout(deps.frame.overlayRegion()),
+      confirm.replacing,
+      deps.frame.overlayRegion(),
+      deps.frame.promptAnchor(),
+    ).find((p) => p.layer.id === layerId);
+    if (placed === undefined) return;
+    const box = boxGeometry(placed.layer.content, placed.width, boxId);
+    if (box === null) return;
+    const ns = layerKey(layerId);
+    const held = Math.min(stores.scrollOffsets.resolved(ns, boxId, box), box.ceiling);
+    const next = Math.min(box.ceiling, Math.max(0, held + rows));
+    if (next !== held) stores.scrollOffsets.set(ns, boxId, next, box);
+  };
+
+  /**
+   * What a layer is rendered with besides its content (C22 I141): its boxes'
+   * offsets and their key under `layer:<id>`, and the box its keys move — an
+   * inspection's (C23 I88) — so the box's thumb is `accent` as a focused
+   * container's is. One function, read by both painters through the graph.
+   */
+  const layerView = (id: string): LayerView => {
+    const ns = layerKey(id);
+    return {
+      offsets: stores.scrollOffsets.forEntry(ns),
+      key: stores.scrollOffsets.key(ns),
+      focus: confirm.focusedBox(id),
+    };
+  };
+
+  /**
    * Each layer's own scroller, as C16's `scrollLayer` asks for it (C16 I74,
    * §3d P2–P6).
    *
@@ -3636,8 +3840,26 @@ export async function constructGraph(
    */
   const scrollLayer = (id: string, notches: number): boolean => {
     if (id === MENU_ID) return keys.scrollMenu(notches * WHEEL_ROWS);
-    const placed = stores.overlays.layout(deps.frame.overlayRegion()).find((p) => p.layer.id === id);
-    if (placed === undefined || !placed.truncated) return false;
+    const placed = layersAsDrawn(
+      stores.overlays.layout(deps.frame.overlayRegion()),
+      confirm.replacing,
+      deps.frame.overlayRegion(),
+      deps.frame.promptAnchor(),
+    ).find((p) => p.layer.id === id);
+    if (placed === undefined) return false;
+    // **The layer's first overflowing box, before its row offset** (I141, §6q.4
+    // ruling 2). A layer holding a box is one whose owner bounded the payload,
+    // so the wheel moves what the owner drew a bar for; the row offset is the
+    // fallback for a layer that did not.
+    const box = firstOverflowingBox(placed.layer.content, placed.width);
+    if (box !== null) {
+      const ns = layerKey(id);
+      const held = Math.min(stores.scrollOffsets.resolved(ns, box.id, box.geometry), box.geometry.ceiling);
+      const next = Math.min(box.geometry.ceiling, Math.max(0, held + notches * WHEEL_ROWS));
+      if (next !== held) stores.scrollOffsets.set(ns, box.id, next, box.geometry);
+      return true;
+    }
+    if (!placed.truncated) return false;
     const rows = built.blocks.measureSequence(placed.layer.content, placed.width, stores.measures);
     const most = Math.max(0, rows - placed.height);
     const held = Math.min(layerScroll.get(id) ?? 0, most);
@@ -3646,8 +3868,15 @@ export async function constructGraph(
   };
   // **A layer that goes takes its offset with it**, and one pushed again under
   // the same id opens at its top — the peek is pushed per element.
+  //
+  // **And its boxes' offsets with it** (I141): the `layer:<id>` namespace goes
+  // on push, pop and dismiss, and stays across a content update — an owner
+  // that replaces its content for a *new subject* drops it itself (§6q.4
+  // ruling 1), because only the owner knows which updates those are.
   stores.overlays.subscribe((change) => {
-    if (change.kind !== "content") layerScroll.delete(change.id);
+    if (change.kind === "content") return;
+    layerScroll.delete(change.id);
+    stores.scrollOffsets.delete(layerKey(change.id));
   });
 
   /**
@@ -3960,6 +4189,29 @@ export async function constructGraph(
   const armId = (entryId: string, blockId: string, elementId: string): string =>
     `${entryId}\u0000${blockId}\u0000${elementId}`;
 
+  /**
+   * The jump a primary press on the transcript's bar makes, or `null` where the
+   * press is not on a drawn bar (C14 I63, I64).
+   *
+   * Row *r* of an *h*-row region puts `topRow` at `round(r × maxTop / (h − 1))`,
+   * so the first row is the top and the last the bottom, and the move is
+   * `scrollBy` — follow is derived from where it lands (C14 I5), never set.
+   */
+  const barJump = (column: number, row: number): (() => void) | null => {
+    const region = deps.frame.region();
+    if (column !== region.left + region.width) return null;
+    const r = row - region.top;
+    if (r < 0 || r >= region.height) return null;
+    const { topRow, totalRows, viewportHeight } = stores.viewport.scroll;
+    const maxTop = Math.max(0, totalRows - viewportHeight);
+    if (maxTop === 0) return null;
+    const target = region.height <= 1 ? maxTop : Math.round((r * maxTop) / (region.height - 1));
+    return () => {
+      stores.viewport.scrollBy(target - topRow);
+      scheduler.commit("input");
+    };
+  };
+
   const pointerEffect = (e: InputEvent): (() => void) | null => {
     if (e.kind !== "mouse") return null;
     // **The column, translated once, as the row is** (C14 I57, ruling 68). The
@@ -4028,6 +4280,15 @@ export async function constructGraph(
         stores.cursorPositions.set(over.id, under.block.id, sample);
         scheduler.commit("input");
       };
+    }
+    // **A press on the transcript's bar jumps, and focuses nothing** (C14 I63,
+    // I64, `R-BLK-363`). The bar is the margin column — the one past the
+    // region's content — and is drawn only while the transcript overflows, so
+    // a press there on a transcript that fits is an ordinary press and falls
+    // through. Before the element lookup: the bar is a control, not an element.
+    if (e.button === "button0" && !e.motion && !e.meta && !e.ctrl && !e.shift) {
+      const jump = barJump(e.col, e.row);
+      if (jump !== null) return jump;
     }
     // **One translation, and the same pull the router used.** The router
     // translated the row for its rungs (C16 I20); a handler is handed the
@@ -4871,6 +5132,7 @@ export async function constructGraph(
         // chord this reader can press, and a rebinding moves it.
         chord: (target, action) => keymap.entries().find((b) => b.target === target && b.action === action)?.key,
         ...(top?.rung === "substate" ? { substate: top.name } : {}),
+        ...(top?.rung === "substate" && top.name === "preview" && previewScrolls ? { previewScrolls: true } : {}),
         ...(question === null ? {} : { question }),
         ...(copyRefused ? { refused: true } : {}),
         // C22 I139 — where the watch row stands, for the scope line's chips.
@@ -4946,6 +5208,7 @@ export async function constructGraph(
       return stores.bufferedEntries;
     },
     layerScroll: (id: string) => layerScroll.get(id) ?? 0,
+    layerView,
     semanticCaretAt,
     revealSemanticCaret,
     scrollBoxSpans,
@@ -5003,6 +5266,45 @@ function wheelAmount(e: InputEvent): ((v: Scroller) => void) | null {
  * state sees a half-applied store — which cost C14 a blank screen that every
  * assertion passed.
  */
+/** A layer's namespace in `ScrollOffsets` (C22 I141) — no transcript entry id can take this form. */
+export function layerKey(id: string): string {
+  return `layer:${id}`;
+}
+
+/**
+ * The layers where the paint drew them (C22 I142, §6q.4 ruling 3).
+ *
+ * **Every layer keeps its C15 placement but one.** A replacing question
+ * (C23 I74) stays on the stack — C16's ladder reads it — and is painted in the
+ * prompt's rows, not at the placement C15 computed for it: one row below the
+ * region (the rule), the prompt's height, the region's width. The pointer read
+ * C15's placement, so a press in the middle of the region was the question's
+ * and a wheel over the question's own rows reached the prompt. Region rows,
+ * as C16 hit-tests in (C22 I28).
+ */
+export function layersAsDrawn(
+  placed: readonly Placed[],
+  replacing: Layer | null,
+  region: Readonly<{ width: number; height: number }>,
+  prompt: Readonly<{ row: number; rows: number }>,
+): readonly Placed[] {
+  if (replacing === null) return placed;
+  return placed.map((p) =>
+    p.layer !== replacing
+      ? p
+      : {
+          layer: p.layer,
+          top: prompt.row + RULE_ROWS / 2,
+          left: 0,
+          height: prompt.rows,
+          width: region.width,
+          // The prompt slot draws the question whole and windows nothing, so
+          // there is no row offset for a wheel to bank (I141's fallback).
+          truncated: false,
+        },
+  );
+}
+
 function routerDeps(
   stores: {
     transcript: ReturnType<typeof createTranscriptStore>;
@@ -5051,7 +5353,16 @@ function routerDeps(
     // takes the wheel and no press, so a click on it still reaches the row
     // beneath (C15 I21). Filtering by `takesInput` left the peek band of the
     // scroll order unreachable by the one gesture it is for (§3d P5).
-    placed: (gesture) => stores.overlays.layout(frame.overlayRegion()).filter((p) => takesPointer(p, gesture)),
+    // **Where the paint drew them** (C22 I142): a replacing question is drawn
+    // in the prompt's rows, so it is hit-tested there and never at the C15
+    // placement nothing is drawn at.
+    placed: (gesture) =>
+      layersAsDrawn(
+        stores.overlays.layout(frame.overlayRegion()),
+        confirm.replacing,
+        frame.overlayRegion(),
+        frame.promptAnchor(),
+      ).filter((p) => takesPointer(p, gesture)),
     scrollLayer,
     popLayer: () => void stores.overlays.pop(),
     nativeSelection: frame.nativeSelection,

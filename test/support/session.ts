@@ -95,6 +95,7 @@ export function fakeFs(): FileSystem {
    * shown to respond to the thing under test* — applied to the filesystem.
    */
   const dirs = new Set<string>();
+  let made = 0;
   const parentOf = (p: string) => p.slice(0, Math.max(0, p.lastIndexOf("/")));
   const ensure = (p: string) => {
     const dir = parentOf(p);
@@ -148,6 +149,19 @@ export function fakeFs(): FileSystem {
       dirs.add(p);
       return Promise.resolve();
     },
+    // C22 I144 — a fresh directory per call, and a removal that takes what is
+    // in it, so a row can ask whether a file outlived its directory.
+    makeTempDir: (prefix) => {
+      made += 1;
+      const dir = `/tmp/${prefix}${String(made)}`;
+      dirs.add(dir);
+      return Promise.resolve(dir);
+    },
+    removeDir: (dir) => {
+      dirs.delete(dir);
+      for (const f of [...files.keys()]) if (f.startsWith(`${dir}/`)) files.delete(f);
+      return Promise.resolve();
+    },
     // A real answer, not an empty list: C19's path and executable sources take
     // this, and a fake returning nothing makes a completion assertion pass for
     // the wrong reason (`test/support/README.md`).
@@ -195,6 +209,7 @@ export const FRAME: FrameQueries = {
   region: () => ({ top: 1, left: 1, height: 20, width: 80 }),
   overlayRegion: () => ({ width: 80, height: 24 }),
   promptAnchor: () => ({ row: 21, rows: 1 }),
+  promptCap: () => 12,
   mouseEnabled: () => true,
   raiseExitConfirm: () => undefined,
 };

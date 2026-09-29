@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT. Source: docs/design/language/calcium-registry.json, rendered by build-calcium.mjs's renderKeysMarkdown; written with the key ladder below by tools/keymap-table.mjs -->
 # Calcium keys
 
-Revision 0.20 · 66 current bindings · a `default-terminal` chord is one a terminal without the Kitty protocol sends; an `enhanced-terminal` chord needs the protocol
+Revision 0.21 · 69 current bindings · a `default-terminal` chord is one a terminal without the Kitty protocol sends; an `enhanced-terminal` chord needs the protocol
 
 The universal set gives one purpose to each key and does not depend on what has focus; the active owner resolves that purpose.
 
@@ -75,6 +75,9 @@ docs/KEYS.md and the help entry come from the same source; a hand-written keymap
 | key | ⌃⇧V | enhanced-terminal | always | paste | paste |
 | key | ⌃Y | default-terminal | always | paste | paste |
 | key | ⌥⌫ | default-terminal | always | queue.drop | drop the last queued message |
+| key | ⌥⇧↑ | default-terminal | previewing | preview.scroll.up | scroll the chip preview up |
+| key | ⌥⇧↓ | default-terminal | previewing | preview.scroll.down | scroll the chip preview down |
+| key | ⌥o | default-terminal | previewing | preview.open | open the chip in the editor |
 
 ## transcript
 
@@ -149,6 +152,7 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `delete` | both |  |  |  |  |  |  | delete |  |  |  |
 | `↓` † | both |  |  |  | moveSemanticCaretDown | menuNext | insideDown | historyNext |  | rowDown |  |
 | `⌥↓` | both |  |  |  |  |  |  |  |  |  | scrollPageDown |
+| `⌥⇧↓` | both |  |  |  |  | previewScrollDown |  |  |  |  |  |
 | `⇧↓` † | both |  |  |  | extendSemanticSelectionDown |  |  |  |  | extendRowDown |  |
 | `⌘↓` | enhanced-terminal |  |  |  |  |  |  |  |  |  | scrollBottom |
 | `⌃E` | both |  |  |  |  |  |  | end |  |  |  |
@@ -173,6 +177,7 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⌥←` † | both |  |  |  |  |  |  | wordLeft |  | dividerLeft |  |
 | `⌥⇧←` | both |  |  |  |  |  |  | extendWordLeft |  |  |  |
 | `⇧←` † | both |  |  |  | extendSemanticSelectionLeft |  |  | extendCharLeft |  |  |  |
+| `⌥o` | both |  |  |  |  | previewOpen |  |  |  |  |  |
 | `o` | both |  |  |  |  |  | orbitToggle |  |  |  |  |
 | `⌥p` | both |  |  |  |  |  |  |  |  |  | postureCycle |
 | `pagedown` † | both |  |  |  |  |  |  |  |  | blockPageDown | scrollPageDown |
@@ -190,6 +195,7 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⇥` † | both |  |  |  |  | menuNext |  | complete | focusPrompt | entryNext |  |
 | `⌃U` | both |  |  |  |  |  |  | killToStart |  |  |  |
 | `⌥↑` | both |  |  |  |  |  |  |  |  |  | scrollPageUp |
+| `⌥⇧↑` | both |  |  |  |  | previewScrollUp |  |  |  |  |  |
 | `⇧↑` † | both |  |  |  | extendSemanticSelectionUp |  |  |  |  | extendRowUp |  |
 | `⌘↑` | enhanced-terminal |  |  |  |  |  |  |  |  |  | scrollTop |
 | `↑` † | both |  |  |  | moveSemanticCaretUp | menuPrev | insideUp | historyPrev |  | rowUp |  |
@@ -203,4 +209,4 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⌃Z` | both |  |  |  |  |  |  | undo |  |  |  |
 | `⌥z` | both |  |  |  |  |  |  | redo |  |  |  |
 
-154 bindings · 101 keys · 25 resolved by the ladder (†).
+157 bindings · 104 keys · 25 resolved by the ladder (†).

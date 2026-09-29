@@ -1,7 +1,7 @@
 {
   "meta": {
     "name": "Calcium design language",
-    "revision": "0.20",
+    "revision": "0.21",
     "generatedArtifact": "calcium-design-language.html",
     "ruleIdPolicy": "IDs are explicit, permanent, and never derived from order.",
     "normativeSource": "calcium-registry.json",
@@ -19483,6 +19483,20 @@
       "supersededBy": null,
       "legacyIds": [],
       "contentDigest": "e9f133f5f928512b330af1fb0a5f38fd1ea05aa4b96639f1b5f4a89e5ebc20da"
+    },
+    {
+      "id": "R-KEY-010",
+      "title": "A chip preview's own keys are chords the prompt does not bind, and enter always sends",
+      "text": "While a chip preview is up, the prompt keeps every key it binds, and enter sends. The preview owns three chords the prompt does not bind, each deliverable without the Kitty protocol: ⌥⇧↑ and ⌥⇧↓ scroll the preview, and ⌥o opens the chip in the reader's editor. The preview's key row names them from the keymap.",
+      "status": "current",
+      "sectionKey": "replace-or-float-and-where-a-chip-previews-101",
+      "tags": [
+        "interaction"
+      ],
+      "supersedes": [],
+      "supersededBy": null,
+      "legacyIds": [],
+      "contentDigest": "cee512e3fe6a687fa382b6fcc874b9e74946ef991adad7a9e0366722a503705a"
     }
   ],
   "sections": [
@@ -34675,6 +34689,30 @@
       "ruleIds": [
         "R-KEY-009"
       ]
+    },
+    {
+      "id": "preview.scroll.up",
+      "label": "scroll the chip preview up",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-010"
+      ]
+    },
+    {
+      "id": "preview.scroll.down",
+      "label": "scroll the chip preview down",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-010"
+      ]
+    },
+    {
+      "id": "preview.open",
+      "label": "open the chip in the editor",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-010"
+      ]
     }
   ],
   "bindings": [
@@ -35877,6 +35915,48 @@
       ],
       "kind": "key",
       "when": "focused"
+    },
+    {
+      "id": "binding.preview-scroll-up",
+      "actionId": "preview.scroll.up",
+      "chord": "⌥⇧↑",
+      "scope": "prompt",
+      "label": "scroll the chip preview up",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-010"
+      ],
+      "kind": "key",
+      "when": "previewing"
+    },
+    {
+      "id": "binding.preview-scroll-down",
+      "actionId": "preview.scroll.down",
+      "chord": "⌥⇧↓",
+      "scope": "prompt",
+      "label": "scroll the chip preview down",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-010"
+      ],
+      "kind": "key",
+      "when": "previewing"
+    },
+    {
+      "id": "binding.preview-open",
+      "actionId": "preview.open",
+      "chord": "⌥o",
+      "scope": "prompt",
+      "label": "open the chip in the editor",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-010"
+      ],
+      "kind": "key",
+      "when": "previewing"
     }
   ],
   "spinners": [

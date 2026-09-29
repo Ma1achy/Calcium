@@ -8,7 +8,8 @@
 // frame, and a test calling the mechanism directly would miss the wiring.
 import { describe, expect, it } from "vitest";
 
-import { buildSession } from "../support/session.js";
+import { NO_EDITOR, openChipInEditor } from "../../src/shell/chip-editor.js";
+import { buildGraph, buildSession, fakeFs } from "../support/session.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 
 /** Written as a code point rather than a literal, so no control byte is in the file. */
@@ -145,16 +146,118 @@ describe("C22 §6l.12 — a chip previews above the prompt", () => {
 });
 
 describe("C22 §6q — the chip preview's box and keys (ruling 53), owed at the spec commit", () => {
-  it.todo(
-    "T1.175 (C22 I143, ruling 53): the preview over a 47-line chip at a 20-row region is a scroll box of 7 rows whose last row names the scroll chords and the open chord; over a 3-line chip the box is 3 rows and the row names the open chord alone — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
-  );
-  it.todo(
-    "T4.116 (C22 I143, I51, ruling 53): with a paste chip previewed, enter submits the prompt with the chip's content; the scroll-down chord moves the box one row and leaves the caret — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
-  );
-  it.todo(
-    "T1.176 (C22 I144, C02 I19): openChipInEditor refuses with no editor and runs nothing; with a runner rewriting the file editChip is called once with the new content and line count; unchanged, not called; the temporary directory is gone on every path; the argv passes the path as an argument — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
-  );
-  it.todo(
-    "T4.117 (C22 I144, C23 §4): through a built session with a fake runner, the open chord suspends and resumes once, resets the decoder and re-mints the chip; with a verb holding the guard it runs nothing and says so — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
-  );
+  it("T1.175 (C22 I143, ruling 53): the preview is a bounded scroll box, and its last row names the chords from the keymap", async () => {
+    // The harness frame's layer region is 24 rows, so the box's ceiling is
+    // `floor(24 / 2) − 3 = 9` — C15's default fraction less the panel's two
+    // borders and the key row.
+    const { graph, stdin } = await buildGraph();
+    graph.lifecycle.acquire();
+    const preview = () => graph.overlays.stack.find((l) => l.id === "chip-preview");
+    const parts = () => {
+      const panel = preview()?.content[0];
+      if (panel === undefined || panel.kind !== "panel") return null;
+      const [box, keys] = panel.children;
+      return {
+        height: box?.kind === "scroll" ? box.height : null,
+        keys: keys?.kind === "raw" ? keys.text : null,
+      };
+    };
+
+    stdin.emit(`${ESC}[200~${pasteOf(47, "long")}${ESC}[201~`);
+    await settle();
+    expect(parts(), "a 47-line chip overflows the bounded box").toEqual({
+      height: 9,
+      keys: "⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor",
+    });
+    expect(graph.ownerHints().previewScrolls, "the owner line names the scroll too").toBe(true);
+
+    // **The control: a chip that fits is exactly its rows**, and a chord that
+    // would move nothing is not offered.
+    graph.editor.clear();
+    stdin.emit(`${ESC}[200~${pasteOf(6, "short")}${ESC}[201~`);
+    await settle();
+    expect(parts(), "a 6-line chip fits").toEqual({ height: 6, keys: "⌥o open in editor" });
+    expect(graph.ownerHints().previewScrolls, "and names no scroll").toBeUndefined();
+  });
+
+  it("T1.176 (C22 I144, C02 I19): the editor's arms — refused with none, re-minted on a change, the directory gone on every path", async () => {
+    const chip = { ordinal: 1, kind: "paste" as const, name: "pasted", lines: 3, content: "a\nb\nc" };
+    const calls: (readonly string[])[] = [];
+    const fs = fakeFs();
+    /** A fake terminal loan that runs `edit` over the file the argv names as `$1`. */
+    const borrowing =
+      (edit: (text: string) => string | null) =>
+      async (argv: readonly string[]) => {
+        calls.push(argv);
+        const path = argv[4] ?? "";
+        const text = await fs.readFile(path);
+        const next = edit(text);
+        if (next !== null) await fs.writeFile(path, next);
+        return { kind: "ran" as const, exit: { code: 0, signal: null } };
+      };
+    const deps = (editor: string | null, edit: (text: string) => string | null) => ({
+      editor,
+      fs,
+      borrow: borrowing(edit),
+      chord: "⌥o",
+    });
+
+    // No editor: refused, and nothing ran.
+    expect(await openChipInEditor(chip, deps(null, (t) => t))).toEqual({ kind: "refused", text: NO_EDITOR });
+    expect(calls, "nothing was lent the terminal").toEqual([]);
+
+    // A change: the content back, its lines recounted — and the path is `$1`,
+    // never text in the command.
+    const changed = await openChipInEditor(chip, deps("vi -n", (t) => t.replace("b\n", "")));
+    expect(changed).toEqual({ kind: "changed", content: "a\nc", lines: 2 });
+    expect(calls[0]?.slice(0, 4)).toEqual(["sh", "-c", 'vi -n "$1"', "sh"]);
+    const path = calls[0]?.[4] ?? "";
+    await expect(fs.readFile(path), "the directory went with its file").rejects.toThrow(/ENOENT/u);
+
+    // **An editor's final newline is the file's**: written back with one added
+    // and nothing else, the chip is unchanged.
+    expect(await openChipInEditor(chip, deps("vi", (t) => `${t}\n`))).toEqual({ kind: "unchanged" });
+    expect(await openChipInEditor(chip, deps("vi", () => null))).toEqual({ kind: "unchanged" });
+
+    // Busy: refused naming the verb, and the directory is still removed.
+    const busy = await openChipInEditor(chip, {
+      editor: "vi",
+      fs,
+      borrow: async () => ({ kind: "busy" as const, verb: "deploy" }),
+      chord: "⌥o",
+    });
+    expect(busy).toEqual({ kind: "refused", text: "deploy is still running, and ⌥o waits for it" });
+
+    // A throw from the loan: the directory is removed before it propagates.
+    let thrownPath = "";
+    await expect(
+      openChipInEditor(chip, {
+        editor: "vi",
+        fs,
+        borrow: async (argv) => {
+          thrownPath = argv[4] ?? "";
+          throw new Error("handoff refused");
+        },
+        chord: "⌥o",
+      }),
+    ).rejects.toThrow("handoff refused");
+    await expect(fs.readFile(thrownPath), "removed on the throwing path too").rejects.toThrow(/ENOENT/u);
+
+    // A target opens the target, as `$1`, and nothing comes back.
+    calls.length = 0;
+    const opened = await openChipInEditor(
+      { ...chip, target: "/work/notes.md" },
+      {
+        editor: "code -w",
+        fs,
+        borrow: async (argv) => {
+          calls.push(argv);
+          return { kind: "ran" as const, exit: { code: 0, signal: null } };
+        },
+        chord: "⌥o",
+      },
+    );
+    expect(opened).toEqual({ kind: "opened" });
+    expect(calls).toEqual([["sh", "-c", 'code -w "$1"', "sh", "/work/notes.md"]]);
+  });
 });

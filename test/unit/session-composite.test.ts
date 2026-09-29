@@ -15,6 +15,9 @@ import { describe, expect, it } from "vitest";
 import { compose, type Composed } from "../../src/shell/frame.js";
 import { composeFrame, type FrameResult } from "../../src/shell/render-frame.js";
 import { cursorFor, paint, type PaintDeps } from "../../src/shell/paint.js";
+import { composite, layerLines, UNSCROLLED } from "../../src/shell/composite.js";
+import { ChromeCache } from "../../src/shell/chrome-cache.js";
+import { block, NO_PROBE } from "../../src/data/viewmodel/index.js";
 import { FrameError } from "../../src/shell/frame-error.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { createOverlayManager, type Placed } from "../../src/viewport/overlay/index.js";
@@ -632,7 +635,48 @@ describe("C22 §6b — the diff's leading reset (C22 I57)", () => {
 });
 
 describe("C22 §6q — a scroll box inside a layer scrolls (F1302), owed at the spec commit", () => {
-  it.todo(
-    "T1.174 (C22 I141, F1302): a layer holding a twelve-line scroll box in four rows draws lines 4–7 through composite and through the replacing prompt slot with its layer namespace at 3, lines 1–4 at 0, the chrome cache missing once on the scrolled frame; scrollLayer moves the box and not the layer offset — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
-  );
+  it("T1.174 (C22 I141, F1302): a box inside a layer draws from its offset, and the chrome cache keys on it", () => {
+    const registry = createBlockRegistry({ defaults: true });
+    const lines = Array.from({ length: 12 }, (_, i) => `line ${String(i + 1)}`).join("\n");
+    const content = [
+      block({ kind: "scroll", id: "box", height: 4, children: [block({ kind: "code", id: "c", language: "text", text: lines })] }),
+    ];
+    const misses: string[] = [];
+    const probe = { ...NO_PROBE, miss: (cache: string, reason: string) => void misses.push(`${cache}:${reason}`) };
+    const chrome = new ChromeCache(probe as never);
+    const deps = { registry, theme: DARK_THEME, capabilities: FULL_CAPS, chrome };
+    const text = (rows: readonly string[]): string[] => rows.map((r) => visible(r).replace(/\s*[┃│▐█▌|#]?\s*$/u, "").trim());
+
+    // Unscrolled: the frame it always was, and a miss for the absent slot.
+    const top = layerLines(content, 30, deps, UNSCROLLED);
+    expect(text(top).slice(0, 4)).toEqual(["line 1", "line 2", "line 3", "line 4"]);
+    expect(layerLines(content, 30, deps, UNSCROLLED), "held").toBe(top);
+    expect(misses).toEqual(["chrome:absent"]);
+
+    // Scrolled by three: lines 4–7, **and one miss** — the same array, width
+    // and theme, so without the view axis the cache would serve the top.
+    const view = { offsets: { box: 3 }, key: "box=3", focus: null };
+    const scrolled = layerLines(content, 30, deps, view);
+    expect(text(scrolled).slice(0, 4)).toEqual(["line 4", "line 5", "line 6", "line 7"]);
+    expect(misses).toEqual(["chrome:absent", "chrome:focus"]);
+    expect(layerLines(content, 30, deps, view), "held at the view").toBe(scrolled);
+
+    // **Through the compositor with the same view** — `layerRows` reads
+    // `layerView` by id, so the placed layer draws what the prompt slot does.
+    const manager = createOverlayManager({ registry: measurer });
+    manager.push({ ...anchored("L", 6, { row: 8, prefer: "above" }, { width: 30 }), content } as never);
+    const placed = manager.layout({ width: 40, height: 10 });
+    const base = Array.from({ length: 12 }, () => " ".repeat(40));
+    const drawn = composite(base, placed, {
+      registry,
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      columns: 40,
+      regionTop: 1,
+      region: { width: 40, height: 10 },
+      layerView: (id: string) => (id === "L" ? view : UNSCROLLED),
+    } as never);
+    expect(drawn.map((r) => visible(r)).join("\n"), "the compositor draws the scrolled rows").toContain("line 4");
+    expect(drawn.map((r) => visible(r)).join("\n")).not.toContain("line 1 ");
+  });
 });

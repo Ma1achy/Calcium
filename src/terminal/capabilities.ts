@@ -92,6 +92,12 @@ export type TerminalCapabilities = Readonly<{
    * a consumer says *sent to the terminal's clipboard* and not *copied*.
    */
   clipboard: "none" | "osc52";
+  /**
+   * The reader's editor command (I19): `$VISUAL`, else `$EDITOR`, else `null`.
+   * A command line, handed to a shell whole — C22 I144's `⌥o` runs it with the
+   * file as an argument, never as text in the command.
+   */
+  editor: string | null;
 }>;
 
 /** §014's three rungs (C22 I128). */
@@ -226,6 +232,11 @@ export const DEGRADATION: Readonly<
   clipboard: Object.freeze({
     behaviour:
       "A copy goes to a platform clipboard tool when one is found (C21 I20); otherwise the reader is offered a file and told so. Nothing is ever claimed as copied that was not",
+    owner: "L4",
+  }),
+  editor: Object.freeze({
+    behaviour:
+      "The chip preview's open key says `no editor — set $VISUAL or $EDITOR` and runs nothing; the chip stays in the prompt as it was",
     owner: "L4",
   }),
 });
@@ -592,7 +603,17 @@ function detect(env: Readonly<NodeJS.ProcessEnv>): Answers {
     // The same `terminal`, so the same gate (I11, I18): tmux's default
     // `set-clipboard external` ignores an application's OSC 52.
     clipboard: fromIdentity(identified, terminal, CLIPBOARD, "none"),
+    // **Not gated by `usable` or `TMUX`** (I19, §3's boundary): the rule is
+    // derived from neither `TERM` nor the identification. `read` treats an
+    // empty string as unset, so `VISUAL=""` falls through to `EDITOR`.
+    editor: detectEditor(read(env, "VISUAL"), read(env, "EDITOR")),
   };
+}
+
+/** I19 — `$VISUAL`, else `$EDITOR`: `stated` when either speaks, `null` and `assumed` when neither does. */
+function detectEditor(visual: string | undefined, editor: string | undefined): Answer<string | null> {
+  const said = visual ?? editor;
+  return said === undefined ? [null, "assumed"] : [said, "stated"];
 }
 
 /**
@@ -685,6 +706,8 @@ const VALIDATORS: Readonly<Record<keyof TerminalCapabilities, (v: unknown) => bo
     notify: (v: unknown) =>
       Array.isArray(v) && v.every((r) => (NOTIFY_RUNGS as readonly unknown[]).includes(r)),
     clipboard: oneOf("none", "osc52"),
+    // A declared editor is a non-empty command line, or `null` for none (I19).
+    editor: (v: unknown) => v === null || (typeof v === "string" && v.trim() !== ""),
   });
 
 const FIELDS = Object.keys(VALIDATORS) as (keyof TerminalCapabilities)[];

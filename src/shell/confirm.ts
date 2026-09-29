@@ -30,6 +30,8 @@ import { questionNotice, warnNotice } from "./documents.js";
 import { questionConsumer, routingFor } from "./question-routing.js";
 import { cells } from "../presentation/text.js";
 import { createChoiceSelection, defaultStart } from "./choice-selection.js";
+import { chordText } from "../interaction/router/keymap.js";
+import type { FocusState } from "../presentation/blocks/types.js";
 
 export const CONFIRM_LAYER_ID = "confirm";
 
@@ -50,6 +52,11 @@ export const QUESTION_KEYS = Object.freeze({
   next: Object.freeze(["down", "right", "tab"]),
   answer: Object.freeze(["return", "enter"]),
   leave: Object.freeze(["escape"]),
+  /**
+   * An inspection's own keys (C23 I88): a row each way, a page each way. Bare
+   * only — `⌥↑`/`⌥↓` are C16's page-scroll intercept and never arrive here.
+   */
+  scroll: Object.freeze({ up: "up", down: "down", pageUp: "pageup", pageDown: "pagedown" }),
   shown: Object.freeze({ move: Object.freeze(["left", "right"]), answer: "enter", leave: "escape" }),
 });
 
@@ -137,6 +144,22 @@ export type ConfirmDeps = Readonly<{
   overlayRegion: () => Readonly<{ width: number; height: number }>;
   /** The frame is L4's to commit; C15 never paints (A02 Seam 4). */
   invalidate: () => void;
+  /**
+   * The inspection's box, moved in `ScrollOffsets` under the layer's namespace
+   * (C23 I88, C22 I141). `by` clamps against the box's ceiling at the width it
+   * is drawn at, which only L4 can measure; `reset` drops the namespace, so an
+   * entry into the inspection opens at its top. Absent in a harness with no
+   * store: the keys are then consumed and nothing moves.
+   */
+  inspectionBox?: Readonly<{ by: (boxId: string, rows: number) => void; reset: () => void }>;
+  /**
+   * The rows of the slot a replacing question is drawn in (C22 I142, S01 §3's
+   * cap) — what the inspection's box is sized to, less the panel's chrome
+   * (C23 I88). Absent, the region's height stands in.
+   */
+  slotRows?: () => number;
+  /** Whether the terminal draws Unicode — the rung the key row is spelled at (C16 I58). Absent is Unicode. */
+  unicode?: () => boolean;
 }>;
 
 export interface ConfirmHost {
@@ -172,6 +195,12 @@ export interface ConfirmHost {
   refuse(): void;
   /** What the owner line reads of the open question, or `null` (C22 I133). */
   vocabulary(): QuestionVocabulary | null;
+  /**
+   * The box layer `id`'s keys move, as a render focus, or `null` (C23 I88,
+   * C22 I141) — the inspection's box while the question is suspended, so its
+   * thumb is `accent` as a focused container's is (`R-BLK-160`).
+   */
+  focusedBox(id: string): FocusState | null;
   /** Whether a question is open — C22 refuses a submission while one is. */
   readonly open: boolean;
   /**
@@ -319,18 +348,26 @@ function truncated(deps: ConfirmDeps): boolean {
  * the tail cut off — which is the failure `render`'s cut arm exists to avoid
  * one level up.
  */
-function inspection(opts: AskOptions, rows: number): readonly Block[] {
+/** The inspection's box — the one its keys and the wheel move (C23 I88). */
+export const INSPECTION_BOX_ID = "confirm-source";
+
+function inspection(opts: AskOptions, rows: number, unicode: boolean): readonly Block[] {
+  const k = QUESTION_KEYS.scroll;
+  // **Spelled at the terminal's rung** (C16 I58, C23 I88): `↑↓` at Unicode and
+  // `Up/Down` in text names — `chordText`'s pair rule, the owner line's own.
+  const move = [k.up, k.down].map((name) => chordText({ name }, unicode)).join(unicode ? "" : "/");
+  const leave = chordText({ name: QUESTION_KEYS.leave[0]! }, unicode);
   const children: Block[] = [
     questionNotice(opts.question, "confirm-question"),
     block({
       kind: "scroll",
-      id: "confirm-source",
+      id: INSPECTION_BOX_ID,
       // At least one row: a region too small to hold anything still has to
       // draw a box, and a height of 0 is a box C04 refuses.
       height: Math.max(1, rows), // cells-ok — a row count
       children: opts.detail === undefined ? [] : [opts.detail],
     }),
-    block({ kind: "raw", id: "confirm-leave", text: "esc  back to the question" }),
+    block({ kind: "raw", id: "confirm-leave", text: `${move} scroll  ${leave} back to the question` }),
   ];
   return [block({ kind: "panel", id: "confirm-panel", title: "Confirm", children })];
 }
@@ -423,7 +460,7 @@ function placementOf(
  * here, and `handler` and the predicate both read it rather than each carrying a
  * copy of the same four cases.
  */
-type Meaning = "resolve" | "move" | "compose" | "leave" | "none";
+type Meaning = "resolve" | "move" | "compose" | "leave" | "scroll" | "none";
 
 export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
   let handler: ((e: InputEvent) => boolean | Verdict) | null = null;
@@ -447,8 +484,16 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
    * is singular.
    */
   let suspended = false;
+  /** The inspection box's interior, for a page (C23 I88); set on each suspend. */
+  let interior = 1;
 
   return {
+    focusedBox(id) {
+      return suspended && handler !== null && id === CONFIRM_LAYER_ID
+        ? { blockId: INSPECTION_BOX_ID, rowId: null }
+        : null;
+    },
+
     get open() {
       return handler !== null;
     },
@@ -606,12 +651,30 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
          */
         const suspend = (): boolean => {
           suspended = true;
+          // **Every entry is an arrival** (C23 I88): the box opens at its top,
+          // and a content update keeps the namespace (C22 I141), so the reset
+          // is this owner's to make.
+          deps.inspectionBox?.reset();
+          // Bounded by the room rather than by a constant: the payload is
+          // here because it did not fit, so the figure that matters is how
+          // much room there is. **The room is the prompt's slot** (C22 I142):
+          // a replacing question is drawn there, and a box sized to the region
+          // made a panel taller than the slot, whose cut took the key row and
+          // the bottom border — a finding recorded with this lane.
+          interior = Math.max(1, (deps.slotRows?.() ?? deps.overlayRegion().height) - 6); // cells-ok — the panel's own chrome
           deps.overlays.update(CONFIRM_LAYER_ID, {
-            // Bounded by the region rather than by a constant: the payload is
-            // here because it did not fit, so the figure that matters is how
-            // much room there is.
-            content: inspection(opts, Math.max(1, deps.overlayRegion().height - 6)), // cells-ok — the panel's own chrome
+            content: inspection(opts, interior, deps.unicode?.() ?? true),
           });
+          deps.invalidate();
+          return true;
+        };
+
+        /** `↑`/`↓` a row, `PgUp`/`PgDn` the interior less one, floored at 1 (C23 I88). */
+        const scrollInspection = (name: string): boolean => {
+          const k = QUESTION_KEYS.scroll;
+          const page = Math.max(1, interior - 1);
+          const rows = name === k.up ? -1 : name === k.down ? 1 : name === k.pageUp ? -page : page;
+          deps.inspectionBox?.by(INSPECTION_BOX_ID, rows);
           deps.invalidate();
           return true;
         };
@@ -677,7 +740,13 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
           // it leaves the inspection and not the request, so it cannot be a
           // `resolve` here — and no accelerator answers, because the reader is
           // reading the evidence rather than choosing between answers.
-          if (suspended) return is(QUESTION_KEYS.leave) ? "leave" : "none";
+          if (suspended) {
+            if (is(QUESTION_KEYS.leave)) return "leave";
+            // **And its payload's scrolling** (C23 I88, `R-BLK-840`). Bare keys
+            // only: a modified arrow is someone else's chord.
+            const bareKey = !ctrl && !e.key.meta && !e.key.shift;
+            return bareKey && (Object.values(QUESTION_KEYS.scroll) as readonly string[]).includes(name) ? "scroll" : "none";
+          }
           if (is(QUESTION_KEYS.leave)) return "resolve";
           // **A bare `⏎` answers a reply; a modified one is the line's** (§052:
           // *⏎ submit   ⇧⏎ newline*, C16 I54). Before `reply…` there is no line,
@@ -742,6 +811,8 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
               }
             case "leave":
               return leaveInspection();
+            case "scroll":
+              return scrollInspection(name);
             case "compose":
               // **Not consumed, and passed to the shell's forward** (C16 I54).
               // This comment said C16 handed the `false` down the ladder to the

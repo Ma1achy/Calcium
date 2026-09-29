@@ -49,6 +49,8 @@ import type { Choice } from "../../src/shell/local/registry.js";
 import { ASCII_CAPS, measurable, visible } from "../support/render.js";
 import type { OverlayManager } from "../../src/viewport/overlay/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
+import { buildSession } from "../support/session.js";
+import { fakeStdin } from "../support/fake-terminal.js";
 
 /**
  * The confirm's layer, rendered — the frame rather than the blocks.
@@ -895,8 +897,75 @@ describe("C23 I82 — a question refuses once and says so (review batch 2, M5)",
   });
 });
 
-describe("C23 I88 — the inspection scrolls in a built session, owed at the spec commit", () => {
-  it.todo(
-    "T4.88 (C23 I88, C22 I141, C22 I142): an approval overflowing its region; show full diff; down three times puts line 4 first in the prompt slot, the question unresolved, and the last row names the scroll keys — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
-  );
+describe("C23 I88 — the inspection scrolls in a built session", () => {
+  it("T4.88 (C23 I88, C22 I141, C22 I142): an approval overflowing its region; show full diff; down three times puts line 4 first in the prompt slot, the question unresolved, and the last row names the scroll keys", async () => {
+    const stdin = fakeStdin();
+    let answered: unknown = null;
+    const s = await buildSession(
+      {
+        stdin: stdin as never,
+        manifest: {
+          schema: "tui.manifest/1",
+          binary: "prism",
+          version: "1.0.0",
+          tools: [{ name: "apply", local: true, summary: "apply", args: [], flags: [] }],
+        },
+        localHandlers: {
+          apply: async (_argv: unknown, ctx: { ask: (o: unknown) => Promise<unknown> }) => {
+            answered = await ctx.ask({
+              question: "Apply the patch?",
+              detail: block({
+                kind: "raw",
+                id: "d",
+                text: Array.from({ length: 30 }, (_, i) => `patch line ${String(i + 1)}`).join("\n"),
+              }),
+              choices: [
+                { key: "n", label: "no", default: true },
+                { key: "s", label: "show full diff", inspect: true },
+              ],
+            });
+            return { schema: "tui.view/1", status: "ok", blocks: [] };
+          },
+        },
+      } as never,
+      { columns: 80, rows: 30 },
+    );
+    const flush = async (): Promise<void> => {
+      for (let i = 0; i < 4; i += 1) await Promise.resolve();
+      await new Promise((r) => setTimeout(r, 20));
+    };
+    // One byte at a time: a run arriving together is a paste (C16 §7).
+    for (const ch of "/apply\r") {
+      stdin.emit(ch);
+      await flush();
+    }
+    // `→` ends C16 I44's arrival guard; `s` suspends into the inspection.
+    stdin.emit("\u001b[C");
+    await flush();
+    stdin.emit("s");
+    await flush();
+    const text = (): readonly string[] => s.screen().text;
+    const first = (): number => text().findIndex((l) => /patch line \d+\b/u.test(l));
+    const at = first();
+    expect(at, "the payload is drawn").toBeGreaterThanOrEqual(0);
+    expect(text()[at], "at its top").toMatch(/patch line 1\b/u);
+    expect(text().some((l) => l.includes("patch line 30")), "and it overflows").toBe(false);
+
+    for (let i = 0; i < 3; i += 1) {
+      stdin.emit("\u001b[B");
+      await flush();
+    }
+    expect(first(), "the box's first row is where it was").toBe(at);
+    expect(text()[at], "and now reads line 4").toMatch(/patch line 4\b/u);
+    expect(text().some((l) => /patch line 3\b/u.test(l)), "line 3 is above the box").toBe(false);
+    // **In the prompt slot, whole** (C22 I142, C23 I74): the panel sits between
+    // the two rules that bound the prompt's rows, and the slot's cap did not cut
+    // its key row or its bottom border (C23 I88's sizing).
+    const top = text().findIndex((l) => l.startsWith("┌ Confirm"));
+    const bottom = text().findIndex((l, i) => i > at && l.startsWith("└"));
+    const rule = (l: string | undefined) => /^─+$/u.test(l ?? "");
+    expect([rule(text()[top - 1]), rule(text()[bottom + 1])], "between the prompt's two rules").toEqual([true, true]);
+    expect(text()[bottom - 1], "the panel's last row is the key row").toContain("↑↓ scroll  esc back to the question");
+    expect(answered, "the question is unresolved").toBeNull();
+  });
 });

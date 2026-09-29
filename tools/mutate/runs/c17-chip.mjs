@@ -92,8 +92,9 @@ const results = runPass({
       // buffer are indistinguishable and the side map cannot be keyed.
       name: "every chip gets the same sentinel",
       file: EDITOR,
-      from: "    this.#nextSentinel += 1;",
-      to: "",
+      // `#mint`'s increment, by the line after it: `editChip` (C17 I35) has one too.
+      from: "    this.#nextSentinel += 1;\n    this.#ordinal += 1;",
+      to: "    this.#ordinal += 1;",
       expect: "T2.47",
     },
     {
@@ -109,6 +110,23 @@ const results = runPass({
       from: "    this.insert(`${sentinel}${opts?.delimiter ?? \"\"}`, { atomic: true });",
       to: "    this.insert(`${chip.name}${opts?.delimiter ?? \"\"}`, { atomic: true });",
       expect: "T2.41",
+    },
+    {
+      // T6.39 (I35) — the re-mint numbers a new chip: the edited paste takes
+      // the next ordinal rather than keeping its own.
+      name: "the re-mint takes a fresh ordinal",
+      file: EDITOR,
+      from: "{ chip: { ...parts, ordinal: chip.ordinal }, owner: found.owner }",
+      to: "{ chip: { ...parts, ordinal: (this.#ordinal += 1) }, owner: found.owner }",
+      expect: "T1.60",
+    },
+    {
+      // I35, I5 — the re-mint pushes no undo unit: `undo` goes past it.
+      name: "the re-mint is not its own undo unit",
+      file: EDITOR,
+      from: "    // `atomic`: its own unit, closed — the re-mint is one edit (I35, I5).\n    this.#history.edit(this.#snapshot(), \"atomic\");\n",
+      to: "",
+      expect: "T1.60",
     },
   ],
 });

@@ -261,7 +261,7 @@ export function compose(deps: ComposeDeps): Composed {
   // before the height, because `promptRows` is what the height subtracts.
   const content = regionWidth(size.columns);
   const wanted = Math.max(1, deps.promptRows(content, PROMPT_GUTTER));
-  const promptRows = Math.max(1, Math.min(wanted, Math.floor(size.rows / 2)));
+  const promptRows = Math.max(1, Math.min(wanted, promptCap(size.rows)));
 
   // Clamped at zero: a terminal too short for chrome plus a prompt gets a
   // transcript of no rows rather than a negative height that would read as an
@@ -383,4 +383,14 @@ export function gutterMatchesPrompt(): boolean {
   // are compared with each other, and the equality holds under either
   // convention.
   return PROMPT_SUBSTITUTION.every((form) => PROMPT_GUTTER.first === cells(form)); // narrow-ok
+}
+
+/**
+ * The most rows the prompt's slot takes — half the terminal, floored at one
+ * (S01 §3). **One function, two readers**: `compose` caps the prompt with it,
+ * and a replacing question's inspection sizes its box to it (C23 I88), because
+ * that question is drawn in this slot (C22 I142) and not in the region.
+ */
+export function promptCap(rows: number): number {
+  return Math.max(1, Math.floor(rows / 2)); // cells-ok — a row count
 }

@@ -93,6 +93,7 @@ export const FULL_CAPS: TerminalCapabilities = Object.freeze({
   renderMode: "rich",
   notification: "none",
   clipboard: "none",
+  editor: null,
   notify: [],
 });
 

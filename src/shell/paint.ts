@@ -44,8 +44,8 @@ import {
 } from "../presentation/blocks/paint.js";
 import { SGR_RESET, sgr, sgrPattern } from "../terminal/escapes.js";
 import { HEADER_ROWS, HEADER_RULE_ROWS, MIN_COLUMNS, promptFor, PROMPT_GUTTER } from "./config.js";
-import { glyphs } from "../presentation/blocks/index.js";
-import { composite } from "./composite.js";
+import { glyphs, scrollbarColumn, scrollbarSet } from "../presentation/blocks/index.js";
+import { composite, type LayerView } from "./composite.js";
 import type { ChromeCache, ChromeRole } from "./chrome-cache.js";
 import { exact, FrameError } from "./frame-error.js";
 import { gutterMatchesPrompt, heightsSum, promptTop, type Composed } from "./frame.js";
@@ -54,7 +54,7 @@ import type { Block } from "../data/viewmodel/index.js";
 import type { Placed } from "../viewport/overlay/index.js";
 import type { Cell, CellSpan } from "../interaction/editor/index.js";
 import type { BlockRegistry } from "../presentation/blocks/index.js";
-import { resolveBase, resolveHueBand } from "../presentation/theme/index.js";
+import { resolveBase, resolveHueBand, resolveTone } from "../presentation/theme/index.js";
 import type { ResolvedTheme } from "../presentation/theme/index.js";
 import type { Style } from "../presentation/theme/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
@@ -104,6 +104,17 @@ export type PaintDeps = Readonly<{
    * is *every layer at its top*, which is every frame nobody has wheeled.
    */
   layerScroll?: (id: string) => number;
+  /**
+   * A layer's boxes' offsets and the box its keys move (C22 I141). Absent is
+   * every layer unscrolled.
+   */
+  layerView?: (id: string) => LayerView;
+  /**
+   * C14's scroll, for the transcript's bar (C14 I62), and whether focus is in
+   * the transcript — the thumb's tone. Absent draws no bar, which is a harness
+   * that paints a frame with no viewport behind it.
+   */
+  transcriptBar?: () => Readonly<{ topRow: number; totalRows: number; focused: boolean }>;
   /** C17's cursor as a cell in the prompt's own layout (C17 §2). */
   promptCursor: () => Cell;
   /** The session's render scratch (C12 I107), for a 3D plot inside a layer. */
@@ -1028,6 +1039,7 @@ export function paint(
       columns: width,
       ...(deps.scratch === undefined ? {} : { scratch: deps.scratch }),
       ...(deps.layerScroll === undefined ? {} : { layerScroll: deps.layerScroll }),
+      ...(deps.layerView === undefined ? {} : { layerView: deps.layerView }),
     });
   }
 
@@ -1161,5 +1173,37 @@ function transcript(frame: Composed, deps: PaintDeps, width: number): readonly s
   for (let i = 0; i < frame.region.height - blank; i += 1) {
     out.push(exact(rows[i] ?? "", width));
   }
-  return out;
+  return withTranscriptBar(out, frame, deps, width);
+}
+
+/**
+ * The transcript's bar, on the margin column (C14 I62, `R-BLK-164`).
+ *
+ * **The margin is the one column no row writes** (C22 I109), so the bar costs
+ * no reflow and no measurement: each region row is already `width` cells, and
+ * its last cell is replaced. `scrollbarColumn` answers `null` for a transcript
+ * that fits — *a bar that cannot move is decoration* — and nothing changes.
+ * The set and the arithmetic are a `scroll` box's own (C09 §7f), and the thumb
+ * takes `accent` while focus is in the transcript, `muted` otherwise
+ * (`R-BLK-160`), the whole column at one tone as §021 draws it.
+ */
+function withTranscriptBar(
+  rows: string[],
+  frame: Composed,
+  deps: PaintDeps,
+  width: number,
+): string[] {
+  const scroll = deps.transcriptBar?.();
+  if (scroll === undefined || width < 2) return rows;
+  const column = scrollbarColumn(frame.region.height, scroll.totalRows, scroll.topRow, scrollbarSet(deps.capabilities));
+  if (column === null) return rows;
+  const ink = sgr(resolveTone(scroll.focused ? "accent" : "muted", deps.theme, deps.capabilities));
+  const amb = deps.capabilities.ambiguousWidth;
+  const inner = width - 1; // cells-ok — a width less its margin column
+  // `fitStyled` after the cut: a wide cluster straddling the margin is cut
+  // whole and padded, so the bar is always the row's last cell.
+  return rows.map(
+    (row, i) =>
+      `${fitStyled(sliceCells(row, 0, inner, amb), inner, SGR_RESET, amb)}${SGR_RESET}${ink}${column[i] ?? ""}${SGR_RESET}`,
+  );
 }

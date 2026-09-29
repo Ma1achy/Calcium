@@ -114,6 +114,15 @@ export type KeyDeps = Readonly<{
     open: (n?: number) => void;
   }>;
   /**
+   * The chip preview's keys (C22 I143, I144) — the composition root's, because
+   * the layer, the store and the editor are all there. Each asks whether the
+   * preview is the panel on top, and does nothing when it is not.
+   */
+  previewKeys: Readonly<{
+    scroll: (rows: 1 | -1) => void;
+    open: () => void;
+  }>;
+  /**
    * Send the prompt's line, for its `⏎` (C22 I133, ruling 63).
    *
    * **Not `submit`**, which takes a line: this sends the line the editor holds,
@@ -809,6 +818,10 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     watchJump7: () => void deps.watchKeys.open(7),
     watchJump8: () => void deps.watchKeys.open(8),
     watchJump9: () => void deps.watchKeys.open(9),
+    // --- the chip preview (C22 I143, I144) ---------------------------------
+    previewScrollUp: () => void deps.previewKeys.scroll(-1),
+    previewScrollDown: () => void deps.previewKeys.scroll(1),
+    previewOpen: () => void deps.previewKeys.open(),
     agentNext: reserved,
     agentPrevious: reserved,
     agent1: reserved,

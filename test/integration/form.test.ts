@@ -266,8 +266,10 @@ describe("C22 I118 — a form in a session", () => {
       // a chord and then an action the table binds, and nothing else on this
       // frame has that shape.
       const actions = new Set<string>(defaultKeymap.map((b) => b.action));
+      // Less the margin column, where the transcript's bar is drawn while the
+      // listing overflows (C14 I62).
       const listed = p.rows().filter((r) => {
-        const m = /│\s+\S+\s+(\w+)\s*$/u.exec(r);
+        const m = /│\s+\S+\s+(\w+)\s*$/u.exec([...r].slice(0, -1).join(""));
         return m !== null && actions.has(m[1] ?? "");
       });
       expect(listed.length, "F1 answers inside a field").toBeGreaterThan(0);

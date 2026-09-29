@@ -173,6 +173,7 @@ describe("C02 fail-on-revert", () => {
       notification: "inferred",
       notify: "assumed",
       clipboard: "inferred",
+      editor: "assumed",
     };
 
     // It agrees with the real thing on the environment it was written from…
@@ -183,7 +184,7 @@ describe("C02 fail-on-revert", () => {
     }).sources;
     expect(BESIDE, "the static map agrees where it was written").toEqual({ ...named });
 
-    // …and is wrong for seven of fourteen inside a multiplexer, which is the column
+    // …and is wrong for seven of fifteen inside a multiplexer, which is the column
     // T1.14 asserts and the reason the pair is returned by the rule.
     //
     // **The same locale and `COLORFGBG`**, so the only variable between the two

@@ -13,14 +13,16 @@
  * and shutdown (§8, below).
  */
 
-import { availableParallelism } from "node:os";
-import { dirname } from "node:path";
+import { availableParallelism, tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { appendFileSync, closeSync, mkdirSync, openSync, writeSync } from "node:fs";
 import {
   appendFile,
   mkdir,
+  mkdtemp,
   readdir,
   readFile,
+  rm,
   writeFile,
 } from "node:fs/promises";
 import { resolveConfig, type Ambient, type ResolvedConfig } from "./config.js";
@@ -30,7 +32,7 @@ import type { SemanticMode } from "./semantic-selection.js";
 import { drawFallback, tooSmall } from "./fallback.js";
 import { isUsable } from "../terminal/capabilities.js";
 import { usageText } from "./usage.js";
-import { compose, type Composed } from "./frame.js";
+import { compose, promptCap, type Composed } from "./frame.js";
 import { commandRows, type PaintDeps } from "./paint.js";
 import { transmitFrame, transmits, type SentImages } from "./transmit-image.js";
 import { composeFrame } from "./render-frame.js";
@@ -54,7 +56,7 @@ import type { RenderScratch } from "../presentation/blocks/types.js";
 import { contextAt } from "../interaction/completion/index.js";
 import { chipSpans, cursorCell, layout, selectionSpans, type CellSpan } from "../interaction/editor/index.js";
 import { extentOf } from "../interaction/router/focus.js";
-import { renderSequenceToLines } from "../presentation/render-lines.js";
+import { layerLines } from "./composite.js";
 import { PROMPT_GUTTER, regionWidth, transcriptWidth } from "./config.js";
 import { cursorStyleFor, steadyWhileTyping } from "./cursor-style.js";
 import { autoscrollFor, beginDrag, clampToContainer, type Drag } from "./drag-selection.js";
@@ -106,6 +108,10 @@ const nodeFileSystem: FileSystem = {
       name: e.name,
       directory: e.isDirectory(),
     })),
+  // C22 I144 — `mkdtemp` makes the directory `0700`, so the chip is the
+  // reader's alone while their editor has it.
+  makeTempDir: (prefix) => mkdtemp(join(tmpdir(), prefix)),
+  removeDir: (path) => rm(path, { recursive: true, force: true }),
 };
 
 /**
@@ -1302,13 +1308,21 @@ class Session implements TuiInstance {
   #questionRows(graph: Graph, width: number): readonly string[] | null {
     const layer = graph.confirm.replacing;
     if (layer === null || layer.content.length === 0) return null;
-    const render = (blocks: readonly Block[], w: number): readonly string[] =>
-      renderSequenceToLines(graph.blocks, blocks, w, {
+    // **The compositor's function, with the layer's view** (C22 I141, F1302):
+    // this painter rendered the content with no offsets, so an inspection's
+    // box drew its top whatever the store held.
+    return layerLines(
+      layer.content,
+      width,
+      {
+        registry: graph.blocks,
         theme: graph.theme.current,
         capabilities: graph.capabilities,
         motion: graph.motion,
-      });
-    return graph.chrome.layer(layer.content, width, graph.theme.current.name, render);
+        chrome: graph.chrome,
+      },
+      graph.layerView(layer.id),
+    );
   }
 
   #paintDeps(graph: Graph, frame: Composed): PaintDeps {
@@ -1462,6 +1476,14 @@ class Session implements TuiInstance {
       // where it is painted and nothing else.
       // C16 I74 — where the wheel left each layer.
       layerScroll: (id) => graph.layerScroll(id),
+      // C22 I141 — each layer's boxes' offsets, and the box its keys move.
+      layerView: (id) => graph.layerView(id),
+      // C14 I62 — the transcript's bar, from C14's scroll; the thumb is
+      // `accent` while focus is in the transcript (`R-BLK-160`).
+      transcriptBar: () => {
+        const { topRow, totalRows } = graph.viewport.scroll;
+        return { topRow, totalRows, focused: graph.focus.current.at === "liveBlock" };
+      },
       overlays: () => {
         const replacing = graph.confirm.replacing;
         const placed = graph.overlays.layout(frame.overlayRegion);
@@ -2099,6 +2121,8 @@ class Session implements TuiInstance {
         const f = this.#composed();
         return { row: f.region.height, rows: f.promptRows };
       },
+      // C23 I88 — the slot a replacing question is drawn in, capped as the frame caps it.
+      promptCap: () => promptCap(this.#composed().size.rows),
       mouseEnabled: () => this.#graph?.capabilities.mouse ?? false,
       // Ctrl-C and Ctrl-D raise a confirm; answering it is what stops.
       //

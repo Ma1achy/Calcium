@@ -340,6 +340,15 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // layer is on top — the handler reads `overlays.top`, which is L4's to do and
   // is why C20 adds no fourth row here.
   { target: "panel", key: { name: "r", ctrl: true }, action: "searchOlder" },
+  //
+  // **The chip preview's own three** (C22 I143, C22 I144, `R-KEY-010`, ruling 53
+  // amended). `panel` because the preview is a prompt substate (C15 I29): the
+  // prompt answers first (`promptUnderMenu`) and binds none of these, so they
+  // reach the panel's rows. Over a menu or a search the row resolves too, and
+  // the effect asks the owner — consumed, and nothing moves (§6q.2).
+  { target: "panel", ...fromRegistry("preview.scroll.up"), action: "previewScrollUp" },
+  { target: "panel", ...fromRegistry("preview.scroll.down"), action: "previewScrollDown" },
+  { target: "panel", ...fromRegistry("preview.open"), action: "previewOpen" },
 
   // --- C17, readline's set and no more (I21, C16 §6) -----------------------
   //
@@ -1063,6 +1072,9 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
     watchJump7: true,
     watchJump8: true,
     watchJump9: true,
+    previewScrollUp: true,
+    previewScrollDown: true,
+    previewOpen: true,
     agentNext: true,
     agentPrevious: true,
     agent1: true,

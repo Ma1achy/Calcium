@@ -17,9 +17,13 @@ export { mapRamps } from "./ramp.js";
 export { countdown, elapsed, statusRowsFor } from "./kinds/status.js";
 export { age, barOf, interiorOf, panelInterior } from "./kinds/containers.js";
 export { tapeMemberCols, tapeStart } from "./kinds/tape.js";
+// The transcript's bar is drawn by the shell in the margin column (C14 I62) —
+// the same column arithmetic and the same set a `scroll` box draws with.
+export { scrollbarColumn } from "./scrollbar.js";
 export { defaultButton } from "./kinds/form.js";
 export {
   glyphs,
+  scrollbarSet,
   type GlyphCaps,
   glyphFor,
   glyphCells,

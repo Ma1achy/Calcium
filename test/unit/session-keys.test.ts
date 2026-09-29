@@ -368,6 +368,11 @@ describe("C22 §3 step 11 — the effect table", () => {
       // preview, which is derived from the caret rather than bound to a key —
       // so a scan over key bindings cannot see it and should not.
       "chipAt",
+      // **Driven by the shell after an editor returns** (C17 I35, C22 I144).
+      // `⌥o` is a binding, and it reaches `editChip` through an asynchronous
+      // handoff rather than as the key's effect — the edit is what came back
+      // from `$EDITOR`, which a scan over key bindings cannot see.
+      "editChip",
       // Construction rather than an edit — it records no undo unit and
       // `createEditor` is its only caller (C17 §5).
       "seed",
@@ -406,6 +411,7 @@ describe("C22 §3 step 11 — the effect table", () => {
       runAction: () => undefined,
       focusTranscript: () => undefined,
       watchKeys: { focusPrevious: () => undefined, step: () => undefined, open: () => undefined },
+      previewKeys: { scroll: () => undefined, open: () => undefined },
       // C16 I49 — the child's one exit. Counted here rather than stubbed
       // silent, because this harness is the one that walks every action.
       detachChild: () => undefined,

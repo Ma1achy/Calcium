@@ -2115,6 +2115,33 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       return guard.route;
     },
 
+    /**
+     * `runHandoff`'s five calls with no entry behind them (C22 I144, C23 §4).
+     *
+     * **The same `finally` shape, for A6.5's reason**: a rejection from C21
+     * after the suspend still resumes, resets the decoder and repaints. The
+     * guard is taken for the duration and released on every path — its
+     * `release` drains the queue, so a line typed before the editor opened runs
+     * after it closes, as one typed during a `/tty` line would.
+     */
+    borrowTerminal: async (argv: readonly string[], label: string) => {
+      if (guard.route !== null) return { kind: "busy" as const, verb: guard.verb };
+      guard.take("shell", label);
+      try {
+        deps.lifecycle.suspend();
+        try {
+          const exit = await deps.runner.handoff(argv, { cwd: () => deps.session().cwd });
+          return { kind: "ran" as const, exit };
+        } finally {
+          deps.lifecycle.resume();
+          deps.resetInput();
+          deps.scheduler.invalidate();
+        }
+      } finally {
+        guard.release();
+      }
+    },
+
     cancel: () => {
       // The in-flight invocation first, so the entry settles with what it had
       // (C23 I10), then the guard.

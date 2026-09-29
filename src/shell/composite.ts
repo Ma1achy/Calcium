@@ -35,7 +35,7 @@
  * the other's half.
  */
 
-import { renderSequenceToLines } from "../presentation/render-lines.js";
+import { renderSequenceToLines, type RenderOptions } from "../presentation/render-lines.js";
 import type { ChromeCache } from "./chrome-cache.js";
 import type { Block } from "../data/viewmodel/index.js";
 import type { RenderScratch } from "../presentation/blocks/types.js";
@@ -47,6 +47,60 @@ import type { BlockRegistry } from "../presentation/blocks/index.js";
 import type { ResolvedTheme } from "../presentation/theme/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Probe } from "../data/viewmodel/index.js";
+
+/**
+ * What a layer's content is rendered with besides itself (C22 I141).
+ *
+ * `offsets` is `ScrollOffsets.forEntry("layer:<id>")` and `key` its `key`, so
+ * the chrome cache can tell a scrolled layer from the one it held. `focus` is
+ * the box the layer's keys move, if any — an inspection's (C23 I88) — so the
+ * box's thumb takes `accent` as a focused container's does (`R-BLK-160`).
+ */
+export type LayerView = Readonly<{
+  offsets: Readonly<Record<string, number>>;
+  key: string;
+  focus: RenderOptions["focus"];
+}>;
+
+/** The view of a layer nothing has scrolled or focused — and of one with no store behind it. */
+export const UNSCROLLED: LayerView = Object.freeze({ offsets: Object.freeze({}), key: "", focus: null });
+
+/**
+ * A layer's rows at `width`, through the chrome cache when there is one (C22
+ * I102, I141) — **one function for both of a layer's painters**, the
+ * compositor and the prompt slot a replacing question is drawn in (C23 I74).
+ * Two copies of this were one with offsets and one without, which is F1302.
+ */
+export function layerLines(
+  content: readonly Block[],
+  width: number,
+  deps: Readonly<{
+    registry: BlockRegistry;
+    theme: ResolvedTheme;
+    capabilities: TerminalCapabilities;
+    chrome?: ChromeCache;
+    scratch?: RenderScratch;
+    probe?: Probe;
+    motion?: RenderOptions["motion"];
+  }>,
+  view: LayerView = UNSCROLLED,
+): readonly string[] {
+  if (content.length === 0) return [];
+  const render = (blocks: readonly Block[], w: number): readonly string[] =>
+    renderSequenceToLines(deps.registry, blocks, w, {
+      theme: deps.theme,
+      capabilities: deps.capabilities,
+      ...(deps.motion === undefined ? {} : { motion: deps.motion }),
+      ...(view.focus === null || view.focus === undefined ? {} : { focus: view.focus }),
+      ...(view.key === "" ? {} : { scrollOffsets: view.offsets }),
+      ...(deps.scratch === undefined ? {} : { scratch: deps.scratch }),
+      ...(deps.probe === undefined ? {} : { probe: deps.probe }),
+    });
+  const viewKey = `${view.key}|${view.focus?.blockId ?? ""}`;
+  return deps.chrome === undefined
+    ? render(content, width)
+    : deps.chrome.layer(content, width, deps.theme.name, render, viewKey === "|" ? "" : viewKey);
+}
 
 export type CompositeDeps = Readonly<{
   registry: BlockRegistry;
@@ -60,6 +114,12 @@ export type CompositeDeps = Readonly<{
    * clamped here to the lines there are, as `offsetOf` clamps a `scroll` box.
    */
   layerScroll?: (id: string) => number;
+  /**
+   * A layer's view state — its boxes' offsets and what holds its keys (C22
+   * I141). Absent is every layer unscrolled, which is the frame this drew
+   * before the store had a namespace for layers.
+   */
+  layerView?: (id: string) => LayerView;
   /**
    * C28's seam (I30). Absent is not recording, and that is the usual case.
    */
@@ -162,21 +222,11 @@ export function composite(
  * whole (I29).
  */
 function layerRows(p: Placed, deps: CompositeDeps): readonly string[] {
-  const render = (blocks: readonly Block[], width: number): readonly string[] =>
-    renderSequenceToLines(deps.registry, blocks, width, {
-      theme: deps.theme,
-      capabilities: deps.capabilities,
-      ...(deps.scratch === undefined ? {} : { scratch: deps.scratch }),
-      ...(deps.probe === undefined ? {} : { probe: deps.probe }),
-    });
-  // **Once per content** (C22 I102): a layer's owner replaces the array when
-  // the content changes, and that identity is the key.
-  const lines =
-    p.layer.content.length === 0
-      ? []
-      : deps.chrome === undefined
-        ? render(p.layer.content, p.width)
-        : deps.chrome.layer(p.layer.content, p.width, deps.theme.name, render);
+  // **Once per content and view** (C22 I102, I141): a layer's owner replaces
+  // the array when the content changes, and that identity is the key — with
+  // the offsets beside it, because a box scrolled inside a layer changes the
+  // rows and not the array.
+  const lines = layerLines(p.layer.content, p.width, deps, deps.layerView?.(p.layer.id) ?? UNSCROLLED);
 
   const from = Math.min(deps.layerScroll?.(p.layer.id) ?? 0, Math.max(0, lines.length - p.height));
   const out: string[] = [];

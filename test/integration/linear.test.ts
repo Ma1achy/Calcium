@@ -105,7 +105,7 @@ describe("C22 §6m — a linear session", () => {
       expect(at, "the start").toBeGreaterThan(-1);
       expect(out.slice(at, at + 4)).toEqual([
         "entry 1 of 1: /capabilities",
-        "entry 1: /capabilities — succeeded, 14 rows", // one row per C02 field; C02 I18 added `clipboard`
+        "entry 1: /capabilities — succeeded, 15 rows", // one row per C02 field; C02 I18 added `clipboard`
         "table",
         "field  value  source",
       ]);

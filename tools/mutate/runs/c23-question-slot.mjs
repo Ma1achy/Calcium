@@ -254,8 +254,10 @@ const results = runPass({
       // still reading — and reads on screen as the box simply closing.
       name: "escape inside an inspection resolves the question",
       file: CONFIRM,
-      from: '          if (suspended) return is(QUESTION_KEYS.leave) ? "leave" : "none";',
-      to: '          if (false) return "leave";',
+      // Re-anchored for C23 I88: the inspection's branch now also classifies
+      // its scrolling keys, and `leave` is its first line.
+      from: '            if (is(QUESTION_KEYS.leave)) return "leave";\n',
+      to: '',
       expect: "T1.70",
     },
     {
@@ -264,8 +266,8 @@ const results = runPass({
       // moment it matters.
       name: "a key that is not a choice opens the source",
       file: CONFIRM,
-      from: "          if (suspended) return is(",
-      to: '          if (!suspended && e.key.name === "tab") { suspend(); return "none"; }\n          if (suspended) return is(',
+      from: "          if (suspended) {\n            if (is(QUESTION_KEYS.leave))",
+      to: '          if (!suspended && e.key.name === "tab") { suspend(); return "none"; }\n          if (suspended) {\n            if (is(QUESTION_KEYS.leave))',
       expect: "T1.70b",
     },
     {

@@ -16,7 +16,11 @@ import { fsIo, report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CONSTRUCT = "src/shell/construct.ts";
 const EDITOR = "src/interaction/editor/editor.ts";
-const FILES = "test/unit/chip-preview.test.ts test/unit/chip-form.test.ts";
+const CHIP_EDITOR = "src/shell/chip-editor.ts";
+const INTERCEPTS = "src/interaction/router/intercepts.ts";
+const FILES =
+  "test/unit/chip-preview.test.ts test/unit/chip-form.test.ts test/integration/chip-preview.test.ts " +
+  "test/unit/router-dispatch.test.ts";
 
 const { read, write } = fsIo(ROOT);
 const run = () => {
@@ -51,8 +55,8 @@ const results = runPass({
       // panel's own content would show it.
       name: "THE DEFECT: the preview is not dismissed when the caret leaves the chip",
       file: CONSTRUCT,
-      from: "      previewed = null;\n      if (have) stores.overlays.dismiss(CHIP_PREVIEW_ID);\n      return;",
-      to: "      previewed = null;\n      return;",
+      from: "      previewScrolls = false;\n      if (have) stores.overlays.dismiss(CHIP_PREVIEW_ID);\n      return;",
+      to: "      previewScrolls = false;\n      return;",
       expect: "T1.69",
     },
     {
@@ -115,6 +119,41 @@ const results = runPass({
       from: "      title: chipLabel(chip, chipLook),",
       to: "      title: \"Chip\",",
       expect: "T1.69",
+    },
+    {
+      // T6.144 (C22 I143) — the preview's content the bare `code` block again:
+      // no box, no bar, nothing for the chords to move.
+      name: "the preview's content is the bare code block, not a box",
+      file: CONSTRUCT,
+      from: "    makeBlock({\n      kind: \"scroll\",\n      id: PREVIEW_BOX_ID,\n      height,\n      children: [makeBlock({ kind: \"code\", id: \"chip-preview-content\", language: \"text\", text: chip.content })],\n    });\n",
+      to: "    makeBlock({ kind: \"code\", id: \"chip-preview-content\", language: \"text\", text: chip.content });\n",
+      expect: "T1.175",
+    },
+    {
+      // T6.145 (C22 I144) — the read-back dropped: the editor ran and nothing returns.
+      name: "the edited file is never read back",
+      file: CHIP_EDITOR,
+      from: "    const read = await deps.fs.readFile(path);\n",
+      to: "    const read = chip.content;\n",
+      expect: "T1.176",
+    },
+    {
+      // C22 I144, ruling 9 — the editor's added newline kept, so an unchanged
+      // file is a changed chip.
+      name: "an editor's added final newline is kept",
+      file: CHIP_EDITOR,
+      from: "!chip.content.endsWith(\"\\n\") && read.endsWith(\"\\n\")",
+      to: "false",
+      expect: "T1.176",
+    },
+    {
+      // C16 T6.65 (I40) — the intercept reads *meta and an arrow* again, and
+      // takes the preview's `⌥⇧` chords before the ladder.
+      name: "the page-scroll intercept takes ⌥⇧↑/⌥⇧↓",
+      file: INTERCEPTS,
+      from: "  return key.meta && !key.shift && !key.ctrl && (key.name === \"up\" || key.name === \"down\");\n",
+      to: "  return key.meta && (key.name === \"up\" || key.name === \"down\");\n",
+      expect: "T1.200",
     },
   ],
 });

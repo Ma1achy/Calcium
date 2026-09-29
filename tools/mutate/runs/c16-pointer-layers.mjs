@@ -89,8 +89,10 @@ const results = runPass({
       // gets the wheel from a built session.
       name: "L4 scrolls a peek that is not cut",
       file: CONSTRUCT,
-      from: "    if (placed === undefined || !placed.truncated) return false;\n",
-      to: "    if (placed === undefined) return false;\n",
+      // Re-anchored for C22 I141: the row offset is now the fallback after a
+      // layer's first overflowing box, and this is its guard.
+      from: "    if (!placed.truncated) return false;\n",
+      to: "",
       expect: "T4.93",
     },
     {

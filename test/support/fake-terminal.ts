@@ -21,6 +21,7 @@ export const ALL_CAPABILITIES: TerminalCapabilities = Object.freeze({
   renderMode: "rich",
   notification: "none",
   clipboard: "none",
+  editor: null,
   notify: [],
 });
 

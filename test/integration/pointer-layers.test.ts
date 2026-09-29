@@ -181,11 +181,139 @@ describe("C16 I74 — the wheel over a layer, through the graph (review batch 3,
   });
 });
 
-describe("C22 §6q — the wheel reaches a box in a layer, where the layer is drawn, owed at the spec commit", () => {
-  it.todo(
-    "T4.114 (C22 I141, C16 I74): a chip preview over a 40-line paste; a wheel notch down over the panel moves the box by WHEEL_ROWS; the layer dismissed and pushed again opens at its top — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
-  );
-  it.todo(
-    "T4.115 (C22 I142, C23 I74): an approval replacing the prompt, suspended; a wheel over the prompt's rows moves the box, and one over the region's middle moves and answers nothing — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
-  );
+describe("C22 §6q — the wheel reaches a box in a layer, where the layer is drawn", () => {
+  /** construct.ts's `WHEEL_ROWS` — a notch is three rows (C16 I74). */
+  const NOTCH = 3;
+  const ESC = String.fromCharCode(27);
+  const settle = async (): Promise<void> => {
+    for (let i = 0; i < 8; i += 1) await new Promise((r) => setImmediate(r));
+  };
+  const lines = (n: number, word: string): string => Array.from({ length: n }, (_, i) => `${word} ${String(i)}`).join("\n");
+
+  it("T4.114 (C22 I141, C16 I74): a wheel over a chip preview moves its box by a notch, and the preview pushed again opens at its top", async () => {
+    const { graph, stdin } = await buildGraph();
+    graph.lifecycle.acquire();
+    stdin.emit(`${ESC}[200~${lines(40, "line")}${ESC}[201~`);
+    await settle();
+    const offset = () => graph.layerView("chip-preview").offsets["chip-preview-box"] ?? 0;
+    const placed = graph.overlays.layout({ width: 80, height: 24 }).find((p) => p.layer.id === "chip-preview");
+    expect(placed, "the preview is up").toBeDefined();
+    expect(offset(), "at its top").toBe(0);
+    const topRow = graph.viewport.scroll.topRow;
+
+    // The harness region's top is terminal row 1; a notch over the panel's
+    // second row, where the box is.
+    const row = 1 + (placed?.top ?? 0) + 1;
+    expect(graph.router.dispatch(wheel(row, 5, "wheelDown")), "consumed").toBe(true);
+    expect(offset(), "one notch").toBe(NOTCH);
+    graph.router.dispatch(wheel(row, 5, "wheelDown"));
+    expect(offset(), "two").toBe(2 * NOTCH);
+    graph.router.dispatch(wheel(row, 5, "wheelUp"));
+    expect(offset(), "and back one").toBe(NOTCH);
+    expect(graph.viewport.scroll.topRow, "the transcript beneath did not move").toBe(topRow);
+    expect(graph.editor.chipAt()?.lines, "the chip is untouched").toBe(40);
+
+    // Off the chip, the preview goes; back on, it is pushed again — at its top.
+    stdin.emit(" ");
+    await settle();
+    expect(graph.overlays.top?.id, "gone with the caret off the chip").not.toBe("chip-preview");
+    stdin.emit("\u007f");
+    await settle();
+    expect(graph.overlays.top?.id, "back").toBe("chip-preview");
+    expect(offset(), "opened at its top").toBe(0);
+
+    // **And a layer whose owner resets nothing** — the preview drops its own
+    // namespace on every push (§6q.4 ruling 1), so it cannot tell whether the
+    // stack's subscription deletes it; a bare layer can. (The mutation pass
+    // found the preview arm above blind to that delete.)
+    stdin.emit(" ");
+    await settle();
+    const bare = () => ({
+      id: "bare",
+      kind: "panel" as const,
+      placement: { kind: "anchored" as const, row: 21, rows: 1, prefer: "above" as const },
+      content: [
+        {
+          kind: "panel",
+          id: "bare-panel",
+          title: "Bare",
+          children: [{ kind: "scroll", id: "bare-box", height: 5, children: [{ kind: "code", id: "bare-code", language: "text", text: lines(30, "bare") }] }],
+        },
+      ] as never,
+      blocking: false,
+      dismissal: "escape" as const,
+    });
+    const bareOffset = () => graph.layerView("bare").offsets["bare-box"] ?? 0;
+    graph.overlays.push(bare() as never);
+    const at = graph.overlays.layout({ width: 80, height: 24 }).find((p) => p.layer.id === "bare");
+    expect(at, "the bare layer is placed").toBeDefined();
+    graph.router.dispatch(wheel(1 + (at?.top ?? 0) + 2, 5, "wheelDown"));
+    expect(bareOffset(), "a notch").toBe(NOTCH);
+    graph.overlays.pop();
+    graph.overlays.push(bare() as never);
+    expect(bareOffset(), "pushed again under the same id, it opens at its top: the namespace went with the layer").toBe(0);
+  });
+
+  it("T4.115 (C22 I142, C23 I74): a wheel over a replacing question's rows moves its box, and one over the region's middle answers nothing", async () => {
+    const { graph, stdin } = await buildGraph();
+    graph.lifecycle.acquire();
+    // Forty rows in the transcript, at the tail: a wheel reaching it moves it.
+    graph.transcript.append(
+      {
+        schema: "tui.view/1",
+        command: "/filler",
+        status: "ok",
+        blocks: [{ kind: "code", id: "f", language: "text", text: lines(40, "filler") }],
+        meta: {
+          verb: "filler",
+          adapter: "passthrough",
+          exitCode: 0,
+          durationMs: 0,
+          truncated: false,
+          argv: [],
+          stderr: "",
+          transport: "local",
+          origin: "user",
+        },
+      } as never,
+      { streaming: false },
+    );
+    let answered: unknown = null;
+    void graph.confirm
+      .ask({
+        question: "Apply the patch?",
+        detail: { kind: "raw", id: "d", text: lines(30, "diff") } as never,
+        choices: [
+          { key: "n", label: "no", default: true },
+          { key: "s", label: "show full diff", inspect: true },
+        ],
+      })
+      .then((a) => {
+        answered = a;
+      });
+    expect(graph.confirm.replacing?.id, "the approval replaces the prompt").toBe("confirm");
+    // `→` first ends C16 I44's arrival guard, as `overlay-displaced` does.
+    stdin.emit("\u001b[C");
+    stdin.emit("s");
+    await settle();
+    const offset = () => graph.layerView("confirm").offsets["confirm-source"] ?? 0;
+    expect(JSON.stringify(graph.overlays.top?.content), "suspended").toContain("confirm-source");
+
+    // **Where it is drawn, not where C15 would place it** (C22 I142): the prompt's
+    // row is the anchor's (21) below one rule, in the region's coordinates, and
+    // the region begins on terminal row 1.
+    const promptRow = 1 + 21 + 1;
+    expect(graph.router.dispatch(wheel(promptRow, 5, "wheelDown")), "consumed over the prompt's rows").toBe(true);
+    expect(offset(), "the box moved a notch").toBe(NOTCH);
+
+    // Over the region's middle — where C15's floating placement would have put
+    // the panel — the question's box does not move and nothing is answered.
+    const topRow = graph.viewport.scroll.topRow;
+    graph.router.dispatch(wheel(1 + 10, 5, "wheelUp"));
+    expect(offset(), "the box is where the prompt-row notch left it").toBe(NOTCH);
+    expect(graph.viewport.scroll.topRow, "the wheel reached the transcript instead").toBeLessThan(topRow);
+    await settle();
+    expect(answered, "and answered nothing").toBeNull();
+    expect(graph.confirm.open, "the question is still open").toBe(true);
+  });
 });

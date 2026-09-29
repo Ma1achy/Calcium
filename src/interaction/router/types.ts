@@ -590,6 +590,11 @@ export type KeyAction =
   | "watchJump7"
   | "watchJump8"
   | "watchJump9"
+  // **The chip preview's three** (C22 I143, C22 I144, ruling 53 amended): chords
+  // the prompt does not bind, answered at `panel` after the prompt declines.
+  | "previewScrollUp"
+  | "previewScrollDown"
+  | "previewOpen"
   | "agentNext"
   | "agentPrevious"
   | "agent1"

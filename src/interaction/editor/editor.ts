@@ -151,6 +151,14 @@ export interface LineEditor {
    * forwards is what gives position 0 an answer at all.
    */
   chipAt(): Chip | null;
+  /**
+   * Re-mint `chip` with `parts`, keeping its ordinal (I35, C22 I144).
+   *
+   * Every occurrence of the chip's sentinel becomes one fresh sentinel, as one
+   * undo unit; the old stays in the table (I34), so `⌃_` brings the chip back
+   * as it was. `false`, and nothing changes, when the chip is not in the buffer.
+   */
+  editChip(chip: Chip, parts: ChipParts): boolean;
   deleteBackward(): void;
   deleteForward(): void;
   move(motion: Motion): void;
@@ -460,6 +468,31 @@ class Editor implements LineEditor {
     // makes for a paste, which is what this is. With a region, `insert` takes
     // the `structural` arm instead and the unit covers both halves.
     this.insert(`${sentinel}${opts?.delimiter ?? ""}`, { atomic: true });
+  }
+
+  editChip(chip: Chip, parts: ChipParts): boolean {
+    // **By identity, through the table** (I34): a record is found by the
+    // sentinel bound to it, and a chip not in the buffer — deleted, or never
+    // this line's — has nothing to re-mint.
+    let found: Readonly<{ sentinel: string; owner: number }> | null = null;
+    for (const [sentinel, held] of this.#chips) {
+      if (held.chip === chip && this.#text.includes(sentinel)) {
+        found = { sentinel, owner: held.owner };
+        break;
+      }
+    }
+    if (found === null) return false;
+    this.#history.endKill();
+    // `atomic`: its own unit, closed — the re-mint is one edit (I35, I5).
+    this.#history.edit(this.#snapshot(), "atomic");
+    // **A fresh sentinel with the old ordinal** — not `#mint`, which numbers a
+    // new chip. The counter still advances, so no sentinel is rebound (I34).
+    const fresh = String.fromCodePoint(CHIP_BASE + this.#nextSentinel);
+    this.#nextSentinel += 1;
+    this.#chips.set(fresh, { chip: { ...parts, ordinal: chip.ordinal }, owner: found.owner });
+    // One grapheme for one: the caret and any region keep their positions.
+    this.#text = this.#text.split(found.sentinel).join(fresh);
+    return true;
   }
 
   chipAt(): Chip | null {
