@@ -57389,6 +57389,11 @@ pre-change tree at the same load 28.3 s and 28.8 s; after, T2.12 at 26.4 s and 1
 Neither reaches the new code. F1348 records design-fixtures T1.5 and contract/theme T2.62, and F1351 C22 T4.49 and
 T4.53; none of the three here is in either.
 
+**Corrected 2026-09-29.** C11 T2.3 was not load: it was a regression from 4e3c7153, found by bisection and fixed —
+F1435. The other two stand. One more member, measured the same day: tier 5's `overlay` T5.4 failed once inside a full
+e2e run at load 3.3 (a `waitFor` timeout at 15.4 s) and passed three runs of three alone against the same `dist/`,
+at 2.3 s, 2.7 s and 0.4 s.
+
 ## F1407 — `oscText` passes bidi characters into window titles and notifications ★★☆☆☆
 
 Found by lane b4-m12. `oscText` in `terminal/escapes.ts` removes `[\u0000-\u001f\u007f-\u009f]` before
@@ -57570,3 +57575,15 @@ four the corpus files whose devcontainer settings and path-derived image hashes 
 was renamed `calcium-tui` in the same commit. `menu-over-diff` now has a row in `SHOTS` (shot 15) and is recorded
 from the fixture world, which also closes the *one shot cannot be regenerated* note under F158's heading. **What it
 does not do**: the old text stays in git history and in every clone taken before this commit.
+
+## F1435 — C11 T2.3's slowdown was a regression, not load ★★★☆☆
+
+Found by bisecting C11 T2.3's red at f0697eb0 (15.9 s alone), then fixed by lane b4-perf. 4e3c7153, ruling 82's table code, took the row from about 3 s to about 6.5 s at load 1.6–2.8 (2.8× at load 3.1). A CPU profile showed three costs multiplying: the table was planned again for every expanded row, ruling 82 runs each plan twice, and every plan re-measured four constant glyph strings. The fix shares one plan per walk over the rows (it lives only for that call, so the no-cache rule holds) and computes the mark's cells once at module load. Timings in ms, T2.3 alone, three interleaved rounds: 3d4b2241 3335 / 3009 / 2671; 4e3c7153 6589 / 6178 / 6094; f0697eb0 6777 / 6714 / 6389; with the fix 2974 / 2697 / 2661. Zero golden frames moved, as predicted. C11 T3.24 counts plans rather than timing them (one plan for 5 expanded rows or 50, no glyph measured per plan) and fails on the unfixed tip with *expected 5 to be 1*; mutation run `c11-plan-count` kills all six mutations and its control. F1406 had listed T2.3 as a load-sensitive row; this corrects it.
+
+## F1436 — a mutation survived a layout change because only the runs whose anchors moved were re-run ★★★☆☆
+
+Found by lane b4-perf. `c11-focus-gutter`'s T6.24 mutation had survived since 4e3c7153: ruling 82 moved every column-drop boundary off the seven widths T2.3 checks, and that landing re-ran only the mutation runs whose anchors had moved. Nothing re-ran this one, so the survivor went unseen for 37 commits. C11 T2.3a now measures the expanded fixture at every width from 20 to 170, and the run kills everything. **The class**: a change that moves layout can blind a row without touching its anchor, so every mutation run over the files a layout change touches is re-run with it, not only the ones whose anchors moved.
+
+## F1437 — the blocks lane added no measurable cost, and 4e3c7153 → f0697eb0 is about 5% slower unattributed ★★☆☆☆
+
+Measured by lane b4-perf, T2.3 alone, three interleaved rounds. The blocks lane's paired differences were +1316, −755 and −190 ms, so the earlier 8.4 → 10.2 s reading was load, not the lane. Separately, 4e3c7153 → f0697eb0 is slower in all three rounds (+188, +536, +295 ms, about 5%). The span holds 37 commits and has not been bisected.
