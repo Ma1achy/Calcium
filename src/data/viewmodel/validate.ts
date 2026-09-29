@@ -1215,7 +1215,7 @@ function checkRamp(value: unknown, e: string[], where: string, onSpan: boolean):
   }
   for (const key of Object.keys(value)) {
     if (!RAMP_KEYS.has(key)) {
-      e.push(`${where}: unknown member "${key}" — a ramp carries fill, from, to, colormap, bands, animate, since and nothing else (C04 I106)`);
+      e.push(`${where}: unknown member "${key}" — a ramp carries fill, from, to, colormap, bands, animate, since, overshoot and nothing else (C04 I106)`);
       return;
     }
   }
@@ -1278,6 +1278,35 @@ function checkRamp(value: unknown, e: string[], where: string, onSpan: boolean):
         e.push(`${where}: "bands" must be an integer in 2..8 — one band is a gradient wearing a different name (C04 I106)`);
         return;
       }
+    }
+  }
+  // **The overshoot stop is a gradient's over a slot pair, off a span** (I148,
+  // §5c.1). A map's end is a map stop and a lift is a colour it does not hold;
+  // a palette names nothing; a fold has no end to lift and a quantiser would
+  // step the lift away; and on a span the floor is proven per slot (I107),
+  // which a lifted `to` is not.
+  const overshoot = value["overshoot"];
+  if (overshoot !== undefined) {
+    if (fill !== "gradient" || !hasPair) {
+      e.push(`${where}: "overshoot" rides on a "gradient" over a from/to pair alone — a colormap, a palette, a centred and a stepped fill have no end to lift (C04 I148)`);
+      return;
+    }
+    if (onSpan) {
+      e.push(`${where}: "overshoot" is refused on a span — the contrast floor is proven per slot and a lifted "to" is no slot (C04 I107, I148)`);
+      return;
+    }
+    if (!isRecord(overshoot) || Object.keys(overshoot).some((k) => k !== "lift" && k !== "share")) {
+      e.push(`${where}: "overshoot" is a record of "lift" and "share" and nothing else (C04 I148)`);
+      return;
+    }
+    const { lift, share } = overshoot;
+    if (typeof lift !== "number" || !Number.isFinite(lift) || lift <= 1 || lift > 2) {
+      e.push(`${where}: "overshoot.lift" must be finite in (1, 2] — 1 is no overshoot, 2 bounds a channel doubling (C04 I148)`);
+      return;
+    }
+    if (typeof share !== "number" || !Number.isFinite(share) || share <= 0 || share >= 1) {
+      e.push(`${where}: "overshoot.share" must be finite in (0, 1) — 0 is no stop, 1 leaves nothing to mix (C04 I148)`);
+      return;
     }
   }
   if (animate !== undefined && (typeof animate !== "string" || !RAMP_ANIMATION_SET.has(animate))) {

@@ -18,7 +18,11 @@ import { sgr } from "../../src/terminal/escapes.js";
 const sgrParams = (style: Parameters<typeof sgr>[0]): string =>
   sgr(style).replace(/^\u001b\[/u, "").replace(/m$/u, "");
 import { tickIntervalOf } from "../../src/presentation/blocks/index.js";
-import { styledScreenFrom } from "../support/styled-screen.js";
+import { applySgr, styledScreenFrom, type CellStyle } from "../support/styled-screen.js";
+import { rampStyle, resolveTone } from "../../src/presentation/theme/index.js";
+import { nearestAnsi256 } from "../../src/presentation/theme/colormap.js";
+import type { Ramp, Tone } from "../../src/data/viewmodel/index.js";
+import { graphemes } from "../../src/presentation/text.js";
 
 const ESC = String.fromCharCode(27);
 
@@ -96,6 +100,47 @@ const withoutMark = (line: string, caps = FULL_CAPS): string => {
  * that is mostly escapes — it says nothing about which column the frame
  * landed in and nothing about the tone it took.
  */
+/** A tone's 24-bit hex in the dark theme — the ends a trail's ramp is mixed between. */
+const hexOf = (tone: Tone): string => {
+  const c = resolveTone(tone, DARK_THEME, { colourDepth: 24 }).colour;
+  return c !== undefined && c.kind === "rgb" ? c.hex : "#000000";
+};
+/** `#rrggbb` → the `fg` a styled cell records for it. */
+const fgOf = (hex: string): string =>
+  `38;2;${String(Number.parseInt(hex.slice(1, 3), 16))};${String(Number.parseInt(hex.slice(3, 5), 16))};${String(Number.parseInt(hex.slice(5, 7), 16))}`;
+/** Each channel ×`f`, clamped at 255 — §026's lift, restated so the row reads without the source. */
+const liftFg = (fg: string, f: number): string =>
+  fg.split(";").map((v, i) => (i < 2 ? v : String(Math.min(255, Math.round(Number(v) * f))))).join(";");
+
+/**
+ * The rendered row as clusters with their style — **by grapheme, not by code
+ * unit**, because the rows it reads carry combining marks, families and flags,
+ * which `styledScreenFrom`'s one-index-per-cell model splits (C09 I133).
+ */
+const clustersOf = (b: Notice, width = 40): readonly { g: string; style: CellStyle }[] => {
+  const line = measurable({ capabilities: FULL_CAPS }).renderToLines(b as never, width)[0] ?? "";
+  const out: { g: string; style: CellStyle }[] = [];
+  let style: CellStyle = { fg: "", bg: "", attrs: [] };
+  for (const piece of line.split(/(\u001b\[[0-9;]*m)/u)) {
+    const sgrMatch = /^\u001b\[([0-9;]*)m$/u.exec(piece);
+    if (sgrMatch !== null) {
+      style = applySgr(style, sgrMatch[1] === "" ? [0] : sgrMatch[1]!.split(";").map(Number));
+      continue;
+    }
+    for (const g of graphemes(piece)) out.push({ g, style });
+  }
+  return out;
+};
+/** The clusters of `text` in the row, in order — or a failure naming what the row drew instead. */
+const textClusters = (b: Notice, width = 40): readonly { g: string; style: CellStyle }[] => {
+  const all = clustersOf(b, width);
+  const want = graphemes(b.text);
+  for (let k = 0; k + want.length <= all.length; k += 1) {
+    if (want.every((g, i) => all[k + i]!.g === g)) return all.slice(k, k + want.length);
+  }
+  throw new Error(`the row does not hold the text whole: ${JSON.stringify(all.map((c) => c.g).join(""))}`);
+};
+
 const gridOf = (b: Notice, width = 40, caps = FULL_CAPS, tick?: number) => {
   const kit = measurable({ capabilities: caps, ...(tick === undefined ? {} : { tick }) });
   const lines = kit.renderToLines(b as never, width);
@@ -194,7 +239,7 @@ describe("C09 §7e — the band", () => {
     const grid = gridOf(b, 20);
     const newest = grid[1]!.filter((c) => c.ch === "f").at(-1)!;
     const accent = gridOf(notice({ text: "x", tone: "accent" }))[0]![0]!.style.fg;
-    expect(newest.style.fg, "the head across a wrap is accent").toBe(accent);
+    expect(newest.style.fg, "the head across a wrap is the lifted accent (C09 I132)").toBe(liftFg(accent, 1.35));
   });
 
   it("T1.77 (C09 I90, §7e, §026): the head is the hot end of the band", () => {
@@ -204,7 +249,7 @@ describe("C09 §7e — the band", () => {
     const row = gridOf(notice({ text: "abcdefghijklmnopqrstu", streaming: true, trail: "hotEdge" }))[0]!;
     const at = (ch: string) => row.find((c) => c.ch === ch)!;
     const accent = gridOf(notice({ text: "x", tone: "accent" }))[0]![0]!.style.fg;
-    expect(at("u").style.fg, "the newest character is accent").toBe(accent);
+    expect(at("u").style.fg, "the newest character is the accent lifted ×1.35 (C09 I132)").toBe(liftFg(accent, 1.35));
     expect(at("h").style.fg, "and the band's oldest is not").not.toBe(accent);
     // **The control: outside the band the text is its own ink**, so the two
     // reads above are about the band and not about the whole row being accent.
@@ -249,6 +294,16 @@ describe("C09 §7e — the band", () => {
   });
 
   it("T1.56 (C09 I90, C04 I123, §7e): the target is the run's own ink, not a fixed colour", () => {
+    // **Inside the band, where the target is the only difference.** The two
+    // rows below compare whole frames, and since C09 I132 gave hotEdge its lift
+    // and hue none, the second differs at the head whatever the target — a
+    // fixed target survived it. `x y` is all band, so every cell is a ramp
+    // sample and the run's tone reaches the bytes only through `from`.
+    const band = (over: Partial<Notice>) => textClusters(notice({ text: "x y", streaming: true, trail: "hotEdge", ...over }));
+    const dimBand = band({ spans: [{ from: 0, to: 3, tone: "dim" }] } as Partial<Notice>);
+    const plainBand = band({});
+    expect(dimBand[0]!.style.fg, "the oldest cell cools toward dim, not toward the body").not.toBe(plainBand[0]!.style.fg);
+
     // **Two documents one field apart.** A fixed target passes any row that only
     // asks whether a ramp is present, so the arms differ by the run's tone
     // alone — `R-BLK-196`'s dim reasoning block, whose trail must cool to dim.
@@ -577,7 +632,136 @@ describe("C09 §099 — an elided run shortens from its middle", () => {
 });
 
 describe("C04 I148 and C09 I132, I133 — the hot edge's overshoot and the band by grapheme (review batch 4 M13.4, M13.5)", () => {
-  it.todo("T1.82 (C04 I148, C10 I36): overshoot samples lift the head at 24-bit, quantise at 8-bit, and change nothing at 4 and 1 — not deferred on a component: the code lands in the next commit of this round");
-  it.todo("T1.150 (C09 I132, §7e): each form's head, middle, tail and first cell outside, as colours — not deferred on a component: the code lands in the next commit of this round");
-  it.todo("T3.129 (C09 I133, §7e): a cluster at the band's edge is wholly in or out, a combining mark is never dropped, and the newest cluster is the head — not deferred on a component: the code lands in the next commit of this round");
+  it("T1.82 (C04 I148, C10 I36): overshoot samples lift the head at 24-bit, quantise at 8-bit, and change nothing at 4 and 1", () => {
+    const stop = { lift: 1.35, share: 0.35 };
+    const plain: Ramp = { fill: "gradient", from: "default", to: "accent" };
+    const lifted: Ramp = { ...plain, overshoot: stop };
+    const at = (ramp: Ramp, t: number, colourDepth: 1 | 4 | 8 | 24) => rampStyle(ramp, t, 0, DARK_THEME, { colourDepth });
+    const hex = (ramp: Ramp, t: number): string => {
+      const c = at(ramp, t, 24)?.colour;
+      return c !== undefined && c.kind === "rgb" ? c.hex : "";
+    };
+    const accent = hexOf("accent");
+    const ch = (h: string) => [1, 3, 5].map((i) => Number.parseInt(h.slice(i, i + 2), 16));
+    // t = 1: every channel ×1.35, clamped at 255 — the demo's `Math.min`.
+    expect(ch(hex(lifted, 1))).toEqual(ch(accent).map((c) => Math.min(255, Math.round(c * 1.35))));
+    expect(ch(hex(lifted, 1)).some((c) => c === 255), "the accent's red channel clamps").toBe(true);
+    // The knee is the accent exactly, and below it the plain mix over [0, 0.65].
+    expect(hex(lifted, 0.65), "t = 1 − share is `to`").toBe(accent);
+    expect(hex(lifted, 0.325), "halfway to the knee is the plain mix at one half").toBe(hex(plain, 0.5));
+    expect(hex(lifted, 0), "t = 0 is `from`").toBe(hex(plain, 0));
+    // The lift rises through the stop: t = 0.825 is halfway, ×1.175.
+    expect(ch(hex(lifted, 0.825))).toEqual(ch(accent).map((c) => Math.min(255, Math.round(c * 1.175))));
+    for (const t of [0, 0.2, 0.325, 0.65, 0.7, 0.825, 0.9, 1]) {
+      // 8-bit: the 24-bit sample, quantised — including the lifted ones.
+      expect(at(lifted, t, 8), `8-bit at ${String(t)}`).toEqual({ colour: { kind: "ansi256", index: nearestAnsi256(hex(lifted, t)) } });
+      // 4-bit and 1-bit: no colour brighter than `to`, so the stop says nothing.
+      expect(at(lifted, t, 4), `4-bit at ${String(t)}`).toEqual(at(plain, t, 4));
+      expect(at(lifted, t, 1), `1-bit at ${String(t)}`).toEqual(at(plain, t, 1));
+    }
+    // **The control**: the 8-bit head is not the plain accent's index, so the
+    // 8-bit row above is about the lift and not about two equal quantisations.
+    expect(at(lifted, 1, 8)).not.toEqual(at(plain, 1, 8));
+  });
+
+  it("T1.150 (C09 I132, §7e): each form's head, middle, tail and first cell outside, as colours", () => {
+    // Twenty-one narrow cells: the band is `h`..`u`, so `u` is the head, `r`
+    // the fourth-newest, `h` the oldest and `g` the first cell outside.
+    const text = "abcdefghijklmnopqrstu";
+    const read = (over: Partial<Notice>, tick?: number) => {
+      const row = gridOf(notice({ text, ...over }), 40, FULL_CAPS, tick)[0]!;
+      const at = (c: string) => row.find((x) => x.ch === c)!.style;
+      return { head: at("u"), fourth: at("r"), oldest: at("h"), outside: at("g") };
+    };
+    const ink = read({}).outside; // the same cell of the same notice, not streaming
+    const warnInk = read({ tone: "warn" }).outside;
+    const accent = fgOf(hexOf("accent"));
+    const channels = (fg: string) => fg.split(";").slice(2).map(Number);
+
+    const hot = read({ streaming: true, trail: "hotEdge" });
+    expect(hot.head.fg, "hotEdge's head: the accent ×1.35, clamped").toBe(liftFg(accent, 1.35));
+    expect(hot.fourth.fg, "the fourth-newest is lifted — inside the newest 35%").not.toBe(accent);
+    channels(hot.fourth.fg).forEach((c, i) => expect(c, `channel ${String(i)} at or above the accent's`).toBeGreaterThanOrEqual(channels(accent)[i]!));
+    expect(hot.oldest.fg, "the oldest is tinted").not.toBe(ink.fg);
+    const step = channels(accent).map((a, i) => Math.abs(a - channels(fgOf(hexOf("default")))[i]!) / 0.65 / 14);
+    channels(hot.oldest.fg).forEach((c, i) =>
+      expect(Math.abs(c - channels(fgOf(hexOf("default")))[i]!), `the oldest within one step of the ink, channel ${String(i)}`).toBeLessThanOrEqual(Math.ceil(step[i]!) + 1),
+    );
+    expect(hot.outside, "the first cell outside is the ink exactly").toEqual(ink);
+
+    const fade = read({ streaming: true, trail: "fade" });
+    expect(fade.head.fg, "fade's head is `muted`").toBe(fgOf(hexOf("muted")));
+    expect(fade.outside).toEqual(ink);
+
+    const hue = read({ streaming: true, trail: "hue", tone: "warn" });
+    expect(hue.head.fg, "hue's head is the accent, with no lift").toBe(accent);
+    expect(hue.oldest.fg, "cooling toward the warn body tone").not.toBe(accent);
+    expect(hue.outside, "and outside it the warn notice's own ink").toEqual(warnInk);
+
+    // **The ripple never starts** (C09 I132's note): a one-shot with no
+    // `since` holds its not-started frame, so the band is the ink throughout.
+    // Asserted as it draws — this goes red the day the ripple is started.
+    for (const tick of [0, 12]) {
+      const ripple = read({ streaming: true, trail: "ripple" }, tick);
+      for (const cell of [ripple.head, ripple.fourth, ripple.oldest, ripple.outside]) expect(cell, `ripple at tick ${String(tick)}`).toEqual(ink);
+    }
+
+    const weight = read({ streaming: true, trail: "weight" });
+    for (const [where, style] of [["head", weight.head], ["fourth", weight.fourth], ["oldest", weight.oldest]] as const) {
+      expect(style.attrs, `weight is bold at the ${where}`).toContain(1);
+    }
+    expect(weight.outside.attrs, "and not outside").not.toContain(1);
+  });
+
+  it("T3.129 (C09 I133, §7e): a cluster at the band's edge is wholly in or out, a combining mark is never dropped, and the newest cluster is the head", () => {
+    const lifted = liftFg(fgOf(hexOf("accent")), 1.35);
+    const settled = (text: string) => textClusters(notice({ text }));
+    const streaming = (text: string) => textClusters(notice({ text, streaming: true, trail: "hotEdge" }));
+    /** The clusters the band tinted: those whose style differs from the settled row's. */
+    const band = (text: string) => {
+      const plain = settled(text);
+      return streaming(text).filter((c, i) => c.style.fg !== plain[i]!.style.fg);
+    };
+    const bandCells = (text: string) => band(text).reduce((n, c) => n + cells(c.g), 0);
+
+    // **The measured case**: `k` + U+0301 just outside fourteen cells. The mark
+    // was dropped from the frame; `textClusters` throws if it is not there whole.
+    const edge = "abcdefghijk\u0301lmnopqrstuvwxy";
+    const drawn = streaming(edge);
+    const k = drawn.find((c) => c.g === "k\u0301")!;
+    expect(k, "the cluster is drawn whole").toBeDefined();
+    expect(k.style.fg, "and it is outside the band").toBe(settled(edge).find((c) => c.g === "k\u0301")!.style.fg);
+    expect(bandCells(edge)).toBe(14);
+
+    // **A band ending in a ZWJ family**: five code points, one cluster — and
+    // the newest cluster is the head. Counting code points put it at 12/17.
+    const family = "abcdefghijklmnop\u{1F468}\u200D\u{1F469}\u200D\u{1F467}";
+    expect(streaming(family).at(-1)!.style.fg, "the family is the head").toBe(lifted);
+
+    // **U+0301 inside the band**: the newest `y` is the head, not a step short.
+    const inside = "abcdefghijklmnopqrste\u0301xy";
+    expect(streaming(inside).at(-1)!.style.fg, "`y` is the head").toBe(lifted);
+    // **And across a run boundary** the advance is in clusters too: a span
+    // ending on `é` starts a second run, and a run advancing by code points
+    // pushes `x` to `t = 1` beside `y`. Only the newest cluster is the head.
+    const split = notice({ text: inside, streaming: true, trail: "hotEdge", spans: [{ from: 20, to: 22, tone: "identifier" }] } as Partial<Notice>);
+    expect(textClusters(split).filter((c) => c.style.fg === lifted).map((c) => c.g), "one head, and it is `y`").toEqual(["y"]);
+
+    // **Wide clusters straddling the edge** are wholly in or wholly out: one
+    // cell of room left is not room for two.
+    for (const wide of ["\u{1F600}", "\u{1F1EC}\u{1F1E7}"]) {
+      const out = `abc${wide}${"m".repeat(13)}`;
+      expect(band(out).map((c) => c.g), `${wide} one cell short: out`).not.toContain(wide);
+      expect(bandCells(out), `${wide} out: the band is the thirteen`).toBe(13);
+      const inn = `abc${wide}${"m".repeat(12)}`;
+      expect(band(inn).map((c) => c.g), `${wide} with room: in`).toContain(wide);
+      expect(bandCells(inn), `${wide} in: fourteen`).toBe(14);
+    }
+
+    // Every band: at most fourteen cells, and every cluster whole in the row
+    // (`textClusters` would have thrown otherwise).
+    for (const text of [edge, family, inside, "short", "e\u0301".repeat(20)]) {
+      expect(bandCells(text), JSON.stringify(text)).toBeLessThanOrEqual(14);
+    }
+  });
 });

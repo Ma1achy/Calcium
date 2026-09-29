@@ -407,8 +407,38 @@ describe("C09 §2c width — fail-on-revert", () => {
   });
 
 describe("C09 I132–I135 — tier 6 (review batch 4)", () => {
-  it.todo("T6.184 (C09 I132): hotEdge without its overshoot → T1.150 fails at the head — not deferred on a component: the code lands in the next commit of this round");
-  it.todo("T6.185 (C09 I133): the band walk by code unit → T3.129 fails on the dropped mark — not deferred on a component: the code lands in the next commit of this round");
+  /** The last cluster of a rendered notice's text and the SGR before it, read by grapheme. */
+  const streamed = (text: string): { frame: string; headSgr: string } => {
+    const line = measurable({ capabilities: FULL_CAPS }).renderToLines(
+      block({ kind: "notice", id: "n", tone: "default", text, streaming: true, trail: "hotEdge" } as never),
+      40,
+    )[0]!;
+    const at = line.lastIndexOf(text.slice(-1));
+    const sgrs = line.slice(0, at).match(/\u001b\[[0-9;]*m/gu) ?? [];
+    return { frame: visible(line), headSgr: sgrs.at(-1) ?? "" };
+  };
+
+  it("T6.184 (C09 I132): hotEdge without its overshoot → T1.150 fails at the head", () => {
+    // **The plain gradient's head is the accent** (#e8a87c); the overshoot's is
+    // every channel ×1.35 clamped (#ffe3a7). Drawing hotEdge without the stop
+    // puts the first where T1.150 asserts the second.
+    const { headSgr } = streamed("abcdefghijklmnopqrstu");
+    expect(headSgr, "the head is the lifted accent").toContain("38;2;255;227;167");
+    expect(headSgr, "and not the plain accent").not.toContain("38;2;232;168;124");
+  });
+
+  it("T6.185 (C09 I133): the band walk by code unit → T3.129 fails on the dropped mark", () => {
+    // **A zero-width mark is a step of its own to a code-unit walk**: it stops
+    // between `k` and U+0301, and the cut split the cluster out of the frame.
+    // The grapheme walk keeps it — T3.129's first row.
+    const text = "abcdefghijk\u0301lmnopqrstuvwxy";
+    expect(streamed(text).frame, "the combining mark is in the frame").toContain("k\u0301");
+    // **And `of` in code points** put a five-code-point family's head at 12/17
+    // of the way up: the cluster count is what reaches `t = 1`.
+    const family = "abcdefghijklmnop\u{1F468}\u200D\u{1F469}\u200D\u{1F467}";
+    expect([...family.slice(-8)].length, "five code points, one cluster").toBe(5);
+    expect(streamed(family).headSgr, "the family is the head").toContain("38;2;255;227;167");
+  });
   it.todo("T6.186 (C09 I134): the crop removed → T3.76 and T3.130 fail — not deferred on a component: the code lands in the next commit of this round");
   it.todo("T6.187 (C09 I135): segmented mapped back to slant → T2.226 fails — not deferred on a component: the code lands in the next commit of this round");
 });

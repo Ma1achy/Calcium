@@ -219,9 +219,9 @@ describe("C04 §3am.1 — `elide`", () => {
     expect(narrow.length, "shorter, and only in the marked run").toBeLessThan(wide.length);
   });
 
-  it("T2.117 (C04 I106, I109, R-MOT-012): RAMP_KEYS has seven members, the union is the registry's twenty-three and `none`, an eighth key is refused by name, and a ramped document round-trips through JSON", () => {
-    expect(RAMP_KEYS.size).toBe(7);
-    expect([...RAMP_KEYS].sort()).toEqual(["animate", "bands", "colormap", "fill", "from", "since", "to"]);
+  it("T2.117 (C04 I106, I109, I148, R-MOT-012): RAMP_KEYS has eight members, the union is the registry's twenty-three and `none`, a ninth key is refused by name, and a ramped document round-trips through JSON", () => {
+    expect(RAMP_KEYS.size, "`overshoot` is the eighth (C04 I148)").toBe(8);
+    expect([...RAMP_KEYS].sort()).toEqual(["animate", "bands", "colormap", "fill", "from", "overshoot", "since", "to"]);
 
     // **The union written out, not counted.** A count is satisfied by swapping
     // one member for another, and this list is the design's — twenty-three
@@ -238,9 +238,9 @@ describe("C04 §3am.1 — `elide`", () => {
     ]);
 
     const ramped = (ramp: unknown): unknown => ({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp }] });
-    const eighth = validateBlock(ramped({ fill: "palette", period: 200 }));
-    expect(eighth.ok).toBe(false);
-    if (!eighth.ok) expect(eighth.error.join(" ")).toMatch(/unknown member "period" — a ramp carries fill, from, to, colormap, bands, animate, since and nothing else/u);
+    const ninth = validateBlock(ramped({ fill: "palette", period: 200 }));
+    expect(ninth.ok).toBe(false);
+    if (!ninth.ok) expect(ninth.error.join(" ")).toMatch(/unknown member "period" — a ramp carries fill, from, to, colormap, bands, animate, since, overshoot and nothing else/u);
 
     // `sweep` used to be the refused name here, on C04 I109's *an event the render
     // cannot time*. It ships; a name the design does not carry is what the

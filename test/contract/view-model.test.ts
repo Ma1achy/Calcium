@@ -1217,5 +1217,28 @@ describe("C04 I144, I146, I148 — what a tape member, a bar and an overshoot ma
     expect(tape([{ id: "c", label: "count" }]).ok, "no detail and no state").toBe(true);
   });
   it.todo("T2.151 (C04 I146, §3as): painted, quantity, granularity and liveness are refused outside their unions, and style only when not a string — not deferred on a component: the code lands in the next commit of this round");
-  it.todo("T2.152 (C04 I148, §5c.1): overshoot is accepted on a gradient over a slot pair and refused everywhere else and out of range — not deferred on a component: the code lands in the next commit of this round");
+  it("T2.152 (C04 I148, §5c.1): overshoot is accepted on a gradient over a slot pair and refused everywhere else and out of range", () => {
+    const stop = { lift: 1.35, share: 0.35 };
+    const onBar = (ramp: unknown) => validateBlock({ kind: "progress", id: "g", label: "x", current: 3, total: 10, ramp });
+    const onSpan = (ramp: unknown) =>
+      validateBlock({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp }] });
+    const refused = (got: ReturnType<typeof validateBlock>, why: string, pattern: RegExp = /overshoot/u): void => {
+      expect(got.ok, why).toBe(false);
+      expect(got.ok ? "" : got.error.join("\n"), why).toMatch(pattern);
+    };
+    const pair = { fill: "gradient", from: "default", to: "accent" };
+    expect(onBar({ ...pair, overshoot: stop }).ok, "a gradient over a slot pair takes it").toBe(true);
+    expect(onBar({ ...pair, overshoot: { lift: 2, share: 0.01 } }).ok, "lift 2 is inside (1, 2]").toBe(true);
+
+    refused(onBar({ fill: "gradient", colormap: "viridis", overshoot: stop }), "a colormap gradient");
+    refused(onBar({ fill: "palette", overshoot: stop }), "a palette");
+    refused(onBar({ ...pair, fill: "centred", overshoot: stop }), "a centred fill");
+    refused(onBar({ ...pair, fill: "step", bands: 3, overshoot: stop }), "a step fill");
+    refused(onSpan({ ...pair, overshoot: stop }), "on a span", /refused on a span/u);
+    expect(onSpan(pair).ok, "the control: the same pair on a span without the stop is valid").toBe(true);
+    for (const lift of [1, 2.5, Number.NaN]) refused(onBar({ ...pair, overshoot: { lift, share: 0.35 } }), `lift ${String(lift)}`, /lift/u);
+    for (const share of [0, 1, -0.1]) refused(onBar({ ...pair, overshoot: { lift: 1.35, share } }), `share ${String(share)}`, /share/u);
+    refused(onBar({ ...pair, overshoot: { ...stop, knee: 0.5 } }), "a third member", /"lift" and "share" and nothing else/u);
+    refused(onBar({ ...pair, overshoot: 1.35 }), "not a record", /"lift" and "share" and nothing else/u);
+  });
 });

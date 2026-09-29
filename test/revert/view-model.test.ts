@@ -21,13 +21,14 @@ import {
 } from "../../src/data/viewmodel/index.js";
 import { CORPUS, doc, ONE_PER_KIND, tableOf } from "../support/blocks.js";
 import { axesOf } from "../../src/data/viewmodel/index.js";
-import { ASCII_CAPS, FULL_CAPS, measurable } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, measurable } from "../support/render.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createViewport } from "../../src/viewport/viewport/index.js";
 import { measureSequence } from "../support/viewport.js";
 import { FREE_WIDTH_SLOTS, SUBSTITUTIONS, glyphs } from "../../src/presentation/blocks/index.js";
 import { cells, sliceCells } from "../../src/presentation/text.js";
 import { tapeMemberCols } from "../../src/presentation/blocks/index.js";
+import { rampStyle } from "../../src/presentation/theme/index.js";
 import { checkAsciiParity, formatReport } from "../../src/testing/measurement-conformance.js";
 
 function unwrap(r: ReturnType<typeof applyPatch>): ViewDocument {
@@ -555,7 +556,14 @@ describe("C04 I124, I144–I148 — tier 6 (review batch 4)", () => {
     expect(kit.renderToLines(tape, old).join(""), "at the old width the row slides").toContain("«");
     expect(kit.registry.width(tape, 200), "and the width counts what it draws").toBeGreaterThan(old);
   });
-  it.todo("T6.112 (C04 I148): the sampler ignoring overshoot → T1.82 fails at t = 1 — not deferred on a component: the code lands in the next commit of this round");
+  it("T6.112 (C04 I148): the sampler ignoring overshoot → T1.82 fails at t = 1", () => {
+    // **What ignoring it draws**: the plain gradient, whose `t = 1` is the
+    // accent exactly — the head the band drew before, and not T1.82's lift.
+    const plain = { fill: "gradient", from: "default", to: "accent" } as const;
+    const sample = (ramp: Parameters<typeof rampStyle>[0]) => rampStyle(ramp, 1, 0, DARK_THEME, { colourDepth: 24 });
+    expect(sample({ ...plain, overshoot: { lift: 1.35, share: 0.35 } }), "the stop moves the head").not.toEqual(sample(plain));
+    expect(sample({ ...plain, overshoot: { lift: 1.35, share: 0.35 } })).toEqual({ colour: { kind: "rgb", hex: "#ffe3a7" } });
+  });
   it("T6.113 (C04 I124): tapeMemberCols leaving out the current's lead → T1.83 fails", () => {
     // **The lead is the member's**: the current's range opens on `›`, two cells
     // before its label. A range taken from the text alone starts at the label,

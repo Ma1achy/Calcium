@@ -9,7 +9,7 @@
 import type { AmbiguousWidth } from "../../text.js";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Glyph, Notice, Pills, Progress, Raw, Rule, Tip, Tone } from "../../../data/viewmodel/index.js";
-import { cells, stripControl, truncate, truncateParts, wrapCells } from "../../text.js";
+import { cells, graphemes, stripControl, truncate, truncateParts, wrapCells } from "../../text.js";
 import type { Run } from "../../runs.js";
 import { runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../runs.js";
 import { NO_STYLE, rampStyle } from "../../theme/index.js";
@@ -384,6 +384,16 @@ const TRAIL_HEAD: Readonly<Record<"hotEdge" | "fade" | "hue" | "ripple", Tone>> 
 });
 
 /**
+ * `hotEdge`'s overshoot, the design's own profile (C09 I132, C04 I148, §026).
+ *
+ * The demo lifts the accent by `1 + (1 − d / 0.35) × 0.35` below `d = 0.35`
+ * and mixes to the ink over the rest; as a ramp stop that is `{ lift: 1.35,
+ * share: 0.35 }` exactly. `TRAIL_HEAD` alone drew a plain gradient, so the
+ * newest cluster sat at the accent and never above it.
+ */
+const TRAIL_OVERSHOOT = Object.freeze({ lift: 1.35, share: 0.35 });
+
+/**
  * The trail's band, laid over the head of a streaming notice (C09 I90, I91, §7e).
  *
  * **Derived here because only here knows the width** (C04 I122). The block says
@@ -424,16 +434,24 @@ function withTrail(
   // the one above; a row it enters part-way ends it. The cells a break
   // consumed are not in any row and so not in the band. A whole band on a short
   // text is the whole text — "never reaching further than the text".
+  //
+  // **Walked back by grapheme cluster** (I133). It stepped one UTF-16 code unit
+  // at a time, so a zero-width combining mark was a step of its own: the walk
+  // stopped between it and its base, the cut split the cluster, and the mark
+  // fell out of the frame. A cluster is wholly in the band or wholly out.
   const cuts: { row: number; start: number }[] = [];
   let left = TRAIL_CELLS;
   for (let row = wrapped.length - 1; row >= 0 && left > 0; row -= 1) { // cells-ok — an array index
     const text = runsText(wrapped[row] ?? []);
+    const clusters = graphemes(text);
     let start = text.length; // cells-ok — a code-unit cursor
-    while (start > 0 && cells(text.slice(start - 1), ambiguous) <= left) start -= 1; // cells-ok — a code-unit cursor
-    if (start < text.length) { // cells-ok — a code-unit comparison
-      cuts.unshift({ row, start });
-      left -= cells(text.slice(start), ambiguous);
+    for (let k = clusters.length - 1; k >= 0; k -= 1) { // cells-ok — a cluster index
+      const w = cells(clusters[k] ?? "", ambiguous);
+      if (w > left) break;
+      left -= w;
+      start -= (clusters[k] ?? "").length; // cells-ok — a code-unit cursor
     }
+    if (start < text.length) cuts.unshift({ row, start }); // cells-ok — a code-unit comparison
     if (start > 0) break;
   }
   if (cuts.length === 0) return wrapped; // cells-ok — a row count
@@ -446,7 +464,7 @@ function withTrail(
     return { row, head: sliceRuns(line, 0, start), band: sliceRuns(line, start, length) };
   });
   const of = bands.reduce(
-    (n, b) => n + b.band.reduce((m, r) => m + [...r.text].length, 0), // cells-ok — a cluster count
+    (n, b) => n + b.band.reduce((m, r) => m + graphemes(r.text).length, 0), // cells-ok — a cluster count, the unit `paintRuns` indexes (I133)
     0,
   );
   const out = [...wrapped];
@@ -467,8 +485,9 @@ function withTrail(
         from: target,
         to: TRAIL_HEAD[form],
         ...(form === "ripple" ? { animate: "ripple" as const } : {}),
+        ...(form === "hotEdge" ? { overshoot: TRAIL_OVERSHOOT } : {}),
       };
-      const count = [...run.text].length; // cells-ok — a cluster count
+      const count = graphemes(run.text).length; // cells-ok — a cluster count (I133)
       // **Over `of + 1` positions, with the band at the top `of`**, so the
       // oldest cell is one step off the ink and not on it: `d = (head − i) /
       // trail` tints all fourteen and leaves the fifteenth plain. At `of`

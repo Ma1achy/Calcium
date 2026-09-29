@@ -500,10 +500,23 @@ export type Ramp = Readonly<{
    * one-shot without a stamp would otherwise have.
    */
   since?: number;
+
+  /**
+   * **A stop past `to`** (I148, §5c.1; review batch 4 M13.4). Over the last
+   * `share` of the axis `to` is lifted channel by channel, from ×1 up to
+   * ×`lift` at `t = 1`, and `from` mixes to `to` over the rest — the hot edge's
+   * profile, which a ramp closed to `Tone` (I106) otherwise has no seam for.
+   * A gradient over a slot pair only, and never on a span (I107): a lifted
+   * `to` is no slot, so the floor has nothing to prove it against.
+   */
+  overshoot?: RampOvershoot;
 }>;
 
-/** The members of a ramp, for a gate that cannot silently take a seventh (I106). */
-export const RAMP_KEYS: ReadonlySet<string> = new Set(["fill", "from", "to", "colormap", "bands", "animate", "since"]);
+/** `lift` finite in `(1, 2]`, `share` in `(0, 1)` (I148). */
+export type RampOvershoot = Readonly<{ lift: number; share: number }>;
+
+/** The members of a ramp, for a gate that cannot silently take a ninth (I106). */
+export const RAMP_KEYS: ReadonlySet<string> = new Set(["fill", "from", "to", "colormap", "bands", "animate", "since", "overshoot"]);
 
 // --- trails ---------------------------------------------------------------
 
