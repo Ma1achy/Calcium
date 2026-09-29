@@ -2100,7 +2100,10 @@ export async function constructGraph(
       // C22 I49's overrides. Deriving it again anywhere else is F124.
       capabilities: detection.capabilities,
       // C07 I18 — the width a body wraps at; no route reads its height (C23 I41).
-      region: deps.frame.overlayRegion,
+      // The transcript's box, not the layer's (C14 I57): a body is drawn one
+      // column in, beside the rail, and a child told the layer's width wraps a
+      // column wider than its panel draws — the staircase T5.2 reads.
+      region: deps.frame.region,
       editor: stores.editor,
       overlays: stores.overlays,
       // C28 §3c — for `/profile`'s handler, the way `stop` reaches `/exit`.

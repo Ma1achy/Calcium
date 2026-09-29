@@ -946,6 +946,9 @@
   "horizontal": [
    "border"
   ],
+  "rail": [
+   "gutter"
+  ],
   "residue": [
    "row-lead",
    "inline"
@@ -2087,6 +2090,10 @@
    "<"
   ],
   [
+   "▌",
+   "|"
+  ],
+  [
    "·",
    ":"
   ],
@@ -2368,6 +2375,7 @@
   "heavyVertical": "H",
   "hollow": "o",
   "horizontal": "-",
+  "rail": "|",
   "residue": "...",
   "revert": "<",
   "separator": ":",
@@ -2416,6 +2424,7 @@
   "heavyVertical": "┃",
   "hollow": "○",
   "horizontal": "─",
+  "rail": "▌",
   "residue": "⋯",
   "revert": "↺",
   "separator": "·",
