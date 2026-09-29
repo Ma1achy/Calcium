@@ -57341,3 +57341,66 @@ are `example`; R-TRU-001's *escaped* is the binding clause. Ruling 71 decided th
 and C1, `<U+XXXX>` for every bidi format character — and the mechanism, once at the registry's resolve, so copy
 reads the neutralised block with everything else. T2.193 runs every kind through `copyOf` and `copySequence`. A
 file whose name holds `ESC[2J` and U+202E copies as `^[[2J<U+202E>` (C04 T2.140, the lane's T2.139).
+
+## F1401 — the reader's own typed line is written with its bidi characters raw ★★★☆☆
+
+Measured by lane b4-m12 writing C09 T4.107 (4f6ba2e8, 1f88a69a). Every document, error and far-side payload reaches
+the writer neutralised, but two shell-drawn rows write the reader's own typed line raw: the prompt being edited
+(C17's painter) and the command echo `commandRows` draws above an entry (C22 I33). Both passed U+202E, and the
+editor measured it at zero width. Neither is a block, so neither reaches the registry's resolve. `commandRows` in
+`shell/paint.ts` still does not neutralise at 86fcb10c.
+
+## F1402 — nothing refuses a literal bidi character in a tracked file ★★☆☆☆
+
+Found by lane b4-m12. `trust-boundary.test.ts` landed in 1ef3b4d1 with its twelve bidi characters as literal code
+points — a file write turned the `\u` escapes into characters — and `make enforce` passed. 1f88a69a restored the
+escapes. A literal U+202E in a source file reorders what a reviewer sees against what the compiler reads, and no
+A03 rule looks for one.
+
+## F1403 — `cells()` measured five bidi characters at zero width where xterm painted a cell ★★☆☆☆
+
+Found by lane b4-m12 widening C27 I2 to bidi. Measured, `@xterm/headless` places them two ways: U+200F and U+202E
+join the previous cell at no width, while U+2066–U+2069 and U+061C take a cell of their own at width 1 — where
+`cells()` reads every bidi character as zero. C27 I6 (`cells(text)` equals the emulator's painted width) drifted on
+a child printing any of the second group. C27 T6.12 is the revert row.
+
+## F1404 — a child's OSC 8 link reached the snapshot as an underline with the link gone ★★☆☆☆
+
+Found by C27 T2.7 (M12 item 6). `@xterm/headless` acts on a hyperlink itself and left the linked cells `underline:
+true`, so a child's link reached the snapshot as an underline run — a claim that the text is a link, with the link
+gone. OSC 52 needed nothing: the headless build has no clipboard handler.
+
+## F1405 — neutralising lengthens text, so span offsets had to be re-based ★☆☆☆☆
+
+Found by lane b4-m12 building ruling 71's mechanism. `TextSpan` offsets index the raw text, and caret and
+`<U+XXXX>` forms are longer than the characters they show, so a span over neutralised text would have coloured the
+wrong cells. Built with the neutraliser rather than found after it; recorded because every span-bearing field
+depends on it.
+
+## F1406 — three more rows pass close to their time limits under load ★★☆☆☆
+
+Measured by lane b4-m12 at load 15–20. C11 T2.3 timed out at its own 15 s budget: alone it passed at 13.15 s, and
+the tree before the lane's change took 13.8 s. C24 T2.12 and image-kitty T1.42 hit their 30 s limits: on the
+pre-change tree at the same load 28.3 s and 28.8 s; after, T2.12 at 26.4 s and 17.0 s, T1.42 at 28.2 s and 19.9 s.
+Neither reaches the new code. F1348 records design-fixtures T1.5 and contract/theme T2.62, and F1351 C22 T4.49 and
+T4.53; none of the three here is in either.
+
+## F1407 — `oscText` passes bidi characters into window titles and notifications ★★☆☆☆
+
+Found by lane b4-m12. `oscText` in `terminal/escapes.ts` removes `[\u0000-\u001f\u007f-\u009f]` before
+`windowTitle` and the notification sequence, and nothing else, so a title or notification built from a tool's
+output carries U+202E into the terminal's title bar or the desktop's notification. Ruling 71 escapes bidi
+everywhere a block is drawn; these two sinks are not blocks.
+
+## F1408 — definitions' own `stripControl` calls receive no control any more ★☆☆☆☆
+
+Found by lane b4-m12's mutation pass: two `stripControl` mutations survived because `#resolve` neutralises every
+field before a definition reads it, and were removed with a note in `c09-trust-boundary`. The calls remain — 110 in
+`src`, across adapters, the shell and the block kinds — and whether any is still load-bearing (a path that does not
+come through `#resolve`) is unmeasured.
+
+## F1409 — a semantic copy's first entry omits its command line and later entries include it ★☆☆☆☆
+
+Observed by lane b4-m12 hardening C14 T4.37c: a multi-entry semantic copy reads `e0-line-0 …\n\nsay\ne1-line-0 …` —
+the first entry's text begins at its blocks, and every later entry is preceded by its command. Either both carry
+the command or neither does; which is owed a ruling.
