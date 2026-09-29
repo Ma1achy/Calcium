@@ -57393,6 +57393,9 @@ T4.53; none of the three here is in either.
 F1435. The other two stand. One more member, measured the same day: tier 5's `overlay` T5.4 failed once inside a full
 e2e run at load 3.3 (a `waitFor` timeout at 15.4 s) and passed three runs of three alone against the same `dist/`,
 at 2.3 s, 2.7 s and 0.4 s.
+Two more, from the shell lane's chain at 1ba5e868 (five-minute load 5.0): C28 T1.42 (`profiler-tree.test.ts`, 53.5× the
+area for 100× the data against a bound of 40) and C16 T1.170 (`surface.test.ts`, an extra `normal-mode:release` after
+the escape). Each passed three of three alone at load about 1; neither file was changed by the lane.
 
 ## F1407 — `oscText` passes bidi characters into window titles and notifications ★★☆☆☆
 

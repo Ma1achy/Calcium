@@ -30,8 +30,8 @@ type change.
 | rank | mechanism | ids keyed | consumers | ⚠ | disposition |
 |---|---|---|---|---|---|
 | **1** | [The consumer cannot reach a fact the framework holds](#1) | 31 | **closed** | ⚠ C07 · C24 | real Calcium work, with consumers |
-| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 105 | **10 open** · 10 unread | ⚠ C04 · C23 | real Calcium work · **13 of 14 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
-| **3** | [A block cannot express what the surface needs](#3) | 13 | **1 open** · 1 unread | ⚠ C04 | mixed — two absorbed |
+| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 105 | **9 open** · 10 unread | ⚠ C04 · C23 | real Calcium work · **13 of 14 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
+| **3** | [A block cannot express what the surface needs](#3) | 13 | **closed** · 1 unread | ⚠ C04 | mixed — two absorbed |
 | **4** | [A change axis distinct from `Tone`](#4) | 5 | **closed** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
 | **5** | [The far side's shape is not the framework's contract](#5) | 11 | **closed** · 2 unread | ⚠ C05 | mostly app-side · one shim |
 | **6** | [Rendered from data that has since moved](#6) | 5 | **closed** | ⚠ C04 | real Calcium work |
@@ -140,9 +140,9 @@ view's** producer is defined by the region and has no other bound.
 **F1129** — **the report cannot express the abscissa its own question needs.** *Does cost rise with position in the document* is a real profiling question and `scatter` is the form for it — a slope is an O(n) nobody declared. `byEntry` is keyed by entry id and `NodeStat` carries nine members, **not one of them ordinal**; `snapshot()` sorts by `self`, so even the map's insertion order is gone before a consumer sees it. `Aggregate` holds the answer privately — its rows carry `lastFrame`, kept only to decide whether to increment `frames` — and a `firstFrame` beside it would be one assignment. Recorded rather than built: the round that found it is the front end and the change is to a published backend type, and a card that took its ordering from the sort it happens to receive would be a figure whose x axis is a rendering artefact. **Deferred, blocker `NodeStat.firstFrame`**, so picking the entry up begins by grepping the symbol · **Open**
 
 
-## 2 · A complete mechanism, unreachable from the other side of a seam — **8 open** · 91 closed · 6 with no verdict ⚠
+## 2 · A complete mechanism, unreachable from the other side of a seam — **7 open** · 92 closed · 6 with no verdict ⚠
 
-**F1395** — **a form field's committed value can hold a raw sentinel** · **Open** — measured at the editor; the field write is the shell lane's (`construct.ts:2718`, `:2758`)
+**F1395** — **a form field's committed value can hold a raw sentinel** · **Closed** — a field is written with `resolved`, and a value holding a line break is refused (C22 I148, 588da957)
 
 **F1376** — **`settle` ended the entry's stream and left the blocks streaming** · **Closed** — C13 I22: settle strips every block's `streaming` in the one change that settles (2af7e95b)
 
@@ -335,7 +335,7 @@ mechanism.
 
 **F1079** — **half of `make check` had no corpus, and the procedure that verifies a commit doubles it.** `eslint .` lints every `.js`/`.mjs` it can reach and the config carried **no `ignores`**, so **745** files decided that gate — 371 `dist/`, 87 scratch under `out/` — and **999** with `out/verify` in place, which is the worktree recipe used to check that a *commit* is green. **The rules reach none of it and parsing reaches all of it**: the one rule block is `tools/**` relative to the config, so a fabricated `var x = 1; if (x == 1)` under `out/verify/tools/` fires nothing with `no-var`, `prefer-const` and `eqeqeq` all configured — while a stray paren in a scratch probe took the gate red on a tree whose sources were clean. The two `dist/` warnings it had been printing all along are the same fact in its quiet form · **Closed** — 282 files, named rather than derived from `.gitignore` (`out/` is not in it, and *committable* and *lintable* are different questions), and T2.129 asks `isPathIgnored` rather than reading the config as prose. Its control is the ignore-everything arm, which satisfies every exclusion assertion and makes the gate a no-op
 
-## 3 · A block cannot express what the surface needs — **1 open** · 12 closed · none with no verdict
+## 3 · A block cannot express what the surface needs — **closed** · 13 closed · none with no verdict
 
 **F1374** — **a `Ramp` closed to `Tone` had no way to say *brighter than the accent*** · **Closed** — C04 I148 (`overshoot`) and C09 I133 (cf973d23)
 
@@ -365,7 +365,7 @@ together rather than patching apart.
 
 **F805** — a focused `mosaic` is invisible by C26 §7's own rule — no furniture to carry a tone; ruled, pinned structurally by T1.28 · **Closed** (F991) — C26 §7 and T1.28, which asserts byte-identity and nothing outside the rectangles
 
-**F1260** — **R-BLK-214 draws a call *blocked on you* and `CallState` has no member for it.** The registry's dot table has seven rows; the union has five, and *said something* is prose. Blocked on you is a call waiting on a question, and nothing ties a question to the call that raised it, so a blocked call draws `running` · **Open, ruled 2026-09-27** — the link lands with batch 3's M15 question queue; *waiting on you* is `warn` and blinks, static `warn` plus the words at reduced motion
+**F1260** — **R-BLK-214 draws a call *blocked on you* and `CallState` has no member for it.** The registry's dot table has seven rows; the union has five, and *said something* is prose. Blocked on you is a call waiting on a question, and nothing ties a question to the call that raised it, so a blocked call draws `running` · **Closed** — `CallState` gains `waiting` (C04 I149), and a question is tied to the call that raised it (C23 §7g); shell lane group B (14f078cc)
 
 <a id="4"></a>
 ## 4 · A change axis distinct from `Tone` — **closed** · 5 closed · none with no verdict — C04 I35, I36 and I38 answered all five
@@ -2592,7 +2592,7 @@ reads goes through the entry point a user has.
 
 **F1435** — **C11 T2.3's slowdown was a regression, not load** · **Closed** — one plan per walk, the mark's cells a constant; T3.24 counts plans (644a2c63)
 
-**F1406** — **three more rows pass close to their time limits under load** · **Open** — C24 T2.12, image-kitty T1.42 and tier 5's overlay T5.4 (C11 T2.3 was a regression, F1435); not the rows F1348 or F1351 record — the same class, three more members
+**F1406** — **three more rows pass close to their time limits under load** · **Open** — C24 T2.12, image-kitty T1.42, tier 5's overlay T5.4, C28 T1.42 and C16 T1.170 (C11 T2.3 was a regression, F1435); not the rows F1348 or F1351 record — the same class, three more members
 
 **F1385** — **three process faults in the blocks lane** · **Closed** — recorded; the timeout half is F1348
 
