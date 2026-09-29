@@ -137,7 +137,7 @@ Artefact SHAs are shown **truncated in the middle** — the leading and trailing
 | 160 · 120 · 100 · 80 | none | none |
 | 60 | `updated` | `created` |
 
-**Both tables fit at 80.** Families sum to 61 cells with gaps, versions to 64 — these are six- and eight-column tables where S03 and S05 are eleven, so nothing is under pressure until the terminal is genuinely narrow. An earlier draft asserted drops at 80 by analogy with the wider tables rather than by arithmetic, which T4.1 would have caught on the first run.
+**Both tables fit at 80.** Families sum to 61 cells with gaps, versions to 64 — 63 and 66 with the disclosure reservation wherever a row hides something (C11 I32), and both still fit — these are six- and eight-column tables where S03 and S05 are eleven, so nothing is under pressure until the terminal is genuinely narrow. An earlier draft asserted drops at 80 by analogy with the wider tables rather than by arithmetic, which T4.1 would have caught on the first run.
 
 At 60 only the timestamp drops from each. `serving` and `latest` therefore survive everywhere, which is what matters — their divergence is the finding — and `state` survives on the version table because it is how you tell which row that divergence refers to.
 

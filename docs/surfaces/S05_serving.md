@@ -71,7 +71,7 @@ Display order is the declared order below; priority governs survival only (C11 I
 
 | Width | Drops |
 |---|---|
-| 160 · 120 · 100 | none — all eleven, summing to 93 cells with gaps |
+| 160 · 120 · 100 | none — all eleven, summing to 93 cells with gaps, 95 with the disclosure reservation wherever a row hides something (C11 I32) |
 | 80 | `age`, `p50` |
 | 60 | `age`, `p50`, `req/s`, `p99`, `version` |
 

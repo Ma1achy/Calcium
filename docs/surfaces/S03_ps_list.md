@@ -50,6 +50,7 @@ The arithmetic, so the next reader does not have to derive it (`test/integration
 | Less `mr` (6 + a gap) | 104 — still over |
 | Less `spark` (8 + a gap) | **94** — fits, and the ten drawn above are what is left |
 | Residual to the two `flex` columns, `family` and `detail` | 4, two each |
+| **With the disclosure reservation** (C11 I32, ruling 82): `expand` at 3 for `▹+N`, N 1–9 | **96** — fits; residual **2**, one each |
 
 **`family` truncates at 98, and that is what the correction exposes.** `digit-classifier` is 16 cells and the column gets 14 — 12 declared plus its half of the residual. The old figure appeared to fit it only because it had dropped `owner` and spent those 10 cells on `family`. If a full family name at 100 columns matters more than `owner` does, the remedy is `owner`'s priority or `family`'s minimum in §3, not the picture.
 
@@ -108,11 +109,11 @@ The arithmetic then works the right way round. Widening `metric` to 15 would cos
 
 ### What survives at each width
 
-Derived from the priorities, and pinned by golden frames:
+Derived from the priorities, and pinned by golden frames. **The sets hold under the disclosure reservation** (C11 §3a, ruling 82): CP6 plans every width below through `planDisclosed`, and only the totals move.
 
 | Width | Columns |
 |---|---|
-| 160 | all twelve, summing to 112 cells with gaps |
+| 160 | all twelve, summing to 112 cells with gaps — 114 with the disclosure reservation wherever a row hides something (C11 I32) |
 | 120 | all twelve, family and detail flexed |
 | 100 | drops `mr`, `spark` |
 | 80 | drops `mr`, `spark`, `owner`, `kind` |
