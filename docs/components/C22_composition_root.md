@@ -3963,7 +3963,7 @@ PTY harness.
 - **T4.117** (I144, C23 §4): through a built session with a fake runner, `⌥o` on a chip suspends and resumes the lifecycle once each, resets the decoder and re-mints the chip; with a verb holding the guard it runs nothing and says so.
 - **T6.145** (I144): the read-back dropped, so the edit never returns → **T1.176**'s rewrite arm fails.
 - **T6.146** (I145): the menu's selection update dropping `promptLive` → **T1.177** fails at `Tab`: the layer still reads `true`.
-- **T4.118** (I146, C26 I32): through a built session, a box of 3 over 12 rows with focus on its first child: a press on the bar's last row puts the offset at the ceiling and focus stays; with a box nested in it, a press on the inner bar's column moves the inner box and not the outer; a press on the bar column of a box whose content fits focuses the child.
+- **T4.118** (I146, C26 I32): through a built session, a box of 3 over 12 rows with focus on its first child: a press on the bar's last row puts the offset at the ceiling and focus stays; with a box nested in it, a press on the inner bar's column moves the inner box and not the outer; a press on the bar column of a box whose content fits focuses the child. **The jump latches** (C26 I32): with a child focused, a bar press and then a resize leave the offset where the bar put it.
 - **T6.147** (I146): the bar check removed → **T4.118** fails: the press focuses the child and the offset is unchanged.
 - **T6.141** (I131; ruling 81): a producer's `trailSince` overwritten → **T1.173** fails on the producer's stamp. `tools/mutate/runs/c22-trail-stamp.mjs`.
 

@@ -1009,6 +1009,12 @@ the space a focus ring would occupy is reserved by the data or it does not exist
 
 Background and reverse video are free. Anything that changes size is not.
 
+**One cell moves with focus, and it changes no size: a tape's window (I31, ruling 80).** A member
+the resting window does not draw brings the window to it when focus lands there, so the row
+draws other members in the same cells. The row is still one row, and `measure` still sees no
+focus. The reason for the edge is a height moving without `rev`, and that holds. What the
+exception gives up is only the literal *nothing else*, and C09 T2.184 asserts the two arms apart.
+
 **A block-level focus paints the cells the block already reserves, and three kinds now do**
 (F769's recorded residue, ruled here). The rule above bounds the answer — no ring, no marker, no
 row — so the affordance is a tone on furniture the data draws whether or not focus is on it, and
@@ -1756,6 +1762,7 @@ key does to focus, the tape's window and the pull is event-mediated.
 | a left-pane and a right-pane element whose rows overlap | **no** | I28 × row overlap | the row test requires **the same pane**, so crossing stays I28's and a split is not a wide row |
 | a multi-row element and a one-row element inside its rows, same pane | yes | overlap is the whole test | recorded as the test's reach: *one row* is *rows that overlap*, not *rows that are equal* |
 | an element with no rows | never | `[from, to)` empty | overlaps nothing, so it is its own row |
+| a tape member the resting window does not draw, focused | — | I31 × §7's *focus changes tone and nothing else* (C09 I121) | **found by the suite, not the walk**: C09 T2.184 went red on `tape/seams` at 7 columns. The window follows, so a cell moves. §7 now names this as the one exception, and it changes no size |
 
 ### 8c.3 — the sequence trace
 
@@ -1940,7 +1947,7 @@ Named against the invariants; the tiers are the six.
 - **T4.34** (I31): through a built session, `→` past the window slides it — the frame is read, and the focused member is on screen while `›` is not; `↓` out of the tape brings the current back by the minimum. A press on a drawn member's cells focuses that member, and a press on `«n` focuses nothing new.
 - **T4.35** (I32): focus on a box's child, then a resize that moves its rows: the box is re-pulled so the child is in view.
 - **T4.36** (I32): focus on a box's child, then a patch that moves it (`rev`): re-pulled.
-- **T4.37** (I32, D15): `PgDn` on the focused box, then a patch and a resize: the offset stays where the reader put it; `↓` then pulls, and a later patch re-pulls. The wheel over a second box latches that box alone.
+- **T4.37** (I32, D15): `PgDn` on the focused box, then a patch: the offset stays where the reader put it; `↓` then pulls, and a later patch re-pulls. The wheel over a second box latches that box alone, and the wheel over the focused box latches it. *(A resize is T4.35's, and C22 T4.118 covers the bar's own latch through one.)*
 - **T6.1** (I30): `elementRight` as the old `crossPane(1)` → **T1.164** fails at the tape's second member.
 - **T6.2** (I30): `rowDown`'s row skip removed → **T1.165** fails: `↓` walks to member 1.
 - **T6.3** (I31): `layout`'s anchor back to `current` → **T1.166** and **T4.34** fail: the focused member is off screen.
