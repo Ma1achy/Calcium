@@ -13,7 +13,7 @@ import { MENU_ID } from "../../src/interaction/completion/index.js";
 import { SEARCH_ID } from "../../src/interaction/history/index.js";
 import { buildGraph, COPY_MODES } from "../support/session.js";
 import { createKeyEffects } from "../../src/shell/keys.js";
-import { createFocusStore } from "../../src/interaction/router/focus.js";
+import { createFocusStore, FOCUS_ORDER } from "../../src/interaction/router/focus.js";
 import type { InputEvent, Key } from "../../src/interaction/router/types.js";
 import type { Graph } from "../../src/shell/construct.js";
 
@@ -588,9 +588,113 @@ describe("C22 §3 step 11 — the effect table", () => {
     expect(graph.router.target, "and a table is entered").toBe("liveBlock");
   });
 
-  it.todo(
-    "T2.17 (C16 I78): every focus target with keymap rows has a rung handler that consumes them — not deferred on a component: the row lands in the next commit, with the spec it is written against",
-  );
+  it("T2.17 (C16 I78): every focus target with keymap rows has a rung handler that consumes them", async () => {
+    // **The class, not a fourth instance** (F1339). `interaction`, then
+    // `nativeSelection` (F765), then `watchRow` each arrived with table rows and
+    // no handler registered at the target: the router's own rung takes `⌃c` and
+    // nothing else, so every row resolved and was never consulted. T1.4h found
+    // the third, and only once its fixture put focus on the row — a target it
+    // had no setup for was walked from wherever the previous row left focus,
+    // and the key was consumed *somewhere*. So this row is over `FOCUS_ORDER`
+    // rather than over the table, and asserts where it stands before it
+    // presses anything.
+    //
+    // **Reserved rows get handlers, as in T1.4h** (C16 §6c, C22 I134): with
+    // none a reserved row passes by design, which would read here as the
+    // defect.
+    const keyActions = Object.fromEntries(Object.keys(RESERVED_ACTIONS).map((id) => [id, () => undefined]));
+    const { graph } = await buildGraph({ keyActions });
+    graph.lifecycle.acquire();
+
+    /**
+     * How each target becomes the active one. **Keyed by `FOCUS_ORDER`'s own
+     * type**, so a tenth target is a compile error here until it has a way in,
+     * and the loop below refuses an absent entry at run time as well.
+     * `global` is not a place focus rests — `activeTarget` never answers it —
+     * so its rows are pressed at the prompt and reach it as step 3's fallback.
+     */
+    const REACH = {
+      child: attachChild,
+      overlay: openOverlay,
+      nativeSelection: () => void (COPY_MODES.native = true),
+      semanticSelection: () => void (COPY_MODES.semantic = true),
+      panel: openPanel,
+      interaction: enterInside,
+      prompt: (g: Graph) => g.focus.reset(),
+      watchRow: (g: Graph) => g.focus.toWatches("w", 0),
+      // A fresh table each time: `⇧⏎` re-runs the live entry, and the entry it
+      // leaves live has no rows to enter.
+      liveBlock: (g: Graph) => {
+        g.transcript.append(LIVE_DOC as never, { streaming: true });
+        g.focus.reset();
+        g.router.dispatch(press({ name: "down" }));
+      },
+      global: (g: Graph) => g.focus.reset(),
+    } satisfies Record<(typeof FOCUS_ORDER)[number], (g: Graph) => void>;
+
+    /** The stages that say the rung passed the key on (C16 §4 steps 3 and 5). */
+    const PASSED = ["global", "dropped", "child:consumed", "modal-blocked"];
+    const answered = new Map<string, number>();
+    const beforeLadder: string[] = [];
+    const shadowed: string[] = [];
+    const base = defaultKeymap.filter((b) => b.profile !== "enhanced-terminal");
+
+    for (const t of FOCUS_ORDER) {
+      const reach: ((g: Graph) => void) | undefined = (REACH as Record<string, (g: Graph) => void>)[t];
+      expect(reach, `${t} has no way in — add one to REACH`).toBeDefined();
+      for (const b of base.filter((r) => r.target === t)) {
+        const row = `${t}:${keySlot(b.key)} -> ${b.action}`;
+        reach?.(graph);
+        // **The precondition, asserted** (`test/support/README.md`): the row
+        // is about the target's handler, and a key pressed anywhere else says
+        // nothing about it.
+        expect(graph.router.target, `${row}: the fixture did not reach the target`).toBe(t === "global" ? "prompt" : t);
+        graph.router.dispatch(press(b.key));
+        const stages = graph.router.lastStages;
+        const at = stages.findIndex((st) => st.startsWith("target:"));
+        if (at === -1) {
+          // An intercept answered before the ladder (C16 I40, C16 I75) — `host.detach`,
+          // the page-scroll chords. Not a rung's key, so not this row's.
+          beforeLadder.push(row);
+        } else if (t === "global") {
+          if (!stages.includes("global")) {
+            // The prompt took it first — `?` is typed (C16 §6c's precedence).
+            shadowed.push(row);
+          } else {
+            expect(stages, `${row}: reached the fallback and nothing took it`).not.toContain("dropped");
+            answered.set(t, (answered.get(t) ?? 0) + 1);
+          }
+        } else {
+          expect(stages[at], `${row}: dispatched at another target`).toBe(`target:${t}`);
+          const after = stages.slice(at + 1);
+          expect(
+            after.filter((st) => PASSED.includes(st)),
+            `${row}: the rung passed a key its own table binds — no handler at ${t} consults the keymap`,
+          ).toEqual([]);
+          answered.set(t, (answered.get(t) ?? 0) + 1);
+        }
+        while (graph.overlays.top !== null) graph.overlays.dismiss(graph.overlays.top.id);
+        graph.focus.setMode("navigate");
+        graph.focus.reset();
+        COPY_MODES.native = false;
+        COPY_MODES.semantic = false;
+        graph.editor.clear();
+      }
+    }
+
+    // **Every target is exercised by at least one row its handler answers**,
+    // and the one exception is compared by equality: `child`'s only base row is
+    // `⌃]`, which C16 I75 takes before the ladder so that no handler is offered it.
+    const unanswered = FOCUS_ORDER.filter((t) => (answered.get(t) ?? 0) === 0);
+    expect(unanswered, "targets whose every row is answered before the ladder").toEqual(["child"]);
+    // The two residues, by equality, so a row moving into either is seen.
+    expect(beforeLadder, "rows an intercept answers").toEqual([
+      "child:c+] -> hostDetach",
+      "global:m+up -> scrollPageUp",
+      "global:m+down -> scrollPageDown",
+    ]);
+    expect(shadowed, "global rows the prompt takes first").toEqual(["global:? -> helpKeymap"]);
+  });
 
   it("T1.4h2 (C22 I26): the effects that are observable from outside, each asserted", async () => {
     const { graph } = await buildGraph();
