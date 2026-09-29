@@ -88,7 +88,8 @@ const results = runPass({
       // C14 I51 — the element-less blocks lose their spans: prose unreachable.
       name: "a block with no element has no span",
       file: SESSION,
-      from: "        spans.push(Object.freeze({ key: semantic.keyOf(entry.id, b.blockId), from: b.from, to: b.to }));\n",
+      // Re-anchored for C14 I60: the span carries its run's columns.
+      from: "        spans.push(Object.freeze({ key: semantic.keyOf(entry.id, b.blockId), from: b.from, to: b.to, cols: b.cols }));\n",
       to: "",
       expect: "T4.37e",
     },

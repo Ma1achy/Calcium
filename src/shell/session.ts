@@ -42,7 +42,7 @@ import { reserveNeeded } from "./block-faults.js";
 import { descendants } from "../data/viewmodel/index.js";
 import type { Block, Image, Plot } from "../data/viewmodel/index.js";
 import { blockSpansOfEntry, elementsOfEntry, entryLayout, renderEntryPieces, windowEntry } from "./entry-layout.js";
-import { RAIL_BLANK, railCell, railRowsOf, selectedElementRowsOf, washedRowsOf, washSelectedRows } from "./paint.js";
+import { RAIL_BLANK, railCell, railRowsOf, selectedElementRowsOf, washedRowsOf, washRectCells, washSelectedRows } from "./paint.js";
 import { animationIntervalOf, TICK_MS } from "../presentation/blocks/index.js";
 import { isBand } from "../presentation/blocks/paint.js";
 import type { EntryParts } from "./render-cache.js";
@@ -1352,9 +1352,7 @@ class Session implements TuiInstance {
           // **The selection and the spans it was taken over** (C14 I39). Null
           // outside the mode, which is every frame the reader is not copying —
           // so the wash costs one comparison and the render path is unchanged.
-          this.#semantic === null
-            ? null
-            : { blocks: this.#semantic.blocks, spans: this.#selectionSpans(width) },
+          this.#selectionWash(width),
         ),
       // **The question's rows when one replaces the prompt** (C23 I74, §7f).
       // **And the reader's held line while a form field has the editor** (C22
@@ -1570,6 +1568,12 @@ class Session implements TuiInstance {
 
     const spans: semantic.BlockSpan[] = [];
     for (const entry of entries) {
+      // **The run's columns, which a rectangle clamps into** (C14 I60). One
+      // walk for both halves, so an element's span and a prose block's carry
+      // the same edges when they sit in the same run.
+      const blockSpans = blockSpansOfEntry(graph.blocks, entry.doc.blocks, width);
+      const colsAt = (row: number): Readonly<{ from: number; to: number }> | undefined =>
+        blockSpans.find((b) => b.from <= row && row < b.to)?.cols;
       for (const { blockId, element } of elementsOfEntry(
         graph.blocks,
         entry.doc.blocks,
@@ -1581,11 +1585,13 @@ class Session implements TuiInstance {
         // the set once per row — which reads as a count that climbs while the
         // selection does not change (C14 I38).
         if (element.level !== "block") continue;
+        const cols = colsAt(element.rows.from);
         spans.push(
           Object.freeze({
             key: semantic.keyOf(entry.id, blockId),
             from: element.rows.from,
             to: element.rows.to,
+            ...(cols === undefined ? {} : { cols }),
           }),
         );
       }
@@ -1595,10 +1601,10 @@ class Session implements TuiInstance {
       // rows meet the block's, so a block already reachable keeps its key and a
       // container's children are not taken twice.
       const own = spans.filter((sp) => semantic.entryOf(sp.key) === entry.id);
-      for (const b of blockSpansOfEntry(graph.blocks, entry.doc.blocks, width)) {
+      for (const b of blockSpans) {
         if (b.to <= b.from) continue;
         if (own.some((sp) => sp.from < b.to && sp.to > b.from)) continue;
-        spans.push(Object.freeze({ key: semantic.keyOf(entry.id, b.blockId), from: b.from, to: b.to }));
+        spans.push(Object.freeze({ key: semantic.keyOf(entry.id, b.blockId), from: b.from, to: b.to, cols: b.cols }));
       }
     }
     const frozen = Object.freeze(spans);
@@ -1617,6 +1623,8 @@ class Session implements TuiInstance {
    */
   #drag: Drag | null = null;
   #dragRow = 0;
+  /** The pointer's transcript column, for a rectangle's tick (C14 I60) — the row's reason, one axis over. */
+  #dragColumn = 0;
   /** The autoscroll's handle — a **second** ticker, because I35 stopped the first. */
   #autoscroll: Disposable | null = null;
 
@@ -1651,7 +1659,7 @@ class Session implements TuiInstance {
    * the boxes: two widths here would put the caret in a different block from
    * the one the spans describe, and the drag would work.
    */
-  #semanticDrag(regionRow: number, phase: "press" | "move" | "release"): boolean {
+  #semanticDrag(regionRow: number, phase: "press" | "move" | "release", column = 0): boolean {
     const graph = this.#graph;
     if (graph === null || this.#semantic === null) return false;
     if (phase === "release") {
@@ -1663,6 +1671,7 @@ class Session implements TuiInstance {
     const width = this.#composed().region.width;
     const caret = graph.semanticCaretAt(regionRow, width);
     this.#dragRow = regionRow;
+    this.#dragColumn = column;
     // **A row with no entry under it is most of a drag, not an error.** The
     // pointer is past the container — which is the state `R-SEL-013`'s bands
     // exist for — so the gesture stays alive and the ticker is re-armed for the
@@ -1674,9 +1683,18 @@ class Session implements TuiInstance {
       return true;
     }
 
+    // **In the rectangle the gesture moves cells, not blocks** (C14 I60): a
+    // press plants both cursors at the pointer's cell and a motion moves the
+    // head, the row clipped by I42 and the column the pointer's own.
+    const inRect = this.#semantic.rect !== null;
     if (phase === "press") {
       this.#drag = beginDrag(caret, graph.scrollBoxSpans());
-      this.#semantic = semantic.placeCaret(this.#semantic, caret);
+      this.#semantic = inRect
+        ? semantic.placeRect(this.#semantic, Object.freeze({ ...caret, column }))
+        : semantic.placeCaret(this.#semantic, caret);
+    } else if (inRect) {
+      if (this.#drag === null) return false;
+      this.#semantic = semantic.extendRectTo(this.#semantic, Object.freeze({ ...caret, column }));
     } else {
       if (this.#drag === null) return false;
       // **Clamped into the drag's container first** (C14 I50, `R-SEL-013`):
@@ -1741,12 +1759,13 @@ class Session implements TuiInstance {
     const width = this.#composed().region.width;
     const caret = graph.semanticCaretAt(rows > 0 ? rect.to - 1 : rect.from, width);
     if (caret === null) return;
-    this.#semantic = semantic.extendTo(
-      this.#semantic,
-      caret,
-      this.#selectionSpans(width),
-      this.#selectionOrder(),
-    );
+    // **The rectangle's head, in the rectangle** (C14 I60, §6e trace row 14).
+    // The tick called the block `extendTo` whatever the mode, so a rectangle
+    // drag held past the edge scrolled and took blocks nobody was drawing.
+    this.#semantic =
+      this.#semantic.rect !== null
+        ? semantic.extendRectTo(this.#semantic, Object.freeze({ ...caret, column: this.#dragColumn }))
+        : semantic.extendTo(this.#semantic, caret, this.#selectionSpans(width), this.#selectionOrder());
     graph.scheduler.commit("input");
   }
 
@@ -1766,15 +1785,40 @@ class Session implements TuiInstance {
     return this.#graph?.documentEntries.map((e) => e.id) ?? [];
   }
 
-  /** A plain arrow, and a shifted one (C14 I37, §6c). */
-  #moveSemanticCaret(delta: number, extend: boolean): void {
+  /**
+   * A plain arrow, and a shifted one (C14 I37, I60, §6c, §6e).
+   *
+   * **Columns move only in the rectangle** (ruling 70): at block granularity a
+   * block is atomic and there is no horizontal extent, so `⇧←`/`⇧→` and a plain
+   * `←`/`→` do nothing there. **And the viewport follows the caret** (I37
+   * amended): a move that takes it off the screen scrolls by the overshoot.
+   */
+  #moveSemanticCaret(rows: number, columns: number, extend: boolean): void {
     const graph = this.#graph;
     if (graph === null || this.#semantic === null) return;
-    const spans = this.#selectionSpans();
+    const width = this.#composed().region.width;
+    const spans = this.#selectionSpans(width);
     const order = this.#selectionOrder();
-    this.#semantic = extend
-      ? semantic.extendCaret(this.#semantic, delta, spans, order)
-      : semantic.moveCaret(this.#semantic, delta, spans, order);
+    if (this.#semantic.rect !== null) {
+      this.#semantic = semantic.moveRect(this.#semantic, rows, columns, extend, spans, order);
+    } else {
+      if (rows === 0) return;
+      this.#semantic = extend
+        ? semantic.extendCaret(this.#semantic, rows, spans, order)
+        : semantic.moveCaret(this.#semantic, rows, spans, order);
+    }
+    const caret = this.#semantic?.caret ?? null;
+    if (caret !== null) graph.revealSemanticCaret(caret, width);
+    graph.scheduler.commit("input");
+  }
+
+  /** `⌃V` — the rectangle on at the caret, or off (C14 I60, rulings 36, 71). */
+  #toggleSemanticRect(): void {
+    const graph = this.#graph;
+    if (graph === null || this.#semantic === null) return;
+    // A gesture in flight belongs to the granularity it began in.
+    this.#endDrag();
+    this.#semantic = semantic.toggleRect(this.#semantic, this.#selectionSpans());
     graph.scheduler.commit("input");
   }
 
@@ -1803,11 +1847,11 @@ class Session implements TuiInstance {
 
   /**
    * Leave semantic copy whole, in one step — the copy-mode switch's half
-   * (C16 I66, §6c S11).
+   * (C16 I66, §6c S11), and `⏎`'s way out after its copy (C14 I59).
    *
-   * **Its one caller is `#setNativeSelection`**: `⌃c` is a refusal in a copy
-   * mode since ruling 59, so the only thing that ends this mode without the
-   * reader's `esc` is entering the other one, which must not leave both up.
+   * **Two callers, and neither is `⌃c`**: it is a refusal in a copy mode since
+   * ruling 59. Entering native selection must not leave both modes up, and
+   * `⏎` leaves by copying (R-BLK-838's *leaves by esc, or a copy*).
    */
   #exitSemanticSelection(): void {
     if (this.#semantic === null) return;
@@ -1844,60 +1888,137 @@ class Session implements TuiInstance {
   }
 
   /**
-   * `y` — the selected entries to the clipboard (`R-SEL-004`, `R-SEL-011`).
+   * `y` and `⏎` — the selection to the kill buffer, and `⏎` leaves (C14 I59,
+   * I47, `R-SEL-004`, `R-SEL-011`, R-BLK-838).
    *
-   * **Document order is the transcript's**, and C09's `copySequence` is what
-   * turns each entry's blocks into its source. Neither is reachable from the
-   * key table, which is why this is a frame query rather than an effect.
-   *
-   * **`R-SEL-011`'s refusal is owed and is not here**, and it is blocked on the
-   * same parked word the mode label is (C14 §6a). The rule says *if neither is
-   * available the mode states it and offers a file instead*, because *a copy
-   * that appears to work and does not is the worst outcome available here* —
-   * and neither mechanism is built, so the condition holds on every copy this
-   * takes. What the rule asks for is *the mode* stating it, and the mode's
-   * statement surface is the footer label; a notice block on every `y` is the
-   * other reading and is noise on the key a reader presses most.
-   *
-   * So the refusal lands with the label, and until then the text reaches the
-   * kill buffer and nothing claims it reached the system clipboard. That is the
-   * honest half: `⌃y` yanks it back, which is a true statement about where it
-   * went, and no part of this says otherwise.
-   *
-   * A copy of nothing is not a refusal and says nothing: the count is on screen,
-   * and a notice that fired on an empty selection would be noise on the one key
-   * a reader presses repeatedly.
+   * **One copy path under both keys**, which is what I47 needed the single
+   * action for: a return that copied through another path could copy the
+   * record. **Never silent** (ruling 71): nothing selected, and a selection
+   * whose copy is empty, each say so and stay — `⏎` leaving on an empty copy
+   * would discard the mode for nothing — and neither calls `copyText("")`.
+   * A copy says where it went, and where it went is the kill buffer: `⌃y`
+   * yanks it back, which is a true statement about it. The system clipboard
+   * and OSC 52 are `R-SEL-011`'s two mechanisms, and they are wired next
+   * (review batch 4, M10 item 1).
    */
-  #copySelectedEntries(): void {
+  #copySelectedEntries(leave: boolean): void {
     const graph = this.#graph;
-    if (graph === null || this.#semantic === null) return;
-    const text = semantic.copyTextOf(
-      this.#semantic,
-      // **The held blocks, not the record's** (C14 I33, §6b A6). This is the
-      // row a paint-path freeze cannot satisfy: the screen would be right and
-      // the clipboard would carry text that was never on it, with nothing
-      // telling the reader it happened.
+    const mode = this.#semantic;
+    if (graph === null || mode === null) return;
+    if (!semantic.hasSelection(mode)) {
+      this.#raiseToast("nothing selected");
+      return;
+    }
+    const text = this.#copyText(graph, mode);
+    if (text === "") {
+      this.#raiseToast("the selection copies no text");
+      return;
+    }
+    graph.editor.copyText(text);
+    if (leave) this.#exitSemanticSelection();
+    this.#raiseToast("copied to the kill buffer");
+  }
+
+  /**
+   * What a copy right now takes (C14 I33, I43, I60) — the rectangle's cells
+   * while it is up, the selected blocks' sources otherwise.
+   *
+   * **The held blocks, not the record's** (C14 I33, §6b A6), in both arms. This
+   * is the row a paint-path freeze cannot satisfy: the screen would be right and
+   * the clipboard would carry text that was never on it.
+   */
+  #copyText(graph: Graph, mode: semantic.SemanticSelection): string {
+    if (mode.rect !== null) {
+      const width = this.#composed().region.width;
+      const rect = semantic.rectOf(mode, this.#selectionSpans(width), this.#selectionOrder());
+      return rect === null ? "" : this.#rectText(graph, rect, width);
+    }
+    return semantic.copyTextOf(
+      mode,
       graph.documentEntries.map((e) => ({ id: e.id, blocks: e.doc.blocks })),
       graph.blocks.copySequence,
     );
-    if (text === "") return;
+  }
 
-    graph.editor.copyText(text);
-    graph.scheduler.commit("input");
+  /** A rectangle's cells, over its entry's lines at `width` (C14 I43, I60). */
+  #rectText(graph: Graph, rect: semantic.CellRect, width: number): string {
+    return semantic.cellTextOf(
+      rect,
+      this.#entryLines(graph, semantic.entryOf(rect.key), width),
+      graph.capabilities.ambiguousWidth,
+    );
+  }
+
+  /**
+   * An entry's block rows as the frame draws them, whole (C14 I43, I60).
+   *
+   * *Cells are what the frame drew*: rendered through the frame's own
+   * per-entry options — focus, scroll offsets, cameras, cursors, frames and
+   * series — at the transcript's width, with no selection on them, because the
+   * ink comes off the copy and the ground is the selection's own.
+   */
+  #entryLines(graph: Graph, entryId: string, width: number): readonly string[] {
+    const entry = entryById(graph.documentEntries, entryId);
+    if (entry === undefined) return [];
+    const blocks = graph.oneShots.stamp(entry.id, entry.doc.blocks, this.#tick);
+    const pieces = windowEntry(entryLayout(blocks, width), 0, Number.MAX_SAFE_INTEGER, graph.blocks);
+    const focus = focusFor(graph, entry.id);
+    return renderEntryPieces(graph.blocks, pieces, {
+      theme: graph.theme.current,
+      capabilities: graph.capabilities,
+      motion: graph.motion,
+      focus,
+      tick: this.#tick,
+      scrollOffsets: graph.scrollOffsets.forEntry(entry.id),
+      cameras: graph.cameras.forEntry(entry.id),
+      cursorPositions: graph.cursorPositions.forEntry(entry.id),
+      frames: graph.frames.forEntry(entry.id),
+      placementScope: entry.id,
+      seriesVisibility: graph.seriesVisibility.forEntry(entry.id),
+    }).rows;
+  }
+
+  /** The wash's inputs for this frame, or `null` outside the mode (C14 I39, I60). */
+  #selectionWash(width: number): SelectionWash | null {
+    const mode = this.#semantic;
+    if (mode === null) return null;
+    const spans = this.#selectionSpans(width);
+    if (mode.rect === null) return { blocks: mode.blocks, spans, rect: null };
+    return { blocks: NO_KEYS, spans, rect: semantic.rectOf(mode, spans, this.#selectionOrder()) };
   }
 
   /** C14 I55 — the copy rung's mode and, in semantic mode, the selection's size. */
-  #copyState(): CopyState | undefined {
+  #copyState(width: number): CopyState | undefined {
     if (this.#nativeSelection) return { mode: "native" };
     const graph = this.#graph;
     if (this.#semantic === null || graph === null) return undefined;
-    return {
-      mode: "semantic",
-      size: semantic.sizeOf(
-        this.#semantic,
+    const mode = this.#semantic;
+    const spans = this.#selectionSpans(width);
+    // **The rectangle's own numbers while it is up** (C14 I55, I60): its size
+    // and the count over its cells, never the block set kept underneath.
+    let rect: Readonly<{ columns: number; rows: number }> | null = null;
+    let size: Readonly<{ chars: number; rows: number; entries: number }> | null;
+    if (mode.rect !== null) {
+      const cells = semantic.rectOf(mode, spans, this.#selectionOrder());
+      const text = cells === null ? "" : this.#rectText(graph, cells, width);
+      rect =
+        cells === null
+          ? { columns: 0, rows: 0 }
+          : { columns: cells.toColumn - cells.fromColumn + 1, rows: cells.toRow - cells.fromRow + 1 };
+      size = semantic.textSize(text, 1);
+    } else {
+      size = semantic.sizeOf(
+        mode,
         graph.documentEntries.map((e) => ({ id: e.id, blocks: e.doc.blocks })),
         graph.blocks.copySequence,
-      ),
+      );
+    }
+    return {
+      mode: "semantic",
+      size,
+      clears: semantic.hasSelection(mode),
+      all: semantic.selectsAll(mode, spans),
+      rect,
     };
   }
 
@@ -1910,10 +2031,12 @@ class Session implements TuiInstance {
       escapeSemanticSelection: () => this.#escapeSemanticSelection(),
       selectEntryUnderCaret: () => this.#selectEntries("caret"),
       selectAllLoadedEntries: () => this.#selectEntries("all"),
-      copySelectedEntries: () => this.#copySelectedEntries(),
+      copySelectedEntries: () => this.#copySelectedEntries(false),
+      copyAndLeaveSemanticSelection: () => this.#copySelectedEntries(true),
+      toggleSemanticRect: () => this.#toggleSemanticRect(),
       toast: (text) => this.#raiseToast(text),
-      moveSemanticCaret: (delta, extend) => this.#moveSemanticCaret(delta, extend),
-      semanticDrag: (row, phase) => this.#semanticDrag(row, phase),
+      moveSemanticCaret: (rows, columns, extend) => this.#moveSemanticCaret(rows, columns, extend),
+      semanticDrag: (row, phase, column) => this.#semanticDrag(row, phase, column),
       enterNativeSelection: () => this.#setNativeSelection(true),
       exitNativeSelection: () => this.#setNativeSelection(false),
       region: () => this.#composed().region,
@@ -1989,7 +2112,7 @@ class Session implements TuiInstance {
       bufferedEntries: () => this.#graph?.bufferedEntries ?? 0,
       // C14 I55 — which copy mode, and how much `⏎` would take. Over the held
       // view, as the copy itself is (A6), so the count is the paste.
-      copy: () => this.#copyState(),
+      copy: (columns) => this.#copyState(transcriptWidth(columns)),
       // C22 I118 — the owner line's field arm.
       editingField: () => this.#graph?.fieldHeld() != null,
       // C22 I133 — the owner line's keys, from the session's keymap.
@@ -2083,6 +2206,8 @@ function entryById(entries: readonly Entry[], id: string): Entry | undefined {
  * rail (C14 I58).
  */
 const NO_ROWS: ReadonlySet<number> = Object.freeze(new Set<number>());
+/** No block keys — the block set's place in the wash while the rectangle has the screen (C14 I60). */
+const NO_KEYS: ReadonlySet<string> = Object.freeze(new Set<string>());
 
 /**
  * The entry's blocks under a **banded** selection (C14 I54), or `undefined`.
@@ -2100,10 +2225,15 @@ function washedBlocksOf(graph: Graph, entryId: string, selection: SelectionWash 
   return ids.size === 0 ? undefined : ids;
 }
 
-/** What the wash needs: the selection and the spans it was taken over (I39). */
+/**
+ * What the wash needs: the selection and the spans it was taken over (I39) —
+ * and the rectangle, which replaces the block set on screen while it is up
+ * (C14 I60): `blocks` is empty then, so neither is washed twice.
+ */
 type SelectionWash = Readonly<{
   blocks: ReadonlySet<string>;
   spans: readonly semantic.BlockSpan[];
+  rect: semantic.CellRect | null;
 }>;
 
 function visibleRows(
@@ -2417,9 +2547,19 @@ function visibleRows(
     const washedRows = selection === null
       ? NO_ROWS
       : washedRowsOf(selection.spans, selection.blocks, entry.id, from, lines.length);
-    const shown = washedRows.size === 0
+    const blockShown = washedRows.size === 0
       ? lines
       : washSelectedRows(lines, washedRows, graph.theme.current, graph.capabilities, width);
+    // **The rectangle's cells, and the rail on its first row** (C14 I60, I58's
+    // *first row of the selection*). Only in the entry its block is in.
+    const rect = selection?.rect ?? null;
+    const inRect = rect !== null && semantic.entryOf(rect.key) === entry.id;
+    const shown = inRect
+      ? washRectCells(blockShown, rect, from, graph.theme.current, graph.capabilities)
+      : blockShown;
+    const rectRail = inRect && rect.fromRow - from >= 0 && rect.fromRow - from < lines.length
+      ? new Set([rect.fromRow - from])
+      : NO_ROWS;
     // **Column 0, the rail's** (C14 I57, I58, ruling 68). Every row the frame
     // draws in the transcript is led by one cell the blocks never see: the rail
     // beside the first row of each selected block and each selected element,
@@ -2434,7 +2574,7 @@ function visibleRows(
           from,
           lines.length,
         );
-    const railRows = railRowsOf(washedRows, elementRows);
+    const railRows = railRowsOf(railRowsOf(washedRows, rectRail), elementRows);
     const rail = railRows.size === 0 ? "" : railCell(graph.theme.current, graph.capabilities);
     const led = shown.map((row, i) => (railRows.has(i) ? rail : RAIL_BLANK) + row);
     out.push(...[...keptChrome.map((row) => RAIL_BLANK + row), ...led].slice(0, ve.takeRows));

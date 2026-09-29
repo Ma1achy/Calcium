@@ -124,6 +124,7 @@ describe("C14 §6b — the freeze", () => {
       caret: { entryId: id, row: 0 },
       anchor: null,
       blocks: new Set([keyOf(id, "e1")]),
+      rect: null,
     };
     const textOf = (entries: readonly { id: string; doc: { blocks: readonly Block[] } }[]): string =>
       copyTextOf(

@@ -499,6 +499,12 @@ const BYTES: Readonly<Record<string, readonly string[]>> = {
   "semanticSelection down": ["\u001b[B"],
   "semanticSelection s+up": ["\u001b[1;2A"],
   "semanticSelection s+down": ["\u001b[1;2B"],
+  // The rectangle's four and its toggle (C14 I60, ruling 36).
+  "semanticSelection s+left": ["\u001b[1;2D"],
+  "semanticSelection s+right": ["\u001b[1;2C"],
+  "semanticSelection left": ["\u001b[D", "\u001bOD"],
+  "semanticSelection right": ["\u001b[C", "\u001bOC"],
+  "semanticSelection c+v": ["\u0016"],
 
   // Scrolling (I23). **This is the check the ruling asked for**, and it
   // came out positive: `⌃Home` and `⌃End` reach the decoder in both of the
@@ -1180,8 +1186,13 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     // `←` `→` `⏎` `esc` `⇥` `⇧⇥` and `watch.jump[n]`'s `1`–`9` — fifteen in,
     // none out. The prompt's `⇧⇥` kept its row and changed its action to
     // `focusPrevious`, which the set below is what says.
-    expect(rows).toHaveLength(149);
-    expect(new Set(rows).size, "no two rows are identical").toBe(149);
+    //
+    // **154 from C14 I59 and I60** (review batch 4, M10; rulings 36, 70). Five
+    // in, none out: the rectangle's `⇧←` `⇧→` `←` `→` at `semanticSelection`,
+    // and its `⌃V` toggle. `⏎` there kept its row and changed its action, to
+    // `copyAndLeaveSemanticSelection`.
+    expect(rows).toHaveLength(154);
+    expect(new Set(rows).size, "no two rows are identical").toBe(154);
 
     // Every row whose chord the registry names resolves to the registry's key —
     // the join asserted from the table's side, so a `chordOf` call that silently
@@ -1240,8 +1251,12 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
       //
       // **106 from C16 §6d** (ruling 50): every one of the watch row's fifteen
       // is a registry chord — the six motions' and `watch.jump.1`–`9`'s own.
+      //
+      // **110 from C14 I60**: the rectangle's four arrows at `semanticSelection`
+      // are `selection.left`/`selection.right` and `move.left`/`move.right`.
+      // `⌃V` is not — a target-local keycap, as `a`, `A` and `y` are.
       "the rows the registry supplies a chord for",
-    ).toBe(106);
+    ).toBe(110);
   });
 
   it("T1.94 (I41): ⌘↑ and ⌥↑ are two actions under the enhanced profile and one under the base", () => {
@@ -1592,14 +1607,16 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
 });
 
 describe("C16 §8 I53 — key repeat is declared per binding", () => {
-  it("T1.47 (C14 I47, R-SEL-015): ⏎ at semanticSelection is y's copySelectedEntries", () => {
+  it("T1.47 (C14 I47, C14 I59, R-SEL-015): ⏎ at semanticSelection copies and leaves, y copies and stays", () => {
     const map = createKeymap(defaultKeymap);
     const enter: Key = { name: "enter", ctrl: false, meta: false, shift: false, sequence: "\r" };
     const y: Key = { name: "y", ctrl: false, meta: false, shift: false, sequence: "y" };
     // The control: `y` is the copy key here, so the row below compares against
     // a binding that exists rather than against two absences.
     expect(map.resolve("semanticSelection", y)?.action).toBe("copySelectedEntries");
-    expect(map.resolve("semanticSelection", enter)?.action, "⏎ is the same action").toBe("copySelectedEntries");
+    // **Amended (C14 I59)**: ⏎ is the copy that leaves — its own action over
+    // `y`'s copy path, which T4.40 drives through a session.
+    expect(map.resolve("semanticSelection", enter)?.action, "⏎ copies and leaves").toBe("copyAndLeaveSemanticSelection");
     // Native handoff copies through the terminal, and ⏎ is not bound there.
     expect(map.resolve("nativeSelection", enter) ?? null, "and nothing at native handoff").toBeNull();
   });
@@ -1977,12 +1994,14 @@ describe("C16 §6c — routes by profile and the registry-global placement (revi
       // binds them at the row.
       "binding.006": ["watchRow"],
       "binding.007": ["watchRow"],
-      "binding.008": ["panel", "semanticSelection"],
-      "binding.009": ["panel", "semanticSelection"],
+      // `←`/`→` and `⇧←`/`⇧→` are the rectangle's at `semanticSelection` since
+      // C14 I60, so copy mode no longer passes them.
+      "binding.008": ["panel"],
+      "binding.009": ["panel"],
       "binding.010": ["prompt"],
       "binding.011": ["prompt"],
-      "binding.012": ["liveBlock", "semanticSelection"],
-      "binding.013": ["liveBlock", "semanticSelection"],
+      "binding.012": ["liveBlock"],
+      "binding.013": ["liveBlock"],
       // And `copy` passes at the row, which holds nothing to copy.
       "binding.copy-enhanced": ["overlay", "panel", "nativeSelection", "watchRow"],
       "binding.copy-base": ["overlay", "panel", "nativeSelection", "watchRow"],

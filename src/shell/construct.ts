@@ -397,7 +397,7 @@ export type FrameQueries = Readonly<{
    * extends it, and a release ends it. The drag's state and the ticker live
    * where the clock is (A03 SS1); the geometry lives here.
    */
-  semanticDrag: (regionRow: number, phase: "press" | "move" | "release") => boolean;
+  semanticDrag: (regionRow: number, phase: "press" | "move" | "release", column?: number) => boolean;
   // **No consumer in `src/` yet, and the consumer is named** (M10c). The footer
   // label is what reads it, and the label is parked on a word the design does
   // not supply: `owner` is the *rung*, both modes map to `copy`, and the design
@@ -410,10 +410,17 @@ export type FrameQueries = Readonly<{
   selectAllLoadedEntries: () => void;
   /** `y` — the selection to the clipboard, with `R-SEL-011`'s refusal when it cannot leave the process. */
   copySelectedEntries: () => void;
+  /** `⏎` — `y`'s copy, then the mode's exit; an empty copy stays and says so (C14 I59). */
+  copyAndLeaveSemanticSelection: () => void;
+  /** `⌃V` — the rectangle on at the caret, or off (C14 I60, ruling 36). */
+  toggleSemanticRect: () => void;
   /** C22 I116 — a toast in the footer's tail, for a fact that changed nothing (§012). */
   toast: (text: string) => void;
-  /** A plain arrow and a shifted one, over the held document (C14 I37, §6c). */
-  moveSemanticCaret: (delta: number, extend: boolean) => void;
+  /**
+   * An arrow, plain or shifted, over the held document (C14 I37, I60, §6c).
+   * `columns` moves only the rectangle; at block granularity it is ignored.
+   */
+  moveSemanticCaret: (rows: number, columns: number, extend: boolean) => void;
   /**
    * Where the transcript sits, for mouse routing (C16 `RouterDeps.region`).
    *
@@ -477,6 +484,11 @@ export type Graph = Readonly<{
   ) => Readonly<{ entryId: string; row: number }> | null;
   scrollBoxSpans: () => readonly BoxSpan[];
   scrollContainerBy: (container: DragContainer, rows: number) => boolean;
+  /**
+   * Scroll the viewport so a caret is on screen (C14 I37 amended, R-SEL-012) —
+   * by the overshoot, and by single rows while its entry is off screen.
+   */
+  revealSemanticCaret: (caret: Readonly<{ entryId: string; row: number }>, width: number) => void;
   containerRect: (
     container: DragContainer,
     width: number,
@@ -3074,6 +3086,49 @@ export async function constructGraph(
   };
 
   /**
+   * A keyboard caret brought on screen (C14 I37 amended, R-SEL-012's last
+   * sentence, I44's *a keyboard extend at an edge scrolls the same one*).
+   *
+   * **The viewport, and only the viewport**: to the keyboard a scroll box is one
+   * atomic block (I36), so the caret never stands inside its scroll. The row is
+   * `containerRect`'s arithmetic — `blankRowsAbove`, `visible()`, the chrome —
+   * and the scroll is the overshoot, so the caret lands on the edge row. A
+   * caret whose entry is not on screen at all is one row past the last visible
+   * entry (a caret moves a row at a time), and single rows bring it on; the
+   * loop stops the moment the viewport cannot move, so a clamp ends it.
+   */
+  const revealSemanticCaret = (
+    caret: Readonly<{ entryId: string; row: number }>,
+    width: number,
+  ): void => {
+    const height = deps.frame.region().height;
+    const entry = stores.documentEntries.find((e) => e.id === caret.entryId);
+    if (entry === undefined || height <= 0) return;
+    const order = stores.documentEntries.map((e) => e.id);
+    const at = order.indexOf(caret.entryId);
+    const rowOnScreen = (): number | "above" | "below" => {
+      const { viewportHeight, totalRows } = stores.viewport.scroll;
+      let top = blankRowsAbove(viewportHeight, totalRows);
+      const shown = stores.viewport.visible().entries;
+      for (const ve of shown) {
+        if (ve.id === caret.entryId) return top + chromeRowsOf(entry, width) + caret.row - ve.skipRows;
+        top += ve.takeRows;
+      }
+      const first = shown[0];
+      return first !== undefined && order.indexOf(first.id) > at ? "above" : "below";
+    };
+    for (let guard = 0; guard <= height + 1; guard += 1) {
+      const row = rowOnScreen();
+      const rows = row === "above" ? -1 : row === "below" ? 1 : row < 0 ? row : row >= height ? row - height + 1 : 0;
+      if (rows === 0) return;
+      const before = stores.viewport.scroll.topRow;
+      stores.viewport.scrollBy(rows);
+      if (stores.viewport.scroll.topRow === before) return;
+      if (typeof row === "number") return;
+    }
+  };
+
+  /**
    * One autoscroll tick's effect — `false` is **the container's end** (C14 I45).
    *
    * `R-SEL-013` stops there rather than rubber-banding, and the stop is read out
@@ -3498,6 +3553,8 @@ export async function constructGraph(
     selectEntryUnderCaret: deps.frame.selectEntryUnderCaret,
     selectAllLoadedEntries: deps.frame.selectAllLoadedEntries,
     copySelectedEntries: deps.frame.copySelectedEntries,
+    copyAndLeaveSemanticSelection: deps.frame.copyAndLeaveSemanticSelection,
+    toggleSemanticRect: deps.frame.toggleSemanticRect,
     toast: deps.frame.toast,
     moveSemanticCaret: deps.frame.moveSemanticCaret,
     exitNativeSelection: deps.frame.exitNativeSelection,
@@ -4462,7 +4519,10 @@ export async function constructGraph(
       if (e.kind === "mouse") {
         if (e.button === "none" || e.button.startsWith("wheel")) return false;
         const phase = !e.press ? "release" : e.motion ? "move" : "press";
-        return deps.frame.semanticDrag(e.row - deps.frame.region().top, phase);
+        // The column by `region.left`, once, as `pointerEffect` translates it
+        // (C14 I57): a rectangle's cell is a transcript column (C14 I60).
+        const region = deps.frame.region();
+        return deps.frame.semanticDrag(e.row - region.top, phase, e.col - region.left);
       }
       const effect = bound("semanticSelection", e);
       if (effect === null) return false;
@@ -4880,6 +4940,7 @@ export async function constructGraph(
     },
     layerScroll: (id: string) => layerScroll.get(id) ?? 0,
     semanticCaretAt,
+    revealSemanticCaret,
     scrollBoxSpans,
     scrollContainerBy,
     containerRect,

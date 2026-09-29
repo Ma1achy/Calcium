@@ -370,6 +370,14 @@ export function blockWidthInEntry(
   return null;
 }
 
+/** A top-level block's content rows and its run's columns, in entry space (C14 I51, I60). */
+export type BlockSpanOfEntry = Readonly<{
+  blockId: string;
+  from: number;
+  to: number;
+  cols: Readonly<{ from: number; to: number }>;
+}>;
+
 /**
  * Each top-level block's **content** rows in entry space (C14 I51) — the runs
  * and the row cursor `elementsOfEntry` uses, so the two cannot disagree about
@@ -380,15 +388,18 @@ export function blockSpansOfEntry(
   registry: Pick<BlockRegistry, "measure" | "measureSequence">,
   blocks: readonly Block[],
   width: number,
-): readonly Readonly<{ blockId: string; from: number; to: number }>[] {
-  const out: Readonly<{ blockId: string; from: number; to: number }>[] = [];
+): readonly BlockSpanOfEntry[] {
+  const out: BlockSpanOfEntry[] = [];
   let top = 0;
   for (const run of entryLayout(blocks, width)) {
     let row = top; // cells-ok — a row cursor, not a width
+    // **The run's columns, in entry-line cells** (C14 I60): the gutter before
+    // `run.indent` is the entry's, and a rectangle's column clamps inside this.
+    const cols = Object.freeze({ from: run.indent, to: run.indent + run.width });
     for (const block of run.blocks) {
       const height = registry.measure(block, run.width);
       const pad = paddingOf(block);
-      out.push(Object.freeze({ blockId: block.id, from: row + pad.t, to: row + height - pad.b }));
+      out.push(Object.freeze({ blockId: block.id, from: row + pad.t, to: row + height - pad.b, cols }));
       row += height;
     }
     top += runRows(registry.measureSequence, run);

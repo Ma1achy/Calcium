@@ -96,7 +96,23 @@ export type SessionSnapshot = Readonly<{
  */
 export type CopyState =
   | Readonly<{ mode: "native" }>
-  | Readonly<{ mode: "semantic"; size: Readonly<{ chars: number; rows: number; entries: number }> | null }>;
+  | Readonly<{
+      mode: "semantic";
+      size: Readonly<{ chars: number; rows: number; entries: number }> | null;
+      /**
+       * *A selection exists* — `hasSelection`, the predicate `esc` branches on
+       * (C14 I59). **Not `size !== null`**: a selection of a `rule` alone copies
+       * nothing and is still what the next `esc` clears.
+       */
+      clears: boolean;
+      /** Every span of the held view is selected — `A`'s *says what it did*, derived (C14 I55). */
+      all: boolean;
+      /**
+       * The rectangle's size in cells, or `null` at block granularity (C14 I60).
+       * Zero by zero where it resolves to no block.
+       */
+      rect: Readonly<{ columns: number; rows: number }> | null;
+    }>;
 
 export type ChromeContext = Readonly<{
   session: SessionSnapshot;

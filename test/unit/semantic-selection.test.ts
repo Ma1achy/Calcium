@@ -22,6 +22,9 @@ import {
   keyOf,
   selectAll,
   selectCaret,
+  hasSelection,
+  selectsAll,
+  toggleRect,
   type BlockSpan,
   type SemanticMode,
 } from "../../src/shell/semantic-selection.js";
@@ -205,6 +208,11 @@ describe("C09 §7a — a kind declares its copy text (M10c)", () => {
 describe("C14 I55 — the copy rung's footer", () => {
   const labels = (copy?: CopyState, caps = FULL_CAPS): readonly string[] =>
     ownerLine("copy", caps, false, 0, copy).map((c) => c.label);
+  /** A semantic state at block granularity; `clears` follows the size unless given, as a selection that copies text does. */
+  const sem = (
+    size: Readonly<{ chars: number; rows: number; entries: number }> | null,
+    extra: Partial<{ clears: boolean; all: boolean; rect: Readonly<{ columns: number; rows: number }> | null }> = {},
+  ): CopyState => ({ mode: "semantic", size, clears: size !== null, all: false, rect: null, ...extra });
 
   it("T1.50 (C14 I55, R-SEL-005, R-SEL-009): the copy rung's owner line reads by mode, esc clears before it leaves, and the count is three chips", () => {
     // **The control: nothing selected** — `esc out`, and no count at all
@@ -212,15 +220,17 @@ describe("C14 I55 — the copy rung's footer", () => {
     // `⇧↑⇧↓`, not `↑↓` (C22 I133): the bare arrows move the caret, and the chip
     // is the keymap's `extendSemanticSelection*` rows since the line stopped
     // spelling its own keys.
-    const idle = ["copy", "⇧↑⇧↓ extend", "⏎ copy", "esc out", "the screen is frozen"];
-    expect(labels({ mode: "semantic", size: null })).toEqual(idle);
+    // **Amended (C14 I59, I60)**: `⏎ copy` is the copy that leaves, and
+    // `⌃V rect` names the way into the rectangle — last, the first to shed.
+    const idle = ["copy", "⇧↑⇧↓ extend", "⏎ copy", "esc out", "the screen is frozen", "⌃V rect"];
+    expect(labels(sem(null))).toEqual(idle);
     expect(labels(undefined), "no copy state is semantic mode with nothing selected").toEqual(idle);
 
     // Over a selection the first esc clears, and the count follows it in order.
-    expect(labels({ mode: "semantic", size: { chars: 418, rows: 9, entries: 2 } })).toEqual([
-      "copy", "⇧↑⇧↓ extend", "⏎ copy", "esc clear", "418 chars · 9 rows · 2 entries", "the screen is frozen",
+    expect(labels(sem({ chars: 418, rows: 9, entries: 2 }))).toEqual([
+      "copy", "⇧↑⇧↓ extend", "⏎ copy", "esc clear", "418 chars · 9 rows · 2 entries", "the screen is frozen", "⌃V rect",
     ]);
-    const one = labels({ mode: "semantic", size: { chars: 1, rows: 1, entries: 1 } });
+    const one = labels(sem({ chars: 1, rows: 1, entries: 1 }));
     expect(one[4], "one of each is singular").toBe("1 char · 1 row · 1 entry");
 
     // **Native handoff names none of the semantic mode's keys**: they reach
@@ -249,12 +259,17 @@ describe("C14 I55 — the copy rung's footer", () => {
     };
     expect(header({ mode: "native" })).toContain("NATIVE");
     expect(header({ mode: "native" })).not.toContain("COPY");
-    expect(header({ mode: "semantic", size: null })).toContain("COPY");
+    expect(header(sem(null))).toContain("COPY");
 
     // At ASCII the separator is the glyph table's, not a literal middle dot.
-    expect(labels({ mode: "semantic", size: { chars: 3, rows: 1, entries: 1 } }, ASCII_CAPS)).toContain("3 chars : 1 row : 1 entry");
-    // Every chip is drawable at the ASCII rung (A03 SS47).
-    for (const copy of [{ mode: "native" } as const, { mode: "semantic", size: { chars: 3, rows: 1, entries: 1 } } as const]) {
+    expect(labels(sem({ chars: 3, rows: 1, entries: 1 }), ASCII_CAPS)).toContain("3 chars : 1 row : 1 entry");
+    // Every chip is drawable at the ASCII rung (A03 SS47) — the rectangle's
+    // `×` included, which is `x` there.
+    for (const copy of [
+      { mode: "native" } as const,
+      sem({ chars: 3, rows: 1, entries: 1 }),
+      sem({ chars: 3, rows: 1, entries: 1 }, { all: true, rect: { columns: 3, rows: 1 } }),
+    ]) {
       for (const label of labels(copy, ASCII_CAPS)) expect(label, label).toMatch(/^[\x20-\x7e]*$/u);
     }
   });
@@ -272,7 +287,7 @@ describe("C14 I55 — the copy rung's footer", () => {
       { id: "e3", blocks: [{ kind: "rule", id: "r2" }] as unknown as Block[] },
     ];
     const pick = (...keys: string[]): SemanticMode =>
-      Object.freeze({ caret: null, anchor: null, blocks: new Set(keys) });
+      Object.freeze({ caret: null, anchor: null, blocks: new Set(keys), rect: null });
     const all = pick(keyOf("e1", "a"), keyOf("e1", "r1"), keyOf("e2", "b"), keyOf("e3", "r2"));
 
     // `héllo\nwörld\n\n日本𝄞` — 5 + 1 + 5 + 2 + 3 code points, four lines, two
@@ -290,7 +305,68 @@ describe("C14 I55 — the copy rung's footer", () => {
 });
 
 describe("C14 §6e — the footer's classification table", () => {
-  it.todo(
-    "T1.80 (C14 I55, C14 I59): ownerLine for every row of §6e's footer table, whole — only blocks that copy nothing reads esc clear with no count, every span reads all loaded entries, the empty transcript and the rectangle over a full block set do not — and hasSelection agrees with escape() on every row — not deferred on a component: the code lands in the next commit of this round",
-  );
+  it("T1.80 (C14 I55, C14 I59, §6e): every row of the footer table, whole, and the esc label agrees with escape() on each", () => {
+    const line = (copy: CopyState, caps = FULL_CAPS): readonly string[] =>
+      ownerLine("copy", caps, false, 0, copy).map((c) => c.label);
+    const COUNT = { chars: 12, rows: 2, entries: 1 };
+    const count = "12 chars · 2 rows · 1 entry";
+    const at = (entryId: string, row: number) => Object.freeze({ entryId, row });
+    // **Real states, and the footer's `clears` read off them** as the session
+    // does — so a row that pairs a state with the label it draws is asserting
+    // the predicate, not a literal the test chose.
+    const spans: readonly BlockSpan[] = [
+      { key: keyOf("e1", "t"), from: 0, to: 1 },
+      { key: keyOf("e1", "r"), from: 1, to: 2 },
+    ];
+    const base = enter(null, at("e1", 0));
+    const some = selectCaret(base, [spans[0] as BlockSpan]);
+    const ruleOnly: SemanticMode = Object.freeze({ caret: at("e1", 1), anchor: null, blocks: new Set([keyOf("e1", "r")]), rect: null });
+    const all = selectAll(base, spans);
+    const rectOn = toggleRect(base, spans);
+    const rectOverAll = toggleRect(all, spans);
+    const state = (
+      mode: SemanticMode,
+      size: typeof COUNT | null,
+      rect: Readonly<{ columns: number; rows: number }> | null = null,
+      loaded: readonly BlockSpan[] = spans,
+    ): CopyState => ({ mode: "semantic", size, clears: hasSelection(mode), all: selectsAll(mode, loaded), rect });
+
+    const rows: readonly (readonly [string, SemanticMode, CopyState, readonly string[]])[] = [
+      ["blocks, none", base, state(base, null),
+        ["copy", "⇧↑⇧↓ extend", "⏎ copy", "esc out", "the screen is frozen", "⌃V rect"]],
+      ["blocks, some", some, state(some, COUNT),
+        ["copy", "⇧↑⇧↓ extend", "⏎ copy", "esc clear", count, "the screen is frozen", "⌃V rect"]],
+      // **The row M10 item 5 named**: a selection that copies nothing is a
+      // selection, and the press over it clears. No count, and `esc clear`.
+      ["blocks, only a rule", ruleOnly, state(ruleOnly, null),
+        ["copy", "⇧↑⇧↓ extend", "⏎ copy", "esc clear", "the screen is frozen", "⌃V rect"]],
+      ["blocks, every span", all, state(all, COUNT),
+        ["copy", "⇧↑⇧↓ extend", "⏎ copy", "esc clear", count, "the screen is frozen", "all loaded entries", "⌃V rect"]],
+      // `every` over nothing is true, and nothing is not *all*.
+      ["blocks, empty transcript", enter(null, null), state(enter(null, null), null, null, []),
+        ["copy", "⇧↑⇧↓ extend", "⏎ copy", "esc out", "the screen is frozen", "⌃V rect"]],
+      ["rect, unresolved", rectOn, state(rectOn, null, { columns: 0, rows: 0 }),
+        ["copy", "RECT", "cells, not source", "⇧↑⇧↓⇧←⇧→ extend", "⏎ copy", "esc clear", "the screen is frozen", "⌃V blocks"]],
+      ["rect, resolved", rectOn, state(rectOn, COUNT, { columns: 6, rows: 2 }),
+        ["copy", "RECT 6×2", "cells, not source", "⇧↑⇧↓⇧←⇧→ extend", "⏎ copy", "esc clear", count, "the screen is frozen", "⌃V blocks"]],
+      // **The table's own find**: the rectangle over a full block set is not
+      // *all loaded entries* — its copy is its cells.
+      ["rect over every span", rectOverAll, state(rectOverAll, COUNT, { columns: 6, rows: 2 }),
+        ["copy", "RECT 6×2", "cells, not source", "⇧↑⇧↓⇧←⇧→ extend", "⏎ copy", "esc clear", count, "the screen is frozen", "⌃V blocks"]],
+    ];
+    for (const [name, mode, copy, want] of rows) {
+      expect(line(copy), name).toEqual(want);
+      // **The label and the behaviour, over the same state**: `esc clear`
+      // exactly where `escape()` keeps the mode up.
+      expect(line(copy).includes("esc clear"), `${name}: the label says what esc does`).toBe(escape(mode) !== null);
+    }
+    // The waiting count follows the frozen screen, and the toggle — a hint —
+    // is last, so it is the first thing the line sheds (§6e, *The order is a
+    // rank*).
+    expect(ownerLine("copy", FULL_CAPS, false, 3, state(all, COUNT)).map((c) => c.label).slice(-4)).toEqual([
+      "the screen is frozen", "3 waiting", "all loaded entries", "⌃V rect",
+    ]);
+    // At ASCII the rectangle's `×` is `x`.
+    expect(line(state(rectOn, COUNT, { columns: 6, rows: 2 }), ASCII_CAPS)).toContain("RECT 6x2");
+  });
 });

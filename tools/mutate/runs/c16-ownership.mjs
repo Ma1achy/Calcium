@@ -129,8 +129,9 @@ const results = runPass({
       // C22 I133 — the copy line names the caret's arrows for extend.
       name: "the copy line's extend chip reads the caret's rows",
       file: CHROME,
-      from: '["extendSemanticSelectionUp", "extendSemanticSelectionDown"], "extend"',
-      to: '["moveSemanticCaretUp", "moveSemanticCaretDown"], "extend"',
+      // Re-anchored for C14 I60: the rectangle adds the horizontal pair.
+      from: '? ["extendSemanticSelectionUp", "extendSemanticSelectionDown"]',
+      to: '? ["moveSemanticCaretUp", "moveSemanticCaretDown"]',
       expect: "T1.171",
     },
     {

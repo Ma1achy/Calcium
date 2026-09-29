@@ -137,7 +137,7 @@ export type ComposeDeps = Readonly<{
    * The copy rung's mode and size (C14 I55). Optional for `bufferedEntries`'
    * reason: a composition with no session graph has no mode to report.
    */
-  copy?: () => CopyState | undefined;
+  copy?: (columns: number) => CopyState | undefined;
   /** C22 I118 — a form field holds the editor; the owner line names it. */
   editingField?: () => boolean;
   /**
@@ -214,7 +214,10 @@ export function compose(deps: ComposeDeps): Composed {
   const session = deps.session();
   const lastFrame = deps.lastFrame?.();
   const capabilities = deps.capabilities();
-  const copy = deps.copy?.();
+  // **The frame's own width, handed down** (C14 I60): the count over a
+  // rectangle is taken over lines laid at the transcript's width, and a copy
+  // state that composed a frame to learn it would compose one inside this one.
+  const copy = deps.copy?.(size.columns);
   const editingField = deps.editingField?.() === true;
   const toast = deps.toast?.();
   const hints = deps.hints?.();

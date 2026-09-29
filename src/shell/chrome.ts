@@ -507,10 +507,29 @@ function ownerChips(
           { label: "the screen is frozen", tone: "muted" },
         ];
       }
-      const size = copy?.mode === "semantic" ? copy.size : null;
+      const semantic = copy?.mode === "semantic" ? copy : null;
+      const size = semantic?.size ?? null;
+      const rect = semantic?.rect ?? null;
       // The frozen screen is the fact, not a hint: it is why nothing responds.
       return [
         { label: "copy", tone: "warn" },
+        // **The rectangle says so in the mode label** (`R-SEL-007`, question 5,
+        // C14 I60): `RECT 12×4` and `cells, not source`, two chips for the
+        // reason the count is one chip and not three — the separator is the
+        // cluster's to draw, and T2.116 refuses a literal one. `RECT` alone
+        // where the rectangle resolves to no block.
+        ...(rect === null
+          ? []
+          : [
+              {
+                label:
+                  rect.columns === 0
+                    ? "RECT"
+                    : `RECT ${String(rect.columns)}${mark(["×", "x"], caps)}${String(rect.rows)}`,
+                tone: "warn" as const,
+              },
+              { label: "cells, not source", tone: "muted" as const },
+            ]),
         // **The refused interrupt, once** (C16 I62, ruling 60). `⌃c` is refused
         // in the mode and the frame is otherwise still, so without this the key
         // is swallowed rather than refused. Drawn on the frame after the refusal
@@ -519,19 +538,35 @@ function ownerChips(
         ...(hints.refused === true
           ? [{ label: `${glyphFor("warn", caps)} interrupt refused`, tone: "warn" as const }]
           : []),
-        // **Vertical only** (C14 §6c): at block granularity there is no
-        // horizontal extent. **And the shifted pair** — the bare arrows move the
-        // caret and `⇧↑⇧↓` extend (`extendSemanticSelection*`), which the line
-        // spelled as bare `↑↓` for as long as it spelled its own keys.
-        ...keyed(hints, "semanticSelection", ["extendSemanticSelectionUp", "extendSemanticSelectionDown"], "extend", caps),
-        ...keyed(hints, "semanticSelection", ["copySelectedEntries"], "copy", caps),
+        // **The shifted arrows extend** — the bare ones move the caret — and
+        // **the horizontal pair only in the rectangle** (C14 I60, ruling 70): at
+        // block granularity a block is atomic and `⇧←⇧→` reach nothing.
+        ...keyed(
+          hints,
+          "semanticSelection",
+          rect === null
+            ? ["extendSemanticSelectionUp", "extendSemanticSelectionDown"]
+            : [
+                "extendSemanticSelectionUp",
+                "extendSemanticSelectionDown",
+                "extendSemanticSelectionLeft",
+                "extendSemanticSelectionRight",
+              ],
+          "extend",
+          caps,
+        ),
+        // `⏎` copies and leaves (C14 I59); §103 draws it `⏎ copy`, and `y` —
+        // the copy that stays — is a bare keycap undrawn, as `a` and `A` are.
+        ...keyed(hints, "semanticSelection", ["copyAndLeaveSemanticSelection"], "copy", caps),
         // **Two chips, not one label with a `·` in it.** The separator is the
         // cluster's to draw (C09 I49) — a literal one in a string is the head's
         // unresolved join F828 found, and T2.116 is right to refuse it here too.
-        // **Which press is next** (`R-SEL-005`, C16 I51): over a selection the
-        // first `esc` clears it, and a footer saying `out` labels that press as
-        // the leaving one.
-        ...one("semanticSelection", "escapeSemanticSelection", size === null ? "out" : "clear"),
+        // **Which press is next** (`R-SEL-005`, C16 I51, C14 I59): over a
+        // selection the first `esc` clears it. **Read from `clears`, which is
+        // `escape()`'s own predicate** — this read `size === null`, and a
+        // selection of a `rule` alone, which copies nothing, drew `esc out` over
+        // the press that cleared.
+        ...one("semanticSelection", "escapeSemanticSelection", semantic?.clears === true ? "clear" : "out"),
         // **The count, over the copy text** (C14 I38, I55, `R-SEL-015`): what
         // `⏎` would put on the clipboard now, as question 35 ruled it —
         // `418 chars · 9 rows · 2 entries`. **One chip**, because the pill's gap
@@ -558,6 +593,17 @@ function ownerChips(
         ...(buffered > 0
           ? [{ label: `${String(buffered)} waiting`, tone: "muted" as const }]
           : []),
+        // **After the facts, the two the line sheds first** (C14 I55). The line
+        // sheds from the right (§103), so what is last goes first: the count,
+        // the frozen screen and the waiting notice are `R-SEL-009`'s and
+        // `R-SEL-010`'s, and these two are not. **`A` says what it did**
+        // (`R-SEL-008`): *the window is not the record*, so the chip names the
+        // loaded entries — derived by equality with every span, so an extend
+        // that shrinks the set drops it.
+        ...(semantic?.all === true ? [{ label: "all loaded entries", tone: "muted" as const }] : []),
+        // **The toggle names where it goes** (C14 I60) — a hint, and the
+        // lowest-ranked thing on the line.
+        ...one("semanticSelection", "toggleSemanticRect", rect === null ? "rect" : "blocks"),
       ];
     }
     case "question": {

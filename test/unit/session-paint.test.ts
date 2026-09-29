@@ -901,12 +901,13 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
     // The corpus, before anything is asserted over it: a walk that found nothing
     // satisfies every for-loop below it (`an exit status is the same bit for
     // clean and for did-not-run`).
-    // **Thirteen, and the last five are M5's owner line** (R-KEY-004, §103). The
+    // **Fourteen, and the last six are M5's owner line** (R-KEY-004, §103) —
+    // `⌃V rect` joined it with the rectangle (C14 I60), last. The
     // fixture's owner is `copy`, so `COPY` in the header and the owner line in
     // the footer are one fact stated at both ends — the header says *which* mode
     // and the last line says *what your keys do in it*, which is the half §103
     // says a reader fights without.
-    expect(all.map((c) => c.label), "thirteen chips, with all three conditional ones up and an owner raised").toEqual([
+    expect(all.map((c) => c.label), "fourteen chips, with all three conditional ones up and an owner raised").toEqual([
       "calcium",
       "/usr/local/bin/prism",
       "COPY",
@@ -923,6 +924,7 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
       // literal `·` inside a label is the unresolved join T2.116 refuses.
       "esc out",
       "the screen is frozen",
+      "⌃V rect",
     ]);
     for (const chip of all) {
       expect(chip.tone, `${chip.label} inherits C09's default instead of naming its own`).toBeDefined();
@@ -1219,7 +1221,7 @@ describe("C22 I133 — the owner line's chords are the keymap's (review batch 2,
     return { chord: (target, action) => entries.find((b) => b.target === target && b.action === action)?.key };
   };
   const labelsOf = (rung: OwnerRung, hints: OwnerHints, opts: { field?: boolean; semantic?: boolean } = {}) =>
-    ownerLine(rung, ASCII_CAPS, false, 0, opts.semantic === true ? { mode: "semantic", size: null } : { mode: "native" }, opts.field === true, hints)
+    ownerLine(rung, ASCII_CAPS, false, 0, opts.semantic === true ? { mode: "semantic", size: null, clears: false, all: false, rect: null } : { mode: "native" }, opts.field === true, hints)
       .map((c) => c.label);
   const ASK = { question: "Discard the draft?", choices: [{ key: "y", label: "discard" }, { key: "n", label: "keep", default: true as const }] };
 
@@ -1264,7 +1266,7 @@ describe("C22 I133 — the owner line's chords are the keymap's (review batch 2,
     expect(drawn.length, "the owner words and facts were drawn").toBeGreaterThan(6);
 
     // The copy line names the extend rows — `⇧↑⇧↓` — and not the caret's `↑↓`.
-    expect(ownerLine("copy", FULL_CAPS, false, 0, { mode: "semantic", size: null }, false, hints).map((c) => c.label))
+    expect(ownerLine("copy", FULL_CAPS, false, 0, { mode: "semantic", size: null, clears: false, all: false, rect: null }, false, hints).map((c) => c.label))
       .toContain("⇧↑⇧↓ extend");
 
     // **A question's line is its own vocabulary**, read through the graph: the

@@ -32,7 +32,8 @@ const MUTATIONS = [
     // **As it shipped**: the clearing press labelled as the leaving one.
     name: "esc always says out",
     file: CHROME,
-    from: '"escapeSemanticSelection", size === null ? "out" : "clear")',
+    // Re-anchored for C14 I59: the label reads `clears`.
+    from: '"escapeSemanticSelection", semantic?.clears === true ? "clear" : "out")',
     to: '"escapeSemanticSelection", "out")',
     expect: "T4.37g",
   },
@@ -86,7 +87,7 @@ const MUTATIONS = [
   {
     name: "the session supplies no copy state",
     file: SESSION,
-    from: "      copy: () => this.#copyState(),",
+    from: "      copy: (columns) => this.#copyState(transcriptWidth(columns)),",
     to: "      copy: () => undefined,",
     expect: "T4.37g",
   },
@@ -107,7 +108,7 @@ const results = await runPass({
     // **A change the run's own corpus can see** (F1254): every copy footer
     // says `esc clear`, so the idle frames fail.
     file: CHROME,
-    from: '"escapeSemanticSelection", size === null ? "out" : "clear")',
+    from: '"escapeSemanticSelection", semantic?.clears === true ? "clear" : "out")',
     to: '"escapeSemanticSelection", "clear")',
     why: "the idle copy footer says esc clear, so T1.50's and T4.37g's controls fail — if this survives, nothing reads the footer",
   },

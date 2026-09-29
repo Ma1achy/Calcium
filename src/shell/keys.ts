@@ -172,14 +172,21 @@ export type KeyDeps = Readonly<{
    * a copy cannot leave the process is the mode's statement rather than a key's.
    */
   copySelectedEntries: () => void;
+  /** `⏎` — the same copy, then the mode's exit (C14 I59, I47). */
+  copyAndLeaveSemanticSelection: () => void;
+  /** `⌃V` — the rectangle on or off (C14 I60, ruling 36). */
+  toggleSemanticRect: () => void;
   /**
    * A toast in the footer's tail (C22 I116, §012) — for a fact that changed
    * nothing, which a copy is: *you pressed a key and something happened. What
    * says so?*
    */
   toast: (text: string) => void;
-  /** The caret's four, as one dep with two axes (C14 I37, §6c). */
-  moveSemanticCaret: (delta: number, extend: boolean) => void;
+  /**
+   * The caret's eight, as one dep with three axes (C14 I37, I60, §6c): rows,
+   * columns — which only the rectangle takes — and whether the anchor holds.
+   */
+  moveSemanticCaret: (rows: number, columns: number, extend: boolean) => void;
   /**
    * Every navigable element in the live entry, addressed and in reading order,
    * or empty (C16 I22, C26 §5).
@@ -827,14 +834,20 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     selectEntryUnderCaret: () => void deps.selectEntryUnderCaret(),
     selectAllLoadedEntries: () => void deps.selectAllLoadedEntries(),
     copySelectedEntries: () => void deps.copySelectedEntries(),
-    // **Four actions over one dep**, because the two axes are the whole
-    // difference: a plain arrow moves and a shifted one extends (C14 I37), and
-    // the direction is the sign. Four deps would be four places for the pair to
-    // come apart.
-    moveSemanticCaretUp: () => void deps.moveSemanticCaret(-1, false),
-    moveSemanticCaretDown: () => void deps.moveSemanticCaret(1, false),
-    extendSemanticSelectionUp: () => void deps.moveSemanticCaret(-1, true),
-    extendSemanticSelectionDown: () => void deps.moveSemanticCaret(1, true),
+    copyAndLeaveSemanticSelection: () => void deps.copyAndLeaveSemanticSelection(),
+    toggleSemanticRect: () => void deps.toggleSemanticRect(),
+    // **Eight actions over one dep**, because the axes are the whole
+    // difference: a plain arrow moves and a shifted one extends (C14 I37), the
+    // direction is the sign, and a column is the rectangle's (I60). Eight deps
+    // would be eight places for the pair to come apart.
+    moveSemanticCaretUp: () => void deps.moveSemanticCaret(-1, 0, false),
+    moveSemanticCaretDown: () => void deps.moveSemanticCaret(1, 0, false),
+    moveSemanticCaretLeft: () => void deps.moveSemanticCaret(0, -1, false),
+    moveSemanticCaretRight: () => void deps.moveSemanticCaret(0, 1, false),
+    extendSemanticSelectionUp: () => void deps.moveSemanticCaret(-1, 0, true),
+    extendSemanticSelectionDown: () => void deps.moveSemanticCaret(1, 0, true),
+    extendSemanticSelectionLeft: () => void deps.moveSemanticCaret(0, -1, true),
+    extendSemanticSelectionRight: () => void deps.moveSemanticCaret(0, 1, true),
 
     // --- C17 ---------------------------------------------------------------
     insertNewline: () => void deps.editor.insert("\n"),

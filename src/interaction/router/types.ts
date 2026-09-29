@@ -685,6 +685,12 @@ export type KeyAction =
   // is the prompt's `⌥w`: an effect is resolved per action rather than per
   // target, so sharing the name would give this key the editor's region copy.
   | "copySelectedEntries"
+  // `⏎` — the same copy, and the mode's other way out (C14 I59, I47,
+  // R-BLK-838's *leaves by esc, or a copy*). A second action and one copy path.
+  | "copyAndLeaveSemanticSelection"
+  // `⌃V` — the rectangle (C14 I60, ruling 36), a target-local keycap as `a`,
+  // `A` and `y` are.
+  | "toggleSemanticRect"
   // The caret's four (C14 I36, I37, §6c). **Plain arrows move and shifted ones
   // extend**, and the pair is why both exist: a mode whose only vertical key
   // extends cannot put the caret anywhere without selecting on the way. The
@@ -694,7 +700,15 @@ export type KeyAction =
   | "moveSemanticCaretUp"
   | "moveSemanticCaretDown"
   | "extendSemanticSelectionUp"
-  | "extendSemanticSelectionDown";
+  | "extendSemanticSelectionDown"
+  // **The horizontal four, which only the rectangle takes** (C14 I60, rulings
+  // 36, 70). At block granularity a block is atomic and has no horizontal
+  // extent, so they do nothing there — and the owner line names them only
+  // while the rectangle is up.
+  | "moveSemanticCaretLeft"
+  | "moveSemanticCaretRight"
+  | "extendSemanticSelectionLeft"
+  | "extendSemanticSelectionRight";
 
 export type Binding = Readonly<{
   target: FocusTarget;

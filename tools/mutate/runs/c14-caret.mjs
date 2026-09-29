@@ -48,9 +48,9 @@ const MUTATIONS = [
     name: "an extend adds to the selection instead of re-deriving it",
     file: MODEL,
     from:
-      "  const caret = step(mode.caret, delta, spans, order);\n  return frozen(caret, anchor, blocksTouched(anchor, caret, spans, order));",
+      "  const caret = step(mode.caret, delta, spans, order);\n  return frozen(caret, anchor, blocksTouched(anchor, caret, spans, order), mode.rect);",
     to:
-      "  const caret = step(mode.caret, delta, spans, order);\n  return frozen(caret, anchor, new Set([...mode.blocks, ...blocksTouched(anchor, caret, spans, order)]));",
+      "  const caret = step(mode.caret, delta, spans, order);\n  return frozen(caret, anchor, new Set([...mode.blocks, ...blocksTouched(anchor, caret, spans, order)]), mode.rect);",
     expect: "T1.38b",
   },
   {
@@ -71,7 +71,8 @@ const MUTATIONS = [
     // is the mode every other editor has — which is why it reads as correct.
     name: "a plain arrow extends as well as moving",
     file: MODEL,
-    from: "  return frozen(step(mode.caret, delta, spans, order), mode.anchor, mode.blocks);",
+    // Re-anchored for C14 I60: the rectangle rides through every block move.
+    from: "  return frozen(step(mode.caret, delta, spans, order), mode.anchor, mode.blocks, mode.rect);",
     to: "  return extendCaret(mode, delta, spans, order);",
     expect: "T1.38b",
   },

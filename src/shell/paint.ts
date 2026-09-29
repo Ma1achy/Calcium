@@ -685,6 +685,40 @@ export function washSelectedRows(
 }
 
 /**
+ * The rectangle's cells under the selection ground, on the frame's copy of an
+ * entry's lines (C14 I60, I40).
+ *
+ * `rect`'s rows are the entry's block rows and `from` is the window's first, as
+ * in {@link washedRowsOf}; its columns are entry-line cells, inclusive. **The
+ * wash is {@link washRow} over the cells alone**, so the precedence and the
+ * 1-bit rung are the block wash's and nothing here decides them; the cells
+ * either side keep the style they were drawn in, because `sliceCells` opens a
+ * tail with the style in effect where it starts. Returns the lines unchanged
+ * where the rectangle has no row in the window, and never touches the array it
+ * was given (I40).
+ */
+export function washRectCells(
+  lines: readonly string[],
+  rect: Readonly<{ fromRow: number; toRow: number; fromColumn: number; toColumn: number }>,
+  from: number,
+  theme: ResolvedTheme,
+  capabilities: TerminalCapabilities,
+): readonly string[] {
+  const lo = rect.fromRow - from;
+  const hi = rect.toRow - from;
+  if (hi < 0 || lo >= lines.length) return lines;
+  const amb = capabilities.ambiguousWidth;
+  const left = rect.fromColumn;
+  const right = rect.toColumn + 1;
+  return lines.map((row, i) => {
+    if (i < lo || i > hi) return row;
+    const before = fitStyled(sliceCells(row, 0, left, amb), left, SGR_RESET, amb);
+    const inner = washRow(sliceCells(row, left, right, amb), theme, capabilities, right - left);
+    return `${before}${SGR_RESET}${inner}${sliceCells(row, right, Number.MAX_SAFE_INTEGER, amb)}`;
+  });
+}
+
+/**
  * A whole row under the selection ground (C14 I39, I41, `R-SEL-003`,
  * `R-SEL-006`).
  *

@@ -155,7 +155,7 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⌃end` | both |  |  |  |  |  |  |  |  |  | scrollBottom |
 | `end` | both |  |  |  |  |  |  | end |  |  |  |
 | `⇧end` | both |  |  |  |  |  |  | extendLineEnd |  |  |  |
-| `⏎` † | both |  |  |  | copySelectedEntries | menuAccept | keepField | submit | watchOpen | rowActivate |  |
+| `⏎` † | both |  |  |  | copyAndLeaveSemanticSelection | menuAccept | keepField | submit | watchOpen | rowActivate |  |
 | `⌥⏎` † | both |  |  |  |  |  |  | insertNewline |  | rerunEntry |  |
 | `⇧⏎` † | both |  |  |  |  |  |  | insertNewline |  | rerunEntry |  |
 | `esc` † | both |  | dismiss | exitNativeSelection | escapeSemanticSelection | dismiss | exitInside |  | focusPrompt | focusPrompt |  |
@@ -169,10 +169,10 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⌃J` | both |  |  |  |  |  |  | insertNewline |  |  |  |
 | `⌃K` | both |  |  |  |  |  |  | killToEnd |  |  |  |
 | `⌃←` | both |  |  |  |  |  |  | wordLeft |  |  |  |
-| `←` † | both |  |  |  |  |  | insideLeft | left | watchPrev | paneLeft |  |
+| `←` † | both |  |  |  | moveSemanticCaretLeft |  | insideLeft | left | watchPrev | paneLeft |  |
 | `⌥←` † | both |  |  |  |  |  |  | wordLeft |  | dividerLeft |  |
 | `⌥⇧←` | both |  |  |  |  |  |  | extendWordLeft |  |  |  |
-| `⇧←` | both |  |  |  |  |  |  | extendCharLeft |  |  |  |
+| `⇧←` † | both |  |  |  | extendSemanticSelectionLeft |  |  | extendCharLeft |  |  |  |
 | `o` | both |  |  |  |  |  | orbitToggle |  |  |  |  |
 | `⌥p` | both |  |  |  |  |  |  |  |  |  | postureCycle |
 | `pagedown` † | both |  |  |  |  |  |  |  |  | blockPageDown | scrollPageDown |
@@ -182,8 +182,8 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⌃→` | both |  |  |  |  |  |  | wordRight |  |  |  |
 | `⌥→` † | both |  |  |  |  |  |  | wordRight |  | dividerRight |  |
 | `⌥⇧→` | both |  |  |  |  |  |  | extendWordRight |  |  |  |
-| `→` † | both |  |  |  |  |  | insideRight | acceptGhostOrForward | watchNext | paneRight |  |
-| `⇧→` | both |  |  |  |  |  |  | extendCharRight |  |  |  |
+| `→` † | both |  |  |  | moveSemanticCaretRight |  | insideRight | acceptGhostOrForward | watchNext | paneRight |  |
+| `⇧→` † | both |  |  |  | extendSemanticSelectionRight |  |  | extendCharRight |  |  |  |
 | `⌃⇥` | enhanced-terminal |  |  |  |  |  |  |  |  |  | agentNext |
 | `⌃⇧⇥` | enhanced-terminal |  |  |  |  |  |  |  |  |  | agentPrevious |
 | `⇧⇥` † | both |  |  |  |  |  |  | focusPrevious | focusTranscript | entryPrev |  |
@@ -193,6 +193,7 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⇧↑` † | both |  |  |  | extendSemanticSelectionUp |  |  |  |  | extendRowUp |  |
 | `⌘↑` | enhanced-terminal |  |  |  |  |  |  |  |  |  | scrollTop |
 | `↑` † | both |  |  |  | moveSemanticCaretUp | menuPrev | insideUp | historyPrev |  | rowUp |  |
+| `⌃V` | both |  |  |  | toggleSemanticRect |  |  |  |  |  |  |
 | `⌃⇧V` | enhanced-terminal |  |  |  |  |  |  | yank |  |  |  |
 | `⌥v` † | both |  |  |  |  |  |  | valuesToggle |  | valuesToggle |  |
 | `⌃W` | both |  |  |  |  |  |  | killWordLeft |  |  |  |
@@ -202,4 +203,4 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⌃Z` | both |  |  |  |  |  |  | undo |  |  |  |
 | `⌥z` | both |  |  |  |  |  |  | redo |  |  |  |
 
-149 bindings · 100 keys · 23 resolved by the ladder (†).
+154 bindings · 101 keys · 25 resolved by the ladder (†).
