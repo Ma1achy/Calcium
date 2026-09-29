@@ -57251,3 +57251,93 @@ watch lane held T6.134), and the blocks lane's trail-stamp rows T1.78 and T6.134
 T6.138–T6.141 (the watch lane holding T1.78 and T6.134–T6.136). SP2's allocation covers invariants; nothing
 reserves test ids across lanes. SP7 and SP15 caught none before the rebase, because each lane's tree was
 self-consistent — the collision exists only in the merge.
+
+## F1285 — a full-size child was scrolled off by any entry appended while it was attached ★★☆☆☆
+
+Batch 3's number, allocated by its plan's findings table (F1276–F1285) and found by the away-ledger walk, row L10:
+an append while a full-size child is attached, and tail-follow scrolls the child's top rows off the screen. Closed
+by C14 I56 in lane E's commits: while L4 keeps an entry whole, a viewport following the tail follows it only as far
+as the held entry's first row, then detaches and anchors there; a reader's scroll ends the hold. The number was
+never written here, the same gap F1378 names for batch 4's plan.
+
+## F1286 — patch leaked controls through three fields while the sweep ran on a registry without it ★★★★☆
+
+Found by the M10–M12 plan's premise check (M12.1) and measured by lane b4-m12. T2.156 called `measurable()` with no
+definitions, so `table`, `plot` and `patch` fell back to `raw` and were never swept as themselves: C09 §7d's *38 of
+the 39 registry kinds, and no control byte reaches the frame* was unsupported for all three and false for `patch`,
+whose measure read stripped text while its paint emitted raw. With the neutraliser taken out of `#resolve`, the
+per-field sweep on the production registry (C09 T2.195, the lane's T2.191 before 56551642 moved it off batch 3's
+ids) leaked `patch:path`, `patch:hunks[].header` and `patch:hunks[].lines[].text`, and T2.156 reported the patch
+payload. **A sweep that falls back is a sweep of the fallback.** Closed by ruling 71's mechanism: neutralise once
+at resolve, memoised on identity, and the sweep takes a constructed session's `graph.blocks` (C09 I127, I130; the
+lane's I124 and I127 before the renumber).
+
+## F1287 — the plan's number for C14 §6a's stale clipboard deferral ★☆☆☆☆
+
+The M10–M12 plan found C14 §6a and the session comment deferring the clipboard until *the same parked word the
+label is*, a condition met by aae861a0. Lane C found it again as F1364 while writing C14 I61. F1364 is the record.
+
+## F1288 — the plan's number for the `esc` label keyed on the copy's size ★☆☆☆☆
+
+The M10–M12 plan found copy mode's `esc` label reading `size === null` (`chrome.ts`) while `escape()` reads the
+block set, so a selection of only a `rule` shows `esc out` over a press that clears — a defect nobody had reported.
+Lane C found it again as F1358. F1358 is the record.
+
+## F1289 — the waiting count was a length difference, so a patch and an evicting append read as nothing ★★★☆☆
+
+Found by the M10–M12 plan (M10.8). `bufferedEntries` shipped as `record.length − held.length`: a patch to a held
+entry reads 0, and an eviction during an append cancels the append to 0 — wrong in the direction `R-SEL-010` exists
+to prevent. Object identity is not the fix either: an append replaces the previous live entry's record, and the
+sweep rebuilds the eviction marker on every write, so identity counts one append as two or three. Lane C ruled it
+by C13's own statements about an entry — `rev` moves iff its document changed (C13 I13), `streaming` ends at settle
+— with the marker an ordinary entry (C13 I14). T1.78 walks §6b's table over a real store with a cap of three; T6.30
+shows the length reading 0 where two arrived. The marker's second eviction is F1356.
+
+## F1290 — C10 T2.57 accepted any single carrier not written as *alone* ★★★☆☆
+
+Found by the M10–M12 plan (M11.2). T2.57 checked only for `tone+ground`: a row marked `alone` needed nothing but a
+citation, and a single carrier written without the word — disclosure's `mark` — passed with no check at all. Once
+the rail landed (b38aca61) its single-carrier arm ran over an empty population. Closed with ruling 82's count:
+carriers are a `+`-list over a closed vocabulary, each fact needs two distinct carriers and one must survive 1-bit,
+and the rows that fail must equal `["prompt selection"]`. T6.153: the old predicate passes `mark`, whose distinct
+count is 1. Lane C kept this number rather than taking a new one.
+
+## F1291 — ruling 41's rail rested on a live gutter that was never drawn ★★★☆☆
+
+Found by the M10–M12 plan (M11.1). Ruling 41 put selection's `▌` rail in *the live gutter's column*, which Q41 (a)
+said already existed *at no geometric cost*. No live gutter was drawn and no column was reserved: M4 retired `▌` as
+a live mark, nothing in `src/shell` read `VisibleEntry.live`, and SF1's row 07 starts `● help` in column 1, while
+A01 D6, C14 D6 and C14:48 still described the gutter. Ruling 68 reserved column 0 for the rail, and every session
+golden moved one column (30 movers read by hand) — the geometric cost the premise said did not exist.
+
+## F1292 — M11.1's premise misread PARKED's layout ★☆☆☆☆
+
+Found by the M10–M12 plan. The review said Q33's ruling was lost under entry 34. Every PARKED entry keeps its
+ruling blockquote **above** its heading — Q33's ruling at `:744` and its heading at `:746`, 34's at `:759`/`:761`,
+35's at `:770`/`:772`, and `git show c7158c22` gives the same layout at 738/740. The ruling was where the file puts
+every ruling; the reader expected it below.
+
+## F1293 — M10.4 was already fixed, and the row covering it asserted only a non-empty copy ★★☆☆☆
+
+Found by the M10–M12 plan: *autoscroll does not extend the selection* was fixed by a3289133b, an ancestor of the
+review's c7158c22 (C14 I49, `#extendToEdge`). What remained was the row. Lane b4-m12 measured it: T4.37c read a
+yank in the prompt, which is capped at 15 rows with its head elided, and its control ran second in the same session
+and read back the subject's text through `⌃U`'s kill, character for character. A hand mutation dropping the first
+entry (`.slice(1)` in `copyParts`) passed the old row and fails the new one.
+
+## F1294 — C14 states a horizontal autoscroll that nothing can do ★☆☆☆☆
+
+Found by the M10–M12 plan (M10.2): no container in `src/` scrolls horizontally — grep finds no horizontal offset
+anywhere, and `drag-selection.ts` has the column arithmetic with no caller for it. The plan ruled it a named *no
+subject* (D-M10-5: an invariant here would be vacuous, and the condition to grep is a horizontal offset on any
+container). At 231a611e C14 still states *Horizontal autoscroll takes the same bands on columns* beside the
+vertical bands, and the rectangle's column is clamped to its block (I60) rather than scrolled. **Owed**: the
+sentence marked as having no subject, with the condition to grep, as C29 does for its horizontal anchor.
+
+## F1295 — copy output was raw in sixteen kinds ★★★☆☆
+
+Found by the M10–M12 plan (M12). `copy` returned raw text in 16 kinds. R-BLK-898 and R-BLK-900, which show copy,
+are `example`; R-TRU-001's *escaped* is the binding clause. Ruling 71 decided the notation — `cat -v` for C0, DEL
+and C1, `<U+XXXX>` for every bidi format character — and the mechanism, once at the registry's resolve, so copy
+reads the neutralised block with everything else. T2.193 runs every kind through `copyOf` and `copySequence`. A
+file whose name holds `ESC[2J` and U+202E copies as `^[[2J<U+202E>` (C04 T2.140, the lane's T2.139).
