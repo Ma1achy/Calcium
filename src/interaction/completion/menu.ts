@@ -251,6 +251,10 @@ export function menuLayer(
     // The substate names itself (C15 I29), so the footer says *complete* and
     // not the *find* it said for every panel.
     owner: Object.freeze({ rung: "substate" as const, name: "complete" as const }),
+    // **The prompt stays live under a menu holding no selection** (C15 I34,
+    // C22 I145, C19 I20): a display of what is available, not a choice being
+    // made. The owner updates it with the selection; this is the push's value.
+    promptLive: selected === null,
     // **No `width`, which is how a layer says *the whole region* (C15 I16:
     // `min(layer.width ?? region.width, region.width)`).**
     //

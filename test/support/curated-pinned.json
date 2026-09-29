@@ -44,7 +44,8 @@
   "failed": "error",
   "queued": "queued",
   "running": "work-unit",
-  "succeeded": "ok"
+  "succeeded": "ok",
+  "waiting": "warn"
  },
  "CATEGORY_REFS": [
   "categorical.c1",

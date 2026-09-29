@@ -192,6 +192,14 @@ export type KeyDeps = Readonly<{
    */
   toast: (text: string) => void;
   /**
+   * How many questions wait behind the open one (C23 I91). A panel a question
+   * displaced comes back only when no question remains, open **or waiting**:
+   * between one question's disposal and the next one's push the stack holds no
+   * blocking layer, and a restore there is a menu drawn for no frame and taken
+   * down again. Absent is none.
+   */
+  questionsWaiting?: () => number;
+  /**
    * The caret's eight, as one dep with three axes (C14 I37, I60, §6c): rows,
    * columns — which only the rectangle takes — and whether the anchor holds.
    */
@@ -580,7 +588,9 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
 
   function redrawMenu(): void {
     if (candidates.length === 0) return;
-    deps.overlays.update(MENU_ID, { content: windowedBlocks() });
+    // `promptLive` goes with every redraw a selection move causes (C22 I145):
+    // a field set only at push reads correct and is stale on the first `Tab` that selects.
+    deps.overlays.update(MENU_ID, { content: windowedBlocks(), promptLive: selection.at === null });
   }
 
   /**
@@ -613,7 +623,13 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     fits = 0;
     wheeled = null;
     const layer = menuLayer(candidates, selection.at, remainder, deps.anchor());
-    if (deps.overlays.update(MENU_ID, { content: layer.content, placement: layer.placement })) {
+    if (
+      deps.overlays.update(MENU_ID, {
+        content: layer.content,
+        placement: layer.placement,
+        promptLive: layer.promptLive ?? false,
+      })
+    ) {
       return;
     }
     remainder = 0;
@@ -1584,6 +1600,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     }
     if (held === null || (change.kind !== "dismiss" && change.kind !== "pop")) return;
     if (deps.overlays.stack.some((l) => l.blocking)) return;
+    if ((deps.questionsWaiting?.() ?? 0) > 0) return;
     const was = held;
     held = null;
     if (deps.editor.text !== was.draft) {

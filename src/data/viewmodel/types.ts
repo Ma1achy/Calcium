@@ -879,18 +879,21 @@ export type Notice = Readonly<{
  * the glyphs are how a capability rung happens to draw them — the mapping is
  * the renderer's and changes with the rung.
  */
-export type CallState = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+export type CallState = "queued" | "waiting" | "running" | "succeeded" | "failed" | "cancelled";
 
 /**
  * The tone a call head in each state carries (I141, R-BLK-214).
  *
  * **Above 1 bit this is the only carrier of the state**, since the dot is one
- * character for four of the five, so a tone chosen apart from the state is a
+ * character for five of the six, so a tone chosen apart from the state is a
  * head that says nothing — which shipped, as `info` for every state. Exhaustive
- * by its type: a sixth state is a compile error here before it is a head.
+ * by its type: a new state is a compile error here before it is a head — `waiting` was the sixth (I149).
  */
 export const CALL_STATE_TONE: Readonly<Record<CallState, Tone>> = Object.freeze({
   queued: "muted",
+  // **Blocked on you** (I149, R-BLK-214): `warn`, and the blink the design
+  // draws is not built (C23 §7g ruling 8) — the tone and the word carry it.
+  waiting: "warn",
   running: "default",
   succeeded: "ok",
   failed: "error",
@@ -904,6 +907,7 @@ export const CALL_STATE_TONE: Readonly<Record<CallState, Tone>> = Object.freeze(
  */
 export const CALL_HEAD_GLYPH: Readonly<Record<CallState, Glyph>> = Object.freeze({
   queued: "queued",
+  waiting: "work-unit",
   running: "work-unit",
   succeeded: "work-unit",
   failed: "work-unit",

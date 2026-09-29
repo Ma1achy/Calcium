@@ -53,8 +53,8 @@ const MUTATIONS = [
     // cover it: with a marked default both arms agree.
     name: "an unmarked question falls back to the first choice",
     file: SELECTION,
-    from: "  return marked < 0 ? choices.length - 1 : marked;",
-    to: "  return marked < 0 ? 0 : marked;",
+    from: "  if (marked >= 0) return marked;",
+    to: "  if (marked >= 0) return marked;\n  if (choices.length > 0) return 0;",
     expect: "T4.15",
   },
   {

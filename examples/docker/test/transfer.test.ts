@@ -12,7 +12,7 @@ import { localContext } from "calcium-tui/testing";
 // `as unknown as LocalContext`, which satisfied the type by erasure — the
 // double narrower than the interface it stands for, which is the shape that
 // cost four diagnoses in this tree. `localContext()` is the real record.
-const ctx: LocalContext = { ...localContext(), command: "/save x", ask: () => Promise.resolve({ key: "y" }) };
+const ctx: LocalContext = { ...localContext(), command: "/save x", ask: () => Promise.resolve({ key: "y", outcome: "answered" }) };
 
 function runnerFor(stdout = "") {
   const calls: string[][] = [];

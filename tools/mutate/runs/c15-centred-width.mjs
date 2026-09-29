@@ -174,8 +174,8 @@ const MUTATIONS = [
     // means. M15: both fields stopped being literals and became §101's table's
     // answer (C23 I73), so the mutation moves what the table said rather than
     // what the file said — the same fact, one indirection on.
-    from: "        blocking: routing.blocking,\n        dismissal: routing.dismissal,",
-    to: "        blocking: routing.blocking,\n        dismissal: opts.placement === \"anchored\" ? \"escape\" : routing.dismissal,",
+    from: "      blocking: routing.blocking,\n      dismissal: routing.dismissal,",
+    to: "      blocking: routing.blocking,\n      dismissal: opts.placement === \"anchored\" ? \"escape\" : routing.dismissal,",
     expect: "T4.18",
   },
   {

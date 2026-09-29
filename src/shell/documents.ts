@@ -335,7 +335,8 @@ function isSettled(call: ToolCallSpec): boolean {
   // and the child's body reached the opposite answers when this read the
   // outcome while the head read the state.
   const state = callState(call);
-  return state !== "queued" && state !== "running";
+  // `waiting` has not started either (C04 I149): it is unsettled.
+  return state !== "queued" && state !== "waiting" && state !== "running";
 }
 
 /**
@@ -399,12 +400,17 @@ export function toolCallHeader(call: ToolCallSpec, caps: Caps, tick = 0): string
 function callState(call: ToolCallSpec): CallState {
   if (call.state !== undefined) return call.state;
   const settled = call.settled === true || (call.outcome !== undefined && call.outcome !== "");
-  if (!settled) return "running";
+  // **Awaiting a decision is `waiting`, not `running`** (C04 I149, C23 I94):
+  // the tool has not started, and R-BLK-214's *blocked on YOU* is warn.
+  if (!settled) return call.waiting === true ? "waiting" : "running";
   // **`cancelled` is its own state and not a kind of failure**, which is the
   // whole reason the design keeps `⊘` apart from `✗`: a call that was stopped
   // says nothing about whether it would have worked. `FAILURE_WORDS` counts it
   // against a parent's rollup (C23 I62) and that is a different question.
-  if (call.outcome === "cancelled") return "cancelled";
+  //
+  // **`expired` is the same state** (C23 I94, `R-BLK-881`): an approval nobody
+  // answered did not run, which is what `cancelled` draws — not `failed`.
+  if (call.outcome === "cancelled" || call.outcome === "expired") return "cancelled";
   return failureWord(call.outcome) === null ? "succeeded" : "failed";
 }
 
@@ -603,7 +609,7 @@ export function operationRows(op: OperationSpec, caps: Caps, tick = 0): readonly
 }
 
 /** The words a settled child can carry that count against the parent (C23 I62). */
-const FAILURE_WORDS: ReadonlySet<string> = new Set(["failed", "denied", "cancelled", "truncated"]);
+const FAILURE_WORDS: ReadonlySet<string> = new Set(["failed", "denied", "cancelled", "expired", "truncated"]);
 
 /**
  * A parent's outcome, derived from its children on every settlement (C23 I62).
@@ -711,9 +717,14 @@ export function questionNotice(text: string, id: string): Block {
 // residue row, which is built.
 
 /** The two answers every approval offers (C23 I60); a caller may widen them — `always allow` is a row like any other. */
+//
+// **`deny` first and marked default** (C23 I94, `R-BLK-348`): *the SAFE answer
+// opens · no is first and focused · esc resolves to it · dismissing is answering
+// no*. It was `allow` marked default, so `esc` — which resolves with the default
+// (C23 I36) — approved and ran the tool.
 const APPROVAL_CHOICES: readonly Choice[] = Object.freeze([
-  { key: "y", label: "allow", default: true },
-  { key: DENY_KEY, label: "deny" },
+  { key: DENY_KEY, label: "deny", default: true },
+  { key: "y", label: "allow" },
 ]);
 
 /**

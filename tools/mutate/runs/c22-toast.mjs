@@ -85,8 +85,8 @@ const results = runPass({
       // K3 — tone alone carries it.
       name: "the toast has no mark",
       file: CHROME,
-      from: "ctx.capabilities === undefined ? ctx.toast : `${glyphFor(\"ok\", ctx.capabilities)} ${ctx.toast}`",
-      to: "ctx.toast",
+      from: ": `${glyphFor(ctx.toastMark === \"expired\" ? \"queued\" : \"ok\", ctx.capabilities)} ${ctx.toast}`,",
+      to: ": ctx.toast,",
       expect: "T1.73",
     },
     {

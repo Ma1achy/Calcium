@@ -143,8 +143,8 @@ const results = runPass({
       // checking *the reply is up* cannot see it.
       name: "THE DEFECT: choosing reply… opens a second question rather than moving the first",
       file: CONFIRM,
-      from: "          deps.overlays.update(CONFIRM_LAYER_ID, {\n            content: render(opts, selected(), cut, refused),\n            placement:",
-      to: "          disposable[Symbol.dispose]();\n          deps.overlays.push({ ...layer, blocking: false });\n          deps.overlays.update(CONFIRM_LAYER_ID, {\n            content: render(opts, selected(), cut, refused),\n            placement:",
+      from: "      deps.overlays.update(CONFIRM_LAYER_ID, {\n        content: draw(selected(), cut, refused),\n        placement: { kind: \"anchored\"",
+      to: "      disposable[Symbol.dispose]();\n      deps.overlays.push({ ...layer, blocking: false });\n      deps.overlays.update(CONFIRM_LAYER_ID, {\n        content: draw(selected(), cut, refused),\n        placement: { kind: \"anchored\"",
       expect: "T1.69",
     },
     {
@@ -153,8 +153,8 @@ const results = runPass({
       // text and the prompt never comes live.
       name: "reply… resolves the question rather than moving it",
       file: CONFIRM,
-      from: "                if (pick?.reply === true && replying === null) return toReply(pick);",
-      to: "                if (false) return toReply(pick);",
+      from: "            if (pick?.reply === true && replying === null) return toReply(pick);",
+      to: "            if (false) return toReply(pick);",
       expect: "T1.69",
     },
     {
@@ -163,8 +163,8 @@ const results = runPass({
       // placement rather than as an ownership fact (C16 I25, router.ts:395).
       name: "a floating reply consumes the keystrokes the prompt needs",
       file: CONFIRM,
-      from: "            case \"compose\":\n",
-      to: "            case \"compose\":\n              return true;\n              // eslint-disable-next-line no-unreachable\n",
+      from: "        case \"compose\":\n",
+      to: "        case \"compose\":\n          return true;\n          // eslint-disable-next-line no-unreachable\n",
       expect: "T1.69",
     },
     {
@@ -173,8 +173,8 @@ const results = runPass({
       // `{key}` is exactly what an escape answers — so the two arms collapse.
       name: "the reply answers with its key and discards what was composed",
       file: CONFIRM,
-      from: "                return settle(key, text);",
-      to: "                return settle(key);",
+      from: "            return settle(key, text, \"answered\", said);",
+      to: "            return settle(key);",
       expect: "T1.69",
     },
     {
@@ -183,8 +183,8 @@ const results = runPass({
       // routing on `key` acts on a choice nobody picked.
       name: "the reply answers with the selected choice rather than the reply choice",
       file: CONFIRM,
-      from: "                const key = replying.key;",
-      to: "                const key = opts.choices[selected()]?.key ?? replying.key;",
+      from: "            const key = replying.key;",
+      to: "            const key = opts.choices[selected()]?.key ?? replying.key;",
       expect: "T1.69",
     },
     {
@@ -194,8 +194,8 @@ const results = runPass({
       // reader having typed it.
       name: "the reply is composed on top of whatever the reader had typed",
       file: CONFIRM,
-      from: "          deps.holdDraft();",
-      to: "          void deps;",
+      from: "      deps.holdDraft();",
+      to: "      void deps;",
       expect: "T1.69",
     },
     {
@@ -204,8 +204,10 @@ const results = runPass({
       // which is exactly when they still want what they had.
       name: "escaping out of a reply keeps the reply's empty line",
       file: CONFIRM,
-      from: "                if (replying !== null) deps.restoreDraft();",
-      to: "                if (false) deps.restoreDraft();",
+      // Re-anchored in review batch 4 (C23 I89): `esc` in a reply goes back
+      // to the choices, and that is where the line is given back now.
+      from: "      kept = deps.keepReply?.() ?? null;\n      deps.restoreDraft();",
+      to: "      kept = deps.keepReply?.() ?? null;\n      if (false) deps.restoreDraft();",
       expect: "T1.69",
     },
     {
@@ -244,8 +246,8 @@ const results = runPass({
       // still reading. Every frame up to that point is identical.
       name: "THE DEFECT: choosing the inspection answers the question",
       file: CONFIRM,
-      from: "                if (pick?.inspect === true) return suspend();",
-      to: "                if (false) return suspend();",
+      from: "            if (pick?.inspect === true) return suspend();",
+      to: "            if (false) return suspend();",
       expect: "T1.70",
     },
     {
@@ -256,7 +258,7 @@ const results = runPass({
       file: CONFIRM,
       // Re-anchored for C23 I88: the inspection's branch now also classifies
       // its scrolling keys, and `leave` is its first line.
-      from: '            if (is(QUESTION_KEYS.leave)) return "leave";\n',
+      from: '        if (is(QUESTION_KEYS.leave)) return "leave";\n',
       to: '',
       expect: "T1.70",
     },
@@ -266,7 +268,7 @@ const results = runPass({
       // moment it matters.
       name: "a key that is not a choice opens the source",
       file: CONFIRM,
-      from: "          if (suspended) {\n            if (is(QUESTION_KEYS.leave))",
+      from: "      if (suspended) {\n        if (is(QUESTION_KEYS.leave))",
       to: '          if (!suspended && e.key.name === "tab") { suspend(); return "none"; }\n          if (suspended) {\n            if (is(QUESTION_KEYS.leave))',
       expect: "T1.70b",
     },

@@ -122,8 +122,8 @@ const MUTATIONS = [
     // whole subject, which is showing the reader what the answer will affect.
     name: "the payload is dropped whether or not it fitted",
     file: CONFIRM,
-    from: "      if (truncated(deps)) {",
-    to: "      if (true) {",
+    from: "    if (truncated(deps)) {",
+    to: "    if (true) {",
     expect: "T4.29",
   },
   {
@@ -132,7 +132,7 @@ const MUTATIONS = [
     // difference only shows on a short terminal.
     name: "the question takes the default height fraction",
     file: CONFIRM,
-    from: "        maxHeightFraction: 0.8,\n",
+    from: "      maxHeightFraction: 0.8,\n",
     to: "",
     expect: "T4.28",
   },

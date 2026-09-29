@@ -756,9 +756,13 @@ const footer = (ctx: ChromeContext): readonly Block[] => [
       ? [{ label: foldHome(ctx.session.cwd, ctx.session.env["HOME"]), tone: "muted" }]
       : [
           {
+            // **An expiry is hollow and muted** (C23 I92, `R-BLK-881`): the
+            // question resolved itself, which did not go well or badly.
             label:
-              ctx.capabilities === undefined ? ctx.toast : `${glyphFor("ok", ctx.capabilities)} ${ctx.toast}`,
-            tone: "ok",
+              ctx.capabilities === undefined
+                ? ctx.toast
+                : `${glyphFor(ctx.toastMark === "expired" ? "queued" : "ok", ctx.capabilities)} ${ctx.toast}`,
+            tone: ctx.toastMark === "expired" ? "muted" : "ok",
           },
         ],
   ),

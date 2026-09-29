@@ -328,7 +328,7 @@ describe("C16 §4a — a click lands where the keys would", () => {
       await new Promise((r) => setTimeout(r, 0));
       clock.advance(1_000); // past the arrival guard (C16 I69)
       graph.router.dispatch(press("y"));
-      await expect(answer).resolves.toEqual({ key: "y" });
+      await expect(answer).resolves.toEqual({ key: "y", outcome: "answered" });
       expect(graph.router.rung, "the same owner at both ends").toBe(rung);
       graph.router.dispatch(mouse(a2, 2, { press: false }));
       expect(graph.editor.text, "the arm died with the owners between").toBe("");

@@ -171,7 +171,7 @@ describe("§052 — a question that wants a sentence, through the router", () =>
     send(press("backspace"));
 
     send(press("enter"));
-    await expect(answer, "the answer carries the line").resolves.toEqual({ key: "r", text: "fix the really parse" });
+    await expect(answer, "the answer carries the line").resolves.toEqual({ key: "r", text: "fix the really parse", outcome: "answered" });
 
     // **The control: the same keys at the prompt do complete**, so the two
     // assertions above are about the owner and not about a fixture C19 has
@@ -224,7 +224,7 @@ describe("§052 — a question that wants a sentence, through the router", () =>
     expect(graph.overlays.stack.map((l) => l.id), "⌃R opens no search over the question").not.toContain(SEARCH_ID);
 
     send(press("enter"));
-    await expect(answer).resolves.toEqual({ key: "r", text: "theirs" });
+    await expect(answer).resolves.toEqual({ key: "r", text: "theirs", outcome: "answered" });
 
     // ---- given back, stack and all ----------------------------------------
     expect(graph.editor.text, "the reader's line").toBe("mine");

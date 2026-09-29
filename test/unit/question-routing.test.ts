@@ -213,6 +213,7 @@ describe("C23 §7f — replace or float", () => {
     await expect(answer, "both facts").resolves.toEqual({
       key: "r",
       text: "because the tests say so",
+      outcome: "answered",
     });
     // **Given back exactly, on the answering path** (C17 I28). The reply's own
     // line clears because it *became* the line, and the reader's comes back
@@ -234,18 +235,29 @@ describe("C23 §7f — replace or float", () => {
     // **`text` is a record of what happened, not a field always filled.** An
     // escape out of the reply state is still an escape: `""` would say the
     // reader replied with nothing.
+    //
+    // **Two escapes since C23 I89**: the first leaves the reply and not the
+    // question, so the borrow is undone there, while the question is still
+    // open; the second, at the choices, answers with the default (C23 I36).
     const e = world();
     e.type("git push --force");
     const escaped = e.confirm.ask({ question: "may I?", choices: CHOICES });
+    let settledYet = false;
+    void escaped.then(() => (settledYet = true));
     expect(e.press("r")).toBe(true);
     e.type("half a thought");
     expect(e.press("escape")).toBe(true);
-    await expect(escaped, "the default's key and no text").resolves.toEqual({ key: "d" });
-    expect(e.overlays.stack, "and the escape takes it down too").toHaveLength(0);
     // **The borrow is undone on this path too**, and it is the path where a
     // restore written on the `⏎` arm alone loses the draft: the reader changed
     // their mind about typing, which is exactly when they still want their line.
     expect(e.line(), "the reader's line survives the escape").toBe("git push --force");
+    await Promise.resolve();
+    expect(settledYet, "the first escape leaves the reply, not the question").toBe(false);
+    expect(e.confirm.replacing, "which replaces the prompt again").not.toBeNull();
+    expect(e.press("escape")).toBe(true);
+    await expect(escaped, "the default's key and no text").resolves.toEqual({ key: "d", outcome: "answered" });
+    expect(e.overlays.stack, "and the escape takes it down too").toHaveLength(0);
+    expect(e.line(), "and the line is still the reader's").toBe("git push --force");
   });
 
   it("T1.70 (C23 I75, I36, §051, `R-QST-002`): an inspection suspends, and the question settles exactly once", async () => {
@@ -300,7 +312,7 @@ describe("C23 §7f — replace or float", () => {
 
     // Only now does it resolve, and only once across the whole sequence.
     expect(w.press("y")).toBe(true);
-    await expect(answer).resolves.toEqual({ key: "y" });
+    await expect(answer).resolves.toEqual({ key: "y", outcome: "answered" });
     await flush();
     expect(settlements, "one settlement across suspend, escape and answer").toBe(1);
     expect(w.overlays.stack, "and the question is gone").toHaveLength(0);
@@ -329,7 +341,7 @@ describe("C23 §7f — replace or float", () => {
 
     w.press("escape");
     w.press("n");
-    await expect(answer).resolves.toEqual({ key: "n" });
+    await expect(answer).resolves.toEqual({ key: "n", outcome: "answered" });
   });
 
 });

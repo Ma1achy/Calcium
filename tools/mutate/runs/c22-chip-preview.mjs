@@ -87,8 +87,10 @@ const results = runPass({
       file: CONSTRUCT,
       // Re-anchored in review batch 2: the preview is found by its declared
       // substate name now, not its id (C15 I29, ruling 61).
-      from: '    return owner.name === "preview" || (owner.name === "complete" && keys.selected === null);',
-      to: '    return owner.name === "complete" && keys.selected === null;',
+      // Re-anchored in review batch 4: the preview declares `promptLive`
+      // (C22 I145, C15 I34), and `promptUnderMenu` reads the field.
+      from: "        promptLive: true,",
+      to: "        promptLive: false,",
       expect: "T1.69",
     },
     {

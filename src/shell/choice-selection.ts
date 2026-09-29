@@ -64,7 +64,18 @@ export function createChoiceSelection(size: number, start: number | null): Choic
  * completion menu too, where the last candidate is not a safe answer but an
  * arbitrary one.
  */
-export function defaultStart(choices: readonly Readonly<{ default?: true }>[]): number {
+export function defaultStart(
+  choices: readonly Readonly<{ default?: true; reply?: true; inspect?: true }>[],
+): number {
   const marked = choices.findIndex((c) => c.default === true);
-  return marked < 0 ? choices.length - 1 : marked;
+  if (marked >= 0) return marked;
+  // **The last choice that answers** (C23 I93, ruling 6). A `reply…` opens a
+  // line and an inspection suspends, so neither is an answer: a fallback that
+  // landed on one made `esc` open a reply or an inspection rather than
+  // resolve. With none that answers, the last, which is the rule as it stood.
+  for (let i = choices.length - 1; i >= 0; i -= 1) {
+    const c = choices[i]!;
+    if (c.reply !== true && c.inspect !== true) return i;
+  }
+  return choices.length - 1;
 }

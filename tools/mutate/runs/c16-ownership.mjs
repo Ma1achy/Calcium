@@ -70,8 +70,8 @@ const results = runPass({
       // see it; the row counts updates and invalidates.
       name: "the one-shot guard deleted from the question's refuse",
       file: CONFIRM,
-      from: "          if (refused || suspended || replying !== null) return;\n",
-      to: "          if (suspended || replying !== null) return;\n",
+      from: "      if (refused || suspended || replying !== null) return;\n",
+      to: "      if (suspended || replying !== null) return;\n",
       expect: "T4.82",
     },
     {
@@ -146,8 +146,8 @@ const results = runPass({
       // C22 I133 — `esc →` names the first choice rather than the default.
       name: "the question's safe path resolves to its first choice",
       file: CONFIRM,
-      from: "          resolvesTo: defaultChoice(opts.choices).label,\n",
-      to: "          resolvesTo: opts.choices[0]?.label ?? \"\",\n",
+      from: "\"choices\" : defaultChoice(opts.choices).label,\n",
+      to: "\"choices\" : opts.choices[0]?.label ?? \"\",\n",
       expect: "T1.171",
     },
     {

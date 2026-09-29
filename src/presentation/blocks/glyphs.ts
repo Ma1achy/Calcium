@@ -465,6 +465,9 @@ export const FREE_WIDTH_SLOTS: ReadonlySet<keyof GlyphSet> = new Set<keyof Glyph
  */
 export const CALL_STATE_GLYPH: Readonly<Record<CallState, Glyph>> = Object.freeze({
   queued: "queued",
+  // **Not `work-unit`, which is `running`'s here** (C04 I149): a waiting head
+  // drawn as a running one says the tool is working while it waits on you.
+  waiting: "warn",
   running: "work-unit",
   succeeded: "ok",
   failed: "error",

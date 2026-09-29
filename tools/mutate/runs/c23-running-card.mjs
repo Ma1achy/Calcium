@@ -209,8 +209,8 @@ const results = runPass({
     {
       name: "denied is recorded as exit 1",
       file: EX,
-      from: "        deps.history.append(line, 126);",
-      to: "        deps.history.append(line, 1);",
+      from: "        deps.history.append(line, answer.outcome === \"cancelled\" ? 130 : 126);",
+      to: "        deps.history.append(line, answer.outcome === \"cancelled\" ? 130 : 1);",
       expect: "T4.51",
     },
     {

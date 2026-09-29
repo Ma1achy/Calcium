@@ -1331,12 +1331,22 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     if (approval !== null) {
       deps.transcript.patch(pendingId, { op: "replace", blockId: call.id, block: header(0, undefined, true) }, "shell");
       deps.scheduler.commit("input");
-      const answer = await deps.confirm.ask(approvalPrompt(call, approval.consequence, approval.choices));
-      if (answer.key === DENY_KEY) {
-        finishCard("denied");
+      const answer = await deps.confirm.ask({
+        ...approvalPrompt(call, approval.consequence, approval.choices),
+        // The asker's withdrawal and expiry reach the question (C23 I92, I94).
+        ...(approval.signal === undefined ? {} : { signal: approval.signal }),
+        ...(approval.expiresAfterMs === undefined ? {} : { expiresAfterMs: approval.expiresAfterMs }),
+      });
+      // **Only an answer runs the tool** (I94, §7g ruling 4). A question that
+      // was withdrawn or timed out resolves with its default's key, and the
+      // approval's default is `deny` — but the card says what happened: *expired,
+      // not denied* (`R-BLK-881`), and nothing is run on either.
+      if (answer.outcome !== "answered" || answer.key === DENY_KEY) {
+        finishCard(answer.outcome === "answered" ? "denied" : answer.outcome);
         refresh.settled(pendingId);
         deps.transcript.settle(pendingId);
-        deps.history.append(line, 126);
+        // 130 for a withdrawal, as `cancelThis` records one; 126 otherwise.
+        deps.history.append(line, answer.outcome === "cancelled" ? 130 : 126);
         deps.scheduler.commit("completion");
         guard.release();
         return;

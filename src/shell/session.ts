@@ -832,6 +832,10 @@ class Session implements TuiInstance {
     // 1 — C23 refuses further submissions. Before the release, so a submission
     // racing shutdown loses the race (T3.19).
     graph.session.beginStopping();
+    // **Every question resolves, before teardown** (C23 I92): an owner awaiting
+    // one would otherwise be left pending by a session that no longer exists.
+    // `cancelled`, with each one's default key — the safe answer.
+    graph.confirm.cancelAll();
     this.#identity?.stop();
     // **Before the release, and disposed rather than left to the frame that
     // never comes.** The ticker re-arms itself out of `#render`, so a session
@@ -1664,13 +1668,15 @@ class Session implements TuiInstance {
    * first's expiry, left armed, would clear the second early.
    */
   #toast: string | null = null;
+  #toastMark: "expired" | undefined = undefined;
   #toastTimer: Disposable | null = null;
 
-  #raiseToast(text: string): void {
+  #raiseToast(text: string, mark?: "expired"): void {
     const graph = this.#graph;
     if (graph === null || graph.session.snapshot.stopping) return;
     this.#toastTimer?.[Symbol.dispose]();
     this.#toast = text;
+    this.#toastMark = mark;
     this.#toastTimer = this.config.schedule(() => {
       this.#toastTimer = null;
       this.#toast = null;
@@ -2098,7 +2104,7 @@ class Session implements TuiInstance {
       copySelectedEntries: () => this.#copySelectedEntries(false),
       copyAndLeaveSemanticSelection: () => this.#copySelectedEntries(true),
       toggleSemanticRect: () => this.#toggleSemanticRect(),
-      toast: (text) => this.#raiseToast(text),
+      toast: (text, mark) => this.#raiseToast(text, mark),
       moveSemanticCaret: (rows, columns, extend) => this.#moveSemanticCaret(rows, columns, extend),
       semanticDrag: (row, phase, column) => this.#semanticDrag(row, phase, column),
       enterNativeSelection: () => this.#setNativeSelection(true),
@@ -2187,6 +2193,7 @@ class Session implements TuiInstance {
       watches: () => this.#graph?.watchRow(),
       // C22 I116 — the live toast, drawn in the footer's tail while it lives.
       toast: () => this.#toast ?? undefined,
+      toastMark: () => this.#toastMark,
       // A03 SS47 — the owner line draws chords, so the chrome resolves them.
       capabilities: () => graph?.capabilities ?? null,
       // C24 I32 — read per frame from the recorder rather than kept here. A

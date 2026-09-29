@@ -108,8 +108,8 @@ const results = runPass({
     {
       name: "a modified ⏎ answers the reply",
       file: "src/shell/confirm.ts",
-      from: '          if (is(QUESTION_KEYS.answer) && (bare || replying === null)) return "resolve";',
-      to: '          if (is(QUESTION_KEYS.answer)) return "resolve";',
+      from: '      if (is(QUESTION_KEYS.answer) && (bare || replying === null)) return "resolve";',
+      to: '      if (is(QUESTION_KEYS.answer)) return "resolve";',
       expect: "T4.80",
     },
     {

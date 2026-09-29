@@ -133,6 +133,8 @@ export type ComposeDeps = Readonly<{
   bufferedEntries?: () => number;
   /** C22 I116 — the live toast's text, or undefined. Optional: absent is *none live*. */
   toast?: () => string | undefined;
+  /** C22 I116, C23 I92 — the live toast's mark when it is not `ok`. Absent is `ok`. */
+  toastMark?: () => "expired" | undefined;
   /**
    * The copy rung's mode and size (C14 I55). Optional for `bufferedEntries`'
    * reason: a composition with no session graph has no mode to report.
@@ -220,6 +222,7 @@ export function compose(deps: ComposeDeps): Composed {
   const copy = deps.copy?.(size.columns);
   const editingField = deps.editingField?.() === true;
   const toast = deps.toast?.();
+  const toastMark = toast === undefined ? undefined : deps.toastMark?.();
   const hints = deps.hints?.();
   const ownerRefused = deps.ownerRefused?.() ?? null;
   const watches = deps.watches?.();
@@ -238,6 +241,7 @@ export function compose(deps: ComposeDeps): Composed {
     ...(copy === undefined ? {} : { copy }),
     ...(editingField ? { editingField } : {}),
     ...(toast === undefined ? {} : { toast }),
+    ...(toastMark === undefined ? {} : { toastMark }),
     ...(hints === undefined ? {} : { hints }),
     ...(ownerRefused === null ? {} : { ownerRefused }),
     ...(watches === undefined ? {} : { watches }),

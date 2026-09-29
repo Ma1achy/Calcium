@@ -85,10 +85,13 @@ export type { CursorShape, CursorStyle } from "./terminal/escapes.js";
  * hand and drift from it.
  */
 export type {
+  // C24 I42 — what `ctx.ask` resolves with, so a handler can name what it awaits.
+  AskAnswer,
   AskOptions,
   Choice,
   LocalContext,
   LocalHandler,
+  QuestionOutcome,
 } from "./shell/local/registry.js";
 
 // --- blocks — the type a consumer returns -----------------------------------

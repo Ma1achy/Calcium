@@ -43,14 +43,14 @@ const results = runPass({
     {
       name: "a page is the whole interior, not the interior less one",
       file: CONFIRM,
-      from: "          const page = Math.max(1, interior - 1);\n",
-      to: "          const page = Math.max(1, interior);\n",
+      from: "      const page = Math.max(1, interior - 1);\n",
+      to: "      const page = Math.max(1, interior);\n",
       expect: "T1.98",
     },
     {
       name: "an entry into the inspection keeps where the last one was left",
       file: CONFIRM,
-      from: "          deps.inspectionBox?.reset();\n",
+      from: "      deps.inspectionBox?.reset();\n",
       to: "",
       expect: "T1.98",
     },

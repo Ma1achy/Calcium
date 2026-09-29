@@ -205,6 +205,14 @@ export type ChromeContext = Readonly<{
    */
   toast?: string;
   /**
+   * What the live toast's mark says, when it is not `ok` (C22 I116, C23 I92).
+   *
+   * `expired` is a question that resolved itself because nobody answered it
+   * (`R-BLK-881`): *the question expired*, drawn hollow and muted — `✓` would
+   * say it went well. Absent is `ok`, which is every other toast.
+   */
+  toastMark?: "expired";
+  /**
    * C02's resolved record, because **the chrome draws marks and a mark needs a
    * rung** (A03 SS47, C09 I22). The owner line's chords are `⏎ ⇧ ⇥ ⌃] ←→ ↑↓`,
    * none of which an ASCII terminal can render, and a framework string carrying
@@ -668,7 +676,17 @@ export type PipelineDeps = Readonly<{
    * lands with its test consumer rather than a producer nothing calls.
    */
   approval?: (call: Readonly<{ name: string; args: string }>) =>
-    Readonly<{ consequence?: string; choices?: readonly Readonly<{ key: string; label: string; default?: true }>[] }> | null;
+    Readonly<{
+      consequence?: string;
+      choices?: readonly Readonly<{ key: string; label: string; default?: true }>[];
+      /**
+       * The asker withdrawing its question (C23 I92, I94, `R-BLK-881`): the
+       * approval resolves `cancelled` and the call runs nothing.
+       */
+      signal?: AbortSignal;
+      /** How long the approval stays open before it resolves `expired` (C23 I92). */
+      expiresAfterMs?: number;
+    }> | null;
   theme: ThemeStore;
   /** Persist the chosen variant (C22 I40). Absent in harnesses with no state directory. */
   persistTheme?: (name: string) => void;

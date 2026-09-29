@@ -417,7 +417,7 @@ export type FrameQueries = Readonly<{
   /** `⌃V` — the rectangle on at the caret, or off (C14 I60, ruling 36). */
   toggleSemanticRect: () => void;
   /** C22 I116 — a toast in the footer's tail, for a fact that changed nothing (§012). */
-  toast: (text: string) => void;
+  toast: (text: string, mark?: "expired") => void;
   /**
    * An arrow, plain or shifted, over the held document (C14 I37, I60, §6c).
    * `columns` moves only the rectangle; at block granularity it is ignored.
@@ -1971,7 +1971,26 @@ export async function constructGraph(
     // motion are shared — and *the question gets its OWN buffer, selection,
     // history and undo*. This comment used to say *the same history*, which no
     // design file says (C23 I77, C17 I29).
-    draft: () => stores.editor.text,
+    // **Resolved, not `text`** (C23 I90): a chip is a sentinel in `text` and
+    // its content in `resolved`, and the owner asked for what was written.
+    draft: () => stores.editor.resolved,
+    // …and the linear stream is told the line as the prompt draws it (I90).
+    drawn: () => {
+      let out = "";
+      for (const ch of stores.editor.text) out += stores.editor.drawAs(ch) ?? ch;
+      return out;
+    },
+    // C23 I89 — `esc` in a reply keeps the line for the next `reply…`.
+    keepReply: () => stores.editor.snapshot(),
+    resumeReply: (kept) => stores.editor.restore(kept as ReturnType<typeof stores.editor.snapshot>),
+    // C23 I92, §7g ruling 7 — expiry on the injected timer, no clock read.
+    schedule: config.schedule,
+    expired: (opts, ms) =>
+      deps.frame.toast(
+        `the question expired ${glyphs(detection.capabilities).separator} ${opts.question} after ${String(Math.round(ms / 1000))}s`,
+        "expired",
+      ),
+    separator: () => glyphs(detection.capabilities).separator,
     // **One `LineState`, held here rather than inside the host** (C17 I28).
     // The host is where the question's rules live and this is where the editor
     // is; a copy of the line inside `confirm.ts` would be a second record of
@@ -2541,6 +2560,9 @@ export async function constructGraph(
         // **`preview`, and `promptUnderMenu` reads it** (C15 I29, ruling 61):
         // the substate's name is what said *the prompt answers first* by id.
         owner: { rung: "substate", name: "preview" },
+        // It has no selection to hold, so the prompt is live beneath it for as
+        // long as it is up (C22 I145, C15 I34).
+        promptLive: true,
       });
     }
     previewed = chip;
@@ -3633,6 +3655,8 @@ export async function constructGraph(
   };
 
   const keys = createKeyEffects({
+    // C23 I91 — a displaced panel waits for the last question, not the first.
+    questionsWaiting: () => confirm.waiting,
     // The owner's history while a typed reply holds the line (C23 I77).
     reply: () => replyHistory,
     // **`?` and `F1` reach the handler `/help keys` runs** (R-KEY-005, C16 §6a),
@@ -3925,9 +3949,13 @@ export async function constructGraph(
     // ruling 61). This compared two layer ids, because no field told a preview
     // or a menu from a search — *a gap worth closing and not a rule to guess
     // at*, said here — and the declared owner is that field.
-    const owner = stores.overlays.top?.owner;
-    if (owner?.rung !== "substate") return false;
-    return owner.name === "preview" || (owner.name === "complete" && keys.selected === null);
+    //
+    // **And the layer now declares it** (C22 I145, C15 I34, ruling 23): the
+    // owner's name answered *which substate*, and `keys.selected` answered
+    // *is it live*; `promptLive` is the second on the layer itself, updated by
+    // the menu with its selection, so a third layer declares it rather than
+    // adding an arm here.
+    return stores.overlays.top?.promptLive === true;
   };
 
   /**
