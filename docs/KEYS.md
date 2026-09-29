@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT. Source: docs/design/language/calcium-registry.json, rendered by build-calcium.mjs's renderKeysMarkdown; written with the key ladder below by tools/keymap-table.mjs -->
 # Calcium keys
 
-Revision 0.17 · 66 current bindings · a `default-terminal` chord is one a terminal without the Kitty protocol sends; an `enhanced-terminal` chord needs the protocol
+Revision 0.18 · 66 current bindings · a `default-terminal` chord is one a terminal without the Kitty protocol sends; an `enhanced-terminal` chord needs the protocol
 
 The universal set gives one purpose to each key and does not depend on what has focus; the active owner resolves that purpose.
 

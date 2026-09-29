@@ -36,8 +36,10 @@ import {
   MAX_FOOTER_ROWS,
   PROMPT_GUTTER,
   PROMPT_SUBSTITUTION,
+  RAIL_COLUMNS,
   regionWidth,
   RULE_ROWS,
+  transcriptWidth,
 } from "./config.js";
 import type { TerminalSize } from "../terminal/lifecycle.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
@@ -69,11 +71,13 @@ export type Composed = Readonly<{
   /**
    * Where the transcript sits — C16's `region`, and the width it is drawn at.
    *
-   * `width` is the terminal's less `CONTENT_MARGIN_R` (I109): the transcript is
-   * resized, measured and rendered at it, and the paint pads what comes back to
-   * `size.columns`. C16 reads `top` and `height` and nothing else.
+   * `width` is the terminal's less `CONTENT_MARGIN_R` (I109) and less the
+   * rail's column (C14 I57): the transcript is resized, measured and rendered at
+   * it, and the paint pads what comes back to `size.columns`. `left` is that
+   * column — the pointer's column is translated by it as its row is by `top`.
+   * C16 reads `top` and `height` and nothing else.
    */
-  region: Readonly<{ top: number; height: number; width: number }>;
+  region: Readonly<{ top: number; left: number; height: number; width: number }>;
   /**
    * How big a layer may be — C15's `Region`, `{ width, height }`.
    *
@@ -275,9 +279,18 @@ export function compose(deps: ComposeDeps): Composed {
     // while the paint pads every row to `size.columns`. The frame is the
     // terminal's width and the *document* is narrower — the one distinction a
     // composer can read the wrong side of.
-    region: Object.freeze({ top: HEADER_ROWS + HEADER_RULE_ROWS, height, width: content }),
-    // **The same height and now the same width as the transcript region** (I28,
-    // I109 · §6l.9 row 5). A layer's content is content: `place.ts` centres at
+    // **And one column in from the left** (C14 I57, ruling 68): column 0 is the
+    // selection rail's on every row, and the transcript is laid out beside it.
+    region: Object.freeze({
+      top: HEADER_ROWS + HEADER_RULE_ROWS,
+      left: RAIL_COLUMNS,
+      height,
+      width: transcriptWidth(size.columns),
+    }),
+    // **The same height as the transcript region, and the region's width** (I28,
+    // I109 · §6l.9 row 5) — the transcript's plus the rail's column, because a
+    // layer floats over the whole region and the rail is the transcript's alone
+    // (C14 I57). A layer's content is content: `place.ts` centres at
     // `⌊(region.width − width) / 2⌋` and clamps to it, so a centred layer moves
     // by nought or one column and a layer declaring no width is one cell
     // narrower — right for the reason the transcript's rows are. It was the whole

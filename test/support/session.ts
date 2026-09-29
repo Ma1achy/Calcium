@@ -185,7 +185,12 @@ export const FRAME: FrameQueries = {
   moveSemanticCaret: () => undefined,
   enterNativeSelection: () => undefined,
   exitNativeSelection: () => undefined,
-  region: () => ({ top: 1, height: 20 }),
+  // The transcript's box as the frame composes it (C14 I57): one column in
+  // for the rail. Its width is the 80 the unit rows resize their viewport to
+  // (`graphAt80` and its siblings), since element columns are placed at it; a
+  // real frame's layer region is one wider, and nothing here derives one from
+  // the other.
+  region: () => ({ top: 1, left: 1, height: 20, width: 80 }),
   overlayRegion: () => ({ width: 80, height: 24 }),
   promptAnchor: () => ({ row: 21, rows: 1 }),
   mouseEnabled: () => true,

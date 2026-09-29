@@ -69,7 +69,9 @@ const FRAME: FrameQueries = {
     moveSemanticCaret: () => undefined,
   enterNativeSelection: () => undefined,
   exitNativeSelection: () => undefined,
-  region: () => ({ top: 1, height: 20 }),
+  // The transcript's box as the frame composes it (C14 I57): one column in
+  // for the rail, and one narrower than the layer region.
+  region: () => ({ top: 1, left: 1, height: 20, width: 79 }),
   overlayRegion: () => ({ width: 80, height: 24 }),
   promptAnchor: () => ({ row: 21, rows: 1 }),
   mouseEnabled: () => false,

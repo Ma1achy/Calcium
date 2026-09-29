@@ -40,7 +40,7 @@ const results = runPass({
   run,
   control: {
     file: CONSTRUCT,
-    from: "    const series = sample === null ? legendUnder(hit.id, under, e.col) : null;",
+    from: "    const series = sample === null ? legendUnder(hit.id, under, col) : null;",
     to: "    const series = null;",
     why: "the legend arm removed — T4.73 and T4.73b fail; a run in which the third writer can vanish and stay green cannot see the seam",
   },

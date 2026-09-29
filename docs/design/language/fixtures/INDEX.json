@@ -6,7 +6,7 @@
   "title": "Current contract — the rules implementations targetcurrent · R-SPC-001 · example R-EXA-001",
   "cols": 1244,
   "rows": 126,
-  "sha": "fa80c0768fe834ec",
+  "sha": "39018d27b75e8e2a",
   "ruleIds": [
    "R-SPC-001",
    "R-EXA-001"
@@ -19,7 +19,7 @@
   "title": "The primitives, and where each is definedcurrent · R-PRI-001 R-PRI-002 · example R-EXA-002",
   "cols": 183,
   "rows": 67,
-  "sha": "82f9358243fdf6c3",
+  "sha": "5a4c8ea0902be03e",
   "ruleIds": [
    "R-PRI-001",
    "R-PRI-002",
@@ -73,10 +73,10 @@
   "file": "006-the-mark-vocabulary-twelve-canonical-glyphs-00.txt",
   "section": 6,
   "id": "the-mark-vocabulary-twelve-canonical-glyphs-006",
-  "title": "The mark vocabulary — nineteen canonical glyphscurrent · R-GLY-003 R-GLY-002 · example R-EXA-006",
+  "title": "The mark vocabulary — twenty canonical glyphscurrent · R-GLY-003 R-GLY-002 · example R-EXA-006",
   "cols": 170,
-  "rows": 30,
-  "sha": "263d33867d2f77f0",
+  "rows": 31,
+  "sha": "52d99683dc491bc7",
   "ruleIds": [
    "R-GLY-003",
    "R-GLY-002",
@@ -1303,7 +1303,7 @@
   "title": "Three major rules it broke in its own examplescurrent · R-GLY-003 R-MOT-002 R-EVT-001 · retained example blocks generated from registry · example R-EXA-093",
   "cols": 78,
   "rows": 84,
-  "sha": "0a1710ad93320123",
+  "sha": "596d8078c5c44a9e",
   "ruleIds": [
    "R-GLY-003",
    "R-MOT-002",

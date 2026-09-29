@@ -257,6 +257,18 @@ export type GlyphSet = Readonly<{
    */
   revert: string;
   /**
+   * The selection rail — the registry's `selection-rail` (C14 I58, ruling 68,
+   * `R-THM-005`). Drawn by the frame in column 0 of the transcript beside each
+   * selected row's first row, never by a block: selection's second carrier, the
+   * ground being its first.
+   *
+   * **The same characters as `bar` and a slot of its own**, for `choiceOpen`'s
+   * reason: `bar` is a form's caret and a plot's glyph, and this is a gutter
+   * mark. Two meanings on one slot is F161's hazard, and the domains differ —
+   * `gutter` meets neither `plot` nor `form`.
+   */
+  rail: string;
+  /**
    * The separator between a call head's fields — `verb · args · duration ·
    * outcome` (C09 I49, `AGENT_TUI_DESIGN.md` §9e).
    *
@@ -276,6 +288,7 @@ const UNICODE: GlyphSet = Object.freeze({
   tapeLeft: "\u00ab",
   tapeRight: "\u00bb",
   revert: "\u21ba",
+  rail: "\u258c",
   separator: "\u00b7",
   horizontal: "─",
   vertical: "│",
@@ -353,6 +366,9 @@ const ASCII: GlyphSet = Object.freeze({
   tapeLeft: "[",
   tapeRight: "]",
   revert: "<",
+  // `|` — the rail's own column is its domain, `gutter`, so the quote rail's
+  // and the tree guide's `|` sit in columns this never shares (C14 I58).
+  rail: "|",
   // `:` and not `-` (F834): `-` is `TURN_ASCII`'s first frame, and a dispatched
   // head read `verb - -`. The rung is a character no set's ASCII frames use.
   separator: ":",
@@ -1500,6 +1516,8 @@ export const GLYPH_SET_DOMAINS: Readonly<Record<keyof GlyphSet, readonly string[
   tapeLeft: ["inline"],
   tapeRight: ["inline"],
   revert: ["inline"],
+  // Column 0 of the transcript region, which the frame reserves (C14 I57).
+  rail: ["gutter"],
   separator: ["inline"],
 
   horizontal: ["border"],

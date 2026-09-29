@@ -62,14 +62,17 @@ const results = runPass({
       expect: "T2.57",
     },
     {
-      // **A single-carrier exception taken by writing one.** `selection` has one
-      // carrier and the tree declares it — `paint.ts:250`. Strip the citation
-      // and the exception becomes this document's to grant, which is the whole
-      // difference between a limit that is recorded and a rule that is bent.
-      name: "a single-carrier axis stops citing the file that declares it",
+      // **A single-carrier exception taken by writing one.** Re-pointed when
+      // `selection` took its rail (C14 I58, ruling 68): it was the last axis
+      // written `alone`, and the row that demanded a citation of each then ran
+      // over an empty set. So the mutation constructs the subject: a row
+      // declared single-carrier with no citation, which the arm must refuse.
+      name: "an axis is declared single-carrier without citing the file that declares it",
       file: SPEC,
-      from: "| **selection** | `surface.selection` | the wash, `inverse` at 1-bit (`paint.ts:250`) | **ground alone** |",
-      to: "| **selection** | `surface.selection` | the wash, and inverse at 1-bit | **ground alone** |",
+      from: "| **disclosure** | `TableRow.expanded` | `▹` / `▿` (`glyphs.ts:1260`, `:1265`) | mark | mark |",
+      // The file named without a line, so the renderer arm (`.ts\``) still
+      // passes and only the citation arm can fail.
+      to: "| **disclosure** | `TableRow.expanded` | `▹` / `▿` (`glyphs.ts`) | **mark alone** | mark |",
       expect: "T2.57",
     },
     {

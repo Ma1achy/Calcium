@@ -1,7 +1,7 @@
 {
   "meta": {
     "name": "Calcium design language",
-    "revision": "0.17",
+    "revision": "0.18",
     "generatedArtifact": "calcium-design-language.html",
     "ruleIdPolicy": "IDs are explicit, permanent, and never derived from order.",
     "normativeSource": "calcium-registry.json",
@@ -33769,6 +33769,29 @@
       ],
       "canonical": true,
       "widthClass": "ambiguous"
+    },
+    {
+      "id": "selection-rail",
+      "unicode": "▌",
+      "ascii": "|",
+      "semanticRole": "selection rail",
+      "tone": "accent",
+      "widthByCapability": {
+        "unicode": 1,
+        "ascii": 1
+      },
+      "reservedCells": 1,
+      "collisionDomains": [
+        "gutter"
+      ],
+      "accessibleName": "selected",
+      "status": "current",
+      "ruleIds": [
+        "R-GLY-003",
+        "R-THM-005"
+      ],
+      "canonical": true,
+      "widthClass": "ambiguous"
     }
   ],
   "delimiters": [
@@ -52498,6 +52521,11 @@
       "contains": [],
       "figure": false,
       "note": "a windowed strip of peers that slides rather than sheds (§095) — the agent strip is its first consumer. A chrome row, not a content row, so its marks do not meet a transcript row's lead."
+    },
+    "gutter": {
+      "contains": [],
+      "note": "column 0 of the transcript region, which the frame reserves on every row for the selection rail (ruling 68). Not inside `content-row`: the rail stands beside a row's lead, never in it, so a quote rail's or a tree guide's `|` one column along is a different column.",
+      "figure": false
     }
   }
 }

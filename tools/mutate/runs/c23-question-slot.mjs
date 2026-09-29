@@ -284,7 +284,7 @@ const results = runPass({
       // box the editor has no coordinates in.
       name: "the caret stays where the editor put it while the prompt is replaced",
       file: SESSION,
-      from: "      promptReplaced: () => this.#questionRows(graph, width) !== null,",
+      from: "      promptReplaced: () => this.#questionRows(graph, promptWidth) !== null,",
       to: "      promptReplaced: () => false,",
       expect: "T4.70",
     },

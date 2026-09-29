@@ -119,7 +119,7 @@ const FLOORS: Readonly<Record<string, number>> = Object.freeze({
 
 export const DEFAULT_FLOOR = 4.5;
 
-/** A selection band against the page (R-THM-005) — the ground is its only carrier. */
+/** A selection band against the page (R-THM-005) — the ground is its only ground-level carrier; the `▌` rail is its second (C14 I58). */
 export const BAND_VS_PAGE = 3;
 /** A focus band against the page (R-THM-005) — relaxed, because the focus mark carries focus. */
 export const FOCUS_VS_PAGE = 2;
@@ -799,7 +799,7 @@ export function validateBands(tokens: ThemeTokens): readonly ThemeError[] {
     const measured = ratio(selection, bg);
     if (measured < BAND_VS_PAGE) {
       say("surfaces.selection", measured, BAND_VS_PAGE,
-        "the ground is selection's only carrier, so a selection band that does not read is a fact with nothing carrying it");
+        "the ground is selection's only ground-level carrier, so a selection band that does not read leaves the rail carrying it alone");
     }
   }
   if (focus !== undefined) {

@@ -971,12 +971,14 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     expect(ps, "the first card").toBeGreaterThan(0);
     expect(note, "the second card").toBeGreaterThan(ps);
     // Row 17: the hook marks content, not the leading gap the block carried.
-    expect(rows[ps + 1]?.indexOf("⎿"), "the first hook at column 2").toBe(2);
+    // Column 2 of the transcript, which starts at the terminal's column 1: the
+    // rail reserves column 0 on every row (C14 I57), so the terminal reads 3.
+    expect(rows[ps + 1]?.indexOf("⎿"), "the first hook at column 2").toBe(3);
     expect(rows[ps + 1], "and it carries the body's content").toContain("web running");
-    expect(rows[note + 1]?.indexOf("⎿"), "the second hook at column 2").toBe(2);
+    expect(rows[note + 1]?.indexOf("⎿"), "the second hook at column 2").toBe(3);
     // Rows 18–19: one blank closes entry 1 (before entry 2's `❯ /note` echo),
     // one closes entry 2 above the upper rule.
-    expect(rows[note - 1]?.startsWith("❯ /note"), "entry 2's command echo").toBe(true);
+    expect(rows[note - 1]?.startsWith(" ❯ /note"), "entry 2's command echo, past the rail's column").toBe(true);
     expect(rows[note - 2], "one blank row closing entry 1").toBe("");
     expect(rows[note + 2], "the blank closing entry 2").toBe("");
     expect(/^[─-]{20,}/u.test(rows[note + 3] ?? ""), "then the upper rule").toBe(true);
@@ -991,14 +993,14 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
       schema: "tui.manifest/1",
       binary: "prism",
       version: "1.0.0",
-      tools: [{ name: "wide", local: true, summary: "one notice, 99 cells", args: [], flags: [] }],
+      tools: [{ name: "wide", local: true, summary: "one notice, 98 cells", args: [], flags: [] }],
     };
     const localHandlers: NonNullable<TuiConfig["localHandlers"]> = {
       wide: () => ({
         schema: "tui.view/1",
         command: "wide",
         status: "ok",
-        blocks: [{ kind: "notice", id: "n", tone: "muted", text: "a".repeat(99) }],
+        blocks: [{ kind: "notice", id: "n", tone: "muted", text: "a".repeat(98) }],
       }),
     };
     const stdin = fakeStdin();
@@ -1016,8 +1018,11 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     // narrower than the terminal. The premise the row was written for is
     // unchanged — a notice that fits the region and not the indented body, so
     // it wraps once more under the hook — and only the split moved.
-    expect(rows[at + 1]?.startsWith(`  ⎿  ${"a".repeat(94)}`), "the body's first row: the hook at 2 and 94 cells").toBe(true);
-    expect(rows[at + 2]?.trimEnd(), "the wrapped cells, under the bar (C22 I88)").toBe("  │  aaaaa");
+    // **98 cells and 93 + 5 since the rail** (C14 I57): the transcript is a
+    // further column in, so the notice that fits it is 98 and the rows start at
+    // the terminal's column 1.
+    expect(rows[at + 1]?.startsWith(`   ⎿  ${"a".repeat(93)}`), "the body's first row: the hook at 2 and 93 cells").toBe(true);
+    expect(rows[at + 2]?.trimEnd(), "the wrapped cells, under the bar (C22 I88)").toBe("   │  aaaaa");
     expect(rows[at + 3]?.trim(), "the entry's blank row (I85)").toBe("");
     expect(/^[─-]{20,}/u.test(rows[at + 4] ?? ""), "then the upper rule — nothing dropped between").toBe(true);
     expect(rows[at + 5]?.trimStart().startsWith("❯"), "and the prompt").toBe(true);

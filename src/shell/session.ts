@@ -42,7 +42,7 @@ import { reserveNeeded } from "./block-faults.js";
 import { descendants } from "../data/viewmodel/index.js";
 import type { Block, Image, Plot } from "../data/viewmodel/index.js";
 import { blockSpansOfEntry, elementsOfEntry, entryLayout, renderEntryPieces, windowEntry } from "./entry-layout.js";
-import { washedRowsOf, washSelectedRows } from "./paint.js";
+import { RAIL_BLANK, railCell, railRowsOf, selectedElementRowsOf, washedRowsOf, washSelectedRows } from "./paint.js";
 import { animationIntervalOf, TICK_MS } from "../presentation/blocks/index.js";
 import { isBand } from "../presentation/blocks/paint.js";
 import type { EntryParts } from "./render-cache.js";
@@ -55,7 +55,7 @@ import { contextAt } from "../interaction/completion/index.js";
 import { chipSpans, cursorCell, layout, selectionSpans, type CellSpan } from "../interaction/editor/index.js";
 import { extentOf } from "../interaction/router/focus.js";
 import { renderSequenceToLines } from "../presentation/render-lines.js";
-import { PROMPT_GUTTER, regionWidth } from "./config.js";
+import { PROMPT_GUTTER, regionWidth, transcriptWidth } from "./config.js";
 import { cursorStyleFor, steadyWhileTyping } from "./cursor-style.js";
 import { autoscrollFor, beginDrag, clampToContainer, type Drag } from "./drag-selection.js";
 import { createIdentityLoop } from "./identity.js";
@@ -1063,7 +1063,7 @@ class Session implements TuiInstance {
             // to. It partitions blocks and no run is measured here, which is why
             // this is affordable over every entry rather than the visible ones.
             graph.transcript.entries.flatMap((e) =>
-              entryLayout(e.doc.blocks, regionWidth(graph.lifecycle.size().columns))
+              entryLayout(e.doc.blocks, transcriptWidth(graph.lifecycle.size().columns))
                 .filter((run) => !run.blank)
                 .map((run) => ({ scope: e.id, blocks: run.blocks, width: run.width })),
             ),
@@ -1073,7 +1073,8 @@ class Session implements TuiInstance {
             // and the declared cell box is a render-time fact that was a
             // hardcoded `1` before F380.
             //
-            // **`regionWidth` rather than the region** (I109, §6l.9 row 7): the
+            // **`transcriptWidth` rather than the region** (I109, §6l.9 row 7,
+            // C14 I57 — it was `regionWidth` until the rail took a column): the
             // write seam runs after `composeFrame` has returned and holds no
             // `Composed`, so the one implementation is reached for rather than
             // the value. Spelling `columns - 1` here is what the helper exists
@@ -1081,7 +1082,7 @@ class Session implements TuiInstance {
             // the blocks were measured at, and at 80 columns a card-nested
             // picture declared 80 cells wide and addressed across 76 is what
             // F1026 measured going wrong one width along.
-            regionWidth(graph.lifecycle.size().columns),
+            transcriptWidth(graph.lifecycle.size().columns),
             graph.probe,
           )
         : "") + result.write;
@@ -1314,6 +1315,12 @@ class Session implements TuiInstance {
     // reading the wrong one and a second `frame.size.columns` here is that
     // failure spelled harmlessly.
     const width = frame.region.width;
+    // **The prompt keeps the region's content width** (C14 I57, C22 I109): the
+    // transcript is one column narrower for the rail, and `composeFrame` counts
+    // the prompt's rows at `regionWidth` — so a prompt laid out here at the
+    // transcript's width disagrees with the composed height at a wrap boundary,
+    // and the paint's own check throws. One implementation, reached for by name.
+    const promptWidth = regionWidth(frame.size.columns);
     return {
       registry: graph.blocks,
       theme: graph.theme.current,
@@ -1354,25 +1361,25 @@ class Session implements TuiInstance {
       // I118): the field draws what is typed, and the prompt keeps showing what
       // the reader left there — drawn by the same walk, chips and all.
       promptRows: () => {
-        const question = this.#questionRows(graph, width);
+        const question = this.#questionRows(graph, promptWidth);
         if (question !== null) return question;
         const held = graph.fieldHeld();
         return held === null
-          ? graph.editor.layout(width, PROMPT_GUTTER)
-          : layout(held.text, width, PROMPT_GUTTER, graph.editor.drawAs);
+          ? graph.editor.layout(promptWidth, PROMPT_GUTTER)
+          : layout(held.text, promptWidth, PROMPT_GUTTER, graph.editor.drawAs);
       },
       // **No caret in a replaced prompt.** §101 draws the `▌` only once the
       // reader has chosen `reply…` and the prompt has come live beneath the
       // question; a caret left at the editor's position would sit inside the
       // question's box, on a row the editor did not write.
       promptCursor: () => {
-        if (this.#questionRows(graph, width) !== null) return { row: 0, col: 0 };
+        if (this.#questionRows(graph, promptWidth) !== null) return { row: 0, col: 0 };
         const held = graph.fieldHeld();
         return held === null
-          ? graph.editor.cursorCell(width, PROMPT_GUTTER)
-          : cursorCell(held.text, held.cursor, width, PROMPT_GUTTER, graph.editor.drawAs);
+          ? graph.editor.cursorCell(promptWidth, PROMPT_GUTTER)
+          : cursorCell(held.text, held.cursor, promptWidth, PROMPT_GUTTER, graph.editor.drawAs);
       },
-      promptReplaced: () => this.#questionRows(graph, width) !== null,
+      promptReplaced: () => this.#questionRows(graph, promptWidth) !== null,
       // **The wash, mapped through the same walk the rows came from** (C17 I18,
       // roadmap entry 23). `selection` is read here rather than a
       // `selectionSpans` method being added to `LineEditor`, because the guard
@@ -1386,7 +1393,7 @@ class Session implements TuiInstance {
         // spans are cell ranges into the editor's rows, and the rows on screen
         // are the question's — so a live region would wash cells of a box it
         // has no coordinates in.
-        if (this.#questionRows(graph, width) !== null) return EMPTY_SPANS;
+        if (this.#questionRows(graph, promptWidth) !== null) return EMPTY_SPANS;
         const held = graph.fieldHeld();
         const sel = held === null ? graph.editor.selection : held.selection;
         if (sel === null) return EMPTY_SPANS;
@@ -1394,7 +1401,7 @@ class Session implements TuiInstance {
           held?.text ?? graph.editor.text,
           sel.anchor,
           sel.head,
-          width,
+          promptWidth,
           PROMPT_GUTTER,
           // The fourth caller of the one walk, and the one the seam was nearly
           // written without: a wash measured on sentinels and drawn over labels
@@ -1410,7 +1417,7 @@ class Session implements TuiInstance {
       // ground is measured where its label was drawn or it is somewhere else,
       // which is the same argument `promptSelection` above rests on.
       promptChips: () =>
-        chipSpans(graph.fieldHeld()?.text ?? graph.editor.text, width, PROMPT_GUTTER, graph.editor.drawAs),
+        chipSpans(graph.fieldHeld()?.text ?? graph.editor.text, promptWidth, PROMPT_GUTTER, graph.editor.drawAs),
       promptFocused: () =>
         graph.router.target === "prompt" || graph.promptUnderMenu(),
       // **Read at paint, not captured** (C22 I66). `/theme light --no-bg`
@@ -2065,25 +2072,17 @@ function entryById(entries: readonly Entry[], id: string): Entry | undefined {
  * ordinary output and part company at a wrap boundary.
  */
 /**
- * One row per selected block, at the block's first row (C14 I39).
+ * One row per selected block, at the block's first row (C14 I39) — the rows
+ * `washedRowsOf` answers in `visibleRows`.
  *
  * **The spans are the caret's own** (I36), so what is washed and what an extend
  * took cannot disagree — a second walk over the blocks would be a second answer
  * to *where does this block start*. A block whose first row is outside the
- * window contributes nothing here, which is right: the ground goes on the first
- * row and a window that begins below it is showing the body.
+ * window contributes nothing, which is right: the ground goes on the first row
+ * and a window that begins below it is showing the body. The same set leads the
+ * rail (C14 I58).
  */
-function washSelected(
-  graph: Graph,
-  lines: readonly string[],
-  entryId: string,
-  from: number,
-  width: number,
-  selection: SelectionWash,
-): readonly string[] {
-  const rows = washedRowsOf(selection.spans, selection.blocks, entryId, from, lines.length);
-  return washSelectedRows(lines, rows, graph.theme.current, graph.capabilities, width);
-}
+const NO_ROWS: ReadonlySet<number> = Object.freeze(new Set<number>());
 
 /**
  * The entry's blocks under a **banded** selection (C14 I54), or `undefined`.
@@ -2415,8 +2414,30 @@ function visibleRows(
     // C22 I71's *correct frame, previous state*, the symptom whose report says
     // *it froze*. A tenth cache axis would be correct and would bust an entry's
     // whole slot on every keystroke in the mode.
-    const shown = selection === null ? lines : washSelected(graph, lines, entry.id, from, width, selection);
-    out.push(...[...keptChrome, ...shown].slice(0, ve.takeRows));
+    const washedRows = selection === null
+      ? NO_ROWS
+      : washedRowsOf(selection.spans, selection.blocks, entry.id, from, lines.length);
+    const shown = washedRows.size === 0
+      ? lines
+      : washSelectedRows(lines, washedRows, graph.theme.current, graph.capabilities, width);
+    // **Column 0, the rail's** (C14 I57, I58, ruling 68). Every row the frame
+    // draws in the transcript is led by one cell the blocks never see: the rail
+    // beside the first row of each selected block and each selected element,
+    // and a blank everywhere else — the command echo, a body row, a
+    // continuation. Beside the washed row, never inside it: the wash re-opens
+    // `inverse` at 1-bit and an inverted `▌` is another glyph (I52).
+    const elementRows = focus?.selected === undefined
+      ? NO_ROWS
+      : selectedElementRowsOf(
+          elementsOfEntry(graph.blocks, entry.doc.blocks, width, entry.doc.command),
+          focus.selected,
+          from,
+          lines.length,
+        );
+    const railRows = railRowsOf(washedRows, elementRows);
+    const rail = railRows.size === 0 ? "" : railCell(graph.theme.current, graph.capabilities);
+    const led = shown.map((row, i) => (railRows.has(i) ? rail : RAIL_BLANK) + row);
+    out.push(...[...keptChrome.map((row) => RAIL_BLANK + row), ...led].slice(0, ve.takeRows));
   }
   onAnimation(
     fastest === null && orbits.length === 0 && frames.length === 0

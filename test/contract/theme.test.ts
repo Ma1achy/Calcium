@@ -522,7 +522,7 @@ describe("C10 contract", () => {
     const faintSelection = withSurface("selection", "#0a0a0a");
     const sel = validateBands(faintSelection).filter((e) => e.path === "surfaces.selection");
     expect(sel, "the selection band must read against the page").toHaveLength(1);
-    expect(sel[0]!.message).toContain("only carrier");
+    expect(sel[0]!.message).toContain("only ground-level carrier");
 
     // 3 and 4 — the focus band's two constraints, and **they fail in opposite
     //     directions**, which is why they are two constraints and not one. The
@@ -1922,8 +1922,12 @@ describe("C10 I52 — the registry's state axes and the spec's declarations", ()
     expect(violates("word + border"), "neither").toBe(false);
 
     // **Every single-carrier row cites the file that declares it**, so the
-    // exception cannot be taken by writing one here. `selection` and `choice`
-    // are the two, and both are declared in the tree.
+    // exception cannot be taken by writing one here. **The population is empty
+    // at this commit**: `choice` took its weight (C09 I132, ruling 54) and
+    // `selection` its rail (C14 I58, ruling 68), which were the two, so this
+    // loop runs over nothing today. It stays because the commitment (47) still
+    // grants a cited exception, and the mutation run `c10-carriers` is what
+    // shows it live — it writes an uncited `alone` row and expects this to fail.
     for (const row of rows.filter((r) => r.carriers.includes("alone"))) {
       expect(row.renderer, `${row.axis}: a single carrier cites its declaration`).toMatch(/\.ts:\d+/u);
     }

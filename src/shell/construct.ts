@@ -161,7 +161,7 @@ import {
   persistPolicy,
   persists,
 } from "./transcript-persist.js";
-import { regionWidth } from "./config.js";
+import { transcriptWidth } from "./config.js";
 import type { ResolvedConfig } from "./config.js";
 import { anyBlinking, CURSOR_BLINK_MS } from "./cursor-style.js";
 import { createSessionStore, type SessionStore } from "./state.js";
@@ -421,7 +421,7 @@ export type FrameQueries = Readonly<{
    * `{ width, height }` (C15 `Region`). Two shapes, one word, and passing
    * either to the other's consumer compiles for `height` alone.
    */
-  region: () => Readonly<{ top: number; height: number }>;
+  region: () => Readonly<{ top: number; left: number; height: number; width: number }>;
   /** The area layers are placed within (C15 `Region`). */
   overlayRegion: () => Readonly<{ width: number; height: number }>;
   mouseEnabled: () => boolean;
@@ -1024,7 +1024,8 @@ export async function constructGraph(
       // value in the wrong axis is the same defect with a shorter life — a
       // `visible()` answered before that frame exists would be measured a
       // column wide.
-      width: regionWidth(size.columns),
+      // And less the rail's column (C14 I57): the transcript's width, by name.
+      width: transcriptWidth(size.columns),
       ...(deps.profiler === undefined ? {} : { probe: deps.profiler.asProbe() }),
       // **The region's height, not the terminal's** (C22 I34, C14 I22). The
       // first `#render` overwrites this from the composed frame; it is computed
@@ -2225,7 +2226,7 @@ export async function constructGraph(
     // in, and their rows follow the header measured at the full width. The
     // entry's recorded command rides along so a head's `copy` is the invocation
     // (C22 I90).
-    return elementsOfEntry(built.blocks, entry.doc.blocks, deps.frame.overlayRegion().width, entry.doc.command);
+    return elementsOfEntry(built.blocks, entry.doc.blocks, deps.frame.region().width, entry.doc.command);
   };
   /** The live entry's — what `↓` from the prompt enters (C16 I22). */
   const liveElements = (): readonly PlacedElement[] =>
@@ -2312,7 +2313,7 @@ export async function constructGraph(
     const found = elements[index];
     if (found === undefined || found.element.detail === undefined) return null;
 
-    const width = deps.frame.overlayRegion().width;
+    const width = deps.frame.region().width;
     const { viewportHeight, totalRows } = stores.viewport.scroll;
     let top = blankRowsAbove(viewportHeight, totalRows);
     for (const ve of stores.viewport.visible().entries) {
@@ -2584,7 +2585,7 @@ export async function constructGraph(
    * re-derived. `null` where the entry holds no such block.
    */
   const widthIn = (entry: TranscriptEntry, id: string): Readonly<{ outer: number; inner: number }> | null =>
-    blockWidthInEntry(built.blocks, entry.doc.blocks, deps.frame.overlayRegion().width, id);
+    blockWidthInEntry(built.blocks, entry.doc.blocks, deps.frame.region().width, id);
 
   /**
    * A split of an entry by id, and the width it is drawn at (C22 I117).
@@ -2999,9 +3000,10 @@ export async function constructGraph(
       // **Through `elementsOf`, which is the one call site** (C26 I8): the
       // keyboard, the pointer and now the drag reach one resolver, so none of
       // them can disagree about what is there. It lays out at
-      // `overlayRegion().width`, which `frame.ts` makes identical to the
-      // transcript region's, so these rows and the selection's spans are
-      // measured at the same number.
+      // `region().width`, the transcript's (C14 I57), so these rows and the
+      // selection's spans are measured at the same number. It read
+      // `overlayRegion().width` while `frame.ts` made the two identical; the
+      // rail's column ended that.
       for (const { blockId, element } of elementsOf(entry.id)) {
         if (element.level !== "block" || !boxes.has(blockId)) continue;
         const held = merged.get(blockId);
@@ -3139,7 +3141,7 @@ export async function constructGraph(
   ): Readonly<{ blockId: string; element: NavElement; block: Block; row: number; pane?: PaneRef }> | null => {
     const entry = stores.transcript.entries.find((e) => e.id === hit.id);
     if (entry === undefined) return null;
-    const width = deps.frame.overlayRegion().width;
+    const width = deps.frame.region().width;
     const blockRow = hit.rowOffset - chromeRowsOf(entry, width);
     if (blockRow < 0) return null;
 
@@ -3892,6 +3894,12 @@ export async function constructGraph(
 
   const pointerEffect = (e: InputEvent): (() => void) | null => {
     if (e.kind !== "mouse") return null;
+    // **The column, translated once, as the row is** (C14 I57, ruling 68). The
+    // transcript starts one column in — column 0 is the rail's — so every
+    // element's `cols` is the terminal's column less `region().left`. A press
+    // on column 0 is on no element. The row is translated at each use below,
+    // where it always was.
+    const col = e.col - deps.frame.region().left;
     // **The release is where an activation lands** (C16 I45, §4a's release row,
     // R-OWN-003, R-PTR-005). The row used to read *nothing, and it is unconsumed
     // — a release that also acted would be a second click*, which is true of a
@@ -3914,7 +3922,7 @@ export async function constructGraph(
         router.commitPointer("");
         return null;
       }
-      const stillUnder = elementAt(over, e.col);
+      const stillUnder = elementAt(over, col);
       if (stillUnder === null) {
         router.commitPointer("");
         return null;
@@ -3932,7 +3940,7 @@ export async function constructGraph(
     // with a button held otherwise reads as a press on whatever it crosses.
     if (dividerDrag !== null && e.motion && e.button === "button0") {
       const drag = dividerDrag;
-      return () => placeDivider(drag.entryId, drag.split, e.col - drag.left);
+      return () => placeDivider(drag.entryId, drag.split, col - drag.left);
     }
     // **A hover aims and does nothing else** (§4a's hover row; C01 I21). Mode
     // 1003's motion with no button held: the crosshair follows the pointer and
@@ -3944,9 +3952,9 @@ export async function constructGraph(
       if (!e.motion) return null;
       const over = entryAtRegionRow(e.row - deps.frame.region().top);
       if (over === null) return null;
-      const under = elementAt(over, e.col);
+      const under = elementAt(over, col);
       if (under === null) return null;
-      const sample = sampleUnder(under, e.col);
+      const sample = sampleUnder(under, col);
       if (sample === null || stores.cursorPositions.get(over.id, under.block.id) === sample) return null;
       return () => {
         stores.cursorPositions.set(over.id, under.block.id, sample);
@@ -3964,11 +3972,11 @@ export async function constructGraph(
     // the pointer for a click to land on.
     if (e.button === "button0" && !e.motion && !e.meta && !e.ctrl) {
       const entry = stores.transcript.entries.find((x) => x.id === hit.id);
-      const blockRow = entry === undefined ? -1 : hit.rowOffset - chromeRowsOf(entry, deps.frame.overlayRegion().width);
+      const blockRow = entry === undefined ? -1 : hit.rowOffset - chromeRowsOf(entry, deps.frame.region().width);
       const splits = new Set(elementsOf(hit.id).flatMap((p) => (p.pane === undefined ? [] : [p.pane.split])));
       for (const split of splits) {
         const box = splitTop(hit.id, split);
-        if (box === null || box.divider !== e.col) continue;
+        if (box === null || box.divider !== col) continue;
         if (blockRow < box.top || blockRow >= box.top + box.height) continue;
         return () => {
           dividerDrag = { entryId: hit.id, split, left: box.left };
@@ -3981,7 +3989,7 @@ export async function constructGraph(
       // one over a box pages **that** box, and elsewhere is declined so the
       // transcript takes it (row i).
       if (e.button !== "wheelUp" && e.button !== "wheelDown") return null;
-      const under = elementAt(hit, e.col);
+      const under = elementAt(hit, col);
       // **A split pane pages itself under the wheel** (C22 I117), the pane the
       // pointer is over, by the wheel's rows.
       if (under?.pane !== undefined) {
@@ -4005,7 +4013,7 @@ export async function constructGraph(
     // Recorded rather than absorbed: a second button has no key equal yet, and
     // a `meta`- or `ctrl`-modified click has no `⇧↓`-shaped state to reach.
     if (e.button !== "button0" || e.meta || e.ctrl) return null;
-    const under = elementAt(hit, e.col);
+    const under = elementAt(hit, col);
     if (under === null) return null;
     const address = Object.freeze({ blockId: under.blockId, elementId: under.element.id });
     const at = focus.current;
@@ -4021,13 +4029,13 @@ export async function constructGraph(
     // three of them want it: a click focuses the plot *and* aims, a click on
     // the focused plot aims where a row would activate (row m), and a drag on
     // the focused plot aims where a row would extend (row o).
-    const sample = sampleUnder(under, e.col);
+    const sample = sampleUnder(under, col);
     // **The legend, where the pointer is over an entry of it** (§4a's legend row,
     // C12 I117): `seriesVisibility`'s third writer, the digit key's own lines.
     // Disjoint from the area by construction — the column and the area are
     // complementary cells of one layout — so at most one of `sample` and
     // `series` answers, and the focus call below is shared by both.
-    const series = sample === null ? legendUnder(hit.id, under, e.col) : null;
+    const series = sample === null ? legendUnder(hit.id, under, col) : null;
     const crosshair = sample !== null
       ? (): void => {
           stores.cursorPositions.set(hit.id, under.block.id, sample);
@@ -4722,7 +4730,9 @@ export async function constructGraph(
     // filled it lost its command row, top border and first body rows off the
     // screen, and every row two cells to the panel's rails.
     context: (id) => {
-      const region = deps.frame.overlayRegion();
+      // The transcript's region, not the layer's (C14 I57): the entry is drawn
+      // one column in, beside the rail.
+      const region = deps.frame.region();
       const chrome = chromeRowsOf({ doc: { command: childCommand(id) } }, region.width) + ENTRY_GAP;
       const room = panelInterior(region.width, region.height - chrome);
       return Object.freeze({

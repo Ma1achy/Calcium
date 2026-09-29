@@ -588,6 +588,71 @@ export function washedRowsOf(
 }
 
 /**
+ * The rows the rail leads, as a set (C14 I57, I58, T1.77): the washed rows —
+ * one per selected block — unioned with each selected element's first row.
+ *
+ * One function because the union is the claim: a block selection and an
+ * element selection in the same window both take the rail, and a frame that
+ * consults only one of them draws the other's rows blank-led.
+ */
+export function railRowsOf(washed: ReadonlySet<number>, elements: ReadonlySet<number>): ReadonlySet<number> {
+  return elements.size === 0 ? washed : washed.size === 0 ? elements : new Set([...washed, ...elements]);
+}
+
+/**
+ * The first rows of an entry's **selected elements** (C14 I58, C26 I16).
+ *
+ * `focus.selected` is drawn by the block that holds each element — C11 washes
+ * a table row with no knowledge of the frame — so the rail beside it is the
+ * frame's, placed from the entry's elements. `placed` is `elementsOfEntry` at
+ * the transcript's width, whose rows are in the entry's block space, as `from`
+ * is. The first row only: a wrapped row's continuation carries nothing in the
+ * gutter (`R-SEL-016`).
+ */
+export function selectedElementRowsOf(
+  placed: readonly Readonly<{ blockId: string; element: Readonly<{ id: string; rows: Readonly<{ from: number }> }> }>[],
+  selected: readonly Readonly<{ blockId: string; rowId: string }>[],
+  from: number,
+  lineCount: number,
+): ReadonlySet<number> {
+  const rows = new Set<number>();
+  if (selected.length === 0) return rows;
+  const wanted = new Set(selected.map((s) => `${s.blockId}\u0000${s.rowId}`));
+  for (const p of placed) {
+    if (!wanted.has(`${p.blockId}\u0000${p.element.id}`)) continue;
+    const at = p.element.rows.from - from;
+    if (at >= 0 && at < lineCount) rows.add(at);
+  }
+  return rows;
+}
+
+/**
+ * The rail's cell (C14 I58, ruling 68) — `▌` in `accent` on the selection
+ * ground, or `|` where the rung is ASCII.
+ *
+ * **Never `inverse`, and that is why it is not the wash.** `selectionStyle`
+ * answers `inverse` where there is no colour, and an inverted `▌` is a
+ * right-half block: the mark would say a different thing at 1-bit than at every
+ * other rung. So the rail takes the selection ground only where the ground is a
+ * background, and at 1-bit it is the glyph upright beside an inverted row.
+ *
+ * **The ink through `tone(…, "selection")`**, the one path every renderer uses,
+ * so a banded theme's rail is the band's ink (C10 I45, C14 I53) with nothing
+ * here knowing which themes band.
+ */
+export function railCell(theme: ResolvedTheme, capabilities: TerminalCapabilities): string {
+  const ground = selectionStyle(theme, capabilities);
+  const style: Style = {
+    ...tone("accent", theme, capabilities, "selection"),
+    ...(ground.background === undefined ? {} : { background: ground.background }),
+  };
+  return paintSpans([{ text: glyphs(capabilities).rail, style }]);
+}
+
+/** Column 0 of a transcript row that carries no rail (C14 I57). */
+export const RAIL_BLANK = " ";
+
+/**
  * The frame's copy of an entry's lines, with the selected rows grounded
  * (C14 I40).
  *

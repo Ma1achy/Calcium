@@ -9,6 +9,11 @@
 // written into the cache produces a **correct** frame, the previous one, which
 // is C22 I71's *it froze*.
 //
+// **The rail's rows follow** (C14 I57, I58, ruling 68): column 0 reserved on
+// every transcript row, the pointer translated by it, the prompt keeping the
+// content width, and the rail beside the wash rather than inside it. Each is a
+// frame that still shows a selection, one column off or in the wrong ink.
+//
 // A mutation that fails nothing indicts the tests or the prose, not the code.
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
@@ -16,8 +21,14 @@ import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/unit/copy-freeze.test.ts";
+const CMD =
+  "npx vitest run test/unit/copy-freeze.test.ts test/unit/selection-rail.test.ts " +
+  "test/integration/selection-rail.test.ts test/revert/selection-rail.test.ts test/revert/frame.test.ts";
 const PAINT = "src/shell/paint.ts";
+const SESSION = "src/shell/session.ts";
+const CONSTRUCT = "src/shell/construct.ts";
+const CONFIG = "src/shell/config.ts";
+const FRAME = "src/shell/frame.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -129,6 +140,82 @@ const MUTATIONS = [
     to: '  const band = isBand(theme, "selection", capabilities) ? tone("default", theme, capabilities, "focusGround") : {};',
     expect: "T1.40e",
   },
+  {
+    // **The rail in the selection's whole style** (C14 I58, ruling 68). At
+    // 1-bit that style is `inverse`, which is the right-half block §6d refuses;
+    // on every colour rung it reads as the ground it already was.
+    name: "the rail takes the selection's whole style, inverse included",
+    file: PAINT,
+    from: "    ...(ground.background === undefined ? {} : { background: ground.background }),",
+    to: "    ...ground,",
+    expect: "T3.25 (C14",
+  },
+  {
+    // **The pointer read in the terminal's columns** (C14 I57). Every element
+    // is one cell right of where the click lands, so a click on a gap between
+    // options focuses the one after it.
+    name: "the pointer column is not translated by the region's left",
+    file: CONSTRUCT,
+    from: "    const col = e.col - deps.frame.region().left;",
+    to: "    const col = e.col;",
+    expect: "T4.39 (C14",
+  },
+  {
+    // **The prompt laid out at the transcript's width** — the reading the
+    // shared `width` variable invites, and one cell of wrap early.
+    name: "the prompt takes the transcript's width, not the content width",
+    file: SESSION,
+    from: "    const promptWidth = regionWidth(frame.size.columns);",
+    to: "    const promptWidth = transcriptWidth(frame.size.columns);",
+    expect: "T4.39 (C14",
+  },
+  {
+    // **Column 0 reserved without the width giving it back** (T6.28's revert).
+    name: "the transcript is laid out at the content width, and overruns by the rail",
+    file: CONFIG,
+    from: "  return Math.max(1, regionWidth(columns) - RAIL_COLUMNS); // cells-ok — a column count",
+    to: "  return Math.max(1, regionWidth(columns)); // cells-ok — a column count",
+    expect: "T4.39 (C14",
+  },
+  {
+    // **The frame's region at column 0**: the rows are still prefixed, so the
+    // picture is right, and only the pointer reads one cell off.
+    name: "the frame reports the region at column 0",
+    file: FRAME,
+    from: "left: RAIL_COLUMNS,",
+    to: "left: 0,",
+    expect: "T4.39 (C14",
+  },
+  {
+    // **Element selection without the rail** — the pre-ruling-68 frame, where
+    // `▸` was selection's only carrier on a table row.
+    name: "a selected element's row takes no rail",
+    file: PAINT,
+    from: "  return elements.size === 0 ? washed : washed.size === 0 ? elements : new Set([...washed, ...elements]);",
+    to: "  return washed;",
+    expect: "T1.77 (C14",
+  },
+  {
+    // **The chrome rows not reserved**: the head and the echo at column 0, the
+    // body at column 1 — a frame whose rows disagree about where column 0 is.
+    name: "the entry's chrome rows are drawn without the reserved column",
+    file: SESSION,
+    from: "keptChrome.map((row) => RAIL_BLANK + row)",
+    to: "keptChrome",
+    expect: "T4.39 (C14",
+  },
+  {
+    // **The frame consults one set of the two** — the union computed and not
+    // read, which T1.77 cannot see and the session can.
+    name: "the frame leads only the washed rows, whatever the union says",
+    file: SESSION,
+    from: "    const led = shown.map((row, i) => (railRows.has(i) ? rail : RAIL_BLANK) + row);",
+    to: "    const led = shown.map((row, i) => (washedRows.has(i) ? rail : RAIL_BLANK) + row);",
+    expect: "T4.39 (C14",
+  },
+  // **The rail rows' `expect` is the title's opening, `T4.39 (C14`, not the bare
+  // id**: T6.28 and T6.29 are titled "→ T4.39 fails" and "→ T3.25 fails", so a
+  // bare id is matched by the revert row failing and the named row need not.
 ];
 
 const results = await runPass({

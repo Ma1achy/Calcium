@@ -164,7 +164,7 @@ describe("C22 §6 — the paint", () => {
 
     const broken: Composed = Object.freeze({
       ...good,
-      region: Object.freeze({ top: 1, height: good.region.height + 1, width: good.region.width }),
+      region: Object.freeze({ ...good.region, height: good.region.height + 1 }),
     });
 
     expect(heightsSum(broken)).toBe(false);
@@ -252,7 +252,7 @@ describe("C22 §6 — the paint", () => {
     // cap of one needs three, so at three rows the sum is false and the fallback
     // draws. The cap path in `promptWindow` is still code, so the frame that
     // exercises it is built by hand with a region of zero rows, and it still sums.
-    const f: Composed = { ...frameAt(40, 5, 3), promptRows: 1, promptWanted: 3, region: { top: 2, height: 0, width: 39 }, overlayRegion: { width: 39, height: 0 } };
+    const f: Composed = { ...frameAt(40, 5, 3), promptRows: 1, promptWanted: 3, region: { top: 2, left: 1, height: 0, width: 38 }, overlayRegion: { width: 39, height: 0 } };
     expect(f.promptRows, "a cap of one").toBe(1);
 
     const lines = paint(f, deps({ promptRows: () => ["first", "second", "third"] }));

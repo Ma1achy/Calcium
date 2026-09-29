@@ -10,7 +10,7 @@
 // a whole sequence, so one call is one increment however many blocks an entry
 // holds.
 import { describe, expect, it, vi } from "vitest";
-import { regionWidth } from "../../src/shell/config.js";
+import { transcriptWidth } from "../../src/shell/config.js";
 import { BODY_INDENT } from "../../src/shell/entry-layout.js";
 
 import { buildGraph, buildSession } from "../support/session.js";
@@ -1034,8 +1034,10 @@ describe("C22 I108 — the paced schedule, wired (F1207)", () => {
       // under the hook (I83, §6l.2 row 11) — so the number to read is the
       // region's less the indent, and it is `columns − 1 − 4` rather than
       // `columns − 4`. That one column is the whole of what this row is about.
+      // The region is the transcript's box, a further column in for the rail's
+      // reserved column 0 (C14 I57), so the number is `transcriptWidth`.
       expect(widest, `the widest ask at ${String(columns)} columns`).toBe(
-        regionWidth(columns) - BODY_INDENT,
+        transcriptWidth(columns) - BODY_INDENT,
       );
       expect(widest, "and never off the terminal's width").not.toBe(columns - BODY_INDENT);
     }

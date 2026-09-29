@@ -189,8 +189,8 @@ const results = runPass({
       // §3aq E5 — the drag places the divider under the pointer.
       name: "the drag places the divider one cell short",
       file: CONSTRUCT,
-      from: "      return () => placeDivider(drag.entryId, drag.split, e.col - drag.left);",
-      to: "      return () => placeDivider(drag.entryId, drag.split, e.col - drag.left - 1);",
+      from: "      return () => placeDivider(drag.entryId, drag.split, col - drag.left);",
+      to: "      return () => placeDivider(drag.entryId, drag.split, col - drag.left - 1);",
       expect: "T4.98",
     },
     {

@@ -230,8 +230,9 @@ export function withBackground(style: Style | undefined, surface: Style): Style 
  * and one slot carries one meaning. **The 1-bit rung is `inverse`, not a
  * mark**: `resolveBackground` answers `NO_STYLE` without colour, and a wash
  * alone would fall straight from a background to nothing; an attribute
- * survives the depth where a colour does not, and a gutter mark would cost a
- * cell C11 I14 forbids. `shell/paint.ts`'s `selectionStyle` is this same
+ * survives the depth where a colour does not. The gutter mark is not this
+ * function's: it is the `▌` rail, drawn by the frame in the column it reserves
+ * (C14 I57, I58), so no cell of a row is spent on it and C11 I14 holds. `shell/paint.ts`'s `selectionStyle` is this same
  * ladder for the prompt, written first; it should import this one.
  *
  * Painted **over `tone.default`** and nothing else — the one ink C10 §4b has
@@ -247,7 +248,8 @@ export function withBackground(style: Style | undefined, surface: Style): Style 
  * contrast gate and no reader for exactly as long as that was true.
  *
  * **No 1-bit rung here, and that is deliberate.** `selectionStyle` falls to
- * `inverse` because the ground is selection's only carrier; focus has `▸`
+ * `inverse` because the ground is selection's only ground-level carrier (its
+ * second is the `▌` rail, C14 I58); focus has `▸`
  * (C09 I83), which survives to 1-bit and survives a reader who overrode their
  * background. A second inverse rung would make a focused row and a selected one
  * the same frame, which is the defect this function exists to end. So where

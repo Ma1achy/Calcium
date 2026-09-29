@@ -47,11 +47,20 @@ const press = (name: string): InputEvent => ({
   key: { name, ctrl: false, meta: false, shift: false, sequence: name },
 });
 
-/** A press at a terminal (row, col); `over` sets the fields a drag or a release differ in. */
+/**
+ * A press at a terminal row and a **transcript** column; `over` sets the fields
+ * a drag or a release differ in.
+ *
+ * The column is the transcript's because every row here derives it from one —
+ * an element's `cols`, a sample's centre — and the harness frame puts the
+ * transcript at terminal column `REGION.left`, past the rail's column 0 (C14
+ * I57). Translated once here, as `term()` translates the row; a prompt or header
+ * row reads no column, so the shift is nothing there.
+ */
 const mouse = (row: number, col = 0, over: Partial<Mouse> = {}): InputEvent => ({
   kind: "mouse",
   row,
-  col,
+  col: REGION.left + col,
   button: "button0",
   press: true,
   shift: false,
@@ -136,8 +145,8 @@ const AT = (entryId: string, elementId: string, blockId: string, anchor: ReturnT
   mode: "navigate",
 });
 
-/** The harness's frame: a 20-row region starting at terminal row 1 (`test/support/session.ts`). */
-const REGION = { top: 1, height: 20 };
+/** The harness's frame: a 20-row region starting at terminal row 1 and column 1 (`test/support/session.ts`). */
+const REGION = { top: 1, left: 1, height: 20 };
 
 /**
  * A graph whose viewport is the region's height — `buildGraph` never renders, so
@@ -724,8 +733,9 @@ describe("C16 §4a — the frame side", () => {
     expect(lastFocus(w.seen(), "q1"), "nothing is highlighted before the click").toBeNull();
     expect(lastFocus(w.seen(), "q2")).toBeNull();
 
-    // Column 5, inside the table: it is a card's body, four cells in (C22 I84).
-    await type(sgrClick(betaRow, 5));
+    // Column 6, inside the table: it is a card's body, BODY_INDENT cells into
+    // a transcript that starts at the terminal's column 1 (C22 I84, C14 I57).
+    await type(sgrClick(betaRow, 6));
     expect(lastFocus(w.seen(), "q1"), "the settled entry's second row, on screen").toEqual({
       blockId: "t1",
       rowId: "b1",
@@ -733,7 +743,7 @@ describe("C16 §4a — the frame side", () => {
     expect(lastFocus(w.seen(), "q2"), "and the live entry drew no highlight").toBeNull();
 
     // The row above, in the same frame's coordinates, is the first row.
-    await type(sgrClick(betaRow - 1, 5));
+    await type(sgrClick(betaRow - 1, 6));
     expect(lastFocus(w.seen(), "q1")).toEqual({ blockId: "t1", rowId: "a1" });
   });
 });
@@ -920,10 +930,13 @@ describe("C16 §4a — the crosshair, read from the painted frame", () => {
     expect(text().join("\n")).not.toMatch(/train: \d/u);
 
     // The plot is a card's body, BODY_INDENT cells in (C22 I83, I84, C09 I5),
-    // and the pointer goes to a sample's centre — 43 for the third and 26 for
-    // the first, both measured from the frame by where the mark lands.
-    await type(sgrClick(areaRow, 43));
-    expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(43);
+    // and the pointer goes to a sample's centre — 44 for the third and 27 for
+    // the first, both measured from the frame by where the mark lands. **Each
+    // moved right by one with the rail** (C14 I57): the transcript starts at
+    // column 1 and is a column narrower, and the centres, probed from 15 to 80,
+    // are 10, 27, 44, 60 and 77.
+    await type(sgrClick(areaRow, 44));
+    expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(44);
     expect(text().join("\n"), "and the readout names the third sample").toMatch(/train: 30/u);
 
     // A second click at sample 1's centre, eighteen cells left — the mark
@@ -936,8 +949,8 @@ describe("C16 §4a — the crosshair, read from the painted frame", () => {
     // expectation edited alone turns that into *the mark is near the pointer*.
     // **And back by one with C09 I5**: the body moved from four cells in to
     // five, and a click at 25 drew the mark at 26, which is the centre now.
-    await type(sgrClick(areaRow, 26));
-    expect(ruleRow().indexOf("▲")).toBe(26);
+    await type(sgrClick(areaRow, 27));
+    expect(ruleRow().indexOf("▲")).toBe(27);
     expect(text().join("\n")).toMatch(/train: 20/u);
     expect(text().join("\n")).not.toMatch(/train: 30/u);
   });
@@ -1091,8 +1104,8 @@ describe("C16 §4a — the hover, read from the painted frame", () => {
     expect(cursorRow(), "focus at the prompt: the cursor is on its row").toBe(promptRow);
     expect(ruleRow()).not.toContain("▲");
 
-    await type(sgrHover(areaRow, 43)); // a tick centre under the indent (C22 I83, I84)
-    expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(43);
+    await type(sgrHover(areaRow, 44)); // a tick centre under the indent (C22 I83, I84), one right for the rail (C14 I57)
+    expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(44);
     expect(text().join("\n"), "and the readout names the third sample").toMatch(/train: 30/u);
     expect(cursorRow(), "and the cursor is still on the prompt row — focus did not move").toBe(promptRow);
 

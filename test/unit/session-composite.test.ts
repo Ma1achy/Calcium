@@ -169,7 +169,9 @@ describe("C22 §6a — compositing", () => {
     // nothing any check can see — the sum holds at every width with every layer
     // misplaced.
     expect(f.overlayRegion.height, "the same height as the transcript").toBe(f.region.height);
-    expect(f.overlayRegion.width, "and the same width").toBe(f.region.width);
+    // The width is the region's content width: the transcript's plus the
+    // rail's column, because a layer floats over the whole region (C14 I57).
+    expect(f.overlayRegion.width, "the transcript's and the rail's").toBe(f.region.width + f.region.left);
     expect(f.overlayRegion.width, "which is not the terminal's").toBe(f.size.columns - 1);
 
     // And a layer at the region's first row draws on the frame's third — below

@@ -181,12 +181,12 @@ const results = runPass({
       // every behavioural row would agree with until the two parted.
       name: "a second element resolver",
       file: CONSTRUCT,
-      from: "    return elementsOfEntry(built.blocks, entry.doc.blocks, deps.frame.overlayRegion().width, entry.doc.command);",
+      from: "    return elementsOfEntry(built.blocks, entry.doc.blocks, deps.frame.region().width, entry.doc.command);",
       to:
         "    if (entry.doc.blocks.length === 0) {\n" +
-        "      return elementsOfEntry(built.blocks, [], deps.frame.overlayRegion().width, entry.doc.command);\n" +
+        "      return elementsOfEntry(built.blocks, [], deps.frame.region().width, entry.doc.command);\n" +
         "    }\n" +
-        "    return elementsOfEntry(built.blocks, entry.doc.blocks, deps.frame.overlayRegion().width, entry.doc.command);",
+        "    return elementsOfEntry(built.blocks, entry.doc.blocks, deps.frame.region().width, entry.doc.command);",
       expect: "T2.33",
     },
   ],

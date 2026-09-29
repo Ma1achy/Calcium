@@ -22,8 +22,10 @@ import {
   MIN_ROWS,
   RULE_ROWS,
   CONTENT_MARGIN_R,
+  RAIL_COLUMNS,
   regionWidth,
   resolveConfig,
+  transcriptWidth,
   type Ambient,
 } from "../../src/shell/config.js";
 import { clusterCells, foldHome, formatClock, makeDefaultChrome } from "../../src/shell/chrome.js";
@@ -136,11 +138,14 @@ describe("C22 §6l — the frame's default look", () => {
 
   it("T1.64 (C22 I109, §6l.9 rows 1–4): the region is a column narrower than the terminal, and the rules and the chrome are not", () => {
     const f = frameAt(24, makeDefaultChrome("plots-tui", "/usr/local/bin/plots"), 1, 80);
-    expect(f.region.width, "the terminal's less CONTENT_MARGIN_R").toBe(80 - CONTENT_MARGIN_R);
-    expect(regionWidth(80)).toBe(f.region.width);
-    // **The same width for a layer's box** (I28, §6l.9 row 5): an overlay's
-    // content is content.
-    expect(f.overlayRegion.width).toBe(f.region.width);
+    // The transcript is the terminal's less CONTENT_MARGIN_R and less the rail's
+    // column 0 (C14 I57, ruling 68); the region's content width is one wider.
+    expect(f.region.width, "the terminal's less CONTENT_MARGIN_R and the rail").toBe(80 - CONTENT_MARGIN_R - RAIL_COLUMNS);
+    expect(f.region.left, "one column in, beside the rail").toBe(RAIL_COLUMNS);
+    expect(transcriptWidth(80)).toBe(f.region.width);
+    // **The content width for a layer's box** (I28, §6l.9 row 5): an overlay's
+    // content is content, and it floats over the rail's column too.
+    expect(f.overlayRegion.width).toBe(regionWidth(80));
 
     // **Both numbers in one frame, because either one alone is
     // self-consistent.** The defect this landing can produce is a composer
@@ -159,10 +164,13 @@ describe("C22 §6l — the frame's default look", () => {
     // the chrome is not narrowed with the document.
     expect(displayCells(strip(lines[0] ?? "")), "the header's clock at the edge").toBe(80);
 
-    // The prompt's body is the region's width less the gutter (§6l.9 row 4).
+    // The prompt's body is the region's content width less the gutter (§6l.9
+    // row 4) — `regionWidth`, not the transcript's (C14 I57).
     expect(f.promptWanted).toBe(1);
-    const promptWidths = new Set([60, 80, 120].map((c) => frameAt(24, FOOTER(1), 1, c).region.width));
+    const promptWidths = new Set([60, 80, 120].map((c) => frameAt(24, FOOTER(1), 1, c).overlayRegion.width));
     expect([...promptWidths].sort((a, b) => a - b)).toEqual([59, 79, 119]);
+    const transcriptWidths = new Set([60, 80, 120].map((c) => frameAt(24, FOOTER(1), 1, c).region.width));
+    expect([...transcriptWidths].sort((a, b) => a - b)).toEqual([58, 78, 118]);
 
     // The floor at 1 is reached by no size the gate accepts, and is asserted
     // directly rather than through a frame.

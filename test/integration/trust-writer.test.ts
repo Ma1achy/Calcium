@@ -131,7 +131,9 @@ describe("C09 §7d — the writer", () => {
       const at = hit.index;
       const moved = Math.max(bytes.lastIndexOf("H", at), bytes.lastIndexOf("G", at));
       const row = bytes.slice(moved + 1, at).replace(/\u001b\[[0-9;]*m/gu, "");
-      sites.add(row.startsWith("\u276f /show ") ? "the typed line" : `elsewhere: ${JSON.stringify(row.slice(-40))}`);
+      // The echo is drawn past the rail's reserved column 0 (C14 I57) and the
+      // prompt at column 0, so exactly one leading blank is the echo's.
+      sites.add(/^ ?\u276f \/show /u.test(row) ? "the typed line" : `elsewhere: ${JSON.stringify(row.slice(-40))}`);
     }
     expect([...sites], "raw bidi written somewhere other than the reader's own typed line").toEqual(["the typed line"]);
     for (const needle of [`${ESC}]52`, `${ESC}]0;`, `${ESC}[6n`]) {
