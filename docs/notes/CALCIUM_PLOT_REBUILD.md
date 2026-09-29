@@ -160,7 +160,7 @@ continuous field a matrix is.
 does not:**
 
 - `Style` carries a `background`; `paint.ts:73` applies it
-- `escapes.ts:243` emits `48` for extended background colour
+- `escapes.ts:402` emits `48` for extended background colour
 - `paint.ts:54` records why it is unused: *C25 is the only consumer and the only
   kind that paints a background at all*
 - `catalogue-png.mjs` now parses `48;5;n` and `48;2;r;g;b`

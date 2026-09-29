@@ -116,23 +116,44 @@ export const BELL = "\x07";
 const BIDI_FORMAT = /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu;
 
 /**
+ * C0, DEL and C1, in caret form (C01 I26, ruling 86) — `data/text.ts`'s
+ * `controlForm`, restated because `terminal/` may not import `data/`, and held
+ * equal to it by C01 T2.13 over every BMP code point. `^[` for an escape, `^?`
+ * for DEL, `M-^[` for U+009B: `cat -v`'s convention.
+ *
+ * **Tab and newline included**, which is the one difference: a block lays the
+ * two out, and a payload is one line nothing lays out.
+ */
+const CONTROL = /[\u0000-\u001f\u007f-\u009f]/gu;
+const caret = (ch: string): string => {
+  const unit = ch.charCodeAt(0);
+  if (unit === 0x7f) return "^?";
+  if (unit >= 0x80) return `M-^${String.fromCharCode(unit - 0x40)}`;
+  return `^${String.fromCharCode(unit + 0x40)}`;
+};
+
+/**
  * An OSC payload's text (C01 I26) — the one sanitiser both builders below
  * read.
  *
- * C0, DEL and C1 are **deleted**: anything that could end the string early or
- * start another sequence inside it. `terminal/` may not import `data/`, so the
- * rule is restated here at its narrowest — an OSC payload is text, and text has
- * no controls in it.
+ * A control is **shown**, never written and never deleted: anything that
+ * could end the string early or start another sequence inside it arrives as
+ * printable ASCII. Deleting it, which this did until ruling 86, left the
+ * control's arguments behind as text — `ESC [ 2 J` in a tool's output reached
+ * the title as `[2J` (F1458).
  *
- * A bidi format character is **shown**, as `<U+202E>` — ruling 71's form. It
- * is printable by category, so the filter above passed it whole, and a title
- * or a notification built from a tool's output reordered what the reader saw
- * in the title bar (F1407). The form is printable ASCII and holds nothing
- * either arm rewrites.
+ * A bidi format character is **shown** too, as `<U+202E>` — ruling 71's form.
+ * It is printable by category, so a C0-and-C1 filter passed it whole, and a
+ * title or a notification built from a tool's output reordered what the reader
+ * saw in the title bar (F1407).
+ *
+ * Both forms are printable ASCII and hold nothing either arm rewrites, so the
+ * two arms commute and the whole is idempotent: a line already in the shown
+ * form (C22 I149) passes through as itself.
  */
 const oscText = (text: string): string =>
   text
-    .replace(/[\u0000-\u001f\u007f-\u009f]/gu, "")
+    .replace(CONTROL, caret)
     .replace(BIDI_FORMAT, (ch) => `<U+${(ch.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}>`);
 
 /** OSC 2 — the window title (C01 I24), through `oscText` (C01 I26). */

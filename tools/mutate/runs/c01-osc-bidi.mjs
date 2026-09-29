@@ -3,8 +3,8 @@
 //
 // **Two ways the arm can be lost**: whole, which is the tree before F1407 was
 // closed, and by one member, which is the restated set drifting from
-// `data/text.ts`'s — the reason T2.12 exists. The control is the older arm,
-// C0 deletion, removed: T1.31 reads a title's `[31m` residue directly.
+// `data/text.ts`'s — the reason T2.12 exists. The control is the other arm,
+// the caret form, removed: T1.31 reads a title's `^[[31m` directly.
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
@@ -31,9 +31,9 @@ const results = runPass({
   run,
   control: {
     file: ESCAPES,
-    from: '    .replace(/[\\u0000-\\u001f\\u007f-\\u009f]/gu, "")\n',
+    from: "    .replace(CONTROL, caret)\n",
     to: "",
-    why: "T1.31 asserts a title's `ESC [ 31 m` arrives as `[31m`; with the C0 arm gone the ESC is written",
+    why: "T1.31 asserts a title's `ESC [ 31 m` arrives as `^[[31m`; with the caret arm gone the ESC is written",
   },
   mutations: [
     {

@@ -717,7 +717,7 @@ describe("C01 focus reporting and the title stack (I23, I24)", () => {
     lifecycle.title("c\x1b[31m");
     lifecycle.release();
     const tail = stdout.output.slice(again);
-    expect(tail.startsWith(`${PUSH}\x1b]2;c[31m\x07`), "pushed, and the text control-stripped").toBe(true);
+    expect(tail.startsWith(`${PUSH}\x1b]2;c^[[31m\x07`), "pushed, and the control shown (C01 I26)").toBe(true);
     expect(count(tail, POP), "popped at release").toBe(1);
   });
 });
@@ -788,8 +788,8 @@ describe("C01 the OSC text payloads (I26)", () => {
       }
     }
 
-    // The older arm is unchanged beside it: a C0 is deleted, not shown.
-    expect(windowTitle("a\x1b\u202Eb")).toBe("\x1b]2;a<U+202E>b\x07");
+    // The other arm beside it: a C0 is shown too, in caret form (T1.34).
+    expect(windowTitle("a\x1b\u202Eb")).toBe("\x1b]2;a^[<U+202E>b\x07");
     // And the notification's leading-number guard still reads the text it is handed.
     expect(systemNotification("7\u202E;x")).toBe("\x1b]9;7<U+202E>;x\x07");
 
@@ -798,6 +798,75 @@ describe("C01 the OSC text payloads (I26)", () => {
     expect(windowTitle("\u05D0\u05D1")).toBe("\x1b]2;\u05D0\u05D1\x07");
   });
 
-  it.todo("T1.34 (C01 I26): ESC [ 2 J reaches a title and a notification as ^[[2J, and C0, DEL, C1, tab and newline are shown in caret form — not deferred on a component: lands with the F1458 code commit of review batch 4");
-  it.todo("T1.35 (C01 I26): over every BMP code unit, neither payload holds a C0, DEL or C1 code unit or a bidi format character — not deferred on a component: lands with the F1458 code commit of review batch 4");
+  it("T1.34 (I26, ruling 86): ESC [ 2 J reaches a title and a notification as ^[[2J, and C0, DEL, C1, tab and newline are shown in caret form", () => {
+    // **F1458's case by name**: deletion left `[2J`, which reads as text a
+    // tool meant to print. The form reads as what it is.
+    expect(windowTitle("a\x1b[2Jb")).toBe("\x1b]2;a^[[2Jb\x07");
+    expect(systemNotification("a\x1b[2Jb")).toBe("\x1b]9;a^[[2Jb\x07");
+
+    // One of each arm, and tab and newline, which a block leaves as
+    // themselves and a payload cannot (C01 I26's stated difference).
+    const cases: ReadonlyArray<readonly [number, string]> = [
+      [0x00, "^@"],
+      [0x07, "^G"],
+      [0x09, "^I"],
+      [0x0a, "^J"],
+      [0x1b, "^["],
+      [0x1f, "^_"],
+      [0x7f, "^?"],
+      [0x80, "M-^@"],
+      [0x9b, "M-^["],
+      [0x9c, "M-^\\"],
+      [0x9f, "M-^_"],
+    ];
+    for (const [cp, form] of cases) {
+      const text = `a${String.fromCharCode(cp)}b`;
+      expect(windowTitle(text), `U+${cp.toString(16)} in a title`).toBe(`\x1b]2;a${form}b\x07`);
+      expect(systemNotification(text), `U+${cp.toString(16)} in a notification`).toBe(`\x1b]9;a${form}b\x07`);
+    }
+
+    // The two arms side by side, in either order.
+    expect(windowTitle("\x1b\u202E\u202E\x1b")).toBe("\x1b]2;^[<U+202E><U+202E>^[\x07");
+    // **Idempotent**: a line C22 I149 already put in the form passes as itself.
+    const shownLine = "prism: ^[[2J <U+202E> M-^[";
+    expect(windowTitle(shownLine)).toBe(`\x1b]2;${shownLine}\x07`);
+    // The leading-number guard still reads the form, not the raw text.
+    expect(systemNotification("7\x1b;x")).toBe("\x1b]9;7^[;x\x07");
+
+    // **The control**: printable ASCII that looks like the residue passes
+    // whole, so the rows above read a rewrite and not a copy.
+    expect(windowTitle("abc [2J")).toBe("\x1b]2;abc [2J\x07");
+  });
+
+  it("T1.35 (I26): over every BMP code unit, neither payload holds a C0, DEL or C1 code unit or a bidi format character", () => {
+    // **The security property, read from the bytes a terminal receives**:
+    // anything that could end the string early or open a sequence inside it.
+    // `BIDI` is the twelve above; a code unit, not a code point, because a
+    // payload's forbidden set is all in the BMP.
+    const forbidden = (u: number): boolean => u < 0x20 || (u >= 0x7f && u <= 0x9f) || BIDI.includes(u);
+    const bad: string[] = [];
+    let rewritten = 0;
+    for (let cp = 0; cp <= 0xffff; cp += 1) {
+      if (cp >= 0xd800 && cp <= 0xdfff) continue; // a lone surrogate is not a character
+      const text = `a${String.fromCharCode(cp)}b`;
+      for (const [open, sequence] of [
+        ["\x1b]2;", windowTitle(text)],
+        ["\x1b]9;", systemNotification(text)],
+      ] as const) {
+        expect(sequence.startsWith(open) && sequence.endsWith("\x07")).toBe(true);
+        const payload = sequence.slice(open.length, -1);
+        for (let i = 0; i < payload.length; i += 1) {
+          if (forbidden(payload.charCodeAt(i))) {
+            bad.push(`U+${cp.toString(16).toUpperCase().padStart(4, "0")} in ${open.slice(2, 3)}`);
+            break;
+          }
+        }
+        if (open === "\x1b]2;" && payload !== text) rewritten += 1;
+      }
+    }
+    expect(bad, "a code unit the terminal would read as a control or a reordering").toEqual([]);
+    // The control: C0, DEL and C1 (65) and ruling 71's twelve were rewritten,
+    // so the sweep read payloads that had something to hide.
+    expect(rewritten, "65 C0, DEL and C1 and twelve bidi").toBe(77);
+  });
 });

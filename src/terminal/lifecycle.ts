@@ -115,7 +115,7 @@ export interface TerminalLifecycle {
   setMouseTracking(on: boolean): void;
   /**
    * The window title (I24, C22 I128): pushes the reader's title on the first
-   * write, then `OSC 2`, control-stripped. A no-op unless acquired.
+   * write, then `OSC 2`, its controls shown (I26). A no-op unless acquired.
    */
   title(text: string): void;
   /** Pops what `title` pushed, once; nothing when nothing was (I24). */

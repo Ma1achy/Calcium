@@ -282,12 +282,12 @@ describe("C01 fail-on-revert", () => {
 
 describe("C01 fail-on-revert, the clipboard (I25)", () => {
   it("T6.23 (I25): passing the text through oscText → T1.32's round trip loses ESC and the newline", () => {
-    // `windowTitle` strips controls, and it is right to: a title is text. A copy is
+    // `windowTitle` rewrites controls, and it is right to: a title is text. A copy is
     // the reader's text, and base64 already makes it safe inside the string.
     const text = "\x1b[1mbold\x1b[0m\nsecond line";
     const payload = clipboardWrite(text)?.slice("\x1b]52;c;".length, -1) ?? "";
     expect(Buffer.from(payload, "base64").toString("utf8")).toBe(text);
-    // The control: the title path does strip, so the two are not one rule applied twice.
+    // The control: the title path does rewrite, so the two are not one rule applied twice.
     expect(windowTitle(text)).not.toContain("\n");
   });
 
@@ -298,5 +298,12 @@ describe("C01 fail-on-revert, the clipboard (I25)", () => {
 });
 
 describe("C01 fail-on-revert, the OSC text payloads (I26)", () => {
-  it.todo("T6.26 (C01 I26): oscText's control arm put back to deleting → T1.34 fails on the residue — not deferred on a component: lands with the F1458 code commit of review batch 4");
+  it("T6.26 (I26, ruling 86): oscText's control arm put back to deleting → T1.34 fails on the residue `[2J`", () => {
+    // The mutation itself is `tools/mutate/runs/c01-osc-caret.mjs`, with the
+    // C1 prefix dropped (→ T2.13) and C1 passed whole (→ T1.35) beside it.
+    // Here, the outcome it reverts: the escape is shown, and never deleted.
+    const title = windowTitle("\x1b[2J");
+    expect(title).toBe("\x1b]2;^[[2J\x07");
+    expect(title, "the residue alone is what deletion left").not.toBe("\x1b]2;[2J\x07");
+  });
 });
