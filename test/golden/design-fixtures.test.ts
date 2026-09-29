@@ -19,88 +19,38 @@
  * most-drawn line in the application.
  *
  * So the **class is a judgement** and the rows below hold the parts that rot on
- * their own: membership by equality in both directions, targets that exist, and
- * a census compared against the figure the document prints.
+ * their own: membership by equality in both directions, targets that exist, a
+ * census compared against the figure the document prints — and, since review
+ * batch 4 (M16.1), **each framed fixture's figure against its golden frame**,
+ * which is the comparison the map existed to make and the one nothing made.
+ *
+ * **T1.5 is retired, not renumbered** (M16.6). It searched the tree's code for
+ * each row's probe, and a substring answers *a word with this spelling occurs*:
+ * §035 and §036 read as built for a whole MR on an option key of
+ * `Intl.Segmenter`, and §076 on a real symbol belonging to another subject. It
+ * walked every file for every probe, which made it the row a loaded lane timed
+ * out. T1.7 asks what the probe stood in for — does the frame draw what the
+ * figure draws — and the probes stay in the column as a reader's pointer.
  */
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import {
+  FIXTURES,
+  allowed,
+  carry,
+  differences,
+  framed,
+  figureWidth,
+  measured,
+  ranges,
+  rows,
+  rungWidth,
+} from "../../tools/design/figures.js";
+
 const MAP = "test/golden/DESIGN_FIXTURES.md";
-
-/**
- * A file's code, with its comments removed.
- *
- * **A probe that resolves only inside a comment is not evidence.** The column
- * already warns that a probe says *a subject with this name is in the tree* and
- * not that the subject matches the design; what it did not say is that prose
- * counted as the tree.
- *
- * **What this does NOT catch, stated because the narrowing was written for a
- * case it turned out not to reach.** §035 and §036 probed `granularity` and read
- * as built for a whole MR while `Progress` has `style` and `ramp` and no third
- * member — and `granularity` survives this strip, because five of its eight
- * occurrences are `new Intl.Segmenter(undefined, { granularity: "grapheme" })`,
- * which is code. An option key of an unrelated standard-library call is as good
- * a resolution as a declaration to a substring search. **Reading the type is
- * what found that one**, and nothing here or anywhere else would have; the two
- * rows are `no` now because a person went and looked. The control below is
- * therefore a separate word — a probe that really does live only in prose —
- * rather than the case that motivated the reading.
- */
-const code = (src: string): string =>
-  src.replaceAll(/\/\*[\s\S]*?\*\//gu, "").replaceAll(/(?<![:"'`])\/\/[^\n]*/gu, "");
-
-/**
- * A rule id is a **citation**, and a citation belongs in a comment.
- *
- * The one exemption, named rather than left to a reader to infer: `R-KEY-005`
- * is §022's probe and lives in prose, because a design rule is something the
- * code is annotated *with*. Every other probe is a symbol and must be reachable
- * by the compiler. **Its blind spot, stated**: a symbol whose only occurrence is
- * in a string literal still counts, because the strip is lexical and does not
- * parse — which is the direction that admits too much rather than too little.
- */
-const CITATION = /^R-[A-Z]{3}-\d{3}$/u;
-
-/** Every `.ts` under `src/` and `test/` — what a probe is looked for in. */
-const FILES: readonly string[] = (function walk(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
-    const full = join(dir, e.name);
-    if (e.isDirectory()) return e.name === "node_modules" ? [] : walk(full);
-    return e.name.endsWith(".ts") ? [full] : [];
-  });
-})("src").concat(
-  (function walk(dir: string): string[] {
-    return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
-      const full = join(dir, e.name);
-      if (e.isDirectory()) return e.name === "node_modules" ? [] : walk(full);
-      return e.name.endsWith(".ts") ? [full] : [];
-    });
-  })("test"),
-);
-const FIXTURES = "docs/design/language/fixtures";
-
-type Row = Readonly<{ section: number; cls: string; built: string; target: string }>;
-
-/** The table, parsed — `| § | class | target | why |`. */
-function rows(): readonly Row[] {
-  const doc = readFileSync(MAP, "utf8");
-  const body = doc.slice(doc.indexOf("## The table"), doc.indexOf("## The two with no fixture"));
-  // **A cell may hold an escaped pipe**, because a probe is an alternation and
-  // the `built` column carries it. `[^|]+` stops at the byte whatever markdown
-  // means by the backslash, and it silently dropped the two rows whose probe
-  // had one — caught by the membership row, which is what it is for.
-  const cell = String.raw`(?:[^|\\]|\\.)+`;
-  const re = new RegExp(String.raw`^\| (\d+) \| (\w+) \| (${cell}) \| (${cell}) \|`, "gmu");
-  return [...body.matchAll(re)].map((m) => ({
-    section: Number(m[1]),
-    cls: m[2]!,
-    built: m[3]!.trim(),
-    target: m[4]!.trim(),
-  }));
-}
 
 type Fixture = Readonly<{ section: number; file: string }>;
 
@@ -144,44 +94,6 @@ describe("M16 — the design fixtures, mapped", () => {
     expect(dangling, "frame rows whose target is not in the tree").toEqual([]);
   });
 
-  it("T1.5 (M16): every probe in the `built` column resolves in the tree", () => {
-    // **The column is evidence or it is nothing.** Its first draft answered
-    // *is this built* from the plan rather than from HEAD and was wrong for
-    // most of the corpus — `focusGround`, `dismissal`, `nativeSelection`,
-    // `scrollbar.ts`, `tape.ts`, `headMark` and `REGISTRY_THEMES` were all
-    // already in the tree while the table called them outstanding.
-    //
-    // **And a probe that does not resolve indicts the probe first** (F277).
-    // Seven of the first sixty-five were wrong: one searched `src/` for a
-    // symbol that lives in `test/`, two named block kinds the repo never had,
-    // and §069's named a spelling that does not exist for a surface that is
-    // built. Every one reads, from outside, exactly like an absence.
-    //
-    // **An eighth was wrong in the other direction**, and it is the worse
-    // failure of the two because nothing about it reads like an absence: §035
-    // and §036 probed `granularity` and answered *built* for a subject
-    // `Progress` does not have. The search runs over `code(src)` now, with the
-    // one citation-shaped probe exempted by name — but that narrowing does not
-    // reach `granularity`, which resolves inside `Intl.Segmenter`'s options.
-    // Those two rows read `no` because the type was read, not because a gate
-    // said so. The control for this arm is a word that lives only in prose:
-    // `unpatchable`, which occurs once, in a comment in `transcript.test.ts`,
-    // and which this row rejects.
-    const dead: string[] = [];
-    for (const r of rows()) {
-      if (r.built === "—" || r.built === "no") continue;
-      const symbols = r.built.replaceAll("`", "").split("\\|").map((x) => x.trim());
-      const found = symbols.some((sym) =>
-        FILES.some((f) => {
-          const src = readFileSync(f, "utf8");
-          return CITATION.test(sym) ? src.includes(sym) : code(src).includes(sym);
-        }),
-      );
-      if (!found) dead.push(`§${String(r.section)} → ${r.built}`);
-    }
-    expect(dead, "probes naming nothing in the tree").toEqual([]);
-  });
-
   it("T1.4 (M16): the census in the document is the census of the table", () => {
     // **The number moves only on purpose.** The direction that matters is
     // `owed` → `frame` as the reconciliation lands, and it should be a figure a
@@ -218,7 +130,94 @@ describe("M16 — the design fixtures, mapped", () => {
     ).toEqual({ built, unbuilt, framed });
   });
 
-  it.todo("T1.6 (M16.1): the figure column is present on exactly the framed rows, and each range lies inside its fixture — not deferred on a component: it lands with `tools/design/figures.ts` in the next commit");
-  it.todo("T1.7 (M16.1): each framed fixture's golden frame against its figure — the difference is the allowed one, or there is none — not deferred on a component: it lands with `tools/design/figures.ts` in the next commit");
-  it.todo("T1.8 (M16.1): the allowed differences equal the measured ones in both directions, and each carries a reason — not deferred on a component: it lands with `tools/design/figures.ts` in the next commit");
+  it("T1.6 (M16.1): the figure column is present on exactly the framed rows, and each range lies inside its fixture", () => {
+    // **Present on exactly the framed rows, by equality.** A figure on an
+    // unframed row is a claim nothing compares; a framed row with none has
+    // nothing to be compared against — and the day a `built: no` row gains a
+    // probe, this is the row that says its figure is owed.
+    const all = rows();
+    expect(
+      all.filter((r) => r.figure !== "—").map((r) => r.section),
+      "the rows carrying a figure are the framed rows",
+    ).toEqual(all.filter(framed).map((r) => r.section));
+    const index = new Map(fixtures().map((f) => [f.section, f.file]));
+    const bad: string[] = [];
+    for (const r of all.filter(framed)) {
+      const spans = ranges(r.figure);
+      const lines = readFileSync(join(FIXTURES, index.get(r.section)!), "utf8").replace(/\n$/u, "").split("\n");
+      if (spans === null) bad.push(`§${String(r.section)}: \`${r.figure}\` is not a line range`);
+      else
+        for (const [a, b] of spans)
+          if (a < 1 || b < a || b > lines.length)
+            bad.push(`§${String(r.section)}: ${String(a)}-${String(b)} against ${String(lines.length)} lines`);
+    }
+    expect(bad, "figures that are not ranges inside their fixture").toEqual([]);
+  });
+
+  // **One row per framed fixture**, so a red names its section. The list is
+  // the table's, read when the file is collected — a fixture framed later
+  // gets its row without anyone writing one.
+  const allowedBySection = new Map(allowed().map((d) => [d.section, measured(d)]));
+  const measuredBySection = new Map(differences().map((d) => [d.section, measured(d)]));
+  it.each(rows().filter(framed).map((r) => r.section))(
+    "T1.7 (M16.1): §%s's golden frame against its figure — the difference is the allowed one, or there is none",
+    (section) => {
+      expect(measuredBySection.get(section), "the marks the figure and the frame do not share").toEqual(
+        allowedBySection.get(section),
+      );
+    },
+  );
+
+  it("T1.8 (M16.1): the allowed differences equal the measured ones in both directions, and each carries a reason", () => {
+    // **Equality, not containment** — the membership row's reason, one file
+    // over. A subset check lets an entry outlive the difference it excused,
+    // and an excuse with no subject reads as coverage of something that is no
+    // longer there.
+    expect(
+      allowed().map(measured),
+      "test/golden/design-differences.json against the tree — `npx tsx tools/design/figures.ts --write` re-derives it",
+    ).toEqual(differences().map(measured));
+    expect(
+      allowed()
+        .filter((d) => d.reason.trim() === "")
+        .map((d) => d.section),
+      "entries with no reason — each is owed one, written by a person",
+    ).toEqual([]);
+  });
+
+  it("T1.9 (M16.1): re-deriving keeps a section's reason while its entry keeps its kind, and drops it when the kind changes", () => {
+    // **The one command is only safe if it cannot launder a stale reason.** A
+    // row that became locatable has a reason about why it was not, and
+    // carrying that across would make T1.8's reason check pass on a sentence
+    // about the other state.
+    const located = (section: number, reason: string) =>
+      ({ section, target: "design-surfaces.test.ts", width: 80, figureCells: 60, figureOnly: ["✦ U+2726"], frameOnly: [], reason }) as const;
+    const unlocated = (section: number, reason: string) =>
+      ({ section, target: "blocks.test.ts", unlocated: true, reason }) as const;
+    const prior = [located(1, "moved marks"), unlocated(2, "indexed by kind"), located(3, "stale")];
+    const now = [
+      { ...located(1, ""), figureOnly: ["✓ U+2713"] }, // same kind, marks moved: the reason stays
+      located(2, ""), // became locatable: the reason is about the other state
+      unlocated(4, ""), // new: nobody has written one
+    ];
+    expect(carry(prior, now).map((d) => [d.section, d.reason])).toEqual([
+      [1, "moved marks"],
+      [2, ""],
+      [4, ""],
+    ]);
+  });
+
+  it("T1.10 (M16.1): a figure's width is its cells, so a wide glyph picks the golden a terminal would need", () => {
+    // **Constructed, because the corpus cannot say it.** Measured at the lane's
+    // tree, no framed figure's widest line holds a wide glyph, so `.length` and
+    // `cells()` agree on all 58 and a comparison run over the corpus is blind
+    // to which one it used. Twenty-one `⚡` are twenty-one code units and
+    // forty-two cells: `.length` would compare them against the 40-column
+    // golden, which cannot hold the line.
+    const wide = ["⚡".repeat(21)];
+    expect(figureWidth(wide), "cells, not code units").toBe(42);
+    expect(rungWidth([80, 40], figureWidth(wide)), "the narrowest golden that holds it").toBe(80);
+    expect(rungWidth([80, 40], 40), "a figure exactly the width takes that golden").toBe(40);
+    expect(rungWidth([80, 40], 81), "and wider than every golden takes the widest").toBe(80);
+  });
 });

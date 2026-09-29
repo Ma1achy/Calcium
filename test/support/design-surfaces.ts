@@ -16,6 +16,8 @@
 // **An entry is a §, a reason and a function returning rows** — the shape
 // `STATES` chose, for its reason: adding one is three lines and the frame comes
 // free, so the cost of covering a surface never argues against covering it.
+import { readFileSync } from "node:fs";
+
 import { block } from "../../src/data/viewmodel/index.js";
 import { chordText, defaultKeymap, scopesInReadingOrder } from "../../src/interaction/router/keymap.js";
 import {
@@ -585,13 +587,36 @@ const WELL = block({
  * are restated here deliberately, because a presentation choice is what a
  * census is *for* comparing.
  *
- * **121 bindings and not the fixture's 39.** §019 pictures the registry's own
- * bindings; the tree's resolved keymap is the registry's plus the routes and
- * the block rungs, which is the thing a reader actually presses. The census
+ * **The keymap's count and not the fixture's.** §019 pictures the registry's
+ * own bindings; the tree's resolved keymap is the registry's plus the routes
+ * and the block rungs, which is the thing a reader actually presses. The census
  * draws what ships, so the two numbers are expected to differ — the check is
  * that the *grouping* and the *order* are the design's, not that the totals
  * match. `prompt` is the rung because it is where a session opens.
+ *
+ * **Both numbers are derived, in the heading** (review batch 4, M16.7). This
+ * comment carried them by hand — *121 bindings and not the fixture's 39* — and
+ * both were stale by the time anyone read them again: the keymap is generated
+ * from the registry since batch 2's M6, and batch 1's regeneration moved the
+ * fixture's figure to the registry's current count. `keymapCounts` reads the
+ * two sources the numbers come from, so the golden's heading moves when either
+ * does, and a sentence here cannot fall behind.
  */
+/**
+ * `N bindings across S scopes · the registry's current R`, read from the
+ * keymap and the registry when the module loads — the figure the §019 heading
+ * carries, and the only place it is written. No number appears in this comment
+ * on purpose: a worked example would be the hand count again.
+ */
+function keymapCounts(): string {
+  const registry = JSON.parse(
+    readFileSync(new URL("../../docs/design/language/calcium-registry.json", import.meta.url), "utf8"),
+  ) as { bindings: readonly { status: string }[] };
+  const scopes = new Set(defaultKeymap.map((b) => b.target)).size;
+  const current = registry.bindings.filter((b) => b.status === "current").length;
+  return `${String(defaultKeymap.length)} bindings across ${String(scopes)} scopes · the registry's current ${String(current)}`;
+}
+
 const keymapCensus = (width: number, caps: TerminalCapabilities, theme: ResolvedTheme): readonly string[] => {
   const all = defaultKeymap.map((b) => ({ keys: chordText(b.key, caps.unicode !== "ascii"), does: b.action, target: b.target }));
   const here = "prompt";
@@ -1488,7 +1513,7 @@ export const SURFACES: readonly Surface[] = Object.freeze([
     ...paintedChrome(w, c, t),
     ...buttonRungs(w, c, t),
   ] },
-  { section: 19, name: "the resolved keymap, the reader's own rung first", rows: keymapCensus },
+  { section: 19, name: `the resolved keymap, the reader's own rung first — ${keymapCounts()}`, rows: keymapCensus },
   { section: 21, name: "the scrollbar — the set, and the bar beside a box", rows: (w, c, t) => [
     ...scrollbarCensus(w, c),
     ...draw(SCROLLED)(w, c, t),
