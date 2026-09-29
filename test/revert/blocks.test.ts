@@ -405,3 +405,10 @@ describe("C09 §2c width — fail-on-revert", () => {
       "and the child whole is what the box used to paint",
     ).toBe(30);
   });
+
+describe("C09 I132–I135 — tier 6 (review batch 4)", () => {
+  it.todo("T6.184 (C09 I132): hotEdge without its overshoot → T1.150 fails at the head — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T6.185 (C09 I133): the band walk by code unit → T3.129 fails on the dropped mark — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T6.186 (C09 I134): the crop removed → T3.76 and T3.130 fail — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T6.187 (C09 I135): segmented mapped back to slant → T2.226 fails — not deferred on a component: the code lands in the next commit of this round");
+});

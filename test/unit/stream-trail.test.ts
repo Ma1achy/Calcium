@@ -575,3 +575,9 @@ describe("C09 §099 — an elided run shortens from its middle", () => {
     }
   });
 });
+
+describe("C04 I148 and C09 I132, I133 — the hot edge's overshoot and the band by grapheme (review batch 4 M13.4, M13.5)", () => {
+  it.todo("T1.82 (C04 I148, C10 I36): overshoot samples lift the head at 24-bit, quantise at 8-bit, and change nothing at 4 and 1 — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T1.150 (C09 I132, §7e): each form's head, middle, tail and first cell outside, as colours — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T3.129 (C09 I133, §7e): a cluster at the band's edge is wholly in or out, a combining mark is never dropped, and the newest cluster is the head — not deferred on a component: the code lands in the next commit of this round");
+});

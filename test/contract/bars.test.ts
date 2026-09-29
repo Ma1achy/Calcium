@@ -132,3 +132,8 @@ describe("roadmap 51 — bar styles, and ambiguous width is a tier", () => {
     // reader to rediscover.
   });
 });
+
+describe("C09 I135 — counted work uses posts, and braille draws eighths (review batch 4 M16.3)", () => {
+  it.todo("T2.226 (C09 I135, §7j): the granularity × style table, drawn — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T2.227 (C09 I135, §7j): the braille frames — one cell through eight steps, three cells at seven fractions, painted and ASCII whole — not deferred on a component: the code lands in the next commit of this round");
+});

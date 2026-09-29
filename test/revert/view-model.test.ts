@@ -525,3 +525,12 @@ describe("C04 I6 fail-on-revert — the vocabulary is closed", () => {
     expect(wire.ok ? "" : wire.error.join("\n"), "the wire").toMatch(/requires a glyph \(C04 I6, D29\)/u);
   });
 });
+
+describe("C04 I124, I144–I148 — tier 6 (review batch 4)", () => {
+  it.todo("T6.108 (C04 I144): the tape arm reverted to requireArray → T2.150 fails — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T6.109 (C04 I145): progress measuring 1 at every fraction → T1.80 fails at 100/100 — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T6.110 (C04 I146): the progress arm without its field checks → T2.151 fails — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T6.111 (C04 I147): width counting labels and gaps only → T1.81 fails on the measured case — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T6.112 (C04 I148): the sampler ignoring overshoot → T1.82 fails at t = 1 — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T6.113 (C04 I124): tapeMemberCols leaving out the current's lead → T1.83 fails — not deferred on a component: the code lands in the next commit of this round");
+});

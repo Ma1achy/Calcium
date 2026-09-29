@@ -183,3 +183,7 @@ describe("C13 fail-on-revert", () => {
     expect(s.entries).toEqual([]);
   });
 });
+
+describe("C13 I22 — tier 6 (review batch 4)", () => {
+  it.todo("T6.15 (C13 I22): settle without the strip → T1.41 fails at row 3a — not deferred on a component: the code lands in the next commit of this round");
+});

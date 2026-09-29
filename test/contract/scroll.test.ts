@@ -734,3 +734,7 @@ describe("C29 1.5 — what the content column declares", () => {
     );
   });
 });
+
+describe("C09 I134 — a bounded box crops what it cannot slice (review batch 4 M14.6)", () => {
+  it.todo("T3.130 (C09 I134, F1334): three 76-cell notices in a box of 3 at 75 columns keep their residue row inside the box at every offset — not deferred on a component: the code lands in the next commit of this round");
+});

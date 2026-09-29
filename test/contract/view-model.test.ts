@@ -1189,3 +1189,9 @@ describe("C04 I6 — a closed vocabulary carries its own fact (ruling 44)", () =
     }
   });
 });
+
+describe("C04 I144, I146, I148 — what a tape member, a bar and an overshoot may say (review batch 4)", () => {
+  it.todo("T2.150 (C04 I144, §3ao.1): a tape's members are refused unless each has a unique id, a label, a string detail and a known state — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T2.151 (C04 I146, §3as): painted, quantity, granularity and liveness are refused outside their unions, and style only when not a string — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T2.152 (C04 I148, §5c.1): overshoot is accepted on a gradient over a slot pair and refused everywhere else and out of range — not deferred on a component: the code lands in the next commit of this round");
+});

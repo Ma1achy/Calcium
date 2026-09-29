@@ -170,7 +170,7 @@ Three rules make eviction safe:
 |---|---|
 | unknown or evicted id | `{ ok: false, reason: "unknown" }`, store unchanged |
 | already settled | `{ ok: false, reason: "settled" }`, store unchanged |
-| `settle(id)` | `{ ok: true, rev }` — `rev` unchanged, nothing about the document did |
+| `settle(id)` | `{ ok: true, rev }` — `rev` unchanged, nothing about the document did — **unless a block still carried `streaming: true`, which settling strips, so the document did change and `rev` moves (I22)** |
 | `settle(id, doc)` | `{ ok: true, rev }` — `rev` incremented (I13) |
 | `settle(id, invalidDoc)` | **throws**, exactly as `append` does and for its reason (§3): C23 built it, C07 validated it and C04 froze it, so three layers failed for it to arrive and there is no recovery a caller could perform |
 
@@ -179,6 +179,34 @@ Three rules make eviction safe:
 **Cap overshoot is reported too.** When the cap cannot be met because every candidate is live or streaming, `overCap` holds the excess block count. L4 surfaces it; C13 does not decide what to do about it.
 
 Ids are never reused after eviction, so a stale reference resolves to nothing rather than to the wrong entry.
+
+### Settling ends the stream in the document too (I22; review batch 4 M13.3, D4)
+
+**A block's own `streaming: true` survived settlement**. `settle` flipped
+`entry.streaming` and left the document's blocks as given, so a notice a producer marked streaming
+kept the agent's mark and its two reserved cells (C09 I101) on a settled entry for the rest of the
+session — and on disk, since I20 writes the settled document.
+
+**A sequence trace** — an entry holding a notice with `streaming: true`, and what each call leaves:
+
+| # | call | the entry afterwards | `rev` | changes emitted |
+|---|---|---|---|---|
+| 1 | `append(doc, { streaming: true })` | streaming; the notice streams | 0 | `append` |
+| 2 | `patch(id, …)` on the notice's text | streaming; the notice still streams | 1 | `patch` |
+| 3a | `settle(id)` | settled; **no block streams**; the document is otherwise the one it held | **2** — the document changed (I13) | one `settle` |
+| 3b | `settle(id, final)`, `final`'s notice still streaming | settled; `final` less the flag | 2 | one `settle` |
+| 3c | `settle(id, final)`, nothing in `final` streaming | settled; `final` itself | 2 | one `settle` |
+| 3d | `settle(id)` where nothing streams | settled; the same document value | 1, unmoved | one `settle` |
+| 3e | `settle(id, invalid)` | **throws before anything is stripped**; the entry is streaming and unchanged | 1 | none |
+| 4 | a notice nested in a `scroll`, a `panel` or a table row's `detail` | stripped at every depth — the walk is `childBlocks`, the one that knows every container | as 3a–3c | one `settle` |
+| 5 | `patch` from the shell after settlement, re-marking a notice | taken — the shell's statement (§6); I22 constrains `settle` and nothing after it | 3 | `patch` |
+
+**One change and not two** (row 3a). C14 re-measures on `settle` as on `patch` (C14 §4), so the
+reserved cells go in the same frame as the flag; a strip emitted as a second `patch` would be C13
+emitting two changes for one call, the history C14's handler once ran against half-applied.
+
+**The throw leaves nothing behind** (row 3e). Validation runs first and the strip is pure, so the
+rejection path mutates nothing — the question the walk asks of every ruling that throws.
 
 ### 5a. Raw payload retention
 
@@ -394,6 +422,7 @@ Store-level: at most one entry is `live` at any moment, and it is always the las
 - **I19** — Readers take `TranscriptView`, never `TranscriptStore`. The mutators and the §5a payload window are reachable only from L4, so no consumer above can append, clear, or see a debug buffer it was never given.
 - **I20** — **An entry reaches disk only if its verb declared persistence and the entry has settled** (§5b). Both halves are load-bearing and each answers a different failure. *Settled* makes the file append-only **in fact rather than by assumption**: a transcript entry is patched and settled after a history entry would already have been immutable, so a row written earlier is a row that disagrees with memory — and a missing last entry is recovered by running the command again where a divergent file is not recovered at all. *Declared* is because **the framework never redacts and cannot**: C20's redactor works on a tokenised command line, a rendered document has eighteen kinds and no tokens, and a redactor wrong about one kind is worse than none because it is switched on. The verb is the unit because that is where the knowledge is — the same ground C05 I19 already gives `handoff`, *the app author is the only party who can know this*. Off by default, since a missing feature is visible on the first resume and **a leaked secret is not visible at all** (F168).
 - **I21** — **Every mutation replaces `entries` with a new array, and a read never copies one.** The array's identity is therefore the store's revision, which is what lets a reader index it: `session.ts` holds a `WeakMap` keyed on exactly this array and answers `entryById` from it, in place of the O(entries) scan it ran once per visible entry per frame (F914). Both halves are load-bearing and fail in opposite directions — a mutation that wrote through the array it had already handed out would leave that index serving an entry the store no longer holds, and a getter that returned a fresh copy would miss on every read and be correct while buying nothing. The store already had the first property, by building each new list through `map`; what it did not have was anywhere saying a consumer may rely on it.
+- **I22** — *(§5, I13, C09 I101, C04 I122; review batch 4 M13.3, D4)* **Settling an entry ends the stream in its document too: the settled document carries no block with `streaming: true` at any depth, and it replaces the old one in the one `settle` change that flips `entry.streaming`.** The flag is stripped from `doc` when one is given and from the entry's current document when not. Where no block carries it the document is the same value and `rev` moves only as I13 already says; where one does, `rev` moves, because the document changed. An invalid `doc` throws before anything is stripped. → T1.41, T6.15
 
 ---
 
@@ -418,6 +447,7 @@ Store-level: at most one entry is `live` at any moment, and it is always the las
 17. Readers get `TranscriptView`; only L4 holds the store, so nothing above can mutate the transcript or read a retained payload (I19).
 18. **Persistence is declared per verb and writes settled entries only**, the framework redacts nothing, and an app that declares nothing persists nothing (I20, §5b).
 19. `entries` is replaced by every mutation and copied by no read, so its identity is the revision a reader may cache against — the property L4's entry index is keyed on (I21).
+20. A settled entry's document streams nothing: `settle` strips every block's `streaming` in the change that settles it (I22).
 
 ---
 
@@ -464,6 +494,7 @@ Tier 4 — integration (the arc, not the mechanism)
 - **T1.11**: `clear` → empty, `liveId` null, `droppedBlocks` zero.
 - **T1.12** (I12): each operation emits exactly one `Change` of the right kind.
 - **T1.13** (I4): all four `(live, streaming)` states are constructed and asserted by name in one test. The transitions are covered by T1.3, T1.4, T1.8–T1.10; this asserts the *states*, because a suite covering three of four reads exactly like one covering four, and frozen+streaming is the one that goes missing.
+- **T1.41** (I22): the trace's rows 1–4, each asserting the whole entry — `streaming`, `rev`, the document's blocks at every depth and the changes emitted — and row 3e's throw leaving the entry streaming, at its `rev` and holding its flag.
 
 ### Tier 2 — contract / interface
 
@@ -535,6 +566,7 @@ Tier 4 — integration (the arc, not the mechanism)
 - **T6.11** (I13): failing to bump `rev` on patch → C14's cache serves a stale height and the viewport drifts.
 - **T6.12** (I15): sweeping only on `append` → T3.7b fails, and after a stream settles L4 warns about an overshoot that no longer exists.
 - **T6.13** (I21): `patch` writing the replacement into the existing array rather than building a new one → T1.40 fails on identity, and L4's entry index serves a document the store has already replaced. `get entries` returning `[...this.#entries]` → T1.40 fails on the *same-array* half, which is the direction no other row here looks.
+- **T6.15** (I22): `settle` without the strip → **T1.41** fails at row 3a, the settled notice still streaming.
 
 ---
 

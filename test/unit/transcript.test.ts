@@ -428,3 +428,7 @@ describe("C13 unit", () => {
     expect(s.entries[0]?.rev, "and the entry carries it").toBe(before + 1);
   });
 });
+
+describe("C13 I22 — settling ends the stream in the document (review batch 4 M13.3)", () => {
+  it.todo("T1.41 (C13 I22): the settle trace's rows, each asserting the whole entry — not deferred on a component: the code lands in the next commit of this round");
+});

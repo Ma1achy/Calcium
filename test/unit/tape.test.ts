@@ -295,3 +295,8 @@ describe("C04 §3ao — the tape", () => {
     expect(ascii, "and it is not the unicode one").not.toContain("«");
   });
 });
+
+describe("C04 I147 and I124 — the tape's natural width and its members' columns (review batch 4 M14.9, M14.2)", () => {
+  it.todo("T1.81 (C04 I147, §3ao.1): a tape laid out at its own width draws no residue mark, at both conventions and rungs — not deferred on a component: the code lands in the next commit of this round");
+  it.todo("T1.83 (C04 I124, §3ao.1): tapeMemberCols is the drawn row — the lead is the current's, offscreen members are empty at 0 or the width — not deferred on a component: the code lands in the next commit of this round");
+});

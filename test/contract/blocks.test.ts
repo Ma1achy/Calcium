@@ -1381,3 +1381,7 @@ describe("C09 I111 — the trend arrows", () => {
     expect(glyphs({ unicode: "ascii", ambiguousWidth: "narrow" }).trendDown).not.toBe("v");
   });
 });
+
+describe("C04 I145 — a finished bar has zero rows (review batch 4 M16.2)", () => {
+  it.todo("T1.80 (C04 I145, §3as): progress and count vanish at and past their total; capacity and an undeclared quantity persist; padding stays — not deferred on a component: the code lands in the next commit of this round");
+});
