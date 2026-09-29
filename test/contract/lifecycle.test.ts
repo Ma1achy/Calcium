@@ -255,3 +255,9 @@ describe("C01 §5 — the shutdown codes", () => {
     expect([...codes.values()]).toEqual([130, 143, 129]);
   });
 });
+
+describe("C01 the OSC text payloads (I26)", () => {
+  it.todo(
+    "T2.12 (I26): the restated bidi set in escapes.ts equals data/text.ts's over every BMP code point — not deferred on a component: the row lands in the next commit, with the spec it is written against",
+  );
+});

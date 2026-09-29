@@ -756,3 +756,9 @@ describe("C01 the clipboard's OSC 52 (I25)", () => {
     expect(clipboardWrite("é".repeat(37_501))).toBeNull();
   });
 });
+
+describe("C01 the OSC text payloads (I26)", () => {
+  it.todo(
+    "T1.33 (I26): a bidi format character through windowTitle and systemNotification is shown, never written — not deferred on a component: the row lands in the next commit, with the spec it is written against",
+  );
+});
