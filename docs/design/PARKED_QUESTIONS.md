@@ -1188,6 +1188,36 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 **83 · RULED — Whether a copy that fails after copy mode has closed is offered a file.** The b4-clip lane stopped at K12 of C14 §6e's table: the failure arrives after `⏎` has left the mode, where no surface can hold the offer.
 ---
 
+> **Ruled 2026-09-29** (by Claude under the person's standing authority; review batch 4, the bidi lane's integration, F1470). **Linear writes every string in C09 I128's shown form, far-side and typed alike, and the notification body with it.** One form in one stream: C23 I90 already announced a reply *as drawn*, and `clean` deleted C0 and C1 and passed bidi whole, so a far-side override reached the stream raw and a notice read twice. Cost, carried from ruling 71 into speech: a screen reader speaks `<U+202E>`. C22 §6m.4 row 6 and I149.
+
+**84 · RULED — What linear does with a control or bidi character.** The bidi lane reported linear writing the typed line raw, and asked for a decision because a screen reader would speak the form. Measured, the far side's names were raw too (F1470).
+
+---
+
+> **Ruled 2026-09-29** (by Claude under the person's standing authority; review batch 4, F1461). **A status error leads with ✗, and ▲ stays the warning's.** The registry is normative on appearance and every error in §048, §061, §066 and §096 opens with ✗. With ▲ on both, an error and a warning share their only non-colour carrier, which fails the two-carrier floor at 1-bit. Golden movers are named before the change.
+
+**85 · RULED — Which mark leads a status error.** The fixtures lane found the tree leading errors with ▲, citing a design drawing no current fixture contains (F1461).
+
+---
+
+> **Ruled 2026-09-29** (by Claude under the person's standing authority; review batch 4, F1458). **The OSC sinks, the window title and the notification body, show C0, DEL and C1 in caret form, as blocks do.** Deletion left printable residue (`[2J`) that reads as text a tool meant to print, which is what ruling 71 replaced for blocks and C22 I149 for linear. The caret form is printable, so no ESC or BEL can reach an OSC payload either way; nothing is weakened. C01 I26's stated limit becomes the rule.
+
+**86 · RULED — Whether the OSC sinks show controls or delete them.** The classes lane extended ruling 71's bidi clause to OSC 2 and OSC 9 and left C0 and C1 deleting, naming the choice as owed (F1458).
+
+---
+
+> **Ruled 2026-09-29** (by Claude under the person's standing authority; review batch 4, F1460). **§097 is compared against a frame of the panel layer, a menu between two rules above the prompt, under its own heading.** The probe named the panel block kind, so the row compared the right name against the wrong thing; the listed difference was that confusion measured and is retired with it.
+
+**87 · RULED — What §097's figure is compared against.** The fixtures lane found §097 set against the `panel` block (F1460).
+
+---
+
+> **Ruled 2026-09-29** (by Claude under the person's standing authority; review batch 4, F1457). **C16 T1.4h's two rows are dispatched at their own targets, not removed.** Each row names a binding at a target; T2.17 covers the behaviour, but a table row that passes for a reason other than the one it names is a row asserting nothing, and removing it would leave the binding table with a gap where two bindings were said to be checked.
+
+**88 · RULED — Whether T1.4h's mis-aimed rows are re-pointed or removed.** The classes lane found both passing at the wrong target (F1457).
+
+---
+
 ## Not yet recovered
 
 The gap between the entries and the running count in the per-MR reports was chased and closed: some questions had been counted twice. The list is the count. **No total is stated here in prose**, because the one that used to be here said *sixteen* long after that stopped being true — this file's own subject, arriving inside it.
