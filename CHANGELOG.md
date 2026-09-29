@@ -92,6 +92,10 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   is kept as typed: the submitted command, history and the kill buffer are unchanged. Linear
   mode also shows C0 and C1 in caret form where it deleted them, so a notice reads as one line
   rather than two, and a screen reader speaks the form.
+- **A window title and a system notification show control characters in caret form**
+  (46746909, 1e2c5525, ruling 86, C01 I26). `ESC[2J` in a tool's output reaches the title as
+  `^[[2J` where it was `[2J`, and tab and newline appear as `^I` and `^J`. Bidi format characters
+  are still shown as `<U+XXXX>`. No control byte can reach either payload.
 - **A `TerminalLine.text` carrying a bidi format character is refused by `validateDocument`**
   (1ef3b4d1, ruling 71, C04 I110), as C0 and C1 controls already were.
 - **A tape's members are validated** (c714e137, C04 I144): each is a record with a non-empty
