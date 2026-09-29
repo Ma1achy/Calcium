@@ -182,3 +182,9 @@ describe("C17 §5d — which chip the caret is on", () => {
     expect(contentAt(3), "before the second chip, the one after answers").toBe("TWO");
   });
 });
+
+describe("C17 §5e — a chip wider than its row, owed at the spec commit", () => {
+  it.todo("T1.54 (C17 I32, §5e, C09 I103): a label wider than the usable row is drawn at exactly that width, frame kept, cut in the middle — not deferred on a component: the elision lands with the next commit");
+  it.todo("T1.55 (C17 I32, §5e): the usable width is the row the chip is drawn on, read after the walk opens it, and a partly used row is left before the chip is cut — not deferred on a component: lands with the next commit");
+  it.todo("T1.56 (C17 I32, §5e): at usable widths 1 and 2 the marker alone, at 3 the frame around it, and the marker is the tier's — not deferred on a component: lands with the next commit");
+});

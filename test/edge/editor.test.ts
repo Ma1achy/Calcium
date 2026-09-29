@@ -176,3 +176,7 @@ describe("C17 §2 — degenerate geometry", () => {
     expect(e.cursorCell(80, G)).toEqual({ row: 0, col: 4 });
   });
 });
+
+describe("C17 §5e — the elision over wide clusters, owed at the spec commit", () => {
+  it.todo("T3.18 (C17 I32, C09 I9, §5e): a chip named with wide clusters is exactly the usable width at every width, and no cluster is split — not deferred on a component: lands with the next commit");
+});

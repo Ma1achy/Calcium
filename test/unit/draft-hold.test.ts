@@ -140,3 +140,9 @@ describe("C17 §101 — the held draft", () => {
     expect(e.text, "and redo ends on the owner's line").toBe("mine");
   });
 });
+
+describe("C17 §5f — chips across a borrow, owed at the spec commit", () => {
+  it.todo("T1.57 (C17 I33, §5f, §052): a borrow numbers its own chips from #1 and the owner's numbering comes back with its line — not deferred on a component: lands with the next commit");
+  it.todo("T1.58 (C17 I33, I34, §5f, §5a): a chip yanked across owners resolves and takes the current owner's next ordinal; an own chip keeps its sentinel — not deferred on a component: lands with the next commit");
+  it.todo("T1.59 (C17 I34, I24, §5f): every sentinel minted across a borrow is distinct, and the owner's held chip draws and resolves as before — not deferred on a component: lands with the next commit");
+});

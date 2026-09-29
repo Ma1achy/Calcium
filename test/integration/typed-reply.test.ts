@@ -242,3 +242,7 @@ describe("§052 — a question that wants a sentence, through the router", () =>
     expect(graph.editor.text, "↑ at the prompt shows the newest command").toBe("npm test");
   });
 });
+
+describe("C17 §5f — a chip across the reply's borrow, owed at the spec commit", () => {
+  it.todo("T4.9 (C17 I33, I34, with C16 and C23): a reply's pasted chip is its #1, and one yanked back at the prompt takes the prompt's next number and resolves — not deferred on a component: lands with the next commit");
+});
