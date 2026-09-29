@@ -14,7 +14,7 @@ import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, QUIET, measurable, visible } from "../support/render.js";
 import { CORPUS } from "../support/blocks.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
-import { renderToLines } from "../../src/presentation/render-lines.js";
+import { renderSequenceToLines, renderToLines } from "../../src/presentation/render-lines.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
@@ -439,6 +439,27 @@ describe("C09 I132–I135 — tier 6 (review batch 4)", () => {
     expect([...family.slice(-8)].length, "five code points, one cluster").toBe(5);
     expect(streamed(family).headSgr, "the family is the head").toContain("38;2;255;227;167");
   });
-  it.todo("T6.186 (C09 I134): the crop removed → T3.76 and T3.130 fail — not deferred on a component: the code lands in the next commit of this round");
+  it("T6.186 (C09 I134): the crop removed → T3.76 and T3.130 fail", () => {
+    // **What the kept-whole arm drew, from its parts**: at offset 1 the first
+    // notice is cut (its second row only) and the second is whole, so a box
+    // keeping the cut one whole paints 2 + 2 interior rows and the residue — 5
+    // against a measure of 4, with a notice's row where the residue belongs.
+    const kit = measurable({ capabilities: FULL_CAPS });
+    const notice = (i: number) => ({ kind: "notice", id: `n${String(i)}`, tone: "info", text: "n".repeat(76) });
+    const box = block({ kind: "scroll", id: "f1334", height: 3, children: [0, 1, 2].map(notice) } as never);
+    const childRows = kit.registry.measure(block(notice(0) as never), 74);
+    expect(childRows, "each notice is two rows at the content width").toBe(2);
+    expect(kit.registry.windowChild(block(notice(0) as never), 74, 1, 2), "and refuses the slice").toBeNull();
+    const kept = childRows + childRows + 1;
+    const lines = renderSequenceToLines(kit.registry, [box], 75, {
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      focus: null,
+      scrollOffsets: { f1334: 1 },
+    }).map((l) => visible(l).trimEnd());
+    expect(kept, "the kept-whole count").toBe(5);
+    expect(lines.length, "the crop paints the measure").toBe(kit.registry.measure(box, 75));
+    expect(lines.at(-1), "with the residue last").toMatch(/1 above, 2 below/u);
+  });
   it.todo("T6.187 (C09 I135): segmented mapped back to slant → T2.226 fails — not deferred on a component: the code lands in the next commit of this round");
 });

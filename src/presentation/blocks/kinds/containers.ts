@@ -592,15 +592,24 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
     // the interior: the route's own terminal measured 7 rows and painted 32,
     // with `follow` inert and the residue counting against a window that was
     // never applied (F855). `windowChild` returns `null` where the slice would
-    // cost the container something — an atomic kind, a floor, a cap, a residual
-    // — and the child is then kept whole, which is what every child got before.
+    // cost the container something — an atomic kind, a floor, a cap, a residual.
+    //
+    // **And a refused child is cropped, not kept whole** (C09 I134, D16). A row
+    // is a string, so cutting the whole render to `[from, to)` is exact where a
+    // kind declines to slice itself — which is what `split`'s `paneRows` already
+    // did. Kept whole, three 76-cell notices in a box of 3 drew the second
+    // notice's second row where the residue belongs, and a plot of 8 in a box
+    // of 2 measured 3 and painted 9.
     const pieces = shown.map((r) => {
       const height = r.to - r.from;
       const from = Math.max(0, offset - r.from); // cells-ok — a row index
       const to = Math.min(height, offset + interior - r.from); // cells-ok — a row index
-      const piece =
-        from === 0 && to === height ? r.child : (ctx.windowChild(r.child, width, from, to)?.block ?? r.child);
-      return { child: r.child, rendered: ctx.renderChild(piece, width) };
+      if (from === 0 && to === height) return { child: r.child, rendered: ctx.renderChild(r.child, width) };
+      const slice = ctx.windowChild(r.child, width, from, to);
+      return {
+        child: r.child,
+        rendered: slice === null ? ctx.renderChild(r.child, width).slice(from, to) : ctx.renderChild(slice.block, width),
+      };
     });
     let residueRow: string | null = null;
     // **The residue, both directions** (C04 I49). A settled container keeps the
@@ -662,14 +671,14 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
     // because both readings drew two rows; strengthening the row to ask *which*
     // two is what said so.
     //
-    // **So a child taller than the box is still drawn whole and C25 I1 is still
-    // false for that one case** — named in T2.28b rather than replaced by a
-    // frame showing the wrong rows. §3c trace 1 rules it *aligns to its top*,
-    // and taking a child's top rows needs a windowing seam `RenderContext` does
-    // not have: it offers `measureChild` and `renderChild` and nothing that
-    // slices. A ruling naming an operation the layer below lacks — C23 §8a A4's
-    // class, and the remedy is a seam rather than a clip.
-    const drawn = shown.reduce((n, r) => n + ctx.measureChild(r.child, width), 0);
+    // **A child taller than the box is sliced, or cropped where it refuses the
+    // slice** (C09 I58, I134) — the seam this paragraph once said was missing is
+    // `windowChild`, and the crop covers what it declines.
+    //
+    // **The pads are counted from the rows drawn, not the rows measured** (I134).
+    // Counting from `measureChild` charged a cut child its whole height, so a box
+    // whose pieces drew fewer rows than their measures was short of `interior`.
+    const drawn = pieces.reduce((n, p) => n + p.rendered.length, 0); // cells-ok — a row count
     const padCount = Math.max(0, interior - drawn); // cells-ok — a row count, not a width
 
     // **The rows arm** (C09 I73): the shown pieces' rows, the pads as empty

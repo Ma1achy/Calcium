@@ -464,10 +464,10 @@ describe("C09 contract — measurement", () => {
   it("T2.126 (I59, §6b): the kinds a bounded container cannot slice, compared by equality", () => {
     // **An exemption list held by equality, not by membership** — a kind that
     // gains a `window` has to move this list, and a new kind that cannot be
-    // bounded has to fail here rather than join a subset quietly. The overrun
-    // those kinds keep inside a `scroll` is recorded by I59 rather than asserted
-    // correct: `plot` is atomic permanently (I27, C12 I1) and the rest simply
-    // have no window yet.
+    // bounded has to fail here rather than join a subset quietly. Inside a
+    // `scroll` these kinds are cropped rather than sliced (C09 I134), so the
+    // list no longer names an overrun: `plot` is atomic permanently (I27, C12
+    // I1) and the rest simply have no window yet.
     const kit = measurable({
       definitions: [
         tableDefinition as unknown as BlockDefinition<never>,

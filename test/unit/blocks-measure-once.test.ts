@@ -171,7 +171,6 @@ describe("C09 §6 — a (block, width) is answered once per registry call (I61)"
       make: () => Block;
       children: readonly string[];
       drawn?: readonly string[];
-      overdraws?: true;
     }>[] = [
       {
         kind: "panel",
@@ -211,11 +210,10 @@ describe("C09 §6 — a (block, width) is answered once per registry call (I61)"
         children: ["a", "b", "c"],
         // Two rows hold `a` and the top of `b`; `c` is below the box and is
         // measured for the content height without being drawn. `raw` here
-        // declares no `window`, so `b` is kept whole and the box over-draws by
-        // one row — I59's recorded overrun (T3.76, F855), a property of this
-        // fixture and not of the count, so I1 is not asserted for it.
+        // declares no `window`, so `b` is rendered whole and cropped to its top
+        // row (C09 I134) — it over-drew by one row before, and I1 is asserted
+        // for this box now like every other.
         drawn: ["a", "b"],
-        overdraws: true,
       },
       {
         // `mosaic` measures no child in `measure` (C04 I71) — its arm is the
@@ -247,9 +245,7 @@ describe("C09 §6 — a (block, width) is answered once per registry call (I61)"
         `${c.kind}: and every child was measured`,
       ).toEqual([...c.children].sort());
       expect([...counted.rendered].sort(), `${c.kind}: and each child in the box drawn once`).toEqual([...(c.drawn ?? c.children)]);
-      if (c.overdraws !== true) {
-        expect(lines.length, `${c.kind}: measure equals rendered rows (C09 I1)`).toBe(registry.measure(container, 80));
-      }
+      expect(lines.length, `${c.kind}: measure equals rendered rows (C09 I1)`).toBe(registry.measure(container, 80));
     }
   });
 

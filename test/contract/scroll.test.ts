@@ -627,15 +627,12 @@ describe("C09 §6b — the second caller, and the bound it applies", () => {
     expect(strip(held), "the tone is the only difference").toEqual(strip(loose));
   });
 
-  it("T3.76 (C09 I59, §6b): an atomic child taller than the box still over-draws — the recorded limit, with its number", () => {
-    // **The remainder, named rather than asserted correct.** `plot` declares no
-    // `window` and C12 I1 makes that permanent, so `windowChild` returns `null`
-    // and the box keeps the child whole — 3 measured against 9 painted here.
-    //
-    // **This row is a record and T2.126 is the watch.** F856's lesson is that a
-    // row asserting a disagreement stays green for exactly as long as the defect
-    // does; what stops this one growing quietly is the equality-compared list of
-    // kinds that cannot be sliced. A new unsliceable kind fails there, not here.
+  it("T3.76 (C09 I134, I59, §6b): an atomic child taller than the box is cropped — measures 3 and paints 3", () => {
+    // **`plot` declares no `window`** and C12 I1 makes that permanent, so
+    // `windowChild` returns `null` — and since C09 I134 the box crops the whole
+    // render to the rows the window holds. This row asserted the disagreement,
+    // 3 measured against 9 painted, and was green for exactly as long as the
+    // defect (F856); it now asserts the equality.
     const withPlot = createBlockRegistry({ defaults: true });
     withPlot.register(plotDefinition as unknown as BlockDefinition);
     const atomicChild = {
@@ -656,7 +653,19 @@ describe("C09 §6b — the second caller, and the bound it applies", () => {
 
     expect(withPlot.windowChild(atomicChild, 40, 0, 2), "no slice is available").toBeNull();
     expect(withPlot.measure(box, 40)).toBe(3);
-    expect(drawn.length, "and it paints the child whole, which is the limit C09 I59 records").toBe(9); // cells-ok
+    expect(drawn.length, "and paints what it measures").toBe(3); // cells-ok
+    // **Which three**: the plot's own first two rows, then the residue row.
+    // The box spends its last column on the bar (§7f), so the child is drawn
+    // at 39 and each of the box's rows is the child's row and then the bar.
+    const whole = renderSequenceToLines(withPlot, [atomicChild], 39, {
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      focus: null,
+      scrollOffsets: {},
+    }).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, "").trimEnd());
+    expect(whole.length, "the child alone is eight rows").toBe(8);
+    expect(drawn.slice(0, 2).map((l) => [...l].slice(0, 39).join("").trimEnd()), "the child's top two rows, cropped from its whole render").toEqual(whole.slice(0, 2));
+    expect(drawn[2], "and the residue row last").toMatch(/0 above, 6 below/u);
   });
 
   it("T3.75 (C09 I59, §6b): the corpus holds a scroll whose child is taller than its interior", () => {
@@ -736,5 +745,63 @@ describe("C29 1.5 — what the content column declares", () => {
 });
 
 describe("C09 I134 — a bounded box crops what it cannot slice (review batch 4 M14.6)", () => {
-  it.todo("T3.130 (C09 I134, F1334): three 76-cell notices in a box of 3 at 75 columns keep their residue row inside the box at every offset — not deferred on a component: the code lands in the next commit of this round");
+  it("T3.130 (C09 I134, F1334): three 76-cell notices in a box of 3 at 75 columns keep their residue row inside the box at every offset", () => {
+    // **F1334's frame.** Each notice wraps to two rows at the box's content
+    // width, so the content is 6 against an interior of 3 and every offset but
+    // the even ones cuts a notice — which `windowChild` refuses for an atomic
+    // kind, and which the box kept whole, drawing a notice's second row where
+    // the residue belongs.
+    const registry = createBlockRegistry({ defaults: true });
+    const text = "n".repeat(76);
+    const box = {
+      kind: "scroll",
+      id: "f1334",
+      height: 3,
+      children: [0, 1, 2].map((i) => ({ kind: "notice", id: `n${String(i)}`, tone: "info", text })),
+    } as unknown as Block;
+    const content = 6;
+    const measured = registry.measure(box, 75);
+    expect(measured, "3 interior rows and the residue row").toBe(4);
+    // **Which rows, not only how many**: the children's whole renders at the
+    // content width, stacked — the window is rows `[offset, offset + 3)` of it.
+    // A crop taking a cut child's top rows rather than the held ones draws the
+    // right count and the wrong notice rows.
+    const stacked = (box as unknown as Scroll).children.flatMap((child) =>
+      renderSequenceToLines(registry, [child], 74, { theme: DARK_THEME, capabilities: FULL_CAPS, focus: null, scrollOffsets: {} }).map(
+        (line) => line.replace(/\u001b\[[0-9;]*m/gu, "").trimEnd(),
+      ),
+    );
+    expect(stacked.length, "six content rows").toBe(content);
+    expect(stacked[0], "and a notice's two rows differ, so an off-by-one crop is visible").not.toBe(stacked[1]);
+    let cut = 0;
+    for (let offset = 0; offset <= content - 3; offset += 1) {
+      const lines = renderSequenceToLines(registry, [box], 75, {
+        theme: DARK_THEME,
+        capabilities: FULL_CAPS,
+        focus: null,
+        scrollOffsets: { f1334: offset },
+      }).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, "").trimEnd());
+      const at = `offset ${String(offset)}: ${JSON.stringify(lines)}`;
+      expect(lines.length, at).toBe(measured);
+      expect(lines.at(-1), at).toMatch(new RegExp(`${String(offset)} above, ${String(content - 3 - offset)} below`, "u"));
+      expect(lines.slice(0, -1).some((l) => /above, \d+ below/u.test(l)), `${at}: the residue is only the last row`).toBe(false);
+      expect(
+        lines.slice(0, -1).map((l) => [...l].slice(0, 74).join("").trimEnd()),
+        `${at}: the held rows`,
+      ).toEqual(stacked.slice(offset, offset + 3));
+      if (offset % 2 === 1) cut += 1;
+    }
+    expect(cut, "the odd offsets cut a notice — the case the crop covers").toBe(2);
+
+    // **The pads' clause, reached by the one child that can reach it**: a kind
+    // registered to draw one row against a measure of 3. Every conforming kind
+    // renders what it measures (C09 I1), so pads counted from the measure and
+    // from the rows drawn agree everywhere else — this is the case the §6b
+    // table names, and the box must still be its height.
+    const lying = createBlockRegistry({ defaults: true });
+    lying.register({ kind: "liar", measure: () => 3, render: () => ["x"] } as unknown as BlockDefinition);
+    const alone = { kind: "scroll", id: "pads", height: 4, children: [{ kind: "liar", id: "l" }] } as unknown as Block;
+    const padded = renderSequenceToLines(lying, [alone], 20, { theme: DARK_THEME, capabilities: FULL_CAPS, focus: null, scrollOffsets: {} });
+    expect(padded.length, "the box is 4 rows — the pads counted from the one row drawn").toBe(4);
+  });
 });
