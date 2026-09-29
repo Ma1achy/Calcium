@@ -3752,7 +3752,7 @@ PTY harness.
 - **T6.132** (C16 I68): the submit arm's `>` guard removed → **T4.109** fails: `> notes` reaches the pipeline. `tools/mutate/runs/c16-registry-routes.mjs`.
 - **T6.133** (I110, C24 I41): the context handed the region again — `width: region.width, height: region.height` in the surface host's `context` → **T4.94c** fails with the command row, the top border and body rows 0–1 off the screen and every body row cut by two cells; and `options.invalidate()` moved back above `current = null` in `beginClose` → T4.94c's footer still reads `attached`.
 - **T6.134** (I135): the store's drop called before the notifier's read → **T4.111** fails: the watched short settle rings nothing.
-- **T6.135** (I138): the bar-shedding step removed → **T1.78** fails at 60 columns, where the row no longer fits one line.
+- **T6.135** (I138): watches shed before bars — the bar-shedding step removed **and** the shedding ladder's chips keeping their bars → **T1.78** fails at 60 columns, where a watch goes behind `+1` while every bar stands. **Removing the step alone is equivalent** and the first mutation pass showed it: the ladder below draws its chips bare, so with nothing to shed it returns exactly the bare row. The order I138 states lives in two lines, and the row names both.
 - **T6.136** (I136): the default target's `transport: "local"` filter removed → **T1.80** fails: `/watch` names the queued line.
 
 ---
