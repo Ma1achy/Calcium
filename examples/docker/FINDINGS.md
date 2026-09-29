@@ -57587,3 +57587,89 @@ Found by lane b4-perf. `c11-focus-gutter`'s T6.24 mutation had survived since 4e
 ## F1437 — the blocks lane added no measurable cost, and 4e3c7153 → f0697eb0 is about 5% slower unattributed ★★☆☆☆
 
 Measured by lane b4-perf, T2.3 alone, three interleaved rounds. The blocks lane's paired differences were +1316, −755 and −190 ms, so the earlier 8.4 → 10.2 s reading was load, not the lane. Separately, 4e3c7153 → f0697eb0 is slower in all three rounds (+188, +536, +295 ms, about 5%). The span holds 37 commits and has not been bisected.
+
+## F1438 — an approval's default answer was `allow`, so `esc` on an approval ran the tool ★★★★☆
+
+Found by the shell lane's walk of C23 §7g (review batch 4, group B). `APPROVAL_CHOICES` put `allow` first, and a question resolves `esc` with its default, so dismissing an approval ran the tool it asked about. R-BLK-348 draws the opposite: *the SAFE answer opens · no is first and focused · esc resolves to it*. No producer in `src/` raises an approval today, so nothing shipped reached it. Fixed by C23 I94: `deny` is first and the default, execution runs the tool only on an `answered` outcome whose key is not `deny`, and a withdrawn or expired approval settles `cancelled` (history 130 or 126). This strengthens the safety default; it weakens nothing (2cc13b21, 14f078cc).
+
+## F1439 — C23 T1.101 asked for an ordering nothing can observe ★★☆☆☆
+
+Found building C23 §7g (group B). As written at the spec commit, T1.101 asked that Q1's promise be resolved before Q2's layer is pushed. A promise's reactions run after a synchronous push whichever order the two calls are in, so the clause forbade nothing while reading as though it forbade the defect. This is A03 §2's vacuity class in prose. The row now asserts the observable order on the overlay stack: Q1's layer removed, then Q2's pushed under the same id. The push stays synchronous, so a second key in the same batch meets C16 I44's guard (a13c471a).
+
+## F1440 — the pointer hit-tested a replacing question where it is never drawn ★★★☆☆
+
+Found building C22 §6q (group A). `construct.ts`'s pointer `placed` was `overlays.layout()` filtered by gesture, while the paint's list is the same **less** the replacing question, which is drawn in the prompt's rows. So a wheel over the prompt's rows, where an inspection is, reached no layer and met C16 I8's modal consumption; a wheel over the middle of the region, where nothing of the question is drawn, reached the question. It is the defect C16 T4.1's comment names for the router, one filter away. Fixed by C22 I142: the pointer hit-tests through `layersAsDrawn`, covered by T4.115 and T6.143 (a89bf211, 6c605f19).
+
+## F1441 — Windows Terminal's default keymap may take ⌥⇧↑ and ⌥⇧↓ before the app sees them ★★☆☆☆
+
+Found in the collision check for R-KEY-010 (group A, C22 §6q.1). The chip preview scrolls on `⌥⇧↑`/`⌥⇧↓`. macOS and the common Linux desktops bind neither, but Windows Terminal's documented default keymap binds `alt+shift+arrow` to `resizePane`, so on that terminal the chords may never reach the application. The collision gate reads the registry and the keymap and cannot see an emulator's own bindings. **Unmeasured**: no Windows Terminal session was run. Owed: a measurement there, and if confirmed, a second chord or a note in the preview's footer. Recorded in C22 §6q.5.
+
+## F1442 — C16's page-scroll intercept took ⌥⇧↑ and ⌥⇧↓ as well as ⌥↑ and ⌥↓ ★★★☆☆
+
+Found building the chip preview's keys (group A). `intercepts.ts` read the route as `key.meta && (up || down)`, so `⌥⇧↑`/`⌥⇧↓` (`CSI 1;4A`/`B`, `{ up, shift, meta }`) were `page-scroll` too. The preview's scroll chords paged the transcript and never reached the panel. The check that called the chords free read the registry and the keymap, not the intercept, which is read before both. C16 I40 already said *`⌥↑`/`⌥↓` alone*; `isPageScroll` now says it too (meta, the arrow, no shift, no ctrl), covered by C16 T1.200 and T6.65 (6c605f19).
+
+## F1443 — an inspection's box was sized to the region and drawn in the prompt's slot, which cut its key row ★★★☆☆
+
+Found building C23 I88 (group A). The inspection sized its box as `region height − 6`, but a replacing question is drawn in the prompt's rows, which S01 §3 caps at `floor(rows / 2)`. At 80×30 the slot's cut took the panel's key row and bottom border and drew `⋯`. Measured in a worktree at f06f762d as well, so it predates this lane. The box is now sized to the slot (C22 §6q.4 ruling 11; `promptCap` from `frame.ts` and `ConfirmDeps.slotRows`), covered by C23 T4.88 and a mutation in `c23-inspection-scroll` (6c605f19).
+
+## F1444 — roadmap line citations drift silently wherever no anchor watches them ★★☆☆☆
+
+Measured on the shell lane's integration onto c7770e5d. RS1 and RS14b check only citations anchored to a symbol, and they stayed green while **41** unanchored citations in CALCIUM_ROADMAP.md pointed at lines this lane had moved (keys.ts, session.ts, construct.ts, types.ts, confirm.ts, editor.ts and others). Found by resolving each citation against the tree it was written for and mapping it through a line diff. A text search cannot, because targets such as `*/` and `}` recur. During the lane the anchored ones went red twice and were fixed: entry 16's `confirm.ts:243` → `:312`, and entry 25's `deps.ghost()` at `paint.ts:878` → `:886`. The ghost-text entry's `paint.ts:269` had already been adrift before the lane. All re-pointed (588da957, 6a3ae2fa). Two historical records (`paint.ts:137` and `:241`) already named other lines and were left. **Owed**: the unanchored citations have no gate, so the next line-moving change repeats this.
+
+## F1445 — no golden draws the transcript bar, the chip preview's box or an inspection ★★☆☆☆
+
+Found by the shell lane's golden prediction (group A). The prediction named four new surfaces: the transcript's scroll bar, the chip preview's bounded box, an inspection, and the keys view. Only `/keys` moved. None of the three new surfaces is in any golden scene, so each is asserted only by unit and integration rows that read numbers, and nothing reads the frame. Groups C and D did not reach it. Owed: session-frame scenes for all three.
+
+## F1446 — eight rows across three groups were blind until the first mutation pass ★★★☆☆
+
+Measured on the shell lane's first mutation passes (review batch 4). Every row below passed before its mutation and failed to see it:
+
+- **Group A.** T4.114: the chip preview's owner-side reset masked the overlay stack's namespace delete. It now also pushes a bare layer. T4.46: with 60 lines, `maxTop` was 38, a multiple of `h − 1 = 19`, so floor and round agreed at every row. The row's *some row rounds* guard compared its own trailing entry. The transcript is now 61 lines and the guard runs over the first *h* rows.
+- **Group B, four survivors in `c23-question-queue`.** The keys.ts gate: T4.91 now reads the stack's changes through `buildGraph`. The outcome check in execution: T4.92 gained an approval whose default is `allow` and which is withdrawn. The two `promptLive` update sites were each enough on its own, so they are now one mutation using `also`.
+- **Group C, two survivors in T4.34.** The persisted tape start and the pointer's anchor went unseen because the render re-slides to focus from any held start. The row now asserts that `←` from the tail keeps the tail drawn, and that a press on the first drawn member moves the window by exactly one.
+
+All fixed, and the runs catch everything (6c605f19, 14f078cc, 2edd256f).
+
+## F1447 — five rows exceed their time bounds under the batch's parallel load and pass alone ★★☆☆☆
+
+Measured by the shell lane with other lanes running (load average 8–11). Each failed only under load:
+
+- C11 T2.3 at its 15 s budget.
+- rule-ledger T1.154b and T1.156.
+- session T4.28.
+- M16 design-fixtures T1.5, which timed out at 30 s and runs in 7.7 s alone.
+- e2e session-gate T5.8, where a caught refusal exited in **4777 ms** against a 3000 ms bound, then passed twice alone and in a full e2e rerun.
+
+All pass when run alone. T5.8's bound is four times its measured 744 ms, and startup on the bind mount alone is 4.4–5 s, so the bound measures the mount as much as the subject. Owed: a decision per row between a wider bound and a paired measurement.
+
+## F1448 — entering a tape whose window has slid lands focus on member 0, off screen ★★☆☆☆
+
+Found by the walk of C26 §8c (group C) and left as residue in §8c.5. Pressing anywhere on a tape, or arriving by `↓`, focuses member 0. Once the window has slid, member 0 is not drawn, so the window follows focus back to the start (C26 I31, ruling 80) and the reader loses the members they were looking at. Owed: enter at the first drawn member.
+
+## F1449 — `↓` from a mosaic cell forgets the column it left ★★☆☆☆
+
+Found by the walk of C26 §8c (group C) and left as residue in §8c.5. `↓` leaves a row and lands on the first element of the row it enters (C26 I30, D10). From a cell in a mosaic's second column, that is the next row's first cell, so a reader walking down a column has to walk back across on every row. Owed: a column-keeping rule for grids, which is a design question before it is a mechanism.
+
+## F1450 — the walk of C26 §8c missed the interaction of C26 §7 with a tape window that follows focus ★★☆☆☆
+
+Found by the suite, not the walk (group C). §7 says *focus changes tone and nothing else* (C09 I121, T2.184 asserts it at 1-bit), and I31 makes a tape's window follow focus to a member it does not draw. C09 T2.184 went red on `tape/seams` at 7 columns. The walk's classification table had no row where the two rules meet at rest. §7 now names the tape's window as the one cell that moves with focus, a cell that changes no size, and T2.184 asserts both arms as reached (bd5c0e1b).
+
+## F1451 — focus on a tape member outside the drawn window drew nothing ★★★☆☆
+
+Found in the golden read of group C. Before ruling 80, focus could land on a tape member the window did not draw, and the frame showed no focus anywhere: the focus census at 40 columns listed `tape` without `trace` in three fixtures. With the window following focus (C26 I31), the member is drawn and focused, and the census gained `trace`. That was the one unpredicted golden move, and it was read and kept (2edd256f).
+
+## F1452 — `AskAnswer.outcome` is required, so every consumer that fakes `ask` breaks ★★☆☆☆
+
+Found by `make check` in group B. C23 I92 adds `outcome: "answered" | "cancelled" | "expired"` to what `ask` resolves with, and it is required, because the approval route runs a tool only on `answered`. The docker example's fakes in `progress.test.ts` and `transfer.test.ts` returned `{ key }` and failed to type-check. They now answer `{ key: "y", outcome: "answered" }` (14f078cc). Any other consumer's fake breaks the same way. Owed: the CHANGELOG states it as a breaking change for fakes.
+
+## F1453 — at 1-bit `muted` is dim, and a colour-only assertion could not see it ★★☆☆☆
+
+Found in the golden read of M13.6 (group D). The first build of the 1-bit label styled the rule's dashes `muted`, as the painted rung does. At 1-bit `muted` resolves to dim (SGR 2), while the bare rule there is plain text, so the labelled rule was a different rule from the one beside it. T1.178 checked only foreground and background tokens and passed. The golden's styles grid moved where the prediction said it would not. The spans are now unstyled, T1.178 asserts that the label adds no SGR token to the frame, and `c22-label-hue` carries the defect as a mutation (3dcc2810).
+
+## F1454 — a row blurred a field with a focus report, which is routed nowhere ★★☆☆☆
+
+Found writing C22 T4.119 (F1395). The first draft moved focus off a field and then sent a focus report (`ESC [ I`) to make the read loop reconcile the borrow. A focus report is read and routed nowhere (C16 I61), so `reconcileField` never ran, and the row measured a blur that never happened: the field kept `80` and the assertion blamed the write. A bare pointer motion is routed, and the row now uses one (588da957).
+
+## F1455 — F1395's first remedy would have written a chip's lines into a one-line field ★★★☆☆
+
+Found by the walk of F1395. The finding offered writing `resolved` instead of `text` so a yanked chip arrives as its content. A chip is minted for a paste of five lines or more, or for a file, so its content usually holds line breaks, and writing it would put several lines into a field C04 §3ar F9 says is one line. That is F9's defect arriving by another door. C22 I148 writes `resolved` and refuses a value holding a line break in F9's words. On `⏎` the borrow stays open so the chip can be deleted, and on blur nothing is written (c5ff281a, 588da957).
