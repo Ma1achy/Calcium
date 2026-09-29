@@ -429,3 +429,7 @@ describe("C10 I48 — the ground carried from the painter into the resolver", ()
     expect(resolve("tone.error", theme, caps(24), "selection").colour).toEqual(onGround.colour);
   });
 });
+
+describe("C10 I71 — the carrier gate counts per fact", () => {
+  it.todo("T6.153 (C10 I71): the gate accepting one carrier → T2.57 fails — not deferred on a component: the code lands in the next commit of this round");
+});
