@@ -537,3 +537,9 @@ describe("C02 the clipboard (I18)", () => {
     expect(bad.warnings[0]).toContain("clipboard");
   });
 });
+
+describe("C02 I19 — the reader's editor, owed at the spec commit", () => {
+  it.todo(
+    "T1.30 (C02 I19): VISUAL over EDITOR, stated; EDITOR alone; neither is null and assumed; an empty VISUAL falls to EDITOR; a declared command wins and is declared; a declared empty string is refused with a warning — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
+  );
+});

@@ -630,3 +630,9 @@ describe("C22 §6b — the diff's leading reset (C22 I57)", () => {
     expect(/\u001b\[\d+;\d+H/u.test(whole), "and positions nothing row by row").toBe(false);
   });
 });
+
+describe("C22 §6q — a scroll box inside a layer scrolls (F1302), owed at the spec commit", () => {
+  it.todo(
+    "T1.174 (C22 I141, F1302): a layer holding a twelve-line scroll box in four rows draws lines 4–7 through composite and through the replacing prompt slot with its layer namespace at 3, lines 1–4 at 0, the chrome cache missing once on the scrolled frame; scrollLayer moves the box and not the layer offset — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
+  );
+});

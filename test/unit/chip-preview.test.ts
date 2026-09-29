@@ -143,3 +143,18 @@ describe("C22 §6l.12 — a chip previews above the prompt", () => {
     expect(shows(under, "delta 0"), "nothing is pushed beneath it").toBe(false);
   });
 });
+
+describe("C22 §6q — the chip preview's box and keys (ruling 53), owed at the spec commit", () => {
+  it.todo(
+    "T1.175 (C22 I143, ruling 53): the preview over a 47-line chip at a 20-row region is a scroll box of 7 rows whose last row names the scroll chords and the open chord; over a 3-line chip the box is 3 rows and the row names the open chord alone — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
+  );
+  it.todo(
+    "T4.116 (C22 I143, I51, ruling 53): with a paste chip previewed, enter submits the prompt with the chip's content; the scroll-down chord moves the box one row and leaves the caret — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
+  );
+  it.todo(
+    "T1.176 (C22 I144, C02 I19): openChipInEditor refuses with no editor and runs nothing; with a runner rewriting the file editChip is called once with the new content and line count; unchanged, not called; the temporary directory is gone on every path; the argv passes the path as an argument — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
+  );
+  it.todo(
+    "T4.117 (C22 I144, C23 §4): through a built session with a fake runner, the open chord suspends and resumes once, resets the decoder and re-mints the chip; with a verb holding the guard it runs nothing and says so — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
+  );
+});

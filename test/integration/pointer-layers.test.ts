@@ -180,3 +180,12 @@ describe("C16 I74 — the wheel over a layer, through the graph (review batch 3,
     expect(text().slice(0, fitsTop).join("\n"), "the wheel reached the transcript").not.toBe(before);
   });
 });
+
+describe("C22 §6q — the wheel reaches a box in a layer, where the layer is drawn, owed at the spec commit", () => {
+  it.todo(
+    "T4.114 (C22 I141, C16 I74): a chip preview over a 40-line paste; a wheel notch down over the panel moves the box by WHEEL_ROWS; the layer dismissed and pushed again opens at its top — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
+  );
+  it.todo(
+    "T4.115 (C22 I142, C23 I74): an approval replacing the prompt, suspended; a wheel over the prompt's rows moves the box, and one over the region's middle moves and answers nothing — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
+  );
+});

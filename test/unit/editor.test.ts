@@ -1010,3 +1010,9 @@ describe("C17 §5b — the region's cells (roadmap entry 23)", () => {
     expect(chipped.text, "insertChip moves the buffer in the same call").not.toBe(beforeChip);
   });
 });
+
+describe("C17 I35 — a chip is edited by re-minting it, owed at the spec commit", () => {
+  it.todo(
+    "T1.60 (C17 I35, I34): editChip on a chip in the buffer answers true, draws the new line count under the same ordinal, resolves to the new content; undo brings the old chip back; a chip not in the buffer answers false and nothing changes — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
+  );
+});

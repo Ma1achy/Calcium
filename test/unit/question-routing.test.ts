@@ -332,3 +332,9 @@ describe("C23 §7f — replace or float", () => {
   });
 
 });
+
+describe("C23 I88 — an inspection owns scrolling its payload, owed at the spec commit", () => {
+  it.todo(
+    "T1.98 (C23 I88, C22 I141): an approval with a thirty-line payload suspended at a 20-row region; down moves the box one row, PgDn by the interior less one, PgUp back; alt-down never reaches the handler; leaving and suspending again opens at 0 — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
+  );
+});

@@ -894,3 +894,9 @@ describe("C23 I82 — a question refuses once and says so (review batch 2, M5)",
     expect(JSON.stringify(choosing.overlays.top?.content)).toContain("answer this first");
   });
 });
+
+describe("C23 I88 — the inspection scrolls in a built session, owed at the spec commit", () => {
+  it.todo(
+    "T4.88 (C23 I88, C22 I141, C22 I142): an approval overflowing its region; show full diff; down three times puts line 4 first in the prompt slot, the question unresolved, and the last row names the scroll keys — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, group A (C22 §6q)",
+  );
+});
