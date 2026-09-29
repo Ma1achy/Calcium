@@ -15,4 +15,7 @@ describe("C14 §6a — the keys in a real session", () => {
   it.todo(
     "T4.41 (C14 I60, C14 I43, C14 I55): ⌃V, ⇧→ ×3, ⇧↓ draws RECT 4×2 and cells, not source, washes four cells on two rows with the rail on the first; y copies the eight cells with no escape; ⌃V restores block mode — not deferred on a component: the code lands in the next commit of this round",
   );
+  it.todo(
+    "T4.42 (C14 I60, C14 I49): a rectangle drag held past the region's bottom moves the rectangle's head by the ticks, and y copies every row they reached — not deferred on a component: the code lands in the next commit of this round",
+  );
 });
