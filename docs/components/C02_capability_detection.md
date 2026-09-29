@@ -40,6 +40,7 @@ type TerminalCapabilities = Readonly<{
   notification:       "none" | "osc9";     // I16 — a system notification the terminal takes
   notify:             readonly ("bell" | "system" | "title")[];   // I17 — the rungs the reader opted into
   clipboard:          "none" | "osc52";    // I18 — the terminal takes an OSC 52 write
+  editor:             string | null;       // I19 — the reader's editor command, `$VISUAL` else `$EDITOR`
 }>;
 
 function detectCapabilities(
@@ -98,6 +99,7 @@ everything the hover sets, `←`/`→` on a focused plot set too (C16 §4a).
 | `notification` | the identification: kitty, Ghostty, iTerm2, WezTerm and foot → `osc9`; Windows Terminal and an unidentified terminal → `none`; inside `TMUX`, `unreachable` (I16) |
 | `notify` | `CALCIUM_NOTIFY`, comma-separated, of `bell`, `system`, `title` — `stated`; absent → `[]`, `assumed`; an unknown member is dropped with a warning naming it (I17) |
 | `clipboard` | the identification: kitty, Ghostty, WezTerm, foot and Windows Terminal → `osc52`; iTerm2 — off by default — and an unidentified terminal → `none`; inside `TMUX`, `unreachable` (I18) |
+| `editor` | `VISUAL`, else `EDITOR` — `stated`; neither → `null`, `assumed`. Not gated by `dumb` or `TMUX`: neither is about the terminal (I19) |
 
 ### One identification, consulted by every capability
 
@@ -228,6 +230,7 @@ wrong**, which is the only property a consumer can act on:
 | `notification` | `inferred` | `inferred` | **`unreachable`** | `declared` |
 | `notify` | `assumed` | `assumed` | `assumed` | `declared` |
 | `clipboard` | `inferred` | `inferred` | **`unreachable`** | `declared` |
+| `editor` | `stated` or `assumed` | `stated` or `assumed` | `stated` or `assumed` | `declared` |
 
 **The gate demotes `colourDepth` and refuses the other three, and that asymmetry is the table's
 content rather than an inconsistency.** Inside a multiplexer the identification is `null` for every
@@ -551,6 +554,7 @@ fine; what cannot happen is a field with no row, or a row for no field.
 | Route | `renderMode` | **Linear**: an append-only stream of semantic events, and no frame (C22 §6m) | L4 |
 | System notification | `notification` | The `system` rung writes nothing; the bell and the title still reach a reader who opted into them (C22 I128) | L4 |
 | Clipboard by OSC 52 | `clipboard` | A copy goes to a platform clipboard tool when one is found (C21 I20); otherwise the reader is offered a file and told so. Nothing is ever claimed as copied that was not (ruling 72, C14 §6a) | L4 |
+| An editor | `editor` | `⌥o` on a chip preview says `no editor — set $VISUAL or $EDITOR` and runs nothing; the chip stays in the prompt as it was (C22 I144) | L4 |
 | Notification opt-in | `notify` | Nothing is opted in, so no rung fires and focus reporting is not taken — the default, not a failure (I17, C01 I23) | C01 L4 |
 
 Alternate screen is the sole hard requirement (D28). A fullscreen application on the primary screen destroys the user's scrollback, which is worse than not running.
@@ -608,6 +612,7 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 14. **The emulator is identified once, every capability consults that identification, and the identification is gated by `TMUX` before any of them see it** — `synchronisedUpdate` and `imageProtocol` read it, and `colourDepth` reads it too but is outranked by `COLORTERM`, because that variable is the terminal speaking for itself where a name is us inferring (I11). **Identification is not capability**, and the second question — *does a sequence reach it* — is asked in one place rather than by each reader: measured, tmux consumes both an unwrapped APC and `ESC [ ? 2026 h`, and the wrapped form is what survives (§3, FINDINGS F432).
 17. **A terminal's answer is never read, and the reason is the record's lifetime rather than the input path** — a reply is unreadable until raw mode, raw mode is `acquire()`'s, and by then six objects built at C22's construction hold the record; so a probe would run before construction and arrive as an override, on C24's surface and not this component's (I14). Neither of the reasons the file used to give survives being checked: C16 I32 makes a reply harmless where F414 said it would be typed into the prompt, and a DA1-terminated burst makes a probe one round trip where §3 said it needed a window — **both are measured in §3 for that reason**, because a justification the next reader cannot reproduce is one they delete.
 18. **`clipboard` is the identification's column for OSC 52**, `none` where a terminal takes it only after a setting the reader has to change, and declared over the top where the reader has; it says the sequence is taken and never that a copy worked (I18, → C01 I25).
+19. **`editor` is the reader's editor command, read from `$VISUAL` then `$EDITOR`**, and `null` when neither is set; it is a command line handed to a shell whole, and a declaration is the override (I19, → C22 I144).
 
 ---
 
