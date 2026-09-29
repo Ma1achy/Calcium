@@ -1355,7 +1355,11 @@ describe("C22 I33 — a command of several lines", () => {
     vi.useFakeTimers();
     try {
       const stdin = fakeStdin();
-      const s = await buildSession({ stdin: stdin as never } as never, { columns: 80, rows: 24 });
+      // **Thirty rows, not 24**: the six echo rows and `/help`'s answer must all
+      // be on screen for the last assertion to read them. At 24 the answer's
+      // two watch rows (C22 §6p) scrolled `line-0`…`line-4` off the top, and the
+      // row failed on the screen's height rather than on a line break.
+      const s = await buildSession({ stdin: stdin as never } as never, { columns: 80, rows: 30 });
       const step = async (): Promise<void> => {
         await vi.advanceTimersByTimeAsync(50);
         for (let i = 0; i < 4; i += 1) await Promise.resolve();
