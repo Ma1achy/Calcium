@@ -102,7 +102,7 @@ describe("C22 I109 — the region's width", () => {
 });
 
 describe("C22 I33 — tier 6", () => {
-  it("T6.134 (C22 I33): commandRows wrapping the command whole → T1.172 fails", () => {
+  it("T6.137 (C22 I33): commandRows wrapping the command whole → T1.172 fails", () => {
     // **The revert, drawn**: the whole command through one wrap, as it shipped.
     // The break is measured as nothing, so a two-line command is one row, and
     // that row carries the line feed the terminal then acts on.
