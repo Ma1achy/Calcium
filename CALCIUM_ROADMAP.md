@@ -4622,7 +4622,7 @@ the measured case the gate arm was written from. It said `camera`, `azimuth`, `e
 `halfBlockRows` occur zero times in `src/presentation/plot/`; they occur 33, 7, 7 and 1. The entry
 set its own condition — *the field, the cache-key axis and one binding land together or none does*
 — and all three landed: `RenderContext.cameras` (`src/presentation/blocks/types.ts:165`),
-`Cameras.key` (`src/shell/cameras.ts:126`) and the orbit bindings (`src/shell/construct.ts:2802`, `orbitBlock`).
+`Cameras.key` (`src/shell/cameras.ts:126`) and the orbit bindings (`src/shell/construct.ts:3635`, `orbitBlock`).
 BUILT in the column and in the table as of 2026-09-04.
 
 **33 left this list on 2026-08-15**, and its evidence expired the moment the code landed —

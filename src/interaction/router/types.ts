@@ -485,12 +485,13 @@ export type KeyAction =
   | "entryNext"
   // --- a split's panes and its divider (C04 §3aq, C26 I28, C16 I59) ----------
   //
-  // `←`/`→` at `liveBlock` cross a split's divider — the one way focus leaves a
-  // pane, which is what *explicit focus transfer* means — and are no-ops
-  // outside a split. `⌥←`/`⌥→` move the divider a cell; at `prompt` the same
-  // chord is word motion (§019), and the ladder is what tells them apart.
-  | "paneLeft"
-  | "paneRight"
+  // `←`/`→` at `liveBlock` move along the focused row (C26 I30) and, at its
+  // end, cross a split's divider — the one way focus leaves a pane, which is
+  // what *explicit focus transfer* means. `⌥←`/`⌥→` move the divider a cell;
+  // at `prompt` the same chord is word motion (§019), and the ladder is what
+  // tells them apart.
+  | "elementLeft"
+  | "elementRight"
   | "dividerLeft"
   | "dividerRight"
   // --- the horizontal pair (C12 §3s, C22 I76) --------------------------------

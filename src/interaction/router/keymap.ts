@@ -731,8 +731,8 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // divider chord**, *the SCROLLBAR's rule on the other axis*; §019 keeps them
   // word motion *in text fields*, which is the `prompt` rows above, so one
   // chord at two targets is resolved by the ladder rather than refused.
-  { target: "liveBlock", ...fromRegistry("move.left"), action: "paneLeft" },
-  { target: "liveBlock", ...fromRegistry("move.right"), action: "paneRight" },
+  { target: "liveBlock", ...fromRegistry("move.left"), action: "elementLeft" },
+  { target: "liveBlock", ...fromRegistry("move.right"), action: "elementRight" },
   { target: "liveBlock", key: { name: "left", meta: true }, action: "dividerLeft" },
   { target: "liveBlock", key: { name: "right", meta: true }, action: "dividerRight" },
 
@@ -1021,8 +1021,8 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
     rowDown: true,
     entryPrev: true,
     entryNext: true,
-    paneLeft: true,
-    paneRight: true,
+    elementLeft: true,
+    elementRight: true,
     dividerLeft: true,
     dividerRight: true,
     insideLeft: true,

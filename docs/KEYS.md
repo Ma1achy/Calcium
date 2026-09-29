@@ -173,7 +173,7 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⌃J` | both |  |  |  |  |  |  | insertNewline |  |  |  |
 | `⌃K` | both |  |  |  |  |  |  | killToEnd |  |  |  |
 | `⌃←` | both |  |  |  |  |  |  | wordLeft |  |  |  |
-| `←` † | both |  |  |  | moveSemanticCaretLeft |  | insideLeft | left | watchPrev | paneLeft |  |
+| `←` † | both |  |  |  | moveSemanticCaretLeft |  | insideLeft | left | watchPrev | elementLeft |  |
 | `⌥←` † | both |  |  |  |  |  |  | wordLeft |  | dividerLeft |  |
 | `⌥⇧←` | both |  |  |  |  |  |  | extendWordLeft |  |  |  |
 | `⇧←` † | both |  |  |  | extendSemanticSelectionLeft |  |  | extendCharLeft |  |  |  |
@@ -187,7 +187,7 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⌃→` | both |  |  |  |  |  |  | wordRight |  |  |  |
 | `⌥→` † | both |  |  |  |  |  |  | wordRight |  | dividerRight |  |
 | `⌥⇧→` | both |  |  |  |  |  |  | extendWordRight |  |  |  |
-| `→` † | both |  |  |  | moveSemanticCaretRight |  | insideRight | acceptGhostOrForward | watchNext | paneRight |  |
+| `→` † | both |  |  |  | moveSemanticCaretRight |  | insideRight | acceptGhostOrForward | watchNext | elementRight |  |
 | `⇧→` † | both |  |  |  | extendSemanticSelectionRight |  |  | extendCharRight |  |  |  |
 | `⌃⇥` | enhanced-terminal |  |  |  |  |  |  |  |  |  | agentNext |
 | `⌃⇧⇥` | enhanced-terminal |  |  |  |  |  |  |  |  |  | agentPrevious |

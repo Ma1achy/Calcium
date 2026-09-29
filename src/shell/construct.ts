@@ -77,7 +77,7 @@ import { VisibleIds } from "./visible-ids.js";
 import { pacedSchedule } from "./paced-schedule.js";
 import { RenderScratchStore } from "./render-scratch.js";
 import type { BoxSpan, DragContainer } from "./drag-selection.js";
-import { pullIntoView } from "./pull.js";
+import { barTarget, pullIntoView } from "./pull.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
 import { waitingEntries } from "./semantic-selection.js";
 import { createOverlayManager, takesPointer, type Layer, type Placed } from "../viewport/overlay/index.js";
@@ -140,7 +140,16 @@ import { createNavigator, openHistory, SEARCH_ID } from "../interaction/history/
 import type { HistoryEntry, Navigator } from "../interaction/history/index.js";
 import { detectCapabilities, type CapabilitySource, type TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Motion } from "../presentation/blocks/index.js";
-import { barOf, defaultButton, glyphFor, glyphs, interiorOf, panelInterior, tapeStart } from "../presentation/blocks/index.js";
+import {
+  barOf,
+  defaultButton,
+  glyphFor,
+  glyphs,
+  interiorOf,
+  panelInterior,
+  tapeMemberCols,
+  tapeStart,
+} from "../presentation/blocks/index.js";
 import { submitAction } from "./form-submit.js";
 import { createFrameScheduler, type CommitReason } from "../terminal/frame-scheduler.js";
 import type { CaptureResult, Profiler, ProfileReport, TraceFn } from "./profiling/types.js";
@@ -2698,6 +2707,15 @@ export async function constructGraph(
     return null;
   };
 
+  /**
+   * The boxes scrolled by hand since focus last moved (C26 I32), each as
+   * `entry NUL key`. **Per box**, because the wheel's subject is the box under
+   * the pointer (C16 I48): a box the reader never touched keeps following.
+   */
+  const latched = new Set<string>();
+  const latch = (entryId: EntryId, key: string): void => {
+    latched.add(`${entryId}\u0000${key}`);
+  };
   const pageBlock = (direction: 1 | -1): void => {
     // **A split pane pages itself** (C22 I117): the pane focus is in, by the
     // split's height less one row, as a box pages by its own.
@@ -2711,6 +2729,7 @@ export async function constructGraph(
       const box = s === null ? undefined : paneBox(s.split, pane.side, s.width);
       if (s === null || box === undefined) return;
       stores.scrollOffsets.nudge(inEntry, splitPaneKey(pane.split, pane.side), direction * Math.max(1, s.split.height - 1), box);
+      latch(inEntry, splitPaneKey(pane.split, pane.side));
       scheduler.commit("input");
       return;
     }
@@ -2727,6 +2746,7 @@ export async function constructGraph(
     // narrower than the region, and the residue row is decided there.
     const height = built.blocks.measure(block, drawn.outer);
     stores.scrollOffsets.nudge(entryId, block.id, direction * Math.max(1, height - 1), scrollBox(entry, block));
+    latch(entryId, block.id);
     scheduler.commit("input");
   };
 
@@ -2997,18 +3017,30 @@ export async function constructGraph(
    * dead while focus is in a container. *Scrolling never moves focus* is then
    * satisfied and useless, because scrolling does not move anything.
    *
-   * So the pull is driven by focus **changing**, not by focus existing. A
-   * resize does not re-pull either, which is the same ruling seen from the
-   * other side: a reader who put the window somewhere keeps it until they move
-   * focus, and the move is what brings it back.
+   * So the pull is driven by focus **changing**, not by focus existing.
+   *
+   * **And by the focused element's layout changing, unless the reader
+   * scrolled** (C26 I32, D15; review batch 4 M14.5). The comment that stood
+   * here said *a resize does not re-pull either*, and that was a reading of
+   * the refusal rather than a ruling: a resize or a patch that moves the
+   * focused child out of its box leaves focus on something nobody can see, and
+   * nobody chose that. So the key is the focus address, the entry's `rev` and
+   * the width — and a manual scroll of a box **latches** it until focus next
+   * moves, which is the refusal kept: the reader who put the window somewhere
+   * keeps it.
    */
-  let pulledTo: string | null = null;
+  let pulledTo: Readonly<{ where: string; rev: number; width: number }> | null = null;
   const pullScroll = (entry: TranscriptEntry): void => {
     const at = focus.current;
     if (at.at !== "liveBlock" || at.entryId !== entry.id) return;
     const where = `${entry.id}/${at.element?.blockId ?? ""}/${at.element?.elementId ?? ""}`;
-    if (where === pulledTo) return;
-    pulledTo = where;
+    const width = deps.frame.region().width;
+    if (pulledTo !== null && pulledTo.where === where && pulledTo.rev === entry.rev && pulledTo.width === width) return;
+    // **Focus moved, so every latch is dropped** (D15): the move is what
+    // brings the window back, and a latch that outlived it would be the old
+    // defect — a key that is dead while focus is in a container.
+    if (pulledTo?.where !== where) latched.clear();
+    pulledTo = { where, rev: entry.rev, width };
     const placed = elementsOf(entry.id);
     const index = resolveFocus(at.element, placed);
     if (index === null) return;
@@ -3025,6 +3057,7 @@ export async function constructGraph(
       const box = paneBox(s.split, pane.side, s.width);
       if (box === undefined) return;
       const key = splitPaneKey(pane.split, pane.side);
+      if (latched.has(`${entry.id}\u0000${key}`)) return;
       const held = Math.min(stores.scrollOffsets.resolved(entry.id, key, box), box.ceiling);
       // Pane-local rows: the walk carried the split's top (C26 I8, one resolver).
       const next = pullIntoView(held, found.element.rows.from - pane.top, found.element.rows.to - pane.top, s.split.height);
@@ -3036,6 +3069,7 @@ export async function constructGraph(
     // element's `blockId` names the box itself rather than the child.
     const box = blockIn(entry, found.blockId);
     if (box === null || box.kind !== "scroll") return;
+    if (latched.has(`${entry.id}\u0000${box.id}`)) return;
     const geometry = scrollBox(entry, box);
     const drawn = widthIn(entry, box.id);
     if (geometry === undefined || drawn === null) return;
@@ -3052,6 +3086,18 @@ export async function constructGraph(
     const next = pullIntoView(held, local.rows.from, local.rows.to, interior);
     if (next !== held) stores.scrollOffsets.set(entry.id, box.id, next, geometry);
   };
+  /**
+   * The member of tape `blockId` that focus is on, or `null` (C26 I31).
+   *
+   * **The stored address, as the frame reads it**: `render` takes the
+   * resolved focus, and a stored member that has left the tape anchors on
+   * `current` in both, since `layout` finds no member by that id (§8c.5).
+   */
+  const focusedMemberOf = (entryId: EntryId, blockId: string): string | null => {
+    const at = focus.current;
+    if (at.at !== "liveBlock" || at.entryId !== entryId || at.element?.blockId !== blockId) return null;
+    return at.element.elementId;
+  };
   const pullTapes = (entry: TranscriptEntry): void => {
     for (const top of entry.doc.blocks) {
       for (const block of [top, ...descendants(top)]) {
@@ -3062,7 +3108,7 @@ export async function constructGraph(
         const at = widthIn(entry, block.id);
         if (at === null) continue;
         const held = stores.scrollOffsets.get(entry.id, block.id);
-        const next = tapeStart(block, at.inner, detection.capabilities, held);
+        const next = tapeStart(block, at.inner, detection.capabilities, held, focusedMemberOf(entry.id, block.id));
         // **No `box`**, because a tape has no ceiling to follow: `TAIL` on this
         // axis would mean *the last member*, and the window that reaches it is
         // the one `tapeWindow` already computed. The store holds the number.
@@ -3096,6 +3142,7 @@ export async function constructGraph(
     const entry = stores.transcript.entries.find((e) => e.id === entryId);
     const block = entry === undefined ? null : blockIn(entry, blockId);
     stores.scrollOffsets.nudge(entryId, blockId, rows, block === null || entry === undefined ? undefined : scrollBox(entry, block));
+    latch(entryId, blockId);
     scheduler.commit("input");
   };
 
@@ -3363,6 +3410,8 @@ export async function constructGraph(
 
     const placed = elementsOf(hit.id);
     let best: Readonly<{ blockId: string; element: NavElement; block: Block; row: number; pane?: PaneRef }> | null = null;
+    /** Each tape's drawn member columns, asked once per press (C26 I31). */
+    const tapeCols = new Map<string, readonly Readonly<{ from: number; to: number }>[] | null>();
     for (const p of placed) {
       const block = blockIn(entry, p.blockId);
       if (block === null) continue;
@@ -3387,7 +3436,34 @@ export async function constructGraph(
         row = blockRow + Math.min(Math.max(0, Math.trunc(held)), Math.max(0, content - block.height));
       }
       if (row < p.element.rows.from || row >= p.element.rows.to) continue;
-      if (col < p.element.cols.from || col >= p.element.cols.to) continue;
+      let cols = p.element.cols;
+      // **A tape's member at the cells it is drawn in** (C26 I31, C04 I124;
+      // review batch 4 M14.2). Every member's element spans the row, because
+      // a column that moved with the held start would be geometry moving
+      // without `rev` — so the drawn columns are asked of `tapeMemberCols`, at
+      // the held start **and the anchor the frame drew**, offset by the
+      // element's origin. A residue mark or a gap is nobody's.
+      if (block.kind === "tape") {
+        if (!tapeCols.has(block.id)) {
+          const drawnAt = widthIn(entry, block.id);
+          tapeCols.set(
+            block.id,
+            drawnAt === null
+              ? null
+              : tapeMemberCols(
+                  block,
+                  drawnAt.inner,
+                  detection.capabilities,
+                  stores.scrollOffsets.get(hit.id, block.id),
+                  focusedMemberOf(hit.id, block.id),
+                ),
+          );
+        }
+        const member = tapeCols.get(block.id)?.[block.members.findIndex((m) => m.id === p.element.id)];
+        if (member === undefined) continue;
+        cols = { from: p.element.cols.from + member.from, to: p.element.cols.from + member.to };
+      }
+      if (col < cols.from || col >= cols.to) continue;
       if (best === null || LEVEL_DEPTH[p.element.level] > LEVEL_DEPTH[best.element.level]) {
         // `row` is the pointer's row inside the element — the legend's inverse
         // needs it (C12 I117) as the crosshair's needs the column.
@@ -3457,6 +3533,73 @@ export async function constructGraph(
       box = child;
       elementId = at.id;
       rowInChild = contentRow - at.rows.from;
+    }
+  };
+
+  /**
+   * The jump a primary press on a scroll box's bar makes, or `null` where the
+   * press is on no drawn bar (C22 I146, C26 §8c.4).
+   *
+   * **From the outermost box inward, one rung per nested box**, with
+   * `innermostScrollUnder`'s translation: at each rung the pointer's row is in
+   * the box's content, and the box's visible row is that less its offset,
+   * clamped as the renderer clamps it. The bar is the column at the box's
+   * content width, beside the interior — so the residue row has none — and
+   * drawn only while the content overflows. Bars nest at distinct columns, so
+   * at most one rung answers.
+   *
+   * The jump is `barTarget`, the transcript bar's arithmetic, and it latches
+   * the box (C26 I32): the reader put the window there.
+   */
+  const boxBarJump = (
+    entryId: EntryId,
+    start: Readonly<{ block: Block; element: NavElement; row: number }>,
+    col: number,
+  ): (() => void) | null => {
+    const entry = stores.transcript.entries.find((e) => e.id === entryId);
+    if (entry === undefined) return null;
+    const left = start.element.cols.from;
+    let box = start.block;
+    let elementId = start.element.id;
+    let rowInElement = start.row;
+    for (;;) {
+      if (box.kind !== "scroll") return null;
+      const drawn = widthIn(entry, box.id);
+      if (drawn === null) return null;
+      const el = built.blocks.elementsOf(box, drawn.outer).find((x) => x.id === elementId);
+      if (el === undefined) return null;
+      const { contentWidth, content, bar } = barOf(box, drawn.inner, built.blocks.measure);
+      const interior = interiorOf(box);
+      const ceiling = Math.max(0, content - interior);
+      const held = Math.min(Math.max(0, Math.trunc(stores.scrollOffsets.get(entryId, box.id))), ceiling);
+      const visible = el.rows.from + rowInElement - held;
+      if (bar && ceiling > 0 && col === left + contentWidth && visible >= 0 && visible < interior) {
+        const target = box;
+        const to = barTarget(visible, interior, ceiling);
+        const geometry = scrollBox(entry, target);
+        return () => {
+          stores.scrollOffsets.set(entryId, target.id, to, geometry);
+          latch(entryId, target.id);
+          scheduler.commit("input");
+        };
+      }
+      // Down one rung: the child under the pointer, if it is a box.
+      const child = box.children.find((c) => c.id === elementId);
+      if (child === undefined || child.kind !== "scroll") return null;
+      const childDrawn = widthIn(entry, child.id);
+      if (childDrawn === null) return null;
+      const els = built.blocks.elementsOf(child, childDrawn.outer);
+      const childContent = els.reduce((n, x) => Math.max(n, x.rows.to), 0);
+      const childHeld = Math.min(
+        Math.max(0, Math.trunc(stores.scrollOffsets.get(entryId, child.id))),
+        Math.max(0, childContent - child.height),
+      );
+      const contentRow = rowInElement + childHeld;
+      const at = els.find((x) => contentRow >= x.rows.from && contentRow < x.rows.to);
+      if (at === undefined) return null;
+      box = child;
+      elementId = at.id;
+      rowInElement = contentRow - at.rows.from;
     }
   };
 
@@ -4233,7 +4376,7 @@ export async function constructGraph(
     const { topRow, totalRows, viewportHeight } = stores.viewport.scroll;
     const maxTop = Math.max(0, totalRows - viewportHeight);
     if (maxTop === 0) return null;
-    const target = region.height <= 1 ? maxTop : Math.round((r * maxTop) / (region.height - 1));
+    const target = barTarget(r, region.height, maxTop);
     return () => {
       stores.viewport.scrollBy(target - topRow);
       scheduler.commit("input");
@@ -4357,6 +4500,7 @@ export async function constructGraph(
         const rows = e.button === "wheelUp" ? -WHEEL_ROWS : WHEEL_ROWS;
         return () => {
           stores.scrollOffsets.nudge(hit.id, splitPaneKey(pane.split, pane.side), rows, box);
+          latch(hit.id, splitPaneKey(pane.split, pane.side));
           scheduler.commit("input");
         };
       }
@@ -4372,6 +4516,14 @@ export async function constructGraph(
     if (e.button !== "button0" || e.meta || e.ctrl) return null;
     const under = elementAt(hit, col);
     if (under === null) return null;
+    // **A press on a box's bar jumps that box, and focus does not move** (C22
+    // I146, `R-BLK-363`). Before the element: a child's element spans the box's
+    // whole width, bar column included, so the element lookup cannot tell a
+    // press on the bar from one on the child.
+    if (!e.shift && !e.motion && under.block.kind === "scroll") {
+      const jump = boxBarJump(hit.id, under, col);
+      if (jump !== null) return jump;
+    }
     const address = Object.freeze({ blockId: under.blockId, elementId: under.element.id });
     const at = focus.current;
     const inHitEntry = at.at === "liveBlock" && focusedEntryId() === hit.id;

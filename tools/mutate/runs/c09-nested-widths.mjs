@@ -112,8 +112,8 @@ const results = runPass({
     {
       name: "the tape's start taken at the region's width (C09 T6.149)",
       file: CONSTRUCT,
-      from: "        const next = tapeStart(block, at.inner, detection.capabilities, held);\n",
-      to: `        const next = tapeStart(block, ${REGION}, detection.capabilities, held);\n`,
+      from: "        const next = tapeStart(block, at.inner, detection.capabilities, held, focusedMemberOf(entry.id, block.id));\n",
+      to: `        const next = tapeStart(block, ${REGION}, detection.capabilities, held, focusedMemberOf(entry.id, block.id));\n`,
       expect: "T4.63",
     },
     {

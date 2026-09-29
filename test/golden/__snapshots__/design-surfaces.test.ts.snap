@@ -413,7 +413,7 @@ patch           3     18:18 :19 19:
 pills           2     chip-0 chip-1
 choice          3     linear log log2
 control         1     control-1
-tape            5     seams arm count probe
+tape            5     seams arm count probe trace
 tree            6     src interaction parser frame data package
 split           2     split-files split-code
 form            5     name port replicas save cancel
@@ -735,8 +735,8 @@ PageDown  blockPageDown
 PageUp    blockPageUp
 Tab       entryNext
 S-Tab     entryPrev
-Left      paneLeft
-Right     paneRight
+Left      elementLeft
+Right     elementRight
 M-Left    dividerLeft
 M-Right   dividerRight
 S-Enter   rerunEntry
@@ -1484,8 +1484,8 @@ PageDown  blockPageDown
 PageUp    blockPageUp
 Tab       entryNext
 S-Tab     entryPrev
-Left      paneLeft
-Right     paneRight
+Left      elementLeft
+Right     elementRight
 M-Left    dividerLeft
 M-Right   dividerRight
 S-Enter   rerunEntry
@@ -1900,7 +1900,7 @@ patch           3     18:18 :19 19:
 pills           2     chip-0 chip-1
 choice          3     linear log log2
 control         1     control-1
-tape            5     seams arm count probe
+tape            5     seams arm count probe trace
 tree            6     src interaction parser frame data package
 split           2     split-files split-code
 form            5     name port replicas save cancel
@@ -2180,8 +2180,8 @@ pagedown  blockPageDown
 pageup    blockPageUp
 ⇥         entryNext
 ⇧⇥        entryPrev
-←         paneLeft
-→         paneRight
+←         elementLeft
+→         elementRight
 ⌥←        dividerLeft
 ⌥→        dividerRight
 ⇧⏎        rerunEntry
@@ -2868,8 +2868,8 @@ pagedown  blockPageDown
 pageup    blockPageUp
 ⇥         entryNext
 ⇧⇥        entryPrev
-←         paneLeft
-→         paneRight
+←         elementLeft
+→         elementRight
 ⌥←        dividerLeft
 ⌥→        dividerRight
 ⇧⏎        rerunEntry
@@ -3302,7 +3302,7 @@ patch           3     18:18 :19 19:
 pills           2     chip-0 chip-1
 choice          3     linear log log2
 control         1     control-1
-tape            5     seams arm count probe
+tape            5     seams arm count probe trace
 tree            6     src interaction parser frame data package
 split           2     split-files split-code
 form            5     name port replicas save cancel
@@ -3625,8 +3625,8 @@ pagedown  blockPageDown
 pageup    blockPageUp
 ⇥         entryNext
 ⇧⇥        entryPrev
-←         paneLeft
-→         paneRight
+←         elementLeft
+→         elementRight
 ⌥←        dividerLeft
 ⌥→        dividerRight
 ⇧⏎        rerunEntry
@@ -4375,8 +4375,8 @@ pagedown  blockPageDown
 pageup    blockPageUp
 ⇥         entryNext
 ⇧⇥        entryPrev
-←         paneLeft
-→         paneRight
+←         elementLeft
+→         elementRight
 ⌥←        dividerLeft
 ⌥→        dividerRight
 ⇧⏎        rerunEntry

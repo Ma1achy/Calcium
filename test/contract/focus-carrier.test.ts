@@ -4,7 +4,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { block, type Block } from "../../src/data/viewmodel/index.js";
-import { createBlockRegistry, type BlockRegistry, type FocusShape } from "../../src/presentation/blocks/index.js";
+import { createBlockRegistry, tapeMemberCols, type BlockRegistry, type FocusShape } from "../../src/presentation/blocks/index.js";
 import { groundSequence } from "../../src/presentation/blocks/paint.js";
 import { CORPUS, ONE_PER_KIND } from "../support/blocks.js";
 import { DARK_THEME, FULL_CAPS, MONO_CAPS, MONO_UNICODE_CAPS, measurable, visible } from "../support/render.js";
@@ -86,14 +86,38 @@ describe("C09 I121 — the focus carrier at every depth", () => {
     }
   });
 
-  it("T2.184 (C09 I121, C26 §7): at 1-bit the focused frame has the resting frame's visible text", () => {
+  it("T2.184 (C09 I121, C26 §7, C26 I31): at 1-bit the focused frame has the resting frame's visible text, save a tape member the resting window does not draw", () => {
+    // **The one cell focus moves is C26 I31's** (ruling 80): a tape member the
+    // resting window does not draw brings the window to it. Every member the
+    // resting window draws is the old row, unchanged; the others assert the
+    // window followed — the member drawn, the row count the same.
+    let followed = 0;
+    let kept = 0;
     for (const { blk, blockId, rowId } of TARGETS.filter((t) => SHAPES.has(t.blk.kind))) {
       for (const width of [7, 20, 40, 80]) {
         const rest = frame(blk, MONO_UNICODE_CAPS, null, width).map(visible);
         const focused = frame(blk, MONO_UNICODE_CAPS, { blockId, rowId }, width).map(visible);
+        if (blk.kind === "tape") {
+          const tape = blk as Extract<Block, { kind: "tape" }>;
+          const at = tape.members.findIndex((m) => m.id === rowId);
+          const drawn = tapeMemberCols(tape, width, MONO_UNICODE_CAPS, 0)[at];
+          if (drawn !== undefined && drawn.from === drawn.to) {
+            followed += 1;
+            const label = tape.members[at]?.label ?? "";
+            expect(focused.length, `${rowId} w=${String(width)}: the row count`).toBe(rest.length);
+            expect(focused, `${rowId} w=${String(width)}: the window moved`).not.toEqual(rest);
+            expect(focused.join("\n"), `${rowId} w=${String(width)}: the window followed`).toContain(label.slice(0, 1));
+            const cols = tapeMemberCols(tape, width, MONO_UNICODE_CAPS, 0, rowId)[at];
+            expect(cols !== undefined && cols.to > cols.from, `${rowId} w=${String(width)}: drawn at the focused anchor`).toBe(true);
+            continue;
+          }
+          kept += 1;
+        }
         expect(focused, `${blk.kind}/${rowId} w=${String(width)}: no cell moves`).toEqual(rest);
       }
     }
+    expect(followed, "the follow arm is reached").toBeGreaterThan(0);
+    expect(kept, "and so is the drawn arm").toBeGreaterThan(0);
   });
 
   it("T2.185 (C09 I121): at 24-bit no focused frame of the five shapes carries SGR 7", () => {

@@ -383,6 +383,20 @@ const passedOver = (from: PlacedNavElement | undefined, to: PlacedNavElement): b
   return to.pane.side !== 0;
 };
 
+/**
+ * Whether two placed elements are one row (C26 I30, §8c.2): the same pane, or
+ * both in none, and rows that overlap.
+ *
+ * **Overlap, not equality**, so a one-row element beside a taller one shares
+ * its row. **And the same pane**, so a split is not a wide row: its two panes
+ * overlap by construction, and crossing between them stays I28's.
+ */
+const oneRow = (a: PlacedNavElement, b: PlacedNavElement): boolean =>
+  a.pane?.split === b.pane?.split &&
+  a.pane?.side === b.pane?.side &&
+  a.element.rows.from < b.element.rows.to &&
+  b.element.rows.from < a.element.rows.to;
+
 /** The address of a placed element. One expression, so no call site spells it. */
 const addressOf = (p: PlacedNavElement): ElementAddress =>
   Object.freeze({ blockId: p.blockId, elementId: p.element.id });
@@ -533,6 +547,31 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     const shift = deps.paneOffset(pane.split, side);
     const target = others.find((q) => q.element.rows.to - shift > row) ?? others.at(-1); // cells-ok — the last element
     if (target !== undefined) deps.focus.focusRow(entry, addressOf(target));
+  };
+
+  /**
+   * `←`/`→` along the focused row (C26 I30, §8c; `R-BLK-853`).
+   *
+   * The next element in element order that shares the focused one's row, in
+   * the direction pressed; at the row's end, the split's divider where I28
+   * allows it, and nothing otherwise. **Focus moves, never `current`** (ruling
+   * 80): the shell cannot write the producer's field, so a tape's window
+   * follows focus (C26 I31) and `⏎` is how a member is chosen.
+   */
+  const alongRow = (direction: -1 | 1): void => {
+    const found = focusedPlaced();
+    const entry = deps.focusedEntryId();
+    if (found === null || entry === null) return;
+    const here = found.elements[found.at];
+    if (here === undefined) return;
+    for (let j = found.at + direction; j >= 0 && j < found.elements.length; j += direction) {
+      const q = found.elements[j];
+      if (q !== undefined && oneRow(here, q)) {
+        deps.focus.focusRow(entry, addressOf(q));
+        return;
+      }
+    }
+    crossPane(direction === 1 ? 1 : 0);
   };
 
   /** `⌥←`/`⌥→` — the innermost split holding focus (C04 §3aq E4). */
@@ -1074,16 +1113,17 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       deps.focus.focusRow(to.entryId, addressOf(to.first));
     },
 
-    // --- a split's panes and its divider (C04 §3aq, C26 I28, C22 I117) ------
+    // --- along a row, and a split's panes (C26 I30, I28, C22 I117) ---------
     //
-    // **`←`/`→` are the only way focus leaves a pane**, and they go to the
-    // other pane's element nearest the focused row **on screen**: each pane's
-    // own offset is taken off, because the two scroll apart and a content row
-    // in one is not the same line of the frame as the same number in the
-    // other. The first element whose visible rows reach the focused one's, or
-    // the pane's last where none does. Outside a split both do nothing.
-    paneLeft: () => crossPane(0),
-    paneRight: () => crossPane(1),
+    // **`←`/`→` move along the focused row first** (C26 I30), and at its end
+    // **they are the only way focus leaves a pane**: they go to the other
+    // pane's element nearest the focused row **on screen**, with each pane's
+    // own offset taken off, because the two scroll apart and a content row in
+    // one is not the same line of the frame as the same number in the other.
+    // The first element whose visible rows reach the focused one's, or the
+    // pane's last where none does. Outside a split the row's end is a stop.
+    elementLeft: () => alongRow(-1),
+    elementRight: () => alongRow(1),
     // **The divider moves a cell and focus stays** (C04 §3aq E4): element ids
     // do not change with width, and the next resolution finds the same one.
     dividerLeft: () => nudgeDivider(-1),
@@ -1117,8 +1157,12 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       const i = resolveFocus(current.element, elements);
       if (i === null) return;
       // **The next element this step can reach**, which is the next in reading
-      // order unless a split pane is in the way (C26 I28).
-      const next = elements.slice(i + 1).find((q) => !passedOver(elements[i], q));
+      // order unless a split pane is in the way (C26 I28) — **and not on the
+      // focused row** (C26 I30, D10): `↓` leaves a row of elements rather than
+      // walking it, and the first element past the row is the first of the
+      // row it enters.
+      const here = elements[i];
+      const next = elements.slice(i + 1).find((q) => !passedOver(here, q) && (here === undefined || !oneRow(here, q)));
       // **The resolved entry, not the stored one** (C26 I22): after an eviction
       // the two differ, and writing the stored one back would leave the store
       // pointing at nothing while the frame highlights the live entry.
@@ -1172,12 +1216,24 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       // rule below reads it so.
       let reach = -1;
       if (found !== null) {
+        const here = elements[found];
         for (let j = found - 1; j >= 0; j -= 1) {
           const q = elements[j];
-          if (q !== undefined && !passedOver(elements[found], q)) {
+          // **Off the focused row** (C26 I30, D10), as `↓` is.
+          if (q !== undefined && !passedOver(here, q) && (here === undefined || !oneRow(here, q))) {
             reach = j;
             break;
           }
+        }
+        // **The first element of the row it enters**, which is where `↓` lands
+        // on it too (§8c.3 row 5): back along the run that shares the row. The
+        // run is contiguous, so a block beside this one whose rows overlap is
+        // not reached from here.
+        for (let k = reach - 1; reach > 0 && k >= 0; k -= 1) {
+          const q = elements[k];
+          const at = elements[reach];
+          if (q === undefined || at === undefined || passedOver(here, q) || !oneRow(at, q)) break;
+          reach = k;
         }
       }
       const i = found === null ? null : reach === -1 ? 0 : found;

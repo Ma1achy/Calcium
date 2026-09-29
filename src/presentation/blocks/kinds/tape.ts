@@ -94,10 +94,17 @@ function layout(
   width: number,
   ctx: Pick<RenderContext, "capabilities" | "tick" | "motion">,
   held: number,
+  focused: string | null,
 ) {
   const room = normaliseWidth(width);
   const n = block.members.length; // cells-ok — a count of members
   const current = block.members.findIndex((m) => m.id === block.current);
+  // **The anchor: the focused member while focus is in the tape, `current`
+  // otherwise** (C26 I31, ruling 80). The shell cannot write the producer's
+  // `current`, so `←`/`→` move focus and the window follows it. One argument
+  // to the one `layout`, so the frame, the persisted start and the pointer's
+  // columns cannot disagree about where the window is.
+  const focusedAt = focused === null ? -1 : block.members.findIndex((m) => m.id === focused);
   const caps = ctx.capabilities;
   const set = glyphs(caps);
   const marks: TapeMarks = { left: set.tapeLeft, right: set.tapeRight, gap: TAPE_GAP };
@@ -114,7 +121,7 @@ function layout(
   const rich = texts(block, true, ctx);
   const detail = whole(rich);
   const list = detail ? rich : texts(block, false, ctx);
-  const at = current < 0 ? 0 : current;
+  const at = focusedAt >= 0 ? focusedAt : current < 0 ? 0 : current;
   const window =
     n === 0
       ? { from: 0, to: 0, before: 0, after: 0 }
@@ -142,8 +149,9 @@ export function tapeStart(
   width: number,
   capabilities: RenderContext["capabilities"],
   held: number,
+  focused: string | null = null,
 ): number {
-  return layout(block, width, { capabilities, tick: 0 }, held).window.from;
+  return layout(block, width, { capabilities, tick: 0 }, held, focused).window.from;
 }
 
 /**
@@ -195,8 +203,9 @@ function piecesOf(
   width: number,
   ctx: Pick<RenderContext, "capabilities" | "tick" | "motion">,
   held: number,
+  focused: string | null,
 ): Readonly<{ room: number; current: number; pieces: readonly Piece[] }> {
-  const { room, list, window, current } = layout(block, width, ctx, held);
+  const { room, list, window, current } = layout(block, width, ctx, held, focused);
   const set = glyphs(ctx.capabilities);
   const pieces: Piece[] = [];
   const gap = (): void => {
@@ -238,8 +247,9 @@ export function tapeMemberCols(
   width: number,
   capabilities: RenderContext["capabilities"],
   held: number,
+  focused: string | null = null,
 ): readonly Readonly<{ from: number; to: number }>[] {
-  const { room, pieces } = piecesOf(block, width, { capabilities, tick: 0 }, held);
+  const { room, pieces } = piecesOf(block, width, { capabilities, tick: 0 }, held, focused);
   const drawn = new Map<number, { from: number; to: number }>();
   let cursor = 0;
   for (const piece of pieces) {
@@ -309,8 +319,8 @@ export const tapeDefinition: BlockDefinition<Tape> = {
     // far this container is scrolled* and the container is what knows what that
     // means; `tapeWindow` bounds it into the members, as `offsetOf` bounds a
     // box's against its ceiling.
-    const { room, current, pieces } = piecesOf(block, ctx.width, ctx, ctx.scrollOffsets?.[block.id] ?? 0);
     const held = ctx.focus !== null && ctx.focus.blockId === block.id ? ctx.focus.rowId : null;
+    const { room, current, pieces } = piecesOf(block, ctx.width, ctx, ctx.scrollOffsets?.[block.id] ?? 0, held);
     const selected = new Set(
       (ctx.focus?.selected ?? []).filter((s) => s.blockId === block.id).map((s) => s.rowId),
     );

@@ -48,9 +48,10 @@ const results = runPass({
       // C14 I63 — `floor` for `round`: the last row still lands (r = h − 1 is exact)
       // and a middle row lands one short whenever the product is not whole.
       name: "the jump floors rather than rounds",
-      file: CONSTRUCT,
-      from: "Math.round((r * maxTop) / (region.height - 1))",
-      to: "Math.floor((r * maxTop) / (region.height - 1))",
+      // `barTarget` since C22 I146: one function for both bars, in pull.ts.
+      file: "src/shell/pull.ts",
+      from: "Math.round((row * max) / (height - 1))",
+      to: "Math.floor((row * max) / (height - 1))",
       expect: "T4.46",
     },
     {
