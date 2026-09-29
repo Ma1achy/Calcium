@@ -323,4 +323,5 @@ describe("C10 I17 and I70 — muted kept apart, and the 8-bit floor as a load ga
     expect(validateQuantisedFloors(unholdable(dark))).toHaveLength(19);
     expect(validateQuantisedFloors(structuredClone(dark)), "dark after the control").toEqual([]);
   });
+  it.todo("T2.81 (C10 I17, I70): two of I17's six sharing an index on a measured ground is refused, naming the ground, the slots and the index, and no shipped theme is — not deferred on a component: the code lands in the next commit of this round");
 });
