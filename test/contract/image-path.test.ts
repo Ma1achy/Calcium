@@ -45,7 +45,7 @@ describe("C04 I142 — b.image({ path }) keeps the path", () => {
     expect("path" in bytes, "the bytes arm carries no path").toBe(false);
     expect(kit.registry.copyOf(bytes), "alt alone").toBe("a red square");
 
-    // **Content like any other field** (C09 I124): a path is a filename, and a
+    // **Content like any other field** (C09 I127): a path is a filename, and a
     // filename can hold an escape.
     const poisoned = join(dir, `evil${ESC}[2J‮.png`);
     writeFileSync(poisoned, PNG);

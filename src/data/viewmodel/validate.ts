@@ -1023,7 +1023,7 @@ function checkTerminalLine(line: Record<string, unknown>, e: string[], at: strin
       return;
     }
     // **Bidi format characters too** (ruling 71): this kind is exempt from the
-    // registry's neutraliser (C09 I56, I124), so an override here would reorder
+    // registry's neutraliser (C09 I56, I127), so an override here would reorder
     // the frame around it exactly as an escape would repaint it.
     if (isBidiFormat(unit)) {
       e.push(

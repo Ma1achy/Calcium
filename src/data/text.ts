@@ -38,7 +38,7 @@ function isControl(cp: number): boolean {
 }
 
 /**
- * The bidi format characters (C04 I110, C09 I125, ruling 71): the Arabic letter
+ * The bidi format characters (C04 I110, C09 I128, ruling 71): the Arabic letter
  * mark U+061C, the marks U+200E and U+200F, the embeddings and overrides
  * U+202A–U+202E, and the isolates U+2066–U+2069.
  *
@@ -61,7 +61,7 @@ export function isBidiFormat(cp: number): boolean {
 
 /**
  * The visible form of one code unit, or `null` when it is shown as itself
- * (C09 I125) — the one table `neutraliseControl` and a span's re-basing both
+ * (C09 I128) — the one table `neutraliseControl` and a span's re-basing both
  * read, so the two cannot disagree about how long a replacement is.
  *
  * `cat -v`'s convention for C0, DEL and C1 — `^[`, `^?`, `M-^[` — and
@@ -79,7 +79,7 @@ export function controlForm(unit: number): string | null {
 }
 
 /**
- * A control **shown** rather than deleted (C09 I125, `R-TRU-001`: content is
+ * A control **shown** rather than deleted (C09 I128, `R-TRU-001`: content is
  * *escaped*).
  *
  * `stripControl` deletes, and a deleted escape leaves its printable residue —

@@ -510,7 +510,7 @@ class Registry implements BlockRegistry {
    * rather than as a throw.
    */
   /**
-   * **And the block is neutralised here, once** (C09 I124). This is the one
+   * **And the block is neutralised here, once** (C09 I127). This is the one
    * function every member reaches a definition through, so measure, render,
    * the windows, elements and copy all read the same neutralised value — the
    * class closed at its funnel rather than at nineteen call sites. A clean
@@ -1291,7 +1291,7 @@ export function createBlockRegistry(
  * (C09 I34).
  */
 function errorStatus(text: string, height: number): Status {
-  // **Neutralised, because a thrown message is a field too** (C09 I124): the
+  // **Neutralised, because a thrown message is a field too** (C09 I127): the
   // error box is drawn by a definition the registry calls directly, and a
   // renderer's `Error` can carry whatever the block it choked on carried.
   return { kind: "status", id: "status", state: "error", message: neutraliseControl(text), height } as Status;

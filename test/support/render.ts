@@ -198,7 +198,7 @@ export function measurable(
      */
     definitions?: readonly BlockDefinition<never>[];
     /**
-     * **A registry built elsewhere — a constructed session's** (C09 I127).
+     * **A registry built elsewhere — a constructed session's** (C09 I130).
      *
      * The option exists because the sweep that ran on this harness's bare
      * registry reported `table`, `plot` and `patch` clean while they were

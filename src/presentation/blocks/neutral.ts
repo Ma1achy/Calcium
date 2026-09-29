@@ -1,5 +1,5 @@
 /**
- * C09 I124 — a block with every content string neutralised, once per block.
+ * C09 I127 — a block with every content string neutralised, once per block.
  *
  * **The registry calls this at `#resolve` and nothing else does.** `#resolve`
  * sits under `measure`, `render`, the window seams, `elementsOf` and `copyOf`,
@@ -17,7 +17,7 @@ import { controlForm, neutraliseControl } from "../../data/text.js";
 import type { Block } from "../../data/viewmodel/index.js";
 
 /**
- * The fields that are **not** content, by name (C09 I124, T2.191).
+ * The fields that are **not** content, by name (C09 I127, T2.191).
  *
  * Identifiers and cross-references first: `key` names a table column and is the
  * property name in every `row.cells`, `from`/`to` name graph nodes, `target`
@@ -143,7 +143,7 @@ function walk(value: unknown): unknown {
 
 const NEUTRAL = new WeakMap<object, Block>();
 
-/** `block`, neutralised (C09 I124) — itself when clean, and one walk per block object. */
+/** `block`, neutralised (C09 I127) — itself when clean, and one walk per block object. */
 export function neutralBlock(block: Block): Block {
   const held = NEUTRAL.get(block);
   if (held !== undefined) return held;

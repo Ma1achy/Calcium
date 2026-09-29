@@ -1,4 +1,4 @@
-// C09 I128, §7d — the trust boundary at the writer: a whole session frame's bytes.
+// C09 I131, §7d — the trust boundary at the writer: a whole session frame's bytes.
 //
 // **Bytes in, bytes out.** The registry's sweep reads a block's rendered lines;
 // this reads what the session wrote to the terminal, chrome and heads and the
@@ -53,7 +53,7 @@ function strangers(bytes: string): string[] {
 }
 
 describe("C09 §7d — the writer", () => {
-  it("T4.107 (C09 I128, C09 I124, R-TRU-001): every ESC a poisoned session writes opens a sequence of escapes.ts's vocabulary, no C1 is written, and raw bidi only on the typed line", async () => {
+  it("T4.107 (C09 I131, C09 I127, R-TRU-001): every ESC a poisoned session writes opens a sequence of escapes.ts's vocabulary, no C1 is written, and raw bidi only on the typed line", async () => {
     vi.useFakeTimers();
     const stdin = fakeStdin();
     const tool = (name: string) => ({ name, local: true, summary: name, args: [], flags: [] });
@@ -119,7 +119,7 @@ describe("C09 §7d — the writer", () => {
       return cp >= 0x80 && cp <= 0x9f;
     });
     expect(c1.map((ch) => (ch.codePointAt(0) ?? 0).toString(16)), "a C1 code point in the written bytes").toEqual([]);
-    // **Raw bidi only on the reader's own typed line** (C09 I128's stated
+    // **Raw bidi only on the reader's own typed line** (C09 I131's stated
     // exception). The prompt being edited and the command echo `commandRows`
     // draws both write the typed text unneutralised; neither is a block, so the
     // registry never sees them. Each raw character is attributed to the row it

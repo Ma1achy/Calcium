@@ -6,7 +6,7 @@
 // over the nineteen, which is why this is a property over every registered kind
 // and not an assertion that a function is called (C09 I89, `R-TRU-001`).
 //
-// **And the registry is the production one** (C09 I127). This file ran on a
+// **And the registry is the production one** (C09 I130). This file ran on a
 // bare registry, so `table`, `plot` and `patch` fell back to `raw` — which
 // strips — and `patch` leaked through its path, hunk header and line text while
 // the sweep reported it clean. The kinds swept are now `graph.blocks`' own.
@@ -45,7 +45,7 @@ const C1_CSI = String.fromCharCode(0x9b);
 const PAYLOAD = `${ESC}[31mRED${ESC}[0m${ESC}[2J${ESC}]0;title${BEL}${C1_CSI}7m`;
 
 /**
- * The payload as a reader sees it once neutralised (C09 I125) — **written out
+ * The payload as a reader sees it once neutralised (C09 I128) — **written out
  * rather than computed**, so a change to the notation fails T2.156b and is read
  * rather than absorbed. `cat -v`'s form: `^[` for ESC, `^G` for BEL, `M-^[`
  * for the C1 CSI.
@@ -53,7 +53,7 @@ const PAYLOAD = `${ESC}[31mRED${ESC}[0m${ESC}[2J${ESC}]0;title${BEL}${C1_CSI}7m`
 const RESIDUE = "^[[31mRED^[[0m^[[2J^[]0;title^GM-^[7m";
 
 /**
- * Every bidi format character (C04 I110, C09 I125): the marks, the embeddings
+ * Every bidi format character (C04 I110, C09 I128): the marks, the embeddings
  * and overrides, and the isolates. An override reorders every cell after it on
  * the row, so a frame carrying one draws text that is not the text measured.
  */
@@ -61,7 +61,7 @@ const BIDI = ["\u061c", "\u200e", "\u200f", "\u202a", "\u202b", "\u202c", "\u202
 const BIDI_PAYLOAD = `A${BIDI.join("")}Z`;
 
 /**
- * The names the registry leaves alone (C09 I124), **declared here and compared
+ * The names the registry leaves alone (C09 I127), **declared here and compared
  * by equality** with the registry's own list — so a name added there is a
  * decision this file has to agree with, and the poisoner below skips the same
  * fields the neutraliser does. Escaping one side of a reference breaks it: a
@@ -72,7 +72,7 @@ const isIdentifier = (name: string): boolean => IDENTIFIERS.includes(name) || na
 
 /**
  * The (kind, field) pairs whose poisoned value never reaches the frame at
- * width 100 on the production registry (C09 I127) — compared by equality, so a
+ * width 100 on the production registry (C09 I130) — compared by equality, so a
  * field that starts drawing, or stops, is a decision someone reads.
  */
 const NOT_DRAWN = [
@@ -126,7 +126,7 @@ const hitsIn = (drawn: string): string[] => {
 };
 
 /**
- * **The production registry**, built the way a session builds it (C09 I127):
+ * **The production registry**, built the way a session builds it (C09 I130):
  * `graph.blocks` is what `construct.ts` registered — the defaults, then `table`,
  * `plot` and `patch` through the public mechanism.
  */
@@ -136,7 +136,7 @@ beforeAll(async () => {
 });
 
 describe("C09 §7d — the trust boundary", () => {
-  it("T2.190 (C09 I127): the sweep's registry is a constructed session's, and its kinds less terminal equal the kinds swept", () => {
+  it("T2.190 (C09 I130): the sweep's registry is a constructed session's, and its kinds less terminal equal the kinds swept", () => {
     const kit = measurable({ registry: production });
     const swept = [...new Set(CORPUS.map((b) => b.kind))].filter((k) => k !== "terminal").sort();
     const registered = kit.kinds.filter((k) => k !== "terminal").sort();
@@ -157,7 +157,7 @@ describe("C09 §7d — the trust boundary", () => {
     // session probe this row grew out of was vacuous on its first run for
     // precisely that reason, reporting *no control bytes* about a frame that
     // held none of the payload at all. So the residue must be **present**: the
-    // text arrived, shown as the escape it was (C09 I125).
+    // text arrived, shown as the escape it was (C09 I128).
     let sawResidue = 0;
 
     const leaked: string[] = [];
@@ -252,7 +252,7 @@ describe("C09 §7d — the trust boundary", () => {
     expect(gateErrors("שלום עולם"), "right-to-left letters are text, not format characters").toEqual([]);
   });
 
-  it("T1.86 (C09 I125, C09 I124): neutraliseControl over each class, idempotent, tab and newline kept, and a span moves with its text", () => {
+  it("T1.86 (C09 I128, C09 I127): neutraliseControl over each class, idempotent, tab and newline kept, and a span moves with its text", () => {
     const cases: (readonly [number, string])[] = [
       [0x1b, "^["],
       [0x00, "^@"],
@@ -332,7 +332,7 @@ describe("C09 §7d — the trust boundary", () => {
     expect(neutralBlock(neutral as unknown as Block), "the neutralised block is its own answer").toBe(neutral);
   });
 
-  it("T2.191 (C09 I124, C09 I127): per (kind, field), each field poisoned alone draws its neutralised residue and no control", () => {
+  it("T2.191 (C09 I127, C09 I130): per (kind, field), each field poisoned alone draws its neutralised residue and no control", () => {
     // **The identifier list first, by equality with the registry's** — the
     // poisoner below skips exactly these, so a name the neutraliser leaves
     // alone and this file does not know is a drift a reader has to rule on.
@@ -415,7 +415,7 @@ describe("C09 §7d — the trust boundary", () => {
     expect(hitsIn(box), "the thrown message's controls, in the error box").toEqual([]);
   });
 
-  it("T2.192 (C09 I125, C09 I89): the bidi payload reaches no frame as the character and appears as <U+XXXX>", () => {
+  it("T2.192 (C09 I128, C09 I89): the bidi payload reaches no frame as the character and appears as <U+XXXX>", () => {
     const kit = measurable({ registry: production });
     const bidi = poisonWith(BIDI_PAYLOAD);
     const leaked: string[] = [];
@@ -440,7 +440,7 @@ describe("C09 §7d — the trust boundary", () => {
     expect(shown, "the corpus carried the payload").toBeGreaterThan(CORPUS.length / 2);
   });
 
-  it("T2.193 (C09 I126): every kind's copy carries no control and no bidi format character, and carries the residue", () => {
+  it("T2.193 (C09 I129): every kind's copy carries no control and no bidi format character, and carries the residue", () => {
     const kit = measurable({ registry: production });
     const both = poisonWith(`${PAYLOAD}${BIDI_PAYLOAD}`);
     // A C0 other than `\n` and `\t`, DEL, C1, or a bidi format character.
@@ -489,7 +489,7 @@ describe("C09 §7d — the trust boundary", () => {
 
     // And the residue is what the same string looks like once neutralised,
     // which is the value the controls above compare against — written out
-    // rather than computed, so a change to the notation (C09 I125) fails here
+    // rather than computed, so a change to the notation (C09 I128) fails here
     // and is read rather than absorbed.
     expect(neutraliseControl(PAYLOAD)).toBe(RESIDUE);
   });
