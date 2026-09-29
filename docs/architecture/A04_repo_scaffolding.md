@@ -13,7 +13,7 @@
 
 | Deliverable | Where it lives | Contains | Publishes |
 |---|---|---|---|
-| Calcium | `Calcium/` | C01–C25, the framework | A package to GitHub Packages, private |
+| Calcium | `Calcium/` | C01–C25, the framework | The `calcium-tui` package — not published yet (§9) |
 | `docker-tui` | `Calcium/examples/docker/` | R01, the reference app | Nothing — proof, plus an import manifest |
 | `plots-tui` | `Calcium/examples/plots/` | C12's forms in a terminal, built through `b.plot` | Nothing — the one gate that reads a frame rather than comparing bytes |
 | `prism-tui` | its own repository | Prism's adapters, manifest, theme, world, surfaces | Nothing — an internal app |
@@ -309,7 +309,7 @@ The budget argument survives intact, because a PR runs the expensive tier once p
 
 | Repo | Last stage |
 |---|---|
-| Calcium | Publish on tag to GitHub Packages, with attestation and SBOM |
+| Calcium | `make proof` (pack, install clean, examples against the tarball). Publish on tag is **held** until a registry is chosen (§9); the job keeps its attestation step |
 | `docker-tui` | Real-docker run **where available; the skip is recorded, not silent** (R01 §8) · publish the import manifest on release |
 | `prism-tui` | Conformance against the real CLI where available; `record --diff` reporting structural drift. **No CI yet — local `make all` for now** |
 
@@ -452,7 +452,7 @@ The reference app bumping is the release gate. It lives in another repo precisel
 9. CI runs the same Makefile targets a developer runs — not equivalents.
 10. `make enforce` executes A03; it runs before the test suite so violations fail in seconds.
 11. A skipped real-integration run is recorded, never silent.
-12. Distribution is to GitHub Packages, private, from CI on tag using `GITHUB_TOKEN`; no laptop holds a credential.
+12. Nothing is published until a registry is chosen (§9). When it is, distribution is from CI on tag, and no laptop holds a credential.
 13. Not a git dependency — that would require an install script, trading the most valuable supply-chain control for a saved configuration step.
 14. GitHub Actions attestation is not npm provenance, and is not described as it.
 15. `npm link` locally, registry install in CI — the packaging test runs where a link cannot mask it.
