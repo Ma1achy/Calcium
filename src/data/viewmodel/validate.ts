@@ -47,6 +47,7 @@ import {
   MARKER3_MEMBERS,
   STYLE_ARMS,
   TEXT_SPAN_KEYS,
+  TRAIL_ANIMATION,
   TRAIL_FORMS,
   TERMINAL_KEYS,
   TERMINAL_RUN_KEYS,
@@ -55,6 +56,7 @@ import {
   type PlotForm,
   type Progress,
   type Result,
+  type TrailForm,
   type ViewDocument,
 } from "./types.js";
 import { parseAreas } from "./mosaic.js";
@@ -1452,6 +1454,25 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
     }
     if (b["streaming"] !== undefined && typeof b["streaming"] !== "boolean") {
       e.push(`${at} "streaming" must be a boolean (C04 I122)`);
+    }
+    // **`trailSince` belongs to a trail that animates once** (C04 I109, ruling
+    // 81): `Ramp.since`'s rule for the one ramp the document cannot address. On
+    // a still or periodic form it is a stamp nothing reads. Not tied to
+    // `streaming`: the settle strip drops `streaming` and keeps the rest, and a
+    // settled block's stamp is inert rather than wrong.
+    const trailSince = b["trailSince"];
+    if (trailSince !== undefined) {
+      const form = b["trail"] as TrailForm | undefined;
+      const effect = form === undefined ? undefined : TRAIL_ANIMATION[form];
+      if (typeof trailSince !== "number" || !Number.isFinite(trailSince) || trailSince < 0) {
+        e.push(`${at} "trailSince" is the tick a trail's one-shot began on — a finite tick at or after zero (C04 I109)`);
+      } else if (effect === undefined || !RAMP_ONE_SHOTS.has(effect)) {
+        const readers = TRAIL_FORMS.filter((f) => { const a = TRAIL_ANIMATION[f]; return a !== undefined && RAMP_ONE_SHOTS.has(a); });
+        e.push(
+          `${at} "trailSince" is a one-shot trail's stamp and trail "${String(form ?? "hotEdge")}" does not animate once — ` +
+            `${readers.map((f) => `"${f}"`).join(", ")} read it (C04 I109)`,
+        );
+      }
     }
     // The one button a notice may carry (C04 §3, arc 6 §5) — a chip's `Action`,
     // refused by the same rule as a tip's.

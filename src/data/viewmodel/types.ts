@@ -545,6 +545,20 @@ export const TRAIL_FORMS: readonly TrailForm[] = Object.freeze([
   "hotEdge", "fade", "hue", "ripple", "weight",
 ]);
 
+/**
+ * The effect each trail form animates its band with, for the forms that animate
+ * (C09 I132). A form absent here draws a still band.
+ *
+ * **One table for three readers**: C09 builds the band's ramp from it, the gate
+ * refuses `trailSince` on a form whose effect is not a one-shot, and the shell
+ * stamps the forms whose effect is (C04 I109, C22 I131; ruling 81). Three
+ * `form === "ripple"` tests would be three places for the next one-shot form to
+ * be missed.
+ */
+export const TRAIL_ANIMATION: Readonly<Partial<Record<TrailForm, RampAnimation>>> = Object.freeze({
+  ripple: "ripple",
+});
+
 /** The forms that are a colour, and therefore draw nothing at 1-bit (C09 I91). */
 export const TRAIL_COLOUR_FORMS: ReadonlySet<TrailForm> = new Set<TrailForm>([
   "hotEdge", "fade", "hue", "ripple",
@@ -813,6 +827,18 @@ export type Notice = Readonly<{
    * which is §026's default, and it is read only while `streaming`.
    */
   trail?: TrailForm;
+  /**
+   * The tick the trail's one-shot began on, when `trail` names one (C04 I109,
+   * C09 I132; ruling 81) — `Ramp.since` for a ramp the document cannot address,
+   * because C09 derives the band at render.
+   *
+   * **A producer need not supply it and usually cannot**: the shell stamps it at
+   * the first frame that draws each new arrival (C22 I131), so each arrival plays
+   * the ripple once and the band then holds its final frame. Refused on a notice
+   * whose `trail` names no one-shot, for the reason `since` is refused on a
+   * periodic effect.
+   */
+  trailSince?: number;
   /** Styled runs inside `text`, by code-unit offset (§3am, I83). */
   spans?: readonly TextSpan[];
   /** The map a span's `value` reads through (I90). Required the moment any span carries one. */

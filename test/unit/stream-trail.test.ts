@@ -6,7 +6,8 @@
 import { describe, expect, it } from "vitest";
 
 import { validateDocument, TRAIL_FORMS } from "../../src/data/viewmodel/index.js";
-import type { Notice } from "../../src/data/viewmodel/index.js";
+import type { Block, Notice } from "../../src/data/viewmodel/index.js";
+import { OneShots } from "../../src/shell/one-shots.js";
 import { measurable, visible, FULL_CAPS, DARK_THEME } from "../support/render.js";
 import { cells, truncate } from "../../src/presentation/text.js";
 import { capabilities } from "../support/fake-terminal.js";
@@ -698,13 +699,32 @@ describe("C04 I148 and C09 I132, I133 — the hot edge's overshoot and the band 
     expect(hue.oldest.fg, "cooling toward the warn body tone").not.toBe(accent);
     expect(hue.outside, "and outside it the warn notice's own ink").toEqual(warnInk);
 
-    // **The ripple never starts** (C09 I132's note): a one-shot with no
-    // `since` holds its not-started frame, so the band is the ink throughout.
-    // Asserted as it draws — this goes red the day the ripple is started.
-    for (const tick of [0, 12]) {
-      const ripple = read({ streaming: true, trail: "ripple" }, tick);
-      for (const cell of [ripple.head, ripple.fourth, ripple.oldest, ripple.outside]) expect(cell, `ripple at tick ${String(tick)}`).toEqual(ink);
+    // **The ripple runs once from its arrival and holds** (C09 I132, C04 I109;
+    // ruling 81). The shell stamps `trailSince` at the frame that draws the
+    // arrival; here it is stamped by hand at 0, so the ring crosses the band
+    // over ticks 1–11 and rests on its final frame — the ink — from 12 on.
+    // Every band cell and the first outside are read, because a ring is a few
+    // cells wide and the four named ones need not be under it on a given tick.
+    const band = (over: Partial<Notice>, tick: number) => {
+      const row = gridOf(notice({ text, ...over }), 40, FULL_CAPS, tick)[0]!;
+      return [..."ghijklmnopqrstu"].map((c) => row.find((x) => x.ch === c)!.style);
+    };
+    const stamped = { streaming: true, trail: "ripple", trailSince: 0 } as const;
+    const running = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].filter((tick) => band(stamped, tick).some((cell) => cell.fg !== ink.fg));
+    expect(running.length, "the ring is drawn on some tick before the duration ends").toBeGreaterThan(0);
+    for (const tick of [12, 20, 100]) {
+      band(stamped, tick).forEach((cell, i) => expect(cell, `held at tick ${String(tick)}, cell ${String(i)}`).toEqual(ink));
     }
+    // **The control**: the same notice unstamped holds the not-started frame —
+    // frame 0, the ring at radius 0, which lights the band's centre — at every
+    // tick, so the running frames above come from the stamp and not from the
+    // tick alone. It is not the ink: the parked note said it was, measured at
+    // the four named cells, none of which is the centre.
+    const unstamped = { streaming: true, trail: "ripple" } as const;
+    const still = band(unstamped, 0);
+    expect(still.filter((cell) => cell.fg !== ink.fg).length, "frame 0 lights the centre and nothing else").toBe(1);
+    for (let tick = 1; tick <= 12; tick += 1) expect(band(unstamped, tick), `unstamped at tick ${String(tick)}`).toEqual(still);
+    expect(band(stamped, 0), "stamped at 0 and drawn at 0 is the same frame 0").toEqual(still);
 
     const weight = read({ streaming: true, trail: "weight" });
     for (const [where, style] of [["head", weight.head], ["fourth", weight.fourth], ["oldest", weight.oldest]] as const) {
@@ -767,7 +787,25 @@ describe("C04 I148 and C09 I132, I133 — the hot edge's overshoot and the band 
 });
 
 describe("C22 I131 — the trail's one-shot is stamped by the shell, per arrival (ruling 81)", () => {
-  it.todo(
-    "T1.78 (C22 I131, C04 I109, C09 I132): a streaming ripple notice is stamped at the first frame, keeps its stamp on a re-emission, is re-stamped on a new arrival, and a producer's trailSince is kept — not deferred on a component: the code lands in the next commit of this round",
-  );
+  it("T1.78 (C22 I131, C04 I109, C09 I132): a streaming ripple notice is stamped at the first frame, keeps its stamp on a re-emission, is re-stamped on a new arrival, and a producer's trailSince is kept", () => {
+    const shots = new OneShots();
+    /** The stamp on the entry's one notice after a frame at `tick`, over a fresh array each time — a re-emission. */
+    const frame = (over: Partial<Notice>, tick: number, entry = "e1"): Notice =>
+      shots.stamp(entry, [notice({ id: "n", streaming: true, trail: "ripple", ...over })], tick)[0] as Notice;
+
+    expect(frame({ text: "abc" }, 5).trailSince, "the first frame that draws it stamps its tick").toBe(5);
+    expect(frame({ text: "abc" }, 9).trailSince, "a re-emission of the same text keeps the stamp").toBe(5);
+    expect(frame({ text: "abcd" }, 11).trailSince, "the next arrival takes the new tick").toBe(11);
+    expect(frame({ text: "abcd" }, 30).trailSince, "and keeps it until the one after").toBe(11);
+    expect(frame({ text: "abcde", trailSince: 2 }, 40).trailSince, "a producer's own stamp is kept, through a new arrival").toBe(2);
+
+    // Nothing to stamp: a still form, and a settled ripple.
+    expect(frame({ text: "abc", trail: "hotEdge" }, 5, "e2").trailSince, "hotEdge does not animate once").toBeUndefined();
+    expect(frame({ text: "abc", streaming: false }, 5, "e3").trailSince, "a settled block has no head").toBeUndefined();
+    expect(shots.size, "only the ripple's entry holds a stamp").toBe(1);
+
+    // Nested: a notice inside a panel is stamped by the same walk.
+    const nested = shots.stamp("e4", [{ kind: "panel", id: "p", title: "t", children: [notice({ id: "n", text: "x", streaming: true, trail: "ripple" })] }], 7);
+    expect(((nested[0] as { children: readonly Block[] }).children[0] as Notice).trailSince, "inside a container").toBe(7);
+  });
 });

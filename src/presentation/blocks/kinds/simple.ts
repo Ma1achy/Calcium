@@ -7,7 +7,7 @@
  * one of them and not the call.
  */
 import type { AmbiguousWidth } from "../../text.js";
-import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
+import { atLeastOne, normaliseWidth, RAMP_ONE_SHOTS, TRAIL_ANIMATION } from "../../../data/viewmodel/index.js";
 import type { Glyph, Notice, Pills, Progress, Raw, Rule, Tip, Tone } from "../../../data/viewmodel/index.js";
 import { cells, graphemes, stripControl, truncate, truncateParts, wrapCells } from "../../text.js";
 import type { Run } from "../../runs.js";
@@ -421,6 +421,7 @@ function withTrail(
 ): readonly (readonly Run[])[] {
   if (block.streaming !== true) return wrapped;
   const form = block.trail ?? "hotEdge";
+  const effect = TRAIL_ANIMATION[form];
   // **At 1-bit the four colour forms draw nothing rather than something else**
   // (I91). Substituting a mark would spend a cell the block never reserved, and
   // substituting bold for every form would make four names one.
@@ -484,7 +485,13 @@ function withTrail(
         fill: "gradient" as const,
         from: target,
         to: TRAIL_HEAD[form],
-        ...(form === "ripple" ? { animate: "ripple" as const } : {}),
+        // **The effect from the one table, and a one-shot's stamp with it**
+        // (I132, C04 I109; ruling 81). The band's ramp is derived here and has
+        // no address in the document, so its `since` travels on the notice —
+        // stamped by the shell at the arrival the band follows. Without it the
+        // ripple held its not-started frame for the life of the stream.
+        ...(effect !== undefined ? { animate: effect } : {}),
+        ...(effect !== undefined && block.trailSince !== undefined && RAMP_ONE_SHOTS.has(effect) ? { since: block.trailSince } : {}),
         ...(form === "hotEdge" ? { overshoot: TRAIL_OVERSHOOT } : {}),
       };
       const count = graphemes(run.text).length; // cells-ok — a cluster count (I133)

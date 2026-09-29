@@ -1260,7 +1260,23 @@ describe("C04 I144, I146, I148 — what a tape member, a bar and an overshoot ma
     refused(onBar({ ...pair, overshoot: 1.35 }), "not a record", /"lift" and "share" and nothing else/u);
   });
 
-  it.todo(
-    "T2.153 (C04 I109, §5c): trailSince is accepted on a ripple trail and refused on a trail naming no one-shot and out of range — not deferred on a component: the code lands in the next commit of this round",
-  );
+  it("T2.153 (C04 I109, §5c): trailSince is accepted on a ripple trail and refused on a trail naming no one-shot and out of range", () => {
+    const on = (over: Record<string, unknown>) => validateBlock({ kind: "notice", id: "n", tone: "info", text: "abc", ...over });
+    const refused = (got: ReturnType<typeof validateBlock>, why: string, pattern: RegExp): void => {
+      expect(got.ok, why).toBe(false);
+      expect(got.ok ? "" : got.error.join("\n"), why).toMatch(pattern);
+    };
+    for (const streaming of [true, undefined]) {
+      for (const trailSince of [0, 12]) {
+        expect(on({ trail: "ripple", trailSince, ...(streaming === undefined ? {} : { streaming }) }).ok, `ripple at ${String(trailSince)}, streaming ${String(streaming)}`).toBe(true);
+      }
+    }
+    // The forms that read it are named, so a refusal says where the field belongs.
+    refused(on({ streaming: true, trailSince: 0 }), "no trail is hotEdge, which is still", /"trailSince" is a one-shot trail's stamp[^]*"ripple" read it/u);
+    refused(on({ streaming: true, trail: "hotEdge", trailSince: 0 }), "hotEdge", /trail "hotEdge" does not animate once/u);
+    refused(on({ streaming: true, trail: "weight", trailSince: 0 }), "weight", /trail "weight" does not animate once/u);
+    for (const trailSince of [-1, Number.NaN, "3"]) {
+      refused(on({ streaming: true, trail: "ripple", trailSince }), `trailSince ${String(trailSince)}`, /a finite tick at or after zero/u);
+    }
+  });
 });

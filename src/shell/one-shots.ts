@@ -23,15 +23,44 @@
  * keyed on block identity, and a fresh copy per frame would miss all of them.
  * A document with nothing to stamp is returned as it came.
  *
+ * **The streaming trail is stamped here too, per arrival** (C22 I131, C04 I109,
+ * C09 I132; ruling 81). Its ramp is derived at render and has no address, so the
+ * stamp is written on the notice as `trailSince`, and its identity is the block
+ * and the effect with the **arrival** — the text's length — beside it: a new
+ * arrival re-takes the stamp and the ring plays again; a re-emission of the same
+ * text keeps it. Without this the ripple held its not-started frame for the life
+ * of the stream, the one place I109's ruling had not been carried.
+ *
  * **Dropped on `rendered`'s own subscription**, the sixth store to join it, for
  * the reason the other five give: the rows and what chose them are one fact
  * about one entry.
  */
-import { hasChildren, RAMP_ONE_SHOTS, type Block } from "../data/viewmodel/index.js";
+import { hasChildren, RAMP_ONE_SHOTS, TRAIL_ANIMATION, type Block, type Notice } from "../data/viewmodel/index.js";
 import { mapRamps } from "../presentation/blocks/index.js";
 
+/** A stamp, and for a trail the arrival it was taken at. */
+type Stamp = Readonly<{ since: number; arrival?: number }>;
+
+/**
+ * A streaming notice with its trail's one-shot stamped, or the notice as it came.
+ * Settled, a still form, or a producer's own `trailSince`: nothing to write.
+ */
+function stampTrail(notice: Notice, stamps: Map<string, Stamp>, tick: number): Notice {
+  if (notice.streaming !== true || notice.trailSince !== undefined || notice.trail === undefined) return notice;
+  const effect = TRAIL_ANIMATION[notice.trail];
+  if (effect === undefined || !RAMP_ONE_SHOTS.has(effect)) return notice;
+  const key = `${notice.id}\u0000trail\u0000${effect}`;
+  const arrival = notice.text.length; // cells-ok — where the text ends, in the unit it grows by
+  let held = stamps.get(key);
+  if (held === undefined || held.arrival !== arrival) {
+    held = { since: tick, arrival };
+    stamps.set(key, held);
+  }
+  return { ...notice, trailSince: held.since };
+}
+
 export class OneShots {
-  readonly #byEntry = new Map<string, Map<string, number>>();
+  readonly #byEntry = new Map<string, Map<string, Stamp>>();
   #memo = new WeakMap<readonly Block[], Map<string, readonly Block[]>>();
 
   /** Live entries holding at least one stamp. Bounded by the entry count. */
@@ -48,18 +77,19 @@ export class OneShots {
     const held = byArray?.get(entryId);
     if (held !== undefined) return held;
 
-    const stamps = this.#byEntry.get(entryId) ?? new Map<string, number>();
+    const stamps = this.#byEntry.get(entryId) ?? new Map<string, Stamp>();
     const visit = (block: Block): Block => {
       let next = mapRamps(block, (ramp, address) => {
         if (ramp.since !== undefined || ramp.animate === undefined || !RAMP_ONE_SHOTS.has(ramp.animate)) return ramp;
         const key = `${block.id}\u0000${address}\u0000${ramp.animate}`;
-        let since = stamps.get(key);
-        if (since === undefined) {
-          since = tick;
-          stamps.set(key, since);
+        let held = stamps.get(key);
+        if (held === undefined) {
+          held = { since: tick };
+          stamps.set(key, held);
         }
-        return { ...ramp, since };
+        return { ...ramp, since: held.since };
       });
+      if (next.kind === "notice") next = stampTrail(next as Notice, stamps, tick);
       // **Children through `tree.ts`'s two fields and no others**: a container's
       // `children` and a table row's `detail` — `childBlocks`' own answer.
       if (hasChildren(next)) {
