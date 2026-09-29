@@ -111,3 +111,9 @@ describe("C14 §6e — a rectangular copy is cells with the ink off", () => {
     expect(cellTextOf(null, PAINTED), "no rectangle is no text").toBe("");
   });
 });
+
+describe("C14 §6e — the way in, and the keys", () => {
+  it.todo(
+    "T1.79 (C14 I60, C14 I42, rulings 36, 70, 71): ⌃V seeds the rectangle at the caret and its block's first column; ⇧→ ×40 stops at the block's last column; ⇧↓ past the block clips; a plain arrow moves a 1×1; ⌃V off leaves the block set it found; esc clears both; a and A discard it; a narrowed span clamps a stored column — not deferred on a component: the code lands in the next commit of this round",
+  );
+});

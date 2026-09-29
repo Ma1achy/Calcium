@@ -288,3 +288,9 @@ describe("C14 I55 — the copy rung's footer", () => {
     expect(sizeOf(null, loaded, sequence), "outside the mode").toBeNull();
   });
 });
+
+describe("C14 §6e — the footer's classification table", () => {
+  it.todo(
+    "T1.80 (C14 I55, C14 I59): ownerLine for every row of §6e's footer table, whole — only blocks that copy nothing reads esc clear with no count, every span reads all loaded entries, the empty transcript and the rectangle over a full block set do not — and hasSelection agrees with escape() on every row — not deferred on a component: the code lands in the next commit of this round",
+  );
+});
