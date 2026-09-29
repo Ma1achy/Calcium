@@ -1048,7 +1048,7 @@ granularity  continuous · segmented
 liveness     still · active · stalled
 
 BUDGET     = capacity · continuous · still     █████░░░░░  62%  31k/50k
-OPERATION  = progress · segmented · active     ▰▰▰▰▰▱▱▱▱▱  77%
+OPERATION  = progress · segmented · active     ▮▮▮▮▮▮▮▮▯▯  77%
 ```
 
 **Each axis has exactly one consequence, and an explicit declaration outranks it** — which is
@@ -1056,7 +1056,7 @@ what keeps them axes rather than a preset enum wearing three names:
 
 | axis | what it decides | what outranks it |
 |---|---|---|
-| `granularity` | the alphabet, where none is named — `continuous` → `block`, `segmented` → `slant`, the two the design draws | a declared `style`, which the registry's own placement text defers to: *use only when its texture is declared by the component* |
+| `granularity` | the alphabet, where none is named — `continuous` → `block`, `segmented` → ~~`slant`, the two the design draws~~ **`posts`, `R-PRG-002`'s *discrete steps use posts* (I135, ruling 32); the figure above was redrawn with it** | a declared `style`, which the registry's own placement text defers to: *use only when its texture is declared by the component* |
 | `liveness` | the motion on a declared ramp — `still` → none, `active` → `shimmer`, `stalled` → `pulse` | a declared `ramp.animate` |
 | `quantity` | the readout beside the bar — `capacity` → `NN%  current/total`, `progress` → `NN%`, `count` → `current of total` | nothing; it is the readout's only input |
 
