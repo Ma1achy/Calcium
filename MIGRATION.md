@@ -111,6 +111,8 @@ Nothing reports these. Read each against what your application relies on.
 - **A table's `expand` column is as wide as its widest disclosure marker** (`▹+N`).
 - **Control characters in block text are shown, not stripped**, in caret form, and bidi
   format characters as `<U+XXXX>`. Copy carries the same form.
+- **The prompt, the command echo and linear mode show a bidi character as `<U+XXXX>`**, and
+  linear shows C0 and C1 in caret form rather than deleting them. What was typed is unchanged.
 - **A finished `progress` or `count` bar draws zero rows.** A `capacity` bar persists.
 - **A bar's alphabet follows the work it counts**: segmented work with no style draws posts.
 - **At 256 colours some indices move** to hold the contrast floor. No 24-bit value changes.

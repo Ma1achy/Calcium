@@ -87,6 +87,11 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   drawn before), and every bidi format character draws as `<U+XXXX>`, once, at the block
   registry's resolve. Copy carries the same form. *Cost, stated in the ruling:* right-to-left
   text shows its marks.
+- **The prompt, the command echo and linear mode show a bidi format character as `<U+XXXX>`**
+  (d746cd27, 26dcbbb6, 92ba7ebd, 4b68516b; C17 I36, C22 I33, C22 I149). What the reader typed
+  is kept as typed: the submitted command, history and the kill buffer are unchanged. Linear
+  mode also shows C0 and C1 in caret form where it deleted them, so a notice reads as one line
+  rather than two, and a screen reader speaks the form.
 - **A `TerminalLine.text` carrying a bidi format character is refused by `validateDocument`**
   (1ef3b4d1, ruling 71, C04 I110), as C0 and C1 controls already were.
 - **A tape's members are validated** (c714e137, C04 I144): each is a record with a non-empty
