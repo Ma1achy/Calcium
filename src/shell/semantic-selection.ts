@@ -18,6 +18,7 @@
  */
 
 import type { Block } from "../data/viewmodel/index.js";
+import type { TranscriptEntry } from "../viewport/transcript/index.js";
 import { sliceCells } from "../presentation/text.js";
 import type { AmbiguousWidth } from "../presentation/text.js";
 import { sgrPattern } from "../terminal/escapes.js";
@@ -283,6 +284,33 @@ function step(
  * the rule exists to prevent.
  */
 export const count = (mode: SemanticMode): number => mode?.blocks.size ?? 0;
+
+/** The fields of an entry C13 moves when its content changes — the rest are the store's bookkeeping. */
+type Arrival = Pick<TranscriptEntry, "id" | "rev" | "streaming">;
+
+/**
+ * How many of the record's entries the held view does not show (C14 I34,
+ * §6b *The count*, `R-SEL-010`).
+ *
+ * **By C13's own statements about an entry, never by length and never by
+ * object identity.** An entry is waiting when the view has no entry with its
+ * `id`, or holds it at another `rev` (its document changed, C13 I13) or
+ * another `streaming` (it settled). A length reads a patch as nothing and lets
+ * an eviction cancel an append; identity reads an append as two, because C13
+ * replaces the previous live entry's record to clear `live`, and counts the
+ * marker on every write, because the sweep rebuilds it. The marker is an
+ * ordinary entry (C13 I14): it counts when the hold did not have it.
+ */
+export function waitingEntries(record: readonly Arrival[], held: readonly Arrival[]): number {
+  const seen = new Map<string, Arrival>();
+  for (const e of held) seen.set(e.id, e);
+  let n = 0;
+  for (const e of record) {
+    const h = seen.get(e.id);
+    if (h === undefined || h.rev !== e.rev || h.streaming !== e.streaming) n += 1;
+  }
+  return n;
+}
 
 /**
  * What `y` takes — the selected blocks, in document order, entries one blank

@@ -79,6 +79,7 @@ import { RenderScratchStore } from "./render-scratch.js";
 import type { BoxSpan, DragContainer } from "./drag-selection.js";
 import { pullIntoView } from "./pull.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
+import { waitingEntries } from "./semantic-selection.js";
 import { createOverlayManager, takesPointer } from "../viewport/overlay/index.js";
 import { chipLabel, createEditor } from "../interaction/editor/index.js";
 import type { Chip, ChipLook, HeldLine, LineState } from "../interaction/editor/index.js";
@@ -1423,7 +1424,7 @@ export async function constructGraph(
        */
       get bufferedEntries(): number {
         if (heldView === null) return 0;
-        return Math.max(0, transcript.entries.length - heldView.entries.length);
+        return waitingEntries(transcript.entries, heldView.entries);
       },
       /**
        * Freeze the view at the record's current state (C14 I31).
