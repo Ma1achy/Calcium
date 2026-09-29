@@ -1259,4 +1259,8 @@ describe("C04 I144, I146, I148 — what a tape member, a bar and an overshoot ma
     refused(onBar({ ...pair, overshoot: { ...stop, knee: 0.5 } }), "a third member", /"lift" and "share" and nothing else/u);
     refused(onBar({ ...pair, overshoot: 1.35 }), "not a record", /"lift" and "share" and nothing else/u);
   });
+
+  it.todo(
+    "T2.153 (C04 I109, §5c): trailSince is accepted on a ripple trail and refused on a trail naming no one-shot and out of range — not deferred on a component: the code lands in the next commit of this round",
+  );
 });

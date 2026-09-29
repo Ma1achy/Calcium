@@ -765,3 +765,9 @@ describe("C04 I148 and C09 I132, I133 — the hot edge's overshoot and the band 
     }
   });
 });
+
+describe("C22 I131 — the trail's one-shot is stamped by the shell, per arrival (ruling 81)", () => {
+  it.todo(
+    "T1.78 (C22 I131, C04 I109, C09 I132): a streaming ripple notice is stamped at the first frame, keeps its stamp on a re-emission, is re-stamped on a new arrival, and a producer's trailSince is kept — not deferred on a component: the code lands in the next commit of this round",
+  );
+});
