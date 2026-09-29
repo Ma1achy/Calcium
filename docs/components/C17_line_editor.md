@@ -925,7 +925,7 @@ All five need a running shell and are deferred on L4, in the form `todo-expiry` 
 - **T6.24** (I34): `hold()` restarting the sentinel counter, which is the review's remedy as written → T1.59 fails on the held chip's label and on `resolved`.
 
 ---
-- **T6.39** (I35): the re-mint taking a fresh ordinal → **T1.60** fails: the chip draws `#2`.
+- **T6.39** (I35): the re-mint taking a fresh ordinal → **T1.60** fails on the ordinal, 3 for 2. The row first said *the chip draws `#2`*; the editor's own label does not draw the ordinal (`b.ts · 2L`), so the assertion is on `chipAt()`. `tools/mutate/runs/c17-chip.mjs`.
 
 ## 11. Out of scope
 

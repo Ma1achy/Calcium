@@ -2878,7 +2878,12 @@ the preview's box and keys, and the inspection's keys.
   drifted.
 - **C16 I74's layer offset is not F1302's subject.** It moves where a *truncated* layer's cut
   starts. The inspection sizes its box to the region (`height − 6`), so its layer is never
-  truncated and the wheel over it answers `false`.
+  truncated and the wheel over it answers `false`. **True of the layer and not of the slot it is
+  drawn in** — found building group A: a replacing question is drawn in the prompt's rows, which
+  S01 §3 caps at `floor(rows / 2)`, and a box sized to the region made a panel taller than that
+  slot. At 80×30 the slot's cut took the panel's key row and bottom border and drew `⋯` — at
+  f06f762d as well, measured in a base worktree, so it is not this lane's regression. The box is
+  now sized to the slot (6q.4 ruling 11, C23 I88). A finding recorded with this lane.
 - **The pointer hit-tests a replacing question where it is never drawn.** `construct.ts`' pointer
   `placed` is `overlays.layout()` filtered by gesture, and the paint's is the same list **less** the
   replacing question (`session.ts`, `overlays`). So a wheel over the prompt's rows, where the
@@ -2890,6 +2895,13 @@ the preview's box and keys, and the inspection's keys.
   while suspended, consumed silently (ruling 60). `⌥↑`/`⌥↓` are C16's `page-scroll` intercept, read
   before the ladder and sent to the transcript (C16 I40); `PgUp`/`PgDn` resolve through the ladder
   and reach the question's handler first.
+- **The intercept is wider than C16 I40 says** — found building group A, not measured before
+  ruling. `intercepts.ts` read the route as `key.meta && (up || down)`, so `⌥⇧↑`/`⌥⇧↓` (`CSI 1;4A`,
+  `{ up, shift, meta }`) were `page-scroll` too: the preview's scroll chords paged the transcript
+  and never reached the panel, and the row above that calls the chords *free* checked the registry
+  and the keymap and not the intercept, which is read before both. I40 already says *`⌥↑`/`⌥↓`
+  alone*; the predicate now says it too (`isPageScroll`: meta, the arrow, no shift, no ctrl),
+  C16 T1.200. A finding recorded with this lane.
 - **The chip preview has no box** (`construct.ts`' `chipPreviewContent`), and its comment says the
   box, its keys and its bar *arrive with the scrollbar* — whose `scrollbarColumn` has shipped since
   M14 (F1307).
@@ -2923,7 +2935,7 @@ is a table (C18 §8a's shape). The rows are the cells where two rules could both
 | wheel over a layer | any other layer | no such box; the layer truncated | the layer's row offset | C16 I74 — unchanged |
 | wheel over a layer | any other layer | neither | a keyed layer consumes it; a peek declines it | C16 I74 — unchanged |
 | wheel over the prompt's rows | a replacing question | the inspection's box | the box | the pointer's placed set × the paint's (6q.1) |
-| wheel over the region's middle | a replacing question | — | nothing of the question; I8's modal consumption | the same, from the other side |
+| wheel over the region's middle | a replacing question | — | nothing of the question; the transcript beneath, because the wheel is carved out of modality (C16 I40, §103) — the row read *I8's modal consumption* until T4.115 measured it | the same, from the other side |
 | `↑`/`↓` | an inspection | its box | one row | C23 I75 × `R-BLK-840`'s *declared inspection viewport* |
 | `PgUp`/`PgDn` | an inspection | its box | a page, the interior less one | the ladder reaches the question first |
 | `⌥↑`/`⌥↓` | an inspection | its box | **the transcript** | C16 I40's intercept is read before the ladder (`R-BLK-112`) |
@@ -2938,7 +2950,7 @@ is a table (C18 §8a's shape). The rows are the cells where two rules could both
 
 | # | sequence | what is on screen | the rule it forced |
 |---|---|---|---|
-| 1 | a 47-line paste at a 20-row region | the preview: title, a box of `floor(20 / 2) − 3 = 7` rows with a bar, and `⌥⇧↑↓ scroll  ⌥o open in editor` | the box's height is C15's own fraction less the panel's chrome, so the layer is never cut (I143) |
+| 1 | a 47-line paste at a 20-row region | the preview: title, a box of `floor(20 / 2) − 3 = 7` rows with a bar, and `⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor` | the box's height is C15's own fraction less the panel's chrome, so the layer is never cut (I143) |
 | 2 | row 1, then `⌥⇧↓` three times | lines 4–10; the thumb moved | the offset is `layer:chip-preview`'s, and the chrome cache keys on it (I141) — keyed by content alone, the frame would not move |
 | 3 | row 2, the caret moves to chip `#2` | `#2` from its top | a new chip is a new document: the namespace goes with the old one (I143) |
 | 4 | row 2, the caret leaves the chips | no preview; back on `#1`, it opens at its top | dismissal deletes the namespace (I141) |
@@ -2983,6 +2995,22 @@ is a table (C18 §8a's shape). The rows are the cells where two rules could both
 7. **An inspection owns its payload's scrolling and nothing else** (C23 I88). `R-BLK-840`: *wheel
    and page scroll need a declared question or inspection viewport*. `⌥↑`/`⌥↓` stay the transcript's,
    because C16 I40 is a current rule and the intercept is read before any owner.
+
+Taken while building group A, each against something the tree already does:
+
+8. **`⌥o`'s refusal is a `warn` notice on the transcript** (I144). A toast is `ok`-toned and says
+   *a fact that changed nothing* (I116); a refusal is a thing the reader asked for that did not
+   happen, and `R-HON-004` wants it said where the reader reads results. The busy text is
+   `<verb> is still running, and <chord> waits for it`, the chord spelled at the terminal's rung.
+9. **An editor's added final newline is dropped** (I144). `vi` and most editors end a file with
+   one, so a paste without one came back a line longer and never *unchanged* — row 8 of the trace
+   could not happen. One newline the content did not have is the file's, not the paste's.
+10. **A pair's chord keeps both spellings: `⌥⇧↑⌥⇧↓`** (I143). A collapsed `⌥⇧↑↓` was tried and
+    broke `⇧↑⇧↓ extend` in the shipped key rows (C22 T1.50, T1.80, T1.171, T1.46b); *the repo is
+    right about what ships*, so the pair rule stays `chordText`'s and 6q.3 row 1 is respelled.
+11. **An inspection's box is sized to the prompt's slot** (C23 I88). A replacing question is drawn
+    there (C23 I74, I142), and S01 §3 caps the slot at half the terminal; the region is the height
+    of a place the question is not drawn. `promptCap` is the frame's function, read by both.
 
 ### 6q.5 — what the rulings leave behind, named so it is not read as coverage
 
@@ -3328,7 +3356,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 
 - **I143** — *(§6q.4 ruling 5, §6l.12, I113, ruling 53, `R-BLK-825`)* **The chip preview is a bounded box with keys of its own, and `⏎` is never one of them.** The preview's content is a `scroll` box whose height is the smaller of the content's rows and `floor(region.height / 2) − 3`, floored at 1 — C15's default fraction less the panel's two borders and the key row — so the layer is never cut. A new chip or a new region height rebuilds it at its top. `⌥⇧↑`/`⌥⇧↓` move the box one row (`previewScrollUp`/`previewScrollDown`, registry `preview.scroll.up`/`preview.scroll.down`), `⌥o` opens the chip (I144, `preview.open`), and every other key is the prompt's first (I51) — so `⏎` sends. **The panel's last row names the chords from the session keymap** (C16 I58): scrolling only while the box overflows, opening always; the owner line names the same. → T1.175, T4.116, T6.144
 
-- **I144** — *(§6q.4 ruling 6, ruling 53, C02 I19, C17 I35, C21 I6, C23 §4)* **`⌥o` opens a chip in the reader's editor, and an edited paste comes back as one edit.** The editor is C02's `editor` — `$VISUAL`, else `$EDITOR`. A chip carrying a `target` opens it and nothing comes back. Any other chip's content is written to a file in a fresh private temporary directory, the editor runs through the handoff sequence (C23 §4: suspend, C21 `handoff`, resume, reset the decoder, invalidate), and the file is read back: a changed content re-mints the chip in place with its `lines` recounted (C17 I35), and an unchanged one changes nothing. The directory is removed on every path. The command is `sh -c '<editor> "$1"' sh <path>`, so the path is an argument and never text in the command. **Refused visibly, with nothing run**: with no editor (`no editor — set $VISUAL or $EDITOR`), and while a verb holds C23's guard. → T1.176, T4.117, T6.145
+- **I144** — *(§6q.4 ruling 6, ruling 53, C02 I19, C17 I35, C21 I6, C23 §4)* **`⌥o` opens a chip in the reader's editor, and an edited paste comes back as one edit.** The editor is C02's `editor` — `$VISUAL`, else `$EDITOR`. A chip carrying a `target` opens it and nothing comes back. Any other chip's content is written to a file in a fresh private temporary directory, the editor runs through the handoff sequence (C23 §4: suspend, C21 `handoff`, resume, reset the decoder, invalidate), and the file is read back: a changed content re-mints the chip in place with its `lines` recounted (C17 I35), and an unchanged one changes nothing. The directory is removed on every path. The command is `sh -c '<editor> "$1"' sh <path>`, so the path is an argument and never text in the command. **Refused visibly, with nothing run**: with no editor (`no editor — set $VISUAL or $EDITOR`), and while a verb holds C23's guard (`<verb> is still running, and <chord> waits for it`) — each a `warn` notice on the transcript, never a toast (§6q.4 ruling 8). **One final newline the editor added is dropped** before the comparison, so a file written back unchanged by `vi` is unchanged (ruling 9). → T1.176, T4.117, T6.145
 
 ## 11. Commitments
 
@@ -3917,10 +3945,10 @@ PTY harness.
 - **T6.140** (I131; ruling 81): the stamp re-taken on every new array rather than on a new arrival → **T1.173** fails on the re-emission: a poll re-emitting the same text would restart the ring. `tools/mutate/runs/c22-trail-stamp.mjs`.
 - **T1.174** (I141, F1302): a layer whose content is a `scroll` box of twelve lines in four rows, rendered through `composite` and through the replacing prompt slot with `layer:<id>` at 3 → both draw lines 4–7; with the store at 0 both draw 1–4, and the chrome cache serves the unscrolled frame by identity and misses once on the scrolled one. `scrollLayer` on that layer moves the box and leaves the layer's row offset at 0.
 - **T4.114** (I141, C16 I74): through a built session, a chip preview over a 40-line paste; a wheel notch down over the panel → the box's offset is `WHEEL_ROWS` and the frame's first content row is line 4; the layer dismissed and pushed again → the box at its top.
-- **T4.115** (I142, C23 I74): an approval replacing the prompt, suspended into its inspection; a wheel over the prompt's rows moves the box, and a wheel over the middle of the region moves nothing and answers nothing.
+- **T4.115** (I142, C23 I74): an approval replacing the prompt, suspended into its inspection; a wheel over the prompt's rows moves the box, and a wheel over the middle of the region moves no box and answers nothing — the transcript beneath takes it (6q.2).
 - **T6.142** (I141): `layerRows` handed no `scrollOffsets` → **T1.174** fails on the scrolled arm, which draws lines 1–4 at every offset. `tools/mutate/runs/c22-layer-scroll.mjs`.
 - **T6.143** (I142): the pointer's `placed` unfiltered again → **T4.115** fails: the wheel over the prompt's rows reaches no layer.
-- **T1.175** (I143, ruling 53): the preview over a 47-line chip at a 20-row region is a `scroll` box of 7 rows, and its last row reads `⌥⇧↑↓ scroll` and `⌥o open in editor`; over a 3-line chip the box is 3 rows and the row names `⌥o` alone.
+- **T1.175** (I143, ruling 53): the preview over a 47-line chip at a 20-row region is a `scroll` box of 7 rows, and its last row reads `⌥⇧↑⌥⇧↓ scroll` and `⌥o open in editor`; over a 3-line chip the box is 3 rows and the row names `⌥o` alone.
 - **T4.116** (I143, I51, ruling 53): a paste chip, `⏎` → the prompt is submitted with the chip's content, and the preview is gone; `⌥⇧↓` with the preview up moves its box one row and leaves the prompt's caret where it was.
 - **T6.144** (I143): the preview's content reverted to the bare `code` block → **T1.175** fails, and T4.116's `⌥⇧↓` moves nothing.
 - **T1.176** (I144, C02 I19): `openChipInEditor` with no editor → the refusal's words, and no handoff; with an editor and a fake runner that rewrites the file → `editChip` is called once with the new content and its line count; with a runner that leaves it → not called; the temporary directory is gone on all three paths; the argv is `sh -c '<editor> "$1"' sh <path>`.
