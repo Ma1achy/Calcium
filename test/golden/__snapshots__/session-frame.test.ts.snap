@@ -4938,11 +4938,11 @@ ESC[39m
 ESC[15;1H
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «│»
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «/watch» +7sp
 ESC[39m
 «» +2sp
@@ -4953,11 +4953,11 @@ ESC[39m
 ESC[16;1H
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «│»
 ESC[0m
 «» +2sp
-ESC[38;5;246m
+ESC[38;5;247m
 «/unwatch» +5sp
 ESC[39m
 «» +2sp
@@ -5176,12 +5176,12 @@ ESC[15;1H
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «│»
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «/watch» +7sp
 ESC[39m
 «» +2sp
@@ -5194,12 +5194,12 @@ ESC[16;1H
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «│»
 ESC[0m
 ESC[48;5;255m
 «» +2sp
-ESC[38;5;242m
+ESC[38;5;243m
 «/unwatch» +5sp
 ESC[39m
 «» +2sp
