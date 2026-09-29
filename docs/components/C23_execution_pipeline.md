@@ -809,8 +809,8 @@ Two of the three had no producer until now: `elapsedMs` and `attempt` were field
 | when | state | height | what it draws |
 |---|---|---|---|
 | the first fetch is in flight | `loading` | **2** | the message, then `⠸ loading (4s)` |
-| a fetch failed and a retry is coming | `retrying` | **2** | `▲ message`, then `⠸ retrying in 8s (attempt 2)` |
-| a fetch failed and **`retryInMs` is `null`** | `error` | **1** | `▲ message` alone |
+| a fetch failed and a retry is coming | `retrying` | **2** | `✗ message`, then `⠸ retrying in 8s (attempt 2)` |
+| a fetch failed and **`retryInMs` is `null`** | `error` | **1** | `✗ message` alone (C09 I138) |
 
 **H=2 and not 3, because the panel already has the border.** At 3 the box draws a second border
 inside the panel's and spends a row on it; at 4 it buys the ERROR tag at two nested borders. Only

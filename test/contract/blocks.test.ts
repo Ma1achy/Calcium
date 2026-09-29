@@ -1132,6 +1132,9 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
     const below = seen.length - row - 2;
     expect(Math.abs(above - below), "and vertically, odd row below").toBeLessThanOrEqual(1);
   });
+  it.todo(
+    "T2.230 (C09 I138, ruling 85, §048, §096): a failed status leads with ✗ and never with the warning's mark, at every rung, against a warn notice's lead — not deferred on a component: lands with the F1461 code commit of review batch 4",
+  );
   it("T2.159 (C09 I95, §072, `R-COL-004`, `R-BLK-569`): three kinds paint a ground and the rest are text", () => {
     // **A background is for an EXTENT; a foreground is for a MARK.** The census
     // is over the whole kind corpus rather than over the three, which is the

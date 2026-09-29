@@ -666,7 +666,7 @@ the red to "fix" it would be undoing a decision, not repairing an oversight — 
 above are what tell them which.
 
 **The message text is not the only carrier**, which is what makes 2.83 a cost rather than a
-defect. The `▲` mark and the painted word `ERROR` both survive it, and both survive 1-bit where
+defect. The `✗` mark (C09 I138; `▲` until ruling 85) and the painted word `ERROR` both survive it, and both survive 1-bit where
 the colour does not (F34's two channels). A floor is a promise about text being readable; this
 one is being kept by a quieter promise, in a box whose whole subject is already visible.
 ## 4e. Span attributes — set from the span, never from a slot, and lost rather than compensated where a depth cannot show them; and a span touches colour only through a named slot or the block's colormap
