@@ -145,12 +145,15 @@ const SCENES: Readonly<Record<string, Scene>> = {
   "label-shed": { columns: 60, rows: 16, drive: [], chrome: labelledChrome("Calcium") },
 
   /**
-   * The label at one bit, where it is shed for a different reason.
+   * The label at one bit, drawn on the unpainted rung as `[Calcium]` (C22
+   * I147, §6r).
    *
-   * There is no ground to paint with, and drawing it as plain text would put
-   * the application's identity in the rule's own voice — which is the one thing
-   * `R-COL-003` separates. Two sheds with two causes, and a frame showing only
-   * the width one would read as though the rule had a single condition.
+   * There is no ground to paint with, and plain text would put the
+   * application's identity in the rule's own voice, which is what `R-COL-003`
+   * separates. The brackets separate it without a colour, as a chip's and a
+   * button's do. Until review batch 4 this scene recorded a shed: one bit was
+   * the label's second shedding condition. It is now drawn, and width is the
+   * only condition, so `label-shed` above is the frame that shows the shed.
    */
   "label-mono": { columns: 80, rows: 24, drive: [], chrome: labelledChrome("Calcium") },
 };
@@ -159,13 +162,13 @@ const SCENES: Readonly<Record<string, Scene>> = {
 const ASCII_ENV = { TERM: "xterm", LANG: "C" } as const;
 
 /**
- * One bit, where §069's label is shed for want of a ground rather than width.
+ * One bit, where §069's label has no ground and is drawn in brackets (C22 I147).
  *
  * **No environment reaches this rung, and the first draft's did not.** It read
  * `{TERM: "xterm-mono", LANG: "C.UTF-8", NO_COLOR: "1"}` and the row was named
  * `1-bit`; the frame came back at **4** — `fg 90  bg 40` in the styles grid,
- * with the label drawn rather than shed, which is the row asserting the
- * opposite of what it exists to show. `detectColourDepth`
+ * with the label painted on a ground rather than shed (the 1-bit answer at
+ * the time), which is the row asserting the opposite of what it exists to show. `detectColourDepth`
  * (`capabilities.ts:202`) answers `1` for `dumb` or an absent `TERM` and for
  * nothing else — `NO_COLOR` is not one of its five sources and `xterm-mono`
  * falls through to the `4` default.

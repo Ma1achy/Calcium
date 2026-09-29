@@ -103,16 +103,16 @@ const results = runPass({
       expect: "T1.66",
     },
     {
-      // **The 1-bit shed removed**, and it is the branch no unit row reaches.
-      // It is also the mutation the golden's first draft could not have caught:
-      // that arm read `{TERM: "xterm-mono", NO_COLOR: "1"}`, came back at four
-      // bits — `fg 90  bg 40` in the styles grid — and drew the label the row
-      // exists to watch shed. An arm named for the rung it was meant to be at
-      // is not a measurement of the rung it reaches.
-      name: "the label is drawn where there is no ground for it",
+      // **The 1-bit rung restored to a shed** (C22 I147, review batch 4). Until
+      // then this mutation removed the shed, and the golden watched the label
+      // stay away. The golden now watches `[Calcium]` arrive, so the mutation is
+      // the inverse. The history still holds: the golden's first draft read
+      // `{TERM: "xterm-mono", NO_COLOR: "1"}`, came back at four bits, and
+      // measured a rung it was not at.
+      name: "the label shed at 1-bit, where it takes the unpainted rung",
       file: PAINT,
-      from: "  if (deps.capabilities.colourDepth === 1) return null;",
-      to: "  if (deps.capabilities.colourDepth === 0) return null;",
+      from: "  const unpainted = deps.capabilities.colourDepth === 1;\n",
+      to: "  if (deps.capabilities.colourDepth === 1) return null;\n  const unpainted = false;\n",
       expect: "label-mono",
     },
     {

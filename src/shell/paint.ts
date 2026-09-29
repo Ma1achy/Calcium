@@ -258,9 +258,12 @@ function rule(width: number, deps: PaintDeps, label: Label | null = null): strin
  * not leave at least one rule glyph to its left — a label that filled the row
  * would have stopped being a label.
  *
- * At 1-bit there is no ground to paint with, so the label is shed there too:
- * drawing it as plain text would put the application's identity in the rule's
- * own voice, which is the one thing `R-COL-003` separates.
+ * **At 1-bit there is no ground, so the label takes the unpainted rung, `[name]`**
+ * (C22 I147, §6r). Plain text would put the application's identity in the rule's
+ * own voice, which is what `R-COL-003` separates. The brackets separate it
+ * without a colour, as they do for a chip (C17 I25) and a button (C09 I102).
+ * They take the two cells the ground's padding takes, so every threshold below
+ * is the same at every depth.
  */
 function labelSpansOf(
   label: Label | null,
@@ -268,7 +271,7 @@ function labelSpansOf(
   deps: PaintDeps,
 ): readonly Span[] | null {
   if (label === null || width <= MIN_COLUMNS) return null;
-  if (deps.capabilities.colourDepth === 1) return null;
+  const unpainted = deps.capabilities.colourDepth === 1;
   const glyph = glyphs(deps.capabilities).horizontal;
   const ambiguous = deps.capabilities.ambiguousWidth;
   const glyphCells = cells(glyph, ambiguous);
@@ -276,12 +279,21 @@ function labelSpansOf(
 
   // ` <label> ` between the rule and its one trailing glyph — the fixture's
   // `──── calcium ─`, whose two spaces are what keep the name off the dashes.
-  const text = ` ${label.text} `;
+  const text = unpainted ? `[${label.text}]` : ` ${label.text} `;
   const used = cells(text, ambiguous) + glyphCells;
   const left = width - used;
   if (left < glyphCells) return null;
+  const lead = glyph.repeat(Math.floor(left / glyphCells));
+  // The remainder when the glyph is two cells wide — spaces rather than a
+  // half glyph, and on the left where the rule is, not against the label.
+  const pad = left - cells(lead, ambiguous);
 
   const muted = tone("muted", deps.theme, deps.capabilities);
+  // **No span takes a style at 1-bit, the dashes included.** The bare rule is
+  // plain text there (`rule`), and `muted` at 1-bit is dim, so a styled dash
+  // would make the labelled rule a different rule from the one beside it. A hue
+  // has nothing to paint with (I114), and the brackets are the carrier.
+  if (unpainted) return [{ text: lead + " ".repeat(pad) }, { text }, { text: glyph }];
   // **The hue the application named, or `bgElev` when it named none** (I114,
   // §070, C10 I55). Both the band and its ink come from the hue, because the
   // ink on a band is a property of the band — a label whose ink is guessed is
@@ -296,10 +308,6 @@ function labelSpansOf(
   const ground = withBackground(ink, band === null
     ? background("surface.bgElev", deps.theme, deps.capabilities)
     : band.ground);
-  const lead = glyph.repeat(Math.floor(left / glyphCells));
-  // The remainder when the glyph is two cells wide — spaces rather than a
-  // half glyph, and on the left where the rule is, not against the label.
-  const pad = left - cells(lead, ambiguous);
   return [
     { text: lead + " ".repeat(pad), style: muted },
     { text, style: ground },

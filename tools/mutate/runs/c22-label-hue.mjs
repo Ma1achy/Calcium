@@ -69,6 +69,46 @@ const results = runPass({
       to: "  if (label.hue !== undefined && band === null) return null;\n  const ink = band === null ? tone(\"default\", deps.theme, deps.capabilities, \"bgElev\") : band.ink;",
       expect: "T1.71",
     },
+    // ---- C22 I147, §6r: the unpainted rung (review batch 4, M13.6) --------
+    {
+      // T6.148 — the clause I147 amended, restored.
+      name: "the label shed at 1-bit, as it was",
+      file: P,
+      from: "  const unpainted = deps.capabilities.colourDepth === 1;\n",
+      to: "  if (deps.capabilities.colourDepth === 1) return null;\n  const unpainted = false;\n",
+      expect: "T1.178",
+    },
+    {
+      // T6.148 — the plan's form: two cells more, so the boundary moves to 95.
+      name: "the unpainted rung padded as `[ name ]`",
+      file: P,
+      from: "unpainted ? `[${label.text}]` :",
+      to: "unpainted ? `[ ${label.text} ]` :",
+      expect: "T1.178",
+    },
+    {
+      name: "the name drawn as plain text in the rule's voice at 1-bit",
+      file: P,
+      from: "unpainted ? `[${label.text}]` :",
+      to: "false ? `[${label.text}]` :",
+      expect: "T1.178",
+    },
+    {
+      // The first build's defect: `muted` at 1-bit is dim, and the bare rule
+      // there is plain text. A colour-only check passed it.
+      name: "the dashes styled `muted` at 1-bit",
+      file: P,
+      from: "  if (unpainted) return [{ text: lead + \" \".repeat(pad) }, { text }, { text: glyph }];",
+      to: "  if (unpainted) return [{ text: lead + \" \".repeat(pad), style: muted }, { text }, { text: glyph, style: muted }];",
+      expect: "T1.178",
+    },
+    {
+      name: "the unpainted rung taken at 4 bits too",
+      file: P,
+      from: "  const unpainted = deps.capabilities.colourDepth === 1;",
+      to: "  const unpainted = deps.capabilities.colourDepth <= 4;",
+      expect: "T1.178",
+    },
   ],
 });
 
