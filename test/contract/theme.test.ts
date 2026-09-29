@@ -1844,7 +1844,7 @@ describe("C10 I52 — the registry's state axes and the spec's declarations", ()
     expect(check("PushedSurface", "src/shell/surface.ts"), "a row naming the name M9 retired").toBe(false);
   });
 
-  it("T2.57 (C10 I56, §4k.5, R-COR-003, M11): every axis has a carrier row, and tone with ground is one carrier", () => {
+  it("T2.57 (C10 I56, C10 I71, §4k.5, R-COR-003, M11): every axis has a carrier row, and every fact has two carriers, one surviving 1-bit", () => {
     const registry = JSON.parse(
       readFileSync(new URL("../../docs/design/language/calcium-registry.json", import.meta.url), "utf8"),
     ) as { stateAxes: readonly { id: string }[] };
@@ -1864,12 +1864,25 @@ describe("C10 I52 — the registry's state axes and the spec's declarations", ()
     // survived — a control that cannot fail reports thoroughness.
     const section = /### 4k\.5 [\s\S]*?\n### /u.exec(spec)?.[0] ?? "";
     expect(section, "§4k.5 exists").not.toBe("");
-    const rows = [...section.matchAll(/^\|\s*\*\*([a-z]+)\*\*\s*\|([^|]*)\|([^|]*)\|([^|]*)\|/gmu)]
+    const rows = [...section.matchAll(/^\|\s*\*\*([a-z]+)\*\*\s*\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|/gmu)]
       .map((m) => ({
         axis: m[1]!,
         field: m[2]!.trim(),
         renderer: m[3]!.trim(),
         carriers: m[4]!.trim(),
+        survives: m[5]!.trim(),
+      }));
+    // **The sites table** (I71): a site carrying an axis differently from its
+    // row — six cells, the second naming the axis. Two words allowed in the
+    // name, which is what keeps the axis rows' single-word pattern from
+    // reading it.
+    const sites = [...section.matchAll(/^\|\s*\*\*([a-z]+ [a-z]+)\*\*\s*\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|/gmu)]
+      .map((m) => ({
+        axis: m[1]!,
+        field: m[3]!.trim(),
+        renderer: m[4]!.trim(),
+        carriers: m[5]!.trim(),
+        survives: m[6]!.trim(),
       }));
 
     // **Equal as sets, both ways.** An axis added to the design fails until it
@@ -1878,20 +1891,29 @@ describe("C10 I52 — the registry's state axes and the spec's declarations", ()
     expect(rows.map((r) => r.axis).sort(), "§4k.5's rows and the registry's axes")
       .toEqual(registry.stateAxes.map((a) => a.id).sort());
 
-    // **The independence rule, and it is the whole of the gate.** A carrier
-    // either survives 1-bit or it does not: `mark`, `word`, `weight`,
-    // `position` and `inverse` do; `tone` and `ground` do not. A pair drawn
-    // from the second set is one carrier written twice, which is what
-    // R-COR-003 forbids and what nothing in this tree could previously say.
-    const DIES = ["tone", "ground"];
-    const violates = (carriers: string): boolean => {
-      const named = DIES.filter((c) => new RegExp(`\\b${c}\\b`, "u").test(carriers));
-      // Only a pair is a violation: one of them beside a surviving carrier is
-      // the normal case and is most of the table.
-      return named.length === DIES.length;
+    // **The gate counts per fact** (I71, ruling 69). The carriers are a
+    // `+`-separated list over a closed vocabulary: a word the gate does not
+    // know is refused rather than counted, and `tone + ground` fails because
+    // nothing in it survives 1-bit — not by a special case. The surviving
+    // carrier must be NAMED in the row's *survives* column, which is why that
+    // column says `mark and word` and not `both`: `both` was satisfied by any
+    // row and said nothing about which.
+    const SURVIVE = ["mark", "word", "weight", "position", "inverse", "border"];
+    const DIE = ["tone", "ground"];
+    const carriersOf = (text: string): string[] => text.split("+").map((c) => c.trim());
+    const failure = (row: Readonly<{ carriers: string; survives: string }>): string | null => {
+      const named = carriersOf(row.carriers);
+      const unknown = named.filter((c) => !SURVIVE.includes(c) && !DIE.includes(c));
+      if (unknown.length > 0) return `unknown carrier ${JSON.stringify(unknown)}`;
+      if (new Set(named).size < 2) return "fewer than two distinct carriers";
+      const lead = row.survives.split(" — ")[0] ?? "";
+      const surviving = named.filter((c) => SURVIVE.includes(c) && new RegExp(`\\b${c}\\b`, "u").test(lead));
+      if (surviving.length === 0) return "no carrier that survives 1-bit is named as surviving";
+      return null;
     };
 
     let withSubject = 0;
+    const failing: string[] = [];
     for (const row of rows) {
       if (row.carriers.includes("no subject")) {
         // **An axis with no subject cannot lose a carrier**, so demanding two
@@ -1904,33 +1926,35 @@ describe("C10 I52 — the registry's state axes and the spec's declarations", ()
       withSubject += 1;
       expect(row.field, `${row.axis}: names a field`).not.toBe("");
       expect(row.renderer, `${row.axis}: names the renderer that reads it`).toMatch(/\.ts:\d+|T2\.\d+|\.ts`/u);
-      expect(violates(row.carriers), `${row.axis}: tone and ground are one carrier written twice`).toBe(false);
+      if (failure(row) !== null) failing.push(row.axis);
     }
+    for (const site of sites) {
+      expect(site.renderer, `${site.axis}: names the renderer that reads it`).toMatch(/\.ts:\d+/u);
+      if (failure(site) !== null) failing.push(site.axis);
+    }
+
+    // **The exception list, by equality** (I71). A second exception cannot
+    // join quietly, and this one cannot stay once it is carried.
+    expect(failing.sort(), "the rows that fail the gate are exactly the ruled exceptions").toEqual(["prompt selection"]);
 
     // The population is measured, not quoted — ten of the twelve have a
     // subject, and a table that lost them all would otherwise pass.
     expect(withSubject, "axes with a subject in this tree").toBe(10);
     expect(rows.length - withSubject, "and the two with none").toBe(2);
+    expect(sites.map((s) => s.axis), "the sites table was read").toEqual(["prompt selection"]);
 
-    // **The fabricated violation, because the shipped table contains no such
-    // pair** — a rule with nothing to be wrong about passes exactly like one
-    // that is satisfied, and the control is the only thing that tells them
-    // apart. Both directions: the forbidden pair fails, and a pair that merely
-    // contains one of them does not.
-    expect(violates("tone + ground"), "the forbidden pair").toBe(true);
-    expect(violates("mark + tone"), "one of them, beside a carrier that survives").toBe(false);
-    expect(violates("word + border"), "neither").toBe(false);
-
-    // **Every single-carrier row cites the file that declares it**, so the
-    // exception cannot be taken by writing one here. **The population is empty
-    // at this commit**: `choice` took its weight (C09 I132, ruling 54) and
-    // `selection` its rail (C14 I58, ruling 68), which were the two, so this
-    // loop runs over nothing today. It stays because the commitment (47) still
-    // grants a cited exception, and the mutation run `c10-carriers` is what
-    // shows it live — it writes an uncited `alone` row and expects this to fail.
-    for (const row of rows.filter((r) => r.carriers.includes("alone"))) {
-      expect(row.renderer, `${row.axis}: a single carrier cites its declaration`).toMatch(/\.ts:\d+/u);
-    }
+    // **The fabricated violations, both ways**, because the shipped table
+    // passes: a rule with nothing to be wrong about passes exactly like one
+    // that is satisfied. `mark` alone is disclosure before ruling 69, which
+    // the old gate passed because it was never written `alone`.
+    const row = (carriers: string, survives: string) => ({ carriers, survives });
+    expect(failure(row("mark", "mark")), "one carrier").not.toBeNull();
+    expect(failure(row("mark + mark", "mark")), "one carrier written twice").not.toBeNull();
+    expect(failure(row("tone + ground", "tone")), "the forbidden pair — nothing survives").not.toBeNull();
+    expect(failure(row("mark + glow", "mark")), "a carrier the gate does not know").not.toBeNull();
+    expect(failure(row("mark + tone", "tone — the mark is gone")), "the surviving carrier not named").not.toBeNull();
+    expect(failure(row("mark + tone", "mark — the head")), "one surviving, named").toBeNull();
+    expect(failure(row("word + border", "word and border")), "both surviving, named").toBeNull();
   });
 
   it("T2.52 (I52, §4k.4, M11, R-STA-001): the axes and the declarations are equal as sets", () => {
