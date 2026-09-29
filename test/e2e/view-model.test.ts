@@ -68,7 +68,11 @@ function region(frame: readonly string[]): readonly string[] {
   // sits between the region and the prompt, and a slice that kept it captured
   // the rule as the document's last row — equal on the first screen, so the
   // walk was one.
-  return frame.slice(2, at - 1).map((r) => r.trimEnd());
+  // **Less the margin column** (C14 I62): the transcript's bar is drawn there
+  // whenever it overflows, and its thumb moves with every page — so a row
+  // compared across two screens differs in its last cell by design. The
+  // document is the columns before it.
+  return frame.slice(2, at - 1).map((r) => [...r].slice(0, -1).join("").trimEnd());
 }
 
 /**
