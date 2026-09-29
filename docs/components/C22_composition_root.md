@@ -2844,6 +2844,11 @@ argument; *named* is `/watch <back>`, counted from the end as `/debug` counts (C
 - **The status line's `⋯ 2 watching`** is not drawn; the row itself is the count.
 - **A pointer on the row** does nothing: C16 §4's mouse table reaches chrome last and has no
   chrome target, and the keys are the route the record names.
+- **A submission settling takes focus off the row** — C23's submit row ends in `resetFocus()`
+  (C16 I2), so a verb typed before `⇧⇥` returns the reader to the prompt when it settles. That is
+  `liveBlock`'s behaviour one position over, and a consistent picture decides it (C16 I76); the
+  build found it, not the walk, because §6p.3 traced the watched entry's changes and not a second
+  submission's.
 - **An entry with no `progress` block shows its name alone** — §036's elapsed carrier is the
   entry's own card head, which the row does not repeat.
 
@@ -3705,7 +3710,7 @@ PTY harness.
 - **T4.110** (I135, I136, I137, I139, I140, C16 I76): through a built session with a streaming fixture verb — `/watch` appends `watching …` and the footer gains `chrome.watches` above the owner line, which reads `⇧⇥ watches`; the stream patches its `progress` block and the chip's percentage follows on the next frame; `⇧⇥` puts `›` on the chip and the owner line names `move`, `open` and `prompt`; `⏎` puts focus on the watched entry and the row stays; the settle removes the row.
 - **T4.111** (I135, I126, C01 I23): `CALCIUM_NOTIFY=bell`, `ESC [ O`, a watched entry settling after 2 s — `BEL` once; the same with no `/watch` — nothing (**the control**: the watched row, not the duration, rang). A session with nothing opted in still draws the row after `/watch`: the set is the session's.
 - **T4.112** (I136, C23 I5, §6p.5): an invoke holding the guard; `/watch` shows `queued behind`; after the invoke settles it answers `nothing is running to watch` and the footer never drew a row.
-- **T4.113** (I137, C16 I76, `R-COR-002`): the row focused on its only watch; the entry settles — the active target is still `watchRow`, the row reads `nothing watched`, `esc` returns to the prompt and the row goes. A question raised over the focused row takes the keys and the row draws no `›` until it is answered.
+- **T4.113** (I137, C16 I76, `R-COR-002`): the row focused on its only watch; the entry settles — the active target is still `watchRow`, the row reads `nothing watched`, `esc` returns to the prompt and the row goes. A question raised over the focused row takes the keys and the row draws no `›` until it is answered, and has it again after — **and the asking verb's own settle then returns focus to the prompt**, C23's submit-row reset (C16 I2, I76), as it would from `liveBlock`.
 - **T4.109** (C16 I68): through a built graph, `> notes` `⏎` submits nothing — no entry is appended for it and the runner is never called — appends one `warn` notice and keeps the line; `ls > notes` `⏎` is submitted. **The control is the second half**: a guard that refused every line containing `>` passes the first alone.
 - **T4.98** (I117, C04 §3aq E5): a press on the divider's column, a motion report with button 0 held five columns to the right, then the release — the divider is five cells right on the frame and focus is where it was. A motion report after the release moves nothing.
 - **T6.113** (I101): the range split dropped from the slot → T4.89a renders every kept child; the gap row dropped from the assembly → T4.89b fails on the first `gapBefore` child.
