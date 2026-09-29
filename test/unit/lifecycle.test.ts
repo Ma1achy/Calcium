@@ -797,4 +797,7 @@ describe("C01 the OSC text payloads (I26)", () => {
     // passes whole — the arm is about the twelve, not about a script.
     expect(windowTitle("\u05D0\u05D1")).toBe("\x1b]2;\u05D0\u05D1\x07");
   });
+
+  it.todo("T1.34 (C01 I26): ESC [ 2 J reaches a title and a notification as ^[[2J, and C0, DEL, C1, tab and newline are shown in caret form — not deferred on a component: lands with the F1458 code commit of review batch 4");
+  it.todo("T1.35 (C01 I26): over every BMP code unit, neither payload holds a C0, DEL or C1 code unit or a bidi format character — not deferred on a component: lands with the F1458 code commit of review batch 4");
 });

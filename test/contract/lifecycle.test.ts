@@ -277,4 +277,6 @@ describe("C01 the OSC text payloads (I26)", () => {
     // The control: a comparison over nothing agrees too.
     expect(count, "ruling 71's twelve").toBe(12);
   });
+
+  it.todo("T2.13 (C01 I26): the restated caret form in escapes.ts equals data/text.ts's controlForm over every BMP code point, tab and newline excepted — not deferred on a component: lands with the F1458 code commit of review batch 4");
 });

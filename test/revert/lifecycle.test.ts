@@ -296,3 +296,7 @@ describe("C01 fail-on-revert, the clipboard (I25)", () => {
     expect(clipboardWrite(" "), "control: a space is a copy").not.toBeNull();
   });
 });
+
+describe("C01 fail-on-revert, the OSC text payloads (I26)", () => {
+  it.todo("T6.26 (C01 I26): oscText's control arm put back to deleting → T1.34 fails on the residue — not deferred on a component: lands with the F1458 code commit of review batch 4");
+});
