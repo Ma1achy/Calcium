@@ -57522,3 +57522,38 @@ Found by the b4-clip lane's C14 §6e table, row K3. The footer asked `hasClipboa
 so with OSC 52, no tool and a selection past the cap it drew `⏎ copy`, and the press wrote a file under that
 label. The offer is now a property of the selection's text: the footer and the press read one function,
 `fileOffer(() => text)`, and cannot disagree (9e2f1983).
+
+## F1430 — C23's running card labels a two-word verb with its own second word ★★☆☆☆
+
+Found by the b4-demo lane reading every stats still. `/container stats worker` draws its running card as
+`container stats(stats worker)`: `src/shell/execution.ts:1248` builds the arguments with `result.argv.slice(1)`,
+where line 2002 slices by `verb.split(" ").length`. Every two-word verb's card carries its second word twice. Not
+fixed; framework code, and in every stats still.
+
+## F1431 — a stopped container's history row was labelled by its id ★★☆☆☆
+
+Found by the b4-demo lane's world. `nameOf` in `examples/docker/src/dashboard.ts` searched only live containers,
+so the exited `migrate` drew as `d345037c112a` in the CPU history. Fixed in the example (5f441d9d); W6 holds it and
+fails on revert.
+
+## F1432 — the real `/logs` loses its first nine lines ★★★☆☆
+
+Found by the b4-demo lane building the logs shot. C07 drops `malformed` lines until a `degraded` patch arrives, and
+C06 degrades only after ten lines (`DEGRADE_FLOOR`), so the first nine plain-text log lines of a real `docker logs`
+never reach the transcript. The fixture inserts `degraded` itself after line 9 — a copy of C06's rule that can drift
+from it. Not fixed in the framework.
+
+## F1433 — the stats entry is about 41 rows, and clearing first does not keep its top on a 34-row screen ★★☆☆☆
+
+Found by the b4-demo lane. `/container stats` draws an entry of about 41 rows, so at 34 rows its top scrolls off.
+The regeneration note held that clearing before the shot keeps it; measured, it does not. The stills now record at
+46 rows; the 34-row screencast still clips the top of that beat.
+
+## F1434 — the public repository's history and tree carry the host's docker data ★★★★☆
+
+Found by the b4-demo lane. Earlier media commits held host paths, host memory figures, a linuxkit kernel and `vsc-`
+devcontainer names (`scroll.cast`). In the tree today, and on `origin/main` since 2026-08-05 in a public repository:
+`examples/docker/test/corpus/*-real.*` — `images-real.ndjson` lists the host's images, including other projects'
+devcontainer images by name, and `top-real.txt` a container's process table — and `docs/media/menu-over-diff.gif`,
+which the fixture mode cannot regenerate. The new media draw nothing of the machine (checked by pattern over every
+cast and by reading frames). Scrubbing the tree and rewriting published history are the person's decision.
