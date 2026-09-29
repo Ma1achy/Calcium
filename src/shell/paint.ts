@@ -32,6 +32,7 @@
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import type { Motion, RenderScratch } from "../presentation/blocks/types.js";
 import { cells, fitStyled, hardWrapCells, sliceCells } from "../presentation/text.js";
+import { neutraliseControl } from "../data/text.js";
 import {
   background,
   based,
@@ -393,7 +394,16 @@ export function commandRows(
   // near the bottom, scrolling the alternate screen. Each line is wrapped on
   // its own, as the prompt draws the same buffer. A blank line keeps its row
   // because `hardWrapCells("")` is `[""]`, not `[]`.
-  const wrapped = command.split(/\r\n|\r|\n/u).flatMap((line) => hardWrapCells(line, body));
+  //
+  // **Neutralised before it is wrapped** (I33 amended, C17 I36, F1401). The
+  // command is the reader's line and this row is not a block, so C09 I127's
+  // resolve never sees it: a bidi override typed at the prompt was written raw
+  // here and reordered the echo. Before the wrap, so the `<U+202E>` form's
+  // eight cells are in the height the measurer takes from this same function.
+  // `entry.doc.command` keeps the character; only the row shows it.
+  const wrapped = command
+    .split(/\r\n|\r|\n/u)
+    .flatMap((line) => hardWrapCells(neutraliseControl(line), body));
   const prompt = promptFor(caps);
   return wrapped.map((row, i) =>
     (i === 0 ? prompt : " ".repeat(PROMPT_GUTTER.cont)) + row,

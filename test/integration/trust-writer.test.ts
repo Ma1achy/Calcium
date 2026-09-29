@@ -53,7 +53,7 @@ function strangers(bytes: string): string[] {
 }
 
 describe("C09 §7d — the writer", () => {
-  it("T4.107 (C09 I131, C09 I127, R-TRU-001): every ESC a poisoned session writes opens a sequence of escapes.ts's vocabulary, no C1 is written, and raw bidi only on the typed line", async () => {
+  it("T4.107 (C09 I131, C09 I127, R-TRU-001): every ESC a poisoned session writes opens a sequence of escapes.ts's vocabulary, no C1 is written, and no raw bidi at all", async () => {
     vi.useFakeTimers();
     const stdin = fakeStdin();
     const tool = (name: string) => ({ name, local: true, summary: name, args: [], flags: [] });
@@ -111,6 +111,17 @@ describe("C09 §7d — the writer", () => {
     // was drawn, as text. Without this, a session that drew nothing reads clean.
     expect(bytes, "the payload reached the frame, shown as an escape").toContain("^[]52;c;cHduZWQ=^G");
     expect(bytes, "the typed override reached the head, shown").toContain("<U+202E>gpj.exe");
+    // **And both rows that used to carry it raw** (F1401): the prompt while it
+    // is typed, at column 0, and the echo past the rail's column (C14 I57).
+    // Without these a session that drew neither row reads clean below.
+    const drawnOn = (lead: RegExp): boolean =>
+      [...bytes.matchAll(/<U\+202E>gpj\.exe/gu)].some((hit) => {
+        const at = hit.index;
+        const moved = Math.max(bytes.lastIndexOf("H", at), bytes.lastIndexOf("G", at));
+        return lead.test(bytes.slice(moved + 1, at).replace(/\u001b\[[0-9;]*m/gu, ""));
+      });
+    expect(drawnOn(/^\u276f \/show $/u), "the prompt row shows the form").toBe(true);
+    expect(drawnOn(/^ \u276f \/show $/u), "the echo shows the form").toBe(true);
     expect(bytes, "the error's message reached the frame").toContain("failed ^[]52;");
 
     expect(strangers(bytes), "an ESC opening a sequence outside the writer's vocabulary").toEqual([]);
@@ -119,23 +130,19 @@ describe("C09 §7d — the writer", () => {
       return cp >= 0x80 && cp <= 0x9f;
     });
     expect(c1.map((ch) => (ch.codePointAt(0) ?? 0).toString(16)), "a C1 code point in the written bytes").toEqual([]);
-    // **Raw bidi only on the reader's own typed line** (C09 I131's stated
-    // exception). The prompt being edited and the command echo `commandRows`
-    // draws both write the typed text unneutralised; neither is a block, so the
-    // registry never sees them. Each raw character is attributed to the row it
-    // was written on — the text since the last cursor move — and **the set of
-    // sites is compared by equality**, so the day the typed line is neutralised
-    // this row fails and asks to be tightened to *none*.
+    // **No raw bidi at all** (C09 I131, amended). This row held the site set
+    // equal to *the reader's own typed line* — the prompt and the echo, which
+    // are not blocks and wrote the typed text unneutralised — so that it would
+    // fail the day they were neutralised (F1401). They are (C17 I36, C22 I33),
+    // and the set is now empty. Each character is still attributed to its row,
+    // so a failure names where it was written.
     const sites = new Set<string>();
     for (const hit of bytes.matchAll(/[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu)) {
       const at = hit.index;
       const moved = Math.max(bytes.lastIndexOf("H", at), bytes.lastIndexOf("G", at));
-      const row = bytes.slice(moved + 1, at).replace(/\u001b\[[0-9;]*m/gu, "");
-      // The echo is drawn past the rail's reserved column 0 (C14 I57) and the
-      // prompt at column 0, so exactly one leading blank is the echo's.
-      sites.add(/^ ?\u276f \/show /u.test(row) ? "the typed line" : `elsewhere: ${JSON.stringify(row.slice(-40))}`);
+      sites.add(JSON.stringify(bytes.slice(moved + 1, at).replace(/\u001b\[[0-9;]*m/gu, "").slice(-40)));
     }
-    expect([...sites], "raw bidi written somewhere other than the reader's own typed line").toEqual(["the typed line"]);
+    expect([...sites], "raw bidi written, by the row it was written on").toEqual([]);
     for (const needle of [`${ESC}]52`, `${ESC}]0;`, `${ESC}[6n`]) {
       expect(bytes.includes(needle), `${JSON.stringify(needle)} written`).toBe(false);
     }

@@ -33,6 +33,7 @@ import { graphemes } from "./graphemes.js";
 // different subjects. Shadowing them was a compile error rather than a silent
 // one, which is the one direction this collision could have gone well.
 import { cells as widthOf, truncate } from "../../presentation/text.js";
+import { neutraliseControl } from "../../data/text.js";
 
 export type Gutter = Readonly<{ first: number; cont: number }>;
 
@@ -180,7 +181,12 @@ export function chipLabel(chip: Chip, look: ChipLook, limit?: number): string {
   // Minting is untouched — the number is still the map's key — and this is only
   // whether the label spends cells on it.
   const mark = chip.kind === "file" ? "" : `#${String(chip.ordinal)} `;
-  const text = `${mark}${chip.name}${size}`;
+  // **The name shown, not carried** (I36, §5g). A chip's parts come from a
+  // producer, and a file chip's name is a filename — far-side text, drawn in a
+  // row no block resolve reaches. Neutralised here, before it is measured or
+  // cut, so the elision below cuts the `<U+202E>` form as text and the label
+  // is exactly its width; `chipAt` and `resolved` keep the name as it is.
+  const text = `${mark}${neutraliseControl(chip.name)}${size}`;
   // The space either side is the ground's, so it belongs to the painted rung
   // alone — a bracketed label padded as well would be a chip inside a chip.
   const frame = (inner: string): string => (look.painted ? ` ${inner} ` : `[${inner}]`);
@@ -273,7 +279,18 @@ export function walk(
       // measuring the sentinel and drawing the label gives a prompt whose wrap
       // and whose cursor disagree with the frame, and every grapheme-index
       // assertion passes either way.
-      let shown = drawAs?.(cluster) ?? cluster;
+      //
+      // **What a cluster no `drawAs` substitutes draws as** (I36, §5g): itself,
+      // unless it is a bidi format character, which draws as its `<U+202E>`
+      // form (C09 I128). The prompt is not a block, so C09 I127's resolve never
+      // reaches it, and a raw override reorders the row it is typed into. Here
+      // rather than in the buffer, because the buffer is the reader's input and
+      // is submitted as typed; here rather than in the painter, because all
+      // five callers of this walk must see the eight cells or the caret, the
+      // wash and the wrap each disagree with the row. Each bidi character is a
+      // grapheme of its own (`GCB=Control`), so the form is one position.
+      const chip = drawAs?.(cluster);
+      let shown = chip ?? neutraliseControl(cluster);
       // **`cells`, not `clusterWidth`, and the reason is here because the next
       // person will have the same true thought.** `clusterWidth` measures a
       // cluster **by its base code point** — correct for a cluster, and wrong
@@ -302,7 +319,7 @@ export function walk(
       // thing that knows the width it got; a typed cluster is the user's and
       // overflows. Asked a second time, with the limit, only here — so the
       // walk still calls `drawAs` once per cluster on every row that fits.
-      if (w > limit && shown !== cluster && drawAs !== undefined) {
+      if (w > limit && chip !== undefined && drawAs !== undefined) {
         shown = drawAs(cluster, limit) ?? shown;
         w = widthOf(shown);
       }
@@ -311,7 +328,10 @@ export function walk(
       // never passes its row (I32), so the clamp is a guard rather than a rule:
       // it binds only where `width` is at or inside the gutter and `usable` is
       // floored at 1 (§7b) — no cells past the width to paint.
-      if (shown !== cluster) {
+      //
+      // **A chip's, and only a chip's** (I36): `shown !== cluster` is true of a
+      // neutralised bidi character too, and would paint it a chip's ground.
+      if (chip !== undefined) {
         const from = gutterAt(at(), gutter) + used;
         (chips ??= []).push(Object.freeze({ row: at(), from, to: Math.min(from + w, width) }));
       }

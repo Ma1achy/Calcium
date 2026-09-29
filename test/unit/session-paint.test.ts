@@ -1381,5 +1381,20 @@ describe("C22 I33 — a command of several lines", () => {
 });
 
 describe("C22 I33 — the echo neutralised (F1401)", () => {
-  it.todo("T1.179 (C22 I33, C17 I36): commandRows draws U+2066 and U+202E as their forms, no row holds a bidi format character, and the height counts the forms' cells — not deferred on a component: lands with the F1401 code commit of review batch 4");
+  it("T1.179 (C22 I33, C17 I36): commandRows draws U+2066 and U+202E as their forms, no row holds a bidi format character, and the height counts the forms' cells", () => {
+    // Escapes, never literals (A03 SS69).
+    const typed = "/show a\u2066b\u202ec";
+    const bidi = /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u;
+    expect(commandRows(typed, 30, FULL_CAPS)).toEqual(["❯ /show a<U+2066>b<U+202E>c"]);
+    // **The height counts the forms.** At 20 columns the body is 18: the raw
+    // line measures 9 cells and would be one row, the drawn one is 25 and is
+    // two — and the measurer calls this same function (C14 I20).
+    const narrow = commandRows(typed, 20, FULL_CAPS);
+    expect(narrow, "two rows, the form's cells counted").toEqual(["❯ /show a<U+2066>b<U", `${" ".repeat(PROMPT_GUTTER.cont)}+202E>c`]);
+    for (const r of [...narrow, ...commandRows(typed, 30, FULL_CAPS)]) {
+      expect(bidi.test(r), `${JSON.stringify(r)} holds a bidi character`).toBe(false);
+    }
+    // **The control**: a clean command's rows are unchanged.
+    expect(commandRows("/show abc", 20, FULL_CAPS)).toEqual(["❯ /show abc"]);
+  });
 });

@@ -78,6 +78,7 @@ import { pacedSchedule } from "./paced-schedule.js";
 import { RenderScratchStore } from "./render-scratch.js";
 import type { BoxSpan, DragContainer } from "./drag-selection.js";
 import { barTarget, pullIntoView } from "./pull.js";
+import { neutraliseControl } from "../data/text.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
 import { waitingEntries } from "./semantic-selection.js";
 import { createOverlayManager, takesPointer, type Layer, type Placed } from "../viewport/overlay/index.js";
@@ -1986,7 +1987,8 @@ export async function constructGraph(
     // …and the linear stream is told the line as the prompt draws it (I90).
     drawn: () => {
       let out = "";
-      for (const ch of stores.editor.text) out += stores.editor.drawAs(ch) ?? ch;
+      // A bidi character as its form, as the prompt's walk draws it (C17 I36).
+      for (const ch of stores.editor.text) out += stores.editor.drawAs(ch) ?? neutraliseControl(ch);
       return out;
     },
     // C23 I89 — `esc` in a reply keeps the line for the next `reply…`.

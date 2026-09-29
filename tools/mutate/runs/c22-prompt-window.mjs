@@ -100,8 +100,11 @@ const MUTATIONS = [
     // terminal moving down mid-row.
     name: "the command echo wraps the command whole",
     file: PAINT,
-    from: "  const wrapped = command.split(/\\r\\n|\\r|\\n/u).flatMap((line) => hardWrapCells(line, body));",
-    to: "  const wrapped = hardWrapCells(command, body);",
+    // Re-anchored on review batch 4 (F1401): the chain now neutralises each
+    // line (C17 I36), so the anchor is the split alone and the revert makes the
+    // whole command one line.
+    from: "  const wrapped = command\n    .split(/\\r\\n|\\r|\\n/u)\n",
+    to: "  const wrapped = [command]\n",
     expect: "T1.172 (C22",
   },
 ];

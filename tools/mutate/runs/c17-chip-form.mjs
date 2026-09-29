@@ -37,8 +37,11 @@ const results = runPass({
     // and a ground fails at once. If this survives, nothing below reaches the
     // walk.
     file: LAYOUT,
-    from: "      let shown = drawAs?.(cluster) ?? cluster;",
-    to: "      let shown = cluster;",
+    // Re-anchored on review batch 4 (F1401): the unsubstituted arm now draws
+    // through `neutraliseControl` (C17 I36), and dropping the chip arm is
+    // still the whole of this control.
+    from: "      let shown = chip ?? neutraliseControl(cluster);",
+    to: "      let shown = neutraliseControl(cluster);",
     why:
       "the sentinel draws as itself, so no label, no span and no ground exist — "
       + "if this survives, the rows are not reading the walk they think they are",
@@ -59,8 +62,10 @@ const results = runPass({
       // so a label wider than its row is drawn whole and the painter clips it.
       name: "T6.22: the elision removed — a chip wider than its row overflows it",
       file: LAYOUT,
-      from: "      if (w > limit && shown !== cluster && drawAs !== undefined) {",
-      to: "      if (w > limit && shown !== cluster && drawAs !== undefined && Number.NaN > 0) {",
+      // Re-anchored on review batch 4 (F1401): the gate reads `chip`, since a
+      // neutralised bidi character also differs from its cluster (C17 I36).
+      from: "      if (w > limit && chip !== undefined && drawAs !== undefined) {",
+      to: "      if (w > limit && chip !== undefined && drawAs !== undefined && Number.NaN > 0) {",
       expect: "T1.47",
     },
     {
