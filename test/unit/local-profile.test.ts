@@ -29,6 +29,7 @@ import { pipelineHarness, settled } from "../support/execution.js";
 import { FULL_CAPABILITIES, producerContext } from "../support/producer-context.js";
 import type { ProducerContext } from "../../src/data/adapters/types.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
+import { createWatches } from "../../src/shell/watches.js";
 
 const deps = (
   report: () => ProfileReport | null = () => null,
@@ -55,6 +56,8 @@ const deps = (
   profileReport: report,
   // `/profile` reads no setting either (C23 I80's verb does).
   settings: () => [],
+  // Nor a watch (C22 I136's two verbs do).
+  watches: createWatches(() => undefined),
 });
 
 const ctx = (
@@ -71,8 +74,11 @@ const NO_PROFILER = "no profiler to show — this session was built without `Tui
 
 /** The six the framework shipped before this round, by key. */
 const SIX = ["clear", "debug", "exit", "help", "history", "theme"];
-/** And the three since: `/profile`, `/capabilities` (C22 I125) and `/config` (C23 I80, ruling 43). */
-const NINE = [...SIX, "profile", "capabilities", "config"].sort();
+/**
+ * And the five since: `/profile`, `/capabilities` (C22 I125), `/config` (C23
+ * I80, ruling 43), and `/watch` and `/unwatch` (C22 I136, ruling 50).
+ */
+const SHIPPED = [...SIX, "profile", "capabilities", "config", "watch", "unwatch"].sort();
 
 const run = async (
   handlers: Readonly<Record<string, (argv: readonly string[], c: LocalContext) => LocalDocument | Promise<LocalDocument>>>,
@@ -162,7 +168,7 @@ describe("C23 — /profile, the local route", () => {
     // reader is `() => ProfileReport | null` now, so the arm that answers `null`
     // is the handler's own and the sentence is written where it is read.
     const handlers = shippedHandlers(deps());
-    expect(Object.keys(handlers).sort()).toEqual(NINE);
+    expect(Object.keys(handlers).sort()).toEqual(SHIPPED);
 
     const doc = await run(handlers, []);
     const found = notices(doc.blocks);
@@ -176,7 +182,7 @@ describe("C23 — /profile, the local route", () => {
     // `FRAMEWORK_TOOLS`, so a map that dropped `profile` on any condition is
     // what C23 I27 refuses at startup.
     const accepting = shippedHandlers(deps(() => spiedProfiler("spans").profiler.report()));
-    expect(Object.keys(accepting).sort()).toEqual(NINE);
+    expect(Object.keys(accepting).sort()).toEqual(SHIPPED);
     expect(accepting).toHaveProperty("profile");
   });
 
@@ -373,7 +379,7 @@ describe("C23 — /profile, the local route", () => {
     // gone green the day a verb was dropped from the enum and left the
     // completion menu short of it.
     expect([...(row?.args[0]?.values ?? [])]).toEqual([...SECTIONS, "snapshot", "live", "capture"]);
-    expect(FRAMEWORK_TOOLS.map((t) => t.name).sort()).toEqual(NINE);
+    expect(FRAMEWORK_TOOLS.map((t) => t.name).sort()).toEqual(SHIPPED);
   });
 
   it("T4.66 (C23 I68, C23 I27): a real pipeline over the framework's rows — `/profile framework` appends the section's deck as one entry, and `seal()` accepted the nine", async () => {

@@ -38,6 +38,7 @@ import {
   type BodyDeps,
 } from "./linear.js";
 import { createNotifier } from "./notify.js";
+import { createWatches, watchItem } from "./watches.js";
 import { createLedger, summaryOf, type MarkKind, type Settlement } from "./away.js";
 import { BELL, systemNotification } from "../terminal/escapes.js";
 import type { AskOptions } from "./local/registry.js";
@@ -115,7 +116,7 @@ import {
   frameworkSources,
   MENU_ID,
 } from "../interaction/completion/index.js";
-import { createFocusStore, resolveFocus } from "../interaction/router/focus.js";
+import { createFocusStore, resolveFocus, resolveWatch } from "../interaction/router/focus.js";
 import { chordText, createKeymap, defaultKeymap, RESERVED_ACTIONS } from "../interaction/router/keymap.js";
 import { REGISTRY_BINDINGS } from "../interaction/router/registry-bindings.js";
 import { createRouter, type RouterDeps } from "../interaction/router/router.js";
@@ -261,7 +262,7 @@ async function readOrAbsent(
     return null;
   }
 }
-import type { OwnerHints, Pipeline, StopReason } from "./types.js";
+import type { OwnerHints, Pipeline, StopReason, WatchRowState } from "./types.js";
 
 /**
  * The manifest file, read and decoded — the step that was missing (C22 I23).
@@ -524,6 +525,8 @@ export type Graph = Readonly<{
    * vocabulary, and semantic copy mode's refused interrupt. Read per frame.
    */
   ownerHints: () => OwnerHints;
+  /** C22 I139 — the watches and the row's selection, for the chrome. Read per frame. */
+  watchRow: () => WatchRowState | undefined;
   /**
    * The linear route's writer, or `null` on the rich route (C22 I119). The
    * session hands it every commit instead of composing a frame.
@@ -1705,6 +1708,71 @@ export async function constructGraph(
   const focus = createFocusStore();
 
   /**
+   * **The session's watches** (C22 I135, §6p, ruling 50). Built whether or not
+   * a rung is opted in — the notifier below exists only when one is, and the
+   * footer's row has to exist for every reader.
+   */
+  const watches = createWatches((id) => stores.transcript.entries.find((e) => e.id === id));
+
+  /** `⇧⇥`'s second step and the transcript's way in from the prompt (C16 §6a). */
+  const focusTranscript = (): void => {
+    const id = stores.transcript.liveId ?? stores.transcript.entries.at(-1)?.id ?? null;
+    if (id !== null) focus.enterLiveBlock(id, null);
+  };
+
+  /**
+   * The watch row's keys (C16 I76, I77, C22 I140, §6p).
+   *
+   * **Every step reads the set as it stands**, through `resolveWatch`, so a
+   * watch that dropped since the last key cannot be stepped from or opened.
+   */
+  const watchKeys = Object.freeze({
+    /** `⇧⇥` at the prompt: the row while a watch stands, else the transcript. */
+    focusPrevious: (): void => {
+      const first = watches.ids()[0];
+      if (first === undefined) return void focusTranscript();
+      focus.toWatches(first, 0);
+    },
+    step: (by: 1 | -1): void => {
+      const at = focus.current;
+      if (at.at !== "watches") return;
+      const ids = watches.ids();
+      const i = resolveWatch(at, ids);
+      if (i === null) return;
+      const j = Math.min(Math.max(0, i + by), ids.length - 1);
+      focus.toWatches(ids[j]!, j);
+    },
+    /** `⏎`, or `watch.jump[n]` with `n`: focus lands on the entry, and the watch stands. */
+    open: (n?: number): void => {
+      const at = focus.current;
+      if (at.at !== "watches") return;
+      const ids = watches.ids();
+      const i = n === undefined ? resolveWatch(at, ids) : n - 1;
+      const id = i === null ? undefined : ids[i];
+      // Past the count names no watch: consumed, and nothing moves (I140).
+      if (id === undefined) return;
+      focus.enterLiveBlock(id, null);
+    },
+  });
+
+  /**
+   * `ChromeContext.watches` (C22 I139): present while a watch stands or the row
+   * has focus, the selection only while the row is the active target — a
+   * question over the row takes the keys, and the mark goes with them.
+   */
+  const watchRow = (): WatchRowState | undefined => {
+    const ids = watches.ids();
+    const at = focus.current;
+    if (ids.length === 0 && at.at !== "watches") return undefined;
+    const items = ids.map((id) => {
+      const entry = stores.transcript.entries.find((e) => e.id === id);
+      return entry === undefined ? { id, name: id } : watchItem(entry);
+    });
+    const active = at.at === "watches" && router.rung === "scope";
+    return { items, selected: active ? resolveWatch(at, ids) : null };
+  };
+
+  /**
    * `ctx.ask`'s host (C23 I36, C16 I25).
    *
    * **Before the router and not thunked**, unlike the pipeline: it needs only
@@ -1790,16 +1858,24 @@ export async function constructGraph(
           mark: glyphFor("bullet", notifyCaps),
           separator: glyphs(notifyCaps).separator,
           entryOf: (id) => stores.transcript.entries.find((e) => e.id === id),
+          watched: (id) => watches.has(id),
           bell: () => void lifecycle.writer.write(BELL),
           notify: (text) => void lifecycle.writer.write(systemNotification(text)),
           title: (text) => lifecycle.title(text),
           restoreTitle: () => lifecycle.restoreTitle(),
         });
-  if (notifier !== null) {
-    stores.transcript.subscribe((change) => {
-      if (change.kind === "append" || change.kind === "settle") notifier.settled(change.id);
-    });
-  }
+  /**
+   * **One subscription, two readers, in this order** (C22 I135, §6p.3 row 4):
+   * the notifier reads whether a settling entry was watched, and then the set
+   * drops it. Two subscriptions would make the order a registration sequence
+   * nothing states, and the wrong one silences a watched short end.
+   */
+  stores.transcript.subscribe((change) => {
+    if (change.kind === "clear") return void watches.clear();
+    if (change.kind !== "append" && change.kind !== "settle") return;
+    notifier?.settled(change.id);
+    watches.settled(change.id);
+  });
 
   /**
    * **The away ledger** (C23 I85–I87, ruling 51, R-BLK-314): what settled while
@@ -1981,6 +2057,8 @@ export async function constructGraph(
       capabilitySources: detection.sources,
       // C22 I115 — `/config` reads where each value came from (C23 I80).
       settings: config.settings,
+      // C22 I135, I136 — `/watch` and `/unwatch` fill the session's set.
+      watches,
       // **The report reaches a surface through the local route and no other**
       // (C24 I31, C22 I93). A `/profile` verb is where it is wanted, and
       // `LocalContext` is L4; `ProducerContext` is L0 and putting it there
@@ -3390,10 +3468,8 @@ export async function constructGraph(
       pipeline?.submit(line);
     },
     keepField: () => void commitField(),
-    focusTranscript: () => {
-      const id = stores.transcript.liveId ?? stores.transcript.entries.at(-1)?.id ?? null;
-      if (id !== null) focus.enterLiveBlock(id, null);
-    },
+    focusTranscript,
+    watchKeys,
     editor: stores.editor,
     completion: built.completion,
     overlays: stores.overlays,
@@ -4347,6 +4423,17 @@ export async function constructGraph(
       return true;
     });
 
+    // **The watch row's table rows** (C16 I76, I77, §6d). The router registers
+    // the target's `⌃c` rung and nothing else, so without this every row at the
+    // target is bound and never consulted — `nativeSelection`'s defect above,
+    // arriving a third time, and T1.4h's walk is what found it.
+    router.register("watchRow", (e) => {
+      const effect = bound("watchRow", e);
+      if (effect === null) return false;
+      effect();
+      return true;
+    });
+
     // **Semantic copy mode's three** (C14 §6a, C16 §5d) — `esc` and
     // `R-SEL-008`'s bare `a`/`A`. The same pairing as the target above and for
     // the same reason: the router's own `semanticSelection` rung takes `⌃c`
@@ -4693,6 +4780,7 @@ export async function constructGraph(
     focusedEntryId,
     focusedElements,
     fieldHeld: () => fieldBorrow?.held.line ?? null,
+    watchRow,
     ownerHints: (): OwnerHints => {
       const top = stores.overlays.top?.owner;
       const question = confirm.vocabulary();
@@ -4704,6 +4792,12 @@ export async function constructGraph(
         ...(top?.rung === "substate" ? { substate: top.name } : {}),
         ...(question === null ? {} : { question }),
         ...(copyRefused ? { refused: true } : {}),
+        // C22 I139 — where the watch row stands, for the scope line's chips.
+        ...(focus.current.at === "watches"
+          ? { watchRow: "focused" as const }
+          : watches.ids().length > 0
+            ? { watchRow: "present" as const }
+            : {}),
       };
     },
     linear,

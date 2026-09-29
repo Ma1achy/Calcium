@@ -27,6 +27,7 @@ import type { RefreshHost } from "./refresh.js";
 import type { CompletionSource } from "../interaction/completion/index.js";
 import type { Binding, FocusTarget, KeyAction, ReservedKeyAction } from "../interaction/router/types.js";
 import type { CursorStyle } from "../terminal/escapes.js";
+import type { WatchItem, WatchStore } from "./watches.js";
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore } from "../interaction/history/types.js";
 import type { CommandPolicy } from "../interaction/parser/index.js";
@@ -216,6 +217,26 @@ export type ChromeContext = Readonly<{
    * for a session that rebinds nothing and the only one before the graph exists.
    */
   hints?: OwnerHints;
+  /**
+   * The session's watches and the row's selection (C22 I139, §6p, ruling 50).
+   *
+   * **Handed to an application's own footer as `copy` and `toast` are**: the row
+   * is the default footer's drawing of a session fact, and a footer the
+   * application supplies draws it or does not. Present while a watch stands or
+   * the row has focus; `items` oldest first; `selected` is the row's index while
+   * the watch row is the active target and `null` otherwise — a question over
+   * the row takes the keys, and the mark goes with them (§6p.3 row 8).
+   */
+  watches?: WatchRowState;
+}>;
+
+/** One watch as a footer draws it (C22 I137, I139). */
+export type { WatchItem } from "./watches.js";
+
+/** `ChromeContext.watches` (C22 I139). */
+export type WatchRowState = Readonly<{
+  items: readonly WatchItem[];
+  selected: number | null;
 }>;
 
 /**
@@ -233,6 +254,13 @@ export type OwnerHints = Readonly<{
   substate?: "find" | "complete" | "preview";
   question?: Readonly<{ state: "choice" | "reply" | "inspection"; resolvesTo: string }>;
   refused?: boolean;
+  /**
+   * Where the watch row stands for the scope line (C22 I139): `present` while a
+   * watch stands and focus is elsewhere — `⇧⇥` then goes to the row, and the
+   * chip says `watches` — and `focused` while the row has the keys, where the
+   * line names the row's own. Absent is *no row*.
+   */
+  watchRow?: "present" | "focused";
 }>;
 
 export type ChromeFn = (ctx: ChromeContext) => readonly Block[];
@@ -552,6 +580,12 @@ export type PipelineDeps = Readonly<{
    * session was built from rather than resolving it a second time.
    */
   settings: readonly Setting[];
+  /**
+   * The session's watches (C22 I135), for `/watch` and `/unwatch` (I136) —
+   * handed down as `settings` is: the composition root owns the set, because
+   * the notifier and the footer read it too.
+   */
+  watches: WatchStore;
   /**
    * One operation from C28's recorder, for `/profile capture` (C28 I64).
    *

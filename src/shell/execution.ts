@@ -203,6 +203,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // a wiring site that may omit a member is a wiring site that will, and
       // the verb would then answer *no profiler* in a session that has one.
       profileCapture: deps.profileCapture ?? null,
+      // C22 I135 and C22 I136 — the session's watches, whose producers the two verbs are.
+      watches: deps.watches,
     }),
   )) {
     local.register(verb, handler);

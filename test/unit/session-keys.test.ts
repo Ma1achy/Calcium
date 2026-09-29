@@ -266,6 +266,9 @@ describe("C22 §3 step 11 — the effect table", () => {
       // leaves the mode alone — the row would fail for a reason that has nothing
       // to do with whether its effect exists, which is `child`'s argument above.
       if (b.target === "interaction") enterInside(graph);
+      // **The watch row is a stored location** (C16 I76): without it the row's
+      // digits are typed into the editor, which is the `child` argument again.
+      if (b.target === "watchRow") graph.focus.toWatches("w", 0);
       // **The `copy` rung's two targets, and they were unreachable** (C16 I50).
       // `FRAME` hard-wired both flags to `false`, so no row at either could
       // resolve — and `nativeSelection`'s `escape` row passed anyway, consumed
@@ -290,6 +293,7 @@ describe("C22 §3 step 11 — the effect table", () => {
       // `keepField` after it — a no-op with no field held — the walk stayed
       // inside and every `liveBlock` row after it resolved at `interaction`.
       if (b.target === "interaction") graph.focus.setMode("navigate");
+      if (b.target === "watchRow") graph.focus.reset();
       COPY_MODES.native = false;
       COPY_MODES.semantic = false;
       graph.editor.clear();
@@ -401,6 +405,7 @@ describe("C22 §3 step 11 — the effect table", () => {
       keepField: () => undefined,
       runAction: () => undefined,
       focusTranscript: () => undefined,
+      watchKeys: { focusPrevious: () => undefined, step: () => undefined, open: () => undefined },
       // C16 I49 — the child's one exit. Counted here rather than stubbed
       // silent, because this harness is the one that walks every action.
       detachChild: () => undefined,

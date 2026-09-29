@@ -29,6 +29,7 @@ export {
   TICK_MS,
   spinnerSetNames,
   barStyleNames,
+  barStyle,
   GLYPH_DOMAINS,
   GLYPH_SET_DOMAINS,
   GLYPH_SUBSTITUTIONS,

@@ -177,10 +177,12 @@ describe("C05 I27, I28 fail-on-revert", () => {
     }
   });
 
-  it("T6.18 (I28): seeding the collision set from FRAMEWORK_NAMES alone → T1.25 fails", () => {
-    // Without the reservation an app declaring `watch` parses, and the day
-    // `/watch` ships that app stops starting — the break §3 describes, moved
-    // from now, when it costs nothing, to then.
+  it("T6.18 (I28, I6): the `watch` and `unwatch` rows removed from FRAMEWORK_TOOLS with RESERVED_VERBS left empty → T1.25 fails", () => {
+    // The reservation was spent when the verbs were built (ruling 50): the
+    // names are framework rows now, and the collision is a shipped verb's. If
+    // the rows went and nothing re-reserved them, an app declaring `watch`
+    // would parse into the name the framework's verb answers — the break the
+    // reservation existed to move earlier, arriving again.
     const source = raw();
     (source["tools"] as Record<string, unknown>[]).push({ name: "watch", local: false, summary: "mine", args: [], flags: [] });
     expect(parseManifest(source).ok).toBe(false);

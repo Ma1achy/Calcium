@@ -103,6 +103,15 @@ export type FocusTarget =
    */
   | "interaction"
   | "prompt"
+  /**
+   * The footer's watch row (C16 I76, §6d, ruling 50, §085).
+   *
+   * **A position of the `scope` rung, not a rung of its own** — the registry's
+   * A WATCH record says *the footer is not a scope*, and the row raises no
+   * owner: it is where the reader's keys are while they stand in it, as
+   * `liveBlock` is. `RUNG_OF` maps it to `scope`.
+   */
+  | "watchRow"
   | "liveBlock"
   | "global";
 
@@ -158,6 +167,7 @@ export const RUNG_OF: Readonly<Record<Exclude<FocusTarget, "global">, OwnerRung>
   panel: "substate",
   interaction: "inside",
   prompt: "scope",
+  watchRow: "scope",
   liveBlock: "scope",
 });
 
@@ -297,7 +307,19 @@ export type StoredFocus =
        */
       anchor: ElementAddress | null;
       mode: "navigate" | "interact";
-    }>;
+    }>
+  /**
+   * On the footer's watch row (C16 I76, §6d).
+   *
+   * **By id, with the index beside it**, because the row's members go away on
+   * their own — a watch drops at its entry's settle (C22 I130) — and neither
+   * half answers alone. The id keeps the selection on its watch when one ahead
+   * of it drops; the index says where to land when the selected one itself
+   * drops, which an id that no longer exists cannot (C26 I10's *nearest
+   * survivor forward*, on a row). When the last watch drops the id names
+   * nothing and the index resolves to nothing, and focus stays (`R-COR-002`).
+   */
+  | Readonly<{ at: "watches"; id: string; index: number }>;
 
 export type InputEvent =
   | Readonly<{
@@ -545,6 +567,29 @@ export type KeyAction =
   // feature arrives needing a key that is gone.
   | "helpKeymap"
   | "focusTranscript"
+  // --- the watch row (C16 I76, I77, §6d, ruling 50) --------------------------
+  //
+  // **`focusPrevious` is `⇧⇥` at the prompt**, and it was `focusTranscript`'s
+  // row until the row existed: it goes to the watch row while a watch stands
+  // and to the transcript otherwise, so the old name would have been a lie on
+  // exactly the frames it matters. `focusTranscript` keeps its meaning at the
+  // row's own `⇧⇥` — backward past the row.
+  //
+  // **Nine jump names, because an effect takes no key** — `agent1`–`agent9`'s
+  // reason and `toggleSeries1`–`9`'s.
+  | "focusPrevious"
+  | "watchPrev"
+  | "watchNext"
+  | "watchOpen"
+  | "watchJump1"
+  | "watchJump2"
+  | "watchJump3"
+  | "watchJump4"
+  | "watchJump5"
+  | "watchJump6"
+  | "watchJump7"
+  | "watchJump8"
+  | "watchJump9"
   | "agentNext"
   | "agentPrevious"
   | "agent1"

@@ -105,6 +105,15 @@ export type KeyDeps = Readonly<{
   /** Move focus into the transcript, for `⇧⇥` (`focus.previous`, §6a). */
   focusTranscript: () => void;
   /**
+   * The watch row's keys (C16 I76, I77, C22 I140) — the composition root's,
+   * because the set, the focus store and the transcript are all there.
+   */
+  watchKeys: Readonly<{
+    focusPrevious: () => void;
+    step: (by: 1 | -1) => void;
+    open: (n?: number) => void;
+  }>;
+  /**
    * Send the prompt's line, for its `⏎` (C22 I133, ruling 63).
    *
    * **Not `submit`**, which takes a line: this sends the line the editor holds,
@@ -779,6 +788,20 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // --- §6a, M6 ------------------------------------------------------------
     helpKeymap: () => void deps.emit("/help keys"),
     focusTranscript: () => void deps.focusTranscript(),
+    // --- the watch row (C16 I76, I77, §6d) ---------------------------------
+    focusPrevious: () => void deps.watchKeys.focusPrevious(),
+    watchPrev: () => void deps.watchKeys.step(-1),
+    watchNext: () => void deps.watchKeys.step(1),
+    watchOpen: () => void deps.watchKeys.open(),
+    watchJump1: () => void deps.watchKeys.open(1),
+    watchJump2: () => void deps.watchKeys.open(2),
+    watchJump3: () => void deps.watchKeys.open(3),
+    watchJump4: () => void deps.watchKeys.open(4),
+    watchJump5: () => void deps.watchKeys.open(5),
+    watchJump6: () => void deps.watchKeys.open(6),
+    watchJump7: () => void deps.watchKeys.open(7),
+    watchJump8: () => void deps.watchKeys.open(8),
+    watchJump9: () => void deps.watchKeys.open(9),
     agentNext: reserved,
     agentPrevious: reserved,
     agent1: reserved,

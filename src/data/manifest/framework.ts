@@ -186,6 +186,39 @@ export const FRAMEWORK_TOOLS: readonly ToolDef[] = Object.freeze([
     args: [],
     flags: [],
   }),
+  // **The tenth and eleventh, through the reservation** (C05 I28, ruling 50,
+  // §085, C22 I136). Reserved first — the grep found no manifest declaring
+  // either — and building them moved both names here. Ruling 50 called them the
+  // ninth and tenth; `/config` was built after it was written. After it, so no
+  // index an app could read moves (C05 T4.10).
+  Object.freeze({
+    name: "watch",
+    local: true,
+    summary: "pin a running entry to the footer's watch row",
+    args: [
+      Object.freeze({
+        name: "back",
+        type: "int" as const,
+        required: false,
+        summary: "how many entries back; default the newest running one",
+      }),
+    ],
+    flags: [],
+  }),
+  Object.freeze({
+    name: "unwatch",
+    local: true,
+    summary: "release a watch; one also drops itself when its run ends",
+    args: [
+      Object.freeze({
+        name: "back",
+        type: "int" as const,
+        required: false,
+        summary: "how many entries back; default the newest watch",
+      }),
+    ],
+    flags: [],
+  }),
 ] satisfies readonly ToolDef[]);
 
 /** The names, for the collision message and for tests that must not derive them. */
@@ -208,9 +241,9 @@ export const FRAMEWORK_NAMES: readonly string[] = Object.freeze(
  * is built.
  */
 export const RESERVED_VERBS: Readonly<Record<string, string>> = Object.freeze({
-  // §085: `/watch` pins a streaming entry that is not yours, `/unwatch` lets go.
-  watch: "ruling 50, §085",
-  unwatch: "ruling 50, §085",
+  // **Empty today, and the mechanism stands** (C05 I28, ruling 50): `config`
+  // left for `FRAMEWORK_TOOLS` when §075's verb was built, and `watch` and
+  // `unwatch` when §085's were. The next ruled verb is reserved here first.
 });
 
 /**

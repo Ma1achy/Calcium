@@ -109,6 +109,12 @@ export const FOCUS_ORDER = Object.freeze([
   // point: adding a rung to C16 §5's ladder is this line and nothing else.
   "interaction",
   "prompt",
+  // **The watch row, a third position of `scope`** (I76, §6d). Its place among
+  // `prompt` and `liveBlock` decides nothing — the three are one stored
+  // location and never true together — so it sits where the row is drawn
+  // relative to the prompt's own reading order, and below every layer, which
+  // is the only ordering that carries weight.
+  "watchRow",
   "liveBlock",
   "global",
 ] as const satisfies readonly FocusTarget[]);
@@ -166,6 +172,9 @@ export function activeTarget(deps: FocusInputs): FocusTarget {
     return "interaction";
   }
   if (deps.stored.at === "prompt") return "prompt";
+  // **Stored, so a watch dropping cannot move it** (I76, `R-COR-002`). The row
+  // with nothing left on it is still where the reader is standing.
+  if (deps.stored.at === "watches") return "watchRow";
   // **The transcript is the owner whether or not anything is live** (R-COR-002,
   // C16 §3a W1). This row read `if (deps.liveEntry !== null) return "liveBlock"`,
   // and the `null` arm fell through to `global` — so with focus stored in the
@@ -183,6 +192,24 @@ export function activeTarget(deps: FocusInputs): FocusTarget {
   // being *inside* a block is a thing you cannot be once it has settled, where
   // *standing in the transcript* is not. One rung, `scope`, either way.
   return "liveBlock";
+}
+
+/**
+ * Which watch the row is on, over the watches as they stand now (I76, §6d).
+ *
+ * **By id first, then by the index clamped** — the id keeps the selection on
+ * its watch when one ahead of it drops, and the index is where to land when the
+ * selected one itself drops, since an id that no longer exists says nothing
+ * about position. `null` exactly when there is no watch.
+ */
+export function resolveWatch(
+  stored: Readonly<{ id: string; index: number }>,
+  ids: readonly string[],
+): number | null {
+  if (ids.length === 0) return null; // graphemes-ok: a watch count, not text
+  const exact = ids.indexOf(stored.id);
+  if (exact !== -1) return exact;
+  return Math.min(Math.max(0, stored.index), ids.length - 1); // graphemes-ok: a watch count, not text
 }
 
 /**
@@ -331,6 +358,12 @@ export interface FocusStore {
    */
   toPrompt(): void;
   /**
+   * Onto the footer's watch row, at the watch `id` in position `index` (I76,
+   * §6d). From any location — `⇧⇥` at the prompt is the way in, and `←`/`→` at
+   * the row are this call with a neighbour.
+   */
+  toWatches(id: string, index: number): void;
+  /**
    * Movement to an element in `entryId`; a no-op at the prompt. Collapses a
    * selection.
    *
@@ -385,6 +418,9 @@ export function createFocusStore(): FocusStore {
     },
     toPrompt() {
       stored = AT_PROMPT;
+    },
+    toWatches(id, index) {
+      stored = Object.freeze({ at: "watches", id, index });
     },
     focusRow(entryId, element) {
       // Deliberately a no-op at the prompt rather than a way in. Entering the

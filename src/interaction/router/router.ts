@@ -590,6 +590,13 @@ export function createRouter(
       focus.toPrompt();
       return true;
     });
+    // **`liveBlock`'s rung, one position over** (I76, §6d): the watch row is a
+    // position of `scope`, and `⌃c` there is the reader stepping out.
+    register("watchRow", (e) => {
+      if (!isCtrlC(e)) return false;
+      focus.toPrompt();
+      return true;
+    });
     register("prompt", (e) => {
       if (!isCtrlC(e) && !(e.kind === "key" && e.key.ctrl && e.key.name === "d")) return false;
 

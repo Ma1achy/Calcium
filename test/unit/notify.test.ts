@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import type { ViewDocument } from "../../src/data/viewmodel/index.js";
 import type { LinearEntry } from "../../src/shell/linear.js";
 import { createNotifier, earns, LONG_TURN_MS } from "../../src/shell/notify.js";
+import { createWatches } from "../../src/shell/watches.js";
 import { systemNotification } from "../../src/terminal/escapes.js";
 
 const LONG = LONG_TURN_MS;
@@ -55,6 +56,10 @@ describe("C22 §6n — what earns a notification", () => {
     const put = (id: string, seq: number, streaming: boolean, doc: ViewDocument): void =>
       void entries.set(id, { id, seq, streaming, doc });
     const wrote: string[] = [];
+    // **The set is the session's since ruling 50** (C22 I135): the notifier
+    // asks it, and the session drops at settle after the notifier has read —
+    // the order `construct.ts`'s one subscription writes down, reproduced here.
+    const watches = createWatches((id) => entries.get(id));
     const n = createNotifier({
       rungs: ["bell", "system", "title"],
       system: true,
@@ -62,6 +67,7 @@ describe("C22 §6n — what earns a notification", () => {
       mark: "•",
       separator: "·",
       entryOf: (id) => entries.get(id),
+      watched: (id) => watches.has(id),
       bell: () => wrote.push("bell"),
       notify: (text) => wrote.push(`system ${text}`),
       title: (text) => wrote.push(`title ${text}`),
@@ -75,15 +81,18 @@ describe("C22 §6n — what earns a notification", () => {
 
     // A watch on a streaming entry holds; on a settled or unknown one it is refused.
     put("e2", 2, true, docOf("ok", 2_000));
-    expect(n.watch("e2")).toBe(true);
-    expect(n.watch("e1"), "settled").toBe(false);
-    expect(n.watch("nope"), "unknown").toBe(false);
+    expect(watches.watch("e2")).toBe(true);
+    expect(watches.watch("e1"), "settled").toBe(false);
+    expect(watches.watch("nope"), "unknown").toBe(false);
 
     n.focus(false);
     n.settled("e2"); // still streaming — nothing to say yet
+    watches.settled("e2");
     expect(wrote).toEqual([]);
+    expect(watches.has("e2"), "a streaming entry's watch stands").toBe(true);
     put("e2", 2, false, docOf("ok", 2_000));
     n.settled("e2");
+    watches.settled("e2");
     // Every opted rung, bell then system then title, in linear's words.
     expect(wrote).toEqual(["bell", "system prism: entry 2: pytest — succeeded, 2s", "title • prism · done"]);
 
@@ -92,6 +101,7 @@ describe("C22 §6n — what earns a notification", () => {
     wrote.length = 0;
     n.settled("e2");
     expect(wrote).toEqual([]);
+    expect(watches.has("e2"), "dropped at the settle").toBe(false);
 
     // A question while away is `waiting`.
     n.asked("question: which branch? 1 main");
@@ -122,6 +132,7 @@ describe("C22 §6n — what earns a notification", () => {
       mark: "-",
       separator: "·",
       entryOf: () => ({ id: "e", seq: 1, streaming: false, doc: docOf("error", 10) }),
+      watched: () => false,
       bell: () => wrote.push("bell"),
       notify: () => wrote.push("system"),
       title: (text) => wrote.push(`title ${text}`),

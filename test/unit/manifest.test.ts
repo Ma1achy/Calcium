@@ -745,29 +745,29 @@ describe("C05 I27, I28 — a retired key and a reserved name", () => {
     expect("viewport" in parsed.value.tools[0]!, "an unknown key is dropped").toBe(false);
   });
 
-  it("T1.25 (I28): a name reserved for a verb not yet built is refused, naming the reservation", () => {
+  it("T1.25 (I28): the reservation is empty, and the two names it held are refused as verbs Calcium ships", () => {
     // **Written out, not derived** — a list computed from `RESERVED_VERBS`
-    // agrees with itself whatever it holds.
-    // `config` left the list when its verb was built (ruling 43) — the path
-    // every reserved name takes, and T4.9 holds the other end of it.
-    expect(Object.keys(RESERVED_VERBS).sort(), "ruling 50's two").toEqual(["unwatch", "watch"]);
+    // agrees with itself whatever it holds. `config` left the list when its
+    // verb was built (ruling 43), and `watch` and `unwatch` when theirs were
+    // (ruling 50, C22 I136) — the path every reserved name takes.
+    expect(Object.keys(RESERVED_VERBS), "nothing reserved").toEqual([]);
+    for (const name of Object.keys(RESERVED_VERBS)) expect(FRAMEWORK_NAMES).not.toContain(name);
 
-    const parsedTools = fixture().tools.map((t) => t.name);
+    const parsed = parseManifest(raw());
+    expect(parsed.ok).toBe(true);
+    const parsedTools = parsed.ok ? parsed.value.tools.map((t) => t.name) : [];
     for (const name of ["watch", "unwatch"]) {
-      expect(FRAMEWORK_NAMES, `${name} is on one list, never both`).not.toContain(name);
-      expect(parsedTools, `${name} has no row until it is built`).not.toContain(name);
+      expect(FRAMEWORK_NAMES, `${name} is a framework verb now`).toContain(name);
+      expect(parsedTools, `${name} appears in a parsed manifest as a framework row`).toContain(name);
 
       const source = raw();
       (source["tools"] as Record<string, unknown>[]).push({ name, local: false, summary: "mine", args: [], flags: [] });
       const errors = errorsOf(parseManifest(source));
       expect(errors, name).toHaveLength(1);
-      expect(
-        errors[0]?.startsWith(`tools[9].name: "${name}" is reserved for a framework verb not yet built (C05 I28, ruling `),
-        `${name}: ${errors[0]}`,
-      ).toBe(true);
-      // Not the shipped-verb message: the author is not shadowing anything they
-      // can see in `/help`, and a message saying so sends them looking for it.
-      expect(errors[0], "not the collision with a shipped verb").not.toContain("a verb Calcium ships");
+      expect(errors[0], `${name}: ${String(errors[0])}`).toMatch(
+        new RegExp(`^tools\\[9\\]\\.name: "${name}" is a verb Calcium ships \\(C05 §3\\)`, "u"),
+      );
+      expect(errors[0], "never the reservation's message").not.toContain("not yet built");
     }
 
     // **The controls.** A flag named `watch` is not a verb — the fixture's

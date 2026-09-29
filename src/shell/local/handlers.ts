@@ -33,6 +33,8 @@ import type { StopReason } from "../types.js";
 import type { CapabilitySource, TerminalCapabilities } from "../../terminal/capabilities.js";
 import { scopesInReadingOrder } from "../../interaction/router/keymap.js";
 import { configBlock } from "../config-table.js";
+import { watchName } from "../watches.js";
+import type { WatchStore } from "../watches.js";
 import type { Setting } from "../config.js";
 
 export type HandlerDeps = Readonly<{
@@ -107,7 +109,30 @@ export type HandlerDeps = Readonly<{
    * never a second derivation of it.
    */
   settings: () => readonly Setting[];
+  /**
+   * The session's watches, for `/watch` and `/unwatch` (C22 I135, I136). The
+   * set itself rather than a view of it: the two verbs are its producers.
+   */
+  watches: WatchStore;
 }>;
+
+/**
+ * The entry a watch verb names (C22 I136, §6p.2): `back` counted from the
+ * transcript's end as `/debug` counts, or — with none — the verb's own default.
+ * An answer or the notice that says why there is none.
+ */
+type Named = Readonly<{ entry: TranscriptStore["entries"][number] }> | Readonly<{ refusal: string }>;
+
+const nthBack = (transcript: TranscriptStore, raw: string | undefined): Named | null => {
+  if (raw === undefined) return null;
+  // C05 has validated `int` already; a value below one is `/debug`'s one.
+  const back = Math.max(1, Number.parseInt(raw, 10) || 1);
+  const entries = transcript.entries;
+  const entry = entries[entries.length - back];
+  return entry === undefined
+    ? { refusal: `no entry ${String(back)} back — the transcript holds ${String(entries.length)}` }
+    : { entry };
+};
 
 const isSection = (x: unknown): x is ProfileSection =>
   typeof x === "string" && (SECTIONS as readonly string[]).includes(x);
@@ -695,5 +720,56 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
      * source column toned by §075's ladder.
      */
     config: () => doc("/config", [configBlock(deps.settings(), blockId("config"))]),
+
+    /**
+     * **The tenth** (C22 I136, §085, ruling 50) — *pin one that is not yours*.
+     *
+     * **Whose it is decides nothing** (§6p.2): the sentence names the use the
+     * verb was drawn for, and a reader's own run is as watchable. The default is
+     * the newest running entry **that is not the shell's own** — a queued line is
+     * `streaming` and `transport: "local"` until it runs, and when `/watch`
+     * itself was queued the newest such line is this one (§6p.1).
+     */
+    watch: (argv) => {
+      const named =
+        nthBack(deps.transcript, argv[0]) ??
+        (() => {
+          const running = [...deps.transcript.entries]
+            .reverse()
+            .find((e) => e.streaming && e.doc.meta.transport !== "local");
+          return running === undefined ? { refusal: "nothing is running to watch" } : { entry: running };
+        })();
+      if ("refusal" in named) return doc("/watch", [warnNotice(named.refusal, blockId("watch-none"))]);
+      const name = watchName(named.entry);
+      if (deps.watches.has(named.entry.id)) {
+        return doc("/watch", [b.notice("muted", `already watching ${name}`, undefined, { id: blockId("watch") })]);
+      }
+      // I130's `false` — a run that has ended has no future to watch — with words.
+      if (!deps.watches.watch(named.entry.id)) {
+        return doc("/watch", [warnNotice(`${name} has settled — nothing left to watch`, blockId("watch-settled"))]);
+      }
+      return doc("/watch", [b.notice("muted", `watching ${name}`, undefined, { id: blockId("watch") })]);
+    },
+
+    /**
+     * **The eleventh** (C22 I136, §085) — *or it drops itself when the run
+     * ends*. With no argument, the newest watch: a verb with nothing named acts
+     * on what it would most recently have affected.
+     */
+    unwatch: (argv) => {
+      const named: Named =
+        nthBack(deps.transcript, argv[0]) ??
+        (() => {
+          const newest = deps.watches.ids().at(-1);
+          const entry = newest === undefined ? undefined : deps.transcript.entries.find((e) => e.id === newest);
+          return entry === undefined ? { refusal: "nothing is watched" } : { entry };
+        })();
+      if ("refusal" in named) return doc("/unwatch", [warnNotice(named.refusal, blockId("unwatch-none"))]);
+      const name = watchName(named.entry);
+      if (!deps.watches.unwatch(named.entry.id)) {
+        return doc("/unwatch", [warnNotice(`${name} is not watched`, blockId("unwatch-not"))]);
+      }
+      return doc("/unwatch", [b.notice("muted", `stopped watching ${name}`, undefined, { id: blockId("unwatch") })]);
+    },
   };
 }
