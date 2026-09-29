@@ -215,9 +215,16 @@ function columnWidths(
  * free, as every planner input is — `glyphCells` is the widest representation.
  */
 export function disclosureCells(n: number): number {
-  const mark = Math.max(glyphCells("expand"), glyphCells("collapse"));
-  return n > 0 ? mark + 1 + String(n).length : mark; // cells-ok — `+` and ASCII digits, one cell each
+  return n > 0 ? MARK_CELLS + 1 + String(n).length : MARK_CELLS; // cells-ok — `+` and ASCII digits, one cell each
 }
+
+/**
+ * **The mark's cells, taken once**. `glyphCells` measures both halves
+ * of both slots through `cells()`, and every plan asks twice — so measuring
+ * four constant strings per plan was a quarter of T2.3's time (1595 of 6149 ms
+ * inclusive, profiled). The glyph table is a module constant, so this is too.
+ */
+const MARK_CELLS = Math.max(glyphCells("expand"), glyphCells("collapse"));
 
 /** The columns with the `expand` column's minimum raised to `need`, where it is below it. */
 function reserve(cols: readonly ColumnDef[], at: number, need: number): readonly ColumnDef[] {

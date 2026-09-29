@@ -18,7 +18,7 @@ import {
   DEFAULT_WIDTHS,
   formatReport,
 } from "../../src/testing/measurement-conformance.js";
-import type { ColumnDef, Table } from "../../src/data/viewmodel/index.js";
+import type { Block, ColumnDef, Table } from "../../src/data/viewmodel/index.js";
 
 // This file walks `src/`; `budget.ts` carries the measurement and why the 5 s
 // default is not a margin. Re-measure before raising it.
@@ -105,7 +105,32 @@ describe("C11 tier 2 — planColumns as an interface", () => {
     expect(combined.failures, formatReport(combined)).toEqual([]);
   });
 
-  it.todo("T2.3a (C11 I9, C11 I15, C11 I32): measure equals the rendered rows at every width from 20 to 170, every row expanded — not deferred on a component: the code lands in the next commit of this round");
+  it("T2.3a (C11 I9, C11 I15, C11 I32): measure equals the rendered rows at every width from 20 to 170, every row expanded", () => {
+    // **Every width, because the drop boundaries move.** T2.3's seven widths are
+    // a sample of where columns drop, and ruling 82's reservation moved every
+    // boundary by two cells, off all seven. A detail's height taken at the outer
+    // width then disagreed at 36 widths and at none of the seven (T6.24).
+    const r = measurable({ definitions: [tableDefinition] });
+    const block = psTable({ id: "every-width", rows: 5, expanded: [1, 2, 3, 4, 5], detail: true });
+    // **And a detail that wraps**, so the inset width is read as well as the plan:
+    // a keyValue of short fields fits at any inset, and a width two cells wrong
+    // reaches the height only through text that breaks.
+    const prose = "a detail long enough to wrap at every width this row visits, so its height is a function of the inset ".repeat(3);
+    const wrapping: Table = {
+      ...block,
+      id: "every-width-wrapping",
+      rows: block.rows.map((row) => ({ ...row, detail: [{ kind: "notice", id: `${row.id}-prose`, tone: "info", text: prose } as Block] })),
+    };
+    const disagree: string[] = [];
+    for (const table of [block, wrapping]) {
+      for (let width = 20; width <= 170; width += 1) {
+        const measured = r.measure(table, width);
+        const drawn = r.renderToLines(table, width).length; // cells-ok — a row count
+        if (measured !== drawn) disagree.push(`${table.id} ${String(width)}: ${String(measured)}/${String(drawn)}`);
+      }
+    }
+    expect(disagree, "measure/rendered, by width").toEqual([]);
+  });
 
   it("T2.4 (I2): a dropped column's key reaches every row's expanded detail", () => {
     const r = measurable({ definitions: [tableDefinition] });

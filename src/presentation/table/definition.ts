@@ -145,12 +145,28 @@ function hasBody(block: Table): boolean {
   return block.columns.length > 0 && block.rows.length > 0; // cells-ok
 }
 
+/**
+ * **The plan a walk over the rows reads, taken once for the walk**.
+ * `measure`, `unitsOf` and `tableElements` ask for every row's detail height at
+ * one width, and the plan is a function of the block and the width alone — so
+ * planning per row planned the same table once per expanded row, and ruling 82's
+ * second pass doubled that. Planned on first ask, so a walk with no expanded row
+ * plans nothing, as before. Held for one call and dropped with it: C11 holds no
+ * state (I11), and this is a local, not a memo.
+ */
+type DetailPlan = () => PlannedColumns;
+function detailPlanOf(block: Table, width: number): DetailPlan {
+  let plan: PlannedColumns | null = null;
+  return () => (plan ??= plannedColumns(block, bodyWidth(width)));
+}
+
 /** The rows an expanded row's detail occupies at this width. */
 function detailHeight(
   block: Table,
   row: TableRow,
   width: number,
   measureChild: MeasureFn,
+  planOf: DetailPlan = detailPlanOf(block, width),
 ): number {
   if (row.expanded !== true) return 0;
   // **The gutter comes off here and nowhere else** (I15). Four callers ask for a
@@ -158,8 +174,10 @@ function detailHeight(
   // subtraction at each of them is four chances to disagree by two cells, which
   // is the disagreement `measure(block, width) == rows rendered` forbids. It was
   // three of four for one commit, and `window-height` caught it at 353 of 42.
+  // `detailPlanOf` takes the plan at the same `bodyWidth(width)`, from the width
+  // the walk hands both.
   const inner = bodyWidth(width);
-  const plan = plannedColumns(block, inner);
+  const plan = planOf();
   // A sequence, so a detail block declaring `gapBefore` contributes its blank row
   // here exactly as it would at a document's top level (C04 §3a).
   return sequenceHeight(detailBlocks(block, row, plan), insetWidth(inner), measureChild);
@@ -184,8 +202,9 @@ type Unit = Readonly<{ rows: number; row: TableRow | null; bar: boolean }>;
 function unitsOf(block: Table, width: number, measureChild: MeasureFn): readonly Unit[] {
   const out: Unit[] = [];
   if (hasHeader(block)) out.push({ rows: 1, row: null, bar: false });
+  const planOf = detailPlanOf(block, width);
   for (const row of sortedRows(block)) {
-    out.push({ rows: 1 + detailHeight(block, row, width, measureChild), row, bar: false });
+    out.push({ rows: 1 + detailHeight(block, row, width, measureChild, planOf), row, bar: false });
   }
   if (hasActionBar(block)) out.push({ rows: 2, row: null, bar: true });
   return out;
@@ -284,7 +303,8 @@ export const tableDefinition: BlockDefinition<Table> = {
     if (!hasBody(block)) return atLeastOne(header + 1);
 
     let total = header + block.rows.length; // cells-ok
-    for (const row of block.rows) total += detailHeight(block, row, w, measureChild);
+    const planOf = detailPlanOf(block, w);
+    for (const row of block.rows) total += detailHeight(block, row, w, measureChild, planOf);
     // I17 — a blank separator and a label row when any row has actions. Two,
     // because every surface drawing a bar draws a blank above it and the gap
     // cannot come from `gapBefore`: that applies *between* blocks in a sequence
@@ -754,11 +774,11 @@ function rowCopyText(block: Table, r: TableRow): string {
  * wide under the terminal's ambiguous-width setting, may be cut by the painter
  * without declaring a detail here.
  */
-function rowDetail(block: Table, r: TableRow, width: number): Block | null {
+function rowDetail(block: Table, r: TableRow, width: number, planOf: DetailPlan = detailPlanOf(block, width)): Block | null {
   // **The same plan the render draws** (I15): the gutter comes off here too, or
   // this answers *what was lost* against a plan two cells wider than the one on
   // screen, and a row that fits would declare a detail for a column it shows.
-  const plan = plannedColumns(block, bodyWidth(width));
+  const plan = planOf();
   const planned = new Map(plan.visible.map((v) => [v.key, v.width]));
   const dropped = new Set(plan.dropped);
   const rows: { label: string; value: string }[] = [];
@@ -788,10 +808,11 @@ export function tableElements(
   const out: NavElement[] = [];
   let row = hasHeader(block) ? 1 : 0; // cells-ok — a row cursor, not a width
 
+  const planOf = detailPlanOf(block, w);
   for (const r of sortedRows(block)) {
-    const height = 1 + detailHeight(block, r, w, measureChild);
+    const height = 1 + detailHeight(block, r, w, measureChild, planOf);
     const action = r.actions?.[0];
-    const detail = rowDetail(block, r, w);
+    const detail = rowDetail(block, r, w, planOf);
     out.push(
       Object.freeze({
         id: r.id,

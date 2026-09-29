@@ -108,8 +108,9 @@ const results = await runPass({
     // **A change the run's own corpus can see** (F1254): the reservation's
     // arithmetic, which T1.41's `disclosureCells` table reads directly.
     file: PLAN,
-    from: "  return n > 0 ? mark + 1 + String(n).length : mark;",
-    to: "  return n > 0 ? mark + 2 + String(n).length : mark;",
+    // Re-anchored when the mark's cells became `MARK_CELLS` (the T2.3 regression).
+    from: "  return n > 0 ? MARK_CELLS + 1 + String(n).length : MARK_CELLS;",
+    to: "  return n > 0 ? MARK_CELLS + 2 + String(n).length : MARK_CELLS;",
     why: "every reservation one cell wider, so T1.41's table fails — if this survives, nothing reads the reservation",
   },
   mutations: MUTATIONS,

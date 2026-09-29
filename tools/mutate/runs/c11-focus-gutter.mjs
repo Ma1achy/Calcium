@@ -177,9 +177,25 @@ const results = runPass({
       // a plan two cells narrower than the one on screen.
       name: "the detail's height is taken at the outer width",
       file: TABLE,
-      from: "  const inner = bodyWidth(width);\n  const plan = plannedColumns(block, inner);",
-      to: "  const inner = width;\n  const plan = plannedColumns(block, inner);",
-      expect: "T2.3",
+      // Re-anchored when a walk began taking its plan once (the T2.3
+      // regression). **It survived from 4e3c7153 until T2.3a**, measured on
+      // copies of the tree: caught at 3d4b2241 and survived at f0697eb0. Ruling
+      // 82's reservation moved every drop boundary off T2.3's seven widths, so
+      // the row it named went blind. T2.3a measures the expanded fixture at
+      // every width.
+      from: "  return () => (plan ??= plannedColumns(block, bodyWidth(width)));",
+      to: "  return () => (plan ??= plannedColumns(block, width));",
+      expect: "T2.3a",
+    },
+    {
+      // **The other half of that width**: the plan right and the detail's inset
+      // two cells wide. A keyValue of short fields fits at either inset, so
+      // T2.3a carries a detail that wraps.
+      name: "the detail's inset is taken at the outer width",
+      file: TABLE,
+      from: "  const inner = bodyWidth(width);\n  const plan = planOf();",
+      to: "  const inner = width;\n  const plan = planOf();",
+      expect: "T2.3a",
     },
     {
       // A detail child that forgets the gutter. The parent rows keep it, so the
