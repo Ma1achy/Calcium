@@ -57676,3 +57676,19 @@ Found writing C22 T4.119 (F1395). The first draft moved focus off a field and th
 ## F1455 — F1395's first remedy would have written a chip's lines into a one-line field ★★★☆☆
 
 Found by the walk of F1395. The finding offered writing `resolved` instead of `text` so a yanked chip arrives as its content. A chip is minted for a paste of five lines or more, or for a file, so its content usually holds line breaks, and writing it would put several lines into a field C04 §3ar F9 says is one line. That is F9's defect arriving by another door. C22 I148 writes `resolved` and refuses a value holding a line break in F9's words. On `⏎` the borrow stays open so the chip can be deleted, and on blur nothing is written (c5ff281a, 588da957).
+
+## F1456 — SS69's first runs found two literal bidi characters, one shipped and one written by the lane's own edit script ★★☆☆☆
+
+Found by lane b4-classes building A03 SS69 (F1402's class check). Its first run over every tracked file found a literal U+202E at `test/contract/image-path.test.ts:50`, the poisoned filename the row feeds through, which had passed every gate since it landed. That is F1402's second instance. The third arrived while building the rule: the lane's edit script turned the `\u202E` escape in SS69's own doc comment in `tools/enforce/source-scans.mjs` into the literal character, and SS69 refused it on its first enforce, before commit. Both are escapes now, and the exemption list is empty.
+
+## F1457 — C16 T1.4h presses two rows at the wrong target, and both pass without testing anything ★★☆☆☆
+
+Measured by lane b4-classes writing C16 T2.17. `prompt:m+v -> valuesToggle` is dispatched at `liveBlock`, where the same chord is bound, and `liveBlock:m+enter -> rerunEntry` is dispatched at `prompt`, where it is consumed as `insertNewline`. Each row's assertion holds for a reason other than the one it names. T2.17 reaches both rows at their own targets, so the behaviour is covered, but T1.4h's two rows still assert nothing about what they claim. **Owed**: re-point or remove them.
+
+## F1458 — window titles and notifications delete C0 and C1 rather than showing them, and leave printable residue ★★☆☆☆
+
+Found by lane b4-classes extending ruling 71's bidi clause to OSC 2 and OSC 9 (C01 I26, F1407). `oscText` still deletes C0, DEL and C1, so `ESC[2J` in a tool's output reaches the title as `[2J`: the control is gone and its arguments remain as text. Ruling 71 replaced deletion with caret form for blocks. C01 I26 states the older form as its limit rather than choosing one. **Owed**: a ruling on whether the OSC sinks show controls as blocks do.
+
+## F1459 — `make test` read `dist/` through `example-bins` without building it ★★☆☆☆
+
+Found integrating lane b4-classes. The rebased lane's chain failed the three *F56: executing it reaches the application* rows in `test/contract/example-bins.test.ts`. Each example's launcher imports `calcium-tui`, which resolves to the worktree's `dist/`, and that was still the pre-rebase build: `make test` ran before anything rebuilt it. The same file passed 16 of 16 twice once `e2e` had built `dist/` at 20:30. The shell lane saw the same three reds and attributed them to a stale `dist/`. CI was never exposed, because `make check` builds first (F447) and runs before `make test`. That is the ordering hiding the dependency, not satisfying it. **F447's class at a second gate**: a target that reads a generated artefact generates it. `make test` now runs `npm run build` first.

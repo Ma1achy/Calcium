@@ -211,6 +211,12 @@ regime:             ## what a source-scan pass costs *here*, beside the recorded
 	node tools/scan-cost.mjs
 
 test: catalogue               ## tiers 1-4, and the examples' own suites
+	@# **`example-bins` executes each example's launcher, and the launcher reads
+	@# `dist/`** — so this target read a generated artefact without generating it,
+	@# F447's class at the second gate (F1459). CI ran `check` first and hid it;
+	@# a rebased worktree ran `test` first and failed F56's three rows on the
+	@# pre-rebase build, then passed them 16 of 16 once `e2e` had rebuilt.
+	npm run build
 	npm run test
 	@# **The example suites were in no target at all** — `make check` type-checks
 	@# them and nothing ran them, so `examples/docker`'s 313 rows could go red

@@ -39,9 +39,9 @@ type change.
 | **8** | [Absence indistinguishable from failure](#8) | 124 | **6 open** · 6 unread | partly | real Calcium work · **21 of 25 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
 | **9** | [**The instrument was wrong**](#9) | 155 | **4 open** · 66 unread | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 102 | **2 open** · 67 unread | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
-| **11** | [A gate that passes without checking](#11) | 507 | **10 open** · 79 unread | — | **282 closed · 7 open · 80 unread** of 369 — the heading was out by 66 and this row's count column by 1 until F991 counted them, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
+| **11** | [A gate that passes without checking](#11) | 510 | **9 open** · 79 unread | — | **282 closed · 7 open · 80 unread** of 369 — the heading was out by 66 and this row's count column by 1 until F991 counted them, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 26 | **7 open** | — | **new at F80** · Calcium's own suite · **F877 is the first that repairs an instrument rather than recording a reading** |
-| **13** | [Text the framework emits](#13) | 24 | **7 open** · 2 unread | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
+| **13** | [Text the framework emits](#13) | 25 | **7 open** · 2 unread | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 59 | **5 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
 | — | [Singles](#singles) | 120 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
 
@@ -1600,7 +1600,13 @@ I14's second half names it and T1.85 asserts the cell is not the flattened one.
 
 **F1061** — **a commit message is a deferral site, and it is the only one of the four with no reader.** `CLAUDE.md` names three kinds — a code comment, a roadmap row, a chain of citations — and a commit body fails harder than any of them: it is append-only, never opened again, and invisible to *grep from the satisfier*, because the satisfier is a regenerated file rather than a symbol. Swept over **122 commits**: three candidates, **two with no home outside the message** and both this session's own. `7070929b` wrote *six of 244 SVG goldens move and are not regenerated here* and left the golden gate red for **four commits**, found by a lane running that suite for something else; `ce3eea37`'s residue is now F1062. **The third is the control and it is what the rule turns on** — `aa27561e`'s *not repaired the other way* is pinned by T1.25, so the message describes a watch instead of standing in for one, and all three read identically · **Closed** — both instances repaired, and no gate proposed: the wording is prose and the control is textually indistinguishable from the two defects, which is the citation-resolves-against-the-wrong-thing class the audit argues against automating. The habit is one line — a deferral in a commit message has to exist somewhere else first
 
-## 11 · A gate that passes without checking — **508 entries: 17 open · 404 closed · 87 with no verdict**
+## 11 · A gate that passes without checking — **511 entries: 16 open · 408 closed · 87 with no verdict**
+
+**F1459** — **`make test` read `dist/` through `example-bins` without building it** · **Closed** — the target builds first, as F447 made `check` do
+
+**F1457** — **C16 T1.4h presses two rows at the wrong target, and both pass without testing anything** · **Open** — C16 T2.17 reaches both at their own targets; T1.4h unchanged
+
+**F1456** — **SS69's first runs found two literal bidi characters, one shipped and one written by the lane's own edit script** · **Closed** — both escaped; SS69 now refuses the class (eeffca71)
 
 **F1446** — **eight rows across three groups were blind until the first mutation pass** · **Closed** — every survivor's row strengthened; the runs catch all (6c605f19, 14f078cc, 2edd256f)
 
@@ -1612,7 +1618,7 @@ I14's second half names it and T1.85 asserts the cell is not the flattened one.
 
 **F1398** — **C09 I121's census could not see a shed row or a picture in a pane** · **Closed** — T2.228, T2.229 over the production registry at each kind's publishing width (0af676a8)
 
-**F1402** — **nothing refuses a literal bidi character in a tracked file** · **Open** — the instance fixed in 1f88a69a; no enforce rule reads tracked files for literal overrides
+**F1402** — **nothing refuses a literal bidi character in a tracked file** · **Closed** — A03 SS69 refuses a literal bidi format character in any tracked text file; its first run found F1456 (eeffca71)
 
 **F1290** — **C10 T2.57 accepted any single carrier not written as *alone*** · **Closed** — C10 I71: the gate counts distinct carriers per fact, one surviving 1-bit, with prompt selection its one exception compared by equality; T6.153 (9836240c, f6b7c136)
 
@@ -1634,7 +1640,7 @@ I14's second half names it and T1.85 asserts the cell is not the flattened one.
 
 **F1320** — **193 text cells fell below their contrast floor at 8 bits, in all ten themes** · **Closed** — ruling 75 built as C10 I69 (c6240116): the quantiser holds the floor; T2.74 asserts the list empty and is the shipped themes' 8-bit gate
 
-**F1339** — **a focus target whose keymap rows were bound and never consulted, a third time** · **Partly** — `watchRow` fixed in `construct.ts` (1004d067); the class check — every target with keymap rows has a rung handler that reads them — is owed
+**F1339** — **a focus target whose keymap rows were bound and never consulted, a third time** · **Closed** — the class check: C16 I78, T2.17 over every focus target with keymap rows, T6.66 (c908d259)
 
 **F1345** — **SS47 decoded, and the escapes were all premises** · **Closed** — c81fb1ad: SS47 and SS57 share one decoder; 25 newly fired literals in 8 files classified, none drawn without an ASCII form
 
@@ -2656,7 +2662,9 @@ that fails under contention will fail eventually whether or not anyone introduce
 
 **F1111** — **the fixture waited for a window and drove a shell that had not reached its first line.** `b.started` has marked the second capture's reader since the fixture was written; phase one had a window search and `sleep(300)`. **A mapped window says the emulator drew and says nothing about how far its child shell has got** — the push that puts kitty into the keyboard protocol is the *second line* of that shell, after `stty raw -echo`, and on a two-core runner drawing kitty through llvmpipe beside another worker bash's start outlasts three hundred milliseconds, which is why every keyboard recurrence of F812 is in `a`. **Copying the marker would not have been enough**: `a.started` proves bash reached the line and not that kitty applied what the line wrote, which is the precondition the fifth recurrence's sentinel names. `CSI ? u` does — measured in the container, `\e[?3` after `CSI > 3 u` and `\e[?0` after `CSI < u`, so the answer names the live flag set rather than merely arriving, and it cannot precede the application because a pty is a byte stream processed in order. **Closed** — the fixture asks and the row asserts `3` at the moment the drive begins, a precondition measured where the sentinel it replaces inferred one from the byte shape afterwards; pinning the handshake off fails T5.7 naming itself, `flags never answered · CSI 27u CSI 27;1:3u CSI 13;2u CSI 13;2:3u CSI 107;1:3u`, which is also the first time a reader has seen what a clean capture looks like. **What it does not claim is the four `27;2u` recurrences**: the mode was live for those, `27;2u` being the new protocol with Shift set, so two symptoms and two causes and only one closed here — what the other gains is that the next one arrives with the flag set beside it and the push can be ruled out rather than suspected. Cost none measurable, 6.6 s against 6.6 s, the query emitted only where `enter` pushes the keyboard protocol and `read -t 2` bounding a terminal that never answers
 
-## 13 · Text the framework emits — **7 open** · 16 closed · 1 with no verdict
+## 13 · Text the framework emits — **7 open** · 17 closed · 1 with no verdict
+
+**F1458** — **window titles and notifications delete C0 and C1 rather than showing them, and leave printable residue** · **Open** — ruling 71 shows controls in caret form for blocks; the OSC sinks need a ruling of their own
 
 **F1430** — **C23's running card labels a two-word verb with its own second word** · **Open** — `execution.ts:1248` slices one word where `:2002` slices the verb's length
 
@@ -2664,7 +2672,7 @@ that fails under contention will fail eventually whether or not anyone introduce
 
 **F1391** — **a chip label wider than its row was clipped to a label with no closing bracket** · **Closed** — C17 I32, elided in the middle to the row (dfef2062)
 
-**F1407** — **`oscText` passes bidi characters into window titles and notifications** · **Open** — `escapes.ts` strips C0, DEL and C1 only; ruling 71's bidi clause does not reach OSC 2 or OSC 9
+**F1407** — **`oscText` passes bidi characters into window titles and notifications** · **Closed** — C01 I26: `oscText` shows a bidi format character as `<U+XXXX>` in a title and a notification (edc2d5a0)
 
 **F1401** — **the prompt and the command echo write bidi characters raw** · **Open** — C09 I131 states it as the one exception and C09 T4.107 holds the site set by equality, so the row fails the day it is fixed; owed: `neutraliseControl` in `commandRows` and the prompt painter
 
