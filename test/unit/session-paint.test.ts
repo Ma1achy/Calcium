@@ -1042,7 +1042,7 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
 // frame says — the same reason C22's label row reads bytes.
 describe("C22 §6l.11 — the chip's ground in the prompt", () => {
   const SEP = "\u00b7";
-  const LOOK = { separator: SEP, painted: true } as const;
+  const LOOK = { separator: SEP, painted: true, unicode: "full" } as const;
   const PASTE = { ordinal: 1, kind: "paste", name: "json", lines: 47, content: "{}" } as const;
   const GUTTER = { first: 2, cont: 2 } as const;
 

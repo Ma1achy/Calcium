@@ -28,7 +28,7 @@ describe("roadmap 30 — a paste chip is one grapheme to the editor", () => {
    * the atomicity, so they ask the composer what it drew; the form itself is
    * T1.44's subject and is pinned against literals there.
    */
-  const LOOK = { separator: "\u00b7", painted: true } as const;
+  const LOOK = { separator: "\u00b7", painted: true, unicode: "full" } as const;
   const CHIP_LABEL = chipLabel(CHIP, LOOK);
   const GUTTER = { first: 0, cont: 0 } as const;
 

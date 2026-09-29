@@ -9,7 +9,8 @@ import { createEditor } from "../../src/interaction/editor/index.js";
 // walk's `drawAs` seam, which `editor.displayRows` fills in from its own chip
 // table; `layout.ts` takes it as a parameter. Adding an export to the barrel
 // for a test would be an export nothing else consumes (MG24).
-import { displayRows } from "../../src/interaction/editor/layout.js";
+import { chipLabel, displayRows, layout } from "../../src/interaction/editor/layout.js";
+import { cells } from "../../src/presentation/text.js";
 import { graphemes } from "../../src/interaction/editor/graphemes.js";
 
 // This file builds a large corpus; `budget.ts` carries the measurement and
@@ -177,6 +178,31 @@ describe("C17 §2 — degenerate geometry", () => {
   });
 });
 
-describe("C17 §5e — the elision over wide clusters, owed at the spec commit", () => {
-  it.todo("T3.18 (C17 I32, C09 I9, §5e): a chip named with wide clusters is exactly the usable width at every width, and no cluster is split — not deferred on a component: lands with the next commit");
+describe("C17 §5e — the elision over wide clusters", () => {
+  it("T3.18 (C17 I32, C09 I9, §5e): a chip named with wide clusters is exactly the row at every width, and no cluster is split", () => {
+    // **Two-cell clusters on both sides of the cut**: CJK in the head, a ZWJ
+    // family in the tail. A cut that splits a cluster, or keeps a two-cell
+    // glyph a cell past the budget, is one cell wider than the row — which the
+    // painter clips and nothing else reports.
+    const look = { separator: "\u00b7", painted: false, unicode: "full" } as const;
+    const chip = { kind: "paste", name: "日本語-\u{1F468}\u200D\u{1F469}\u200D\u{1F467}-データ", lines: 7, content: "c" } as const;
+    const e = createEditor({ chips: look });
+    e.insertChip(chip);
+    const whole = chipLabel({ ...chip, ordinal: 1 }, look);
+    const natural = cells(whole);
+    const allowed = new Set([...graphemes(whole), "\u2026", " "]);
+
+    let cut = 0;
+    for (let width = 1; width <= natural + 2; width += 1) {
+      const row = layout(e.text, width, { first: 0, cont: 0 }, e.drawAs)[0] ?? "";
+      expect(cells(row), `width ${String(width)}: ${JSON.stringify(row)}`).toBe(Math.min(width, natural));
+      for (const g of graphemes(row)) {
+        expect(allowed.has(g), `width ${String(width)}: ${JSON.stringify(g)} is not a whole cluster of the label`).toBe(true);
+      }
+      if (row !== whole) cut += 1;
+    }
+    // **The fixture responds**: every width below the natural one is a cut,
+    // and the two above it are the whole label.
+    expect(cut, "cut at every width it does not fit").toBe(natural - 1);
+  });
 });

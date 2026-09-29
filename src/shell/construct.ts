@@ -782,9 +782,16 @@ export async function constructGraph(
    * too (I113, §6l.12): the header and the chip in the prompt spelling one chip
    * two ways is what a second derivation would buy.
    */
+  const chipGlyphs = glyphs(detection.capabilities);
   const chipLook: ChipLook = {
-    separator: glyphs(detection.capabilities).separator,
+    separator: chipGlyphs.separator,
     painted: detection.capabilities.colourDepth > 1,
+    // **The tier the separator came from, read off the set rather than
+    // restated** (C17 I32, C02 I9): `glyphs()` hands the ASCII set at the wide
+    // rung as well as at `unicode: "ascii"`, so the elision's marker is `~`
+    // wherever the separator is `:` and never a two-cell `…` the walk measures
+    // as one.
+    unicode: chipGlyphs === glyphs({ unicode: "ascii", ambiguousWidth: "narrow" }) ? "ascii" : detection.capabilities.unicode,
   };
 
   // --- 3. registries: blocks, adapters, manifest, completion sources --------

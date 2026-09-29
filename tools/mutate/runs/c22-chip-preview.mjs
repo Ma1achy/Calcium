@@ -93,8 +93,8 @@ const results = runPass({
       // the one position a reader arrives at without moving.
       name: "only the chip after the caret is read, so a pasted chip never previews",
       file: EDITOR,
-      from: "    return this.#chips.get(before) ?? this.#chips.get(after) ?? null;",
-      to: "    return this.#chips.get(after) ?? null;",
+      from: "    return this.#chips.get(before)?.chip ?? this.#chips.get(after)?.chip ?? null;",
+      to: "    return this.#chips.get(after)?.chip ?? null;",
       expect: "T1.48",
     },
     {
@@ -102,8 +102,8 @@ const results = runPass({
       // position `home` lands on, where there is nothing before the caret.
       name: "only the chip before the caret is read, so the head of the buffer answers nothing",
       file: EDITOR,
-      from: "    return this.#chips.get(before) ?? this.#chips.get(after) ?? null;",
-      to: "    return this.#chips.get(before) ?? null;",
+      from: "    return this.#chips.get(before)?.chip ?? this.#chips.get(after)?.chip ?? null;",
+      to: "    return this.#chips.get(before)?.chip ?? null;",
       expect: "T1.48",
     },
     {

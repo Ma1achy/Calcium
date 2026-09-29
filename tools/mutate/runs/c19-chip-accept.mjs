@@ -81,7 +81,7 @@ const results = runPass({
       // source never supplied.
       name: "the ordinal is read before the counter moves",
       file: EDITOR,
-      from: "    this.#nextChip += 1;",
+      from: "    this.#ordinal += 1;",
       to: "",
       expect: "T1.71",
     },

@@ -24,14 +24,15 @@
  *     whole and leaves its cell blank; one wider than `usable` takes a row of
  *     its own and *overflows* it. C09 I19 substitutes a `?` in the same case
  *     and the divergence is deliberate: a block renders someone's data, an
- *     editor holds what the user typed.
+ *     editor holds what the user typed. **A chip is elided instead** (I32):
+ *     its label is this component's composition, not the user's text.
  */
 
 import { graphemes } from "./graphemes.js";
 // Aliased: `walk` has a local `cells` — the positions array — and the two are
 // different subjects. Shadowing them was a compile error rather than a silent
 // one, which is the one direction this collision could have gone well.
-import { cells as widthOf } from "../../presentation/text.js";
+import { cells as widthOf, truncate } from "../../presentation/text.js";
 
 export type Gutter = Readonly<{ first: number; cont: number }>;
 
@@ -67,8 +68,14 @@ function usableAt(row: number, width: number, gutter: Gutter): number {
  * **The gutter's class with the circularity absent**: a chip's width is its own
  * label's, fixed and independent of the terminal width, so it resolves in one
  * pass rather than needing the width it is computing.
+ *
+ * **`limit` is the width the walk gave it** (I32, §5e). With none it is the
+ * label, which is what the fit test and every caller outside the walk want;
+ * with one it is the label fitted to it — *a kind shortens itself, given the
+ * width it got* (§099). Only the walk passes one, and only once the label has
+ * proved wider than the row it has opened.
  */
-export type ClusterText = (cluster: string) => string | undefined;
+export type ClusterText = (cluster: string, limit?: number) => string | undefined;
 
 /**
  * What a chip **is** — the parts its label is composed from (C17 I25, §5c).
@@ -135,10 +142,28 @@ export type Chip = Readonly<{
  * Both members come from capabilities, which are read once and handed down, so
  * this is settled when the editor is built and never per frame.
  */
-export type ChipLook = Readonly<{ separator: string; painted: boolean }>;
+export type ChipLook = Readonly<{
+  separator: string;
+  painted: boolean;
+  /**
+   * The tier `separator` was taken from, which the elision's marker is taken
+   * from too (I32, §5e): `…` wherever the separator is `·`, `~` wherever it is
+   * the ASCII set's. **Not the terminal's `unicode` field as it stands**: the
+   * ASCII glyph set is also the wide set (C02 I9), so at `ambiguousWidth:
+   * "wide"` the separator is `:` and the marker must be `~` — a `…` there is two
+   * cells the walk measures as one.
+   */
+  unicode: "full" | "bmp" | "ascii";
+}>;
 
-/** A chip's label, composed (C17 I25, §5c, §099). */
-export function chipLabel(chip: Chip, look: ChipLook): string {
+/** The frame either rung spends — a space either side, or the two brackets (I25). */
+const CHIP_FRAME = 2;
+
+/**
+ * A chip's label, composed (C17 I25, §5c, §099) — and, given a `limit` it does
+ * not fit, elided in the middle to exactly that many cells (I32, §5e).
+ */
+export function chipLabel(chip: Chip, look: ChipLook, limit?: number): string {
   const size = chip.lines === undefined ? "" : ` ${look.separator} ${String(chip.lines)}L`;
   // **A `file` drops the ordinal and every other kind keeps it** (I25, §011,
   // §099, §101). A paste's `name` is its detected kind, so two pastes of JSON
@@ -158,7 +183,26 @@ export function chipLabel(chip: Chip, look: ChipLook): string {
   const text = `${mark}${chip.name}${size}`;
   // The space either side is the ground's, so it belongs to the painted rung
   // alone — a bracketed label padded as well would be a chip inside a chip.
-  return look.painted ? ` ${text} ` : `[${text}]`;
+  const frame = (inner: string): string => (look.painted ? ` ${inner} ` : `[${inner}]`);
+  const whole = frame(text);
+  if (limit === undefined) return whole;
+  const room = Math.max(1, Math.floor(limit));
+  if (widthOf(whole) <= room) return whole;
+  // **The middle, because the head says which and the tail says how much**
+  // (I32, `R-BLK-801`): `#1` and `47L` are the two parts that tell two chips
+  // apart, and an end cut keeps the first and loses the second. C09 I103's cut
+  // rather than a second one, so the boundary rounds the way every other middle
+  // cut does and never splits a cluster.
+  const tier = { unicode: look.unicode } as const;
+  // **The marker is `truncate`'s own answer at one cell**, not a literal here:
+  // a zero budget returns the marker alone, so the ASCII tier's `~` comes from
+  // the one place that decides it.
+  const marker = truncate(text, 1, tier, "middle");
+  const inner = room - CHIP_FRAME;
+  // Too narrow for a frame beside the marker: the marker alone, padded, so the
+  // chip still takes exactly the cells it was given (I32).
+  if (inner < widthOf(marker)) return marker + " ".repeat(Math.max(0, room - widthOf(marker)));
+  return frame(truncate(text, inner, tier, "middle"));
 }
 
 /** A `ClusterText` that resolves a sentinel through a table and composes its label. */
@@ -166,9 +210,9 @@ export function chipText(
   chipAt: (cluster: string) => Chip | undefined,
   look: ChipLook,
 ): ClusterText {
-  return (cluster) => {
+  return (cluster, limit) => {
     const chip = chipAt(cluster);
-    return chip === undefined ? undefined : chipLabel(chip, look);
+    return chip === undefined ? undefined : chipLabel(chip, look, limit);
   };
 }
 
@@ -225,12 +269,11 @@ export function walk(
     cells.push({ row: at(), col: gutterAt(at(), gutter) + used });
 
     for (const cluster of graphemes(line)) {
-      const limit = usableAt(at(), width, gutter);
       // **Measured as it is drawn**, which is the invariant the seam exists for:
       // measuring the sentinel and drawing the label gives a prompt whose wrap
       // and whose cursor disagree with the frame, and every grapheme-index
       // assertion passes either way.
-      const shown = drawAs?.(cluster) ?? cluster;
+      let shown = drawAs?.(cluster) ?? cluster;
       // **`cells`, not `clusterWidth`, and the reason is here because the next
       // person will have the same true thought.** `clusterWidth` measures a
       // cluster **by its base code point** — correct for a cluster, and wrong
@@ -241,16 +284,33 @@ export function walk(
       // Safe on the unchanged path: `cells()` and `clusterWidth()` are the same
       // walk — one implementation, so the prompt and every block break at the
       // same place — and `cells(oneCluster)` is `clusterWidth(oneCluster)`.
-      const w = widthOf(shown);
+      let w = widthOf(shown);
 
       // Moves whole. A cluster wider than the whole row still goes on one — it
       // overflows rather than being dropped or substituted (I20).
-      if (used > 0 && used + w > limit) open();
+      if (used > 0 && used + w > usableAt(at(), width, gutter)) open();
 
-      // **Where the substitution landed, taken as it lands.** Clamped to the
-      // row, because a cluster wider than the row overflows it and there are no
-      // cells past the width to paint — the same rule `selectionSpans` uses for
-      // a row a region passes through.
+      // **The limit is the row the cluster lands on, read after the open** (I32,
+      // §5e). It was read once, before it, which was right for the fit test —
+      // decided on the row being left — and is wrong for the elision, which
+      // must fit the row being entered; the two agree only while the gutter's
+      // two figures do.
+      const limit = usableAt(at(), width, gutter);
+
+      // **A chip wider than its row is elided, and a typed cluster is not**
+      // (I32, I20). The label is C17's composition and the walk is the only
+      // thing that knows the width it got; a typed cluster is the user's and
+      // overflows. Asked a second time, with the limit, only here — so the
+      // walk still calls `drawAs` once per cluster on every row that fits.
+      if (w > limit && shown !== cluster && drawAs !== undefined) {
+        shown = drawAs(cluster, limit) ?? shown;
+        w = widthOf(shown);
+      }
+
+      // **Where the substitution landed, taken as it lands.** An elided chip
+      // never passes its row (I32), so the clamp is a guard rather than a rule:
+      // it binds only where `width` is at or inside the gutter and `usable` is
+      // floored at 1 (§7b) — no cells past the width to paint.
       if (shown !== cluster) {
         const from = gutterAt(at(), gutter) + used;
         (chips ??= []).push(Object.freeze({ row: at(), from, to: Math.min(from + w, width) }));
@@ -262,7 +322,7 @@ export function walk(
       // A row that is exactly full ends here, so the position after this
       // cluster is the start of the next row (I19). Opening it now rather than
       // when the next cluster arrives is what gives that position a cell.
-      if (used >= usableAt(at(), width, gutter)) open();
+      if (used >= limit) open();
 
       cells.push({ row: at(), col: gutterAt(at(), gutter) + used });
     }
@@ -384,10 +444,9 @@ export function selectionSpans(
  *
  * **A chip is one wrap unit** (I26), so a span never crosses a row: the walk
  * moves a cluster whole when it does not fit. The one case where the position
- * after a chip is on the next row is the chip that filled or overflowed its
- * own — I20's *overflows rather than being dropped* — and there the span runs
- * to the row's width, which is the same rule `selectionSpans` uses for a row a
- * region passes through.
+ * after a chip is on the next row is the chip that filled its own — which a
+ * chip wider than the row now does exactly, elided to it (I32) rather than
+ * overflowing — and there the span ends at the row's last cell.
  */
 export function chipSpans(
   text: string,

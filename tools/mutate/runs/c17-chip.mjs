@@ -40,7 +40,7 @@ const results = runPass({
     // value is a `Chip` now, not a string, and the reader is the arrow handed
     // to `chipText`. The control is the same one — no substitution, so the
     // frame draws the sentinel.
-    from: "chipText((cluster) => this.#chips.get(cluster), this.#look)",
+    from: "chipText((cluster) => this.#chips.get(cluster)?.chip, this.#look)",
     to: "chipText(() => undefined, this.#look)",
     why: "with no chip resolved the frame draws the sentinel; a run where this survives cannot see a kill",
   },
@@ -50,8 +50,8 @@ const results = runPass({
       // as it was written, and it took a frame-read to find.
       name: "THE DEFECT: the label is measured with `clusterWidth`, by its base code point",
       file: LAYOUT,
-      from: "      const w = widthOf(shown);",
-      to: "      const w = clusterWidth(shown);",
+      from: "      let w = widthOf(shown);",
+      to: "      let w = clusterWidth(shown);",
       expect: "T2.40",
     },
     {
@@ -83,7 +83,7 @@ const results = runPass({
       // Resolution at the wrong end: a sentinel reaching C23, C18 and C20's file.
       name: "`resolved` hands back the raw buffer",
       file: EDITOR,
-      from: "    for (const ch of this.#text) out += this.#chips.get(ch)?.content ?? ch;",
+      from: "    for (const ch of this.#text) out += this.#chips.get(ch)?.chip.content ?? ch;",
       to: "    for (const ch of this.#text) out += ch;",
       expect: "T2.43",
     },
@@ -92,7 +92,7 @@ const results = runPass({
       // buffer are indistinguishable and the side map cannot be keyed.
       name: "every chip gets the same sentinel",
       file: EDITOR,
-      from: "    this.#nextChip += 1;",
+      from: "    this.#nextSentinel += 1;",
       to: "",
       expect: "T2.47",
     },

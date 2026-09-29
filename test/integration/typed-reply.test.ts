@@ -25,6 +25,7 @@ import { SEARCH_ID } from "../../src/interaction/history/index.js";
 import { MENU_ID } from "../../src/interaction/completion/index.js";
 import type { InputEvent } from "../../src/interaction/router/types.js";
 import type { Graph } from "../../src/shell/construct.js";
+import { defaultKeymap } from "../../src/interaction/router/keymap.js";
 
 const press = (name: string, mods: { ctrl?: boolean; meta?: boolean; shift?: boolean } = {}): InputEvent => ({
   kind: "key",
@@ -243,6 +244,35 @@ describe("§052 — a question that wants a sentence, through the router", () =>
   });
 });
 
-describe("C17 §5f — a chip across the reply's borrow, owed at the spec commit", () => {
-  it.todo("T4.9 (C17 I33, I34, with C16 and C23): a reply's pasted chip is its #1, and one yanked back at the prompt takes the prompt's next number and resolves — not deferred on a component: lands with the next commit");
+describe("C17 §5f — a chip across the reply's borrow", () => {
+  it("T4.9 (C17 I33, I34, with C16 and C23): a reply's pasted chip is its #1, and one yanked back at the prompt takes the prompt's next number and resolves", async () => {
+    const { graph, send } = await session();
+    const block = (tag: string): string => Array.from({ length: 6 }, (_, i) => `${tag}${String(i)}`).join("\n");
+    /** The chips a line draws, read off the rows the prompt is drawn from. */
+    const chips = (): string[] =>
+      [...graph.editor.layout(200, { first: 2, cont: 2 }).join("").matchAll(/#(\d+) pasted/gu)].map((m) => `#${m[1] ?? ""}`);
+
+    // **Through the router**, so the paste is the shell's — the line count
+    // decides it is a chip (roadmap 30), and the parts are C17's to number.
+    send({ kind: "paste", text: block("a") });
+    expect(chips(), "the prompt's first chip").toEqual(["#1"]);
+
+    const { answer } = await reply(graph, send);
+    send({ kind: "paste", text: block("b") });
+    expect(chips(), "the reply's first chip is its own #1, not the prompt's #2").toEqual(["#1"]);
+    // `⌃u` kills the chip into the one clipboard (§5a), and answering gives the
+    // reader's line back.
+    send(press("u", { ctrl: true }));
+    expect(graph.editor.text, "the reply's line is empty").toBe("");
+    send(press("enter"));
+    await answer;
+
+    expect(chips(), "the reader's line, numbered as it was").toEqual(["#1"]);
+    const yank = defaultKeymap.find((b) => b.target === "prompt" && b.action === "yank");
+    expect(yank, "a yank chord exists at the prompt").toBeDefined();
+    if (yank === undefined) return;
+    send({ kind: "key", key: { name: yank.key.name, ctrl: yank.key.ctrl ?? false, meta: yank.key.meta ?? false, shift: yank.key.shift ?? false, sequence: yank.key.name } });
+    expect(chips(), "the reply's chip, yanked, takes the prompt's next number").toEqual(["#1", "#2"]);
+    expect(graph.editor.resolved, "and both pastes' content leaves the prompt").toBe(`${block("a")}${block("b")}`);
+  });
 });

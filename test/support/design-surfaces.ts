@@ -1239,10 +1239,13 @@ const contextFill = (
  * chip is one wrap unit, so the row either holds the whole label or none of it.
  */
 const mentionChip = (width: number, capabilities: TerminalCapabilities): readonly string[] => {
-  const sep = glyphs(capabilities).separator;
+  const set = glyphs(capabilities);
+  const sep = set.separator;
+  // The separator's tier, as `construct.ts` reads it (C17 I32).
+  const unicode = set === glyphs({ unicode: "ascii", ambiguousWidth: "narrow" }) ? "ascii" : capabilities.unicode;
   const out: string[] = [];
   for (const painted of [true, false]) {
-    const e = createEditor({ chips: { separator: sep, painted } });
+    const e = createEditor({ chips: { separator: sep, painted, unicode } });
     e.insert("summarise ");
     e.insertChip({ kind: "file", name: "parse.ts", lines: 184, content: "…" }, { delimiter: " " });
     e.insert("for me");
@@ -1260,7 +1263,7 @@ const mentionChip = (width: number, capabilities: TerminalCapabilities): readonl
   }
   // **The resolved line is what leaves the prompt**, and it is not what is drawn:
   // the label never reaches the far side, the content does.
-  const e = createEditor({ chips: { separator: sep, painted: true } });
+  const e = createEditor({ chips: { separator: sep, painted: true, unicode } });
   e.insertChip({ kind: "file", name: "parse.ts", lines: 184, content: "<the file>" });
   out.push("· and what leaves the prompt is the content, never the label", `  │${e.resolved}│`, "");
   return out;
