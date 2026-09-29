@@ -25,12 +25,17 @@
 // for frozen sets only, and the precondition that keeps a malformed hex out of
 // the quantiser. Hand-mutated first; T2.79's first draft died on a membership
 // assertion, a proxy, and now dies on `hcDark`'s `error` and `muted` on one index.
+//
+// **And the gate's scope and its distinctness half** (C10 I70, T6.149–T6.152):
+// shipped projections skipped by identity, and two of I17's six on one index
+// refused unless the set gave them one value.
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/unit/theme.test.ts test/contract/quantised-contrast.test.ts test/edge/theme.test.ts";
+const CMD =
+  "npx vitest run test/unit/theme.test.ts test/contract/quantised-contrast.test.ts test/contract/quantised-gate-scope.test.ts test/edge/theme.test.ts";
 const Q = "src/presentation/theme/quantise.ts";
 const R = "src/presentation/theme/resolve.ts";
 const TABLE = "src/presentation/theme/quantised.generated.ts";
@@ -236,8 +241,8 @@ const results = runPass({
       // no input reaches.
       name: "T6.145: the gate run only on themes the 24-bit gates pass",
       file: STORE,
-      from: "  return [...validateTokens(tokens), ...validatePaintedFloors(tokens), ...validateQuantisedFloors(tokens)];",
-      to: "  const found = [...validateTokens(tokens), ...validatePaintedFloors(tokens)];\n  return found.length > 0 ? found : validateQuantisedFloors(tokens);",
+      from: "  return [...validateTokens(tokens), ...validatePaintedFloors(tokens), ...eight];",
+      to: "  const found = [...validateTokens(tokens), ...validatePaintedFloors(tokens)];\n  return found.length > 0 ? found : eight;",
       expect: "T2.80",
     },
     {
@@ -267,6 +272,40 @@ const results = runPass({
       // The title's colon: the match is a substring, and `T3.2` is a prefix of
       // any T3.2x row these files gain.
       expect: "T3.2:",
+    },
+    {
+      // **T6.149 — the shipped set measured at every load again**: the answer
+      // is the same and the cost is 250–300 ms, so only the call can see it.
+      name: "T6.149: the shipped projections measured at load",
+      file: STORE,
+      from: "  const eight = SHIPPED.has(tokens) ? [] : validateQuantisedFloors(tokens);",
+      to: "  const eight = validateQuantisedFloors(tokens);",
+      expect: "T2.82",
+    },
+    {
+      // **T6.150 — a shipped set told apart by name**: a consumer's set spelled
+      // `dark` passes unmeasured.
+      name: "T6.150: a shipped projection told apart by name, not identity",
+      file: STORE,
+      from: "  const eight = SHIPPED.has(tokens) ? [] : validateQuantisedFloors(tokens);",
+      to: "  const eight = [...SHIPPED].some((t) => t.name === tokens.name) ? [] : validateQuantisedFloors(tokens);",
+      expect: "T2.80",
+    },
+    {
+      // **T6.151 — the silent case back**: every hue on `#767575` painted black.
+      name: "T6.151: the distinctness half removed",
+      file: R,
+      from: "      }).concat(collisions(theme)),",
+      to: "      }),",
+      expect: "T2.81",
+    },
+    {
+      // **T6.152 — a band counted as a collision**: every tone on it is its one ink.
+      name: "T6.152: two slots with one value counted as sharing an index",
+      file: R,
+      from: "      if (new Set(members.map((m) => m.value)).size < 2) continue;",
+      to: "      if (members.length < 2) continue;",
+      expect: "T2.81",
     },
   ],
 });

@@ -19,6 +19,7 @@ import type { Tone } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { ANSI16_WINDOWS_HEX } from "./colormap.js";
 import { DEFAULT_FLOOR, decorationTextPairs, floorFor, inkOn, isHex, luminance, ratio, textGrounds } from "./contrast.js";
+import { MUST_STAY_DISTINCT } from "./four-bit.js";
 import { computeQuantisation, cubeHexOf, quantiseSet, type Admits } from "./quantise.js";
 import {
   NO_STYLE,
@@ -628,9 +629,10 @@ export function validateQuantisedFloors(tokens: ThemeTokens): readonly ThemeErro
 
 /**
  * **The verdict, once per token set** — because the measurement is the held
- * DP for every refused set on every ground, 12–40 ms a theme once warm and
- * ten themes a `loadTheme`, and the shell and every `expectDocument` load the
- * same frozen `defaultTheme`. Kept only for a set frozen all the way down,
+ * DP for every refused set on every ground, 12–40 ms a theme once warm. The
+ * shipped projections no longer reach it (the store skips them, C10 I70), so
+ * what it saves is a consumer's own frozen set loaded more than once, which
+ * nothing in the tree does today. Kept only for a set frozen all the way down,
  * so a consumer's token object mutated between two loads is measured again
  * rather than answered from its first shape.
  */
@@ -675,12 +677,56 @@ function measureQuantisedFloors(tokens: ThemeTokens): readonly ThemeError[] {
           path: `palettes.${ref}`,
           message: `"${ref}" is ${measured.toFixed(2)} : 1 on ${ground} as a 256-colour terminal paints the pair, below ${need} : 1 — no cube entry holds this ground for every ink on it`,
         };
-      }),
+      }).concat(collisions(theme)),
     );
   } finally {
     forget(SCRATCH);
   }
 }
+
+/**
+ * **I17's guarantee as a refusal** (C10 I70, §4c.4 row 13): on every ground the
+ * gate measures, two of `MUST_STAY_DISTINCT` carrying different 24-bit values
+ * must not paint one 8-bit index. The quantiser yields distinctness to the
+ * floor (§4c.4 row 4), so a ground whose floor leaves one admitted entry —
+ * a mid-grey where only black clears — paints `ok` and `error` alike and
+ * reports nothing short. That was the silent case; this names it.
+ *
+ * **One value is one ink** (row 6): a band gives every tone its ink, and a set
+ * that composes two slots to one value asked for them to match. One error per
+ * shared index, at the first slot's path, naming the ground, the slots and the
+ * index.
+ */
+function collisions(theme: ResolvedTheme): readonly ThemeError[] {
+  const grounds = new Set([
+    ...textGrounds(theme.tokens).map(([ground]) => ground),
+    ...decorationTextPairs(theme.tokens).map(([, , ground]) => ground),
+  ]);
+  const out: ThemeError[] = [];
+  for (const ground of grounds) {
+    const byIndex = new Map<number, { slot: string; value: string }[]>();
+    for (const slot of MUST_STAY_DISTINCT) {
+      const painted = resolve(`tone.${slot}`, theme, EIGHT, ground).colour;
+      const authored = resolve(`tone.${slot}`, theme, TRUE_COLOUR, ground).colour;
+      if (painted?.kind !== "ansi256" || authored?.kind !== "rgb") continue;
+      const members = byIndex.get(painted.index) ?? [];
+      members.push({ slot, value: authored.hex.toLowerCase() });
+      byIndex.set(painted.index, members);
+    }
+    for (const [index, members] of byIndex) {
+      if (new Set(members.map((m) => m.value)).size < 2) continue;
+      const slots = members.map((m) => `tone.${m.slot}`);
+      out.push({
+        path: `palettes.${slots[0]!}`,
+        message: `${slots.map((s) => `"${s}"`).join(", ")} all paint index ${String(index)} on ${ground} as a 256-colour terminal paints them — the floor there leaves no entry that keeps them apart, and C10 I17 keeps them apart`,
+      });
+    }
+  }
+  return out;
+}
+
+const EIGHT = Object.freeze({ colourDepth: 8 as const });
+const TRUE_COLOUR = Object.freeze({ colourDepth: 24 as const });
 
 /** Every memo entry resolved under `name` — the scratch gate's, and nobody else's. */
 function forget(name: string): void {

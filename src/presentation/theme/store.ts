@@ -12,6 +12,7 @@
 import type { Result } from "../../data/viewmodel/index.js";
 import { isHex, validateTokens } from "./contrast.js";
 import { clearResolutionCache, validatePaintedFloors, validateQuantisedFloors } from "./resolve.js";
+import { REGISTRY_THEMES } from "./tokens.generated.js";
 import type { ResolvedTheme, ThemeError, ThemeSet, ThemeTokens } from "./types.js";
 
 export type Overrides = Readonly<{
@@ -95,13 +96,25 @@ function resolved(tokens: ThemeTokens, serial: number): ResolvedTheme {
  * hoped** (C10 I70): every colour clears √21 (4.58 : 1) against black or
  * against white, so an ink held to √21 or less always has an extreme to take,
  * and above it the 24-bit gate already refuses a ground carrying inks on both
- * sides. So on a theme the 24-bit gates pass it answers nothing unless the
- * quantiser is wrong, and on one they refuse it names the 256-colour cells
- * beside their reasons. Beside and not after, because a gate that ran only on
- * themes it could never refuse would be a gate no input reaches.
+ * sides. So on a theme the 24-bit gates pass its floor half answers nothing
+ * unless the quantiser is wrong, and on one they refuse it names the
+ * 256-colour cells beside their reasons. Its distinctness half is the one a
+ * 24-bit-clean theme can reach: a floor that leaves one entry for inks I17
+ * keeps apart. Beside and not after, because a gate that ran only on themes
+ * it could never refuse would be a gate no input reaches.
+ *
+ * **Not on a shipped projection** (C10 I70): `defaultTheme`'s token objects are
+ * frozen, generated from the registry and gated where they are built — T2.74
+ * and T2.81 in the suite — so measuring them again at every load spent 250–300
+ * ms of the first `loadTheme` on an answer fixed at build time. Told apart **by
+ * identity** against the generated table and never by name or content: a set a
+ * consumer spells as `dark` is theirs, and is measured.
  */
+const SHIPPED: ReadonlySet<ThemeTokens> = new Set(Object.values(REGISTRY_THEMES));
+
 function gates(tokens: ThemeTokens): readonly ThemeError[] {
-  return [...validateTokens(tokens), ...validatePaintedFloors(tokens), ...validateQuantisedFloors(tokens)];
+  const eight = SHIPPED.has(tokens) ? [] : validateQuantisedFloors(tokens);
+  return [...validateTokens(tokens), ...validatePaintedFloors(tokens), ...eight];
 }
 
 /**

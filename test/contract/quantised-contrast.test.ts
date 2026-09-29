@@ -49,9 +49,31 @@ const unholdable = (tokens: ThemeTokens): ThemeTokens => {
   };
 };
 
+/**
+ * **The floor held by changing side** (C10 §4c.4 row 13): `hcDark` at a floor of
+ * 4.57 with a `diffAdd` both black and white clear at 24 bits, `ok` composed
+ * black on it and its other inks white. Every 24-bit cell clears; at 8 bits the
+ * ground falls to `#767676`, where only black reaches 4.57, so every ink on it
+ * paints black.
+ */
+const sideFlip = (tokens: ThemeTokens): ThemeTokens => {
+  const refs = textGrounds(tokens).find(([ground]) => ground === "diffAdd")![2];
+  const inks = Object.fromEntries(refs.map((ref) => [ref, ref === "tone.ok" ? "#000000" : "#ffffff"]));
+  return {
+    ...tokens,
+    floor: 4.57,
+    surfaces: { ...tokens.surfaces, diffAdd: "#767575" },
+    composed: { ...tokens.composed, "surface.diffAdd": { ...tokens.composed?.["surface.diffAdd"], ...inks } },
+  };
+};
+
+/** The gate's distinctness errors (C10 I17 as a refusal), told apart by wording. */
+const shared = (errors: readonly { path: string; message: string }[]): readonly { path: string; message: string }[] =>
+  errors.filter((e) => e.message.includes("I17 keeps them apart"));
+
 /** The gate's own errors, told from the 24-bit validators' by their wording. */
 const at256 = (errors: readonly { path: string; message: string }[]): readonly { path: string; message: string }[] =>
-  errors.filter((e) => e.message.includes("as a 256-colour terminal paints"));
+  errors.filter((e) => e.message.includes("as a 256-colour terminal paints the pair"));
 
 /** The hex an 8-bit style paints, through the cube the standard fixes. */
 const painted = (style: Style, channel: "colour" | "background" = "colour"): string => {
@@ -62,6 +84,10 @@ const painted = (style: Style, channel: "colour" | "background" = "colour"): str
 
 describe("C10 I68 — quantised contrast", () => {
   it("T2.74 (C10 I68, I69, I26, I54): at 8 bits every shipped theme's shortfalls are the recorded list, and it is empty", () => {
+    // **This row is the shipped themes' 8-bit floor gate** (C10 I70): the store
+    // does not measure a shipped projection at load, so a registry change that
+    // put a cell below its floor is caught here, in the suite, and nowhere else.
+    //
     // **The lists cover the set, both ways**: a theme added with no list, or a
     // list left behind by a retired theme, fails here before any entry is read.
     expect(Object.keys(EIGHT_BIT_SHORTFALLS).sort(), "one recorded list per shipped theme").toEqual(NAMES);
@@ -323,5 +349,40 @@ describe("C10 I17 and I70 — muted kept apart, and the 8-bit floor as a load ga
     expect(validateQuantisedFloors(unholdable(dark))).toHaveLength(19);
     expect(validateQuantisedFloors(structuredClone(dark)), "dark after the control").toEqual([]);
   });
-  it.todo("T2.81 (C10 I17, I70): two of I17's six sharing an index on a measured ground is refused, naming the ground, the slots and the index, and no shipped theme is — not deferred on a component: the code lands in the next commit of this round");
+
+  it("T2.81 (C10 I17, I70, §4c.4 row 13): two of I17's six sharing an index on a measured ground is refused, naming the ground, the slots and the index", () => {
+    // **The shipped half, which the store no longer measures** (C10 I70): no
+    // shipped theme has a shared index on any ground the gate measures.
+    for (const name of NAMES) expect(shared(validateQuantisedFloors(defaultTheme[name]!)), name).toEqual([]);
+
+    // **The silent case made loud.** It loaded before this row: every 24-bit
+    // cell clears and no 8-bit cell is short, and `ok` painted the same black as
+    // `error` and `muted`.
+    const hcDark = defaultTheme["hcDark"]!;
+    const flipped = loadTheme({ flipped: sideFlip(hcDark) });
+    expect(flipped.ok ? [] : flipped.error, "refused, and for this alone").toEqual([
+      {
+        path: "flipped.palettes.tone.ok",
+        message:
+          '"tone.ok", "tone.error", "tone.muted" all paint index 16 on diffAdd as a 256-colour terminal paints them — the floor there leaves no entry that keeps them apart, and C10 I17 keeps them apart',
+      },
+    ]);
+
+    // **An override that forces it, and a control that holds distinct.** A
+    // mid-grey `diffAdd` on hcDark leaves white the only ink that reaches 7.
+    const store_ = store("hcDark");
+    const before = store_.current;
+    const forced = shared(store_.applyOverrides({ surfaces: { diffAdd: "#777777" } }));
+    expect(forced.map((e) => e.path), "one shared index").toEqual(["hcDark.palettes.tone.ok"]);
+    expect(forced[0]!.message).toContain("index 231 on diffAdd");
+    expect(store_.current, "refused whole").toBe(before);
+
+    expect(store_.applyOverrides({ surfaces: { diffAdd: "#003800" } }), "a darker green is accepted").toEqual([]);
+    expect(store_.current, "and applied").not.toBe(before);
+    const six = ["ok", "warn", "error", "info", "accent", "muted"].map((tone) => {
+      const colour = resolve(`tone.${tone}`, store_.current, caps(8), "diffAdd").colour;
+      return colour?.kind === "ansi256" ? colour.index : -1;
+    });
+    expect(new Set(six).size, `six indices on the accepted ground: ${six.join(" ")}`).toBe(6);
+  });
 });
