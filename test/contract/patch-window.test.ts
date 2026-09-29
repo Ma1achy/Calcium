@@ -48,7 +48,7 @@ const ILLUSTRATION: Hunk = {
     line("context", "    matchLabels:"),
     line("remove", "      app: volatility-estimator"),
     line("add", "      app: volatility-estimator"),
-    line("add", "      prism.fmx.io/family: volatility"),
+    line("add", "      prism.example.com/family: volatility"),
     line("context", "  replicas: 2"),
     line("context", "  template:"),
   ],

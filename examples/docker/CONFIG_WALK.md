@@ -40,7 +40,7 @@ cannot, from what `inspect` returns.** Measured on both fixtures:
 
 ```
 dtui-cfg                bind  …/default.conf      → /etc/nginx/conf.d/default.conf   (a file)
-reverent_proskuriakova  bind  /Users/malachy/…    → /workspaces/tui-kit              (a directory)
+reverent_proskuriakova  bind  /Users/someone/…    → /workspaces/tui-kit              (a directory)
 ```
 
 Identical shapes. Distinguishing them costs a `docker exec test -f` per mount, and even then

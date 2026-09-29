@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` |
+| **Package** | `calcium-tui` |
 | **Layer** | L4 shell |
 | **Depends on** | Everything below. It is the only component that may |
 | **Consumed by** | The app's entry point · C23 (receives a subset of the graph, by interface — §3a step 10) |
@@ -3355,7 +3355,7 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.4q** (I24, commitment 14a): a byte written to the fake stdin after `start()` reaches the router as the decoded event, and the same byte written before `acquire()` reaches nothing. The test is the whole path — stream to `onInput` to `push` to `dispatch` — because each half of it existed and passed its own tests while the two were never joined.
 - **T1.4h** (I26): every `defaultKeymap` binding, pressed through a real decoder into a constructed graph, produces its documented effect — fourteen cases, driven from the table rather than listed. A hand-written list is the shape that let fourteen bindings go unexecuted while every test passed.
 - **T1.4i** (I27): a paste of two hundred lines → exactly one `commit("input")`; a scroll key → exactly one, issued by the loop and not by the handler. Both halves, because a handler that also commits passes the first.
-- **T1.4m** (I23, I23a): a session constructed from **the public entry point only** — `import { createTui } from "@fmx/calcium"`, a `ManifestDocument` literal of the app's own verbs, no deep import anywhere in the test — starts, and `/help` lists the framework's verbs alongside it. The constraint is the test: every existing construction harness reaches through the package boundary for `parseManifest`, so each tests a route no consumer has, and that is why both arms of `config.manifest` could be broken with the suite green. The row fails if either the `JSON.parse` or the object-arm parse is removed.
+- **T1.4m** (I23, I23a): a session constructed from **the public entry point only** — `import { createTui } from "calcium-tui"`, a `ManifestDocument` literal of the app's own verbs, no deep import anywhere in the test — starts, and `/help` lists the framework's verbs alongside it. The constraint is the test: every existing construction harness reaches through the package boundary for `parseManifest`, so each tests a route no consumer has, and that is why both arms of `config.manifest` could be broken with the suite green. The row fails if either the `JSON.parse` or the object-arm parse is removed.
 - **T1.4n** (I23): the path arm — a `manifest.json` on the fake filesystem — constructs, and a file containing malformed JSON produces a `ManifestError` naming the file rather than a `SyntaxError` escaping `start()`.
 - **T1.4o** (I23b): a **type-level** row — `const m: TuiConfig["manifest"] = parseManifest(doc).value` does not compile, asserted with an `@ts-expect-error` that fails if the assignment ever becomes legal again. It is the only shape that can hold I23b: the defect it guards is a call that type-checks, so no runtime assertion can be written against it, and the previous type passed every runtime test of the refusal while permitting the call.
 - **T1.4l** (I23): an already-parsed `Manifest` handed back to `createTui` fails on I6's duplicate-name check, naming a framework verb. The refusal that used to be C22's is C05's now, and this is the row that says it still happens.

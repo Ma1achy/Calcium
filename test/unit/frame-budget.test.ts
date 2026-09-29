@@ -44,7 +44,7 @@ const SESSION: SessionSnapshot = Object.freeze({
   env: Object.freeze({ HOME: "/home/ada" }),
   lastUuid: null,
   identity: null,
-  cluster: "fmx-prod",
+  cluster: "corp-prod",
   health: "live",
   version: "1.0.0",
   retained: null,

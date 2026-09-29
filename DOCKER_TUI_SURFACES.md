@@ -19,7 +19,7 @@ Grounded in three decisions: **dense rows** (many containers fit), a **composed 
 dashboard** (shown before any command), and **real tool that demos well** (density over
 decoration, every frame useful).
 
-Local resolution: `"@fmx/calcium": "file:../calcium"` in `docker-tui/package.json`,
+Local resolution: `"calcium-tui": "file:../calcium"` in `docker-tui/package.json`,
 imported from the three entry points as the probe was. R01-honest — a built package, not
 the source tree. Real docker, subprocess transport; `docker … --format json` is the far
 side and the adapter turns it into blocks.

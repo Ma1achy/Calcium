@@ -42,7 +42,7 @@ Separate rather than a monorepo because R01 §8's argument generalises: **a work
 
 **`docker-tui` resolved differently, and the argument above is why it could.** R01 §8 moved it to `Calcium/examples/docker/` on the finding that separation was never the goal — *building against the packaged artefact* was, and separation was one way to get it. Two mechanisms buy the same guarantee inside the workspace:
 
-- **The seal.** `"@fmx/calcium": "file:../.."` plus `"files": ["dist"]` and an `exports` map locked to its entry points — six at C24 I37, every one resolving into `dist/bundle/` (§5, F1193) — so `import "@fmx/calcium/src/…"` is a resolution error enforced by npm rather than by discipline.
+- **The seal.** `"calcium-tui": "file:../.."` plus `"files": ["dist"]` and an `exports` map locked to its entry points — six at C24 I37, every one resolving into `dist/bundle/` (§5, F1193) — so `import "calcium-tui/src/…"` is a resolution error enforced by npm rather than by discipline.
 - **The proof.** `make proof` packs the real tarball, installs it into a tree that has never seen this repository, and runs the app's suite against it — refusing to proceed if npm resolved a symlink instead.
 
 **The distinction that makes this safe is what a repository boundary was actually protecting.** It was never the file layout; it was the resolution path. A boundary enforced by `exports` fails the same way a boundary enforced by separation does — at install, not at review — and it fails on every developer's machine rather than only in CI.
@@ -145,7 +145,7 @@ to be on `PATH`.
 **The separation is in what is installed, not in where the file sits.** Both
 configs live under `.devcontainer/`, because a devcontainer config in a
 subdirectory makes that subdirectory the workspace — and the example's
-dependency is `"@fmx/calcium": "file:../.."`, which then points outside the
+dependency is `"calcium-tui": "file:../.."`, which then points outside the
 mount and fails to install. `.devcontainer/<name>/devcontainer.json` is the
 supported multi-container layout and each mounts the repository root, so the
 path resolves to the thing it names. **This is the rule's cheapest possible
@@ -389,7 +389,7 @@ This is unchanged in every way that matters for R01's argument. Installing from 
 
 ### Why not a git dependency
 
-`"@fmx/calcium": "git+ssh://git@gitlab.fmx/…#v0.3.0"` avoids a registry entirely and is tempting. It does not work here.
+`"calcium-tui": "git+ssh://git@gitlab.example/…#v0.3.0"` avoids a registry entirely and is tempting. It does not work here.
 
 **Git dependencies install from source and need a `prepare` script to build** — and A04 §3 bans install scripts outright, because postinstall is the primary npm attack vector. Allowing one for this would be trading the single most valuable supply-chain control for the convenience of not configuring a registry.
 

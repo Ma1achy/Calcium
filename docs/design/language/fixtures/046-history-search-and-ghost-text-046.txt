@@ -10,7 +10,7 @@ reverse search expands the prompt too — same surface, different content
  ⌥r reverse search      3 of 214
  › /promote a3f9b21 --open-mr
    /diff a3f9b21 7c2d4e1
-   /ps --owner=malachy --since=a3f9b21
+   /ps --owner=someone --since=a3f9b21
 ──────────────────────────────────────────────────────────────────────────────
 ❯ a3f9b21▌
 ──────────────────────────────────────────────────────────────────────────────

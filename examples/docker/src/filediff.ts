@@ -22,10 +22,10 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { b } from "@fmx/calcium";
-import type { LocalDocument, Block, Hunk } from "@fmx/calcium";
+import { b } from "calcium-tui";
+import type { LocalDocument, Block, Hunk } from "calcium-tui";
 
-import type { LocalContext } from "@fmx/calcium";
+import type { LocalContext } from "calcium-tui";
 import type { Runner } from "./mutation.ts";
 const run = promisify(execFile);
 

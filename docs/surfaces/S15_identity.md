@@ -27,9 +27,9 @@ That sets the priority. Each answers a diagnostic question directly and states w
 ```
 ▌ ── whoami ────────────────────────────────────────────────────────────────────
 ▌
-▌   user       malachy.doherty@fmx.io
+▌   user       sam.taylor@example.com
 ▌   teams      vision · ml-platform-readonly
-▌   cluster    fmx-prod · https://prism.fmx.io/v1
+▌   cluster    corp-prod · https://prism.example.com/v1
 ▌   token      valid · expires in 30d          (2026-08-27 14:02 UTC)
 ▌   auth       gitlab oauth
 ▌   config     .calcium/config.toml
@@ -57,7 +57,7 @@ Token state carries **both** a relative and an absolute time. The relative one i
 ```
 ▌ ── login · gitlab oauth ──────────────────────────────────────────────────────
 ▌
-▌   ✓ opening browser                     gitlab.fmx.io/oauth/authorize
+▌   ✓ opening browser                     gitlab.example.com/oauth/authorize
 ▌   ◐ awaiting callback                   localhost:41telling7 · 42s
 ▌
 ▌   Paste the code here if the browser did not open:
@@ -75,7 +75,7 @@ Live while waiting, then a transcript record. Two things are stated up front rat
 On success:
 
 ```
-▌   ✓ signed in as malachy.doherty@fmx.io
+▌   ✓ signed in as sam.taylor@example.com
 ▌     teams vision · ml-platform-readonly · token expires 2026-08-27
 ```
 
@@ -100,8 +100,8 @@ On success:
 ▌    name                               owner               age  note
 ▌ ●  gitlab-readonly-token              research-infra      34d
 ▌ ●  minio-research-creds               research-infra      34d
-▌ ●  wandb-api-key                      malachy             12d
-▌ ✗  huggingface-token                  malachy              8d  not accessible
+▌ ●  wandb-api-key                      someone             12d
+▌ ✗  huggingface-token                  someone              8d  not accessible
 ▌
 ▌   Values are never shown by the CLI.
 ▌

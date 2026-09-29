@@ -776,7 +776,7 @@ const EXPANSION_TABLE = block({
           kind: "keyValue" as const,
           id: "r1-detail",
           rows: [
-            { label: "node", value: "gpu-04.fmx.internal · 2×A100" },
+            { label: "node", value: "gpu-04.example.internal · 2×A100" },
             { label: "mr", value: "!1248  auto-merged" },
           ],
         },

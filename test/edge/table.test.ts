@@ -155,15 +155,15 @@ describe("C11 tier 3 — edges", () => {
 
   it("T3.7: a cell longer than its planned width truncates with the capability-correct marker", () => {
     // At 120 every column survives and `owner` is at its declared minimum of 8,
-    // which `malachy@fmx.io` exceeds — so the marker is forced by the surface's own
+    // which `someone@example.com` exceeds — so the marker is forced by the surface's own
     // declaration rather than by a width chosen to make the test work. At 60 the
     // flex columns absorb the residual and nothing truncates at all, which is why
     // the width matters here.
     const block = psTable({ rows: 1 });
     const unicode = visible(r.renderToLines(block, 120)[1] ?? "");
     const plain = visible(ascii.renderToLines(block, 120)[1] ?? "");
-    expect(unicode).toContain("malachy…");
-    expect(plain).toContain("malachy~");
+    expect(unicode).toContain("someone…");
+    expect(plain).toContain("someone~");
     expect(plain).not.toContain("...");
     // And measurement is unaffected by either.
     expect(r.measure(block, 120)).toBe(ascii.measure(block, 120));

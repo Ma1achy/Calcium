@@ -15,8 +15,8 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { cells } from "@fmx/calcium";
-import type { Block, Panel, Table } from "@fmx/calcium";
+import { cells } from "calcium-tui";
+import type { Block, Panel, Table } from "calcium-tui";
 import { parseNdjson } from "../src/ndjson.ts";
 import {
   COLUMNS,

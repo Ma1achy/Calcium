@@ -14,7 +14,7 @@
  * already covers them, so this family needed no shim change at all.
  */
 
-import type { ToolDef } from "@fmx/calcium";
+import type { ToolDef } from "calcium-tui";
 
 const QUIET = { name: "quiet", short: "q", type: "bool", summary: "Ids only" } as const;
 

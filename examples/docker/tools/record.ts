@@ -279,7 +279,7 @@ export async function recordSession(
   process.env["TZ"] = "UTC";
   const clock = installVirtualTime();
   try {
-    const { createTui } = await import("@fmx/calcium");
+    const { createTui } = await import("calcium-tui");
     const { appConfig } = await import("../src/app.ts");
     const { demoDeps } = await import("../src/world.ts");
 

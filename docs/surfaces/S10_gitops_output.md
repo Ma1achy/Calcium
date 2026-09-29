@@ -14,7 +14,7 @@
 
 ## 1. Purpose
 
-Four verbs, one shape, because they do the same thing: run checks, write YAML into `glass_environment`, and open a merge request.
+Four verbs, one shape, because they do the same thing: run checks, write YAML into `ml_environment`, and open a merge request.
 
 What differs is **who merges it**, and that is the only thing on this surface that really matters. CODEOWNERS auto-merges `candidates/`; it does not auto-merge `serving/`. A production submit lands in about thirty seconds. A promote, a scale and an undeploy wait for a human.
 
@@ -41,19 +41,19 @@ tip        next actions
 ### Auto-merge — `production submit --open-mr`
 
 ```
-▌ ── production submit · fmx_models.jobs.training:job ──────────────────────────
+▌ ── production submit · ml_models.jobs.training:job ──────────────────────────
 ▌
 ▌   ✓ clean working tree                  HEAD a3f9b21
 ▌   ✓ tier-1 rules                        22 rules · 0 errors
-▌   ✓ image resolved                      registry.fmx.io/…/prism-executor:a3f9b21
+▌   ✓ image resolved                      registry.example.com/…/prism-executor:a3f9b21
 ▌   ✓ candidate YAML written              candidates/digit-classifier-a3f9b21.yaml
 ▌   ✓ MR opened                           !1252
 ▌
 ▌   ✓ MR !1252 will auto-merge on green CI.
 ▌     CODEOWNERS auto-merges candidates/. The CRD posts about 30s after merge.
 ▌
-▌   # glass_environment/prism/research-infra/candidates/digit-classifier-a3f9b21.yaml
-▌   apiVersion: prism.fmx.io/v1
+▌   # ml_environment/prism/research-infra/candidates/digit-classifier-a3f9b21.yaml
+▌   apiVersion: prism.example.com/v1
 ▌   kind: PrismRun
 ▌   …
 ▌
@@ -132,7 +132,7 @@ Refusals happen **before anything is written**, and render as S08's failure bloc
 **The dirty-tree asymmetry is stated, not implied.** `experiment submit` warns and proceeds; `production submit` refuses. Both messages are catalogued (A01 Appendix A.3), and the refusal explains why rather than only that:
 
 ```
-▌   ✗ uncommitted changes in fmx_models/digit_classifier.py
+▌   ✗ uncommitted changes in ml_models/digit_classifier.py
 ▌
 ▌     Production submissions require a clean working tree — the candidate YAML
 ▌     records HEAD's SHA as the immutable image tag.

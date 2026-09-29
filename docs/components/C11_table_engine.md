@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` |
+| **Package** | `calcium-tui` |
 | **Layer** | L1 presentation |
 | **Depends on** | C04 (`Table`, `TableRow`, `Cell`, `Measure`) · C09 (registers into its registry; `cells()`; `measureChild`) · C10 (`resolveTone`) |
 | **Consumed by** | C09's registry · every surface with a table |

@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` · report types also at `@fmx/calcium/profiling`, whose `exports` target is `./dist/shell/profiling/index.js` and not `./dist/profiling/` — the subpath is flat and the source is not, which is R14's one visible consequence. `./testing` and `./fixtures` are the precedent |
+| **Package** | `calcium-tui` · report types also at `calcium-tui/profiling`, whose `exports` target is `./dist/shell/profiling/index.js` and not `./dist/profiling/` — the subpath is flat and the source is not, which is R14's one visible consequence. `./testing` and `./fixtures` are the precedent |
 | **Layer** | L4 shell — `src/shell/profiling/` |
 | **Depends on** | nothing new. Node builtins in one file (`node.ts`), gated by SS58 |
 | **Consumed by** | C22 (the composition root injects it), C24 (`TuiConfig.profile`, `ChromeContext.lastFrame`), `tools/profile.mjs` |

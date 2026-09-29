@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` |
+| **Package** | `calcium-tui` |
 | **Layer** | L0 data |
 | **Depends on** | `@xterm/headless` 6.0.0, wrapped in one file · C04's `Terminal` type |
 | **Consumed by** | L4 (C23's shell route) |

@@ -33,7 +33,7 @@
   "title": "The agent at work — five regions, activity presentcurrent · R-STR-001 R-STR-002 R-MOT-008 · retained example blocks generated from registry · example R-EXA-003",
   "cols": 78,
   "rows": 41,
-  "sha": "b22252893de9b4e1",
+  "sha": "d78fb870ccb0ff49",
   "ruleIds": [
    "R-STR-001",
    "R-STR-002",
@@ -48,7 +48,7 @@
   "title": "Idle — the activity region and its rule are gonecurrent · R-STR-001 R-MOT-007 · retained example blocks generated from registry · example R-EXA-004",
   "cols": 78,
   "rows": 17,
-  "sha": "caff0847fcfd4bb5",
+  "sha": "b6660a74a60be128",
   "ruleIds": [
    "R-STR-001",
    "R-MOT-007",
@@ -90,7 +90,7 @@
   "title": "Subagentscurrent · R-COR-001 R-STR-001 · retained example blocks generated from registry · example R-EXA-007",
   "cols": 78,
   "rows": 137,
-  "sha": "247b8122022501c5",
+  "sha": "4ea09748d7741ef9",
   "ruleIds": [
    "R-COR-001",
    "R-STR-001",
@@ -620,7 +620,7 @@
   "title": "History, search and ghost textcurrent · R-COR-001 R-HON-003 R-TXT-001 · retained example blocks generated from registry · example R-EXA-046",
   "cols": 78,
   "rows": 37,
-  "sha": "270ab2c69b138da9",
+  "sha": "fd698feee9e82ad3",
   "ruleIds": [
    "R-COR-001",
    "R-HON-003",
@@ -737,7 +737,7 @@
   "title": "Linkscurrent · R-INT-005 R-INT-006 · retained example blocks generated from registry · example R-EXA-054",
   "cols": 78,
   "rows": 67,
-  "sha": "b8521836b9bb10af",
+  "sha": "a3423d523594c931",
   "ruleIds": [
    "R-INT-005",
    "R-INT-006",
@@ -930,7 +930,7 @@
   "title": "Scrolled back while a turn runscurrent · R-COR-001 R-INT-008 · retained example blocks generated from registry · example R-EXA-067",
   "cols": 78,
   "rows": 101,
-  "sha": "a022811e95a5a5d3",
+  "sha": "8d3896f941bafaea",
   "ruleIds": [
    "R-COR-001",
    "R-INT-008",
@@ -1134,7 +1134,7 @@
   "title": "Prism — /pscurrent · R-STA-001 R-HON-002 · retained example blocks generated from registry · example R-EXA-081",
   "cols": 78,
   "rows": 31,
-  "sha": "8d9a67f3e9fe55ff",
+  "sha": "819a29310e13f08e",
   "ruleIds": [
    "R-STA-001",
    "R-HON-002",
@@ -1148,7 +1148,7 @@
   "title": "No pushed viewscurrent · R-INT-001 R-INT-008 · retained example blocks generated from registry · example R-EXA-082",
   "cols": 82,
   "rows": 62,
-  "sha": "3d5412b0b9c440e3",
+  "sha": "b247a64b866bd9a9",
   "ruleIds": [
    "R-INT-001",
    "R-INT-008",
@@ -1162,7 +1162,7 @@
   "title": "Prism — submitcurrent · R-QST-001 R-PER-001 · retained example blocks generated from registry · example R-EXA-083",
   "cols": 82,
   "rows": 25,
-  "sha": "32550a3fd29615ec",
+  "sha": "e91bb65077e11bea",
   "ruleIds": [
    "R-QST-001",
    "R-PER-001",
@@ -1190,7 +1190,7 @@
   "title": "Prism — the six-hour runcurrent · R-PRG-001 R-MOT-002 R-NTF-001 · retained example blocks generated from registry · example R-EXA-085",
   "cols": 79,
   "rows": 61,
-  "sha": "cc00dd04b06be3fc",
+  "sha": "25b0191dcb332f91",
   "ruleIds": [
    "R-PRG-001",
    "R-MOT-002",

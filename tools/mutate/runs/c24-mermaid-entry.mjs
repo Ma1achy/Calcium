@@ -1,5 +1,5 @@
 // C24 I36 — the runtime barrel imports nothing from the Mermaid renderer; the
-// transform is its own entry, `@fmx/calcium/mermaid`. Mutated (T6.19, F1188).
+// transform is its own entry, `calcium-tui/mermaid`. Mutated (T6.19, F1188).
 //
 // **The pass rebuilds `dist/` at each step and at its end**: T5.6 reads the
 // built package's graph under the import trace, so a mutation of `src/` that
@@ -49,8 +49,8 @@ const results = runPass({
       // runtime import's list; every contract row on the function is green.
       name: "MERMAID-ON-BARREL: the runtime barrel re-exports mermaidCode and loads the renderer",
       file: BARREL,
-      from: "// `mermaidCode` is `@fmx/calcium/mermaid` and not here (C24 I36): its renderer",
-      to: 'export { mermaidCode } from "./presentation/mermaid.js";\n// `mermaidCode` is `@fmx/calcium/mermaid` and not here (C24 I36): its renderer',
+      from: "// `mermaidCode` is `calcium-tui/mermaid` and not here (C24 I36): its renderer",
+      to: 'export { mermaidCode } from "./presentation/mermaid.js";\n// `mermaidCode` is `calcium-tui/mermaid` and not here (C24 I36): its renderer',
       expect: "T5.6",
     },
   ],

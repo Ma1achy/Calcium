@@ -309,7 +309,7 @@ work ###################------------ 62%
 ........................................ 20 20       matchLabels:
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 21    -       app: volatility-estimator
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    21 +       app: volatility-estimator
-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.fmx.io/family: vola~
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.example.com/family:~
 ........................................ 22 23     replicas: 2
 ........................................ 23 24     template:
   A = bg 48;2;73;0;0
@@ -358,7 +358,7 @@ a patch — a unified diff, not the gutter
   drawn  -- serving/volatility-estimator.yaml ---
   drawn  ... 14 unchanged lines
   drawn  @@ -18,6 +18,7 @@
-  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.fmx.io/family: volatility↵   replicas: 2↵   template:
+  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.example.com/family: volatility↵   replicas: 2↵   template:
 
 a status — the message and its detail
   drawn  +--------------------------------------+
@@ -379,7 +379,7 @@ a rule — no source, so it declines
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   uuid     family            status
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB > a3f9b21  digit-classifier  running
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     open
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.example.internal · 2×A~
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
 ........................................   7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
@@ -389,7 +389,7 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   uuid     family            status
 ........................................   a3f9b21  digit-classifier  running
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     open
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.example.internal · 2×A~
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
 ........................................   7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
@@ -1062,7 +1062,7 @@ work ############################################--------------------------- 62%
 ................................................................................ 20 20       matchLabels:
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 21    -       app: volatility-estimator
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    21 +       app: volatility-estimator
-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.fmx.io/family: volatility
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.example.com/family: volatility
 ................................................................................ 22 23     replicas: 2
 ................................................................................ 23 24     template:
   A = bg 48;2;73;0;0
@@ -1111,7 +1111,7 @@ a patch — a unified diff, not the gutter
   drawn  -- serving/volatility-estimator.yaml -----------------------
   drawn  ... 14 unchanged lines
   drawn  @@ -18,6 +18,7 @@
-  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.fmx.io/family: volatility↵   replicas: 2↵   template:
+  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.example.com/family: volatility↵   replicas: 2↵   template:
 
 a status — the message and its detail
   drawn  +----------------------------------------------------------+
@@ -1131,7 +1131,7 @@ a rule — no source, so it declines
 · r1 focused and expanded — the ground opens under ▸, the detail takes bgElev, and r2 beneath it takes none
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA        uuid     family            status
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB > v    a3f9b21  digit-classifier  running
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.example.internal · 2×A100
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
 ................................................................................        7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
@@ -1140,7 +1140,7 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 · r1 expanded with nothing focused — the detail is grounded and the row above it is not: the ground follows expansion
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA        uuid     family            status
 ................................................................................   v    a3f9b21  digit-classifier  running
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.example.internal · 2×A100
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
 ................................................................................        7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
@@ -1800,7 +1800,7 @@ work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯
 ........................................ 20 20       matchLabels:
 ........................................ 21    -       app: volatility-estimator
 ........................................    21 +       app: volatility-estimator
-........................................    22 +       prism.fmx.io/family: vola…
+........................................    22 +       prism.example.com/family:…
 ........................................ 22 23     replicas: 2
 ........................................ 23 24     template:
 · a tag with extent, ex. 3 — and the error tag is the only one
@@ -1842,7 +1842,7 @@ a patch — a unified diff, not the gutter
   drawn  ── serving/volatility-estimator.yaml ───
   drawn  ⋯ 14 unchanged lines
   drawn  @@ -18,6 +18,7 @@
-  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.fmx.io/family: volatility↵   replicas: 2↵   template:
+  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.example.com/family: volatility↵   replicas: 2↵   template:
 
 a status — the message and its detail
   drawn  ┌──────────────────────────────────────┐
@@ -1863,7 +1863,7 @@ a rule — no source, so it declines
 ........................................   uuid     family            status
 ........................................ ▸ a3f9b21  digit-classifier  running
 ........................................     open
-........................................     node  gpu-04.fmx.internal · 2×A100
+........................................     node  gpu-04.example.internal · 2×A…
 ........................................     mr    !1248  auto-merged
 ........................................   7c2d4e1  decoder-zoom      succeeded
 
@@ -1871,7 +1871,7 @@ a rule — no source, so it declines
 ........................................   uuid     family            status
 ........................................   a3f9b21  digit-classifier  running
 ........................................     open
-........................................     node  gpu-04.fmx.internal · 2×A100
+........................................     node  gpu-04.example.internal · 2×A…
 ........................................     mr    !1248  auto-merged
 ........................................   7c2d4e1  decoder-zoom      succeeded
 
@@ -2493,7 +2493,7 @@ work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮
 ................................................................................ 20 20       matchLabels:
 ................................................................................ 21    -       app: volatility-estimator
 ................................................................................    21 +       app: volatility-estimator
-................................................................................    22 +       prism.fmx.io/family: volatility
+................................................................................    22 +       prism.example.com/family: volatility
 ................................................................................ 22 23     replicas: 2
 ................................................................................ 23 24     template:
 · a tag with extent, ex. 3 — and the error tag is the only one
@@ -2535,7 +2535,7 @@ a patch — a unified diff, not the gutter
   drawn  ── serving/volatility-estimator.yaml ───────────────────────
   drawn  ⋯ 14 unchanged lines
   drawn  @@ -18,6 +18,7 @@
-  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.fmx.io/family: volatility↵   replicas: 2↵   template:
+  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.example.com/family: volatility↵   replicas: 2↵   template:
 
 a status — the message and its detail
   drawn  ┌──────────────────────────────────────────────────────────┐
@@ -2555,14 +2555,14 @@ a rule — no source, so it declines
 · r1 focused and expanded — the ground opens under ▸, the detail takes bgElev, and r2 beneath it takes none
 ................................................................................        uuid     family            status
 ................................................................................ ▸ ▿    a3f9b21  digit-classifier  running
-................................................................................     node  gpu-04.fmx.internal · 2×A100
+................................................................................     node  gpu-04.example.internal · 2×A100
 ................................................................................     mr    !1248  auto-merged
 ................................................................................        7c2d4e1  decoder-zoom      succeeded
 
 · r1 expanded with nothing focused — the detail is grounded and the row above it is not: the ground follows expansion
 ................................................................................        uuid     family            status
 ................................................................................   ▿    a3f9b21  digit-classifier  running
-................................................................................     node  gpu-04.fmx.internal · 2×A100
+................................................................................     node  gpu-04.example.internal · 2×A100
 ................................................................................     mr    !1248  auto-merged
 ................................................................................        7c2d4e1  decoder-zoom      succeeded
 
@@ -3186,7 +3186,7 @@ work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯
 ........................................ 20 20       matchLabels:
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 21    -       app: volatility-estimator
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    21 +       app: volatility-estimator
-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.fmx.io/family: vola…
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.example.com/family:…
 ........................................ 22 23     replicas: 2
 ........................................ 23 24     template:
   A = bg 48;2;73;0;0
@@ -3235,7 +3235,7 @@ a patch — a unified diff, not the gutter
   drawn  ── serving/volatility-estimator.yaml ───
   drawn  ⋯ 14 unchanged lines
   drawn  @@ -18,6 +18,7 @@
-  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.fmx.io/family: volatility↵   replicas: 2↵   template:
+  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.example.com/family: volatility↵   replicas: 2↵   template:
 
 a status — the message and its detail
   drawn  ┌──────────────────────────────────────┐
@@ -3256,7 +3256,7 @@ a rule — no source, so it declines
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   uuid     family            status
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB ▸ a3f9b21  digit-classifier  running
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     open
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.example.internal · 2×A…
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
 ........................................   7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
@@ -3266,7 +3266,7 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   uuid     family            status
 ........................................   a3f9b21  digit-classifier  running
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     open
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.example.internal · 2×A…
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
 ........................................   7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
@@ -3940,7 +3940,7 @@ work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮
 ................................................................................ 20 20       matchLabels:
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 21    -       app: volatility-estimator
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    21 +       app: volatility-estimator
-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.fmx.io/family: volatility
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.example.com/family: volatility
 ................................................................................ 22 23     replicas: 2
 ................................................................................ 23 24     template:
   A = bg 48;2;73;0;0
@@ -3989,7 +3989,7 @@ a patch — a unified diff, not the gutter
   drawn  ── serving/volatility-estimator.yaml ───────────────────────
   drawn  ⋯ 14 unchanged lines
   drawn  @@ -18,6 +18,7 @@
-  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.fmx.io/family: volatility↵   replicas: 2↵   template:
+  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.example.com/family: volatility↵   replicas: 2↵   template:
 
 a status — the message and its detail
   drawn  ┌──────────────────────────────────────────────────────────┐
@@ -4009,7 +4009,7 @@ a rule — no source, so it declines
 · r1 focused and expanded — the ground opens under ▸, the detail takes bgElev, and r2 beneath it takes none
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA        uuid     family            status
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB ▸ ▿    a3f9b21  digit-classifier  running
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.example.internal · 2×A100
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
 ................................................................................        7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
@@ -4018,7 +4018,7 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 · r1 expanded with nothing focused — the detail is grounded and the row above it is not: the ground follows expansion
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA        uuid     family            status
 ................................................................................   ▿    a3f9b21  digit-classifier  running
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.example.internal · 2×A100
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
 ................................................................................        7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34

@@ -2325,7 +2325,7 @@
 "supersededBy": []
 },
 "R-BLK-007": {
-"digest": "b1a65d476a828cde18077379a20ebc84d86d32f2304c78f88c84bbcf459955c7",
+"digest": "6912850e6cc530aad183b902b43a329c7114532e09086ccc6baf489e021bb001",
 "status": "example",
 "supersedes": [],
 "supersededBy": []
@@ -2361,7 +2361,7 @@
 "supersededBy": []
 },
 "R-BLK-013": {
-"digest": "586cf291a944cc2bc6d1fb55d9683a05cf9080494ea85997c20e56cb27c7589c",
+"digest": "0581fc7934c7dde22ae1bf6095e8976033f196041c4aa20b131b16536dfdbe03",
 "status": "example",
 "supersedes": [],
 "supersededBy": []
@@ -2451,7 +2451,7 @@
 "supersededBy": []
 },
 "R-BLK-028": {
-"digest": "1cadcf558a167cd7a7651bea6fa595faea5bfe719525780b44f71a0b62718df2",
+"digest": "632fc5eecbdc0427727af291bb22c4d570a16303d4450ae74ac595e9ff10164c",
 "status": "example",
 "supersedes": [],
 "supersededBy": []
@@ -2475,7 +2475,7 @@
 "supersededBy": []
 },
 "R-BLK-032": {
-"digest": "970e57026db454031a2f6f9076ec81f691faa544541dffef9a824a1149a37ba2",
+"digest": "2b083bfba2a86cb43971574123a852b3c770abe2fa2714eb194005f0c0ac2c1d",
 "status": "example",
 "supersedes": [],
 "supersededBy": []
@@ -4197,7 +4197,7 @@
 "supersededBy": []
 },
 "R-BLK-319": {
-"digest": "222f814af1b58e10e318b3f99eeff5962bda1bed53f94360d2486468799217aa",
+"digest": "e0166f4f823858d4c7febfd622242260e8195484192b67120c4d3939ab7d1972",
 "status": "example",
 "supersedes": [],
 "supersededBy": []
@@ -4563,7 +4563,7 @@
 "supersededBy": []
 },
 "R-BLK-380": {
-"digest": "68bf6f8641d68f2c3f191d26c8b5ba12dbc46b10347d0be4769c1a2cd0c0f276",
+"digest": "01237d393b7fde72b972891961f07b5f84623b67a8f37c679f1fad72b6996967",
 "status": "example",
 "supersedes": [],
 "supersededBy": []
@@ -5187,7 +5187,7 @@
 "supersededBy": []
 },
 "R-BLK-484": {
-"digest": "e4a072043f35fe7ed90436d699ab40c826934a3ffa698053aa94980d58ab7cf8",
+"digest": "9a3af409766b359b8427b475c73830f439a429f57de930d9f3869955c0fe929a",
 "status": "example",
 "supersedes": [],
 "supersededBy": []
@@ -5211,7 +5211,7 @@
 "supersededBy": []
 },
 "R-BLK-488": {
-"digest": "a29c58b4a86959ad74cc8635c965e7aa6cc475f044a21b3279a531f1ce6d53c3",
+"digest": "bad1eb8df1918b1ca9d96ed8ea36736db954d295b585a1a254f1180330d3f8dc",
 "status": "example",
 "supersedes": [],
 "supersededBy": []
@@ -6105,7 +6105,7 @@
 "supersededBy": []
 },
 "R-BLK-637": {
-"digest": "202dc6613a0c19df7fa60506447ea7c08b53ff9435577ce8353aa743247d4bb3",
+"digest": "9b285cccdee38c635a82198ae1f086fc0863eac4e4088cf4fe991a24d2e827ae",
 "status": "example",
 "supersedes": [],
 "supersededBy": []
@@ -6183,7 +6183,7 @@
 "supersededBy": []
 },
 "R-BLK-650": {
-"digest": "638e01243e8bdfd7aaa04f0ed051e03ab21d634c83130acfc64210c534d0b5f5",
+"digest": "1cee274a15a1240b2d979953d72042a98aeb72c954322e2db60cfa0e0245470b",
 "status": "example",
 "supersedes": [],
 "supersededBy": []
@@ -6207,7 +6207,7 @@
 "supersededBy": []
 },
 "R-BLK-654": {
-"digest": "2ca5b5575c4ecfd15df2b22c4fa511edfa6ab199be968d7158fd819be972b56c",
+"digest": "eb76a0d80d7e4df97a3c465c4abae9d36c31c46372d45581120d6ef06c5c9d48",
 "status": "example",
 "supersedes": [],
 "supersededBy": []
@@ -6285,7 +6285,7 @@
 "supersededBy": []
 },
 "R-BLK-667": {
-"digest": "0847dda4a3e58e9a643a0b158d1607930377c8b2e1cb50e04eb3bef63dd4d81d",
+"digest": "1c81317fd3a578479917375ed27a573bc49f2e079c222f2d45e02457c812cb46",
 "status": "example",
 "supersedes": [],
 "supersededBy": []
@@ -8127,7 +8127,7 @@
 "supersededBy": []
 },
 "R-BLK-941": {
-"digest": "7670d1fba7695a9414b6efe31c6fc212d188290ec3d479518948cc24a7ccb81b",
+"digest": "083fc8e6106d05ae1e1d6a1f8018a33dfbd65591da0182bca13d3ac6f3af1d68",
 "status": "example",
 "supersedes": [
 "R-BLK-650"
@@ -8179,7 +8179,7 @@
 "supersededBy": []
 },
 "R-BLK-945": {
-"digest": "5f1127c3c4259ca5b51ff0e10888642fa32201661f362d00fb6593be582e7bbc",
+"digest": "6f2387846d5f40775cdde088ae2d0428cf9126965304a977a6cea07404cd6e39",
 "status": "example",
 "supersedes": [
 "R-BLK-007"
@@ -8211,7 +8211,7 @@
 "supersededBy": []
 },
 "R-BLK-949": {
-"digest": "4f3cfa139dce4b5ec499d5a7b1ebdba8688e03fa95f305da44abd13b77216884",
+"digest": "8f0e582b9c3b620c9ba9c909a5c96faf917fa9ea8c82611b6c5ee498c0a1c75d",
 "status": "example",
 "supersedes": [
 "R-BLK-032"
@@ -8339,7 +8339,7 @@
 "supersededBy": []
 },
 "R-BLK-965": {
-"digest": "285ab3b1d5e5a6acddcd7d9d213e5286729eaa7a7402cb3292ff0afd36b7172a",
+"digest": "da048f7d0b885f7208d6cbb4a021c66c173c9a10a094465d48314bb64c2f4882",
 "status": "example",
 "supersedes": [
 "R-BLK-484"
@@ -8363,7 +8363,7 @@
 "supersededBy": []
 },
 "R-BLK-968": {
-"digest": "26698fe754bc3bf434076fe89cc6b5394d25e61b850e2b647f0acd323ca3f6b0",
+"digest": "681094934ef658e0f44200e6bed2d0ae38d33766dba30d1c80d8e7caa71e1372",
 "status": "example",
 "supersedes": [
 "R-BLK-654"
@@ -13648,7 +13648,7 @@
 "themeCount": 869,
 "anchor": {
 "kind": "content-hash",
-"sha256": "90af691ca8d3bafa2f2bfb5f9a949d403d8540be849928bd16a5c009206a23b8",
+"sha256": "62d777c9b1e4b9ef3e0b688d335d6de36c32927f2a807d684ec0746a0864f5f6",
 "note": "A hash stored beside the data it protects is a TRIPWIRE: it catches a careless edit, not a determined one. To make it a SEAL, publish this sha256 in a git tag or CI secret and export CALCIUM_ANCHOR before running the gate; then set claim to external-seal.",
 "claim": "local-tripwire"
 }

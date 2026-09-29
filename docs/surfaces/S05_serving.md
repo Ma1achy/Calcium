@@ -93,7 +93,7 @@ At 60 the table is name, replicas, status, errors — which still answers "what 
 ▌   health          ▲ degraded
 ▌   endpoint        http://volatility-estimator.prism-serving.svc.cluster.local
 ▌   namespace       prism-serving
-▌   image           registry.fmx/prism/modelserver:v0.2.1
+▌   image           registry.example/prism/modelserver:v0.2.1
 ▌   age             12d
 ▌
 ▌ ── request rate · last 30 minutes ─────────────────────────────────────────────

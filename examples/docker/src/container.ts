@@ -22,8 +22,8 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { b } from "@fmx/calcium";
-import type { AdapterDocument, Adapter, Block, ErrorLike } from "@fmx/calcium";
+import { b } from "calcium-tui";
+import type { AdapterDocument, Adapter, Block, ErrorLike } from "calcium-tui";
 import { BUSY, HOT, percent } from "./dashboard.ts";
 
 /**

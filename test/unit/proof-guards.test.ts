@@ -73,7 +73,7 @@ describe("proof.sh guards", () => {
     // publishing to the configured host. A CI job wiring a local registry with
     // `--registry` would have aimed at the real one and read the auth failure as
     // a problem with the local one. The scoped form is what wins, which is why
-    // the script passes `--@fmx:registry=` and then asserts the line rather than
+    // the script passes `--@calcium-tui:registry=` and then asserts the line rather than
     // trusting the flag.
     expect(guardAccepts(TO_CONFIGURED)).toBe(false);
     expect(TO_CONFIGURED, "and npm really does report it as a publish").toContain(
@@ -82,7 +82,7 @@ describe("proof.sh guards", () => {
   });
 
   it("PG3: the scoped override is what is passed, not the bare flag", () => {
-    expect(SCRIPT).toContain("--@fmx:registry=$LOCAL");
+    expect(SCRIPT).toContain("--@calcium-tui:registry=$LOCAL");
     // The bare `--registry` form is the one that fails silently. It must not be
     // what the gate uses.
     expect(/npm publish --dry-run --registry/.test(SCRIPT)).toBe(false);

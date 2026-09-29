@@ -19,8 +19,8 @@
  * `PlotForm` before its builder is the reason to have it; `T-refuse` exercises
  * it, and calls `refuse` rather than building the object by hand.
  */
-import { b } from "@fmx/calcium";
-import type { Block, Camera, PlotForm, Series } from "@fmx/calcium";
+import { b } from "calcium-tui";
+import type { Block, Camera, PlotForm, Series } from "calcium-tui";
 import { CORES, STAGES, WIDTHS, budget, field, magnitudes, summaries, wave } from "./data.ts";
 import { mesh } from "./meshes.ts";
 
@@ -104,7 +104,7 @@ const rows = (n: number, phase: number, cols = 16): Series[] =>
  * function now, which is the difference between a rule and a note about one.
  *
  * **What was here was `type PlotCamera = NonNullable<Plot["camera"]>`, and it
- * had been dead since F509.** The alias existed because `@fmx/calcium` published
+ * had been dead since F509.** The alias existed because `calcium-tui` published
  * `Plot` and not `Camera`, so the only way to name a camera was to index the
  * block that carries a starting one — which compiles and says the wrong thing,
  * since this is a type about a *view*. Its consumer was `cameraAt(phase, …)`,

@@ -7,8 +7,8 @@
  * arriving through a transport that tried to parse it as one document.
  */
 
-import { b } from "@fmx/calcium";
-import type { Adapter, ColumnDef, Glyph, TableRow, Tone } from "@fmx/calcium";
+import { b } from "calcium-tui";
+import type { Adapter, ColumnDef, Glyph, TableRow, Tone } from "calcium-tui";
 import { parseNdjson, str } from "./ndjson.ts";
 import type { Row } from "./ndjson.ts";
 

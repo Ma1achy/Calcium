@@ -33,13 +33,13 @@ is quiet.
 
 ## A — Classification table: which consumer resolves what, and what each can prove
 
-The structural interaction is that **four different things import `@fmx/calcium`
+The structural interaction is that **four different things import `calcium-tui`
 and no two of them resolve it the same way.** Every row is a pair of rules that
 both hold at rest.
 
 | | consumer | how it resolves | can prove | cannot prove |
 |---|---|---|---|---|
-| **A1** | the app's `src/`, in the workspace | npm workspace symlink: `node_modules/@fmx/calcium -> ../..` | the API is usable | anything about the package |
+| **A1** | the app's `src/`, in the workspace | npm workspace symlink: `node_modules/calcium-tui -> ../..` | the API is usable | anything about the package |
 | **A2** | `make proof`'s clean tree | the packed tarball, asserted not to be a symlink | `files`, `exports`, type resolution | — |
 | **A3** | the linked `docker-tui` bin | the same symlink as A1, reached through a global link | the command runs | the same blind spot as A1 |
 | **A4** | the README's minimal example | **undecided — this is the row** | | |

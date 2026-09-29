@@ -42,7 +42,7 @@ four kinds, and what OPEN means for each
 
 ──────────────────────────────────────────────────────────────────────────────
  ⟩ Open this link?
- https://docs.internal.fmx.io/runbooks/parser
+ https://docs.internal.example.com/runbooks/parser
 
   › no    open    copy it instead
 ──────────────────────────────────────────────────────────────────────────────

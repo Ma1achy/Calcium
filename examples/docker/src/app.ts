@@ -17,8 +17,8 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { defaultTheme } from "@fmx/calcium";
-import type { TransportRouter, TuiConfig } from "@fmx/calcium";
+import { defaultTheme } from "calcium-tui";
+import type { TransportRouter, TuiConfig } from "calcium-tui";
 import { BINARY, buildManifest } from "./manifest.ts";
 import { createPsAdapter } from "./ps.ts";
 import { createDashboardHandler, dashboardBlocks } from "./dashboard.ts";

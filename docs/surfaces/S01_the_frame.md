@@ -4,7 +4,7 @@
 |---|---|
 | **Type** | Surface |
 | **Tier** | Chrome — always present, never scrolls |
-| **Package** | `@fmx/calcium` (structure) + `prism-tui` (header and footer content, via hook 5) |
+| **Package** | `calcium-tui` (structure) + `prism-tui` (header and footer content, via hook 5) |
 | **Data source** | C22 `SessionSnapshot` · C14 `VisibleRange` · C17 buffer and cursor · C19 ghost text · C16 `activeTarget` |
 | **Source** | `t01` §The frame · A01 D6, D24a, D30 · A02 §6 hook 5 · C22 §6 |
 | **Status** | Draft |
@@ -28,7 +28,7 @@ Calcium owns the structure; the header's and footer's *content* is app-supplied 
 At 80 × 14, mid-session, with the live block navigable:
 
 ```
-▲ prism  v1.0.0   fmx-prod · malachy@fmx.io              ● live         14:23:07
+▲ prism  v1.0.0   corp-prod · someone@example.com              ● live         14:23:07
 ────────────────────────────────────────────────────────────────────────────────
    ✓ tier-1 rules                        22 rules · 0 errors · 587ms
    next: /test …   /experiment submit …                              587ms
@@ -155,8 +155,8 @@ returns them, bottom-first, so the top layer wins every cell it covers.
 |---|---|---|---|
 | Mark | Static | `▲ prism` | never |
 | Version | `session.version` | `v1.0.0` | 90 cols |
-| Cluster | `session.cluster` | `fmx-prod` | never |
-| Identity | `session.identity` | `malachy@fmx.io`, then `malachy`, then dropped | 100, then 70 |
+| Cluster | `session.cluster` | `corp-prod` | never |
+| Identity | `session.identity` | `someone@example.com`, then `someone`, then dropped | 100, then 70 |
 | Health | `session.health` | §5 | never |
 | Clock | Injected clock | `14:23:07`, then `14:23` | 80 cols |
 

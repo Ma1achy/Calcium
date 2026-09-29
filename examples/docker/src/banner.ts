@@ -23,8 +23,8 @@
  *   been applied, and adding one would produce nine.
  */
 
-import { art, cells } from "@fmx/calcium";
-import type { Block } from "@fmx/calcium";
+import { art, cells } from "calcium-tui";
+import type { Block } from "calcium-tui";
 
 /** Columns between the whale and the wordmark. Four reads well; two is tight. */
 const GAP = 4;

@@ -122,24 +122,24 @@ Calcium's `package.json` must have:
 "files": ["dist"]
 ```
 
-With `exports` locked to the three entry points, `import "@fmx/calcium/src/data/..."` is
+With `exports` locked to the three entry points, `import "calcium-tui/src/data/..."` is
 a **resolution error** — the package boundary is enforced by npm, not by discipline. The
 app can only see what `exports` exposes.
 
 **Verify this first.** If `exports` is missing or permissive, that is the first task —
 and it is a real Calcium finding (C24's package surface is not sealed), which is on-theme:
-the app finds the gap before writing a line. Confirm `import "@fmx/calcium/src/..."` fails
+the app finds the gap before writing a line. Confirm `import "calcium-tui/src/..."` fails
 before proceeding.
 
 ### The dev loop — workspace + `file:`
 
 ```
 Calcium/package.json          →  "workspaces": ["examples/docker"]
-examples/docker/package.json  →  "dependencies": { "@fmx/calcium": "file:../.." }
+examples/docker/package.json  →  "dependencies": { "calcium-tui": "file:../.." }
 ```
 
-`npm install` at the root links `@fmx/calcium` to the built package. The app imports
-`import { b } from "@fmx/calcium"`, resolving to `dist/` **through the exports map**, not
+`npm install` at the root links `calcium-tui` to the built package. The app imports
+`import { b } from "calcium-tui"`, resolving to `dist/` **through the exports map**, not
 to `src/`. Fast loop, no publish step, boundary still enforced. Rebuild Calcium
 (`npm run build`) when its `dist/` needs refreshing.
 
@@ -151,7 +151,7 @@ a publishable package" claim is proven by a CI step that installs the real tarba
 ```
 npx verdaccio &                                          # local registry, localhost:4873
 cd calcium && npm publish --registry http://localhost:4873
-cd $(mktemp -d) && npm init -y   && npm i @fmx/calcium --registry http://localhost:4873  # the real, packed artefact
+cd $(mktemp -d) && npm init -y   && npm i calcium-tui --registry http://localhost:4873  # the real, packed artefact
 # run the example's tests against the INSTALLED package
 ```
 

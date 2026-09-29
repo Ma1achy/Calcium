@@ -12,8 +12,8 @@
  * nothing can cross.
  */
 
-import type { AdapterDocument, Adapter, Block } from "@fmx/calcium";
-import { b } from "@fmx/calcium";
+import type { AdapterDocument, Adapter, Block } from "calcium-tui";
+import { b } from "calcium-tui";
 import { str, type Row } from "./ndjson.ts";
 
 /**

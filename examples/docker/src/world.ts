@@ -50,8 +50,8 @@
  */
 
 import { createHash } from "node:crypto";
-import { createFixtureTransport, createRouter } from "@fmx/calcium";
-import type { Fixture, RawPatch, RawResult, TransportRouter, VerbTransport } from "@fmx/calcium";
+import { createFixtureTransport, createRouter } from "calcium-tui";
+import type { Fixture, RawPatch, RawResult, TransportRouter, VerbTransport } from "calcium-tui";
 import type { Runner } from "./mutation.ts";
 import type { Spawner } from "./progress.ts";
 

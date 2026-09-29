@@ -1,6 +1,6 @@
 # Changelog
 
-Changes to `@fmx/calcium` that a consumer can see. **Kept by hand under `## Unreleased`
+Changes to `calcium-tui` that a consumer can see. **Kept by hand under `## Unreleased`
 until a generator exists** (A04 §9), and every breaking change is named as one.
 
 This is 0.x: a minor version may break the API with no deprecation cycle (README, *This is

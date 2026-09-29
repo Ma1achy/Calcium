@@ -17,7 +17,7 @@
 // come from `examples/plots/src/` rather than being transcribed here, because a
 // transcription of `/all` is exactly what F396 was — a caption claiming every
 // form while the document held one figure per form. The example resolves
-// `@fmx/calcium` to `dist/` on its own, so the import is the consumer's path.
+// `calcium-tui` to `dist/` on its own, so the import is the consumer's path.
 //
 // **Shares are the reading; absolutes are the record** (F936). Four runs of one
 // fixture measured 533, 613, 710 and 854 ms of work on one machine with every

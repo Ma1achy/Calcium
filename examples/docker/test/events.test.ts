@@ -12,7 +12,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { LocalDocument, Block, Events, Group, Notice, Panel } from "@fmx/calcium";
+import type { LocalDocument, Block, Events, Group, Notice, Panel } from "calcium-tui";
 import {
   ACTIONS,
   CAP,
@@ -28,7 +28,7 @@ import {
 import { parseNdjson } from "../src/ndjson.ts";
 import type { Row } from "../src/ndjson.ts";
 
-import { localContext } from "@fmx/calcium/testing";
+import { localContext } from "calcium-tui/testing";
 const CORPUS = parseNdjson(
   readFileSync(new URL("./corpus/events-real.ndjson", import.meta.url), "utf8"),
 ).rows;

@@ -80,7 +80,7 @@ Versions sort **newest first** by creation — ascending age, as S03 established
 ▌   family        digit-classifier
 ▌   state         ● serving · 3/3 replicas
 ▌   created       2026-07-28 12:14:03 UTC   (2h ago)
-▌   produced by   c4e1f23  EvaluationJob  ·  malachy@fmx.io
+▌   produced by   c4e1f23  EvaluationJob  ·  someone@example.com
 ▌   commit        a3f9b21  feat: tune digit classifier
 ▌   mr            !1244  merged 2026-07-28 12:31
 ▌

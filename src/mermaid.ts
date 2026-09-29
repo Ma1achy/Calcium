@@ -1,5 +1,5 @@
 /**
- * `@fmx/calcium/mermaid` — the Mermaid transform, as an entry of its own
+ * `calcium-tui/mermaid` — the Mermaid transform, as an entry of its own
  * (C24 §2, C24 I36).
  *
  * **Separate for a cost, not an audience.** `mermaidCode` is synchronous and

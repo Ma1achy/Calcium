@@ -6,8 +6,8 @@
  * the *glance*: enough forms to judge the system at once, at the sizes a
  * two-column layout gives them.
  */
-import { b } from "@fmx/calcium";
-import type { Block } from "@fmx/calcium";
+import { b } from "calcium-tui";
+import type { Block } from "calcium-tui";
 import { CATALOGUE } from "./catalogue.ts";
 import { WIDTHS, budget, magnitudes, wave } from "./data.ts";
 

@@ -16,7 +16,7 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { createTui } from "@fmx/calcium";
+import { createTui } from "calcium-tui";
 import { appConfig, realDocker } from "./app.ts";
 
 const run = promisify(execFile);

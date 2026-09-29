@@ -28,10 +28,10 @@ At 100 columns, `--mine`, live:
 ▌ ● running ×1  ✓ succeeded ×6  ✗ failed ×2  ○ queued ×1
 ▌
 ▌       uuid     family          status       detail            metric     age  kind        owner
-▌ ▸  ●  a3f9b21  digit-classif…  running      ep 17/40          0.0372     23m  candidate   malachy
-▌ ▸  ✓  7c2d4e1  decoder-zoom    succeeded                      0.0089     41m  experiment  malachy
+▌ ▸  ●  a3f9b21  digit-classif…  running      ep 17/40          0.0372     23m  candidate   someone
+▌ ▸  ✓  7c2d4e1  decoder-zoom    succeeded                      0.0089     41m  experiment  someone
 ▌ ▸  ✗  2e8a04c  graphsage       failed       OOM at ep 3            —  1h 12m  experiment  priya
-▌ ▸  ○  f410d99  flow-predictor  queued                              —      3m  candidate   malachy
+▌ ▸  ○  f410d99  flow-predictor  queued                              —      3m  candidate   someone
 ▌
 ▌ ⏎ detail  ␣ expand  ≡ logs  ⚡ events
 ```
@@ -61,9 +61,9 @@ Both figures in this section are generated from `planColumns` and C11's renderer
 Row 1 expanded:
 
 ```
-▌ ▾  ●  a3f9b21  digit-classif…  running      ep 17/40          0.0372     23m  candidate   malachy
+▌ ▾  ●  a3f9b21  digit-classif…  running      ep 17/40          0.0372     23m  candidate   someone
 ▌     mr    !1248  auto-merged
-▌     node  gpu-04.fmx.internal · 2×GPU · 16Gi
+▌     node  gpu-04.example.internal · 2×GPU · 16Gi
 ▌     ████████████░░░░░░░░░░░░░░░░  43%
 ▌     ≡ logs   ⚡ events   ◉ watch   ⊘ cancel   { } json
 ```

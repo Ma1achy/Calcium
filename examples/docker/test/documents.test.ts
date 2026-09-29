@@ -33,9 +33,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 // F36: no public validator. Resolved through the package — see `deep.ts`,
 // which is also the reason `make proof` was red for two PRs.
-import { expectDocument, localContext, producerContext } from "@fmx/calcium/testing";
-import { toneBudgetSuite, TONE_BUDGET, TONE_SMELL } from "@fmx/calcium/testing";
-import type { ViewDocument } from "@fmx/calcium";
+import { expectDocument, localContext, producerContext } from "calcium-tui/testing";
+import { toneBudgetSuite, TONE_BUDGET, TONE_SMELL } from "calcium-tui/testing";
+import type { ViewDocument } from "calcium-tui";
 import { createCompareHandler, createDriftHandler } from "../src/drift.ts";
 import { createPsAdapter } from "../src/ps.ts";
 import { createContainerAdapter } from "../src/container.ts";
@@ -50,10 +50,10 @@ import {
 import { createEventsHandler } from "../src/events.ts";
 
 
-import { createAdapterRegistry } from "@fmx/calcium";
-import type { Adapter, AdapterContext, RawResult } from "@fmx/calcium";
-import { completeLocal } from "@fmx/calcium";
-import type { LocalDocument } from "@fmx/calcium";
+import { createAdapterRegistry } from "calcium-tui";
+import type { Adapter, AdapterContext, RawResult } from "calcium-tui";
+import { completeLocal } from "calcium-tui";
+import type { LocalDocument } from "calcium-tui";
 
 /**
  * A row's answer as a *document*, completing the local ones.
@@ -208,7 +208,7 @@ describe("F35: every document this app produces is one C13 will accept", () => {
     // **`expectDocument().isValid()`, not a deep import** (F36). The workaround
     // reached past `exports` into `dist/` because "an app cannot validate a
     // document it built" — and it could: the assertion has been public in
-    // `@fmx/calcium/testing` since C24 §7, and nobody re-checked the finding
+    // `calcium-tui/testing` since C24 §7, and nobody re-checked the finding
     // against the surface. It throws with the errors in the message, which is
     // what the hand-rolled message was for.
     expect(() => expectDocument(doc).isValid(), name).not.toThrow();

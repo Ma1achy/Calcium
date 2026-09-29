@@ -21,9 +21,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
-import { b, completeLocal } from "@fmx/calcium";
-import { expectDocument, liveParts, producerContext } from "@fmx/calcium/testing";
-import type { Block, ViewDocument, TerminalCapabilities } from "@fmx/calcium";
+import { b, completeLocal } from "calcium-tui";
+import { expectDocument, liveParts, producerContext } from "calcium-tui/testing";
+import type { Block, ViewDocument, TerminalCapabilities } from "calcium-tui";
 import { CATALOGUE, everyVariant, FORMS, refusals, refuse, variantsOf } from "../src/catalogue.ts";
 import type { Entry } from "../src/catalogue.ts";
 import {
@@ -112,7 +112,7 @@ describe("the plot demo", () => {
       /\bblock\s*\(\s*\{/,
     );
     expect(all, "a figure reached for the testing surface").not.toMatch(
-      /from "@fmx\/calcium\/testing"/,
+      /from "calcium-tui\/testing"/,
     );
   });
 
@@ -408,7 +408,7 @@ describe("every command composes a document the transcript would accept", () => 
     // **The arm a document test can construct** — and the one every app that
     // does not configure a profiler sees. `ProfileReport` is reachable only
     // through `ctx.profile()`: there is no constructor on the public surface and
-    // none in `@fmx/calcium/testing`, so the present arm needs a live session
+    // none in `calcium-tui/testing`, so the present arm needs a live session
     // (F917). It is not uncovered — `profileCard` is exercised across every card
     // by the framework's own `test/unit/profile-deck.test.ts`; what this row adds is
     // that the command composes a document the transcript accepts.

@@ -264,7 +264,7 @@ because a todo list's useful state is *where am I*.
 ```
 » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13
 ▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░░░░░░  62%  31k/50k   calls ▐▐▐▐░░░░░░ 4/10   28 tok/s
-~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3           malachy   31m
+~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3           someone   31m
 ```
 
 **The same footer against a priced API drops the endpoint and shows `$0.23` where the local
@@ -448,7 +448,7 @@ was run.
 ┌ footer · three lines · what the SESSION is ─────────────────────────────────┐
   » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13
   ▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░░░░░░  62%  31k/50k   calls ▐▐▐▐░░░░░░ 4/10   28 tok/s
-  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3           malachy   31m
+  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3           someone   31m
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -492,7 +492,7 @@ wins and the header goes**, because the footer's line 1 already carries it.
 ───────────────────────────────────────────────────────────────────────────────
   » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13
   ▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░░░░░░  62%  31k/50k   calls ▐▐▐▐░░░░░░ 4/10   28 tok/s
-  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3           malachy   31m
+  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3           someone   31m
 ```
 
 ### And stopped mid-task, which is the state a footer cannot express
@@ -1483,7 +1483,7 @@ how long have I been?     session age
 ```
 » auto   ✦ qwen3-coder-next   effort high                    localhost:8000   22:13
 ▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░░░░░░  62%  31k/50k      calls ▐▐▐▐░░░░░░ 4/10   28 tok/s
-~/code/calcium   ⎇ feat/c26-focus   +124/-18 ~1   ✎ 3        malachy   $0.23   31m
+~/code/calcium   ⎇ feat/c26-focus   +124/-18 ~1   ✎ 3        someone   $0.23   31m
 ```
 
 **Line 1 — posture and identity.** Mode first, because it is the safety signal. The endpoint
@@ -1520,12 +1520,12 @@ is not working through anything. `calls 4/10` says what it is.
 local MLX
 » auto   ✦ qwen3-coder-next   effort high              localhost:8000   22:13
 ▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░░░░░░  62%  31k/50k     calls ▐▐▐▐░░░░░░ 4/10   28 tok/s
-~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3               malachy   31m
+~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3               someone   31m
 
 a priced API
 » auto   ✦ claude-opus-4.8   effort high                              22:13
 ▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░░░░░░  62%  31k/200k    calls ▐▐▐▐░░░░░░ 4/10    $0.23
-~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3               malachy   31m
+~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3               someone   31m
 
 no git · single call · no pricing
 » manual   ✦ gemma-4-26b                               localhost:8000   22:13
@@ -1555,7 +1555,7 @@ focus gutter: **reserve if it could apply, fill when it does.**
 » auto   ✦ qwen3-coder-next   effort high                    localhost:8000   22:13
 ▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░░░░░░  62%  31k/50k      calls ▐▐▐▐░░░░░░ 4/10   28 tok/s
 └sys┘└tools┘└─turns──┘└─file─┘                                        ⏎ breakdown
-~/code/calcium   ⎇ feat/c26-focus   +124/-18 ~1   ✎ 3        malachy   $0.23   31m
+~/code/calcium   ⎇ feat/c26-focus   +124/-18 ~1   ✎ 3        someone   $0.23   31m
 ```
 
 **Four lines with labels, or three with the segments coloured in place.** Colour costs no row
@@ -1570,12 +1570,12 @@ an explanation rather than a safety signal, which is the animation rule's own te
 80 columns
 » auto   ✦ qwen3-coder-next                       localhost:8000   22:13
 ▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░░░  62%  31k/50k        calls 4/10        28 tok/s
-~/code/calcium   ⎇ feat/c26   +124/-18            malachy   31m
+~/code/calcium   ⎇ feat/c26   +124/-18            someone   31m
 
 ASCII and 1-bit
 » auto   * qwen3-coder-next                       localhost:8000   22:13
 ##############......  62%  31k/50k         calls 4/10        28 tok/s
-~/code/calcium   > feat/c26   +124/-18            malachy   31m
+~/code/calcium   > feat/c26   +124/-18            someone   31m
 ```
 
 **Two never drop: the mode and the context percentage.** Everything else is a column with a
@@ -2008,7 +2008,7 @@ happens without it.**
 ───────────────────────────────────────────────────────────────────────────────
   » manual   ✦ qwen3-coder-next   effort high         localhost:8000   22:13
   ▐░░░░░░░░░░░░░░░░░░░░░░░░░  2%  1.1k/50k                            0 tok/s
-  ~/code/calcium   ⎇ feat/c26   clean                          malachy   0m
+  ~/code/calcium   ⎇ feat/c26   clean                          someone   0m
 ```
 
 **The context bar is not empty at 2%** — the system prompt and the tool schemas are already in

@@ -156,8 +156,8 @@ describe("C22 §2 — config", () => {
     // The two fields with no writer. They enter here or nowhere, which is what
     // makes "set at construction and never written after" constructible.
     expect(resolveConfig(minimal(), AMBIENT).cluster).toBe("");
-    const r = resolveConfig({ ...minimal(), cluster: "fmx-prod", version: "1.0.0" }, AMBIENT);
-    expect([r.cluster, r.version]).toEqual(["fmx-prod", "1.0.0"]);
+    const r = resolveConfig({ ...minimal(), cluster: "corp-prod", version: "1.0.0" }, AMBIENT);
+    expect([r.cluster, r.version]).toEqual(["corp-prod", "1.0.0"]);
   });
 
   it("the numbers C22 owns are C22's, and stated once", () => {

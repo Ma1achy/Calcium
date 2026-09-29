@@ -176,7 +176,7 @@ describe("C02 integration", () => {
     const table = psTable({ rows: 3, expanded: [1], sort: { key: "age", direction: "desc" } });
     const kit = measurable({ definitions: [tableDefinition], capabilities: ASCII_CAPS });
     // 100 rather than 80: `mr` drops there, so the expand markers are drawn, and
-    // `owner` is visible at its declared minimum of 8, so `malachy@fmx.io`
+    // `owner` is visible at its declared minimum of 8, so `someone@example.com`
     // truncates. Both markers in one frame is the point — each has an ASCII form
     // and each is a place the 1:1 rule can break.
     const drawn = kit.renderToLines(table, 100).map(visible);
@@ -195,7 +195,7 @@ describe("C02 integration", () => {
     expect(open, "an expanded row").toContain("v ");
     // A collapsed row carries its hidden count at ASCII too (C11 I32, ruling 69).
     expect(closed, "a collapsed row").toMatch(/\(\+\d+ /u);
-    expect(drawn.join("\n"), "the ASCII truncation marker").toContain("malachy~");
+    expect(drawn.join("\n"), "the ASCII truncation marker").toContain("someone~");
 
     // And the geometry is the Unicode case's, exactly.
     const full = measurable({ definitions: [tableDefinition] });

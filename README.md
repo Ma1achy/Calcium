@@ -503,8 +503,8 @@ Calcium's.
 <!-- verified against examples/minimal/main.ts by examples/minimal/test/minimal.test.ts -->
 
 ```ts
-import { b, createTui, defaultTheme } from "@fmx/calcium";
-import type { Adapter } from "@fmx/calcium";
+import { b, createTui, defaultTheme } from "calcium-tui";
+import type { Adapter } from "calcium-tui";
 
 const manifest = {
   schema: "tui.manifest/1",

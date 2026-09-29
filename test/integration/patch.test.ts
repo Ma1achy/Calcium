@@ -177,7 +177,7 @@ describe("C25 integration", () => {
     // A background that stopped where the text stopped would be ragged, and the row
     // is the unit a reader sees.
     const width = 80;
-    const changed = raw(width).filter((r) => visible(r).includes("prism.fmx.io/family"));
+    const changed = raw(width).filter((r) => visible(r).includes("prism.example.com/family"));
 
     expect(changed).toHaveLength(1);
     expect(cells(visible(changed[0] as string)), "padded to the full width").toBe(width);
@@ -187,7 +187,7 @@ describe("C25 integration", () => {
     // **The defect a frame showed and no assertion did.** One background per row
     // painted the empty left half green, which asserts that the side with no line
     // gained one. The background belongs to a side.
-    const unpaired = raw(120).find((r) => visible(r).includes("prism.fmx.io/family"));
+    const unpaired = raw(120).find((r) => visible(r).includes("prism.example.com/family"));
 
     expect(unpaired).toBeDefined();
     const [leftHalf] = (unpaired as string).split("│");

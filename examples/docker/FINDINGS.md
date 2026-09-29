@@ -593,7 +593,7 @@ No warning, no error, exit 0. `npm_config_registry` in the environment behaves t
 way. The flag that does win is the **scoped** one:
 
 ```
-$ npm publish --dry-run --@fmx:registry=http://localhost:4873
+$ npm publish --dry-run --@calcium-tui:registry=http://localhost:4873
 npm notice Publishing to http://localhost:4873 with tag latest and default access
 ```
 
@@ -1297,7 +1297,7 @@ toward whole-stack tests or none.
 
 **CLOSED — the seam exists and cites this finding by name.** `src/testing/live-parts.ts`
 exports `liveParts(doc): readonly LivePart[]`, giving back the `block` and *exactly* the
-`LiveSpec` the declarer supplied, and `@fmx/calcium/testing` re-exports it. Its own header
+`LiveSpec` the declarer supplied, and `calcium-tui/testing` re-exports it. Its own header
 carries the argument this entry makes, including why it lands on the testing surface rather
 than the runtime one: *a production consumer reading back what it just declared holds a second
 record of the document, which is the class this repository removes; a test reading it is
@@ -2404,7 +2404,7 @@ works around is a second defect wearing the first one's clothes.**
 
 Fixed in `test/deep.ts`: `dist/` is inside the tarball, so the same modules
 resolve from the package root — the repository in the dev loop,
-`node_modules/@fmx/calcium` under the gate. One expression, both worlds, and it
+`node_modules/calcium-tui` under the gate. One expression, both worlds, and it
 is still a deep import and still F36/F37.
 
 `make proof` now runs both examples and passes: `PROOF_EXIT=0`, 233 and 3.
@@ -2838,7 +2838,11 @@ screen. **What I photographed is what an overlay looks like.**
 
 ### The picture that settles it
 
-![The completion menu drawn over a coloured unified diff: the menu's three rows punch a clean black rectangle out of the red and green diff backgrounds, with a perfectly vertical edge at the same column on every row, and the diff's colour resuming beyond it](../../docs/media/menu-over-diff.gif)
+![The completion menu open under a coloured unified diff: since batch 3 the menu is a panel between two rules above the prompt, so the diff's red and green rows end at the rule above it and nothing is drawn over them](../../docs/media/menu-over-diff.gif)
+
+*Re-recorded 2026-09-29 from the fixture world (F1434). The picture this passage argues from — the menu drawn
+**over** the diff — no longer exists: the menu is now a panel above the prompt (M8), so the overlap it tested
+is gone rather than passed. The argument below is kept as the record of what the old frame showed.*
 
 **The menu drawn over a surface that is coloured to its right edge.** If cells
 went unwritten, the diff's red and green would show through the gaps *inside* the
@@ -5571,7 +5575,7 @@ say `added` and only the frame says `+` (F81). So the app asserts a value whose 
 cannot see.
 
 **And the framework's own testing surface has the same blind spot, for the same reason.**
-`@fmx/calcium/testing` ships `expectDocument().isValid() · measuresCorrectly() ·
+`calcium-tui/testing` ships `expectDocument().isValid() · measuresCorrectly() ·
 rendersAt() · degradesToAscii() · degradesTo1Bit() · hasNoColourOnlyDistinction()`, plus
 two conformance suites. Every one of them **measures or asserts a property and none of them
 returns a frame**. `renderToLines` was there and was removed, correctly — `src/testing/index.ts`
@@ -5875,7 +5879,7 @@ an `ask` in it.
 It is C24 I19's argument a second time — *a producer the framework can test and a consumer
 cannot is a producer whose app-side tests assert against something the user never sees* —
 which is why `createAdapterRegistry`, `completeLocal` and `contextAt` are exported. Closed the
-same way: `producerContext()` and `localContext()` on `@fmx/calcium/testing`, C24 I26.
+same way: `producerContext()` and `localContext()` on `calcium-tui/testing`, C24 I26.
 
 **`ask` defaults to declining**, and that is C23 I36's own semantics rather than a stub's: a
 question resolves with the choice marked `default` on `Esc`, so a handler tested without a
@@ -7448,7 +7452,7 @@ script the Makefile never ran. It did not wire their **install**. So the target 
 machine that had ever run the examples, and failed on the first clean checkout:
 
 ```
-main.ts(1,44): error TS2307: Cannot find module '@fmx/calcium' or its type declarations
+main.ts(1,44): error TS2307: Cannot find module 'calcium-tui' or its type declarations
 ```
 
 **Two things were missing and only one is obvious.** `node_modules` in each example is the
@@ -8747,7 +8751,7 @@ it were pointed at a function the cell does not call.
 
 ### Why the replacement is a repo test
 
-`@fmx/calcium` publishes `createTui` and the builders and **no block-to-lines renderer**, so the
+`calcium-tui` publishes `createTui` and the builders and **no block-to-lines renderer**, so the
 package cannot render a block — which is why the rows were written against a function in the
 first place. `test/repo/` is the established answer (see `banner.test.ts`) and it labels the
 reach rather than hiding it.
@@ -14071,7 +14075,7 @@ its own spec.
 ## F447 — the first target in `all` reads what the last one builds ★★★★★
 
 `make all` is `check enforce audit instruments test golden e2e`. `check` type-checks the
-examples; the examples resolve `@fmx/calcium` to the package root, whose `types` point at
+examples; the examples resolve `calcium-tui` to the package root, whose `types` point at
 `dist/`; and **`dist/` is built by `e2e`**, which runs last.
 
 **So on any commit that widens a public type, `check` reads the previous commit's build and
@@ -16119,7 +16123,7 @@ the deferral shape CLAUDE.md records, where the condition is written at the
 deferral and what satisfies it is written somewhere else.
 
 **Proved before it was ruled.** A miniature of the shape compiles with no casts
-and still narrows on `b.kind`; and `declare module "@fmx/calcium"` from
+and still narrows on `b.kind`; and `declare module "calcium-tui"` from
 `examples/plots` merges with the real declaration rather than opening a new one
 — TS2428, *all declarations must have identical type parameters*, is a merge
 complaining rather than a resolution failing.
@@ -17303,8 +17307,8 @@ ColormapName   Graph            ScaleType Origin AxisCross
 ```
 
 ```ts
-import type { HierarchyNode, QuartileSummary } from "@fmx/calcium";
-// TS2305: Module '"@fmx/calcium"' has no exported member 'HierarchyNode'.
+import type { HierarchyNode, QuartileSummary } from "calcium-tui";
+// TS2305: Module '"calcium-tui"' has no exported member 'HierarchyNode'.
 ```
 
 A literal still passes, so this refuses **only the consumer who factors** — anyone writing
@@ -23045,7 +23049,7 @@ directly passes on the day nothing calls it that way.
 
 ## F505 — a type the public surface uses and does not export ★★★
 
-`@fmx/calcium` exports `Plot`. It does not export `Camera`, which `Plot.camera` is a
+`calcium-tui` exports `Plot`. It does not export `Camera`, which `Plot.camera` is a
 `Partial<` of. A consumer writing anything typed over a camera — a helper, a control, an orbit —
 reaches it by indexing the block:
 
@@ -31578,7 +31582,7 @@ wrong about.
 
 ## F876 — the orphan barrel: an invariant vacuous in both directions at once ★★★☆☆
 
-C24 I31 says `@fmx/calcium/profiling` publishes types, `Tier`, and nothing that runs. The barrel at
+C24 I31 says `calcium-tui/profiling` publishes types, `Tier`, and nothing that runs. The barrel at
 `src/shell/profiling/index.ts` exported **five runtime values** — `createProfiler`,
 `createResourceProbe`, `Hist`, `Ring`, `profilePane` — for as long as it existed.
 
@@ -31872,7 +31876,7 @@ the row and the handler now read one implementation.
 
 **And a real gap underneath:** the row can construct the *absent* arm and not the present one,
 because `ProfileReport` is reachable only through `ctx.profile()`. There is no constructor on the
-public surface and none in `@fmx/calcium/testing`, which publishes `checkBudget(report, …)`,
+public surface and none in `calcium-tui/testing`, which publishes `checkBudget(report, …)`,
 `checkPhases` and `checkLeaks` — three functions that **take** a report to a consumer who has no way
 to make one outside a live session. `profilePane`'s own doc comment calls it *a pure function from a
 report to blocks*, which is true and is exactly why the missing half is invisible: the function is
@@ -33594,7 +33598,7 @@ one being debugged. The row's own bug is what put a real child's exit on the scr
 
 ## F925 — two of the four kinds that hold blocks could not be swept at all ★★★★☆
 
-C24 I13 is *`@fmx/calcium/testing` ships the document assertions, so no consumer reimplements
+C24 I13 is *`calcium-tui/testing` ships the document assertions, so no consumer reimplements
 them*, and `degradesTo1Bit` is the one it says earns the module. Writing T2.12 — the row that
 names the invariant — meant building a document and running the sweep over it. A `scroll` around
 a notice was the shape chosen, because a flat document exercises the assertion and not the walk.
@@ -37024,7 +37028,7 @@ with a reader that sees nothing cannot pass as a corpus that is clean.
 
 ## F999 — the type a consumer had to index for, and the sibling twelve lines above it ★★★☆☆
 
-F505 recorded that `@fmx/calcium` exports `Plot` and not `Camera`, so a consumer typing anything
+F505 recorded that `calcium-tui` exports `Plot` and not `Camera`, so a consumer typing anything
 over a camera indexes the block: `NonNullable<Plot["camera"]>`. Both halves of that are true and
 neither is the whole of it.
 
@@ -46795,7 +46799,7 @@ to the unit — printed under the column heading *elements measured*.
 
 `tools/profile.mjs`'s own header carries it:
 
-> `@fmx/calcium/profiling` was the third and is no longer needed: the phase table
+> `calcium-tui/profiling` was the third and is no longer needed: the phase table
 > moved into the harness, because **a reading computed in a script is a reading
 > no row can be written against**, which is how its negative residue went
 > unasserted (C28 I41, F888).
@@ -51027,7 +51031,7 @@ highlighter's grammars are still open there.
 | **Verdict** | **closed — built and measured.** All four remedies built: the compile cache (R01 R4.6), the quantisation table (C10 I41), the emulator off the graph (C23 I71) and the highlighter's grammars off it (C09 I71) — the last −36 ms container-local and −120 ms on the bind mount, paired |
 
 **The path, at HEAD.** An app's launcher sets `NODE_ENV` and dynamically
-imports its `main.ts`, which statically imports `@fmx/calcium`; the barrel
+imports its `main.ts`, which statically imports `calcium-tui`; the barrel
 statically imports every component, so every module Calcium can ever need is
 resolved, read, compiled and linked before `createTui` is called. That is the
 design — a block kind is a module and the registry is built from them — and
@@ -52213,7 +52217,7 @@ three is a keystroke.
 
 | | |
 |---|---|
-| **Surface** | `src/index.ts:369` re-exports `mermaidCode` from `src/presentation/mermaid.ts`, which statically imports `renderMermaidASCII` from `beautiful-mermaid` — an ESM-only package whose bundle pulls `elkjs`, 8.1 MB installed. So `import "@fmx/calcium"` resolves, reads and compiles the layout engine before `createTui` is called, for every consumer, whether or not a diagram is ever drawn. No example in the tree calls `mermaidCode`; its consumers are `test/contract/mermaid.test.ts` and, by the module-graph rule's own note, an app out of tree |
+| **Surface** | `src/index.ts:369` re-exports `mermaidCode` from `src/presentation/mermaid.ts`, which statically imports `renderMermaidASCII` from `beautiful-mermaid` — an ESM-only package whose bundle pulls `elkjs`, 8.1 MB installed. So `import "calcium-tui"` resolves, reads and compiles the layout engine before `createTui` is called, for every consumer, whether or not a diagram is ever drawn. No example in the tree calls `mermaidCode`; its consumers are `test/contract/mermaid.test.ts` and, by the module-graph rule's own note, an app out of tree |
 | **Reached for** | the F1187 build copied to `/tmp/calc/dist-cur` so the bind mount is out of the figure (F1164's protocol), `make load-down`, six interleaved pairs: a plain import of `dist/index.js` **398–483 ms**, the same import with `beautiful-mermaid` already loaded **278–334 ms**, the paired difference **80–156 ms, median about 110**; `import("beautiful-mermaid")` alone 95–114 ms. Under the import trace the barrel loads 2,458 modules, two of them the renderer's and `elkjs`'s bundles. Per dependency, cold and alone: `ink` 262, `beautiful-mermaid` 127, `@xterm/headless` 38 (off the graph since C23 I71), `react` 7 |
 | **Verdict** | **open** — measured, the remedy sized |
 
@@ -52224,11 +52228,11 @@ build to `require`, and a dynamic import is a promise. C23 I71 took the
 emulator off the graph because its route was already `async`; C09 I71 took
 the grammars off because highlight.js core has a registration seam. Neither
 shape is available here. What the tree does have is the entry-point form:
-`@fmx/calcium/testing`, `/fixtures` and `/profiling` exist so that a
+`calcium-tui/testing`, `/fixtures` and `/profiling` exist so that a
 consumer pays for what it imports (C24 §2), and a diagram renderer that
 most sessions never reach is the same argument.
 
-**Remedy, sized.** C24 I36: a fifth entry, `@fmx/calcium/mermaid`, whose
+**Remedy, sized.** C24 I36: a fifth entry, `calcium-tui/mermaid`, whose
 target is a one-line barrel over `presentation/mermaid.ts`; the runtime
 barrel exports `mermaidCode` no longer and imports nothing from
 `beautiful-mermaid` or `elkjs`. `mermaidCode` itself is untouched — the same
@@ -52275,7 +52279,7 @@ pairs as the sign and the consistency: fifteen of sixteen.
 import (262 ms alone, cold) and it is the renderer; Node's compile cache
 (R01 R4.6) is what the launchers already do about it. A consumer that does
 draw diagrams now pays the renderer at its own import, statically — the
-async form, `import("@fmx/calcium/mermaid")` inside the adapter that needs
+async form, `import("calcium-tui/mermaid")` inside the adapter that needs
 it, is the consumer's to choose and costs nothing here. The examples call
 no `mermaidCode`; the docker example's notes describe the transform and
 name no import line.
@@ -52588,7 +52592,7 @@ that reads Ink's source as the loader hands it over and matches the import
 line byte for byte; any other text leaves the barrel in place. Both failure
 modes — line changed, file gone — land on today's behaviour.
 
-**Remedy, sized.** `@fmx/calcium/launch` (C24 §2's sixth entry, **C24 I37**),
+**Remedy, sized.** `calcium-tui/launch` (C24 §2's sixth entry, **C24 I37**),
 one export `prepareLaunch()` that registers the two hooks; the docker and
 plots launchers call it between `enableCompileCache()` and the app import
 (R01 **R4.7**, **R5.9**). T5.7 is the graph row: a child under
@@ -55882,7 +55886,7 @@ and nobody knew because nothing drew one.**
 | | |
 |---|---|
 | **Surface** | F1209's plan named what Ink's removal would touch: the element arm, `elementOf`, `inked`, three registry decorations, image's dead arm, and the `ink` and `react` rows in `DEPENDENCIES.md`. Every one of those landed. |
-| **Reached for** | The gates found six more, none in the plan, each two or more components away from anything the pass edited: `SpanName`'s `react` member (MG30, C28 I39); C09 commitment 13, a promise about two width implementations agreeing; `test/support/ink.ts` and T2.16's three consumers; `rowsOfAll`, the gate every container branched on, reduced to `rendered.map((r) => r)`; `@fmx/calcium/launch` — a public entry, one commitment, one invariant, three rows and two example bins — whose whole subject was Ink's import line; and R01 R4.6's `> 50`, a threshold over a module graph that had just shrunk to exactly 50. |
+| **Reached for** | The gates found six more, none in the plan, each two or more components away from anything the pass edited: `SpanName`'s `react` member (MG30, C28 I39); C09 commitment 13, a promise about two width implementations agreeing; `test/support/ink.ts` and T2.16's three consumers; `rowsOfAll`, the gate every container branched on, reduced to `rendered.map((r) => r)`; `calcium-tui/launch` — a public entry, one commitment, one invariant, three rows and two example bins — whose whole subject was Ink's import line; and R01 R4.6's `> 50`, a threshold over a module graph that had just shrunk to exactly 50. |
 | **Verdict** | **Open.** |
 
 **The shape is one fact stated six times: a rule can lose its subject somewhere else.** Each of
@@ -56732,7 +56736,7 @@ id. Struck and re-aimed to a new C23 T1.66d.
 
 ## F1350 — a lane worktree's examples resolved the package from the main tree ★★★☆☆
 
-Found by the batch 4 base integration. `/workspace/node_modules/@fmx/calcium` links to `../..`, the main tree; a
+Found by the batch 4 base integration. `/workspace/node_modules/calcium-tui` links to `../..`, the main tree; a
 worktree under `out/wt/<lane>` has no `node_modules`, so every `examples/*` import walked up and landed on the
 **main tree's `dist/`**. A lane's example tests and `make check` typechecked against main — green when the lane
 broke the public surface, red when main was ahead. It surfaced as `make check` failing on a `clipboard` field the
@@ -57549,7 +57553,7 @@ Found by the b4-demo lane. `/container stats` draws an entry of about 41 rows, s
 The regeneration note held that clearing before the shot keeps it; measured, it does not. The stills now record at
 46 rows; the 34-row screencast still clips the top of that beat.
 
-## F1434 — the public repository's history and tree carry the host's docker data ★★★★☆
+## F1434 — the public repository's history and tree carry the host's docker data ★★★★☆ — **CLOSED** in the tree; history kept by the person's ruling
 
 Found by the b4-demo lane. Earlier media commits held host paths, host memory figures, a linuxkit kernel and `vsc-`
 devcontainer names (`scroll.cast`). In the tree today, and on `origin/main` since 2026-08-05 in a public repository:
@@ -57557,3 +57561,12 @@ devcontainer names (`scroll.cast`). In the tree today, and on `origin/main` sinc
 devcontainer images by name, and `top-real.txt` a container's process table — and `docs/media/menu-over-diff.gif`,
 which the fixture mode cannot regenerate. The new media draw nothing of the machine (checked by pattern over every
 cast and by reading frames). Scrubbing the tree and rewriting published history are the person's decision.
+
+**Closed forward, 2026-09-29, by the person's ruling: scrub the tree, rewrite no history, force-push nothing.** The
+audit was shown first and listed no credential. Every host-derived string in the corpus, the media and the sample
+data elsewhere in the repository was replaced by an invented one of the same shape, consistently, so every file
+reads as its old text under one mapping — checked file by file against `HEAD`, 184 of 188 exactly and the other
+four the corpus files whose devcontainer settings and path-derived image hashes were also replaced. The package
+was renamed `calcium-tui` in the same commit. `menu-over-diff` now has a row in `SHOTS` (shot 15) and is recorded
+from the fixture world, which also closes the *one shot cannot be regenerated* note under F158's heading. **What it
+does not do**: the old text stays in git history and in every clone taken before this commit.

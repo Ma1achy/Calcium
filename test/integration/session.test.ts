@@ -505,7 +505,7 @@ describe("C22 §7 — identity, from the app through C23", () => {
   const NOW = 1_000_000;
   const nearlyExpired = () => ({
     user: "m",
-    email: "m@fmx.io",
+    email: "s@example.com",
     groups: [] as readonly string[],
     // Inside the one-day warning window, and comfortably not expired.
     expiresAt: NOW + 14 * 60 * 60 * 1000,

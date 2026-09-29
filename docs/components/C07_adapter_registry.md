@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` (registry, fallback, mapping) + app (the adapters) |
+| **Package** | `calcium-tui` (registry, fallback, mapping) + app (the adapters) |
 | **Layer** | L0 data |
 | **Depends on** | C04 view model · C06 transport types · C05 `ToolDef`, for the exit-2 usage block. All same layer, acyclic |
 | **Consumed by** | L4 execution pipeline |

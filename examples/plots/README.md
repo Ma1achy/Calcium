@@ -9,7 +9,7 @@ cd examples/plots
 npm start                   # then /sample
 ```
 
-**That is usually all of it**, because the example imports `@fmx/calcium`'s
+**That is usually all of it**, because the example imports `calcium-tui`'s
 **built** output and `dist/` is normally already there — anyone who has run
 `make check`, `make test` or the container's build has it. Try `npm start`
 first; if it cannot resolve the package, build it:
@@ -29,7 +29,7 @@ binaries. Build in the container, or reinstall on the host. `dist/` itself is
 plain JavaScript and runs anywhere, which is why the first block usually works
 regardless.
 
-**A consumer installing a published `@fmx/calcium` gets it built and skips all
+**A consumer installing a published `calcium-tui` gets it built and skips all
 of this** — that is R01 R4.4, and the reason the build step belongs in a note
 rather than in the instructions.
 

@@ -105,6 +105,8 @@ TYPE_AT: dict[str, float] = {
     # result. Until that is fixed the shot waits it out, and the finding is where
     # the reason lives rather than this number.
     "config-diff": 6.0,
+    # The same diff as `config-diff`, so the same wait.
+    "menu-over-diff": 6.0,
 }
 
 # name, cols, rows, command, hold, env, still-at (None = animate)
@@ -231,6 +233,15 @@ SHOTS: list[tuple[str, int, int, bytes, float, dict[str, str], float | None]] = 
     #
     #      No `still`: a tail that is not moving is a table.
     ("logs", 110, 30, b"/logs web", 16.0, TRUE, None),
+
+    # 15 — **the menu over a surface coloured to its right edge**, F68's evidence
+    #      in FINDINGS. It had no row here, so it could not be regenerated, and
+    #      the only copy was recorded against a real docker host (F1434). The
+    #      diff is `config-diff`'s, paged to its first hunk so both signs are on
+    #      screen; `/co` then opens the completion menu over it (C19 I19), and a
+    #      cell the menu failed to write would show the diff's red or green
+    #      through the box.
+    ("menu-over-diff", 120, 40, b"/filediff proxy /etc/nginx/conf.d/default.conf", 16.0, TRUE, 13.5),
 ]
 
 # Rendered on a different terminal palette. See shot 7.
@@ -259,7 +270,11 @@ AFTER: dict[str, bytes] = {
     # at all. A probe with no keys put the last hunk on screen by 8.4 s; one
     # page up from there is the first hunk under the dashboard's tail.
     "config-diff": b"\x1b[5~",
+    "menu-over-diff": b"\x1b[5~",
 }
+
+# Text typed after the AFTER keys, as one write — a partial verb, not a submit.
+THEN: dict[str, bytes] = {"menu-over-diff": b"/co"}
 
 FONT = "13"
 
@@ -382,6 +397,9 @@ if __name__ == "__main__":
             # paged the greeting, the diff then landed below a viewport that had
             # stopped following, and the still was the banner (read 2026-09-05).
             script += [(at + 4.0 + i * 1.5, k) for i, k in enumerate(keys)]
+            then = THEN.get(name)
+            if then:
+                script.append((at + 4.0 + len(keys) * 1.5, then))
         # **F811 cannot happen here any more, and that is structural**: each
         # recording's state directory is in memory and dies with it, so the
         # light shot's `/theme light` reaches no later shot. `forget_theme` is

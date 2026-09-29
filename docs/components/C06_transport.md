@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` |
+| **Package** | `calcium-tui` |
 | **Layer** | L0 data |
 | **Depends on** | C21 process runner (same layer, acyclic). **Not C05** — `streams` arrives on the `Invocation`; the caller reads the manifest |
 | **Consumed by** | L4 execution pipeline · C07 adapters (consume its output) |
@@ -120,7 +120,7 @@ function createRouter(opts: {
 
 `createEmulatedTransport` takes a **handler function**, not a world object. Calcium must not reference an app type, and a closure keeps the fixture world entirely on the app side (C08) while the framework supplies only the interface.
 
-**The four constructors — `createTransport`, `createFixtureTransport`, `createEmulatedTransport` and `createRouter` — are on the runtime entry** (`@fmx/calcium`, C24 §3), **with the three parameter types a caller has to write: `TransportDeps`, `Fixture` and `FixtureHandler`** (`RawResult` and `RawPatch`, which a handler returns, were on the entry already through C07's block). MG29 named all three on the run that added the functions alone, which is C24 I29's failure exactly — an export that resolves and cannot be called. Until they were, this section published a three-arm union of which one arm had a reachable constructor: `TuiConfig.transport` takes a `TransportRouter`, the runtime entry exported the types `Invocation`, `TransportRouter` and `VerbTransport` and no function that produces one, and the only `createTransport` caller was the shell's own `subprocess` default. An app wanting the emulator — §1's stated purpose for the mode — could name the type and could not construct the value, which is C24 I2's `BlockRegistry` shape arriving on this seam. `createSubprocessTransport` stays off the entry: the shell constructs it from `TuiConfig.binary`, and an app supplying its own would be a second reader of the runner and the clock.
+**The four constructors — `createTransport`, `createFixtureTransport`, `createEmulatedTransport` and `createRouter` — are on the runtime entry** (`calcium-tui`, C24 §3), **with the three parameter types a caller has to write: `TransportDeps`, `Fixture` and `FixtureHandler`** (`RawResult` and `RawPatch`, which a handler returns, were on the entry already through C07's block). MG29 named all three on the run that added the functions alone, which is C24 I29's failure exactly — an export that resolves and cannot be called. Until they were, this section published a three-arm union of which one arm had a reachable constructor: `TuiConfig.transport` takes a `TransportRouter`, the runtime entry exported the types `Invocation`, `TransportRouter` and `VerbTransport` and no function that produces one, and the only `createTransport` caller was the shell's own `subprocess` default. An app wanting the emulator — §1's stated purpose for the mode — could name the type and could not construct the value, which is C24 I2's `BlockRegistry` shape arriving on this seam. `createSubprocessTransport` stays off the entry: the shell constructs it from `TuiConfig.binary`, and an app supplying its own would be a second reader of the runner and the clock.
 
 `cwd` is a function, not a value. The shell's working directory changes when the user runs `cd` (C18 built-in), and a captured string would spawn every subsequent verb in the original directory.
 

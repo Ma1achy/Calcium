@@ -439,7 +439,7 @@ because one row went through the producer.
 
 ## An example's rows run against `dist/`, so no mutation reaches them
 
-`examples/docker/test/*` and `examples/minimal/test/*` import `@fmx/calcium`,
+`examples/docker/test/*` and `examples/minimal/test/*` import `calcium-tui`,
 which resolves to the built package. A mutation applied to `src/` therefore
 changes nothing those rows can see: the mutation pass reports a **survivor**, and
 the survivor is an artefact of the module graph rather than a gap in the

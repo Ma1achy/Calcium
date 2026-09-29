@@ -14,8 +14,8 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { contextAt, parseManifest } from "@fmx/calcium";
-import type { CompletionContext, Manifest } from "@fmx/calcium";
+import { contextAt, parseManifest } from "calcium-tui";
+import type { CompletionContext, Manifest } from "calcium-tui";
 import { buildManifest } from "../src/manifest.ts";
 import { containerPathSource, containerSource, imageSource, type Run } from "../src/completion.ts";
 

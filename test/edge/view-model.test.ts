@@ -204,7 +204,7 @@ describe("C04 width arithmetic at the boundaries", () => {
     // `DOCKER_TUI_BANNER.md` calls *the top pad already in the document*.
     //
     // Framework-side as well as in the consumer, and the mutation pass is why:
-    // the example's rows import `@fmx/calcium` and run against `dist/`, so a
+    // the example's rows import `calcium-tui` and run against `dist/`, so a
     // mutation to `src/` cannot reach them. A row that a mutation cannot touch
     // is a row that reports nothing about the code under it.
     const kit = measurable({});

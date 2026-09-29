@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` |
+| **Package** | `calcium-tui` |
 | **Layer** | L3 interaction |
 | **Depends on** | C09 (`cells`, grapheme segmentation) |
 | **Consumed by** | C16 (dispatches keys here) · C18 (reads the buffer to classify) · C19 (cursor position for completion) · C20 (sets the buffer on history navigation) · L4 (renders the prompt) |

@@ -7,10 +7,10 @@
 
 ● ps · 0.3s · 4 of 11
   ⎿  uuid     family            status      metric ▾   age  owner
-    ▸ a3f9b21  digit-classifier  running     0.0372    23m  malachy
-      7c2d4e1  decoder-zoom      succeeded   0.0089    41m  malachy
+    ▸ a3f9b21  digit-classifier  running     0.0372    23m  someone
+      7c2d4e1  decoder-zoom      succeeded   0.0089    41m  someone
       2e8a04c  graphsage         failed           —   1h12m  priya
-      f410d99  flow-predictor    queued            —      3m  malachy
+      f410d99  flow-predictor    queued            —      3m  someone
       +7 more · sorted by metric
 
 ──────────────────────────────────────────────────────────────────────────────

@@ -10,7 +10,7 @@
  * 1's ring, arriving a fourth time (F78).
  */
 
-import type { ToolDef } from "@fmx/calcium";
+import type { ToolDef } from "calcium-tui";
 
 const pull: ToolDef = {
   name: "pull",

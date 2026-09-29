@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` |
+| **Package** | `calcium-tui` |
 | **Layer** | L0 terminal |
 | **Depends on** | Nothing. Receives a `TerminalCapabilities` record by injection — it does **not** import C02 |
 | **Consumed by** | C03 frame scheduler · L4 composition root · L4 shell (for suspend/resume around C21) |

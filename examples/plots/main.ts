@@ -25,8 +25,8 @@
  * suite tested the pieces instead, and passed for a session while `/all` and
  * `/form` drew nothing.
  */
-import { createTui, defaultTheme } from "@fmx/calcium";
-import type { Adapter, Block, LocalHandler } from "@fmx/calcium";
+import { createTui, defaultTheme } from "calcium-tui";
+import type { Adapter, Block, LocalHandler } from "calcium-tui";
 import {
   adaptSample, barStyles, compare, everyForm, faults, formFull, formIn, greetingDocument, images, liveFor,
   monitor, mosaics, profileBlocks, rungs, spinners, unknown,

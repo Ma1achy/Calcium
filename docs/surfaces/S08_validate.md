@@ -24,14 +24,14 @@ It is the template for the steps-shaped group: S09 test, S10 GitOps, S11 local e
 ## 2. Success
 
 ```
-▌ ── validate · fmx_models.jobs.training:job · T1 · in-process ─────────────────
+▌ ── validate · ml_models.jobs.training:job · T1 · in-process ─────────────────
 ▌
 ▌   ✓ importing target                    job resolved
 ▌   ✓ tier-1 rules                        22 rules · 0 errors · 587ms
 ▌   ✓ resource estimate                   1×GPU · 8Gi · ~14 minutes
 ▌
-▌   model         fmx_models.models:DigitClassifier
-▌   train_data    fmx_models.data.pipeline:train_pipeline
+▌   model         ml_models.models:DigitClassifier
+▌   train_data    ml_models.data.pipeline:train_pipeline
 ▌   resources     1×GPU · 8Gi        (model floor 1×GPU 8Gi — satisfied)
 ▌   callbacks     3                  MLflowLogger · Checkpoint · EarlyStopping
 ▌   estimated     ~14 minutes        based on similar runs · confidence high
@@ -54,20 +54,20 @@ Warnings are `warn`-toned with their code, and never suppress the success — a 
 ## 3. Failure
 
 ```
-▌ ── validate · fmx_models.jobs.training:job · T1 · in-process ─────────────────
+▌ ── validate · ml_models.jobs.training:job · T1 · in-process ─────────────────
 ▌
 ▌   ✓ importing target                    job resolved
 ▌   ✗ tier-1 rules                        22 rules · 2 errors
 ▌     resource estimate                   not run
 ▌
 ▌   T1-008  TrainingConfig requires at least one of: max_epochs, total_steps
-▌           file    fmx_models/jobs/training.py:18
+▌           file    ml_models/jobs/training.py:18
 ▌           field   config=TrainingConfig(batch_size=128, mixed_precision=True)
 ▌           fix     add max_epochs=N or total_steps=N
 ▌
 ▌   Rule 5  Callback supports mismatch
-▌           file      fmx_models/jobs/training.py:24
-▌           callback  fmx_models.callbacks:MultiMetricEarlyStopping
+▌           file      ml_models/jobs/training.py:24
+▌           callback  ml_models.callbacks:MultiMetricEarlyStopping
 ▌           issue     supports={"inference"}, but job is a TrainingJob
 ▌           fix       add "training" to the callback's supports set
 ▌

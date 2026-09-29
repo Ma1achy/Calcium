@@ -9,13 +9,13 @@
 // (FINDINGS F174).
 //
 // **The package cannot render a block to lines**, which is why they were written
-// that way — `@fmx/calcium` publishes `createTui` and the builders and no
+// that way — `calcium-tui` publishes `createTui` and the builders and no
 // block-to-lines renderer, so the honest place for a frame assertion about an
 // example is here.
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { cells } from "@fmx/calcium";
-import type { Block, Panel, Table } from "@fmx/calcium";
+import { cells } from "calcium-tui";
+import type { Block, Panel, Table } from "calcium-tui";
 import { parseNdjson } from "../../src/ndjson.ts";
 import { BAR_CELLS, COLUMNS, GLYPH_SLOT, isLive, join, livePanelBody, percent } from "../../src/dashboard.ts";
 import type { Joined, Snapshot } from "../../src/dashboard.ts";

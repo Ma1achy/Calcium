@@ -22,16 +22,16 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { b } from "@fmx/calcium";
+import { b } from "calcium-tui";
 import { bannerRow } from "./banner.ts";
-import type { LocalDocument, Block, ColumnDef, Glyph, TableRow, Tone } from "@fmx/calcium";
+import type { LocalDocument, Block, ColumnDef, Glyph, TableRow, Tone } from "calcium-tui";
 import { parseNdjson, str } from "./ndjson.ts";
 import type { Row } from "./ndjson.ts";
 import { stateOf } from "./ps.ts";
 import { capFor, createRingSet, historyBlock } from "./history.ts";
 import type { Runner } from "./mutation.ts";
 
-import type { LocalContext, ProducerContext } from "@fmx/calcium";
+import type { LocalContext, ProducerContext } from "calcium-tui";
 const run = promisify(execFile);
 
 /**

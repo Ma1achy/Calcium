@@ -121,7 +121,7 @@ preparation for it.
 **Three corrections from measuring the nine, before the shape is argued.**
 
 - **The count is nine.** F13, F58b and F85 closed as row 1 and row 2's field never dropped.
-- **F36 is served.** `expectDocument(doc).isValid()` is public in `@fmx/calcium/testing` and
+- **F36 is served.** `expectDocument(doc).isValid()` is public in `calcium-tui/testing` and
   this app already imports that entry in `degradation.test.ts`. What survives is a **stale
   deep import** in `test/documents.test.ts`, which is a workaround to delete rather than a
   gap to close. **The one open read is settled**: both uses survive the throw — the fifteen
@@ -290,7 +290,7 @@ no entry. F15's own mechanism was hiding a second instance of F15's own class.
 | ~~**F8** omitting `env` stops the shell opening~~ | — | — | **CLOSED** — gate 3b (C22 I61), the sentence corrected in three places, T3.20–T3.20e, four mutations. Residue F140 |
 | ~~**F31** `yFormat: "percent"` expects a fraction~~ | — | — | **CLOSED** — arms named for the unit in: `fraction`/`percent` (C04 I41), `b.plot` carries it, validated in both paths, five mutations |
 | ~~**F64** `b.logs` has no consumer and a document claims otherwise~~ | — | — | **CLOSED** — §9's *Exercises* line corrected in place, citation fixed in the entry. Residue **F141** |
-| ~~**F28** the live parts just declared~~ | — | — | **CLOSED** — `liveParts` on `@fmx/calcium/testing` cites it by name |
+| ~~**F28** the live parts just declared~~ | — | — | **CLOSED** — `liveParts` on `calcium-tui/testing` cites it by name |
 | ~~**F53** `exactOptionalPropertyTypes`~~ | — | — | **DISPOSED** — the ruling is in the finding; no task without a second consumer |
 
 **The pre-check was the tier's first step and it removed two of five before any work started.**

@@ -22,12 +22,12 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { b } from "@fmx/calcium";
-import type { LocalDocument, Block, ComparisonRow } from "@fmx/calcium";
+import { b } from "calcium-tui";
+import type { LocalDocument, Block, ComparisonRow } from "calcium-tui";
 import type { Row } from "./ndjson.ts";
 import type { Runner } from "./mutation.ts";
 
-import type { LocalContext } from "@fmx/calcium";
+import type { LocalContext } from "calcium-tui";
 const run = promisify(execFile);
 const realRunner: Runner = async (args) => await run("docker", [...args], { maxBuffer: 8 << 20 });
 

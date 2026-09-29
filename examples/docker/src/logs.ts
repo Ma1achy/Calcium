@@ -13,8 +13,8 @@
  * own `adaptPatch`, for a reason that only exists because of I47.
  */
 
-import { b } from "@fmx/calcium";
-import type { Adapter, RawPatch, StreamContext, ViewPatch } from "@fmx/calcium";
+import { b } from "calcium-tui";
+import type { Adapter, RawPatch, StreamContext, ViewPatch } from "calcium-tui";
 
 /**
  * How many lines the follow replays before it starts following.

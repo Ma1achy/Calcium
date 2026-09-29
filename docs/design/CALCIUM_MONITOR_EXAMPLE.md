@@ -70,10 +70,10 @@ sys-tui                                    up 4d 12h   load 1.24 0.98 0.87   22:
 └───────────────────────────────────┘ └─────────────────────────────────────┘
 
   PID  USER      CPU%   MEM%   TIME      COMMAND                    ▲ CPU%
- 4821  malachy   38.2    4.1   1:24:07   node --max-old-space
+ 4821  someone   38.2    4.1   1:24:07   node --max-old-space
  1204  root      12.4    0.8   4d 2:11   dockerd
- 8837  malachy    8.1   11.2   0:03:44   chrome --type=renderer
- 2291  malachy    4.0    2.2   0:41:12   ghostty
+ 8837  someone    8.1   11.2   0:03:44   chrome --type=renderer
+ 2291  someone    4.0    2.2   0:41:12   ghostty
   ...
 
 ──────────────────────────────────────────────────────────────────────────────

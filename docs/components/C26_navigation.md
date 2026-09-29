@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` |
+| **Package** | `calcium-tui` |
 | **Layer** | L3 interaction |
 | **Depends on** | C09 (`BlockDefinition.elements`, `measure`) · C13 (the entry a scope names) · C14 (the visible range, and `#restoreFromAnchor`'s shape) · C11 (`focusableRowIds`, which this generalises) |
 | **Consumed by** | C16 router · L4 |

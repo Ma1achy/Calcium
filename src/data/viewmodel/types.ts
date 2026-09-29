@@ -4192,7 +4192,7 @@ export type KnownBlockKinds = {
  * renderer that has none draws it degraded as `raw`.
  *
  * ```ts
- * declare module "@fmx/calcium" {
+ * declare module "calcium-tui" {
  *   interface BlockKinds { faulty: Faulty }
  * }
  * ```

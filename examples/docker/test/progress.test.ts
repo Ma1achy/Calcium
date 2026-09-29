@@ -19,9 +19,9 @@ import {
   renderPull,
   type Progress,
 } from "../src/progress.ts";
-import type { Block, LocalContext } from "@fmx/calcium";
+import type { Block, LocalContext } from "calcium-tui";
 
-import { localContext } from "@fmx/calcium/testing";
+import { localContext } from "calcium-tui/testing";
 const fresh = (): Progress => ({
   steps: new Map(),
   layers: new Map(),

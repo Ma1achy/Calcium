@@ -24,7 +24,7 @@ It inherits S08's skeleton: rule, steps, result, tip.
 ## 2. Success
 
 ```
-▌ ── test · fmx_models.jobs.training:job · pytest ──────────────────────────────
+▌ ── test · ml_models.jobs.training:job · pytest ──────────────────────────────
 ▌
 ▌ ── implicit smoke test · structural · read-only · 1 batch ────────────────────
 ▌
@@ -62,8 +62,8 @@ Smoke and user failures render differently, because they are diagnosed different
 ▌   ✗ loss.compute on output + targets
 ▌
 ▌     RuntimeError: Expected target size (4, 10), got (4,)
-▌       fmx_models/jobs/training.py:31  in  CrossEntropy.__call__
-▌       fmx_models/models.py:88         in  DigitClassifier.forward
+▌       ml_models/jobs/training.py:31  in  CrossEntropy.__call__
+▌       ml_models/models.py:88         in  DigitClassifier.forward
 ▌
 ▌     The forward output and the loss disagree about shape. Either the model's
 ▌     final layer or the loss's target_key is wrong.
@@ -83,7 +83,7 @@ A structural failure carries the exception, a **trimmed traceback**, and — whe
 ▌   ✓ DigitClassifier::forward_is_deterministic                         0.06s
 ▌
 ▌     assert not torch.isnan(w).any()
-▌       fmx_models/models.py:104  in  no_nan_in_weights
+▌       ml_models/models.py:104  in  no_nan_in_weights
 ▌       E   assert tensor(True) is False
 ▌
 ▌   ✗ 3 / 4 passed · 1 failed · 2.6s                                   exit 1
