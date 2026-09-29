@@ -98,3 +98,7 @@ describe("C22 I109 — the region's width", () => {
     expect(centred(f.overlayRegion.width, 40)).not.toBe(centred(reverted, 40));
   });
 });
+
+describe("C22 I33 — tier 6", () => {
+  it.todo("T6.134 (C22 I33): commandRows wrapping the command whole → T1.172 fails — not deferred on a component: the code lands in the next commit of this round");
+});

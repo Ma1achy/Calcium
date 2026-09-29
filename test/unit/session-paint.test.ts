@@ -1324,3 +1324,7 @@ describe("C22 I133 — the owner line's chords are the keymap's (review batch 2,
     expect(ownerLine("question", FULL_CAPS, false, 0, undefined, false, graph.ownerHints()).at(-1)?.label).toBe("esc → stop");
   });
 });
+
+describe("C22 I33 — a command of several lines", () => {
+  it.todo("T1.172 (C22 I33): commandRows draws each line of the command and no row carries a line break — not deferred on a component: the code lands in the next commit of this round");
+});
