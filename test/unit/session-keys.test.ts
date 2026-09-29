@@ -250,6 +250,8 @@ describe("C22 §3 step 11 — the effect table", () => {
       ).toBe(true);
     }
 
+    /** Rows pressed at, or dispatched to, a target other than their own (F1457, ruling 88). */
+    const misaimed: string[] = [];
     for (const b of base) {
       if (b.target === "overlay") openOverlay(graph);
       if (b.target === "panel") openPanel(graph);
@@ -260,7 +262,19 @@ describe("C22 §3 step 11 — the effect table", () => {
       if (b.target === "child") attachChild(graph);
       // `liveBlock` needs both halves of what `activeTarget` reads: a live
       // entry in C13 and focus stored there (C16 §3).
-      if (b.target === "liveBlock") enterLive(graph);
+      if (b.target === "liveBlock") {
+        // **A re-run leaves nothing to enter** (F1457): `⇧⏎` re-runs the live
+        // entry, and the entry it leaves live is a status and a notice with no
+        // element, so `↓` stayed at the prompt and the next re-run row was
+        // pressed there — consumed as `insertNewline`. A fresh table for each
+        // re-run row, as T2.17's `liveBlock` way in does for every row.
+        if (b.action === "rerunEntry") graph.transcript.append(LIVE_DOC as never, { streaming: true });
+        enterLive(graph);
+      }
+      // **The prompt, and `global`'s way in, from the prompt** (F1457): a row
+      // with no setup was pressed wherever the previous row left focus, and
+      // `prompt:⌥v` was answered by `liveBlock`'s own `⌥v`.
+      if (b.target === "prompt" || b.target === "global") graph.focus.reset();
       // **The inside needs a block that has one** (C26 I26, §102). `enterLive`'s
       // table declares no view state, so `⏎` there dispatches a row action and
       // leaves the mode alone — the row would fail for a reason that has nothing
@@ -277,8 +291,19 @@ describe("C22 §3 step 11 — the effect table", () => {
       // the argument for walking a table rather than listing it.
       COPY_MODES.native = b.target === "nativeSelection";
       COPY_MODES.semantic = b.target === "semanticSelection";
+      const row = `${b.target}:${keySlot(b.key)} -> ${b.action}`;
+      // **The precondition, asserted** (`test/support/README.md`, F1457): a
+      // row pressed wherever the previous one left focus is consumed
+      // *somewhere*, and passes for a reason other than the one it names.
+      // `global` is not a place focus rests, so its rows are pressed at the
+      // prompt and reach it as step 3's fallback.
+      const expected = b.target === "global" ? "prompt" : b.target;
+      if (graph.router.target !== expected) misaimed.push(`${row} pressed at ${graph.router.target}`);
       const consumed = graph.router.dispatch(press(b.key));
-      expect(consumed, `${b.target}:${b.key.name} -> ${b.action} reached no handler`).toBe(true);
+      expect(consumed, `${row} reached no handler`).toBe(true);
+      // And where it was dispatched, read from the router's own record.
+      const at = graph.router.lastStages.find((st) => st.startsWith("target:"));
+      if (at !== undefined && at !== `target:${expected}`) misaimed.push(`${row} dispatched at ${at}`);
       if (b.target === "overlay") graph.overlays.dismiss("probe");
       // **Every layer, not just the probe.** `reverseSearch` is a *prompt*
       // binding that pushes one, and nothing here was taking it back down — so
@@ -298,6 +323,10 @@ describe("C22 §3 step 11 — the effect table", () => {
       COPY_MODES.semantic = false;
       graph.editor.clear();
     }
+    // **Sixteen entries before ruling 88**, eight rows pressed and dispatched
+    // elsewhere: F1457's two, and six `global` rows pressed at `liveBlock`,
+    // where `pageup` and `pagedown` are `liveBlock`'s own block paging.
+    expect(misaimed, "every row is pressed at the target its binding names").toEqual([]);
     expect([...handled].sort(), "every reserved row reached its application handler").toEqual(
       Object.keys(RESERVED_ACTIONS).sort(),
     );
