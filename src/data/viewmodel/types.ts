@@ -3293,7 +3293,7 @@ export type Pills = Readonly<{
 
 /**
  * A row of peers you navigate, which slides rather than sheds (C04 §3ao, I124,
- * §095, `R-BLK-792`).
+ * §095, `R-BLK-758`–`764`).
  *
  * **The sibling of `Pills` and not a variant of it.** The distinction §095 draws
  * is whether anything points into the row — a focus, a current, a key that walks

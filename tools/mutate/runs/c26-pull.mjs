@@ -125,8 +125,8 @@ const results = runPass({
       // and a window that had slid snaps.
       name: "the tape's window is recomputed from the head rather than from the held start",
       file: "src/presentation/blocks/kinds/tape.ts",
-      from: "      ctx.scrollOffsets?.[block.id] ?? 0,",
-      to: "      0,",
+      from: "piecesOf(block, ctx.width, ctx, ctx.scrollOffsets?.[block.id] ?? 0);",
+      to: "piecesOf(block, ctx.width, ctx, 0);",
       expect: "T1.50",
     },
     {

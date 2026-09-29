@@ -16,7 +16,7 @@ export { mapRamps } from "./ramp.js";
 // The floor the shell reserves for a contained failure (C22 I69, C04 I67).
 export { countdown, elapsed, statusRowsFor } from "./kinds/status.js";
 export { age, barOf, interiorOf, panelInterior } from "./kinds/containers.js";
-export { tapeStart } from "./kinds/tape.js";
+export { tapeMemberCols, tapeStart } from "./kinds/tape.js";
 export { defaultButton } from "./kinds/form.js";
 export {
   glyphs,

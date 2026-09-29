@@ -1191,7 +1191,31 @@ describe("C04 I6 — a closed vocabulary carries its own fact (ruling 44)", () =
 });
 
 describe("C04 I144, I146, I148 — what a tape member, a bar and an overshoot may say (review batch 4)", () => {
-  it.todo("T2.150 (C04 I144, §3ao.1): a tape's members are refused unless each has a unique id, a label, a string detail and a known state — not deferred on a component: the code lands in the next commit of this round");
+  it("T2.150 (C04 I144, §3ao.1): a tape's members are refused unless each has a unique id, a label, a string detail and a known state", () => {
+    const good = { id: "a", label: "seams", detail: "2:53", state: "succeeded" };
+    const tape = (members: readonly unknown[], extra: Record<string, unknown> = {}) =>
+      validateBlock({ kind: "tape", id: "t", members, ...extra });
+    const refused = (members: readonly unknown[], pattern: RegExp, extra: Record<string, unknown> = {}): void => {
+      const got = tape(members, extra);
+      expect(got.ok, JSON.stringify(members)).toBe(false);
+      expect(got.ok ? "" : got.error.join("\n"), JSON.stringify(members)).toMatch(pattern);
+    };
+    refused(["seams"], /member \[0\] must be an object/u);
+    refused([{ label: "x" }], /"id" must be a non-empty string/u);
+    refused([{ id: 7, label: "x" }], /"id" must be a non-empty string/u);
+    refused([{ id: "", label: "x" }], /"id" must be a non-empty string/u);
+    refused([good, { ...good }], /member id "a" appears 2 times/u);
+    refused([{ id: "a" }], /"label"/u);
+    refused([{ id: "a", label: 3 }], /"label"/u);
+    refused([{ ...good, detail: 4 }], /"detail" must be a string/u);
+    refused([{ ...good, state: "ok" }], /"state" is outside its union.*"succeeded"/u);
+    refused([good], /"current" is a member's id, a string/u, { current: 0 });
+
+    // Accepted: each fixed, a current naming no member (C5), and a bare member.
+    expect(tape([good, { id: "b", label: "arm", state: "running" }], { current: "b" }).ok).toBe(true);
+    expect(tape([good], { current: "gone" }).ok, "a current naming no member is valid (C5, T1.48)").toBe(true);
+    expect(tape([{ id: "c", label: "count" }]).ok, "no detail and no state").toBe(true);
+  });
   it.todo("T2.151 (C04 I146, §3as): painted, quantity, granularity and liveness are refused outside their unions, and style only when not a string — not deferred on a component: the code lands in the next commit of this round");
   it.todo("T2.152 (C04 I148, §5c.1): overshoot is accepted on a gradient over a slot pair and refused everywhere else and out of range — not deferred on a component: the code lands in the next commit of this round");
 });

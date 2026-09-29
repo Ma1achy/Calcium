@@ -10,7 +10,8 @@
 import { describe, expect, it } from "vitest";
 
 import { tapeWindow, type TapeMarks } from "../../src/presentation/blocks/tape-window.js";
-import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import { createBlockRegistry, glyphFor, glyphs, tapeMemberCols } from "../../src/presentation/blocks/index.js";
+import { sliceCells } from "../../src/presentation/text.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { validateDocument } from "../../src/data/viewmodel/index.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS } from "../support/render.js";
@@ -112,8 +113,8 @@ describe("C04 §3ao — the tape", () => {
     expect(frame(tape(five, "count"), 80), "where a real current carries the mark").toContain("›");
 
     // **A state this build does not know draws no mark, and does not throw.**
-    // `state` is not checked by `validateDocument` — a tape arriving from the
-    // far side can name anything — and indexing the glyph map with it gave
+    // `validateDocument` refuses one now (C04 I144); this is the renderer's
+    // guard for a tape built without the gate, where indexing the glyph map gave
     // `undefined`, which `glyphFor` threw on. Falling back to a *glyph* instead
     // would be worse than throwing: the row would claim an outcome nobody sent.
     const odd = tape([member("solo", undefined, "elsewhere")], "solo");
@@ -297,6 +298,129 @@ describe("C04 §3ao — the tape", () => {
 });
 
 describe("C04 I147 and I124 — the tape's natural width and its members' columns (review batch 4 M14.9, M14.2)", () => {
-  it.todo("T1.81 (C04 I147, §3ao.1): a tape laid out at its own width draws no residue mark, at both conventions and rungs — not deferred on a component: the code lands in the next commit of this round");
-  it.todo("T1.83 (C04 I124, §3ao.1): tapeMemberCols is the drawn row — the lead is the current's, offscreen members are empty at 0 or the width — not deferred on a component: the code lands in the next commit of this round");
+  const WIDE_CAPS = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
+  const RUNGS = [
+    ["narrow", FULL_CAPS],
+    ["wide", WIDE_CAPS],
+    ["ascii", ASCII_CAPS],
+  ] as const;
+  const sweep: readonly Tape[] = [
+    tape([member("seams", "2:53", "succeeded"), member("arm", "4:02", "running"), member("count")], "arm"),
+    tape([member("seams", "2:53", "succeeded"), member("arm", "4:02", "running"), member("count")]),
+    tape([member("a"), member("b", undefined, "failed"), member("c", "1:00", "queued")], "c"),
+    tape([{ id: "g", label: "αβγ-run", detail: "0:05", state: "cancelled" }, member("plain")], "g"),
+    tape([member("solo", "9:59", "running")], "solo"),
+  ];
+  /** Whether a frame drew a residue mark at these capabilities' rung. */
+  const slides = (line: string, caps: typeof FULL_CAPS): boolean => {
+    const set = glyphs(caps);
+    return line.includes(set.tapeLeft) || line.includes(set.tapeRight);
+  };
+
+  it("T1.81 (C04 I147, §3ao.1): a tape laid out at its own width draws no residue mark, at both conventions and rungs", () => {
+    // **The measured case first.** At 91842503 `width()` answered 17 for this
+    // tape and the row drawn at 17 was `«1  › arm ⋅  1»` — a tape told its own
+    // width and still sliding, because details, marks and the lead were drawn
+    // and not counted.
+    const measured = sweep[0]!;
+    const own = registry.width(measured, 200);
+    expect(own, "wider than the labels and gaps alone").toBeGreaterThan(17);
+    const line = frame(measured, own);
+    for (const label of ["seams", "arm", "count"]) expect(line, `every member is drawn (${label})`).toContain(label);
+    expect(line, "and every detail").toContain("2:53");
+    expect(slides(line, FULL_CAPS), line).toBe(false);
+
+    // **Then the property, at every rung.** `width` takes no capability, so it
+    // answers at the widest and the row at its own width never slides.
+    for (const block of sweep) {
+      const at = registry.width(block, 200);
+      for (const [name, caps] of RUNGS) {
+        const drawn = frame(block, at, caps);
+        expect(slides(drawn, caps), `${name} at ${String(at)}: ${drawn}`).toBe(false);
+        for (const m of block.members) expect(drawn, `${name}: ${m.id} is drawn`).toContain(m.label);
+      }
+      // **And it is the least such width, not merely a safe one**: one cell
+      // less at the widest convention draws a different row. An answer of the
+      // allocation passes every line above and is the policy C04 I147 replaced.
+      const whole = frame(block, at, WIDE_CAPS).trimEnd();
+      expect(frame(block, at - 1, WIDE_CAPS).trimEnd(), `one cell less changes the row: ${whole}`).not.toBe(whole);
+      expect(at, "narrower than the allocation").toBeLessThan(200);
+    }
+  });
+
+  it("T1.83 (C04 I124, §3ao.1): tapeMemberCols is the drawn row — the lead is the current's, offscreen members are empty at 0 or the width", () => {
+    const five = tape(
+      [
+        member("seams", "2:53", "succeeded"),
+        member("arm", "4:02", "running"),
+        member("count"),
+        member("probe", "1:00", "failed"),
+        member("trace"),
+      ],
+      "count",
+    );
+    const blank = /^ *$/u;
+    let offscreen = 0;
+    let leads = 0;
+    for (const block of [five, sweep[0]!, sweep[2]!, sweep[3]!]) {
+      for (const width of [80, 40, 24, 16, 9]) {
+        for (const held of [0, 2, 4]) {
+          for (const [name, caps] of RUNGS) {
+            const line = (
+              renderSequenceToLines(registry, [block], width, {
+                theme: DARK_THEME,
+                capabilities: caps,
+                focus: null,
+                scrollOffsets: { [block.id]: held },
+              })[0] ?? ""
+            ).replace(/\u001b\[[0-9;]*m/gu, "");
+            const cols = tapeMemberCols(block, width, caps, held);
+            const at = `${name} w=${String(width)} held=${String(held)} ${line}`;
+            expect(cols.length, at).toBe(block.members.length);
+            const shown = cols.map((c, i) => ({ ...c, i })).filter((c) => c.to > c.from);
+            // Ranges ascend and never overlap; a member before the window is
+            // empty at 0 and one after it empty at the width.
+            shown.forEach((c, k) => {
+              if (k > 0) expect(c.from, at).toBeGreaterThanOrEqual(shown[k - 1]!.to);
+            });
+            const lo = shown[0]?.i ?? 0;
+            const hi = shown.at(-1)?.i ?? 0;
+            cols.forEach((c, i) => {
+              if (i < lo) expect(c, `${at} member ${String(i)} before`).toEqual({ from: 0, to: 0 });
+              if (i > hi) expect(c, `${at} member ${String(i)} after`).toEqual({ from: width, to: width });
+              if (i < lo || i > hi) offscreen += 1;
+            });
+            // Each range holds its member's drawn text: the lead first where it
+            // is the current, then the label (or as much of it as fits).
+            const set = glyphs(caps);
+            for (const c of shown) {
+              const m = block.members[c.i]!;
+              const text = sliceCells(line, c.from, c.to, caps.ambiguousWidth);
+              const lead = m.id === block.current ? `${glyphFor("current", caps)} ` : "";
+              if (lead !== "") leads += 1;
+              expect(text.startsWith(lead), `${at}: ${JSON.stringify(text)} leads with the current's mark`).toBe(true);
+              const body = text.slice(lead.length);
+              // A truncation ends in its marker, and a wide cluster that did not
+              // fit leaves a pad cell before it; what precedes both is the label's.
+              const kept = body.slice(0, m.label.length).replace(/[~…]$/u, "").trimEnd();
+              expect(m.label.startsWith(kept), `${at}: ${JSON.stringify(text)}`).toBe(true);
+            }
+            // And what no range covers is gaps and residue marks, nothing else.
+            let rest = "";
+            let cursor = 0;
+            for (const c of shown) {
+              rest += sliceCells(line, cursor, c.from, caps.ambiguousWidth);
+              cursor = c.to;
+            }
+            rest += sliceCells(line, cursor, width, caps.ambiguousWidth);
+            const marks = new RegExp(`${set.tapeLeft.replace(/[[\]]/gu, "\\$&")}\\d+|\\d+${set.tapeRight.replace(/[[\]]/gu, "\\$&")}`, "gu");
+            expect(rest.replace(marks, ""), `${at}: uncovered ${JSON.stringify(rest)}`).toMatch(blank);
+          }
+        }
+      }
+    }
+    // The sweep reached both arms it asserts, or it asserted nothing.
+    expect(offscreen, "some member was offscreen").toBeGreaterThan(0);
+    expect(leads, "some range carried the lead").toBeGreaterThan(0);
+  });
 });

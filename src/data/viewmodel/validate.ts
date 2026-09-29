@@ -1920,8 +1920,50 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
   // (C04 I124). A tape nobody is in is still a tape, and a `current` naming no
   // member is the state a producer is in between rebuilding the row and
   // choosing within it — refusing it would make a document invalid for a
-  // moment that is legitimate.
-  tape: (b, e, at) => requireArray(b, "members", e, at),
+  // moment that is legitimate. **Its type is checked** (I144): an index where
+  // an id belongs names a different member the moment one is inserted.
+  //
+  // **The members are** (C04 I144). Every member is an element (I124), so its
+  // id is an address and two members `x` are two targets for one name — the
+  // tree's argument (I129) one kind over. A state outside the union reached the
+  // renderer as a crash until a guard there caught it; it is refused here now,
+  // the guard staying for a tape built without the gate.
+  tape: (b, e, at) => {
+    requireArray(b, "members", e, at);
+    const current = b["current"];
+    if (current !== undefined && !isString(current)) {
+      e.push(`${at}: "current" is a member's id, a string, never an index (C04 I124, I144)`);
+    }
+    const members = b["members"];
+    if (!isArray(members)) return;
+    const ids = new Map<string, number>();
+    members.forEach((raw, i) => {
+      const here = `${at} member [${String(i)}]`;
+      if (!isRecord(raw)) {
+        e.push(`${here} must be an object (C04 I144)`);
+        return;
+      }
+      const id = raw["id"];
+      if (!isString(id) || id === "") {
+        e.push(`${here}: "id" must be a non-empty string — every member is an element, addressed by it (C04 I144)`);
+      } else {
+        ids.set(id, (ids.get(id) ?? 0) + 1);
+      }
+      requireString(raw, "label", e, here);
+      if (raw["detail"] !== undefined && !isString(raw["detail"])) {
+        e.push(`${here}: "detail" must be a string (C04 I144)`);
+      }
+      const state = raw["state"];
+      if (state !== undefined && !CALL_STATES.includes(state as never)) {
+        e.push(`${here}: "state" is outside its union (C04 I141, I144) — one of ${CALL_STATES.map((s) => `"${s}"`).join(", ")}`);
+      }
+    });
+    for (const [id, count] of ids) {
+      if (count > 1) {
+        e.push(`${at}: member id "${id}" appears ${String(count)} times (C04 I144) — two members are two targets for one name`);
+      }
+    }
+  },
   // **Node ids are unique at any depth, not per level** (C04 I129). Each visible
   // node is an element and C26 I6 addresses one by id within the declaration,
   // and `op: "expand"` names a node by it — so two nodes `x` in different

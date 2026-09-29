@@ -16,6 +16,7 @@ import {
   type MergeRow,
   type Table,
   type TableRow,
+  type Tape,
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
 import { CORPUS, doc, ONE_PER_KIND, tableOf } from "../support/blocks.js";
@@ -25,7 +26,8 @@ import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createViewport } from "../../src/viewport/viewport/index.js";
 import { measureSequence } from "../support/viewport.js";
 import { FREE_WIDTH_SLOTS, SUBSTITUTIONS, glyphs } from "../../src/presentation/blocks/index.js";
-import { cells } from "../../src/presentation/text.js";
+import { cells, sliceCells } from "../../src/presentation/text.js";
+import { tapeMemberCols } from "../../src/presentation/blocks/index.js";
 import { checkAsciiParity, formatReport } from "../../src/testing/measurement-conformance.js";
 
 function unwrap(r: ReturnType<typeof applyPatch>): ViewDocument {
@@ -527,10 +529,46 @@ describe("C04 I6 fail-on-revert — the vocabulary is closed", () => {
 });
 
 describe("C04 I124, I144–I148 — tier 6 (review batch 4)", () => {
-  it.todo("T6.108 (C04 I144): the tape arm reverted to requireArray → T2.150 fails — not deferred on a component: the code lands in the next commit of this round");
+  it("T6.108 (C04 I144): the tape arm reverted to requireArray → T2.150 fails", () => {
+    // **The document the old arm let through**: its members are an array, which
+    // is all `requireArray` asked, and two of them answer to one name — so a
+    // click, a focus and an `expand` each had two targets. Reverting the arm
+    // makes this valid and T2.150's duplicate row goes red.
+    const twins = { kind: "tape", id: "t", members: [{ id: "a", label: "x" }, { id: "a", label: "y" }] };
+    expect(Array.isArray(twins.members), "requireArray alone is satisfied").toBe(true);
+    expect(validateBlock(twins).ok, "the arm refuses it").toBe(false);
+  });
   it.todo("T6.109 (C04 I145): progress measuring 1 at every fraction → T1.80 fails at 100/100 — not deferred on a component: the code lands in the next commit of this round");
   it.todo("T6.110 (C04 I146): the progress arm without its field checks → T2.151 fails — not deferred on a component: the code lands in the next commit of this round");
-  it.todo("T6.111 (C04 I147): width counting labels and gaps only → T1.81 fails on the measured case — not deferred on a component: the code lands in the next commit of this round");
+  it("T6.111 (C04 I147): width counting labels and gaps only → T1.81 fails on the measured case", () => {
+    // **The old sum, computed here, and the row it drew.** Labels at narrow and
+    // two gaps: 5 + 3 + 5 + 4 = 17, and a tape laid out at 17 slides.
+    const members = [
+      { id: "seams", label: "seams", detail: "2:53", state: "succeeded" },
+      { id: "arm", label: "arm", detail: "4:02", state: "running" },
+      { id: "count", label: "count" },
+    ];
+    const tape = block({ kind: "tape", id: "t", members, current: "arm" } as never);
+    const old = members.reduce((n, m, i) => n + cells(m.label) + (i > 0 ? 2 : 0), 0); // narrow-ok — the reverted arithmetic
+    expect(old).toBe(17);
+    const kit = measurable({ capabilities: FULL_CAPS });
+    expect(kit.renderToLines(tape, old).join(""), "at the old width the row slides").toContain("«");
+    expect(kit.registry.width(tape, 200), "and the width counts what it draws").toBeGreaterThan(old);
+  });
   it.todo("T6.112 (C04 I148): the sampler ignoring overshoot → T1.82 fails at t = 1 — not deferred on a component: the code lands in the next commit of this round");
-  it.todo("T6.113 (C04 I124): tapeMemberCols leaving out the current's lead → T1.83 fails — not deferred on a component: the code lands in the next commit of this round");
+  it("T6.113 (C04 I124): tapeMemberCols leaving out the current's lead → T1.83 fails", () => {
+    // **The lead is the member's**: the current's range opens on `›`, two cells
+    // before its label. A range taken from the text alone starts at the label,
+    // and a press on the mark lands on nobody — T1.83's lead row fails.
+    const tape = block({
+      kind: "tape",
+      id: "t",
+      members: [{ id: "a", label: "alpha" }, { id: "b", label: "beta" }],
+      current: "b",
+    } as never) as Tape;
+    const cols = tapeMemberCols(tape, 40, FULL_CAPS, 0);
+    const line = measurable({ capabilities: FULL_CAPS }).renderToLines(tape, 40)[0]!.replace(/\u001b\[[0-9;]*m/gu, "");
+    expect(sliceCells(line, cols[1]!.from, cols[1]!.from + 2), "the range opens on the lead").toBe("› ");
+    expect(sliceCells(line, cols[1]!.from + 2, cols[1]!.to), "and the label follows it").toBe("beta");
+  });
 });
