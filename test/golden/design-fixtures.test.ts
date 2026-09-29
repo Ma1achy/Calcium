@@ -208,9 +208,17 @@ describe("M16 — the design fixtures, mapped", () => {
       {
         built: surfaces.filter((r) => r.built !== "no").length,
         unbuilt: surfaces.filter((r) => r.built === "no").length,
-        framed: surfaces.filter((r) => r.target !== "—").length,
+        // **`built: no` is not framed** (review batch 4, M16.1): a frame of a
+        // surface the tree does not have is a census or an absence, and it was
+        // counted as a drawing of the fixture for as long as this line read
+        // only the target.
+        framed: surfaces.filter((r) => r.built !== "no" && r.target !== "—").length,
       },
       "built, unbuilt and framed",
     ).toEqual({ built, unbuilt, framed });
   });
+
+  it.todo("T1.6 (M16.1): the figure column is present on exactly the framed rows, and each range lies inside its fixture — not deferred on a component: it lands with `tools/design/figures.ts` in the next commit");
+  it.todo("T1.7 (M16.1): each framed fixture's golden frame against its figure — the difference is the allowed one, or there is none — not deferred on a component: it lands with `tools/design/figures.ts` in the next commit");
+  it.todo("T1.8 (M16.1): the allowed differences equal the measured ones in both directions, and each carries a reason — not deferred on a component: it lands with `tools/design/figures.ts` in the next commit");
 });
