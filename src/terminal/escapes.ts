@@ -108,18 +108,38 @@ export const TITLE_STACK = mode("\x1b[22;2t", "\x1b[23;2t");
 export const BELL = "\x07";
 
 /**
- * C0, DEL and C1 — anything that could end the string early or start another
- * sequence inside it. `terminal/` may not import `data/`, so the rule is
- * restated here at its narrowest: an OSC payload is text, and text has no
- * controls in it.
+ * The bidi format characters (C01 I26, ruling 71): U+061C, U+200E, U+200F,
+ * U+202A–U+202E and U+2066–U+2069 — `data/text.ts`'s `isBidiFormat`,
+ * restated because `terminal/` may not import `data/`. C01 T2.12 holds the
+ * two equal over every BMP code point, so the copy cannot drift unseen.
  */
-const oscText = (text: string): string => text.replace(/[\u0000-\u001f\u007f-\u009f]/gu, "");
+const BIDI_FORMAT = /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu;
 
-/** OSC 2 — the window title (C01 I24), control-stripped. */
+/**
+ * An OSC payload's text (C01 I26) — the one sanitiser both builders below
+ * read.
+ *
+ * C0, DEL and C1 are **deleted**: anything that could end the string early or
+ * start another sequence inside it. `terminal/` may not import `data/`, so the
+ * rule is restated here at its narrowest — an OSC payload is text, and text has
+ * no controls in it.
+ *
+ * A bidi format character is **shown**, as `<U+202E>` — ruling 71's form. It
+ * is printable by category, so the filter above passed it whole, and a title
+ * or a notification built from a tool's output reordered what the reader saw
+ * in the title bar (F1407). The form is printable ASCII and holds nothing
+ * either arm rewrites.
+ */
+const oscText = (text: string): string =>
+  text
+    .replace(/[\u0000-\u001f\u007f-\u009f]/gu, "")
+    .replace(BIDI_FORMAT, (ch) => `<U+${(ch.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}>`);
+
+/** OSC 2 — the window title (C01 I24), through `oscText` (C01 I26). */
 export const windowTitle = (text: string): string => `\x1b]2;${oscText(text)}\x07`;
 
 /**
- * OSC 9 — a system notification (C02 I16, C22 I128), control-stripped.
+ * OSC 9 — a system notification (C02 I16, C22 I128), through `oscText` (C01 I26).
  *
  * **Never opens with a number and a semicolon**: Ghostty's documentation
  * reserves that shape for ConEmu's OSC 9 sub-commands, so `7zip;` would be read

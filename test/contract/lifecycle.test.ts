@@ -8,6 +8,8 @@ import { SCAN_BUDGET_MS } from "../support/budget.js";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
 import { createTerminalLifecycle, type TerminalLifecycle } from "../../src/terminal/lifecycle.js";
+import { windowTitle } from "../../src/terminal/escapes.js";
+import { isBidiFormat } from "../../src/data/text.js";
 import { capabilities, fakeStdin, fakeStdout } from "../support/fake-terminal.js";
 
 // This file walks `src/`; `budget.ts` carries the measurement and why the 5 s
@@ -257,7 +259,22 @@ describe("C01 §5 — the shutdown codes", () => {
 });
 
 describe("C01 the OSC text payloads (I26)", () => {
-  it.todo(
-    "T2.12 (I26): the restated bidi set in escapes.ts equals data/text.ts's over every BMP code point — not deferred on a component: the row lands in the next commit, with the spec it is written against",
-  );
+  it("T2.12 (I26): the restated bidi set in escapes.ts equals data/text.ts's over every BMP code point", () => {
+    // **By behaviour, not by text.** `terminal/` may not import `data/` (A02
+    // §1), so `escapes.ts` restates ruling 71's set, and a restatement drifts
+    // the day a character is added to one copy. A test may read both halves.
+    const disagree: string[] = [];
+    let count = 0;
+    for (let cp = 0; cp <= 0xffff; cp += 1) {
+      if (cp < 0x20 || (cp >= 0x7f && cp <= 0x9f)) continue; // deleted, I26's other arm
+      if (cp >= 0xd800 && cp <= 0xdfff) continue; // a lone surrogate is not a character
+      const ch = String.fromCharCode(cp);
+      const isShown = windowTitle(ch) !== `\x1b]2;${ch}\x07`;
+      if (isShown) count += 1;
+      if (isShown !== isBidiFormat(cp)) disagree.push(`U+${cp.toString(16).toUpperCase().padStart(4, "0")}`);
+    }
+    expect(disagree, "code points the two copies answer differently").toEqual([]);
+    // The control: a comparison over nothing agrees too.
+    expect(count, "ruling 71's twelve").toBe(12);
+  });
 });

@@ -14,7 +14,7 @@ import {
   type FakeStdout,
 } from "../support/fake-terminal.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
-import { CLIPBOARD_LIMIT, clipboardWrite } from "../../src/terminal/escapes.js";
+import { CLIPBOARD_LIMIT, clipboardWrite, systemNotification, windowTitle } from "../../src/terminal/escapes.js";
 
 type Harness = {
   lifecycle: TerminalLifecycle;
@@ -758,7 +758,43 @@ describe("C01 the clipboard's OSC 52 (I25)", () => {
 });
 
 describe("C01 the OSC text payloads (I26)", () => {
-  it.todo(
-    "T1.33 (I26): a bidi format character through windowTitle and systemNotification is shown, never written — not deferred on a component: the row lands in the next commit, with the spec it is written against",
-  );
+  /**
+   * Ruling 71's twelve, **written as escapes** — a literal override in this
+   * file would reorder what a reviewer reads against what runs (F1402, A03
+   * SS69).
+   */
+  const BIDI = [0x061c, 0x200e, 0x200f, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068, 0x2069];
+  const shown = (cp: number): string => `<U+${cp.toString(16).toUpperCase().padStart(4, "0")}>`;
+  /** The UTF-8 of one code point, to look for in the bytes a terminal would receive. */
+  const utf8 = (cp: number): Buffer => Buffer.from(String.fromCodePoint(cp), "utf8");
+
+  it("T1.33 (I26): a bidi format character through windowTitle and systemNotification is shown, never written", () => {
+    // **U+202E first, by name**, because it is F1407's case: an override in a
+    // title reorders every cell after it in the title bar.
+    expect(windowTitle("a\u202Eb")).toBe("\x1b]2;a<U+202E>b\x07");
+    expect(systemNotification("a\u202Eb")).toBe("\x1b]9;a<U+202E>b\x07");
+
+    for (const cp of BIDI) {
+      const text = `a${String.fromCodePoint(cp)}b`;
+      const title = windowTitle(text);
+      const note = systemNotification(text);
+      expect(title, `U+${cp.toString(16)} in a title`).toBe(`\x1b]2;a${shown(cp)}b\x07`);
+      expect(note, `U+${cp.toString(16)} in a notification`).toBe(`\x1b]9;a${shown(cp)}b\x07`);
+      // **The bytes, read**: the sequence a terminal receives holds none of
+      // the twelve, whichever one went in.
+      for (const other of BIDI) {
+        expect(Buffer.from(title, "utf8").includes(utf8(other)), `U+${other.toString(16)} written in a title`).toBe(false);
+        expect(Buffer.from(note, "utf8").includes(utf8(other)), `U+${other.toString(16)} written in a notification`).toBe(false);
+      }
+    }
+
+    // The older arm is unchanged beside it: a C0 is deleted, not shown.
+    expect(windowTitle("a\x1b\u202Eb")).toBe("\x1b]2;a<U+202E>b\x07");
+    // And the notification's leading-number guard still reads the text it is handed.
+    expect(systemNotification("7\u202E;x")).toBe("\x1b]9;7<U+202E>;x\x07");
+
+    // **The control**: right-to-left *text* is not a format character, and
+    // passes whole — the arm is about the twelve, not about a script.
+    expect(windowTitle("\u05D0\u05D1")).toBe("\x1b]2;\u05D0\u05D1\x07");
+  });
 });
