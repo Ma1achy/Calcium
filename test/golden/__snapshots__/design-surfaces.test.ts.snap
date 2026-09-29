@@ -100,7 +100,7 @@ download ###################-------- 70%
 ── §96 · a status has three parts, and a frame is separate
 +--------------------------------------+
 | -------------- ERROR --------------- |
-| ! the manifest declares a tool the   |
+| x the manifest declares a tool the   |
 | registry has no handler for, so it   |
 | would classify as local and reach    |
 | the pipeline with nothing to run     |
@@ -317,7 +317,7 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.example.com/family:
 · a tag with extent, ex. 3 — and the error tag is the only one
 ........................................ +--------------------------------------+
 ................AAAAAAA................. | -------------- ERROR --------------- |
-........................................ | ! the manifest declares a tool the   |
+........................................ | x the manifest declares a tool the   |
 ........................................ | registry has no handler for, so it   |
 ........................................ | would classify as local and reach    |
 ........................................ | the pipeline with nothing to run     |
@@ -363,7 +363,7 @@ a patch — a unified diff, not the gutter
 a status — the message and its detail
   drawn  +--------------------------------------+
   drawn  | -------------- ERROR --------------- |
-  drawn  | ! the manifest declares a tool the   |
+  drawn  | x the manifest declares a tool the   |
   copy   the manifest declares a tool the registry has no handler for, so it would classify as local and reach the pipeline with nothing to run↵at seal(): \`prune\` is marked local in the manifest and has no handler
 
 a tape — the labels, not the marks
@@ -857,7 +857,7 @@ download ###############################################-------------------- 70%
 +------------------------------------------------------------------------------+
 |                                                                              |
 | ---------------------------------- ERROR ----------------------------------- |
-| ! the manifest declares a tool the registry has no handler for, so it would  |
+| x the manifest declares a tool the registry has no handler for, so it would  |
 | classify as local and reach the pipeline with nothing to run                 |
 | at seal(): \`prune\` is marked local in the manifest and has no handler        |
 |                                                                              |
@@ -1074,7 +1074,7 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ................................................................................ +------------------------------------------------------------------------------+
 ................................................................................ |                                                                              |
 ....................................AAAAAAA..................................... | ---------------------------------- ERROR ----------------------------------- |
-................................................................................ | ! the manifest declares a tool the registry has no handler for, so it would  |
+................................................................................ | x the manifest declares a tool the registry has no handler for, so it would  |
 ................................................................................ | classify as local and reach the pipeline with nothing to run                 |
 ................................................................................ | at seal(): \`prune\` is marked local in the manifest and has no handler        |
 ................................................................................ |                                                                              |
@@ -1119,7 +1119,7 @@ a patch — a unified diff, not the gutter
 a status — the message and its detail
   drawn  +----------------------------------------------------------+
   drawn  | ------------------------ ERROR ------------------------- |
-  drawn  | ! the manifest declares a tool the registry has no       |
+  drawn  | x the manifest declares a tool the registry has no       |
   copy   the manifest declares a tool the registry has no handler for, so it would classify as local and reach the pipeline with nothing to run↵at seal(): \`prune\` is marked local in the manifest and has no handler
 
 a tape — the labels, not the marks
@@ -1601,7 +1601,7 @@ download ███████████████████░░░░�
 ── §96 · a status has three parts, and a frame is separate
 ┌──────────────────────────────────────┐
 │ ────────────── ERROR ─────────────── │
-│ ▲ the manifest declares a tool the   │
+│ ✗ the manifest declares a tool the   │
 │ registry has no handler for, so it   │
 │ would classify as local and reach    │
 │ the pipeline with nothing to run     │
@@ -1812,7 +1812,7 @@ work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯
 · a tag with extent, ex. 3 — and the error tag is the only one
 ........................................ ┌──────────────────────────────────────┐
 ........................................ │ ────────────── ERROR ─────────────── │
-........................................ │ ▲ the manifest declares a tool the   │
+........................................ │ ✗ the manifest declares a tool the   │
 ........................................ │ registry has no handler for, so it   │
 ........................................ │ would classify as local and reach    │
 ........................................ │ the pipeline with nothing to run     │
@@ -1853,7 +1853,7 @@ a patch — a unified diff, not the gutter
 a status — the message and its detail
   drawn  ┌──────────────────────────────────────┐
   drawn  │ ────────────── ERROR ─────────────── │
-  drawn  │ ▲ the manifest declares a tool the   │
+  drawn  │ ✗ the manifest declares a tool the   │
   copy   the manifest declares a tool the registry has no handler for, so it would classify as local and reach the pipeline with nothing to run↵at seal(): \`prune\` is marked local in the manifest and has no handler
 
 a tape — the labels, not the marks
@@ -2298,7 +2298,7 @@ download ███████████████████████�
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                                                                              │
 │ ────────────────────────────────── ERROR ─────────────────────────────────── │
-│ ▲ the manifest declares a tool the registry has no handler for, so it would  │
+│ ✗ the manifest declares a tool the registry has no handler for, so it would  │
 │ classify as local and reach the pipeline with nothing to run                 │
 │ at seal(): \`prune\` is marked local in the manifest and has no handler        │
 │                                                                              │
@@ -2509,7 +2509,7 @@ work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮
 ................................................................................ ┌──────────────────────────────────────────────────────────────────────────────┐
 ................................................................................ │                                                                              │
 ................................................................................ │ ────────────────────────────────── ERROR ─────────────────────────────────── │
-................................................................................ │ ▲ the manifest declares a tool the registry has no handler for, so it would  │
+................................................................................ │ ✗ the manifest declares a tool the registry has no handler for, so it would  │
 ................................................................................ │ classify as local and reach the pipeline with nothing to run                 │
 ................................................................................ │ at seal(): \`prune\` is marked local in the manifest and has no handler        │
 ................................................................................ │                                                                              │
@@ -2549,7 +2549,7 @@ a patch — a unified diff, not the gutter
 a status — the message and its detail
   drawn  ┌──────────────────────────────────────────────────────────┐
   drawn  │ ──────────────────────── ERROR ───────────────────────── │
-  drawn  │ ▲ the manifest declares a tool the registry has no       │
+  drawn  │ ✗ the manifest declares a tool the registry has no       │
   copy   the manifest declares a tool the registry has no handler for, so it would classify as local and reach the pipeline with nothing to run↵at seal(): \`prune\` is marked local in the manifest and has no handler
 
 a tape — the labels, not the marks
@@ -2989,7 +2989,7 @@ download ███████████████████░░░░�
 ── §96 · a status has three parts, and a frame is separate
 ┌──────────────────────────────────────┐
 │ ────────────── ERROR ─────────────── │
-│ ▲ the manifest declares a tool the   │
+│ ✗ the manifest declares a tool the   │
 │ registry has no handler for, so it   │
 │ would classify as local and reach    │
 │ the pipeline with nothing to run     │
@@ -3206,7 +3206,7 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.example.com/family:
 · a tag with extent, ex. 3 — and the error tag is the only one
 ........................................ ┌──────────────────────────────────────┐
 ................AAAAAAA................. │ ────────────── ERROR ─────────────── │
-........................................ │ ▲ the manifest declares a tool the   │
+........................................ │ ✗ the manifest declares a tool the   │
 ........................................ │ registry has no handler for, so it   │
 ........................................ │ would classify as local and reach    │
 ........................................ │ the pipeline with nothing to run     │
@@ -3252,7 +3252,7 @@ a patch — a unified diff, not the gutter
 a status — the message and its detail
   drawn  ┌──────────────────────────────────────┐
   drawn  │ ────────────── ERROR ─────────────── │
-  drawn  │ ▲ the manifest declares a tool the   │
+  drawn  │ ✗ the manifest declares a tool the   │
   copy   the manifest declares a tool the registry has no handler for, so it would classify as local and reach the pipeline with nothing to run↵at seal(): \`prune\` is marked local in the manifest and has no handler
 
 a tape — the labels, not the marks
@@ -3747,7 +3747,7 @@ download ███████████████████████�
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                                                                              │
 │ ────────────────────────────────── ERROR ─────────────────────────────────── │
-│ ▲ the manifest declares a tool the registry has no handler for, so it would  │
+│ ✗ the manifest declares a tool the registry has no handler for, so it would  │
 │ classify as local and reach the pipeline with nothing to run                 │
 │ at seal(): \`prune\` is marked local in the manifest and has no handler        │
 │                                                                              │
@@ -3964,7 +3964,7 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ................................................................................ ┌──────────────────────────────────────────────────────────────────────────────┐
 ................................................................................ │                                                                              │
 ....................................AAAAAAA..................................... │ ────────────────────────────────── ERROR ─────────────────────────────────── │
-................................................................................ │ ▲ the manifest declares a tool the registry has no handler for, so it would  │
+................................................................................ │ ✗ the manifest declares a tool the registry has no handler for, so it would  │
 ................................................................................ │ classify as local and reach the pipeline with nothing to run                 │
 ................................................................................ │ at seal(): \`prune\` is marked local in the manifest and has no handler        │
 ................................................................................ │                                                                              │
@@ -4009,7 +4009,7 @@ a patch — a unified diff, not the gutter
 a status — the message and its detail
   drawn  ┌──────────────────────────────────────────────────────────┐
   drawn  │ ──────────────────────── ERROR ───────────────────────── │
-  drawn  │ ▲ the manifest declares a tool the registry has no       │
+  drawn  │ ✗ the manifest declares a tool the registry has no       │
   copy   the manifest declares a tool the registry has no handler for, so it would classify as local and reach the pipeline with nothing to run↵at seal(): \`prune\` is marked local in the manifest and has no handler
 
 a tape — the labels, not the marks

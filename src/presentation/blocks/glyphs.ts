@@ -99,9 +99,10 @@ export type GlyphSet = Readonly<{
    * right for a reference line and wrong for the one mark that has to survive a
    * dense column. This one sits on the rule, where nothing else is drawn.
    *
-   * It shares a code point with `warning` and never shares a figure: one is a
-   * notice's tone mark and one is a plot's axis. Named separately so a theme or
-   * a substitution can move either without moving the other.
+   * It shares a code point with the vocabulary's `warn` token and never shares
+   * a figure: one is a notice's tone mark and one is a plot's axis. Named
+   * separately so a theme or a substitution can move either without moving the
+   * other.
    */
   cursorMark: string;
   candleHollow: string;
@@ -184,7 +185,8 @@ export type GlyphSet = Readonly<{
   choiceOpen: string;
   dotted: string;
   blocked: string;
-  warning: string;
+  // **No `warning`** (C09 I138, ruling 85): it had one reader, the status's
+  // mark, which is `cross` now. `▲` stays the vocabulary's `warn` token.
   bar: string;
 
   // Sort indicators — the active column's header (C11 §4, A01 A.4).
@@ -325,7 +327,6 @@ const UNICODE: GlyphSet = Object.freeze({
   choiceOpen: "○",
   dotted: "◌",
   blocked: "⊘",
-  warning: "▲",
   bar: "▌",
 
   // **`▴` and `▾`, not `↑`/`↓`** — the design's sort marks (§078, §081,
@@ -407,7 +408,6 @@ const ASCII: GlyphSet = Object.freeze({
   choiceOpen: "@",
   dotted: ".",
   blocked: "/",
-  warning: "!",
   bar: "|",
 
   sortAsc: "^",
@@ -1522,8 +1522,8 @@ export const GLYPH_DOMAINS: Readonly<Record<Glyph, readonly string[]>> = {
  * **Unlike `GLYPH_DOMAINS` this one is not one sentence**, because `GlyphSet`'s
  * rôles are spread across the screen: a frame's own rows, a plot's drawing
  * region, a table's header, and — for the status group — a block's lead. The
- * status group is `row-lead` *and* `plot`: `g.warning` leads a status block
- * (`kinds/status.ts`) while `g.hollow`, `g.filled` and `g.dotted` are points and
+ * status group is `row-lead` *and* `plot`: `g.cross` leads a failed status block
+ * (`kinds/status.ts`, C09 I138) while `g.hollow`, `g.filled` and `g.dotted` are points and
  * outliers inside a plot (`plot/roles.ts`, `plot/glyph-row.ts`).
  */
 export const GLYPH_SET_DOMAINS: Readonly<Record<keyof GlyphSet, readonly string[]>> = {
@@ -1577,7 +1577,6 @@ export const GLYPH_SET_DOMAINS: Readonly<Record<keyof GlyphSet, readonly string[
   choiceOpen: ["row-lead"],
   dotted: ["row-lead", "plot"],
   blocked: ["row-lead", "plot"],
-  warning: ["row-lead", "plot"],
 
   sortAsc: ["table-header"],
   sortDesc: ["table-header"],

@@ -1018,10 +1018,6 @@
   "vertical": [
    "border",
    "tree"
-  ],
-  "warning": [
-   "row-lead",
-   "plot"
   ]
  },
  "GLYPH_SUBSTITUTIONS": [
@@ -2235,10 +2231,6 @@
    "/"
   ],
   [
-   "▲",
-   "!"
-  ],
-  [
    "▌",
    "|"
   ],
@@ -2408,8 +2400,7 @@
   "trendDown": "V",
   "trendFlat": "=",
   "trendUp": "^",
-  "vertical": "|",
-  "warning": "!"
+  "vertical": "|"
  },
  "glyphs(full)": {
   "bar": "▌",
@@ -2457,7 +2448,6 @@
   "trendDown": "↓",
   "trendFlat": "→",
   "trendUp": "↑",
-  "vertical": "│",
-  "warning": "▲"
+  "vertical": "│"
  }
 }

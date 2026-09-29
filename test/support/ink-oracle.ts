@@ -70,6 +70,9 @@ const BAR_EMPTY =
   "C09 I94 / R-PRG-001 / §033 (M16): the ASCII bar's empty cell is the registry's `-` where Ink drew `.` — a track against an absence, and the pair shipped wrong from the day `BAR_STYLES` existed because every row over the table measured a width and none named an `off`";
 const SPINNER_ASCII =
   "C09 I98 / R-MOT-010 / R-MOT-011 / §038 (M16): a spinner set's ASCII rung is the registry's `asciiPattern`, fitted to the set's own frame count, where Ink drew one of three shared alphabets — so a running lead is `|` where it was `-`, and the rung keeps the set's cycle instead of running two and a half times faster";
+const FAILURE_MARK =
+  "C09 I138 / ruling 85 / §048 / §096 (F1461): a failed status leads its message with the failure mark `✗`/`x` where Ink drew the warning's `▲`/`!` — the mark an error shared with a warning at the rungs where it is one of two carriers";
+const SPINNER_AND_FAILURE_MARK = `${SPINNER_ASCII} — and, at this rung too, ${FAILURE_MARK}`;
 const BAR_PERCENT =
   "C09 I96 / §034 (M16): the bar's percentage is `muted` where Ink drew `meta` — all five of §034's bars read it in `c-muted`, painted and drawn alike, and the tree drew `meta` from the day the kind landed with no row naming the tone";
 
@@ -215,7 +218,19 @@ const RETIRED: ReadonlyMap<string, string> = new Map(
       // `ascii` and `mono` only, because the Unicode frames did not move and
       // the `full` arm agrees with Ink exactly as it did.
       ["t2143-steps-steps-1", ALL_WIDTHS, SPINNER_ASCII, ["ascii", "mono"]],
-      ["t2143-status-status-1", ALL_WIDTHS, SPINNER_ASCII, ["ascii", "mono"]],
+      // **And the status's mark, at every rung and every width** (C09 I138).
+      // Measured before the run: the corpus's one failed status is `retrying`,
+      // and its mark survives at every captured width including 2, where it is
+      // the whole first row. Its ASCII and mono captures already differed by
+      // the spinner rung, so they carry both rulings; `full` joins on this one
+      // alone. No other capture draws a failed status — a sweep for `ERROR`
+      // and for a leading `▲`/`!` returns this key and nothing else. The
+      // image fault's key (`t2144-image-img-fault`) is not one, and not because
+      // the fault draws no status: the fixture keeps the corpus image's
+      // `digest`, so once T2.143 has decoded that image the decode cache hands
+      // the fault arm the picture — its capture is `▀▀`, not the fault.
+      ["t2143-status-status-1", ALL_WIDTHS, SPINNER_AND_FAILURE_MARK, ["ascii", "mono"]],
+      ["t2143-status-status-1", ALL_WIDTHS, FAILURE_MARK, ["full"]],
       ["t2143-progress-prog-1", BAR_WIDTHS, BAR_EMPTY, ["ascii", "mono"]],
       ["t2143-progress-adv-zero-total", BAR_WIDTHS, BAR_EMPTY, ["ascii", "mono"]],
       // **The percentage's tone, and the shape of the list is the measurement.**

@@ -418,11 +418,11 @@
     "│ U+2502",
     "┌ U+250C",
     "┐ U+2510",
-    "▲ U+25B2",
     "○ U+25CB",
-    "✓ U+2713"
+    "✓ U+2713",
+    "✗ U+2717"
    ],
-   "reason": "The figure is a two-column rule table joined with ` · `; the frame draws each source beside its rendering — tab and newline shown as ⇥ and ↵, and the rendered table, patch, status and tape bringing their own marks (… ⋯ ─ │ ┌ ┐ ▲ › ⋅ ○ ✓)"
+   "reason": "The figure is a two-column rule table joined with ` · `; the frame draws each source beside its rendering — tab and newline shown as ⇥ and ↵, and the rendered table, patch, status and tape bringing their own marks (… ⋯ ─ │ ┌ ┐ ✗ › ⋅ ○ ✓)"
   },
   {
    "section": 59,
@@ -492,9 +492,9 @@
     "│ U+2502",
     "┌ U+250C",
     "┐ U+2510",
-    "▲ U+25B2"
+    "✗ U+2717"
    ],
-   "reason": "Both are ground censuses over different specimens. The figure's are a diff, a context bar (█ ░ ▒ ▓), a focused row (▸), a braille plot in a well (┤ ┼ and its dots), an image (▀) and the prompt's posture (» ⏎); the frame's are a patch with its residue (⋯), a status box (┌ ┐ │ ▲), the pills posture and a plot well"
+   "reason": "Both are ground censuses over different specimens. The figure's are a diff, a context bar (█ ░ ▒ ▓), a focused row (▸), a braille plot in a well (┤ ┼ and its dots), an image (▀) and the prompt's posture (» ⏎); the frame's are a patch with its residue (⋯), a status box (┌ ┐ │ ✗), the pills posture and a plot well"
   },
   {
    "section": 73,
@@ -594,12 +594,12 @@
     "· U+00B7",
     "— U+2014",
     "⎿ U+23BF",
+    "▲ U+25B2",
     "● U+25CF",
-    "✗ U+2717",
     "✦ U+2726"
    ],
    "frameOnly": [],
-   "reason": "The frame draws the framed container alone; the figure draws three containers — framed, under a ● call head's ⎿ gutter, and bare — and the empty case. **And the message's lead differs**: every ERROR in the design's figures (§048, §061, §066, §096) leads with ✗, and the tree's status leads with ▲, the `warning` mark — a finding recorded with this lane. ✦ is the fixtures' spinner still"
+   "reason": "The frame draws the framed container alone; the figure draws three containers — framed, under a ● call head's ⎿ gutter, and bare — and the empty case. **The message's lead agrees since ruling 85** (C09 I138, F1461): both open an ERROR with ✗. The ▲ left on the figure's side is not a lead: it is the empty case's annotation, *no banner, no ▲, no red*, which names the warning mark where the mark it withholds is now ✗. ✦ is the fixtures' spinner still"
   },
   {
    "section": 97,

@@ -26,9 +26,11 @@ import { glyphTick } from "../ramp.js";
  * The word, in a gap in the rule — `─── ERROR ───`.
  *
  * **No square brackets, and they shipped because a figure was read literally.**
- * The design drew ` ERROR ` and `[▲ plot failed to render: …]`, and in both the
+ * An early drawing had ` ERROR ` and a bracketed message line, and in both the
  * brackets were *annotation*: they marked which cells carry a painted
- * background. They were never characters. **When the paint slot exists, the word
+ * background. They were never characters. No current fixture draws either:
+ * §048 and §096 draw ` ERROR ` in a gap in the rule and `✗ plot failed to
+ * render` beneath it, with no brackets and with the failure mark (C09 I138). **When the paint slot exists, the word
  * and its two spaces are what gets painted — white on red — and the paint is
  * what the brackets were drawing.** Until then it is the error tone in a gap and
  * nothing else.
@@ -375,17 +377,17 @@ function bodyOf(
 }
 
 /**
- * The cells the `warning` mark takes, asked of **both** arms and the wider kept.
+ * The cells the `cross` mark takes, asked of **both** arms and the wider kept.
  *
- * `glyphCells` cannot answer it: `warning` is a `GlyphSet` member, not a
+ * `glyphCells` cannot answer it: `cross` is a `GlyphSet` member, not a
  * `GLYPH_TABLE` token, and the set's arms are not held 1:1 — the residue mark
- * is `⋯` against `...`. Today both arms of this one are a cell (`▲`, `!`), so
+ * is `⋯` against `...`. Today both arms of this one are a cell (`✗`, `x`), so
  * the maximum is exact; were they to part, the wider errs in the direction
  * I34's top rung already errs in — a row of slack, never a row short.
  */
 const MARK_CELLS = Math.max(
-  cells(glyphs({ unicode: "full", ambiguousWidth: "narrow" }).warning),
-  cells(glyphs({ unicode: "ascii", ambiguousWidth: "narrow" }).warning),
+  cells(glyphs({ unicode: "full", ambiguousWidth: "narrow" }).cross),
+  cells(glyphs({ unicode: "ascii", ambiguousWidth: "narrow" }).cross),
 ); // cells-ok — a cell count
 
 /**
@@ -548,8 +550,10 @@ export const statusDefinition: BlockDefinition<Status> = {
     const textWidth = Math.max(1, rowWidth - 2 * gutter); // cells-ok — a cell count
 
     // **The mark is one of the two channels at one bit**, where the tone resolves
-    // to `{ bold: true }` and carries no colour at all (C09 §3a).
-    const mark = block.state === "error" || block.state === "retrying" ? `${g.warning} ` : "";
+    // to `{ bold: true }` and carries no colour at all (C09 §3a) — so it is the
+    // failure mark and never the warning's (C09 I138, ruling 85): with `▲` here
+    // an error and a warning notice shared their only non-colour carrier.
+    const mark = block.state === "error" || block.state === "retrying" ? `${g.cross} ` : "";
     // **The block's set, and `spinnerFrames` resolves an unknown name to the
     // default rather than throwing** — a spinner is decoration, and a session
     // that will not start because a set was misspelt is worse than one that

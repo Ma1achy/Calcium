@@ -1106,7 +1106,12 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
     // lacks a banner passes on a box too narrow to draw one.
     expect(error.map(visible).join("\n"), "the control draws all three").toMatch(/ERROR/u);
     expect(seen.join("\n"), "no banner").not.toMatch(/ERROR/u);
-    expect(seen.join(""), "no mark").not.toContain("▲");
+    // **The mark named is the one the control draws** (C09 I138): asserting
+    // the absence of a character the error box no longer draws would pass on
+    // an empty box that led with one.
+    const cross = glyphs(FULL_CAPS).cross;
+    expect(error.map(visible).join("\n"), "the control draws the mark").toContain(`${cross} `);
+    expect(seen.join(""), "no mark").not.toContain(cross);
     const tone24 = sgr(tone("error", DARK_THEME, FULL_CAPS));
     expect(error.join(""), "the control is painted in the error tone").toContain(tone24);
     expect(empty.join(""), "and this one is not").not.toContain(tone24);
@@ -1132,9 +1137,50 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
     const below = seen.length - row - 2;
     expect(Math.abs(above - below), "and vertically, odd row below").toBeLessThanOrEqual(1);
   });
-  it.todo(
-    "T2.230 (C09 I138, ruling 85, §048, §096): a failed status leads with ✗ and never with the warning's mark, at every rung, against a warn notice's lead — not deferred on a component: lands with the F1461 code commit of review batch 4",
-  );
+  it("T2.230 (C09 I138, ruling 85, §048, §096): a failed status leads with ✗ and never with the warning's mark, at every rung, against a warn notice's lead", () => {
+    // **The rung is the subject, not the decoration.** At 24 bits the tone and
+    // the tag's ground already say *error*; at 1-bit and in ASCII the mark is
+    // one of the two carriers left, so a mark shared with a warning is a
+    // carrier that says nothing. Each rung is asserted against a `warn`
+    // notice drawn at the same capabilities, which is what makes the two
+    // leads differing a measurement rather than a description.
+    const lead = (row: string): string => row.replace(/^[│|]?\s*/u, "");
+    const warn = block({ kind: "notice", id: "w", tone: "warn", glyph: "warn", text: "disk nearly full" }) as Block;
+    for (const [name, caps] of [["full", FULL_CAPS], ["1-bit", MONO_UNICODE_CAPS], ["ascii", ASCII_CAPS]] as const) {
+      const g = glyphs(caps);
+      const kit = measurable({ capabilities: caps });
+      const notice = lead(kit.renderToLines(warn, 40).map(visible)[0] ?? "");
+      // The warning's mark is the vocabulary's `warn` token: `GlyphSet.warning`
+      // retired with this ruling, because the status was its only reader.
+      const warning = glyphFor("warn", caps);
+      expect(notice.startsWith(`${warning} `), `${name}: the control — a warn notice leads with ${warning}`).toBe(true);
+      expect(g.cross, `${name}: the two marks are distinct at this rung`).not.toBe(warning);
+      for (const state of ["error", "retrying"] as const) {
+        for (const height of [7, 1]) {
+          const drawn = kit
+            .renderToLines(statusAt({ state, message: "connection refused", retryInMs: 8000, attempt: 2, height }), 40)
+            .map(visible);
+          const row = drawn.find((r) => r.includes("connection refused")) ?? "";
+          expect(lead(row), `${name} ${state} h=${String(height)}: the message leads with ${g.cross}`).toMatch(
+            new RegExp(`^${g.cross} connection refused`, "u"),
+          );
+          expect(
+            drawn.some((r) => lead(r).startsWith(`${warning} `)),
+            `${name} ${state} h=${String(height)}: and no row leads with the warning's ${warning}`,
+          ).toBe(false);
+        }
+      }
+      for (const state of ["loading", "empty"] as const) {
+        const drawn = kit.renderToLines(statusAt({ state, message: "waiting", height: 7 }), 40).map(visible);
+        for (const mark of [g.cross, warning]) {
+          expect(
+            drawn.some((r) => lead(r).startsWith(`${mark} `)),
+            `${name} ${state}: no mark — neither ${g.cross} nor ${warning}`,
+          ).toBe(false);
+        }
+      }
+    }
+  });
   it("T2.159 (C09 I95, §072, `R-COL-004`, `R-BLK-569`): three kinds paint a ground and the rest are text", () => {
     // **A background is for an EXTENT; a foreground is for a MARK.** The census
     // is over the whole kind corpus rather than over the three, which is the

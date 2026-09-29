@@ -247,7 +247,8 @@ describe("C09 I38 · a refusal draws the refusal", () => {
       // ladder gives it a border and no tag — so the border is what says this is
       // the framework's `status` here, and the rung below asserts the tag.
       expect(rows[0], `${name} must draw the box's border`).toMatch(/^┌─+┐$/u);
-      expect(rows.join(" "), `${name} carries the warning mark`).toContain("▲");
+      // The failure mark, not the warning's (C09 I138, ruling 85).
+      expect(rows.join(" "), `${name} carries the failure mark`).toContain("✗ ");
     }
   });
 
