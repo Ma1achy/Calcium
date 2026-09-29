@@ -1,12 +1,14 @@
 // C09 I121 — a focusable shape with no focus mark keeps a non-colour carrier
 // at every depth: the focus ground where it carries, whole-shape inversion
 // where it does not (R-FOC-001, R-STA-003).
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { block, type Block } from "../../src/data/viewmodel/index.js";
-import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
-import { CORPUS } from "../support/blocks.js";
-import { FULL_CAPS, MONO_CAPS, MONO_UNICODE_CAPS, measurable, visible } from "../support/render.js";
+import { createBlockRegistry, type BlockRegistry, type FocusShape } from "../../src/presentation/blocks/index.js";
+import { groundSequence } from "../../src/presentation/blocks/paint.js";
+import { CORPUS, ONE_PER_KIND } from "../support/blocks.js";
+import { DARK_THEME, FULL_CAPS, MONO_CAPS, MONO_UNICODE_CAPS, measurable, visible } from "../support/render.js";
+import { buildGraph } from "../support/session.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 
 /**
@@ -42,13 +44,29 @@ const TARGETS = (() => {
 const frame = (blk: Block, caps: TerminalCapabilities, focus: { blockId: string; rowId: string } | null, width = 80): readonly string[] =>
   measurable({ capabilities: caps, focus: focus === null ? null : { ...focus, selected: [] } } as never).renderToLines(blk, width);
 
-/** The five shapes C09 I121 names — the ones that read `focusShapeStyle`. */
-const SHAPES = new Set(["notice", "pills", "choice", "control", "tape"]);
+/**
+ * The kinds C09 I121 reaches — the ones that read `focusShapeStyle` — **read
+ * from the kinds' own declarations** (I137), never listed here. This was a
+ * hand list of five, and `form` was missing from it: a `control` that read
+ * `focusStyle` and differed at 1-bit only by losing weight. The defaults
+ * registry is enough for the question, since every `box` and `control` kind is
+ * C09's own; T2.228 holds the whole partition over the production registry.
+ */
+const SHAPES: ReadonlySet<string> = (() => {
+  const reg = createBlockRegistry();
+  return new Set(
+    reg.kinds.filter((k) => {
+      const shape = reg.get(k)?.focusShape;
+      return shape === "box" || shape === "control";
+    }),
+  );
+})();
 
 describe("C09 I121 — the focus carrier at every depth", () => {
   it("T2.183 (C09 I121): at 1-bit every element's focused frame differs from its resting one, save {mosaic} by equality", () => {
     // Non-vacuity: the five shapes and the exemption are all reached.
     const kinds = new Set<string>(TARGETS.map((t) => t.blk.kind));
+    expect([...SHAPES].sort(), "the declared box and control kinds (I137)").toEqual(["choice", "control", "form", "notice", "pills", "tape"]);
     for (const k of [...SHAPES, "mosaic"]) expect(kinds.has(k), `${k} is in the census`).toBe(true);
     // The tape's *current* member is the case the first census missed: it
     // sampled two elements per block, and the current one is already bold.
@@ -91,7 +109,127 @@ describe("C09 I121 — the focus carrier at every depth", () => {
   });
 });
 
+/**
+ * §018 figure 5's subject: a mosaic of framed plots. The corpus's own mosaic
+ * holds `raw` children, which C09 I100's region ground lights — the `frame` arm of
+ * the pane rule (C09 I137) needs a child with furniture of its own.
+ */
+const FIG5 = block({
+  kind: "mosaic",
+  id: "fig5",
+  height: 8,
+  areas: "AB",
+  children: [
+    { ...(ONE_PER_KIND.plot as object), id: "fig5-a" },
+    { ...(ONE_PER_KIND.plot as object), id: "fig5-b" },
+  ],
+} as never) as Block;
+
+/** A `steps` whose details shed: the corpus's never does, at any width. */
+const SHEDDING_STEPS = block({
+  kind: "steps",
+  id: "steps-shed",
+  steps: [
+    { label: "Resolve dependencies", state: "done", detail: "fetched forty-two packages" },
+    { label: "Build", state: "active", detail: "layer 3 of 7 compiling" },
+  ],
+} as never) as Block;
+
+/**
+ * One subject per kind, plus the three the corpus cannot supply — an actionable
+ * notice (the corpus's notice publishes nothing), the shedding `steps`, and
+ * figure 5 in place of the `raw` mosaic.
+ */
+const DECLARED_SUBJECTS: readonly Block[] = [
+  ...Object.values(ONE_PER_KIND).filter((b) => b.kind !== "mosaic"),
+  block({ kind: "notice", id: "act-accent", tone: "accent", text: "Approve", action: { kind: "fill", label: "again", command: "/ps" } } as never) as Block,
+  SHEDDING_STEPS,
+  FIG5,
+];
+
+/** The first width, widest first, at which a block publishes an element. */
+const WIDTHS = [80, 40, 24, 16, 12, 9, 8];
+
+const params = (frame: string): readonly string[] =>
+  [...frame.matchAll(/\u001b\[([0-9;]*)m/gu)].map((m) => m[1] ?? "");
+const has7 = (frame: string): boolean => params(frame).some((p) => p.split(";").includes("7"));
+const backgrounds = (frame: string): ReadonlySet<string> =>
+  new Set(params(frame).filter((p) => p.startsWith("48;") || /^(4[0-7]|10[0-7])$/u.test(p)));
+
 describe("C09 I137 — each kind declares its focus shape", () => {
-  it.todo("T2.228 (C09 I137): the kinds declaring elements equal the kinds declaring focusShape, by equality, over a constructed session's registry — not deferred on a component: it lands with I137\'s code in review batch 4 M16.5");
-  it.todo("T2.229 (C09 I137, I121, R-COL-005): each declared shape's signature holds over every element of every declaring kind — not deferred on a component: it lands with I137\'s code in review batch 4 M16.5");
+  let production: BlockRegistry;
+  beforeAll(async () => {
+    production = (await buildGraph()).graph.blocks;
+  });
+
+  /** Every (subject, width, element) the production registry publishes, for a declaring kind. */
+  const targets = (): readonly { blk: Block; width: number; blockId: string; rowId: string; shape: FocusShape }[] => {
+    const out: { blk: Block; width: number; blockId: string; rowId: string; shape: FocusShape }[] = [];
+    for (const blk of DECLARED_SUBJECTS) {
+      const shape = production.get(blk.kind)?.focusShape;
+      if (shape === undefined) continue;
+      const width = WIDTHS.find((w) => production.elementsOf(blk, w).length > 0);
+      if (width === undefined) continue;
+      for (const el of production.elementsOf(blk, width)) {
+        out.push({ blk, width, blockId: (el as { blockId?: string }).blockId ?? blk.id, rowId: el.id, shape });
+      }
+    }
+    return out;
+  };
+
+  it("T2.228 (C09 I137): the kinds declaring elements equal the kinds declaring focusShape, over a constructed session's registry", () => {
+    const kinds = measurable({ registry: production }).kinds;
+    const withElements = kinds.filter((k) => production.get(k)?.elements !== undefined).sort();
+    const withShape = kinds.filter((k) => production.get(k)?.focusShape !== undefined).sort();
+    // **Equality, not a subset**: a kind gaining `elements` without a shape
+    // fails, and so does a shape declared on a kind that offers nothing.
+    expect(withShape, "the declaring kinds").toEqual(withElements);
+    for (const k of withShape) {
+      expect(["box", "control", "row", "frame"], `${k}'s shape is one of the four`).toContain(production.get(k)?.focusShape);
+    }
+    // Non-vacuity: every declaring kind is a subject T2.229 reaches.
+    const reached = [...new Set(targets().map((t) => t.blk.kind))].sort();
+    expect(reached, "every declaring kind is reached").toEqual(withShape);
+  });
+
+  it("T2.229 (C09 I137, I121, R-COL-005): each declared shape's signature holds over every element of every declaring kind", () => {
+    const FOCUS_GROUND = (groundSequence("surface.focusGround", DARK_THEME, FULL_CAPS).match(/\u001b\[([0-9;]*)m/u) ?? [])[1];
+    expect(FOCUS_GROUND, "the ground resolves at 24-bit").toMatch(/^48;/u);
+    const frame = (t: ReturnType<typeof targets>[number], caps: TerminalCapabilities, focused: boolean): string =>
+      measurable({ registry: production, capabilities: caps, focus: focused ? { blockId: t.blockId, rowId: t.rowId, selected: [] } : null } as never)
+        .renderToLines(t.blk, t.width)
+        .join("\n");
+    const failures: string[] = [];
+    const seen = new Set<FocusShape>();
+    for (const t of targets()) {
+      seen.add(t.shape);
+      const at = `${t.blk.kind}/${t.rowId} (${t.shape}) w=${String(t.width)}`;
+      const fullRest = frame(t, FULL_CAPS, false);
+      const fullFocus = frame(t, FULL_CAPS, true);
+      if (fullRest === fullFocus) failures.push(`${at}: identical at 24-bit`);
+      const added = [...backgrounds(fullFocus)].filter((b) => !backgrounds(fullRest).has(b));
+      for (const caps of [MONO_UNICODE_CAPS, MONO_CAPS]) {
+        const rest = frame(t, caps, false);
+        const focus = frame(t, caps, true);
+        const rung = `${at} unicode=${String(caps.unicode)}`;
+        if (t.shape === "box" || t.shape === "control") {
+          if (!has7(focus)) failures.push(`${rung}: no inversion at 1-bit`);
+          if (rest.split("\n").map(visible).join("\n") !== focus.split("\n").map(visible).join("\n")) failures.push(`${rung}: a cell moved`);
+        } else {
+          if (rest === focus) failures.push(`${rung}: identical at 1-bit`);
+          if (has7(focus) && !has7(rest)) failures.push(`${rung}: inversion is selection's rung`);
+        }
+      }
+      if (t.shape === "box" || t.shape === "control") {
+        if (added.length === 0) failures.push(`${at}: no ground at 24-bit`);
+        if (has7(fullFocus)) failures.push(`${at}: SGR 7 at 24-bit`);
+      } else if (t.shape === "row") {
+        if (!params(fullFocus).includes(FOCUS_GROUND!)) failures.push(`${at}: no focusGround at 24-bit`);
+      } else if (added.length > 0) {
+        failures.push(`${at}: a frame painted a ground (${added.join(" ")})`);
+      }
+    }
+    expect([...seen].sort(), "all four shapes are reached").toEqual(["box", "control", "frame", "row"]);
+    expect(failures).toEqual([]);
+  });
 });

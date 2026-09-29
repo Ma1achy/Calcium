@@ -227,6 +227,8 @@ function bodyWidth(width: number): number {
 
 export const tableDefinition: BlockDefinition<Table> = {
   kind: "table",
+  // C09 I137 — a row with the `▸` column (C11 I15, `R-SEL-006`).
+  focusShape: "row",
 
   // §7a — *a table as TSV with its header* (C09 I86, `R-SEL-004`).
   //

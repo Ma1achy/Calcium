@@ -40,6 +40,8 @@ import type {
   BlockDefinition,
   BlockFault,
   BlockRegistry,
+  FocusShape,
+  FocusState,
   NavElement,
   PlacedElement,
   RenderContext,
@@ -492,6 +494,14 @@ class Registry implements BlockRegistry {
   get(kind: string): BlockDefinition | undefined {
     return this.#definitions.get(kind);
   }
+
+  /**
+   * The shape a block's kind declares for focus, or `null` (I137, §7k) — what
+   * `RenderContext.focusShapeOf` hands a container, so it asks the kind rather
+   * than switching over kinds. An unregistered kind draws as `raw`, which
+   * declares none.
+   */
+  focusShapeOf = (block: Block): FocusShape | null => this.#definitions.get(block.kind)?.focusShape ?? null;
 
   seal(): void {
     // Sealing twice is a no-op, not an error (T3.3). Composition roots compose.
@@ -1178,9 +1188,15 @@ class Registry implements BlockRegistry {
       width: inner,
       measureChild: this.#measureChild,
       widthChild: this.width,
-      renderChild: (child: Block, childWidth: number, theme?: ResolvedTheme): Rendered =>
-        this.render(child, theme === undefined ? { ...ctx, width: childWidth } : { ...ctx, width: childWidth, theme }),
+      renderChild: (child: Block, childWidth: number, theme?: ResolvedTheme, focus?: FocusState | null): Rendered =>
+        this.render(child, {
+          ...ctx,
+          width: childWidth,
+          ...(theme === undefined ? {} : { theme }),
+          ...(focus === undefined ? {} : { focus }),
+        }),
       windowChild: this.windowChild,
+      focusShapeOf: this.focusShapeOf,
     };
 
     // **The height is committed before anything is drawn** (I11). It used to be

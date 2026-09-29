@@ -7,7 +7,10 @@
 import { describe, expect, it } from "vitest";
 
 import { block, type Block } from "../../src/data/viewmodel/index.js";
-import { ASCII_CAPS, FULL_CAPS, measurable, registry } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_UNICODE_CAPS, measurable, registry } from "../support/render.js";
+import { styledScreenFrom, type StyledCell } from "../support/styled-screen.js";
+import { background, focusStyle, selectionStyle } from "../../src/presentation/blocks/paint.js";
+import { sgr } from "../../src/terminal/escapes.js";
 import { cells } from "../../src/presentation/text.js";
 
 const SGR = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "gu");
@@ -318,5 +321,82 @@ describe("C09 I124, I125 — ruling 42: a shed row expands its block in place", 
 });
 
 describe("C09 I137 — a shed row is a row shape and draws its focus", () => {
-  it.todo("T1.151 (C09 I137, I113): a focused shed row takes focusGround and weight, a selected one selection's ground, and a stale focus at a wide width paints nothing — not deferred on a component: it lands with I137\'s code in review batch 4 M16.5");
+  /** A frame as styled cells, one grid row per line. */
+  const grid = (lines: readonly string[], width: number): readonly (readonly StyledCell[])[] =>
+    styledScreenFrom([lines.join("\r\n")], { columns: width, rows: lines.length });
+  /** The background parameters a surface resolves to, as `styled-screen` records them. */
+  const bgOf = (style: ReturnType<typeof background>): string => (sgr(style).match(/\u001b\[([0-9;]*)m/u) ?? [])[1] ?? "";
+  const FOCUS_BG = bgOf(focusStyle(DARK_THEME, FULL_CAPS));
+  const SELECTION_BG = bgOf(background("surface.selection", DARK_THEME, FULL_CAPS));
+  const drawn = (row: readonly StyledCell[]): readonly StyledCell[] => row.filter((c) => c.ch !== " ");
+
+  it("T1.151 (C09 I137, I113): a focused shed row takes focusGround and weight, a selected one selection's ground, and a stale focus at a wide width paints nothing", () => {
+    expect(FOCUS_BG, "the focus ground resolves at 24-bit").toMatch(/^48;/u);
+    expect(SELECTION_BG, "and so does selection's").toMatch(/^48;/u);
+    expect(selectionStyle(DARK_THEME, MONO_UNICODE_CAPS).inverse, "selection's 1-bit rung is inversion").toBe(true);
+    for (const c of CASES) {
+      const kit = (caps: typeof FULL_CAPS, focus: unknown) =>
+        measurable({ capabilities: caps, focus: focus as never }).renderToLines(c.block, c.narrow);
+      const els = registry().elementsOf(c.block, c.narrow);
+      expect(els.map((e) => e.id), `${c.kind} publishes its rows`).toEqual(["shed-0", "shed-1"]);
+      const at = (id: string): number => els.find((e) => e.id === id)!.rows.from;
+
+      for (const caps of [FULL_CAPS, MONO_UNICODE_CAPS]) {
+        const rest = kit(caps, null);
+        // The head alone.
+        const head = kit(caps, { blockId: c.block.id, rowId: "shed-1", selected: undefined });
+        rest.forEach((line, i) => {
+          if (i !== at("shed-1")) expect(head[i], `${c.kind} depth=${String(caps.colourDepth)}: row ${String(i)} is untouched`).toBe(line);
+        });
+        const lit = drawn(grid(head, c.narrow)[at("shed-1")]!);
+        expect(lit.length, `${c.kind}: the head row draws something`).toBeGreaterThan(0);
+        for (const cell of lit) {
+          expect(cell.style.attrs, `${c.kind} depth=${String(caps.colourDepth)} '${cell.ch}': the head is bold`).toContain(1);
+          expect(cell.style.attrs, `${c.kind}: focus is never inversion`).not.toContain(7);
+          expect(cell.style.attrs, `${c.kind}: bold replaces dim`).not.toContain(2);
+          if (caps === FULL_CAPS) expect(cell.style.bg, `${c.kind} '${cell.ch}': on focusGround`).toBe(FOCUS_BG);
+        }
+        // An extent: shed-0 and shed-1, the head on shed-1.
+        const extent = kit(caps, {
+          blockId: c.block.id,
+          rowId: "shed-1",
+          selected: [{ blockId: c.block.id, rowId: "shed-0" }, { blockId: c.block.id, rowId: "shed-1" }],
+        });
+        const g = grid(extent, c.narrow);
+        const resting = grid(rest, c.narrow)[at("shed-0")]!;
+        for (const [k, cell] of g[at("shed-0")]!.entries()) {
+          if (cell.ch === " ") continue;
+          // The extent adds no weight: a cell is bold exactly where its resting
+          // ink already was (a `done` step's mark is bold at 1-bit by its tone).
+          expect(cell.style.attrs.includes(1), `${c.kind} '${cell.ch}': the extent adds no weight`).toBe(resting[k]!.style.attrs.includes(1));
+          if (caps === FULL_CAPS) expect(cell.style.bg, `${c.kind}: the extent on selection's ground`).toBe(SELECTION_BG);
+          else expect(cell.style.attrs, `${c.kind}: the extent inverts at 1-bit`).toContain(7);
+        }
+        for (const cell of drawn(g[at("shed-1")]!)) {
+          expect(cell.style.attrs, `${c.kind}: the selected head keeps its weight`).toContain(1);
+          if (caps === FULL_CAPS) expect(cell.style.bg, `${c.kind}: the selected head on selection's ground`).toBe(SELECTION_BG);
+          else expect(cell.style.attrs, `${c.kind}: and inverts with the extent`).toContain(7);
+        }
+        // Attributes only: no cell moves.
+        for (const frame of [head, extent]) expect(frame.map(plain), `${c.kind}: visible text`).toEqual(rest.map(plain));
+      }
+
+      // **The gate** (S2): the same focus where nothing sheds paints nothing.
+      const wideRest = measurable({ capabilities: FULL_CAPS, focus: null }).renderToLines(c.block, c.wide);
+      const wideFocus = measurable({ capabilities: FULL_CAPS, focus: { blockId: c.block.id, rowId: "shed-0" } as never }).renderToLines(c.block, c.wide);
+      expect(registry().elementsOf(c.block, c.wide), `${c.kind} publishes nothing wide`).toEqual([]);
+      expect(wideFocus, `${c.kind}: a stale shed-0 at ${String(c.wide)} paints nothing`).toEqual(wideRest);
+
+      // **Expanded** (S5): the ground and the weight on the item's row only.
+      const open = { ...c.block, expanded: true } as Block;
+      const openEls = registry().elementsOf(open, c.narrow);
+      const openRest = measurable({ capabilities: FULL_CAPS, focus: null }).renderToLines(open, c.narrow);
+      const openFocus = measurable({ capabilities: FULL_CAPS, focus: { blockId: c.block.id, rowId: "shed-0" } as never }).renderToLines(open, c.narrow);
+      const headRow = openEls.find((e) => e.id === "shed-0")!.rows.from;
+      openRest.forEach((line, i) => {
+        if (i !== headRow) expect(openFocus[i], `${c.kind} expanded: line ${String(i)} keeps its own ground`).toBe(line);
+      });
+      expect(openFocus[headRow], `${c.kind} expanded: the head row is lit`).not.toBe(openRest[headRow]);
+    }
+  });
 });

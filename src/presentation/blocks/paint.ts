@@ -16,7 +16,8 @@ import type { ColourRef, ColourValue, ResolvedTheme } from "../theme/index.js";
 import { COLORMAPS, continuousColour } from "../theme/colormap.js";
 import type { ColormapName, Tone } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
-import type { Motion } from "./types.js";
+import type { FocusState, Motion, RenderContext } from "./types.js";
+import type { Block } from "../../data/viewmodel/index.js";
 import { cells, truncate } from "../text.js";
 import type { Run, SpanAttrs } from "../runs.js";
 import { graphemes } from "../text.js";
@@ -273,6 +274,36 @@ export function focusStyle(theme: ResolvedTheme, caps: TerminalCapabilities): St
 export function focusShapeStyle(theme: ResolvedTheme, caps: TerminalCapabilities): Style {
   const ground = focusStyle(theme, caps);
   return ground.background === undefined ? { inverse: true } : ground;
+}
+
+/**
+ * How a container lights a pane its focus names (C09 I137, I100, §7k).
+ *
+ * The pane's element is `(container, child.id)`, and what it paints depends on
+ * what the child **is** — asked of the kind through `ctx.focusShapeOf`, never a
+ * switch over kinds here:
+ *
+ *   - a `frame` child — a plot, a scroll, a mosaic — has furniture of its own,
+ *     so the focus is **forwarded** to the child's own block element,
+ *     `{ …focus, blockId: child.id, rowId: child.id }` (I85), and the child's
+ *     predicate lights its frame or axes. **No ground**: `R-FOC-004` forbids one
+ *     across a figure, whose background is half of what braille draws with, and
+ *     §018's figure 5 draws the focused pane by its border;
+ *   - any other child keeps I100's region ground, which the caller lays behind
+ *     the child's painted lines through `based`.
+ *
+ * `null` for a pane focus does not name. One function, so `mosaic` and `split`
+ * cannot light a pane two ways.
+ */
+export function paneFocus(
+  containerId: string,
+  child: Block,
+  ctx: RenderContext,
+): Readonly<{ forward: FocusState } | { ground: string }> | null {
+  const focus = ctx.focus ?? null;
+  if (focus === null || focus.blockId !== containerId || focus.rowId !== child.id) return null;
+  if (ctx.focusShapeOf(child) === "frame") return { forward: { ...focus, blockId: child.id, rowId: child.id } };
+  return { ground: groundSequence("surface.focusGround", ctx.theme, ctx.capabilities) };
 }
 
 /**

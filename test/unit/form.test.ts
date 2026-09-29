@@ -17,7 +17,8 @@ import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import type { FocusState } from "../../src/presentation/blocks/types.js";
 import { submitAction } from "../../src/shell/form-submit.js";
 import { doc, ONE_PER_KIND } from "../support/blocks.js";
-import { DARK_THEME, FULL_CAPS, MONO_UNICODE_CAPS } from "../support/render.js";
+import { DARK_THEME, FULL_CAPS, MONO_CAPS, MONO_UNICODE_CAPS, measurable } from "../support/render.js";
+import { styledScreenFrom } from "../support/styled-screen.js";
 import { background } from "../../src/presentation/blocks/paint.js";
 import { formDefinition } from "../../src/presentation/blocks/kinds/form.js";
 import { sgr } from "../../src/terminal/escapes.js";
@@ -200,5 +201,52 @@ describe("C04 §3ar — form", () => {
 });
 
 describe("C09 I137 — a form is a control and inverts at 1-bit", () => {
-  it.todo("T3.131 (C09 I137, I119): at 1-bit a focused field or button inverts exactly its shape, and a non-default button's focused frame differs from rest in visible attributes — not deferred on a component: it lands with I137\'s code in review batch 4 M16.5");
+  it("T3.131 (C09 I137, I119): at 1-bit a focused field or button inverts exactly its shape, and a non-default button's focused frame differs from rest in visible attributes", () => {
+    const form = ONE_PER_KIND.form as Block;
+    const W = 60;
+    const els = createBlockRegistry().elementsOf(form, W);
+    expect(els.map((e) => e.id), "fields and buttons").toEqual(["name", "port", "replicas", "save", "cancel"]);
+    for (const caps of [MONO_UNICODE_CAPS, MONO_CAPS]) {
+      const draw = (focus: FocusState | null): readonly string[] =>
+        measurable({ theme: DARK_THEME, capabilities: caps, focus }).renderToLines(form, W);
+      const rest = draw(null);
+      const grid = (lines: readonly string[]) => styledScreenFrom([lines.join("\r\n")], { columns: W, rows: lines.length });
+      const r = grid(rest);
+      for (const el of els) {
+        const f = grid(draw({ blockId: form.id, rowId: el.id }));
+        const at = `${el.id} unicode=${String(caps.unicode)}`;
+        let inverted = 0;
+        f.forEach((row, y) => row.forEach((cell, x) => {
+          const was = r[y]![x]!;
+          expect(cell.ch, `${at} (${String(y)},${String(x)}): no glyph moves`).toBe(was.ch);
+          const inside = y >= el.rows.from && y < el.rows.to && x >= el.cols.from && x < el.cols.to;
+          if (JSON.stringify(cell.style) !== JSON.stringify(was.style)) {
+            expect(inside, `${at} (${String(y)},${String(x)}): a changed cell is the element's`).toBe(true);
+          }
+          if (cell.style.attrs.includes(7)) {
+            expect(inside, `${at}: inversion stays inside the shape`).toBe(true);
+            inverted += 1;
+          }
+        }));
+        // **The whole shape**: every visible cell of the element's own text.
+        const row = f[el.rows.from]!;
+        const text = row.map((c) => c.ch).join("");
+        // Each element's id is its label in this fixture — the field names and the button words.
+        const label = el.id;
+        const from = text.indexOf(label, el.cols.from);
+        expect(from, `${at}: its label is drawn`).toBeGreaterThanOrEqual(0);
+        for (let x = from; x < from + label.length; x += 1) {
+          expect(row[x]!.style.attrs, `${at} '${row[x]!.ch}': the label inverts`).toContain(7);
+        }
+        expect(inverted, `${at}: something inverts`).toBeGreaterThan(0);
+      }
+      // **The cell the removed-weight form got wrong**: a non-default button's
+      // label differs from rest in its attributes, not only on blank cells.
+      const cancel = els.find((e) => e.id === "cancel")!;
+      const f = grid(draw({ blockId: form.id, rowId: "cancel" }))[cancel.rows.from]!;
+      const restRow = r[cancel.rows.from]!;
+      const x = f.map((c) => c.ch).join("").indexOf("cancel");
+      expect(f[x]!.style.attrs, "the focused cancel's first letter").not.toEqual(restRow[x]!.style.attrs);
+    }
+  });
 });

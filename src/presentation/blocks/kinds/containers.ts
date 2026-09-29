@@ -27,7 +27,7 @@ import type { NavElement } from "../types.js";
 import { cells, sliceCells, stripControl, truncate } from "../../text.js";
 import { SPINNER_CELLS, glyphs, scrollbarSet, spinnerFrameAt } from "../glyphs.js";
 import { scrollbarColumn } from "../scrollbar.js";
-import { based, clampSpans, groundSequence, paint, rows, tone } from "../paint.js";
+import { based, clampSpans, paint, paneFocus, rows, tone } from "../paint.js";
 import { composeRow, fitRow, placeRows, rowCells, type Placed } from "../../rows.js";
 import { layout, measure as solveHeight, type Box, type Size } from "../../layout/index.js";
 import type { BlockDefinition, Rendered, RenderContext, Windowed } from "../types.js";
@@ -465,6 +465,8 @@ function joinChildren(children: readonly Block[], copyChild: CopyFn): string {
 
 export const scrollDefinition: BlockDefinition<Scroll> = {
   kind: "scroll",
+  // C09 I137 — the bar is its furniture: the thumb takes the accent while focus is inside the box, and a child is never painted (§7f).
+  focusShape: "frame",
 
   // C09 I124, C04 I98 — the fold is the flag inverted, and only where the box
   // declares one: a scroll without `collapsed` has no collapsed form, so there
@@ -766,6 +768,8 @@ function mosaicRoom(
 
 export const mosaicDefinition: BlockDefinition<Mosaic> = {
   kind: "mosaic",
+  // C09 I137 — a pane is lit through its child when the child is a frame, and takes I100's ground otherwise.
+  focusShape: "frame",
 
   // §7a — the children that answered, one newline apart (I86). **Not two**:
   // two is `R-SEL-004`'s entry separator and this is inside one entry. A child
@@ -875,17 +879,24 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
     // so the ground has to survive every reset inside them (C11 I25). Each row
     // is padded to the rect's width first — a ground needs cells to paint, and
     // the rect is the pane's whole extent whatever its child chose to fill.
-    const focus = ctx.focus ?? null;
-    const litPane =
-      focus !== null && focus.blockId === block.id && focus.rowId !== null ? focus.rowId : null;
-    const paneGround = litPane === null ? "" : groundSequence("surface.focusGround", ctx.theme, ctx.capabilities);
+    //
+    // **Amended by I137: a pane holding a `frame` is lit through its child.**
+    // The container forwards the focus to the child's own element and paints
+    // no ground — the case this comment's second paragraph said could not
+    // happen *however the plot were written*, which was true of the plot and
+    // not of the container. `paneFocus` decides, from the child's declaration.
     const drawable = block.children.flatMap((child, i) => {
       const rect = rects[i];
       if (rect === undefined) return [];
       const room = mosaicRoom(rect, width, height);
       if (room === null) return [];
-      const drawn = ctx.renderChild(child, room.width);
-      if (child.id !== litPane || paneGround === "") return [{ child, rect, room, drawn }];
+      const lit = paneFocus(block.id, child, ctx);
+      const drawn =
+        lit !== null && "forward" in lit
+          ? ctx.renderChild(child, room.width, undefined, lit.forward)
+          : ctx.renderChild(child, room.width);
+      const paneGround = lit !== null && "ground" in lit ? lit.ground : "";
+      if (paneGround === "") return [{ child, rect, room, drawn }];
       // **Inside untouched** (`R-FOC-004`): the child's own lines are unchanged
       // and a ground is put behind them. Stripping it gives back what the
       // unfocused pane drew, byte for byte.

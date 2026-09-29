@@ -95,6 +95,8 @@ function choiceElements(block: Choice, width: number): readonly NavElement[] {
 
 export const choiceDefinition: BlockDefinition<Choice> = {
   kind: "choice",
+  // C09 I137 — `R-FOC-003`: the mark and the label are one shape (I105).
+  focusShape: "control",
 
   copy: (block) => block.options.map((o) => `${o.chosen === true ? "[x]" : "[ ]"} ${o.label}`).join("  "),
 
@@ -175,6 +177,8 @@ function track(block: Control, room: number, ctx: RenderContext): string {
 
 export const controlDefinition: BlockDefinition<Control> = {
   kind: "control",
+  // C09 I137 — `R-FOC-002`: label, track and value (I106).
+  focusShape: "control",
 
   copy: (block) => `${block.label}  ${block.value}`,
 

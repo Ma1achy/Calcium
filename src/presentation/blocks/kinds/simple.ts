@@ -604,6 +604,8 @@ function buttonSpans(
 
 export const noticeDefinition: BlockDefinition<Notice> = {
   kind: "notice",
+  // C09 I137 — an actionable notice is a button (I102).
+  focusShape: "box",
 
   // §7a — prose copies as its text (I86, `R-SEL-004`). The tone is a
   // rendering and the wrap is the frame's; neither reaches the source.
@@ -1068,6 +1070,8 @@ function pillsElements(block: Pills, width: number): readonly NavElement[] {
 
 export const pillsDefinition: BlockDefinition<Pills> = {
   kind: "pills",
+  // C09 I137 — a chip (I121).
+  focusShape: "box",
 
   // §7a — the labels, space-joined (I86). A row of peers is a row of words;
   // the shedding, the active mark and the tones are all this component's.

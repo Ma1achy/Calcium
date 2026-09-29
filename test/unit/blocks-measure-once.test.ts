@@ -159,6 +159,7 @@ describe("C09 §6 — a (block, width) is answered once per registry call (I61)"
       widthChild: (_child, w) => w,
       renderChild: () => ["x"],
       windowChild: () => null,
+      focusShapeOf: () => null,
     };
     groupDefinition.measure(group as Group, 80, counting);
     groupDefinition.render(group as Group, ctx);

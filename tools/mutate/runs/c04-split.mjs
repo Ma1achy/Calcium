@@ -85,8 +85,9 @@ const results = runPass({
       // §3aq S6 — the pane addressed to the split draws no ground.
       name: "a focused empty pane is not lit",
       file: KIND,
-      from: "      const lit = ctx.focus?.blockId === block.id && ctx.focus.rowId === p.child.id;",
-      to: "      const lit = false as boolean;",
+      // Re-anchored on C09 I137's `paneFocus`, which now decides the pane.
+      from: "      const lit = paneFocus(block.id, p.child, ctx);",
+      to: "      const lit = null as ReturnType<typeof paneFocus>;",
       expect: "T1.58",
     },
     {

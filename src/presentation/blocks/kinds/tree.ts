@@ -98,6 +98,8 @@ function treeElements(block: Tree, width: number): readonly NavElement[] {
 
 export const treeDefinition: BlockDefinition<Tree> = {
   kind: "tree",
+  // C09 I137 — a node is a selectable row; its 1-bit carrier is the label's accent, bold.
+  focusShape: "row",
 
   // §7a — the visible names, one per line and indented by depth, which is what
   // a reader sees and what pastes as a tree.

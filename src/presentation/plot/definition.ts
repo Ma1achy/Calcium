@@ -3642,6 +3642,8 @@ const SERIES_KEYS = 9;
 
 export const plotDefinition: BlockDefinition<Plot> = {
   kind: "plot",
+  // C09 I137 — the frame or the axes take it, never the data (C12 I142, `R-FOC-004`).
+  focusShape: "frame",
 
   // §7a — *a plot as its data view* (C09 I86, `R-SEL-004`). The braille cells,
   // the axes and the colours are the whole of what this component makes, and

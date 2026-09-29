@@ -21,7 +21,7 @@ import { normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Form, FormField } from "../../../data/viewmodel/index.js";
 import { cells, graphemes, stripControl, truncate, wrapCells } from "../../text.js";
 import { glyphFor, glyphs } from "../glyphs.js";
-import { background, focusStyle, pad as padTo, paint, rows, tone, type Span } from "../paint.js";
+import { background, focusShapeStyle, pad as padTo, paint, rows, tone, type Span } from "../paint.js";
 import { fitRow } from "../../rows.js";
 import type { BlockDefinition, NavElement, RenderContext, Rendered } from "../types.js";
 
@@ -212,6 +212,8 @@ function formElements(block: Form, width: number): readonly NavElement[] {
 
 export const formDefinition: BlockDefinition<Form> = {
   kind: "form",
+  // C09 I137 — a field and a button are each washed as one shape, as a `choice`'s option is (I119).
+  focusShape: "control",
 
   // §7a — label and value, tab-separated, as `keyValue` copies (I86).
   copy: (block) => block.fields.map((f) => `${f.label}\t${f.value ?? ""}`).join("\n"),
@@ -228,7 +230,12 @@ export const formDefinition: BlockDefinition<Form> = {
     const focus = ctx.focus !== null && ctx.focus.blockId === block.id ? ctx.focus : null;
     const muted = tone("muted", ctx.theme, caps);
     const plain = tone("default", ctx.theme, caps);
-    const washed = { ...tone("default", ctx.theme, caps, "focusGround"), ...focusStyle(ctx.theme, caps) };
+    // **`focusShapeStyle`, the control's function** (C09 I137, I121). This read
+    // `focusStyle`, which answers nothing at 1-bit — so there focus *removed* the
+    // label's dim and the default slot's bold, and a focused non-default button
+    // differed from the resting one by bold on two blank cells. A form is a
+    // `control`, and a control inverts where the ground cannot carry.
+    const washed = { ...tone("default", ctx.theme, caps, "focusGround"), ...focusShapeStyle(ctx.theme, caps) };
     const out: string[] = Array.from({ length: l.height }, () => "");
     const set = (row: number, spans: readonly Span[]): void => {
       out[row] = paint(spans);

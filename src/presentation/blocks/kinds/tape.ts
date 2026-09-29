@@ -286,6 +286,8 @@ function tapeElements(block: Tape, width: number): readonly NavElement[] {
 
 export const tapeDefinition: BlockDefinition<Tape> = {
   kind: "tape",
+  // C09 I137 — a member (I121).
+  focusShape: "box",
 
   // §7a — the labels, space-joined, and **every member** rather than the window
   // (C09 I86). What a reader copies is the row, and nothing is lost from it.

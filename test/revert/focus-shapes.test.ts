@@ -7,7 +7,12 @@ import { describe, expect, it } from "vitest";
 
 import { block } from "../../src/data/viewmodel/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
-import { DARK_THEME, measurable, MONO_UNICODE_CAPS } from "../support/render.js";
+import { DARK_THEME, FULL_CAPS, measurable, MONO_UNICODE_CAPS } from "../support/render.js";
+import { ONE_PER_KIND } from "../support/blocks.js";
+import { plotDefinition } from "../../src/presentation/plot/definition.js";
+import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
+import { focusStyle } from "../../src/presentation/blocks/paint.js";
+import { sgr } from "../../src/terminal/escapes.js";
 import { styledScreenFrom } from "../support/styled-screen.js";
 
 describe("C09 I132 — tier 6", () => {
@@ -31,7 +36,45 @@ describe("C09 I132 — tier 6", () => {
 });
 
 describe("C09 I137 — tier 6", () => {
-  it.todo("T6.189 (C09 I137): the shed rows' focus gate or treatment removed → T1.151 and T2.229 fail — not deferred on a component: it lands with I137\'s code in review batch 4 M16.5");
-  it.todo("T6.190 (C09 I137, I100): the ground behind a frame child restored, or the focus not forwarded → T1.152 fails — not deferred on a component: it lands with I137\'s code in review batch 4 M16.5");
-  it.todo("T6.191 (C09 I137, I119): form reading focusStyle again → T2.229 and T3.131 fail; its focusShape removed → T2.228 fails — not deferred on a component: it lands with I137\'s code in review batch 4 M16.5");
+  const kv = block({
+    kind: "keyValue",
+    id: "k",
+    rows: [
+      { label: "endpoint", value: "https://api.internal.example/v2" },
+      { label: "region", value: "eu-west-1" },
+    ],
+  }) as unknown as Block;
+  const draw = (b: Block, width: number, focus: unknown, caps = FULL_CAPS): readonly string[] =>
+    measurable({ theme: DARK_THEME, capabilities: caps, focus: focus as never }).renderToLines(b, width);
+
+  it("T6.189 (C09 I137): the shed rows' focus gate or treatment removed → T1.151 and T2.229 fail", () => {
+    // The treatment: at 9 columns the row sheds and a focused shed-0 is lit.
+    expect(draw(kv, 9, { blockId: "k", rowId: "shed-0" })[0], "the head row is lit").not.toBe(draw(kv, 9, null)[0]);
+    // The gate: at 60 nothing sheds, so the same focus paints nothing.
+    expect(draw(kv, 60, { blockId: "k", rowId: "shed-0" }), "a stale shed-0 paints nothing").toEqual(draw(kv, 60, null));
+  });
+
+  it("T6.190 (C09 I137, I100): the ground behind a frame child restored, or the focus not forwarded → T1.152 fails", () => {
+    const plot = ONE_PER_KIND.plot as Block;
+    const fig5 = block({
+      kind: "mosaic",
+      id: "fig5",
+      height: 8,
+      areas: "AB",
+      children: [{ ...(plot as object), id: "fig5-a" }, { ...(plot as object), id: "fig5-b" }],
+    } as never) as unknown as Block;
+    const kit = (focus: unknown) =>
+      measurable({ theme: DARK_THEME, capabilities: FULL_CAPS, focus: focus as never, definitions: [plotDefinition as unknown as BlockDefinition<never>] });
+    const lit = kit({ blockId: "fig5", rowId: "fig5-a" }).renderToLines(fig5, 60).join("\n");
+    const ground = sgr(focusStyle(DARK_THEME, FULL_CAPS));
+    expect(ground.length, "the ground resolves").toBeGreaterThan(0);
+    expect(lit.includes(ground), "no ground across the figure").toBe(false);
+    expect(lit, "the pane is lit through the plot").not.toBe(kit(null).renderToLines(fig5, 60).join("\n"));
+  });
+
+  it("T6.191 (C09 I137, I119): form reading focusStyle again → T2.229 and T3.131 fail; its focusShape removed → T2.228 fails", () => {
+    const form = ONE_PER_KIND.form as Block;
+    const focused = draw(form, 60, { blockId: form.id, rowId: "cancel" }, MONO_UNICODE_CAPS).join("\n");
+    expect(focused.includes("\u001b[7m"), "a focused button inverts at 1-bit").toBe(true);
+  });
 });

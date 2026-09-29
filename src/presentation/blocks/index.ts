@@ -56,6 +56,7 @@ export type {
   BlockFault,
   BlockRegistry,
   MeasureMemo,
+  FocusShape,
   FocusState,
   NavElement,
   PaneRef,
