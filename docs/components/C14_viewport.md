@@ -588,6 +588,42 @@ one thing that can only be written by something holding both, and it is also the
 only observable the mode has for the hold — without it a held view and a broken
 render are the same picture.
 
+### The count — which writes are arrivals (review batch 4, M10 item 8)
+
+The notice shipped as `record.length − held.length`, and a length answers only for
+appends into a record nothing leaves. **Walked as a classification table**, because
+which writes arrive is a fact at rest about what each C13 operation does to an
+entry's record — and the finding is where two correct statements about one write
+overlap: *C13 replaces an entry's object on every write* and *an append changes the
+previous live entry too*.
+
+| write while held | what C13 does to the record (`store.ts`, `cap.ts`) | by length | by identity | **by `id`, `rev`, `streaming`** |
+|---|---|---|---|---|
+| an append | a new entry, **and** the previous live one replaced by `{ ...e, live: false }` | 1 | **2** | 1 |
+| a patch to a held live entry | the entry replaced, `rev + 1` | **0** | 1 | 1 |
+| a second patch to it | replaced again, `rev + 2` | 0 | 1 | 1 |
+| a malformed patch | nothing — `rev` does not move (C13 I13) | 0 | 0 | 0 |
+| a bare `settle` | replaced, `rev` unchanged, `streaming: false` | 0 | 1 | 1 |
+| a `settle` with a document | replaced, `rev + 1`, `streaming: false` | 0 | 1 | 1 |
+| an append that evicts one entry, the first eviction | a new entry, one gone, **the marker added** at the head | **0** | 3 | 2 |
+| an append that evicts one entry, the marker already held | a new entry, one gone, **the marker rebuilt** at `rev` 0 | **0** | 3 | 1 |
+| any write, a marker held | the sweep rebuilds the marker on every write (`cap.ts`) | — | +1 | +0 |
+
+**The rule is C13's own two statements about an entry**: `rev` moves iff its
+document changed (C13 I13), and `streaming` ends at `settle`. An entry is waiting
+when the held view has no entry with its id, or holds it at another `rev` or another
+`streaming`. Object identity is the wrong axis — both of the rows it gets wrong are
+the store doing what it should (the live flag, the marker's rebuild) — and length is
+wrong in the direction R-SEL-010 exists to prevent: a patch arriving and an eviction
+cancelling an arrival both read as *nothing is waiting*.
+
+**The marker is an ordinary entry here too** (C13 I14): the first eviction during a
+hold adds a notice the held view does not show, and it counts once. An entry the
+record dropped and the view still holds is not counted — nothing arrived. The limit
+is stated rather than hidden: a marker whose count changes stays at `rev` 0, so a
+second eviction adds nothing to the number, because C13 does not say the marker's
+document changed.
+
 ### What still moves, and it is not in the document
 
 `R-SEL-009`'s *not the spinners, not the elapsed counts* is two different mechanisms
@@ -1018,7 +1054,7 @@ than stranding the user.
 - **I31** — **While semantic copy mode is up the frame draws a document held at the moment of entry, and the record keeps taking every write.** The hold is entries *and* the heights measured over them, captured together (§6b A2), because an index rebuilt from a record the view no longer shows describes a document nobody is looking at. The record is never queued and never answers a write it has not applied: C13's `patch` returns an outcome C23 branches on, so a deferral there would have to fabricate a verdict (§6b). **Width invalidates the held index and nothing else does** — the hold is over content, not over geometry, which is the same sentence I8 makes about the live one.
 - **I32** — **Scroll moves under the hold; the document does not.** The caret is what pulls the viewport, so a hold that froze `visible()` would walk the caret off the screen and make the mode unusable (§6b A3). `topRow`, `followTail` and the anchor all behave exactly as they do with no mode up, over the held heights rather than the live ones — so I2's clamp is against the held total and moves only when the held document does, which is never while the mode is up.
 - **I33** — **What `y` takes is the held document, not the record** (§6b A6). This is the row a paint-path freeze cannot satisfy, because `y` is not a frame: the screen would be right and the clipboard would carry content that was never on it. `copyTextOf`'s `loaded` argument is therefore the held entries, and `A` selects the held ones for the same reason `R-SEL-008` gives about the window and the record.
-- **I34** — **The footer states the difference while it is non-zero, and the hold is dropped by one commit on exit.** The buffered notice (`R-SEL-010`) is the only subject that reads both sides, and the only observable the hold has: without it a held view and a render that has stopped working are the same picture. On exit the hold is dropped and a single `commit("input")` draws the record — an ordinary frame, not a repaint, for C03 I14's reason: nothing on the terminal became unknown.
+- **I34** — **The footer states the difference while it is non-zero, and the hold is dropped by one commit on exit.** The buffered notice (`R-SEL-010`) is the only subject that reads both sides, and the only observable the hold has: without it a held view and a render that has stopped working are the same picture. On exit the hold is dropped and a single `commit("input")` draws the record — an ordinary frame, not a repaint, for C03 I14's reason: nothing on the terminal became unknown. **Amended (review batch 4, M10 item 8): the difference is counted by entry, not by length** (§6b, *The count*). An entry of the record is waiting when the held view has no entry with its `id`, or holds that entry at a different `rev` or a different `streaming` — C13's statements that its document changed (C13 I13) and that it ended. A length reads 0 for a patch to a held entry and for an eviction that cancels an append; object identity reads an append as two, because C13 replaces the previous live entry's record, and counts the marker on every write. The marker is an ordinary entry (C13 I14) and counts when the hold did not have it.
 - **I35** — **The ticker stops with the mode and the document does not carry it.** Elapsed counts are content and a held view already holds them; the spinner's frame index is `RenderContext.tick`, a counter on the session that no document carries, so a held document still draws a turning spinner unless the ticker is stopped. `#tick`, orbit angles and animated image frames do not advance while the mode is up, which is `R-SEL-009`'s *not the spinners* and is the one clause here that constrains C22 rather than C14.
 
 - **I36** — **The caret is an entry plus an entry-local display row, and the selection's unit is the block.** The split is what makes `R-SEL-003` a rule rather than a property of the type: a selection whose unit is already the block satisfies *all of it or none of it* by construction, and nothing can be written that violates it (A03 §2). An extend maps a row range to a block set by **intersection** — every block whose entry-local rows meet the range, taken whole — so a range covering one row of a table and a range covering all of them give the same answer, and the caret continues past the block it took. The row is the entry's own and never the viewport's, for the reason I6 gives about the anchor: a viewport row moves when anything above it changes height, and an entry-local row survives a resize, which the mode must, because a resize re-lays the held document (I31).
@@ -1175,6 +1211,7 @@ Fake heights, no rendering.
 - **T4.37g** (I55, R-SEL-005, R-SEL-009): a session in semantic copy mode, `a` pressed → the footer carries the count and `esc clear`; `esc` → the count is gone and it reads `esc out`, still in the mode; `esc` again → the mode is left. The control is the frame before `a`, which reads `esc out` and no count.
 - **T1.76** (I56, I5, I6): a viewport of 10 rows following a transcript whose last entry is 10 rows high, that entry held → an append of 3 rows leaves `topRow` on the held entry's first row, `followTail` false and the anchor `{ id, 0 }`; two more appends do not move it; the release returns it to the tail with `followTail` true. The same append with nothing held moves `topRow` by 3 — the control. A scroll while held, then the release → the viewport stays where the reader put it; an append first, when the held entry is short enough that the tail keeps it whole → the viewport follows the tail and the hold never acts.
 - **T1.77** (I57, I58, I39): `railRowsOf` over a transcript window equals `washedRowsOf`'s rows unioned with each `focus.selected` element's first row, **as a set** — a selected block of three rows gives one row, a block whose first row is above the window gives none, and a selected table row inside a card body gives that row's first row in entry space less the window's start. Every other row's column 0 is a blank. The control: with nothing selected the set is empty and every row is blank-led.
+- **T1.78** (I34, §6b *The count*): `waitingEntries(record, held)` over a real C13 store with a cap of a few blocks, frozen by copying its `entries`, for every row of §6b's table — an append is 1 and not 2, a patch to a held live entry is 1 and a second patch to it still 1, a malformed patch 0, a bare settle 1, a settle with a document 1, an append evicting an entry is 2 on the first eviction (the entry and the marker) and 1 once the marker is held, and a write with a marker held adds nothing for the marker. The control: the length difference, computed over the same two lists, is 0 in the patch and eviction rows, so the fixture reaches the cells length gets wrong. **The wiring**, because the function can be right while the footer still subtracts: through a graph, `bufferedEntries` after a patch to the held live entry is 1.
 
 ### Tier 2 — contract / interface
 
@@ -1297,6 +1334,7 @@ Fake heights, no rendering.
 - **T6.27** (I56): following the tail past the held entry — `#follow` ignoring the hold → **T1.76** fails at the first append and **T4.38** loses the child's command row and top border off the top of the screen.
 - **T6.28** (I57): the transcript laid out at the content width rather than `transcriptWidth` → **T4.39** fails on the viewport's width and every row's column 0.
 - **T6.29** (I58): the rail drawn inside the wash, taking `inverse` at 1-bit → **T3.25** fails at both 1-bit rungs.
+- **T6.30** (I34): the waiting count taken as `record.length − held.length` → **T1.78** fails on the patch rows and on both eviction rows, and T1.34's appends-only sequence still passes.
 
 ---
 

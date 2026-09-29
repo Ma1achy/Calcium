@@ -152,6 +152,8 @@ describe("C14 §6b — the freeze", () => {
     graph.thawView();
     expect(graph.bufferedEntries).toBe(0);
   });
+
+  it.todo("T1.78 (C14 I34, §6b The count): the waiting count is by id, rev and streaming, over every row of the table — not deferred on a component: the code lands in the next commit of this round");
 });
 
 // C14 §6c — the caret, the anchor and the granularity atomicity needs.
