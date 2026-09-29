@@ -105,6 +105,22 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   on a ground the gate measures. The shipped theme objects are not re-measured at load (their
   gate runs at build); a copy of one, a set of your own and every override are. Every shipped
   theme loads.
+- **`TerminalCapabilities.editor: string | null` is a required field** (6c605f19, C02 I19). It is
+  read from `VISUAL`, then `EDITOR`, and a literal typed as `TerminalCapabilities` must supply it.
+- **`AskAnswer.outcome` is required** (14f078cc, C23 I92, C24 I42). A question resolves once, as
+  `answered`, `cancelled` or `expired`, and says which. A test fake of `ctx.ask` that answers
+  `{ key }` no longer type-checks; answer `{ key, outcome: "answered" }` (F1452).
+- **An approval's default answer is `deny`** (14f078cc, C23 I94, `R-BLK-348`). `esc` on an
+  approval refuses the tool, where it ran it, and the tool runs only on an `answered` outcome
+  that is not `deny`. A withdrawn or expired approval settles `cancelled` (F1438).
+- **`CallState` gains `waiting`** (14f078cc, C04 I149): a call held on a question, drawn in
+  `warn`'s tone with the work-unit mark. An exhaustive `switch` over `CallState` needs the arm.
+- **`paneLeft` and `paneRight` are renamed `elementLeft` and `elementRight`** (2edd256f, C26
+  I30). `←`/`→` move along a row (elements whose rows overlap, in one pane) and cross a split
+  only at the row's end; `↓`/`↑` leave the row and land on the first element of the row they
+  enter. Code naming the old `KeyAction`s must rename them.
+- **`⌥⇧↑` and `⌥⇧↓` no longer page the transcript** (6c605f19, C16 I40). The page-scroll
+  intercept is `⌥↑`/`⌥↓` exactly, as I40 always said (F1442).
 
 ### Added
 
@@ -191,3 +207,38 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   `events`, `comparison` or `steps`; a focused `form` field or button at 1-bit, which inverts; and a
   `mosaic` or `split` pane holding a plot, which lights the plot's frame instead of painting a ground
   across it.
+- **The transcript draws a scroll bar in its margin column, and a press on it jumps** (6c605f19,
+  C14 I62–I64). Row *r* of the region puts the view at `round(r × maxTop / (h − 1))`; focus does
+  not move, and the last row follows the tail.
+- **A box inside a layer scrolls** (6c605f19, C22 I141–I142). An inspection's `↑`/`↓`,
+  `PgUp`/`PgDn` and the wheel move its box, which opens at the top and is sized to the prompt's
+  slot, so its key row is no longer cut (F1443).
+- **The chip preview scrolls and opens in your editor** (6c605f19, C22 I143–I144, C17 I35,
+  registry 0.21). `⌥⇧↑`/`⌥⇧↓` scroll its bounded box, and `⌥o` opens the chip in `$VISUAL` or
+  `$EDITOR` through `Pipeline.borrowTerminal?`, in a private temporary directory. The edit
+  replaces the chip's content, less one final newline the editor adds. `FileSystem.makeTempDir?`
+  and `removeDir?` are optional.
+- **`AskAnswer` and `QuestionOutcome` are exported, and `AskOptions` takes `signal?` and
+  `expiresAfterMs?`** (14f078cc, C24 I42–I43, C23 I92). An aborted question resolves
+  `cancelled` and an expired one `expired`.
+- **Questions wait their turn** (14f078cc, C23 I91). An `ask` while a question is open is
+  queued, and the open one's title reads `Confirm · N more`.
+- **`esc` inside a typed reply goes back to the choices** (14f078cc, C23 I89), keeping the line;
+  a reply answers with the line as it resolves, so a chip arrives as its content (I90).
+- **`Layer.promptLive?` and `ChromeContext.toastMark?`** (14f078cc, C15 I34, C22 I145). A layer
+  says whether the prompt under it still takes keys, and `update` can change it; a toast for a
+  question that expired unanswered is marked `expired` rather than drawn as `ok`.
+- **A tape's window follows focus** (2edd256f, C26 I31, ruling 80). A member the resting window
+  does not draw brings the window to it. `tapeStart` and `tapeMemberCols` take an optional
+  `focused` member id.
+- **Focus pulls a box again when a layout change moves the focused child, unless you scrolled
+  it** (2edd256f, C26 I32). A patch or a resize re-pulls; a page key, the wheel or a bar press
+  latches the box until focus moves.
+- **A press on a scroll box's bar jumps that box** (2edd256f, C22 I146), the innermost box whose
+  bar is at that column, and focus does not move.
+- **At 1-bit the prompt rule's label is drawn as `[name]`** (3dcc2810, C22 I147), where it was
+  shed. It takes the cells ` name ` takes, so it is shed at the same widths, and it carries no
+  style.
+- **A form field stores what a chip stands for** (588da957, C22 I148, F1395). A field wrote the
+  editor's text, so a yanked chip reached form data as a private-use character. A value holding
+  a line break is refused with its reason: `⏎` keeps the field open, and a blur writes nothing.

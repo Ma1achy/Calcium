@@ -1198,7 +1198,7 @@ describe("C16 §3a — the global-intercept table and the child rung (M5)", () =
   it("T1.200 (I40, C22 I143): the page-scroll intercept is ⌥↑/⌥↓ exactly — ⌥⇧ and ⌃⌥ arrows are the ladder's at every rung", () => {
     // **The predicate read *meta and an arrow***, so `⌥⇧↓` — the chip
     // preview's own scroll chord (`R-KEY-010`) — paged the transcript and never
-    // reached the panel (a finding recorded with this lane). The row is the
+    // reached the panel (F1442). The row is the
     // pair: the exact chord still intercepts, so the refusal below is not a
     // route that intercepts nothing.
     const stage = (rung: string, e: InputEvent): string | undefined => {

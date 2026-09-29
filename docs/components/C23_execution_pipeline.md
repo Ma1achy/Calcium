@@ -1332,8 +1332,7 @@ a menu and guessing one is how the two were conflated in the first place.
   with the default (I36). So `esc` on an approval **runs the tool**. `R-BLK-348` is the design's
   approval: *the SAFE answer opens · no is first and focused · esc resolves to it · dismissing is
   answering no*. No producer in `src/` raises an approval today (`deps.approval` is unset), so
-  nothing shipped has approved on `esc`; the table is still the design's opposite. A finding
-  recorded with this lane.
+  nothing shipped has approved on `esc`; the table is still the design's opposite. F1438.
 - `AskAnswer` is not exported (`src/index.ts`), so a handler cannot name the type of what it
   awaits.
 - A call awaiting its approval draws `running` (`callState` has no `waiting`). R-BLK-214's sixth

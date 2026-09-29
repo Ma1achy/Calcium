@@ -802,7 +802,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
       // much room there is. **The room is the prompt's slot** (C22 I142):
       // a replacing question is drawn there, and a box sized to the region
       // made a panel taller than the slot, whose cut took the key row and
-      // the bottom border — a finding recorded with this lane.
+      // the bottom border (F1443).
       interior = Math.max(1, (deps.slotRows?.() ?? deps.overlayRegion().height) - 6); // cells-ok — the panel's own chrome
       deps.overlays.update(CONFIRM_LAYER_ID, {
         content: inspection(opts, interior, deps.unicode?.() ?? true, waiting.length, deps.separator?.()),

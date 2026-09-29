@@ -55,7 +55,7 @@ const results = runPass({
       expect: "T1.98",
     },
     {
-      // C23 I88, the finding recorded with this lane — the box sized to the region
+      // C23 I88, F1443 — the box sized to the region
       // it is not drawn in, so the prompt slot's cut takes the key row.
       name: "the inspection's box is sized to the region, not the prompt's slot",
       file: CONFIRM,

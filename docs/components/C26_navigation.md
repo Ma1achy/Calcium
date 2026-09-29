@@ -1800,12 +1800,11 @@ differently.
 
 ### 8c.5 — what the rulings leave behind, named so it is not read as coverage
 
-- **Entering a slid tape lands on member 0**, so the window slides to the head on entry and
+- **Entering a slid tape lands on member 0** (F1448), so the window slides to the head on entry and
   the current may leave it. The design is silent on entry; a reader expecting the current is
-  a question for the design, and it is filed rather than guessed (a finding recorded with this
-  lane).
-- **`↓` from a mosaic cell loses its column.** Leaving the row lands on the next line's first
-  cell, where a grid reader expects the cell below. The same finding records it.
+  a question for the design, and it is filed rather than guessed.
+- **`↓` from a mosaic cell loses its column** (F1449). Leaving the row lands on the next line's first
+  cell, where a grid reader expects the cell below.
 - **The anchor is focus's stored member, not the resolved one.** A stored member that has left
   the tape anchors on `current` in both the pull and the frame, so the two agree; what they
   agree on is not a fall-forward inside the tape.

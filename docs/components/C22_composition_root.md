@@ -2888,14 +2888,14 @@ the preview's box and keys, and the inspection's keys.
   S01 §3 caps at `floor(rows / 2)`, and a box sized to the region made a panel taller than that
   slot. At 80×30 the slot's cut took the panel's key row and bottom border and drew `⋯` — at
   f06f762d as well, measured in a base worktree, so it is not this lane's regression. The box is
-  now sized to the slot (6q.4 ruling 11, C23 I88). A finding recorded with this lane.
+  now sized to the slot (6q.4 ruling 11, C23 I88). F1443.
 - **The pointer hit-tests a replacing question where it is never drawn.** `construct.ts`' pointer
   `placed` is `overlays.layout()` filtered by gesture, and the paint's is the same list **less** the
   replacing question (`session.ts`, `overlays`). So a wheel over the prompt's rows, where the
   inspection is, reaches no layer and meets C16 I8's modal consumption; a wheel over the middle of
   the region, where nothing of the question is drawn, reaches the question. The same defect
   C16 T4.1's comment names for the router — *hit-testing against boxes the screen never drew* —
-  one filter away. A finding recorded with this lane.
+  one filter away. F1440.
 - **The inspection's keys**: `classify` answers `leave` for `esc` and `none` for everything else
   while suspended, consumed silently (ruling 60). `⌥↑`/`⌥↓` are C16's `page-scroll` intercept, read
   before the ladder and sent to the transcript (C16 I40); `PgUp`/`PgDn` resolve through the ladder
@@ -2906,7 +2906,7 @@ the preview's box and keys, and the inspection's keys.
   and never reached the panel, and the row above that calls the chords *free* checked the registry
   and the keymap and not the intercept, which is read before both. I40 already says *`⌥↑`/`⌥↓`
   alone*; the predicate now says it too (`isPageScroll`: meta, the arrow, no shift, no ctrl),
-  C16 T1.200. A finding recorded with this lane.
+  C16 T1.200. F1442.
 - **The chip preview has no box** (`construct.ts`' `chipPreviewContent`), and its comment says the
   box, its keys and its bar *arrive with the scrollbar* — whose `scrollbarColumn` has shipped since
   M14 (F1307).
@@ -2921,8 +2921,7 @@ the preview's box and keys, and the inspection's keys.
   decodes to `{ o, meta }` and `CSI 1;4A` to `{ up, shift, meta }` (modifier 4 is shift plus alt,
   `modifiersOf`). **Checked by hand against the platforms' defaults, as ruling 53's amendment
   asks**: macOS and the common Linux desktops bind neither; **Windows Terminal's default keymap
-  binds `alt+shift+arrow` to `resizePane`** (its documentation, unmeasured here). A finding recorded
-  with this lane; the chord is the person's pick and is not reopened.
+  binds `alt+shift+arrow` to `resizePane`** (its documentation, unmeasured here). F1441; the chord is the person's pick and is not reopened.
 - **"The editor" has two readings in the tree.** §6l.12 read `R-BLK-825`'s *open in the editor* as
   `R-BLK-355`'s paste-chip edit view — an in-app borrow of the one line editor. `Chip.target`
   (`layout.ts`) is *what the preview opens when that is not the content*, a field C17 never reads,
@@ -3024,7 +3023,7 @@ Taken while building group A, each against something the tree already does:
   vocabulary where `⏎` keeps rather than sends.
 - **A chip opened by its `target` does not come back.** No producer in `src/` mints one; a file
   changed in the editor leaves the chip's `content` as it was attached.
-- **Windows Terminal's `alt+shift+arrow`** (6q.1): the collision gate cannot see an emulator's own
+- **Windows Terminal's `alt+shift+arrow`** (6q.1, F1441): the collision gate cannot see an emulator's own
   keymap, which is ruling 53's amendment's point.
 - **A layer holding two overflowing boxes** is scrolled by the first; no layer in `src/` holds two.
 - **`⌥↑`/`⌥↓` page the transcript under an inspection** — `R-BLK-840` read as the wheel and
