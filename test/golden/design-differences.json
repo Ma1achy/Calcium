@@ -610,17 +610,10 @@
     "— U+2014",
     "› U+203A",
     "▌ U+258C",
-    "● U+25CF",
-    "❯ U+276F"
+    "● U+25CF"
    ],
-   "frameOnly": [
-    "│ U+2502",
-    "┌ U+250C",
-    "┐ U+2510",
-    "└ U+2514",
-    "┘ U+2518"
-   ],
-   "reason": "A homonym, and a finding recorded with this lane: the frame draws the `panel` BLOCK kind, a titled box (┌ Confirm ─ ┐ └ ┘ │), where §097 specifies the panel LAYER — a menu floating between two rules above the prompt (› ● ❯ ▌). The probe `kind: \"panel\"` names the block for a fixture about the layer"
+   "frameOnly": [],
+   "reason": "The frame is the panel LAYER since ruling 87 (F1460) — a session with the completion menu open over an empty transcript — and the box marks the block kind brought are gone with the homonym. ● is the figure's reply specimen above the menu, which this frame leaves out so every mark is the layer's or the prompt's; ▌ is the figure's drawn cursor, where the tree's is the terminal's own; — is line 32's prose. **› is a real difference**: §097 marks the current candidate with `current`'s ›, and the tree's menu draws its three candidates alike, with no mark, ground or weight on any of them at rest. And one the marks cannot see: the menu's closing rule and the prompt's upper rule are two rows here, where the figure's menu closes on the prompt's rule"
   },
   {
    "section": 99,

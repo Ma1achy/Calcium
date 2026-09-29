@@ -46,6 +46,10 @@ import { styledScreenFrom } from "./styled-screen.js";
 import type { ResolvedTheme } from "../../src/presentation/theme/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 import { RAMP_ANIMATIONS, RAMP_ONE_SHOTS } from "../../src/data/viewmodel/types.js";
+import { HEADER_ROWS, HEADER_RULE_ROWS, MIN_COLUMNS } from "../../src/shell/config.js";
+import { fakeStdin } from "./fake-terminal.js";
+import { opening, settle } from "./frame-golden.js";
+import { buildSession } from "./session.js";
 import type { Block, CallState, Ramp, RampAnimation } from "../../src/data/viewmodel/types.js";
 
 export type Surface = Readonly<{
@@ -53,7 +57,13 @@ export type Surface = Readonly<{
   section: number;
   /** What the fixture specifies, in the design's own words where it has them. */
   name: string;
-  rows: (width: number, caps: TerminalCapabilities, theme: ResolvedTheme) => readonly string[];
+  /**
+   * The frame's rows. **A promise where the subject is a session** (§097): the
+   * panel layer is composed by L4 and nothing below it can draw one, so the
+   * only honest picture is a real `Session`'s screen, and a session settles
+   * asynchronously.
+   */
+  rows: (width: number, caps: TerminalCapabilities, theme: ResolvedTheme) => readonly string[] | Promise<readonly string[]>;
 }>;
 
 // **The theme and the capabilities go to `measurable`, not to `renderToLines`.**
@@ -105,13 +115,56 @@ const STATUS = block({
 // corpus with a label set, which the session goldens do not have: every rule in
 // them is bare. That is `built` and not `framed`, exactly.
 
-/** §097: a transient panel, between two rules. */
-const PANEL = block({
-  kind: "panel",
-  id: "panel",
-  title: "Confirm",
-  children: [block({ kind: "raw", id: "p1", text: "apply this change?" })],
-});
+/**
+ * §097: a transient panel floats, between two rules — **the LAYER, not the
+ * block kind** (ruling 87, F1460).
+ *
+ * **The first draft drew the `panel` block kind here, and it was §069's defect
+ * again.** A `panel` block is a titled box; §097's panel is C15's layer — the
+ * completion menu, find, a chip's preview — floating above the prompt between
+ * two rules, drawn over what is behind it. The probe named the block, so the
+ * row compared the right word against the wrong thing, and its listed
+ * difference (`┌ ┐ └ ┘ │` only in the frame) was that confusion measured.
+ *
+ * **So the frame is a session's**, because L4 is what composes a layer over the
+ * transcript (A02 Seam 4) and nothing below it can draw one: a real `Session`
+ * against the fake terminal, `/c` typed so the completion menu opens, and the
+ * screen read from below the header to the prompt's lower rule — the region
+ * §097's figure draws. The header and the footer are §003's and are not the
+ * subject. The transcript is left empty, so every mark in the frame is the
+ * layer's or the prompt's.
+ *
+ * **Every variant is `dark`**, so the session opens the `dark` theme and the
+ * variant's capabilities go in through `TuiConfig.capabilities`, the door
+ * `frame-golden.ts` takes for a rung the environment cannot reach. **Below
+ * `MIN_COLUMNS` a session draws no frame at all** — it refuses with a notice —
+ * so the narrow golden draws the layer at `MIN_COLUMNS` and says so in a
+ * caption rather than recording the refusal as §097's picture.
+ */
+const PANEL_ROWS = 20;
+const panelLayer = async (width: number, capabilities: TerminalCapabilities): Promise<readonly string[]> => {
+  const columns = Math.max(width, MIN_COLUMNS);
+  const stdin = fakeStdin();
+  const { screen } = await buildSession(
+    { name: "calcium", binary: "prism", stdin: stdin as never, theme: opening("dark"), capabilities },
+    { columns, rows: PANEL_ROWS },
+  );
+  await settle();
+  stdin.emit("/c");
+  await settle();
+  const rows = screen().rows;
+  // **The prompt's lower rule is the last full-width rule on the screen**; the
+  // footer below it is chrome. A rule is `─` at Unicode and `-` at ASCII.
+  const rule = new RegExp(`^[─-]{${String(columns)}}$`, "u");
+  const lower = rows.reduce((last, r, i) => (rule.test(r) ? i : last), -1);
+  const drawn = rows.slice(HEADER_ROWS + HEADER_RULE_ROWS, lower + 1).map((r) => r.replace(/\s+$/u, ""));
+  return [
+    ...(columns === width
+      ? []
+      : [`· drawn at ${String(columns)} columns: below that a session draws no frame, only the notice that it needs ${String(MIN_COLUMNS)}`]),
+    ...drawn,
+  ];
+};
 
 /** §048: block states, one row per state of the same kind. */
 const STEPS = block({
@@ -1484,7 +1537,7 @@ export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 42, name: "widgets — a row of peers that sheds", rows: draw(PILLS) },
   { section: 34, name: "active progress bars", rows: draw(BAR) },
   { section: 96, name: "a status has three parts, and a frame is separate", rows: draw(STATUS) },
-  { section: 97, name: "a transient panel floats, between two rules", rows: draw(PANEL) },
+  { section: 97, name: "a transient panel floats, between two rules — the layer, over an empty transcript", rows: (w, c) => panelLayer(w, c) },
   { section: 48, name: "block states", rows: draw(STEPS) },
   { section: 6, name: "the canonical marks, as a glyph census", rows: glyphCensus },
   { section: 30, name: "the head mark's three rungs", rows: headMarks },

@@ -106,10 +106,24 @@ download ###################-------- 70%
 | the pipeline with nothing to run     |
 | at seal(): \`prune\` is marked local ~ |
 +--------------------------------------+
-── §97 · a transient panel floats, between two rules
-+ Confirm -----------------------------+
-|apply this change?                    |
-+--------------------------------------+
+── §97 · a transient panel floats, between two rules — the layer, over an empty transcript
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+
+
+
+
+
+
+
+
+-----------------------------------------------------------
+  /capabilities
+  /clear
+  /config
+-----------------------------------------------------------
+------------------------------------------------------------
+$ /c
+------------------------------------------------------------
 ── §48 · block states
 + resolve  12 packages
 | fetch    3 remaining
@@ -862,10 +876,23 @@ download ###############################################-------------------- 70%
 | at seal(): \`prune\` is marked local in the manifest and has no handler        |
 |                                                                              |
 +------------------------------------------------------------------------------+
-── §97 · a transient panel floats, between two rules
-+ Confirm ---------------------------------------------------------------------+
-|apply this change?                                                            |
-+------------------------------------------------------------------------------+
+── §97 · a transient panel floats, between two rules — the layer, over an empty transcript
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------------
+  /capabilities               the rendering route, and what the terminal can do
+  /clear                     empty the transcript; command history is untouched
+  /config               every setting, its value, and where the value came from
+-------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+$ /c
+--------------------------------------------------------------------------------
 ── §48 · block states
 + resolve  12 packages
 | fetch    3 remaining
@@ -1607,10 +1634,24 @@ download ███████████████████░░░░�
 │ the pipeline with nothing to run     │
 │ at seal(): \`prune\` is marked local … │
 └──────────────────────────────────────┘
-── §97 · a transient panel floats, between two rules
-┌ Confirm ─────────────────────────────┐
-│apply this change?                    │
-└──────────────────────────────────────┘
+── §97 · a transient panel floats, between two rules — the layer, over an empty transcript
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────
+  /capabilities
+  /clear
+  /config
+───────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────
+❯ /c
+────────────────────────────────────────────────────────────
 ── §48 · block states
 ✓ resolve  12 packages
 ⠋ fetch    3 remaining
@@ -2303,10 +2344,23 @@ download ███████████████████████�
 │ at seal(): \`prune\` is marked local in the manifest and has no handler        │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
-── §97 · a transient panel floats, between two rules
-┌ Confirm ─────────────────────────────────────────────────────────────────────┐
-│apply this change?                                                            │
-└──────────────────────────────────────────────────────────────────────────────┘
+── §97 · a transient panel floats, between two rules — the layer, over an empty transcript
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────────────────────────
+  /capabilities               the rendering route, and what the terminal can do
+  /clear                     empty the transcript; command history is untouched
+  /config               every setting, its value, and where the value came from
+───────────────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────────────────────────
+❯ /c
+────────────────────────────────────────────────────────────────────────────────
 ── §48 · block states
 ✓ resolve  12 packages
 ⠋ fetch    3 remaining
@@ -2995,10 +3049,24 @@ download ███████████████████░░░░�
 │ the pipeline with nothing to run     │
 │ at seal(): \`prune\` is marked local … │
 └──────────────────────────────────────┘
-── §97 · a transient panel floats, between two rules
-┌ Confirm ─────────────────────────────┐
-│apply this change?                    │
-└──────────────────────────────────────┘
+── §97 · a transient panel floats, between two rules — the layer, over an empty transcript
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────
+  /capabilities
+  /clear
+  /config
+───────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────
+❯ /c
+────────────────────────────────────────────────────────────
 ── §48 · block states
 ✓ resolve  12 packages
 ⠋ fetch    3 remaining
@@ -3752,10 +3820,23 @@ download ███████████████████████�
 │ at seal(): \`prune\` is marked local in the manifest and has no handler        │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
-── §97 · a transient panel floats, between two rules
-┌ Confirm ─────────────────────────────────────────────────────────────────────┐
-│apply this change?                                                            │
-└──────────────────────────────────────────────────────────────────────────────┘
+── §97 · a transient panel floats, between two rules — the layer, over an empty transcript
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────────────────────────
+  /capabilities               the rendering route, and what the terminal can do
+  /clear                     empty the transcript; command history is untouched
+  /config               every setting, its value, and where the value came from
+───────────────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────────────────────────
+❯ /c
+────────────────────────────────────────────────────────────────────────────────
 ── §48 · block states
 ✓ resolve  12 packages
 ⠋ fetch    3 remaining
