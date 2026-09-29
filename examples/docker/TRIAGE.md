@@ -30,20 +30,20 @@ type change.
 | rank | mechanism | ids keyed | consumers | ⚠ | disposition |
 |---|---|---|---|---|---|
 | **1** | [The consumer cannot reach a fact the framework holds](#1) | 31 | **closed** | ⚠ C07 · C24 | real Calcium work, with consumers |
-| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 98 | **7 open** · 10 unread | ⚠ C04 · C23 | real Calcium work · **13 of 14 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
-| **3** | [A block cannot express what the surface needs](#3) | 11 | **1 open** · 1 unread | ⚠ C04 | mixed — two absorbed |
+| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 104 | **10 open** · 10 unread | ⚠ C04 · C23 | real Calcium work · **13 of 14 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
+| **3** | [A block cannot express what the surface needs](#3) | 13 | **1 open** · 1 unread | ⚠ C04 | mixed — two absorbed |
 | **4** | [A change axis distinct from `Tone`](#4) | 5 | **closed** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
 | **5** | [The far side's shape is not the framework's contract](#5) | 11 | **closed** · 2 unread | ⚠ C05 | mostly app-side · one shim |
 | **6** | [Rendered from data that has since moved](#6) | 5 | **closed** | ⚠ C04 | real Calcium work |
-| **7** | [An artefact describes the world rather than being checked against it](#7) | 136 | **3 open** · 85 unread | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
-| **8** | [Absence indistinguishable from failure](#8) | 115 | **4 open** · 6 unread | partly | real Calcium work · **21 of 25 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
-| **9** | [**The instrument was wrong**](#9) | 148 | **2 open** · 66 unread | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
-| **10** | [**A claim carried without a record**](#10) | 91 | **closed** · 67 unread | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
-| **11** | [A gate that passes without checking](#11) | 491 | **8 open** · 79 unread | — | **282 closed · 7 open · 80 unread** of 369 — the heading was out by 66 and this row's count column by 1 until F991 counted them, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
-| **12** | [**A time-based assertion under contention**](#12) | 20 | **3 open** | — | **new at F80** · Calcium's own suite · **F877 is the first that repairs an instrument rather than recording a reading** |
-| **13** | [Text the framework emits](#13) | 12 | **2 open** · 2 unread | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
-| **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 51 | **3 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
-| — | [Singles](#singles) | 90 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
+| **7** | [An artefact describes the world rather than being checked against it](#7) | 150 | **4 open** · 85 unread | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
+| **8** | [Absence indistinguishable from failure](#8) | 118 | **5 open** · 6 unread | partly | real Calcium work · **21 of 25 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
+| **9** | [**The instrument was wrong**](#9) | 152 | **4 open** · 66 unread | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
+| **10** | [**A claim carried without a record**](#10) | 96 | **1 open** · 67 unread | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
+| **11** | [A gate that passes without checking](#11) | 499 | **9 open** · 79 unread | — | **282 closed · 7 open · 80 unread** of 369 — the heading was out by 66 and this row's count column by 1 until F991 counted them, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
+| **12** | [**A time-based assertion under contention**](#12) | 22 | **4 open** | — | **new at F80** · Calcium's own suite · **F877 is the first that repairs an instrument rather than recording a reading** |
+| **13** | [Text the framework emits](#13) | 18 | **3 open** · 2 unread | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
+| **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 54 | **3 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
+| — | [Singles](#singles) | 100 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
 
 **Four groups are new since F55** — 9, 10, 12, and F81's arrival in 4. Group 9 is the one
 that changes the picture, and it is the only group whose subject is the apparatus rather
@@ -140,7 +140,19 @@ view's** producer is defined by the region and has no other bound.
 **F1129** — **the report cannot express the abscissa its own question needs.** *Does cost rise with position in the document* is a real profiling question and `scatter` is the form for it — a slope is an O(n) nobody declared. `byEntry` is keyed by entry id and `NodeStat` carries nine members, **not one of them ordinal**; `snapshot()` sorts by `self`, so even the map's insertion order is gone before a consumer sees it. `Aggregate` holds the answer privately — its rows carry `lastFrame`, kept only to decide whether to increment `frames` — and a `firstFrame` beside it would be one assignment. Recorded rather than built: the round that found it is the front end and the change is to a published backend type, and a card that took its ordering from the sort it happens to receive would be a figure whose x axis is a rendering artefact. **Deferred, blocker `NodeStat.firstFrame`**, so picking the entry up begins by grepping the symbol · **Open**
 
 
-## 2 · A complete mechanism, unreachable from the other side of a seam — **5 open** · 87 closed · 6 with no verdict ⚠
+## 2 · A complete mechanism, unreachable from the other side of a seam — **8 open** · 90 closed · 6 with no verdict ⚠
+
+**F1376** — **`settle` ended the entry's stream and left the blocks streaming** · **Closed** — C13 I22: settle strips every block's `streaming` in the one change that settles (2af7e95b)
+
+**F1367** — **ruling 69's `+N` was cut to the mark in every shipping table** · **Closed** — ruling 82: C11 reserves the expand column at the widest disclosure marker it draws (C11 I32, I15 amended; 4e3c7153), and C10 I71's gate lands on it (f6b7c136)
+
+**F1303** — **the tape's pull follows the producer's `current`, never focus** · **Open** — ruling 80 (D9) decides that ←/→ moves focus and the window follows it; M14.1's wiring is the shell lane's and unbuilt
+
+**F1302** — **overlays render with no scroll offsets** · **Open** — the one cause behind M15.5 and M14.4's unreachable tail; the shell lane's first item
+
+**F1300** — **M15.6's remedy as written reopens C17 I24's blind spot** · **Open** — the plan's trace mints sentinels from an editor-lifetime counter (D-F1300); M15.6 is the editor lane's and unbuilt
+
+**F1297** — **a scroll box's elements were measured at the full width, drawn at the width beside the bar** · **Closed** — C09 I126 (batch 3, b3-widths) lays a scroll's elements out at the width beside the bar; the blocks lane found M14.3 not owed at its base. F1332 is the record
 
 **F1338** — **`/watch` cannot pin a long invoke** · **Open** — typed during a guard-holding invoke it queues behind it (C23 I5) and answers after the settle; the remedy is C23 I5's open *who is writing* axis
 
@@ -321,7 +333,11 @@ mechanism.
 
 **F1079** — **half of `make check` had no corpus, and the procedure that verifies a commit doubles it.** `eslint .` lints every `.js`/`.mjs` it can reach and the config carried **no `ignores`**, so **745** files decided that gate — 371 `dist/`, 87 scratch under `out/` — and **999** with `out/verify` in place, which is the worktree recipe used to check that a *commit* is green. **The rules reach none of it and parsing reaches all of it**: the one rule block is `tools/**` relative to the config, so a fabricated `var x = 1; if (x == 1)` under `out/verify/tools/` fires nothing with `no-var`, `prefer-const` and `eqeqeq` all configured — while a stray paren in a scratch probe took the gate red on a tree whose sources were clean. The two `dist/` warnings it had been printing all along are the same fact in its quiet form · **Closed** — 282 files, named rather than derived from `.gitignore` (`out/` is not in it, and *committable* and *lintable* are different questions), and T2.129 asks `isPathIgnored` rather than reading the config as prose. Its control is the ignore-everything arm, which satisfies every exclusion assertion and makes the gate a no-op
 
-## 3 · A block cannot express what the surface needs — **1 open** · 10 closed · none with no verdict
+## 3 · A block cannot express what the surface needs — **1 open** · 12 closed · none with no verdict
+
+**F1374** — **a `Ramp` closed to `Tone` had no way to say *brighter than the accent*** · **Closed** — C04 I148 (`overshoot`) and C09 I133 (cf973d23)
+
+**F1305** — **the plan's number for F1374** · **Closed** — F1374 is the record; closed by C04 I148 and C09 I133
 
 **F1135** — **a mark is an instant and `timeline` draws intervals, so the card was wrong and rendered.** The form takes a `start`, a `mid` and an `end` series per row; `report.marks` is `{at, label}` — instants, with no extent. Fed one series it drew **the first mark as a full-width bar and the second as nothing**: both readings wrong, neither throwing, the card rendering, which is why no assertion reached it and the frame did immediately. **The first repair made it worse and is the half worth recording** — the card put captures on the same axis to give the form its three series, and a `CaptureResult` carries `durationMs` and **no start**, so a capture row was anchored at zero and drawn against wall-clock instants: two kinds of row in two coordinate systems inside one figure that reads as though they are in one. **F1131's class, third instance**, and the second time on this deck that a form's second axis met a source with no such axis. Closed as a `dotplot` — one point per mark at its elapsed time, which is what the datum is — with `timeline` moved to the **deferrals** rather than the refusals, because the form is right and the report has nothing for it: the only interval carrying a start is a span inside a frame, which the `gantt` draws on the frame's own clock. Blocker `CaptureResult.startedAt`, a symbol, so picking the entry up begins by grepping it · **Closed**
  — F50 closed by F1032, and the *relocated to §7* clause it carried resolved against no entry there
@@ -458,7 +474,35 @@ badly and *"the banner overflows when you resize"* argues for itself immediately
 ---
 
 <a id="7"></a>
-## 7 · An artefact describes the world rather than being checked against it — **2 open** · 42 closed · 82 with no verdict — thirty-seven more at F512–F967, twenty-five of them corrected in place; F537, F726 and F934's five read closed at HEAD, and this heading claimed them open until the rows were counted
+## 7 · An artefact describes the world rather than being checked against it — **3 open** · 55 closed · 82 with no verdict — thirty-seven more at F512–F967, twenty-five of them corrected in place; F537, F726 and F934's five read closed at HEAD, and this heading claimed them open until the rows were counted
+
+**F1386** — **C09's parked note was wrong about what an unstamped ripple draws** · **Closed** — C09 I133 and T1.150 corrected (e29c613e)
+
+**F1375** — **`Progress.quantity`'s comment described a vanishing bar as built** · **Closed** — C04 I145: a finished `progress` or `count` bar measures and draws zero rows (5f89073b)
+
+**F1373** — **`tapeElements`' comment described a helper that did not exist** · **Closed** — corrected; `tapeMemberCols` is now that helper (c714e137)
+
+**F1372** — **`tape.width()` counted labels and gaps only** · **Closed** — C04 I147: a tape's width counts what its row draws (c714e137)
+
+**F1370** — **F1355's neighbours in the roadmap reader table drifted too** · **Closed** — every citation in the table and the code block re-pointed and read at its subject (105dc184): `construct.ts:3527`, `keys.ts:537`/`:947`/`:649`/`:997`/`:1292`, `session.ts:1403`, `construct.ts:5101`; the table's `:586` row and the prose's `:619` were one site, now `:649`. Not a drift and not closed here: `keys.ts:1560` and `:1576` read the text for the held draft and are in no row — asked of the editor lane's M15.6
+
+**F1355** — **the roadmap cited the ghost's `contextAt` at `session.ts:1282`** · **Closed** — re-pointed to `session.ts:1448` in both places (6eebd9d6); the neighbours are F1370
+
+**F1328** — **ruling 79's headline was stronger than its mechanism** · **Closed** — ruling 79's record corrected to the mechanism with each displacement measured for band status (7e461945 on lane/b4-quant; 7e461945)
+
+**F1321** — **"dim blue" measured, and the 4-bit reference is not xterm's** · **Closed** — ruling 76: the table is renamed `ANSI16_WINDOWS_HEX` and labelled for what it is; the reference and the 4-bit lists do not move (c6240116)
+
+**F1308** — **TRIAGE says F1260's link lands in batch 3** · **Open** — still reads *batch 3's M15 question queue* at c8c7a77e (TRIAGE F1260 line); M15 is batch 4's
+
+**F1306** — **the plan's number for F1375** · **Closed** — F1375 is the record; closed by C04 I145
+
+**F1304** — **`withTrail` counted band positions in code points** · **Closed** — closed with F1371 by C09 I134 — the band is walked and counted by grapheme cluster
+
+**F1301** — **the plan's number for F1376** · **Closed** — F1376 is the record; closed by C13 I22
+
+**F1299** — **the plan's number for F1373** · **Closed** — F1373 is the record; the comment corrected and `tapeMemberCols` made the helper it described
+
+**F1298** — **the plan's number for F1372** · **Closed** — F1372 is the record; closed by C04 I147
 
 **F1341** — **spec row T1.78 was written from the design specimen, not the glyph table** · **Closed** — a6e85ee1: the ASCII bar is `###---`, and a wide-ambiguous terminal draws C09's ASCII set
 
@@ -712,7 +756,13 @@ answer is a frame-read that cannot be wrong. **Read the ladder before choosing t
 
 **F1040** — **a finding number was allocated, spent and folded, and this row is what stops it being handed out twice.** F753 and F800 were dispatched as two findings because the register holds them as two rows; they are one session, and F1039 has the measurement. The entry exists because a number that names nothing is worse than one that names a redirection: two documents carry the sentence *F1040 is not a separate finding*, and SP5 reads any `F\d+` as a citation — correctly, since nothing distinguishes a citation from a disclaimer. It is the reserved-name hazard at one remove, a finding number being a name in a namespace every document shares · **Closed** — no surface, no code, no test; the alternative repairs were rewording until the number is unspellable, which leaves the allocation unrecorded, or an exemption in a rule that has no other holes
 
-## 8 · Absence indistinguishable from failure — **5 open** · 107 closed · 2 with no verdict
+## 8 · Absence indistinguishable from failure — **6 open** · 109 closed · 2 with no verdict
+
+**F1331** — **a ground that cannot hold keeps the floor by painting every hue black, silently** · **Closed** — ruled a refusal: C10 I70 refuses a set whose I17 tones share an index on a measured ground (a022dd41)
+
+**F1322** — **a clipboard tool on `PATH` can confirm a copy to the wrong machine** · **Closed** — C21 §2b's walk found all three; W6, W13 and W16 are gates under T1.14 and T3.20 (54fae41a)
+
+**F1296** — **an unmarked question's default is its last choice** · **Open** — D24 decided (at most one default, never on a reply or inspection choice, the fallback skipping both); M15.7 is the shell lane's and unbuilt
 
 **F1280** — **the quiet window removed the guard's explanation** · **Closed** — C16 I70: `ready in a moment`, then a warn chip naming the chord and the way out after the first refusal, and a wake at `nextDeadline()`**
 
@@ -959,7 +1009,15 @@ and the claim has to be one the producer can support.*
 **F1130** — **the view has no failure path, and the forms it is about to draw refuse rather than degrade.** `profile-view.ts` contains no `try` and no `catch`, and its refresh ends `arm(profiler)` — so anything `paneBlocks` throws escapes a scheduled callback **and takes the re-arm with it**: the timer is already `null`, nothing re-schedules, and the view stops refreshing with the tier still raised, because the restore runs from `pop()` and the ring reset that raised it already happened. **The failure is worse than a crash because it looks like nothing** — a frozen pane showing a one-second-old report is indistinguishable from a quiet session. It cannot fire today, which is why it has never been seen: the four panes build `bar` and `line` with two series and computed heights, and every one of `b.plot`'s forty refusals is about members those two never carry. **The deck arms it** — `b.plot` throws, rather than degrades, on a `violin` under two rows per band, a `boxplot` with fewer rows than bands, a ninth series off a matrix form, a second series on a `bubble`, `width` with `aspect`, and thirty-five more, every one a function of the region or the report's shape, and the region is not bounded below. Ruled for the deck: **the kit refuses above the form** — a card declares the floor its form needs, the kit compares it to the region before building, and a card that cannot be drawn draws a notice naming which. The `try` is the second line of defence and not the first, because a caught throw one second later is still a pane that cannot draw itself · **Open**
 
 
-## 9 · The instrument was wrong — **4 open** · 77 closed · 67 with no verdict · new at F80 · **six more from the residue pass, two of them the brief's own grep · two from the owed three, both reporting before they had a subject · five from the seven owed items, each a fixture or row measuring something other than its subject · four from the three lanes, three of them a check whose expectation comes from its own subject · three from the three owed items, one of them the framework's own width measurer used as the authority for a width · seven from lanes5, three of them an instrument whose corpus or anchor was not the subject it named · eight from lanes6, two of them a gate that read a Unicode code point as a citation and invented a finding · two from lanes7, one of them a mutation that indicted its fixture rather than its rule and one an anchor that only re-running could tell from a live one** · **one from the deferral backlog, a third state the mutation harness had no name for** · **one from the uncited-invariant backlog, a fake reimplementing the rule it stands for and inverting it** · **one from the profiler's owed list, a row reader that could not match a vitest summary carrying a failure (F949)** · **three from the six open items — a registry with no `plot` measuring a pane's JSON (F959), a PTY painter that paints `DECSCUSR` as text (F966), and two mutations written to be quadratic that were linear (F958)** · **two from the T1.83 diagnosis — a replay stand-in that read no clock and was served every later value two reads stale (F963), and a red row whose whole evidence was *expected false to be true* (F965)**
+## 9 · The instrument was wrong — **6 open** · 79 closed · 67 with no verdict · new at F80 · **six more from the residue pass, two of them the brief's own grep · two from the owed three, both reporting before they had a subject · five from the seven owed items, each a fixture or row measuring something other than its subject · four from the three lanes, three of them a check whose expectation comes from its own subject · three from the three owed items, one of them the framework's own width measurer used as the authority for a width · seven from lanes5, three of them an instrument whose corpus or anchor was not the subject it named · eight from lanes6, two of them a gate that read a Unicode code point as a citation and invented a finding · two from lanes7, one of them a mutation that indicted its fixture rather than its rule and one an anchor that only re-running could tell from a live one** · **one from the deferral backlog, a third state the mutation harness had no name for** · **one from the uncited-invariant backlog, a fake reimplementing the rule it stands for and inverting it** · **one from the profiler's owed list, a row reader that could not match a vitest summary carrying a failure (F949)** · **three from the six open items — a registry with no `plot` measuring a pane's JSON (F959), a PTY painter that paints `DECSCUSR` as text (F966), and two mutations written to be quadratic that were linear (F958)** · **two from the T1.83 diagnosis — a replay stand-in that read no clock and was served every later value two reads stale (F963), and a red row whose whole evidence was *expected false to be true* (F965)**
+
+**F1366** — **the `buildSession` harness runs from `/work`, which does not exist** · **Open** — T4.43 spawns from a real directory; the harness default is unchanged, so any other real spawn from it fails ENOENT
+
+**F1363** — **C14 T6.32 named a row that cannot see its mutation** · **Closed** — T6.32 names T3.15 (308be987), measured by the mutation pass
+
+**F1357** — **C17 T5.2's byte wait resolved on the echo, not the output** · **Closed** — T5.2 restated to wait on an output row with no `echo` before it, and its tail counted over the transcript region (9fad37e3)
+
+**F1323** — **under vitest an uncaught exception during a test does not fail it** · **Partly** — C21 T3.20 listens for `uncaughtException` across the write plus one turn (6a9ce17d); the survey of other *no unhandled error* rows is owed
 
 **F1350** — **a lane worktree's examples resolved the package from the main tree** · **Closed** — per-worktree `node_modules/@fmx/calcium` links, and lane worktrees are cut by a script that makes one
 
@@ -1282,7 +1340,17 @@ the reading that missed one.
 **F1128** — **the worst set is recomputed per report, so a card indexed into it changes underneath the reader.** `report()` computes `[...drawn].sort((a, b) => b.work - a.work).slice(0, worstKeep)` fresh on every call, which is correct and is what C28 I32 says — *which frames are worst is not known until later*. What follows from it had no reader until there was a card per retained frame. **The view refreshes every second**, so a card addressed as *the third worst frame* is a different frame at the next tick whenever a slower frame arrives or an older one falls out of the 512-frame ring: a reader looking at a flame graph of a 31 ms frame looks up at a 28 ms one, with nothing changed on screen but the numbers. **The naive design is the one that fails, and it fails silently** — an index into `worst` is the obvious address, it is stable in every fixture with fewer than ten frames, and it is wrong the moment the session is busy enough to be worth profiling. Ruled: **a card is addressed by the frame's `seq`, never by its position**, re-resolved against `worst` on each draw; a `seq` that has left the set is said so and the card clamps to the nearest, because the frame leaving the worst set is itself a reading · **Open**
 
 
-## 10 · A claim carried without a record — **closed** · 21 closed · 69 with no verdict — **61: twelve findings disproved, four refusal premises expired unread (F573–F575, F577), three lane premises measured false (F601, F619, F620), two more from the three lanes — a deliberate divergence nobody wrote down (F640) and a brief's *every gate green* that was red before the lane began (F645), one rule's yield over its whole corpus measured at zero (F657), three from lanes5 — a count restated three times against three authorities (F680), a refusal's cost measured at 7 of 9 stops (F671) and a surface named by §4 and resolved by nothing in `src/` (F677) — five from lanes6 — the dangerous half of a width repair measured instead of argued (F694), a deferral whose named condition had already been met with nothing watching (F696), zero goldens moved where every one was expected to (F702), *every SVG golden moves* measured at 10 of 244 (F706) and a mechanism three documents name that does not exist at one of its two sites (F715) — one from lanes7, a filed finding whose premise the type system makes unconstructible, so the mirrored fix would have changed nothing (F727) — four deferral premises false when written, twenty claims caught before anything was built on them, one rule that governed thirty forms, one reasoned claim that five documents inherited, and one recorded budget that did not reproduce against its own controls, and **F862** — an architecture commitment naming the table its measurements are recorded in, every cell of which is empty — and **F884**, the instrument run over a *plan*: seven defects with a file and a line, four of whose citations do not resolve at HEAD — and **F914**, that plan's seven measured a round on: three already fixed or never defects, three costing 1.2%, and the one that mattered absent from every table sorted by cost, and **F916**, a cache kept on a 75% hit rate that bought 59 ns a hit, and **F940** and **F942**, P11's residue re-measured — a refusal on record that was about a different cache, and *measured once* false one line above the pair it read as a repeat, and **F946**, a spec naming a raiser no spec specified** · new at F80
+## 10 · A claim carried without a record — **1 open** · 25 closed · 69 with no verdict — **61: twelve findings disproved, four refusal premises expired unread (F573–F575, F577), three lane premises measured false (F601, F619, F620), two more from the three lanes — a deliberate divergence nobody wrote down (F640) and a brief's *every gate green* that was red before the lane began (F645), one rule's yield over its whole corpus measured at zero (F657), three from lanes5 — a count restated three times against three authorities (F680), a refusal's cost measured at 7 of 9 stops (F671) and a surface named by §4 and resolved by nothing in `src/` (F677) — five from lanes6 — the dangerous half of a width repair measured instead of argued (F694), a deferral whose named condition had already been met with nothing watching (F696), zero goldens moved where every one was expected to (F702), *every SVG golden moves* measured at 10 of 244 (F706) and a mechanism three documents name that does not exist at one of its two sites (F715) — one from lanes7, a filed finding whose premise the type system makes unconstructible, so the mirrored fix would have changed nothing (F727) — four deferral premises false when written, twenty claims caught before anything was built on them, one rule that governed thirty forms, one reasoned claim that five documents inherited, and one recorded budget that did not reproduce against its own controls, and **F862** — an architecture commitment naming the table its measurements are recorded in, every cell of which is empty — and **F884**, the instrument run over a *plan*: seven defects with a file and a line, four of whose citations do not resolve at HEAD — and **F914**, that plan's seven measured a round on: three already fixed or never defects, three costing 1.2%, and the one that mattered absent from every table sorted by cost, and **F916**, a cache kept on a 75% hit rate that bought 59 ns a hit, and **F940** and **F942**, P11's residue re-measured — a refusal on record that was about a different cache, and *measured once* false one line above the pair it read as a repeat, and **F946**, a spec naming a raiser no spec specified** · new at F80
+
+**F1387** — **F1380 was already on record, and was filed as new** · **Closed** — C22 §6o.4's bullet struck with a pointer to ruling 81 (276dd7d9)
+
+**F1380** — **the `ripple` trail never started** · **Closed** — ruling 81: the shell stamps `Notice.trailSince` per arrival (ce7f0604); already on record in C22 §6o.4 (F1387)
+
+**F1378** — **the M13–M16 plan's findings from F1296 were never recorded** · **Closed** — filed with this batch's ledger: F1296–F1308, the duplicates pointing at the lane's numbers; the plan's two spare numbers were never used
+
+**F1364** — **C14 §6a's clipboard deferral waited on a label already ruled** · **Closed** — §6a rewritten to say what is built (8f23c22c)
+
+**F1307** — **the chip preview's deferral outlived its condition** · **Open** — the condition (`scrollbar.ts`) has held since M14; the preview's box, keys and bar are M14.4, owed to the shell lane
 
 **F1340** — **the watch trace missed a submission settling while the reader is on the row** · **Closed** — C16 I76 amended: a settle returns the row to the prompt, as it does `liveBlock` (797a629b)
 
@@ -1496,7 +1564,23 @@ I14's second half names it and T1.85 asserts the cell is not the flattened one.
 
 **F1061** — **a commit message is a deferral site, and it is the only one of the four with no reader.** `CLAUDE.md` names three kinds — a code comment, a roadmap row, a chain of citations — and a commit body fails harder than any of them: it is append-only, never opened again, and invisible to *grep from the satisfier*, because the satisfier is a regenerated file rather than a symbol. Swept over **122 commits**: three candidates, **two with no home outside the message** and both this session's own. `7070929b` wrote *six of 244 SVG goldens move and are not regenerated here* and left the golden gate red for **four commits**, found by a lane running that suite for something else; `ce3eea37`'s residue is now F1062. **The third is the control and it is what the rule turns on** — `aa27561e`'s *not repaired the other way* is pinned by T1.25, so the message describes a watch instead of standing in for one, and all three read identically · **Closed** — both instances repaired, and no gate proposed: the wording is prose and the control is textually indistinguishable from the two defects, which is the citation-resolves-against-the-wrong-thing class the audit argues against automating. The habit is one line — a deferral in a commit message has to exist somewhere else first
 
-## 11 · A gate that passes without checking — **492 entries: 15 open · 390 closed · 87 with no verdict**
+## 11 · A gate that passes without checking — **500 entries: 16 open · 397 closed · 87 with no verdict**
+
+**F1390** — **parallel lanes took the same C22 test ids** · **Partly** — renumbered at integration (4fe1dd47, c8c7a77e); nothing reserves T-ids across lanes
+
+**F1389** — **a lane reporting subset runs left three reds for the integration chain** · **Closed** — fixed in 5a518c66
+
+**F1384** — **three vacuities found by the blocks lane's mutation pass** · **Closed** — all three rows strengthened
+
+**F1383** — **C09 I135's pads clause was unreachable by a conforming kind** · **Closed** — T3.130 constructs a child that measures 3 and draws 1 (957f1631)
+
+**F1382** — **a mutation was caught by a glyph collision** · **Closed** — C23 T1.72 asserts the stopped `●` mark
+
+**F1377** — **nothing checked that a cited design rule exists** · **Closed** — SS68 (318f45da): 1 042 citations in `docs/components` and `docs/architecture` resolve against the registry
+
+**F1369** — **`c11-disclosure`'s first pass had two survivors, both indicting the tests** · **Closed** — T1.41 and T1.42 rebuilt; 9/9 caught (4e3c7153)
+
+**F1320** — **193 text cells fell below their contrast floor at 8 bits, in all ten themes** · **Closed** — ruling 75 built as C10 I69 (c6240116): the quantiser holds the floor; T2.74 asserts the list empty and is the shipped themes' 8-bit gate
 
 **F1339** — **a focus target whose keymap rows were bound and never consulted, a third time** · **Partly** — `watchRow` fixed in `construct.ts` (1004d067); the class check — every target with keymap rows has a rung handler that reads them — is owed
 
@@ -2448,7 +2532,11 @@ reads goes through the entry point a user has.
 
 **F1151** — **a spec can lose a section heading and `make enforce` stays green.** C10 I40's insertion re-emitted its anchor paragraph without the `## 8. Commitments` heading that followed it; the script asserted the anchor and printed ok, `commitmentsOf(C10)` returned 0 for 34 numbered commitments, and SP13/SP11 were satisfied by the empty answer for three green enforce runs. Caught only by SP13's own fabrication test, which fabricates on C10 by the accident of F1066's file. Discriminator: `commitmentsOf(f).length === 0 && invariantsOf(f).length > 0` for any spec · **Open** — the remedy is a heading-presence rule or a zero-count refusal; the edit-script lesson is to assert the artefact after the write, not the anchor before it
 
-## 12 · A time-based assertion under contention — **3 open** · 17 closed · none with no verdict · new at F80
+## 12 · A time-based assertion under contention — **4 open** · 18 closed · none with no verdict · new at F80
+
+**F1385** — **three process faults in the blocks lane** · **Closed** — recorded; the timeout half is F1348
+
+**F1348** — **two source-walking rows have fixed time limits and go red under lane load** · **Open** — design-fixtures T1.5 and contract/theme T2.62; F1351's class, the same verdict: a red here is a load reading
 
 **F1351** — **two single-pass-frame rows go red under load** · **Open** — C22 T4.49 and T4.53 fail alone at load ~18, alternating, and at the tip where the chain was green
 
@@ -2508,7 +2596,19 @@ that fails under contention will fail eventually whether or not anyone introduce
 
 **F1111** — **the fixture waited for a window and drove a shell that had not reached its first line.** `b.started` has marked the second capture's reader since the fixture was written; phase one had a window search and `sleep(300)`. **A mapped window says the emulator drew and says nothing about how far its child shell has got** — the push that puts kitty into the keyboard protocol is the *second line* of that shell, after `stty raw -echo`, and on a two-core runner drawing kitty through llvmpipe beside another worker bash's start outlasts three hundred milliseconds, which is why every keyboard recurrence of F812 is in `a`. **Copying the marker would not have been enough**: `a.started` proves bash reached the line and not that kitty applied what the line wrote, which is the precondition the fifth recurrence's sentinel names. `CSI ? u` does — measured in the container, `\e[?3` after `CSI > 3 u` and `\e[?0` after `CSI < u`, so the answer names the live flag set rather than merely arriving, and it cannot precede the application because a pty is a byte stream processed in order. **Closed** — the fixture asks and the row asserts `3` at the moment the drive begins, a precondition measured where the sentinel it replaces inferred one from the byte shape afterwards; pinning the handshake off fails T5.7 naming itself, `flags never answered · CSI 27u CSI 27;1:3u CSI 13;2u CSI 13;2:3u CSI 107;1:3u`, which is also the first time a reader has seen what a clean capture looks like. **What it does not claim is the four `27;2u` recurrences**: the mode was live for those, `27;2u` being the new protocol with Shift set, so two symptoms and two causes and only one closed here — what the other gains is that the next one arrives with the flag set beside it and the push can be ruled out rather than suspected. Cost none measurable, 6.6 s against 6.6 s, the query emitted only where `enter` pushes the keyboard protocol and `read -t 2` bounding a terminal that never answers
 
-## 13 · Text the framework emits — **2 open** · 9 closed · 1 with no verdict
+## 13 · Text the framework emits — **3 open** · 14 closed · 1 with no verdict
+
+**F1371** — **the trail band walked back by code unit and counted code points** · **Closed** — C09 I134: the band is walked and counted by grapheme cluster (cf973d23, as I133 before the renumber)
+
+**F1368** — **a count cut at the column edge reads as a different number** · **Closed** — ruled: a marker wider than its column draws the mark alone, never a cut count (C11 §3a row 9, T1.42; 4e3c7153)
+
+**F1361** — **the copy footer shed a rule's fact three times at 100 columns** · **Closed** — chips ranked facts before hints, and `no clipboard` the last fact (5a2fd0bb, ec917932)
+
+**F1360** — **the copy footer drew `all loaded entries` beside a rectangle** · **Closed** — `a`/`A` discard the rectangle, and `esc` clears both (f2bf2500)
+
+**F1354** — **the pipe arm has no line discipline, so output staircases** · **Open** — not fixed; C23 and C27's
+
+**F1353** — **a multi-line command echo wrote bare line feeds and scrolled the alternate screen** · **Closed** — C22 I33: the echo draws a command as its lines, and no row carries a break (3a83908e, 9fad37e3)
 
 **F995** — **absent was reported as the wrong type, and the ruling was already in this repository pointing the other way.** A `notice` with no `tone` and a `notice` whose `tone` is `42` both read *"tone" must be a string* — true both times, and the first sends a reader to a value there is no value for. `src/shell/config.ts` distinguishes exactly this for `createTui`'s required fields, and half the argument had been applied — to the config an app author types, and not to the validator every adapter's output passes through. **The count found by reading was wrong**: 47 sites by *which function emits the sentence*, and **12 more** by deleting each key of the one-per-kind corpus in turn, each with a bespoke predicate no grep for a helper reaches. **One of the twelve is the same defect reversed** — *`digest` is derived and must be present* emitted for a digest that was present and was a number. Absence is `=== undefined`, never `key in b`, because `in` gives one document two sentences either side of `JSON.stringify`; `null` is present and wrong. 56 call sites carry the split, 42 required keys are reachable, 41 are split, and one conditional requirement is exempt by equality. **Closed**
 
@@ -2548,7 +2648,13 @@ already made — folding it in is cheaper than making a second one.
 **F1262** — **the design's fixtures draw the result branch two ways, and its three-rung specimen moves a column R-GLY-003 fixes.** 33 fixtures draw `⎿` with one blank before the text and 8 with two; §068 draws `⎿ let` over `` `- let ``, column 6 against 7. Ruled for the rule: the tree draws both five cells wide · **Open, ruled 2026-09-27** — the 33 fixtures and §068 are corrected through successor blocks via the builder
 
 <a id="14"></a>
-## 14 · A constant, a channel or a rule that outlived its configuration — **3 open** · 46 closed · 2 with no verdict · new at F492
+## 14 · A constant, a channel or a rule that outlived its configuration — **3 open** · 49 closed · 2 with no verdict · new at F492
+
+**F1358** — **copy mode's `esc` label and `esc` itself read two different predicates** · **Closed** — C14 I59: one predicate, `hasSelection`, says a selection exists (f2bf2500)
+
+**F1352** — **a sixth `overlayRegion` site told a PTY child one column too many** · **Closed** — execution's region reads `deps.frame.region`, the transcript's box (9dc27872)
+
+**F1324** — **I17's distinctness repair split a band's one ink at 8 bits** · **Closed** — C10 I17 amended: two slots the set gives one value are one ink, not a collision; T2.78, T6.139 (c6240116)
 
 **F1337** — **the surface's consuming wrapper was a second copy of the child rung.** After ruling 62 the router's `child:consumed` rung consumed unclaimed keys for both sources, and removing the wrapper failed nothing · **Closed** — C16 I49 names the rung; the wrapper is removed and its mutation replaced by one on the rung (review batch 3, b3-mut)
 
@@ -2666,7 +2772,27 @@ written as one. Every member reads as deliberate, which is why none was found by
 
 **F1093** — **a budget written to widen a five-second default became a narrowing when the default went to thirty.** C12 T2.1 sweeps twelve fuzz corpora across every width from one to two hundred through three rasteriser entry points, one corpus being a hundred thousand points, and it carries the only hand-written row timeout in the tree with a comment defending it: *an explicit budget, because 3.2 s against a 5 s default is not a margin … twenty seconds says the seconds are expected*. Every sentence of that is right and the number it produced now does the opposite of what it was for, because `vitest.config.ts` set `testTimeout` to thirty thousand on 2026-08-22 — so the override stopped being a widening of five and became **a third off** the limit the row would otherwise have had, in a file whose comment says the row exists because the default was too small. Measured: the row is **6936 ms** in the devcontainer and **20960 ms** on the runner, against its explicit twenty thousand and a global thirty. **It would have passed on the default it was written to escape** — the failure is the override, not the runner and not the row. **The population is exactly one**: swept over `test/`, every other explicit row timeout is at or above the global, almost all of them in tier five where a real PTY needs its own budget, and four candidates that looked sub-global on a first pass are not row timeouts at all — two arguments to `waitForFrame`, one to `elapsedNeeded`, one an assertion bound. **F967's class, third instance in a day, and the first that is a number rather than prose**: a stale sentence misleads a reader, a stale number fails the build on the one machine that was not available to disagree when it was written. **And the direction is the surprise** — an override reads as *more room*, this one is less, and nothing in the syntax says so; twenty thousand beside a comment about a five-second default reads as generous at every glance. **Open** — `CORPUS_BUDGET_MS`, which is what the row is in `budget.ts`'s own taxonomy, sixty seconds against a runner figure of twenty-one; the number leaves the file so the next regime change moves it once, and the comment keeps its argument and gains the measurement the argument was missing · **Closed** — and the one way this repair could fail silently is the constant not being read, a wrong argument position leaving the row on the global and green, which is indistinguishable from the fix working. Driven rather than assumed: with the constant set to one the row fails with `Test timed out in 1ms`, and `budget.ts` was restored from a copy with its md5 compared. The row runs in two thousand three hundred and nine milliseconds alone and six thousand nine hundred and thirty-six inside the suite, against sixty thousand
 
-## Singles — one consumer each — **2 open** · 74 closed · 14 with no verdict
+## Singles — one consumer each — **7 open** · 79 closed · 14 with no verdict
+
+**F1388** — **a same-length rewrite reads as the same arrival** · **Open** — stated as C22 §6o.4's residue; a producer replacing text with text of equal length does not replay the ripple
+
+**F1381** — **a kind's exact slice is output-equivalent to cropping** · **Open** — no row measures the cost a slice saves
+
+**F1379** — **the trail profile is stretched over a short band** · **Open** — not built
+
+**F1365** — **a first copy's *copied* could land over a second copy's pending sentence** · **Closed** — a generation guard in `createCopier`; C14 I61, T3.26 (d59839b5)
+
+**F1362** — **copy mode seeded its caret off screen when following the tail** · **Closed** — C14 I37 amended: the first arrow scrolls to the caret (f2bf2500)
+
+**F1359** — **the autoscroll tick extended the block selection whatever the mode** · **Closed** — C14 I60, T4.42 and T6.35 (f2bf2500)
+
+**F1356** — **the eviction marker's count changes at `rev` 0 beside a cache keyed on `rev`** · **Open** — a question with its mechanism named; a probe never got the marker on screen, so unmeasured
+
+**F1330** — **C10 I70's load gate has a narrow reach and cost the first load 250–300 ms** · **Closed** — round 3 scopes I70 to non-shipped sets (a022dd41); the shipped themes are gated at build by T2.74 and T2.81, and the cost is gone
+
+**F1329** — **on `paper`'s page `info` and `muted` are 1.16 : 1 apart** · **Open** — index-distinct at 1.16 : 1; `info` is still a grey at ΔE76 30.1 from its blue
+
+**F1325** — **holding the floor while holding rank costs hue** · **Closed** — ruling 79 took the collision half into C10 I17 and rejected CIEDE2000 and re-valuing `paper`; the thin carrier left is F1329
 
 **F1314** — **a child surface was told the whole region.** At 60×20 it was told 59×13; the entry's command row, both borders and the gap pushed rows off-screen, while the context, the measurement and the viewport all agreed · **Closed** by C24 I41 — the child is told the panel's interior
 

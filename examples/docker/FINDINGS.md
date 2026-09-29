@@ -56776,3 +56776,478 @@ walk. Ruled the same as `liveBlock`.
 Two clauses of C22 T1.78 came from §085's specimen: an ASCII bar `###...` (C09's table draws `###---`) and a wide
 rung drawing Unicode (C09 draws its ASCII set where ambiguous-width glyphs render wide). The row's first run found
 both. **A specimen is an example (R-SEC-036)**; the table is what ships.
+
+## F1296 — an unmarked question's default is its last choice, which may be the inspection ★★★☆☆
+
+Found by the M13–M16 plan's premise check at a4502d3c (`confirm.ts:166-173`, `choice-selection.ts:67-70`). When no
+choice is marked default, `defaultChoice` falls back to the **last** choice. §051 draws `no yes show full diff`, so
+on an unmarked §051-shaped question `esc` answers with the inspection's key, and `⏎` on opening suspends; a
+`reply…` choice placed last does the same. The plan's D24 answers it — at most one default, never on a reply or
+inspection choice, and the fallback skips those — and M15.7 builds it with the shell lane. Recorded under F1378:
+the plan held the number and FINDINGS did not.
+
+## F1297 — a scroll box's elements were measured at the width the bar leaves to render ★★☆☆☆
+
+Found by the M13–M16 plan (`containers.ts:501,506` against `:561-564`): a scroll box's `elements` measured child
+rows at the full width `w` while `render` laid them out at `w−1` whenever the bar is drawn, so a child wrapping
+differently at `w−1` gave hit rows and focus-pull rows for a different document from the one drawn, and the column
+range covered the bar. **The same defect as F1332**, found by the plan first and filed second: batch 3's C09 I126
+publishes `childWidthsOf` and asks every nested question at the drawn width, and the blocks lane, re-checking
+M14.3's premise at a022dd41, found it not owed. F1332 is the record.
+
+## F1298 — the plan's number for `tape.width()` counting labels and gaps only ★☆☆☆☆
+
+The M13–M16 plan found `tape.width()` counting labels and gaps only (`tape.ts:180-187` against `:105-111`), so a
+tape laid out at its own natural width draws `n»`. The blocks lane measured the same defect afresh under F1372 and
+closed it by C04 I147. **One defect, two numbers** — the plan's never reached this file (F1378). F1372 is the
+record.
+
+## F1299 — the plan's number for the tape's zero-width-range comment ★☆☆☆☆
+
+The M13–M16 plan found a comment in `tape.ts` (`:152-153`) saying off-screen tape members carry a zero-width column
+range while the code gave every member `{0,w}` (`:161`). The blocks lane filed it again as F1373 and closed it.
+F1373 is the record.
+
+## F1300 — holding the chip map and counter across a reply reopens C17 I24's blind spot ★★★☆☆
+
+Found by the M13–M16 plan's sequence trace over M15.6 (`editor.ts:398-408`, C17 I24). `hold()` leaves `#chips` and
+`#nextChip` shared, and the remedy as the review wrote it — *hold the chip map and counter* — would let a reply
+restart the counter and mint the same sentinel as a prompt chip; the layout memo, keyed without the chip table,
+then returns the reply's label after `resume`. The plan's trace rules sentinels from an editor-lifetime counter so
+S0 is never registered twice, and a held field draws through its own chip table (C17 I36 in the plan's numbering).
+Owed to the editor lane.
+
+## F1301 — the plan's number for a block's `streaming` surviving settlement ★☆☆☆☆
+
+The M13–M16 plan found that `settle` sets `entry.streaming = false` and leaves the document's blocks as given
+(`store.ts:211`, `simple.ts:261,501-518`), so the agent mark and its reserved cells stay on a settled entry —
+M13.3's real residue, after the review's *more is coming* premise was refuted. The blocks lane filed it again as
+F1376 and closed it by C13 I22. F1376 is the record.
+
+## F1302 — overlays render with no scroll offsets ★★★☆☆
+
+Found by the M13–M16 plan (`session.ts:2337`): only entries receive scroll offsets, so every `scroll` box inside a
+layer is pinned at offset 0. It is the single cause behind M15.5 (an inspection that cannot scroll) and M14.4 (the
+chip preview's unreachable tail). The plan orders the shell lane to begin with it.
+
+## F1303 — the tape's pull follows the producer's `current`, never focus ★★☆☆☆
+
+Found by the M13–M16 plan (`construct.ts:2676-2687`): `pullTapes` follows `block.current` and never focus, so a
+focused member off-screen is never pulled into view. R-BLK-857 (`example`) says the window never moves without
+moving the current, R-BLK-853 points the other way, and the shell cannot write a producer's `current`. Ruling 80
+(the plan's D9) decides: ←/→ moves focus, the window follows focus while it is in the tape, and `⏎` activates.
+
+## F1304 — `withTrail` counted band positions in code points, a second site of M13.5's class ★☆☆☆☆
+
+Found by the M13–M16 plan (`simple.ts:449,471`: `[...r.text].length`): a second site of M13.5's code-unit class,
+beside the band's UTF-16 step back. The blocks lane's F1371 measured both halves — the walk by code unit and the
+count by code point — and C09 I134 walks and counts by grapheme cluster. F1371 is the record.
+
+## F1305 — the plan's number for hotEdge's overshoot having no seam ★☆☆☆☆
+
+The M13–M16 plan found hotEdge's overshoot-and-hold only in the design's demo script
+(`calcium-design-language.html:6458`), with R-BLK-191 an `example` and `Ramp` closed to `Tone` (C10 I16), so no
+seam could say *brighter than the accent*. The blocks lane filed it again as F1374 and closed it by C04 I148
+(`overshoot`) and C09 I133. F1374 is the record.
+
+## F1306 — the plan's number for `Progress.quantity`'s comment describing an unbuilt vanishing bar ★☆☆☆☆
+
+The M13–M16 plan found `Progress.quantity`'s doc comment stating as fact that a finished bar *is gone rather than
+full*, while `measure` always answered 1 and C04 I17 forbade 0 rows for a present block (`simple.ts:728`). The
+blocks lane filed it again as F1375 and closed it by C04 I145. F1375 is the record.
+
+## F1307 — the chip preview's deferral outlived its condition ★★☆☆☆
+
+Found by the M13–M16 plan (`construct.ts:2220-2223`): *the box, its keys and its bar … arrive with the scrollbar* —
+a deferral whose condition has been met since M14 landed `scrollbar.ts`, and which nothing revisited. CLAUDE.md's
+deferral-with-a-satisfier-elsewhere shape: the condition is written where the deferral is, the satisfier somewhere
+else. M14.4 builds the preview's box and keys, after F1302's offsets.
+
+## F1308 — TRIAGE says F1260's link lands in batch 3; M15 is in batch 4 ★☆☆☆☆
+
+Found by the M13–M16 plan: F1260's triage line says the link from a question to its call lands *with batch 3's M15
+question queue*. M15 is in batch 4. Unchanged at c8c7a77e.
+
+## F1320 — 193 text cells fell below their contrast floor at 8 bits, where C10 I26 said the rung was provable ★★★★☆
+
+Found by lane b4-contrast (M11 item 7) measuring ink and ground as the resolver paints them, both quantised, over
+exactly the cells the 24-bit gate checks. **193 cells short at 8 bits, every one clear at 24** — dark 14, light 38,
+hcDark 58, hcLight 11, ink 1, warm 16, nord 15, viol 7, mono 2, paper 31, of 1,070 text cells and 100 hue bands.
+C10 I26 called the rung *provable*, and nobody had measured it. Three shapes: (a) hcDark's focus ground `#234f92`
+quantises to `#005faf`, white on it 6.45 against a declared 7, and no cube ink reaches 7 there — 19 cells; (b) hue
+bands, `purple` 3.56 in six themes and `blue` 3.55 in hcDark — 7 cells; (c) 167 inks whose nearest cube entry
+misses the floor where a clearing entry exists a median 2.8 ΔE76 further away (worst 53.4). The plan's premise that
+a shortfall means a token change held only for (a) and (b).
+
+Ruling 75 put the remedy in the mechanism: an entry a slot's floor refuses counts as distance `Infinity` in the
+quantiser's existing assignment, so floor, rank (I6) and distinctness (I17) are held together, and a ground takes
+the nearest entry its inks clear on — hcDark's focus ground moves to `#005f87` (white 7.03), and shape (b) is fixed
+by moving the hue grounds. No registry value moved. The list is empty and T2.74 holds it empty (35d7a03c on
+lane/b4-quant; c6240116 on the batch).
+
+## F1321 — "dim blue" is index 12 on the dark maps' black page, and the 4-bit reference is not xterm's ★★☆☆☆
+
+Found by lane b4-contrast (M11 item 7, batch 1 item 21's *dim blue*). `light`'s `tone.info` goes to index 4 at 4
+bits, navy on white at 16.01 : 1 — not short. The short blue is index 12, `#0000ff` on black at 2.44 : 1, which the
+dark and high-contrast maps give `syntax.function` and `categorical.c5` in seven themes; index 4 is short only on
+the diff grounds (3.12 on green, 1.46 on maroon), because every map paints them ANSI green and maroon. The 4-bit
+total is 403 cells in four lists (dark 38, light 41, hcDark 42, hcLight 51). `focusGround` has no 4-bit entry in
+any map, so its 216 cells are measured on the page; the ten-hue 4-bit map does not exist (I55 parks it).
+
+**The reference was mislabelled.** `ANSI16_HEX`, which C10 I61 called *the xterm defaults*, is not xterm's: under
+real xterm index 12 on black is 4.43 and index 4 is 2.23. Ruling 76 relabels rather than replaces. Lane b4-quant
+then corrected the ruling's own premise: the table is the **legacy Windows console palette** (the values of HTML
+4's sixteen named colours), not VGA, whose levels are `0xaa`/`0x55`; it differs from xterm's at indices 1–8 and 12,
+not only the five this finding sampled. Renamed `ANSI16_WINDOWS_HEX` across `colormap.ts`, `contrast.ts`, the test
+support and the curated pin; the `module-graph.mjs` comment and the registry note reworded in round 2.
+
+## F1322 — a clipboard tool on `PATH` can confirm a copy to the wrong machine ★★★☆☆
+
+Found by lane b4-l0's classification walk over capability × tool presence × payload size × transport (C21 §2b, 18
+rows). Over SSH, `pbcopy` or `clip.exe` on the remote host fills **that host's** clipboard and exits 0 — an
+observable, confirmed copy to the wrong machine, which is exactly the false claim R-SEL-011 forbids. Two
+neighbours: a `PATH` search honouring a relative entry (`.`, or the empty entry) runs a `pbcopy` planted in the
+launch directory; and reading a failing tool's stderr for a reason never finishes, because `xclip`, `xsel` and
+`wl-copy` fork a server that keeps the parent's pipes for as long as it serves the selection. Neither ruling 72,
+the plan nor the review named any of them. Closed by W6 (SSH refuses `pbcopy` and `clip.exe`), W13 (absolute
+entries only) and W16 (stdout and stderr ignored); mutations NO-SSH-GATE, RELATIVE-ENTRY and PIPE-AND-CLOSE are
+caught.
+
+## F1323 — under vitest an uncaught exception during a test does not fail it ★★★☆☆
+
+Found by c21-clipboard's EPIPE-UNHANDLED survivor. With `writeClipboard`'s stdin error listener removed, a real
+`write EPIPE` escaped and T3.20 stayed green: vitest reports an uncaught exception beside the rows, so a row
+claiming *never an unhandled error* that only awaits its result passes with the guard gone. A plain Node probe
+shows the EPIPE uncaught at 1 B, 64 KiB, 1 MiB and 16 MiB of input. T3.20 now listens for `uncaughtException`
+across the operation plus one turn and asserts it heard nothing; with the listener removed it fails *no EPIPE
+escaped*. **Owed**: other rows making the same claim by awaiting alone are likely blind the same way, and none has
+been surveyed.
+
+## F1324 — I17's distinctness repair split a band's one ink at 8 bits ★★☆☆☆
+
+Found by lane b4-quant's walk (C10 §4c.4), predating the lane. I17's repair treated every slot of a band as a
+separate ink, so hcLight's black focus ink became `#000000`, `#080808`, `#121212`, `#1c1c1c` and `#262626` — the
+last is `accent`, at 6.59 against the theme's 7 — its white selection ink split into five near-whites, and both
+hcDark bands split the same way (R-THM-005). I68 had counted these cells under F1320's shape (a). Closed: slots
+with one 24-bit value count as one ink.
+
+## F1325 — holding the floor while holding rank costs hue ★★☆☆☆
+
+Found by lane b4-quant measuring ruling 75 as built. 259 cells move away from the nearest set — median 13.5 ΔE76,
+40 above 30, worst 64.3 (hcDark `syntax.keyword` on `diffAdd` becomes `#ffffff`). On `paper`'s page `tone.info`
+became `#6c6c6c`, the index of `tone.muted`, so at 8 bits info could not be told from muted; I17 did not guard the
+pair because `muted` was not one of its five. The alternative measured — re-picking each short ink on its own —
+moves 167 cells and loses less hue, and inverts 165 pairs that rank separates. Ruling 79 answered the collision
+(I17's set gains `muted`) and rejected both CIEDE2000 and re-valuing `paper`, each changing more than the one
+collision. The hue cost stands as the price of the floor; what is left is F1329.
+
+## F1328 — ruling 79's headline was stronger than its mechanism ★★☆☆☆
+
+Found by lane b4-quant building ruling 79. *No fact shares an index with `muted`* is the intent; what was built is
+narrower — I17's kept-distinct set gains `muted`, and where two members claim one index the lighter claimant moves.
+So on `paper`'s page `muted` moves (242 → 243) and `info` keeps its grey. Eight picks move, all `tone` slots, all
+clear of their floors, and three indices end up shared with a tone outside the set: hcLight `muted` = `meta` (89)
+on `diffRemove`, nord `info` = `identifier` (195) on `selection`, and nord `muted` = `default` = `dim` (254) on
+`selection`, which is one value and not a collision. Round 3 measured each for band status — none is a band — and
+PARKED 79 now states the mechanism and the table.
+
+## F1329 — on `paper`'s page the carrier ruling 79 protects is distinct by index and close by eye ★★☆☆☆
+
+Found by lane b4-quant after ruling 79. `info` (242, `#6c6c6c`, 4.53 : 1 on `#eeeeee`) and `muted` (243, `#767676`,
+3.91 : 1) differ by index and are 1.16 : 1 apart, and `info` is a grey at ΔE76 30.1 from `#1f6b94`. The rule is
+satisfied and the reader's carrier is thin. Left open by ruling 79's correction.
+
+## F1330 — C10 I70's load gate cannot refuse what the 24-bit gates pass, and cost 250–300 ms ★★☆☆☆
+
+Found by lane b4-quant building I70. Every colour clears √21 (4.58 : 1) against black or white, so a theme the
+24-bit gates pass has an empty 8-bit shortfall list unless the quantiser is wrong — exact, not sampled. Through
+`applyOverrides` the gate fires only when a slot override flips a flat ink's side on a mid-grey ground on a theme
+whose floor is above √21 (T2.80: hcDark, `tone.ok` `#000000`, `bg` `#777777`, 19 cells). And it made the first
+`loadTheme(defaultTheme)` in a process 80–86 → 323–373 ms. Round 3 skipped the gate for the shipped token objects
+(T2.82 proves the scope by identity); interleaved in one process the tree's first load is 1.03× the pre-gate
+build's CPU against 5.03× with the gate everywhere. The remedy that added held sets to I41's table is unbuilt
+because the scope removed its cost.
+
+## F1331 — a ground that cannot hold keeps the floor by painting every hue black, silently ★★☆☆☆
+
+Found by lane b4-quant (C10 §4c.4 row 13, left unruled in round 2). Where a ground cannot hold, the floor is kept
+by moving inks to the other side and the gate stays silent: `hcDark` at floor 4.57 with `diffAdd` `#767575` loaded
+fine, and at 8 bits every white ink on that ground painted `#000000` — no cell short, every hue gone, nothing
+reporting it. Round 3 made it a refusal: two of I17's six with different 24-bit values painting one index on a
+ground the gate measures is one error naming the ground, the slots and the index. Shipped themes: 0, held by T2.81.
+A 32 × 32 × 4 search of `diffAdd` overrides found none the 24-bit gates accept that still collides, so the refusal
+is reached through custom `floor` or `composed` values.
+
+## F1348 — two source-walking rows have fixed time limits and go red under lane load ★★☆☆☆
+
+Found by lane b4-quant round 3 at load 15–24 with 14 vitest processes from other lanes. design-fixtures T1.5 reads
+every `.ts` under `src` and `test` once per probe symbol over the bind mount: 12.9 s in round 2, 53.9 s in the full
+run, 85 s alone, 162 s with one worker, against 30 s. contract/theme T2.62 (the SS67 scan): 9.3 s alone, 15.2 s
+beside six other files, against 15 s. Neither reads anything the round changed. The blocks lane saw T1.5 at 38.5 s
+alone (F1385). F1351's class — a row whose verdict depends on the machine — in two rows that only read files.
+
+## F1352 — a sixth `overlayRegion` site told a PTY child one column too many ★★★☆☆
+
+Found by lane C running the tier-5 rows M11.1's rail reservation reaches: T5.3a and T5.5 failed with the
+reservation and passed without it. C14 §6d's walk counted five `overlayRegion().width` lookups resting on an
+identity the reservation ends; execution's `region` was wired to `deps.frame.overlayRegion` — passing the function
+rather than calling it — so the walk's grep missed it. A PTY child and its emulator were told 94 columns (`99 − 5`)
+while the body drew at 93 (`98 − 5`), and every wrapped line landed one column off.
+
+## F1353 — a multi-line command echo wrote bare line feeds and scrolled the alternate screen ★★★★☆
+
+Found by lane C reading C17 T5.2's frame. A bracketed paste, or a chip resolving at submission, puts `\n` in the
+command; `hardWrapCells` measures the break as nothing, so the echo wrote it raw inside one frame row — the
+terminal moved down mid-row, and near the bottom it **scrolled the alternate screen**, the failure that corrupts
+state the frame can no longer see. One 200-line submission wrote 127 bare line feeds at the base; in-process a
+six-line paste writes five. T5.2 was passing on a collage, and C09 T4.107's premise was false. Closed by C22 I33:
+`commandRows` splits on `\r\n`, `\r` and `\n` and wraps each line, and the measurer reads the same function. T1.172
+asserts no bare line feed through a session; T6.134 (now T6.137) draws the revert.
+
+## F1354 — the pipe arm has no line discipline, so a child's multi-line output staircases ★★★☆☆
+
+Found by lane C reading T5.2's frame. A child run over a pipe rather than a PTY gets no line discipline to turn
+`\n` into `\r\n`, and the emulator's `convertEol` is false by default, so multi-line output steps right one line at
+a time inside the child's box. Measured on the emulator directly; pre-existing, and outside the lane's files.
+
+## F1355 — the roadmap cited the ghost's `contextAt` at a line it had left ★☆☆☆☆
+
+Found by lane C: CALCIUM_ROADMAP's reader table and index-reader block cited `session.ts:1282` for `contextAt`
+inside `completion.ghost(…)`, and the call had moved to `:1448`. Re-pointed in both places, one citation only,
+because the roadmap is single-writer.
+
+## F1356 — the eviction marker's count changes at `rev` 0 beside a cache keyed on `rev` ★☆☆☆☆
+
+Found by lane C's C14 §6b classification table (M10 item 8). C13's sweep rebuilds the eviction marker on every
+write at `rev` 0, so a second eviction changes the marker's count without moving its `rev` (C13 I13 says `rev`
+moves iff the document changed, and nothing says the marker's did). A render cache keyed on `rev` could then draw
+the first count. The same fact makes C14 I34's waiting count add nothing for a second eviction, which I34 states as
+its limit. Two probes through a session never brought the marker on screen, so whether the drawn count goes stale
+is **unmeasured**.
+
+## F1357 — C17 T5.2's byte wait resolved on the echo, not the output ★★☆☆☆
+
+Found by lane C beside F1353. T5.2's comment said the echo shows the chip's label, so `waitFor(/line-199/)` could
+only match the output; the echo holds the resolved command, and always did, so the wait resolved on the echo. Its
+last-nine-rows tail also assumed four output rows above the rules, where the output is a scrolled box closed by its
+residue row and the entry's blank. Restated; three runs green.
+
+## F1358 — copy mode's `esc` label and `esc` itself read two different predicates ★★☆☆☆
+
+Found by lane C (M10 item 5). The footer's `esc` label read `size === null` while `escape()` read the block set, so
+a selection of a `rule` alone — which copies nothing and is still what `esc` clears — showed `esc out` over a press
+that clears. `CopyState` now carries `clears`, and the label and the key read the same predicate. T6.32's revert is
+caught by T3.15, not T1.80 (F1363).
+
+## F1359 — the autoscroll tick extended the block selection whatever the mode ★★☆☆☆
+
+Found by lane C's §6e sequence trace, row 14 (M10 item 2): a rectangle drag held past the edge took blocks, because
+the edge-scroll tick extended the block selection without asking which mode was up. Rectangle mode is `rect !==
+null` (I60), and the tick extends the rectangle in it.
+
+## F1360 — the copy footer drew `all loaded entries` beside a rectangle ★☆☆☆☆
+
+Found by lane C's footer table (C14 §6e): `A` selected every loaded entry while a rectangle stayed up, and the
+footer stated both. Ruled for a consistent picture: `a` and `A` discard the rectangle, and `esc` clears the
+rectangle and the blocks together.
+
+## F1361 — the copy footer sheds from the right, and three additions each shed a rule's fact at 100 columns ★★☆☆☆
+
+Found by lane C building M10. The footer sheds from the right (§103), so where a chip is placed decides what
+survives. `⌃V rect` and `all loaded entries` each shed *the screen is frozen*, and would shed `N waiting`; later
+`no clipboard`, placed before the `⏎` it qualifies, shed the rectangle's count (T4.41: `… extend  no clipboard  ⏎
+to file  esc clear`). **The same defect three times in one item.** The chips were re-ranked so the rules' facts
+come before hints, and `⏎ to file` already says where the text goes, so `no clipboard` is the last fact.
+
+## F1362 — copy mode seeded its caret off screen when following the tail ★☆☆☆☆
+
+Found by lane C (M10 item 7). Entering copy mode seeds the caret on the last entry's row 0, which is off screen
+whenever the view follows a tail longer than it. The first keyboard move now scrolls the caret into view.
+
+## F1363 — C14 T6.32 named a row that cannot see its mutation ★☆☆☆☆
+
+Found by lane C's `c14-copy-keys` run. T6.32 said reading the `esc` label from `size` fails T1.80, but T1.80 is
+handed `clears` precomputed, so it cannot see the session computing it; T3.15 is what catches the revert. The same
+run moved a second expectation: `hasSelection` ignoring the rectangle is caught by T1.80, not T1.79.
+
+## F1364 — C14 §6a's clipboard deferral waited on a label already ruled ★☆☆☆☆
+
+Found by lane C writing C14 I61. §6a deferred the clipboard until *the same parked word the label is*; that label
+was ruled on 2026-09-24, and the condition was met in the section below the deferral. The
+deferral-with-a-satisfier-elsewhere shape again (F1307).
+
+## F1365 — a first copy's *copied* could land over a second copy's pending sentence ★★☆☆☆
+
+Found by lane C's §6e sequence trace, row 9. C21 resolves each tool write on its own exit, so two copies in flight
+answer in an order nothing controls, and the first copy's *copied* could overwrite the second's *copying with …*.
+The second copy supersedes the first, and a superseded or late answer says nothing.
+
+## F1366 — the `buildSession` harness runs from a working directory that does not exist ★★☆☆☆
+
+Found by lane C's T4.43 first run: the harness session's cwd is `/work`, the spawn failed `ENOENT`, and the toast
+said `pbcopy failed (spawn … ENOENT) — saved to /state/copy.txt` — C14's W11 path saying so honestly, about the
+harness. Any real spawn from a harness session fails the same way.
+
+## F1367 — ruling 69's `+N` was cut to the mark in every shipping table ★★★☆☆
+
+Found by lane C at M11.2. Ruling 69 gives disclosure its second carrier, the `+N` hidden count beside the mark, but
+the expand column is producer-declared (`minWidth: 1` in `fallback.ts` and every test surface) and C11 I15 kept the
+planner from reading `role`, so `▹+3` was cut to `▹` by `fitAt` everywhere. C10 I71's gate would have recorded
+*mark + word* over a word never drawn, and N itself was unspecified. Ruling 82 took option (a): the framework draws
+the marker, so the framework sizes it; N is `plan.dropped.length + (row.detail?.length ?? 0)`. S03, S05, S06 and
+S14 totals each rise by 2 and no drop set moves.
+
+## F1368 — a count cut at the column edge reads as a different number ★★☆☆☆
+
+Found by lane C's C11 §3a classification walk under ruling 82. `▹+12` cut from the end reads `▹+1` — not a
+truncated count but a wrong one, which is worse than none. Ruled: when the marker is wider than its column, draw
+the mark alone.
+
+## F1369 — `c11-disclosure`'s first pass had two survivors, and both indicted the tests ★★☆☆☆
+
+Found by lane C's new mutation run. *The bound reserves the mark alone* survived because T1.41's N ≥ 10 row never
+crossed a digit between the two planning passes; it is now ten one-cell columns at width 4, where a single pass
+reserves 3 cells for a count of 10. *N = 0 draws `+0`* survived because every N = 0 row sat in a one-cell
+reservation where the width guard hid it; T1.42 now puts a zero-count row beside a detail row, so a `+0` would fit.
+**A mutation that survives can indict its subject's rows, not the code.**
+
+## F1370 — F1355's neighbours in the roadmap reader table drifted too ★☆☆☆☆
+
+Found by lane C fixing F1355. In the same table: `session.ts:1242` (`selectionSpans`) is now `:1403`;
+`keys.ts:407`/`:716` in the table and `:382`/`:652` in the code block (`contextAt`) are now `:528`/`:924`;
+`construct.ts:2534`'s `submit(stores.editor.resolved)` no longer exists, the nearest being `pipeline?.submit` at
+3419, 3428 and 3451; `keys.ts:586` is now 640; and the `history.previous(` site is not found. Lane C re-pointed
+`:1242` with F1355 and took it out when the edit was blocked.
+
+## F1371 — the trail band walked back by code unit and counted code points ★★★☆☆
+
+Found by the blocks lane (M13.5). The band stepped back one UTF-16 code unit at a time and counted code points, so
+it dropped a U+0301 at the band's edge from the frame, drew a ZWJ family's head at `#e2b698`, and drew `y` at
+`#e7ab82` after a mark inside the band. A cluster is now wholly in the band or wholly out, and the newest sits at
+`t = 1`. The plan's F1304 was the counting half.
+
+## F1372 — `tape.width()` counted labels and gaps only ★★☆☆☆
+
+Found by the blocks lane (M14.9). `tape.width()` answered 17 and the tape drew `«1  › arm ⋅  1»`: the current's `›
+`, state marks, details and the residue marks were left out, so a tape laid out at its own natural width cut
+itself. First found by the plan as F1298.
+
+## F1373 — `tapeElements`' comment described a helper that did not exist ★☆☆☆☆
+
+Found by the blocks lane. The comment described a zero-width-range helper for off-screen members; the code gave
+every member `{0,w}`. First found by the plan as F1299.
+
+## F1374 — a `Ramp` closed to `Tone` had no way to say *brighter than the accent* ★★☆☆☆
+
+Found by the blocks lane (M13.4). hotEdge drew a plain gradient where §026's profile lifts the accent over the
+newest 35% of the band and holds it, because a ramp closed to `Tone` (C10 I16) has no seam for a colour past its
+slot. `Ramp.overshoot: { lift, share }` — on a gradient over a slot pair only, refused on a span — carries it;
+hotEdge uses `{1.35, 0.35}`. First found by the plan as F1305.
+
+## F1375 — `Progress.quantity`'s comment described a vanishing bar as built ★☆☆☆☆
+
+Found by the blocks lane (M16.2). The comment said a finished bar *is gone rather than full*; `measure` answered 1.
+First found by the plan as F1306.
+
+## F1376 — `settle` ended the entry's stream and left the blocks streaming ★★☆☆☆
+
+Found by the blocks lane (M13.3). `settle` flipped the entry's flag and left `streaming: true` on its blocks, so a
+settled entry kept the agent mark and its reserved cells. Stripped in the same change rather than a second one,
+because C13 emitting two changes for one call is history this repository already paid for. First found by the plan
+as F1301.
+
+## F1377 — nothing checked that a cited design rule exists ★★☆☆☆
+
+Found by the blocks lane. SP3 resolves invariant, row and finding numbers and SP8 resolves sections, but an
+`R-XXX-NNN` id was the one citation form nothing read. C26 I24 cited `R-NAV-004`, from a family the registry has
+never had, and a person found it by following the link (corrected in 049c69fb). SS68 reads every such id and
+resolves it against `rules[].id`, current, example and superseded alike; green on its first run, nothing exempted.
+Stated blind spot: it checks that a rule exists, not that it says what the citing sentence claims.
+
+## F1378 — the M13–M16 plan's findings from F1296 were never recorded ★☆☆☆☆
+
+Found by the blocks lane: SP5 refused the plan's numbers in specs, because the plan allocated fifteen numbers from
+F1296 in its §0 — thirteen used, two spare — and nothing wrote them here. Six of them were then found again by the
+lane under new numbers (F1298 = F1372, F1299 = F1373, F1301 = F1376, F1304 ⊂ F1371, F1305 = F1374, F1306 = F1375).
+**A number reserved in a plan is a claim with no record**, and the second finder cannot see it.
+
+## F1379 — the trail profile is stretched over a short band ★☆☆☆☆
+
+Found by the blocks lane. The trail's profile is laid over the band's own length rather than a fixed fourteen, so a
+short band compresses it; and for wide text the band's cells differ from its cluster positions.
+
+## F1380 — the `ripple` trail never started ★★☆☆☆
+
+Found by the blocks lane: `ripple` is a one-shot, and the band's derived ramp had no `since`, so the ripple held
+its not-started frame for the life of the stream — the one place C04 I109's M2 ruling had not been carried. **Not
+new**: C22 §6o.4's third bullet already said the ripple *is minted at render with no `since` … and plays frame 0
+for as long as the notice streams* (F1387). What the not-started frame draws was misread too (F1386). Ruling 81
+closes it.
+
+## F1381 — a kind's exact slice is output-equivalent to cropping, and only its cost is unmeasured ★☆☆☆☆
+
+Found by the blocks lane after C09 I135 (as I134 before the renumber). Since a bounded box crops what it cannot
+slice, a kind's exact slice changes no output — `c09-scroll-crop` declares it an expected survivor. Its only value
+is cost (2 000 `logs` lines rendered to draw 6), and no row measures that.
+
+## F1382 — a mutation was caught by a glyph collision, and survived when posts removed it ★★☆☆☆
+
+Found by the blocks lane's `c23-operation-head` run. *Stopped head composed as running* had been caught only by
+T1.71, and only because the agent spinner's frames share `▰` with the old segmented bar; posts (C09 I136) removed
+the collision and the mutation survived. C23 T1.72 now asserts the stopped mark itself.
+
+## F1383 — C09 I135's *pads counted from rows drawn* could not be reached by a conforming kind ★☆☆☆☆
+
+Found by the blocks lane (M14.6). The clause distinguishes rows drawn from rows measured, and every conforming kind
+draws what it measures, so the clause had nothing to be wrong about until a row built a child that breaks the
+agreement.
+
+## F1384 — three vacuities the mutation pass found in the blocks lane's rows ★★☆☆☆
+
+Found by the blocks lane's mutation passes. C04 T1.81 was satisfied by answering the allocation (*width answers the
+allocation* survived; closed by a tightness clause). C09 T1.56's hue/hotEdge comparison went vacuous once hotEdge
+gained a lift hue lacks. C09 T2.227's fractions were all whole eighths, so round and floor agreed; a fraction
+between eighths now rounds.
+
+## F1385 — three process faults in the blocks lane ★☆☆☆☆
+
+Found by the blocks lane. Bind-mount lag let a commit stage a stale `c09-bar-alphabet.mjs` while `enforce` read the
+fixed file, so 5f89073b first held a bare `I146` that trips SP3 (amended and re-verified). The first attempt to
+commit dbe17d36 failed for no visible reason and passed on retry. design-fixtures T1.5 exceeded its 30 s limit
+alone, at 38.5 s over the bind mount — F1348's row.
+
+## F1386 — C09's parked note was wrong about what an unstamped ripple draws ★★☆☆☆
+
+Found by the blocks lane reading every band cell. The note said the unstamped band is the ink at every position and
+tick; it is frame 0 of the ring — radius 0, one cell lit at the band's centre. T1.150 read four named cells (the
+head, the fourth-newest, the oldest and the first outside), and the centre was none of them. The control is now
+*one frame at every tick, the same frame the stamped notice draws at its own stamp*.
+
+## F1387 — F1380 was already on record, and was filed as new ★☆☆☆☆
+
+Found by the blocks lane in round 2. C22 §6o.4's third bullet had recorded the unstarted ripple before F1380 was
+written. **Ask where a claim was written down** — run on a finding before the number is taken.
+
+## F1388 — a same-length rewrite of a notice's text reads as the same arrival ★☆☆☆☆
+
+Found by the blocks lane building ruling 81. The shell's arrival identity for a trail stamp is the text's length,
+so a producer that replaces the text with a different text of the same length is the same arrival and the ripple
+does not replay. Recorded as the residue ruling 81 leaves.
+
+## F1389 — a lane reporting subset runs left three reds for the integration chain ★★☆☆☆
+
+Lane C's hand-back reported targeted test runs and never the whole suite, so three reds surfaced only in batch 4's
+integration chain. Two roadmap citations its rail had displaced: entry 25's `deps.ghost()` read, cited at
+`paint.ts:757`, had moved to `:867`, out of RS14b's anchor window; entry 29's `paint.ts:877` fell on a blank line
+and RS1 failed — all five of that entry's citations had drifted, re-pointed to `frame.ts:251`, `config.ts:76`,
+`frame.ts:70`, `frame.ts:359` and `paint.ts:1012`. And C22 T1.172's 24-row session: `/help`'s answer grew two rows
+with batch 3's watch verbs and scrolled `line-0…line-4` off the top; thirty rows hold the echo and the answer. **A
+subset chosen by the lane is chosen by what the lane thinks it touched.**
+
+## F1390 — parallel lanes took the same C22 test ids, and each lane was self-consistent ★★☆☆☆
+
+Batch 4's integration found C22 row ids taken twice: lane C's `commandRows` revert row T6.134 moved to T6.137 (the
+watch lane held T6.134), and the blocks lane's trail-stamp rows T1.78 and T6.134–T6.137 moved to T1.173 and
+T6.138–T6.141 (the watch lane holding T1.78 and T6.134–T6.136). SP2's allocation covers invariants; nothing
+reserves test ids across lanes. SP7 and SP15 caught none before the rebase, because each lane's tree was
+self-consistent — the collision exists only in the merge.
