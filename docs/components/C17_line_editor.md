@@ -409,7 +409,7 @@ is which pairs of owners each channel joins, and that holds at rest.
 | `resume`, `restore` | the owner's own | The held line is the owner's text. |
 | `yank` | **any owner's** | **The one channel that joins two owners**: the kill buffer is the one clipboard (§5a) and §052 names *paste rules* among what a borrower shares. A foreign chip is **adopted** — minted afresh under the current owner's next ordinal, parts unchanged — and an own chip is inserted as it is, which is the same chip twice. |
 | `setText` (history, completion) | none | History records the submitted line, which is `resolved`; a candidate is text. |
-| `loadField` (a field's stored value, through `restore`) | a sentinel a past field borrow committed | Resolves through the one table and keeps the ordinal it was minted with; `restore` is not an edit and adopts nothing. That a field's value can hold a sentinel at all is a finding of its own, F1395. |
+| `loadField` (a field's stored value, through `restore`) | a sentinel a past field borrow committed | Resolves through the one table and keeps the ordinal it was minted with; `restore` is not an edit and adopts nothing. That a field's value can hold a sentinel at all was a finding of its own, F1395, **closed by C22 I148**: the shell writes a field with `resolved`, so a stored value holds no sentinel and this row's input is plain text. |
 
 **One table, and that is the ruling the plan's third clause turned on.** *A held line
 draws through its own chip table* presumes one table per owner, and the row for

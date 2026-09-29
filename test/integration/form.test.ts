@@ -277,4 +277,8 @@ describe("C22 I118 — a form in a session", () => {
       vi.useRealTimers();
     }
   });
+
+  it.todo(
+    "T4.119 (C22 I148, I118, C04 §3ar F9, F1395): a chip yanked into a field is written as its content, and refused when that content holds a line break — not deferred on a component: the row lands with the code commit of review batch 4's shell lane, F1395",
+  );
 });
