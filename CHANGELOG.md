@@ -172,3 +172,8 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
 - **A settled entry's blocks no longer stream** (2af7e95b, C13 I22): `settle` strips every
   block's `streaming` in the one change that settles, so a settled notice loses its mark and
   reserved cells.
+- **A chip wider than its row is elided in the middle, frame kept** (dfef2062, C17 I32). It was
+  clipped at the row's edge, which left a label with no closing bracket (F1391).
+- **A borrowed line numbers its own chips** (dfef2062, C17 I33, I34). A typed reply or a form
+  field counts its chips from `#1`, and the prompt's numbering comes back when the borrow ends; a
+  chip yanked across owners takes the line's next number.

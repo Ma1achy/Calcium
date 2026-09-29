@@ -57404,3 +57404,44 @@ come through `#resolve`) is unmeasured.
 Observed by lane b4-m12 hardening C14 T4.37c: a multi-entry semantic copy reads `e0-line-0 …\n\nsay\ne1-line-0 …` —
 the first entry's text begins at its blocks, and every later entry is preceded by its command. Either both carry
 the command or neither does; which is owed a ruling.
+
+## F1391 — a chip label wider than its row was clipped to a label with no closing bracket ★★★☆☆
+
+Found by the editor lane's premise check for M13.1. `layout.ts` placed a chip with `row += shown` and no limit,
+and the painter's `exact()` clipped at the right edge: `["ab ","[#1 a-very-long-detected-kind · 4096L]"," z"]` at
+width 14 read `[#1 a-very-lo` — no closing bracket and no marker, so indistinguishable from typed text. C17 I20
+and I26 justified the overflow with *a chip is what the user pasted*, which is true of the content and does not
+constrain the label, which is C17's own composition (I25). A correct sentence attached to the wrong decision.
+Closed by C17 I32: a chip wider than its row is elided in the middle to exactly the row, frame kept (dfef2062).
+
+## F1392 — the prompt measures ambiguous-width characters narrow from end to end ★★☆☆☆
+
+Found by the editor lane building C17 I32. The prompt's walk calls `cells()` with no ambiguity argument and
+`exact()` takes `fitStyled`'s narrow default, so at `ambiguousWidth: "wide"` a typed ambiguous character, or one
+inside a chip's name, occupies one cell more on the terminal than the prompt measured — the direction that wraps.
+From reading the code; not measured on a terminal. The chip's frame and elision marker are exact at the wide rung,
+because `glyphs()` hands the ASCII set there (C02 I9); the name and every typed cluster are not.
+
+## F1393 — a typed private-use character equal to a minted sentinel draws as that chip and submits its content ★★★☆☆
+
+Found by the editor lane writing C17 I34's blind spot. `stripForBuffer` strips control characters only, so a
+typed or pasted private-use character equal to a minted sentinel is that chip. Measured:
+`insertChip(json, content "SECRET")` then `insert("  typed")` with U+E000 typed gives the rows
+`["[#1 json · 5L] [#1 json · 5L] typed"]` and `resolved` = `"SECRET SECRET typed"`. Nerd Font Pomicons occupy
+U+E000–U+E00A, the first eleven sentinels, and Powerline's U+E0A0 is chip 161. The user sees the chip twice and
+submits its content twice, which is at least visible on the prompt; nothing refuses it.
+
+## F1394 — the sentinel counter leaves the Private Use Area after 6,400 chips ★☆☆☆☆
+
+Found by the editor lane ruling C17 I34 (a sentinel is never reused). `CHIP_BASE + n` runs past U+F8FF after
+6,400 chips in one editor's life, into U+F900 and beyond — CJK compatibility ideographs a reader can type, so
+F1393's collision becomes an ordinary character's. From reading the code; not fixed. The alphabet is §5c's
+decision: `chipAt`, `resolved`, the layout walk and three regex rows in `editor.test.ts` read it.
+
+## F1395 — a form field's committed value can hold a raw sentinel ★★★☆☆
+
+Found by the editor lane's C17 §5f table (row `loadField`). `endField` and `⏎` write the field with
+`writeField(…, stores.editor.text)` at `construct.ts:2718` and `:2758` — the unresolved text. Measured at the
+editor: kill a chip, `hold()`, `yank()`, and `text` is U+E001, so a chip yanked into a field reaches C04 form data
+as a private-use character. A field refuses a multi-line paste, so `yank` is the only way in. The remedy is the
+shell's — write `resolved`, or refuse to adopt a chip into a field — and it belongs to the shell lane.
