@@ -56681,3 +56681,70 @@ nothing fails (172 passed). `onInput(event) ? true : event.kind === "key"` resta
 The one difference is an unclaimed key release at `child`: the wrapper answered `true`, the router's release
 branch answers `false` and records `release-dropped`, and the composition root ignores `dispatch`'s return
 (`construct.ts:4415`). C16 I49 and its W5 row amended to name the rung; the surface registers `onInput` alone.
+
+## F1332 — nested boxes were measured and addressed at the wrong width, in two layers ★★★☆☆
+
+Found by lane b3-widths (M8 item 4), walked as a table of 12 arrangements × elementsOf, hit-testing and measure,
+with paint as the reference: 15 cells disagreed at 755c44c6. The block library had three narrowings C04's
+`childWidths` does not know — a scroll's bar, a right pane's bar and an aligned cell — and published none; a
+scroll's own `elements` laid its children out at full width while `render` drew them a column narrower. The
+shell asked every nested question at the region's width: the scroll box's ceiling, the page, the pull's and the
+wheel's `elementsOf`, the tape's start, and `blockWidthInEntry`'s descent. Measured before the code: a box of 2
+holding three 80-cell notices answered `b` on the second row of `a`; a box in a card body clamped at a ceiling
+of 1 where the frame's was 4; the wheel on a middle box's child moved the box inside it; a tape in a card body
+persisted start 0 where the frame drew 1. Closed by C09 I126.
+
+## F1333 — `semanticsOf` descends by C04's widths, not the drawn ones ★☆☆☆☆
+
+Found beside F1332. `semanticsOf` still descends by C04's `childWidths`, ignoring scroll bars and a container's
+padding. Its only shell reader, `linear.ts` `blockLines`, reads a node's role, name and value and never nested
+geometry. The condition to grep is a reader of a semantic node's geometry.
+
+## F1334 — a scroll that cuts an atomic child draws the child whole and pushes the residue row outside the box ★★☆☆☆
+
+Frame read by lane b3-widths: three 76-cell notices in a box of 3 in a card body at 81 columns drew the second
+notice's second row where `0 above, 3 below` belongs. Not new behaviour — the I58 null arm, T2.28b and F855 — but
+it makes C04 I49's residue row unreadable at any offset that cuts a child, so C09 T4.61 was built on a box of 2 to
+avoid it.
+
+## F1345 — SS47 decoded, and the escapes were all premises ★☆☆☆☆
+
+F1326's class, closed by lane b3-tail. SS47 now judges `decodeLiteral(body)` — `\uXXXX`, `\u{…}` and `\xNN`, one
+escape at a time from the left, so an escaped backslash stays ASCII. The newly fired set is 25 literals in 8 files
+(F1326's 63 counted every escape, prose and excused files included). Classified by drawn × does the ASCII rung
+need it: four files draw only behind a capability test or into SVG, four hold data; each is an exemption with its
+premise, compared to the fired files by equality (23 = 23). SS57's old decoder read `\u` only and mis-decoded an
+escaped backslash; the two rules now share the decoder. Stated blind spot: `String.fromCodePoint`, variables, and
+`String.raw` read as cooked.
+
+## F1346 — `pipeline.resized()`'s order against the resize commit is equivalent ★☆☆☆☆
+
+F1336's owed part, measured by lane b3-tail. With the call moved after `scheduler.commit("resize")`, the 24 files
+that drive a resize through the graph pass (398 passed). `resize` is never immediate (C03 I15), and the listener
+calls only `emulator.resize` and `child.resize`, neither of which commits a frame, so no path can show the order.
+Two sibling comments (`types.ts`, `execution.ts`) said *child first* while the code resizes the emulator first.
+
+## F1347 — a retired view's row survived in C28 §10 ★☆☆☆☆
+
+C28 §8a says the rows naming the view "are struck or re-aimed in §10"; T1.96 was neither and still asserted *the
+layer's body equals `profileDeck(…)`* after the layer retired, its claim living on in a C23 test titled with C28's
+id. Struck and re-aimed to a new C23 T1.66d.
+
+## F1350 — a lane worktree's examples resolved the package from the main tree ★★★☆☆
+
+Found by the batch 4 base integration. `/workspace/node_modules/@fmx/calcium` links to `../..`, the main tree; a
+worktree under `out/wt/<lane>` has no `node_modules`, so every `examples/*` import walked up and landed on the
+**main tree's `dist/`**. A lane's example tests and `make check` typechecked against main — green when the lane
+broke the public surface, red when main was ahead. It surfaced as `make check` failing on a `clipboard` field the
+lane had added and main had not. Every lane worktree then open had the same fault. Closed by a gitignored link in
+each worktree to itself; the package resolves through `dist/`, so a lane builds before an example test.
+
+## F1351 — two single-pass-frame rows go red under load ★★☆☆☆
+
+The chain at a2f82495 ran at load ~20 with three lanes building. Among ~40 timeouts two rows failed fast:
+`deferred-height.test.ts` T4.49 ("no border yet: expected true to be false") and T4.53 ("one render on the frame that
+found the fault: expected 2 to be 1"). Run alone three times they failed three times; at ac65bb09, whose chain was
+green, they failed too, alternating between the two rows. So it is not a landing — but a row about a *single-pass*
+frame whose verdict depends on load asserts something about the scheduler's timing that the invariant does not
+state. **Owed**: find what load changes (a coalesced wake landing inside the measured frame is the first
+candidate) and either state it in C22 I69 or remove it from the row.

@@ -55,6 +55,10 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   declaring one is refused. `config` is now the framework's ninth verb (70913a44).
 - **A child surface is told the panel's interior** (de2fcd48, C24 I41): `SurfaceContext.width`
   and `height` exclude the entry's chrome and the panel border, where they were the whole region.
+- **`profileDeck` is removed from the public API** (85c82136, ruling 78, C24 I33). It served the
+  retired `/profile` view. Draw a section by calling `profileCard` for each id `CARDS` lists for it.
+- **A `tui.view/1` document with a `warn` or `error` cell or notice and no glyph is refused at the
+  wire** (9d7db83d, ruling 77, C04 I6), as `block()` always refused it.
 
 ### Added
 
