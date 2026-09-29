@@ -13,6 +13,7 @@ import { buildSession } from "../support/session.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 import { createEditor } from "../../src/interaction/editor/editor.js";
 import type { TuiConfig } from "../../src/shell/types.js";
+import { COPY_DEADLINE_MS } from "../../src/shell/clipboard.js";
 
 const ESC = "\u001b";
 const ENTER_MODE = `${ESC}V`;
@@ -105,7 +106,25 @@ describe("C14 §6a — the clipboard in a real session", () => {
     }
   });
 
-  it.todo("T4.44 (C14 I61): a pending copy's deadline is disposed when the session stops — not deferred on a component: the code lands in the next commit of this round");
+  it("T4.44 (C14 I61): a pending copy's deadline is disposed when the session stops", async () => {
+    // **A tool that takes the text and does not answer** — alive for three
+    // seconds, past `COPY_DEADLINE_MS`, so the only thing between the stop and
+    // a `copy.txt` is the session disposing the copier. It runs to its end
+    // detached (C21 I2); the row asserts the deadline, not the process.
+    const dir = mkdtempSync(join(tmpdir(), "calcium-pbcopy-"));
+    writeFileSync(join(dir, "pbcopy"), "#!/bin/sh\n/bin/cat > /dev/null\nexec /bin/sleep 3\n");
+    chmodSync(join(dir, "pbcopy"), 0o755);
+    const t = await session({ env: { TERM: "xterm-256color", LANG: "en_GB.UTF-8", PATH: dir }, cwd: dir });
+    await t.press("/note\r");
+    await t.press(ENTER_MODE);
+    await t.press("a");
+    await t.press("y");
+    expect(t.toast("copying with pbcopy"), "the copy is pending when the session stops").toBe(true);
+    await t.tui.stop("exit");
+    await new Promise((r) => setTimeout(r, COPY_DEADLINE_MS + 400));
+    const fs = (t.tui as unknown as { config: { fs: { readFile: (p: string) => Promise<string> } } }).config.fs;
+    await expect(fs.readFile("/state/copy.txt"), "the deadline was disposed with the session").rejects.toBeDefined();
+  }, 10_000);
 
   it("T4.8 (C17 I31): a copy sent by OSC 52, then ⌃y → the prompt holds the text the payload decodes to", async () => {
     const o = await session({ capabilities: { clipboard: "osc52" } });

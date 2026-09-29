@@ -111,6 +111,17 @@ const MUTATIONS = [
     to: "    hasClipboard: true,",
     expect: "T3.26 (C14 I61",
   },
+  {
+    // **The session's half of `dispose`** (T4.44): T3.26 disposes the copier
+    // itself and cannot see whether the session ever does. Removed, a pending
+    // copy's deadline outlives the stop and writes `copy.txt` for a session
+    // that has gone.
+    name: "the session never disposes the copier",
+    file: SESSION,
+    from: "    this.#copier?.[Symbol.dispose]();\n    this.#tickAt = null;",
+    to: "    this.#tickAt = null;",
+    expect: "T4.44 (C14 I61",
+  },
 ];
 
 const results = await runPass({
