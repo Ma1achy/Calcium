@@ -17,7 +17,7 @@ import { controlForm, neutraliseControl } from "../../data/text.js";
 import type { Block } from "../../data/viewmodel/index.js";
 
 /**
- * The fields that are **not** content, by name (C09 I127, T2.191).
+ * The fields that are **not** content, by name (C09 I127, T2.195).
  *
  * Identifiers and cross-references first: `key` names a table column and is the
  * property name in every `row.cells`, `from`/`to` name graph nodes, `target`
@@ -91,7 +91,7 @@ function walk(value: unknown): unknown {
 
   // **Arrays before the record test**, whose prototype check an array fails:
   // the first draft asked `isPlain` first and so never descended into one,
-  // which left every string below a block's top level raw — found by T2.191
+  // which left every string below a block's top level raw — found by T2.195
   // on `patch`'s hunk header while the top-level `path` came out clean.
   if (Array.isArray(value)) {
     let out: unknown[] | null = null;

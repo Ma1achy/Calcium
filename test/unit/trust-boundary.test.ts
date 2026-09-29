@@ -136,7 +136,7 @@ beforeAll(async () => {
 });
 
 describe("C09 §7d — the trust boundary", () => {
-  it("T2.190 (C09 I130): the sweep's registry is a constructed session's, and its kinds less terminal equal the kinds swept", () => {
+  it("T2.194 (C09 I130): the sweep's registry is a constructed session's, and its kinds less terminal equal the kinds swept", () => {
     const kit = measurable({ registry: production });
     const swept = [...new Set(CORPUS.map((b) => b.kind))].filter((k) => k !== "terminal").sort();
     const registered = kit.kinds.filter((k) => k !== "terminal").sort();
@@ -252,7 +252,7 @@ describe("C09 §7d — the trust boundary", () => {
     expect(gateErrors("שלום עולם"), "right-to-left letters are text, not format characters").toEqual([]);
   });
 
-  it("T1.86 (C09 I128, C09 I127): neutraliseControl over each class, idempotent, tab and newline kept, and a span moves with its text", () => {
+  it("T1.89 (C09 I128, C09 I127): neutraliseControl over each class, idempotent, tab and newline kept, and a span moves with its text", () => {
     const cases: (readonly [number, string])[] = [
       [0x1b, "^["],
       [0x00, "^@"],
@@ -332,7 +332,7 @@ describe("C09 §7d — the trust boundary", () => {
     expect(neutralBlock(neutral as unknown as Block), "the neutralised block is its own answer").toBe(neutral);
   });
 
-  it("T2.191 (C09 I127, C09 I130): per (kind, field), each field poisoned alone draws its neutralised residue and no control", () => {
+  it("T2.195 (C09 I127, C09 I130): per (kind, field), each field poisoned alone draws its neutralised residue and no control", () => {
     // **The identifier list first, by equality with the registry's** — the
     // poisoner below skips exactly these, so a name the neutraliser leaves
     // alone and this file does not know is a drift a reader has to rule on.

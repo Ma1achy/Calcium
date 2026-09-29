@@ -15,7 +15,7 @@ import { measurable, visible } from "../support/render.js";
 const ESC = String.fromCharCode(27);
 
 describe("C09 §7d — tier 6", () => {
-  it("T6.142 (C09 I127): #resolve handing the block un-neutralised → T2.191 fails on patch's path, hunk header and line text", () => {
+  it("T6.150 (C09 I127): #resolve handing the block un-neutralised → T2.195 fails on patch's path, hunk header and line text", () => {
     // **The three fields that leaked** while the sweep ran on a registry that
     // drew `patch` as `raw`: the header's path, the hunk header and a line's
     // text, which was tokenised raw and sliced by the stripped length.
@@ -33,7 +33,7 @@ describe("C09 §7d — tier 6", () => {
     expect(visible(drawn).split("^[[2J").length - 1, "the path, the header and the line each show ^[").toBe(3);
   });
 
-  it("T6.144 (C09 I128): the bidi arm without U+2066–U+2069 → T1.86 and T2.192 fail on the isolates", () => {
+  it("T6.151 (C09 I128): the bidi arm without U+2066–U+2069 → T1.89 and T2.192 fail on the isolates", () => {
     // **The isolates are the members a narrowed range drops first**: they were
     // added to Unicode after the embeddings, and a range written from memory as
     // `202A–202E` reads complete.
@@ -43,11 +43,11 @@ describe("C09 §7d — tier 6", () => {
     }
   });
 
-  it("T6.145 (C09 I130): the sweep on a bare registry → T2.190 fails on the kinds", () => {
+  it("T6.152 (C09 I130): the sweep on a bare registry → T2.194 fails on the kinds", () => {
     // **The row the sweep's registry is asserted by.** A bare `measurable()`
     // lacks the three the framework registers through the public mechanism, and
     // on that registry each fell back to `raw` — which is how `patch`'s leak
-    // read clean. T2.190 compares the production kinds by equality, so the bare
+    // read clean. T2.194 compares the production kinds by equality, so the bare
     // registry fails it on exactly these three.
     const bare = measurable().kinds;
     const full = measurable({ definitions: [tableDefinition, plotDefinition, patchDefinition] as never }).kinds;
@@ -55,7 +55,7 @@ describe("C09 §7d — tier 6", () => {
     expect(["table", "plot", "patch"].filter((k) => full.includes(k))).toEqual(["table", "plot", "patch"]);
   });
 
-  it("T6.146 (C09 I129): copyOf handing the caller's block → T2.193 fails on every kind that copies", () => {
+  it("T6.153 (C09 I129): copyOf handing the caller's block → T2.193 fails on every kind that copies", () => {
     // **The copy reads the resolved block**, and the resolved block is the
     // neutralised one. Handing the definition the caller's block instead keeps
     // every copy working and puts the ESC on the clipboard.

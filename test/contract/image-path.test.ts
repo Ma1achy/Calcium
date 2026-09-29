@@ -23,7 +23,7 @@ afterAll(() => {
 });
 
 describe("C04 I142 — b.image({ path }) keeps the path", () => {
-  it("T2.139 (C04 I142, C09 I86): the path is carried beside the bytes, copy is alt, a newline and the path with no blank line, a bytes-built image copies its alt alone, and the path is neutralised", () => {
+  it("T2.140 (C04 I142, C09 I86): the path is carried beside the bytes, copy is alt, a newline and the path with no blank line, a bytes-built image copies its alt alone, and the path is neutralised", () => {
     const kit = measurable();
     const path = join(dir, "square.png");
     writeFileSync(path, PNG);

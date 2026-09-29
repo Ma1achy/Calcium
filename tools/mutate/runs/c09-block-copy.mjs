@@ -47,13 +47,13 @@ const MUTATIONS = [
     expect: "T2.193",
   },
   {
-    // **C04 I142 undone at the builder** (T6.105): the path read and dropped,
+    // **C04 I142 undone at the builder** (T6.107): the path read and dropped,
     // so the copy is the alt alone — indistinguishable from a bytes-built image.
     name: "b.image drops the path it read",
     file: "src/shell/builders/index.ts",
     from: "      ...(path === undefined ? {} : { path }),\n",
     to: "",
-    expect: "T2.139",
+    expect: "T2.140",
   },
   {
     // **The copy as it shipped**: alt alone, the path unread.
@@ -61,7 +61,7 @@ const MUTATIONS = [
     file: "src/presentation/blocks/kinds/image.ts",
     from: '  copy: (block) => [block.alt, block.path ?? ""]',
     to: '  copy: (block) => [block.alt]',
-    expect: "T2.139",
+    expect: "T2.140",
   },
   {
     // **An alt ending in a newline meets the join's own** — a blank line, which
@@ -70,7 +70,7 @@ const MUTATIONS = [
     file: "src/presentation/blocks/kinds/image.ts",
     from: '.join("\\n").replace(/\\n{2,}/gu, "\\n"),',
     to: '.join("\\n"),',
-    expect: "T2.139",
+    expect: "T2.140",
   },
   {
     // **The omission ruling, inverted** (C09 I86). A declining kind answering

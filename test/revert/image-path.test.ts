@@ -11,7 +11,7 @@ import { ONE_PER_KIND } from "../support/blocks.js";
 import { measurable } from "../support/render.js";
 
 describe("C04 I142 — tier 6", () => {
-  it("T6.105 (C04 I142): the builder dropping the path it read → T2.139 fails on path and on the copy", () => {
+  it("T6.107 (C04 I142): the builder dropping the path it read → T2.140 fails on path and on the copy", () => {
     // **The state this invariant replaced**, and the one a reader cannot tell
     // from a picture built from bytes: a copy of the alt alone. The row asserts
     // the two artefacts differ, so a builder that drops the path makes them equal.

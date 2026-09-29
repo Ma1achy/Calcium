@@ -59,22 +59,22 @@ const results = runPass({
   },
   mutations: [
     {
-      // **The registry hands the definition the raw block** (C09 §7d, T6.142):
+      // **The registry hands the definition the raw block** (C09 §7d, T6.150):
       // the class that leaked `patch`'s path, hunk header and line text.
       name: "#resolve hands a registered kind the block un-neutralised",
       file: "src/presentation/blocks/registry.ts",
       from: "    if (held !== undefined) return { definition: held, block: neutralBlock(block) };",
       to: "    if (held !== undefined) return { definition: held, block };",
-      expect: "T2.191",
+      expect: "T2.195",
     },
     {
-      // **The isolates dropped from the bidi arm** (T6.144): added to Unicode
+      // **The isolates dropped from the bidi arm** (T6.151): added to Unicode
       // after the embeddings, so a range written from memory reads complete.
       name: "the bidi arm loses U+2066–U+2069",
       file: DATA_TEXT,
       from: "(cp >= 0x2066 && cp <= 0x2069)",
       to: "(cp >= 0x2066 && cp <= 0x2065)",
-      expect: "T1.86",
+      expect: "T1.89",
     },
     {
       // **The neutraliser keeps ESC**, the plausible loosening one layer up
@@ -100,16 +100,16 @@ const results = runPass({
       file: "src/presentation/blocks/neutral.ts",
       from: '    out["spans"] = rebased(spans, raw);',
       to: '    out["spans"] = spans;',
-      expect: "T1.86",
+      expect: "T1.89",
     },
     {
-      // **The sweep back on a bare registry** (T6.145): `table`, `plot` and
+      // **The sweep back on a bare registry** (T6.152): `table`, `plot` and
       // `patch` fall to `raw`, and the three-site leak is invisible again.
       name: "the sweep runs on a bare registry",
       file: "test/unit/trust-boundary.test.ts",
       from: "  production = (await buildGraph()).graph.blocks;",
       to: "  production = measurable().registry;",
-      expect: "T2.190",
+      expect: "T2.194",
     },
     {
       // **A thrown message drawn raw** — the error box is a block the registry
@@ -119,9 +119,9 @@ const results = runPass({
       from: "message: neutraliseControl(text), height }",
       to: "message: text, height }",
       // **First written against T4.107, and it survived**: that row's error is
-      // a handler's, which C23 draws. No row made a definition throw, so T2.191
+      // a handler's, which C23 draws. No row made a definition throw, so T2.195
       // gained the clause.
-      expect: "T2.191",
+      expect: "T2.195",
     },
     {
       // **THE DEFECT: the exemption stops being paid for.** With the gate's
