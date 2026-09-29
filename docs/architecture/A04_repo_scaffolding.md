@@ -369,7 +369,28 @@ It encodes: read the spec's commitments and invariants first; one test per invar
 
 ## 9. Distribution
 
-**Not published publicly.** Calcium publishes on tag from CI to **GitHub Packages**, private.
+**Not published yet — held, 2026-09-29, by the person's ruling.** The package was renamed
+`calcium-tui` (169f8cc8), and the name is **unscoped**. GitHub Packages accepts only scoped
+names (`@owner/name`), so the arrangement below cannot publish it, and the registry is not
+yet chosen. Until it is:
+
+- `package.json` carries **no `publishConfig`**, and CI's `publish` job is **held off** with
+  its reason beside it, so no tag publishes anything anywhere.
+- `make proof` still proves the package is a package: publish is not refused, the tarball
+  installs into clean trees, and the examples run against it. With no `publishConfig`, the
+  plain `--registry` override is the one that takes, which is what the script passes and then
+  asserts (F12's rule — assert the line, do not trust the flag — is unchanged).
+- A consumer clones the repository, runs `npm install` and `npm run build`, and depends on
+  the folder with `"calcium-tui": "file:<path>"`, as the examples do. **Not a git
+  dependency**, for the reason below.
+- The name was checked free on the public npm registry on 2026-09-29, with the variants npm
+  treats as the same name (`calciumtui`, `calcium_tui`, `calcium.tui`). That is a reading, not
+  a reservation.
+
+What follows is the arrangement this replaced, kept because the reasoning about git
+dependencies and local iteration still holds whichever registry is chosen.
+
+**Formerly: not published publicly.** Calcium published on tag from CI to **GitHub Packages**, private.
 
 Consumers install it as an ordinary npm dependency pointed at that registry:
 
