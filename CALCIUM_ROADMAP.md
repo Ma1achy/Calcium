@@ -2600,19 +2600,19 @@ sites and every one of them would need its own answer:
 
 | reader | what it does with the string |
 |---|---|
-| `shell/construct.ts:2534` | `pipeline?.submit(stores.editor.resolved)` — **C23 takes a string**, and `resolved` is declared `readonly resolved: string` |
-| `shell/keys.ts:407`, `:716` | `contextAt(text, cursor, manifest)` — C19 completes against it |
-| `shell/keys.ts:586` | `const before = deps.editor.text`, then `setText` — an **edit round-trip** through a plain string |
-| `shell/keys.ts:829`, `:1106` | `history.previous(text)`, `searchOpen(text)` — **C20 stores strings** |
-| `shell/session.ts:1242` | `selectionSpans(text, …)` — C09's wash |
+| `shell/construct.ts:3527` | `const line = stores.editor.resolved`, then `pipeline?.submit(line)` — **C23 takes a string**, and `resolved` is declared `readonly resolved: string` |
+| `shell/keys.ts:537`, `:947` | `contextAt(text, cursor, manifest)` — C19 completes against it |
+| `shell/keys.ts:649` | `const before = deps.editor.text`, then `setText` — an **edit round-trip** through a plain string |
+| `shell/keys.ts:997`, `:1292` | `(reply ?? history).previous(text)`, `searchOpen(text)` — **C20 stores strings** |
+| `shell/session.ts:1403` | `selectionSpans(text, …)` — C09's wash |
 | `shell/session.ts:1448` | `contextAt(text, cursor, …)` inside `completion.ghost(…)` — C19 again, from the shell (`:579` when this was written, `:1282` until review batch 4) |
-| `shell/construct.ts:4342` | `promptHasText` |
+| `shell/construct.ts:5101` | `promptHasText` |
 
 **The count read *seven* until 2026-09-10 and the population has never been seven.** Measured
 at `437aaa79`, the commit that wrote this table: nine reader sites, of which the table listed
 eight and the prose above it said seven. Nine again today — **the population never moved; the
 count was wrong on the day and the citations drifted around it.** The member that has never
-been in the table is `keys.ts:619` (`:397` then), which reads the buffer and writes it back
+been in the table is `keys.ts:649` (`:397` then; the table's `:649` row is it, added since), which reads the buffer and writes it back
 through `setText` — an **edit round-trip**, so a sentinel plus a side map has to survive a
 write and not only a read. That is the strongest row here and it was the missing one. F1092.
 
@@ -2627,10 +2627,10 @@ table above is a list of *what consumes the string*, and it is the wrong axis fo
 it was answering. **Four of the nine pass a buffer index alongside it**:
 
 ```
-keys.ts:382     contextAt(editor.text, editor.cursor, manifest)
-keys.ts:652     contextAt(editor.text, editor.cursor, manifest)
+keys.ts:537     contextAt(editor.text, editor.cursor, manifest)
+keys.ts:947     contextAt(editor.text, editor.cursor, manifest)
 session.ts:1448 contextAt(editor.text, editor.cursor, manifest)   — the ghost
-session.ts:1242 selectionSpans(editor.text, sel.anchor, sel.head, …)
+session.ts:1403 selectionSpans(editor.text, sel.anchor, sel.head, …)
 ```
 
 **So the obvious implementation of *the nine readers keep working* does not work.** The
