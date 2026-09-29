@@ -29,19 +29,24 @@ exports[`golden frames — one per design fixture > dark-ascii at 40 1`] = `
   │<the file>│
 
 ── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
-· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
+· a choice — the MARK and the WEIGHT carry chosen, the WASH carries focus, and the label is part of the shape
   at rest
     ........................................ scale  @ linear  * log  @ log2
+    .................WWWWW.................. weight
   focused on \`linear\` — NOT chosen: the mark did not move
     .......AAAAAAAA......................... scale  @ linear  * log  @ log2
       A = bg 48;2;46;46;46
+    .................WWWWW.................. weight
   focused on \`log\` — chosen: the same wash, the same mark
     .................AAAAA.................. scale  @ linear  * log  @ log2
       A = bg 48;2;46;46;46
+    .................WWWWW.................. weight
   a checkbox, on
     ........................................ + run the suite after each edit
+    WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW......... weight
   a checkbox, off — ⏎ toggled it
     ........................................ x run the suite after each edit
+    ........................................ weight
 
 · a control — three states, three mechanisms, and the VALUE is none of them
   at rest
@@ -770,19 +775,24 @@ exports[`golden frames — one per design fixture > dark-ascii at 80 1`] = `
   │<the file>│
 
 ── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
-· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
+· a choice — the MARK and the WEIGHT carry chosen, the WASH carries focus, and the label is part of the shape
   at rest
     .................................................... scale  @ linear  * log  @ log2
+    .................WWWWW.............................. weight
   focused on \`linear\` — NOT chosen: the mark did not move
     .......AAAAAAAA..................................... scale  @ linear  * log  @ log2
       A = bg 48;2;46;46;46
+    .................WWWWW.............................. weight
   focused on \`log\` — chosen: the same wash, the same mark
     .................AAAAA.............................. scale  @ linear  * log  @ log2
       A = bg 48;2;46;46;46
+    .................WWWWW.............................. weight
   a checkbox, on
     .................................................... + run the suite after each edit
+    WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW..................... weight
   a checkbox, off — ⏎ toggled it
     .................................................... x run the suite after each edit
+    .................................................... weight
 
 · a control — three states, three mechanisms, and the VALUE is none of them
   at rest
@@ -1504,17 +1514,22 @@ exports[`golden frames — one per design fixture > dark-mono-unicode at 40 1`] 
   │<the file>│
 
 ── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
-· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
+· a choice — the MARK and the WEIGHT carry chosen, the WASH carries focus, and the label is part of the shape
   at rest
     ........................................ scale  ○ linear  ● log  ○ log2
+    .................WWWWW.................. weight
   focused on \`linear\` — NOT chosen: the mark did not move
     ........................................ scale  ○ linear  ● log  ○ log2
+    .................WWWWW.................. weight
   focused on \`log\` — chosen: the same wash, the same mark
     ........................................ scale  ○ linear  ● log  ○ log2
+    .................WWWWW.................. weight
   a checkbox, on
     ........................................ ✓ run the suite after each edit
+    WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW......... weight
   a checkbox, off — ⏎ toggled it
     ........................................ ✗ run the suite after each edit
+    ........................................ weight
 
 · a control — three states, three mechanisms, and the VALUE is none of them
   at rest
@@ -2187,17 +2202,22 @@ exports[`golden frames — one per design fixture > dark-mono-unicode at 80 1`] 
   │<the file>│
 
 ── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
-· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
+· a choice — the MARK and the WEIGHT carry chosen, the WASH carries focus, and the label is part of the shape
   at rest
     .................................................... scale  ○ linear  ● log  ○ log2
+    .................WWWWW.............................. weight
   focused on \`linear\` — NOT chosen: the mark did not move
     .................................................... scale  ○ linear  ● log  ○ log2
+    .................WWWWW.............................. weight
   focused on \`log\` — chosen: the same wash, the same mark
     .................................................... scale  ○ linear  ● log  ○ log2
+    .................WWWWW.............................. weight
   a checkbox, on
     .................................................... ✓ run the suite after each edit
+    WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW..................... weight
   a checkbox, off — ⏎ toggled it
     .................................................... ✗ run the suite after each edit
+    .................................................... weight
 
 · a control — three states, three mechanisms, and the VALUE is none of them
   at rest
@@ -2862,19 +2882,24 @@ exports[`golden frames — one per design fixture > dark-unicode at 40 1`] = `
   │<the file>│
 
 ── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
-· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
+· a choice — the MARK and the WEIGHT carry chosen, the WASH carries focus, and the label is part of the shape
   at rest
     ........................................ scale  ○ linear  ● log  ○ log2
+    .................WWWWW.................. weight
   focused on \`linear\` — NOT chosen: the mark did not move
     .......AAAAAAAA......................... scale  ○ linear  ● log  ○ log2
       A = bg 48;2;46;46;46
+    .................WWWWW.................. weight
   focused on \`log\` — chosen: the same wash, the same mark
     .................AAAAA.................. scale  ○ linear  ● log  ○ log2
       A = bg 48;2;46;46;46
+    .................WWWWW.................. weight
   a checkbox, on
     ........................................ ✓ run the suite after each edit
+    WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW......... weight
   a checkbox, off — ⏎ toggled it
     ........................................ ✗ run the suite after each edit
+    ........................................ weight
 
 · a control — three states, three mechanisms, and the VALUE is none of them
   at rest
@@ -3604,19 +3629,24 @@ exports[`golden frames — one per design fixture > dark-unicode at 80 1`] = `
   │<the file>│
 
 ── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
-· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
+· a choice — the MARK and the WEIGHT carry chosen, the WASH carries focus, and the label is part of the shape
   at rest
     .................................................... scale  ○ linear  ● log  ○ log2
+    .................WWWWW.............................. weight
   focused on \`linear\` — NOT chosen: the mark did not move
     .......AAAAAAAA..................................... scale  ○ linear  ● log  ○ log2
       A = bg 48;2;46;46;46
+    .................WWWWW.............................. weight
   focused on \`log\` — chosen: the same wash, the same mark
     .................AAAAA.............................. scale  ○ linear  ● log  ○ log2
       A = bg 48;2;46;46;46
+    .................WWWWW.............................. weight
   a checkbox, on
     .................................................... ✓ run the suite after each edit
+    WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW..................... weight
   a checkbox, off — ⏎ toggled it
     .................................................... ✗ run the suite after each edit
+    .................................................... weight
 
 · a control — three states, three mechanisms, and the VALUE is none of them
   at rest

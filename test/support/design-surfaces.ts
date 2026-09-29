@@ -1422,11 +1422,17 @@ const focusShapes = (
     const lines = kit.renderToLines(b, at);
     const grid = styledScreenFrom([lines.join("\n")], { columns: at, rows: lines.length });
     // `maskOf` already writes the text beside its mask, so the plain line would
-    // be the same row twice.
-    return [`  ${caption}`, ...maskOf(grid).map((l) => `    ${l}`)];
+    // be the same row twice. **The choice also shows its weight** (C09 I132):
+    // `maskOf` reads grounds only, and chosen's second carrier is bold, which
+    // a ground mask cannot draw — so a choice's pass adds a row marking every
+    // bold cell with `W`.
+    const weight = b.kind === "choice"
+      ? grid.map((row) => `${row.map((c) => (c.style.attrs.includes(1) ? "W" : ".")).join("")} weight`)
+      : [];
+    return [`  ${caption}`, ...maskOf(grid).map((l) => `    ${l}`), ...weight.map((l) => `    ${l}`)];
   };
   return [
-    "· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape",
+    "· a choice — the MARK and the WEIGHT carry chosen, the WASH carries focus, and the label is part of the shape",
     ...pass("at rest", radio, null),
     ...pass("focused on `linear` — NOT chosen: the mark did not move", radio, { blockId: "c", rowId: "lin" }),
     ...pass("focused on `log` — chosen: the same wash, the same mark", radio, { blockId: "c", rowId: "log" }),

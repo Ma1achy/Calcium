@@ -37,7 +37,7 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 40 1`] = `
 ── pills · measured 1 · rendered 1
 [38;2;232;168;124mall[39m  [38;2;140;140;140mfailed[39m
 ── choice · measured 1 · rendered 1
-[38;2;140;140;140mscale[39m  [38;2;212;212;212m@ linear[39m  [38;2;212;212;212m* log[39m  [38;2;212;212;212m@ log2[39m
+[38;2;140;140;140mscale[39m  [38;2;212;212;212m@ linear[39m  [1m[38;2;212;212;212m* log[39m[22m  [38;2;212;212;212m@ log2[39m
 ── control · measured 1 · rendered 1
 [38;2;212;212;212mlearning rate  +-------*---------+  [38;2;127;174;207m3e-4[39m
 ── tape · measured 1 · rendered 1
@@ -134,7 +134,7 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 60 1`] = `
 ── pills · measured 1 · rendered 1
 [38;2;232;168;124mall[39m  [38;2;140;140;140mfailed[39m
 ── choice · measured 1 · rendered 1
-[38;2;140;140;140mscale[39m  [38;2;212;212;212m@ linear[39m  [38;2;212;212;212m* log[39m  [38;2;212;212;212m@ log2[39m
+[38;2;140;140;140mscale[39m  [38;2;212;212;212m@ linear[39m  [1m[38;2;212;212;212m* log[39m[22m  [38;2;212;212;212m@ log2[39m
 ── control · measured 1 · rendered 1
 [38;2;212;212;212mlearning rate  +---------------*---------------------+  [38;2;127;174;207m3e-4[39m
 ── tape · measured 1 · rendered 1
@@ -231,7 +231,7 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 80 1`] = `
 ── pills · measured 1 · rendered 1
 [38;2;232;168;124mall[39m  [38;2;140;140;140mfailed[39m
 ── choice · measured 1 · rendered 1
-[38;2;140;140;140mscale[39m  [38;2;212;212;212m@ linear[39m  [38;2;212;212;212m* log[39m  [38;2;212;212;212m@ log2[39m
+[38;2;140;140;140mscale[39m  [38;2;212;212;212m@ linear[39m  [1m[38;2;212;212;212m* log[39m[22m  [38;2;212;212;212m@ log2[39m
 ── control · measured 1 · rendered 1
 [38;2;212;212;212mlearning rate  +------------------------*--------------------------------+  [38;2;127;174;207m3e-4[39m
 ── tape · measured 1 · rendered 1
@@ -328,7 +328,7 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 120 1`] = `
 ── pills · measured 1 · rendered 1
 [38;2;232;168;124mall[39m  [38;2;140;140;140mfailed[39m
 ── choice · measured 1 · rendered 1
-[38;2;140;140;140mscale[39m  [38;2;212;212;212m@ linear[39m  [38;2;212;212;212m* log[39m  [38;2;212;212;212m@ log2[39m
+[38;2;140;140;140mscale[39m  [38;2;212;212;212m@ linear[39m  [1m[38;2;212;212;212m* log[39m[22m  [38;2;212;212;212m@ log2[39m
 ── control · measured 1 · rendered 1
 [38;2;212;212;212mlearning rate  +----------------------------------------*--------------------------------------------------------+  [38;2;127;174;207m3e-4[39m
 ── tape · measured 1 · rendered 1
@@ -425,7 +425,7 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 40 1`] = `
 ── pills · measured 1 · rendered 1
 [38;2;232;168;124mall[39m  [38;2;140;140;140mfailed[39m
 ── choice · measured 1 · rendered 1
-[38;2;140;140;140mscale[39m  [38;2;212;212;212m○ linear[39m  [38;2;212;212;212m● log[39m  [38;2;212;212;212m○ log2[39m
+[38;2;140;140;140mscale[39m  [38;2;212;212;212m○ linear[39m  [1m[38;2;212;212;212m● log[39m[22m  [38;2;212;212;212m○ log2[39m
 ── control · measured 1 · rendered 1
 [38;2;212;212;212mlearning rate  ├───────●─────────┤  [38;2;127;174;207m3e-4[39m
 ── tape · measured 1 · rendered 1
@@ -522,7 +522,7 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 60 1`] = `
 ── pills · measured 1 · rendered 1
 [38;2;232;168;124mall[39m  [38;2;140;140;140mfailed[39m
 ── choice · measured 1 · rendered 1
-[38;2;140;140;140mscale[39m  [38;2;212;212;212m○ linear[39m  [38;2;212;212;212m● log[39m  [38;2;212;212;212m○ log2[39m
+[38;2;140;140;140mscale[39m  [38;2;212;212;212m○ linear[39m  [1m[38;2;212;212;212m● log[39m[22m  [38;2;212;212;212m○ log2[39m
 ── control · measured 1 · rendered 1
 [38;2;212;212;212mlearning rate  ├───────────────●─────────────────────┤  [38;2;127;174;207m3e-4[39m
 ── tape · measured 1 · rendered 1
@@ -619,7 +619,7 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 80 1`] = `
 ── pills · measured 1 · rendered 1
 [38;2;232;168;124mall[39m  [38;2;140;140;140mfailed[39m
 ── choice · measured 1 · rendered 1
-[38;2;140;140;140mscale[39m  [38;2;212;212;212m○ linear[39m  [38;2;212;212;212m● log[39m  [38;2;212;212;212m○ log2[39m
+[38;2;140;140;140mscale[39m  [38;2;212;212;212m○ linear[39m  [1m[38;2;212;212;212m● log[39m[22m  [38;2;212;212;212m○ log2[39m
 ── control · measured 1 · rendered 1
 [38;2;212;212;212mlearning rate  ├────────────────────────●────────────────────────────────┤  [38;2;127;174;207m3e-4[39m
 ── tape · measured 1 · rendered 1
@@ -716,7 +716,7 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 120 1`] = `
 ── pills · measured 1 · rendered 1
 [38;2;232;168;124mall[39m  [38;2;140;140;140mfailed[39m
 ── choice · measured 1 · rendered 1
-[38;2;140;140;140mscale[39m  [38;2;212;212;212m○ linear[39m  [38;2;212;212;212m● log[39m  [38;2;212;212;212m○ log2[39m
+[38;2;140;140;140mscale[39m  [38;2;212;212;212m○ linear[39m  [1m[38;2;212;212;212m● log[39m[22m  [38;2;212;212;212m○ log2[39m
 ── control · measured 1 · rendered 1
 [38;2;212;212;212mlearning rate  ├────────────────────────────────────────●────────────────────────────────────────────────────────┤  [38;2;127;174;207m3e-4[39m
 ── tape · measured 1 · rendered 1
@@ -813,7 +813,7 @@ exports[`C09 T2.10 — golden frames > light-ascii at 40 1`] = `
 ── pills · measured 1 · rendered 1
 [38;2;31;96;240mall[39m  [38;2;110;111;118mfailed[39m
 ── choice · measured 1 · rendered 1
-[38;2;110;111;118mscale[39m  [38;2;56;58;66m@ linear[39m  [38;2;56;58;66m* log[39m  [38;2;56;58;66m@ log2[39m
+[38;2;110;111;118mscale[39m  [38;2;56;58;66m@ linear[39m  [1m[38;2;56;58;66m* log[39m[22m  [38;2;56;58;66m@ log2[39m
 ── control · measured 1 · rendered 1
 [38;2;56;58;66mlearning rate  +-------*---------+  [38;2;1;115;165m3e-4[39m
 ── tape · measured 1 · rendered 1
@@ -910,7 +910,7 @@ exports[`C09 T2.10 — golden frames > light-ascii at 60 1`] = `
 ── pills · measured 1 · rendered 1
 [38;2;31;96;240mall[39m  [38;2;110;111;118mfailed[39m
 ── choice · measured 1 · rendered 1
-[38;2;110;111;118mscale[39m  [38;2;56;58;66m@ linear[39m  [38;2;56;58;66m* log[39m  [38;2;56;58;66m@ log2[39m
+[38;2;110;111;118mscale[39m  [38;2;56;58;66m@ linear[39m  [1m[38;2;56;58;66m* log[39m[22m  [38;2;56;58;66m@ log2[39m
 ── control · measured 1 · rendered 1
 [38;2;56;58;66mlearning rate  +---------------*---------------------+  [38;2;1;115;165m3e-4[39m
 ── tape · measured 1 · rendered 1
@@ -1007,7 +1007,7 @@ exports[`C09 T2.10 — golden frames > light-ascii at 80 1`] = `
 ── pills · measured 1 · rendered 1
 [38;2;31;96;240mall[39m  [38;2;110;111;118mfailed[39m
 ── choice · measured 1 · rendered 1
-[38;2;110;111;118mscale[39m  [38;2;56;58;66m@ linear[39m  [38;2;56;58;66m* log[39m  [38;2;56;58;66m@ log2[39m
+[38;2;110;111;118mscale[39m  [38;2;56;58;66m@ linear[39m  [1m[38;2;56;58;66m* log[39m[22m  [38;2;56;58;66m@ log2[39m
 ── control · measured 1 · rendered 1
 [38;2;56;58;66mlearning rate  +------------------------*--------------------------------+  [38;2;1;115;165m3e-4[39m
 ── tape · measured 1 · rendered 1
@@ -1104,7 +1104,7 @@ exports[`C09 T2.10 — golden frames > light-ascii at 120 1`] = `
 ── pills · measured 1 · rendered 1
 [38;2;31;96;240mall[39m  [38;2;110;111;118mfailed[39m
 ── choice · measured 1 · rendered 1
-[38;2;110;111;118mscale[39m  [38;2;56;58;66m@ linear[39m  [38;2;56;58;66m* log[39m  [38;2;56;58;66m@ log2[39m
+[38;2;110;111;118mscale[39m  [38;2;56;58;66m@ linear[39m  [1m[38;2;56;58;66m* log[39m[22m  [38;2;56;58;66m@ log2[39m
 ── control · measured 1 · rendered 1
 [38;2;56;58;66mlearning rate  +----------------------------------------*--------------------------------------------------------+  [38;2;1;115;165m3e-4[39m
 ── tape · measured 1 · rendered 1
@@ -1201,7 +1201,7 @@ exports[`C09 T2.10 — golden frames > light-unicode at 40 1`] = `
 ── pills · measured 1 · rendered 1
 [38;2;31;96;240mall[39m  [38;2;110;111;118mfailed[39m
 ── choice · measured 1 · rendered 1
-[38;2;110;111;118mscale[39m  [38;2;56;58;66m○ linear[39m  [38;2;56;58;66m● log[39m  [38;2;56;58;66m○ log2[39m
+[38;2;110;111;118mscale[39m  [38;2;56;58;66m○ linear[39m  [1m[38;2;56;58;66m● log[39m[22m  [38;2;56;58;66m○ log2[39m
 ── control · measured 1 · rendered 1
 [38;2;56;58;66mlearning rate  ├───────●─────────┤  [38;2;1;115;165m3e-4[39m
 ── tape · measured 1 · rendered 1
@@ -1298,7 +1298,7 @@ exports[`C09 T2.10 — golden frames > light-unicode at 60 1`] = `
 ── pills · measured 1 · rendered 1
 [38;2;31;96;240mall[39m  [38;2;110;111;118mfailed[39m
 ── choice · measured 1 · rendered 1
-[38;2;110;111;118mscale[39m  [38;2;56;58;66m○ linear[39m  [38;2;56;58;66m● log[39m  [38;2;56;58;66m○ log2[39m
+[38;2;110;111;118mscale[39m  [38;2;56;58;66m○ linear[39m  [1m[38;2;56;58;66m● log[39m[22m  [38;2;56;58;66m○ log2[39m
 ── control · measured 1 · rendered 1
 [38;2;56;58;66mlearning rate  ├───────────────●─────────────────────┤  [38;2;1;115;165m3e-4[39m
 ── tape · measured 1 · rendered 1
@@ -1395,7 +1395,7 @@ exports[`C09 T2.10 — golden frames > light-unicode at 80 1`] = `
 ── pills · measured 1 · rendered 1
 [38;2;31;96;240mall[39m  [38;2;110;111;118mfailed[39m
 ── choice · measured 1 · rendered 1
-[38;2;110;111;118mscale[39m  [38;2;56;58;66m○ linear[39m  [38;2;56;58;66m● log[39m  [38;2;56;58;66m○ log2[39m
+[38;2;110;111;118mscale[39m  [38;2;56;58;66m○ linear[39m  [1m[38;2;56;58;66m● log[39m[22m  [38;2;56;58;66m○ log2[39m
 ── control · measured 1 · rendered 1
 [38;2;56;58;66mlearning rate  ├────────────────────────●────────────────────────────────┤  [38;2;1;115;165m3e-4[39m
 ── tape · measured 1 · rendered 1
@@ -1492,7 +1492,7 @@ exports[`C09 T2.10 — golden frames > light-unicode at 120 1`] = `
 ── pills · measured 1 · rendered 1
 [38;2;31;96;240mall[39m  [38;2;110;111;118mfailed[39m
 ── choice · measured 1 · rendered 1
-[38;2;110;111;118mscale[39m  [38;2;56;58;66m○ linear[39m  [38;2;56;58;66m● log[39m  [38;2;56;58;66m○ log2[39m
+[38;2;110;111;118mscale[39m  [38;2;56;58;66m○ linear[39m  [1m[38;2;56;58;66m● log[39m[22m  [38;2;56;58;66m○ log2[39m
 ── control · measured 1 · rendered 1
 [38;2;56;58;66mlearning rate  ├────────────────────────────────────────●────────────────────────────────────────────────────────┤  [38;2;1;115;165m3e-4[39m
 ── tape · measured 1 · rendered 1

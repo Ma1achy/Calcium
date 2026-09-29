@@ -13,7 +13,7 @@ import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/unit/focus-shapes.test.ts test/golden/focus-shapes.test.ts";
+const CMD = "npx vitest run test/unit/focus-shapes.test.ts test/golden/focus-shapes.test.ts test/revert/focus-shapes.test.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -53,8 +53,9 @@ const results = runPass({
       // rewrites the datum under them.
       name: "the mark is drawn from focus rather than from chosen",
       file: FILE,
-      from: "      spans.push({ text: optionText(block, i, ctx.capabilities), style });",
-      to: "      spans.push({ text: optionText({ ...block, options: block.options.map((o) => ({ ...o, chosen: o.id === head })) }, i, ctx.capabilities), style });",
+      // Re-anchored 2026-09-29: the span's style became `weighted` (C09 I132).
+      from: "      spans.push({ text: optionText(block, i, ctx.capabilities), style: weighted });",
+      to: "      spans.push({ text: optionText({ ...block, options: block.options.map((o) => ({ ...o, chosen: o.id === head })) }, i, ctx.capabilities), style: weighted });",
       expect: "T1.72",
     },
     {
@@ -66,6 +67,36 @@ const results = runPass({
       from: "  return `${markOf(block, option.chosen === true, caps)} ${stripControl(option.label)}`;",
       to: "  return stripControl(option.label);",
       expect: "T1.72",
+    },
+    {
+      // **Chosen loses its weight (C09 I132, ruling 54)** — the mark is left
+      // as its one carrier, and at 1-bit, where the wash is `inverse`, a
+      // resting chosen option and an unchosen one differ by the glyph alone.
+      name: "a chosen option is drawn without bold",
+      file: FILE,
+      from: "      const weighted = option.chosen === true ? { ...style, bold: true } : style;",
+      to: "      const weighted = style;",
+      expect: "T1.90",
+    },
+    {
+      // **The weight read off focus** — the channel-swap I105 is about,
+      // arriving on the new carrier: correct on the focused chosen option and
+      // wrong on every other cell.
+      name: "the weight is drawn from focus rather than from chosen",
+      file: FILE,
+      from: "      const weighted = option.chosen === true ? { ...style, bold: true } : style;",
+      to: "      const weighted = focused ? { ...style, bold: true } : style;",
+      expect: "T1.90",
+    },
+    {
+      // **Bold on the block's label as well** — the muted label is `dim` at
+      // 1-bit, so this is bold and dim on one span (F1258's channel) and a
+      // weight that no longer says *chosen*.
+      name: "the block label is drawn bold",
+      file: FILE,
+      from: '      spans.push({ text: stripControl(block.label), style: tone("muted", ctx.theme, ctx.capabilities) });',
+      to: '      spans.push({ text: stripControl(block.label), style: { ...tone("muted", ctx.theme, ctx.capabilities), bold: true } });',
+      expect: "T1.90",
     },
     {
       // **The value toned with focus.** It reads well and it says the reading
