@@ -1127,20 +1127,20 @@ a rule — no source, so it declines
 
 ── §82 · no pushed views — a row expanded in place, and the rows below carrying on
 · r1 focused and expanded — the ground opens under ▸, the detail takes bgElev, and r2 beneath it takes none
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA      uuid     family            status
-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB > v  a3f9b21  digit-classifier  running
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA        uuid     family            status
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB > v    a3f9b21  digit-classifier  running
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
-................................................................................      7c2d4e1  decoder-zoom      succeeded
+................................................................................        7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
   B = bg 48;2;46;46;46
 
 · r1 expanded with nothing focused — the detail is grounded and the row above it is not: the ground follows expansion
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA      uuid     family            status
-................................................................................   v  a3f9b21  digit-classifier  running
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA        uuid     family            status
+................................................................................   v    a3f9b21  digit-classifier  running
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
-................................................................................      7c2d4e1  decoder-zoom      succeeded
+................................................................................        7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
 
 ── §17 · focus treatment follows the shape — what each kind publishes against what it draws
@@ -2549,18 +2549,18 @@ a rule — no source, so it declines
 
 ── §82 · no pushed views — a row expanded in place, and the rows below carrying on
 · r1 focused and expanded — the ground opens under ▸, the detail takes bgElev, and r2 beneath it takes none
-................................................................................      uuid     family            status
-................................................................................ ▸ ▿  a3f9b21  digit-classifier  running
+................................................................................        uuid     family            status
+................................................................................ ▸ ▿    a3f9b21  digit-classifier  running
 ................................................................................     node  gpu-04.fmx.internal · 2×A100
 ................................................................................     mr    !1248  auto-merged
-................................................................................      7c2d4e1  decoder-zoom      succeeded
+................................................................................        7c2d4e1  decoder-zoom      succeeded
 
 · r1 expanded with nothing focused — the detail is grounded and the row above it is not: the ground follows expansion
-................................................................................      uuid     family            status
-................................................................................   ▿  a3f9b21  digit-classifier  running
+................................................................................        uuid     family            status
+................................................................................   ▿    a3f9b21  digit-classifier  running
 ................................................................................     node  gpu-04.fmx.internal · 2×A100
 ................................................................................     mr    !1248  auto-merged
-................................................................................      7c2d4e1  decoder-zoom      succeeded
+................................................................................        7c2d4e1  decoder-zoom      succeeded
 
 ── §17 · focus treatment follows the shape — what each kind publishes against what it draws
 kind         elements  focus is drawn for
@@ -4001,20 +4001,20 @@ a rule — no source, so it declines
 
 ── §82 · no pushed views — a row expanded in place, and the rows below carrying on
 · r1 focused and expanded — the ground opens under ▸, the detail takes bgElev, and r2 beneath it takes none
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA      uuid     family            status
-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB ▸ ▿  a3f9b21  digit-classifier  running
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA        uuid     family            status
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB ▸ ▿    a3f9b21  digit-classifier  running
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
-................................................................................      7c2d4e1  decoder-zoom      succeeded
+................................................................................        7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
   B = bg 48;2;46;46;46
 
 · r1 expanded with nothing focused — the detail is grounded and the row above it is not: the ground follows expansion
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA      uuid     family            status
-................................................................................   ▿  a3f9b21  digit-classifier  running
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA        uuid     family            status
+................................................................................   ▿    a3f9b21  digit-classifier  running
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
-................................................................................      7c2d4e1  decoder-zoom      succeeded
+................................................................................        7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
 
 ── §17 · focus treatment follows the shape — what each kind publishes against what it draws

@@ -347,6 +347,11 @@ export function rowSpans(
   options: Readonly<{
     expandable: boolean;
     /**
+     * What expanding this row reveals (C11 I32, ruling 69) — drawn `+N` beside a
+     * collapsed row's mark, and not at all at zero.
+     */
+    hidden: number;
+    /**
      * **The ground this row is painted on** (C10 I48, I14) — a surface name,
      * absent being the page. One value, chosen by the caller that also picks
      * the wash, because *which ground did this row take* is one question and
@@ -380,9 +385,19 @@ export function rowSpans(
     // that cannot be opened leaves the column blank rather than drawing a marker
     // that does nothing when pressed.
     if (column?.role === "expand") {
-      const marker = options.expandable
-        ? glyphFor(row.expanded === true ? "collapse" : "expand", ctx.capabilities)
-        : "";
+      // **Two carriers for a collapsed row** (C10 §4k.5, ruling 69): the mark and
+      // the count it hides, so collapsed and leaf differ by more than a glyph.
+      // An expanded row's second carrier is its content's position below it.
+      const mark = glyphFor(row.expanded === true ? "collapse" : "expand", ctx.capabilities);
+      const counted = row.expanded !== true && options.hidden > 0 ? `${mark}+${String(options.hidden)}` : mark;
+      // **A count is never cut** (C11 I32, §3a row 9): below the reservation —
+      // the column itself truncated — `▹+12` cut from the end reads `▹+1`, a
+      // different number, so the mark stands alone.
+      const marker = !options.expandable
+        ? ""
+        : cells(counted, ctx.capabilities.ambiguousWidth) <= planned.width
+          ? counted
+          : mark;
       // `fitAt` and not `fit` for the reason above, even though the internal
       // glyph table cannot reach it today: `glyphFor` collapses `expand` and
       // `collapse` to `>` and `v` at `ambiguousWidth: "wide"` (C09 I48), so the

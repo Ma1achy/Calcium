@@ -30,7 +30,7 @@ import type { BlockDefinition, NavElement, Rendered, RenderContext, Windowed } f
 import { decimalEnds, decimalPoints, emptySpans, headerSpans, markedSeriesColumns, rowSpans, trendMark } from "./cells.js";
 import { columnAlignments, groupingColumns, unknownColumns } from "./kind.js";
 import { detailBlocks, isExpandable } from "./detail.js";
-import { planColumns, type PlannedColumns } from "./plan.js";
+import { planDisclosed, type PlannedColumns } from "./plan.js";
 import { sortedRows } from "./sort.js";
 
 /**
@@ -79,9 +79,35 @@ function effectiveColumns(block: Table): Table["columns"] {
   return columns;
 }
 
+/**
+ * What expanding a row reveals — its hidden count, `+N` beside a collapsed
+ * row's mark (C11 I32, rulings 69 and 82): the columns dropped at this width
+ * and the row's own detail blocks.
+ */
+export function hiddenCount(row: TableRow, plan: PlannedColumns): number {
+  return plan.dropped.length + (row.detail?.length ?? 0); // cells-ok — a count, not a width
+}
+
+/**
+ * **A window's reservation, pinned to the table's** (C11 I32, I18's shape). The
+ * count reads the rows, so a slice holding none of the rows with detail would
+ * reserve fewer cells and start every column after the marker at a different
+ * cell on scroll — the same argument as the alignments and the number minimums
+ * `window` already pins. **The rows are pinned rather than the cells**, because
+ * the table plans at more than one width (the body, the inner width) and the
+ * reservation is a function of the width: a window's count is read from the
+ * table it was cut from.
+ */
+const PINNED = new WeakMap<Table, Table>();
+
 /** The one plan every reader takes (I31): `measure`, `width`, `render`, `window` and the row detail. */
 function plannedColumns(block: Table, width: number): PlannedColumns {
-  return planColumns(effectiveColumns(block), width);
+  const cols = effectiveColumns(block);
+  // **The widest detail the marker counts** (C11 I32): read from the table a
+  // window was cut from, so every slice reserves what the whole does.
+  let detail = 0;
+  for (const row of (PINNED.get(block) ?? block).rows) detail = Math.max(detail, row.detail?.length ?? 0); // cells-ok — a count of blocks
+  return planDisclosed(cols, width, detail);
 }
 
 /**
@@ -348,8 +374,7 @@ export const tableDefinition: BlockDefinition<Table> = {
 
     const kept = units.slice(first, last + 1);
     const wholeAligns = columnAlignments(block);
-    return Object.freeze({
-      block: {
+    const windowed: Table = {
         ...block,
         rows: kept.map((u) => u.row).filter((r): r is TableRow => r !== null),
         showHeader: first === 0 && hasHeader(block),
@@ -377,7 +402,12 @@ export const tableDefinition: BlockDefinition<Table> = {
           // `exactOptionalPropertyTypes` wants rather than a case that arises.
           return align === undefined ? c : { ...c, align };
         }),
-      },
+    };
+    // **And the disclosure reservation** (C11 I32): read from the table the
+    // window was cut from, whatever window this one was cut from in turn.
+    PINNED.set(windowed, PINNED.get(block) ?? block);
+    return Object.freeze({
+      block: windowed,
       skipRows: lo - (tops[first] ?? 0), // cells-ok
       dropRows: bottomOf(last) - hi, // cells-ok
     });
@@ -572,7 +602,8 @@ export const tableDefinition: BlockDefinition<Table> = {
         : isHead
           ? "focusGround"
           : undefined;
-      const spans = rowSpans(block, row, plan, ctx, { expandable, on, marked, points, aligns, grouping, unknown, ends });
+      const hidden = hiddenCount(row, plan);
+      const spans = rowSpans(block, row, plan, ctx, { expandable, hidden, on, marked, points, aligns, grouping, unknown, ends });
       // **The ground goes to `emit`, not to the spans** (§5c). Applied here it
       // stopped at the gutter, which is the divergence: the reserved column is
       // part of the row it leads, so the ground has to be put on where the

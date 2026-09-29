@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { readdirSync } from "node:fs";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { tableElements, planColumns, tableDefinition } from "../../src/presentation/table/index.js";
+import { planDisclosed } from "../../src/presentation/table/plan.js";
 import {
   surfaceColumns,
   surfaceDrops,
@@ -28,6 +29,10 @@ function defs(columns: readonly SurfaceColumn[]): readonly ColumnDef[] {
     minWidth: c.minWidth,
     flex: c.flex,
     sortable: c.sortable,
+    // **The surfaces' `expand` row is the marker column** (C11 I15, I32): the
+    // spec tables have no `role` column, and the key is how every one of them
+    // names it.
+    ...(c.key === "expand" ? { role: "expand" as const } : {}),
   }));
 }
 
@@ -204,10 +209,15 @@ describe("C11 tier 4 — the planner against the surfaces", () => {
         }
       });
 
-      it("T4.1 (CP6): planColumns drops exactly what the surface states", () => {
+      it("T4.1 (CP6, C11 I32): the plan C11 draws drops exactly what the surface states", () => {
         const columns = defs(parsed);
         for (const { width, dropped } of stated) {
-          const plan = planColumns(columns, width);
+          // **`planDisclosed`, the plan C11 draws** (ruling 82): the marker's
+          // reservation is part of the drop arithmetic now, so a stated order
+          // checked against `planColumns` would describe a table nothing renders.
+          // Detail 0 — N is the dropped columns alone, which is every surface's
+          // count below ten (C11 I32's classification table).
+          const plan = planDisclosed(columns, width, 0);
           expect(
             [...plan.dropped].sort(),
             `${surface.label} at ${String(width)}: stated ${JSON.stringify(dropped)}, ` +

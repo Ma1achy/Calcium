@@ -20,6 +20,7 @@
 import { normaliseWidth } from "../../data/viewmodel/index.js";
 import { distribute, type Demand } from "../layout/index.js";
 import type { ColumnDef } from "../../data/viewmodel/index.js";
+import { glyphCells } from "../blocks/glyphs.js";
 
 /** Cells between adjacent columns (§3 step 1). */
 export const COLUMN_GAP = 2;
@@ -206,4 +207,50 @@ function columnWidths(
     };
   });
   return distribute(demands, available - gaps, "largest-remainder").sizes;
+}
+
+/**
+ * The cells a disclosure marker takes for a hidden count (C11 I32, ruling 82):
+ * the wider of the two marks, and `+N` beside it where N is not zero. Capability-
+ * free, as every planner input is — `glyphCells` is the widest representation.
+ */
+export function disclosureCells(n: number): number {
+  const mark = Math.max(glyphCells("expand"), glyphCells("collapse"));
+  return n > 0 ? mark + 1 + String(n).length : mark; // cells-ok — `+` and ASCII digits, one cell each
+}
+
+/** The columns with the `expand` column's minimum raised to `need`, where it is below it. */
+function reserve(cols: readonly ColumnDef[], at: number, need: number): readonly ColumnDef[] {
+  const column = cols[at];
+  if (column === undefined || !(need > minOf(column))) return cols;
+  return cols.map((c, i) => (i === at ? { ...c, minWidth: need } : c));
+}
+
+/**
+ * The plan C11 draws: `planColumns` with the `expand` column reserved at the
+ * widest disclosure marker it will draw (C11 I32, I15 as amended, ruling 82).
+ *
+ * **The one role the planner reads.** The marker is framework-drawn — the
+ * producer declares a column, and C11 draws `▹+N` into it — so its width is
+ * the framework's. `planColumns` stays role-blind (T2.9); this is the entry that
+ * reads `expand`, and only it.
+ *
+ * `detail` is the widest row's detail-block count, because N is what expansion
+ * reveals: the columns dropped at this width and the row's own detail.
+ *
+ * **Two plans, and the second is the answer.** N depends on what drops and what
+ * drops depends on the reservation, so the first plan reserves for the most the
+ * table could hide — every other column and the widest detail — and the second
+ * reserves for what that plan hid. Admission is a prefix of the priority order,
+ * so a smaller reservation never drops more: every count the second plan draws
+ * fits the cells it reserved. A table whose rows hide nothing reserves the mark
+ * alone, which is the declared cell and no change.
+ */
+export function planDisclosed(cols: readonly ColumnDef[], width: number, detail: number): PlannedColumns {
+  const at = cols.findIndex((c) => c.role === "expand");
+  if (at === -1) return planColumns(cols, width);
+  const hideable = cols.length - 1 + detail; // cells-ok — a count of columns and blocks
+  const bound = planColumns(reserve(cols, at, disclosureCells(hideable)), width);
+  const hidden = bound.dropped.length + detail; // cells-ok — a count
+  return planColumns(reserve(cols, at, disclosureCells(hidden)), width);
 }

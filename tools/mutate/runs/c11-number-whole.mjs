@@ -29,8 +29,9 @@ const MUTATIONS = [
     // **As it shipped**: the planner reads the declarations and `41208` is cut.
     name: "the plan reads the declared columns",
     file: DEFINITION,
-    from: "  return planColumns(effectiveColumns(block), width);",
-    to: "  return planColumns(block.columns, width);",
+    // Re-anchored for C11 I32: the plan's input is read once, then disclosed.
+    from: "  const cols = effectiveColumns(block);\n  // **The widest detail",
+    to: "  const cols = block.columns;\n  // **The widest detail",
     expect: "T1.40",
   },
   {

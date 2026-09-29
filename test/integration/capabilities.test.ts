@@ -193,7 +193,8 @@ describe("C02 integration", () => {
     const closed = drawn.find((l) => l.includes("2e8a04c")) ?? "";
     expect(header, "the descending sort indicator").toContain("age v");
     expect(open, "an expanded row").toContain("v ");
-    expect(closed, "a collapsed row").toContain("( ");
+    // A collapsed row carries its hidden count at ASCII too (C11 I32, ruling 69).
+    expect(closed, "a collapsed row").toMatch(/\(\+\d+ /u);
     expect(drawn.join("\n"), "the ASCII truncation marker").toContain("malachy~");
 
     // And the geometry is the Unicode case's, exactly.
