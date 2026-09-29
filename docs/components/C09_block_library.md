@@ -3098,11 +3098,12 @@ a band could have been mistaken for a reveal.
 
 ---
 
-## 7f. The scrollbar — one column, one family, twice the resolution (§021, `R-BLK-*`)
+## 7f. The scrollbar — one column, one family, twice the resolution (§021, `R-BLK-151`–`171`, `R-BLK-954`)
 
-§021 specifies it completely and the repository has none: no track, no thumb,
-no reserved column anywhere in `src/`. What follows is that figure read as
-arithmetic.
+~~§021 specifies it completely and the repository has none: no track, no thumb,
+no reserved column anywhere in `src/`.~~ **Superseded: built as I92** in
+`presentation/blocks/scrollbar.ts`, and the sentence is kept as the state this
+section was written against. What follows is §021's figure read as arithmetic.
 
 ### A track and a thumb are one shape at two weights
 
