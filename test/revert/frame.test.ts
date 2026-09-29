@@ -11,6 +11,8 @@
 import { describe, expect, it } from "vitest";
 
 import { compose, type Composed } from "../../src/shell/frame.js";
+import { commandRows } from "../../src/shell/paint.js";
+import { hardWrapCells } from "../../src/presentation/text.js";
 import { CONTENT_MARGIN_R, RAIL_COLUMNS, regionWidth, transcriptWidth } from "../../src/shell/config.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
@@ -100,5 +102,14 @@ describe("C22 I109 — the region's width", () => {
 });
 
 describe("C22 I33 — tier 6", () => {
-  it.todo("T6.134 (C22 I33): commandRows wrapping the command whole → T1.172 fails — not deferred on a component: the code lands in the next commit of this round");
+  it("T6.134 (C22 I33): commandRows wrapping the command whole → T1.172 fails", () => {
+    // **The revert, drawn**: the whole command through one wrap, as it shipped.
+    // The break is measured as nothing, so a two-line command is one row, and
+    // that row carries the line feed the terminal then acts on.
+    const command = "echo a\necho b";
+    const whole = hardWrapCells(command, 28);
+    expect(whole, "one row holds both lines").toHaveLength(1);
+    expect(whole[0], "and the break inside it").toContain("\n");
+    expect(commandRows(command, 30, FULL_CAPS), "line by line, two rows and no break").toHaveLength(2);
+  });
 });

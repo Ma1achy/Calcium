@@ -8,11 +8,12 @@
 //   - **One width per frame** (`docs/notes/resize-and-compositor.md`). A frame
 //     composed at two widths is coherent at neither, and the wrap it causes
 //     scrolls the alternate screen.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 
 import { compose, heightsSum, type Composed } from "../../src/shell/frame.js";
-import { cursorFor, paint, placedLayers, type PaintDeps } from "../../src/shell/paint.js";
+import { commandRows, cursorFor, paint, placedLayers, type PaintDeps } from "../../src/shell/paint.js";
+import { PROMPT_GUTTER } from "../../src/shell/config.js";
 import { exact, FrameError } from "../../src/shell/frame-error.js";
 import { displayCells } from "../../src/presentation/text.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
@@ -28,6 +29,7 @@ import type { Placed } from "../../src/viewport/overlay/index.js";
 import type { ProfileReport } from "../../src/shell/profiling/types.js";
 import { registry as measurer, rows as contentRows } from "../support/overlay.js";
 import { buildGraph, buildSession } from "../support/session.js";
+import { fakeStdin } from "../support/fake-terminal.js";
 import { childBorderLegend, makeDefaultChrome, ownerLine, shedToWidth } from "../../src/shell/chrome.js";
 import type { Key, OwnerRung } from "../../src/interaction/router/types.js";
 import { chordText, createKeymap, defaultKeymap } from "../../src/interaction/router/keymap.js";
@@ -1326,5 +1328,48 @@ describe("C22 I133 — the owner line's chords are the keymap's (review batch 2,
 });
 
 describe("C22 I33 — a command of several lines", () => {
-  it.todo("T1.172 (C22 I33): commandRows draws each line of the command and no row carries a line break — not deferred on a component: the code lands in the next commit of this round");
+  it("T1.172 (C22 I33): commandRows draws each line of the command and no row carries a line break", async () => {
+    const W = 30;
+    // **The control**: one line is one row, the prompt and the text.
+    expect(commandRows("/ps --all", W, FULL_CAPS)).toEqual(["❯ /ps --all"]);
+
+    // `\n`, `\r\n`, a blank line, and a line wider than the body.
+    const long = "x".repeat(40);
+    const rows = commandRows(`echo a\r\necho b\n\n${long}`, W, FULL_CAPS);
+    const cont = " ".repeat(PROMPT_GUTTER.cont);
+    const body = W - PROMPT_GUTTER.first;
+    expect(rows, "one row per line, the long one wrapped within its own rows").toEqual([
+      "❯ echo a",
+      `${cont}echo b`,
+      cont,
+      `${cont}${long.slice(0, body)}`,
+      `${cont}${long.slice(body)}`,
+    ]);
+    // **Over every row**, because the defect was one row holding the rest.
+    for (const r of rows) expect(/[\r\n]/u.test(r), `${JSON.stringify(r)} holds a break`).toBe(false);
+
+    // **Through a session**: a bracketed paste of six lines, submitted, writes
+    // no bare line feed into the frame's bytes — it wrote five.
+    vi.useFakeTimers();
+    try {
+      const stdin = fakeStdin();
+      const s = await buildSession({ stdin: stdin as never } as never, { columns: 80, rows: 24 });
+      const step = async (): Promise<void> => {
+        await vi.advanceTimersByTimeAsync(50);
+        for (let i = 0; i < 4; i += 1) await Promise.resolve();
+      };
+      await step();
+      const before = s.stdout.output.length;
+      stdin.emit(`\u001b[200~${Array.from({ length: 6 }, (_, i) => `/help line-${String(i)}`).join("\n")}\u001b[201~`);
+      await step();
+      stdin.emit("\r");
+      for (let i = 0; i < 10; i += 1) await step();
+      const out = s.stdout.output.slice(before);
+      expect(out, "the submission reached the frame").toContain("/help line-5");
+      expect((out.match(/\n/gu) ?? []).length, "bare line feeds written into the frame").toBe(0);
+      expect(s.screen().text.some((r) => r.trimStart().startsWith("/help line-3")), "each line on its own row").toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

@@ -113,27 +113,36 @@ describe("C17 tier 5 — at a real prompt", () => {
       // `line-199` as **output**, with no `echo` before it: the far side ran the
       // two hundredth command, which is only possible if the sentinel resolved.
       // The old row waited for `echo line-199` — the command *echoed into the
-      // transcript* — and the transcript now shows the chip's label there, which
-      // is the pair this asserts from the other end.
-      await pty.waitFor(/line-199/, 15_000);
+      // transcript*. **The echo draws the resolved command, line by line** (C22
+      // I33, amended): it drew it before as well, raw, with its line feeds
+      // inside one row, which scrolled the alternate screen and left this frame
+      // a collage — the row passed on it by luck. So `line-199` is in the echo
+      // too, and a byte wait resolves on the echo before anything has run: the
+      // output is told apart **on the frame**, as a row with no `echo` before it.
+      await pty.waitForFrame((f) => f.some((r) => /(^|\s)line-199\b/u.test(r) && !r.includes("echo line-199")), 15_000);
       expect(pty.frame, "the frame is still whole after a 200-line submission").toHaveLength(24);
       // The prompt emptying is Seam 4's property and is asserted against the
       // store at tier 1 (C23 T1.20). What this row adds is that the transcript
       // holds the block as **one** entry: two hundred submissions would put two
       // hundred command rows on the screen, and the bottom of the frame is a
       // run of the pasted lines rather than a run of prompts.
-      // Nine rows, not eight: the two rules around the prompt (C22 I81) sit in
-      // the frame's last **five** with the prompt and the two footer rows —
-      // facts-and-directory, then §103's owner line (M5, R-KEY-004) — and the
-      // claim is about the four output rows above them.
-      const tail = pty.frame.slice(-9).map((r) => r.trimEnd());
-      // **`line-` and not `echo line-`**: what fills the tail is the far side's
-      // *output*, because the chip resolved to two hundred commands and they
-      // ran. The old form looked for the echoed command text, which the chip
-      // replaced with its label — one grapheme in the buffer, one row in the
-      // transcript, two hundred lines through the seam.
-      expect(tail.filter((r) => r.includes("line-")).length).toBeGreaterThan(1);
-      expect(tail.filter((r) => r.startsWith("❯")).length, "one prompt, not many").toBeLessThan(2);
+      // **The transcript region, not a count of rows from the bottom.** This
+      // read the last nine rows and expected four output rows directly above
+      // the rules; the output is a scrolled box now, closed by its residue row
+      // (`⋯ N above`) and the entry's blank (C22 I85), so a fixed tail held one
+      // output row and asserted the layout rather than the claim. The region is
+      // everything between the header's rule and the upper rule.
+      const frame = pty.frame.map((r) => r.trimEnd());
+      const rules = frame.flatMap((r, i) => (/^[─-]{20,}$/u.test(r) ? [i] : []));
+      const region = frame.slice((rules[0] ?? 0) + 1, rules[1] ?? frame.length);
+      // **`line-` and not `echo line-`**: the far side's *output*, because the
+      // chip resolved to two hundred commands and they ran. The echo draws the
+      // command's lines too (C22 I33), so it is excluded by name.
+      expect(region.filter((r) => /(^|\s)line-\d/u.test(r) && !r.includes("echo line-")).length, "output rows").toBeGreaterThan(1);
+      // One command, not two hundred: a submission per line would put a prompt
+      // glyph at the head of each echo, and the echo's continuation rows carry
+      // none.
+      expect(region.filter((r) => r.trimStart().startsWith("❯")).length, "one command's echo at most").toBeLessThan(2);
     } finally {
       pty.kill();
     }

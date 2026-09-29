@@ -94,6 +94,16 @@ const MUTATIONS = [
     to: "  const last = out.length - 1;",
     expect: "T1.21e",
   },
+  {
+    // **The echo wrapped whole** (C22 I33, amended), as it shipped: the
+    // break measured as nothing, one row holding every line, and the
+    // terminal moving down mid-row.
+    name: "the command echo wraps the command whole",
+    file: PAINT,
+    from: "  const wrapped = command.split(/\\r\\n|\\r|\\n/u).flatMap((line) => hardWrapCells(line, body));",
+    to: "  const wrapped = hardWrapCells(command, body);",
+    expect: "T1.172 (C22",
+  },
 ];
 
 /**

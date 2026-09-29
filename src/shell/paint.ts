@@ -368,7 +368,13 @@ export function commandRows(
 ): readonly string[] {
   if (command === "") return [];
   const body = Math.max(1, width - PROMPT_GUTTER.first);
-  const wrapped = hardWrapCells(command, body);
+  // **Line by line, and no row holds a break** (C22 I33, amended). A paste or a
+  // resolved chip puts `\n` in the command, `hardWrapCells` measures it as
+  // nothing, and written raw inside a row it moved the terminal down mid-row —
+  // near the bottom, scrolling the alternate screen. Each line is wrapped on
+  // its own, as the prompt draws the same buffer. A blank line keeps its row
+  // because `hardWrapCells("")` is `[""]`, not `[]`.
+  const wrapped = command.split(/\r\n|\r|\n/u).flatMap((line) => hardWrapCells(line, body));
   const prompt = promptFor(caps);
   return wrapped.map((row, i) =>
     (i === 0 ? prompt : " ".repeat(PROMPT_GUTTER.cont)) + row,
