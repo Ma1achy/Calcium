@@ -494,16 +494,17 @@ the same mark.
 
 **One clipboard** (`R-SEL-011`, C17 §5a). `y` fills the same buffer `⌃k` fills and
 `⌃y` yanks, which is the reduction §1 of `CALCIUM_SELECTION_DESIGN.md` argued for
-from the other side. The system clipboard and OSC 52 are the rule's two mechanisms
-and neither is built; what **is** owed here is the rule's last sentence — *if
-neither is available the mode states it and offers a file instead*, because *a copy
-that appears to work and does not is the worst outcome available here.* So the
-refusal is **owed and blocked on the same parked word the label is**: the rule asks
-for *the mode* to state it, the mode's statement surface is the footer label, and a
-notice block on every `y` is the other reading and is noise on the key a reader
-presses most. Until then the text reaches the kill buffer and nothing claims it
-reached the system clipboard — `⌃y` yanks it back, which is a true statement
-about where it went.
+from the other side. The system clipboard and OSC 52 are the rule's two mechanisms,
+and **both are built** (ruling 72, I61): the kill buffer first, always, then OSC 52
+where C02 says the terminal takes it, then a platform tool where C21 finds one that
+reaches the reader, then a file. *Corrected on review batch 4 (M10 item 1):* this
+paragraph deferred the refusal on *the same parked word the label is* — and the label
+was ruled on 2026-09-24 (questions 4 and 35), four days before the deferral was
+re-read. The condition was met in the section below it. The rule's last sentence —
+*if neither is available the mode states it and offers a file instead* — is the
+footer's `no clipboard` and `⏎ to file` (§6e's table), because the mode's statement
+surface is the footer and a notice on every `y` is noise on the key a reader presses
+most. §6e's *Where the copy goes* walks the order.
 
 ### The label, the count and the next press
 
@@ -1021,6 +1022,7 @@ Structural: every cell is a state at rest. Mode × selection × the waiting coun
 | rect | resolved | `copy` · `RECT w×h` · `cells, not source` · … `esc clear` · the count over the cells · `the screen is frozen` · `⌃V blocks` |
 | rect | blocks also selected underneath | as *rect*: never `all loaded entries`, and the count is the rectangle's |
 | any semantic | waiting > 0 | … `N waiting` straight after `the screen is frozen` |
+| any semantic | no clipboard — C02 `none` and no tool (I61) | … `no clipboard` · `⏎ to file` in place of `⏎ copy`, the fact before the key it qualifies |
 
 The table found one row the trace did not: **the rectangle over a full block
 set** (row 9 of the table). `all loaded entries` computed from the block set
@@ -1035,6 +1037,39 @@ with it. Measured in T4.41's session, the line read `copy  ⇧↑⇧↓ extend  
 stopped. The count, the frozen screen and the waiting notice are `R-SEL-009`'s
 and `R-SEL-010`'s; `all loaded entries` and the toggle are not, so they come
 last and go first.
+
+#### Where the copy goes — a sequence trace
+
+*(review batch 4, M10 item 1; ruling 72, C21 §2b, C01 I25, C02 I18, C17 I31)* C21's
+walk classifies what each layer hands up — which capability, which tool, which
+payload. **The order is L4's, and L4 is the only layer with a clock**, so the rows
+where a copy meets something that happens *after* it are this walk's. Event-mediated,
+so a trace; the structural cells are C21's W1–W18 and are not restated.
+
+| # | state | event | the rules that meet | ruling |
+|---|---|---|---|---|
+| 1 | any | a copy with text | C17 I31 *one clipboard* × a second destination | **the kill buffer first**, with the same text, in every row below. `⌃y` yanks what the clipboard received |
+| 2 | `osc52`, within the cap | `y` | *OSC 52 first* × its success cannot be observed | `clipboardWrite(text)` on the writer, and the toast reads `sent to the terminal's clipboard` — never *copied* |
+| 3 | `osc52`, past the cap, a tool found | `y` | C21 W2 — `null` is one mechanism declining | the tool, as row 4 |
+| 4 | `none`, a tool found | `y` | a tool answers later × *never silent* | the toast reads `copying with pbcopy…` at once; the answer replaces it |
+| 5 | a tool pending | it exits `0` | an observable success | `copied to the clipboard by pbcopy` |
+| 6 | a tool pending | it fails — a code, a signal, a spawn error | C21 W10, W11 | the file, as row 11, and the toast names the failure: `pbcopy failed (exited with code 1) — saved to <path>` |
+| 7 | a tool pending | the deadline, `COPY_DEADLINE_MS` | C21 W18 — C21 has no timer | the file, and `pbcopy did not answer — saved to <path>`. **2 000 ms and unmeasured**; a tool that answers at all answers in milliseconds |
+| 8 | the deadline fired | the tool exits `0` late | one copy, one sentence | **dropped.** The toast already named where the text is sure to be, and a second sentence would contradict the first |
+| 9 | a tool pending | a second copy | two answers × one toast line | **the second supersedes the first**: the first's deadline is disposed and its answer, when it comes, is dropped. Without this the first copy's `copied` lands over the second's `copying…` and names the wrong text |
+| 10 | a tool pending | the session stops | the deadline × stop | the deadline is disposed with the toast's; the tool is detached (C21 I2) and runs to its end, and nothing is said, because nothing can be drawn |
+| 11 | `none`, no tool | `⏎` or `y` | *states it and offers a file* | the footer already read `no clipboard` and `⏎ to file` before the press; the press writes `<stateDir>/copy.txt`, replacing the last, and the toast names the path |
+| 12 | a file | the write rejects | *never silent* × the kill buffer | `no clipboard, and <path> could not be written — ⌃y yanks it`, which row 1 makes true |
+| 13 | `osc52`, past the cap, no tool | `y` | C21 W3 | the file, and `too large for the terminal's clipboard — saved to <path>` |
+| 14 | `⏎` left the mode | a tool answers | the mode's end × the answer | the toast is the session's, not the mode's, so it is drawn |
+
+**The walk found row 9**, which no layer below could: C21 resolves each write on its
+own exit and is right to, and two correct answers to two copies arrive in an order
+nothing controls. It also found that **rows 6, 7 and 13 write a file the reader was not
+offered at rest** — the footer offers one only where no mechanism exists. That is the
+rule's fallback applied after the fact: the reader asked for a copy, the file is the
+destination the rule names when the clipboard fails, and the toast says so. It is
+the ruling, and it is stated here because it reads as more than *offers*.
 
 ---
 
@@ -1210,6 +1245,7 @@ than stranding the user.
 - **I58** — *(ruling 68, `R-THM-005`, `R-SEL-003`, `R-SEL-006`, `R-SEL-016`, ruling 69)* **The rail is selection's second carrier, drawn by the frame in column 0 beside every selected row's first row, at every rung.** A row takes the rail if it is the first row of a block in the semantic copy selection (the rows I39 washes), or the first row of an element in `focus.selected`. No other row does: not a continuation, not a selected block's body, not the prompt's selection, whose `▌` is its caret (ruling 69's exception), and nothing in native copy mode. **The glyph is the registry's** (`selection-rail`, `▌`, ASCII `|`, collision domain `gutter`), read through `glyphs(caps).rail`. **Its ink is `accent` resolved against the selection ground**, so on a banded theme it is the band's ink (C10 I45, I53). **Its ground is the selection ground where that ground is a background, and never `inverse`**: at 1-bit the row inverts from column 1 and the rail stays upright, because an inverted `▌` is a right-half block. It is drawn beside the washed row, never inside the wash, since the wash re-opens `inverse` after every sequence (I52). **No block draws it and no block knows it**: it is not in the render cache (I40), and the rows C09 renders are byte-identical with and without it. → T1.77, T3.25, T4.39, T6.29
 - **I59** — *(review batch 4, M10 items 5 and 6; ruling 71, `R-SEL-005`, `R-SEL-011`, R-BLK-838)* **One predicate says a selection exists, and `⏎` leaves by copying.** `hasSelection(mode)` is *the rectangle is up, or the block set is not empty*; `escape()` clears on it and leaves without it, and the footer's `esc clear` / `esc out` is the same call — two predicates each correct alone disagreed over a selection that copies no text (§6e trace row 2). `⏎` copies and leaves the mode; `y` and the registry's `copy` copy and stay; each raises a toast naming where the text went. **An empty copy is never silent and never leaves**: nothing selected toasts `nothing selected`, a selection whose copy is empty toasts `the selection copies no text`, the mode stays up, and nothing is written to any buffer — `copyText("")` is not called. → T1.80, T3.15, T4.40
 - **I60** — *(review batch 4, M10 item 2; rulings 36, 70, 71, `R-SEL-007`)* **`⌃V` toggles the rectangle, and rectangle mode is `rect !== null`.** On, it seeds anchor and head at the caret's row and the first column of the caret's block; off, it discards the rectangle and leaves the block set as it was. `⇧←`/`⇧→` move the head's column and `⇧↑`/`⇧↓` its row, the anchor fixed; a plain arrow moves both; a press plants both at the pointer's cell and a drag moves the head, and an autoscroll tick moves the head to the edge row at the drag's last column. At block granularity `⇧←`/`⇧→` do nothing. **The column is clamped to the anchor's block** — its span's columns, the run's indent to the run's edge — both when the head is stored and when `rectBetween` derives the rectangle, so a resize narrowing the block narrows the rectangle. While it is up the copy, the count, the wash and the rail are the rectangle's: `cellTextOf` over the entry's lines rendered with the frame's per-entry options, the wash over exactly its cells, the rail on its first row; the block set is neither washed nor counted. `a` and `A` discard it. `CellRect`, `rectBetween` and `cellTextOf` are consumed, and their allow-list entries are removed. → T1.79, T4.41
+- **I61** — *(review batch 4, M10 item 1; ruling 72, `R-SEL-011`, → C01 I25, C02 I18, C21 I20, C17 I31)* **A copy goes to the kill buffer, then to one clipboard by the person's order, and says where it went in words that are true.** The kill buffer takes the text first, every time (C17 I31). Then: OSC 52 when C02's `clipboard` is `osc52` and `clipboardWrite` returns bytes, toasted `sent to the terminal's clipboard` and **never** *copied*, because nothing comes back; otherwise the tool `findClipboardTool` found, toasted `copying with <tool>…` and then `copied to the clipboard by <tool>` on its exit `0`; otherwise, or when the tool fails or has not answered by `COPY_DEADLINE_MS`, `<stateDir>/copy.txt`, toasted with the path and the reason. **One copy speaks once**: a copy supersedes an earlier one still pending, whose deadline is disposed and whose answer is dropped, and an answer after the deadline is dropped. The footer states the absence at rest — `no clipboard` and `⏎ to file` where C02 says `none` and no tool was found. The routing, the wording and the pending copy are one module, `shell/clipboard.ts`; C14 performs none of it (I11). → T1.81, T3.26, T4.43, T5.6
 
 ---
 
@@ -1341,6 +1377,7 @@ Fake heights, no rendering.
 - **T1.78** (I34, §6b *The count*): `waitingEntries(record, held)` over a real C13 store with a cap of a few blocks, frozen by copying its `entries`, for every row of §6b's table — an append is 1 and not 2, a patch to a held live entry is 1 and a second patch to it still 1, a malformed patch 0, a bare settle 1, a settle with a document 1, an append evicting an entry is 2 on the first eviction (the entry and the marker) and 1 once the marker is held, and a write with a marker held adds nothing for the marker. The control: the length difference, computed over the same two lists, is 0 in the patch and eviction rows, so the fixture reaches the cells length gets wrong. **The wiring**, because the function can be right while the footer still subtracts: through a graph, `bufferedEntries` after a patch to the held live entry is 1.
 - **T1.79** (I60, I42, rulings 36, 70, 71): the rectangle's model over spans that carry columns — `⌃V` seeds anchor and head at the caret and the block's first column; `⇧→` forty times stops at the block's last column and one `⇧←` moves back one; `⇧↓` past the block clips and the rectangle survives; a plain arrow moves a 1×1; `⌃V` off leaves the block set it found, by equality; `esc` clears both; `a` and `A` discard it; and `rectBetween` over spans narrowed by a resize clamps a stored column. The control is T1.42's spans, which carry no columns and clamp none.
 - **T1.80** (I55, I59, §6e's footer table): `ownerLine` for every row of the classification table, asserted as the whole line — including *only blocks that copy nothing*, which reads `esc clear` with no count, *every span* with `all loaded entries`, *the empty transcript* without it, and *the rectangle over a full block set* without it. And `hasSelection` against `escape()` over the same states: `esc clear` exactly where `escape()` keeps the mode.
+- **T1.81** (I61, §6e *Where the copy goes*, C21 W1–W4): `routeCopy` over each capability × tool × payload cell — `osc52` within → the bytes `clipboardWrite` builds; `osc52` past the cap with a tool → the tool; without → the file, *too large*; `none` with a tool → the tool; without → the file, *no clipboard* — and `copyToast` over every outcome: only a tool's `ok` says *copied*, and OSC 52's says *sent*.
 
 ### Tier 2 — contract / interface
 
@@ -1397,6 +1434,7 @@ Fake heights, no rendering.
 - **T3.23** (I24, C25 I18): a `patch` over the cap → the piece is a valid `Patch` carrying its path header and `collapsedBefore` markers inside `shown`, and the registry's `capped` survives `windowRows` building a fresh block.
 - **T3.24** (I24, C09 I11): a kind whose `measure` throws on a block over the cap → contained exactly as before, one row, the fault reported once for `measure`; the cap adds no second report.
 - **T3.25** (I58, I53, C10 I45, C10 I66): a selected block's first row at 24-bit, 8-bit, 4-bit, 1-bit with Unicode and 1-bit ASCII, on `dark` and on `hcDark`. Column 0 is `▌` (`|` in ASCII); its ink is `accent` against the selection ground, and the band's ink on `hcDark` above 1-bit; it never carries `inverse`, and at 1-bit the row's cells from column 1 do. The cell is the rail's alone: no block span reaches column 0.
+- **T3.26** (I61, trace rows 7–10): a copier over a tool that never answers → the deadline writes the file and toasts `did not answer`; a late `ok` after it says nothing; a second copy while the first is pending → the first's answer is dropped and only the second speaks; `dispose` → the deadline never fires.
 
 ### Tier 4 — integration
 
@@ -1419,6 +1457,7 @@ Fake heights, no rendering.
 - **T4.40** (I59, I47, R-BLK-838): a real session — `a` then `⏎` → the kill buffer holds the entry, the mode is left, and the toast names the destination; `a` then `y` → the same text, the mode still up, a toast; the control is `⏎` with nothing selected, which stays up and toasts `nothing selected`.
 - **T4.41** (I60, I43, I55): a real session over a block of known cells — `⌃V`, `⇧→` ×3, `⇧↓` → the footer reads `RECT 4×2` and `cells, not source`, the rows are washed over four cells and the rail leads the first; `y` → the kill buffer holds those eight cells as two lines with no escape; `⌃V` → the footer is block mode's again with the earlier block count restored.
 - **T4.42** (I60, I49, §6e trace row 14): a real session over a block taller than the region — `⌃V`, a press on a cell, the pointer dragged four cells right and far below the region and held → the view scrolls, and `y` copies one text whose every line is the same four cells and which has more lines than the pointer crossed: only the ticks' extend can take the rows scrolled in after it left.
+- **T4.43** (I61, C17 I31): three real sessions. `clipboard: "osc52"` declared → the terminal receives `ESC ] 52 ; c ; <base64> BEL` of exactly the copied text, the toast reads `sent to the terminal's clipboard`, and `⌃y` yanks the same text. A `PATH` holding a `pbcopy` that writes its stdin to a file → that file holds the text and the toast reads `copied to the clipboard by pbcopy`. Neither → the footer reads `no clipboard` and `⏎ to file`, `⏎` writes `/state/copy.txt` with the text, and the toast names it.
 
 ### Tier 5 — e2e
 
@@ -1427,7 +1466,7 @@ Fake heights, no rendering.
 - **T5.3**: a live `--logs` tail at 1,000 lines/s while scrolled up reading → the view does not move.
 - **T5.4**: the same, then `End` → snaps to the bottom and resumes following.
 - **T5.5**: dragging the terminal edge from 160 to 60 and back while scrolled to the middle → the same content is on screen at both ends, no blank frames.
-- **T5.6** (§6a, R-SEL-004): semantic copy mode selecting forty rows across three entries and yanking → the clipboard holds exactly those rows as plain text, in document order with a blank line between entries.
+- **T5.6** (I61, §6a, R-SEL-004, R-SEL-011): a PTY session with `clipboard: "osc52"` declared — three entries, `A`, `y` → the OSC 52 payload **decoded from the PTY's bytes** is the three entries' copy text, plain, in document order with a blank line between entries, and the toast reads `sent to the terminal's clipboard`. *Amended (review batch 4, M10 item 1):* it read *forty rows*; the count is the fixture's and not the claim, and the claim — what the clipboard holds — had no instrument until the payload could be read off the wire.
 
 - **T4.11** (I24, with C13 and C09): a viewport over a transcript whose entry holds a 25-line `logs` block under `maxBlockRows: 10` → `totalRows` is `chrome + 11`, `visible()` at the foot selects the marker row, and the frame's last block row reads `… 10 of 25 rows`.
 
@@ -1472,6 +1511,9 @@ Fake heights, no rendering.
 - **T6.33** (I60): `rectBetween` ignoring a span's columns → **T1.79** fails on the forty presses and on the narrowed span, and the copy reaches into the gutter.
 - **T6.34** (I37): the edge scroll removed from the keyboard move → **T3.14** fails at the press past the last row, where the view stays put and the caret is off the screen.
 - **T6.35** (I60): the autoscroll tick extending the block selection in the rectangle, as it did → **T4.42** fails: the rectangle's head never leaves the press, and the copy is one cell.
+- **T6.36** (I61, ruling 72): OSC 52's toast worded *copied* → **T1.81** fails. The defect is the one the ruling was written against: a copy that appears to work, on the one path whose success nothing reports.
+- **T6.37** (I61, trace rows 7–9): the pending copy's deadline removed → **T3.26** fails: a `pbcopy` that never exits leaves `copying with pbcopy…` up until the toast expires, and then nothing — silent, which R-SEL-011 calls the worst outcome available.
+- **T6.38** (C17 I31): the kill buffer skipped when a clipboard took the text → **T4.43** fails at `⌃y`, which yanks the previous kill.
 
 ---
 
