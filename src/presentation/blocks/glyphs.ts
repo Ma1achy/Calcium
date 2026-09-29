@@ -1160,6 +1160,12 @@ type BarStyle = Readonly<{
   on: string;
   off: string;
   narrowOnly?: boolean;
+  /**
+   * **A cell's eighths, emptiest first** (C09 I135, §7j) — the partial cell a
+   * sub-cell alphabet draws between its full cells and its blanks. `braille`'s
+   * alone: every other texture steps a whole cell at a time.
+   */
+  steps?: readonly string[];
 }>;
 
 /**
@@ -1211,7 +1217,15 @@ const BAR_STYLES: Readonly<Record<string, BarStyle>> = Object.freeze({
   // **No `narrowOnly`, and it is the only one.** Braille is `Neutral`, so it is
   // one cell under both conventions — which is what makes it the style a wide
   // terminal keeps rather than the one it loses.
-  braille: Object.freeze({ on: "⣿", off: " " }),
+  //
+  // **And it steps in eighths** (C09 I135, §7j, ruling 32's amendment): the left
+  // dot column fills bottom to top, then the right — U+2840, 2844, 2846, 2847,
+  // 28C7, 28E7, 28F7, 28FF — the registry's `steps`, character for character.
+  braille: Object.freeze({
+    on: "⣿",
+    off: " ",
+    steps: Object.freeze(["\u2840", "\u2844", "\u2846", "\u2847", "\u28C7", "\u28E7", "\u28F7", "\u28FF"]),
+  }),
   ascii: BAR_ASCII,
 });
 
@@ -1227,7 +1241,7 @@ export const DEFAULT_BAR_STYLE = "block";
 export function barStyle(
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
   name: string = DEFAULT_BAR_STYLE,
-): Readonly<{ on: string; off: string }> {
+): Readonly<{ on: string; off: string; steps?: readonly string[] }> {
   const style = BAR_STYLES[name] ?? BAR_STYLES[DEFAULT_BAR_STYLE];
   if (style === undefined) return BAR_ASCII;
   if (caps.unicode === "ascii") return BAR_ASCII;

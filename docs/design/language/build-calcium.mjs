@@ -534,6 +534,14 @@ export function validateRegistry(registry) {
   for (const bar of currentBars) {
     if (typeof bar.placement !== 'string' || !bar.placement.trim()) throw new Error(`${bar.id} lacks a placement`);
     if (!bar.ruleIds.includes('R-PRG-002')) throw new Error(`${bar.id} omits placement rule`);
+    // **A sub-cell alphabet carries its steps** (ruling 32's amendment, C09 I135):
+    // eight single characters, the full cell last, and only where the placement
+    // says sub-cell — a whole-cell texture with steps would be drawn in eighths.
+    const subCell = /sub-cell/u.test(bar.placement);
+    if (subCell !== ('steps' in bar)) throw new Error(`${bar.id}: steps ${subCell ? 'missing on a sub-cell alphabet' : 'on a whole-cell alphabet'}`);
+    if (subCell && (!Array.isArray(bar.steps) || bar.steps.length !== 8 || bar.steps.some(step => [...step].length !== 1) || bar.steps.at(-1) !== bar.filled)) {
+      throw new Error(`${bar.id}: steps must be eight single characters ending on the filled cell`);
+    }
   }
   const gallery = registry.barPolicy.gallerySample;
   if (!gallery || gallery.width !== gallery.filledCells + gallery.emptyCells || Math.round(gallery.value * gallery.width) !== gallery.filledCells) {
@@ -1080,6 +1088,22 @@ function renderBars(registry) {
   const sample = registry.barPolicy.gallerySample;
   const rows = bars.map(item => `<span class="c-default" data-bar-alphabet="${esc(item.id)}">  </span><span class="c-accent">${esc(item.filled.repeat(sample.filledCells))}</span><span class="c-muted">${esc(item.empty.repeat(sample.emptyCells))}</span><span class="c-default">   ${esc(item.id.padEnd(12))}</span><span class="c-muted">${esc(sample.label)}</span>`).join('\n');
   const byId = new Map(bars.map(item => [item.id, item]));
+  // **The sub-cell frames** (C09 §7j): one cell through its eight steps, then a
+  // bar of three at seven fractions — `e = round(f × 3 × 8)` eighths, `floor(e / 8)`
+  // full cells, `steps[e mod 8 − 1]` where `e mod 8 > 0`, blanks after.
+  const frameOf = (item, e, width) => {
+    const part = e % 8;
+    const drawn = item.filled.repeat(Math.floor(e / 8)) + (part > 0 ? item.steps[part - 1] : '');
+    return drawn + item.empty.repeat(width - [...drawn].length);
+  };
+  const stepRows = bars.filter(item => Array.isArray(item.steps)).map(item => {
+    const cell = item.steps.map(step => `<span class="c-accent">${esc(step)}</span>`).join(' ');
+    const frames = [0, 1, 8, 9, 12, 23, 24].map(e =>
+      `<span class="c-muted">  ${esc(`${e}/24`.padEnd(8))}│</span><span class="c-accent">${esc(frameOf(item, e, 3))}</span><span class="c-muted">│</span>`).join('\n');
+    return `<span data-bar-steps="${esc(item.id)}"><span class="c-default">  ${esc(item.id)} in eighths — the left dot column bottom to top, then the right; an empty cell is a blank</span>
+<span class="c-muted">  one cell  </span>${cell}
+${frames}</span>`;
+  }).join('\n');
   const placementRows = registry.barSpecimens.map(specimen => {
     if (specimen.kind === 'spinner') {
       return `<span data-bar-specimen="${esc(specimen.id)}" data-content-digest="${esc(specimen.contentDigest)}"><span class="c-default">  </span><span class="c-${esc(specimen.tone)} sp sp-${esc(specimen.spinnerId)}" data-bar-placement="indeterminate"></span><span class="c-muted"> ${esc(specimen.elapsed)}</span><span class="c-default">${' '.repeat(specimen.padCells)}</span><span class="c-muted">${esc(specimen.label)}</span></span>`;
@@ -1092,6 +1116,9 @@ function renderBars(registry) {
 <span class="c-muted">filled = floor(clamp(value ÷ total, 0, 1) × width + 0.5); empty = width − filled.</span>
 <span class=gap> </span>
 ${rows}
+<span class=gap> </span>
+<span class="c-default bold">SUB-CELL STEPS [${refs(['R-PRG-002'])}]</span>
+${stepRows}
 <span class=gap> </span>
 <span class="c-default bold">AND WHERE EACH BELONGS [${refs(['R-PRG-002'])}]</span>
 ${placementRows}

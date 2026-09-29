@@ -107,7 +107,7 @@ describe("C23 I76 — an operation's head brackets while it runs and flattens wh
     // Running, there is a bar.
     const live = linesOf(operationRows(compacting({}), FULL_CAPS), 56);
     expect(live.length, "a head and a bar").toBe(2);
-    expect(live[1]).toContain("▰");
+    expect(live[1], "counted work draws posts (C09 I135)").toContain("▮");
 
     // **Three stopped states, asserted separately.** Two arguments end with no
     // bar and neither substitutes for the other — *a 100% bar on a finished
@@ -119,8 +119,15 @@ describe("C23 I76 — an operation's head brackets while it runs and flattens wh
       const rows = linesOf(operationRows(compacting({ state, current }), FULL_CAPS), 56);
       expect(rows.length, `${state} draws the head alone`).toBe(1);
       expect(rows[0], `${state} keeps its head`).toContain("Compacting conversation…");
-      expect(rows.join(""), `${state} draws no bar`).not.toContain("▰");
-      expect(rows.join(""), `${state} draws no empty bar either`).not.toContain("▱");
+      // **And the head is a stopped one**: it leads with its settled mark, not
+      // the walking frame the running head leads with. This was caught only by
+      // accident while the bar was `▰` — the spinner's frames share the glyph —
+      // and C09 I135's posts took the accident away.
+      const spinning = live[0]!.trimStart().split(" ")[0]!;
+      expect(rows[0]!.trimStart().startsWith(spinning), `${state} draws no walking frame`).toBe(false);
+      expect(rows[0]!.trimStart(), `${state} leads with its settled mark`).toMatch(/^● /u);
+      expect(rows.join(""), `${state} draws no bar`).not.toContain("▮");
+      expect(rows.join(""), `${state} draws no empty bar either`).not.toContain("▯");
     }
 
     // **A head is one committed row at both ends** (C09 I46). The running arm
@@ -147,12 +154,12 @@ describe("C09 I104 — a meter's label column costs nothing when there is no lab
     // **Read the BAR's length, not the absence of text** — a row asserting *no
     // label is drawn* is satisfied by nineteen spaces, which is what the tree
     // drew: `width / 3` was reserved unconditionally.
-    const cellsOf = (line: string): number => (line.match(/[▰▱]/gu) ?? []).length;
+    const cellsOf = (line: string): number => (line.match(/[▮▯]/gu) ?? []).length; // posts, since C09 I135
     expect(cellsOf(none), "the unlabelled bar is longer").toBeGreaterThan(cellsOf(some));
     expect(cellsOf(none) - cellsOf(some), "by the column and its gap").toBe(19);
 
     // And it starts at the row's own first cell — the gap went with the column.
-    expect(none.startsWith("▰"), `drawn as |${none}|`).toBe(true);
+    expect(none.startsWith("▮"), `drawn as |${none}|`).toBe(true);
     // The control: the labelled bar is unchanged, column and all.
     expect(some.startsWith("Compacting")).toBe(true);
 
@@ -164,7 +171,7 @@ describe("C09 I104 — a meter's label column costs nothing when there is no lab
     const short = bar("ctx");
     expect(short.startsWith("ctx "), `drawn as |${short}|`).toBe(true);
     // The bar begins one gap after the label, not a third of the row in.
-    expect(short.indexOf("\u25b0"), "the label's width plus one gap, and no more").toBe(4);
+    expect(short.indexOf("\u25ae"), "the label's width plus one gap, and no more").toBe(4);
     // And the cells the padding used to take are the bar's: 18 − 3 = 15 back.
     expect(cellsOf(short) - cellsOf(some), "a short label spends what it is, not what it may").toBe(15);
   });

@@ -539,8 +539,24 @@ describe("C04 I124, I144–I148 — tier 6 (review batch 4)", () => {
     expect(Array.isArray(twins.members), "requireArray alone is satisfied").toBe(true);
     expect(validateBlock(twins).ok, "the arm refuses it").toBe(false);
   });
-  it.todo("T6.109 (C04 I145): progress measuring 1 at every fraction → T1.80 fails at 100/100 — not deferred on a component: the code lands in the next commit of this round");
-  it.todo("T6.110 (C04 I146): the progress arm without its field checks → T2.151 fails — not deferred on a component: the code lands in the next commit of this round");
+  it("T6.109 (C04 I145): progress measuring 1 at every fraction → T1.80 fails at 100/100", () => {
+    // **The old answer beside the new one**: at 99/100 both say 1, which is why
+    // a row sampling below the total could not tell them apart; at 100/100 only
+    // the finished-bar arm says 0.
+    const kit = measurable({ capabilities: FULL_CAPS });
+    const at = (current: number) => kit.registry.measure(block({ kind: "progress", id: "m", label: "x", quantity: "progress", current, total: 100 } as never), 40);
+    expect(at(99), "below the total, the two answers agree").toBe(1);
+    expect(at(100), "at it, the reverted 1 is what T1.80 refuses").toBe(0);
+  });
+
+  it("T6.110 (C04 I146): the progress arm without its field checks → T2.151 fails", () => {
+    // **What the arm let through before**: `"progres"` is a string, the one
+    // thing a field nobody checked could be, and it never finishes (C04 I145).
+    const misspelt = { kind: "progress", id: "g", label: "x", current: 10, total: 10, quantity: "progres" };
+    expect(validateBlock(misspelt).ok, "the arm refuses it").toBe(false);
+    const kit = measurable({ capabilities: FULL_CAPS });
+    expect(kit.registry.measure(block({ ...misspelt, quantity: "progress" } as never), 40), "spelt right, it has finished").toBe(0);
+  });
   it("T6.111 (C04 I147): width counting labels and gaps only → T1.81 fails on the measured case", () => {
     // **The old sum, computed here, and the row it drew.** Labels at narrow and
     // two gaps: 5 + 3 + 5 + 4 = 17, and a tape laid out at 17 slides.

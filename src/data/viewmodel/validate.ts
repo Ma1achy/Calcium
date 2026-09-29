@@ -53,6 +53,7 @@ import {
   type OHLC,
   type Plot,
   type PlotForm,
+  type Progress,
   type Result,
   type ViewDocument,
 } from "./types.js";
@@ -1199,6 +1200,13 @@ const TONE_SET: ReadonlySet<string> = new Set<string>(TONES);
 const RAMP_FILL_SET: ReadonlySet<string> = new Set<string>(RAMP_FILLS);
 const RAMP_ANIMATION_SET: ReadonlySet<string> = new Set<string>(RAMP_ANIMATIONS);
 
+/** `progress`'s three closed members and their unions (C04 I146, §3as) — each typed against the field it gates. */
+const PROGRESS_UNIONS: readonly (readonly [string, readonly string[]])[] = [
+  ["quantity", ["capacity", "progress", "count"] satisfies readonly NonNullable<Progress["quantity"]>[]],
+  ["granularity", ["continuous", "segmented"] satisfies readonly NonNullable<Progress["granularity"]>[]],
+  ["liveness", ["still", "active", "stalled"] satisfies readonly NonNullable<Progress["liveness"]>[]],
+];
+
 /**
  * A `Ramp` at the gate (C04 §3am.2, I106–I109). One error per fault, the first
  * fault only, each naming the rule it broke.
@@ -1878,6 +1886,22 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
     // C04 I108 — the one block-level carrier, and the one place a colormap
     // backing is admitted: the bar's ink fills its cell and reads by area.
     if (b["ramp"] !== undefined) checkRamp(b["ramp"], e, `${at}.ramp`, false);
+    // **The four fields were not checked at all** (C04 I146, §3as). `quantity`
+    // is refused rather than defaulted on I123's precedent: `"progres"` never
+    // finishes (I145) and nothing would say why. `style` names no closed set —
+    // an unknown name is the default (roadmap 51) — so only its type is checked.
+    if (b["painted"] !== undefined && typeof b["painted"] !== "boolean") {
+      e.push(`${at}: "painted" must be a boolean (C04 I146)`);
+    }
+    for (const [field, union] of PROGRESS_UNIONS) {
+      const value = b[field];
+      if (value !== undefined && !union.includes(value as never)) {
+        e.push(`${at}: "${field}" is outside its union (C04 I146) — one of ${union.map((v) => `"${v}"`).join(", ")}`);
+      }
+    }
+    if (b["style"] !== undefined && !isString(b["style"])) {
+      e.push(`${at}: "style" must be a string — a bar style's name; an unknown one draws the default (C04 I146)`);
+    }
   },
   code: (b, e, at) => {
     requireString(b, "language", e, at);

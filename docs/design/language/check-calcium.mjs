@@ -313,6 +313,15 @@ function checkStructuredCoverageAndRetention(registry, html) {
       requireText(html, htmlEsc(bar.placement), `primary bar placement use ${bar.id}`);
     }
   }
+  // **The sub-cell steps and their frames** (ruling 32's amendment, C09 I135): the
+  // braille record carries eight, and the page draws the cell and the 23/24 frame.
+  const braille = currentBars.find(item => item.id === 'braille');
+  if (!Array.isArray(braille?.steps) || braille.steps.length !== 8) fail('braille carries no sub-cell steps');
+  for (const bar of currentBars.filter(item => Array.isArray(item.steps))) {
+    requireText(html, `data-bar-steps="${bar.id}"`, `sub-cell steps ${bar.id}`);
+    for (const step of bar.steps) requireText(html, `<span class="c-accent">${step}</span>`, `${bar.id} step ${step}`);
+    requireText(html, `${bar.filled}${bar.filled}${bar.steps[6]}`, `${bar.id} three-cell frame at 23/24`);
+  }
   requireText(html, 'data-bar-placement="indeterminate"', 'indeterminate spinner placement');
   for (const specimen of registry.barSpecimens) {
     if (specimen.contentDigest !== barSpecimenContentDigest(specimen)) fail(`${specimen.id} bar specimen digest drifted`);

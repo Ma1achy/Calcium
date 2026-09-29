@@ -48,8 +48,8 @@ const results = runPass({
       // falls too. A row asserting only *the six fall* passes here.
       name: "braille is treated as narrow-only, so a wide terminal loses it too",
       file: FILE,
-      from: "  braille: Object.freeze({ on: \"⣿\", off: \" \" }),",
-      to: "  braille: Object.freeze({ on: \"⣿\", off: \" \", narrowOnly: true }),",
+      from: "  braille: Object.freeze({\n    on: \"⣿\",\n    off: \" \",\n",
+      to: "  braille: Object.freeze({\n    on: \"⣿\",\n    off: \" \",\n    narrowOnly: true,\n",
       expect: "T2.91",
     },
     {

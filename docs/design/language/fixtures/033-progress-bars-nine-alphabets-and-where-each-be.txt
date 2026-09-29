@@ -11,6 +11,17 @@ filled = floor(clamp(value ÷ total, 0, 1) × width + 0.5); empty = width − fi
   ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿            braille     62%
   ###############---------   ascii       62%
 
+SUB-CELL STEPS [R-PRG-002]
+  braille in eighths — the left dot column bottom to top, then the right; an empty cell is a blank
+  one cell  ⡀ ⡄ ⡆ ⡇ ⣇ ⣧ ⣷ ⣿
+  0/24    │   │
+  1/24    │⡀  │
+  8/24    │⣿  │
+  9/24    │⣿⡀ │
+  12/24   │⣿⡇ │
+  23/24   │⣿⣿⣷│
+  24/24   │⣿⣿⣿│
+
 AND WHERE EACH BELONGS [R-PRG-002]
   ███████████████░░░░░░░░░  determinate work — a total is known
   ✦ 12s                 indeterminate — a spinner, never a bar

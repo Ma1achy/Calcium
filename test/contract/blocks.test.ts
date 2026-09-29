@@ -1302,12 +1302,13 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
         .map(visible)
         .join("");
 
-    // **Granularity picks the alphabet, and `style` outranks it.** The two the
-    // design draws — `block` for continuous, `slant` for segmented — and the
-    // registry's own deferral for the rest: *use only when its texture is
-    // declared by the component*.
+    // **Granularity picks the alphabet, and `style` outranks it.** `block` for
+    // continuous and `posts` for segmented — `R-PRG-002`'s *discrete steps use
+    // posts*, which ruling 32 took over §035's `slant` specimens (C09 I135) —
+    // and the registry's own deferral for the rest: *use only when its texture
+    // is declared by the component*.
     expect(at({ granularity: "continuous" }), "continuous is the block alphabet").toContain("█");
-    expect(at({ granularity: "segmented" }), "segmented is the slant alphabet").toContain("▰");
+    expect(at({ granularity: "segmented" }), "segmented is posts (C09 I135)").toContain("▮");
     expect(at({ granularity: "segmented", style: "beads" }), "a declared style outranks it").toContain("•");
 
     // **Quantity picks the readout, and it is the one axis that moves a frame
@@ -1361,7 +1362,7 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
     const training = at({ quantity: "progress", granularity: "continuous", liveness: "active", ramp });
     expect(budget, "BUDGET is continuous and carries its pair").toContain("█");
     expect(budget, "BUDGET reads both").toContain("60%  6/10");
-    expect(operation, "OPERATION is segmented").toContain("▰");
+    expect(operation, "OPERATION is segmented, and counted work draws posts (C09 I135)").toContain("▮");
     expect(operation, "and reads its share alone").not.toContain("6/10");
     expect(training, "the third triple is expressible and is neither preset").toContain("█");
     expect(training, "and it is a progress, not a capacity").not.toContain("6/10");
@@ -1383,5 +1384,37 @@ describe("C09 I111 — the trend arrows", () => {
 });
 
 describe("C04 I145 — a finished bar has zero rows (review batch 4 M16.2)", () => {
-  it.todo("T1.80 (C04 I145, §3as): progress and count vanish at and past their total; capacity and an undeclared quantity persist; padding stays — not deferred on a component: the code lands in the next commit of this round");
+  it("T1.80 (C04 I145, §3as): progress and count vanish at and past their total; capacity and an undeclared quantity persist; padding stays", () => {
+    const kit = measurable({ theme: DARK_THEME, capabilities: FULL_CAPS });
+    const bar = (spec: Record<string, unknown>) =>
+      block({ kind: "progress", id: "m", label: "work", ...spec } as never);
+    const read = (spec: Record<string, unknown>) => {
+      const b = bar(spec);
+      const lines = kit.renderToLines(b, 40).map(visible);
+      return { measured: kit.registry.measure(b, 40), lines };
+    };
+    for (const quantity of ["progress", "count"]) {
+      expect(read({ quantity, current: 99, total: 100 }).lines.length, `${quantity} at 99/100 draws`).toBe(1);
+      for (const current of [100, 150]) {
+        const got = read({ quantity, current, total: 100 });
+        expect(got.measured, `${quantity} at ${String(current)}/100 measures 0`).toBe(0);
+        expect(got.lines, `${quantity} at ${String(current)}/100 renders nothing`).toEqual([]);
+      }
+    }
+    // `capacity` persists, and its number is not clamped (C09 I28).
+    for (const current of [100, 150]) {
+      const got = read({ quantity: "capacity", current, total: 100 });
+      expect(got.lines.length, `capacity at ${String(current)}/100`).toBe(1);
+      expect(got.lines[0], "reading its own share").toContain(`${String(current)}%`);
+    }
+    // An undeclared quantity never finishes (D25) — examples/docker's CPU bar.
+    expect(read({ current: 150, total: 100 }).lines.length, "undeclared at 150/100 draws").toBe(1);
+    // `total: 0` has no proportion, so it is never finished.
+    expect(read({ quantity: "progress", current: 0, total: 0 }).lines.length, "total 0 draws").toBe(1);
+    expect(read({ quantity: "progress", current: -1, total: 10 }).lines.length, "a negative current draws").toBe(1);
+    // The registry's padding applies to the zero, as it does to an empty container's.
+    const padded = read({ quantity: "progress", current: 100, total: 100, padding: { t: 1 } });
+    expect(padded.measured, "a finished bar with padding measures its padding").toBe(1);
+    expect(padded.lines.map((l) => l.trim()), "and renders one blank row").toEqual([""]);
+  });
 });

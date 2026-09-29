@@ -6,7 +6,7 @@
   "title": "Current contract — the rules implementations targetcurrent · R-SPC-001 · example R-EXA-001",
   "cols": 1244,
   "rows": 126,
-  "sha": "39018d27b75e8e2a",
+  "sha": "b1d71cecae1cb7ee",
   "ruleIds": [
    "R-SPC-001",
    "R-EXA-001"
@@ -449,9 +449,9 @@
   "section": 33,
   "id": "progress-bars-nine-alphabets-and-where-each-belongs-033",
   "title": "Progress bars — nine alphabets, and where each belongscurrent · R-PRG-001 R-PRG-002 · example R-EXA-033",
-  "cols": 93,
-  "rows": 22,
-  "sha": "fa364eb3efcb1204",
+  "cols": 98,
+  "rows": 33,
+  "sha": "93e85bb489a00be7",
   "ruleIds": [
    "R-PRG-001",
    "R-PRG-002",

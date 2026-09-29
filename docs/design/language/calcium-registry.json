@@ -1,7 +1,7 @@
 {
   "meta": {
     "name": "Calcium design language",
-    "revision": "0.18",
+    "revision": "0.20",
     "generatedArtifact": "calcium-design-language.html",
     "ruleIdPolicy": "IDs are explicit, permanent, and never derived from order.",
     "normativeSource": "calcium-registry.json",
@@ -37180,6 +37180,16 @@
       "id": "braille",
       "filled": "⣿",
       "empty": " ",
+      "steps": [
+        "⡀",
+        "⡄",
+        "⡆",
+        "⡇",
+        "⣇",
+        "⣧",
+        "⣷",
+        "⣿"
+      ],
       "status": "current",
       "ruleIds": [
         "R-PRG-001",

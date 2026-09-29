@@ -461,5 +461,15 @@ describe("C09 I132–I135 — tier 6 (review batch 4)", () => {
     expect(lines.length, "the crop paints the measure").toBe(kit.registry.measure(box, 75));
     expect(lines.at(-1), "with the residue last").toMatch(/1 above, 2 below/u);
   });
-  it.todo("T6.187 (C09 I135): segmented mapped back to slant → T2.226 fails — not deferred on a component: the code lands in the next commit of this round");
+  it("T6.187 (C09 I135): segmented mapped back to slant → T2.226 fails", () => {
+    // **Two reverts, each against the row that names it**: `segmented` drawing
+    // `▰` rather than `▮`, and the braille steps dropped, which draws a bar at
+    // 1/8 of a cell as a blank where T2.227 wants `⡀`.
+    const row = (spec: Record<string, unknown>, width = 40) =>
+      visible(measurable({ capabilities: FULL_CAPS }).renderToLines(block({ kind: "progress", id: "m", label: "", ...spec } as never), width).join(""));
+    const segmented = row({ granularity: "segmented", current: 6, total: 10 });
+    expect(segmented, "posts").toContain("▮");
+    expect(segmented, "and not slant").not.toContain("▰");
+    expect(row({ style: "braille", current: 1, total: 8 }, 1 + 1 + 3)[0], "one eighth of one cell").toBe("⡀");
+  });
 });

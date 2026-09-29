@@ -1506,7 +1506,7 @@ exports[`golden frames — one per design fixture > dark-mono-unicode at 40 1`] 
 
 · the compaction is an OPERATION — segmented, active, and §036's head above it
     ✦ compacting (4s · 3 of 5 turns)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 60%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 60%
 
 · and when it stops the bar goes and the delta stays — one grammar, not two specimens
     ✓ 3 turns compacted · 10.7k → 0.9k tok
@@ -1557,16 +1557,16 @@ exports[`golden frames — one per design fixture > dark-mono-unicode at 40 1`] 
 · the head brackets while it runs and flattens when it stops — and the bar goes with the motion
   running · elapsed and delta
     ✦ Compacting conversation… (5m 38s · ↓ …
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
   running · elapsed alone
     ✦ Compacting conversation… (5m 38s)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
   running · delta alone
     ✦ Compacting conversation… (↓ 8.0k toke…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
   running · neither — and no empty parentheses
     ✦ Compacting conversation…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
   settled — flat, and the bar is GONE
     ✓ compacted · 6m 12s · 41k → 12k tokens…
   cancelled — muted, and the bar goes for its own reason
@@ -1578,13 +1578,13 @@ exports[`golden frames — one per design fixture > dark-mono-unicode at 40 1`] 
 
 · the same shape for every operation — §036's four, the delta in each one's own units
     ✦ Compacting conversation… (5m 38s · ↓ …
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
     ✦ Indexing the repository… (12s · 4,102…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 44%
     ✦ Uploading the checkpoint… (64s · 2.1 …
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 44%
     ✦ Running the suite… (31s · 892 of 1,20…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱ 74%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯ 74%
 
 ── §95 · a tape, where a row of peers would shed
 scout ✓  planner ✓  › builder ⋅  2»
@@ -1673,7 +1673,7 @@ beads •••••••••••••••••••••◦◦◦�
 posts ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯ 70%
 slant ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱ 70%
 squares ■■■■■■■■■■■■■■■■■■■■□□□□□□□□ 70%
-braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿         70%
+braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣇         70%
 ascii #####################--------- 70%
 ── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
 · the fills — 24 bits, one letter per distinct ink, assigned within the row
@@ -1783,13 +1783,13 @@ ascii #####################--------- 70%
 · BUDGET · capacity · continuous · still
 work ███████████████░░░░░░░░░ 62%  31/50
 · OPERATION · progress · segmented · active
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 62%
 · a training run · progress · continuous · active
 work ███████████████████░░░░░░░░░░░░ 62%
 · a step count · count · segmented · still
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱ 31 of 50
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯ 31 of 50
 · stalled · progress · segmented · stalled
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ........................................ ── serving/volatility-estimator.yaml ───
@@ -2199,7 +2199,7 @@ exports[`golden frames — one per design fixture > dark-mono-unicode at 80 1`] 
 
 · the compaction is an OPERATION — segmented, active, and §036's head above it
     ✦ compacting (4s · 3 of 5 turns)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 60%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 60%
 
 · and when it stops the bar goes and the delta stays — one grammar, not two specimens
     ✓ 3 turns compacted · 10.7k → 0.9k tok
@@ -2250,16 +2250,16 @@ exports[`golden frames — one per design fixture > dark-mono-unicode at 80 1`] 
 · the head brackets while it runs and flattens when it stops — and the bar goes with the motion
   running · elapsed and delta
     ✦ Compacting conversation… (5m 38s · ↓ 8.0k tokens)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
   running · elapsed alone
     ✦ Compacting conversation… (5m 38s)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
   running · delta alone
     ✦ Compacting conversation… (↓ 8.0k tokens)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
   running · neither — and no empty parentheses
     ✦ Compacting conversation…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
   settled — flat, and the bar is GONE
     ✓ compacted · 6m 12s · 41k → 12k tokens · 18 turns summ…
   cancelled — muted, and the bar goes for its own reason
@@ -2271,13 +2271,13 @@ exports[`golden frames — one per design fixture > dark-mono-unicode at 80 1`] 
 
 · the same shape for every operation — §036's four, the delta in each one's own units
     ✦ Compacting conversation… (5m 38s · ↓ 8.0k tokens)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
     ✦ Indexing the repository… (12s · 4,102 of 9,318 files)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 44%
     ✦ Uploading the checkpoint… (64s · 2.1 of 4.8 GiB)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 44%
     ✦ Running the suite… (31s · 892 of 1,204 tests)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 74%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 74%
 
 ── §95 · a tape, where a row of peers would shed
 scout 4s ✓  planner 1m12s ✓  › builder ⋅ 8s  critic 2s ○  scribe 0s ○
@@ -2366,7 +2366,7 @@ beads ••••••••••••••••••••••••�
 posts ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 70%
 slant ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 70%
 squares ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■□□□□□□□□□□□□□□□□□□□□ 70%
-braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿                     70%
+braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣇                     70%
 ascii #################################################--------------------- 70%
 ── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
 · the fills — 24 bits, one letter per distinct ink, assigned within the row
@@ -2476,13 +2476,13 @@ ascii #################################################--------------------- 70%
 · BUDGET · capacity · continuous · still
 work ████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░ 62%  31/50
 · OPERATION · progress · segmented · active
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 62%
 · a training run · progress · continuous · active
 work ████████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░ 62%
 · a step count · count · segmented · still
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 31 of 50
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 31 of 50
 · stalled · progress · segmented · stalled
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ................................................................................ ── serving/volatility-estimator.yaml ───────────────────────────────────────────
@@ -2884,7 +2884,7 @@ exports[`golden frames — one per design fixture > dark-unicode at 40 1`] = `
 
 · the compaction is an OPERATION — segmented, active, and §036's head above it
     ✦ compacting (4s · 3 of 5 turns)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 60%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 60%
 
 · and when it stops the bar goes and the delta stays — one grammar, not two specimens
     ● 3 turns compacted · 10.7k → 0.9k tok
@@ -2939,16 +2939,16 @@ exports[`golden frames — one per design fixture > dark-unicode at 40 1`] = `
 · the head brackets while it runs and flattens when it stops — and the bar goes with the motion
   running · elapsed and delta
     ✦ Compacting conversation… (5m 38s · ↓ …
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
   running · elapsed alone
     ✦ Compacting conversation… (5m 38s)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
   running · delta alone
     ✦ Compacting conversation… (↓ 8.0k toke…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
   running · neither — and no empty parentheses
     ✦ Compacting conversation…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
   settled — flat, and the bar is GONE
     ● compacted · 6m 12s · 41k → 12k tokens…
   cancelled — muted, and the bar goes for its own reason
@@ -2960,13 +2960,13 @@ exports[`golden frames — one per design fixture > dark-unicode at 40 1`] = `
 
 · the same shape for every operation — §036's four, the delta in each one's own units
     ✦ Compacting conversation… (5m 38s · ↓ …
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
     ✦ Indexing the repository… (12s · 4,102…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 44%
     ✦ Uploading the checkpoint… (64s · 2.1 …
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 44%
     ✦ Running the suite… (31s · 892 of 1,20…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱ 74%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯ 74%
 
 ── §95 · a tape, where a row of peers would shed
 scout ✓  planner ✓  › builder ⋅  2»
@@ -3055,7 +3055,7 @@ beads •••••••••••••••••••••◦◦◦�
 posts ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯ 70%
 slant ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱ 70%
 squares ■■■■■■■■■■■■■■■■■■■■□□□□□□□□ 70%
-braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿         70%
+braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣇         70%
 ascii #####################--------- 70%
 ── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
 · the fills — 24 bits, one letter per distinct ink, assigned within the row
@@ -3169,13 +3169,13 @@ ascii #####################--------- 70%
 · BUDGET · capacity · continuous · still
 work ███████████████░░░░░░░░░ 62%  31/50
 · OPERATION · progress · segmented · active
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 62%
 · a training run · progress · continuous · active
 work ███████████████████░░░░░░░░░░░░ 62%
 · a step count · count · segmented · still
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱ 31 of 50
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯ 31 of 50
 · stalled · progress · segmented · stalled
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ........................................ ── serving/volatility-estimator.yaml ───
@@ -3638,7 +3638,7 @@ exports[`golden frames — one per design fixture > dark-unicode at 80 1`] = `
 
 · the compaction is an OPERATION — segmented, active, and §036's head above it
     ✦ compacting (4s · 3 of 5 turns)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 60%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 60%
 
 · and when it stops the bar goes and the delta stays — one grammar, not two specimens
     ● 3 turns compacted · 10.7k → 0.9k tok
@@ -3693,16 +3693,16 @@ exports[`golden frames — one per design fixture > dark-unicode at 80 1`] = `
 · the head brackets while it runs and flattens when it stops — and the bar goes with the motion
   running · elapsed and delta
     ✦ Compacting conversation… (5m 38s · ↓ 8.0k tokens)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
   running · elapsed alone
     ✦ Compacting conversation… (5m 38s)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
   running · delta alone
     ✦ Compacting conversation… (↓ 8.0k tokens)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
   running · neither — and no empty parentheses
     ✦ Compacting conversation…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
   settled — flat, and the bar is GONE
     ● compacted · 6m 12s · 41k → 12k tokens · 18 turns summ…
   cancelled — muted, and the bar goes for its own reason
@@ -3714,13 +3714,13 @@ exports[`golden frames — one per design fixture > dark-unicode at 80 1`] = `
 
 · the same shape for every operation — §036's four, the delta in each one's own units
     ✦ Compacting conversation… (5m 38s · ↓ 8.0k tokens)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
     ✦ Indexing the repository… (12s · 4,102 of 9,318 files)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 44%
     ✦ Uploading the checkpoint… (64s · 2.1 of 4.8 GiB)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 44%
     ✦ Running the suite… (31s · 892 of 1,204 tests)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 74%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 74%
 
 ── §95 · a tape, where a row of peers would shed
 scout 4s ✓  planner 1m12s ✓  › builder ⋅ 8s  critic 2s ○  scribe 0s ○
@@ -3809,7 +3809,7 @@ beads ••••••••••••••••••••••••�
 posts ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 70%
 slant ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 70%
 squares ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■□□□□□□□□□□□□□□□□□□□□ 70%
-braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿                     70%
+braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣇                     70%
 ascii #################################################--------------------- 70%
 ── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
 · the fills — 24 bits, one letter per distinct ink, assigned within the row
@@ -3923,13 +3923,13 @@ ascii #################################################--------------------- 70%
 · BUDGET · capacity · continuous · still
 work ████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░ 62%  31/50
 · OPERATION · progress · segmented · active
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 62%
 · a training run · progress · continuous · active
 work ████████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░ 62%
 · a step count · count · segmented · still
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 31 of 50
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 31 of 50
 · stalled · progress · segmented · stalled
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ................................................................................ ── serving/volatility-estimator.yaml ───────────────────────────────────────────

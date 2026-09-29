@@ -1216,7 +1216,25 @@ describe("C04 I144, I146, I148 — what a tape member, a bar and an overshoot ma
     expect(tape([good], { current: "gone" }).ok, "a current naming no member is valid (C5, T1.48)").toBe(true);
     expect(tape([{ id: "c", label: "count" }]).ok, "no detail and no state").toBe(true);
   });
-  it.todo("T2.151 (C04 I146, §3as): painted, quantity, granularity and liveness are refused outside their unions, and style only when not a string — not deferred on a component: the code lands in the next commit of this round");
+  it("T2.151 (C04 I146, §3as): painted, quantity, granularity and liveness are refused outside their unions, and style only when not a string", () => {
+    const bar = (extra: Record<string, unknown>) =>
+      validateBlock({ kind: "progress", id: "g", label: "x", current: 3, total: 10, ...extra });
+    const refused = (extra: Record<string, unknown>, pattern: RegExp): void => {
+      const got = bar(extra);
+      expect(got.ok, JSON.stringify(extra)).toBe(false);
+      expect(got.ok ? "" : got.error.join("\n"), JSON.stringify(extra)).toMatch(pattern);
+    };
+    refused({ painted: "yes" }, /"painted" must be a boolean/u);
+    refused({ quantity: "progres" }, /"quantity" is outside its union.*"capacity", "progress", "count"/u);
+    refused({ granularity: "stepped" }, /"granularity" is outside its union/u);
+    refused({ liveness: "moving" }, /"liveness" is outside its union/u);
+    refused({ style: 3 }, /"style" must be a string/u);
+    for (const painted of [true, false]) expect(bar({ painted }).ok, `painted ${String(painted)}`).toBe(true);
+    for (const quantity of ["capacity", "progress", "count"]) expect(bar({ quantity }).ok, quantity).toBe(true);
+    for (const granularity of ["continuous", "segmented"]) expect(bar({ granularity }).ok, granularity).toBe(true);
+    for (const liveness of ["still", "active", "stalled"]) expect(bar({ liveness }).ok, liveness).toBe(true);
+    expect(bar({ style: "no-such-style" }).ok, "an unknown style name is the default, not a refusal").toBe(true);
+  });
   it("T2.152 (C04 I148, §5c.1): overshoot is accepted on a gradient over a slot pair and refused everywhere else and out of range", () => {
     const stop = { lift: 1.35, share: 0.35 };
     const onBar = (ramp: unknown) => validateBlock({ kind: "progress", id: "g", label: "x", current: 3, total: 10, ramp });
