@@ -90,3 +90,8 @@ describe("C09 I121 — the focus carrier at every depth", () => {
     }
   });
 });
+
+describe("C09 I137 — each kind declares its focus shape", () => {
+  it.todo("T2.228 (C09 I137): the kinds declaring elements equal the kinds declaring focusShape, by equality, over a constructed session's registry — not deferred on a component: it lands with I137\'s code in review batch 4 M16.5");
+  it.todo("T2.229 (C09 I137, I121, R-COL-005): each declared shape's signature holds over every element of every declaring kind — not deferred on a component: it lands with I137\'s code in review batch 4 M16.5");
+});

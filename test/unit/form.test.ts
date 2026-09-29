@@ -198,3 +198,7 @@ describe("C04 §3ar — form", () => {
     expect(mono.find((l) => l.includes("not a port number"))!.replace(SGR, "").trim()).toBe("\u2717 not a port number");
   });
 });
+
+describe("C09 I137 — a form is a control and inverts at 1-bit", () => {
+  it.todo("T3.131 (C09 I137, I119): at 1-bit a focused field or button inverts exactly its shape, and a non-default button's focused frame differs from rest in visible attributes — not deferred on a component: it lands with I137\'s code in review batch 4 M16.5");
+});

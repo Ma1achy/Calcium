@@ -29,3 +29,9 @@ describe("C09 I132 — tier 6", () => {
     expect(chosen.style.attrs, "the chosen mark carries the weight as well").toEqual([1]);
   });
 });
+
+describe("C09 I137 — tier 6", () => {
+  it.todo("T6.189 (C09 I137): the shed rows' focus gate or treatment removed → T1.151 and T2.229 fail — not deferred on a component: it lands with I137\'s code in review batch 4 M16.5");
+  it.todo("T6.190 (C09 I137, I100): the ground behind a frame child restored, or the focus not forwarded → T1.152 fails — not deferred on a component: it lands with I137\'s code in review batch 4 M16.5");
+  it.todo("T6.191 (C09 I137, I119): form reading focusStyle again → T2.229 and T3.131 fail; its focusShape removed → T2.228 fails — not deferred on a component: it lands with I137\'s code in review batch 4 M16.5");
+});

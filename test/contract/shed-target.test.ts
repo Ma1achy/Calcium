@@ -316,3 +316,7 @@ describe("C09 I124, I125 — ruling 42: a shed row expands its block in place", 
     }
   });
 });
+
+describe("C09 I137 — a shed row is a row shape and draws its focus", () => {
+  it.todo("T1.151 (C09 I137, I113): a focused shed row takes focusGround and weight, a selected one selection's ground, and a stale focus at a wide width paints nothing — not deferred on a component: it lands with I137\'s code in review batch 4 M16.5");
+});

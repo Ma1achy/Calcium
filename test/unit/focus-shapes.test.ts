@@ -226,3 +226,7 @@ describe("C09 I132 — a chosen option carries its mark and its weight", () => {
     }
   });
 });
+
+describe("C09 I137 — a pane holding a frame is lit through its child", () => {
+  it.todo("T1.152 (C09 I137, I100): a mosaic or split pane holding a framed plot lights the plot's frame and paints no ground; a raw-holding pane keeps the ground — not deferred on a component: it lands with I137\'s code in review batch 4 M16.5");
+});
