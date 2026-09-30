@@ -194,6 +194,10 @@ describe("§4 (T1.7) — every row of the mapping table", () => {
     valid(doc);
   });
 
+  it.todo(
+    "T1.23 (C07 I24, F1493): a cancelled result's notice is muted with the cancelled mark, from cancelledNotice — not deferred on a component: lands with the F1490 code commit of review batch 4",
+  );
+
   it("T3.20: cancelled and timedOut both set → partial, per the precedence", () => {
     const doc = registry.adapt(raw({ cancelled: true, timedOut: true, exitCode: null }), CTX);
     expect(doc.status).toBe("partial");

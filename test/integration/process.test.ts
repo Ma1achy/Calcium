@@ -445,6 +445,12 @@ describe("C21 with C06", () => {
       "SIGKILL: meta 137 · recorded /tty vim 137",
     ]);
   });
+  it.todo(
+    "T4.100 (C23 I100, C21 I19, ruling 98, F1491): the shell route's code is C07 I14's — 137 for SIGKILL on both arms, -1 and `did not start` for a spawn failure — not deferred on a component: lands with the F1491 code commit of review batch 4",
+  );
+  it.todo(
+    "T4.101 (C23 I29, C23 I5, F1492): a line a ⌃c cleared from the queue is recorded in C20 at settlement, as -1 — not deferred on a component: lands with the F1492 code commit of review batch 4",
+  );
   it("T4.7 (with C22): session exit signals every child before the terminal is released", async () => {
     // A02 Seam 4's `Shutdown` row, and the whole claim is the **order**: a
     // child still running when the alternate screen is released writes onto the

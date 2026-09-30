@@ -96,4 +96,7 @@ describe("C23 §5 — errorDoc", () => {
 
     expect(doc.error, "the document carries what the far side said").toEqual(error);
   });
+  it.todo(
+    "T1.106 (C23 I100, ruling 98, F1491): an error document composed with no code carries 1, noticeDoc and errorDoc alike — not deferred on a component: lands with the F1491 code commit of review batch 4",
+  );
 });

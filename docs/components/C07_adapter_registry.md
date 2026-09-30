@@ -178,7 +178,7 @@ Evaluated top to bottom; **the first match wins**. `cancelled` outranks `timedOu
 
 | Condition | Status | Document |
 |---|---|---|
-| `cancelled` | `partial` | Whatever was produced, plus a muted "cancelled" notice. Includes the invocation aborted before anything was spawned — nothing ran, and nothing failed |
+| `cancelled` | `partial` | Whatever was produced, plus a muted notice with the `cancelled` mark (⊘), from `cancelledNotice` (I24). Includes the invocation aborted before anything was spawned — nothing ran, and nothing failed |
 | `timedOut` | `error` | `TIMEOUT` envelope naming the elapsed budget |
 | `exitCode === 0` | `ok` | Adapter output |
 | `exitCode === 1` | `error` | Envelope parsed from stdout; if absent, synthesised from stderr |
@@ -387,6 +387,7 @@ The first two lines are right and the third sends the reader to debug an adapter
 - **I21** — `flags` carries C05's validated flag **values**, not tokens (C05 I21). It is what makes `shellOnly` usable: a flag the shell consumes is absent from `argv` by construction, so an adapter reading `raw.argv` cannot see the thing that selects its own rendering. `userRequestedJson` is this field hardcoded for one flag and stays, because `--json` is transmitted and `--raw` is not — two axes, two fields.
 - **I22** — **An overflowed `RawResult` produces a document carrying an overflow `notice`, on every route, and `meta.truncated` is not how it is recorded.** The block is appended in `finish` so no route can omit it, its id yields to a collision rather than failing validation, and `meta.truncated` keeps I13's meaning — the fallback capped rows — so the two causes stay distinguishable to the reader and to anything that reads `meta`. C23's `shell` route, which does not pass through the registry, appends the same block (§4).
 - **I23** — **A far side that wrote nothing and an adapter that failed are two notices, and the discriminator is `stdoutRaw`.** When a registered adapter throws with nothing on standard output the notice names the missing output and not the adapter; with a payload present it names the adapter, because an adapter handed bytes it cannot render is at fault and the reader should be sent to it. `outcome.status` is not the test — it is `ok` when a command succeeds silently and `error` when a failing command still emits a payload, so it is wrong in both directions (§7a, F996). Both notices are muted and both are appended last, after the far side's own.
+- **I24** — *(C23 I96, C23 I99, C04 I6, F1493)* **A cancelled result's notice is the `cancelled` call state: `muted`, with the `cancelled` mark (⊘, `/` in ASCII), composed by `cancelledNotice`.** That function is the one composer of the cancel form, used by this mapping and by every C23 route that settles a cancel into a document (C23 I96). It lives here because L0 is the one layer both can import. A second copy would be a second place for the mark to go missing. **Reachability, measured:** the shell's own invocation reached this arm only as the far side's late answer after a cancel. C23 I99 now drops that answer, so the shell no longer reaches it. A consumer that drives `createAdapterRegistry` with a cancelled `RawResult` does reach it, and so does every row that calls `adapt` directly. *As it stood:* ~~`muted` with no glyph~~. The status and the tone were the cancelled state's, but the mark was not. → T1.23, T6.15
 
 ---
 
@@ -417,6 +418,7 @@ The first two lines are right and the third sends the reader to debug an adapter
 23. `flags` carries validated values, which is what makes a `shellOnly` flag readable by the adapter whose rendering it selects (I21).
 24. An overflowed result says so in a `notice` the reader sees, on every route, and `meta.truncated` goes on meaning what I13 says it means (I22).
 25. **A notice names the layer that actually failed** (I23). A command that produced nothing and an adapter that could not render what it was given are two sentences, discriminated by `stdoutRaw` rather than by status — because a status test is wrong at a silent success and at a failure that still emitted a payload (§7a, F996).
+26. **A cancelled result is drawn as the `cancelled` call state, by the same composer as every cancel the shell draws** (I24).
 
 ---
 
@@ -447,6 +449,7 @@ Six tiers. Every cell of the §8 transition table is covered.
 - **T1.19** (I14): each `meta.exitCode` case — an exit code, `SIGTERM` → 143, an unrecognised signal name → 128, both null → −1.
 - **T1.20** (I14, §4): an invocation aborted before spawn → `partial` with `meta.exitCode` −1, not an error. Same code as a spawn failure, opposite status.
 - **T1.22** (I23, §7a, F996): **all four cells of the table, in one row, because the axis is what the finding got wrong.** A registered adapter that throws is driven with (far side ok · a payload), (ok · empty), (error · empty) and (error · a payload); the two empty cells name the missing output and never the adapter, the two payload cells name the adapter, and **the set that moves is asserted to be exactly the two empty ones** — which buys nothing over four per-cell assertions today and everything at the fifth cell, since a case added to the table is constrained the moment it exists. That correction came from the mutation pass; the reason first written down was wrong. A fifth case — `cancelled`, whose status is `partial` — takes the empty arm, which is the case a status test misses in the third direction. The control is that all four still render through the fallback and all four documents are valid.
+- **T1.23** (I24, F1493): `cancelled` with forty lines and with none → the last block's kind, tone, glyph and text as one string each: `notice muted cancelled · Cancelled. Output produced before the stop is shown above.` The control is `timedOut`, whose notice is `error` with the `error` mark.
 - **T1.21** (I22): a `RawResult` with `overflowed: true` through the fallback route, the identity route and the last resort → each document carries one `notice` naming the cut and `meta.truncated` is `false`; the same three with `overflowed: false` carry none. An identity document that already uses the id `overflowed` → the notice is appended under a suffixed id and the document is not the last resort.
 
 ### Tier 2 — contract / interface
@@ -521,6 +524,7 @@ Six tiers. Every cell of the §8 transition table is covered.
 - **T6.12** (I15): a caller passing a constant `seq` → C23's T1.7b fails on the sequence *and* on the blocks that reached the entry. Named here as well as in C23 because the number is spent here and supplied there: nothing in this component can detect it, since every test constructs its own `StreamContext` and supplies the counter correctly by construction.
 - **T6.13** (I12): dropping the `malformed` patch that precedes `degraded` → T3.19c fails, and every degraded stream loses its first remainder line silently.
 - **T6.14** (I22): recording the overflow as `meta.truncated` instead of the notice, in `finish` or on C23's `shell` route → T1.21 and C23's T3.20 fail, and a cut result reads as a capped one to the only field that records either. Dropping the append on C23's stream route → C23's T3.20a fails — the route that carried the flag and read it nowhere.
+- **T6.15** (I24): the mark dropped from `cancelledNotice` → **T1.23** fails on both rows, and C23 **T4.94**, **T4.95** and **T4.97** fail with it, because it is one composer. `tools/mutate/runs/c23-app-cancel.mjs`.
 
 ---
 
