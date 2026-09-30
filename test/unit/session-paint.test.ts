@@ -434,7 +434,7 @@ describe("C22 — the selection wash (roadmap entry 23)", () => {
   /** The painted index of prompt row `i`: header + viewport, then the prompt. */
   const promptAt = (f: Composed, i: number): number => f.region.top + f.region.height + 1 + i; // header, its rule, region, the upper rule
 
-  it("T4.22 (C11 I17, I9): the wash is appearance — no row and no cell moves", () => {
+  it("C22 T4.22 (C11 I17, I9): the wash is appearance — no row and no cell moves", () => {
     // **The invariant at every step, not a note about this one.** A row of
     // chrome — a marker line, a bracket, a status row — is forbidden by the
     // same rule that makes the wash free.
@@ -772,7 +772,7 @@ describe("C22 §4a — one overlay layout per frame, shared by the rows and the 
     expect(calls, "the thunk answered once for both").toBe(1);
   });
 
-  it("T4.64 (C09 I61, C22 I86; C28 I31): a real session's chrome children are measured once per registry call — the header pair once per frame and the footer pair twice, for compose's own call", async () => {
+  it("C22 T4.64 (C09 I61, C22 I86; C28 I31): a real session's chrome children are measured once per registry call — the header pair once per frame and the footer pair twice, for compose's own call", async () => {
     let seen: ProfileReport | null = null;
     const { tui } = await buildSession({
       profile: {

@@ -68,7 +68,7 @@ const MUTATIONS = [
     file: MENU,
     from: "    { kind: \"raw\", id: `${MENU_ID}-more`, text: `+ ${String(remainder)} more` } satisfies Block,\n  ]);",
     to: "    { kind: \"raw\", id: `${MENU_ID}-more`, text: `+ ${String(remainder)} more` } satisfies Block,\n    { ...top, id: `${MENU_ID}-edge` },\n  ]);",
-    // Not C22's session T4.34, which the first draft named and which stays
+    // Not the session's C19 T4.12 (titled T4.34 then, F1489), which the first draft named and which stays
     // green: the rule lands one row past the box and the frame cuts it, so no
     // stacked rule reaches the screen. The pass scored it caught because the id
     // was in the output (F1472); the FAIL lines named T4.9 (C19 T6.26).

@@ -324,11 +324,7 @@ describe("C22 §6c — the cache's C13 arms", () => {
     expect(forward, "sorted, not insertion-ordered").toBe("a=1,z=1");
   });
 
-  it.todo(
-    "C22 T4.18h (I58, C04 I48, F1489): the offsets drop on the same subscription as the rendered rows — not deferred on a component: the T4.18f row below is retitled to it in the next commit, F1489",
-  );
-
-  it("T4.18f (C04 I48): the offsets drop on the same subscription as the rendered rows", async () => {
+  it("C22 T4.18h (I58, C04 I48): the offsets drop on the same subscription as the rendered rows", async () => {
     // **One callback for both**, so a future eviction path cannot reach one and
     // miss the other. Driven through `clear`, which is the arm the real graph
     // can reach (T4.18a's note explains why `evict` is not drivable here).

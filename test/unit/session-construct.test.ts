@@ -417,11 +417,7 @@ describe("C22 §3 — construction order", () => {
     expect(graph.capabilities.colourDepth).toBe(8);
   });
 
-  it.todo(
-    "C22 T1.183 (C01 I13, F1489): the viewport is built against the real terminal width — not deferred on a component: the T1.14 row below is retitled to it in the next commit, F1489",
-  );
-
-  it("T1.14 (C01 I13): the viewport is built against the real terminal width", async () => {
+  it("C22 T1.183 (C01 I13): the viewport is built against the real terminal width", async () => {
     // The pair §3a could not see, because the constraint lives in C01. The
     // viewport takes width and height at step 5; only `lifecycle.ts` may read
     // them; and the lifecycle is step 7 and cannot move, because I1. Resolved

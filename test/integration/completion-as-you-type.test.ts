@@ -299,7 +299,7 @@ describe("C19 §6 — the menu's edges", () => {
     // continuous with the transcript above it. **The bottom one is the
     // prompt's since ruling 90** (F1475): C22 I81 draws a rule above the
     // prompt on every frame, and a rule of the menu's own stacked two. So the
-    // menu's last row is a candidate, and C22's session T4.34 reads the rule
+    // menu's last row is a candidate, and the session's C19 T4.12 reads the rule
     // under it.
     const first = rows[0] ?? "";
     const last = rows[rows.length - 1] ?? "";

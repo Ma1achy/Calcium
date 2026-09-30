@@ -158,7 +158,9 @@ const results = runPass({
       file: "src/shell/construct.ts",
       from: "  const size = terminalSize(config.stdout);",
       to: "  const size = { columns: 80, rows: 24 };",
-      expect: "T1.14",
+      // C22 T1.183, titled T1.14 until F1489: C01 declares no T1.14 and C22's
+      // is the lone `Esc` (A03 SP16).
+      expect: "T1.183",
     },
     {
       name: "acquire the terminal during construction (I2)",

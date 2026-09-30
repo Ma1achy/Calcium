@@ -117,7 +117,7 @@ describe("C22 §6b — the write is a difference", () => {
     expect(screen().rows, "showing the same thing it showed before").toEqual(rowsBefore);
   });
 
-  it("T4.33 (C19 I23, C15 I14): a resize moves the open menu with the region", async () => {
+  it("C22 T4.33 (C19 I23, C15 I14): a resize moves the open menu with the region", async () => {
     // **Read from the screen, because the anchor number agrees with the wrong
     // place.** An anchored layer stores the row it was placed against, and
     // every writer of that row was a keystroke path: the resize handler
@@ -201,11 +201,7 @@ describe("C22 §6b — the write is a difference", () => {
     );
   });
 
-  it.todo(
-    "C19 T4.12 (I23, entry 16, ruling 90, F1489): the truncated menu's indicator is on the screen, and the menu closes on the prompt's rule — not deferred on a component: the T4.34 row below is retitled to it in the next commit, F1489",
-  );
-
-  it("T4.34 (C19 I23, entry 16, ruling 90): the truncated menu's indicator is on the screen, and the menu closes on the prompt's rule", async () => {
+  it("C19 T4.12 (I23, entry 16, ruling 90): the truncated menu's indicator is on the screen, and the menu closes on the prompt's rule", async () => {
     // **Through the real wiring, because that is where it was missing.** The
     // window and the remainder are both unit-tested and both were right; what
     // shipped was a call site that handed C15 every candidate and let the frame
@@ -1198,7 +1194,7 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
 });
 
 describe("C22 — native selection, entered and left (C16 §5b, C03 §4a)", () => {
-  it("T4.30 (C16 §5b B1): ⌥⇧C enters, the header says NATIVE, mouse tracking goes off", async () => {
+  it("C22 T4.30 (C16 §5b B1): ⌥⇧C enters, the header says NATIVE, mouse tracking goes off", async () => {
     // **`⌥⇧C`, not `⌥v`, since M6** (C16 §6a): the registry gives `⌥v` to
     // `values.toggle` and native selection its own two chords — `⌥⇧C` native handoff,
     // `⌥⇧V` semantic. Nothing was invented for this; the design supplied both.
@@ -1235,7 +1231,7 @@ describe("C22 — native selection, entered and left (C16 §5b, C03 §4a)", () =
     expect(screen().rows[0]).toContain("NATIVE");
   });
 
-  it("T4.31 (C16 §5b B1, I62): esc leaves it, and the screen comes back", async () => {
+  it("C22 T4.31 (C16 §5b B1, I62): esc leaves it, and the screen comes back", async () => {
     const stdin = fakeStdin();
     const { stdout, screen, clock } = await buildSession({ stdin: stdin as never });
 
@@ -1262,7 +1258,7 @@ describe("C22 — native selection, entered and left (C16 §5b, C03 §4a)", () =
     expect(stdout.output.slice(before.length), "tracking back on").toContain("[?1002h");
   });
 
-  it("T4.32 (C03 I13): while native selection is up, output does not move the screen", async () => {
+  it("C22 T4.32 (C03 I13): while native selection is up, output does not move the screen", async () => {
     // The whole point of the suspension, at the level where it is visible:
     // a selection the reader is taking must not come to mean other text.
     const stdin = fakeStdin();
@@ -1333,7 +1329,7 @@ describe("C22 — native selection: the order inside the exit, and the far side 
     for (let i = 0; i < 4; i += 1) await Promise.resolve();
   };
 
-  it("T4.31b (C16 §5b B1, C01 I10): after esc the tracking pair is the first thing written, before any byte of the frame", async () => {
+  it("C22 T4.31b (C16 §5b B1, C01 I10): after esc the tracking pair is the first thing written, before any byte of the frame", async () => {
     const stdin = fakeStdin();
     const { stdout, screen, clock } = await buildSession({ stdin: stdin as never });
     const type = typer(stdin);
@@ -1360,7 +1356,7 @@ describe("C22 — native selection: the order inside the exit, and the far side 
     ).toBe(true);
   });
 
-  it("T4.32b (C03 I13, C16 §5b B4): a verb settling during native selection writes nothing; the exit's one frame carries it", async () => {
+  it("C22 T4.32b (C03 I13, C16 §5b B4): a verb settling during native selection writes nothing; the exit's one frame carries it", async () => {
     const stdin = fakeStdin();
     let settle: ((doc: unknown) => void) | null = null;
     const { stdout, screen, clock } = await buildSession({
@@ -1403,7 +1399,7 @@ describe("C22 — native selection: the order inside the exit, and the far side 
     expect(screen().text.join("\n"), "and it carries what settled under the hold").toContain(TEXT);
   });
 
-  it("T4.32c (C16 §5c C5): ⌥⇧C a second time in native selection writes nothing — one 1002l, not two", async () => {
+  it("C22 T4.32c (C16 §5c C5): ⌥⇧C a second time in native selection writes nothing — one 1002l, not two", async () => {
     const stdin = fakeStdin();
     const { stdout, screen } = await buildSession({ stdin: stdin as never });
     const type = typer(stdin);

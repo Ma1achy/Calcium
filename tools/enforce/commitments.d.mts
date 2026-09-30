@@ -200,6 +200,20 @@ export declare function checkRowFiles(
   exempt?: readonly string[],
 ): { violations: Violation[]; rows: number; unowned: number; split: number };
 
+/** SP16 — every test row id a spec declares retired: struck, or headed superseded, retired or struck. */
+export declare function retiredRowsOf(
+  file: string,
+  readFile?: (file: string) => string,
+): Set<string>;
+
+/** A03 SP16 — a titled row locates the row its spec declares, not the file owner's and not a retired one. */
+export declare function checkRowResolves(
+  testFiles: readonly string[],
+  specs: readonly string[],
+  readFile?: (file: string) => string,
+  exempt?: readonly string[],
+): { violations: Violation[]; rows: number; misfiled: number; dangling: number };
+
 /** Every invariant a spec lists as retired, each carrying a finding number. */
 export declare function retiredInvariantsOf(
   file: string,
