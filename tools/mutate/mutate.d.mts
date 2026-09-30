@@ -43,7 +43,8 @@ export type Mutation = Readonly<{
   file: string;
   from: string;
   to: string;
-  expect: string;
+  /** The row expected to catch it; `null` for a declared survivor, which names none. */
+  expect: string | null;
   /**
    * Further edits applied with this one, for **two wirings each sufficient
    * alone** (F227): a revert row about a pair has to break the pair, or the
@@ -61,9 +62,13 @@ export type Control = Readonly<{ file: string; from: string; to: string; why: st
 
 export type Outcome = Readonly<{
   name: string;
-  expect: string;
+  expect: string | null;
   killed: boolean;
-  byNamedTest?: boolean;
+  /**
+   * Did the row `expect` names fail — `null` when the run printed no `FAIL` line
+   * to say, which the report calls a kill whose named check was unavailable.
+   */
+  byNamedTest?: boolean | null;
   anchorMissed?: boolean;
   /**
    * The anchor matched more than once and was refused — `replace()` would take
@@ -124,13 +129,32 @@ export declare function fsIo(root: string): {
 };
 
 /** How many places an anchor matches — `replace` takes the first (F219, F1037). */
+/** A run's `FAIL` lines, colour stripped — the only lines saying a row failed (F1472). */
+export declare function failLines(output: string): string[];
+
+/**
+ * The row ids a `FAIL` line names, one list per `>` segment after the file: the
+ * run of ids at each segment's head, and nothing a title merely cites (F1472).
+ */
+export declare function rowsOn(line: string): string[][];
+
 /**
  * The row ids on a run's `FAIL` lines — what caught a mutation when the row it
- * expected did not. Read off the **last** `>` segment: vitest prints
- * `FAIL <file> > <describe> > <row>`, and a describe opens with a component id,
- * so reading left to right names the component rather than the row.
+ * expected did not. Read off the **innermost** segment with an id at its head,
+ * less a component qualifier: vitest prints `FAIL <file> > <describe> > <row>`,
+ * a describe opens with a component id, and a row may be a describe whose cases
+ * are unnumbered (F1472).
  */
 export declare function failedRows(output: string): string[];
+
+/**
+ * Did the thing `expect` names fail? Read from the `FAIL` lines, never the whole
+ * output, which lists a passing row's ✓ under a file that failed (F1472). An id
+ * is matched at a segment's head with its boundary, anything else as a substring
+ * of the line; `null` names nothing. `null` back when the run printed no `FAIL`
+ * line at all, so the kill cannot be attributed either way.
+ */
+export declare function namedFailed(output: string, expect: string | null): boolean | null;
 
 export declare function hitsOf(src: string, from: string): number;
 

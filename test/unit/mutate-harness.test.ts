@@ -17,9 +17,11 @@ import {
   AnchorError,
   apply,
   BlindHarnessError,
+  failedRows,
   hitsOf,
   incomplete,
   killed,
+  namedFailed,
   report,
   runPass,
   strip,
@@ -82,6 +84,122 @@ const WHOLE_FAILED =
 const WHOLE_DEFERRED =
   `${E}[2m      Tests ${E}[22m ${E}[1m${E}[32m2 passed${E}[39m${E}[22m${E}[2m | ${E}[22m` +
   `${E}[33m2 skipped${E}[39m${E}[2m | ${E}[22m${E}[90m1 todo${E}[39m${E}[90m (5)${E}[39m`;
+
+/**
+ * **One file, one row failing and one passing, as bytes** (F1472) — captured
+ * 2026-09-30 from vitest 4.1.10 over a two-row file. Row B's title is in this
+ * output three times, and it passed: once on its own `✓` line under the file
+ * that failed, and once in the code frame printed beneath row A's failure. A
+ * substring test over the whole output finds it either way, which is how both
+ * of `c22-key-targets.mjs`'s mutations read `caught T1.4h` when the only
+ * `FAIL` line was C16 T2.17.
+ */
+const ONE_FILE = `
+${E}[1m${E}[30m${E}[46m RUN ${E}[49m${E}[39m${E}[22m ${E}[36mv4.1.10 ${E}[39m${E}[90m/workspace/out/b4-harness-cap${E}[39m
+
+ ${E}[31m❯${E}[39m rows.test.mjs ${E}[2m(${E}[22m${E}[2m2 tests${E}[22m${E}[2m | ${E}[22m${E}[31m1 failed${E}[39m${E}[2m)${E}[22m${E}[32m 6${E}[2mms${E}[22m${E}[39m
+${E}[31m     ${E}[31m×${E}[31m T9.1 (fixture): row A fails${E}[39m${E}[32m 5${E}[2mms${E}[22m${E}[39m
+     ${E}[32m✓${E}[39m T9.2 (fixture): row B passes${E}[32m 0${E}[2mms${E}[22m${E}[39m
+
+${E}[31m⎯⎯⎯⎯⎯⎯⎯${E}[39m${E}[1m${E}[41m Failed Tests 1 ${E}[49m${E}[22m${E}[31m⎯⎯⎯⎯⎯⎯⎯${E}[39m
+
+${E}[41m${E}[1m FAIL ${E}[22m${E}[49m rows.test.mjs${E}[2m > ${E}[22mC99 — one file, one failing row and one passing${E}[2m > ${E}[22mT9.1 (fixture): row A fails
+${E}[31m${E}[1mAssertionError${E}[22m: expected 1 to be 2 // Object.is equality${E}[39m
+
+${E}[32m- Expected${E}[39m
+${E}[31m+ Received${E}[39m
+
+${E}[32m- 2${E}[39m
+${E}[31m+ 1${E}[39m
+
+${E}[36m ${E}[2m❯${E}[22m rows.test.mjs:${E}[2m3:53${E}[22m${E}[39m
+    ${E}[90m  1|${E}[39m ${E}[35mimport${E}[39m { describe${E}[33m,${E}[39m expect${E}[33m,${E}[39m it } ${E}[35mfrom${E}[39m ${E}[32m"vitest"${E}[39m${E}[33m;${E}[39m
+    ${E}[90m  2|${E}[39m ${E}[34mdescribe${E}[39m(${E}[32m"C99 — one file, one failing row and one passing"${E}[39m${E}[33m,${E}[39m () ${E}[33m=>${E}[39m {
+    ${E}[90m  3|${E}[39m   ${E}[34mit${E}[39m(${E}[32m"T9.1 (fixture): row A fails"${E}[39m${E}[33m,${E}[39m () ${E}[33m=>${E}[39m ${E}[34mexpect${E}[39m(${E}[34m1${E}[39m)${E}[33m.${E}[39m${E}[34mtoBe${E}[39m(${E}[34m2${E}[39m))${E}[33m;${E}[39m
+    ${E}[90m   |${E}[39m                                                     ${E}[31m^${E}[39m
+    ${E}[90m  4|${E}[39m   ${E}[34mit${E}[39m(${E}[32m"T9.2 (fixture): row B passes"${E}[39m${E}[33m,${E}[39m () ${E}[33m=>${E}[39m ${E}[34mexpect${E}[39m(${E}[34m1${E}[39m)${E}[33m.${E}[39m${E}[34mtoBe${E}[39m(${E}[34m1${E}[39m))${E}[33m;${E}[39m
+    ${E}[90m  5|${E}[39m })${E}[33m;${E}[39m
+
+${E}[31m${E}[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯${E}[22m${E}[39m
+
+
+${E}[2m Test Files ${E}[22m ${E}[1m${E}[31m1 failed${E}[39m${E}[22m${E}[90m (1)${E}[39m
+${E}[2m      Tests ${E}[22m ${E}[1m${E}[31m1 failed${E}[39m${E}[22m${E}[2m | ${E}[22m${E}[1m${E}[32m1 passed${E}[39m${E}[22m${E}[90m (2)${E}[39m
+
+`;
+
+/**
+ * **Every shape a row takes on a `FAIL` line, as bytes** (F1472) — the same
+ * session, one file. Measured over `vitest list` and every id-shaped `expect` in
+ * `tools/mutate/runs/`: a single id, a component-qualified pair, a row that is a
+ * `describe` with unnumbered cases, a case citing another row, an `it.each`
+ * member, a case titled for two rows by a comma and by a `·`, and a row under a
+ * describe that opens with a component id. Rows T9.2
+ * and T9.4 passed, and T9.4 is a prefix of T9.4h, which failed.
+ */
+const SHAPES = `
+${E}[1m${E}[30m${E}[46m RUN ${E}[49m${E}[39m${E}[22m ${E}[36mv4.1.10 ${E}[39m${E}[90m/workspace/out/b4-harness-cap${E}[39m
+
+ ${E}[31m❯${E}[39m shapes.test.mjs ${E}[2m(${E}[22m${E}[2m11 tests${E}[22m${E}[2m | ${E}[22m${E}[31m8 failed${E}[39m${E}[2m)${E}[22m${E}[32m 19${E}[2mms${E}[22m${E}[39m
+${E}[31m     ${E}[31m×${E}[31m T9.1 (fixture): row A fails${E}[39m${E}[32m 9${E}[2mms${E}[22m${E}[39m
+     ${E}[32m✓${E}[39m T9.2 (fixture): row B passes${E}[32m 0${E}[2mms${E}[22m${E}[39m
+     ${E}[32m✓${E}[39m T9.4 (fixture): a prefix of the failing row passes${E}[32m 0${E}[2mms${E}[22m${E}[39m
+${E}[31m     ${E}[31m×${E}[31m C98 T9.4h (fixture): a component-qualified row fails${E}[39m${E}[32m 1${E}[2mms${E}[22m${E}[39m
+     ${E}[32m✓${E}[39m T9.5 (fixture): each one${E}[32m 0${E}[2mms${E}[22m${E}[39m
+${E}[31m     ${E}[31m×${E}[31m T9.5 (fixture): each two${E}[39m${E}[32m 1${E}[2mms${E}[22m${E}[39m
+${E}[31m       ${E}[31m×${E}[31m an unnumbered case fails${E}[39m${E}[32m 1${E}[2mms${E}[22m${E}[39m
+${E}[31m       ${E}[31m×${E}[31m the case fails, which HX7 asserts and this records${E}[39m${E}[32m 1${E}[2mms${E}[22m${E}[39m
+${E}[31m     ${E}[31m×${E}[31m T9.7, T9.8 (fixture): one case titled for two rows fails${E}[39m${E}[32m 1${E}[2mms${E}[22m${E}[39m
+${E}[31m     ${E}[31m×${E}[31m XB1 · T9.9 (fixture): a pair written with a middle dot fails${E}[39m${E}[32m 0${E}[2mms${E}[22m${E}[39m
+${E}[31m     ${E}[31m×${E}[31m T9.6: the row inside fails${E}[39m${E}[32m 1${E}[2mms${E}[22m${E}[39m
+
+${E}[31m⎯⎯⎯⎯⎯⎯⎯${E}[39m${E}[1m${E}[41m Failed Tests 8 ${E}[49m${E}[22m${E}[31m⎯⎯⎯⎯⎯⎯⎯${E}[39m
+
+${E}[41m${E}[1m FAIL ${E}[22m${E}[49m shapes.test.mjs${E}[2m > ${E}[22mC99 — the shapes a row takes on a FAIL line${E}[2m > ${E}[22mT9.1 (fixture): row A fails
+${E}[41m${E}[1m FAIL ${E}[22m${E}[49m shapes.test.mjs${E}[2m > ${E}[22mC99 — the shapes a row takes on a FAIL line${E}[2m > ${E}[22mC98 T9.4h (fixture): a component-qualified row fails
+${E}[41m${E}[1m FAIL ${E}[22m${E}[49m shapes.test.mjs${E}[2m > ${E}[22mC99 — the shapes a row takes on a FAIL line${E}[2m > ${E}[22mHX1 (fixture): a row that is a describe block${E}[2m > ${E}[22man unnumbered case fails
+${E}[41m${E}[1m FAIL ${E}[22m${E}[49m shapes.test.mjs${E}[2m > ${E}[22mC99 — the shapes a row takes on a FAIL line${E}[2m > ${E}[22mHX10 (fixture): a describe whose case cites another row${E}[2m > ${E}[22mthe case fails, which HX7 asserts and this records
+${E}[41m${E}[1m FAIL ${E}[22m${E}[49m shapes.test.mjs${E}[2m > ${E}[22mC99 — the shapes a row takes on a FAIL line${E}[2m > ${E}[22mT9.7, T9.8 (fixture): one case titled for two rows fails
+${E}[41m${E}[1m FAIL ${E}[22m${E}[49m shapes.test.mjs${E}[2m > ${E}[22mC99 — the shapes a row takes on a FAIL line${E}[2m > ${E}[22mXB1 · T9.9 (fixture): a pair written with a middle dot fails
+${E}[41m${E}[1m FAIL ${E}[22m${E}[49m shapes.test.mjs${E}[2m > ${E}[22mC98 — a describe opening with a component id${E}[2m > ${E}[22mT9.6: the row inside fails
+${E}[31m${E}[1mAssertionError${E}[22m: expected 1 to be 2 // Object.is equality${E}[39m
+
+${E}[32m- Expected${E}[39m
+${E}[31m+ Received${E}[39m
+
+${E}[32m- 2${E}[39m
+${E}[31m+ 1${E}[39m
+
+${E}[36m ${E}[2m❯${E}[22m fail shapes.test.mjs:${E}[2m2:30${E}[22m${E}[39m
+    ${E}[90m  1|${E}[39m ${E}[35mimport${E}[39m { describe${E}[33m,${E}[39m expect${E}[33m,${E}[39m it } ${E}[35mfrom${E}[39m ${E}[32m"vitest"${E}[39m${E}[33m;${E}[39m
+    ${E}[90m  2|${E}[39m ${E}[35mconst${E}[39m fail ${E}[33m=${E}[39m () ${E}[33m=>${E}[39m ${E}[34mexpect${E}[39m(${E}[34m1${E}[39m)${E}[33m.${E}[39m${E}[34mtoBe${E}[39m(${E}[34m2${E}[39m)${E}[33m;${E}[39m
+    ${E}[90m   |${E}[39m                              ${E}[31m^${E}[39m
+    ${E}[90m  3|${E}[39m ${E}[35mconst${E}[39m pass ${E}[33m=${E}[39m () ${E}[33m=>${E}[39m ${E}[34mexpect${E}[39m(${E}[34m1${E}[39m)${E}[33m.${E}[39m${E}[34mtoBe${E}[39m(${E}[34m1${E}[39m)${E}[33m;${E}[39m
+    ${E}[90m  4|${E}[39m ${E}[34mdescribe${E}[39m(${E}[32m"C99 — the shapes a row takes on a FAIL line"${E}[39m${E}[33m,${E}[39m () ${E}[33m=>${E}[39m {
+
+${E}[31m${E}[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯${E}[22m${E}[39m
+
+${E}[41m${E}[1m FAIL ${E}[22m${E}[49m shapes.test.mjs${E}[2m > ${E}[22mC99 — the shapes a row takes on a FAIL line${E}[2m > ${E}[22mT9.5 (fixture): each two
+${E}[31m${E}[1mAssertionError${E}[22m: expected 'two' to be 'one' // Object.is equality${E}[39m
+
+Expected: ${E}[32m"one"${E}[39m
+Received: ${E}[31m"two"${E}[39m
+
+${E}[36m ${E}[2m❯${E}[22m shapes.test.mjs:${E}[2m9:71${E}[22m${E}[39m
+    ${E}[90m  7|${E}[39m   ${E}[34mit${E}[39m(${E}[32m"T9.4 (fixture): a prefix of the failing row passes"${E}[39m${E}[33m,${E}[39m pass)${E}[33m;${E}[39m
+    ${E}[90m  8|${E}[39m   ${E}[34mit${E}[39m(${E}[32m"C98 T9.4h (fixture): a component-qualified row fails"${E}[39m${E}[33m,${E}[39m fail)${E}[33m;${E}[39m
+    ${E}[90m  9|${E}[39m   it.each(["one", "two"])("T9.5 (fixture): each %s", (x) => expect(x).…
+    ${E}[90m   |${E}[39m                                                                       ${E}[31m^${E}[39m
+    ${E}[90m 10|${E}[39m   ${E}[34mdescribe${E}[39m(${E}[32m"HX1 (fixture): a row that is a describe block"${E}[39m${E}[33m,${E}[39m () ${E}[33m=>${E}[39m {
+    ${E}[90m 11|${E}[39m     ${E}[34mit${E}[39m(${E}[32m"an unnumbered case fails"${E}[39m${E}[33m,${E}[39m fail)${E}[33m;${E}[39m
+
+${E}[31m${E}[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯${E}[22m${E}[39m
+
+
+${E}[2m Test Files ${E}[22m ${E}[1m${E}[31m1 failed${E}[39m${E}[22m${E}[90m (1)${E}[39m
+${E}[2m      Tests ${E}[22m ${E}[1m${E}[31m8 failed${E}[39m${E}[22m${E}[2m | ${E}[22m${E}[1m${E}[32m3 passed${E}[39m${E}[22m${E}[90m (11)${E}[39m
+
+`;
 
 describe("mutation harness", () => {
   it("MH1: reads a kill through the colour codes — the defect, restored", () => {
@@ -345,9 +463,13 @@ describe("mutation harness", () => {
     // Killed only when `x` is touched: `y` is the line no test covers. The
     // failing output names T1.1, so "caught" and "CAUGHT ELSEWHERE" are
     // distinguishable — a kill by *some other* test is a finding too, since the
-    // mutation was aimed at one and hit another.
+    // mutation was aimed at one and hit another. The `FAIL` line is what names
+    // it: the `×` line alone sits in a file's listing beside the `✓` rows, and
+    // since F1472 a kill with no `FAIL` line cannot be attributed at all.
     const run = (): string =>
-      files.get("a.ts")?.includes("const x = 1;") ? PASSED : `${FAILED}\n  × T1.1 asserts x`;
+      files.get("a.ts")?.includes("const x = 1;")
+        ? PASSED
+        : `  × T1.1 asserts x\n FAIL  a.test.ts > T1.1 asserts x\n${FAILED}`;
 
     const results = runPass({
       typecheck: TYPED,
@@ -844,4 +966,104 @@ describe("mutation harness", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   }, 60_000);
+
+  it("MH12 (F1472): a passing row's ✓ line under a file that failed is not a catch — the real bytes", () => {
+    // **The named row passed and the report said `caught`.** Vitest lists every
+    // row of a file that failed, passing ones included, so the substring the
+    // harness looked for was present whenever the named row shared a file with
+    // the row that did fail. `caughtBy` two lines below already read the `FAIL`
+    // lines; the verdict above it did not.
+    const files = new Map([["a.ts", "const x = 1;\n"]]);
+    const run = (): string => (files.get("a.ts")?.includes("const x = 1;") ? PASSED : ONE_FILE);
+
+    const results = runPass({
+      typecheck: TYPED,
+      mutations: [
+        { name: "aimed at the row that passed", file: "a.ts", from: "const x = 1;", to: "const x = 9;", expect: "T9.2" },
+        { name: "aimed at the row that failed", file: "a.ts", from: "const x = 1;", to: "const x = 8;", expect: "T9.1" },
+      ],
+      control: { file: "a.ts", from: "const x = 1;", to: "const x = 0;", why: "T9.1 asserts x" },
+      read: (f) => files.get(f) as string,
+      write: (f, s) => void files.set(f, s),
+      run,
+    });
+
+    // **The fixture responds to the thing under test**: the passing row's
+    // title is in the bytes, which is the whole of what the old test matched.
+    expect(ONE_FILE, "row B's ✓ line is in the output").toMatch(/✓.* T9\.2 \(fixture\): row B passes/u);
+    expect(results.map((r) => [r.expect, r.killed, r.byNamedTest])).toEqual([
+      ["T9.2", true, false],
+      ["T9.1", true, true],
+    ]);
+    const lines = report(results).split("\n");
+    expect(lines[0], "the passing row did not catch it, and the row that did is named").toMatch(
+      /^CAUGHT ELSEWHERE \(by T9\.1\) T9\.2 /u,
+    );
+    expect(lines[1], "and the failing row did").toMatch(/^caught\s+T9\.1 /u);
+  });
+
+  it("MH12b (F1472): each shape of row id is named when it failed and only then — the real bytes", () => {
+    // **The set, not its first member**: one assertion per shape, because the
+    // reader this replaced got two of the five right by reading the first id
+    // anywhere in the last segment.
+    const named = (e: string | null): boolean | null => namedFailed(SHAPES, e);
+    expect(named("T9.1"), "a single id that failed").toBe(true);
+    expect(named("T9.2"), "a single id that passed, its ✓ line in the output").toBe(false);
+    expect(SHAPES, "and the fixture carries it").toMatch(/✓.* T9\.2 /u);
+    expect(named("T9.4h"), "the row of a component-qualified pair").toBe(true);
+    expect(named("T9.4"), "a prefix of a failing row is not that row").toBe(false);
+    expect(named("T9.5"), "an it.each member that failed, beside one that passed").toBe(true);
+    expect(named("HX1"), "a describe whose unnumbered case failed").toBe(true);
+    expect(named("HX10"), "a describe whose case cites another row").toBe(true);
+    expect(named("HX7"), "and the row it cites did not fail").toBe(false);
+    expect(named("T9.6"), "a row under a describe opening with a component id").toBe(true);
+    expect([named("T9.7"), named("T9.8")], "both rows of a comma list").toEqual([true, true]);
+    expect([named("XB1"), named("T9.9")], "both rows of a `·` pair").toEqual([true, true]);
+    // **A `:` ends the head.** Four titles in the tree read like
+    // `R2.3d: R2.3c is blocked by a mechanism` — the second id is the subject of
+    // a sentence, cited rather than named. Not in the capture, so the line is
+    // written in the capture's own form, colours stripped.
+    const colon = " FAIL  shapes.test.mjs > C99 — the shapes > T9.10: T9.11 is cited after the colon\n";
+    expect([namedFailed(colon, "T9.10"), namedFailed(colon, "T9.11")], "the row, and not its subject").toEqual([
+      true,
+      false,
+    ]);
+
+    // **Anything that is not an id is read off the same lines**, the file path
+    // included — `golden` and `baseline` name their suites by it.
+    expect(named("C98 T9.4h (fixture)"), "a title fragment on a FAIL line").toBe(true);
+    expect(named("row B passes"), "a fragment of a passing row's title").toBe(false);
+    expect(named("shapes.test"), "a suite, by its path").toBe(true);
+    expect(named("(none — expected to survive)"), "a declared survivor names nothing").toBe(false);
+    expect(named(null), "and neither does `null`").toBe(false);
+    // `output.includes(null)` looked for the text `null`, which a failure's diff
+    // prints as often as not.
+    expect(namedFailed(`${SHAPES}Received: null\n`, null), "even where a diff prints it").toBe(false);
+    expect(namedFailed(`TIMED OUT after 300000ms\n     ${E}[32m✓${E}[39m T9.2`, "T9.2"), "no FAIL line: unknown").toBeNull();
+
+    // `caughtBy`'s reader, over the same bytes: the rows, not the component that
+    // qualifies one, the describe a case sits in, or the row a case cites.
+    expect(failedRows(SHAPES)).toEqual(["T9.1", "T9.4h", "HX1", "HX10", "T9.7", "T9.8", "XB1", "T9.9", "T9.6", "T9.5"]);
+  });
+
+  it("MH12c (F1472): a kill with no FAIL line to read is reported as unattributable, not as caught", () => {
+    // A timeout is the kill `killed` counts with no `FAIL` line behind it. The
+    // listing printed before the child was stopped carries the named row's ✓,
+    // which the substring read as `caught`.
+    const files = new Map([["a.ts", "const x = 1;\n"]]);
+    const run = (): string =>
+      files.get("a.ts")?.includes("const x = 1;")
+        ? PASSED
+        : `     ${E}[32m✓${E}[39m T9.2 (fixture): row B passes\nTIMED OUT after 300000ms`;
+    const results = runPass({
+      typecheck: TYPED,
+      mutations: [{ name: "never returns", file: "a.ts", from: "const x = 1;", to: "const x = 9;", expect: "T9.2" }],
+      control: { file: "a.ts", from: "const x = 1;", to: "const x = 0;", why: "the suite never returns" },
+      read: (f) => files.get(f) as string,
+      write: (f, s) => void files.set(f, s),
+      run,
+    });
+    expect(results.map((r) => [r.killed, r.byNamedTest])).toEqual([[true, null]]);
+    expect(report(results).split("\n")[0]).toMatch(/^KILLED, NAMED CHECK UNAVAILABLE T9\.2 /u);
+  });
 });

@@ -263,30 +263,143 @@ export function apply(src, { file, from, to }) {
  * dispositions being invisible on the row that reports it.
  */
 /**
+ * The `FAIL` lines of a run, colour stripped: one per failing test, and the only
+ * lines in vitest's output that say a row **failed** (F1472).
+ *
+ * **Nothing else in the output can answer that, and most of it looks as if it
+ * could.** Vitest lists every row of a file that failed, the passing ones with a
+ * `✓`, and prints a code frame under each failure that quotes its neighbours'
+ * titles from the source. A row's title in the output is evidence that the row
+ * *ran*; only its `FAIL` line is evidence that it failed.
+ *
+ * Anchored at the line start and required to carry a `>`, so a test that logs
+ * the word — an enforcement row printing a rule's verdict — is not a failure, and
+ * a file that did not load (`FAIL <file> [ <file> ]`, which names no row) is
+ * `unbuilt`'s to report.
+ */
+export function failLines(output) {
+  return output
+    .split("\n")
+    .map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ""))
+    .filter((line) => /^\s*FAIL\s+\S.* > /u.test(line));
+}
+
+/** A row id as this repo titles one: a short capital prefix, a digit, then `[\w.]*`. */
+const ROW_ID = /^[A-Z]{1,4}\d[\w.]*$/u;
+
+/**
+ * The row ids a `FAIL` line names, one list per `>` segment after the file.
+ *
+ * **A row is named at the head of a segment and nowhere else.** Measured over
+ * `vitest list` and every id-shaped `expect` in `runs/`, the head takes five
+ * shapes, and a pattern that finds the first id anywhere in the last segment
+ * gets three of them wrong:
+ *
+ * - `T2.13: …` — one id, the common case.
+ * - `C22 T1.4h (C22 I26): …` — a row qualified by its component. The first-match
+ *   reading returned `C22`.
+ * - `T3.17, T3.10, T3.23 (I20): …` and `XA10 · T1.141 (C12 I118): …` — one
+ *   test titled for several rows. Every one of them is named.
+ * - `HG1 (C04 I64): … > a node with no value` — a row that is a `describe`, its
+ *   cases unnumbered. The last segment holds no id, so the row read as absent:
+ *   90 of the 1145 distinct id-shaped expectations are this shape.
+ * - `YC10 … > nine of the fifteen …, which YC7 asserts and this records` — a
+ *   case whose prose **cites** another row. The first-match reading returned
+ *   the citation, so a mutation aimed at YC7 read as caught by it.
+ *
+ * The head is the run of leading id tokens: a `,` or `·` between two of them
+ * continues it, and a `:` or the first other word ends it — four titles read
+ * `R2.3d: R2.3c is blocked…`, where the id after the colon is a sentence's
+ * subject. A trailing `.` is a
+ * sentence's full stop, not part of the id. Its blind spot, stated: a title
+ * that itself contains ` > ` is split there, and its tail read as a segment.
+ */
+export function rowsOn(line) {
+  return line
+    .split(" > ")
+    .slice(1)
+    .map((segment) => {
+      const ids = [];
+      for (const token of segment.trim().split(/\s+/u)) {
+        if (token === "·" && ids.length > 0) continue;
+        const id = token.replace(/[:,]$/u, "").replace(/\.$/u, "");
+        if (!ROW_ID.test(id)) break;
+        ids.push(id);
+        if (token.endsWith(":")) break;
+      }
+      return ids;
+    });
+}
+
+/** A component id qualifying the row after it — `C22 T1.4h` — rather than a row. */
+const QUALIFIER = /^[ACR]\d{2}$/u;
+
+/**
  * The row ids vitest named as failing, in order, deduplicated.
  *
  * Read from the `FAIL` lines rather than from the summary, because the summary
- * is a count and the question is *which*. A row id is how this repo titles a
- * test — a short prefix and a number — and the first one on a `FAIL` line is
- * the row, whatever follows it.
+ * is a count and the question is *which*. The rows are the **innermost** segment
+ * with an id at its head — the case's own when it has one, the enclosing
+ * `describe`'s when the cases are unnumbered — less a component qualifier:
+ * `C22 T1.4h` is T1.4h.
  */
 export function failedRows(output) {
   const out = [];
-  for (const line of output.split("\n")) {
-    if (!/\bFAIL\b/u.test(line)) continue;
-    // **The row is the last `>` segment, never the first match on the line.**
+  for (const line of failLines(output)) {
+    // **The row is the innermost segment, never the first match on the line.**
     // Vitest prints `FAIL <file> > <describe> > <row>: …` and a describe block
     // opens with a component id — `C24 I38 — every entry resolves…` — which the
     // row pattern matches perfectly. Reading left to right returned the
     // describe's id for every nested row, so `caughtBy` named components rather
     // than the rows that failed, which is a list that reads as an answer and
     // is not one.
-    const clean = line.replace(/\u001b\[[0-9;]*m/gu, "");
-    const last = clean.split(">").pop() ?? "";
-    const m = /(?:^|\s)([A-Z]{1,4}\d[\w.]*)[\s(:]/u.exec(last);
-    if (m !== null && !out.includes(m[1])) out.push(m[1]);
+    const ids = rowsOn(line).filter((head) => head.length > 0).at(-1) ?? [];
+    const rows = ids.length > 1 && QUALIFIER.test(ids[0]) ? ids.slice(1) : ids;
+    for (const row of rows) if (!out.includes(row)) out.push(row);
   }
   return out;
+}
+
+/**
+ * Did the thing a mutation's `expect` names fail? `true`, `false`, or `null`
+ * when the output cannot say (F1472).
+ *
+ * **This used to be `output.includes(m.expect)`**, and a passing row's title is
+ * in the output whenever it shares a file with the row that did fail — on its
+ * `✓` line, and in the code frame under the failure. `c22-key-targets.mjs`'s two
+ * mutations both read `caught T1.4h` when the only `FAIL` line was C16 T2.17.
+ *
+ * Every run in `runs/` drives vitest — all 382 were surveyed, including the
+ * ones that build or run a tool first — so every `expect` is judged against the
+ * `FAIL` lines and nothing else. Three shapes, and one rule each:
+ *
+ * - **A row id** (2932 uses, 1145 distinct) is named when a `FAIL` line names it
+ *   at the head of a segment — `rowsOn` says why the head and not anywhere. An
+ *   id has a boundary: T1.4 is not T1.4h, which a substring cannot tell apart.
+ * - **Anything else** (271 uses: a title fragment such as `T1.4h (C22` or `a
+ *   removed entry`, a suite such as `golden` or `baseline`) is named when a
+ *   `FAIL` line contains it, the file path included — `golden` and `baseline`
+ *   name their suites by it. It is as specific as its text: `—` is on nearly
+ *   every `FAIL` line in the repo, and the harness cannot sharpen a claim the run
+ *   did not make.
+ * - **`null`**, or `(none — expected to survive)`, names nothing: a declared
+ *   survivor that was killed was caught elsewhere, and `caughtBy` says by what.
+ *
+ * **`null` back means the run was killed and printed no `FAIL` line** — a
+ * `TIMED OUT` marker is the case `killed` already counts. There is no failing
+ * row to attribute it to, so the report says the named check was unavailable
+ * rather than guessing either way. The substring was never a fallback worth
+ * keeping for it: no run's runner is anything but vitest, and `killed` reads
+ * vitest's own summary, so a runner that printed no `FAIL` lines would have no
+ * kill to attribute in the first place.
+ */
+export function namedFailed(output, expect) {
+  if (typeof expect !== "string") return false;
+  const lines = failLines(output);
+  if (lines.length === 0) return null;
+  return ROW_ID.test(expect)
+    ? lines.some((line) => rowsOn(line).some((ids) => ids.includes(expect)))
+    : lines.some((line) => line.includes(expect));
 }
 
 export function hitsOf(src, from) {
@@ -540,6 +653,7 @@ export function runPass({
       }
       for (const [f, src] of staged) write(f, src);
       const output = run();
+      const named = namedFailed(output, m.expect);
       // **`unbuilt` is asked before `incomplete`, deliberately.** Both can hold
       // at once — a mutation that takes three suites down and kills a worker in
       // the fourth — and the more specific diagnosis is the one that names the
@@ -562,14 +676,16 @@ export function runPass({
                 name: m.name,
                 expect: m.expect,
                 killed: killed(output),
-                byNamedTest: output.includes(m.expect),
+                // **From the `FAIL` lines, never the whole output** (F1472): a
+                // passing row's title is printed under a file that failed.
+                byNamedTest: named,
                 // **Who did catch it, when the named row did not** (F1244).
                 // `CAUGHT ELSEWHERE` says the claim is wrong and stops there,
                 // so the reader re-derives the answer from a log they have to
                 // go and find. Four expectations in `c04-mosaic` have been
                 // wrong since it was written, reported on every run, each one
                 // costing that walk. The rows are in the output already.
-                caughtBy: killed(output) && !output.includes(m.expect) ? failedRows(output) : [],
+                caughtBy: killed(output) && named !== true ? failedRows(output) : [],
               };
       // **Only a survivor pays for this, and only a failure pays twice**
       // (F1106). The mutated tree is still on disk here — `finally` has not
@@ -632,8 +748,10 @@ export function report(results) {
       : r.untyped
       ? "DID NOT TYPE    "
       : r.killed
-        ? r.byNamedTest
+        ? r.byNamedTest === true
           ? "caught          "
+          : r.byNamedTest === null
+          ? "KILLED, NAMED CHECK UNAVAILABLE"
           : `CAUGHT ELSEWHERE${(r.caughtBy ?? []).length > 0 ? ` (by ${r.caughtBy.slice(0, 3).join(", ")})` : ""}`
         : "SURVIVED        ";
     // The figures, because *I could not tell* with no number beside it is a
