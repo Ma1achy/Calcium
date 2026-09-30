@@ -39,9 +39,12 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
 - **`Verdict` is `handle | reject | pass`** (M5). Intercepts use `InterceptVerdict`
   (`handle | reject | global-intercept`), and a handler cannot return `global-intercept`.
 - **`RouterDeps.refused({ rung, cause })` is required** (M5), and the router's exit
-  dependencies are removed.
+  dependencies are removed. `Verdict`, `InterceptVerdict` and `RouterDeps` are not on a package
+  entry point, and before this change no published type reached any of them, so no consumer's
+  code breaks (F1504). They are listed because the router's refusals are new behaviour.
 - **A key release reaches an attached child only** (M5).
-- **`clearConfirmLayer` and `history-clear-confirm` are removed** (M5).
+- **`clearConfirmLayer` and `history-clear-confirm` are removed** (M5). A consumer met the method
+  as `deps.history.clearConfirmLayer()` in a `TuiConfig.pipeline` factory.
 - **`TuiConfig.keyActions` is keyed by the design registry's action id** (4a2019ed, M6), and
   an id outside the reserved set is a construction error (C24 I39).
 - **Sixteen bindings are split by keyboard profile** (5ccc3676, M6). A chord only a Kitty-protocol
@@ -54,7 +57,7 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
 - **`PushedSurface` is `ChildSurface`, `PushedSurfaceHandle` is `ChildSurfaceHandle`, and the
   schema string `"calcium.pushed-surface/1"` is `"calcium.child-surface/1"`** (M9; record restored
   in 36761bc5). No aliases are exported.
-- **`RefreshHost` has one kind, `{ kind: "entry"; id }`** (36761bc5, C24 I40). `b.live` is driven
+- **`RefreshHost` has one kind, `{ kind: "entry"; id }`** (4c68e9d5; record in 36761bc5, C24 I40). `b.live` is driven
   only in a transcript entry.
 - **A manifest declaring `view` is refused** (f10e7a3f, C05 I27), naming its retirement — on a
   tool or a flag, `true` or `false`.
@@ -107,8 +110,9 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   rule** (74c17b8b, rulings 89 and 90, C19 I29 and I23). The first candidate is current until
   one is selected, drawn with `›` (`*` in ASCII), the pick ground and bold; the menu no longer
   draws a rule of its own above the prompt's. `Table` gains `current?: string`, the id of the
-  row a chooser is on (C04 I150, C11 I33). `menuBlocks`' second parameter is now the current
-  index, and `menuRowsShown` charges one row of chrome fewer.
+  row a chooser is on (C04 I150, C11 I33). Inside the framework, `menuBlocks`' second parameter
+  is now the current index and `menuRowsShown` charges one row of chrome fewer; `menuBlocks` and
+  `menuRowsShown` are not on a package entry point.
 - **The completion footer names what each key does in the state shown** (0d476af7, rulings 96
   and 99, C22 I150). At rest it offers `⏎ run`, `⇥ complete` and the way out, where it offered
   `↑↓ move` and `⏎ accept` while `⏎` submitted the line and `↑` walked history. The move keys and `⏎ accept`
@@ -177,16 +181,19 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   read from `VISUAL`, then `EDITOR`, and a literal typed as `TerminalCapabilities` must supply it.
 - **`AskAnswer.outcome` is required** (14f078cc, C23 I92, C24 I42). A question resolves once, as
   `answered`, `cancelled` or `expired`, and says which. A test fake of `ctx.ask` that answers
-  `{ key }` no longer type-checks; answer `{ key, outcome: "answered" }` (F1452).
+  `{ key }` no longer type-checks; answer `{ key, outcome: "answered" }` (F1452). A fake that
+  answers the key as a string, as `LocalContext.ask` resolved before f661eafe, fails the same way.
 - **An approval's default answer is `deny`** (14f078cc, C23 I94, `R-BLK-348`). `esc` on an
   approval refuses the tool, where it ran it, and the tool runs only on an `answered` outcome
   that is not `deny`. A withdrawn or expired approval settles `cancelled` (F1438).
 - **`CallState` gains `waiting`** (14f078cc, C04 I149): a call held on a question, drawn in
   `warn`'s tone with the work-unit mark. An exhaustive `switch` over `CallState` needs the arm.
+  `CallState` is not on a package entry point; a consumer meets it as `Notice.state`.
 - **`paneLeft` and `paneRight` are renamed `elementLeft` and `elementRight`** (2edd256f, C26
   I30). `←`/`→` move along a row (elements whose rows overlap, in one pane) and cross a split
   only at the row's end; `↓`/`↑` leave the row and land on the first element of the row they
-  enter. Code naming the old `KeyAction`s must rename them.
+  enter. Code naming the old `KeyAction`s must rename them. `KeyAction` is not on a package entry
+  point; a consumer names one as the second argument of a `ChromeFn`'s `ctx.hints.chord`.
 - **`⌥⇧↑` and `⌥⇧↓` no longer page the transcript** (6c605f19, C16 I40). The page-scroll
   intercept is `⌥↑`/`⌥↓` exactly, as I40 always said (F1442).
 
@@ -195,7 +202,8 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
 - **`/watch` and `/unwatch`, the footer's watch row and `watch.jump[n]`** (1004d067, ruling 50, C22 I135–I140,
   C16 I76–I77, registry 0.16). `ChromeContext.watches?: WatchRowState` and `OwnerHints.watchRow?:
   "present" | "focused"` carry the session's watches and the row's selection, so an application's own footer
-  can draw the row; `WatchItem` and `WatchRowState` are exported.
+  can draw the row. `WatchItem` and `WatchRowState` are not on a package entry point; a chrome
+  function reaches both through its context's `watches` (F1504).
 - **`ColumnDef.vocabulary`** (7003e78f, C04 I6). A column's closed set of words, which may
   carry their tone without a glyph; a cell outside it is refused.
 - **`Patch.cap` and `expanded`** on `Patch`, `keyValue`, `events`, `comparison` and `steps`
@@ -211,12 +219,14 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   because a choice row's ASCII rendering changes.
 - **`ChromeContext.hints?: OwnerHints`** (M5). The owner line's chords come from the
   session keymap (`chord(target, action)`). It also carries the substate's name, the open
-  question's state and default, and copy mode's one-shot refusal.
+  question's state and default, and copy mode's one-shot refusal. `OwnerHints` is not on a package
+  entry point; a `ChromeFn` reaches it as its context's `hints`.
 - **`Layer.owner?: LayerOwner`** (M5). `{ rung: "question" }` or
   `{ rung: "substate", name: "find" | "complete" | "preview" }`. A declared owner that the
   layer's own fields contradict is refused at push.
-- **Keymap: `prompt ⏎ → submit` and `interaction ⏎ → keepField`** (M5). `ownerLine` takes
-  a seventh argument, `hints`, which defaults to the default keymap.
+- **Keymap: `prompt ⏎ → submit` and `interaction ⏎ → keepField`** (M5). Inside the framework,
+  `ownerLine` takes a seventh argument, `hints`, which defaults to the default keymap; `ownerLine`
+  is not on a package entry point.
 - **Copy reaches the system clipboard, and never writes a file on its own** (d59839b5,
   9e2f1983; ruling 72 as the person amended it, ruling 83; C14 I61, C17 I31, C01 I25, C21
   I20). A copy goes to the kill buffer first, then to one clipboard in the person's order: OSC
@@ -251,7 +261,8 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
 - **A ramp's `overshoot: { lift, share }`** (cf973d23, C04 I148, C09 I133). On a gradient over a
   slot pair only: over the last `share` of the axis `to` is lifted up to `×lift`, and `from`
   mixes to it over the rest — the hot edge's profile. `lift` is in `(1, 2]` and `share` in
-  `(0, 1)`; refused on a span. `RAMP_KEYS` has eight members. `hotEdge` trails now draw it.
+  `(0, 1)`; refused on a span. Inside the framework `RAMP_KEYS` has eight members; `RAMP_KEYS` is
+  not on a package entry point. `hotEdge` trails now draw it.
 - **A chosen option is bold as well as marked** (89dd5e35, ruling 54, C09 I132), at every
   depth; the weight is never measured.
 - **A command of several lines is echoed as its lines** (9fad37e3, C22 I33). A bracketed paste
@@ -297,8 +308,8 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   says whether the prompt under it still takes keys, and `update` can change it; a toast for a
   question that expired unanswered is marked `expired` rather than drawn as `ok`.
 - **A tape's window follows focus** (2edd256f, C26 I31, ruling 80). A member the resting window
-  does not draw brings the window to it. `tapeStart` and `tapeMemberCols` take an optional
-  `focused` member id.
+  does not draw brings the window to it. Inside the framework `tapeStart` and `tapeMemberCols` take
+  an optional `focused` member id; `tapeStart` and `tapeMemberCols` are not on a package entry point.
 - **Focus pulls a box again when a layout change moves the focused child, unless you scrolled
   it** (2edd256f, C26 I32). A patch or a resize re-pulls; a page key, the wheel or a bar press
   latches the box until focus moves.

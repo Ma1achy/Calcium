@@ -49,25 +49,25 @@ missed fails to resolve rather than failing later.
 
 ## 2. Changes the compiler finds
 
-After the rename, `tsc` reports each of these. The fix is the one named.
+After the rename, `tsc` reports each of these. The fix is the one named. Each row names the
+published type you meet the change through, which is not always the type it was made in: a
+`ChromeFn`'s context is typed `ChromeContext`, and no entry exports that name.
 
 | change | what to do |
 |---|---|
 | `Glyph` `live` removed | Drop it. A live panel's title takes a spinner frame; `quote`'s ASCII rail is `\|`. |
 | `Glyph` `step` removed | A call head sets `Notice.state` and `glyph: "work-unit"` (or `"queued"`); the renderer picks the mark. |
-| `Glyph` `running` → `work-unit` | Rename. `CallState`'s `running` is unchanged. |
-| `ChromeContext.copyMode` removed | Read `ChromeContext.owner` and `ChromeContext.copy`. |
-| `Verdict` is `handle \| reject \| pass` | An intercept returns `InterceptVerdict`; only an intercept may return `global-intercept`. |
-| `RouterDeps.refused` required | Supply `refused({ rung, cause })`; remove the router's exit dependencies. |
-| `clearConfirmLayer` removed | Delete the call; the `history-clear-confirm` action is gone with it. |
+| `Glyph` `running` → `work-unit` | Rename. `Notice.state`'s `running` is unchanged. |
+| A `ChromeFn`'s context loses `copyMode` | Read the context's `owner` and `copy`. |
+| `TuiConfig.pipeline`'s `deps.history.clearConfirmLayer()` removed | Delete the call; the `history-clear-confirm` action is gone with it. |
 | `PushedSurface` → `ChildSurface` | Rename, with `PushedSurfaceHandle` → `ChildSurfaceHandle`. No aliases. |
 | `RefreshHost` has one kind | Use `{ kind: "entry", id }`. |
 | `profileDeck` removed | Call `profileCard` for each id `CARDS` lists for the section. |
 | `TerminalCapabilities.clipboard` required | Supply `"none"` or `"osc52"` in a literal. |
 | `TerminalCapabilities.editor` required | Supply a `string` or `null` in a literal. |
-| `AskAnswer.outcome` required | A fake `ctx.ask` answers `{ key, outcome: "answered" }`. |
-| `CallState` gains `waiting` | Add the arm to an exhaustive `switch`. |
-| `paneLeft`/`paneRight` → `elementLeft`/`elementRight` | Rename the `KeyAction`s. |
+| `LocalContext.ask` resolves an `AskAnswer`, and `AskAnswer.outcome` is required | A fake `ctx.ask` answers `{ key, outcome: "answered" }`, where it answered `{ key }`, or on an older build the key as a string. |
+| `Notice.state` gains `waiting` | Add the arm to an exhaustive `switch`. |
+| A `ChromeFn`'s `ctx.hints.chord` takes `elementLeft`/`elementRight`, not `paneLeft`/`paneRight` | Rename them. |
 
 ## 3. Changes refused when they run
 
