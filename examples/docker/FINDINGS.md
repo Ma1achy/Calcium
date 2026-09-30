@@ -57788,6 +57788,12 @@ Measured: against C22 T1.4h as it stood at 0e08af20, both key mutations in `c22-
 
 **The scope is unmeasured, and it is every run.** A killed mutation whose named row sits in a file with the row that did fail reads as named whether it was or not. 73 distinct `expect` values are prose rather than row ids, from probe and tool runs, and they need their own rule rather than `failedRows`. **Owed**: `byNamedTest` from `failedRows` for a row-id `expect`, a decision for the prose ones, a harness row that fails on the substring form, and a re-run of every run on a quiet machine to count the verdicts that change.
 
+**The harness half landed** on lane b4-harness, as ff5adbae and 60cf6424. `byNamedTest` now reads `namedFailed()`, which looks only at the `FAIL` lines. `failedRows` is rebuilt on `rowsOn`, which recognises 1145 distinct row-id expectations where the old reader recognised 1055. **The prose `expect`s are ruled**: with no `FAIL` line to name them, the verdict is `KILLED, NAMED CHECK UNAVAILABLE`, which is still a kill and never reads as the named row's. MH12, MH12b and MH12c each went red first on the substring form.
+
+**The summary had the same fault one level up**, and it is closed as well. It printed `every mutation was caught` beneath CAUGHT ELSEWHERE rows. It now ends `caught by the named row N · caught elsewhere N · unavailable N · survived N` and prints the all-clear only when every kill is the named row's (MH13, red first). `tools/mutate/sweep.mjs` had no bucket for the unavailable state, so such kills dropped out of its `caught` total; it now counts them (MS4).
+
+**A five-run sample moved one verdict**, `c22-linear`'s T4.102, to CAUGHT ELSEWHERE (by T4.103). It was a vacuous row and is F1478. **Still owed**: the re-run of every run, which is what F1472 exists to count.
+
 ## F1473 — T2.144's `img-fault` never reaches the fault arm in a whole-file run ★★★☆☆
 
 Found by lane b4-golden (ruling 85). The fixture overrides an image's `data` but keeps the corpus image's `digest`. The decode cache (`DECODED`, keyed on digest) then returns the real picture once T2.143 has decoded it. Its capture is `▀▀`, a picture, not a fault. With `src` at 0e08af20, `npx vitest run test/contract/rows-arm.test.ts -t "T2.144"` fails alone (`img-fault at 2: expected [ …(3) ] to deeply equal [ Array(1) ]`) and passes in the whole-file run. The row depends on the one before it and does not construct the state it names. **Owed**: a digest of the fixture's own, and the row shown to fail on the fault arm removed.
@@ -57807,3 +57813,11 @@ Found by lane b4-golden (ruling 85). `src/shell/execution.ts:1041–1047`: a han
 ## F1477 — two design texts still name ▲ as the error mark ★★☆☆☆
 
 Found by lane b4-golden (ruling 85). §096's empty-case annotation reads *no banner, no ▲, no red* beside its own ✗ error. The registry's `attention` asciiNote cites `GlyphSet.warning`, which ruling 85 retired. Both are in the normative design, which the lane rightly did not edit. **Owed at the release seal**, which already re-seals the baseline and bumps the revision: both texts corrected, the HTML regenerated, and the sealed digests re-taken.
+
+## F1478 — T4.102 cites C22 I123 and cannot see it: removing the unchanged-line guard passes it ★★★☆☆
+
+Found by the F1472 harness fix. Its sample re-ran `tools/mutate/runs/c22-linear.mjs`, and the mutation that deletes `if (next === shown) return;` from `createLinearOutput`'s `redraw` read `CAUGHT ELSEWHERE (by T4.103) T4.102`. Under the old substring verdict it had read `caught`. T4.102 names C22 I123, *a commit that changes nothing writes nothing*. It passed with the guard gone.
+
+**Two vacuous clauses, one cause.** After `s.resize({ columns: 40, rows: 10 })` the row read the output at `step()`, which is 0 ms. A resize commits on the scheduler's timer, so nothing had committed yet. Its check, `lines(since(before)).every((l) => l === "> xy")`, is also true of an empty write. The idle-commit clause above it (`step(200)` with no commit) has no cause to commit either. Measured: narrowing to 3 columns and reading at 0 ms gave `the narrowed line, once: expected +0 to be 1`; at 100 ms it gave 1.
+
+**Closed** on the same branch. T4.102 now waits 100 ms after each resize. A resize the line survives must write `""`, and a narrowing to 3 columns must write exactly one line. With the guard hand-removed (`if (next === shown) return;` commented out), T4.102 fails on its own row: `a resize the line survives unchanged: expected '\r\u001b[2K> xy\u001b[5G' to be ''`. The class is an assertion over a write that never happened, which `every` and a 0 ms read both satisfy.
