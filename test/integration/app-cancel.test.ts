@@ -240,4 +240,11 @@ describe("C23 I98, I99 — the app route's cancel", () => {
       "/tail web.log: ok · tail(web.log) / /ps: partial · ps · cancelled / /ps --quiet: partial · cancelled before it ran",
     );
   });
+
+  it.todo(
+    "T4.103 (C23 I98, ruling 100 d, F1509): a cancel's document leaves the stall row out, on a stream and on an invocation — not deferred on a component: lands with the F1509 code commit of review batch 4",
+  );
+  it.todo(
+    "T4.104 (C23 I102, F1509): no stall row lands on an entry after it settles — not deferred on a component: lands with the F1509 code commit of review batch 4",
+  );
 });
