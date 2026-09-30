@@ -472,6 +472,7 @@ describe("C22 §3 step 11 — the effect table", () => {
       viewport: recordingViewport().viewport,
       anchor: () => ({ row: 10, rows: 1 }),
       overlayRegion: () => ({ width: 80, height: 24 }),
+      measure: graph.blocks.measure,
       redraw: () => undefined,
       focus: createFocusStore(),
       // A stand-in, and it must not supply the behaviour: this suite drives the

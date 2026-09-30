@@ -2601,9 +2601,9 @@ sites and every one of them would need its own answer:
 | reader | what it does with the string |
 |---|---|
 | `shell/construct.ts:3548` | `const line = stores.editor.resolved`, then `pipeline?.submit(line)` — **C23 takes a string**, and `resolved` is declared `readonly resolved: string` |
-| `shell/keys.ts:554`, `:976` | `contextAt(text, cursor, manifest)` — C19 completes against it |
-| `shell/keys.ts:717` | `const before = deps.editor.text`, then `setText` — an **edit round-trip** through a plain string |
-| `shell/keys.ts:1069`, `:1292` | `(reply ?? history).previous(text)`, `searchOpen(text)` — **C20 stores strings** |
+| `shell/keys.ts:602`, `:1042` | `contextAt(text, cursor, manifest)` — C19 completes against it |
+| `shell/keys.ts:740` | `const before = deps.editor.text`, then `setText` — an **edit round-trip** through a plain string |
+| `shell/keys.ts:1092`, `:1404` | `(reply ?? history).previous(text)`, `searchOpen(text)` — **C20 stores strings** |
 | `shell/session.ts:1421` | `selectionSpans(text, …)` — C09's wash |
 | `shell/session.ts:1466` | `contextAt(text, cursor, …)` inside `completion.ghost(…)` — C19 again, from the shell (`:579` when this was written, `:1282` until review batch 4) |
 | `shell/construct.ts:5122` | `promptHasText` |
@@ -2612,7 +2612,7 @@ sites and every one of them would need its own answer:
 at `437aaa79`, the commit that wrote this table: nine reader sites, of which the table listed
 eight and the prose above it said seven. Nine again today — **the population never moved; the
 count was wrong on the day and the citations drifted around it.** The member that has never
-been in the table is `keys.ts:717` (`:397` then; the table's `:649` row is it, added since), which reads the buffer and writes it back
+been in the table is `keys.ts:740` (`:397` then, `:717` until F1487's pills window; the table's `:649` row is it, added since), which reads the buffer and writes it back
 through `setText` — an **edit round-trip**, so a sentinel plus a side map has to survive a
 write and not only a read. That is the strongest row here and it was the missing one. F1092.
 

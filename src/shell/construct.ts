@@ -3872,6 +3872,8 @@ export async function constructGraph(
     schedule: config.schedule,
     anchor: deps.frame.promptAnchor,
     overlayRegion: deps.frame.overlayRegion,
+    // C19 I23, F1487 — the pills window is measured, by the registry that draws it.
+    measure: built.blocks.measure,
     focus,
     // The entry half of B1's pair; the exit is already on the `⌃c` rung below.
     enterNativeSelection: deps.frame.enterNativeSelection,

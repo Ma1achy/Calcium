@@ -9,7 +9,8 @@
 import { describe, expect, it } from "vitest";
 
 import { MENU_ID } from "../../src/interaction/completion/index.js";
-import { buildGraph } from "../support/session.js";
+import { buildGraph, buildSession } from "../support/session.js";
+import { fakeStdin } from "../support/fake-terminal.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import type { CompletionSource } from "../../src/interaction/completion/index.js";
 import type { Graph } from "../../src/shell/construct.js";
@@ -357,6 +358,106 @@ describe("C19 §6 — the menu's edges", () => {
       59,
     );
     expect(missing, "and most of sixty are not").toBeGreaterThan(0);
+  });
+});
+
+describe("C19 I23 — the pills window fills its box (F1487)", () => {
+  /** A session at 100 × 16 whose `/z` offers sixty candidates, with or without a detail. */
+  async function sixty(detail: boolean) {
+    const many = Array.from({ length: 60 }, (_, i) => ({
+      value: `/z${String(i)}-entry`,
+      ...(detail ? { detail: "a verb" } : {}),
+    }));
+    const stdin = fakeStdin();
+    const session = await buildSession(
+      {
+        stdin: stdin as never,
+        completionSources: [{ id: "many", slots: ["verb"], dynamic: false, complete: () => many }],
+      },
+      { columns: 100, rows: 16 },
+    );
+    const settled = async (): Promise<void> => {
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setTimeout(r, 0));
+    };
+    await settled();
+    const press = async (bytes: string): Promise<void> => {
+      for (const ch of bytes) {
+        stdin.emit(ch);
+        await settled();
+      }
+    };
+    await press("/z");
+    /** Where the menu's box starts on screen: its top rule. */
+    const boxTop = (): number => {
+      const rows = session.screen().rows.map((r) => r.trimEnd());
+      const prompt = rows.findIndex((r) => r.startsWith("❯"));
+      return rows.findIndex((r, i) => i < prompt - 1 && /^[─-]{20,}$/u.test(r) && i > 1);
+    };
+    /** The menu's box: its top rule down to the row above the prompt's rule. */
+    const box = (): readonly string[] => {
+      const rows = session.screen().rows.map((r) => r.trimEnd());
+      const prompt = rows.findIndex((r) => r.startsWith("❯"));
+      return rows.slice(boxTop(), prompt - 1);
+    };
+    /** Wheel notches down over the box's first row of chips (C16 I74), as SGR bytes. */
+    const wheelDown = async (notches: number): Promise<void> => {
+      const row = boxTop() + 2;
+      for (let i = 0; i < notches; i++) {
+        stdin.emit(`\u001b[<65;10;${String(row)}M`);
+        await settled();
+      }
+    };
+    return { press, box, wheelDown };
+  }
+  const chips = (row: string): readonly string[] => row.trim().split(/\s{2,}/u).map((c) => c.replace(/^[›*]\s*/u, ""));
+  const more = (box: readonly string[]): number => Number(/\+ (\d+) more/u.exec(box.at(-1) ?? "")?.[1] ?? "NaN");
+
+  it("T3.30 (C19 I23, F1487): through the shell, the pills box is full rows of pills, and the indicator counts the rest", async () => {
+    // **The control first: the table form under the same cap.** One candidate
+    // a row, and the box it fills is the height the pills box must reach.
+    const table = await sixty(true);
+    const tableBox = table.box();
+    expect(tableBox[0], "the menu's top rule").toMatch(/^[─-]{20,}$/u);
+    expect(more(tableBox), "the table was cut").toBeGreaterThan(0);
+
+    const pills = await sixty(false);
+    const box = pills.box();
+    // **The subject**: the pills form, cut. Not the table, whose rows carry a detail.
+    expect(box.slice(1, -1).every((r) => !r.includes("a verb")), "the pills form").toBe(true);
+    expect(more(box), "and cut").toBeGreaterThan(0);
+    // **The box is the table's height, and every row in it holds pills.** F1487
+    // drew one row of chips in a box sized for several.
+    expect(box.length, "the same cap").toBe(tableBox.length);
+    const rows = box.slice(1, -1);
+    expect(rows.length, "more than one row of chips").toBeGreaterThan(1);
+    expect(rows.every((r) => chips(r).length > 1), "every row between the rule and the indicator holds chips").toBe(true);
+    // **The count is the rest**: sixty less the chips drawn.
+    const drawn = rows.flatMap(chips);
+    expect(more(box), "N is sixty less the chips drawn").toBe(60 - drawn.length);
+
+    // **After ⇥ and enough ↓ to pass the first window**, the selection is drawn
+    // and the box keeps its height.
+    await pills.press("\t");
+    for (let i = 0; i < drawn.length + 3; i++) await pills.press("\u001b[B");
+    const moved = pills.box();
+    expect(moved.length, "the box keeps its height").toBe(box.length);
+    expect(
+      moved.slice(1, -1).flatMap(chips),
+      "the selected chip is on screen",
+    ).toContain(`/z${String(drawn.length + 3)}-entry`);
+
+    // **A wheel run far past the end clamps** (C16 I74), at rest so the wheel
+    // owns the window: the last candidate is drawn and the box keeps its height.
+    const wheeled = await sixty(false);
+    await wheeled.wheelDown(40);
+    const end = wheeled.box();
+    const endChips = end.slice(1, -1).flatMap(chips);
+    expect(endChips, "the wheel moved the window").not.toContain("/z0-entry");
+    expect(endChips, "and it stops at the last candidate").toContain("/z59-entry");
+    expect(end.length, "the box keeps its height").toBe(box.length);
+    expect(more(end), "N is sixty less the chips drawn").toBe(60 - endChips.length);
   });
 });
 

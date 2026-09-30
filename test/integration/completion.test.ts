@@ -11,6 +11,7 @@ import {
   menuLayer,
   menuRowsShown,
   menuWindow,
+  menuWindowOf,
   MENU_ID,
   remainderOf,
   verbSource,
@@ -188,8 +189,11 @@ describe("C19 + C15 — the menu is an overlay (I8)", () => {
       const first = manager.layout(region)[0];
       if (first === undefined) throw new Error("unreachable");
       const fits = menuRowsShown(first);
-      const remainder = remainderOf(first, many.length, fits);
-      const w = menuWindow(many.length, 0, fits);
+      expect(remainderOf(first, many.length, fits), `${form}: the first placement cut something`).toBeGreaterThan(0);
+      // **The window `keys.ts` draws** (F1487): sized in the placement's rows at
+      // its width, over the registry that will measure the result.
+      const w = menuWindowOf(many, 0, fits, first.width, (b, width) => r.registry.measure(b, width));
+      const remainder = many.length - w.shown;
       manager.update(MENU_ID, {
         content: menuBlocks(many.slice(w.start, w.start + w.shown), 0, remainder),
       });
@@ -208,18 +212,15 @@ describe("C19 + C15 — the menu is an overlay (I8)", () => {
       expect(drawn[drawn.length - 1] ?? "", `${form}: the indicator closes the box`).toContain(
         `+ ${String(remainder)} more`,
       );
-      // **And the table's window fills the box it was sized for** (T6.27). A
-      // chrome count charging a row the menu no longer draws hands back a
-      // window one row short, which fits inside the box and so passes the
-      // assertions above: the box shrinks to it, one candidate fewer is shown,
-      // and the remainder counts it as missing. The first placement is the cap
-      // the window was sized against. The table form only: `menuRowsShown`
-      // counts one candidate a row, which is the table's shape, and pills pack
-      // several candidates onto a row, so their box is under-filled on the
-      // clean tree too — measured, three pills on one row in a five-row cap.
-      if (form === "table") {
-        expect(placed.height, `${form}: the window fills the box it was sized for`).toBe(first.height);
-      }
+      // **And the window fills the box it was sized for, in both forms** (T6.27,
+      // T6.28). A chrome count charging a row the menu no longer draws hands
+      // back a window one row short, which fits inside the box and so passes
+      // the assertions above: the box shrinks to it, one candidate fewer is
+      // shown, and the remainder counts it as missing. The first placement is
+      // the cap the window was sized against. **The pills form was exempt
+      // until F1487**: its window was sized one candidate a row, the table's
+      // shape, and drew three pills on one row in a five-row cap.
+      expect(placed.height, `${form}: the window fills the box it was sized for`).toBe(first.height);
     }
   });
 

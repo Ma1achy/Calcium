@@ -140,15 +140,7 @@ export function menuBlocks(
         current: current === null ? OUT_OF_VIEW : `${MENU_ID}-${String(current)}`,
         showHeader: false,
       }
-    : {
-        kind: "pills",
-        id: `${MENU_ID}-pills`,
-        chips: candidates.map((c, i) => ({
-          label: c.display ?? c.value,
-          ...(c.tone === undefined ? {} : { tone: c.tone }),
-          ...(i === current ? { active: true } : {}),
-        })),
-      };
+    : pillsOf(candidates, current);
 
   // **The edges, and there are two** (I23). The menu spans the region, so its
   // neighbours in both directions are left-aligned text at the same width: the
@@ -198,6 +190,23 @@ export function menuBlocks(
 }
 
 /**
+ * The pills form's body: one chip a candidate, the current one `active` (I29).
+ * **One builder for the drawing and the window**, so the rows the window is
+ * sized by are the rows of the block that is drawn (F1487).
+ */
+function pillsOf(candidates: readonly Candidate[], current: number | null): Block {
+  return {
+    kind: "pills",
+    id: `${MENU_ID}-pills`,
+    chips: candidates.map((c, i) => ({
+      label: c.display ?? c.value,
+      ...(c.tone === undefined ? {} : { tone: c.tone }),
+      ...(i === current ? { active: true } : {}),
+    })),
+  };
+}
+
+/**
  * The candidates that fit, and where the window starts (I23).
  *
  * **The compositor cuts from the end, so anything the owner puts last is what
@@ -235,6 +244,70 @@ export function menuWindow(
   // like two that are satisfied — found by a mutation that changed them and
   // failed nothing (A03 §2).
   return Object.freeze({ start: Math.max(0, at - fits + 1), shown: fits });
+}
+
+/**
+ * A block's height at a width — the registry's `measure` (C09 I1), handed down
+ * by the shell, which holds the registry. The pills window is sized by it.
+ */
+export type MeasureBlock = (block: Block, width: number) => number;
+
+/**
+ * The window the menu draws, sized by the rows its placement gives the
+ * candidates (I23, F1487). `rows` is `menuRowsShown`'s answer and `width` the
+ * placement's; `from` is where the wheel put the start, `null` while the
+ * selection places it (C16 I74).
+ */
+export function menuWindowOf(
+  candidates: readonly Candidate[],
+  selected: number | null,
+  rows: number,
+  width: number,
+  measure: MeasureBlock,
+  from: number | null = null,
+): Readonly<{ start: number; shown: number }> {
+  const total = candidates.length; // graphemes-ok: a candidate count, not text
+  // **The table spends one row a candidate**, which is the shape `menuWindow`
+  // counts in, so its window is that function's and the wheel clamps as it did.
+  if (candidates.some((c) => c.detail !== undefined)) {
+    const w = menuWindow(total, selected, rows);
+    if (from === null) return w;
+    return Object.freeze({ start: Math.min(Math.max(0, from), total - w.shown), shown: w.shown });
+  }
+  // **Pills pack several a row** (F1487). The row count was handed to
+  // `menuWindow` as a count of candidates, so the pills form drew one row of
+  // chips in a box sized for several. Whether a run fits is the pills block's
+  // own answer at the placement's width — measured, never counted in cells
+  // here, where the count would drift from `chipRows`.
+  const fits = (start: number, n: number): boolean =>
+    measure(pillsOf(candidates.slice(start, start + n), null), width) <= rows; // graphemes-ok: a candidate count, not text
+  if (rows <= 0 || fits(0, total)) return Object.freeze({ start: 0, shown: total });
+  /** The longest run from `start` that fits, and never fewer than one chip. */
+  const longest = (start: number): number => {
+    let lo = 1;
+    let hi = total - start;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (fits(start, mid)) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
+  };
+  /** The earliest start whose run to `to` fits — the window that follows the selection. */
+  const earliest = (to: number): number => {
+    let lo = 0;
+    let hi = to;
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (fits(mid, to - mid + 1)) hi = mid;
+      else lo = mid + 1;
+    }
+    return lo;
+  };
+  // The wheel's start is clamped to the last start that still reaches the end,
+  // as the table's is clamped to `total - shown`.
+  const start = from === null ? earliest(selected ?? 0) : Math.min(Math.max(0, from), earliest(total - 1));
+  return Object.freeze({ start, shown: longest(start) });
 }
 
 /**

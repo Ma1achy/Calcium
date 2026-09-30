@@ -31,7 +31,8 @@ export {
   type DirEntry,
   type ReadDir,
 } from "./sources.js";
-export { MENU_ID, menuBlocks, menuLayer, menuRowsShown, menuWindow, remainderOf } from "./menu.js";
+export { MENU_ID, menuBlocks, menuLayer, menuRowsShown, menuWindow, menuWindowOf, remainderOf } from "./menu.js";
+export type { MeasureBlock } from "./menu.js";
 export {
   CompletionError,
   SLOT_KINDS,

@@ -45,9 +45,12 @@ const MUTATIONS = [
     // Re-anchored 2026-09-28 (review batch 3, M8): the slice starts at a
     // wheeled start when the reader has scrolled the menu (C16 I74); the
     // mutation is unchanged.
+    //
+    // Re-anchored 2026-09-30 (F1487): the start is the window's own, wheeled
+    // or not, since `menuWindowOf` takes the wheel's; the mutation is unchanged.
     name: "the menu hands over every candidate again",
     file: KEYS,
-    from: "    const slice = candidates.slice(start, start + w.shown);",
+    from: "    const slice = candidates.slice(w.start, w.start + w.shown);",
     to: "    const slice = candidates;",
     expect: "T4.9",
   },
@@ -99,10 +102,13 @@ const MUTATIONS = [
     // Re-anchored 2026-09-28 (review batch 3, M8): the wheel's `scrollMenu`
     // computes the same window, so the anchor carries the comment after it to
     // name the drawing one; the mutation is unchanged.
+    //
+    // Re-anchored 2026-09-30 (F1487): the draw and the wheel share one call
+    // now, `windowFrom`, so the anchor is that call; the mutation is unchanged.
     name: "the window takes one row more than the placement holds",
     file: KEYS,
-    from: "    const w = menuWindow(candidates.length, selection.at, fits);\n    // **The keys own",
-    to: "    const w = menuWindow(candidates.length, selection.at, fits + 1);\n    // **The keys own",
+    from: "    return menuWindowOf(candidates, selection.at, fits, across, deps.measure, from);",
+    to: "    return menuWindowOf(candidates, selection.at, fits + 1, across, deps.measure, from);",
     expect: "T4.9",
   },
   {
