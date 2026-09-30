@@ -57951,6 +57951,8 @@ Found by lane b4-exec2's walk (C23 §8a A6.7, row 7). On the app route, `⌃c`, 
 
 **Ruled (97):** the shell writes a `partial` document that keeps what was drawn, with exit 130. **Owed**: the settle path, a row per cancel source, and a check that C07's cancelled mapping (F1493) is or is not on this path.
 
+**Closed** by lane b4-exec3 (040976bf spec, 13abac71 code, C23 I98). Invoke, a cancelled stream and a withdrawn approval each settle through `settle(id, doc)` with the card as it stood — the head reading `cancelled`, every streamed block, then `⊘ Cancelled.` — at `partial`, exit 130, matching C20. Denied and expired approvals are not cancels (ruling 100 a, F1510). T4.97 read `status ok … code 0 · recorded /ps 130` on all three sources before the fix. The walk found a worse defect behind it, the late answer (F1505).
+
 ## F1491 — the shell route records `code ?? 1`, and an `error` notice carries exit 0 ★★☆☆☆
 
 Found by lane b4-exec2. Two sites disagree with C07 I14's table, which the handoff now uses (I97).
@@ -57959,17 +57961,23 @@ Found by lane b4-exec2. Two sites disagree with C07 I14's table, which the hando
 
 **Ruled (98).** **Owed**: both sites, and a row per site that reads the code beside the status.
 
+**Closed** by lane b4-exec3 (045a1422, C23 I100). The shell route's code goes through `exitCodeOf`. A spawn failure reads C07's *The command did not start.* and records −1, where it read *exited with code 1*. `compose` takes its default code from the status, so an `error` document composed with no code carries 1. **Ruling 98's *137 for SIGKILL* was false on the PTY arm**, which reported 0 beside the signal; that is F1507, fixed at C21.
+
 ## F1492 — lines cleared from the queue never reach history ★★☆☆☆
 
 Found by lane b4-exec2. C23 I29 records every submitted line at settlement. `clearQueue` settles each queued line with the cancelled notice (ruling 92) and records none of them. Measured: after `⌃c` with two lines queued behind a running `/ps`, C20 held only `/ps 130`.
 
 **Owed**: each cleared line recorded at settlement. Its code is 0, the document's own (C04: `partial`, and nothing ran); if a spec says otherwise, amend the spec first. A row reads the history after a clear.
 
+**Closed** by lane b4-exec3 (c839dc14, C23 I29). Each line `⌃c` clears from the queue is recorded in C20. **The code is −1, not the 0 the finding proposed**: C07 §3 names *an invocation whose signal was already aborted so nothing was spawned* as a producer of −1, and a cleared line is that one step earlier. 0 would record a success and 130 an interrupt of something that never ran. The document's `meta.exitCode` is −1 as well. T4.101.
+
 ## F1493 — C07's cancelled notice draws no ⊘ ★☆☆☆☆
 
 Found by lane b4-exec2 while checking ruling 92's citation. C07's mapping for a cancelled call (`mapping.ts` about 190–200) is `muted` on `partial` with no glyph. So ruling 92's *what C07 already gives a cancelled call* holds for the tone and the status, not for ⊘. The lane did not measure whether the path is reachable on `⌃c`, because `cancelThis` settles the entry before `invoke` resolves.
 
 **Owed**: measure its reachability; F1490's build decides the path. If it is reachable, it takes the cancelled mark.
+
+**Closed** by lane b4-exec3 (13abac71, C07 I24). Before C23 I99, the shell reached C07's cancelled arm only through the late answer, whose document was then discarded (F1505); after it, the shell does not reach the arm at all. It is still reachable through the public `createAdapterRegistry().adapt`, so the mark was built. `cancelledNotice` moved to `mapping.ts`, in L0, which both the adapters and the shell may import, so there is one composer. C07 T1.23 read `notice muted undefined` before the fix.
 
 ## F1494 — a new advisory against a dev-only transitive turned every branch's `make audit` red ★★★☆☆
 
@@ -58064,3 +58072,59 @@ Found while filing lane b4-menu2's proposed notes at 3ed61fde. The lane proposed
 Nothing checks a release note's claim about the public surface. C24 owns the surface and `make proof` installs the tarball, but neither reads the notes.
 
 **Owed**: correct c007d8ef's sentence; measure each MIGRATION §2 row by compiling a consumer against the packed tarball, then drop or reword the rows no consumer can hit; and add a check that every name the notes call exported resolves in `dist/`'s entries.
+
+## F1505 — a far side's late answer rewrote a cancelled entry and released the next command's guard ★★★★☆
+
+Found by lane b4-exec3's sequence trace (C23 §8a A6.8, rows 4–6), measured at 0cb6f461 with a probe through `pipelineHarness`. With a real transport, the far side's answer arrives after an app-route cancel:
+- **Row 4.** `invoke` resolved with C06's `cancelled` result. C13 refused the document as `settled`, but `recordHistory` ran anyway, so C20 read `/ps 130, /ps 0`.
+- **Row 5.** A stream's late `end` ran `finishCard`. That is a `"shell"` patch, which C13 admits on a settled entry, so the head became `ok/succeeded · exit null`. A real subprocess stream yields `end` after every cancel.
+- **Row 6.** The late `finally` cleared the cancel slot and released the guard the next submission held. Measured: a third `/ps` ran beside `/ps --quiet` (3 invokes), and `⌃c` reached the third while `/ps --quiet` went on streaming.
+
+No row could put an answer after a cancel, because `pipelineHarness`'s transport ignores the invocation's signal.
+
+**Closed** by lane b4-exec3 (13abac71, C23 I99). The invoke continuation returns once the controller is aborted, on both the resolve and the throw path. `streamInto` takes the signal and returns at the next patch after a cancel. `finally` clears the cancel slot only if it is still this run's, and releases the guard only while `holdsGuard` is true. T4.98 read `[ true, '/ps 130, /ps 0' ]` and T4.99 read `[ 3, …]` before the fix.
+
+## F1506 — a stream that ends on its own releases the guard the next command holds ★★★☆☆
+
+Found by lane b4-exec3's trace (C23 §8a A6.8 row 7), with no cancel involved. The stream route released the guard before its loop and again in `finally`, so a stream that simply ended released the guard `/ps` held. `/ps --quiet` started beside it, and `⌃c` left `/ps` orphaned.
+
+**Closed** by lane b4-exec3 (13abac71): the pre-loop release clears `holdsGuard`, and `finally` releases only while it is set.
+
+## F1507 — the PTY arm reported a code of 0 beside a signal ★★★☆☆
+
+Found by lane b4-exec3 while building ruling 98. **Ruling 98's *137 for SIGKILL* was false on the PTY arm.** Measured with node-pty 1.1.0 in the container:
+
+```
+exit 0 -> {"exitCode":0,"signal":0}
+exit 3 -> {"exitCode":3,"signal":0}
+kill -9 $$ -> {"exitCode":0,"signal":9}
+kill -INT $$ -> {"exitCode":0,"signal":2}
+```
+
+C21 turned that into `{code: 0, signal: "SIGKILL"}`, and `exitCodeOf` reads the code first, so a PTY command killed by a signal recorded 0. C21 T2.9 asserted `{code: 0, signal: "SIGTERM"}` and called it *the pipe arm's own vocabulary*, which it is not.
+
+**Closed** by lane b4-exec3 (045a1422). `runner.ts` reports a null code when the port names a signal. T4.100 read `pty SIGKILL: Killed by SIGKILL. · meta 0 · recorded 0` before the fix.
+
+## F1508 — a stream's own end records nothing in C20 ★★★☆☆
+
+Found by lane b4-exec3. A stream's natural `end`, a malformed patch and a stream throw each settle through `settle(id)`, and none of them calls `history.append`. C23 I29 says every submitted line is recorded at settlement on every terminal path. Measured: after `/tail web.log` ended on its own, C20 held only `/ps --quiet 130`. The cancel is the only stream settlement that records.
+
+**Owed**: record at each stream settlement, with the code the entry settled with (ruling 100).
+
+## F1509 — a stall row survives a cancel ★★☆☆☆
+
+Found by lane b4-exec3's trace (C23 §8a A6.8 row 8). `cancelThis` does not call `refresh.settled`, so the settled card keeps `no output for 2m`. Calling it would rewrite the row as `resumed after 2m`, which is false for a cancel. §8a A4's remedy was written for a stream that resumed.
+
+**Ruled (100 d):** the shell composes the cancel's document (ruling 97), and it leaves the stall row out. `settle(id, doc)` replaces the view, so no delete is needed.
+
+## F1510 — a denied approval settles with code 0 while C20 records 126 ★★★☆☆
+
+Found by lane b4-exec3. A denied or expired approval settles through `settle(id)` with `meta.exitCode` 0, while C20 records 126 (C23 I60). It is F1490's shape: the document and the history disagree about one entry. Ruling 98 does not reach it, because the document is not `error`.
+
+**Ruled (100 a):** the document carries 126. The status is unchanged, because a refusal is not an error (§047).
+
+## F1511 — one `Exit` is worded two ways ★★☆☆☆
+
+Found by lane b4-exec3. `{code: null, signal: null}` reads *X ended without an exit status* on the handoff (ruling 94 c), and *The command did not start.* on the shell route and in C07. On every C21 arm it is produced only by a spawn failure, so the handoff's sentence describes an ending no arm produces.
+
+**Ruled (100 c):** the handoff says the child did not start.

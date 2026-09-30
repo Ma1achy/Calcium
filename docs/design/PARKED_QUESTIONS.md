@@ -1284,6 +1284,12 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1509, F1510, F1511). **An entry settles with one code, and the document and C20 both carry it.** C23 I29 already says C20 records *the code the entry settled with*. Every route that disagrees with itself is wrong on the document's side. (a) **A denied or expired approval's document carries 126**, the code C20 records (C23 I60). Its status is unchanged. A denial is a decision, not a failure: §047 says a refusal *is not an error and never red*, and ruling 98 constrains `error` documents only. (b) **A withdrawn approval stays 130** (ruling 97). The approval was asked by a far side that was already running, so the entry had started. A queued line that `⌃c` cleared never reached the pipeline, and that is why it is −1 (C07 §3). The two codes differ because one entry had started and the other had not. (c) **Ruling 94(c) is amended: a child that ended with neither a code nor a signal says *did not start* on the handoff too.** Lane b4-exec3 measured that `{code: null, signal: null}` comes only from a spawn failure on every C21 arm. So C07 and the shell route's *The command did not start.* is the true sentence, and *ended without an exit status* describes an ending no arm produces (tie-break 2). (d) **A cancel's document leaves the stall row out.** The shell composes that document (ruling 97, C23 I98), and a stall is a condition of a live entry. `settle(id, doc)` replaces the view, so no delete is needed. `refresh.settled`'s *resumed after* is not called, because it would be false for a cancel.
+
+**100 · RULED — Which code an entry settles with, and what a cancel's document keeps.** Lane b4-exec3 found a denied approval at `ok`/0 beside C20's 126, a withdrawn approval at 130 beside a cleared line's −1, one `Exit` worded two ways, and a stall row outliving a cancel.
+
+---
+
 ## Not yet recovered
 
 The gap between the entries and the running count in the per-MR reports was chased and closed: some questions had been counted twice. The list is the count. **No total is stated here in prose**, because the one that used to be here said *sixteen* long after that stopped being true — this file's own subject, arriving inside it.

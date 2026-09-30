@@ -118,6 +118,16 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   was an `error` document with an error box and `error.code: "CANCELLED"`. The code is gone;
   `meta.exitCode` is still 130. Queued lines cleared by Ctrl-C settle the same way, with
   `⊘ cancelled before it ran`, where they were a `▲` warning on an `ok` document.
+- **An app-route cancel settles `partial`, keeping the card** (13abac71, ruling 97, C23 I98). `⌃c`
+  over an invocation or a stream, or an approval its asker withdrew, leaves the head reading
+  `cancelled`, what had streamed, and `⊘ Cancelled.` beneath, with `meta.exitCode` 130, where it
+  settled `ok` with 0. A far side's answer arriving after the cancel no longer changes the entry
+  or records the line twice (C23 I99).
+- **Exit codes agree with what happened** (045a1422, ruling 98, C23 I100, C21 I19). A PTY command
+  killed by a signal records 128+n, where it recorded 0. A shell command that never started reads
+  `The command did not start.` and records −1, where it read `exited with code 1`. An `error`
+  document composed with no code carries 1.
+- **Lines `⌃c` clears from the queue reach history** (c839dc14, C23 I29), with code −1.
 - **A key action that throws appends an `error` notice** (70f5fcb1, ruling 93, C22 I134), `✗`
   on an `error` document, where it was a warning on an `ok` one.
 - **A window title and a system notification show control characters in caret form**

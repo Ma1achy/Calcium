@@ -129,3 +129,9 @@ Nothing reports these. Read each against what your application relies on.
   `meta.exitCode === 130` is unchanged.
 - **A handed-off child's exit code reaches `meta.exitCode` and history**: 128+n for a signal,
   −1 when it never started. It was always 0.
+- **An app-route cancel settles `partial` with `meta.exitCode` 130**, where it settled `ok` with 0.
+  Code that detects a cancel from `status === "ok"` and a history code of 130 tests
+  `status === "partial"`.
+- **A PTY command killed by a signal records 128+n**; it recorded 0. **A shell command that never
+  started records −1** and reads `The command did not start.`
+- **Lines cleared from the queue are recorded in history** at −1.
