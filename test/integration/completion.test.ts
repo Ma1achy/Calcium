@@ -16,6 +16,7 @@ import {
   verbSource,
 } from "../../src/interaction/completion/index.js";
 import { parseManifest } from "../../src/data/manifest/index.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
 import { createOverlayManager } from "../../src/viewport/overlay/index.js";
 import { tokenise } from "../../src/interaction/parser/index.js";
 import { raw } from "../support/manifest.js";
@@ -165,35 +166,61 @@ describe("C19 + C15 — the menu is an overlay (I8)", () => {
     // loses — the `+ N more` row and the bottom edge both, on every occasion
     // the indicator fired. A mechanism observable exactly never, which is
     // A03 §2's vacuity class arriving in shipped code.
-    const r = measurable();
-    const manager = createOverlayManager({
-      registry: { measureSequence: (b, w) => r.registry.measureSequence(b, w) },
-    });
-    const many = Array.from({ length: 60 }, (_, i) => ({ value: `entry-${String(i)}` }));
-    manager.push(menuLayer(many, 0, 0, { row: 2, rows: 1 }));
+    //
+    // **Both forms, with C11 registered.** Candidates without details draw as
+    // pills and candidates with them as a table (C19 §6), and the harness's
+    // bare registry draws an unregistered `table` as `raw` (C09 I130's reason).
+    const r = measurable({ definitions: [tableDefinition] });
+    const forms = [
+      { form: "pills", many: Array.from({ length: 60 }, (_, i) => ({ value: `entry-${String(i)}` })) },
+      {
+        form: "table",
+        many: Array.from({ length: 60 }, (_, i) => ({ value: `entry-${String(i)}`, detail: "a detail" })),
+      },
+    ];
+    for (const { form, many } of forms) {
+      const manager = createOverlayManager({
+        registry: { measureSequence: (b, w) => r.registry.measureSequence(b, w) },
+      });
+      manager.push(menuLayer(many, 0, 0, { row: 2, rows: 1 }));
 
-    const region = { width: 80, height: 10 };
-    const first = manager.layout(region)[0];
-    if (first === undefined) throw new Error("unreachable");
-    const fits = menuRowsShown(first);
-    const remainder = remainderOf(first, many.length, fits);
-    const w = menuWindow(many.length, 0, fits);
-    manager.update(MENU_ID, {
-      content: menuBlocks(many.slice(w.start, w.start + w.shown), 0, remainder),
-    });
+      const region = { width: 80, height: 10 };
+      const first = manager.layout(region)[0];
+      if (first === undefined) throw new Error("unreachable");
+      const fits = menuRowsShown(first);
+      const remainder = remainderOf(first, many.length, fits);
+      const w = menuWindow(many.length, 0, fits);
+      manager.update(MENU_ID, {
+        content: menuBlocks(many.slice(w.start, w.start + w.shown), 0, remainder),
+      });
 
-    const placed = manager.layout(region)[0];
-    if (placed === undefined) throw new Error("unreachable");
-    const lines = placed.layer.content.flatMap((b) => r.renderToLines(b, placed.width));
-    const drawn = lines.slice(0, placed.height).map(visible);
+      const placed = manager.layout(region)[0];
+      if (placed === undefined) throw new Error("unreachable");
+      const lines = placed.layer.content.flatMap((b) => r.renderToLines(b, placed.width));
+      const drawn = lines.slice(0, placed.height).map(visible);
 
-    expect(drawn.some((l) => l.includes(`+ ${String(remainder)} more`)), "the indicator is drawn").toBe(
-      true,
-    );
-    expect(lines.length, "and nothing is cut at all now").toBeLessThanOrEqual(placed.height);
-    // **The indicator is the box's last row** (ruling 90): the edge under it is
-    // the prompt's own rule, which the frame draws and the layer does not.
-    expect(drawn[drawn.length - 1] ?? "", "the indicator closes the box").toContain(`+ ${String(remainder)} more`);
+      expect(drawn.some((l) => l.includes(`+ ${String(remainder)} more`)), `${form}: the indicator is drawn`).toBe(
+        true,
+      );
+      expect(lines.length, `${form}: and nothing is cut at all now`).toBeLessThanOrEqual(placed.height);
+      // **The indicator is the box's last row** (ruling 90): the edge under it
+      // is the prompt's own rule, which the frame draws and the layer does not.
+      expect(drawn[drawn.length - 1] ?? "", `${form}: the indicator closes the box`).toContain(
+        `+ ${String(remainder)} more`,
+      );
+      // **And the table's window fills the box it was sized for** (T6.27). A
+      // chrome count charging a row the menu no longer draws hands back a
+      // window one row short, which fits inside the box and so passes the
+      // assertions above: the box shrinks to it, one candidate fewer is shown,
+      // and the remainder counts it as missing. The first placement is the cap
+      // the window was sized against. The table form only: `menuRowsShown`
+      // counts one candidate a row, which is the table's shape, and pills pack
+      // several candidates onto a row, so their box is under-filled on the
+      // clean tree too — measured, three pills on one row in a five-row cap.
+      if (form === "table") {
+        expect(placed.height, `${form}: the window fills the box it was sized for`).toBe(first.height);
+      }
+    }
   });
 
   it("T4.10 (I23, I20): the selection stays inside the window as it moves", () => {

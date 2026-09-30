@@ -1,10 +1,11 @@
-// C19 T6.25, T6.26 — the current candidate and the shared rule, reverted.
+// C19 T6.25, T6.26, T6.27 — the current candidate, the shared rule and the
+// chrome count that shares it, reverted.
 //
 // Each row pins the property its revert breaks; `tools/mutate/runs/c19-menu-current.mjs`
-// makes both reverts mechanically and names the rows that go red.
+// makes the reverts mechanically and names the rows that go red.
 import { describe, expect, it } from "vitest";
 
-import { menuLayer } from "../../src/interaction/completion/index.js";
+import { menuLayer, menuRowsShown } from "../../src/interaction/completion/index.js";
 
 const DETAILED = [
   { value: "/capabilities", detail: "the rendering route" },
@@ -12,7 +13,7 @@ const DETAILED = [
 ];
 const ANCHOR = { row: 20, rows: 1 };
 
-describe("C19 T6.25, T6.26", () => {
+describe("C19 T6.25, T6.26, T6.27", () => {
   it("T6.25 (C19 I29): the current taken from the selection alone → T1.72 and T4.11 fail, at rest no row carries ›", () => {
     // A typed menu holds no selection and the prompt keeps its keys (I20), and
     // it still marks a current: the two facts are separate fields.
@@ -24,7 +25,7 @@ describe("C19 T6.25, T6.26", () => {
     );
   });
 
-  it("T6.26 (C19 I23): the menu's own bottom rule restored → T3.25 and C22's session T4.34 fail on two stacked rules", () => {
+  it("T6.26 (C19 I23): the menu's own bottom rule restored → T3.25 fails on the untruncated arm and T4.9 on the truncated, where the frame cuts the rule", () => {
     for (const remainder of [0, 4]) {
       const kinds = menuLayer(DETAILED, 0, remainder, ANCHOR).content.map((b) => b.kind);
       expect(kinds[0], `${String(remainder)}: the top edge is the menu's`).toBe("rule");
@@ -32,7 +33,12 @@ describe("C19 T6.25, T6.26", () => {
     }
   });
 
-  it.todo(
-    "T6.27 (C19 I23): menuRowsShown still charging the bottom edge → T4.9 fails — not deferred on a component: lands with the F1474 code commit of review batch 4",
-  );
+  it("T6.27 (C19 I23): menuRowsShown still charging the bottom edge → T4.9 fails, the window one candidate short of its box", () => {
+    // The chrome is the top edge, and the indicator when truncated: the bottom
+    // edge is the prompt's rule (ruling 90), so neither arm charges it.
+    const placed = (height: number, truncated: boolean) =>
+      ({ height, truncated }) as unknown as Parameters<typeof menuRowsShown>[0];
+    expect(menuRowsShown(placed(6, false)), "untruncated: one row of chrome").toBe(5);
+    expect(menuRowsShown(placed(6, true)), "truncated: the edge and the indicator").toBe(4);
+  });
 });
