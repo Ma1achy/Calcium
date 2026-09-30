@@ -68,6 +68,26 @@ export function exitCodeOf(raw: Pick<RawResult, "exitCode" | "signal">): number 
   return -1;
 }
 
+/**
+ * **A cancel, drawn as the `cancelled` call state** (C07 I24, C23 I96): `muted`,
+ * with the state's own mark — ⊘, `/` in ASCII.
+ *
+ * **The one composer of the cancel form**, and it is here because this is the
+ * lowest layer both of its users can import: the `cancelled` row of §4 below,
+ * and every C23 route that settles a cancel into a document — the shell route's
+ * `Cancelled.` above the screen it kept, a handed-off child that ended on an
+ * interrupt or a closed terminal, a queued entry a `⌃c` clears, and the app
+ * route's card. It was C23's alone, and this row drew the same notice without
+ * the mark (F1493): the tone and the status were the state's, and ⊘ was not.
+ *
+ * **The state's mark displaces the continuation mark** (C23 §8a A6.6 row 5).
+ * A `muted` notice under a command would take `⎿`, and the `cancelled` state
+ * has a mark of its own; both claim the one slot, and the state's wins.
+ */
+export function cancelledNotice(text: string, id: string): Block {
+  return block({ kind: "notice", id, tone: "muted", glyph: "cancelled", text });
+}
+
 function errorNotice(id: string, text: string): Block {
   // A slot, not a character (C04 §5). C09 §4 owns both renderings and the
   // 1:1 rule, so this survives `LANG=C` without C07 knowing what it draws.
@@ -195,14 +215,7 @@ export function mapResult(raw: RawResult, ctx: AdapterContext): Outcome {
     return {
       status: "partial",
       blocks: null,
-      appended: [
-        block({
-          kind: "notice",
-          id: id("cancelled"),
-          tone: "muted",
-          text: "Cancelled. Output produced before the stop is shown above.",
-        }),
-      ],
+      appended: [cancelledNotice("Cancelled. Output produced before the stop is shown above.", id("cancelled"))],
     };
   }
 

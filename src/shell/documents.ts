@@ -14,7 +14,7 @@
  */
 
 import { CALL_HEAD_GLYPH, CALL_STATE_TONE, block, document } from "../data/viewmodel/index.js";
-import { usageBlocks } from "../data/adapters/index.js";
+import { cancelledNotice, usageBlocks } from "../data/adapters/index.js";
 import { elapsed, glyphs, spinnerFrames } from "../presentation/blocks/index.js";
 import type { AskOptions, Choice } from "./local/registry.js";
 import { defaulted } from "./builders/seq.js";
@@ -231,27 +231,6 @@ export function noticeDoc(
 }
 
 /**
- * **A cancel, drawn as the `cancelled` call state** (C23 I96, ruling 92): `muted`,
- * with the state's own mark — ⊘, `/` in ASCII.
- *
- * **One composer for every route that settles a cancel into a document**: the
- * shell route's `Cancelled.` above the screen it kept, a handed-off child that
- * ended on an interrupt or a closed terminal, and each queued entry a `⌃c`
- * clears. They were three forms — an `error` box, this, and a `warn` ▲ — so a
- * cancel read as a failure, a cancel or a warning depending on where it
- * happened.
- *
- * **The state's mark displaces the continuation mark** (C23 §8a A6.6 row 5).
- * A `muted` notice under a command would take `⎿`, and the `cancelled` state
- * has a mark of its own; both claim the one slot, and the state's wins — on
- * the routes that use this the notice heads its entry, so there is nothing
- * above it inside the entry to continue.
- */
-export function cancelledNotice(text: string, id: string): Block {
-  return block({ kind: "notice", id, tone: "muted", glyph: "cancelled", text });
-}
-
-/**
  * A cancel as a whole document: the notice alone, on `partial` (C23 I10, I96).
  * **Never `error`**: a stopped child says nothing about whether it would have
  * worked (C23 I81), and C04 I3 then admits no `error` field — so there is no
@@ -264,6 +243,30 @@ export function cancelledDoc(command: string, text: string, metaSpec: MetaSpec):
     blocks: [cancelledNotice(text, blockId("notice"))],
     meta: metaSpec,
   });
+}
+
+/**
+ * **An app-route cancel, as the document the shell writes** (C23 I98, ruling 97).
+ *
+ * The card as it stood — its head, already reading `cancelled` (I54), and every
+ * block the entry streamed under it — with the cancelled notice after them, on
+ * `partial`, and 130 in `meta.exitCode`: the code C20 records for the same
+ * settlement (I29), and C01 I17's 128 + `SIGINT`. It was `settle(id)` with no
+ * document, which can change no status, so the entry stayed `ok` with 0 beside a
+ * record of 130 (F1490).
+ *
+ * **The rest of `meta` is the card's own**, because the card was composed by
+ * this route at step 3 with the verb, the transport and the argv it spawned;
+ * nothing about a cancel changes them. `held` never carries `error` — a pending
+ * card is `ok` until it settles — so there is none to drop for C04 I3.
+ */
+export function cancelledCard(held: ViewDocument): ViewDocument {
+  return {
+    ...held,
+    status: "partial",
+    blocks: [...held.blocks, cancelledNotice("Cancelled.", blockId("cancelled"))],
+    meta: { ...held.meta, exitCode: 130 },
+  };
 }
 
 /**

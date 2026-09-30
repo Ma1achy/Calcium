@@ -23,6 +23,8 @@ import { fsIo, report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const EXECUTION = "src/shell/execution.ts";
 const DOCS = "src/shell/documents.ts";
+// The composer moved to C07 (C07 I24, F1493): one place for the mark, below both users.
+const MAPPING = "src/data/adapters/mapping.ts";
 const CONSTRUCT = "src/shell/construct.ts";
 const FILES = [
   "test/integration/process.test.ts",
@@ -55,7 +57,7 @@ const results = runPass({
   control: {
     // **A change the corpus can see** (F1254): every cancel's words change, on
     // all three routes that compose one.
-    file: DOCS,
+    file: MAPPING,
     from: 'return block({ kind: "notice", id, tone: "muted", glyph: "cancelled", text });',
     to: 'return block({ kind: "notice", id, tone: "muted", glyph: "cancelled", text: text.toUpperCase() });',
     why:
@@ -92,7 +94,7 @@ const results = runPass({
       // The composer's mark, which every route shares: `muted` obliges none, so
       // the block is still valid and draws no ⊘ anywhere.
       name: "T6.111: the mark dropped from cancelledNotice",
-      file: DOCS,
+      file: MAPPING,
       from: 'tone: "muted", glyph: "cancelled", text });',
       to: 'tone: "muted", text });',
       expect: "T4.94",
