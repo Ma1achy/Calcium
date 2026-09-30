@@ -17,9 +17,13 @@ describe("AUTHORITY §Browser conformance — the page's own checks, executed", 
   // runner reports each problem prefixed by its case; each row takes its own.
   let problems: string[] = [];
   let cases = 0;
+  // **Its own limit, on asymmetry** (F1406). Nine pages in a headless browser: 6.1 to
+  // 12.2 s at load about 4 (lane pr-instr, alternated across #62 and #63), and 10.7 s once
+  // at load 2.5, against vitest's 10 s default hook limit. The rows assert which pages are
+  // refused, not how fast; a timeout here reports the machine.
   beforeAll(async () => {
     ({ cases, problems } = await selfTest());
-  });
+  }, 60_000);
   const mine = (prefix: string) => problems.filter((p) => p.startsWith(`${prefix}:`));
 
   it("self-test: every case was run — seven fabricated pages and two clean controls", () => {

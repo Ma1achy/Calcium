@@ -57408,6 +57408,8 @@ the escape). Each passed three of three alone at load about 1; neither file was 
 
 **2026-09-30, RS14b (`roadmap-status.test.ts`).** It spawns the tool four times, and each spawn walks the tree over the bind mount. It took 1.35 s alone, and 46.6 s (b4-menu at 312f4e3b), 34.1 s (b4-fixmap at 788f7923) and 38.2 s (b4-fixmap at aa4e1741) in three consecutive loaded chains, against the file's 30 s `testTimeout`. It passed alone each time. It was red in more chains than not, so it now carries its own 120 s limit. The row asserts counts rather than speed, so the limit is kept on asymmetry: raising it costs nothing on a correct tree, and a timeout diagnosed as drift costs a session.
 
+**2026-09-30, the browser conformance row (`test/browser/design-page.test.ts`, the instruments fixture for `chromium.mjs`).** Its `beforeAll` runs nine pages in a headless browser under vitest's default 10 s hook limit. Lane pr-instr timed it alternating between #62 and #63 at load about 4: 7015, 10005 and 11581 ms on #62, and 12247, 6851 and 6096 ms on #63. So the cost belongs to the machine, not to either tree. It failed once more alone (10.68 s at load 2.49), and it failed the instruments gate in two chains (b4-fixmap at 788f7923, #63 at d99921f1). The hook now carries 60 s, on the same asymmetry as RS14b.
+
 ## F1407 — `oscText` passes bidi characters into window titles and notifications ★★☆☆☆
 
 Found by lane b4-m12. `oscText` in `terminal/escapes.ts` removes `[\u0000-\u001f\u007f-\u009f]` before
@@ -57891,6 +57893,8 @@ Eleven mutations were run and each turned its row red. Three defects of the gate
 The cost is that CI's `fast` job builds twice. That is accepted: a stale `dist/` passes against the previous commit.
 
 **Closed.** `make instruments` reads `65 instruments, every one with a fixture · 810 rows · all green`, and `/tmp/gates-wt.sh` runs it as the seventh gate. **#62 and #63 still carry the red** until their own trees are repaired.
+
+**Carried down the stack** by lane pr-instr, because #61 was red on the same gate (`74 found, 47 with a fixture`), so the gap predates batch 2. The repair was ported to #61 (9ca007ad), merged forward through #62 (81581547) and #63 (d99921f1), and pushed. Each tree reads `64 found, 64 with a fixture`. **One classification differs by tree, and correctly.** On #61–#63, `design-fixture-map.py` reproduced `DESIGN_FIXTURES.md` byte for byte (md5 unchanged), so it was a live writer that nothing ran, and it got a fixture, DM1. DM1's first run on #63 found that 3b36dc74 had changed §22's citation to T1.197 in the markdown and not in the writer's table, so a regeneration would have restored the stale T1.100. The lane fixed the writer's table on #63. On batch 4 the writer is gone (ruling 95), and the merge (44555b32) took batch 4's side.
 
 ## F1486 — the completion footer offers `⏎ accept` where `⏎` submits the line ★★★★☆
 
