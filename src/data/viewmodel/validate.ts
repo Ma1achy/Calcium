@@ -969,9 +969,11 @@ function checkAction(raw: unknown, where: string, e: string[]): void {
  * a reader can find each one.
  */
 /**
- * `attributesOnly` is the hunk-line arm (C04 I91): bold/italic/underline and
- * neither `tone` nor `value`, because the line's gutter and syntax palettes are
- * already the two a row may carry (C25 §3).
+ * `attributesOnly` is the hunk-line arm (C04 I91): offsets,
+ * bold/italic/underline and `elide` only. It refuses `foreground`, `tone`,
+ * `value` and `ramp` because the line's gutter and syntax palettes are already
+ * the two a row may carry, and refuses `dim`/`inverse` because the hunk's
+ * attribute vocabulary is closed (C25 §3).
  */
 /**
  * C04 I110, I111 — a screen line's text and its runs.
