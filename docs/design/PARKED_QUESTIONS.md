@@ -1236,6 +1236,30 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1479). **A cancel is drawn as the `cancelled` call state on every route**: muted, ⊘ (`/` in ASCII), on a `partial` document, which is what C07 already gives a cancelled call (`mapping.ts:190`). **This corrects ruling 91's premise.** Ruling 91 said a handoff's cancel settles `cancelled` "as C23 I66's ladder does"; measured by lane b4-exec, C23 I66's shell route settles a cancel on `error`, with an error box and code `CANCELLED`, so it draws a cancel as the failure ruling 91 separates it from. A consistent picture beats a lone rule: C23 I81's `cancelled` state, the registry's call-state tones and C07's mapping agree, and C23 I66's shell arm is the one that disagrees. So C23 I66 is amended to settle `partial` in the `cancelled` form, and `clearQueue`'s *cancelled before it ran* takes the same form in place of warn and ▲.
+
+**92 · RULED — What a cancel looks like, on every route.** Lane b4-exec built ruling 91 and found its cited precedent drew a cancel as a failure (F1479).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1481). **A notice that reports a failure is an `error` document, in error tone, with ✗.** It is ruling 91's rule, *a notice's tone agrees with its document's status*, read from the content side: the key action notice at `construct.ts:4198` says *failed* and was a warning on an `ok` document, which agrees with itself and disagrees with what it says. Warnings on `ok` documents that report no failure are the usual convention and stay.
+
+**93 · RULED — Whether a failed key action is a warning.** Lane b4-exec found *the key action `X` failed* drawn as a warning on an `ok` document (F1481).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1482). **Three edges of ruling 91, each kept as written except the text.** (a) An exit of 128+n with no signal, as a grandchild killed under `sh -c` returns, is **not** decoded as a signal: the shell reports what it received, and a real `exit 130` is indistinguishable. It is a failure. (b) **SIGQUIT stays a failure**: it asks for a core dump, which is an abort, not a cancel. (c) A child that ended with neither a code nor a signal says **ended without an exit status**, not *exited 1*. `code ?? 1` names an exit the child never returned; the state stays failed.
+
+**94 · RULED — 128+n under `sh -c`, SIGQUIT, and a child with no exit status.** Lane b4-exec's walk table, rows 3, 4 and 6 (F1482).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1484). **`tools/design-fixture-map.py` loses its writer, and `DESIGN_FIXTURES.md` is the one record.** Run at 78cd90e1 the script rewrote the file `+114/−192`, dropping the `figure` column and the rule-interaction table that `design-fixtures.test.ts` parses by equality. The repository is right about what ships, and what ships is the hand-edited markdown. `design-prose-with-surfaces.py` reads its classes from the markdown's class column rather than from the script's table, so there is one record to agree with.
+
+**95 · RULED — The retired fixture-map generator.** Lane b4-instr found it destructive and still runnable (F1484).
+
+---
+
 ## Not yet recovered
 
 The gap between the entries and the running count in the per-MR reports was chased and closed: some questions had been counted twice. The list is the count. **No total is stated here in prose**, because the one that used to be here said *sixteen* long after that stopped being true — this file's own subject, arriving inside it.

@@ -97,6 +97,12 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   longer share their only non-colour carrier. The change is that one cell; nothing measures
   differently. In `calcium-tui/testing`, the `status` row of the document-premise table names
   the `cross` mark.
+- **A handed-off child's ending takes its status's tone and mark** (cf3b6f86, ruling 91,
+  C23 I95). A `/tty` or `interactive` verb that exits non-zero, or ends on any signal but
+  SIGINT, SIGTERM or SIGHUP, now gives an `error` notice with `✗` (`x`), where it gave a
+  warning with `▲`. SIGINT, SIGTERM and SIGHUP give a `muted` notice with `⊘` (`/`) on a
+  `partial` document, where they gave a warning on an `error` document. A consumer matching
+  the handoff notice's tone, mark or status should update.
 - **A window title and a system notification show control characters in caret form**
   (46746909, 1e2c5525, ruling 86, C01 I26). `ESC[2J` in a tool's output reaches the title as
   `^[[2J` where it was `[2J`, and tab and newline appear as `^I` and `^J`. Bidi format characters

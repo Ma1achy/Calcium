@@ -57798,6 +57798,8 @@ Measured: against C22 T1.4h as it stood at 0e08af20, both key mutations in `c22-
 
 Found by lane b4-golden (ruling 85). The fixture overrides an image's `data` but keeps the corpus image's `digest`. The decode cache (`DECODED`, keyed on digest) then returns the real picture once T2.143 has decoded it. Its capture is `▀▀`, a picture, not a fault. With `src` at 0e08af20, `npx vitest run test/contract/rows-arm.test.ts -t "T2.144"` fails alone (`img-fault at 2: expected [ …(3) ] to deeply equal [ Array(1) ]`) and passes in the whole-file run. The row depends on the one before it and does not construct the state it names. **Owed**: a digest of the fixture's own, and the row shown to fail on the fault arm removed.
 
+**Closed** by lane b4-exec (0d185e1f, de9df639). The `img-fault` fixture has its own digest, `digestOf("not-a-png")`, so the decode cache cannot answer it from the corpus image. Its 33 Ink captures, which were the corpus image's under a second name, are retired as `SHARED_DIGEST`, and the fault arm is asserted by shape: the box's two rows, the caption, and the decoder's reason. Before the fix, the whole file passed with the alt drawn alone (`Tests 4 passed (4)`) and the row alone failed. After it, `c09-image-fault-arm.mjs` catches 3 of 3, with a control that turns T2.143, T2.144 and T2.146 red.
+
 ## F1474 — the completion menu marks no current candidate at rest ★★★☆☆
 
 Found by lane b4-golden building §097's frame (ruling 87). The frame's three candidates have identical styles in a `readFrame` read: no mark, no ground, no weight. §097 draws `current`'s `›` on one, and the footer offers `⏎ accept`, so the reader is offered a key that acts on a candidate the frame does not show. **Ruled (89)**: the registry is normative on appearance, so the current candidate carries the mark at rest.
@@ -57810,6 +57812,8 @@ Found by lane b4-golden. The menu's closing rule and the prompt's upper rule dra
 
 Found by lane b4-golden (ruling 85). `src/shell/execution.ts:1041–1047`: a handed-off child that exits non-zero, or ends on any signal, is appended as `noticeDoc(…, "warn", …, "error")`. The document's status says it failed, and its only visible carriers, the tone and the ▲ mark, say warning. **Ruled (91)**: a notice's tone agrees with its document's status. A non-zero exit, or a signal other than SIGINT, SIGTERM or SIGHUP, is a failure: error tone and ✗. SIGINT, SIGTERM and SIGHUP are what an interrupt or a closed terminal sends, and they settle `cancelled` as C23 I66's ladder does.
 
+**Closed** by lane b4-exec (eb33893b spec, cf3b6f86 code), built from a seven-row walk table (C23 §8a A6.6). A non-zero exit or a crash is an `error` notice with ✗. SIGINT, SIGTERM and SIGHUP settle in the `cancelled` form: muted, ⊘, `partial`. `noticeDoc` gained an optional state mark, because the table's row 5 found the continuation mark and the cancelled mark both claiming one glyph slot. T4.93 was an `it.todo` and now runs. `c23-handoff-ending.mjs` catches 3 of 3 with a control. Read in frames: `⊘ vim ended on SIGINT` in muted, where it was `▲` in amber. **The ruling's cited precedent was wrong**: C23 I66 settles a cancel on `error`, which is F1479 and ruling 92. Rows 3, 4 and 6 of the table are F1482 and ruling 94.
+
 ## F1477 — two design texts still name ▲ as the error mark ★★☆☆☆
 
 Found by lane b4-golden (ruling 85). §096's empty-case annotation reads *no banner, no ▲, no red* beside its own ✗ error. The registry's `attention` asciiNote cites `GlyphSet.warning`, which ruling 85 retired. Both are in the normative design, which the lane rightly did not edit. **Owed at the release seal**, which already re-seals the baseline and bumps the revision: both texts corrected, the HTML regenerated, and the sealed digests re-taken.
@@ -57821,3 +57825,59 @@ Found by the F1472 harness fix. Its sample re-ran `tools/mutate/runs/c22-linear.
 **Two vacuous clauses, one cause.** After `s.resize({ columns: 40, rows: 10 })` the row read the output at `step()`, which is 0 ms. A resize commits on the scheduler's timer, so nothing had committed yet. Its check, `lines(since(before)).every((l) => l === "> xy")`, is also true of an empty write. The idle-commit clause above it (`step(200)` with no commit) has no cause to commit either. Measured: narrowing to 3 columns and reading at 0 ms gave `the narrowed line, once: expected +0 to be 1`; at 100 ms it gave 1.
 
 **Closed** on the same branch. T4.102 now waits 100 ms after each resize. A resize the line survives must write `""`, and a narrowing to 3 columns must write exactly one line. With the guard hand-removed (`if (next === shown) return;` commented out), T4.102 fails on its own row: `a resize the line survives unchanged: expected '\r\u001b[2K> xy\u001b[5G' to be ''`. The class is an assertion over a write that never happened, which `every` and a 0 ms read both satisfy.
+
+## F1479 — a cancel is drawn as a failure on the shell route and as a warning in the queue ★★★☆☆
+
+Found by lane b4-exec while building ruling 91. That ruling said a handed-off child's cancel settles `cancelled` "as C23 I66's ladder does". Measured, I66's shell route (`execution.ts` about 911–960) settles a cancel on status `error`, draws an error box saying `Cancelled.`, and sets code `CANCELLED`. That is failure's status and tone, so the precedent the ruling cited draws a cancel as the failure the ruling separates it from. The lane built the handoff arm on the `cancelled` call state instead: `CALL_STATE_TONE.cancelled` is `muted`, the glyph is ⊘, and the status is `partial`, which is C07's mapping for a cancelled call (`mapping.ts:190`, C23 T3.4).
+
+A second site: `clearQueue` (`execution.ts` about 598) writes `noticeDoc(item.line, "cancelled before it ran", "warn", …)`, a warning with ▲ on an `ok` document, for a cancel. C09 T2.97 names this notice as its case.
+
+**Ruled (92):** a cancel is the `cancelled` call state on every route. I66 is amended and both sites follow. **Owed**: the I66 amendment, both code sites, T2.97 moved with them, and a row per site that reads tone, mark and status.
+
+## F1480 — a handed-off child's exit code never reaches history ★★★☆☆
+
+Found by lane b4-exec. `noticeDoc`'s meta has no `exitCode`, so `meta()` defaults it to 0, and a handed-off `vim` that exits 1 is recorded in history as a success. This goes against C23 I29, which has history record what the command returned. Ruling 91 made the notice say failure; the record beneath it still says success, so the two disagree about one run.
+
+**Owed**: the handoff's notice carries the child's exit code into meta (`128 + n` for a signal, as C21 reports one), and a row that reads the history entry after a non-zero handoff.
+
+## F1481 — a failed key action is drawn as a warning on an `ok` document ★★☆☆☆
+
+Found by lane b4-exec, surveying `src/shell/` for other notices whose tone disagrees with their content. `construct.ts:4198` writes *the key action `X` failed: …* as a warning on an `ok` document. The lane checked the other warning notices on `ok` documents (`construct.ts` 1243, 1300, 1370, 1406, 2602, 4310; `execution.ts` 1793, 1833): none of them reports a failure, and they follow the usual convention.
+
+**Ruled (93):** a notice that reports a failure is an `error` document, in error tone, with ✗. **Owed**: the one site and a row reading its tone, mark and status.
+
+## F1482 — a handed-off child with no exit status is said to have exited 1 ★★☆☆☆
+
+Found by lane b4-exec's walk table for ruling 91 (`out/b4-exec-walk.txt`, C23 §8a A6.6). Row 3: with neither a code nor a signal, the text is built from `code ?? 1` and reads *vim exited 1*, an exit code the child never returned. Row 4: under `sh -c`, a grandchild killed by a signal comes back as 128+n with no signal and counts as a failure. Row 6: SIGQUIT, which a terminal can also send, is a failure because the ruling names three cancel signals.
+
+**Ruled (94):** rows 4 and 6 stay as built, for the reasons recorded in the ruling. Row 3's text becomes *ended without an exit status*, and its state stays failed. **Owed**: the text and a row for it.
+
+## F1483 — the image fault text carries an em dash onto the ASCII rung ★☆☆☆☆
+
+Found by lane b4-exec while fixing F1473. Under ASCII, the image decoder's fault reads `x not a PNG or a GIF — …`: the mark takes its ASCII form and the prose beside it keeps U+2014. The ASCII rung is defined over glyphs, so whether framework-authored prose is inside it is a question, not yet a defect.
+
+**Owed**: survey how other framework-authored text meets the ASCII rung (status messages, notices, the size fallback), then rule the class rather than this instance.
+
+## F1484 — a retired generator still rewrites `DESIGN_FIXTURES.md` and drops what the tests parse ★★★☆☆
+
+Found by lane b4-instr while classifying the unfixtured tools. `tools/design-fixture-map.py` writes `test/golden/DESIGN_FIXTURES.md` from its own table, `M`. The file has since been edited by hand: the `figure` column and the rule-interaction table were added, and `design-fixtures.test.ts` parses it by equality. Run against a copy at 78cd90e1, the script rewrote the file `+114/−192` and dropped both. Nothing prevents it being run. `design-prose-with-surfaces.py` still parses `M` out of the script's text. Today `M` agrees with the markdown's class column (109 rows, 33 `prose` in each), but it is a second record of one fact.
+
+**Ruled (95):** the writer half goes and the markdown is the one record. The census reads the class column from the markdown. **Owed**: both changes, and the instruments exemption replaced by a fixture if a reader remains.
+
+## F1485 — `make instruments` ran only in CI, and thirty-eight tools accumulated with no fixture ★★★★☆
+
+`make instruments` (`tools/instruments.mjs`) runs in CI's `fast` job and in no local chain. PRs #62 and #63 went red on it, and batch 4's tip read `85 found, 47 with a fixture`, with 38 `NO FIXTURE`. It is the *gate that exists and is not run* shape again: every landing since #62 was checked against everything except this.
+
+Lane b4-instr classified all 38, verifying each by its callers and, for the one-shots, by re-running them against a `git archive` copy:
+- **11 had a test that nobody had listed**, now registered: `chromium.mjs`, `figures.ts`, `release.mjs`, `released-against.mjs`, `fixtures.ts`, `generate-keymap.mjs`, `rule-status.mjs`, `from-registry.mjs`, `curated/pin.ts`, `bundle.mjs`, `record.ts`.
+- **7 got a new one**: `wcag.mjs` (WC1–6, including equality with `contrast.ts` over a 216-colour cube), `quantised.mjs` (QT1), three benches (BP1–5), and two census reporters (DC1–5).
+- **18 one-shots and two non-instruments are exempt, one entry per file**, each with a reason quoting what the tool printed on re-run.
+
+Eleven mutations were run and each turned its row red. Three defects of the gate itself were fixed alongside:
+- `NOT_INSTRUMENTS` entries were never checked for presence, so an exemption could outlive its file.
+- Eight fixtures read `dist/` without building it; `instruments` now builds first (F447's rule).
+- `quantised.mjs`'s header claimed a byte-identical regeneration and nothing ran the writer; QT1 does.
+
+The cost is that CI's `fast` job builds twice. That is accepted: a stale `dist/` passes against the previous commit.
+
+**Closed.** `make instruments` reads `65 instruments, every one with a fixture · 810 rows · all green`, and `/tmp/gates-wt.sh` runs it as the seventh gate. **#62 and #63 still carry the red** until their own trees are repaired.
