@@ -86,7 +86,7 @@ const results = runPass({
       // **What shipped in the queue** (F1479): a warning, ▲, on `ok`.
       name: "T6.111: the cleared queue's notice put back to warn",
       file: EXECUTION,
-      from: 'cancelledDoc(item.line, "cancelled before it ran", { origin: "user" })',
+      from: 'cancelledDoc(item.line, "cancelled before it ran", { origin: "user", exitCode: -1 })',
       to: 'noticeDoc(item.line, "cancelled before it ran", "warn", { origin: "user" })',
       expect: "T4.95",
     },

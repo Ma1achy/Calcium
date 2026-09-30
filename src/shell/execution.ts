@@ -603,7 +603,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    */
   const clearQueue = (): void => {
     for (const item of queue.splice(0)) {
-      deps.transcript.settle(item.id, cancelledDoc(item.line, "cancelled before it ran", { origin: "user" }));
+      // **A cleared line is a submission, and it settles here** (I29, F1492):
+      // recorded with the code it settled with, which is -1, C07 I14's *never
+      // started*. C07 §3 names an invocation aborted before anything was
+      // spawned as one of -1's two producers, and this is that invocation one
+      // step earlier. 0 would record a success, 130 an interrupt of something
+      // that was never running. It was recorded nowhere, so `↑` could not
+      // recall a line the reader typed.
+      const doc = cancelledDoc(item.line, "cancelled before it ran", { origin: "user", exitCode: -1 });
+      deps.transcript.settle(item.id, doc);
+      recordHistory(item.line, doc);
     }
   };
 

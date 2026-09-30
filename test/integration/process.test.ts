@@ -512,9 +512,29 @@ describe("C21 with C06", () => {
       "pty SIGKILL: Killed by SIGKILL. · meta 137 · recorded 137",
     ]);
   });
-  it.todo(
-    "T4.101 (C23 I29, C23 I5, F1492): a line a ⌃c cleared from the queue is recorded in C20 at settlement, as -1 — not deferred on a component: lands with the F1492 code commit of review batch 4",
-  );
+  it("T4.101 (C23 I29, C23 I5, F1492): a line a ⌃c cleared from the queue is recorded in C20 at settlement, as -1", async () => {
+    // **The record and the documents together**, because C23 I29 records *the code
+    // the entry settled with*: a row reading C20 alone passes a build that
+    // records -1 beside documents saying 0. Two queued, as T4.95 has, so the
+    // order is visible and one cleared line cannot stand for both.
+    const h = pipelineHarness({ invoke: () => new Promise<never>(() => undefined) });
+    h.pipeline.submit("/ps");
+    await new Promise((r) => void setTimeout(r, 0));
+    h.pipeline.submit("/ps --quiet");
+    h.pipeline.submit("/ps");
+    await settled();
+
+    h.pipeline.cancel();
+    await settled(h.pipeline);
+
+    expect([
+      h.recorded.map((r) => `${r.command} ${String(r.exitCode)}`).join(", "),
+      h.transcript.entries.map((e) => `${e.doc.command} ${e.doc.status} ${String(e.doc.meta.exitCode)}`).join(", "),
+    ]).toEqual([
+      "/ps 130, /ps --quiet -1, /ps -1",
+      "/ps partial 130, /ps --quiet partial -1, /ps partial -1",
+    ]);
+  });
   it("T4.7 (with C22): session exit signals every child before the terminal is released", async () => {
     // A02 Seam 4's `Shutdown` row, and the whole claim is the **order**: a
     // child still running when the alternate screen is released writes onto the
