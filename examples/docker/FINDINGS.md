@@ -56711,6 +56711,8 @@ notice's second row where `0 above, 3 below` belongs. Not new behaviour — the 
 it makes C04 I49's residue row unreadable at any offset that cuts a child, so C09 T4.61 was built on a box of 2 to
 avoid it.
 
+**Closed**, verified at 5318cd25. C09 I135 (7bf1a2d0, which landed it as I134 before e5538c4b renumbered it): a scroll box crops a child that the window cuts, so it draws `height` rows plus its residue at every offset. T3.76, T3.130 and T6.186 pass. T3.130 drives a bare box at 75 columns rather than the finding's card body at 81; the crop is in the scroll box's own render, so the host should not matter. C09 T4.61's `boxSession(2)` workaround is now unneeded and is left alone.
+
 ## F1345 — SS47 decoded, and the escapes were all premises ★☆☆☆☆
 
 F1326's class, closed by lane b3-tail. SS47 now judges `decodeLiteral(body)` — `\uXXXX`, `\u{…}` and `\xNN`, one
@@ -56790,6 +56792,8 @@ on an unmarked §051-shaped question `esc` answers with the inspection's key, an
 inspection choice, and the fallback skips those — and M15.7 builds it with the shell lane. Recorded under F1378:
 the plan held the number and FINDINGS did not.
 
+**Closed**, verified at 5318cd25 by an inspector reading the rows and running them. C23 I93 (14f078cc): `ask` rejects a second default, and a default on a reply or inspection choice, before anything is queued, and `defaultStart` falls back to the last choice that answers, so the opening selection and `esc` agree. T1.104 passes; T6.109 is its mutation run. The residue, a set in which no choice answers, is F1495.
+
 ## F1297 — a scroll box's elements were measured at the width the bar leaves to render ★★☆☆☆
 
 Found by the M13–M16 plan (`containers.ts:501,506` against `:561-564`): a scroll box's `elements` measured child
@@ -56834,12 +56838,16 @@ Found by the M13–M16 plan (`session.ts:2337`): only entries receive scroll off
 layer is pinned at offset 0. It is the single cause behind M15.5 (an inspection that cannot scroll) and M14.4 (the
 chip preview's unreachable tail). The plan orders the shell lane to begin with it.
 
+**Closed**, verified at 5318cd25. C22 I141 (6c605f19): both layer painters (`composite.ts:229`, `session.ts:1318`) render a layer's scroll boxes from `ScrollOffsets` under `layer:<id>`. T1.174 and T4.114 pass; T6.142 is its mutation run. Its two consequences are built: M15.5 is C23 I88, and M14.4 is C22 I143 (F1307).
+
 ## F1303 — the tape's pull follows the producer's `current`, never focus ★★☆☆☆
 
 Found by the M13–M16 plan (`construct.ts:2676-2687`): `pullTapes` follows `block.current` and never focus, so a
 focused member off-screen is never pulled into view. R-BLK-857 (`example`) says the window never moves without
 moving the current, R-BLK-853 points the other way, and the shell cannot write a producer's `current`. Ruling 80
 (the plan's D9) decides: ←/→ moves focus, the window follows focus while it is in the tape, and `⏎` activates.
+
+**Closed**, verified at 5318cd25. C26 I31 (2edd256f): while focus is in a tape, the window follows the focused member through one anchor that render, `tapeStart` and `tapeMemberCols` share. C26 T1.166, and T4.34 reading the frame, pass; T6.3 and T6.4 are its mutation rows. `⏎` activating is the existing element activation and has no row of its own here.
 
 ## F1304 — `withTrail` counted band positions in code points, a second site of M13.5's class ★☆☆☆☆
 
@@ -56867,10 +56875,14 @@ a deferral whose condition has been met since M14 landed `scrollbar.ts`, and whi
 deferral-with-a-satisfier-elsewhere shape: the condition is written where the deferral is, the satisfier somewhere
 else. M14.4 builds the preview's box and keys, after F1302's offsets.
 
+**Closed**, verified at 5318cd25. C22 I143 (6c605f19): the chip preview is a bounded scroll box with `⌥⇧↑`/`⌥⇧↓` and `⌥o`, and the deferral comment is gone from `src/`. T1.175 and T4.116 pass; T6.144 is its mutation run. How the preview is drawn against §101 is F1503.
+
 ## F1308 — TRIAGE says F1260's link lands in batch 3; M15 is in batch 4 ★☆☆☆☆
 
 Found by the M13–M16 plan: F1260's triage line says the link from a question to its call lands *with batch 3's M15
 question queue*. M15 is in batch 4. Unchanged at c8c7a77e.
+
+**Closed**, verified at 5318cd25. 19e8885f rewrote F1260's TRIAGE line as Closed, on C04 I149 and C23 §7g (14f078cc). The batch-3 wording survives only in F1260's dated ruling paragraph, which is a historical record.
 
 ## F1320 — 193 text cells fell below their contrast floor at 8 bits, where C10 I26 said the rung was provable ★★★★☆
 
@@ -57904,11 +57916,15 @@ Found by lane b4-menu's walk while building ruling 89 (`out/b4-menu-walk.txt`, r
 
 **Ruled (96):** the footer names what each key does in the state the frame shows. **Owed**: the footer's two states, and a row that reads the footer at rest and after `⇥` and asserts they differ.
 
+**Closed** by lane b4-menu2 (73b59abc spec, 0d476af7 code). `OwnerHints.promptUnderMenu` comes from the router's own predicate, and `chrome.ts`'s `complete` arm gains a rest state whose chord is read from the keymap. At rest the footer reads `complete  ⇥ complete  esc close`, and after `⇥` it reads `complete  ↑↓ move  ⏎ accept  esc close` (ASCII: `Tab complete`, `Up/Down move  Enter accept`). T1.182 and T4.120 were red first; `c22-menu-footer.mjs` gave caught by the named row 5 · survived 0. **One premise was corrected**: ruling 96's *`⇥` or `↓`* holds for `⇥` alone, because `↓` at rest belongs to the prompt. Ruling 99 then amended the rest footer to add `⏎ run`, from §029.
+
 ## F1487 — the pills form of the menu under-fills its box ★★☆☆☆
 
 Found by lane b4-menu's mutation pass. `menuRowsShown` counts one candidate per row, which is the table form's shape. The pills form wraps several candidates onto one row, so its window is sized for rows it never draws. Measured: 60 pills under a five-row cap drew three pills on one row, followed by `+ 57 more`. This holds on the clean tree before and after the lane. C19 T4.9's fill clause is scoped to the table form (cbb21e6d), with this recorded beside it.
 
 **Owed**: size the pills window by the rows its pills wrap to at the menu's width, and extend T4.9's fill clause to that form.
+
+**Closed** by lane b4-menu2 (3a8df408, 13144bfa spec, cfa684f7 code). `menuWindowOf` sizes the pills window by the rows its pills wrap to at the placement's width, and `+ N more` counts the pills left out. `KeyDeps.measure` is now required. T4.9 and T3.30 were red first; `c19-pills-window.mjs` gave caught by the named row 7 · survived 0. **Ruling 99 retires the pills form the same day** (F1496), so this window leaves with it; it is closed as built rather than as moot, because it was what the tree drew.
 
 ## F1488 — §097's menu is half-built: pills carry no `›`, the other rows no `bgElev`, and find and preview draw no rules ★★☆☆☆
 
@@ -57919,11 +57935,15 @@ Three gaps, reported by lane b4-menu against §097 and not built by rulings 89 a
 
 **Owed**: read R-BLK-866 and §097 against the three panels in frames, then build what the registry draws. The design fixtures' `figureOnly` for §097 is where a miss will show.
 
+**Closed** by lane b4-menu2's survey. **The pills premise was wrong**: R-BLK-866 draws no pills, so ruling 89's `›` had no picture to follow in that form. Ruling 99 retires the form (F1496). The other three gaps are real and are filed on their own: the panel ground (F1501), find (F1502) and the chip preview (F1503).
+
 ## F1489 — a session row is named T4.34 and is not C22's T4.34 ★★☆☆☆
 
 Found by lane b4-menu. The menu's closing-rule row in `test/integration/session.test.ts` is named T4.34. C22 T4.34 is a different row, citing C22 I66. The session row has no spec row of its own. So a mutation `expect` of `T4.34` resolves to whichever the harness reads first. Lane b4-menu's first draft of `c19-menu-current.mjs` was scored `caught T4.34` from the id's presence while T4.34 stayed green, which is F1472's second instance.
 
 **Owed**: give the session row an id of its own and a spec row, and have SP9 or a sibling rule refuse one id in two tables.
+
+**Closed** by lane b4-menu2 (b7b2f3b7, 503f2710 spec, 3ed61fde code). No existing rule refused this shape: SP7 checks ids within one spec, and SP15 one title per spec. A03 SP16 refuses a titled row whose attributed spec does not declare the id when the file's owner does, or has retired it. It was red on the real tree with sixteen rows, F1489's own among them. Three rows were renumbered, thirteen prefixed, and 19 ids stay on a debt list compared by equality. `enforce-sp16-row-resolves.mjs` gave caught by the named row 6 · survived 0. The 639 rows naming an id no spec declares are counted and not gated; that is F1500.
 
 ## F1490 — an app-route cancel settles `ok` with exit 0 while history records 130 ★★★☆☆
 
@@ -57958,3 +57978,89 @@ Once `make instruments` passed on #61 (F1485), CI's `fast` job reached the next 
 **Fixed under that section's procedure**, at the bottom of the stack. #61 took a three-line lockfile change (51298e2d) whose integrity equals the registry's. `npm audit fix --package-lock-only` crashed inside npm's arborist (`Cannot read properties of null (reading 'edgesOut')`, resolving vitest's optional peer set, npm 10.9.8), so the bump was `npm update brace-expansion --package-lock-only` in an isolated `git archive` copy, where `npm audit --audit-level=high`, `npm ci` and `make check` each exited 0. It was merged forward through #62 (bd41c7f2) and #63 (9eee4149) and into batch 4 (241175d3), and pushed. Two moderate vitest advisories remain below the gate; their fix would take vitest outside its declared range.
 
 **The process half.** This is the second gate in one day that CI ran and the local chain did not. `/tmp/gates-wt.sh` now runs `audit` and `released` as well. The `degraded` job (`make test` under `TERM=dumb LANG=C`, `xterm`/`C` and `xterm-256color`/`en_GB.UTF-8`) was skipped on every PR since #61's `fast` went red, so it has never run on any of this work. CI is its instrument now that `fast` passes, and its first result on each PR is owed a reading.
+
+## F1495 — a choice set in which no choice answers is accepted, and `esc` opens a reply ★★☆☆☆
+
+Found by the inspector verifying F1296 at 5318cd25, read from the source and not measured in a frame. C23 I93 rejects a second default and a default on a reply or an inspection choice, and `defaultStart` (`src/shell/choice-selection.ts:67-81`) skips reply and inspection choices when there is no default. A set made only of those passes `invalidChoices` (`src/shell/confirm.ts:405-426`), and `defaultStart` then returns the last index (`choice-selection.ts:80`), so `esc` opens a reply or an inspection instead of answering. C23 I93 says nothing about a set in which no choice answers.
+
+**Owed**: either `ask` refuses such a set, or I93 states what `esc` does in it.
+
+## F1496 — the completion menu keeps a pills form no picture draws ★★★☆☆
+
+Found by lane b4-menu2 at 3ed61fde's survey for F1488. C19 §5 draws *two rows of pills when the candidate set is short*, meaning candidates with no `detail`. R-BLK-866 names the palette *a PANEL whose list is a LADDER*, and R-BLK-867, §029 and §097 all draw one candidate a row with `›` on the current. No picture draws pills. The design's horizontal row with a current is the tape (§095), and the `current` glyph's domains are `chooser-row` and `tape`. F1487's pills window, built by the same lane (cfa684f7), retires with the form.
+
+**Ruled (99):** the menu is a ladder in every case. **Owed**: a candidate with no `detail` takes the table form with an empty hint cell; C19 §5, I18, I23, I29, T3.29 and T4.9 lose their pills clauses; the goldens that draw pills move.
+
+## F1497 — `↑` at rest recalls history under a menu still showing the old line's candidates ★★★☆☆
+
+Found by lane b4-menu2 at 3ed61fde's walk at 80×24. Type `/c` and the menu opens at rest. `↑` belongs to the prompt then (C19 I20), and it puts `/help` in the prompt while the menu goes on showing `/c`'s candidates. The frame offers completions for a line that is no longer there.
+
+**Owed**: a frame, then a ruling from C19's rebuild clause (§6, *a rebuild clears the selection*): either the menu closes on a recall or it rebuilds against the recalled line.
+
+## F1498 — the menu's `esc` suppression survives backspacing to an empty line ★★☆☆☆
+
+Found by lane b4-menu2 at 3ed61fde's walk. `esc` closes the menu and suppresses it for the line, so retyping does not reopen it. Backspacing to an empty prompt and typing `/c` again still finds it suppressed, and only a ghost completion shows. The line the suppression was taken against no longer exists.
+
+**Owed**: measure it in a frame, then end the suppression when the prompt empties.
+
+## F1499 — C22 T4.18g's title repeats T4.18f's word for word ★☆☆☆☆
+
+Found by lane b4-menu2 at 3ed61fde while renumbering for F1489. C22 T4.18f (I76) and T4.18g (I78) cover different invariants, and T4.18g's title is T4.18f's copied. SP15 does not see it, because the ids differ.
+
+**Owed**: a title that names T4.18g's own assertion.
+
+## F1500 — 639 titled rows name an id no spec declares ★★☆☆☆
+
+Measured by lane b4-menu2 at 3ed61fde's survey when A03 SP16 was wired (1a9b6abb, landed as 3ed61fde). Of 4201 titled rows, 3385 resolve, 30 collided with the file owner's id, 6 reused a retired id, **639 dangle** and 141 have no owning spec. SP16 gates the collisions and the retired ids, and it counts the 639 without gating them. A row that names an id no spec declares cannot be checked against what its spec says.
+
+**Owed**: sort the 639 into rows whose spec is missing a row and rows whose title is wrong, then gate the class.
+
+## F1501 — no panel paints `bgElev` ★★★☆☆
+
+Found by lane b4-menu2 at 3ed61fde's survey. R-BLK-569 (*a panel takes bgElev*) and R-BLK-628 decide it, and §097 draws `bgElev` on the menu's rows. Nothing in `src/` paints a panel ground: the only `bgElev` painters are a notice's button and the rule label's band. Measured on the completion menu at full colour: the current row takes bg 216, and every other row is fg 188 on no ground.
+
+**Owed**: a ground for the panel layer, through the theme's surface. Every golden with a panel moves.
+
+## F1502 — find draws no upper rule, declares its width, and cuts its hit ★★★☆☆
+
+Found by lane b4-menu2 at 3ed61fde's survey at 80×24, with history `/help`, `/history`, `/clear`, then `⌃r h`:
+
+```
+19 |(reverse-i-search) `h': /h…
+20 |────────────────────────────────────────────────
+21 |❯
+24 |find  ↑↓ hits  ⏎ open  esc close
+```
+
+There is no rule above the panel, and §097 warns that without it a panel reads as transcript content. Its hit is cut to `/h…`. It still declares `width: cells(line) + 4`, the declaration C19's menu gave up (*the menu spans the region*).
+
+**Owed**: the upper rule, the region's width, and a hit drawn whole where it fits.
+
+## F1503 — the chip preview is a bordered box, not §101's panel ★★★☆☆
+
+Found by lane b4-menu2 at 3ed61fde's survey, after a six-line paste then `←`:
+
+```
+12 |┌  #1 pasted · 6L  ──────────────────────────────┐
+13 |│one                                            ┃│
+17 |│five                                           ││
+18 |│⋯ 0 above, 1 below                              │
+19 |│⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor                │
+20 |────────────────────────────────────────────────
+21 |❯  #1 pasted · 6L
+```
+
+It is a `panel` block's border with no bottom corner. §101 draws a menu panel between two rules: a header row, the content with a scrollbar, and a hint row. §101's hints also differ: `↑↓ scroll  ⏎ open in the editor  ←→ other chips`.
+
+**Owed**: the preview as a menu-style panel. Where its keys disagree with the registry's `preview.*` bindings (C22 I143), the registry decides.
+
+## F1504 — the release notes call types exported that no package entry reaches ★★☆☆☆
+
+Found while filing lane b4-menu2's proposed notes at 3ed61fde. The lane proposed CHANGELOG and MIGRATION lines for `KeyDeps.measure`, `OwnerHints.promptUnderMenu`, `menuWindowOf` and `MeasureBlock`. None of the four is in `src/index.ts` or any other entry in `package.json`'s `exports` (`./testing`, `./fixtures`, `./profiling`), and `dist/index.d.ts` names none of them, so the lines were not filed. Checking the neighbouring claims the same way:
+
+- CHANGELOG's watch-row entry (c007d8ef) says *`WatchItem` and `WatchRowState` are exported*. They are exported from `src/shell/watches.ts` and `src/shell/types.ts`, and no package entry re-exports either.
+- MIGRATION §2, *changes the compiler finds*, names `ChromeContext`, `Verdict`, `InterceptVerdict`, `RouterDeps`, `clearConfirmLayer`, `PushedSurface`, `CallState` and `KeyAction`. None is reachable by name from a package entry. Some may still reach a consumer structurally, through a public type's fields (`Notice.state` is a `CallState`), and that is unmeasured.
+
+Nothing checks a release note's claim about the public surface. C24 owns the surface and `make proof` installs the tarball, but neither reads the notes.
+
+**Owed**: correct c007d8ef's sentence; measure each MIGRATION §2 row by compiling a consumer against the packed tarball, then drop or reword the rows no consumer can hit; and add a check that every name the notes call exported resolves in `dist/`'s entries.

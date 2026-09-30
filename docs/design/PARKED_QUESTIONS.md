@@ -1278,6 +1278,12 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1488). **The completion menu is a ladder in every case, and the pills form retires from it.** Every picture of the menu draws one candidate a row with `›` on the current: §029, §097, and `R-BLK-866`, which names the palette *a PANEL whose list is a LADDER*, with `R-BLK-867`'s vertical list. No picture draws a row of pills, and a consistent picture beats a lone rule (tie-break 2), here C19 §5's *two rows of pills when the candidate set is short*. **This corrects F1488's premise.** F1488 asked the pills form to draw ruling 89's `›`; the registry gives the pills form no basis to draw anything. A candidate with no `detail` takes the table form with an empty hint cell, so C19 I29's *the pills form sets `active`*, the pills half of C19 T4.9 and F1487's pills window (cfa684f7) go with it, and the one form takes `current` through C04 I150. **Ruling 96 is amended by the same pictures**: §029's panel footer offers `⏎ run` at rest, and under C19 I20 `⏎` at rest submits the line, so the rest footer is `⏎ run   ⇥ complete   esc close`. §029 also offers `↑↓ move` at rest, and that half is not taken: the registry binds no arrow in the prompt, C19 I20 gives `↑` to history, and the repository is right about what ships (tie-break 4). `⇥ complete` keeps the registry's label for `binding.004` over §029's `↹ accept` (tie-break 1).
+
+**99 · RULED — Which form the completion menu takes.** Lane b4-menu2's survey found `R-BLK-866` draws no pills, so ruling 89's mark had no picture to follow in the pills form (F1488).
+
+---
+
 ## Not yet recovered
 
 The gap between the entries and the running count in the per-MR reports was chased and closed: some questions had been counted twice. The list is the count. **No total is stated here in prose**, because the one that used to be here said *sixteen* long after that stopped being true — this file's own subject, arriving inside it.

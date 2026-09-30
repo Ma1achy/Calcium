@@ -109,6 +109,10 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   draws a rule of its own above the prompt's. `Table` gains `current?: string`, the id of the
   row a chooser is on (C04 I150, C11 I33). `menuBlocks`' second parameter is now the current
   index, and `menuRowsShown` charges one row of chrome fewer.
+- **The completion footer names what each key does in the state shown** (0d476af7, ruling 96,
+  C22 I150). At rest it offers `⇥ complete` and the way out, where it offered `↑↓ move` and
+  `⏎ accept` while `⏎` submitted the line and `↑` walked history. The move keys and `⏎ accept`
+  appear once `⇥` has selected.
 - **A cancelled shell command settles `partial`, not `error`** (7f92f76e, ruling 92, C23 I96).
   `!cmd` then Ctrl-C leaves a muted `⊘ Cancelled.` notice above the screen it kept, where it
   was an `error` document with an error box and `error.code: "CANCELLED"`. The code is gone;
