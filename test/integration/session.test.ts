@@ -271,9 +271,75 @@ describe("C22 §6b — the write is a difference", () => {
 });
 
 describe("C22 I150 — the completion footer at rest and after Tab", () => {
-  it.todo(
-    "T4.120 (C22 I150, C19 I20, C19 I29, ruling 96): the footer read at rest and after Tab differs, and each names only keys that do what it says — not deferred on a component: lands in the next commit, ruling 96",
-  );
+  /** A session at 80 columns with `/c` typed a byte at a time: the menu at rest. */
+  async function atRest() {
+    const stdin = fakeStdin();
+    const session = await buildSession({ stdin: stdin as never }, { columns: 80, rows: 24 });
+    await settle();
+    const press = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      // `⇥` runs §5 in a promise continuation (C19 I21), so a macrotask too.
+      await settle();
+      await new Promise((r) => setTimeout(r, 0));
+    };
+    for (const ch of "/c") await press(ch);
+    const rows = (): readonly string[] => session.screen().rows.map((r) => r.trimEnd());
+    const footer = (): string => rows().at(-1) ?? "";
+    /** The menu's rows: everything above the prompt's upper rule that is not blank. */
+    const menu = (): readonly string[] => {
+      const r = rows();
+      const prompt = r.findIndex((l) => l.startsWith("❯"));
+      return r.slice(0, prompt - 1).filter((l) => l.trim() !== "");
+    };
+    const prompt = (): string => rows().find((l) => l.startsWith("❯")) ?? "";
+    return { press, rows, footer, menu, prompt };
+  }
+  const TAB = "\t";
+  const DOWN = "\u001b[B";
+  const ENTER = "\r";
+
+  it("T4.120 (C22 I150, C19 I20, C19 I29, ruling 96, F1486): the footer at rest and after ⇥ differ, and each names only keys that do what it says", async () => {
+    const s = await atRest();
+    // **The subject before the claim**: the menu is up and marks its current.
+    expect(s.menu().some((l) => l.includes("› /capabilities")), "the menu is up at rest, marked").toBe(true);
+    const restMenu = s.menu();
+    const rest = s.footer();
+    expect(rest).toBe("complete  ⇥ complete  esc close");
+
+    await s.press(TAB);
+    const selected = s.footer();
+    expect(selected).toBe("complete  ↑↓ move  ⏎ accept  esc close");
+    // **The difference is the claim** (ruling 96). The menu's rows are the same
+    // text in both states — ruling 89 marks the current at rest and after `⇥`
+    // alike — so the footer is the one thing on screen that tells them apart.
+    expect(s.menu(), "the menu reads the same after ⇥").toEqual(restMenu);
+    expect(selected, "and the footer does not").not.toBe(rest);
+
+    await s.press(DOWN);
+    expect(s.footer(), "↓ moves within a selection and the line holds").toBe(selected);
+    expect(s.menu().some((l) => l.includes("› /clear")), "the mark moved").toBe(true);
+    // `⏎ accept` does what it says once there is a selection.
+    await s.press(ENTER);
+    expect(s.prompt()).toBe("❯ /clear");
+  });
+
+  it("T4.120 (C22 I150, C19 I20, ruling 96): the controls — ⏎ at rest submits, and ↓ at rest selects nothing", async () => {
+    // **What the rest line leaves out, pressed.** `⏎` is not offered at rest
+    // because it submits the partial line; measured before the footer moved,
+    // this is the frame that sat beneath `⏎ accept`.
+    const enter = await atRest();
+    await enter.press(ENTER);
+    expect(enter.rows().some((l) => l.includes("unknown verb: /c")), "⏎ at rest ran the line").toBe(true);
+
+    // **`↓` is the prompt's at rest** (C19 §6a): ruling 96 read *`⇥` or `↓`*
+    // as the keys that select, and the second does not. The footer and the
+    // mark stay where they were.
+    const down = await atRest();
+    const before = { footer: down.footer(), menu: down.menu() };
+    await down.press(DOWN);
+    expect({ footer: down.footer(), menu: down.menu() }).toEqual(before);
+    expect(down.footer()).toBe("complete  ⇥ complete  esc close");
+  });
 });
 
 describe("C22 integration — the frame's viewport", () => {

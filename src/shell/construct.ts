@@ -5339,6 +5339,8 @@ export async function constructGraph(
         chord: (target, action) => keymap.entries().find((b) => b.target === target && b.action === action)?.key,
         ...(top?.rung === "substate" ? { substate: top.name } : {}),
         ...(top?.rung === "substate" && top.name === "preview" && previewScrolls ? { previewScrolls: true } : {}),
+        // C22 I150 — a menu at rest, read from the predicate dispatch reads (I51).
+        ...(top?.rung === "substate" && top.name === "complete" && promptUnderMenu() ? { promptUnderMenu: true } : {}),
         ...(question === null ? {} : { question }),
         ...(copyRefused ? { refused: true } : {}),
         // C22 I139 — where the watch row stands, for the scope line's chips.

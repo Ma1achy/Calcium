@@ -1330,9 +1330,63 @@ describe("C22 I133 — the owner line's chords are the keymap's (review batch 2,
 });
 
 describe("C22 I150 — the completion footer names what each key does", () => {
-  it.todo(
-    "T1.182 (C22 I150, ruling 96): the complete line at rest offers the prompt's complete chord and the way out, and once selected the move keys and accept — not deferred on a component: lands in the next commit, ruling 96",
-  );
+  /** Hints over a table for a completion panel, at rest or holding a selection. */
+  const over = (rows: readonly Binding[], rest: boolean): OwnerHints => {
+    const entries = createKeymap(rows, "default-terminal").entries();
+    return {
+      chord: (target, action) => entries.find((b) => b.target === target && b.action === action)?.key,
+      substate: "complete",
+      ...(rest ? { promptUnderMenu: true } : {}),
+    };
+  };
+  const line = (hints: OwnerHints): readonly string[] =>
+    ownerLine("substate", FULL_CAPS, false, 0, undefined, false, hints).map((c) => c.label);
+
+  it("T1.182 (C22 I150, ruling 96): at rest the line offers the prompt's complete chord and the way out; once selected, the move keys and accept", async () => {
+    // **At rest the prompt answers first** (C19 I20): `⏎` submits and `↑` is
+    // history, so a chip saying `accept` or `move` names a key that goes
+    // somewhere else. F1486 measured `⏎` submitting `/c` under `⏎ accept`.
+    const rest = line(over(defaultKeymap, true));
+    expect(rest).toEqual(["complete", "⇥ complete", "esc close"]);
+    expect(rest.some((l) => /accept|move/u.test(l)), "no chip names a key the menu does not hold").toBe(false);
+
+    // **The control, and the other state**: with a selection the menu owns its
+    // keys and the line is the one it always drew.
+    expect(line(over(defaultKeymap, false))).toEqual(["complete", "↑↓ move", "⏎ accept", "esc close"]);
+
+    // **The chord is the keymap's** (C22 I133): the prompt's `complete` moved to
+    // `⌃o` moves the rest line's chip, which a literal `⇥` would not.
+    const ctrlO = defaultKeymap.map((b) =>
+      b.target === "prompt" && b.action === "complete" ? { ...b, key: { name: "o", ctrl: true } } : b,
+    );
+    const moved = line(over(ctrlO, true));
+    expect(moved).toContain(`${chordText({ name: "o", ctrl: true })} complete`);
+    expect(moved, "and the old chord is not named").not.toContain("⇥ complete");
+
+    // **Through the graph, from the router's own predicate** (C22 I51, I145): a
+    // `complete` panel declaring `promptLive` answers the hint, and one that
+    // does not answers nothing.
+    const { graph } = await buildGraph();
+    graph.lifecycle.acquire();
+    const hintsWith = (promptLive: boolean): OwnerHints => {
+      graph.overlays.push({
+        id: "probe-complete",
+        kind: "panel",
+        owner: { rung: "substate", name: "complete" },
+        placement: { kind: "anchored", row: 20, rows: 1, prefer: "above" },
+        content: [],
+        blocking: false,
+        dismissal: "escape",
+        promptLive,
+      });
+      const hints = graph.ownerHints();
+      graph.overlays.dismiss("probe-complete");
+      return hints;
+    };
+    expect(hintsWith(true).promptUnderMenu, "a menu at rest").toBe(true);
+    expect(hintsWith(false).promptUnderMenu, "a menu holding a selection").toBeUndefined();
+    expect(line(hintsWith(true))).toEqual(["complete", "⇥ complete", "esc close"]);
+  });
 });
 
 describe("C22 I33 — a command of several lines", () => {

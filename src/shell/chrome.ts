@@ -663,6 +663,19 @@ function ownerChips(
       // `find`, over a completion menu and a chip preview alike.
       switch (hints.substate) {
         case "complete":
+          // **At rest the prompt answers first** (C22 I150, C19 I20, ruling 96):
+          // `⏎` submits and `↑` is history, so `⏎ accept` and `↑↓ move` would
+          // name keys that go somewhere else. The key that acts on the marked
+          // candidate is the prompt's `complete`, which selects it. And this
+          // line is the only thing on screen that tells rest from a selection,
+          // because the mark is drawn in both (C19 I29).
+          if (hints.promptUnderMenu === true) {
+            return [
+              { label: "complete", tone: "accent" },
+              ...keyed(hints, "prompt", ["complete"], "complete", caps),
+              ...one("panel", "dismiss", "close"),
+            ];
+          }
           return [
             { label: "complete", tone: "accent" },
             ...keyed(hints, "panel", ["menuPrev", "menuNext"], "move", caps),

@@ -287,6 +287,13 @@ export type OwnerHints = Readonly<{
   substate?: "find" | "complete" | "preview";
   /** Whether the chip preview's box overflows — the owner line's scroll chip (C22 I143). */
   previewScrolls?: boolean;
+  /**
+   * A completion menu at rest: the prompt's keys resolve before the panel's
+   * (C22 I150, C19 I20, ruling 96). **The router's own answer** — `promptUnderMenu()`,
+   * the top layer's `promptLive` (I145) — so the line cannot name a key that
+   * dispatch sends somewhere else. Absent is *the menu owns its keys*.
+   */
+  promptUnderMenu?: boolean;
   question?: Readonly<{ state: "choice" | "reply" | "inspection"; resolvesTo: string }>;
   refused?: boolean;
   /**
