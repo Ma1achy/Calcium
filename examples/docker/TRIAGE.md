@@ -43,7 +43,7 @@ type change.
 | **12** | [**A time-based assertion under contention**](#12) | 26 | **7 open** | — | **new at F80** · Calcium's own suite · **F877 is the first that repairs an instrument rather than recording a reading** |
 | **13** | [Text the framework emits](#13) | 26 | **5 open** · 2 unread | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 59 | **5 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
-| — | [Singles](#singles) | 168 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
+| — | [Singles](#singles) | 171 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
 
 **Four groups are new since F55** — 9, 10, 12, and F81's arrival in 4. Group 9 is the one
 that changes the picture, and it is the only group whose subject is the apparatus rather
@@ -2888,7 +2888,13 @@ written as one. Every member reads as deliberate, which is why none was found by
 
 **F1093** — **a budget written to widen a five-second default became a narrowing when the default went to thirty.** C12 T2.1 sweeps twelve fuzz corpora across every width from one to two hundred through three rasteriser entry points, one corpus being a hundred thousand points, and it carries the only hand-written row timeout in the tree with a comment defending it: *an explicit budget, because 3.2 s against a 5 s default is not a margin … twenty seconds says the seconds are expected*. Every sentence of that is right and the number it produced now does the opposite of what it was for, because `vitest.config.ts` set `testTimeout` to thirty thousand on 2026-08-22 — so the override stopped being a widening of five and became **a third off** the limit the row would otherwise have had, in a file whose comment says the row exists because the default was too small. Measured: the row is **6936 ms** in the devcontainer and **20960 ms** on the runner, against its explicit twenty thousand and a global thirty. **It would have passed on the default it was written to escape** — the failure is the override, not the runner and not the row. **The population is exactly one**: swept over `test/`, every other explicit row timeout is at or above the global, almost all of them in tier five where a real PTY needs its own budget, and four candidates that looked sub-global on a first pass are not row timeouts at all — two arguments to `waitForFrame`, one to `elapsedNeeded`, one an assertion bound. **F967's class, third instance in a day, and the first that is a number rather than prose**: a stale sentence misleads a reader, a stale number fails the build on the one machine that was not available to disagree when it was written. **And the direction is the surprise** — an override reads as *more room*, this one is less, and nothing in the syntax says so; twenty thousand beside a comment about a five-second default reads as generous at every glance. **Open** — `CORPUS_BUDGET_MS`, which is what the row is in `budget.ts`'s own taxonomy, sixty seconds against a runner figure of twenty-one; the number leaves the file so the next regime change moves it once, and the comment keeps its argument and gains the measurement the argument was missing · **Closed** — and the one way this repair could fail silently is the constant not being read, a wrong argument position leaving the row on the global and green, which is indistinguishable from the fix working. Driven rather than assumed: with the constant set to one the row fails with `Test timed out in 1ms`, and `budget.ts` was restored from a copy with its md5 compared. The row runs in two thousand three hundred and nine milliseconds alone and six thousand nine hundred and thirty-six inside the suite, against sixty thousand
 
-## Singles — one consumer each — **28 open** · 126 closed · 14 with no verdict
+## Singles — one consumer each — **27 open** · 130 closed · 14 with no verdict
+
+**F1526** — **a settled `error` status animates forever** · **Open** — ruling 106(c): an `error` status does not animate
+
+**F1525** — **C22 T5.4 sends `⏎` before the selection it means to accept exists** · **Open** — owed: T5.4 waits for the selection and for the resized frame; sweep the other rows with the same `waitFor` shape
+
+**F1524** — **a completion result for a submitted line opens a selected menu over the next one** · **Open** — ruling 106(a, b): a submit, a recall or an emptied line invalidates an in-flight request; `⏎` runs the line as shown
 
 **F1523** — **C22 T1.175's spec row and its test described different regions** · **Closed** — 01916624: the row rewritten to the figures its test drives (24 rows, 9)
 
@@ -2932,13 +2938,13 @@ written as one. Every member reads as deliberate, which is why none was found by
 
 **F1500** — **639 titled rows name an id no spec declares** · **Open** — owed: resolve the population, or state why SP16 counts it rather than gating it
 
-**F1499** — **C22 T4.18g's title repeats T4.18f's word for word** · **Open** — owed: T4.18g takes a title naming what it asserts (I78); lane b4-menu3
+**F1499** — **C22 T4.18g's title repeats T4.18f's word for word** · **Closed** — C22 T4.18g (898332f1): its spec text and test title name the visibility store and the toggle; T4.18f's title no longer duplicates it
 
-**F1498** — **the menu's `esc` suppression survives backspacing to an empty line** · **Open** — owed: the suppression ends when the line it was taken against is gone; lane b4-menu3
+**F1498** — **the menu's `esc` suppression survives backspacing to an empty line** · **Closed** — C19 I31 (898332f1): an emptied line ends the Esc hold; a token shortened and retyped keeps it, stated in I31; T3.31
 
-**F1497** — **`↑` at rest recalls history under a menu still showing the old line's candidates** · **Open** — owed: measure, then close or rebuild the menu when a recall replaces its line; lane b4-menu3
+**F1497** — **`↑` at rest recalls history under a menu still showing the old line's candidates** · **Closed** — C19 I31 (898332f1): a history walk (`↑` or `↓`) goes through `recall()`, which closes the menu and ends the Esc hold (ruling 105 b); T3.32, `c19-line-gone.mjs` 5 of 5 by the named row
 
-**F1496** — **the completion menu keeps a pills form no picture draws** · **Open** — ruling 99: the menu is a ladder in every case and the pills form retires; owed to lane b4-menu3
+**F1496** — **the completion menu keeps a pills form no picture draws** · **Closed** — C19 I30 (ef10fab2 spec, 898332f1 code): one ladder, an empty hint cell for a candidate with no `detail`, the pills form and F1487's window removed, `Candidate.tone` drawn in the value cell (ruling 105 a); T1.72, T3.29, T4.9, `c19-menu-ladder.mjs` 5 of 5 by the named row
 
 **F1495** — **a choice set in which no choice answers is accepted, and `esc` opens a reply** · **Open** — owed: `ask` refuses a set in which no choice answers, or C23 I93 states what `esc` does in one
 

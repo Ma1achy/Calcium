@@ -122,6 +122,10 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   337f3763, ruling 104, C22 I151, C20 I30). Each floats between two rules on the theme's elevated ground.
   Reverse search spans the width and shows its match whole, where a match longer than the empty
   query was cut. A chip's preview lost its box border and gained a header row and a key row.
+- **The completion menu is one candidate a row whatever the candidates carry** (898332f1, ruling
+  99, C19 I30). A candidate with no `detail` draws as a row with an empty hint, where a set with no
+  hints drew as pills, and `Candidate.tone` colours the label in every row, where only the pills
+  form read it. `↑` or `↓` walking history closes an open menu (C19 I31).
 - **An app-route cancel settles `partial`, keeping the card** (13abac71, ruling 97, C23 I98). `⌃c`
   over an invocation or a stream, or an approval its asker withdrew, leaves the head reading
   `cancelled`, what had streamed, and `⊘ Cancelled.` beneath, with `meta.exitCode` 130, where it

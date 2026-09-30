@@ -57999,11 +57999,15 @@ Found by lane b4-menu2 at 3ed61fde's survey for F1488. C19 §5 draws *two rows o
 
 **Ruled (99):** the menu is a ladder in every case. **Owed**: a candidate with no `detail` takes the table form with an empty hint cell; C19 §5, I18, I23, I29, T3.29 and T4.9 lose their pills clauses; the goldens that draw pills move.
 
+**Closed** by lane b4-menu3 (ef10fab2 spec, 898332f1 code, C19 I30). `menuBlocks` draws the table in every case, and a candidate with no `detail` takes an empty hint cell. `pillsOf` and F1487's pills window are gone, and `menuWindowOf` is `menuWindow` plus the wheel's clamp again. **The walk found a reader the ruling had not named**: `Candidate.tone`, a public field, was read only by the pills form, so retiring the form alone would have left a field nothing draws. Ruling 105(a) gives it to the value cell of every row. No source in `src/` or `examples/` sets a tone, so no frame moved. Predicted golden movers: none; none moved.
+
 ## F1497 — `↑` at rest recalls history under a menu still showing the old line's candidates ★★★☆☆
 
 Found by lane b4-menu2 at 3ed61fde's walk at 80×24. Type `/c` and the menu opens at rest. `↑` belongs to the prompt then (C19 I20), and it puts `/help` in the prompt while the menu goes on showing `/c`'s candidates. The frame offers completions for a line that is no longer there.
 
 **Owed**: a frame, then a ruling from C19's rebuild clause (§6, *a rebuild clears the selection*): either the menu closes on a recall or it rebuilds against the recalled line.
+
+**Closed** by lane b4-menu3 (898332f1, C19 I31). Measured at ae00b6dd, 80×24: `❯ /help` sat under `/c`'s three candidates. Ruling 105(b) closes the menu rather than rebuilding it. `↓` reaches the same state: after `↑`, backspacing to `/h` opens a menu, and `↓` brings back the draft. So both walks go through `recall()` (C19 §8c trace 10, step 3′, which shares step 2's path and was not measured separately).
 
 ## F1498 — the menu's `esc` suppression survives backspacing to an empty line ★★☆☆☆
 
@@ -58011,11 +58015,15 @@ Found by lane b4-menu2 at 3ed61fde's walk. `esc` closes the menu and suppresses 
 
 **Owed**: measure it in a frame, then end the suppression when the prompt empties.
 
+**Closed** by lane b4-menu3 (898332f1, C19 I31). Measured through a built graph: `/c`, `esc`, `⌫⌫`, `/c` gave no menu. `afterEdit` ends the hold when the line empties. **The limit is stated in I31**: a token shortened and retyped is the same token, so the hold stays, and so does a later token deleted back to its start while earlier ones remain. T3.31.
+
 ## F1499 — C22 T4.18g's title repeats T4.18f's word for word ★☆☆☆☆
 
 Found by lane b4-menu2 at 3ed61fde while renumbering for F1489. C22 T4.18f (I76) and T4.18g (I78) cover different invariants, and T4.18g's title is T4.18f's copied. SP15 does not see it, because the ids differ.
 
 **Owed**: a title that names T4.18g's own assertion.
+
+**Closed** by lane b4-menu3 (898332f1). C22 T4.18g's spec text and its title in `series-visibility.test.ts` now say what it asserts. T4.18f's own test title in `cursor-positions.test.ts` is still generic, though it no longer duplicates T4.18g.
 
 ## F1500 — 639 titled rows name an id no spec declares ★★☆☆☆
 
@@ -58196,3 +58204,23 @@ Found by lane b4-panels. `Raw` spans carry a tone and no ground (C04 I89), so th
 Found by lane b4-panels. The row said a 20-row region and 7 rows. The test drove 24 and asserted 9. Both agreed with the formula, so neither was wrong on its own terms, and nothing compared them.
 
 **Closed** in 01916624: the row now states the figures its test drives.
+
+## F1524 — a completion result for a submitted line opens a selected menu over the next one ★★★☆☆
+
+Found by the locksmith's diagnosis of C22 T5.4, at db80ded5 and at menu3's b02975fd alike. `complete` (`src/shell/keys.ts:965-1034`) fires `deps.completion.request(ctx, mine).then(...)`, and its only guard is `if (mine !== seq) return;` (`keys.ts:993`). `request` is `async` (`engine.ts:294`), so even a static set resolves a microtask later. `construct.ts:5123` routes every key from one read synchronously. So when `⇥` and `⏎` arrive in one read, `submitPrompt` runs first. Then `keys.reset()` (`keys.ts:1748-1752`) closes the menu without bumping `seq` or calling `completion.cancel()`, and the late result opens a selected menu built from the submitted line.
+
+Forced-order reproduction, with `\t\r` in one write: 3 of 3 fail on both trees, with or without a resize. Tab, then a wait for `⏎ accept`, then Enter: 0 of 3. The row's own steps pinned to one CPU: 7 of 60 on menu3, 3 of 40 at db80ded5. Every failure on both trees matched: `✗ bad_value … got ""`, then `› running` over an empty `❯`. By reading only, menu3's `recall()` has the same gap.
+
+**Ruled (106).** **Owed**: amend C19 §4 and I15; bump `seq` (or cancel) in `reset()` and `recall()`; add a row that sends `⇥⏎` in one batch and asserts no menu layer over an empty prompt.
+
+## F1525 — C22 T5.4 sends `⏎` before the selection it means to accept exists ★★☆☆☆
+
+Found by the locksmith's diagnosis of C22 T5.4. `waitFor` matches against all output since the session started (`test/support/pty.ts`). `waitFor(/queued/)` resolves on the menu at rest, before `⇥` has selected anything. The post-resize `waitFor(/❯ \/ps --status=/)` resolves at once, on the frame from before the resize. So `⏎` is written about 1 ms after the rest frame, and the row fails whenever the session reads `\t\r` together. That is why the row was intermittent, 1 in 7 at worst, and never reproducible at will. With ruling 106's fix the row still fails in that interleaving, for the test's reason alone, because `⏎` at rest runs the line.
+
+**Owed**: wait with `waitForFrame` for `⏎ accept` after `⇥`, and for the 60-column frame after the resize. Grep for the same shape in the other tier-5 rows.
+
+## F1526 — a settled `error` status animates forever ★☆☆☆☆
+
+Found by the locksmith's diagnosis of C22 T5.4, as a symptom rather than the cause. `errorDoc`'s `status` block carries `state: "error"` (`documents.ts:941`), and `ANIMATES.status` is true for the kind whatever the state (`animation.ts`). So the session ticker (`session.ts:1184-1260`) wakes at spinner cadence for a settled error box, about every 20 ms and 140 ms, and draws an empty diff each time. At idle it reads 4 times in 3 s. Under a selected menu, where `cursorFor` is null, each frame is two cursor hides, which is the flood in T5.4's failure output.
+
+**Ruled (106 c).**

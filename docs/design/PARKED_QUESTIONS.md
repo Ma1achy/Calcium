@@ -1302,6 +1302,18 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1496, F1497). **Two consequences of ruling 99, both ruled by lane b4-menu3's walk and taken as its rulings.** (a) **`Candidate.tone` colours the value cell in every row.** The pills form was the field's only reader, so retiring the form would have left a public field that nothing draws. The ladder takes it, so a source that sets a tone sees it whether or not the candidate has a `detail`. No source in the repository sets one. (b) **A history walk closes the menu and ends its `esc` hold; it does not rebuild it.** C19's recompute set already leaves out `historyPrev` and `historyNext` because *a menu over a recalled command is noise*. I22's rebuild (*a rebuild clears the selection*) is a keystroke's, and rebuilding on a recall would draw the very menu that reason excludes. An emptied line also ends the hold, because the line it was taken against is gone (C19 I31).
+
+**105 · RULED — What the ladder draws of a candidate's tone, and what a recall does to an open menu.** Lane b4-menu3 found `Candidate.tone` read only by the retiring pills form, and a recalled line under the old line's menu (F1497).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1524, F1526). **A key typed behind an in-flight completion acts on the line as it stands.** (a) **`⏎` typed while `⇥`'s request is still in flight runs the line as shown**, not `⇥`'s result. At rest `⏎` submits (C19 I20). Input never waits on a fetch (C22 I18). And a line whose content depends on something decided after the keystroke is what C23 I28 rules out. So the user runs what they saw when they pressed the key, and never a line that `⇥` would have produced afterwards. (b) **Every way the line goes away invalidates an in-flight request**: a submit, a history recall, and an emptied line, as well as `esc`. C19 I15 named only `esc`, so a result for a line that had been submitted was applied to the next, empty line, and opened a selected menu over it. (c) **A settled `error` status does not animate.** `ANIMATES.status` held for the kind whatever its state, so the session ticker woke at spinner cadence for an error box in which nothing turns, and drew an empty frame each time.
+
+**106 · RULED — What a key does behind an in-flight completion, and what ends one.** A locksmith diagnosing menu3's intermittent C22 T5.4 found that the race exists at db80ded5 too (3 of 40 runs pinned to one CPU). An Enter sent before `⇥`'s selection existed submitted `/ps --status=`, and `⇥`'s late result then opened `› running` over the empty prompt (F1524).
+
+---
+
 ## Not yet recovered
 
 The gap between the entries and the running count in the per-MR reports was chased and closed: some questions had been counted twice. The list is the count. **No total is stated here in prose**, because the one that used to be here said *sixteen* long after that stopped being true — this file's own subject, arriving inside it.
