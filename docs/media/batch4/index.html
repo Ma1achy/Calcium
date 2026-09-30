@@ -1,0 +1,108 @@
+<title>Calcium Batch 4 Frames</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Hat+Mono:wght@400;600&family=Red+Hat+Text:wght@400;500;700&display=swap">
+<style>
+/* Layout: a contact sheet: one wide frame per row on phones, two per row on desktop, grouped by example */
+:root {
+  --bg: #f3f2ee;
+  --panel: #ffffff;
+  --fg: #1d1f21;
+  --muted: #5f6368;
+  --rule: #d9d6cf;
+  --accent: #b8612f;
+  --sheet: #1c1c1c;
+  --mono: "Red Hat Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --text: "Red Hat Text", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141517; --panel: #1d1f22; --fg: #e8e6e1; --muted: #9a9ea5; --rule: #2e3136; --accent: #e8a878;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141517; --panel: #1d1f22; --fg: #e8e6e1; --muted: #9a9ea5; --rule: #2e3136; --accent: #e8a878;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--text); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1320px; margin: 0 auto; padding-inline: 20px; padding-block: 36px 64px; display: grid; gap: 40px; }
+header { display: grid; gap: 10px; max-width: 72ch; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--mono); font-weight: 600; font-size: clamp(26px, 4vw, 38px); line-height: 1.15; margin: 0; text-wrap: balance; }
+header p { margin: 0; color: var(--muted); }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.meta b { color: var(--fg); font-weight: 600; }
+nav { display: flex; flex-wrap: wrap; gap: 8px; }
+nav a { font-family: var(--mono); font-size: 13px; color: var(--fg); text-decoration: none; border: 1px solid var(--rule); border-radius: 999px; padding: 4px 12px; }
+nav a:hover, nav a:focus-visible { border-color: var(--accent); outline: none; }
+section { display: grid; gap: 18px; }
+section > h2 { font-family: var(--mono); font-weight: 600; font-size: 18px; margin: 0; padding-bottom: 8px; border-bottom: 1px solid var(--rule); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+section > h2 span { color: var(--muted); font-weight: 400; font-size: 13px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 560px), 1fr)); gap: 22px; }
+.shot { margin: 0; background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; display: grid; grid-template-rows: auto 1fr; min-width: 0; }
+.shot a { display: block; background: var(--sheet); line-height: 0; }
+.shot img { width: 100%; height: auto; display: block; }
+figcaption { padding: 12px 14px 14px; display: grid; gap: 6px; align-content: start; }
+.cap-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+h3 { font-size: 15px; font-weight: 700; margin: 0; }
+.tag { font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--accent); border: 1px solid var(--accent); border-radius: 3px; padding: 0 6px; }
+.tag.quiet { color: var(--muted); border-color: var(--rule); }
+figcaption p { margin: 0; color: var(--muted); font-size: 14px; }
+figcaption code { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.notes { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 18px; display: grid; gap: 6px; max-width: 80ch; }
+.notes h2 { font-size: 14px; margin: 0; font-family: var(--mono); }
+.notes ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Calcium · review batch 4 · PR #66</div>
+    <h1>Batch 4 frames</h1>
+    <p>Both example apps, rebuilt from the batch 4 branch and recorded in a pseudo-terminal, then drawn from the recorded bytes. The docker app runs against its invented fixture world, so nothing here comes from a real Docker host.</p>
+    <div class="meta"><span>tree <b>a1284cb0</b></span><span>recorded <b>2026-09-30</b></span><span>docker <b>15 scenes</b></span><span>plots <b>8 scenes</b></span></div>
+    <nav><a href="#docker">docker-tui</a><a href="#plots">plots-tui</a><a href="#notes">About these images</a></nav>
+  </header>
+  <section id="docker">
+    <h2>docker-tui <span>examples/docker · fixture world</span></h2>
+    <div class="grid">
+<figure class="shot" id="docker-completion"><a href="docker/completion.png" target="_blank" rel="noopener"><img src="docker/completion.png" alt="Typing /co" loading="lazy"></a><figcaption><div class="cap-head"><h3>Typing /co</h3><span class="tag">changed in batch 4</span></div><p>The completion menu is one candidate a row, with › and the pick ground on the current one (ruling 99). Its rows sit on the raised panel ground between two rules (ruling 104). A candidate with no hint gets an empty cell. At rest the footer offers ⏎ run, ⇥ complete and esc close (ruling 96, amended by 99).</p><code>docker/completion</code></figcaption></figure>
+<figure class="shot" id="docker-menu-over-diff"><a href="docker/menu-over-diff.png" target="_blank" rel="noopener"><img src="docker/menu-over-diff.png" alt="The menu over a diff" loading="lazy"></a><figcaption><div class="cap-head"><h3>The menu over a diff</h3><span class="tag">changed in batch 4</span></div><p>The same panel floating over a file diff. Nothing above it moves or reflows; it draws over the transcript and closes on the prompt&#x27;s rule.</p><code>docker/menu-over-diff</code></figcaption></figure>
+<figure class="shot" id="docker-s3-live"><a href="docker/s3-live.png" target="_blank" rel="noopener"><img src="docker/s3-live.gif" alt="Live container stats" loading="lazy"></a><figcaption><div class="cap-head"><h3>Live container stats</h3><span class="tag quiet">animated</span></div><p>/container stats worker: a live chart advancing on its own ticks while the transcript stays put.</p><code>docker/s3-live</code></figcaption></figure>
+<figure class="shot" id="docker-ps-120"><a href="docker/ps-120.png" target="_blank" rel="noopener"><img src="docker/ps-120.png" alt="/ps at 120 columns" loading="lazy"></a><figcaption><div class="cap-head"><h3>/ps at 120 columns</h3></div><p>A table verb, with the dashboard above it.</p><code>docker/ps-120</code></figcaption></figure>
+<figure class="shot" id="docker-ps-80"><a href="docker/ps-80.png" target="_blank" rel="noopener"><img src="docker/ps-80.png" alt="/ps at 80 columns" loading="lazy"></a><figcaption><div class="cap-head"><h3>/ps at 80 columns</h3></div><p>The same table narrowed: image paths truncate in the middle, so the head says where and the tail says what.</p><code>docker/ps-80</code></figcaption></figure>
+<figure class="shot" id="docker-config-diff"><a href="docker/config-diff.png" target="_blank" rel="noopener"><img src="docker/config-diff.png" alt="A config diff" loading="lazy"></a><figcaption><div class="cap-head"><h3>A config diff</h3></div><p>/filediff proxy …/default.conf: a unified diff with added and removed grounds.</p><code>docker/config-diff</code></figcaption></figure>
+<figure class="shot" id="docker-drift"><a href="docker/drift.png" target="_blank" rel="noopener"><img src="docker/drift.png" alt="/drift web" loading="lazy"></a><figcaption><div class="cap-head"><h3>/drift web</h3></div><p>What changed in a container since its image.</p><code>docker/drift</code></figcaption></figure>
+<figure class="shot" id="docker-scroll"><a href="docker/scroll.png" target="_blank" rel="noopener"><img src="docker/scroll.gif" alt="Scrolling /images" loading="lazy"></a><figcaption><div class="cap-head"><h3>Scrolling /images</h3><span class="tag quiet">animated</span></div><p>A long result scrolled in place.</p><code>docker/scroll</code></figcaption></figure>
+<figure class="shot" id="docker-logs"><a href="docker/logs.png" target="_blank" rel="noopener"><img src="docker/logs.gif" alt="/logs web" loading="lazy"></a><figcaption><div class="cap-head"><h3>/logs web</h3><span class="tag quiet">animated</span></div><p>A log tail streaming into its card.</p><code>docker/logs</code></figcaption></figure>
+<figure class="shot" id="docker-theme-light"><a href="docker/theme-light.png" target="_blank" rel="noopener"><img src="docker/theme-light.png" alt="/theme light" loading="lazy"></a><figcaption><div class="cap-head"><h3>/theme light</h3></div><p>The light theme, switched live.</p><code>docker/theme-light</code></figcaption></figure>
+<figure class="shot" id="docker-depth-24"><a href="docker/depth-24.png" target="_blank" rel="noopener"><img src="docker/depth-24.png" alt="24-bit colour" loading="lazy"></a><figcaption><div class="cap-head"><h3>24-bit colour</h3></div><p>The stats view at full colour.</p><code>docker/depth-24</code></figcaption></figure>
+<figure class="shot" id="docker-depth-8"><a href="docker/depth-8.png" target="_blank" rel="noopener"><img src="docker/depth-8.png" alt="256 colours" loading="lazy"></a><figcaption><div class="cap-head"><h3>256 colours</h3></div><p>The same view on a 256-colour terminal.</p><code>docker/depth-8</code></figcaption></figure>
+<figure class="shot" id="docker-depth-4"><a href="docker/depth-4.png" target="_blank" rel="noopener"><img src="docker/depth-4.png" alt="16 colours" loading="lazy"></a><figcaption><div class="cap-head"><h3>16 colours</h3></div><p>The same view with the sixteen ANSI colours.</p><code>docker/depth-4</code></figcaption></figure>
+<figure class="shot" id="docker-depth-1"><a href="docker/depth-1.png" target="_blank" rel="noopener"><img src="docker/depth-1.png" alt="1-bit" loading="lazy"></a><figcaption><div class="cap-head"><h3>1-bit</h3></div><p>No colour at all. State is carried by glyph and weight.</p><code>docker/depth-1</code></figcaption></figure>
+<figure class="shot" id="docker-depth-ascii"><a href="docker/depth-ascii.png" target="_blank" rel="noopener"><img src="docker/depth-ascii.png" alt="ASCII" loading="lazy"></a><figcaption><div class="cap-head"><h3>ASCII</h3></div><p>No Unicode: every glyph takes its ASCII fallback.</p><code>docker/depth-ascii</code></figcaption></figure>
+    </div>
+  </section>
+  <section id="plots">
+    <h2>plots-tui <span>examples/plots</span></h2>
+    <div class="grid">
+<figure class="shot" id="plots-plot-compare"><a href="plots/plot-compare.png" target="_blank" rel="noopener"><img src="plots/plot-compare.png" alt="plot compare" loading="lazy"></a><figcaption><div class="cap-head"><h3>plot compare</h3></div><p>The same block through two renderers; the fallback is a decision.</p><code>plots/plot-compare</code></figcaption></figure>
+<figure class="shot" id="plots-plot-gallery"><a href="plots/plot-gallery.png" target="_blank" rel="noopener"><img src="plots/plot-gallery.png" alt="plot gallery" loading="lazy"></a><figcaption><div class="cap-head"><h3>plot gallery</h3></div><p>Six plot forms in one frame, each labelled by what it says.</p><code>plots/plot-gallery</code></figcaption></figure>
+<figure class="shot" id="plots-plot-live"><a href="plots/plot-live.png" target="_blank" rel="noopener"><img src="plots/plot-live.gif" alt="plot live" loading="lazy"></a><figcaption><div class="cap-head"><h3>plot live</h3><span class="tag quiet">animated</span></div><p>A plot that advances without the transcript moving under it.</p><code>plots/plot-live</code></figcaption></figure>
+<figure class="shot" id="plots-plot-mosaic"><a href="plots/plot-mosaic.png" target="_blank" rel="noopener"><img src="plots/plot-mosaic.png" alt="plot mosaic" loading="lazy"></a><figcaption><div class="cap-head"><h3>plot mosaic</h3></div><p>A named layout: the engine&#x27;s grid, holes and all.</p><code>plots/plot-mosaic</code></figcaption></figure>
+<figure class="shot" id="plots-profile-frame"><a href="plots/profile-frame.png" target="_blank" rel="noopener"><img src="plots/profile-frame.png" alt="profile frame" loading="lazy"></a><figcaption><div class="cap-head"><h3>profile frame</h3></div><p>Where a frame&#x27;s time went, per site, as self time.</p><code>plots/profile-frame</code></figcaption></figure>
+<figure class="shot" id="plots-profile-memory"><a href="plots/profile-memory.png" target="_blank" rel="noopener"><img src="plots/profile-memory.png" alt="profile memory" loading="lazy"></a><figcaption><div class="cap-head"><h3>profile memory</h3></div><p>The heap over the session, sampled.</p><code>plots/profile-memory</code></figcaption></figure>
+<figure class="shot" id="plots-profile-verdict"><a href="plots/profile-verdict.png" target="_blank" rel="noopener"><img src="plots/profile-verdict.png" alt="profile verdict" loading="lazy"></a><figcaption><div class="cap-head"><h3>profile verdict</h3></div><p>The framework measuring itself and answering yes or no.</p><code>plots/profile-verdict</code></figcaption></figure>
+<figure class="shot" id="plots-profile-view"><a href="plots/profile-view.png" target="_blank" rel="noopener"><img src="plots/profile-view.gif" alt="profile view" loading="lazy"></a><figcaption><div class="cap-head"><h3>profile view</h3><span class="tag quiet">animated</span></div><p>/profile, walked card by card.</p><code>plots/profile-view</code></figcaption></figure>
+    </div>
+  </section>
+  <aside class="notes" id="notes">
+    <h2>About these images</h2>
+    <ul>
+      <li>Each still is the moment the example's own media script chooses. Animated scenes are sampled every 0.2 s of recorded time.</li>
+      <li>The card hook <code>⎿</code> (U+23BF) shows as a small box: the renderer's font has no glyph for it. The terminal draws it.</li>
+      <li>In the light theme, faint lines between text spans are seams in this renderer, which paints each span's ground separately. They are not in the terminal.</li>
+      <li>Click a frame to open it at full size.</li>
+    </ul>
+  </aside>
+</div>
