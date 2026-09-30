@@ -2423,6 +2423,15 @@ node's own fields in a fixed order, no glyph and no colour.* This section is the
   `push` and resolved by its removal.
 - **The call's state is resolved already** — `running`, `succeeded`, `failed`, `cancelled` —
   by the head (C23 I59), so a completion line reads a state and never parses painted text.
+  **And where the head's word is one the shell wrote, the line names that word instead of a code**
+  (ruling 103 b, I152). `denied`, `expired` and `cancelled` are three words over one `cancelled`
+  state, and 126 and 130 are codes the shell chose, which a child can also return on its own (C23 §8a
+  A6.9 row 16) — so neither the state nor the code can say which ending it was, and the head's word
+  can. It is read from the head's `text`, the model's field and not a painted row: the last part after
+  the slot's separator, and only when it is one of C23's `FAILURE_WORDS`, the closed set `finishCard`
+  writes. **Its blind spot, stated**: a head the far side composed, in a stated state, whose own text
+  happens to end with one of those words after a separator, is read as saying it. The structured answer
+  is §110's *resolution* axis on the head, which no block carries yet.
 
 ### 6m.2 — the classification table: which change writes which line
 
@@ -3513,6 +3522,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I149** — *(§6m.4 row 6, C09 I128, ruling 71, `R-TRU-001`, C23 I90; F1470)* **Every string linear writes is in the shown form, never raw and never deleted.** `clean` is `neutraliseControl` followed by tab expansion and trimming. The name, the value, the source, the command, a question and its choices, and the answer all pass through it, and so does the notification body that repeats them (§6n.4 row 4). `windowLine` draws each grapheme of the draft in that form and measures the form, so the caret stands on the cell the reader sees. C23 I90's `drawn` already arrives in the form, and `clean` is idempotent on it. The buffer is untouched: the answer's `text` and the command a verb is handed keep the character as typed (C17 I36).
 - **I150** — *(ruling 96, ruling 99, F1486, I51, I133, I145, C19 I20, C19 I29, `binding.004`)* **The completion substate's owner line names what each key does in the state the frame shows.** While the menu holds no selection the prompt's keys resolve first (C19 I20), so `⏎` submits and `↑` walks history, and the line is `complete · ⏎ run · ⇥ complete · esc close`: `⏎` is the chord the session keymap binds to the prompt's `submit`, named for what it does to the line at rest (ruling 99, §029), `⇥` is the chord the session keymap binds to the prompt's `complete` (the registry's `binding.004`, *complete in the prompt*), and `esc` is the panel's `dismiss`, which the prompt does not bind. Once `⇥` has made a selection the menu owns its keys and the line is `complete · ↑↓ move · ⏎ accept · esc close`. `↓` at rest is the prompt's and selects nothing (C19 §6a). **The line reads the router's answer, not the menu's state**: `OwnerHints.promptUnderMenu` is `promptUnderMenu()`, the top layer's `promptLive` (I145), so the footer, the cursor and the dispatch read one predicate and a footer cannot name a key that goes somewhere else. **It is the one visible difference between rest and a selection**: ruling 89 marks the current candidate in both (C19 I29), and the two frames were otherwise identical. Absent is *the menu owns its keys*, which is every line drawn with no session behind it. → T1.182, T4.120, T6.152
 - **I151** — *(§097, `R-BLK-569`, `R-BLK-628`, `R-BLK-775`, F1501; §6s ruling 1)* **A panel's rows between its edges take `surface.bgElev`.** The compositor paints `surface.bgElev` behind every line of a `kind: "panel"` layer except the lines of its leading `rule` blocks — the upper edge; the lower edge is the prompt's rule (I81) and is not in the layer — through `based`, so a span that sets its own background keeps its cells (the menu's `pick` row), and the padding to the box's width is grounded (I29). The exemption is by content line, so a row-scrolled panel keeps it (§6s.2 row 7). Where no ground resolves — 1 bit, a theme whose `bgElev` inherits — the rows are byte for byte what they were. A `peek` and an `overlay` take none. → T1.184, T4.121, T6.153, T6.154
+- **I152** — *(§6m.2, ruling 103 b, F1517, C23 I101, C23 §8a A6.9)* **A completion line says `exit N` only of a child's own ending.** Where the settled head's word is one the shell writes — `denied`, `expired`, `cancelled`, `truncated`, `failed` — the verdict names it and appends no code, because the code beside it is the shell's: 126 for a denial and an expiry, 130 for a cancel, 1 for a malformed patch and a throw (C23 I101). A `cancelled` head's word is the verdict's first part — `/ps — denied`, `/ps — expired`, `/ps — cancelled` — and a `failed` head's follows its state, `failed, truncated`. A head whose word is `exit N` keeps it, so a child that ended 130 on its own still reads `failed, exit 130`. C20 records every one of these codes as before (C23 I29). *As it stood:* ~~`exit N` for any non-zero code on a document that is not the shell's own~~ — a denial read `/ps — failed, exit 126` and a cancel `cancelled, exit 130` (F1517). → T1.186, T6.157
 
 ## 11. Commitments
 
@@ -3634,6 +3644,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 92. **A layer's box scrolls from the one offset store, and the pointer finds layers where they are drawn** (I141, I142, §6q). The inspection, the chip preview and any `scroll` box an application puts in a layer are one mechanism; a replacing question is hit where the reader sees it.
 93. **The chip preview has a box and three chords, and `⌥o` hands the chip to the reader's editor** (I143, I144, ruling 53). `⏎` stays the prompt's; an edited paste returns as one undo unit.
 94. **The transient panels are §097's: region-wide, between two rules, on `bgElev`** (I151, I113, I143; C20 I30). The chip preview is §101's menu panel, and its box counts its residue row.
+95. **A completion line says how the entry ended, and a code only where the child gave one** (I152, ruling 103 b, F1517). A denial reads `denied`, not `failed, exit 126`.
 
 ---
 
@@ -4137,6 +4148,8 @@ PTY harness.
 - **T6.154** (I151): the edge exemption dropped, so the rule is grounded → **T1.184** and **T4.121** fail on the rule.
 - **T6.155** (I143): the overflowing cap returned to `− 3` → **T1.175** fails: the 47-line layer is `truncated`.
 - **T6.156** (I143): the chip count dropped, so `←→ other chips` is offered with one chip → **T1.185** fails.
+- **T1.186** (I152, ruling 103 b, F1517): `completionLine` over a settled card whose head reads `denied`, `expired`, `cancelled`, `truncated` and `failed`, with `meta.exitCode` 126, 126, 130, 1 and 1 on a `subprocess` document → `/ps — denied`, `/ps — expired`, `/ps — cancelled`, `/ps — failed, truncated`, `/ps — failed`; a head reading `exit 130` over 130 → `/ps — failed, exit 130`; `exit 1` → `failed, exit 1`. At the ASCII separator `:` the same.
+- **T6.157** (I152): the verdict reading `outcomeOf` alone again → **T1.186** fails on each of the five shell words, and not on the two `exit N` rows.
 
 ---
 

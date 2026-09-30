@@ -1190,4 +1190,8 @@ describe("C23 §7g — a question's life in a built session", () => {
     expect(head(permissive)).toBe("ps · cancelled");
     expect(permissive.calls, "withdrawn with allow as its key, and nothing ran").not.toContain("invoke");
   });
+
+  it.todo(
+    "T4.107 (C23 I94, C23 I93, F1495): a refused approval settles its card failed and runs nothing — not deferred on a component: lands with the ruling 103 code commit of lane b4-exec5",
+  );
 });

@@ -355,4 +355,8 @@ describe("C23 I98, I99 — the app route's cancel", () => {
       "still running: call · stall-notice: no output for 2m",
     ]);
   });
+
+  it.todo(
+    "T4.106 (C23 I103, ruling 103 c, ruling 103 d, F1519, F1520): the stall watch arms on approval, and a composed settlement leaves the stall row out — not deferred on a component: lands with the ruling 103 code commit of lane b4-exec5",
+  );
 });

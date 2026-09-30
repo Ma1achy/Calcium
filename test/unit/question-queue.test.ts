@@ -357,4 +357,8 @@ describe("C23 §7g — the reply, the queue, the three resolutions", () => {
     w.press("escape");
     await expect(q).resolves.toEqual({ key: DENY_KEY, outcome: "answered" });
   });
+
+  it.todo(
+    "T1.107 (C23 I93, F1495): a set in which no choice answers is refused by ask and by the testing stand-in — not deferred on a component: lands with the ruling 103 code commit of lane b4-exec5",
+  );
 });

@@ -176,4 +176,8 @@ describe("C22 §6m — linear events", () => {
     const before = windowLine({ label: "> ", text: `a${RLO}b`, cursor: 1 }, 40);
     expect(before.caret).toBe(2 + 1);
   });
+
+  it.todo(
+    "T1.186 (C22 I152, ruling 103 b, F1517): a completion line says exit N only of a child's own ending — not deferred on a component: lands with the ruling 103 code commit of lane b4-exec5",
+  );
 });

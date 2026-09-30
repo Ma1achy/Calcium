@@ -200,4 +200,8 @@ describe("C23 I101 — one code per settlement", () => {
       "end SIGKILL: failed · tail(web.log) · exit 137",
     ]);
   });
+
+  it.todo(
+    "T4.105 (C23 I60, C23 I94, C23 I81, ruling 103 a, F1518): a denied, expired, withdrawn and cancelled head is muted in the cancelled state at every rung — not deferred on a component: lands with the ruling 103 code commit of lane b4-exec5",
+  );
 });
