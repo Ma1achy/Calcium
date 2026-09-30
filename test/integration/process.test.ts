@@ -279,9 +279,49 @@ describe("C21 with C06", () => {
     expect(entry?.doc.status, "the failure is reported rather than swallowed").toBe("error");
     expect(JSON.stringify(entry?.doc)).toMatch(/raw mode/);
   });
-  it.todo(
-    "T4.93 (C23 I95, ruling 91, F1476): a handoff's notice takes the tone and mark of the status it sits on — finished, failed or cancelled — not deferred on a component: lands with the F1476 code commit of review batch 4",
-  );
+  it("T4.93 (C23 I95, ruling 91, F1476): a handoff's notice takes the tone and mark of the status it sits on — finished, failed or cancelled", async () => {
+    // **A classification table, asserted whole** (C23 §8a A6.6). The defect was
+    // a tone and a status that disagreed — `warn` and ▲ on an `error` document —
+    // so a row per field would pass a build that moved one and not the other.
+    // Each cell is its own harness: one `Exit` per submission, read once.
+    const endings: readonly (readonly [string, { code: number | null; signal: string | null }])[] = [
+      ["exit 0", { code: 0, signal: null }],
+      ["exited 1", { code: 1, signal: null }],
+      // A child that never started (C21 I13): `code ?? 1`, and still a failure.
+      ["never started", { code: null, signal: null }],
+      // A grandchild's SIGINT under `sh -c` arrives as 128+n with no signal, and
+      // ruling 91 says a non-zero exit is a failure (A6.6 row 4).
+      ["exited 130", { code: 130, signal: null }],
+      ["SIGKILL", { code: null, signal: "SIGKILL" }],
+      // A terminal sends it too; the ruling's set is three (A6.6 row 6).
+      ["SIGQUIT", { code: null, signal: "SIGQUIT" }],
+      ["SIGINT", { code: null, signal: "SIGINT" }],
+      ["SIGTERM", { code: null, signal: "SIGTERM" }],
+      ["SIGHUP", { code: null, signal: "SIGHUP" }],
+    ];
+    const seen: string[] = [];
+    for (const [name, exit] of endings) {
+      const h = pipelineHarness({ handoff: () => Promise.resolve(exit) });
+      h.pipeline.submit("/tty vim");
+      await settled(h.pipeline);
+      const doc = h.transcript.entries.at(-1)?.doc;
+      const notice = doc?.blocks[0] as { kind?: string; tone?: string; glyph?: string; text?: string } | undefined;
+      expect(doc?.blocks, `${name}: one block`).toHaveLength(1);
+      expect(notice?.kind, `${name}: a notice`).toBe("notice");
+      seen.push(`${name}: ${String(notice?.tone)} ${String(notice?.glyph)} ${String(doc?.status)} · ${String(notice?.text)}`);
+    }
+    expect(seen).toEqual([
+      "exit 0: muted continuation ok · vim finished",
+      "exited 1: error error error · vim exited 1",
+      "never started: error error error · vim exited 1",
+      "exited 130: error error error · vim exited 130",
+      "SIGKILL: error error error · vim ended on SIGKILL",
+      "SIGQUIT: error error error · vim ended on SIGQUIT",
+      "SIGINT: muted cancelled partial · vim ended on SIGINT",
+      "SIGTERM: muted cancelled partial · vim ended on SIGTERM",
+      "SIGHUP: muted cancelled partial · vim ended on SIGHUP",
+    ]);
+  });
   it("T4.7 (with C22): session exit signals every child before the terminal is released", async () => {
     // A02 Seam 4's `Shutdown` row, and the whole claim is the **order**: a
     // child still running when the alternate screen is released writes onto the

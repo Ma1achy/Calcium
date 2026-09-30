@@ -26,6 +26,7 @@ import type {
   DocumentMeta,
   DocumentStatus,
   ErrorLike,
+  Glyph,
   ViewDocument,
 } from "../data/viewmodel/index.js";
 
@@ -183,6 +184,13 @@ const GLYPH_OF = Object.freeze({
  * rather than at the two call sites is the class rather than the instances: the
  * message is the notice's own text, which is what an `ErrorLike` carrying
  * anything else would be paraphrasing.
+ *
+ * **`mark` is a state's mark, where the notice says a call's state** (C23 I95).
+ * A cancelled handoff is `muted` under a command, which the derivation below
+ * answers with the continuation mark — and the `cancelled` state has a mark of
+ * its own. Both claim the one slot, and the state's wins: the notice is the
+ * entry's only block, so there is nothing above it to continue. Absent, the
+ * mark is the tone's, as it always was.
  */
 export function noticeDoc(
   command: string,
@@ -190,6 +198,7 @@ export function noticeDoc(
   tone: "muted" | "warn" | "error" | "info",
   metaSpec: MetaSpec,
   status: DocumentStatus = "ok",
+  mark?: Glyph,
 ): ViewDocument {
   // **`muted` takes the continuation mark, and the condition is the command**
   // (C09 §4). Eligibility is a property of the *entry*, not of the block: the
@@ -210,7 +219,7 @@ export function noticeDoc(
   // is `error`, so the tone alone would have spared it — but only by accident,
   // and its own `command` is `""`.
   const glyph =
-    tone === "muted" ? (command === "" ? undefined : "continuation") : GLYPH_OF[tone];
+    mark ?? (tone === "muted" ? (command === "" ? undefined : "continuation") : GLYPH_OF[tone]);
   return compose({
     command,
     status,

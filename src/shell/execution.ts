@@ -72,6 +72,14 @@ export type InFlight = "app" | "local" | "shell" | null;
  */
 const headOf = (command: string): string => command.split(/\s+/u)[0] ?? "shell";
 
+/**
+ * The signals a handed-off child ends on when it was stopped rather than when
+ * it failed (C23 I95, ruling 91): an interrupt, a termination request and a
+ * closed terminal. Any other signal is a failure, `SIGQUIT` included — a
+ * terminal sends it too, and the ruling's set is these three (§8a A6.6 row 6).
+ */
+const CANCEL_SIGNALS: ReadonlySet<string> = new Set(["SIGINT", "SIGTERM", "SIGHUP"]);
+
 /** What a handler is told when validation failed and there is nothing parsed. */
 const EMPTY_ARGS: Readonly<Record<string, unknown>> = Object.freeze({});
 
@@ -1038,13 +1046,28 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // A notice rather than a `raw` block: the child wrote to the terminal
       // directly, so there is no output to carry. What the transcript can say
       // is that it ran and how it ended.
+      //
+      // **Its tone and mark agree with its status** (C23 I95, ruling 91). This
+      // was `warn` and ▲ on an `error` document for every non-zero exit and
+      // every signal, so the document said failed and everything a reader sees
+      // said warning. Three endings, each the call state of the same name:
+      // `failed` is `error` and ✗ on `error`; `cancelled` is `muted` and ⊘ on
+      // `partial`, the status C07 gives a cancelled call (C23 T3.4) — never
+      // I66's error document, which would draw the cancel as the failure the
+      // ruling separates it from. The signal is read first (§8a A6.6 row 7).
       const code = exit.code ?? 1;
-      appendAndCommit(
+      const text =
         exit.signal !== null
-          ? noticeDoc(line, `${label} ended on ${exit.signal}`, "warn", { origin: "user" }, "error")
+          ? `${label} ended on ${exit.signal}`
           : code === 0
-            ? noticeDoc(line, `${label} finished`, "muted", { origin: "user" })
-            : noticeDoc(line, `${label} exited ${String(code)}`, "warn", { origin: "user" }, "error"),
+            ? `${label} finished`
+            : `${label} exited ${String(code)}`;
+      appendAndCommit(
+        exit.signal !== null && CANCEL_SIGNALS.has(exit.signal)
+          ? noticeDoc(line, text, "muted", { origin: "user" }, "partial", "cancelled")
+          : exit.signal === null && code === 0
+            ? noticeDoc(line, text, "muted", { origin: "user" })
+            : noticeDoc(line, text, "error", { origin: "user" }, "error"),
         settle,
       );
     } catch (cause) {
