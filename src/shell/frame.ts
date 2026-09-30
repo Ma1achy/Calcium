@@ -42,7 +42,7 @@ import {
 import type { TerminalSize } from "../terminal/lifecycle.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Block } from "../data/viewmodel/index.js";
-import type { Chrome, CopyState, Label, SessionSnapshot } from "./types.js";
+import type { Chrome, CopyState, Label, OwnerHints, SessionSnapshot } from "./types.js";
 import type { OwnerRung } from "../interaction/router/types.js";
 
 /** What the frame is, before anything paints it. */
@@ -131,6 +131,12 @@ export type ComposeDeps = Readonly<{
   copy?: () => CopyState | undefined;
   /** C22 I118 — a form field holds the editor; the owner line names it. */
   editingField?: () => boolean;
+  /**
+   * C22 I133 — what the owner line names its keys from. Optional for
+   * `bufferedEntries`' reason: with no session graph there is no keymap but the
+   * default, and absent is that.
+   */
+  hints?: () => OwnerHints | undefined;
   /** C02's resolved record, for the chrome's marks (A03 SS47). `null` before
    * the session graph exists, which is also when there is no owner. */
   capabilities: () => TerminalCapabilities | null;
@@ -196,6 +202,7 @@ export function compose(deps: ComposeDeps): Composed {
   const copy = deps.copy?.();
   const editingField = deps.editingField?.() === true;
   const toast = deps.toast?.();
+  const hints = deps.hints?.();
   const ctx = {
     session,
     now,
@@ -211,6 +218,7 @@ export function compose(deps: ComposeDeps): Composed {
     ...(copy === undefined ? {} : { copy }),
     ...(editingField ? { editingField } : {}),
     ...(toast === undefined ? {} : { toast }),
+    ...(hints === undefined ? {} : { hints }),
   };
 
   const { header, footer, label } = chromeOf(deps, ctx);

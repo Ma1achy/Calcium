@@ -56,7 +56,7 @@ function byKey(a, b) {
 /**
  * The table, as data: one row per distinct key, one cell per target.
  *
- * @param {readonly {target: string, key: {name: string, ctrl?: boolean, meta?: boolean, shift?: boolean}, action: string}[]} bindings
+ * @param {readonly {target: string, key: {name: string, ctrl?: boolean, meta?: boolean, shift?: boolean}, action: string, fallback?: string, profile?: string}[]} bindings
  * @param {readonly string[]} order
  * @returns {{ rows: Array<{ text: string, cells: Map<string, string>, ladder: boolean }>, bindings: number, ladder: number }}
  */
@@ -74,7 +74,10 @@ export function tabulate(bindings, order) {
       // too rather than writing a cell that silently keeps one of the two.
       throw new Error(`duplicate binding for ${b.target} ${text}`);
     }
-    row.cells.set(b.target, b.action);
+    // **A reserved row names what it does unhandled** (C16 §6c, C22 I134): `⌥⌫`
+    // is `queueDrop` for an application that registers one and `killWordLeft`
+    // otherwise, and a cell saying only the first describes a key nobody has.
+    row.cells.set(b.target, b.fallback === undefined ? b.action : `${b.action}, else ${b.fallback}`);
     if (b.profile !== undefined) row.profile = b.profile;
     byText.set(text, row);
   }

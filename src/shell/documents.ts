@@ -13,7 +13,7 @@
  * forgot would be indistinguishable from the ones that meant it.
  */
 
-import { block, document } from "../data/viewmodel/index.js";
+import { CALL_HEAD_GLYPH, CALL_STATE_TONE, block, document } from "../data/viewmodel/index.js";
 import { usageBlocks } from "../data/adapters/index.js";
 import { elapsed, glyphs, spinnerFrames } from "../presentation/blocks/index.js";
 import type { AskOptions, Choice } from "./local/registry.js";
@@ -308,7 +308,12 @@ function invocation(call: Pick<ToolCallSpec, "name" | "args">): string {
 
 /** Whether a call's head is a settled one: said so, or carrying a word (C23 I59). */
 function isSettled(call: ToolCallSpec): boolean {
-  return call.settled === true || (call.outcome !== undefined && call.outcome !== "");
+  // **Read from the state, not beside it** (C23 I81): a stated `cancelled` with
+  // no outcome is settled, and a stated `running` with one is not — the rollup
+  // and the child's body reached the opposite answers when this read the
+  // outcome while the head read the state.
+  const state = callState(call);
+  return state !== "queued" && state !== "running";
 }
 
 /**
@@ -341,9 +346,12 @@ export function toolCallHeader(call: ToolCallSpec, caps: Caps, tick = 0): string
   const since = call.elapsedMs === undefined ? "" : elapsed(call.elapsedMs);
   if (call.waiting === true) {
     parts.push(`${spin(caps, tick)} waiting`);
-  } else if (!isSettled(call)) {
+  } else if (callState(call) === "running") {
+    // **`running`'s alone, not *unsettled*'s** (C23 I81): a queued call has not
+    // started and R-BLK-214 draws it still, so its slot is empty (F1261).
     parts.push(since === "" ? spin(caps, tick) : `${spin(caps, tick)} ${since}`);
-  } else if (since !== "") {
+  } else if (since !== "" && isSettled(call)) {
+    // Settled, the duration it took. Queued, nothing has started, so there is none.
     parts.push(since);
   }
   const outcome =
@@ -375,7 +383,21 @@ function callState(call: ToolCallSpec): CallState {
   // says nothing about whether it would have worked. `FAILURE_WORDS` counts it
   // against a parent's rollup (C23 I62) and that is a different question.
   if (call.outcome === "cancelled") return "cancelled";
-  return call.outcome !== undefined && FAILURE_WORDS.has(call.outcome) ? "failed" : "succeeded";
+  return failureWord(call.outcome) === null ? "succeeded" : "failed";
+}
+
+/**
+ * What an outcome says went wrong, or `null` (C23 I81): `failed` for a far
+ * side's non-zero `exit N`, the word itself for a member of `FAILURE_WORDS`.
+ *
+ * **The one classifier.** `rollUp` matched `exit N` and `callState` did not, so
+ * a call ending `exit 1` counted against its parent while its own head drew
+ * `succeeded`.
+ */
+function failureWord(outcome: string | undefined): string | null {
+  if (outcome === undefined) return null;
+  if (/^exit [1-9]/u.test(outcome)) return "failed";
+  return FAILURE_WORDS.has(outcome) ? outcome : null;
 }
 
 /**
@@ -394,11 +416,14 @@ export function callHead(call: ToolCallSpec, caps: Caps, tick = 0, foldTarget?: 
   // own mark where it does not. Both are one cell with no indent, so `measure`
   // reads `glyph` alone and is right at every rung.
   const state = callState(call);
+  // **The tone and the mark are the state's** (C04 I141): above 1 bit the tone
+  // is the only thing saying which state the `●` is in, and this wrote `info`
+  // for all five.
   const base = {
     kind: "notice" as const,
     id: call.id ?? blockId("call"),
-    tone: "info" as const,
-    glyph: "running" as const,
+    tone: CALL_STATE_TONE[state],
+    glyph: CALL_HEAD_GLYPH[state],
     state,
     text,
   };
@@ -491,11 +516,6 @@ export function operationHeader(op: OperationSpec, caps: Caps, tick = 0): string
 }
 
 /** Muted for cancelled, error for failed, and info for the rest (§036, `R-BLK-265`). */
-function operationTone(op: OperationSpec): "muted" | "error" | "info" {
-  const state = op.state ?? "running";
-  return state === "cancelled" ? "muted" : state === "failed" ? "error" : "info";
-}
-
 /**
  * The operation's head block (C23 I76): a notice carrying the header, the
  * state's mark in the gutter once it has stopped and the walking one in the
@@ -506,7 +526,10 @@ export function operationHead(op: OperationSpec, caps: Caps, tick = 0): Block {
   const base = {
     kind: "notice" as const,
     id: op.id ?? blockId("operation"),
-    tone: operationTone(op),
+    // **The state's tone, the one map a call head reads** (C23 I76, C04 I141):
+    // R-BLK-265's *muted for cancelled, error for failed* is that map's two rows.
+    // This was `info` running and settled — the call head's constant again.
+    tone: CALL_STATE_TONE[running ? "running" : (op.state ?? "succeeded")],
     text: operationHeader(op, caps, tick),
   };
   // **A state at both ends, and a glyph at only one.** `state` is what makes a
@@ -520,7 +543,7 @@ export function operationHead(op: OperationSpec, caps: Caps, tick = 0): Block {
   return block(
     running
       ? { ...base, state: "running" as const }
-      : { ...base, glyph: "running" as const, state: op.state ?? "succeeded" },
+      : { ...base, glyph: CALL_HEAD_GLYPH[op.state ?? "succeeded"], state: op.state ?? "succeeded" },
   );
 }
 
@@ -577,7 +600,12 @@ export function rollUp(children: readonly ToolCallSpec[]): readonly string[] {
   let succeeded = 0;
   for (const child of settled) {
     const outcome = child.outcome ?? "";
-    const word = /^exit [1-9]/u.test(outcome) ? "failed" : FAILURE_WORDS.has(outcome) ? outcome : null;
+    // **By the child's state, which its own head draws** (C23 I81) — a stated
+    // state wins over the outcome here exactly as it does there.
+    const state = callState(child);
+    const said = failureWord(child.outcome);
+    const word =
+      state === "succeeded" ? null : state === "cancelled" ? "cancelled" : said === null || said === "cancelled" ? "failed" : said;
     if (word !== null) {
       failures.set(word, (failures.get(word) ?? 0) + 1);
       continue;

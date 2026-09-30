@@ -2346,9 +2346,6 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "have caught it. Needs the action dispatch route (F21) before anything can reach it",
   "HistoryStore.resetNavigation":
     "C20 — clears navigation state; the shell resets by submitting. Unverified. F97's group",
-  "HistoryStore.clearConfirmLayer":
-    "C20 — dismisses the clear-confirmation overlay; the shell dismisses via the router's " +
-    "`dismiss` action. Unverified. F97's group",
 
   // === F84: the `export type` cohort ======================================
   //

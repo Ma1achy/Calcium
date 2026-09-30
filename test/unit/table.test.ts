@@ -1274,8 +1274,8 @@ describe("the missing number and the trend (I29, I30)", () => {
     }
   });
   it("T1.39 (C11 I30, R-COL-006): a trend cell's arrow takes its tone from the column's polarity", () => {
-    // §088 §4's three rows, and the two arms it does not draw: a neutral column
-    // and a reading that held.
+    // §088 §4's three rows, and the three arms it does not draw: a neutral
+    // column, a reading that held, and a cell with no trend in a trend column.
     const col = (key: string, polarity?: "higher" | "lower" | "neutral"): ColumnDef => ({
       key, label: key, priority: 1, minWidth: 14, sortable: false, ...(polarity === undefined ? {} : { polarity }),
     });
@@ -1311,18 +1311,25 @@ describe("the missing number and the trend (I29, I30)", () => {
     // trend that always paints DOWN as ok gets wrong.
     expect(visible(bad!)).toContain("\u2191 from 0.04");
     expect(opener(bad!, "\u2191", 0), "loss rose").toBe(ink("error"));
-    // A reading that held draws no arrow and the text alone.
-    expect(visible(bad!)).toContain("from 0.5");
-    expect(visible(bad!)).not.toMatch(/[\u2191\u2193^V] from 0\.5/u);
+    // **A reading that held draws `→`, in the default tone** (question 37): no
+    // arrow is not *flat*, so a held reading and a missing one are two pictures.
+    expect(visible(bad!)).toContain("\u2192 from 0.5");
+    expect(opener(bad!, "\u2192", 0), "a reading that held").toBe(ink("default"));
+    // The control: the cell with no trend in the same row draws no mark at all —
+    // the text alone, where the flat mark would have stood.
+    const noTrend = visible(bad!).slice(visible(bad!).lastIndexOf("from 0.5") + "from 0.5".length);
+    expect(noTrend.trim(), "a cell with no trend is its text alone").toBe("-");
 
     // **The shape carries the direction at every rung** (R-DEG-001): at 1-bit the
     // arrows survive the tone, and at ASCII they are `^` and `V`.
     const mono = draw(MONO_UNICODE_CAPS).map(visible);
     expect(mono[1]).toContain("\u2193 from 0.41");
     expect(mono[2]).toContain("\u2191 from 0.04");
+    expect(mono[2]).toContain("\u2192 from 0.5");
     const ascii = draw(ASCII_CAPS).map(visible);
     expect(ascii[1]).toContain("V from 0.41");
     expect(ascii[1]).toContain("^ from 0.62");
+    expect(ascii[2]).toContain("= from 0.5");
   });
 });
 

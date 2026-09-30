@@ -851,9 +851,9 @@ describe("C16 §4a — the crosshair, read from the painted frame", () => {
     expect(ruleRow(), "no mark before the click").not.toContain("▲");
     expect(text().join("\n")).not.toMatch(/train: \d/u);
 
-    // The plot is a card's body, four cells in (C22 I83, I84), so its tick
-    // centres sit at 26, 43, 61, 78 (measured from the frame); the pointer goes
-    // to a centre.
+    // The plot is a card's body, BODY_INDENT cells in (C22 I83, I84, C09 I5),
+    // and the pointer goes to a sample's centre — 43 for the third and 26 for
+    // the first, both measured from the frame by where the mark lands.
     await type(sgrClick(areaRow, 43));
     expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(43);
     expect(text().join("\n"), "and the readout names the third sample").toMatch(/train: 30/u);
@@ -866,8 +866,10 @@ describe("C16 §4a — the crosshair, read from the painted frame", () => {
     // centre shifts left. The input moves with it rather than the expectation,
     // because the claim is *the mark is under the pointer at a centre* and an
     // expectation edited alone turns that into *the mark is near the pointer*.
-    await type(sgrClick(areaRow, 25));
-    expect(ruleRow().indexOf("▲")).toBe(25);
+    // **And back by one with C09 I5**: the body moved from four cells in to
+    // five, and a click at 25 drew the mark at 26, which is the centre now.
+    await type(sgrClick(areaRow, 26));
+    expect(ruleRow().indexOf("▲")).toBe(26);
     expect(text().join("\n")).toMatch(/train: 20/u);
     expect(text().join("\n")).not.toMatch(/train: 30/u);
   });

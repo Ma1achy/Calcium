@@ -199,13 +199,14 @@ const COVERED = [
   ["examples/docker/tools/corrections.mjs", ["node", "examples/docker/tools/corrections_test.mjs"]],
   ["examples/docker/tools/measure-raw.mjs", null], // same fixture — the shared registry
   ["examples/docker/tools/measure-s3.mjs", null], // same fixture
-  // **Twenty-seven at once, and the equality comparison paid out to nobody.**
-  // CI's fast job said `74 found, 47 with a fixture` on #61, and the target had
-  // not been run on the lanes that added them. Every one of the twenty-seven
-  // was read and its callers grepped: ten are exempted below, and of the
-  // seventeen here, nine had a fixture all along that nobody had listed and
-  // eight were given one. The classification is batch 4's (2c8d323a), cut to
-  // the files this tree holds, with one exception: `design-fixture-map.py`.
+  // **Thirty-two at once, and the equality comparison paid out to nobody.**
+  // CI's fast job said `74 found, 47 with a fixture` on #61, and #62 adds five
+  // more (79 found); the target had not been run on the lanes that added them.
+  // Every one of the thirty-two was read and its callers grepped: fifteen are
+  // exempted below, and of the seventeen here, nine had a fixture all along
+  // that nobody had listed and eight were given one. The classification is
+  // batch 4's (2c8d323a), cut to the files this tree holds, with one
+  // exception: `design-fixture-map.py`.
   //
   // The nine. **The browser row needs `make chromium`**, which is why it is
   // a prerequisite of this target — the catalogue's reason, one artefact on.
@@ -239,9 +240,9 @@ const COVERED = [
   ["tools/design-unregistered-marks.py", null], // same fixture — DC3 to DC5
   // **The exception.** Batch 4 exempts this as a retired generator, because
   // there DESIGN_FIXTURES.md has been edited by hand and a run rewrites it.
-  // Not yet: on this tree a run against a copy at 8f115e74 reproduced the file
-  // byte for byte, so it is a live writer and gets QT1's fixture shape. DM1
-  // expires when the hand edit arrives, and says so.
+  // Not yet: on this tree a run against a copy — at 8f115e74, and again at
+  // 94e8d467 — reproduced the file byte for byte, so it is a live writer and
+  // gets QT1's fixture shape. DM1 expires when the hand edit arrives, and says so.
   ["tools/design-fixture-map.py", ["npx", "vitest", "run", "test/unit/design-fixture-map.test.ts"]],
   // **This runner's own reader.** It reported `0 rows` for a child that had run
   // six and failed one (F929, F949), and nothing could ask it a question because
@@ -281,8 +282,9 @@ const NOT_INSTRUMENTS = {
   "tools/terminal-probe/probe.py": "runs at import and opens /dev/tty at module scope, so its parsers cannot be imported; the expiry is a `__main__` guard, and it must be verified in a real terminal",
   // **The one-shot registry edits, one entry each rather than a glob** — a glob
   // over `register-*` would exempt the next file of that name before anyone
-  // read it, and one of the next may be a checker. Each was *run* at
-  // 8f115e74 against a copy of the tree, and each refused or said it had
+  // read it, and one of the next may be a checker. Each was *run* against a
+  // copy of the tree — at 8f115e74 for #61's nine, at 94e8d467 for #62's five
+  // and all fourteen again — and each refused or said it had
   // nothing to do, which is the evidence *already applied* rests on: the text
   // after the dash is what it printed. What checks their output is the
   // registry's own gate — `make design-check`: `check-calcium.mjs` (digests,
@@ -290,8 +292,13 @@ const NOT_INSTRUMENTS = {
   // `rule-status.mjs` (the ledger). **Kept rather than deleted** because the
   // registry is normative and its edits have to stay auditable after they ran —
   // `register-sel.mjs`'s header, which the rest cite.
+  "tools/design/register-ascii-interval.mjs": ONE_SHOT("already recorded · spinnerPolicy.asciiIntervalMs is 120, nothing written"),
+  "tools/design/register-key-008.mjs": ONE_SHOT("already registered · R-KEY-008 present, nothing written"),
   "tools/design/register-revert.mjs": ONE_SHOT("`revert` already exists — this script has run"),
   "tools/design/register-sel.mjs": ONE_SHOT("already registered · 15 of 15 R-SEL rules present, nothing written"),
+  "tools/design/register-trend-flat.mjs": ONE_SHOT("already registered · trend-flat present, nothing written"),
+  "tools/design/supersede-bindings.mjs": ONE_SHOT("binding.transcript-bottom-base already exists"),
+  "tools/design/supersede-branch-blocks.mjs": ONE_SHOT("already superseded · all 28 blocks have successors and no one-blank branch is projected, nothing written"),
   "tools/design/supersede-rulings.mjs": ONE_SHOT("R-STR-003 is already superseded — this script has run"),
   "tools/design/supersede-thm-003.mjs": ONE_SHOT("R-THM-003 is already superseded — this script has run"),
   "tools/theme/floor-scope.mjs": ONE_SHOT("R-THM-004 already exists — this script has run"),
@@ -307,7 +314,7 @@ const NOT_INSTRUMENTS = {
 
 /** The reason every one-shot shares, with what it printed when it was run again. */
 function ONE_SHOT(said) {
-  return `a one-shot registry edit, already applied — re-run at 8f115e74 it said *${said}* and wrote nothing; its output is the registry, which \`make design-check\` checks`;
+  return `a one-shot registry edit, already applied — re-run at 94e8d467 it said *${said}* and wrote nothing; its output is the registry, which \`make design-check\` checks`;
 }
 
 // **`.ts` was missing, and the omission has a history worth keeping.**
@@ -441,7 +448,7 @@ function main() {
   const missing = files.filter((f) => !covered.has(f));
   const stale = [...covered].filter((f) => !files.includes(f));
   // **And the exemptions, the same way.** An entry for a file that is gone
-  // outlives its reason in silence — and with nine one-shots listed one by
+  // outlives its reason in silence — and with fourteen one-shots listed one by
   // one, deleting one is the likeliest edit this table will see.
   // `__pycache__` is the one entry absent on a clean clone: the python
   // fixtures write it, and it is gitignored.

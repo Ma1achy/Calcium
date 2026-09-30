@@ -19,7 +19,7 @@
 
 import type { Block, Group } from "../data/viewmodel/index.js";
 import { block as rebuild, childWidths, contentWidth, hasChildren, paddingOf } from "../data/viewmodel/index.js";
-import { glyphFor } from "../presentation/blocks/index.js";
+import { glyphCells, glyphFor } from "../presentation/blocks/index.js";
 import type { BlockRegistry, PlacedElement } from "../presentation/blocks/index.js";
 import type { RenderScratch } from "../presentation/blocks/types.js";
 import { paint as paintSpans, tone } from "../presentation/blocks/paint.js";
@@ -40,8 +40,16 @@ import type { EntryParts } from "./render-cache.js";
  */
 export const HOOK_INDENT = 2;
 
-/** The body's indent under the hook, in cells — the hook's column, the mark, and its trailing space. */
-export const BODY_INDENT = HOOK_INDENT + 2;
+/**
+ * The body's indent under the hook, in cells — the hook's column, the mark's
+ * reservation, and its trailing space (C22 I83).
+ *
+ * **Derived from the reservation, not written**: five cells, because the
+ * registry's ASCII hook is `` `- `` and the slot reserves two at every rung
+ * (C09 I5, R-GLY-003). It was `HOOK_INDENT + 2`, which was right only while the
+ * ASCII hook was one character and drew `` `-text `` the day it became two.
+ */
+export const BODY_INDENT = HOOK_INDENT + glyphCells("continuation") + 1;
 
 /**
  * One gutter column per level of nesting, and it is the body's indent (C22 I89,
@@ -518,9 +526,11 @@ function assemble(
 /**
  * One gutter cell's text, `GUTTER_UNIT` cells wide (I88, I89): `HOOK_INDENT`
  * blanks, then the glyph or glyphs, muted, padded to the unit. Every glyph is
- * one cell at both width conventions — `continuation` is Neutral (C09 I5) and
+ * one cell per character at both width conventions — `continuation` is Neutral
+ * and its ASCII `` `- `` is two characters in two cells (C09 I5), and
  * `glyphForMask` flattens to ASCII where box drawing would double (F293) — so
- * the geometry the measurer committed is the geometry drawn.
+ * padding by character count is padding by cells, and the geometry the
+ * measurer committed is the geometry drawn.
  */
 function gutterCell(cell: GutterCell, options: RenderOptions): string {
   if (cell === "blank") return " ".repeat(GUTTER_UNIT);
@@ -532,7 +542,7 @@ function gutterCell(cell: GutterCell, options: RenderOptions): string {
         ? glyphForMask(LINE_UP | LINE_DOWN, "sharp", caps)
         : `${glyphForMask(cell === "branch" ? LINE_UP | LINE_DOWN | LINE_RIGHT : LINE_UP | LINE_RIGHT, "sharp", caps)}${glyphForMask(LINE_LEFT | LINE_RIGHT, "sharp", caps)}`;
   const painted = paintSpans([{ text: glyphs, style: tone("muted", options.theme, caps) }]);
-  const pad = GUTTER_UNIT - HOOK_INDENT - [...glyphs].length; // cells-ok — every gutter glyph is one cell by construction (C09 I5, F293)
+  const pad = GUTTER_UNIT - HOOK_INDENT - [...glyphs].length; // cells-ok — one cell per character by construction (C09 I5, F293)
   return `${" ".repeat(HOOK_INDENT)}${painted}${" ".repeat(Math.max(0, pad))}`;
 }
 

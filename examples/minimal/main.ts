@@ -35,7 +35,7 @@ const list: Adapter = {
               state: {
                 text: String(r["state"]),
                 tone: r["state"] === "running" ? "ok" : "muted",
-                glyph: r["state"] === "running" ? "running" : "queued",
+                glyph: r["state"] === "running" ? "work-unit" : "queued",
               },
               replicas: { text: String(r["replicas"]) },
             },

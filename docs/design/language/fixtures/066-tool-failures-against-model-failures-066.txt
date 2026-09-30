@@ -2,7 +2,7 @@ a tool failed and the MODEL failed are different facts, and the shapes differ
 
 a TOOL failure is a result — it hangs under its own call and the turn goes on
   ● read_file(missing.ts) · 0.1s · failed
-    ⎿ ✗ ENOENT: no such file
+    ⎿  ✗ ENOENT: no such file
   ● I'll check the directory listing instead.     ← the turn continues
 
 a MODEL failure ends the turn, and it is the status block

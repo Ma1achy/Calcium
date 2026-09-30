@@ -12,16 +12,16 @@ whatever the result actually is. The tools are deliberately boring.
     shell/paint.ts        254  // until C17's cursorCell is
 
 ● run_command(npm test) · 4.1s · exit 0
-  ⎿ 118 passed, 2 todo
-    +1,204 more · ⏎ expand
+  ⎿  118 passed, 2 todo
+     +1,204 more · ⏎ expand
 
 ● read_image(loss-curve.png) · 512×384
-  ⎿ ⣿⣿⣷⣤⣄⡀  ⢀⣠⣤⣶⣿⣿⣿⣷⣤⣀
-    ⣿⣿⣿⣿⣿⣿⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+  ⎿  ⣿⣿⣷⣤⣄⡀  ⢀⣠⣤⣶⣿⣿⣿⣷⣤⣀
+     ⣿⣿⣿⣿⣿⣿⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
 
 ● query(select p50, p99 from latency) · 2 metrics
-  ⎿ p50 ▓▓▓▓▓▓▓▓░░░░ 18ms
-    p99 ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 290ms
+  ⎿  p50 ▓▓▓▓▓▓▓▓░░░░ 18ms
+     p99 ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 290ms
 
 the gallery is a coverage argument as much as a feature — every block kind
 gets one real consumer, and a tool card that could not hold a plot or an

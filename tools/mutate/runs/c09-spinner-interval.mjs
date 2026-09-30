@@ -1,4 +1,5 @@
-// A spinner steps at its own set's interval (C09 I112, C22 I74).
+// A spinner steps at its own set's interval (C09 I112, C22 I74) — and at the
+// ASCII rung, at the rung's one cadence (question 40).
 //
 // **Each mutation leaves every spinner turning.** What moves is the rate: the
 // counter counted in the fastest interval on screen, or a set's frame read off
@@ -44,7 +45,7 @@ const MUTATIONS = [
     // changes on every tick.
     name: "the frame ignores the set's interval",
     file: GLYPHS,
-    from: "  const step = Math.floor((tick * TICK_MS) / spinnerIntervalMs(name));",
+    from: "  const step = Math.floor((tick * TICK_MS) / spinnerIntervalMs(name, caps));",
     to: "  const step = tick;",
     expect: "T1.78",
   },
@@ -67,6 +68,56 @@ const MUTATIONS = [
     from: "spinnerFrameAt(ctx.capabilities, glyphTick(ctx.tick, ctx.motion), block.spinner)",
     to: "spinnerFrameAt(ctx.capabilities, Math.floor((glyphTick(ctx.tick, ctx.motion) * spinnerIntervalMs(block.spinner)) / 80), block.spinner)",
     expect: "T1.79",
+  },
+  {
+    // **Question 40, the lookup**: the rung ignored, so every ASCII rung turns
+    // at its set's own interval — nine rates for one `|/-\` alphabet.
+    name: "the ASCII rung takes the set's own interval",
+    file: GLYPHS,
+    from: "  return caps !== undefined && atAsciiRung(caps, set) ? ASCII_INTERVAL_MS : set.intervalMs;",
+    to: "  return set.intervalMs;",
+    expect: "T2.73",
+  },
+  {
+    // The frame stepped at the Unicode rung's interval while the ASCII frames
+    // are drawn: the helper asked without the capabilities it was handed.
+    name: "the frame steps at the set's own interval at ASCII",
+    file: GLYPHS,
+    from: "/ spinnerIntervalMs(name, caps));",
+    to: "/ spinnerIntervalMs(name));",
+    expect: "T2.73",
+  },
+  {
+    name: "the ASCII cadence is 110 ms, not the registry's 120",
+    file: GLYPHS,
+    from: "const ASCII_INTERVAL_MS = 120;",
+    to: "const ASCII_INTERVAL_MS = 110;",
+    expect: "T2.73",
+  },
+  {
+    // `narrowOnly` at `wide` draws the ASCII frames; the cadence forgot it.
+    name: "the cadence's rung ignores a narrow-only set at wide",
+    file: GLYPHS,
+    from: '  return caps.unicode === "ascii" || (set.narrowOnly === true && caps.ambiguousWidth === "wide");',
+    to: '  return caps.unicode === "ascii";',
+    expect: "T2.73",
+  },
+  {
+    // **The wake**: a status asks for its set's own cadence whatever the rung.
+    name: "a status's wake ignores the capabilities",
+    file: "src/presentation/blocks/animation.ts",
+    from: "spinnerIntervalMs((block as Status).spinner, caps)",
+    to: "spinnerIntervalMs((block as Status).spinner)",
+    expect: "T2.73",
+  },
+  {
+    // **The wiring**: the session asks for the cadence without handing down
+    // the capabilities, so the function is right and its caller is not.
+    name: "the session's wake is asked without the capabilities",
+    file: SESSION,
+    from: "animationIntervalOf(windowed.blocks, { tick, width }, graph.capabilities)",
+    to: "animationIntervalOf(windowed.blocks, { tick, width })",
+    expect: "T4.17v",
   },
   {
     // And at `tape`, whose running member draws `agent`.

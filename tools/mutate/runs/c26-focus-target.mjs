@@ -68,10 +68,11 @@ const MUTATIONS = [
     // disagree, which is why T1.3d asserts the comparison rather than the slot.
     name: "activeTarget answers interaction before it consults the layers",
     file: FOCUS,
-    from: '  if (deps.overlayTop?.kind === "overlay") return "overlay";\n  if (deps.nativeSelection) return "nativeSelection";',
+    // Re-anchored in review batch 2: the layer's rung is read once (C16 I63).
+    from: '  if (layerRung === "question") return "overlay";\n  if (deps.nativeSelection) return "nativeSelection";',
     to:
       '  if (deps.stored.at === "liveBlock" && deps.stored.mode === "interact") return "interaction";\n' +
-      '  if (deps.overlayTop?.kind === "overlay") return "overlay";\n  if (deps.nativeSelection) return "nativeSelection";',
+      '  if (layerRung === "question") return "overlay";\n  if (deps.nativeSelection) return "nativeSelection";',
     expect: "T1.3d",
   },
   {
@@ -142,8 +143,8 @@ const results = runPass({
   run,
   control: {
     file: FOCUS,
-    from: '  if (deps.overlayTop?.kind === "overlay") return "overlay";',
-    to: '  if (deps.overlayTop?.kind === "overlay") return "prompt";',
+    from: '  if (layerRung === "question") return "overlay";',
+    to: '  if (layerRung === "question") return "prompt";',
     why:
       "the highest row of A02 §2 answering with the wrong target — if this survives, the " +
       "suite is not reading activeTarget at all and every kill below is unearned",

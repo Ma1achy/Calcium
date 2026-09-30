@@ -20,13 +20,13 @@ import { fakeStdin, capabilities } from "../support/fake-terminal.js";
 import { rowContaining, styleAt, styledScreenFrom, textOf, type CellStyle } from "../support/styled-screen.js";
 import { measurable, visible } from "../support/render.js";
 import type { FocusState } from "../../src/presentation/blocks/index.js";
-import { glyphFor, headMark } from "../../src/presentation/blocks/glyphs.js";
+import { CALL_STATE_GLYPH, glyphFor, headMark } from "../../src/presentation/blocks/glyphs.js";
 import { background, focusStyle, isBand, selectionStyle, tone } from "../../src/presentation/blocks/paint.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
-import { defaultTheme, loadTheme } from "../../src/presentation/theme/index.js";
-import { block, mosaicRects, parseAreas } from "../../src/data/viewmodel/index.js";
+import { defaultTheme, loadTheme, recede, resolveTone } from "../../src/presentation/theme/index.js";
+import { CALL_HEAD_GLYPH, CALL_STATE_TONE, block, mosaicRects, parseAreas } from "../../src/data/viewmodel/index.js";
 import { sgr } from "../../src/terminal/escapes.js";
 import { focusKey } from "../../src/shell/render-cache.js";
 import { GUTTER_CELLS } from "../support/table-gutter.js";
@@ -708,7 +708,7 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
   // were one when this row was written, so it was reading the call head's rule
   // off the button's only instance. `state` is the other member, and it is the
   // one this invariant governs.
-  const NOTICE = block({ kind: "notice", id: "n", tone: "error", glyph: "error", text: "pull failed", state: "failed" } as never);
+  const NOTICE = block({ kind: "notice", id: "n", tone: "error", glyph: "work-unit", text: "pull failed", state: "failed" } as never);
   const BUTTON = block({ kind: "notice", id: "n", tone: "error", glyph: "error", text: "pull failed", action: RETRY } as never);
   const PLAIN = block({ kind: "notice", id: "n", tone: "error", glyph: "error", text: "pull failed" } as never);
   const noticeAt = (b: typeof NOTICE, focus: FocusState | null, depth: 24 | 1 = 24) =>
@@ -719,35 +719,34 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
     const caps = capabilities({ colourDepth: 24 });
     const WASHED: ReadonlySet<string> = new Set(["n"]);
     const headOf = (t: typeof theme, state: (typeof STATES)[number], washed?: ReadonlySet<string>): string => {
-      const b = block({ kind: "notice", id: "n", tone: "info", glyph: "running", text: "x", state } as never);
+      const b = block({ kind: "notice", id: "n", tone: CALL_STATE_TONE[state], glyph: CALL_HEAD_GLYPH[state], text: "x", state } as never);
       const [first] = renderToLines(registry, b, 20, { theme: t, capabilities: caps, focus: null, ...(washed === undefined ? {} : { washed }) });
       return [...(first ?? "").replace(SGR, "")][0] ?? "";
     };
-    const running = glyphFor("running", caps);
+    const running = glyphFor("work-unit", caps);
     const own = STATES.map((s) => glyphFor(headMark(s, capabilities({ colourDepth: 1 })), caps));
     for (const variant of ["hcDark", "hcLight"] as const) {
       const loaded = loadTheme(defaultTheme, variant);
       if (!loaded.ok) throw new Error(`${variant} must load`);
       const hc = loaded.value.current;
       expect(STATES.map((s) => headOf(hc, s, WASHED)), `${variant}: washed, the state's own mark`).toEqual(own);
-      expect(STATES.map((s) => headOf(hc, s)), `${variant}: not washed, ●`).toEqual(STATES.map(() => running));
+      expect(STATES.map((s) => headOf(hc, s)), `${variant}: not washed, the toned mark`).toEqual(STATES.map((s) => glyphFor(CALL_HEAD_GLYPH[s], caps)));
       // A washed set naming another block leaves this head alone.
       expect(headOf(hc, "failed", new Set(["other"])), `${variant}: another block's wash`).toBe(running);
     }
     // The control: `dark` does not band its selection, so `washed` moves nothing.
-    expect(STATES.map((s) => headOf(theme, s, WASHED)), "dark: washed, still ●").toEqual(STATES.map(() => running));
+    expect(STATES.map((s) => headOf(theme, s, WASHED)), "dark: washed, still the toned mark").toEqual(STATES.map((s) => glyphFor(CALL_HEAD_GLYPH[s], caps)));
   });
 
   it("T1.75 (C09 I45, C10 I45, R-THM-005): a focused call head on a band takes the state's own mark, and the page keeps ●", () => {
     const STATES = ["queued", "running", "succeeded", "failed", "cancelled"] as const;
     const caps = capabilities({ colourDepth: 24 });
     const headOf = (t: typeof theme, state: (typeof STATES)[number], focus: FocusState | null): string => {
-      const b = block({ kind: "notice", id: "n", tone: "info", glyph: "running", text: "x", state } as never);
+      const b = block({ kind: "notice", id: "n", tone: CALL_STATE_TONE[state], glyph: CALL_HEAD_GLYPH[state], text: "x", state } as never);
       const [first] = renderToLines(registry, b, 20, { theme: t, capabilities: caps, focus });
       return [...(first ?? "").replace(SGR, "")][0] ?? "";
     };
     const FOCUS = { blockId: "n", rowId: "n" };
-    const running = glyphFor("running", caps);
     for (const variant of ["hcDark", "hcLight"] as const) {
       const loaded = loadTheme(defaultTheme, variant);
       if (!loaded.ok) throw new Error(`${variant} must load`);
@@ -762,13 +761,79 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
       // **The band is found by its name** (C10 I45): the theme having bands is
       // not every ground being one. `bgElev` is where the page's heads sit in a
       // card, and it is no band in either theme.
-      expect(isBand(hc, "focusGround"), `${variant}: focus is a band`).toBe(true);
-      expect(isBand(hc, "bgElev"), `${variant}: the elevated page is not`).toBe(false);
-      // Off the band the same theme keeps the collapse: tone still carries.
-      expect(STATES.map((s) => headOf(hc, s, null)), `${variant}: the page keeps ●`).toEqual(STATES.map(() => running));
+      expect(isBand(hc, "focusGround", caps), `${variant}: focus is a band`).toBe(true);
+      expect(isBand(hc, "bgElev", caps), `${variant}: the elevated page is not`).toBe(false);
+      // Off the band the same theme keeps the collapse: tone still carries —
+      // `●`, and `○` for a call that has not started (R-BLK-220, F1261).
+      expect(STATES.map((s) => headOf(hc, s, null)), `${variant}: the page keeps the toned mark`).toEqual(STATES.map((s) => glyphFor(CALL_HEAD_GLYPH[s], caps)));
     }
     // The control: `dark`'s focus ground is not a band, so focus moves nothing.
-    expect(STATES.map((s) => headOf(theme, s, FOCUS)), "dark: focused, still ●").toEqual(STATES.map(() => running));
+    expect(STATES.map((s) => headOf(theme, s, FOCUS)), "dark: focused, still the toned mark").toEqual(STATES.map((s) => glyphFor(CALL_HEAD_GLYPH[s], caps)));
+  });
+
+  it("T1.84 (C09 I45, I110, C10 I66, C14 I54, R-THM-005): a call head is the toned mark exactly where the resolver paints its five state inks apart", () => {
+    // **The oracle is the resolver, not `isBand`** (C10 I66): the five inks
+    // `CALL_STATE_TONE` names, resolved on the ground the head lands on under
+    // the theme it is drawn in — receded inside a stale panel (C09 I110) — and the
+    // toned mark stands exactly where they are not all one `Style`. So it asks
+    // what is painted, and cannot agree with the head by sharing its predicate.
+    const STATES = ["queued", "running", "succeeded", "failed", "cancelled"] as const;
+    const POSITIONS = ["focused", "washed", "neither"] as const;
+    const headOf = (
+      t: typeof theme,
+      depth: 1 | 4 | 8 | 24,
+      position: (typeof POSITIONS)[number],
+      stale: boolean,
+      state: (typeof STATES)[number],
+    ): string => {
+      const caps = capabilities({ colourDepth: depth });
+      const head = block({ kind: "notice", id: "n", tone: CALL_STATE_TONE[state], glyph: CALL_HEAD_GLYPH[state], text: "HEADTEXT", state } as never);
+      const shown = stale ? block({ kind: "panel", id: "p", title: "t", staleForMs: 60_000, children: [head] } as never) : head;
+      const lines = renderToLines(registry, shown, 30, {
+        theme: t,
+        capabilities: caps,
+        focus: position === "focused" ? { blockId: "n", rowId: "n" } : null,
+        ...(position === "washed" ? { washed: new Set(["n"]) } : {}),
+      });
+      const row = lines.map((l) => l.replace(SGR, "")).find((l) => l.includes("HEADTEXT")) ?? "";
+      return [...row.slice(0, row.indexOf("HEADTEXT"))].at(-2) ?? "";
+    };
+    const carries = (t: typeof theme, depth: 1 | 4 | 8 | 24, position: (typeof POSITIONS)[number], stale: boolean): boolean => {
+      const caps = { colourDepth: depth };
+      const drawn = stale ? recede(t) : t;
+      const ground = position === "focused" ? "focusGround" : position === "washed" ? "selection" : undefined;
+      const inks = new Set(STATES.map((s) => JSON.stringify(resolveTone(CALL_STATE_TONE[s], drawn, caps, ground))));
+      return depth > 1 && inks.size > 1;
+    };
+    const spent: string[] = [];
+    let cells = 0;
+    for (const variant of ["hcDark", "hcLight", "dark"] as const) {
+      const loaded = loadTheme(defaultTheme, variant);
+      if (!loaded.ok) throw new Error(`${variant} must load`);
+      const t = loaded.value.current;
+      for (const depth of [1, 4, 8, 24] as const) {
+        const glyphCaps = capabilities({ colourDepth: depth });
+        for (const position of POSITIONS) {
+          for (const stale of [false, true]) {
+            const toned = carries(t, depth, position, stale);
+            if (!toned && depth > 1) spent.push(`${variant} ${String(depth)} ${position}${stale ? " stale" : ""}`);
+            const want = STATES.map((s) => glyphFor(toned ? CALL_HEAD_GLYPH[s] : CALL_STATE_GLYPH[s], glyphCaps));
+            const got = STATES.map((s) => headOf(t, depth, position, stale, s));
+            cells += STATES.length;
+            expect(got, `${variant} at ${String(depth)} bits, ${position}${stale ? ", in a stale panel" : ""}`).toEqual(want);
+          }
+        }
+      }
+    }
+    expect(cells, "3 themes × 4 depths × 3 positions × 2 panels × 5 states").toBe(360);
+    // **The fixture responds, and on the axes the invariant names**: above one
+    // bit the oracle spends the tone on both bands of both high-contrast
+    // themes at 4, 8 and 24 bits, on nothing of `dark`'s page, and inside every
+    // stale panel. Written out rather than derived, so an oracle that answered
+    // one way everywhere fails here and not only against the renderer.
+    const bands = ["hcDark", "hcLight"].flatMap((v) => [4, 8, 24].flatMap((d) => [`${v} ${String(d)} focused`, `${v} ${String(d)} washed`]));
+    const receded = ["hcDark", "hcLight", "dark"].flatMap((v) => [4, 8, 24].flatMap((d) => POSITIONS.map((p) => `${v} ${String(d)} ${p} stale`)));
+    expect(spent.sort(), "where tone is spent above one bit").toEqual([...bands, ...receded].sort());
   });
 
   it("T1.29 (C26 §7, C04 §3, C09 I83): a focused notice keeps its own tone over the focus ground — glyph and text; one without an action declares nothing and cannot move", () => {

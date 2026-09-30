@@ -23,9 +23,32 @@ import type { ElementAddress, FocusTarget, StoredFocus } from "./types.js";
  * file free of an import from `viewport/`, which is a real edge C16 does have but
  * has no reason to spend here.
  */
+/**
+ * A keyed layer as the ladder reads it: its kind and its declared owner
+ * (C15 I29). Structural, for the reason `FocusInputs` is.
+ */
+export type KeyedTop = Readonly<{
+  kind: "overlay" | "panel";
+  owner?: Readonly<{ rung: "question" | "substate" }>;
+}>;
+
+/**
+ * The rung a keyed layer answers at — its declared owner, else its kind's
+ * (C16 I63, C15 I29, R-QST-001).
+ *
+ * **One derivation, and there were two.** `activeTarget` read the kind, and the
+ * intercept table read *is an answer callback registered* — so a blocking
+ * overlay nothing could answer was `question` to the footer, the guard and the
+ * epoch, and `scope` to the table, which then cancelled a verb beneath it (C16
+ * §3b S13). Every reader of the rung now reads this.
+ */
+export function rungOfLayer(top: KeyedTop): "question" | "substate" {
+  return top.owner?.rung ?? (top.kind === "panel" ? "substate" : "question");
+}
+
 export type FocusInputs = Readonly<{
   /** C15's `top`. `null` when the stack is empty. */
-  overlayTop: Readonly<{ kind: "overlay" | "panel" }> | null;
+  overlayTop: KeyedTop | null;
   nativeSelection: boolean;
   /**
    * Semantic copy mode is up (C14 §6a, I50).
@@ -103,7 +126,8 @@ export const FOCUS_ORDER = Object.freeze([
  */
 export function activeTarget(deps: FocusInputs): FocusTarget {
   if (deps.attachedChild) return "child";
-  if (deps.overlayTop?.kind === "overlay") return "overlay";
+  const layerRung = deps.overlayTop === null ? null : rungOfLayer(deps.overlayTop);
+  if (layerRung === "question") return "overlay";
   if (deps.nativeSelection) return "nativeSelection";
   // **The same rung, and the order between them decides nothing** (I50). Both
   // map to `copy`, and the two cannot be up at once because each mode's entry
@@ -118,7 +142,7 @@ export function activeTarget(deps: FocusInputs): FocusTarget {
   // completion menu was an `overlay` and therefore a question. It sits below
   // `nativeSelection` because a frozen screen outranks a thing you opened on top of a
   // live one.
-  if (deps.overlayTop?.kind === "panel") return "panel";
+  if (layerRung === "substate") return "panel";
   // **Before the `prompt` row, and gated on the live entry** (C26 I2). The mode
   // is stored, so it can outlive the entry that was being interacted with —
   // freezing is a mode exit nobody signals (C26 §8a trace, the live-block

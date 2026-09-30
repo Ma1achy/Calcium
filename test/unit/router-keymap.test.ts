@@ -2,7 +2,8 @@
  * C16 §6 — the keymap as data. Tiers 1, 2 and 3.
  */
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 
@@ -15,6 +16,9 @@ import { createDecoder } from "../../src/interaction/router/decode.js";
 import { REGISTRY_BINDINGS } from "../../src/interaction/router/registry-bindings.js";
 import { ACCELERATION, DEFAULT_REPEAT, REPEAT_POLICIES, repeatFor, repeatSteps } from "../../src/interaction/router/repeat.js";
 import type { Binding, FocusTarget, Key } from "../../src/interaction/router/types.js";
+import type { ManifestDocument } from "../../src/data/manifest/types.js";
+import { buildGraph, MANIFEST } from "../support/session.js";
+import { renderKeysMarkdown, validateRegistry } from "../../docs/design/language/build-calcium.mjs";
 
 const k = (name: string, mods: Partial<Key> = {}): Key => ({
   name,
@@ -228,6 +232,316 @@ describe("C16 §6 — /help renders from the table dispatch uses", () => {
   });
 });
 
+/**
+ * **The wire forms of every row, keyed `target slot`** (C16 I17, T2.13).
+ *
+ * At module scope since C16 §6c, because T1.37 decodes the registry's chords
+ * through the same bytes: a second table would be a second record of what a
+ * terminal sends, and the two would drift the way `keySlot`'s copy once did.
+ * T2.13's note on why each entry is here stays with the entries.
+ */
+const BYTES: Readonly<Record<string, readonly string[]>> = {
+  // Both forms, because a terminal sends one or the other and a rule
+  // satisfied by either is satisfied on half the terminals.
+  // The prompt's `submit` (C22 I133, ruling 63): the byte a return sends.
+  "prompt enter": ["\r"],
+  "prompt s+enter": ["\u001b[13;2u", "\u001b[27;2;13~"],
+  "prompt m+enter": ["\u001b\r"],
+  "prompt c+j": ["\n"],
+
+  // C19 §6's seven. Written with `\u001b` rather than a raw byte: the two
+  // rows above carry literal escapes and read as `[13;2u` on every screen
+  // they are shown on, which is SS43's argument arriving in a directory the
+  // rule does not scan.
+  "prompt tab": ["\t"],
+  // Both forms: `\u001bOC` is what a terminal in application cursor mode
+  // sends, and a rule satisfied by only the normal form is satisfied on half
+  // the terminals — which is exactly how Shift-Enter came to be unreachable.
+  "prompt right": ["\u001b[C", "\u001bOC"],
+  // **`panel`, because the menu and the search are panels** (C15 §2c, I27).
+  // The four rows moved target with the kind; the bytes did not move,
+  // which is the point — a substate is reached by the same keys a question
+  // was, and only the owner changed.
+  "panel tab": ["\t"],
+  "panel down": ["\u001b[B", "\u001bOB"],
+  "panel up": ["\u001b[A", "\u001bOA"],
+  "panel enter": ["\r"],
+  // **A lone `Esc` is the one form that needs time.** The same byte begins
+  // every sequence above, so it is held for the disambiguation window and
+  // the key arrives from `poll` once the window closes. A fixed clock cannot
+  // express that, which is why the loop below steps one.
+  //
+  // Twice, because `dismiss` is bound at both an overlay and a panel: the
+  // kinds differ on how they come to be escapable and not on what closes
+  // them (C15 I26).
+  "overlay escape": ["\u001b"],
+  "panel escape": ["\u001b"],
+
+  // **The captured child's one key** (C16 I49, R-BLK-908). `⌃]` is
+  // `0x1d` — the ASCII group separator, which is what `ctrl` does to `]`
+  // — and it is a byte rather than a name a terminal has to be persuaded
+  // to send, which is half the argument for it as the base candidate.
+  // `⌥esc` is `ESC ESC`: the second `ESC` closes the first's
+  // disambiguation window, so it needs the stepped clock exactly as a
+  // lone `Esc` does, and it is `enhanced-terminal` only.
+  "child c+]": ["\u001d"],
+  "child m+escape": ["\u001b\u001b"],
+
+  // C20's four. The arrows carry both forms for the reason the `right`
+  // row above gives — a rule satisfied by only the normal form is
+  // satisfied on half the terminals — and `\u0012` is Ctrl-R, a byte
+  // rather than a name a terminal has to be persuaded to send.
+  "prompt up": ["\u001b[A", "\u001bOA"],
+  "prompt down": ["\u001b[B", "\u001bOB"],
+  "prompt c+r": ["\u0012"],
+  "panel c+r": ["\u0012"],
+
+  // C17's editing set (I21). **This table is the check the ruling asked
+  // for**, and it earned it: every meta form here is one a terminal has to
+  // be persuaded to send, and a binding whose wire form nobody could name
+  // is the fourteen-unexecuted-bindings defect arriving from the other end.
+  "prompt backspace": ["\u007f"],
+  "prompt c+h": ["\u0008"],
+  "prompt delete": ["\u001b[3~"],
+  "prompt c+w": ["\u0017"],
+  // ESC-prefixed, which is how a terminal sends a meta-modified key when it
+  // has no `modifyOtherKeys` — and the decoder's 50 ms window is what tells
+  // it from a lone `Esc` followed by a keystroke.
+  "prompt m+backspace": ["\u001b\u007f"],
+  "prompt m+d": ["\u001bd"],
+  "prompt c+u": ["\u0015"],
+  "prompt c+k": ["\u000b"],
+  "prompt c+y": ["\u0019"],
+  "prompt c+a": ["\u0001"],
+  "prompt c+e": ["\u0005"],
+  // Both forms, for the reason the arrows above carry both.
+  "prompt home": ["\u001b[H", "\u001b[1~"],
+  "prompt end": ["\u001b[F", "\u001b[4~"],
+  "prompt m+b": ["\u001bb"],
+  "prompt m+f": ["\u001bf"],
+  "prompt c+left": ["\u001b[1;5D"],
+  "prompt c+right": ["\u001b[1;5C"],
+  "prompt left": ["\u001b[D", "\u001bOD"],
+  // The byte that would be SIGTSTP if raw mode did not clear `ISIG`, which
+  // is why this row exists rather than a reasoned assurance.
+  "prompt c+z": ["\u001a"],
+  "prompt m+z": ["\u001bz"],
+
+  // --- selection (C17 §5b) ---------------------------------------------
+  //
+  // **`⌥⇧←` carries BOTH forms, and step 0 is why it can.** A terminal
+  // sending Option as Alt gives `CSI 1;4D`; one sending it as Meta gives
+  // `CSI 1;10D`, and `modifiersOf` read three of xterm's four modifier bits
+  // — so the second decoded as `s+left`, which is a *different bound key*.
+  // Listing one form here would have passed on half the terminals, which is
+  // the same argument Shift-Enter's row makes above.
+  //
+  // `⇧⌃a`/`⇧⌃e` are absent rather than approximated: ctrl+shift+letter is
+  // `0x01`, the collision that already cost `⌃⇧a` and `⌃_`.
+  "prompt s+left": ["\u001b[1;2D"],
+  "prompt s+right": ["\u001b[1;2C"],
+  "prompt ms+left": ["\u001b[1;4D", "\u001b[1;10D"],
+  "prompt ms+right": ["\u001b[1;4C", "\u001b[1;10C"],
+  // `⌥←`/`⌥→` (C17 I30, §019): xterm's Alt (3) and Meta (9) forms, the
+  // same pair the extend rows above carry with Shift added.
+  "prompt m+left": ["\u001b[1;3D", "\u001b[1;9D"],
+  "prompt m+right": ["\u001b[1;3C", "\u001b[1;9C"],
+  "prompt s+home": ["\u001b[1;2H"],
+  "prompt s+end": ["\u001b[1;2F"],
+  "prompt m+a": ["\u001ba"],
+  "prompt m+w": ["\u001bw"],
+
+  // --- the transcript's selection (C26 §5c) ----------------------------
+  //
+  // `⇧↑`/`⇧↓` reach the letter table with `modifiersOf("2")`, and plain `y`
+  // is a byte. The application-cursor form has no modified variant, so
+  // unlike the unshifted arrows these carry one wire form each.
+  "liveBlock s+up": ["\u001b[1;2A"],
+  "liveBlock s+down": ["\u001b[1;2B"],
+  "liveBlock y": ["y"],
+  // `⌃a` is the byte `0x01`, the same one `prompt c+a` walks above — one
+  // byte, two targets, two actions (C26 §5c).
+  "liveBlock c+a": ["\u0001"],
+  // **The inside's own, moved with the family** (C26 I27, C16 I28, §102).
+  // `[` `]` `{` `}` retired: §102's control row is `←→ orbit   ↑↓ tilt`,
+  // and the brackets existed only because `liveBlock`'s arrows step
+  // elements. The shifted-printable finding the retired rows recorded is
+  // kept in the prose and not in a row, because there is no longer a
+  // binding to be wrong about: a terminal sends `{` as the byte `{` with no
+  // shift flag, so `{name: "[", shift: true}` would have resolved against
+  // an event nothing sends.
+  //
+  // `+` `=` `-` `r` `o` are the same printables at the new target, and the
+  // arrows carry the same two wire forms the prompt's do.
+  // A split's panes and its divider (C26 I28, C16 I59): the prompt's arrow
+  // and word-motion bytes, at the other target.
+  "liveBlock left": ["\u001b[D", "\u001bOD"],
+  "liveBlock right": ["\u001b[C", "\u001bOC"],
+  "liveBlock m+left": ["\u001b[1;3D", "\u001b[1;9D"],
+  "liveBlock m+right": ["\u001b[1;3C", "\u001b[1;9C"],
+  "interaction left": ["\u001b[D", "\u001bOD"],
+  "interaction right": ["\u001b[C", "\u001bOC"],
+  "interaction up": ["\u001b[A", "\u001bOA"],
+  "interaction down": ["\u001b[B", "\u001bOB"],
+  "interaction escape": ["\u001b"],
+  // A held field's `keepField` (C22 I118, C22 I133).
+  "interaction enter": ["\r"],
+  "interaction +": ["+"],
+  "interaction =": ["="],
+  "interaction -": ["-"],
+  "interaction r": ["r"],
+  "interaction o": ["o"],
+
+  // Native selection's entry, at both targets it is bound to (C16 §5b). The key is
+  // provisional — which key enters native selection is the rebindable-keys row's
+  // question — and its *wire form* is not: this check fired on the binding
+  // the moment it was added, before the mode had a producer, which is what
+  // it is for.
+  "prompt m+v": ["\u001bv"],
+  "liveBlock m+v": ["\u001bv"],
+
+  // The pushed view (I24). **The plain letters are the interesting rows**,
+  // and they are only bindable at this target: a prompt takes `n` and `p`
+  // as text, and §6 rejected `g`/`G` for the transcript for exactly that
+  // reason. A pushed view has no prompt competing for them, so the bytes
+  // are the characters themselves — `G` is `⇧g`, which a terminal sends as
+  // the capital rather than as a modifier.
+  // --- §6a, M6: the design's routes -----------------------------------
+  //
+  // **`⌥⇧C` is `m+C` and not `ms+c`**: `ESC C` names the character it
+  // carries and sets no shift bit, which is what this row refused the first
+  // spelling on — the binding was written before it was pressed, and the
+  // rule caught it in the same pass.
+  // **`global` since C16 §6c** (ruling 65): one row each, where they were
+  // written twice, at `prompt` and at `liveBlock`, and so reached no other
+  // owner — semantic copy mode among them, which is where the switch lives.
+  "global m+C": ["\u001bC"],
+  "global m+V": ["\u001bV"],
+  "global f1": ["\u001bOP", "\u001b[11~"],
+  // `?` is `global` too, and native selection captures it (§6c table B).
+  "global ?": ["?"],
+  "nativeSelection ?": ["?"],
+  // `copy` at every owner with a copy verb (§6c table B): `⌥w` everywhere,
+  // `⌃⇧C` under the protocol.
+  "liveBlock m+w": ["\u001bw"],
+  "liveBlock cs+c": ["\u001b[99;6u"],
+  "interaction m+w": ["\u001bw"],
+  "interaction cs+c": ["\u001b[99;6u"],
+  "semanticSelection m+w": ["\u001bw"],
+  "semanticSelection cs+c": ["\u001b[99;6u"],
+  "prompt s+tab": ["\u001b[Z"],
+  "global m+up": ["\u001b[1;3A"],
+  "global m+down": ["\u001b[1;3B"],
+  "prompt cs+c": ["\u001b[99;6u"],
+  "prompt cs+v": ["\u001b[118;6u"],
+  "global m+p": ["\u001bp"],
+  "global m+,": ["\u001b,"],
+  "global m+.": ["\u001b."],
+  "global c+tab": ["\u001b[9;5u"],
+  "global cs+tab": ["\u001b[9;6u"],
+  "global m+1": ["\u001b1"],
+  // **`⌘↑`/`⌘↓`, and they are the rows I41 is about** (§6a). `CSI 1;9A` is
+  // the xterm-shaped arrow with modifier bit 8 — the *same bytes* a terminal
+  // with no protocol sends for `⌥↑`. What makes it a distinct chord is the
+  // negotiated protocol, which is why the decoder below is built at the
+  // binding's own profile rather than at one fixed setting.
+  "global u+up": ["\u001b[1;9A"],
+  "global u+down": ["\u001b[1;9B"],
+  "global u+1": ["\u001b[49;9u"],
+  "global m+2": ["\u001b2"],
+  "global u+2": ["\u001b[50;9u"],
+  "global m+3": ["\u001b3"],
+  "global u+3": ["\u001b[51;9u"],
+  "global m+4": ["\u001b4"],
+  "global u+4": ["\u001b[52;9u"],
+  "global m+5": ["\u001b5"],
+  "global u+5": ["\u001b[53;9u"],
+  "global m+6": ["\u001b6"],
+  "global u+6": ["\u001b[54;9u"],
+  "global m+7": ["\u001b7"],
+  "global u+7": ["\u001b[55;9u"],
+  "global m+8": ["\u001b8"],
+  "global u+8": ["\u001b[56;9u"],
+  "global m+9": ["\u001b9"],
+  "global u+9": ["\u001b[57;9u"],
+
+  "pushedView n": ["n"],
+  "pushedView p": ["p"],
+  "pushedView g": ["g"],
+  "pushedView G": ["G"],
+  "pushedView pageup": ["\u001b[5~"],
+  "pushedView pagedown": ["\u001b[6~"],
+  "pushedView up": ["\u001b[A", "\u001bOA"],
+  "pushedView down": ["\u001b[B", "\u001bOB"],
+  // The section gesture (C16 I33). The same two wire forms `liveBlock`
+  // already proves — `CSI Z` for the shifted arm, which the decoder answers
+  // with `{name: "tab", shift: true}` — at a third target, resolved by the
+  // ladder rather than by a second table.
+  "pushedView tab": ["\t"],
+  "pushedView s+tab": ["\u001b[Z"],
+  "pushedView escape": ["\u001b"],
+  // Native selection's own dismissal (C16 §5c): the same lone byte, resolved when
+  // `activeTarget` answers `nativeSelection`.
+  "nativeSelection escape": ["\u001b"],
+  // Semantic copy mode's three (C14 §6a, C16 §5d). `esc` is the same lone
+  // byte at a third target — one key, and which verb it runs is the target's
+  // — and `a`/`A` are `R-SEL-008`'s bare keycaps, which are only bindable
+  // because nothing else can be active while this target is. The bytes are
+  // the characters themselves, which is what makes this row worth running
+  // rather than obvious: a rule that named them `m+a` would compile and be
+  // unpressable.
+  "semanticSelection escape": ["\u001b"],
+  "semanticSelection a": ["a"],
+  "semanticSelection A": ["A"],
+  "semanticSelection y": ["y"],
+  "semanticSelection enter": ["\r"],
+  "semanticSelection up": ["\u001b[A"],
+  "semanticSelection down": ["\u001b[B"],
+  "semanticSelection s+up": ["\u001b[1;2A"],
+  "semanticSelection s+down": ["\u001b[1;2B"],
+
+  // Scrolling (I23). **This is the check the ruling asked for**, and it
+  // came out positive: `⌃Home` and `⌃End` reach the decoder in both of the
+  // forms terminals send them in, so no decoder branch was widened and no
+  // candidate was dropped. `CSI 1;5H` lands in the letter table with
+  // `modifiersOf("5")` setting ctrl; `CSI 7;5~` lands in the tilde table at
+  // the same name with the same modifiers. Both are listed for the reason
+  // the arrows carry both — a rule satisfied by one form is satisfied on
+  // half the terminals.
+  "global pageup": ["\u001b[5~"],
+  "global pagedown": ["\u001b[6~"],
+  // C04 I48 — the same two wire forms at a second target, which is the
+  // ladder resolving one key by priority rather than a duplicate the
+  // conflict rule refuses. Pressable end to end: scroll-wiring T4.41
+  // types these exact bytes into a session and reads the frame move.
+  "liveBlock pagedown": ["\u001b[6~"],
+  "liveBlock pageup": ["\u001b[5~"],
+  "global c+home": ["\u001b[1;5H", "\u001b[7;5~"],
+  "global c+end": ["\u001b[1;5F", "\u001b[8;5~"],
+
+  // The live block (I22). `escape` needs the disambiguation window to
+  // close, like `overlay escape` above.
+  "liveBlock escape": ["\u001b"],
+  "liveBlock down": ["\u001b[B", "\u001bOB"],
+  "liveBlock up": ["\u001b[A", "\u001bOA"],
+  // F21's binding. `\r` is what a terminal sends for Return, and it is the
+  // same byte `overlay enter` resolves — which is the argument for the key:
+  // a reader who has accepted a menu item has already learnt it.
+  "liveBlock enter": ["\r"],
+
+  // Between entries (C26 I21, §4g). **`⇧tab` is the row this table refused
+  // on arrival**: `CSI Z` is what every terminal sends for backtab and the
+  // decoder discarded it as well-formed-but-unknown, so the binding named a
+  // key nothing produced — the fourth instance of I17's class and the first
+  // found before the row shipped rather than after. The bare form only; a
+  // parameterised `Z` stays malformed (router-decode T3.13).
+  "liveBlock tab": ["\t"],
+  "liveBlock s+tab": ["\u001b[Z"],
+  // Re-run (C23 I18): the prompt's newline pair, at the other target.
+  "liveBlock s+enter": ["\u001b[13;2u", "\u001b[27;2;13~"],
+  "liveBlock m+enter": ["\u001b\r"],
+};
+
 describe("§6 — the default table (C17 I12)", () => {
   it("T2.11 (C17 I12): three newline bindings, two of them terminal-independent", () => {
     // Asserted against `defaultKeymap` rather than a table the test writes.
@@ -312,292 +626,6 @@ describe("§6 — the default table (C17 I12)", () => {
     // **A binding with no byte sequence here fails**, and that is the check
     // rather than an inconvenience: a row nobody can name the wire form of is a
     // row nobody can press.
-    const BYTES: Record<string, readonly string[]> = {
-      // Both forms, because a terminal sends one or the other and a rule
-      // satisfied by either is satisfied on half the terminals.
-      "prompt s+enter": ["\u001b[13;2u", "\u001b[27;2;13~"],
-      "prompt m+enter": ["\u001b\r"],
-      "prompt c+j": ["\n"],
-
-      // C19 §6's seven. Written with `\u001b` rather than a raw byte: the two
-      // rows above carry literal escapes and read as `[13;2u` on every screen
-      // they are shown on, which is SS43's argument arriving in a directory the
-      // rule does not scan.
-      "prompt tab": ["\t"],
-      // Both forms: `\u001bOC` is what a terminal in application cursor mode
-      // sends, and a rule satisfied by only the normal form is satisfied on half
-      // the terminals — which is exactly how Shift-Enter came to be unreachable.
-      "prompt right": ["\u001b[C", "\u001bOC"],
-      // **`panel`, because the menu and the search are panels** (C15 §2c, I27).
-      // The four rows moved target with the kind; the bytes did not move,
-      // which is the point — a substate is reached by the same keys a question
-      // was, and only the owner changed.
-      "panel tab": ["\t"],
-      "panel down": ["\u001b[B", "\u001bOB"],
-      "panel up": ["\u001b[A", "\u001bOA"],
-      "panel enter": ["\r"],
-      // **A lone `Esc` is the one form that needs time.** The same byte begins
-      // every sequence above, so it is held for the disambiguation window and
-      // the key arrives from `poll` once the window closes. A fixed clock cannot
-      // express that, which is why the loop below steps one.
-      //
-      // Twice, because `dismiss` is bound at both an overlay and a panel: the
-      // kinds differ on how they come to be escapable and not on what closes
-      // them (C15 I26).
-      "overlay escape": ["\u001b"],
-      "panel escape": ["\u001b"],
-
-      // **The captured child's one key** (C16 I49, R-BLK-908). `⌃]` is
-      // `0x1d` — the ASCII group separator, which is what `ctrl` does to `]`
-      // — and it is a byte rather than a name a terminal has to be persuaded
-      // to send, which is half the argument for it as the base candidate.
-      // `⌥esc` is `ESC ESC`: the second `ESC` closes the first's
-      // disambiguation window, so it needs the stepped clock exactly as a
-      // lone `Esc` does, and it is `enhanced-terminal` only.
-      "child c+]": ["\u001d"],
-      "child m+escape": ["\u001b\u001b"],
-
-      // C20's four. The arrows carry both forms for the reason the `right`
-      // row above gives — a rule satisfied by only the normal form is
-      // satisfied on half the terminals — and `\u0012` is Ctrl-R, a byte
-      // rather than a name a terminal has to be persuaded to send.
-      "prompt up": ["\u001b[A", "\u001bOA"],
-      "prompt down": ["\u001b[B", "\u001bOB"],
-      "prompt c+r": ["\u0012"],
-      "panel c+r": ["\u0012"],
-
-      // C17's editing set (I21). **This table is the check the ruling asked
-      // for**, and it earned it: every meta form here is one a terminal has to
-      // be persuaded to send, and a binding whose wire form nobody could name
-      // is the fourteen-unexecuted-bindings defect arriving from the other end.
-      "prompt backspace": ["\u007f"],
-      "prompt c+h": ["\u0008"],
-      "prompt delete": ["\u001b[3~"],
-      "prompt c+w": ["\u0017"],
-      // ESC-prefixed, which is how a terminal sends a meta-modified key when it
-      // has no `modifyOtherKeys` — and the decoder's 50 ms window is what tells
-      // it from a lone `Esc` followed by a keystroke.
-      "prompt m+backspace": ["\u001b\u007f"],
-      "prompt m+d": ["\u001bd"],
-      "prompt c+u": ["\u0015"],
-      "prompt c+k": ["\u000b"],
-      "prompt c+y": ["\u0019"],
-      "prompt c+a": ["\u0001"],
-      "prompt c+e": ["\u0005"],
-      // Both forms, for the reason the arrows above carry both.
-      "prompt home": ["\u001b[H", "\u001b[1~"],
-      "prompt end": ["\u001b[F", "\u001b[4~"],
-      "prompt m+b": ["\u001bb"],
-      "prompt m+f": ["\u001bf"],
-      "prompt c+left": ["\u001b[1;5D"],
-      "prompt c+right": ["\u001b[1;5C"],
-      "prompt left": ["\u001b[D", "\u001bOD"],
-      // The byte that would be SIGTSTP if raw mode did not clear `ISIG`, which
-      // is why this row exists rather than a reasoned assurance.
-      "prompt c+z": ["\u001a"],
-      "prompt m+z": ["\u001bz"],
-
-      // --- selection (C17 §5b) ---------------------------------------------
-      //
-      // **`⌥⇧←` carries BOTH forms, and step 0 is why it can.** A terminal
-      // sending Option as Alt gives `CSI 1;4D`; one sending it as Meta gives
-      // `CSI 1;10D`, and `modifiersOf` read three of xterm's four modifier bits
-      // — so the second decoded as `s+left`, which is a *different bound key*.
-      // Listing one form here would have passed on half the terminals, which is
-      // the same argument Shift-Enter's row makes above.
-      //
-      // `⇧⌃a`/`⇧⌃e` are absent rather than approximated: ctrl+shift+letter is
-      // `0x01`, the collision that already cost `⌃⇧a` and `⌃_`.
-      "prompt s+left": ["\u001b[1;2D"],
-      "prompt s+right": ["\u001b[1;2C"],
-      "prompt ms+left": ["\u001b[1;4D", "\u001b[1;10D"],
-      "prompt ms+right": ["\u001b[1;4C", "\u001b[1;10C"],
-      // `⌥←`/`⌥→` (C17 I30, §019): xterm's Alt (3) and Meta (9) forms, the
-      // same pair the extend rows above carry with Shift added.
-      "prompt m+left": ["\u001b[1;3D", "\u001b[1;9D"],
-      "prompt m+right": ["\u001b[1;3C", "\u001b[1;9C"],
-      "prompt s+home": ["\u001b[1;2H"],
-      "prompt s+end": ["\u001b[1;2F"],
-      "prompt m+a": ["\u001ba"],
-      "prompt m+w": ["\u001bw"],
-
-      // --- the transcript's selection (C26 §5c) ----------------------------
-      //
-      // `⇧↑`/`⇧↓` reach the letter table with `modifiersOf("2")`, and plain `y`
-      // is a byte. The application-cursor form has no modified variant, so
-      // unlike the unshifted arrows these carry one wire form each.
-      "liveBlock s+up": ["\u001b[1;2A"],
-      "liveBlock s+down": ["\u001b[1;2B"],
-      "liveBlock y": ["y"],
-      // `⌃a` is the byte `0x01`, the same one `prompt c+a` walks above — one
-      // byte, two targets, two actions (C26 §5c).
-      "liveBlock c+a": ["\u0001"],
-      // **The inside's own, moved with the family** (C26 I27, C16 I28, §102).
-      // `[` `]` `{` `}` retired: §102's control row is `←→ orbit   ↑↓ tilt`,
-      // and the brackets existed only because `liveBlock`'s arrows step
-      // elements. The shifted-printable finding the retired rows recorded is
-      // kept in the prose and not in a row, because there is no longer a
-      // binding to be wrong about: a terminal sends `{` as the byte `{` with no
-      // shift flag, so `{name: "[", shift: true}` would have resolved against
-      // an event nothing sends.
-      //
-      // `+` `=` `-` `r` `o` are the same printables at the new target, and the
-      // arrows carry the same two wire forms the prompt's do.
-      // A split's panes and its divider (C26 I28, C16 I59): the prompt's arrow
-      // and word-motion bytes, at the other target.
-      "liveBlock left": ["\u001b[D", "\u001bOD"],
-      "liveBlock right": ["\u001b[C", "\u001bOC"],
-      "liveBlock m+left": ["\u001b[1;3D", "\u001b[1;9D"],
-      "liveBlock m+right": ["\u001b[1;3C", "\u001b[1;9C"],
-      "interaction left": ["\u001b[D", "\u001bOD"],
-      "interaction right": ["\u001b[C", "\u001bOC"],
-      "interaction up": ["\u001b[A", "\u001bOA"],
-      "interaction down": ["\u001b[B", "\u001bOB"],
-      "interaction escape": ["\u001b"],
-      "interaction +": ["+"],
-      "interaction =": ["="],
-      "interaction -": ["-"],
-      "interaction r": ["r"],
-      "interaction o": ["o"],
-
-      // Native selection's entry, at both targets it is bound to (C16 §5b). The key is
-      // provisional — which key enters native selection is the rebindable-keys row's
-      // question — and its *wire form* is not: this check fired on the binding
-      // the moment it was added, before the mode had a producer, which is what
-      // it is for.
-      "prompt m+v": ["\u001bv"],
-      "liveBlock m+v": ["\u001bv"],
-
-      // The pushed view (I24). **The plain letters are the interesting rows**,
-      // and they are only bindable at this target: a prompt takes `n` and `p`
-      // as text, and §6 rejected `g`/`G` for the transcript for exactly that
-      // reason. A pushed view has no prompt competing for them, so the bytes
-      // are the characters themselves — `G` is `⇧g`, which a terminal sends as
-      // the capital rather than as a modifier.
-      // --- §6a, M6: the design's routes -----------------------------------
-      //
-      // **`⌥⇧C` is `m+C` and not `ms+c`**: `ESC C` names the character it
-      // carries and sets no shift bit, which is what this row refused the first
-      // spelling on — the binding was written before it was pressed, and the
-      // rule caught it in the same pass.
-      "prompt m+C": ["\u001bC"],
-      "liveBlock m+C": ["\u001bC"],
-      "prompt m+V": ["\u001bV"],
-      "liveBlock m+V": ["\u001bV"],
-      "global f1": ["\u001bOP", "\u001b[11~"],
-      "liveBlock ?": ["?"],
-      "prompt s+tab": ["\u001b[Z"],
-      "global m+up": ["\u001b[1;3A"],
-      "global m+down": ["\u001b[1;3B"],
-      "prompt cs+c": ["\u001b[99;6u"],
-      "prompt cs+v": ["\u001b[118;6u"],
-      "global m+p": ["\u001bp"],
-      "global m+,": ["\u001b,"],
-      "global m+.": ["\u001b."],
-      "global c+tab": ["\u001b[9;5u"],
-      "global cs+tab": ["\u001b[9;6u"],
-      "global m+1": ["\u001b1"],
-      // **`⌘↑`/`⌘↓`, and they are the rows I41 is about** (§6a). `CSI 1;9A` is
-      // the xterm-shaped arrow with modifier bit 8 — the *same bytes* a terminal
-      // with no protocol sends for `⌥↑`. What makes it a distinct chord is the
-      // negotiated protocol, which is why the decoder below is built at the
-      // binding's own profile rather than at one fixed setting.
-      "global u+up": ["\u001b[1;9A"],
-      "global u+down": ["\u001b[1;9B"],
-      "global u+1": ["\u001b[49;9u"],
-      "global m+2": ["\u001b2"],
-      "global u+2": ["\u001b[50;9u"],
-      "global m+3": ["\u001b3"],
-      "global u+3": ["\u001b[51;9u"],
-      "global m+4": ["\u001b4"],
-      "global u+4": ["\u001b[52;9u"],
-      "global m+5": ["\u001b5"],
-      "global u+5": ["\u001b[53;9u"],
-      "global m+6": ["\u001b6"],
-      "global u+6": ["\u001b[54;9u"],
-      "global m+7": ["\u001b7"],
-      "global u+7": ["\u001b[55;9u"],
-      "global m+8": ["\u001b8"],
-      "global u+8": ["\u001b[56;9u"],
-      "global m+9": ["\u001b9"],
-      "global u+9": ["\u001b[57;9u"],
-
-      "pushedView n": ["n"],
-      "pushedView p": ["p"],
-      "pushedView g": ["g"],
-      "pushedView G": ["G"],
-      "pushedView pageup": ["\u001b[5~"],
-      "pushedView pagedown": ["\u001b[6~"],
-      "pushedView up": ["\u001b[A", "\u001bOA"],
-      "pushedView down": ["\u001b[B", "\u001bOB"],
-      // The section gesture (C16 I33). The same two wire forms `liveBlock`
-      // already proves — `CSI Z` for the shifted arm, which the decoder answers
-      // with `{name: "tab", shift: true}` — at a third target, resolved by the
-      // ladder rather than by a second table.
-      "pushedView tab": ["\t"],
-      "pushedView s+tab": ["\u001b[Z"],
-      "pushedView escape": ["\u001b"],
-      // Native selection's own dismissal (C16 §5c): the same lone byte, resolved when
-      // `activeTarget` answers `nativeSelection`.
-      "nativeSelection escape": ["\u001b"],
-      // Semantic copy mode's three (C14 §6a, C16 §5d). `esc` is the same lone
-      // byte at a third target — one key, and which verb it runs is the target's
-      // — and `a`/`A` are `R-SEL-008`'s bare keycaps, which are only bindable
-      // because nothing else can be active while this target is. The bytes are
-      // the characters themselves, which is what makes this row worth running
-      // rather than obvious: a rule that named them `m+a` would compile and be
-      // unpressable.
-      "semanticSelection escape": ["\u001b"],
-      "semanticSelection a": ["a"],
-      "semanticSelection A": ["A"],
-      "semanticSelection y": ["y"],
-      "semanticSelection enter": ["\r"],
-      "semanticSelection up": ["\u001b[A"],
-      "semanticSelection down": ["\u001b[B"],
-      "semanticSelection s+up": ["\u001b[1;2A"],
-      "semanticSelection s+down": ["\u001b[1;2B"],
-
-      // Scrolling (I23). **This is the check the ruling asked for**, and it
-      // came out positive: `⌃Home` and `⌃End` reach the decoder in both of the
-      // forms terminals send them in, so no decoder branch was widened and no
-      // candidate was dropped. `CSI 1;5H` lands in the letter table with
-      // `modifiersOf("5")` setting ctrl; `CSI 7;5~` lands in the tilde table at
-      // the same name with the same modifiers. Both are listed for the reason
-      // the arrows carry both — a rule satisfied by one form is satisfied on
-      // half the terminals.
-      "global pageup": ["\u001b[5~"],
-      "global pagedown": ["\u001b[6~"],
-      // C04 I48 — the same two wire forms at a second target, which is the
-      // ladder resolving one key by priority rather than a duplicate the
-      // conflict rule refuses. Pressable end to end: scroll-wiring T4.41
-      // types these exact bytes into a session and reads the frame move.
-      "liveBlock pagedown": ["\u001b[6~"],
-      "liveBlock pageup": ["\u001b[5~"],
-      "global c+home": ["\u001b[1;5H", "\u001b[7;5~"],
-      "global c+end": ["\u001b[1;5F", "\u001b[8;5~"],
-
-      // The live block (I22). `escape` needs the disambiguation window to
-      // close, like `overlay escape` above.
-      "liveBlock escape": ["\u001b"],
-      "liveBlock down": ["\u001b[B", "\u001bOB"],
-      "liveBlock up": ["\u001b[A", "\u001bOA"],
-      // F21's binding. `\r` is what a terminal sends for Return, and it is the
-      // same byte `overlay enter` resolves — which is the argument for the key:
-      // a reader who has accepted a menu item has already learnt it.
-      "liveBlock enter": ["\r"],
-
-      // Between entries (C26 I21, §4g). **`⇧tab` is the row this table refused
-      // on arrival**: `CSI Z` is what every terminal sends for backtab and the
-      // decoder discarded it as well-formed-but-unknown, so the binding named a
-      // key nothing produced — the fourth instance of I17's class and the first
-      // found before the row shipped rather than after. The bare form only; a
-      // parameterised `Z` stays malformed (router-decode T3.13).
-      "liveBlock tab": ["\t"],
-      "liveBlock s+tab": ["\u001b[Z"],
-      // Re-run (C23 I18): the prompt's newline pair, at the other target.
-      "liveBlock s+enter": ["\u001b[13;2u", "\u001b[27;2;13~"],
-      "liveBlock m+enter": ["\u001b\r"],
-    };
 
     // Per profile (M6, I35), for T2.12's reason: an enhanced route resolves on
     // an enhanced terminal and nowhere else.
@@ -905,12 +933,13 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
       expect(b.key.name, `${b.actionId} has a name`).not.toBe("");
     }
 
-    // **`chordOf`'s guard, pinned by its source, and the reason is a mutation
+    // **`chordOf`'s guard — `fromRegistry`'s since C16 §6c — pinned by its
+    // source, and the reason is a mutation
     // that survived.** Replacing the throw with a fallback key fails nothing:
     // the branch is unreachable while the assertion above holds, because every
     // `actionId` a row names is present. So the guard is defence for a state
     // this row makes impossible, and its only witness is that it is written —
-    // which is the shape T1.38 already uses for `keys.ts`'s reservations.
+    // which is the shape C24 T2.23 uses for `keys.ts`'s reservations.
     //
     // A fallback would be the worse failure of the two: a registry rename would
     // bind a chord nobody asked for and every row here would stay green, where a
@@ -918,8 +947,8 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     const src = readFileSync(join(ROOT, "src/interaction/router/keymap.ts"), "utf8");
     expect(
       src,
-      "chordOf throws on an unknown actionId rather than defaulting a chord",
-    ).toContain("throw new Error(`no registry binding for ${actionId}`)");
+      "fromRegistry throws on anything but one record rather than defaulting a chord",
+    ).toContain("throw new Error(`${String(found.length)} registry bindings for ${actionId} in ${profile}, not one`)");
   });
 
   it("T1.98 (C16 §6a clause 6, R-KEY-005, §019): a chord renders in the design's notation, by equality against the registry", () => {
@@ -1121,14 +1150,31 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     //
     // **127 from C16 I59** (§105, C26 I28): a split's four at `liveBlock` —
     // `←` `→` across the divider and `⌥←` `⌥→` moving it — four in, none out.
-    expect(rows).toHaveLength(127);
-    expect(new Set(rows).size, "no two rows are identical").toBe(127);
+    //
+    // **129 from C22 I133** (ruling 63): `⏎` joined `prompt` as `submit` and
+    // `interaction` as `keepField` — two in, none out. Both were branches in
+    // the composition root testing `enter` by name, so the owner line named
+    // chords this table did not hold.
+    //
+    // **134 from C16 §6c** (ruling 65, I66). Five out: `⌥⇧C` and `⌥⇧V` at
+    // `prompt` and at `liveBlock`, and `?` at `liveBlock`. Ten in: those three
+    // once each at `global`; `copy` at `liveBlock`, `interaction` and
+    // `semanticSelection`, `⌥w` and `⌃⇧C` at each; and `?` at
+    // `nativeSelection`, captured to `passToTerminal`. Every other row kept its
+    // target, chord, action and profile, which the set below is what says — the
+    // base routes the registry now names (`⌥⏎`, `⌃Y`, `⌥w`, `⌥1`…) were already
+    // rows, spelled as literals.
+    expect(rows).toHaveLength(134);
+    expect(new Set(rows).size, "no two rows are identical").toBe(134);
 
     // Every row whose chord the registry names resolves to the registry's key —
     // the join asserted from the table's side, so a `chordOf` call that silently
     // fell back to a literal would fail here.
-    const byAction = new Map(REGISTRY_BINDINGS.map((b) => [b.actionId, keySlot(b.key)]));
-    const registryChords = new Set(byAction.values());
+    // **Every record's chord, not one per action.** This was a map keyed by
+    // `actionId`, which kept the last record for each action — right while
+    // every action had one record, and short by the sixteen base chords the
+    // day each family gained two (C16 §6c): 68 where the table has 89.
+    const registryChords = new Set(REGISTRY_BINDINGS.map((b) => keySlot(b.key)));
     const fromRegistry = defaultKeymap.filter((b) => registryChords.has(keySlot(b.key)));
     expect(
       fromRegistry.length,
@@ -1167,8 +1213,16 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
       // `chordOf("move.left")` and `chordOf("move.right")`. The divider's `⌥←`
       // `⌥→` are not — the registry names no chord for the divider — and that
       // absence is the one the two rows' literal keys record.
+      //
+      // **68 from C22 I133** (ruling 63): `submit` at `prompt` and `keepField`
+      // at `interaction` are both the registry's `confirm`.
+      //
+      // **91 from C16 §6c**: the sixteen base records gave `⌥⏎`, `⌃Y`, `⌥w`,
+      // `⌥.`, `⌥,`, `⌥1`–`⌥9`, `⌃home` and `⌃end` a record, so the literal rows
+      // spelling them joined — and every one of the 91 now carries the record's
+      // id as `registry`, which T1.37 asserts from the table's side.
       "the rows the registry supplies a chord for",
-    ).toBe(66);
+    ).toBe(91);
   });
 
   it("T1.94 (I41): ⌘↑ and ⌥↑ are two actions under the enhanced profile and one under the base", () => {
@@ -1218,7 +1272,8 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     // **The legacy arm keeps folding bit 8 into `meta`, deliberately**, and this
     // is the control that stops `super` leaking into a terminal that never
     // reported the protocol: `CSI 1;9A` carries the same bit and answers `⌥↑`.
-    // That is also why `⌘↑` has no route — see the keymap's note.
+    // **Without a protocol**, that is: under kitty the same bit is `super`, and
+    // `⌘↑` has an enhanced route (C16 §6c) — this comment said it had none.
     const legacy = press(`${ESC}[1;9A`);
     expect(legacy?.name).toBe("up");
     expect(legacy?.meta, "bit 8 folds to meta on the legacy arm").toBe(true);
@@ -1254,6 +1309,11 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
       "agent9 u+9",
       "agentNext c+tab",
       "agentPrevious cs+tab",
+      // **`copy` at every owner with a copy verb** (C16 §6c, ruling 65): the
+      // enhanced `⌃⇧C` beside each owner's `⌥w`.
+      "copyElement cs+c",
+      "copyElement cs+c",
+      "copySelectedEntries cs+c",
       "copySelection cs+c",
       // **`⌥esc`, enhanced only** (I49, R-BLK-908). Without the protocol it is
       // `ESC ESC`, which is the lone-`Esc` disambiguation window rather than a
@@ -1305,103 +1365,152 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     expect(defaultKeymap.some((b) => b.profile === "enhanced-terminal")).toBe(true);
   });
 
-  it("T1.37 (I37): every current registry binding resolves, or is declared with the site that handles it", () => {
-    // **The gate that makes the registry normative without deleting the table**
-    // (R-KEY-007). The registry names 39 bindings; this table holds 85 rows over
-    // ~65 actions, so agreement is asked of the rows the design speaks to.
-    //
-    // Three arms, and the third is the one that needs its owner named: without
-    // it, *the design says `⇥` moves focus and the tree completes* and *the
-    // design says `⇥` moves focus and nobody noticed* read identically.
-    const ELSEWHERE: Readonly<Record<string, string>> = Object.freeze({
-      // Handled outside the keymap, by a named site.
-      confirm: "src/shell/construct.ts — the prompt's submit row; `overlay enter` and `liveBlock enter` are this table's",
-      escape: "src/interaction/router/router.ts — the ladder's rungs; `overlay`, `nativeSelection`, `pushedView` and `child` each have one",
-      interrupt: "src/interaction/router/intercepts.ts — a reserved route read before the ladder (§103)",
-      "help.command": "src/data/manifest/framework.ts — `/help` is a verb, and `/help keys` is what `?` and F1 submit",
-      // Owner captures, under R-KEY-003's own *unless the current owner
-      // explicitly captures the action* clause. The owner is named because that
-      // is what separates a ruled capture from an unnoticed disagreement.
-      "focus.next": "captured by `prompt` for `complete` (C19 §6); `liveBlock`, `overlay` and `pushedView` each move focus on it",
-      "move.up": "captured by `prompt` for `historyPrev` (C20); `liveBlock` moves a row and `overlay` a menu item",
-      "move.down": "captured by `prompt` for `historyNext` (C20); `liveBlock` moves a row and `overlay` a menu item",
-      "move.left": "captured by `prompt` for `left` (C17); `liveBlock` moves the crosshair",
-      "move.right": "captured by `prompt` for `acceptGhostOrForward` (C19 §6)",
-      "selection.up": "captured by `liveBlock` for `extendRowUp`; the prompt is one line and has no row above",
-      "selection.down": "captured by `liveBlock` for `extendRowDown`; the prompt is one line and has no row below",
-      "transcript.top": "`⌃home` → `scrollTop`; `⌘↑` has no wire form this decoder can tell from `⌥↑` — see the keymap's note",
-      "transcript.bottom": "`⌃end` → `scrollBottom`; `⌘↓` likewise",
-    });
+  it("T1.37 (I37, I42, I36, I66): every current key record resolves through the decoder to the rows carrying its id, at a target its placement admits", () => {
+    // **Replaced (§6c).** The gate this row was asked whether *some* row carried
+    // an action named for each binding — and ignored the chord, the target, the
+    // profile and the decoder, which is how sixteen records said
+    // `default-terminal` for chords a legacy terminal cannot send while it
+    // stayed green. Clause 1's two directions, asked from both sides: each
+    // record reaches its rows through real bytes, and each row spelling a
+    // registry chord says which record.
+    const RECORDS = (REGISTRY.bindings as readonly Readonly<{
+      id: string; actionId: string; chord: string; scope: string; kind: string; status: string;
+      profile: "default-terminal" | "enhanced-terminal"; when?: string;
+    }>[]).filter((b) => b.kind === "key" && b.status === "current");
+    expect(RECORDS.length, "the registry has key records to check").toBeGreaterThan(50);
+    const byId = new Map(REGISTRY_BINDINGS.map((b) => [b.id, b]));
 
-    // The design's action name against this table's. Explicit, because the two
-    // vocabularies were written years apart and a fuzzy match would make the
-    // gate agree with itself.
-    const ACTION_OF: Readonly<Record<string, string>> = Object.freeze({
-      newline: "insertNewline",
-      "focus.previous": "focusTranscript",
-      "selection.left": "extendCharLeft",
-      "selection.right": "extendCharRight",
-      copy: "copySelection",
-      paste: "yank",
-      "help.f1": "helpKeymap",
-      "help.question": "helpKeymap",
-      "agent.next": "agentNext",
-      "agent.previous": "agentPrevious",
-      "agent.1": "agent1",
-      "agent.2": "agent2",
-      "agent.3": "agent3",
-      "agent.4": "agent4",
-      "agent.5": "agent5",
-      "agent.6": "agent6",
-      "agent.7": "agent7",
-      "agent.8": "agent8",
-      "agent.9": "agent9",
-      "page.up": "scrollPageUp",
-      "page.down": "scrollPageDown",
-      "posture.cycle": "postureCycle",
-      "values.toggle": "valuesToggle",
-      "queue.drop": "queueDrop",
-      "selection.native": "enterNativeSelection",
-      "selection.semantic": "enterSemanticSelection",
-      // M9 — the captured child's one key (C16 I49, R-BLK-908). Two registry
-      // bindings, one action: `⌃]` base and `⌥esc` enhanced.
-      "host.detach": "hostDetach",
-    });
+    /**
+     * **Which targets a record's placement admits.** `scope` and `when` are the
+     * design's; the targets are the tree's, so the map between them is written
+     * here and is the claim. A `global` record's purpose is resolved by the
+     * active owner (R-KEY-003), so `always` admits every owner but the attached
+     * child, whose keys are its own.
+     */
+    const OWNERS = ["global", "overlay", "panel", "prompt", "liveBlock", "interaction", "semanticSelection", "nativeSelection"];
+    const ADMITS: Readonly<Record<string, readonly string[]>> = {
+      "global/always": OWNERS,
+      "global/focused": ["prompt", "panel", "liveBlock", "interaction", "semanticSelection"],
+      "global/selectable": ["prompt", "liveBlock", "semanticSelection"],
+      // `global` by I52's one exemption, and the rungs with no line.
+      "global/non-typing": ["global", "liveBlock", "interaction", "semanticSelection", "nativeSelection"],
+      "global/attached": ["child"],
+      "prompt/always": ["prompt"],
+      // The transcript is not a target: its keys are `global` rows, and a
+      // focused entry is the transcript's too.
+      "transcript/always": ["global", "liveBlock"],
+    };
+    /** A row outside its record's placement, with the owner that took it (R-KEY-003). */
+    const CAPTURES = [
+      "liveBlock newline rerunEntry — C23 I18: the prompt's newline pair re-runs a focused entry",
+      "prompt values.toggle valuesToggle — the transcript's toggle, reachable while the prompt holds focus",
+    ];
 
-    const base = createKeymap(defaultKeymap, "default-terminal");
-    const rich = createKeymap(defaultKeymap, "enhanced-terminal");
-    const current = REGISTRY.bindings.filter((b) => b.status === "current");
-    expect(current.length, "the registry has bindings to check").toBeGreaterThan(30);
+    const decoderFor = (profile: "default-terminal" | "enhanced-terminal") => {
+      let t = 1_000;
+      const d = createDecoder({
+        capabilities: {
+          bracketedPaste: true,
+          mouse: true,
+          keyboardProtocol: profile === "enhanced-terminal" ? "kitty" : "none",
+        },
+        now: () => t,
+      });
+      return (seq: string): Key[] => {
+        const pushed = d.push(new TextEncoder().encode(seq));
+        t += 1_000;
+        return [...pushed, ...d.poll()].flatMap((e) => (e.kind === "key" ? [e.key] : []));
+      };
+    };
+    const maps = {
+      "default-terminal": createKeymap(defaultKeymap, "default-terminal"),
+      "enhanced-terminal": createKeymap(defaultKeymap, "enhanced-terminal"),
+    } as const;
+    const wireForms = (slot: string): readonly string[] => [
+      ...new Set(Object.entries(BYTES).filter(([k]) => k.endsWith(` ${slot}`)).flatMap(([, v]) => v)),
+    ];
 
-    const unanswered: string[] = [];
-    for (const b of current) {
-      if (b.actionId in ELSEWHERE) continue;
-      const action = ACTION_OF[b.actionId];
-      if (action === undefined) {
-        unanswered.push(`${b.actionId} (${b.chord}) — no action named for it at all`);
+    const captured: string[] = [];
+    const unrowed: string[] = [];
+    const bothProfiles: string[] = [];
+    for (const r of RECORDS) {
+      const generated = byId.get(r.id);
+      expect(generated, `${r.id} reached the generated file`).toBeDefined();
+      if (generated === undefined) continue;
+      const slot = keySlot(generated.key);
+      const rows = defaultKeymap.filter((b) => b.registry === r.id);
+      if (rows.length === 0) {
+        unrowed.push(r.id);
         continue;
       }
-      if (!defaultKeymap.some((row) => row.action === action)) {
-        unanswered.push(`${b.actionId} (${b.chord}, ${b.scope}) → ${action}, which nothing binds`);
+      const forms = wireForms(slot);
+      expect(forms.length, `${r.id} ${r.chord} has a wire form`).toBeGreaterThan(0);
+      // **A base record is one a terminal without the protocol sends** — the
+      // field the sixteen got wrong, asked of the bytes rather than the label.
+      if (r.profile === "default-terminal") {
+        for (const seq of forms) {
+          expect(/^\u001b\[[\d;:]*u$/u.test(seq), `${r.id} ${r.chord}: ${JSON.stringify(seq)} is csi-u`).toBe(false);
+          expect(seq.startsWith("\u001b[27;"), `${r.id} ${r.chord}: ${JSON.stringify(seq)} is modifyOtherKeys`).toBe(false);
+        }
+      }
+      for (const row of rows) {
+        // Identity, through the decoder at the record's own profile.
+        for (const seq of forms) {
+          const keys = decoderFor(r.profile)(seq);
+          expect(keys, `${r.id}: ${JSON.stringify(seq)} decodes to one key`).toHaveLength(1);
+          expect(maps[r.profile].resolve(row.target, keys[0]!), `${r.id} at ${row.target}: ${JSON.stringify(seq)}`).toBe(row);
+        }
+        const admitted = ADMITS[`${r.scope}/${r.when ?? "always"}`];
+        expect(admitted, `${r.id}: ${r.scope}/${r.when ?? "always"} is a placement this row knows`).toBeDefined();
+        if (!(admitted ?? []).includes(row.target)) {
+          captured.push(`${row.target} ${r.actionId} ${row.action}`);
+        }
+        if (r.profile === "enhanced-terminal") {
+          if (row.profile === undefined) {
+            bothProfiles.push(r.id);
+            continue;
+          }
+          // An enhanced-only chord does nothing on a terminal that cannot send it.
+          const key: Key = {
+            name: row.key.name,
+            ctrl: row.key.ctrl ?? false,
+            meta: row.key.meta ?? false,
+            shift: row.key.shift ?? false,
+            ...(row.key.super === true ? { super: true } : {}),
+            sequence: row.key.name,
+          };
+          expect(maps["default-terminal"].resolve(row.target, key), `${r.id} at ${row.target} under the default profile`).toBeNull();
+        }
       }
     }
-    expect(
-      unanswered,
-      "every current registry binding resolves, is handled by a named site, or is a declared capture",
-    ).toEqual([]);
 
-    // **The declaration list is driven, not a licence** (F102): an entry for a
-    // binding the registry no longer has is a premise nobody re-checked.
-    const ids = new Set(current.map((b) => b.actionId));
-    expect(
-      Object.keys(ELSEWHERE).filter((k) => !ids.has(k)),
-      "no declaration outlives the binding it excuses",
-    ).toEqual([]);
+    // **Every row spelling a registry chord says which** — the other direction,
+    // from the table's side, so a literal key that happens to equal a
+    // registry chord fails here rather than reading as unrelated.
+    const inProfile = (p: string | undefined, q: string): boolean => p === undefined || p === q;
+    const recordSlots = RECORDS.flatMap((r) => {
+      const g = byId.get(r.id);
+      return g === undefined ? [] : [{ slot: keySlot(g.key), profile: r.profile }];
+    });
+    const unlabelled = defaultKeymap
+      .filter((b) => b.registry === undefined)
+      .filter((b) => recordSlots.some((r) =>
+        r.slot === keySlot(b.key)
+        && (r.profile === "default-terminal" ? true : inProfile(b.profile, "enhanced-terminal"))))
+      .map((b) => `${b.target} ${keySlot(b.key)} ${b.action}`);
+    expect(unlabelled, "no row spells a registry chord without naming the record").toEqual([]);
 
-    // And the maps were built, so the two above are not satisfied by an empty
-    // table — `createKeymap` throws on a collision, which is half the gate.
-    expect(base.entries().length).toBeGreaterThan(80);
-    expect(rich.entries().length).toBeGreaterThan(80);
+    // The three lists, each by equality — a subset check would let an entry
+    // outlive the row it excuses.
+    expect(
+      [...new Set(captured)].sort(),
+      "the captures outside a record's placement, and no others",
+    ).toEqual(CAPTURES.map((c) => c.split(" — ")[0]).sort());
+    expect(unrowed, "the one record answered outside the keymap — T1.37b dispatches it").toEqual(["binding.016"]);
+    expect(
+      [...new Set(bothProfiles)],
+      "`⇧⏎` is bound in both profiles, and nothing else is (§6c table C)",
+    ).toEqual(["binding.newline-enhanced"]);
   });
 
   it("T1.158 (I52, R-INT-002, R-CAP-001): no scope where a line is being composed binds a bare single key", () => {
@@ -1437,7 +1546,10 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     const offenders = defaultKeymap
       .filter((b) => TYPING.includes(b.target) && bare(b))
       .map((b) => `${b.target}: ${b.key.name}`);
-    expect(offenders, "a typing scope binds no bare single key").toEqual([]);
+    // **One exemption, by equality** (I52 amended, C16 §6c): `global ?` — the
+    // registry's `help.question`, `when: non-typing`. Every typing owner takes a
+    // printable before step 3 runs, which C16 T4.85 proves by dispatch at each.
+    expect(offenders, "a typing scope binds no bare single key but `global ?`").toEqual(["global: ?"]);
 
     // **The control is on the other side of the split**, and it is what stops
     // this being a rule with nothing to be wrong about: the non-typing scopes
@@ -1450,40 +1562,10 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
       .toBeGreaterThan(0);
   });
 
-  it("T1.38 (I38): every reserved chord carries an explicit no-op, and none of them acts", () => {
-    // §6's closed set makes an action with no executor uncompilable, so the
-    // alternative to a declared no-op is leaving the chord unbound — and an
-    // unbound chord is one an application takes.
-    const RESERVED = [
-      "agentNext", "agentPrevious", "agent1", "agent2", "agent3", "agent4", "agent5",
-      "agent6", "agent7", "agent8", "agent9", "postureCycle", "valuesToggle", "queueDrop",
-      // **`enterSemanticSelection` left this list in M10b** and that is what a
-      // reservation is for: it held the chord against an application taking it
-      // for the interval between the design naming the mode and the mode
-      // existing (C14 §6a). Fourteen now, and the list shrinking is the
-      // mechanism working rather than the rule weakening.
-    ] as const;
-    for (const action of RESERVED) {
-      expect(
-        defaultKeymap.some((b) => b.action === action),
-        `${action} has a chord reserved for it`,
-      ).toBe(true);
-    }
-    // **And the executor is the declared no-op, read out of L4's table** — the
-    // half that makes this a reservation rather than a list. `expect(RESERVED
-    // .length).toBe(15)` was here first and is an array literal's own length:
-    // A03 §2's vacuity class, written by hand.
-    const effects = readFileSync("src/shell/keys.ts", "utf8");
-    for (const action of RESERVED) {
-      expect(
-        new RegExp(`\\n\\s*${action}: reserved,`, "u").test(effects),
-        `${action} is bound to the declared no-op, not to an effect that happens to do nothing`,
-      ).toBe(true);
-    }
-    // The control: the pattern finds nothing for an action that *does* act, so
-    // the loop above is not satisfied by a regex that matches anything.
-    expect(/\n\s*insertNewline: reserved,/u.test(effects), "an acting effect is not reserved").toBe(false);
-  });
+  // **T1.38 moved to test/integration/key-actions.test.ts** (C16 §6c, C22 I134).
+  // It read `keys.ts` for `<action>: reserved,` and so held the no-op as the
+  // reservation's meaning; the reservation passes through now, and the row
+  // presses `⌥⌫` through a built graph. The declaration it read is C24 T2.23's.
 });
 
 describe("C16 §8 I53 — key repeat is declared per binding", () => {
@@ -1796,5 +1878,143 @@ describe("C16 I58 — a chord has one spelling per rung", () => {
       expect(chordText(key, true), "the Unicode rung is the registry's").toBe(unicode);
       expect(chordText(key, false), `${unicode} at ASCII`).toBe(ascii);
     }
+  });
+});
+
+describe("C16 §6c — routes by profile and the registry-global placement (review batch 2, M6)", () => {
+  const REG = JSON.parse(
+    readFileSync(join(ROOT, "docs/design/language/calcium-registry.json"), "utf8"),
+  ) as {
+    bindings: readonly Readonly<{
+      id: string; actionId: string; scope: string; kind: string; status: string; when?: string;
+      profile: string; supersedes?: readonly string[]; supersededBy?: string | null;
+    }>[];
+  };
+
+  it("T1.37b (C16 I37): ⌃C with an app verb in flight reaches the stage `cancel` — the one record answered outside the keymap, by dispatch", async () => {
+    // T1.37's `binding.016` is the record no row carries: `interrupt` is read by
+    // the intercept table before the ladder (§103). A declaration naming the
+    // site is what T1.37 held before; this row presses the key instead.
+    const { graph, stdin } = await buildGraph({
+      manifest: {
+        ...(MANIFEST as ManifestDocument),
+        tools: [...(MANIFEST as ManifestDocument).tools, { name: "slow", local: true, summary: "never settles", args: [], flags: [] }],
+      } as never,
+      localHandlers: { slow: () => new Promise<never>(() => undefined) },
+    });
+    graph.lifecycle.acquire();
+    stdin.emit("/slow\r");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(graph.pipeline.inFlight, "the control: a verb is in flight").not.toBeNull();
+    stdin.emit("\u0003");
+    expect(graph.router.lastStages, "⌃C interrupts it").toContain("cancel");
+    expect(graph.pipeline.inFlight, "and it is gone").toBeNull();
+  });
+
+  it("T1.173 (C16 I66): a registry-global key record is one global row or an owner row at each owner with the verb — the passes and captures declared, by equality", () => {
+    const OWNERS = ["overlay", "panel", "prompt", "liveBlock", "interaction", "semanticSelection", "nativeSelection"];
+    /** The owners a `global` record's `when` names, as T1.37's placement map reads it. */
+    const NAMED: Readonly<Record<string, readonly string[]>> = {
+      always: OWNERS,
+      focused: ["prompt", "panel", "liveBlock", "interaction", "semanticSelection"],
+      selectable: ["prompt", "liveBlock", "semanticSelection"],
+      "non-typing": ["liveBlock", "interaction", "semanticSelection", "nativeSelection"],
+      attached: ["child"],
+    };
+    /**
+     * **Bound once, at `global`**, where step 3 answers the key after any owner
+     * passes it (§4) — and the one owner that must not reach step 3 captures it.
+     * `?` is the case: native selection's frame is frozen (§6c table B).
+     */
+    const GLOBAL_ROW: Readonly<Record<string, readonly string[]>> = {
+      "binding.017": [],
+      "binding.018": ["nativeSelection"],
+      "binding.035": [],
+      "binding.selection-native": [],
+      "binding.selection-semantic": [],
+      ...Object.fromEntries(
+        ["agent-next", "agent-previous", ...Array.from({ length: 9 }, (_, i) => `agent-${String(i + 1)}`)]
+          .flatMap((f) => [[`binding.${f}-enhanced`, []], [`binding.${f}-base`, []]]),
+      ),
+    };
+    /**
+     * **Bound at the owners, and these owners pass.** A pass reaches step 3 or a
+     * site outside the keymap — the question's classifier, the terminal's own
+     * selection. `⏎` at `prompt` and `interaction` is a row since C22 I133
+     * (`submit`, `keepField`), so neither passes it any more. `copy` at native selection is ruling
+     * 65's: the terminal holds the selection, so the terminal copies it.
+     */
+    const PASSES: Readonly<Record<string, readonly string[]>> = {
+      "binding.001": ["overlay", "nativeSelection"],
+      "binding.003": ["prompt"],
+      "binding.004": ["overlay", "interaction", "semanticSelection", "nativeSelection"],
+      "binding.005": ["overlay", "panel", "interaction", "semanticSelection", "nativeSelection"],
+      "binding.006": [],
+      "binding.007": [],
+      "binding.008": ["panel", "semanticSelection"],
+      "binding.009": ["panel", "semanticSelection"],
+      "binding.010": ["prompt"],
+      "binding.011": ["prompt"],
+      "binding.012": ["liveBlock", "semanticSelection"],
+      "binding.013": ["liveBlock", "semanticSelection"],
+      "binding.copy-enhanced": ["overlay", "panel", "nativeSelection"],
+      "binding.copy-base": ["overlay", "panel", "nativeSelection"],
+      "binding.host-detach": [],
+      "binding.host-detach-enhanced": [],
+    };
+
+    const globalRow: Record<string, readonly string[]> = {};
+    const passes: Record<string, readonly string[]> = {};
+    const records = REG.bindings.filter((b) => b.kind === "key" && b.status === "current" && b.scope === "global");
+    expect(records.length, "the corpus: every registry-global key record").toBeGreaterThan(40);
+    for (const r of records) {
+      const rows = defaultKeymap.filter((b) => b.registry === r.id);
+      if (rows.length === 0) continue; // `binding.016`, T1.37b's.
+      const targets = new Set<string>(rows.map((b) => b.target));
+      if (targets.has("global")) {
+        expect(rows.filter((b) => b.target === "global"), `${r.id}: one global row`).toHaveLength(1);
+        globalRow[r.id] = [...targets].filter((t) => t !== "global").sort();
+      } else {
+        passes[r.id] = (NAMED[r.when ?? "always"] ?? []).filter((o) => !targets.has(o));
+      }
+    }
+    expect(globalRow, "the records bound at `global`, and each one's captures").toEqual(GLOBAL_ROW);
+    expect(passes, "the records bound at their owners, and each one's passes").toEqual(PASSES);
+  });
+
+  it("T1.174 (C16 I42, §6c table C): the supersession script refuses its own output and writes nothing; a non-reciprocal binding link is refused", () => {
+    const dir = mkdtempSync(join(tmpdir(), "m6-supersede-"));
+    try {
+      cpSync(join(ROOT, "docs/design/language/calcium-registry.json"), join(dir, "calcium-registry.json"));
+      const before = readFileSync(join(dir, "calcium-registry.json"), "utf8");
+      const out = spawnSync("node", ["tools/design/supersede-bindings.mjs", "--dir", dir], { cwd: ROOT, encoding: "utf8" });
+      expect(out.status, "it refuses").toBe(1);
+      expect(out.stderr, "naming a record that has run").toContain("binding.002 is already superseded");
+      expect(readFileSync(join(dir, "calcium-registry.json"), "utf8"), "and writes nothing").toBe(before);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+
+    // **The fabricated violation, on a copy** — the check `validateRegistry`
+    // gained for bindings. The control is the registry as it is, which passes.
+    const registry = JSON.parse(readFileSync(join(ROOT, "docs/design/language/calcium-registry.json"), "utf8"));
+    expect(() => validateRegistry(registry), "the control: the registry validates").not.toThrow();
+    const broken = structuredClone(registry) as { bindings: { id: string; supersedes?: string[] }[] };
+    const successor = broken.bindings.find((b) => b.id === "binding.copy-enhanced");
+    expect(successor?.supersedes, "the link the fabrication breaks").toEqual(["binding.014"]);
+    successor!.supersedes = [];
+    expect(() => validateRegistry(broken as never)).toThrow(/binding\.014 \/ binding\.copy-enhanced supersession is not reciprocal/u);
+  });
+
+  it("T1.175 (C16 §6a clause 5): docs/KEYS.md's design half carries a Profile column with the records' own values, and no header claims one profile", () => {
+    const registry = JSON.parse(readFileSync(join(ROOT, "docs/design/language/calcium-registry.json"), "utf8"));
+    const md = renderKeysMarkdown(registry);
+    expect(md, "no single-profile header").not.toContain("profile: default-terminal");
+    const rows = md.split("\n").filter((l) => /^\| (key|command) \|/u.test(l));
+    const current = REG.bindings.filter((b) => b.status === "current");
+    expect(rows, "one row per current record").toHaveLength(current.length);
+    const listed = rows.map((l) => l.split("|").map((c) => c.trim())[3]).sort();
+    expect(listed, "the records' own profiles, by equality").toEqual(current.map((b) => b.profile).sort());
+    expect(listed, "and both appear").toContain("enhanced-terminal");
   });
 });

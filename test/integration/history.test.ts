@@ -11,7 +11,8 @@ import { describe, expect, it } from "vitest";
 import { parse } from "../../src/interaction/parser/index.js";
 import { fixture } from "../support/manifest.js";
 import { createOverlayManager } from "../../src/viewport/overlay/index.js";
-import { CONFIRM_ID, LIST_ID, SEARCH_ID } from "../../src/interaction/history/index.js";
+import * as history from "../../src/interaction/history/index.js";
+import { LIST_ID, SEARCH_ID } from "../../src/interaction/history/index.js";
 import { registry } from "../support/overlay.js";
 import { openWith, seedFiles, entry } from "../support/history.js";
 
@@ -99,33 +100,29 @@ describe("T4.3 (with C15) — the search overlay", () => {
   });
 });
 
-describe("T4.4, T3.15 (with C15, I14) — the clear confirm", () => {
-  it("`Esc` on it is a no-op, through the real stack rather than by inspection", async () => {
+describe("T3.15 (I14, C15 I29) — C20's layers are substates, and it holds no question", () => {
+  it("every layer builder C20 exports makes a panel that declares its substate", async () => {
+    // **Amended in review batch 2** (C16 ruling 61). This was T4.4 and T3.15
+    // over `clearConfirmLayer` — a blocking overlay no answer callback could
+    // answer, pushed by nothing in `src/`, and the one layer C16's footer and
+    // intercept table read as two rungs. `/history clear` asks through C23's
+    // confirm host when it is wired, so what C20 owes is that none of its
+    // layers is a question.
+    const builders = Object.entries(history).filter(
+      ([name, v]) => typeof v === "function" && name.endsWith("Layer"),
+    );
+    expect(builders.map(([name]) => name), "one builder, and it is the search").toEqual(["searchLayer"]);
+
     const { store } = await openWith(three);
+    store.searchOpen("");
+    const layer = store.searchLayer(ANCHOR);
+    expect(layer.kind).toBe("panel");
+    expect(layer.owner).toEqual({ rung: "substate", name: "find" });
+
+    // Through the real stack, which refuses an owner the fields contradict.
     const overlays = createOverlayManager({ registry });
-
-    overlays.push(store.clearConfirmLayer());
-    expect(overlays.top?.id).toBe(CONFIRM_ID);
-
-    // What C16's one `overlay:escape → dismiss` row does, which is what makes
-    // this a property of the stack and not of the store's own literal.
-    expect(overlays.pop()).toBeNull();
-    expect(overlays.top?.id).toBe(CONFIRM_ID);
-    expect(store.entries).toHaveLength(3);
-
-    // Only the thing that raised it can resolve it.
-    overlays.dismiss(CONFIRM_ID);
-    expect(overlays.top).toBeNull();
-    expect(store.entries).toHaveLength(3);
-  });
-
-  it("the confirm names what it is about to destroy", async () => {
-    const { store } = await openWith(three);
-    expect(store.clearConfirmLayer().content[0]).toMatchObject({
-      kind: "notice",
-      tone: "warn",
-      text: "Clear 3 history entries? (y/N)",
-    });
+    overlays.push(layer);
+    expect(overlays.top?.owner?.rung).toBe("substate");
   });
 });
 

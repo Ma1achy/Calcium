@@ -107,7 +107,9 @@ const results = await runPass({
       // brackets retired with it (§102, C26 I27, C16 I28) — §102's control row is
       // `←→ orbit`, and `liveBlock` is *outside*, where a camera may not be
       // committed from.
-      from: '  { target: "interaction", key: chordOf("move.left"), action: "insideLeft" },',
+      // Re-anchored for C16 §6c: the row spreads `fromRegistry` where it called
+      // `chordOf`, and it is the same row.
+      from: '  { target: "interaction", ...fromRegistry("move.left"), action: "insideLeft" },',
       to: "",
       expect: "T4.17f",
     },

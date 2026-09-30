@@ -14,10 +14,8 @@ export { createNavigator, type Navigator } from "./navigate.js";
 export { redact, entropy, isExempt, REDACTED, type Fired, type Redaction, type Rule } from "./redact.js";
 export { escape, unescape, load, collapse } from "./codec.js";
 export {
-  CONFIRM_ID,
   LIST_ID,
   SEARCH_ID,
-  clearConfirmLayer,
   listBlocks,
   searchLayer,
   searchLine,

@@ -113,7 +113,7 @@ describe("walk C: the cells", () => {
   });
 
   it("C1b: every state maps to a slot in the vocabulary, and unknown is its own", () => {
-    expect(stateOf("running")).toEqual({ glyph: "running", tone: "ok" });
+    expect(stateOf("running")).toEqual({ glyph: "work-unit", tone: "ok" });
     expect(stateOf("exited")).toEqual({ glyph: "error", tone: "error" });
     // F6: `paused` is `pending`, because R01's `▪` is not a slot.
     expect(stateOf("paused")).toEqual({ glyph: "pending", tone: "warn" });

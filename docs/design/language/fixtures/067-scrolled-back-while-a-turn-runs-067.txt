@@ -9,7 +9,7 @@ transcript and it scrolls. It is not chrome.
     declares elements contributes any.
 
   ✦  editing parse.ts  41s · 3.2k tok
-  ⎿ todo  4/5  ·  ◻ run the suite
+  ⎿  todo  4/5  ·  ◻ run the suite
 
    ↓ 3 new messages ⏎
 ──────────────────────────────────────────────────────────────────────────────

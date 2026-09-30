@@ -16,8 +16,9 @@ export type Key = Readonly<{
    * `⌘` on macOS, the Windows key elsewhere — Kitty modifier bit 8 (C16 I34).
    *
    * **Optional, and it can only ever be `true` where the protocol said so.**
-   * `modifiersOf`'s legacy arm keeps folding bit 8 into `meta`, deliberately: on
-   * a terminal with no protocol `⌘a` genuinely arrives as `Alt-a`, and a decoder
+   * `modifiersOf`'s legacy arm keeps folding bit 8 into `meta` **without a
+   * protocol** (C16 I41), deliberately: on a terminal with no protocol `⌘a`
+   * genuinely arrives as `Alt-a`, and a decoder
    * that guessed otherwise would make one wire form two bindings. So the field is
    * safe to add — absent is *this terminal cannot tell*, not *not pressed*.
    *
@@ -172,9 +173,32 @@ export const RUNG_OF: Readonly<Record<Exclude<FocusTarget, "global">, OwnerRung>
  * - `handle` — this is the one owner that acts.
  * - `reject` — consume it, and explain where silence would look broken.
  * - `pass` — continue downward.
- * - `global-intercept` — take the registry-declared exception.
+ *
+ * **Three, and `global-intercept` is not one of them** (C16 I64). It was the
+ * fourth, and no handler produced it: `runRung` read it as *not `pass`*, so a
+ * handler that returned it was consumed with no stage and nothing acting. It is
+ * a thing an **intercept** declares — take the route's own exception, ahead of
+ * the ladder — and a handler has no exception to take. So it lives on
+ * `InterceptVerdict`, and a handler naming it does not compile.
  */
-export type Verdict = "handle" | "reject" | "pass" | "global-intercept";
+export type Verdict = "handle" | "reject" | "pass";
+
+/**
+ * What an intercept declares at one rung (C16 I64, §103).
+ *
+ * - `handle` — continue to the rung, which answers the route with its own verb.
+ *   Only `interrupt` declares it: a child's signal, a substate's pop and a
+ *   scope's cancel are three verbs, and the rung is where they are told apart.
+ * - `reject` — consume it, run no rung, and say why (I62).
+ * - `global-intercept` — take the intercept's declared `exception`; the ladder is
+ *   not consulted.
+ *
+ * `handle` meant the second of these for `page-scroll` and the wheel until review
+ * batch 2, and `dispatch` asked `intercept !== "interrupt"` to know which verb
+ * the word was — one word, two meanings, and the branch on the intercept id was
+ * where the second one lived.
+ */
+export type InterceptVerdict = "handle" | "reject" | "global-intercept";
 
 /**
  * Where focus is, as a thing that can be resolved (C26 I10, §8b.7).
@@ -470,6 +494,16 @@ export type KeyAction =
   | "insideDown"
   /** `esc out` (§102) — leave the inside and stay on the element (C26 I14). */
   | "exitInside"
+  // --- the two `⏎`s the owner line names (C22 I133, ruling 63) --------------
+  //
+  // Both were branches in `construct.ts` that tested `enter` by name, so the
+  // footer's `⏎ send` and `⏎ keep` were chords the keymap did not hold — a hint
+  // with no row behind it is C16 I19's second keymap. As rows, the line looks
+  // them up like every other chip and a rebinding moves them.
+  /** Send the prompt's line (C23 §2) — the scope rung's primary action. */
+  | "submit"
+  /** Keep what a held form field holds (C22 I118, C16 I60). */
+  | "keepField"
   // --- re-run the focused entry (C23 I18) ------------------------------------
   //
   // **Not an action kind.** The five `Action` kinds fire against a document's
@@ -581,16 +615,18 @@ export type KeyAction =
   // the same defect inverted, and just as testable.
   | "enterNativeSelection"
   | "exitNativeSelection"
+  // **A key native selection declines, and nothing in Calcium acts on it**
+  // (C16 I66, §6c table B, ruling 65). `?` while the terminal holds the
+  // selection: the frame is frozen, so the help entry would land unseen, and a
+  // pass in the ladder's sense reaches step 3's `global` `?`, which is that.
+  | "passToTerminal"
   // --- semantic copy mode (C14 §6a, C16 §5d) ---------------------------------
   //
-  // **Two exits, and that is the one thing this mode does not share with the
-  // one above** (I51, §5d D1/D2/D5). `escapeSemanticSelection` clears a
-  // selection if there is one and leaves when there is none;
-  // `exitSemanticSelection` always leaves, and it is **not a `KeyAction`** — it
-  // sits on `RouterDeps` beside `popLayer`, because the `⌃c` rung is what calls
-  // it and no keymap row resolves to it. Folding the two into one action reads
-  // as tidier and would put the clear step on the ladder's cancel, which is the
-  // rung answering two questions.
+  // **One exit, and it clears first** (I51, §5d D1/D2). `escapeSemanticSelection`
+  // clears a selection if there is one and leaves when there is none. There was
+  // a second, `exitSemanticSelection`, which always left and sat on `RouterDeps`
+  // for the `⌃c` rung; §103 has COPY MODE reject the interrupt (I62, ruling 59),
+  // so the rung and the verb went together.
   //
   // `a` and `A` are `R-SEL-008`'s and are bound at this target only: the rule
   // gives them bare keycaps, which is legible exactly because no other target
@@ -628,7 +664,47 @@ export type Binding = Readonly<{
    * an xterm without it can deliver, and I36 requires every action to have one.
    */
   profile?: "default-terminal" | "enhanced-terminal";
+  /**
+   * The registry record this row spells, by id (C16 §6c, I42 amended).
+   *
+   * Absent on a row whose chord the registry does not name. Internal —
+   * `Binding` is not published — and read by the gate, which asks from the
+   * table's side whether a row spelling a registry chord says which (T1.37).
+   */
+  registry?: string;
+  /**
+   * What a reserved row does when no handler is registered (C16 §6c, C22 I134).
+   *
+   * The meaning the reservation displaced: `⌥⌫` was `killWordLeft` before the
+   * registry gave it to `queue.drop`. A reserved row without one resolves as
+   * though it were absent.
+   */
+  fallback?: KeyAction;
 }>;
+
+/**
+ * The registry ids of the actions the design names and the tree reserves —
+ * what `TuiConfig.keyActions` is keyed by (C24 I39, C16 §6c, ruling 64).
+ *
+ * The design's spelling, because an application reads it in the registry,
+ * `/help` and `docs/KEYS.md`. `keymap.ts`'s `RESERVED_ACTIONS` is total over
+ * it, so the type and the table cannot name different sets.
+ */
+export type ReservedKeyAction =
+  | "agent.next"
+  | "agent.previous"
+  | "agent.1"
+  | "agent.2"
+  | "agent.3"
+  | "agent.4"
+  | "agent.5"
+  | "agent.6"
+  | "agent.7"
+  | "agent.8"
+  | "agent.9"
+  | "posture.cycle"
+  | "values.toggle"
+  | "queue.drop";
 
 /** A terminal’s profile, resolved from C02’s record (§6a, R-CAP-001). */
 export type KeyProfile = "default-terminal" | "enhanced-terminal";

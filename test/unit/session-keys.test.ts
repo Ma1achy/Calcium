@@ -8,7 +8,7 @@
 // Every component involved was finished and had its own passing suite.
 import { describe, expect, it, vi } from "vitest";
 
-import { defaultKeymap } from "../../src/interaction/router/keymap.js";
+import { defaultKeymap, keySlot, RESERVED_ACTIONS } from "../../src/interaction/router/keymap.js";
 import { MENU_ID } from "../../src/interaction/completion/index.js";
 import { SEARCH_ID } from "../../src/interaction/history/index.js";
 import { buildGraph, COPY_MODES } from "../support/session.js";
@@ -168,6 +168,12 @@ function enterLive(graph: Graph): void {
     );
   }
   graph.editor.clear();
+  // **From the prompt, as a user arrives** — `enterInside` below does the same.
+  // Without it the walk's previous row decides where `↓` lands: the inside's
+  // `copy` row (C16 §6c) leaves focus in `interact` mode, where `⇥` is the
+  // inside's and not `liveBlock`'s, and the next `liveBlock` row fails for a
+  // reason that has nothing to do with its own effect.
+  graph.focus.reset();
   graph.router.dispatch(press({ name: "down" }));
 }
 
@@ -214,7 +220,16 @@ describe("C22 §3 step 11 — the effect table", () => {
     // is the shape that let fourteen bindings go unexecuted while every test
     // passed: the list agrees with itself, and the table it was copied from is
     // free to grow a row nobody dispatches. `/help` renders that row.
-    const { graph } = await buildGraph();
+    //
+    // **Every reserved id has a handler here** (C16 §6c, C22 I134). Without
+    // one a reserved row resolves as though absent and the key passes — which
+    // is the design, and would read here as a row reaching nothing. With one,
+    // the walk also shows each reserved row reaches the application.
+    const handled = new Set<string>();
+    const keyActions = Object.fromEntries(
+      Object.keys(RESERVED_ACTIONS).map((id) => [id, () => void handled.add(id)]),
+    );
+    const { graph } = await buildGraph({ keyActions });
     graph.lifecycle.acquire();
 
     expect(defaultKeymap.length, "the table is not empty, so this is not vacuous").toBeGreaterThan(0);
@@ -270,10 +285,18 @@ describe("C22 §3 step 11 — the effect table", () => {
       // claimed to have reset, and the failure named the new binding rather
       // than the leak.
       while (graph.overlays.top !== null) graph.overlays.dismiss(graph.overlays.top.id);
+      // **And the inside, for the same reason** (C22 I133): `exitInside` used to
+      // be the last `interaction` row and left the mode as it found it; with
+      // `keepField` after it — a no-op with no field held — the walk stayed
+      // inside and every `liveBlock` row after it resolved at `interaction`.
+      if (b.target === "interaction") graph.focus.setMode("navigate");
       COPY_MODES.native = false;
       COPY_MODES.semantic = false;
       graph.editor.clear();
     }
+    expect([...handled].sort(), "every reserved row reached its application handler").toEqual(
+      Object.keys(RESERVED_ACTIONS).sort(),
+    );
   });
 
   it("T2.14 (C16 I21): every editing operation C17 exposes is reached by some binding", async () => {
@@ -372,6 +395,11 @@ describe("C22 §3 step 11 — the effect table", () => {
       reply: () => null,
       emit: () => undefined,
       submit: () => undefined,
+      // C22 I133 — the prompt's `⏎` is a row now, so this walk reaches it; the
+      // line it sends is the composition root's to resolve, and nothing here is.
+      submitPrompt: () => undefined,
+      keepField: () => undefined,
+      runAction: () => undefined,
       focusTranscript: () => undefined,
       // C16 I49 — the child's one exit. Counted here rather than stubbed
       // silent, because this harness is the one that walks every action.
@@ -431,9 +459,14 @@ describe("C22 §3 step 11 — the effect table", () => {
       },
     });
 
-    // Every prompt binding, through the table dispatch uses.
+    // Every binding a key at the prompt reaches, through the table dispatch
+    // uses: the prompt's rows, and the `global` rows whose key the prompt does
+    // not bind — step 3 answers those when the prompt passes (C16 §6c). `⌥⇧C`
+    // became a `global` row there, and it is the one path to `collapse`.
+    const promptSlots = new Set(defaultKeymap.filter((b) => b.target === "prompt").map((b) => keySlot(b.key)));
     for (const b of defaultKeymap) {
-      if (b.target !== "prompt") continue;
+      const reached = b.target === "prompt" || (b.target === "global" && !promptSlots.has(keySlot(b.key)));
+      if (!reached) continue;
       const effect = effects.table[b.action];
       expect(effect, `${b.action} has no effect`).toBeDefined();
       effect?.();

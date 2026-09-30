@@ -33,7 +33,8 @@ const results = runPass({
   run,
   control: {
     file: FILE,
-    from: "  return block.exclusive === true ? (chosen ? g.filled : g.hollow) : (chosen ? g.tick : g.cross);",
+    // Re-anchored 2026-09-27: the unchosen exclusive mark became `choiceOpen` (C09 I123).
+    from: "  return block.exclusive === true ? (chosen ? g.filled : g.choiceOpen) : (chosen ? g.tick : g.cross);",
     to: "  return block.exclusive === true ? g.filled : g.tick;",
     why: "the mark stops carrying chosen at all — every option draws the chosen glyph, which is the channel collapsing rather than swapping; a row that cannot see that cannot see either half of C09 I105",
   },

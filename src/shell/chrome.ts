@@ -18,10 +18,11 @@ import { block } from "../data/viewmodel/index.js";
 import type { Block, Pills } from "../data/viewmodel/index.js";
 import { glyphFor, glyphs } from "../presentation/blocks/index.js";
 import { cells } from "../presentation/text.js";
-import type { ChromeContext, ChromeFn, CopyState } from "./types.js";
+import type { ChromeContext, ChromeFn, CopyState, OwnerHints } from "./types.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
-import type { Binding, OwnerRung } from "../interaction/router/types.js";
-import { chordText } from "../interaction/router/keymap.js";
+import type { Binding, FocusTarget, KeyAction, OwnerRung } from "../interaction/router/types.js";
+import { chordText, defaultKeymap } from "../interaction/router/keymap.js";
+import { QUESTION_KEYS } from "./confirm.js";
 
 type Chip = Pills["chips"][number];
 
@@ -174,8 +175,16 @@ export function formatFrameCost(ms: number): string {
  * **Which rungs get how much** is §103's own split, and it is not uniform:
  * *every rung retains owner plus its highest-ranked reachable safe action;
  * **ordinary** rungs also show primary action, safe exit and help.* A question
- * is not an ordinary rung — it declares its own actions and the shell does not
- * know them — so its line is the owner and the safe path, and nothing else.
+ * is not an ordinary rung — its keys are its own vocabulary, not keymap rows —
+ * so its line is the owner and what that vocabulary names, ending on where `esc`
+ * resolves (C22 I133, ruling 63).
+ *
+ * **The keys are looked up, not spelled** (C22 I133). Every chord on the line is
+ * `hints.chord(target, action)` — the session keymap's first row for an action
+ * — so a rebinding moves the chip and an unbound action draws none. The line
+ * said *the owner is the framework's own, so the keys are safe to name*, and
+ * that was true of the owner and not of the keys: `⇧⏎ newline` is an app's to
+ * rebind, and the footer went on naming the old chord.
  *
  * `null` is the idle ladder, where the global keymap is all there is and there
  * is no owner to name; the row is absent rather than empty.
@@ -209,10 +218,37 @@ const hint = (keys: readonly Binding["key"][], does: string, caps: TerminalCapab
   return `${keys.map((k) => chordText(k, unicode)).join(unicode ? "" : "/")} ${does}`;
 };
 
-const ENTER = { name: "enter" } as const;
+/**
+ * `shedToWidth`'s way out, found by its spelling (C16 I58). The one key this
+ * file still names, and it names it to recognise a chip rather than to draw one.
+ */
 const ESC = { name: "escape" } as const;
-const UP = { name: "up" } as const;
-const DOWN = { name: "down" } as const;
+
+/**
+ * The default keymap's answer, for a line drawn with no session behind it
+ * (C22 I133): the first row for the action on a terminal with no protocol
+ * reported, which is what `createKeymap(defaultKeymap).entries()` holds there.
+ */
+const DEFAULT_HINTS: OwnerHints = Object.freeze({
+  chord: (target: FocusTarget, action: KeyAction) =>
+    defaultKeymap.find((b) => b.target === target && b.action === action && b.profile !== "enhanced-terminal")?.key,
+});
+
+/**
+ * One chip for one or two actions at a target, **or none** (C22 I133): the keys
+ * are the keymap's, so an action nobody binds is a chip nobody can press, and it
+ * is not drawn. A pair draws the half that is bound.
+ */
+const keyed = (
+  hints: OwnerHints,
+  target: FocusTarget,
+  actions: readonly KeyAction[],
+  does: string,
+  caps: TerminalCapabilities,
+): Chip[] => {
+  const keys = actions.flatMap((a) => hints.chord(target, a) ?? []);
+  return keys.length === 0 ? [] : [{ label: hint(keys, does, caps), tone: "muted" }];
+};
 
 /**
  * The gap `pills` puts between chips, so the shed measures what will be drawn
@@ -304,8 +340,9 @@ export function ownerLine(
   buffered = 0,
   copy?: CopyState,
   field = false,
+  hints: OwnerHints = DEFAULT_HINTS,
 ): readonly Chip[] {
-  const chips = ownerChips(rung, caps, buffered, copy, field);
+  const chips = ownerChips(rung, caps, buffered, copy, field, hints);
   // **The armed mark, and it is a chip rather than a decoration** (C16 I44,
   // C22 §6, R-INT-008). A newly raised owner refuses one activation so a key
   // already in flight cannot answer a question that arrived under it, and a
@@ -326,15 +363,20 @@ function ownerChips(
   rung: OwnerRung | null,
   caps: TerminalCapabilities,
   buffered: number,
-  copy?: CopyState,
-  field = false,
+  copy: CopyState | undefined,
+  field: boolean,
+  hints: OwnerHints,
 ): readonly Chip[] {
+  // **Every chord below is an action looked up, never a key spelled** (C22
+  // I133, C16 I19). The words are this line's; the keys are the keymap's.
+  const one = (target: FocusTarget, action: KeyAction, does: string): Chip[] =>
+    keyed(hints, target, [action], does, caps);
   switch (rung) {
     case "child":
       return [
         { label: "attached", tone: "warn" },
         { label: mark(["keys → child", "keys -> child"], caps), tone: "muted" },
-        { label: hint([{ name: "]", ctrl: true }], "host escape", caps), tone: "muted" },
+        ...one("child", "hostDetach", "host escape"),
       ];
     case "copy": {
       // **Native handoff** (C14 I55, fixture 044): the terminal owns the mouse,
@@ -344,7 +386,7 @@ function ownerChips(
           { label: "native", tone: "warn" },
           { label: "mouse tracking off", tone: "muted" },
           { label: "the terminal owns the mouse", tone: "muted" },
-          { label: hint([ESC], "out", caps), tone: "muted" },
+          ...one("nativeSelection", "exitNativeSelection", "out"),
           { label: "the screen is frozen", tone: "muted" },
         ];
       }
@@ -352,20 +394,27 @@ function ownerChips(
       // The frozen screen is the fact, not a hint: it is why nothing responds.
       return [
         { label: "copy", tone: "warn" },
-        // **`↑↓`, not `←→↑↓`** (C14 §6c). `selection.left`/`selection.right` are
-        // horizontal and at block granularity there is no horizontal extent —
-        // the axis belongs to `R-SEL-007`'s rectangular selection, which copies
-        // cells rather than source. A footer naming a key that does nothing is
-        // C16 I19's second keymap disagreeing with the first.
-        { label: hint([UP, DOWN], "extend", caps), tone: "muted" },
-        { label: hint([ENTER], "copy", caps), tone: "muted" },
+        // **The refused interrupt, once** (C16 I62, ruling 60). `⌃c` is refused
+        // in the mode and the frame is otherwise still, so without this the key
+        // is swallowed rather than refused. Drawn on the frame after the refusal
+        // and gone on the next key; native selection has no frame to draw it on,
+        // which is the stated limit.
+        ...(hints.refused === true
+          ? [{ label: `${glyphFor("warn", caps)} interrupt refused`, tone: "warn" as const }]
+          : []),
+        // **Vertical only** (C14 §6c): at block granularity there is no
+        // horizontal extent. **And the shifted pair** — the bare arrows move the
+        // caret and `⇧↑⇧↓` extend (`extendSemanticSelection*`), which the line
+        // spelled as bare `↑↓` for as long as it spelled its own keys.
+        ...keyed(hints, "semanticSelection", ["extendSemanticSelectionUp", "extendSemanticSelectionDown"], "extend", caps),
+        ...keyed(hints, "semanticSelection", ["copySelectedEntries"], "copy", caps),
         // **Two chips, not one label with a `·` in it.** The separator is the
         // cluster's to draw (C09 I49) — a literal one in a string is the head's
         // unresolved join F828 found, and T2.116 is right to refuse it here too.
         // **Which press is next** (`R-SEL-005`, C16 I51): over a selection the
         // first `esc` clears it, and a footer saying `out` labels that press as
         // the leaving one.
-        { label: hint([ESC], size === null ? "out" : "clear", caps), tone: "muted" },
+        ...one("semanticSelection", "escapeSemanticSelection", size === null ? "out" : "clear"),
         // **The count, over the copy text** (C14 I38, I55, `R-SEL-015`): what
         // `⏎` would put on the clipboard now, as question 35 ruled it —
         // `418 chars · 9 rows · 2 entries`. **One chip**, because the pill's gap
@@ -394,21 +443,54 @@ function ownerChips(
           : []),
       ];
     }
-    case "question":
-      // Owner plus the safe path. The declared actions are the question's own
-      // and the shell cannot name them without holding a second copy of them.
+    case "question": {
+      // **The question's own words** (C22 I133, ruling 63, fixture 061). It is
+      // not an ordinary rung and its keys are not keymap rows, so they come from
+      // the vocabulary `classify` reads — and `esc` says where it resolves,
+      // which is the default's label rather than the phrase *safe path*.
+      const q = hints.question;
+      const k = QUESTION_KEYS.shown;
+      const key = (name: string): Binding["key"] => ({ name });
+      if (q?.state === "inspection") {
+        return [
+          { label: "question", tone: "warn" },
+          { label: hint([key(k.leave)], "back", caps), tone: "muted" },
+        ];
+      }
       return [
         { label: "question", tone: "warn" },
-        { label: "declared actions", tone: "muted" },
-        { label: hint([ESC], "safe path", caps), tone: "muted" },
+        // A reply owns the editor's arrows (C16 I54), so nothing moves.
+        ...(q?.state === "reply" ? [] : [{ label: hint(k.move.map(key), "move", caps), tone: "muted" as const }]),
+        { label: hint([key(k.answer)], "answer", caps), tone: "muted" },
+        // With no question in hand — a line drawn from the rung alone — the
+        // target is still the default, and saying so is true of every question.
+        { label: `${hint([key(k.leave)], mark(["→", "->"], caps), caps)} ${q?.resolvesTo ?? "default"}`, tone: "muted" },
       ];
+    }
     case "substate":
-      return [
-        { label: "find", tone: "accent" },
-        { label: hint([UP, DOWN], "hits", caps), tone: "muted" },
-        { label: hint([ENTER], "open", caps), tone: "muted" },
-        { label: hint([ESC], "close", caps), tone: "muted" },
-      ];
+      // **The substate names itself** (C15 I29, ruling 61): it was always
+      // `find`, over a completion menu and a chip preview alike.
+      switch (hints.substate) {
+        case "complete":
+          return [
+            { label: "complete", tone: "accent" },
+            ...keyed(hints, "panel", ["menuPrev", "menuNext"], "move", caps),
+            ...keyed(hints, "panel", ["menuAccept"], "accept", caps),
+            ...one("panel", "dismiss", "close"),
+          ];
+        case "preview":
+          // The preview composes nothing and the prompt keeps its keys
+          // (`promptUnderMenu`), so the only key the layer owns is its way out.
+          return [{ label: "preview", tone: "accent" }, ...one("panel", "dismiss", "close")];
+        default:
+          // §103's specimen, word for word; the keys are the panel's rows.
+          return [
+            { label: "find", tone: "accent" },
+            ...keyed(hints, "panel", ["menuPrev", "menuNext"], "hits", caps),
+            ...keyed(hints, "panel", ["menuAccept"], "open", caps),
+            ...one("panel", "dismiss", "close"),
+          ];
+      }
     case "inside":
       // **A field is an inside with two keys** (C22 I118, C16 I60): `⏎` keeps
       // what was typed and `esc` does not. A plot's orbit named over a text
@@ -416,24 +498,24 @@ function ownerChips(
       if (field) {
         return [
           { label: "field", tone: "accent" },
-          { label: hint([ENTER], "keep", caps), tone: "muted" },
-          { label: hint([ESC], "discard", caps), tone: "muted" },
+          ...one("interaction", "keepField", "keep"),
+          ...one("interaction", "exitInside", "discard"),
         ];
       }
       return [
         { label: "inside", tone: "accent" },
-        { label: hint([{ name: "left" }, { name: "right" }], "orbit", caps), tone: "muted" },
-        { label: hint([UP, DOWN], "tilt", caps), tone: "muted" },
-        { label: hint([ESC], "out", caps), tone: "muted" },
+        ...keyed(hints, "interaction", ["insideLeft", "insideRight"], "orbit", caps),
+        ...keyed(hints, "interaction", ["insideUp", "insideDown"], "tilt", caps),
+        ...one("interaction", "exitInside", "out"),
       ];
     case "scope":
       // No owner word: the scope is the rung a reader is on when nothing has
       // been raised, so naming it would put a label on the absence of one.
       return [
-        { label: hint([ENTER], "send", caps), tone: "muted" },
-        { label: hint([{ name: "enter", shift: true }], "newline", caps), tone: "muted" },
-        { label: hint([{ name: "tab" }], "complete", caps), tone: "muted" },
-        { label: hint([{ name: "tab", shift: true }], "transcript", caps), tone: "muted" },
+        ...keyed(hints, "prompt", ["submit"], "send", caps),
+        ...keyed(hints, "prompt", ["insertNewline"], "newline", caps),
+        ...keyed(hints, "prompt", ["complete"], "complete", caps),
+        ...keyed(hints, "prompt", ["focusTranscript"], "transcript", caps),
       ];
     default:
       return [];
@@ -493,6 +575,7 @@ const footer = (ctx: ChromeContext): readonly Block[] => [
               ctx.bufferedEntries ?? 0,
               ctx.copy,
               ctx.editingField === true,
+              ctx.hints,
             ),
             ctx.columns,
             ctx.capabilities,

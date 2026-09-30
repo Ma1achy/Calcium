@@ -96,8 +96,23 @@ export type KeyDeps = Readonly<{
    * (C16 I57, C23 I79) — no clear, no history, no queue. `?` and `F1`.
    */
   emit: (line: string) => void;
+  /**
+   * Runs the palette's action by its registry id (C16 I68, §6c Q2) — the
+   * composition root's, because which row an id names depends on the
+   * keymap's profile and the application's handlers, and neither is here.
+   */
+  runAction: (id: string) => void;
   /** Move focus into the transcript, for `⇧⇥` (`focus.previous`, §6a). */
   focusTranscript: () => void;
+  /**
+   * Send the prompt's line, for its `⏎` (C22 I133, ruling 63).
+   *
+   * **Not `submit`**, which takes a line: this sends the line the editor holds,
+   * and the composition root is where a chip becomes its content (roadmap 30).
+   */
+  submitPrompt: () => void;
+  /** Keep what a held form field holds, for its `⏎` (C22 I118, I133). A no-op with no field held. */
+  keepField: () => void;
   /**
    * Leave a captured child and return ownership to the host (C16 I49,
    * R-BLK-908).
@@ -121,23 +136,19 @@ export type KeyDeps = Readonly<{
   /**
    * Enter native selection (C16 §5b, C03 §4a).
    *
-   * **The entry half only, and the exit is deliberately not here.** Leaving is
-   * `⌃c` on the ladder's native-selection rung, which already calls `exitNativeSelection` —
-   * so a matching effect in this table would be a second exit with an order of
-   * its own. The pair still ships together; they just do not ship *here*
-   * together.
+   * **And the exit, `esc`'s** (C16 §5c). There was a second exit, `⌃c` on the
+   * ladder's native-selection rung; §103 has COPY MODE reject the interrupt
+   * (C16 I62, ruling 59), so `esc` is the one way out.
    */
   enterNativeSelection: () => void;
   exitNativeSelection: () => void;
   /**
    * Semantic copy mode (C14 §6a, C16 §5d, I51).
    *
-   * **The exit is here where the handoff's is not, and the difference is I51.**
-   * `⌃c` on the ladder's rung calls `exitSemanticSelection` directly, exactly as
-   * it calls `exitNativeSelection` — but `esc` needs a *different* verb, because
-   * it clears a selection first, and a verb a keymap row resolves has to live in
-   * this table. So the pair here is the entry and the `esc` verb; the ladder's
-   * exit is not a second way out of the same shape, it is the other one.
+   * **`esc` is the one way out, and it clears a selection first** (I51). The
+   * ladder's `⌃c` rung called a second verb, `exitSemanticSelection`, which
+   * always left; §103 has COPY MODE reject the interrupt (C16 I62, ruling 59),
+   * so the rung and the verb are gone.
    */
   enterSemanticSelection: () => void;
   escapeSemanticSelection: () => void;
@@ -615,7 +626,19 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     const at = selection.at;
     const candidate = at === null ? undefined : candidates[at];
     if (candidate === undefined) return;
-    applyEdit(ctxNow(), candidate, whole);
+    const ctx = ctxNow();
+    // **An action row runs; it is never inserted** (C16 I68, §6c Q2). The
+    // line was only ever the query, so it goes before the action runs — an
+    // action that reads the prompt reads an empty one, as it would from its
+    // chord at an empty prompt.
+    if (ctx.slot.kind === "action") {
+      closeMenu();
+      suppressedAt = null;
+      deps.editor.clear();
+      deps.runAction(candidate.value);
+      return;
+    }
+    applyEdit(ctx, candidate, whole);
     closeMenu();
   }
 
@@ -686,6 +709,15 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   }
 
   /**
+   * **A reserved chord's executor, which `bound` never runs** (C16 §6c, C22 I134).
+   *
+   * The reservation passes through now: with no handler registered through
+   * `TuiConfig.keyActions` the row resolves as though absent, or to the
+   * `fallback` it names, and with one it resolves to the handler — so the
+   * composition root answers these rows before this table is consulted. The
+   * entries stay because §6's closed set makes an action with no executor
+   * uncompilable. What follows is the note as the no-op was written:
+   *
    * **A reserved chord with an explicit no-op** (C16 I38, §6a).
    *
    * Fourteen of these: the nine agent slots, `agent.next`/`agent.previous`,
@@ -731,11 +763,8 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // holding it for.
     enterSemanticSelection: () => void deps.enterSemanticSelection(),
     escapeSemanticSelection: () => void deps.escapeSemanticSelection(),
-    // **`exitSemanticSelection` is not in this table and that is I51.** The
-    // ladder's `⌃c` rung calls it on `RouterDeps`, and a row here would be a
-    // second way out with an order of its own — the shape the native handoff's
-    // exit is kept out of this table for. `esc` is here because it is a
-    // different verb, not a second spelling of the same one.
+    // **`esc` is the only way out** (I51, C16 I62). `⌃c` is refused in the mode,
+    // so there is no second exit to keep out of this table.
     selectEntryUnderCaret: () => void deps.selectEntryUnderCaret(),
     selectAllLoadedEntries: () => void deps.selectAllLoadedEntries(),
     copySelectedEntries: () => void deps.copySelectedEntries(),
@@ -750,6 +779,10 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
 
     // --- C17 ---------------------------------------------------------------
     insertNewline: () => void deps.editor.insert("\n"),
+
+    // --- the two `⏎`s the owner line names (C22 I133, ruling 63) -------------
+    submit: () => void deps.submitPrompt(),
+    keepField: () => void deps.keepField(),
 
     // --- C19 ---------------------------------------------------------------
     //
@@ -1354,13 +1387,18 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // region under it is two selections at once. `collapse()` rather than a
     // motion, because the caret must stay where the reader left it — and here
     // rather than in `#setNativeSelection`, because this effect is the only way in
-    // (`⌥⇧C` at the prompt and in the block) and T2.14 asks that every C17
+    // (`⌥⇧C`, a `global` row since C16 §6c) and T2.14 asks that every C17
     // operation be reachable from a key.
     enterNativeSelection: () => {
       deps.editor.collapse();
       deps.enterNativeSelection();
     },
     exitNativeSelection: () => void deps.exitNativeSelection(),
+    // **Consumed, and nothing acts** (C16 I66, §6c table B): the key is the
+    // terminal's while it holds the selection. A named no-op, as `reserved`
+    // is, so a reader can tell a decline from an effect that happens to do
+    // nothing today.
+    passToTerminal: () => undefined,
   });
 
   /**

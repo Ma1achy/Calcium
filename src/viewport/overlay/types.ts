@@ -87,6 +87,26 @@ export type Layer = Readonly<{
    */
   dismissal: "escape" | "focus" | "answer";
   /**
+   * Which owner rung this layer is, when it takes keys (I29, R-QST-001, C16 I63).
+   *
+   * *A question declares blocking and owner explicitly* — the design's own
+   * words, and until this field the owner was the one half not declared. C16
+   * derived it twice: from `kind` for the footer, the guard and the epoch, and
+   * from whether an answer callback was registered for the intercept table —
+   * and on a blocking overlay nothing could answer, the two said `question`
+   * and `scope`. Declared, there is one answer and C16 reads it.
+   *
+   * **Absent is the kind's own rung**: an overlay is a question and a panel an
+   * unnamed substate. The strict form — every overlay declares `question` and
+   * is therefore blocking and closed by `answer` — is not built: probed, it
+   * refused 52 rows whose non-blocking overlays are test stand-ins with no
+   * design counterpart (C15 I29).
+   *
+   * Never changes (I14), and `LayerUpdate` does not admit it: a layer whose
+   * owner moved mid-life makes the ladder depend on when it looked.
+   */
+  owner?: LayerOwner;
+  /**
    * Requested width in cells; absent means the region's.
    *
    * Declared rather than measured because `BlockRegistry` answers height at a
@@ -111,6 +131,17 @@ export type Layer = Readonly<{
    */
   cursor?: Readonly<{ row: number; col: number }>;
 }>;
+
+/**
+ * The owner rung a keyed layer declares (I29, §103).
+ *
+ * A **substate names itself** — `find`, `complete` or `preview` — because the
+ * footer says which one is up and `promptUnderMenu` decides by it; both read
+ * layer ids before this, and the footer said `find` for all three.
+ */
+export type LayerOwner =
+  | Readonly<{ rung: "question" }>
+  | Readonly<{ rung: "substate"; name: "find" | "complete" | "preview" }>;
 
 /**
  * A layer C16 can route to — what `top` answers (I21).

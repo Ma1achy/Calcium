@@ -20,7 +20,7 @@ held at the point where a choice would be mine to invent.
 
 ## Entries
 
-**Open: 18, 23, 32, 36, 37, 39, 40.** Every other entry is ruled or retracted. A ruled entry keeps its body, with the ruling directly above it and a premise note wherever the ruling rested on something the entry or the design contradicts.
+**Open: none.** Ruled 2026-09-27: 18, 23, 32, 36, 37, 39–54. Every other entry is ruled or retracted. *Recounted 2026-09-27 from the headings*: the line read *18, 23, 32, 36, 37, 39, 40* while 41–51 were headed OPEN below it, so eleven open questions were missing from the summary that says which are open. A ruled entry keeps its body, with the ruling directly above it and a premise note wherever the ruling rested on something the entry or the design contradicts.
 
 > **Ruled 2026-09-24.** Already answered, by the chain rule. The repo-side spec (C09 §4, I5) carries the narrowed rule and the registry does not. That assumption stands as the answer.
 
@@ -214,7 +214,9 @@ Registering it needs an ASCII rung, which is a visible choice — the same choic
 as 15 and reached by a different road. **Held.** The finding is the absence, and
 it is recorded here rather than left to the next sweep.
 
-**18 · The two normative sources disagree about the five permission postures,
+> **Ruled 2026-09-27.** **Neither list.** Postures are the agent application's concept; the framework reserves `posture.cycle` and nothing else, so it does not hard-code five. **The rule that matters is recorded instead: an application declares its postures, and a posture that skips permission checks is drawn loudest — `error` tone plus a mark — is never the default, and is never reached silently by cycling.** Both conflicting lists — §071's five with `skip` and the registry's `permissionPostures` with `ask` — are superseded by that rule, and the application (agent-tui) defines the actual five. **The rules it disposes of**: `R-PER-001` (the posture registry) becomes a registry of the application's declared postures rather than the framework's five, and `R-COL-001`'s blocked clause — *override red means unsafe override* — is answered: the skipping posture is the override, and its red is the `error` tone this ruling gives it. **Owed:** the rule registered as a successor through the builder (released records are not edited in place), the `permissionPostures` records marked superseded, and a `posture.cycle` that refuses to land on a skipping posture without saying so.
+
+**18 · RULED — The two normative sources disagree about the five permission postures,
 and about the one that matters.** §071 measures five — `manual`,
 `accept-edits`, `plan`, `auto`, **`skip`** — each with a symbol chosen against a
 stated trap (`❯ ? ❙❙ » !!`, with `⏸` rejected because *it IS an emoji — the `⏺`
@@ -402,7 +404,9 @@ refused.
 
 ---
 
-**23 · Does §101's `completion` row answer twice?** M15's last deliverable is
+> **Ruled 2026-09-27** (by the person). **Keep six rows; carry the second property on the layer.** *Where a printable key goes* and *whether the prompt is drawn underneath* are two properties that part in one cell, so the layer declares the second one rather than a kind or an id standing in for it, and `promptUnderMenu`'s hard-coded exemption is replaced by reading that field. **Built in:** review batch 4 (M15).
+
+**23 · RULED — Does §101's `completion` row answer twice?** M15's last deliverable is
 `promptUnderMenu`'s hardcoded exemption, whose comment has long said what it
 needed: *named rather than derived because no field distinguishes them from a
 search — which is a gap worth closing and not a rule to guess at.* The walk is
@@ -724,7 +728,11 @@ The direction clause of the same rule is built and checked separately.
 
 ---
 
-**32 · Posts or slant for counted work, and no glyphs for a sub-cell braille
+> **Ruled 2026-09-27.** **Counted work uses posts**, per `R-PRG-002` (*discrete steps use posts*); the tree's `granularity: "segmented"` → slant mapping is the thing that changes, and §035/§036's slant specimens are examples (R-SEC-036). **The sub-cell braille bar is owed a proposal, drawn before anything is registered**: a ramp in eighth-cell steps — the left dot column filling bottom to top, then the right — with its ASCII fallback, shown as frames for review first. Batch 4 M16 item 3 carries the posts half.
+
+> **Amended 2026-09-28** (by the person). **The braille sub-cell ramp is approved and registered: `⡀⡄⡆⡇⣇⣧⣷⣿`** (U+2840, 2844, 2846, 2847, 28C7, 28E7, 28F7, 28FF) — eighth-cell steps, the left dot column filling bottom to top, then the right; an empty cell is a blank. The ASCII rung stays whole-cell `#`/`-`. **Owed:** the registry record through the builder and a release, and the bar alphabet's frames, in batch 4's M16 lane.
+
+**32 · RULED — Posts or slant for counted work, and no glyphs for a sub-cell braille
 bar.** `R-PRG-002` says *discrete steps use posts* and *sub-cell progress uses
 braille*. §033 draws `▮▮▮▮▮▯▯▯ discrete steps — five of eight` in posts; §035 and
 §036 draw counted work in slant — *compacting ▰▰… 3 of 5 turns*, *indexing …
@@ -774,7 +782,9 @@ the footer, beside `copy`, or in the prompt rule's label) are both visible
 choices. Question 4's shared chip is adjacent and separate: that one is which
 mode's label the rung shows, this one is what the count says and where.
 
-**36 · OPEN — `R-SEL-007`'s rectangular selection has a label and no way in.** Ruling
+> **Ruled 2026-09-27** (by the person). **`⇧←` / `⇧→` extend the selection from its anchor, and rectangular selection toggles on `⌃V` in copy mode.** This is not the entry's proposal (a), which had `⇧←`/`⇧→` begin a rectangle; the horizontal extend is what they do, and the rectangle gets its own toggle, so the `RECT 12×4 · cells, not source` label has a state to be drawn in. **Built in:** review batch 4 (M10 items 2–3).
+
+**36 · RULED — `R-SEL-007`'s rectangular selection has a label and no way in.** Ruling
 5 gave the mode label, `RECT 12×4 · cells, not source`, and the clip and the
 escape-free cells are built (`rectBetween`, `cellTextOf`, C14 I42, I43). But the
 registry holds no rectangular action and no binding, and neither the HTML nor any
@@ -792,7 +802,9 @@ make. **Proposed, (a) recommended**:
   beside the `v`/`V` the mode already takes. One new chord, delivered as `0x16` on
   every terminal, and free in the registry and the repo at that rung.
 
-**37 · OPEN — A trend with no movement.** §088 §4 draws a trend going down and a
+> **Ruled 2026-09-27** (by the person). **A flat trend gets `→` (ASCII `=`); an absent trend stays `-`. No arrow is not *flat*.** A reading that held is a fact with a direction of its own, and leaving it unmarked makes it indistinguishable from a reading with no comparison at all. The registry gains the mark through the builder. **Built in:** review batch 2 (M4). **Built** in 8fd66890 (C11 I30, C09 I111): a reading that held draws `→`, `=` at ASCII, through a registered `trend-flat` glyph; a cell with no trend draws nothing.
+
+**37 · RULED — A trend with no movement.** §088 §4 draws a trend going down and a
 trend going up, and `R-COL-006` gives each a tone from the metric's polarity. It
 draws no reading that did not move, and `from === to` is ordinary data — a metric
 that held. **Taken unless you say otherwise** (C11 I30): no arrow, the text alone
@@ -823,7 +835,9 @@ alone, because a glyph slot is a pair and has no ASCII half to ship without.
 
 ---
 
-**39 · OPEN — What a collision inside a spinner set is.** Ruling 11 put spinner frames
+> **Ruled 2026-09-27** (by the person). **A set's ASCII frames must not all be one character.** The within-set rule is that the ASCII rung *moves*; downsampling several Unicode frames onto one ASCII frame is allowed, which is what the 12 of 27 SS64 hits are. A set whose ASCII rung is a single repeated character is a still mark in a slot that says *live*. **Built in:** review batch 2 (M4, with item 7's glyph gate). **Built** in 07746cc2 (C09 I98): T2.190 beside the glyph gate checks the tree's sets and the registry's — a set whose ASCII frames are all one character fails it.
+
+**39 · RULED — What a collision inside a spinner set is.** Ruling 11 put spinner frames
 in their own domain, the duration slot, and said collisions are checked only within a
 set. **The premise that the static test applies inside a set does not hold.** Every
 set's `ascii` aligns with its `frames` index for index (27 of 27), and SS64's test — one
@@ -847,7 +861,9 @@ because a set compared with nothing is a rule with nothing to be wrong about.
 
 ---
 
-**40 · OPEN — Which interval a shared ASCII alphabet takes.** Ruling 30 applies
+> **Ruled 2026-09-27** (by the person). **120 ms for every ASCII alphabet.** One cadence for the ASCII rung — the entry's proposal (a) — which is §039's *nothing varies its rate*. **Built in:** review batch 2 (M4). **Built** in 729ca488 and 0bd29cc9 (C09 I112): the registry records `spinnerPolicy.asciiIntervalMs = 120` and every ASCII rung steps at it. **The cost, measured:** fit-cycle is lost at ASCII, and `toggle` turns in 240 ms.
+
+**40 · RULED — Which interval a shared ASCII alphabet takes.** Ruling 30 applies
 `R-MOT-011` per rung — sets that collapse to one ASCII alphabet share an interval at
 that rung — and the registry records no ASCII interval to share. Measured from its
 spinner records: `|/-\` is nine sets at 80, 90, 100, 110, 120, 120, 130, 140 and
@@ -867,7 +883,9 @@ and `binary4` at 120. The number is visible — it is how fast the ASCII rung tu
 
 ---
 
-**41 · OPEN — Which column the `▌` selection rail takes.** Ruling 33 makes `▌` selection's
+> **Ruled 2026-09-27** (by the person). **The selection rail takes the live gutter's column** — the entry's proposal (a). It is the one column that displaces no head mark, and the head mark is the call state's only glyph carrier at 1-bit. **Built in:** review batch 4 (M11 item 1).
+
+**41 · RULED — Which column the `▌` selection rail takes.** Ruling 33 makes `▌` selection's
 second carrier. §017 (`R-BLK-127`, `R-BLK-129`) draws it as the first two cells of a
 selected row, `▌ ` on the band, before the focus mark's column — on search-result rows
 whose left edge is blank. In the transcript a selected row is its block's first row (C14
@@ -889,7 +907,9 @@ column 1 displaces the head mark — which at 1-bit is the call state's only gly
 
 ---
 
-**42 · OPEN — What `⏎` on a shed row expands into.** Ruling 19: *`⏎` expands what it
+> **Ruled 2026-09-27** (by the person). **`⏎` on a shed row gives the table's expanded-row form** — the entry's proposal (a): `expand` for the block, `expanded` on the block, the withheld parts drawn beneath each row as `label  value`. It lands with in-place expansion, which is the same mechanism. **Built in:** review batch 3 (M9 item 1).
+
+**42 · RULED — What `⏎` on a shed row expands into.** Ruling 19: *`⏎` expands what it
 stands for*; §104 says the same and draws only the collapsed row (`val loss  0.0372
 +1`). C09 I113 makes the withheld parts reachable through the peek, which is the
 table's dropped-column precedent and exists. The in-place form does not: the four
@@ -908,43 +928,203 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
-**43 · OPEN — §075's `/config` collides with docker-tui's `/config`.** Ruling 28 builds the provenance display, and §075 names its verb `/config`. `examples/docker/src/manifest/read.ts:163` already declares a `config` verb — a container's config file against its image's original (S8) — and C05 I6 makes a framework verb of the same name a **parse error** for that manifest, so the example would not start. The design decides the framework's name; it does not decide the example's new one, and the rename reaches **106 references across 19 files**, a recorded `demo.cast` and the media tools among them.
+> **Ruled 2026-09-27** (by the person). **The example's verb is renamed to `/filediff`**, so §075's `/config` stays the framework's. The 106 references, `demo.cast` and the media tools move with it. **Built in:** review batch 3 (with M9's manifest work).
+
+**43 · RULED — §075's `/config` collides with docker-tui's `/config`.** Ruling 28 builds the provenance display, and §075 names its verb `/config`. `examples/docker/src/manifest/read.ts:163` already declares a `config` verb — a container's config file against its image's original (S8) — and C05 I6 makes a framework verb of the same name a **parse error** for that manifest, so the example would not start. The design decides the framework's name; it does not decide the example's new one, and the rename reaches **106 references across 19 files**, a recorded `demo.cast` and the media tools among them.
 
 **Built meanwhile** (C22 I115, C23 I80): the provenance record, the ladder and the table. What waits is the verb and its manifest row. **The one-word answer** is the example's new name — `/filediff` is the proposal — or a different framework verb, which would depart from §075.
 
 ---
 
-**44 · OPEN — §075's ladder puts `warn` and `error` on a word, and C04 I6 refuses both without a glyph.** §075: `env` is *warn — your shell chose it*, `flag` is *error — this invocation chose it*. C04 I6 (D29) throws for a cell whose tone is `warn` or `error` and whose glyph is empty — *colour alone does not survive 1-bit or a colour-blind reader*. Here colour is not alone: the word `env` or `flag` **is** the fact, and the tone is its second carrier, which is tie-break 4's per-fact count. The design is consistent; C04 I6 counts per effect.
+> **Ruled 2026-09-27** (by the person). **C04 I6 exempts a closed vocabulary.** A word drawn from a declared, closed set — `env`, `flag` — carries its own fact, and the tone is its second carrier (tie-break 4, carriers count per fact). The exemption is by declared vocabulary, never by free text, so a cell's text cannot opt itself out. **Built in:** review batch 3 (with 43).
+
+**44 · RULED — §075's ladder puts `warn` and `error` on a word, and C04 I6 refuses both without a glyph.** §075: `env` is *warn — your shell chose it*, `flag` is *error — this invocation chose it*. C04 I6 (D29) throws for a cell whose tone is `warn` or `error` and whose glyph is empty — *colour alone does not survive 1-bit or a colour-blind reader*. Here colour is not alone: the word `env` or `flag` **is** the fact, and the tone is its second carrier, which is tie-break 4's per-fact count. The design is consistent; C04 I6 counts per effect.
 
 **Why parked, not ruled**: making C04 I6 accept a word that carries its own fact weakens an invariant, and *which words qualify* has no field to answer from — a free-text cell cannot say whether its text is a label or the fact. **Nothing reaches it today**: `env` and `flag` have no producer (ruling 28). **The one-word answers**: (a) C04 I6 exempts a cell drawn from a closed vocabulary the block declares; (b) the ladder's two loud rungs take a glyph (`warn`'s `▲`, `error`'s `✗`) beside the word; (c) the ladder stops at `meta`.
 
 
-**45 · OPEN — How the palette opens, and where its query is typed.** Ruling 20 builds §105's five primitives. The registry defines the palette as *an overlay whose rows are filtered actions* (R-PRI-001), and §105 draws it as `❯ open▌  3 of 61` above action rows carrying their chords, with `+58 more` beneath. **Everything it draws is built already**, as §105 says: C19's menu is §097's panel between two rules, with a detail column and the `+ N more` residue, and the registry's 40 actions are the rows. **What the design does not give is the way in.** No action opens a palette and no binding names one. §105's `❯ open▌` is a prompt row, so the query may be typed in the prompt, but the figure does not say what turns a prompt into a palette.
+> **Ruled 2026-09-27** (by the person). **`>` opens the palette only at an EMPTY prompt — the same exception `/` already has — and that limit is written into the rule.** A `>` typed anywhere else is text. **Built in:** review batch 2 (M6).
+
+**45 · RULED — How the palette opens, and where its query is typed.** Ruling 20 builds §105's five primitives. The registry defines the palette as *an overlay whose rows are filtered actions* (R-PRI-001), and §105 draws it as `❯ open▌  3 of 61` above action rows carrying their chords, with `+58 more` beneath. **Everything it draws is built already**, as §105 says: C19's menu is §097's panel between two rules, with a detail column and the `+ N more` residue, and the registry's 40 actions are the rows. **What the design does not give is the way in.** No action opens a palette and no binding names one. §105's `❯ open▌` is a prompt row, so the query may be typed in the prompt, but the figure does not say what turns a prompt into a palette.
 
 **Why parked, not ruled**: the opener is a key or a word the reader has to learn. That is a visible choice, and every candidate collides with something: `⌃⇧P` collapses to `⌃P` in the base profile; `⌥p` is `posture.cycle`; `/` already opens the verb menu.
 
 **The proposal**: `>` typed as the first character of an empty prompt switches the menu's source from verbs to actions, as in VS Code's quick-open. That costs no chord, keeps the query in the prompt as §105 draws it, and the base and enhanced profiles agree. The alternatives: (b) an action `palette.open` on `⌃⇧P` enhanced and `⌥k` base; (c) a verb `/actions`.
 
 
-**46 · OPEN — Whether the divider takes the accent while the right pane holds focus.** §105: *the focused pane takes the accent ON the divider, so which side owns the arrows is visible without a label.* The figure shows one state, with a `┃` segment in the divider. Built (C04 §3aq S7): the divider is the left pane's bar (ruling 22 and §021, read together), so it takes the accent under §021's rule, *the thumb takes the accent when its container has focus*, while focus is in the left pane. It is `muted` otherwise. With focus in the right pane, the accent is on that pane's own bar in its last column, and only where the pane overflows.
+> **Ruled 2026-09-27** (by the person). **Keep what's built**: the divider is the left pane's bar and takes the accent under §021's rule; the right pane's focus shows on its own bar. **Built in:** nothing to build.
+
+**46 · RULED — Whether the divider takes the accent while the right pane holds focus.** §105: *the focused pane takes the accent ON the divider, so which side owns the arrows is visible without a label.* The figure shows one state, with a `┃` segment in the divider. Built (C04 §3aq S7): the divider is the left pane's bar (ruling 22 and §021, read together), so it takes the accent under §021's rule, *the thumb takes the accent when its container has focus*, while focus is in the left pane. It is `muted` otherwise. With focus in the right pane, the accent is on that pane's own bar in its last column, and only where the pane overflows.
 
 **Why parked, not ruled**: *which side owns the arrows is visible* asks for a difference between the two sides, and a single column in one tone gives only two states for three conditions (left pane, right pane, neither). With focus in a right pane that fits, the divider reads the same as with no focus in the split. The focus mark on the focused row still shows the side, but that is a mark, not the divider.
 
 **The proposal**: keep what is built. Every alternative spends a second carrier on one column. One is a half-cell edge (`▕`/`▏`) facing the focused pane, which is a glyph the registry does not have. Another is accent on the divider whenever either pane is focused, which says *in the split* and not *which side*.
 
 
-**47 · OPEN — §105's form indents its fields one cell right of the button row, and C09 I87 forbids it.** §105 draws ` name        prism-serve` over `› save    cancel`: every field row starts one cell right of the button row's `›`. C09 I87 says nothing is drawn left of a block's **head**, its first drawn row, on any row — a naive drag picks up whatever sits in that gutter as though it were text (`R-SEL-016`). With the fields first, the head is the first field row at column 1, and the button row starts at column 0, left of it.
+> **Ruled 2026-09-27** (by the person). **Keep what's built**: the fields flush at column 0. C09 I87 stands and the figure's one-cell indent is the specimen's (R-SEC-036). **Built in:** nothing to build.
+
+**47 · RULED — §105's form indents its fields one cell right of the button row, and C09 I87 forbids it.** §105 draws ` name        prism-serve` over `› save    cancel`: every field row starts one cell right of the button row's `›`. C09 I87 says nothing is drawn left of a block's **head**, its first drawn row, on any row — a naive drag picks up whatever sits in that gutter as though it were text (`R-SEL-016`). With the fields first, the head is the first field row at column 1, and the button row starts at column 0, left of it.
 
 **Built meanwhile** (C04 §3ar): the fields flush at column 0, so the button row is exactly the figure's and every field column is the figure's less one. **Why parked, not ruled**: keeping the figure's cell means weakening I87, and the obvious weakening — measure from the leftmost row rather than the head — is the tautology I87 records its own control catching. **The one-word answers**: (a) keep it flush; (b) indent the button row with the fields, so `›` sits at column 1 under the labels' first letter; (c) I87 exempts a row whose first cell is a mark the block declares, which is a list.
 
 
-**48 · OPEN — How often a running call says it is still running, in linear mode.** §107: *a running call announces start, useful elapsed milestones, blockage and completion — not spinner frames.* Start, blockage (a question) and completion are built (C22 §6m). **A milestone needs an interval**, and the design gives none — `R-MOT-*` fixes spinner intervals, which are frames, and §107 excludes frames by name. It is a visible timing value, which is why it is here. **The proposal**: at 10 s, 30 s, 1 min and every minute after — `entry 7: pytest tests/unit — running, 30s` — a doubling-ish ladder that says *still going* often early and rarely late, and is silent for a call that finishes inside ten seconds. **Built meanwhile**: nothing between start and completion, so a long call is silent in linear until it ends.
+> **Ruled 2026-09-27** (by the person). **Linear mode reports a long call at 10 s, 30 s, 1 min, then every minute** — the entry's proposal. **Built in:** review batch 4 (M11, linear mode).
 
-**49 · OPEN — The rate limit on linear announcements.** §107: *announce is none / polite / assertive, with deduplication and rate limits.* Deduplication is built (C22 I120): a fact is written once per id. **A rate limit is a number** — events per second, or a minimum gap between polite events — and the design gives none. **The proposal**: no limit on `assertive`; `polite` events inside 250 ms of each other are written as one batch, which is §107's *coherent batches* reached from the other side. **Built meanwhile**: every event is written as it happens. **Widened 2026-09-25 by ruling 27** (C22 §6n): a notification rung repeated while the reader is away is the same number asked of a second stream — every earning fact rings once until this is answered.
+**48 · RULED — How often a running call says it is still running, in linear mode.** §107: *a running call announces start, useful elapsed milestones, blockage and completion — not spinner frames.* Start, blockage (a question) and completion are built (C22 §6m). **A milestone needs an interval**, and the design gives none — `R-MOT-*` fixes spinner intervals, which are frames, and §107 excludes frames by name. It is a visible timing value, which is why it is here. **The proposal**: at 10 s, 30 s, 1 min and every minute after — `entry 7: pytest tests/unit — running, 30s` — a doubling-ish ladder that says *still going* often early and rarely late, and is silent for a call that finishes inside ten seconds. **Built meanwhile**: nothing between start and completion, so a long call is silent in linear until it ends.
 
-**50 · OPEN — Who fills a watch, and where it is shown.** Ruling 27 built the watch as *a declaration that producers fill* (C22 I130): a streaming entry can be watched, the watch drops at settle, and its completion earns a notification always. **Nothing in the tree fills it.** §085 names two producers — `/watch` to *pin one that is not yours*, and *a long-running job you started* — and one display, the footer's watch row (`⋯ › a3f9b21 █████░ 43%`, `⇧⇥` to focus it, `←→` among watches, `⏎` to scroll to its entry and open it). **`/watch` and `/unwatch` would be the ninth and tenth framework verbs**, and C05 §3 makes each a breaking change for any app declaring the name — the process is a grep of every manifest first, and the brief puts the manifest out of scope. The row is `example` display with a binding (`watch.jump[n]`) the registry does not hold. **The one-word answers**: (a) build `/watch` and `/unwatch` as framework verbs after the grep; (b) a producer declares it — an application calling a `watch(id)` on `TuiInstance`, which is C24 surface; (c) both, and the footer row with them. **Built meanwhile**: the declaration and its earning; no producer, no row.
+> **Ruled 2026-09-27** (by the person). **Polite events within 250 ms are written as one batch**; `assertive` is not limited. The entry's proposal. **Built in:** review batch 4 (M11, linear mode).
 
-**51 · OPEN — Where the return line goes.** §014: *when you come back, the transcript says what you missed* — `● 3 entries settled while you were away   ⌘↓ to the bottom`. The transcript holds entries, and every line in it is one: a line appended on return is either an entry the reader never ran, with a `seq` and a place in `/history`'s neighbour, or a second kind of row that §6m's stream and C13's eviction would both have to learn. Nothing in the tree counts arrivals while away — the `N waiting` chip counts what a **frozen** view holds back (C14 I34). **The one-word answers**: (a) a chip on the owner line, beside `N waiting`, shown from the focus-in until the reader reaches the bottom; (b) a transient toast (§6j's) on focus-in; (c) a notice entry, accepting that it is one. **Built meanwhile**: nothing on return; the rungs are what reached the reader.
+**49 · RULED — The rate limit on linear announcements.** §107: *announce is none / polite / assertive, with deduplication and rate limits.* Deduplication is built (C22 I120): a fact is written once per id. **A rate limit is a number** — events per second, or a minimum gap between polite events — and the design gives none. **The proposal**: no limit on `assertive`; `polite` events inside 250 ms of each other are written as one batch, which is §107's *coherent batches* reached from the other side. **Built meanwhile**: every event is written as it happens. **Widened 2026-09-25 by ruling 27** (C22 §6n): a notification rung repeated while the reader is away is the same number asked of a second stream — every earning fact rings once until this is answered.
+
+> **Ruled 2026-09-27** (by the person). **`/watch` is a reserved framework verb, and watches get built.** Framework verb names are reserved **in the manifest schema**, so an app declaring one gets a validation error rather than a parse failure found at start; **`/capabilities` is confirmed on the same basis.** The grep of every manifest the entry names is the first step. **Built in:** review batch 3 (with M9 item 7's manifest diagnostic).
+
+**50 · RULED — Who fills a watch, and where it is shown.** Ruling 27 built the watch as *a declaration that producers fill* (C22 I130): a streaming entry can be watched, the watch drops at settle, and its completion earns a notification always. **Nothing in the tree fills it.** §085 names two producers — `/watch` to *pin one that is not yours*, and *a long-running job you started* — and one display, the footer's watch row (`⋯ › a3f9b21 █████░ 43%`, `⇧⇥` to focus it, `←→` among watches, `⏎` to scroll to its entry and open it). **`/watch` and `/unwatch` would be the ninth and tenth framework verbs**, and C05 §3 makes each a breaking change for any app declaring the name — the process is a grep of every manifest first, and the brief puts the manifest out of scope. The row is `example` display with a binding (`watch.jump[n]`) the registry does not hold. **The one-word answers**: (a) build `/watch` and `/unwatch` as framework verbs after the grep; (b) a producer declares it — an application calling a `watch(id)` on `TuiInstance`, which is C24 surface; (c) both, and the footer row with them. **Built meanwhile**: the declaration and its earning; no producer, no row.
+
+> **Ruled 2026-09-27** (by the person). **"While you were away" is a transcript entry** — the entry's answer (c). It is what R-BLK-314's detach summary is too, so the two share one form. **Built in:** review batch 3 (with M9 item 3's detach summary).
+
+**51 · RULED — Where the return line goes.** §014: *when you come back, the transcript says what you missed* — `● 3 entries settled while you were away   ⌘↓ to the bottom`. The transcript holds entries, and every line in it is one: a line appended on return is either an entry the reader never ran, with a `seq` and a place in `/history`'s neighbour, or a second kind of row that §6m's stream and C13's eviction would both have to learn. Nothing in the tree counts arrivals while away — the `N waiting` chip counts what a **frozen** view holds back (C14 I34). **The one-word answers**: (a) a chip on the owner line, beside `N waiting`, shown from the focus-in until the reader reaches the bottom; (b) a transient toast (§6j's) on focus-in; (c) a notice entry, accepting that it is one. **Built meanwhile**: nothing on return; the rungs are what reached the reader.
+---
+
+> **Ruled 2026-09-27** (review batch 3, M7 item 9). **The quiet window.** An activation is refused only if it arrives within ~250 ms of the question appearing; while guarded, the guard holds for as long as activation keys keep arriving inside the window, so a held key's auto-repeat stays caught however long it is held. A deliberate `⏎` after the window answers at once. This replaces the refuse-the-first-activation rule, and it is also M7 item 3's remedy (auto-repeat defeating a guard that disarms after one refusal). **Owed:** C16's guard amended spec-first when batch 3 opens, with a 30 Hz synthetic repeat and a deliberate press after quiet as the two rows.
+
+> **Amended 2026-09-28** (by the person), correcting the window found short by batch 3's walk. **Two numbers, not one.** Without key-release reporting, a question refuses activations during an **arrival grace of 750 ms** — at least the OS repeat delay, covering X11's 660 ms default — and then stays guarded while activation keys keep arriving **within 250 ms of each other**. Under the kitty protocol the guard uses the held-key set from release events and **no timers**. *Why the first form failed:* a 250 ms window from arrival closes before a held key's first repeat, so the commonest case — `⏎` submitting a verb that asks at once — still answered. **Owed:** C16 amended spec-first in batch 3, and a row holding a key across arrival with a 660 ms first repeat then 30 Hz repeats, where none may answer.
+
+**52 · RULED — How long a newly arrived question refuses an activation.** R-OWN-002 arms a new owner so the first activation after it is refused out loud. Refusing exactly one is defeated by a held key's repeats without key-release reporting (M7 item 3), and refusing every first `⏎` costs a deliberate reader a press on every question. Raised by review batch 3 as *for Malachy*.
+
+---
+
+> **Ruled 2026-09-27** (review batch 4, M13 item 2). **`⏎` always sends.** The chip preview takes its own registered bindings, shown in its footer: **`⌃↑` / `⌃↓` scroll** it, and **`⌥o` opens the chip in the editor** — not `⌃E`, which is the prompt's end-of-line. Both are registered as registry bindings with base-terminal routes. **Measured free on 2026-09-27**: `⌥o`, `⌃↑` and `⌃↓` have no binding in `calcium-registry.json` (41 bindings; the same search finds `⌥p` → `binding.035` and `⌥↑` → `page.up`), none in `docs/KEYS.md`, and the shipped keymap is generated from the registry through `chordOf`. `⌥o` arrives as `ESC o` and `⌃↑`/`⌃↓` as `CSI 1;5A`/`B`, so all three are deliverable without the Kitty protocol. **Owed:** the bindings through the builder, the collision gate run over them, the preview's footer, and a row that pastes a chip and presses `⏎` and asserts the prompt was sent.
+
+> **Amended 2026-09-28** (by the person). **`⌃↑`/`⌃↓` are dropped: the preview scrolls on `⌥⇧↑`/`⌥⇧↓`**, with base-terminal routes (`CSI 1;4A`/`B`, deliverable without the protocol); `⌥o` stays for open. *Why the first pick failed:* on default macOS `⌃↑`/`⌃↓` are Mission Control and App Exposé, and the OS takes them before the terminal sees a byte. **The collision check cannot see OS-level shortcuts** — it reads the registry, the keymap and KEYS.md — **so every future chord is also checked by hand against macOS, Windows and the common Linux desktops' defaults.** Measured free on 2026-09-28: `⌥⇧↑`/`⌥⇧↓` have no current binding in `calcium-registry.json`, no row in `keymap.ts` and no entry in `docs/KEYS.md`. **Owed:** a decode row asserting `CSI 1;4A` is `{up, shift, meta}`, and the bindings through M6's supersession script.
+
+**53 · RULED — The chip preview's keys.** R-BLK-825's specimen shows the preview with `↑↓ scroll · ⏎ open in editor`. `chipAt()` counts a chip on either side of the caret, and the caret sits after a chip just pasted, so giving the preview `⏎` breaks paste-then-send — the commonest flow. The design's keys are a specimen (R-SEC-036); the departure is recorded here.
+
+---
+
+> **Ruled 2026-09-27** (review batch 4, M11 item 4). **A chosen choice takes its mark plus bold**, so it keeps two carriers at 1-bit — the mark and the weight — where a focused unchosen choice has `›` alone. Bold and not inverse, because inverse is selection's 1-bit rendering. **Owed:** C10's carrier table and the choice renderer, spec-first when batch 4 opens.
+
+**54 · RULED — Choice's second carrier.** R-COR-003 wants two independent carriers for every interaction distinction; at 1-bit *chosen* and *focused* were distinguished by one mark each.
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M4 item 8). **The band predicate's two latent cells are closed at the validator too.** `validateBands` checks C10 I61's pair before its `isHex(bg)` early return, and refuses a `bandFourBit` key with no `bandInk` partner. *Reason:* a consistent picture beats a lone rule — once the resolver and `isBand` share `bandAt`, a theme the validator admits must not be able to make them disagree. **Owed:** C10 I61's sentence and T2.73, in batch 2's M4 item 8.
+
+**55 · RULED — Does the validator close X1 and X3?** The M4 item 8 walk found two theme shapes no shipped theme reaches: a `bandInk` with no `bandFourBit` pair (the pair check sits after an early return), and an orphan `bandFourBit` (never iterated).
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M4 item 8). **A head on a receded (stale) panel takes its state's mark**, because tone does not carry there: every ink resolves to `dim`, so five states would otherwise draw one mark in one ink. The predicate is the existing one — *does tone carry here* — asked of the panel as well as the ground. *Reason:* carrier rules count per fact (R-COR-003, R-HON-002); a receded tone is tone that has stopped carrying. **Owed:** measure the frame first (the walk did not render it); build in the same lane, or record the measurement if the premise is false.
+
+**56 · RULED — A call head inside a `staleForMs` panel.** Found by the M4 item 8 walk as X2, outside the band claim and the same class.
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M4 item 9). **The `Glyph` token is spelled `"work-unit"`, the registry's id**, and SS64's three key parsers widen to accept a quoted hyphenated key, with a row asserting the parsed `GLYPH_TABLE` keys equal `GLYPH_TOKENS` by equality. *Reason:* structured data beats prose — the registry id is the name, and `workUnit` would be a second spelling of it. **Owed:** batch 2's M4 item 9.
+
+**57 · RULED — `work-unit` or `workUnit`.** The first hyphenated `Glyph` token drops silently out of SS64's `(\w+)` parsers.
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M4 item 10 and M5 item 10). **A root `CHANGELOG.md`, kept by hand under `## Unreleased`**, breaking changes named explicitly; A04 §9's row is amended first to say so until a generator exists. *Reason:* the repo is right about what ships — no generator exists, and a changelog row naming a generator that does not exist is a claim with no source. **Owed:** A04 §9 spec-first, then the file, carrying `live`, `step`, `running`→`work-unit`, `ChromeContext.copyMode`→`owner`, and each later batch's public breaks.
+
+**58 · RULED — Where the changelog lives.** A04 §9 says *generated from commits*; nothing generates it and no file exists.
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M5 item 1 — the item the person sent). **`⌃c` is refused at a question and in either copy mode**: the table's `reject` consumes and explains and runs no rung. The question stays open and unanswered; copy mode stays on. C16 ruling A, §5b B1/B2, §5d D5, I51 and C23 I36's `⌃c` half are amended, not cited. *Reason:* the design decides (§103 — *QUESTION and COPY MODE reject*), and the review item asks for exactly this. *Cost, stated:* in copy mode `⌃c` no longer cancels a running verb; the reader presses `esc` first.
+
+**59 · RULED — `⌃c` at a question and in copy mode.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M5). **How a refusal explains itself.** At a question: `▲ answer this first`, warn-toned, on the question's own row, triggered by the first non-answer input and **held until the question resolves**; later non-answers change nothing and invalidate nothing; the inspection state is silent (its only key is leave). In semantic copy mode: a one-shot warn chip on the owner line. In native selection the scheduler is suspended and nothing can be drawn — **stated as the limit**, not papered over; the toast is `ok`-toned and is not used for a refusal. *Reason:* fixture 061 is the picture, and a consistent picture beats a lone rule.
+
+**60 · RULED — The refusal notice's form, persistence and home in each owner.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M5 item 3). **Layer owners.** `history-clear-confirm` is retired: it has no `src` consumer and nothing could answer it under a declared `question` owner. The chip preview declares `owner: "substate"` named `preview`, which subsumes `promptUnderMenu`'s id switch. *Reason:* the repo is right about what ships — a layer only a test pushes is not a subject.
+
+**61 · RULED — Two layers with no owner to declare.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M5 item 8). **Shell delegation consumes keys at the `child` rung**; F1 and every other key no rung binds stop there instead of falling to `global` (C16 I49). Forwarding bytes to the delegated child's stdin needs a C21/C23 mechanism that does not exist and is **recorded as a finding, not built** here. A question raised while a surface child is attached cannot be answered today; it is **owed to batch 3's M9 item 4** (the host escape read before the child rung), whose symbol is `interceptOf`'s `host.detach` arm. *Reason:* C16 I49 is the rule; the minimum that makes it true is consumption.
+
+**62 · RULED — What a `child` owner does with keys it cannot deliver.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M5 item 5). **Hints come from the keymap, so the keymap gains the rows it lacks**: a prompt `submit` row for `⏎` and a field `keep` row, and a question's hints come from its own declared vocabulary. *Reason:* one source — a hint that is not a binding is C16 I19's second keymap.
+
+**63 · RULED — Hinted keys with no keymap row.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M6 item 1). **Reserved actions pass through.** The hook is `TuiConfig.keyActions?: Partial<Record<ReservedKeyAction, () => boolean | void>>`, keyed by registry id; a handler returning `false` falls through; an unknown id is a construction error. With no handler a reserved row resolves as though absent, except `queue.drop`, whose displaced meaning `killWordLeft` is its `fallback`. `⌥v` with no handler is **dropped**, not restored to copy mode, which stays on `⌥⇧C` — one verb, one chord. *Reason:* the review item's rule, and a consistent picture.
+
+**64 · RULED — The reserved-action hook's shape, and `⌥v`.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M6 item 4). **Registry-global bindings.** `?` and `selection.*` are `global` rows; `copy` is an owner row at every owner with a copy verb — prompt, focused block (`copyElement`), semantic selection, and at `interaction` the focused element — and native selection passes it to the terminal. `?` in native selection passes (the frame is frozen, so an entry would land unseen). `selection.native`/`selection.semantic` from the other copy mode switches mode; from the same mode it is a no-op. **`⌃c` recognition is exact**: `⌃⇧C` under kitty is copy, never interrupt or exit-arming; on the base profile the bytes are `⌃c` and interrupt wins (ruling 3 of the reconciliation, unchanged). `⇧⏎` stays bound in both profiles, listed by equality, because an unbound `⇧⏎` submits. *Reason:* the registry's scope is `global`, and the design decides.
+
+**65 · RULED — Where the registry-global bindings fire.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 2, M6). **Ruling 53's chip-preview chords land in batch 4 with the preview**, not in M6: the two-direction gate M6 builds requires every registry binding to resolve to an action at a target, and the preview's target and verbs do not exist yet. Registering them now would need an *owed* arm in the gate, which is the exemption M6 item 3 removes. *Reason:* a consistent picture beats a lone rule.
+
+**66 · RULED — When ruling 53's chords are registered.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; ruling 45's build). **Ruling 45 corrected on one premise: `/` has no empty-prompt exception** — it switches namespace at any command position (`context.ts:218-225`, C19 T3.17). So `>`'s limit is written fresh: C19's slot classification tests `input[0] === ">"` **before** tokenising, a `>`-led line is never handed to C18 on submit, and the rule lands as **R-KEY-008** through `release.mjs`. **Measured by the walk: `> notes` then `⏎` today is delegated to the user's shell and truncates the file `notes`** — the submit guard closes that. Built as the last step of batch 2's M6. *Reason:* the ruling's intent stands; only its "same as `/`" premise was false, and a guard that stops a truncation strengthens a safety default.
+
+**67 · RULED — Ruling 45's premise about `/`.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 4, M11 item 1 — applying ruling 41). **Ruling 41's premise is corrected and the ruling stands: the frame reserves column 0 of the transcript region on every row, and the `▌` selection rail is drawn there.** Measured: no live gutter is drawn and no column is reserved today (`containers.ts:163-170`; SF1 row 07 starts `● help` in column 1), so ruling 41's *at no geometric cost* was false. The live gutter of A01 D6 and C14 D6/I18 is superseded — liveness is the spinner (R-GLY-003). The rail's ASCII form is `|` in a new `gutter` domain; it is never inverted at 1-bit. *Reason:* the ruling's intent — the rail takes the gutter column — is kept; only its cost claim was wrong. *Cost, stated:* every composed-session golden moves one column.
+
+**68 · RULED — Ruling 41 rested on a column that does not exist.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 4, M11 item 2). **Two carriers where the gate finds one.** Disclosure: `collapsed` carries its hidden count (`+N`) beside the mark, so collapsed and leaf differ by mark and word; `expanded` carries the content's position. Prompt selection is a **ruled exception** on the gate's equality list — the `▌` that would be its second carrier is the caret there — carried by ground (inverse at 1-bit) with the caret at one end. *Reason:* carrier rules count per fact; a named exception is the form the gate already has (`linear`).
+
+**69 · RULED — Disclosure and the prompt selection under the two-carrier gate.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 4, M10 item 3). **R-SEL-003/015 decide: a block stays atomic in semantic copy mode.** Ruling 36's `⇧←`/`⇧→` extend columns **in rectangle mode**, from the anchor, clamped to the block; there is no character caret over prose. *Reason:* when pictures disagree the rule decides, and the rendered column of markdown is not its source offset (R-SEL-001: copy takes the source). M10 item 3 is answered by the rectangle, not by a prose caret.
+
+**70 · RULED — Caret keys over prose.**
+
+---
+
+> **Ruled 2026-09-27** (by Claude under the person's standing authority; review batch 4, M12). **The trust boundary.** Neutralise once, at the block registry's resolve, memoised on identity; `cat -v` notation for C0/DEL/C1 and `<U+XXXX>` for every bidi format character including LRM/RLM/ALM (C04 I110 widened to refuse them in `terminal` lines). No raw-copy action. Switching C07's ingress from strip to escape, ANSI SGR to spans, and rebuilt OSC 8 are a **follow-up lane after the core**, because escaping ingress without the colour table makes coloured CLI output worse. OSC 52 is written only through `escapes.ts`, capped near 100 KB, and the toast says *sent by OSC 52*, never *copied*. ⏎ on an empty selection stays and says so; ⌃V off discards the rectangle. *Reason:* R-TRU-001 binds (*escaped*); R-BLK-898/900 are examples. *Cost, stated:* legitimate right-to-left text shows its marks.
+
+**71 · RULED — The trust boundary's mechanism and notation, and the copy destinations.**
+
+---
+
+> **Ruled 2026-09-28** (by the person; review batch 4, M10 item 1). **The local clipboard is approved as an optional runtime tool, not a package.** Order: **OSC 52 first** (it works over SSH), then a platform tool if present — `pbcopy`; `wl-copy`, `xclip` or `xsel`; `clip.exe` — detected at runtime and never required, spawned with a **fixed argv, no shell, payload on stdin**. If none is available the reader is offered file export and told so. OSC 52's success cannot be observed, so that path is worded honestly: *sent to the terminal's clipboard*, never *copied*. **Owed:** a `DEPENDENCIES.md` row for the optional tools, with batch 4's M10 lane.
+
+**72 · RULED — The local clipboard's mechanisms.** Batch 4's M10–M12 walk found copy reaching only the kill buffer, and spawning a platform clipboard tool is a dependency in practice, so it was the person's to decide.
+
+---
+
+> **Ruled 2026-09-28** (by Claude under the person's standing authority; review batch 3, M9 item 1). **C07 I18 stands, and `Patch.cap` is a row budget its producer declares; the framework derives no default.** Lane b3-d measured D12's premise and it does not hold: `ProducerContext.height` is non-null only on the view route (C07 I18), and R-EXA-082 retired that route, so no framework producer can compute *one viewport*. The two remedies were to give an entry a height, or to have C22 write the cap onto a far side's block. The first is I18's own refusal — a transcript entry is windowed by rows and has no bound, and the terminal's height standing in for one is the guess I18 was written against. The second is D12's own objection, a shell rewriting another producer's block. **Tie-breaks:** the repo is right about what ships (I18's argument is measured and current), and D12 was the lone rule. So *one viewport* is a producer's choice, never the framework's guess; a patch with no `cap` draws whole, as it did.
+
+**73 · RULED — Who writes a patch's cap, when no producer can see a height.**
+
+---
+
+> **Ruled 2026-09-28** (by Claude under the person's standing authority; review batch 4, M11 item 8, folded into batch 2). **`examples/docker/FINDINGS.md` stays tracked, where it is.** The review called it an agent log and asked for it to be removed or moved out of the tree with M4 item 5's clean-up. It is also the register the gates resolve against: SP5 resolves every cited finding number against it — 7,465 citations in 832 files under `docs/`, `src/`, `test/` and `tools/` at e1a8d608 — and SP6, SP12 and SP14 gate `TRIAGE.md`'s keys, open set and tallies against its ids. Removing it deletes the evidence those citations point at; moving it changes a path and nothing about what it is. **Tie-breaks:** the repo is right about what ships, and a consistent picture beats a lone rule. **What the review's point does buy**, and is not refused: the file's size is real (56 k lines), and its growth is the thing to watch — a split by range behind the same resolver is a change SP5 can carry, if it is ever wanted.
+
+**74 · RULED — Whether the findings register leaves the tree.**
+
 ---
 
 ## Not yet recovered

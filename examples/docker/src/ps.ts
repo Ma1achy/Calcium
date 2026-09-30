@@ -30,7 +30,7 @@ export { parseNdjson };
  * another state's colour.
  */
 const STATES: Readonly<Record<string, { glyph: Glyph; tone: Tone }>> = {
-  running: { glyph: "running", tone: "ok" },
+  running: { glyph: "work-unit", tone: "ok" },
   restarting: { glyph: "warn", tone: "warn" },
   paused: { glyph: "pending", tone: "warn" },
   exited: { glyph: "error", tone: "error" },

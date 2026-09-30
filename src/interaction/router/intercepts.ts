@@ -17,7 +17,7 @@
  * live in one.
  */
 
-import type { InputEvent, OwnerRung, Verdict } from "./types.js";
+import type { InputEvent, InterceptVerdict, Key, OwnerRung } from "./types.js";
 
 /** The intercepts §103 names. An app-registered one joins this union (M7). */
 export type InterceptId = "interrupt" | "page-scroll" | "wheel";
@@ -38,10 +38,26 @@ export type InterceptId = "interrupt" | "page-scroll" | "wheel";
  * So every rung carries a verdict and TypeScript is what enforces it: a seventh
  * rung is a decision somebody takes rather than a default they inherit.
  */
-export type OwnerApplicability = Readonly<Record<OwnerRung, Verdict>> &
+export type OwnerApplicability = Readonly<Record<OwnerRung, InterceptVerdict>> &
   Readonly<{
-    /** What happens when no rung above `scope` owns the keyboard. */
-    idle: Verdict;
+    /**
+     * What happens when no rung owns the keyboard. **Unreachable from a
+     * session** (C16 §3b): `activeTarget` has not answered `global` since §3a's
+     * W1, so `rung` is never `null` there. Kept because the table is total over
+     * what `interceptVerdict` accepts, and a router built with nothing focused
+     * is still a router.
+     */
+    idle: InterceptVerdict;
+    /**
+     * Where `global-intercept` sends this route (C16 I64) — `null` for an
+     * intercept that declares none, which is `interrupt`: its non-rejecting
+     * rungs all `handle`, because *cancel* is a different verb at each.
+     *
+     * - `transcript` — the transcript's pager at `global`, whatever is focused
+     *   (I40, R-BLK-112).
+     * - `pointer` — the wheel's pointer-hit owner, through `routeMouse`.
+     */
+    exception: "transcript" | "pointer" | null;
     /** Prose, because a declared override that nobody can read is a special case with a table around it. */
     why: string;
   }>;
@@ -51,14 +67,17 @@ export const INTERCEPTS: Readonly<Record<InterceptId, OwnerApplicability>> = Obj
    * §103: *interrupt — CHILD handles; QUESTION and COPY MODE reject; an ordinary
    * running owner handles tool/turn interrupt; idle rejects silently.*
    *
-   * The `question` row is the one the tree already reached by a different route
-   * and for a reason worth keeping: C16 §5's ruling A puts a question above the
-   * cancel rungs, because declining and cancelling produce the same outcome and
-   * the one that leaves a record wins. Two arguments, one answer — and the
-   * table is where they stop being two.
+   * The `question` row outranks the cancel rungs because the table is read
+   * before them: a local verb waiting on `ctx.ask` is in flight, and its `⌃c` is
+   * refused rather than cancelling the verb or declining the question (C16 I7,
+   * I62, ruling 59). The question stays open and says `answer this first`.
    */
   interrupt: {
     child: "handle",
+    // **A reject runs no rung** (C16 I62, ruling 59). It used to run the owning
+    // one first, so this row said *reject* and the dispatch answered the
+    // question with its default and left copy mode — the table's word, and the
+    // opposite deed.
     copy: "reject",
     question: "reject",
     // **An ordinary running owner handles tool/turn interrupt** (§103), and
@@ -68,6 +87,7 @@ export const INTERCEPTS: Readonly<Record<InterceptId, OwnerApplicability>> = Obj
     inside: "handle",
     scope: "handle",
     idle: "reject",
+    exception: null,
     why: "a child owns its own signal; a question and a frozen screen are resolved by their own exits, not by cancelling something else",
   },
   /**
@@ -83,13 +103,14 @@ export const INTERCEPTS: Readonly<Record<InterceptId, OwnerApplicability>> = Obj
     // captured child owns its keys; it does not own the transcript scrolled
     // behind it, and a reader who cannot page while a child is attached cannot
     // read what the child just wrote.
-    child: "handle",
+    child: "global-intercept",
     copy: "reject",
-    question: "handle",
-    substate: "handle",
-    inside: "handle",
-    scope: "handle",
-    idle: "handle",
+    question: "global-intercept",
+    substate: "global-intercept",
+    inside: "global-intercept",
+    scope: "global-intercept",
+    idle: "global-intercept",
+    exception: "transcript",
     why: "the screen is frozen, so scrolling it would be scrolling a picture; every other rung scrolls the viewport and FOCUS IS NOT MOVED BY IT",
   },
   /**
@@ -101,13 +122,14 @@ export const INTERCEPTS: Readonly<Record<InterceptId, OwnerApplicability>> = Obj
    * a frozen screen.
    */
   wheel: {
-    child: "handle",
+    child: "global-intercept",
     copy: "reject",
-    question: "handle",
-    substate: "handle",
-    inside: "handle",
-    scope: "handle",
-    idle: "handle",
+    question: "global-intercept",
+    substate: "global-intercept",
+    inside: "global-intercept",
+    scope: "global-intercept",
+    idle: "global-intercept",
+    exception: "pointer",
     why: "tracking-off is a terminal fact and handled before decode; in native selection the wheel would move a screen that is deliberately still",
   },
 });
@@ -119,7 +141,7 @@ export const INTERCEPTS: Readonly<Record<InterceptId, OwnerApplicability>> = Obj
  * signature that let a caller read *no verdict here* as *carry on down the
  * ladder*, which is the one answer a reserved route must never give.
  */
-export function interceptVerdict(id: InterceptId, rung: OwnerRung | null): Verdict {
+export function interceptVerdict(id: InterceptId, rung: OwnerRung | null): InterceptVerdict {
   const table = INTERCEPTS[id];
   return rung === null ? table.idle : table[rung];
 }
@@ -145,10 +167,29 @@ export function interceptVerdict(id: InterceptId, rung: OwnerRung | null): Verdi
  * into a compromise: *the active viewport* had to mean the focused box for
  * `PgUp` and the transcript for `⌥↑`, and one verdict cannot say both.
  */
+/**
+ * `⌃c`, exactly (C16 I67, §6c S7–S10): `ctrl` and the name `c`, and no
+ * `shift`, `meta` or `super`.
+ *
+ * **Kitty's `⌃⇧C` is `CSI 99;6u`** — the name `c` with `shift` — and it is the
+ * enhanced profile's `copy`. Read loosely it was an interrupt at every reader:
+ * it cancelled a running verb (measured), armed the exit and denied a question.
+ * On the base profile the bytes are `0x03`, which decodes with no `shift`, so
+ * interrupt still wins there.
+ *
+ * **One predicate for both readers** — this table and the router's ladder. The
+ * question's classifier was the third and read the same loose test; it stopped
+ * reading `⌃c` at all with ruling 59 (C16 I62), since the router refuses it at a
+ * question before the classifier is asked.
+ */
+export function isExactCtrlC(key: Key): boolean {
+  return key.ctrl && key.name === "c" && !key.shift && !key.meta && key.super !== true;
+}
+
 export function interceptOf(e: InputEvent): InterceptId | null {
   if (e.kind === "mouse") return e.button.startsWith("wheel") ? "wheel" : null;
   if (e.kind !== "key") return null;
   const { key } = e;
-  if (key.ctrl && key.name === "c") return "interrupt";
+  if (isExactCtrlC(key)) return "interrupt";
   return key.meta && (key.name === "up" || key.name === "down") ? "page-scroll" : null;
 }

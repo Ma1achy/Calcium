@@ -11,6 +11,7 @@ import type { MeasureFn } from "../../src/data/viewmodel/index.js";
 import { degradeColour } from "../../src/presentation/theme/colormap.js";
 import { b } from "../../src/shell/builders/index.js";
 import { pipelineHarness, settled } from "../support/execution.js";
+import { BODY_INDENT } from "../../src/shell/entry-layout.js";
 import { createProcessRunner } from "../../src/data/process/runner.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 
@@ -695,7 +696,7 @@ describe("C23 — the shell route as a live screen, spec-first rows", () => {
     // calls have returned (F852).
     //
     // What is left is the figure, and it is the one that can be wrong: the
-    // region is 60 and the body's inner width is 56.
+    // region is 60 and the body's inner width is 55 (60 − BODY_INDENT).
     let width = 80;
     const told: number[] = [];
     let emit: ((c: string) => void) | null = null;
@@ -735,8 +736,8 @@ describe("C23 — the shell route as a live screen, spec-first rows", () => {
 
     const scroll = h.transcript.entries[0]?.doc.blocks[0] as { children: readonly Block[] };
     const screen = scroll.children[0] as { cols: number };
-    expect(told, "the child was told once").toEqual([56]);
-    expect(screen.cols, "and the emulator holds the same number").toBe(56);
-    expect(screen.cols, "which is the body's inner width, not the region's").toBe(60 - 4);
+    expect(told, "the child was told once").toEqual([60 - BODY_INDENT]);
+    expect(screen.cols, "and the emulator holds the same number").toBe(60 - BODY_INDENT);
+    expect(screen.cols, "which is the body's inner width, not the region's").toBe(55);
   });
 });

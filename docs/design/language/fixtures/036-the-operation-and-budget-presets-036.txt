@@ -80,7 +80,7 @@ cancelled, and interrupted
 
   ● compacting · 2m 10s · cancelled   nothing was summarised
   ● compacting · 2m 10s · failed
-  ⎿ ✗ the summariser returned no content
+  ⎿  ✗ the summariser returned no content
   muted for cancelled, error for failed — and in both the bar goes,
   because a stopped bar is a claim about progress that is not being
   made any more.

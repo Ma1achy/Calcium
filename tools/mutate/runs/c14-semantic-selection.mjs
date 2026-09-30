@@ -68,16 +68,10 @@ const MUTATIONS = [
     to: "  return mode.blocks.size === 0 ? null : frozen(null, null, new Set<string>());",
     expect: "T1.41b",
   },
-  {
-    // **`⌃c` taking `esc`'s route** (C16 §5d D5). The defect the walk found:
-    // carrying the clear step onto the ladder's cancel reads as consistency,
-    // and makes the rung answer *cancel the innermost thing AND tidy up*.
-    name: "the ⌃c rung clears first instead of leaving",
-    file: ROUTER,
-    from: "      deps.exitSemanticSelection();\n      return true;",
-    to: "      deps.escapeSemanticSelection();\n      return true;",
-    expect: "T1.41f",
-  },
+  // **"the ⌃c rung clears first instead of leaving" is retired with the rung**
+  // (C16 I62, ruling 59): copy mode rejects the interrupt, so there is no
+  // semantic-selection `⌃c` rung to route anywhere. T1.41f now asserts the
+  // refusal, and `c16-ownership.mjs` mutates the reject path itself.
   {
     // **Two rungs where the design has one** (C16 I50). Mapping the mode to
     // `substate` leaves every routing test green — it is still a target, it
@@ -94,7 +88,8 @@ const MUTATIONS = [
     // C14 I47 — the footer's `⏎ copy` with nothing bound, as it shipped.
     name: "⏎ is unbound at semanticSelection",
     file: "src/interaction/router/keymap.ts",
-    from: '  { target: "semanticSelection", key: chordOf("confirm"), action: "copySelectedEntries" },\n',
+    // Re-anchored for C16 §6c: the row spreads `fromRegistry` where it called `chordOf`.
+    from: '  { target: "semanticSelection", ...fromRegistry("confirm"), action: "copySelectedEntries" },\n',
     to: "",
     expect: "T1.47",
   },

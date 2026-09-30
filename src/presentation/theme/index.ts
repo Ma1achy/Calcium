@@ -16,6 +16,7 @@ export { DARK_FOUR_BIT, HIGH_CONTRAST_FOUR_BIT, LIGHT_FOUR_BIT, MUST_STAY_DISTIN
 export { assertPictureGlyph, isPictureGlyph } from "./picture.js";
 export { collisions, separation, OKABE_ITO_CANONICAL, SEPARATION_FLOOR, VISIONS, type Collision, type Vision } from "./cvd.js";
 export {
+  bandAt,
   cacheSize,
   clearResolutionCache,
   quantisedHex,

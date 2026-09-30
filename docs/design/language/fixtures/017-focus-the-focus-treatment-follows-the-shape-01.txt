@@ -43,13 +43,13 @@ an unpainted BOX — one row or less, so it paints whole
 a REGION — more than one row, so the entry washes and the row paints
 
   ▸ ● search("inQuote") · 1.2s · 3 files
-      ⎿ parse.ts:41    let inQuote = false;
-        tokens.ts:88   if (inQuote) continue;
+      ⎿  parse.ts:41    let inQuote = false;
+         tokens.ts:88   if (inQuote) continue;
   transcript scope — you have the BLOCK
 
   ▸ ● search("inQuote") · 1.2s · 3 files
-      ⎿ parse.ts:41    let inQuote = false;
-        tokens.ts:88   if (inQuote) continue;
+      ⎿  parse.ts:41    let inQuote = false;
+         tokens.ts:88   if (inQuote) continue;
   block scope — the entry settles back and the ROW paints
 
 four grounds, four jobs

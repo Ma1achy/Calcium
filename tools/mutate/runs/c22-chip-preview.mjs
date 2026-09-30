@@ -81,8 +81,10 @@ const results = runPass({
       // reaches no handler and the caret can never leave the chip.
       name: "the preview answers keys rather than letting the prompt answer beneath it",
       file: CONSTRUCT,
-      from: "    stores.overlays.top?.id === CHIP_PREVIEW_ID ||\n",
-      to: "",
+      // Re-anchored in review batch 2: the preview is found by its declared
+      // substate name now, not its id (C15 I29, ruling 61).
+      from: '    return owner.name === "preview" || (owner.name === "complete" && keys.selected === null);',
+      to: '    return owner.name === "complete" && keys.selected === null;',
       expect: "T1.69",
     },
     {

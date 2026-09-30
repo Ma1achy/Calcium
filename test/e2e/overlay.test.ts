@@ -54,9 +54,6 @@ function routerDeps(overlays: OverlayManager): RouterDeps {
     popLayer: () => void overlays.pop(),
     nativeSelection: () => false,
     semanticSelection: () => false,
-    escapeSemanticSelection: () => undefined,
-    exitSemanticSelection: () => undefined,
-    exitNativeSelection: () => undefined,
     liveEntry: () => null,
     entryAtRow: () => null,
     inFlight: () => null,
@@ -72,6 +69,7 @@ function routerDeps(overlays: OverlayManager): RouterDeps {
     promptHasText: () => false,
     clearPrompt: () => undefined,
     raiseExitConfirm: () => undefined,
+    refused: () => undefined,
   };
 }
 

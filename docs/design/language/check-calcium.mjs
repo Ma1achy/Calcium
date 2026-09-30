@@ -150,8 +150,15 @@ function checkSpinnerFallbacks(registry, html) {
     requireText(html, fallbackPrefix, `generated fallback table row for ${spinner.id}`);
     if (spinner.reusable) requireText(html, `data-spinner-inventory="${htmlEsc(spinner.id)}" data-ascii-resolved="${resolvedAttr}"`, `generated spinner inventory row for ${spinner.id}`);
     else rejectText(html, `data-spinner-inventory="${htmlEsc(spinner.id)}"`, 'composite agent inserted into reusable spinner gallery');
-    requireText(css, `[data-spinner-capability="ascii"] .sp-${spinner.id}::after{content:${cssString(expected[0])};animation-name:${asciiName}}`, `per-set ASCII capability CSS for ${spinner.id}`);
+    // At the policy's one ASCII cadence (question 40), over the resolved frames.
+    const asciiCycleMs = registry.spinnerPolicy.asciiIntervalMs * expected.length;
+    requireText(css, `[data-spinner-capability="ascii"] .sp-${spinner.id}::after{content:${cssString(expected[0])};animation-name:${asciiName};animation-duration:${asciiCycleMs}ms}`, `per-set ASCII capability CSS for ${spinner.id}`);
   }
+  // Every fallback row prints the one ASCII cadence, and there is a row per set.
+  const rowCadences = [...html.matchAll(/data-spinner-fallback="[^"]*"[^\n]*?(\d+)ms · /g)].map(m => Number(m[1]));
+  if (rowCadences.length !== current.length) fail(`${rowCadences.length} fallback rows print a cadence; registry has ${current.length} sets`);
+  const offCadence = rowCadences.filter(ms => ms !== registry.spinnerPolicy.asciiIntervalMs);
+  if (offCadence.length) fail(`fallback rows print ${offCadence.join(', ')}ms where the ASCII rung steps at ${registry.spinnerPolicy.asciiIntervalMs}ms`);
   const agent = current.find(item => item.id === 'agent');
   const composedUnicode = agent.asciiTrajectory.spinnerIds.flatMap(id => current.find(item => item.id === id).frames);
   if (!same(agent.frames, composedUnicode)) fail('agent Unicode walk drifted from its named component sets');

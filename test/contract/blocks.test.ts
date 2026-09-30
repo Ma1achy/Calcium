@@ -25,7 +25,7 @@ import {
 import { rowContaining, styleAt, styledScreenFrom } from "../support/styled-screen.js";
 import { CONTENT_LINE_CAP, statusRowsFor } from "../../src/presentation/blocks/kinds/status.js";
 import { background, focusStyle, tone } from "../../src/presentation/blocks/paint.js";
-import { block } from "../../src/data/viewmodel/index.js";
+import { CALL_STATE_TONE, block } from "../../src/data/viewmodel/index.js";
 import { sgr } from "../../src/terminal/escapes.js";
 import { cells, hasEmojiForm, TEXT_PRESENTATION } from "../../src/presentation/text.js";
 import { SPINNER_SETS } from "../../src/presentation/blocks/glyphs.js";
@@ -160,6 +160,45 @@ describe("C09 contract — measurement", () => {
     }
   });
 
+  it("T2.188 (C09 I5, R-GLY-003, C22 I83): a continuation notice at every width from 6 to 24, at Unicode and ASCII, measures what it renders and starts its text in one column at both rungs", () => {
+    // **The narrow widths are the point**: the hanging indent is five cells of a
+    // six-cell row at the bottom of the range, so a lead one cell wider than
+    // `measure` believes is a wrapped row `measure` did not count, and a lead one
+    // cell narrower at one rung moves every row's text at that rung.
+    const notice = block({
+      kind: "notice",
+      id: "t2-188",
+      tone: "muted",
+      glyph: "continuation",
+      text: "the quick brown fox jumps over the lazy dog, twice over",
+    });
+    const unicode = measurable({ capabilities: FULL_CAPS });
+    const ascii = measurable({ capabilities: ASCII_CAPS });
+    const LEAD = 5;
+    for (let width = 6; width <= 24; width += 1) {
+      const rungs = [
+        ["unicode", unicode, "  ⎿  "],
+        ["ascii", ascii, "  `- "],
+      ] as const;
+      const bodies: string[][] = [];
+      for (const [name, kit, hook] of rungs) {
+        const rows = kit.renderToLines(notice, width).map(visible);
+        expect(rows.length, `${name} at ${String(width)}: measure is what renders`).toBe(kit.measure(notice, width));
+        expect(rows.length, `${name} at ${String(width)}: the fixture wraps`).toBeGreaterThan(1);
+        expect(rows[0]?.slice(0, LEAD), `${name} at ${String(width)}: the hook, padded to its reservation`).toBe(hook);
+        for (const [index, row] of rows.entries()) {
+          expect(cells(row), `${name} at ${String(width)}, row ${String(index)}: inside the width`).toBeLessThanOrEqual(width);
+          if (index > 0) expect(row.slice(0, LEAD), `${name} at ${String(width)}, row ${String(index)}: the hanging indent`).toBe(" ".repeat(LEAD));
+          expect(row.charAt(LEAD), `${name} at ${String(width)}, row ${String(index)}: text starts at the column`).not.toBe(" ");
+        }
+        bodies.push(rows.map((row) => row.slice(LEAD)));
+      }
+      // One column at both rungs means one wrap at both rungs: the text after
+      // the lead is the same rows, not merely the same count.
+      expect(bodies[1], `at ${String(width)}: the ASCII rung wraps the text where Unicode does`).toEqual(bodies[0]);
+    }
+  });
+
   it("T2.5 (I5): every substitution in §4 occupies the same slot at every rung", () => {
     // **Amended twice, and the second amendment narrowed the first.** One cell
     // against one cell was a way of guaranteeing that no column moves when the
@@ -212,6 +251,27 @@ describe("C09 contract — measurement", () => {
       const widths = rungs.map((caps) => cells(glyphs(caps)[name], caps.ambiguousWidth));
       expect(new Set(widths).size, `${name} is exempt because it varies — ${widths.join(", ")}`).toBeGreaterThan(1);
     }
+
+    // **The block's glyph slot, by reservation** (R-GLY-001, R-GLY-003).
+    // `glyphCells` is the widest of the two renderings, and the lead a notice
+    // draws puts its text in one column at every rung — `continuation` is the
+    // one two-cell slot, `⎿` padded to `` `- ``, and it is what makes the
+    // padding a property rather than a no-op on one-cell marks.
+    const wideCaps = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
+    const reserved: string[] = [];
+    for (const token of GLYPH_TOKENS) {
+      const halves = [glyphFor(token, FULL_CAPS), glyphFor(token, ASCII_CAPS)];
+      expect(glyphCells(token), `${token}: the reservation is the widest half`).toBe(Math.max(...halves.map((half) => cells(half))));
+      if (glyphCells(token) > 1) reserved.push(token);
+      // Text no glyph draws: `x` is `error`'s ASCII half, and `indexOf` found
+      // the mark rather than the text the first time this ran.
+      const probe = block({ kind: "notice", id: `t2-5-${token}`, tone: "default", glyph: token, text: "Zq" });
+      const columns = [FULL_CAPS, wideCaps, ASCII_CAPS].map((caps) =>
+        visible(measurable({ capabilities: caps }).renderToLines(probe, 40)[0] ?? "").indexOf("Zq"),
+      );
+      expect(new Set(columns).size, `${token}: the text column at narrow, wide and ASCII — ${columns.join(", ")}`).toBe(1);
+    }
+    expect(reserved, "the multi-cell slots, by equality").toEqual(["continuation"]);
   });
 
   it("T2.5b (I5, C04 §5): every `Glyph` is 1:1 by cell count, in both renderings", () => {
@@ -220,19 +280,30 @@ describe("C09 contract — measurement", () => {
     // emitted a block-supplied character verbatim. Now every glyph a block can
     // name is in this table, so the guarantee covers the whole field rather
     // than most of it.
-    for (const [unicode, ascii] of GLYPH_SUBSTITUTIONS) {
-      expect(cells(ascii), `${unicode} → ${ascii}`).toBe(cells(unicode));
+    //
+    // *Restated for review batch 2, M4 item 6* (C09 T2.115): the halves are
+    // equal for every token but `continuation`, whose `` `- `` is the
+    // registry's two cells against `⎿`'s one. What a measurer relies on is the
+    // reservation, which bounds both; T2.5 asserts the renderer pads to it.
+    for (const token of GLYPH_TOKENS) {
+      const [unicode, ascii] = [glyphFor(token, FULL_CAPS), glyphFor(token, ASCII_CAPS)];
       expect(cells(unicode), `${unicode} is one cell`).toBe(1);
+      expect(cells(ascii), `${unicode} → ${ascii} fits the reservation`).toBeLessThanOrEqual(glyphCells(token));
+      if (token !== "continuation") expect(cells(ascii), `${unicode} → ${ascii}`).toBe(cells(unicode));
     }
+    expect(GLYPH_SUBSTITUTIONS.length, "every substitution is a token's pair").toBe(GLYPH_TOKENS.length);
   });
 
-  it("T2.5c: `glyphCells` agrees with both renderings, which is what lets measure skip capabilities", () => {
+  it("T2.5c: `glyphCells` bounds both renderings, which is what lets measure skip capabilities", () => {
     // `measure` receives width and no capability record (C04 §5), so it can only
-    // be right if the two renderings are the same width. This asserts the thing
-    // the measurer actually relies on rather than the table it is derived from.
+    // be right if no rendering is wider than the slot it measured. It used to
+    // assert both were *equal* to it; `continuation`'s `⎿` is one cell of a
+    // two-cell reservation (C09 I5) and the lead pads it, which T2.5 reads off
+    // the frame.
     for (const token of GLYPH_TOKENS) {
-      expect(glyphCells(token)).toBe(cells(glyphFor(token, FULL_CAPS)));
-      expect(glyphCells(token)).toBe(cells(glyphFor(token, ASCII_CAPS)));
+      expect(cells(glyphFor(token, FULL_CAPS))).toBeLessThanOrEqual(glyphCells(token));
+      expect(cells(glyphFor(token, ASCII_CAPS))).toBeLessThanOrEqual(glyphCells(token));
+      expect(Math.max(cells(glyphFor(token, FULL_CAPS)), cells(glyphFor(token, ASCII_CAPS)))).toBe(glyphCells(token));
     }
   });
 
@@ -535,7 +606,7 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
     expect(offenders).toEqual([]);
     // **The controls, so an empty table cannot pass the row**: the two marks
     // the table found on its first run are in it, and the keycap base `*` —
-    // `step`'s and `running`'s ASCII rung — is excluded by the row's own guard.
+    // `step`'s and `work-unit`'s ASCII rung — is excluded by the row's own guard.
     expect(hasEmojiForm(0x23fa), "⏺︎ U+23FA, the mark F823 is about").toBe(true);
     expect(hasEmojiForm(0x2139), "ℹ U+2139, the mark F832 found").toBe(true);
     expect(hasEmojiForm(0x2b24), "⬤ U+2B24, which held the slot between F823 and F854").toBe(false);
@@ -548,14 +619,14 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
     }
     expect(bare, "a bare base is still a violation — the remedy is the selector, not the exemption").toEqual(["\u23fa"]);
     expect(hasEmojiForm(0x2a), "* is a keycap base in the Unicode file and excluded by construction (F832)").toBe(false);
-    expect(glyphFor("running", ASCII_CAPS), "so the ASCII rung is still *").toBe("*");
+    expect(glyphFor("work-unit", ASCII_CAPS), "so the ASCII rung is still *").toBe("*");
   });
 
-  it("T2.115 (C09 I48): every `Glyph` is 1:1 by cell count at BOTH conventions, through `glyphFor`", () => {
+  it("T2.115 (C09 I48, I5): every `Glyph` is its reservation's width at BOTH conventions, through `glyphFor`", () => {
     // T2.5b asserted the rule at `narrow` alone, and ten of seventeen members
     // broke it at `wide` while it was green (F825). The two named sets are
     // compared by equality so a member moving between them fails the row.
-    const AMBIGUOUS = new Set(["warn", "info", "pending", "working", "running", "queued", "cancelled", "expand", "collapse", "focus", "bullet"]);
+    const AMBIGUOUS = new Set(["warn", "info", "pending", "working", "work-unit", "queued", "cancelled", "expand", "collapse", "focus", "bullet"]);
     // `question` `⟩` and `current` `›` join NEUTRAL, measured rather than
     // assumed: both are one cell at either convention, so neither takes a wide
     // fallback and both are `steady`. They arrived with M11's carrier matrix —
@@ -583,9 +654,11 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
       const ascii = glyphFor(token, ASCII_CAPS);
       // The invariant's own subject, untouched: one cell at every rung, through
       // `glyphFor`, which is what lets `measure` skip capabilities (I5).
+      // Restated (C09 T2.115, M4 item 6): the width at every rung is the
+      // reservation's for the ASCII half and one cell for the Unicode one.
       expect(cells(narrow, "narrow"), `${token} narrow`).toBe(1);
-      expect(cells(wide, "wide"), `${token} at wide, through glyphFor`).toBe(1);
-      expect(cells(ascii, "wide"), `${token} ascii`).toBe(1);
+      expect(cells(wide, "wide"), `${token} at wide, through glyphFor`).toBe(glyphCells(token));
+      expect(cells(ascii, "wide"), `${token} ascii`).toBe(glyphCells(token));
       // And the rung is taken whole — T2.171 is the row for it; here it is the
       // premise the partition below no longer gets to assume.
       expect(wide, `${token}: the wide arm is the ASCII rung`).toBe(ascii);
@@ -774,7 +847,7 @@ describe("C09 contract — the slice seam", () => {
  * the ground and nothing else, and the assertion is the geometry.
  */
 describe("C09 I83 — a notice takes the focus ground and no column", () => {
-  const HEAD = block({ kind: "notice", id: "h", tone: "default", glyph: "running", state: "running", text: "ps · ok" } as never);
+  const HEAD = block({ kind: "notice", id: "h", tone: "default", glyph: "work-unit", state: "running", text: "ps · ok" } as never);
   const BODY = block({ kind: "notice", id: "b", tone: "muted", glyph: "continuation", text: "one row" } as never);
   const WIDTH = 40;
   const kitAt = (focus: RenderContext["focus"], caps = FULL_CAPS) =>
@@ -833,8 +906,13 @@ describe("C09 I83 — a notice takes the focus ground and no column", () => {
     // **Three tones, because one passes a mechanism that paints a constant.**
     // The form this replaces put `accent` on the selection ground, which could
     // not tell a focused `info` notice from an unfocused `accent` one.
-    for (const name of ["info", "error", "warn"] as const) {
-      const notice = block({ kind: "notice", id: "h", tone: name, glyph: "running", state: "running", text: `on ${name}` } as never);
+    //
+    // **Iterated over states, because a head's tone is its state's** (C04 I141):
+    // this put `info` and `warn` on a `running` head, which construction now
+    // refuses. Three states give three tones, `error` among them.
+    for (const state of ["failed", "succeeded", "running"] as const) {
+      const name = CALL_STATE_TONE[state];
+      const notice = block({ kind: "notice", id: "h", tone: name, glyph: "work-unit", state, text: `on ${name}` } as never);
       const lines = kitAt({ blockId: "h", rowId: "h" }).renderSequence([notice], WIDTH);
       // **The slot is the notice's; the hex is the ground's answer** (C10 I48).
       // `dark` composes a nearer `error` for `focusGround`, so a row asserting
@@ -1291,12 +1369,12 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
 });
 
 describe("C09 I111 — the trend arrows", () => {
-  it("T2.174 (C09 I111, R-COL-006): trendUp and trendDown resolve to ↑ ↓ and ^ V", () => {
-    const at = (caps: Parameters<typeof glyphs>[0]) => [glyphs(caps).trendUp, glyphs(caps).trendDown];
-    expect(at({ unicode: "full", ambiguousWidth: "narrow" })).toEqual(["\u2191", "\u2193"]);
-    expect(at({ unicode: "ascii", ambiguousWidth: "narrow" })).toEqual(["^", "V"]);
-    // Both arrows are Ambiguous, so `wide` takes the ASCII rung with the set (C09 I48).
-    expect(at({ unicode: "full", ambiguousWidth: "wide" })).toEqual(["^", "V"]);
+  it("T2.174 (C09 I111, R-COL-006, question 37): trendUp, trendDown and trendFlat resolve to ↑ ↓ → and ^ V =", () => {
+    const at = (caps: Parameters<typeof glyphs>[0]) => [glyphs(caps).trendUp, glyphs(caps).trendDown, glyphs(caps).trendFlat];
+    expect(at({ unicode: "full", ambiguousWidth: "narrow" })).toEqual(["\u2191", "\u2193", "\u2192"]);
+    expect(at({ unicode: "ascii", ambiguousWidth: "narrow" })).toEqual(["^", "V", "="]);
+    // All three are Ambiguous, so `wide` takes the ASCII rung with the set (C09 I48).
+    expect(at({ unicode: "full", ambiguousWidth: "wide" })).toEqual(["^", "V", "="]);
     // **`V` and not `v`** (question 38): `v` is disclosure's, and a row's lead and
     // a cell share one content row.
     expect(glyphFor("collapse", { unicode: "ascii", ambiguousWidth: "narrow" })).toBe("v");

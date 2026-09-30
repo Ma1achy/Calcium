@@ -384,6 +384,12 @@ export function validateRegistry(registry) {
     }
   };
   walkForCitations(registry, '', 0);
+  // **Bindings are superseded the way rules are, and walked the same way** (C16
+  // §6c, T1.174). Sixteen were superseded when the design's `profile` field was
+  // corrected, and nothing walked their links: a binding carries no digest and no
+  // baseline, so a successor that named no predecessor would have read as two
+  // unrelated records. The rules' own walk, not a second copy of it.
+  validateSupersession(registry.bindings, new Map(registry.bindings.map(binding => [binding.id, binding])));
   const currentSpinners = active(registry.spinners);
   const spinnerIds = new Set();
   for (const spinner of currentSpinners) {
@@ -513,6 +519,11 @@ export function validateRegistry(registry) {
   }
   if (!registry.spinnerPolicy?.previewDefault || !registry.spinnerPolicy?.previewDefaultSource || !registry.spinnerPolicy?.measuredQuery) {
     throw new Error('spinner preview policy is incomplete');
+  }
+  // **One cadence for the ASCII rung** (question 40): every set's ASCII frames
+  // step at this interval, whatever the set's own — `R-MOT-011` per rung.
+  if (!Number.isInteger(registry.spinnerPolicy.asciiIntervalMs) || registry.spinnerPolicy.asciiIntervalMs <= 0) {
+    throw new Error('spinner policy records no ASCII interval');
   }
   if (!registry.barPolicy?.indeterminate || !Array.isArray(registry.barPolicy.placementOrder)) throw new Error('bar placement policy is incomplete');
   const currentBars = active(registry.bars);
@@ -955,13 +966,16 @@ function renderKeymap(registry, compact = false) {
     const body = entries.map(item => {
       const route = item.kind === 'command' ? '<span class="c-meta">cmd </span>' : '<span class="c-muted">key </span>';
       const when = item.when ? `<span class="c-meta"> \u00b7 ${esc(item.when)}</span>` : '';
-      return `<span class="c-default">  </span>${route}<span class="c-accent">${esc(item.chord.padEnd(7))}</span><span class="c-muted">${esc(item.label)}</span>${when}`;
+      // The profile beside the condition, because it is one: an enhanced chord is
+      // a route only where the terminal reported the protocol (C16 §6c).
+      const profile = item.profile === 'enhanced-terminal' ? `<span class="c-meta"> \u00b7 enhanced</span>` : '';
+      return `<span class="c-default">  </span>${route}<span class="c-accent">${esc(item.chord.padEnd(7))}</span><span class="c-muted">${esc(item.label)}</span>${when}${profile}`;
     }).join('\n');
     return `${header}\n${body}`;
   }).join('\n<span class=gap> </span>\n');
   const heading = compact
     ? `<span class="c-ok">● </span><span class="c-default">keys</span><span class="c-muted"> · </span><span class="c-ok">${countValue(registry, 'bindings')} bindings</span>`
-    : `<span class="c-default bold">RESOLVED DEFAULT-TERMINAL KEYMAP · ${countValue(registry, 'bindings')} bindings</span>`;
+    : `<span class="c-default bold">RESOLVED KEYMAP · ${countValue(registry, 'bindings')} bindings · default and enhanced terminals</span>`;
   const intro = compact
     ? `<span class="c-muted" data-help-policy="durable-entry">${esc(registry.keymapPolicy.help.durableEntry)}</span>`
     : `<span class="c-muted" data-keymap-policy="universal">${esc(registry.keymapPolicy.universal)}</span>\n<span class="c-muted">Actions are primary. Chords are the resolved profile. A named command route is the intended contract; only ${active(registry.bindings).filter(b => b.kind === 'command').length} of ${active(registry.bindings).length} bindings carry one today.</span>`;
@@ -994,8 +1008,13 @@ export function renderKeysMarkdown(registry) {
   }
   // Route and Condition are columns, not omissions. `/help` under a "Key" column
   // with no condition read as an unconditional global keystroke.
-  const sections = [...groups.entries()].map(([scope, entries]) => `## ${scope}\n\n| Route | Binding | Condition | Action | Meaning |\n| --- | --- | --- | --- | --- |\n${entries.map(binding => `| ${markdownCell(binding.kind ?? 'key')} | ${markdownCell(binding.chord)} | ${markdownCell(binding.when ?? 'always')} | ${markdownCell(binding.actionId)} | ${markdownCell(binding.label)} |`).join('\n')}`).join('\n\n');
-  return `<!-- GENERATED FILE — DO NOT EDIT. Source: docs/design/language/calcium-registry.json, rendered by build-calcium.mjs's renderKeysMarkdown; written with the key ladder below by tools/keymap-table.mjs -->\n# Calcium keys\n\nRevision ${registry.meta.revision} · ${bindings.length} current bindings · profile: default-terminal\n\n${registry.keymapPolicy.universal}\n\n${registry.keymapPolicy.help.docsContract}\n\n${sections}\n`;
+  //
+  // **And Profile is a column, where it was a header** (C16 §6a clause 5, §6c).
+  // One header said `profile: default-terminal` over every row, so this file
+  // listed `⌘1` for a plain terminal: the record's own field is the fact, and a
+  // file-wide claim is a second record of it that cannot be true of every row.
+  const sections = [...groups.entries()].map(([scope, entries]) => `## ${scope}\n\n| Route | Binding | Profile | Condition | Action | Meaning |\n| --- | --- | --- | --- | --- | --- |\n${entries.map(binding => `| ${markdownCell(binding.kind ?? 'key')} | ${markdownCell(binding.chord)} | ${markdownCell(binding.profile)} | ${markdownCell(binding.when ?? 'always')} | ${markdownCell(binding.actionId)} | ${markdownCell(binding.label)} |`).join('\n')}`).join('\n\n');
+  return `<!-- GENERATED FILE — DO NOT EDIT. Source: docs/design/language/calcium-registry.json, rendered by build-calcium.mjs's renderKeysMarkdown; written with the key ladder below by tools/keymap-table.mjs -->\n# Calcium keys\n\nRevision ${registry.meta.revision} · ${bindings.length} current bindings · a \`default-terminal\` chord is one a terminal without the Kitty protocol sends; an \`enhanced-terminal\` chord needs the protocol\n\n${registry.keymapPolicy.universal}\n\n${registry.keymapPolicy.help.docsContract}\n\n${sections}\n`;
 }
 
 function renderSpinners(registry) {
@@ -1030,12 +1049,13 @@ function renderSpinnerFallbackTable(registry) {
   const rows = active(registry.spinners).map(item => {
     const asciiFrames = spinnerAsciiFrames(registry, item);
     const descriptor = spinnerPatternDescriptor(registry, item);
-    return `<span data-spinner-fallback="${esc(item.id)}" data-ascii-motion="${esc(item.asciiMotion)}" data-ascii-trajectory="${esc(item.asciiTrajectory.type)}" data-ascii-pattern="${esc(descriptor.attribute)}" data-ascii-resolved="${esc(asciiFrames.join(''))}" data-glyph-capability="ascii"><span class="c-accent sp sp-${esc(item.id)}"></span><span class="c-default">  ${esc(item.id.padEnd(16))}</span><span class="c-muted">${esc(item.asciiMotion.padEnd(17))}</span><span class="c-default">${esc(descriptor.visible.padEnd(34))}</span><span class="c-muted">${String(item.intervalMs).padStart(4)}ms · ${String(item.frames.length).padStart(2)} frames</span></span>`;
+    return `<span data-spinner-fallback="${esc(item.id)}" data-ascii-motion="${esc(item.asciiMotion)}" data-ascii-trajectory="${esc(item.asciiTrajectory.type)}" data-ascii-pattern="${esc(descriptor.attribute)}" data-ascii-resolved="${esc(asciiFrames.join(''))}" data-glyph-capability="ascii"><span class="c-accent sp sp-${esc(item.id)}"></span><span class="c-default">  ${esc(item.id.padEnd(16))}</span><span class="c-muted">${esc(item.asciiMotion.padEnd(17))}</span><span class="c-default">${esc(descriptor.visible.padEnd(34))}</span><span class="c-muted">${String(registry.spinnerPolicy.asciiIntervalMs).padStart(4)}ms · ${String(item.frames.length).padStart(2)} frames</span></span>`;
   }).join('\n');
   return `<span class="c-default bold" data-generated-spinner-fallbacks="current">SEMANTIC ASCII FALLBACKS · GENERATED FROM THE SPINNER REGISTRY [${refs(['R-MOT-005'])}]</span>
 <span class="c-muted">  sample  primary           motion           fitted trajectory                   interval · resolved length</span>
 ${rows}
-<span class="c-muted">Each base pattern is fitted once across the primary trajectory; composite sets concatenate named source trajectories. The same resolved frames generate the ASCII CSS.</span>`;
+<span class="c-muted">Each base pattern is fitted once across the primary trajectory; composite sets concatenate named source trajectories. The same resolved frames generate the ASCII CSS.</span>
+<span class="c-muted">Every ASCII rung steps at ${String(registry.spinnerPolicy.asciiIntervalMs)}ms, whatever its set's own interval: sets sharing an ASCII alphabet share its cadence [${refs(['R-MOT-011'])}].</span>`;
 }
 
 const cssString = value => `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
@@ -1047,7 +1067,10 @@ function spinnerCss(registry) {
     const asciiKeyframe = `${spinner.keyframe}-ascii`;
     const ascii = asciiFrames.map((frame, index) => `${percent(index, asciiFrames.length)}{content:${cssString(frame)}}`).join('');
     const phase = spinner.id === 'agent' ? ' var(--phase,0ms)' : '';
-    return `@keyframes ${spinner.keyframe}{${frames}}\n@keyframes ${asciiKeyframe}{${ascii}}\n.sp-${spinner.id}::after{content:${cssString(spinner.initial)};animation:${spinner.keyframe} ${spinner.cycleMs}ms steps(1,end)${phase} infinite}\n[data-glyph-capability="ascii"] .sp-${spinner.id}::after,.sp-${spinner.id}[data-spinner-capability="ascii"]::after,[data-spinner-capability="ascii"] .sp-${spinner.id}::after{content:${cssString(asciiFrames[0])};animation-name:${asciiKeyframe}}`;
+    // The ASCII rung's cycle is its resolved frames at the policy's one cadence
+    // (question 40), not the set's own cycle: fit-cycle keeps the pattern's shape.
+    const asciiCycleMs = registry.spinnerPolicy.asciiIntervalMs * asciiFrames.length;
+    return `@keyframes ${spinner.keyframe}{${frames}}\n@keyframes ${asciiKeyframe}{${ascii}}\n.sp-${spinner.id}::after{content:${cssString(spinner.initial)};animation:${spinner.keyframe} ${spinner.cycleMs}ms steps(1,end)${phase} infinite}\n[data-glyph-capability="ascii"] .sp-${spinner.id}::after,.sp-${spinner.id}[data-spinner-capability="ascii"]::after,[data-spinner-capability="ascii"] .sp-${spinner.id}::after{content:${cssString(asciiFrames[0])};animation-name:${asciiKeyframe};animation-duration:${asciiCycleMs}ms}`;
   });
   return `/* GENERATED SPINNER CSS · current R-MOT-002 and R-MOT-005 records only */\n${blocks.join('\n')}`;
 }

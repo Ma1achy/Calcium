@@ -15,7 +15,16 @@
  */
 
 import { REGISTRY_BINDINGS } from "./registry-bindings.js";
-import type { Binding, BlockKeymap, BuiltinBinding, FocusTarget, Key, KeyAction, KeyProfile } from "./types.js";
+import type {
+  Binding,
+  BlockKeymap,
+  BuiltinBinding,
+  FocusTarget,
+  Key,
+  KeyAction,
+  KeyProfile,
+  ReservedKeyAction,
+} from "./types.js";
 import { FOCUS_ORDER } from "./focus.js";
 
 export class KeymapError extends Error {
@@ -204,6 +213,21 @@ export interface Keymap {
 }
 
 /**
+ * The enhanced records bound in **both** profiles, by id and by equality in
+ * C16 T1.37 (§6c table C).
+ *
+ * One: `⇧⏎`. Without the protocol it is `⏎` on most terminals — which is why the
+ * record is `enhanced-terminal` — but xterm's `modifyOtherKeys` sends
+ * `CSI 27;2;13~` with no protocol reported, and the prompt submits on any
+ * `enter` whatever its modifiers. Bound only under the protocol, `⇧⏎` would send
+ * the line on exactly the terminals that can tell it apart.
+ *
+ * Declared above the table, because `fromRegistry` reads it while the table is
+ * being built — below it, a module load stops on the temporal dead zone.
+ */
+const BOTH_PROFILES: ReadonlySet<string> = new Set(["binding.newline-enhanced"]);
+
+/**
  * The default table (§6), seeded rather than filled.
  *
  * **It was seeded with three rows and the emptiness was called honest**, on the
@@ -239,8 +263,19 @@ export interface Keymap {
  * produce, which is what found that.
  */
 export const defaultKeymap: readonly BuiltinBinding[] = [
-  { target: "prompt", key: chordOf("newline"), action: "insertNewline" },
-  { target: "prompt", key: { name: "enter", meta: true }, action: "insertNewline" },
+  // **The prompt's `⏎`, a row since ruling 63** (C22 I133). It was a branch in
+  // the composition root that tested `enter` by name, so the owner line's
+  // `⏎ send` named a chord this table did not hold. First, because it is the
+  // scope rung's primary action and the line reads an action's first row.
+  { target: "prompt", ...fromRegistry("confirm"), action: "submit" },
+  // **`⇧⏎` in both profiles, and it is the one row that is** (C16 §6c table C).
+  // Its record is `enhanced-terminal` — without the protocol `⇧⏎` is `⏎` — but
+  // xterm's `modifyOtherKeys` delivers `CSI 27;2;13~` on a base profile, and an
+  // `enter` with a modifier no row binds still reaches `submit` (C22 I133): an
+  // enhanced-only row would make `⇧⏎` send the line there. `BOTH_PROFILES`
+  // lists it by equality.
+  { target: "prompt", ...fromRegistry("newline", "enhanced-terminal"), action: "insertNewline" },
+  { target: "prompt", ...fromRegistry("newline"), action: "insertNewline" },
   { target: "prompt", key: { name: "j", ctrl: true }, action: "insertNewline" },
 
   // --- C19 §6's seven ----------------------------------------------------
@@ -251,14 +286,14 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // file graph stays acyclic and passes, and the component graph does not. The
   // spec's own wording is the right one: these bindings are C16's. C19 declares
   // what it needs bound and this file is where bindings live.
-  { target: "prompt", key: chordOf("focus.next"), action: "complete" },
+  { target: "prompt", ...fromRegistry("focus.next"), action: "complete" },
   //
   // **One action, not two, and this table is what forces it.** Accepting the
   // ghost cannot be a row beside moving the cursor forward: two bindings for
   // one `(target, key)` is a construction error below, so the fallback lives in
   // the handler. The two-row design is the natural one and it fails at startup
   // rather than at the keystroke — loud, but still the seam rewritten.
-  { target: "prompt", key: chordOf("move.right"), action: "acceptGhostOrForward" },
+  { target: "prompt", ...fromRegistry("move.right"), action: "acceptGhostOrForward" },
 
   // **The menu's four rows are `panel`, not `overlay`** (C15 §2c, I27,
   // R-BLK-109). The completion menu and reverse-i-search are panels — prompt
@@ -267,10 +302,12 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // and `exitNativeSelection` there, and one `(target, key)` takes one binding.
   // It was `pushedView` and `viewPop` until the view kind was deleted
   // (R-EXA-082, F1254) — the same collision, one rung over.
-  { target: "panel", key: chordOf("focus.next"), action: "menuNext" },
-  { target: "panel", key: chordOf("move.down"), action: "menuNext" },
-  { target: "panel", key: chordOf("move.up"), action: "menuPrev" },
-  { target: "panel", key: chordOf("confirm"), action: "menuAccept" },
+  // **`↓` before `⇥`, and the order is read** (C22 I133): the owner line names
+  // an action by its first row, and §103's substate line is `↑↓ hits`.
+  { target: "panel", ...fromRegistry("move.down"), action: "menuNext" },
+  { target: "panel", ...fromRegistry("focus.next"), action: "menuNext" },
+  { target: "panel", ...fromRegistry("move.up"), action: "menuPrev" },
+  { target: "panel", ...fromRegistry("confirm"), action: "menuAccept" },
   //
   // Generic rather than C19's alone, landing now because C19 is the first
   // dismissable overlay to arrive. It respects `dismissal`, so a confirm
@@ -282,8 +319,8 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // `dismissal` says so, and both need the row: with the menu a panel, an
   // `overlay`-only row would leave `esc` unbound over a completion, and a
   // `panel`-only row would leave a dismissable confirm unclosable.
-  { target: "overlay", key: chordOf("escape"), action: "dismiss" },
-  { target: "panel", key: chordOf("escape"), action: "dismiss" },
+  { target: "overlay", ...fromRegistry("escape"), action: "dismiss" },
+  { target: "panel", ...fromRegistry("escape"), action: "dismiss" },
 
   // --- C20's three, and the fourth that is not here ----------------------
   //
@@ -293,8 +330,8 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // truth: while a menu is open the arrows belong to the menu, and C16 derives
   // the target from the stack (I1) rather than from what each consumer would
   // prefer.
-  { target: "prompt", key: chordOf("move.up"), action: "historyPrev" },
-  { target: "prompt", key: chordOf("move.down"), action: "historyNext" },
+  { target: "prompt", ...fromRegistry("move.up"), action: "historyPrev" },
+  { target: "prompt", ...fromRegistry("move.down"), action: "historyNext" },
   { target: "prompt", key: { name: "r", ctrl: true }, action: "reverseSearch" },
   //
   // A second `⌃r` steps to an older match, and it is a `panel` row because
@@ -328,14 +365,16 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // traditions, because they are distinct wire forms and no other binding wants
   // either* — and in M6 one does; see the row below.
   { target: "prompt", key: { name: "w", ctrl: true }, action: "killWordLeft" },
-  // **`⌥⌫` left `killWordLeft` in M6** — the registry gives it to `queue.drop`
-  // (§6a). `⌃w` keeps the verb, so nothing C17 exposes becomes unreachable;
-  // what is lost is the second tradition's spelling of it.
-  { target: "prompt", key: chordOf("queue.drop"), action: "queueDrop" },
+  // **`⌥⌫` is `queue.drop`, and `killWordLeft` is what it does until a queue
+  // exists** (C16 §6c table A, C22 I134). The registry gives the chord to the
+  // queue and the reservation holds it; with no handler registered the row
+  // passes through to the meaning it displaced, so the key kills a word at the
+  // prompt, in a typed reply and in a field — where it was dead in all three.
+  { target: "prompt", ...fromRegistry("queue.drop"), action: "queueDrop", fallback: "killWordLeft" },
   { target: "prompt", key: { name: "d", meta: true }, action: "killWordRight" },
   { target: "prompt", key: { name: "u", ctrl: true }, action: "killToStart" },
   { target: "prompt", key: { name: "k", ctrl: true }, action: "killToEnd" },
-  { target: "prompt", key: { name: "y", ctrl: true }, action: "yank" },
+  { target: "prompt", ...fromRegistry("paste"), action: "yank" },
 
   { target: "prompt", key: { name: "a", ctrl: true }, action: "home" },
   { target: "prompt", key: { name: "home" }, action: "home" },
@@ -351,7 +390,7 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   { target: "prompt", key: { name: "f", meta: true }, action: "wordRight" },
   { target: "prompt", key: { name: "right", ctrl: true }, action: "wordRight" },
   { target: "prompt", key: { name: "right", meta: true }, action: "wordRight" },
-  { target: "prompt", key: chordOf("move.left"), action: "left" },
+  { target: "prompt", ...fromRegistry("move.left"), action: "left" },
 
   // **Not readline's, and confirmed twice before being written.** `⌃z` is the
   // one binding whose failure mode is that the session suspends, so neither
@@ -428,8 +467,8 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // `CSI 1;10D`, which the decoder read as `⇧←` because `modifiersOf` never
   // looked at xterm's bit 8. Both forms are in T2.13's table so the row cannot
   // pass on half the terminals.
-  { target: "prompt", key: chordOf("selection.left"), action: "extendCharLeft" },
-  { target: "prompt", key: chordOf("selection.right"), action: "extendCharRight" },
+  { target: "prompt", ...fromRegistry("selection.left"), action: "extendCharLeft" },
+  { target: "prompt", ...fromRegistry("selection.right"), action: "extendCharRight" },
   { target: "prompt", key: { name: "left", meta: true, shift: true }, action: "extendWordLeft" },
   { target: "prompt", key: { name: "right", meta: true, shift: true }, action: "extendWordRight" },
   { target: "prompt", key: { name: "home", shift: true }, action: "extendLineStart" },
@@ -443,7 +482,7 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // than preferred: `⌃c` is cancel at every rung of the ladder and `⌃w` is a
   // word kill in every readline application. Checked through the decoder —
   // `ESC w` is `m+w`, and `w` is free on the meta path.
-  { target: "prompt", key: { name: "w", meta: true }, action: "copySelection" },
+  { target: "prompt", ...fromRegistry("copy"), action: "copySelection" },
 
   // --- the transcript's selection (C26 §5c) --------------------------------
   //
@@ -454,9 +493,14 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // Plain `y`, because this target has no prompt competing for letters — the
   // same argument `pushedView`'s `n`/`p`/`g` make. Checked through the decoder:
   // `⇧↑` is `CSI 1;2A` and `⇧↓` is `CSI 1;2B`, both `s+up`/`s+down`.
-  { target: "liveBlock", key: chordOf("selection.up"), action: "extendRowUp" },
-  { target: "liveBlock", key: chordOf("selection.down"), action: "extendRowDown" },
+  { target: "liveBlock", ...fromRegistry("selection.up"), action: "extendRowUp" },
+  { target: "liveBlock", ...fromRegistry("selection.down"), action: "extendRowDown" },
   { target: "liveBlock", key: { name: "y" }, action: "copyElement" },
+  // **The registry's `copy` too, not `y` alone** (C16 I66, §6c table B). `copy`
+  // is registry-`global`, and *the active owner resolves that purpose*: it was
+  // bound at the prompt and nowhere else, so `⌥w` on a focused row did nothing.
+  { target: "liveBlock", ...fromRegistry("copy"), action: "copyElement" },
+  { target: "liveBlock", ...fromRegistry("copy", "enhanced-terminal"), action: "copyElement" },
   // **`⌃a`, free at this target and measured so** (C26 §5c): dispatching it
   // with focus on a row left the store unchanged before this row existed. At
   // `prompt` the same byte is `home`, which is why the transcript's select-all
@@ -476,10 +520,12 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // **Checked through the real decoder before being written down** (T2.13,
   // T2.14): `ESC v` decodes as `{name: "v", meta: true}`.
   //
-  // **Two targets, not `global`.** `activeTarget` answers `global` only with no
-  // live entry and focus away from the prompt, so a `global` row would resolve
-  // almost nowhere. Not `interaction`: a block's declared keys are an open set
-  // (C26 I14) and a framework binding there shadows one — C16 §5a row A4.
+  // **One `global` row each, not two narrowed ones** (C16 I66, ruling 65). This
+  // said *`activeTarget` answers `global` only with no live entry, so a `global`
+  // row would resolve almost nowhere* — and `global` is not a rung `activeTarget`
+  // answers, it is dispatch's step 3, reached after **any** rung that passes
+  // (§4). The registry's scope is `global`; from the other copy mode the chord
+  // switches and from its own it does nothing, which is the session's to hold.
   // **`⌥⇧C` is `{name: "C", meta: true}` and not `meta+shift+c`** (I17): `ESC C`
   // names the character it carries, and the decoder sets no shift bit for a
   // capital. Pressed through the real decoder before being written down, which
@@ -490,17 +536,23 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // `selection.semantic` — *enter Calcium copy mode*. What this tree built and
   // called copy mode is the native handoff, so it takes `⌥⇧C`; the semantic
   // mode is `reserved` until M10b builds it.
-  { target: "prompt", key: chordOf("selection.native"), action: "enterNativeSelection" },
-  { target: "liveBlock", key: chordOf("selection.native"), action: "enterNativeSelection" },
-  { target: "prompt", key: chordOf("values.toggle"), action: "valuesToggle" },
-  { target: "liveBlock", key: chordOf("values.toggle"), action: "valuesToggle" },
-  { target: "prompt", key: chordOf("selection.semantic"), action: "enterSemanticSelection" },
-  { target: "liveBlock", key: chordOf("selection.semantic"), action: "enterSemanticSelection" },
+  { target: "global", ...fromRegistry("selection.native"), action: "enterNativeSelection" },
+  { target: "global", ...fromRegistry("selection.semantic"), action: "enterSemanticSelection" },
+  // `values.toggle` is the transcript's, and a declared capture at the prompt
+  // (C16 §6c): the reader toggles the values of what they are reading from
+  // where they are typing, as `⌥↑` pages it from there.
+  { target: "prompt", ...fromRegistry("values.toggle"), action: "valuesToggle" },
+  { target: "liveBlock", ...fromRegistry("values.toggle"), action: "valuesToggle" },
   // The target's own dismissal, as `dismiss` is an overlay's (C16 §5c). `⌃c`
   // stays the ladder's, and I24 defends the pair. It read `as \`viewPop\` is the
   // view's` until the view kind was deleted (R-EXA-082, F1254); the pattern is
   // the argument and the view was only its clearest instance.
-  { target: "nativeSelection", key: chordOf("escape"), action: "exitNativeSelection" },
+  { target: "nativeSelection", ...fromRegistry("escape"), action: "exitNativeSelection" },
+  // **`?` is captured here and does nothing** (C16 §6c table B, ruling 65). The
+  // frame is frozen while the terminal holds the selection, so the help entry a
+  // `global` `?` appends would land where nobody can see it; a *pass* in the
+  // ladder's sense reaches step 3, which is exactly that.
+  { target: "nativeSelection", ...fromRegistry("help.question"), action: "passToTerminal" },
 
   // --- semantic copy mode (C14 §6a, C16 §5d) ---------------------------------
   //
@@ -509,7 +561,7 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // a second row keyed on the selection would be a condition the table has no
   // column for, and `escapeSemanticSelection` is the verb that holds it. The
   // reader presses one key twice; the footer says which press they are on.
-  { target: "semanticSelection", key: chordOf("escape"), action: "escapeSemanticSelection" },
+  { target: "semanticSelection", ...fromRegistry("escape"), action: "escapeSemanticSelection" },
   // **Bare keycaps, and that is legible only because of the target** (`R-SEL-008`).
   // `a` and `A` would be unbindable anywhere a reader might be typing; at this
   // target nothing else can be active, which is what the rule is relying on when
@@ -517,47 +569,44 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // the export path writes a file instead.
   { target: "semanticSelection", key: { name: "a" }, action: "selectEntryUnderCaret" },
   { target: "semanticSelection", key: { name: "A" }, action: "selectAllLoadedEntries" },
-  // `y`, as at `liveBlock` — the same keycap at a coarser grain (`R-SEL-004`),
-  // and **a different action**, which is the thing worth saying. `copySelection`
-  // already exists and is the prompt's `⌥w`: effects resolve per action rather
-  // than per target, so reusing the name would give this key the editor's
-  // region copy and a mode that selects entries would paste the prompt.
+  // **`⏎` copies** (C14 I47, R-SEL-015, §103): the footer has said `⏎ copy`
+  // since the mode landed, and the count is defined as *what return would
+  // copy*. **First, because the order is read** (C22 I133): the owner line
+  // names an action by its first row, and §103's copy line is `⏎ copy`.
+  { target: "semanticSelection", ...fromRegistry("confirm"), action: "copySelectedEntries" },
+  // `y` is the same copy, as at `liveBlock` — the same keycap at a coarser grain
+  // (`R-SEL-004`), and **a different action from the prompt's**, which is the
+  // thing worth saying. `copySelection` already exists and is the prompt's `⌥w`:
+  // effects resolve per action rather than per target, so reusing the name
+  // would give this key the editor's region copy and a mode that selects
+  // entries would paste the prompt. `⏎`'s action, so it reads the held view (A6).
   { target: "semanticSelection", key: { name: "y" }, action: "copySelectedEntries" },
-  // **`⏎` is the same copy** (C14 I47, R-SEL-015, §103): the footer has said
-  // `⏎ copy` since the mode landed, and the count is defined as *what return
-  // would copy*. `y`'s action, not a second one, so it reads the held view (A6).
-  { target: "semanticSelection", key: chordOf("confirm"), action: "copySelectedEntries" },
+  // And the registry's `copy`, as at every owner with the verb (C16 I66).
+  { target: "semanticSelection", ...fromRegistry("copy"), action: "copySelectedEntries" },
+  { target: "semanticSelection", ...fromRegistry("copy", "enhanced-terminal"), action: "copySelectedEntries" },
   // **The caret moves, and the shifted pair extends** (C14 I37, §6c). `⇧←` and
   // `⇧→` are deliberately absent: `selection.left`/`selection.right` are
   // horizontal, and at block granularity there is no horizontal extent — the
   // axis belongs to `R-SEL-007`'s rectangular selection, which copies cells
   // rather than source and is a different thing to select.
-  { target: "semanticSelection", key: { name: "up" }, action: "moveSemanticCaretUp" },
-  { target: "semanticSelection", key: { name: "down" }, action: "moveSemanticCaretDown" },
-  {
-    target: "semanticSelection",
-    key: chordOf("selection.up"),
-    action: "extendSemanticSelectionUp",
-  },
-  {
-    target: "semanticSelection",
-    key: chordOf("selection.down"),
-    action: "extendSemanticSelectionDown",
-  },
+  { target: "semanticSelection", ...fromRegistry("move.up"), action: "moveSemanticCaretUp" },
+  { target: "semanticSelection", ...fromRegistry("move.down"), action: "moveSemanticCaretDown" },
+  { target: "semanticSelection", ...fromRegistry("selection.up"), action: "extendSemanticSelectionUp" },
+  { target: "semanticSelection", ...fromRegistry("selection.down"), action: "extendSemanticSelectionDown" },
 
   { target: "global", key: { name: "pageup" }, action: "scrollPageUp" },
   { target: "global", key: { name: "pagedown" }, action: "scrollPageDown" },
-  { target: "global", key: { name: "home", ctrl: true }, action: "scrollTop" },
-  { target: "global", key: { name: "end", ctrl: true }, action: "scrollBottom" },
+  { target: "global", ...fromRegistry("transcript.top"), action: "scrollTop" },
+  { target: "global", ...fromRegistry("transcript.bottom"), action: "scrollBottom" },
 
-  { target: "liveBlock", key: chordOf("escape"), action: "focusPrompt" },
-  { target: "liveBlock", key: chordOf("move.down"), action: "rowDown" },
-  { target: "liveBlock", key: chordOf("move.up"), action: "rowUp" },
+  { target: "liveBlock", ...fromRegistry("escape"), action: "focusPrompt" },
+  { target: "liveBlock", ...fromRegistry("move.down"), action: "rowDown" },
+  { target: "liveBlock", ...fromRegistry("move.up"), action: "rowUp" },
   // **The point of being here at all** (C23 I37, F21). `escape`, `down` and `up`
   // were the whole of this target: a cursor with nothing to press. `enter` is
   // the same key `overlay` accepts a menu item with, which is the consistency a
   // reader has already learnt by the time they reach a row.
-  { target: "liveBlock", key: chordOf("confirm"), action: "rowActivate" },
+  { target: "liveBlock", ...fromRegistry("confirm"), action: "rowActivate" },
 
   // **A working key gains a second meaning, and that is a behaviour change**
   // (C04 §3c, C26 §4b). `pageup`/`pagedown` are bound at `global` to the
@@ -614,10 +663,10 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // declaration** (C16 I28): two rows for `←` at one target is the duplicate
   // this table refuses, and §102's kind table is what makes one action total —
   // a kind has a camera **or** a cursor, never both.
-  { target: "interaction", key: chordOf("move.left"), action: "insideLeft" },
-  { target: "interaction", key: chordOf("move.right"), action: "insideRight" },
-  { target: "interaction", key: chordOf("move.up"), action: "insideUp" },
-  { target: "interaction", key: chordOf("move.down"), action: "insideDown" },
+  { target: "interaction", ...fromRegistry("move.left"), action: "insideLeft" },
+  { target: "interaction", ...fromRegistry("move.right"), action: "insideRight" },
+  { target: "interaction", ...fromRegistry("move.up"), action: "insideUp" },
+  { target: "interaction", ...fromRegistry("move.down"), action: "insideDown" },
   // `+` `=` `-` keep the dolly. The control row **sheds descriptions and then
   // becomes `?` keys**, so its not naming a dolly key is a fact about its width
   // and not a retirement — reading an absence in a shed form as a ruling is
@@ -631,7 +680,18 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // (`router.ts`'s `interaction` registration); `esc` is what the design draws
   // in the control row, and it leaves by the same one step — the rung below is
   // what takes the reader out of the block, which is C26 I14's two-level escape.
-  { target: "interaction", key: chordOf("escape"), action: "exitInside" },
+  { target: "interaction", ...fromRegistry("escape"), action: "exitInside" },
+  // **A held field's `⏎`** (C22 I118, C22 I133, ruling 63). The field is the
+  // `interaction` rung's other owner, and its two answers are `⏎ keep` and
+  // `esc discard` — the second is `exitInside` above. Inside a block with no
+  // field held it keeps nothing, as `hostDetach` detaches nothing with no child:
+  // `⏎` there reached `global` and no row, so consuming it changes no frame.
+  { target: "interaction", ...fromRegistry("confirm"), action: "keepField" },
+  // **Copy from inside copies the focused element** (C16 I66, ruling 65). The
+  // inside is still focus on one element, and `copyElement` reads the extent
+  // `focusFor` washes — so the verb is the block's, one rung in.
+  { target: "interaction", ...fromRegistry("copy"), action: "copyElement" },
+  { target: "interaction", ...fromRegistry("copy", "enhanced-terminal"), action: "copyElement" },
   { target: "liveBlock", key: { name: "pagedown" }, action: "blockPageDown" },
   { target: "liveBlock", key: { name: "pageup" }, action: "blockPageUp" },
 
@@ -644,8 +704,8 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // did not produce until this row needed it (C16 §2): T2.13 is what would
   // have refused the row, and adding the form rather than picking another key
   // is the ruling I17 leaves room for when the form is one every terminal sends.
-  { target: "liveBlock", key: chordOf("focus.next"), action: "entryNext" },
-  { target: "liveBlock", key: chordOf("focus.previous"), action: "entryPrev" },
+  { target: "liveBlock", ...fromRegistry("focus.next"), action: "entryNext" },
+  { target: "liveBlock", ...fromRegistry("focus.previous"), action: "entryPrev" },
 
   // --- a split's panes and its divider (C04 §3aq, C26 I28, C16 I59) --------
   //
@@ -656,8 +716,8 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // divider chord**, *the SCROLLBAR's rule on the other axis*; §019 keeps them
   // word motion *in text fields*, which is the `prompt` rows above, so one
   // chord at two targets is resolved by the ladder rather than refused.
-  { target: "liveBlock", key: chordOf("move.left"), action: "paneLeft" },
-  { target: "liveBlock", key: chordOf("move.right"), action: "paneRight" },
+  { target: "liveBlock", ...fromRegistry("move.left"), action: "paneLeft" },
+  { target: "liveBlock", ...fromRegistry("move.right"), action: "paneRight" },
   { target: "liveBlock", key: { name: "left", meta: true }, action: "dividerLeft" },
   { target: "liveBlock", key: { name: "right", meta: true }, action: "dividerRight" },
 
@@ -686,8 +746,8 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // for one action is not the duplicate the conflict rule refuses, and the
   // terminal-dependent one is kept for I12's reason: the meta form works
   // everywhere and the shift form is better where it exists.
-  { target: "liveBlock", key: chordOf("newline"), action: "rerunEntry" },
-  { target: "liveBlock", key: { name: "enter", meta: true }, action: "rerunEntry" },
+  { target: "liveBlock", ...fromRegistry("newline", "enhanced-terminal"), action: "rerunEntry" },
+  { target: "liveBlock", ...fromRegistry("newline"), action: "rerunEntry" },
 
   // --- §6a, M6: the design's routes ------------------------------------------
   //
@@ -698,21 +758,26 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   //
   // `⌘`, `⇧⏎`, `⌃⇧`-letters and `⌃⇥` are byte-identical to their unmodified
   // forms on a terminal without the Kitty protocol, so each of those actions
-  // needs a base route too (I36). Six of the eight base routes are chords this
-  // table already binds to the same meaning, which is the argument for them.
+  // needs a base route too (I36) — and the registry now holds both as records
+  // (§6c table C), so a row's profile is its record's and not its own claim.
 
-  // Help — a durable transcript entry, not a layer (R-KEY-005).
-  { target: "global", key: chordOf("help.f1"), action: "helpKeymap" },
-  { target: "liveBlock", key: chordOf("help.question"), action: "helpKeymap" },
+  // Help — a durable transcript entry, not a layer (R-KEY-005). **`?` is a
+  // `global` row** (C16 I66, ruling 65), where it was `liveBlock`'s alone: every
+  // owner a line is composed in takes a printable before step 3, so the row
+  // answers exactly where the registry's `when: non-typing` says — I52 lists it.
+  { target: "global", ...fromRegistry("help.f1"), action: "helpKeymap" },
+  { target: "global", ...fromRegistry("help.question"), action: "helpKeymap" },
 
   // `focus.previous` — the prompt had no `⇧⇥`, and the owner line advertises it.
-  { target: "prompt", key: chordOf("focus.previous"), action: "focusTranscript" },
+  { target: "prompt", ...fromRegistry("focus.previous"), action: "focusTranscript" },
 
   // `page.up` / `page.down`. `pageup`/`pagedown` are already bound at `global`;
-  // these are the design's chords for the same operation, and M5's intercept
-  // table classifies all four as `page-scroll` before the ladder sees them.
-  { target: "global", key: chordOf("page.up"), action: "scrollPageUp" },
-  { target: "global", key: chordOf("page.down"), action: "scrollPageDown" },
+  // these are the design's chords for the same operation. Only these two are
+  // `page-scroll` in the intercept table (`interceptOf`, C16 §3): the legacy
+  // `pageup`/`pagedown` resolve through the ladder like any other `global` row,
+  // so a focused block's `blockPageUp`/`blockPageDown` takes them first.
+  { target: "global", ...fromRegistry("page.up"), action: "scrollPageUp" },
+  { target: "global", ...fromRegistry("page.down"), action: "scrollPageDown" },
 
   // **`transcript.top` / `transcript.bottom`, restored** (§6a, I41). The earlier
   // note here said `⌘↑` has no wire form, having measured that `CSI 1;9A` folds
@@ -722,36 +787,16 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // kitty's, so `modifiersOf` now reads it by the negotiated protocol and the two
   // chords stop being one key on a terminal that distinguishes them.
   //
-  // Enhanced only: without the protocol, bit 8 *is* Meta and the fold is correct,
-  // so these rows would collide with `⌥↑` exactly as the old note said. `⌃home`
-  // and `⌃end` remain the `default-terminal` routes, which is I36.
-  {
-    target: "global",
-    key: chordOf("transcript.top"),
-    action: "scrollTop",
-    profile: "enhanced-terminal",
-  },
-  {
-    target: "global",
-    key: chordOf("transcript.bottom"),
-    action: "scrollBottom",
-    profile: "enhanced-terminal",
-  },
+  // Enhanced only — their records say so now (§6c): without the protocol, bit 8
+  // *is* Meta and the fold is correct, so these rows would collide with `⌥↑`
+  // exactly as the old note said. `⌃home` and `⌃end` are the base records.
+  { target: "global", ...fromRegistry("transcript.top", "enhanced-terminal"), action: "scrollTop" },
+  { target: "global", ...fromRegistry("transcript.bottom", "enhanced-terminal"), action: "scrollBottom" },
 
-  // `copy` / `paste`. The base routes are `⌥w` → `copySelection` and `⌃y` →
-  // `yank`, both already bound at `prompt`; these are the enhanced spellings.
-  {
-    target: "prompt",
-    key: chordOf("copy"),
-    action: "copySelection",
-    profile: "enhanced-terminal",
-  },
-  {
-    target: "prompt",
-    key: chordOf("paste"),
-    action: "yank",
-    profile: "enhanced-terminal",
-  },
+  // `copy` / `paste` at the prompt, enhanced. The base routes `⌥w` and `⌃Y` are
+  // the prompt rows above; the other owners' copy rows sit with their verbs.
+  { target: "prompt", ...fromRegistry("copy", "enhanced-terminal"), action: "copySelection" },
+  { target: "prompt", ...fromRegistry("paste", "enhanced-terminal"), action: "yank" },
 
   // --- the captured child's one key (I49, R-BLK-908) ---------------------
   //
@@ -765,97 +810,39 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // `ESC ESC`, which is the lone-`Esc` disambiguation window rather than a
   // chord — and `esc` belongs to the child (R-INT-007), so a base-profile row
   // would take the child's own key away on the terminals least able to say so.
-  { target: "child", key: chordOf("host.detach"), action: "hostDetach" },
-  {
-    target: "child",
-    key: chordOfBinding("binding.host-detach-enhanced"),
-    action: "hostDetach",
-    profile: "enhanced-terminal",
-  },
+  { target: "child", ...fromRegistry("host.detach"), action: "hostDetach" },
+  { target: "child", ...fromRegistry("host.detach", "enhanced-terminal"), action: "hostDetach" },
 
-  // `posture.cycle` — reserved, no effect (I38).
-  { target: "global", key: chordOf("posture.cycle"), action: "postureCycle" },
+  // `posture.cycle` — reserved, and it passes through until a handler is
+  // registered (C16 §6c, C22 I134).
+  { target: "global", ...fromRegistry("posture.cycle"), action: "postureCycle" },
 
-  // The agent strip: eleven reserved chords, each in both profiles (I38).
+  // The agent strip: eleven reserved actions, each with a base and an enhanced
+  // record (§6c table C), passing through until a handler is registered.
   // `⌥,` and `⌥.` replace `⌥⇥`/`⇧⌥⇥`, which the OS window switcher takes on
   // Windows and most Linux desktops — the compositor never hands them over.
-  { target: "global", key: { name: ",", meta: true }, action: "agentPrevious" },
-  { target: "global", key: { name: ".", meta: true }, action: "agentNext" },
-  {
-    target: "global",
-    key: chordOf("agent.next"),
-    action: "agentNext",
-    profile: "enhanced-terminal",
-  },
-  {
-    target: "global",
-    key: chordOf("agent.previous"),
-    action: "agentPrevious",
-    profile: "enhanced-terminal",
-  },
-  { target: "global", key: { name: "1", meta: true }, action: "agent1" },
-  {
-    target: "global",
-    key: chordOf("agent.1"),
-    action: "agent1",
-    profile: "enhanced-terminal",
-  },
-  { target: "global", key: { name: "2", meta: true }, action: "agent2" },
-  {
-    target: "global",
-    key: chordOf("agent.2"),
-    action: "agent2",
-    profile: "enhanced-terminal",
-  },
-  { target: "global", key: { name: "3", meta: true }, action: "agent3" },
-  {
-    target: "global",
-    key: chordOf("agent.3"),
-    action: "agent3",
-    profile: "enhanced-terminal",
-  },
-  { target: "global", key: { name: "4", meta: true }, action: "agent4" },
-  {
-    target: "global",
-    key: chordOf("agent.4"),
-    action: "agent4",
-    profile: "enhanced-terminal",
-  },
-  { target: "global", key: { name: "5", meta: true }, action: "agent5" },
-  {
-    target: "global",
-    key: chordOf("agent.5"),
-    action: "agent5",
-    profile: "enhanced-terminal",
-  },
-  { target: "global", key: { name: "6", meta: true }, action: "agent6" },
-  {
-    target: "global",
-    key: chordOf("agent.6"),
-    action: "agent6",
-    profile: "enhanced-terminal",
-  },
-  { target: "global", key: { name: "7", meta: true }, action: "agent7" },
-  {
-    target: "global",
-    key: chordOf("agent.7"),
-    action: "agent7",
-    profile: "enhanced-terminal",
-  },
-  { target: "global", key: { name: "8", meta: true }, action: "agent8" },
-  {
-    target: "global",
-    key: chordOf("agent.8"),
-    action: "agent8",
-    profile: "enhanced-terminal",
-  },
-  { target: "global", key: { name: "9", meta: true }, action: "agent9" },
-  {
-    target: "global",
-    key: chordOf("agent.9"),
-    action: "agent9",
-    profile: "enhanced-terminal",
-  },
+  { target: "global", ...fromRegistry("agent.previous"), action: "agentPrevious" },
+  { target: "global", ...fromRegistry("agent.next"), action: "agentNext" },
+  { target: "global", ...fromRegistry("agent.next", "enhanced-terminal"), action: "agentNext" },
+  { target: "global", ...fromRegistry("agent.previous", "enhanced-terminal"), action: "agentPrevious" },
+  { target: "global", ...fromRegistry("agent.1"), action: "agent1" },
+  { target: "global", ...fromRegistry("agent.1", "enhanced-terminal"), action: "agent1" },
+  { target: "global", ...fromRegistry("agent.2"), action: "agent2" },
+  { target: "global", ...fromRegistry("agent.2", "enhanced-terminal"), action: "agent2" },
+  { target: "global", ...fromRegistry("agent.3"), action: "agent3" },
+  { target: "global", ...fromRegistry("agent.3", "enhanced-terminal"), action: "agent3" },
+  { target: "global", ...fromRegistry("agent.4"), action: "agent4" },
+  { target: "global", ...fromRegistry("agent.4", "enhanced-terminal"), action: "agent4" },
+  { target: "global", ...fromRegistry("agent.5"), action: "agent5" },
+  { target: "global", ...fromRegistry("agent.5", "enhanced-terminal"), action: "agent5" },
+  { target: "global", ...fromRegistry("agent.6"), action: "agent6" },
+  { target: "global", ...fromRegistry("agent.6", "enhanced-terminal"), action: "agent6" },
+  { target: "global", ...fromRegistry("agent.7"), action: "agent7" },
+  { target: "global", ...fromRegistry("agent.7", "enhanced-terminal"), action: "agent7" },
+  { target: "global", ...fromRegistry("agent.8"), action: "agent8" },
+  { target: "global", ...fromRegistry("agent.8", "enhanced-terminal"), action: "agent8" },
+  { target: "global", ...fromRegistry("agent.9"), action: "agent9" },
+  { target: "global", ...fromRegistry("agent.9", "enhanced-terminal"), action: "agent9" },
 
 ];
 
@@ -876,13 +863,14 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
  * no copy of L4's *table* — this is the vocabulary, which is C16's own (I19).
  */
 /**
- * The chord the registry names for a design verb (§6b, I42, R-KEY-007).
+ * The chord, the record and the profile the registry names for a design verb
+ * (§6b, §6c, I42, R-KEY-007).
  *
  * **The chord is written in `calcium-registry.json` and nowhere else.** M6 had it
  * hand-written here as well, with a rule comparing the two — two records of one
  * fact, where the gate catches drift after it happens and makes the copy look
  * deliberate. `registry-bindings.ts` is generated from the registry, and a row
- * above that the registry names takes its key from here.
+ * the registry names spreads this.
  *
  * **The `target` and the action stay on the row, because the registry does not
  * hold them.** Nine of its bindings are one verb several owners spell
@@ -891,43 +879,61 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
  * `actionId` does not select a handler. That is R-KEY-003's *unless the current
  * owner explicitly captures the action*, and the registry's `when: "focused"` is
  * the design saying the owner decides. The join is the row: this supplies the
- * chord, the row supplies who and what.
+ * chord, the record's id and its profile; the row supplies who and what.
  *
- * **`profile` is not taken from the registry, and that is a finding rather than
- * an omission.** Every registry binding carries `profile: "default-terminal"` —
- * measured, all 39 — while this table marks 15 rows `enhanced-terminal`. The two
- * fields share a name and a value space and mean different things: the design's
- * asserts the route it intends, and this one records whether a terminal without
- * the Kitty protocol can *deliver* the bytes. §6a measured four families that
- * cannot — `⌃⇧`-letters, `⇧⏎`, `⌃⇥` and `⌘n` are byte-identical to their
- * unmodified forms — so generating `profile` from the registry would bind chords
- * on terminals that can never send them. It stays a row's own declaration.
- */
-/**
- * The chord of one **named binding**, for an action the registry gives two.
+ * **`profile` is the record's, and it was the row's own for as long as the record
+ * was wrong** (§6c). Every registry binding said `default-terminal`, including
+ * chords a legacy terminal cannot send, so the row kept a second record of
+ * deliverability. Sixteen records were superseded instead, and the row now reads
+ * the design's field: an `enhanced-terminal` record gives an enhanced-only row, a
+ * `default-terminal` one a row in both profiles — a base route also works on an
+ * enhanced terminal. **`registry`** is the record's id, which is what lets the
+ * gate ask, from the table's side, whether a row spelling a registry chord says
+ * which record it spells (C16 T1.37).
  *
- * `chordOf` takes the first row for an action and that is right while an action
- * has one chord. `host.detach` has two by design — *its base candidate is `⌃]`;
- * `⌥esc` is an enhancement* (R-BLK-908) — so the profile split lives in the
- * registry rather than in a literal here, and the row that wants the second one
- * has to say which. Asking by id rather than by `(actionId, profile)` because
- * the profile is the keymap row's own declaration and reading it from two
- * places is the drift §6b exists to end.
+ * Asked by `(actionId, profile)` and thrown on anything but one answer — a
+ * build-time fact: a missing record means the registry changed under a row that
+ * still names it, and a fallback chord would bind something nobody asked for.
  */
-function chordOfBinding(id: string): Binding["key"] {
-  const found = REGISTRY_BINDINGS.find((b) => b.id === id);
-  if (found === undefined) throw new Error(`no registry binding ${id}`);
-  return found.key;
+function fromRegistry(
+  actionId: string,
+  profile: KeyProfile = "default-terminal",
+): Readonly<{ key: Binding["key"]; registry: string; profile?: "enhanced-terminal" }> {
+  const found = REGISTRY_BINDINGS.filter((b) => b.actionId === actionId && b.profile === profile);
+  const only = found[0];
+  if (only === undefined || found.length !== 1) { // graphemes-ok — an array of registry records, not text
+    throw new Error(`${String(found.length)} registry bindings for ${actionId} in ${profile}, not one`); // graphemes-ok — the same array's count
+  }
+  return only.profile === "enhanced-terminal" && !BOTH_PROFILES.has(only.id)
+    ? { key: only.key, registry: only.id, profile: "enhanced-terminal" }
+    : { key: only.key, registry: only.id };
 }
 
-function chordOf(actionId: string): Binding["key"] {
-  const found = REGISTRY_BINDINGS.find((b) => b.actionId === actionId);
-  // A build-time fact, thrown rather than defaulted: a missing id means the
-  // registry changed under a row that still names it, and a fallback chord would
-  // bind something nobody asked for (T1.96).
-  if (found === undefined) throw new Error(`no registry binding for ${actionId}`);
-  return found.key;
-}
+/**
+ * The reserved actions, by the registry id an application registers a handler
+ * under (C16 §6c, C24 I39, ruling 64).
+ *
+ * **Keyed by the design's spelling**, because that is what `/help`, `docs/KEYS.md`
+ * and the registry print — `queue.drop`, not `queueDrop`. `satisfies` makes the
+ * map total over `ReservedKeyAction`, so the public type and this table cannot
+ * disagree about the set; C24 T2.23 holds it to the registry's ids.
+ */
+export const RESERVED_ACTIONS: Readonly<Record<ReservedKeyAction, KeyAction>> = Object.freeze({
+  "agent.next": "agentNext",
+  "agent.previous": "agentPrevious",
+  "agent.1": "agent1",
+  "agent.2": "agent2",
+  "agent.3": "agent3",
+  "agent.4": "agent4",
+  "agent.5": "agent5",
+  "agent.6": "agent6",
+  "agent.7": "agent7",
+  "agent.8": "agent8",
+  "agent.9": "agent9",
+  "posture.cycle": "postureCycle",
+  "values.toggle": "valuesToggle",
+  "queue.drop": "queueDrop",
+} satisfies Record<ReservedKeyAction, KeyAction>);
 
 const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
   Object.keys({
@@ -982,6 +988,8 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
     insideUp: true,
     insideDown: true,
     exitInside: true,
+    submit: true,
+    keepField: true,
     rerunEntry: true,
     dollyIn: true,
     dollyOut: true,
@@ -1005,6 +1013,7 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
     scrollBottom: true,
     enterNativeSelection: true,
     exitNativeSelection: true,
+    passToTerminal: true,
     // --- §6a, M6 ------------------------------------------------------------
     helpKeymap: true,
     focusTranscript: true,

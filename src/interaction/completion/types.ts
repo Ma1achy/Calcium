@@ -52,6 +52,14 @@ export type Slot =
   | Readonly<{ kind: "flagValue"; flag: FlagDef }>
   | Readonly<{ kind: "positional"; arg: ArgDef }>
   | Readonly<{ kind: "path" }>
+  /**
+   * The action palette: `>` as the line's first character (C16 I68).
+   *
+   * **Its source is the composition root's**, not the framework's — the
+   * actions the prompt reaches are a fact about the keymap and the
+   * application's handlers, and this layer holds neither.
+   */
+  | Readonly<{ kind: "action" }>
   | Readonly<{ kind: "none" }>;
 
 /** The union as a runtime list, so T2.7 can be exhaustive over it. */
@@ -62,6 +70,7 @@ export const SLOT_KINDS = Object.freeze([
   "flagValue",
   "positional",
   "path",
+  "action",
   "none",
 ] as const satisfies readonly Slot["kind"][]);
 

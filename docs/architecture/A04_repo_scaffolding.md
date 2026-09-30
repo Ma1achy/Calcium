@@ -410,7 +410,9 @@ Calcium publishes on tag from CI, never a laptop.
 | Attestation | GitHub Actions attestation, linking artefact to workflow. Not npm provenance |
 | SBOM | CycloneDX, attached to the release |
 | Credential | `GITHUB_TOKEN`, workflow-scoped, expiring with the run |
-| Changelog | Generated from commits; breaking changes named explicitly |
+| Changelog | `CHANGELOG.md` at the root, **kept by hand under `## Unreleased` until a generator exists**; breaking changes named explicitly, each entry naming the commit that made it |
+
+**The changelog row said *generated from commits*, and nothing generated it** (question 58): no file existed, and the two commits that removed public `Glyph` members carried no breaking-change marker for a generator to find. A row naming a mechanism that does not exist is a claim with no source, so the row now says what the repository does. When a generator lands it replaces the hand-kept section and this row changes with it.
 
 The reference app bumping is the release gate. It lives in another repo precisely so that bumping it is a real test rather than a compile check.
 

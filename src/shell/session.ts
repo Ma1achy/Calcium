@@ -1475,6 +1475,12 @@ class Session implements TuiInstance {
   #setNativeSelection(on: boolean): void {
     const graph = this.#graph;
     if (graph === null || this.#nativeSelection === on) return;
+    // **One copy mode at a time** (C16 I66, §6c S11). `⌥⇧C` is a `global` row,
+    // so it reaches here from semantic copy mode too, and this guard reads only
+    // its own flag: without the exit the held view stayed up under a
+    // suspended scheduler with the mouse handed to the terminal. Before the
+    // flag, so the semantic exit's own commit is the frame this one follows.
+    if (on) this.#exitSemanticSelection();
     this.#nativeSelection = on;
 
     if (on) {
@@ -1504,6 +1510,9 @@ class Session implements TuiInstance {
   #enterSemanticSelection(): void {
     const graph = this.#graph;
     if (graph === null || this.#semantic !== null) return;
+    // The other direction of the same rule (C16 I66): leaving native selection
+    // resumes the scheduler and takes the mouse back before this holds a view.
+    this.#setNativeSelection(false);
     const stored = graph.focus.current;
     const entryId =
       stored.at === "liveBlock" ? stored.entryId : (graph.transcript.entries.at(-1)?.id ?? null);
@@ -1783,7 +1792,14 @@ class Session implements TuiInstance {
     this.#graph?.scheduler.commit("input");
   }
 
-  /** `⌃c` — leave, and **never clear first** (C16 I51, §5d D5). */
+  /**
+   * Leave semantic copy whole, in one step — the copy-mode switch's half
+   * (C16 I66, §6c S11).
+   *
+   * **Its one caller is `#setNativeSelection`**: `⌃c` is a refusal in a copy
+   * mode since ruling 59, so the only thing that ends this mode without the
+   * reader's `esc` is entering the other one, which must not leave both up.
+   */
   #exitSemanticSelection(): void {
     if (this.#semantic === null) return;
     // Leaving the mode ends the gesture (C14 I48) — a ticker outliving it would
@@ -1883,7 +1899,6 @@ class Session implements TuiInstance {
       semanticSelectionCount: () => semantic.count(this.#semantic),
       enterSemanticSelection: () => this.#enterSemanticSelection(),
       escapeSemanticSelection: () => this.#escapeSemanticSelection(),
-      exitSemanticSelection: () => this.#exitSemanticSelection(),
       selectEntryUnderCaret: () => this.#selectEntries("caret"),
       selectAllLoadedEntries: () => this.#selectEntries("all"),
       copySelectedEntries: () => this.#copySelectedEntries(),
@@ -1966,6 +1981,8 @@ class Session implements TuiInstance {
       copy: () => this.#copyState(),
       // C22 I118 — the owner line's field arm.
       editingField: () => this.#graph?.fieldHeld() != null,
+      // C22 I133 — the owner line's keys, from the session's keymap.
+      hints: () => this.#graph?.ownerHints(),
       // C22 I116 — the live toast, drawn in the footer's tail while it lives.
       toast: () => this.#toast ?? undefined,
       // A03 SS47 — the owner line draws chords, so the chrome resolves them.
@@ -2065,11 +2082,12 @@ function washSelected(
 /**
  * The entry's blocks under a **banded** selection (C14 I54), or `undefined`.
  *
- * Undefined on a theme without a selection band and for an entry with nothing
- * selected, so both key and render exactly as they did before the field.
+ * Undefined where the selection is not painted as a band — a theme without
+ * one, or any theme at 1 bit (C10 I66) — and for an entry with nothing
+ * selected, so each keys and renders exactly as it did before the field.
  */
 function washedBlocksOf(graph: Graph, entryId: string, selection: SelectionWash | null): ReadonlySet<string> | undefined {
-  if (selection === null || !isBand(graph.theme.current, "selection")) return undefined;
+  if (selection === null || !isBand(graph.theme.current, "selection", graph.capabilities)) return undefined;
   const ids = new Set<string>();
   for (const key of selection.blocks) {
     if (semantic.entryOf(key) === entryId) ids.add(key.slice(key.indexOf("\u0000") + 1));
@@ -2158,9 +2176,9 @@ function visibleRows(
     const from = Math.max(0, ve.skipRows - chrome.length);
     const to = Math.max(from, ve.skipRows + ve.takeRows - chrome.length);
     // **Through the entry's layout, not over the document's blocks** (C22 I83,
-    // I84, I85; §6l.4 D, §6l.6). A card's body sits four cells in under a hook at
-    // the header's text column and is windowed, measured and rendered at
-    // `width − 4`; every entry closes with one blank row — both by the same
+    // I84, I85; §6l.4 D, §6l.6). A card's body sits `BODY_INDENT` cells in under
+    // a hook at the header's text column and is windowed, measured and rendered
+    // at `width − BODY_INDENT`; every entry closes with one blank row — both by the same
     // `entryLayout` the measurer wrapper in `construct.ts` calls, so the rows C14
     // counted are the rows drawn here. A document that is not a card is one run
     // at `width` and the blank.
@@ -2285,7 +2303,9 @@ function visibleRows(
 
     // **With the tick and the width** (C22 I132, C09 I120): a one-shot that has
     // run its course asks for nothing, so a finished `pop` disarms the ticker.
-    const cadence = animationIntervalOf(windowed.blocks, { tick, width });
+    // **And the capabilities** (C09 I112): the rung the spinners are drawn at
+    // decides how fast they turn — every ASCII rung at one cadence.
+    const cadence = animationIntervalOf(windowed.blocks, { tick, width }, graph.capabilities);
     if (cadence !== null && (fastest === null || cadence < fastest)) fastest = cadence;
     // **The tick is its own axis, not a suffix of the slot** (C22 I103, F1189).
     // Folded into the slot every spinner tick was a `focus` miss, which drops
@@ -2294,9 +2314,9 @@ function visibleRows(
     // **The range is its own axis, beside the stable key** (C22 I101): a miss
     // on it alone keeps the parts, and the render below assembles from them.
     // **The tenth axis, and only where the picture depends on it** (C14 I54).
-    // On a theme that bands its selection a washed call head draws its state's
-    // own mark, so the selection changes what is rendered there — and only
-    // there. Everywhere else it is absent and keys nothing, which keeps I40's
+    // Where the selection is painted as a band — a theme that declares one, above
+    // 1 bit (C10 I66) — a washed call head draws its state's own mark, so the
+    // selection changes what is rendered there, and only there. Everywhere else it is absent and keys nothing, which keeps I40's
     // reason for refusing the axis true on every theme it was written about.
     const washed = washedBlocksOf(graph, entry.id, selection);
     const washedKey = washed === undefined ? "" : `\u0000${[...washed].sort().join("\u0001")}`;

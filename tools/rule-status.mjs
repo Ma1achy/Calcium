@@ -2,6 +2,7 @@
 //
 //     node tools/rule-status.mjs                  # the real ledger
 //     node tools/rule-status.mjs --file <path>    # a fixture's
+//     node tools/rule-status.mjs --parked <path>  # a fixture register
 //
 // **Every `current` rule in the registry is in exactly one of three states**, and
 // the three sets partition the population by equality. `roadmap-status.mjs` is
@@ -99,8 +100,15 @@ for (const id of current) {
 
 const cited = citedIds();
 
-/** The open entries of the parked file, by number — a retracted or ruled one is not open. */
-const PARKED = "docs/design/PARKED_QUESTIONS.md";
+/**
+ * The open entries of the parked file, by number — a retracted or ruled one is not open.
+ *
+ * `--parked <path>` replaces the register, for the same reason `--scope` exists:
+ * the control for an open question cannot take its arm once every real entry is
+ * ruled, which happened on 2026-09-27 and turned T1.154b red on a correct tree.
+ */
+const argParked = process.argv.indexOf("--parked");
+const PARKED = argParked === -1 ? "docs/design/PARKED_QUESTIONS.md" : process.argv[argParked + 1];
 const openQuestions = new Set(
   [...readFileSync(PARKED, "utf8").matchAll(/^\*\*(\d+) · (?!RETRACTED|RULED)/gmu)].map((m) => m[1]),
 );

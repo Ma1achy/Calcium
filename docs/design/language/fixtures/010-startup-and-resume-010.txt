@@ -22,7 +22,7 @@ it is the only setting that can surprise you later.
 resuming — the transcript is not empty, so the notice is an entry
 
   ● resumed · 14 turns · 2h ago · 31k tok restored
-  ⎿ last: edited parse.ts, ran the suite, 2 failing
+  ⎿  last: edited parse.ts, ran the suite, 2 failing
 
  ❯ what was failing again?
 

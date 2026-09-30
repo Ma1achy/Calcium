@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { buildSession } from "../support/session.js";
 import { fakeStdin } from "../support/fake-terminal.js";
+import type { ProfileReport } from "../../src/index.js";
 import type { TuiConfig } from "../../src/shell/types.js";
 
 const settle = async (): Promise<void> => {
@@ -117,8 +118,13 @@ async function copiedFromBoxed(
   await step(0);
   stdin.emit("y");
   await step(0);
-  stdin.emit("\u0003");
-  await step(0);
+  // **`esc` twice, where this pressed `⌃c`** (C16 I62, ruling 59): copy mode
+  // refuses the interrupt. The first clears the selection and the second leaves
+  // (C16 I51); each waits out the decoder's lone-`Esc` window.
+  stdin.emit("\u001b");
+  await step(100);
+  stdin.emit("\u001b");
+  await step(100);
   stdin.emit("\u0019");
   await step(0);
   const rows = screen().rows;
@@ -158,7 +164,7 @@ describe("C14 §6f — the drag in a real session", () => {
                 schema: "tui.view/1",
                 command: "heads",
                 status: "ok",
-                blocks: [{ kind: "notice", id: "h", tone: "error", glyph: "running", text: "HEADTEXT", state: "failed" }],
+                blocks: [{ kind: "notice", id: "h", tone: "error", glyph: "work-unit", text: "HEADTEXT", state: "failed" }],
               }) as never,
           },
           stdin: stdin as never,
@@ -205,6 +211,82 @@ describe("C14 §6f — the drag in a real session", () => {
       // The control: `dark` does not band its selection.
       const dark = await headIn("dark");
       expect([dark.before, dark.selected, dark.after], "dark: ● throughout").toEqual(["●", "●", "●"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("T4.37h (C14 I54, C10 I66): in hcDark at 1 bit selecting the failed head and clearing it costs the render cache no focus miss; at 24 bits each misses", async () => {
+    // **The only row that sees the 1-bit half of C10 I66.** At 1 bit every
+    // head already takes its state's mark, so the frame is the same whether or
+    // not `washed` keys the cache; what differs is whether the entry is
+    // rendered again for a picture that did not change. The profiler's miss
+    // counts are that reading — the cache's own, over the whole session.
+    vi.useFakeTimers();
+    try {
+      const run = async (depth: 1 | 24): Promise<{ marks: readonly string[]; focusMisses: number }> => {
+        const stdin = fakeStdin();
+        let seen: ProfileReport | null = null;
+        const { screen, clock, tui } = await buildSession({
+          manifest: {
+            ...(MANIFEST as Exclude<typeof MANIFEST, string>),
+            tools: [{ name: "heads", local: true, summary: "one failed call head", args: [], flags: [] }],
+          },
+          localHandlers: {
+            heads: () =>
+              ({
+                schema: "tui.view/1",
+                command: "heads",
+                status: "ok",
+                blocks: [{ kind: "notice", id: "h", tone: "error", glyph: "work-unit", text: "HEADTEXT", state: "failed" }],
+              }) as never,
+          },
+          capabilities: { colourDepth: depth },
+          profile: { tier: "counters", onReport: (r: ProfileReport) => void (seen = r) },
+          stdin: stdin as never,
+        });
+        const step = async (ms = 0): Promise<void> => {
+          clock.advance(ms);
+          await vi.advanceTimersByTimeAsync(ms);
+          await settle();
+        };
+        const mark = (): string => {
+          const row = screen().rows.find((r) => r.includes("HEADTEXT")) ?? "";
+          return [...row.slice(0, row.indexOf("HEADTEXT"))].at(-2) ?? "";
+        };
+        await step();
+        stdin.emit("/theme hcDark\r");
+        await step();
+        stdin.emit("/heads\r");
+        await step();
+        const at = screen().rows.findIndex((r) => r.includes("HEADTEXT")) + 1;
+        stdin.emit("\u001bV");
+        await step();
+        const marks = [mark()];
+        stdin.emit(press(6, at));
+        await step();
+        stdin.emit(moveTo(7, at));
+        await step();
+        stdin.emit(release(7, at));
+        await step();
+        marks.push(mark());
+        // One lone byte, past the disambiguation window: it clears the selection (C14 I48).
+        stdin.emit("\u001b");
+        await step(100);
+        marks.push(mark());
+        await tui.stop("exit");
+        const report = seen as ProfileReport | null;
+        if (report === null) throw new Error("no report arrived");
+        return { marks, focusMisses: report.misses["render"]?.focus ?? 0 };
+      };
+      const mono = await run(1);
+      expect(mono.marks, "1 bit: the state's own mark throughout").toEqual(["✗", "✗", "✗"]);
+      expect(mono.focusMisses, "1 bit: the selection keys nothing").toBe(0);
+      // The control: at 24 bits the band is painted, the mark moves, and the
+      // selection and its clearing each miss — the counter responds.
+      const truecolour = await run(24);
+      expect(truecolour.marks, "24 bits: ●, then the state's mark under the band, then ●").toEqual(["●", "✗", "●"]);
+      expect(truecolour.focusMisses, "24 bits: the selection and its clearing").toBe(2);
     } finally {
       vi.useRealTimers();
     }
@@ -354,8 +436,11 @@ describe("C14 §6f — the drag in a real session", () => {
         await step(0);
         stdin.emit("y");
         await step(0);
-        stdin.emit("\u0003");
-        await step(0);
+        // `esc` twice — clear, then leave (C16 I51, I62).
+        stdin.emit("\u001b");
+        await step(100);
+        stdin.emit("\u001b");
+        await step(100);
         stdin.emit("\u0019");
         await step(0);
         const text = prompt();
@@ -422,7 +507,7 @@ describe("C14 §6f — the drag in a real session", () => {
     }
   });
 
-  it("T4.37b (C14 I48, R-SEL-013): esc and ⌃c end the drag and its autoscroll", async () => {
+  it("T4.37b (C14 I48, R-SEL-013): esc ends the drag and its autoscroll; ⌃c, refused, ends nothing", async () => {
     vi.useFakeTimers();
     try {
       const stdin = fakeStdin();
@@ -486,13 +571,16 @@ describe("C14 §6f — the drag in a real session", () => {
         await step(0);
       }
 
-      // `⌃c` — leaves the mode, and the transcript it hands back holds still.
+      // **`⌃c` — refused, so it ends nothing** (C14 I48 amended, C16 I62,
+      // ruling 59). It used to leave the mode, and leaving is what ended the
+      // gesture; R-SEL-013 names release, esc and the container's end, and a
+      // refused key performs none of them. The held pointer keeps scrolling.
       await armedAndScrolling("⌃c");
       stdin.emit("\u0003");
       await step(0);
-      const afterExit = view();
+      const afterRefusal = view();
       await step(600);
-      expect(view(), "⌃c stopped the autoscroll").toBe(afterExit);
+      expect(view(), "⌃c is refused and the drag goes on").not.toBe(afterRefusal);
     } finally {
       vi.useRealTimers();
     }

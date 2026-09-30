@@ -1,12 +1,12 @@
 one column, one box-drawing family, and twice the resolution it looks
 
   ● pytest tests/unit · 4.2s · 1,204 passed
-    ⎿ ============== test session starts =========
-      collected 1204 items                            ╽
-      tests/unit/plot.py ........................   ┃
-      tests/unit/table.py ...................... ┃
-      tests/unit/patch.py ......................     ╿
-      +1,136 more
+    ⎿  ============== test session starts =========
+       collected 1204 items                            ╽
+       tests/unit/plot.py ........................   ┃
+       tests/unit/table.py ...................... ┃
+       tests/unit/patch.py ......................     ╿
+       +1,136 more
 
   │   the track      light vertical
   ┃   the thumb      HEAVY vertical — the same shape, more weight

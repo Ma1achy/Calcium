@@ -100,6 +100,7 @@ function world(
   const invalidate = vi.fn();
   const globalSeen: InputEvent[] = [];
   let cancels = 0;
+  let refusals = 0;
 
   // **A real line, not a stub** (F1153's rule about a fixture supplying the
   // behaviour): T1.69 asserts the text the reply carries, so the harness must
@@ -126,7 +127,13 @@ function world(
     overlayRegion: () => ({ width: 80, height: 24 }),
     overlayAnswerCallback: confirm.answerHandler,
     overlayWouldResolve: confirm.resolvesHandler,
-    keyReleasesReported: () => false,
+    // **Releases reported, and nothing held**, so a question arrives unguarded
+    // (C16 I44's precise arm). It was `false`, and every row spent the guard on
+    // a neutral `x` — which is now a refusal that draws `answer this first`
+    // (C23 I82), so the rows about what a key means would be reading a question
+    // that had already refused once. T4.78 and T4.79 own the guard and say
+    // `false` themselves.
+    keyReleasesReported: () => true,
     // **The cast below is why this has to be written out** (C16 I49). The other
     // four `RouterDeps` sites are checked, so a required dep forces each of
     // them; this one is `as unknown as RouterDeps`, so a missing field is a
@@ -139,10 +146,7 @@ function world(
     placed: () => overlays.layout({ width: 80, height: 24 }),
     popLayer: () => void overlays.pop(),
     nativeSelection: () => false,
-    exitNativeSelection: () => undefined,
     semanticSelection: () => false,
-    escapeSemanticSelection: () => undefined,
-    exitSemanticSelection: () => undefined,
     liveEntry: () => null,
     entryAtRow: () => null,
     inFlight: () => null,
@@ -155,6 +159,12 @@ function world(
     region: () => ({ top: 0, height: 10 }),
     mouseEnabled: () => false,
     raiseExitConfirm: () => undefined,
+    // L4's routing, as `construct.ts` does it (C16 I62): a refusal at the
+    // question is the question's to explain.
+    refused: (r: { rung: string | null }) => {
+      refusals += 1;
+      if (r.rung === "question") confirm.refuse();
+    },
     ...over,
   } as unknown as RouterDeps;
 
@@ -185,30 +195,24 @@ function world(
     viewport,
     store,
     cancels: () => cancels,
+    refusals: () => refusals,
   };
 }
 
 /**
- * Present a question and spend its activation guard (C16 I44, R-BLK-788, M7).
+ * Present a question (C16 I44, R-BLK-788, M7).
  *
- * **A newly presented question refuses one ambiguous activation**, and this world
- * reports no key releases — so on it the conservative arm applies and the first
- * key that would resolve the question is refused, naming why. The rows below are
- * about what a key *means* to a question, which is a different fact, so they
- * spend the guard on a neutral key first and then assert the meaning. T4.78 and
- * T4.79 are the rows that own the guard itself.
- *
- * `x` is neutral by the question's own classification: not an escape, not
- * `⏎`, not an arrow, and not an accelerator of `YES_NO`.
+ * **Unguarded, because this world reports key releases and holds none.** It
+ * used to report none, so the conservative arm guarded every question and this
+ * spent the guard on a neutral `x` — and since C23 I82 a neutral key is a
+ * refusal that draws `answer this first`, so every row reading the question
+ * afterwards was reading one that had already refused. T4.78 and T4.79 are the
+ * rows that own the guard, and they build the other world.
  */
 const present = (
   w: ReturnType<typeof world>,
   opts: Parameters<typeof w.confirm.ask>[0],
-): ReturnType<typeof w.confirm.ask> => {
-  const p = w.confirm.ask(opts);
-  w.router.dispatch(key("x"));
-  return p;
-};
+): ReturnType<typeof w.confirm.ask> => w.confirm.ask(opts);
 
 describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
   it("T4.1 (C16 I25): a real accelerator keystroke resolves the promise", async () => {
@@ -234,18 +238,32 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     await expect(answer).resolves.toEqual({ key: "n" });
   });
 
-  it("T4.3 (C23 I36, C16 I25): ⌃c resolves with the default, and is not consumed into silence", async () => {
+  it("T4.81 (C16 I62, C23 I36, ruling 59): ⌃c at an open question leaves it open, unanswered and saying so", async () => {
+    // **Inverted in review batch 2.** This was T4.3, *⌃c resolves with the
+    // default*, and it was the specified behaviour: the intercept table said
+    // `reject` and the dispatch ran the owning rung, whose answer callback
+    // classified `⌃c` as `resolve`. §103 has a QUESTION reject the interrupt
+    // (ruling 59), so the refusal is what is asserted — and the promise is still
+    // the only thing that tells *refused* from *answered and popped late*.
     const w = world();
     const answer = present(w, { question: "Stop api-gateway?", choices: YES_NO });
 
-    expect(w.router.dispatch(ctrlC)).toBe(true);
+    expect(w.router.dispatch(ctrlC), "consumed").toBe(true);
+    expect(w.router.lastStages).toEqual(["arming", "intercept:interrupt:question:reject", "reject"]);
 
-    // **The assertion the rung's old behaviour passes.** `⌃c` at a
-    // non-dismissable top returned true and did nothing (C16 I8), so "consumed" and
-    // "the layer is gone" are both satisfiable without the question ever being
-    // answered. The promise is the only thing that tells them apart.
+    let settled = false;
+    void answer.then(() => (settled = true));
+    await Promise.resolve();
+    expect(settled, "the question is not answered").toBe(false);
+    expect(w.overlays.top?.id, "and it is still up").toBe("confirm");
+    // **And it says so** (C23 I82): a refusal nothing on screen reports is a
+    // key swallowed. Read from the frame, on the question's own row.
+    const row = frameOf(w.overlays).find((l) => l.includes("Stop api-gateway?"));
+    expect(row, "the notice is beside the question").toContain("answer this first");
+
+    // The control: an answer still answers it.
+    w.router.dispatch(key("n"));
     await expect(answer).resolves.toEqual({ key: "n" });
-    expect(w.overlays.top).toBeNull();
   });
 
   it("T4.4 (C23 I36): arrows move the selection and Enter takes it", async () => {
@@ -305,7 +323,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     // already in flight from a deliberate one, so the first ambiguous
     // activation is refused — and refused is not dropped: the verdict is
     // `reject`, the question is still open, and it is still unanswered.
-    const w = world();
+    const w = world({ keyReleasesReported: () => false });
     const answer = w.confirm.ask({ question: "Stop api-gateway?", choices: YES_NO });
 
     expect(w.router.ownerArmed, "the question arrived, so it is guarded").toBe(true);
@@ -324,7 +342,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     // mode: an arrow under a question that has just arrived reaches the
     // question, moves its selection, and leaves it open — which is how a reader
     // reads what they are being asked before answering it.
-    const w = world();
+    const w = world({ keyReleasesReported: () => false });
     const answer = w.confirm.ask({ question: "Stop api-gateway?", choices: YES_NO });
 
     expect(w.router.dispatch(key("down")), "neutral, and the question's").toBe(true);
@@ -351,7 +369,9 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     const answer = present(w, { question: "Stop api-gateway?", choices: YES_NO });
     w.router.dispatch(key("q"));
     expect(w.globalSeen.length, "an unbound key is the question's, not global's").toBe(before);
-    expect(w.router.lastStages).toEqual(["arming", "target:overlay"]);
+    // **A `reject` now, where it was consumed with no stage** (C23 I82): the
+    // question refused it and said so, and the router records the verdict.
+    expect(w.router.lastStages).toEqual(["arming", "target:overlay", "reject"]);
 
     w.router.dispatch(key("n"));
     await answer;
@@ -414,33 +434,31 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     await answer;
   });
 
-  it("T4.10 (C16 I25): ⌃c answers the question rather than cancelling the verb", async () => {
-    // **The state the other rows could not construct.** `world()` reports
-    // `inFlight: () => null`, and a local verb awaiting `ctx.ask` is in flight
-    // for the whole time its question is up — so rung 1 took `⌃c` and the
-    // question never saw it. T4.3 passed throughout, because its harness was the
-    // one arrangement where both readings agree.
+  it("T4.81b (C16 I62, I7): ⌃c at a question with a local verb in flight cancels nothing", async () => {
+    // **The state the other rows could not construct**, kept from T4.10.
+    // `world()` reports `inFlight: () => null`, and a local verb awaiting
+    // `ctx.ask` is in flight for the whole time its question is up — so rung 1
+    // took `⌃c` and the question never saw it; cancellation discards the entry,
+    // and a frame-read found the submitted line had **disappeared**.
     //
-    // Found by a frame-read and by nothing else: the container was untouched and
-    // the layer was gone, which is what a test asserts, and the frame showed the
-    // submitted line had **disappeared** — cancellation discards the entry.
+    // **Amended in review batch 2** (ruling 59): T4.10 asserted `⌃c` *answered*
+    // the question instead. It now does neither — the question is open, the verb
+    // is waiting, and the refusal is the table's, before rung 1 is read (I7).
     const w = world({ inFlight: () => "local" });
     const cancelled = w.cancels;
 
     const answer = present(w, { question: "Stop api-gateway?", choices: YES_NO });
     expect(w.router.dispatch(ctrlC)).toBe(true);
 
-    await expect(answer).resolves.toEqual({ key: "n" });
     expect(cancelled(), "the verb must not be cancelled — it was waiting for us").toBe(0);
-    // **The rung that answered is the intercept table's, not §5's** (M5). §103
-    // gives `interrupt` an owner-applicability table where a QUESTION *rejects*
-    // — consume it and let the question resolve, never cancel the verb that is
-    // waiting on the answer — so `⌃c` never reaches §5's cancel rungs and the
-    // stage that records the decision names the route and the rung it was
-    // decided at. The two assertions above are the behaviour; this is the
-    // channel, named so a refactor that reached the same answer by the old path
-    // is visible rather than silent.
+    let settled = false;
+    void answer.then(() => (settled = true));
+    await Promise.resolve();
+    expect(settled, "and the question is not answered for it").toBe(false);
     expect(w.router.lastStages).toEqual(["arming", "intercept:interrupt:question:reject", "reject"]);
+
+    w.router.dispatch(key("n"));
+    await answer;
   });
 
   it("T4.11 (C16 I25): with no question open, ⌃c still cancels a running verb", async () => {
@@ -750,7 +768,9 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
   });
 
   it("T4.8 (C23 I36): resolves with a choice on every path, never null", async () => {
-    for (const k of [key("y"), key("n"), key("escape"), ctrlC, key("return")]) {
+    // **`⌃c` is not a path** (ruling 59): it is refused, and T4.81 asserts what
+    // that leaves.
+    for (const k of [key("y"), key("n"), key("escape"), key("return")]) {
       const w = world();
       const answer = present(w, { question: "q?", choices: YES_NO });
       w.router.dispatch(k);
@@ -763,5 +783,98 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
       expect(["y", "n"]).toContain(got.key);
       expect(got.text, "nothing was composed under any of them").toBeUndefined();
     }
+  });
+});
+
+describe("C23 I82 — a question refuses once and says so (review batch 2, M5)", () => {
+  it("T4.82 (C23 I82, R-HON-004, ruling 60): the first refused key adds the notice with one update and one invalidate; the second changes nothing", async () => {
+    const w = world();
+    const answer = present(w, { question: "Stop api-gateway?", choices: YES_NO });
+    const updates: string[] = [];
+    using _sub = w.overlays.subscribe((c) => void (c.kind === "content" && updates.push(c.id)));
+    const before = frameOf(w.overlays);
+    expect(before.join("\n"), "the control: nothing refused yet").not.toContain("answer this first");
+    w.invalidate.mockClear();
+
+    // The first refusal: one update, one invalidate, and the frame says why.
+    expect(w.router.dispatch(key("q")), "consumed").toBe(true);
+    expect(updates, "one C15 update").toEqual(["confirm"]);
+    expect(w.invalidate, "one invalidate").toHaveBeenCalledTimes(1);
+    const first = frameOf(w.overlays);
+    const row = first.find((l) => l.includes("Stop api-gateway?"));
+    expect(row, "on the question's own row").toContain("answer this first");
+    expect(first.length, "and it took no row of its own").toBe(before.length);
+
+    // The second: consumed, and nothing at all.
+    expect(w.router.dispatch(key("q")), "consumed").toBe(true);
+    expect(updates, "no second update").toEqual(["confirm"]);
+    expect(w.invalidate, "no second invalidate").toHaveBeenCalledTimes(1);
+    expect(frameOf(w.overlays), "the same lines").toEqual(first);
+
+    // The notice stays with the question and is not an answer: `n` answers.
+    w.router.dispatch(key("n"));
+    await expect(answer).resolves.toEqual({ key: "n" });
+  });
+
+  it("T4.82b (C23 I82, entry 16 R2): at 12 rows the choices are still drawn after the notice lands", () => {
+    const w = world({}, { width: 80, height: 12 });
+    void present(w, {
+      question: "Remove 6 stopped containers?",
+      detail: block({ kind: "raw", id: "d", text: Array.from({ length: 4 }, (_, i) => `row ${String(i)}`).join("\n") }),
+      choices: YES_NO,
+    });
+    w.router.dispatch(key("q"));
+
+    const placed = w.overlays.layout({ width: 80, height: 12 })[0];
+    if (placed === undefined) throw new Error("unreachable");
+    const r = measurable({ definitions: [tableDefinition] });
+    const all = placed.layer.content.flatMap((b) => r.renderToLines(b, placed.width).map(visible));
+    const drawn = all.slice(0, placed.height);
+    expect(drawn.join("\n"), "the refusal is drawn").toContain("answer this first");
+    expect(drawn.some((l) => l.includes("[n]")), "and so are the answers").toBe(true);
+    expect(all.length, "nothing is cut").toBeLessThanOrEqual(placed.height);
+  });
+
+  it("T4.73 (C23 I82, ruling 60): the inspection and the reply state are never refused", async () => {
+    const letter = key("q");
+
+    // The inspection: its only key is `esc`, and a reader reading is not refused.
+    const inspecting = world();
+    void present(inspecting, {
+      question: "Apply the patch?",
+      detail: block({ kind: "raw", id: "d", text: "diff" }),
+      choices: [
+        { key: "n", label: "no", default: true },
+        { key: "s", label: "show full diff", inspect: true },
+      ],
+    });
+    inspecting.router.dispatch(key("s"));
+    expect(JSON.stringify(inspecting.overlays.top?.content), "suspended").toContain("confirm-source");
+    inspecting.router.dispatch(letter);
+    expect(JSON.stringify(inspecting.overlays.top?.content), "no notice in the inspection").not.toContain(
+      "answer this first",
+    );
+
+    // The reply state: a letter is composition, passed to the prompt.
+    const replying = world();
+    void present(replying, {
+      question: "Why?",
+      choices: [
+        { key: "n", label: "no", default: true },
+        { key: "r", label: "reply…", reply: true },
+      ],
+    });
+    replying.router.dispatch(key("r"));
+    expect(replying.confirm.composing, "composing a reply").toBe(true);
+    replying.router.dispatch(letter);
+    expect(JSON.stringify(replying.overlays.top?.content), "no notice while composing").not.toContain(
+      "answer this first",
+    );
+
+    // The control: the same letter at the choice state draws it.
+    const choosing = world();
+    void present(choosing, { question: "Apply?", choices: YES_NO });
+    choosing.router.dispatch(letter);
+    expect(JSON.stringify(choosing.overlays.top?.content)).toContain("answer this first");
   });
 });

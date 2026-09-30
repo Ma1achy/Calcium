@@ -22,6 +22,9 @@
  */
 
 import {
+  CALL_HEAD_GLYPH,
+  CALL_STATE_TONE,
+  CALL_STATES,
   GLYPH_REQUIRED_TONES,
   type Block,
   type Cell,
@@ -108,6 +111,32 @@ function requireGlyph(tone: Tone | undefined, glyph: Glyph | undefined, where: s
     `${where}: tone "${tone}" requires a non-empty glyph (C04 I6, D29) — ` +
       `colour alone does not survive 1-bit or a colour-blind reader`,
   );
+}
+
+/**
+ * A call head's state names its tone and its glyph (I141) — the same refusal
+ * `validateDocument` makes, at construction, so `block()` cannot build a notice
+ * the validator would refuse. Refused, never corrected: a head saying `failed`
+ * in `info` is a document its own fields contradict.
+ */
+function checkCallState(notice: Notice): void {
+  const state = notice.state;
+  if (state === undefined) return;
+  const where = `notice "${notice.id}"`;
+  if (!CALL_STATES.includes(state)) {
+    throw new BlockShapeError(`${where}: "state" is outside its union (I141) — one of ${CALL_STATES.join(", ")}`);
+  }
+  if (notice.tone !== CALL_STATE_TONE[state]) {
+    throw new BlockShapeError(`${where}: "tone" must be "${CALL_STATE_TONE[state]}" for state "${state}" (I141) — the state names its tone`);
+  }
+  // **Absent is admitted on a running head alone** (I141): an operation's
+  // walking mark leads its text, so a gutter mark would be a second one. The
+  // fields cannot tell an operation from a call, so a running call head with no
+  // glyph passes too — `callHead` always writes one, and that is the limit.
+  if (notice.glyph === undefined && state === "running") return;
+  if (notice.glyph !== CALL_HEAD_GLYPH[state]) {
+    throw new BlockShapeError(`${where}: "glyph" must be "${CALL_HEAD_GLYPH[state]}" for state "${state}" (I141) — the state names its mark`);
+  }
 }
 
 /**
@@ -334,6 +363,7 @@ function checkShape(block: Block): void {
   switch (block.kind) {
     case "notice":
       requireGlyph(block.tone, (block as Notice).glyph, `notice "${block.id}"`);
+      checkCallState(block as Notice);
       break;
     case "plot":
       checkHeatmap(block);

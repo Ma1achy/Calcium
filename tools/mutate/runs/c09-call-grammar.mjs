@@ -3,7 +3,7 @@
 // Every mutation is a shape the tree shipped in or nearly did: `⏺` (the head mark
 // until F823), `-` for the separator (until F834), `glyphFor` reading `unicode`
 // alone (until F825), and a fitter that shortens the last run rather than the one
-// marked `elide`. The control is the head mark itself — T2.45 and T2.112 both
+// marked `elide`. The control is the head mark itself — T2.187 and T2.112 both
 // read the table, so a green control would mean the table is not what the rows
 // read.
 import { readFileSync, writeFileSync } from "node:fs";
@@ -11,7 +11,7 @@ import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/contract/blocks.test.ts test/contract/tool-call.test.ts";
+const CMD = "npx vitest run test/contract/blocks.test.ts test/contract/tool-call.test.ts test/contract/call-state.test.ts";
 const GLYPHS = "src/presentation/blocks/glyphs.ts";
 const SIMPLE = "src/presentation/blocks/kinds/simple.ts";
 
@@ -32,9 +32,9 @@ const results = runPass({
   control: {
     file: GLYPHS,
     from: '  succeeded: "ok",',
-    to: '  succeeded: "running",',
+    to: '  succeeded: "work-unit",',
     why:
-      "T2.45 asserts the five marks the states take where shape has to carry them; a succeeded call " +
+      "T2.187 asserts the five marks the states take where shape has to carry them; a succeeded call " +
       "drawing `\u25cf` collides with running at 1 bit and in ASCII, so a pass where this survives " +
       "is a pass that saw no kill",
   },
@@ -51,7 +51,7 @@ const results = runPass({
       file: GLYPHS,
       from: '  return caps.colourDepth > 1 && caps.unicode !== "ascii" && !onBand;',
       to: "  return true;",
-      expect: "T2.45"
+      expect: "T2.187"
     },
     {
       // C09 I49 (T2.116), F834 — the rung the tree carried for one commit.

@@ -219,7 +219,7 @@ const results = runPass({
       // `ripple` trail is still with it. The state this repaired, reinstated.
       name: "a streaming notice asks for no tick",
       file: ANIMATION,
-      from: "  if (block.kind === \"notice\" && (block as Notice).streaming === true) return spinnerIntervalMs(\"agent\");",
+      from: "  if (block.kind === \"notice\" && (block as Notice).streaming === true) return spinnerIntervalMs(\"agent\", caps);",
       to: "",
       expect: "T1.65",
     },

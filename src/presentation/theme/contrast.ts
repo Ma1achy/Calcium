@@ -713,11 +713,47 @@ export function validateTokens(tokens: ThemeTokens): readonly ThemeError[] {
  * 1.01 : 1 from each other in `hcLight`, separated by hue alone.
  */
 export function validateBands(tokens: ThemeTokens): readonly ThemeError[] {
-  const bands = tokens.bandInk;
-  if (bands === undefined) return Object.freeze([]);
-  const bg = tokens.surfaces.bg;
-  if (!isHex(bg)) return Object.freeze([]);
   const errors: ThemeError[] = [];
+  const bands = tokens.bandInk ?? {};
+
+  // **Every band has a 4-bit pair, and the pair is two indices** (C10 I61).
+  // Structural, so it binds at load: a band with no pair resolves at 4-bit to
+  // no ground and one index per tone, the state I61 was written against. The
+  // pair's contrast is a claim about a reference palette and is T2.64's, not
+  // this gate's — a user's sixteen are the user's.
+  //
+  // **First, and in both directions** (question 55). This sat after the
+  // `isHex(bg)` return below, so a theme inheriting its page could declare a
+  // band with no pair; and it iterated `bandInk` alone, so a pair with no band
+  // was never read. Each is a 4-bit band one reader painted and the other did
+  // not, and `bandAt` (I66) now paints neither — refused here, a theme cannot
+  // ship a band it silently does not draw.
+  for (const name of Object.keys(bands)) {
+    const pair = tokens.bandFourBit?.[name];
+    if (pair === undefined) {
+      errors.push({
+        path: `bandFourBit.${name}`,
+        message: "a band with no 4-bit pair has no ground at colourDepth 4 and one index per tone on it (C10 I61)",
+      });
+    } else if (pair.ground === pair.ink) {
+      errors.push({
+        path: `bandFourBit.${name}`,
+        message: `ground and ink are both index ${String(pair.ground)} — a band whose ink is its ground draws nothing on it (C10 I61)`,
+      });
+    }
+  }
+  for (const name of Object.keys(tokens.bandFourBit ?? {})) {
+    if (bands[name] === undefined) {
+      errors.push({
+        path: `bandFourBit.${name}`,
+        message: "a 4-bit pair with no band declares a band at colourDepth 4 alone, which nothing paints (C10 I61, I66)",
+      });
+    }
+  }
+
+  if (tokens.bandInk === undefined) return Object.freeze(errors);
+  const bg = tokens.surfaces.bg;
+  if (!isHex(bg)) return Object.freeze(errors);
   const promised = tokens.floor ?? DEFAULT_FLOOR;
 
   // **The band's name IS the surface's name** (I45). This read *`focusGround` if
@@ -781,25 +817,6 @@ export function validateBands(tokens: ThemeTokens): readonly ThemeError[] {
     }
   }
 
-  // **Every band has a 4-bit pair, and the pair is two indices** (C10 I61).
-  // Structural, so it binds at load: a band with no pair resolves at 4-bit to
-  // no ground and one index per tone, the state I61 was written against. The
-  // pair's contrast is a claim about a reference palette and is T2.64's, not
-  // this gate's — a user's sixteen are the user's.
-  for (const name of Object.keys(bands)) {
-    const pair = tokens.bandFourBit?.[name];
-    if (pair === undefined) {
-      errors.push({
-        path: `bandFourBit.${name}`,
-        message: "a band with no 4-bit pair has no ground at colourDepth 4 and one index per tone on it (C10 I61)",
-      });
-    } else if (pair.ground === pair.ink) {
-      errors.push({
-        path: `bandFourBit.${name}`,
-        message: `ground and ink are both index ${String(pair.ground)} — a band whose ink is its ground draws nothing on it (C10 I61)`,
-      });
-    }
-  }
   return Object.freeze(errors);
 }
 

@@ -99,7 +99,7 @@ const GLYPH_RAIL: ReadonlySet<Glyph> = new Set<Glyph>(["quote"]);
  *
  * **The test is the call state, not the glyph token.** It used to be
  * `glyph === "step"`, and that slot is gone: above the monochrome rung the head
- * mark is `running`'s `●` for every state, which a muted `running` notice could
+ * mark is `work-unit`'s `●` for every state, which a muted `work-unit` notice could
  * also hold, and at 1 bit it is five different tokens. A predicate over the
  * character would have answered differently at different capabilities, which is
  * a focus ring that changes shape when the terminal does. `state` is on the
@@ -128,7 +128,15 @@ function declaresElement(block: Notice): boolean {
  * reverse, and both are frames that measure correctly and are wrong.
  */
 function glyphLead(glyph: Glyph, caps: RenderContext["capabilities"]): string {
-  return `${" ".repeat(GLYPH_INDENT.get(glyph) ?? 0)}${glyphFor(glyph, caps)} `;
+  // **Padded to the token's reservation** (C09 I5, R-GLY-003): `⎿` is one cell
+  // of `continuation`'s two, and the blank after it is what keeps the text in
+  // the column `` `- `` puts it in. `prefixCells` counts the reservation, so
+  // the two agree by construction rather than by every mark being one cell.
+  const drawn = glyphFor(glyph, caps);
+  // `glyphFor` hands back the ASCII half at `wide` (I48), so the mark drawn is
+  // never Ambiguous and its narrow width is its width.
+  const pad = " ".repeat(Math.max(0, glyphCells(glyph) - cells(drawn))); // narrow-ok
+  return `${" ".repeat(GLYPH_INDENT.get(glyph) ?? 0)}${drawn}${pad} `;
 }
 
 /**
@@ -659,13 +667,17 @@ export const noticeDefinition: BlockDefinition<Notice> = {
                     // function of whether tone can carry it. Geometry is
                     // untouched — every candidate is one cell with no indent.
                     // On a band the tone is spent per cell (C10 I45), so a focused
-                    // head in a high-contrast theme takes the 1-bit rung's mark.
+                    // head in a high-contrast theme takes the 1-bit rung's mark —
+                    // where the band is painted at this depth (C10 I66). And on a
+                    // receded panel it is spent per panel (I110, question 56):
+                    // every ink there is `dim`, so five states would be one.
                     block.state !== undefined
                       ? headMark(
                           block.state,
                           ctx.capabilities,
-                          (focused && isBand(ctx.theme, "focusGround")) ||
-                            (ctx.washed?.has(block.id) === true && isBand(ctx.theme, "selection")),
+                          (focused && isBand(ctx.theme, "focusGround", ctx.capabilities)) ||
+                            (ctx.washed?.has(block.id) === true && isBand(ctx.theme, "selection", ctx.capabilities)) ||
+                            ctx.theme.recedes !== undefined,
                         )
                       : block.glyph,
                     ctx.capabilities,

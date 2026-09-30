@@ -15,6 +15,7 @@
  * has box drawing and no astral planes still gets `┌` and `✓`.
  */
 import type { CallState, Glyph, Marker3 } from "../../data/viewmodel/types.js";
+import { CALL_HEAD_GLYPH } from "../../data/viewmodel/types.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { cells } from "../text.js";
 
@@ -175,6 +176,12 @@ export type GlyphSet = Readonly<{
   cross: string;
   filled: string;
   hollow: string;
+  /**
+   * An unchosen option in an exclusive choice — the registry's `choice-open`
+   * (C09 I123). `○` like `hollow`, and a slot of its own because the ASCII
+   * halves differ: `@` here, `o` for the plot's hollow marker.
+   */
+  choiceOpen: string;
   dotted: string;
   blocked: string;
   warning: string;
@@ -198,6 +205,12 @@ export type GlyphSet = Readonly<{
    * lead, and the lead and a cell share one content row (SS64).
    */
   trendDown: string;
+  /**
+   * **A reading that held** (question 37): `→`, and `=` at ASCII, in the default
+   * tone. No mark is not *flat* — it is a cell with no comparison at all — so a
+   * held reading draws a mark of its own and an absent trend draws none.
+   */
+  trendFlat: string;
 
   // Progress.
 
@@ -296,6 +309,7 @@ const UNICODE: GlyphSet = Object.freeze({
   cross: "✗",
   filled: "●",
   hollow: "○",
+  choiceOpen: "○",
   dotted: "◌",
   blocked: "⊘",
   warning: "▲",
@@ -308,10 +322,12 @@ const UNICODE: GlyphSet = Object.freeze({
   sortAsc: "▴",
   sortDesc: "▾",
 
-  // `↑` and `↓` — the registry's `trend-up` and `trend-down`. Both Ambiguous, so
-  // the set's collapse to ASCII at `wide` takes them with the rest (C09 I48).
+  // `↑`, `↓` and `→` — the registry's `trend-up`, `trend-down` and `trend-flat`.
+  // All three Ambiguous, so the set's collapse to ASCII at `wide` takes them with
+  // the rest (C09 I48).
   trendUp: "\u2191",
   trendDown: "\u2193",
+  trendFlat: "\u2192",
 
 });
 
@@ -372,6 +388,7 @@ const ASCII: GlyphSet = Object.freeze({
   cross: "x",
   filled: "*",
   hollow: "o",
+  choiceOpen: "@",
   dotted: ".",
   blocked: "/",
   warning: "!",
@@ -382,6 +399,8 @@ const ASCII: GlyphSet = Object.freeze({
 
   trendUp: "^",
   trendDown: "V",
+  // `=` is free in the content row: its other two uses are figure marks (SS64).
+  trendFlat: "=",
 
 });
 
@@ -430,7 +449,7 @@ export const FREE_WIDTH_SLOTS: ReadonlySet<keyof GlyphSet> = new Set<keyof Glyph
  */
 export const CALL_STATE_GLYPH: Readonly<Record<CallState, Glyph>> = Object.freeze({
   queued: "queued",
-  running: "running",
+  running: "work-unit",
   succeeded: "ok",
   failed: "error",
   cancelled: "cancelled",
@@ -452,7 +471,9 @@ export const CALL_STATE_GLYPH: Readonly<Record<CallState, Glyph>> = Object.freez
  * **And per cell, on a band** (C10 I45, R-THM-005). A band's ink is total, so a
  * cell on one has spent its tone exactly as a 1-bit terminal has. `onBand` is
  * the ground's answer and the capability record cannot give it: in `hcDark` a
- * focused head is on a band and every other head on the page is not.
+ * focused head is on a band and every other head on the page is not. The
+ * caller also passes it for a head on a receded panel (I110, question 56),
+ * where every ink is `dim` and the tone is spent per panel rather than per cell.
  */
 export function toneCarries(caps: GlyphCaps & Pick<TerminalCapabilities, "colourDepth">, onBand = false): boolean {
   return caps.colourDepth > 1 && caps.unicode !== "ascii" && !onBand;
@@ -466,7 +487,10 @@ export function toneCarries(caps: GlyphCaps & Pick<TerminalCapabilities, "colour
  * it is not one of these, so resolving by capability moves no geometry.
  */
 export function headMark(state: CallState, caps: Parameters<typeof toneCarries>[0], onBand = false): Glyph {
-  return toneCarries(caps, onBand) ? "running" : CALL_STATE_GLYPH[state];
+  // Where tone carries, the state's toned mark — `●`, or `○` for a call that
+  // has not started (R-BLK-220). It was `work-unit`'s for all five, so a queued head
+  // was a filled dot beside a running one whose spinner had not ticked (F1261).
+  return toneCarries(caps, onBand) ? CALL_HEAD_GLYPH[state] : CALL_STATE_GLYPH[state];
 }
 
 /** The pairs, for the test that asserts each is 1:1 (T2.5). */
@@ -540,10 +564,14 @@ export function glyphs(caps: GlyphCaps): GlyphSet {
  * four- or five-frame pattern at the *same interval*, so `braille` — ten frames
  * at 80 ms, an 800 ms cycle — spun at 320 ms in ASCII, two and a half times
  * faster. The registry fits its pattern to the set's own frame count
- * (`asciiTrajectory: "fit-cycle"`), which holds each glyph longer and keeps the
- * cycle, and that is what `R-MOT-010`'s *shape of its motion* means. `R-MOT-011`
- * — one alphabet, one cadence — was green on the collapse the whole time, with
- * three consistent families and no mismatch.
+ * (`asciiTrajectory: "fit-cycle"`), which holds each glyph longer, and that is
+ * what `R-MOT-010`'s *shape of its motion* means. `R-MOT-011` — one alphabet,
+ * one cadence — was green on the collapse the whole time, with three consistent
+ * families and no mismatch.
+ *
+ * **The fitted rung no longer keeps the set's cycle** (question 40): every ASCII
+ * rung steps at `ASCII_INTERVAL_MS`, so the nine sets sharing `|/-\` turn it at
+ * one rate. The pattern's shape is kept; its duration is the rung's.
  *
  * **`narrowOnly` is a tier and not a refusal**, which is what `ambiguousWidth`
  * changed. Every frame of these sets is `East_Asian_Width=Ambiguous` — the
@@ -910,6 +938,28 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
 /** The default, and the set this returned before it took a name. */
 const DEFAULT_SET = "braille";
 
+/**
+ * The ASCII rung's one cadence, in milliseconds — the registry's
+ * `spinnerPolicy.asciiIntervalMs` (C09 I112, question 40, `R-MOT-011`).
+ *
+ * **One number for the rung, not one per set.** Nine sets share `|/-\` at nine
+ * intervals between 80 and 140 ms, six share `.oO@Oo` and two share `0–f`; a
+ * shared alphabet at several rates is two spinners that look alike and disagree
+ * about how busy the machine is. 120 is the mode of the one, the median of the
+ * other and a member of the third, and §039 says *nothing varies its rate*.
+ * T2.73 holds this equal to the registry's.
+ */
+const ASCII_INTERVAL_MS = 120;
+
+/**
+ * Whether a set draws its ASCII frames at these capabilities — the one test
+ * `spinnerFrames` and `spinnerIntervalMs` both ask, so the frames and the
+ * cadence cannot come from two different rungs.
+ */
+function atAsciiRung(caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">, set: SpinnerSet): boolean {
+  return caps.unicode === "ascii" || (set.narrowOnly === true && caps.ambiguousWidth === "wide");
+}
+
 function setFor(name: string): SpinnerSet {
   return SPINNER_SETS[name] ?? SPINNER_SETS[DEFAULT_SET] ?? { frames: [], intervalMs: 80, ascii: [] };
 }
@@ -932,8 +982,7 @@ export function spinnerFrames(
   name: string = DEFAULT_SET,
 ): readonly string[] {
   const set = setFor(name);
-  if (caps.unicode === "ascii") return set.ascii;
-  return set.narrowOnly === true && caps.ambiguousWidth === "wide" ? set.ascii : set.frames;
+  return atAsciiRung(caps, set) ? set.ascii : set.frames;
 }
 
 /**
@@ -1244,9 +1293,17 @@ export const spinnerSetNames = (): readonly string[] => Object.freeze(Object.key
  * **The interval belongs to the set**, so this is the same lookup rather than a
  * second table: a caller holding frames from one set and an interval from
  * another is the drift the pairing exists to prevent.
+ *
+ * **And to the rung, given the capabilities** (C09 I112, question 40): where the
+ * set draws its ASCII frames every set steps at `ASCII_INTERVAL_MS`. With no
+ * capabilities the answer is the Unicode rung's, which is the set's own.
  */
-export function spinnerIntervalMs(name: string = DEFAULT_SET): number {
-  return setFor(name).intervalMs;
+export function spinnerIntervalMs(
+  name: string = DEFAULT_SET,
+  caps?: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+): number {
+  const set = setFor(name);
+  return caps !== undefined && atAsciiRung(caps, set) ? ASCII_INTERVAL_MS : set.intervalMs;
 }
 
 /**
@@ -1275,7 +1332,7 @@ export function spinnerFrameAt(
   const frames = spinnerFrames(caps, name);
   const count = frames.length; // cells-ok — a frame count
   if (count === 0) return "";
-  const step = Math.floor((tick * TICK_MS) / spinnerIntervalMs(name));
+  const step = Math.floor((tick * TICK_MS) / spinnerIntervalMs(name, caps));
   return frames[step % count] ?? "";
 }
 
@@ -1318,7 +1375,7 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     info: ["\u24d8", "i"],
     pending: ["◌", "."],
     working: ["◐", "%"],
-    running: ["●", "*"],
+    "work-unit": ["●", "*"],
     queued: ["○", "o"],
     cancelled: ["⊘", "/"],
     // **`▹` U+25B9 HOLLOW, and the ASCII half is `(`** — a collapsed row
@@ -1366,7 +1423,13 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     // `unicode` alone. Recorded because §4's note says a third set of narrow
     // survivors is the better answer the day someone measures one, and this is
     // one. The ASCII half is `tree(1)`'s rendering of the same hook.
-    continuation: ["⎿", "`"],
+    //
+    // **The ASCII half is the registry's `` `- ``, two cells, and the slot
+    // reserves two at every rung** (C09 I5, R-GLY-001, R-GLY-003): `⎿` is
+    // padded to the reservation where it is drawn, so the text after it lands
+    // in one column at both. It was `` ` `` alone — half the design's mark,
+    // which is how every slot stayed one cell.
+    continuation: ["⎿", "`-"],
   });
 
 /**
@@ -1393,7 +1456,7 @@ export const GLYPH_DOMAINS: Readonly<Record<Glyph, readonly string[]>> = {
   question: ["row-lead"],
   // **Not `row-lead`, and the registry's own record is the measurement**: over
   // every `›` in the design not one is a transcript gutter. Recording it here
-  // would spend `*` against the running head mark for a position `›` never
+  // would spend `*` against `work-unit`'s head mark for a position `›` never
   // occupies.
   // **And a form's default button** (C09 I119): §105 draws `› save`.
   current: ["chooser-row", "tape", "form"],
@@ -1405,7 +1468,7 @@ export const GLYPH_DOMAINS: Readonly<Record<Glyph, readonly string[]>> = {
   info: ["row-lead"],
   pending: ["row-lead"],
   working: ["row-lead"],
-  running: ["row-lead"],
+  "work-unit": ["row-lead"],
   queued: ["row-lead"],
   cancelled: ["row-lead"],
   // **And a tree's twisty** (C04 I131): the same pair in the tree's own indent
@@ -1475,6 +1538,7 @@ export const GLYPH_SET_DOMAINS: Readonly<Record<keyof GlyphSet, readonly string[
   cross: ["row-lead", "plot"],
   filled: ["row-lead", "plot"],
   hollow: ["row-lead", "plot"],
+  choiceOpen: ["row-lead"],
   dotted: ["row-lead", "plot"],
   blocked: ["row-lead", "plot"],
   warning: ["row-lead", "plot"],
@@ -1484,6 +1548,7 @@ export const GLYPH_SET_DOMAINS: Readonly<Record<keyof GlyphSet, readonly string[
 
   trendUp: ["inline"],
   trendDown: ["inline"],
+  trendFlat: ["inline"],
 };
 
 /** The pairs, for the test that asserts each is 1:1 by cell count (I5). */
@@ -1520,7 +1585,7 @@ export function glyphFor(token: Glyph, caps: Pick<TerminalCapabilities, "unicode
   if (caps.unicode === "ascii") return pair[1];
   // **The whole vocabulary, not the Ambiguous members** (I48, §093). A set is
   // legible because its members were drawn by one hand; resolving per token
-  // drew `*` for running beneath a `⎿` continuation with `✓` and `✗` as
+  // drew `*` for `work-unit` beneath a `⎿` continuation with `✓` and `✗` as
   // outcomes — eleven of eighteen fallen and seven still Unicode, which is C02
   // I9's *mostly ASCII dressed as Unicode* inside one alphabet. The rule the
   // old line implemented was about **width**, and it was right about width:
@@ -1544,7 +1609,13 @@ export function glyphCells(token: Glyph): number {
   // this replaces said *2:2 at wide*, which assumed both halves Ambiguous;
   // none of the ASCII halves is (F825). Passing a capability here would make a
   // property of the table depend on the terminal reading it.
-  return cells(GLYPH_TABLE[token][0]); // narrow-ok
+  //
+  // **The reservation: the widest of the two** (I5, R-GLY-001, *reservedCells
+  // equal to its widest representation*), derived from the table rather than
+  // written beside it. One cell for every token but `continuation`, whose
+  // ASCII half is `` `- ``; the renderer pads the narrower one to it.
+  const [unicode, ascii] = GLYPH_TABLE[token];
+  return Math.max(cells(unicode), cells(ascii)); // narrow-ok
 }
 
 /**

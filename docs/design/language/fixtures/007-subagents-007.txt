@@ -51,7 +51,7 @@ its first entry.
   ● I'll grep the prose, the register and the roadmap separately.
 
   ● search("refus") · 1.2s · 1,204 matches
-    ⎿ +1,204 more · ⏎ expand
+    ⎿  +1,204 more · ⏎ expand
 
   ✦  cross-checking the register  4m 02s · 46k tok
   ────────────────────────────────────────────────────── calcium/count ─

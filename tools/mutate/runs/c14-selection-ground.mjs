@@ -115,7 +115,7 @@ const MUTATIONS = [
     // themes. Every theme without a band reads identically.
     name: "the wash lays the band's ground and not its ink",
     file: PAINT,
-    from: '  const band = isBand(theme, "selection") ? tone("default", theme, capabilities, "selection") : {};',
+    from: '  const band = isBand(theme, "selection", capabilities) ? tone("default", theme, capabilities, "selection") : {};',
     to: "  const band = {};",
     expect: "T1.40e",
   },
@@ -125,8 +125,8 @@ const MUTATIONS = [
     // colour in `hcDark`, on the selection's bright ground.
     name: "the wash's ink is resolved against the focus band",
     file: PAINT,
-    from: '  const band = isBand(theme, "selection") ? tone("default", theme, capabilities, "selection") : {};',
-    to: '  const band = isBand(theme, "selection") ? tone("default", theme, capabilities, "focusGround") : {};',
+    from: '  const band = isBand(theme, "selection", capabilities) ? tone("default", theme, capabilities, "selection") : {};',
+    to: '  const band = isBand(theme, "selection", capabilities) ? tone("default", theme, capabilities, "focusGround") : {};',
     expect: "T1.40e",
   },
 ];

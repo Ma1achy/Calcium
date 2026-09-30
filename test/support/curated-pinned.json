@@ -43,7 +43,7 @@
   "cancelled": "cancelled",
   "failed": "error",
   "queued": "queued",
-  "running": "running",
+  "running": "work-unit",
   "succeeded": "ok"
  },
  "CATEGORY_REFS": [
@@ -860,10 +860,10 @@
   "quote": [
    "row-lead"
   ],
-  "running": [
+  "warn": [
    "row-lead"
   ],
-  "warn": [
+  "work-unit": [
    "row-lead"
   ],
   "working": [
@@ -896,6 +896,9 @@
   ],
   "candleHollow": [
    "plot"
+  ],
+  "choiceOpen": [
+   "row-lead"
   ],
   "cross": [
    "row-lead",
@@ -1002,6 +1005,9 @@
   "trendDown": [
    "inline"
   ],
+  "trendFlat": [
+   "inline"
+  ],
   "trendUp": [
    "inline"
   ],
@@ -1085,7 +1091,7 @@
   ],
   [
    "⎿",
-   "`"
+   "`-"
   ]
  ],
  "GLYPH_TOKENS": [
@@ -1097,7 +1103,7 @@
   "info",
   "pending",
   "working",
-  "running",
+  "work-unit",
   "queued",
   "cancelled",
   "expand",
@@ -2208,6 +2214,10 @@
    "o"
   ],
   [
+   "○",
+   "@"
+  ],
+  [
    "◌",
    "."
   ],
@@ -2238,6 +2248,10 @@
   [
    "↓",
    "V"
+  ],
+  [
+   "→",
+   "="
   ]
  ],
  "VISIONS": [
@@ -2338,6 +2352,7 @@
   "candleCross": "+",
   "candleFilled": "#",
   "candleHollow": "=",
+  "choiceOpen": "@",
   "cross": "x",
   "crossing": "+",
   "cursorMark": "^",
@@ -2371,6 +2386,7 @@
   "topLeft": "+",
   "topRight": "+",
   "trendDown": "V",
+  "trendFlat": "=",
   "trendUp": "^",
   "vertical": "|",
   "warning": "!"
@@ -2384,6 +2400,7 @@
   "candleCross": "┿",
   "candleFilled": "┃",
   "candleHollow": "▯",
+  "choiceOpen": "○",
   "cross": "✗",
   "crossing": "┼",
   "cursorMark": "▲",
@@ -2417,6 +2434,7 @@
   "topLeft": "┌",
   "topRight": "┐",
   "trendDown": "↓",
+  "trendFlat": "→",
   "trendUp": "↑",
   "vertical": "│",
   "warning": "▲"

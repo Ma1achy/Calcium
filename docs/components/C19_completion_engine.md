@@ -44,10 +44,13 @@ type Slot =
   | Readonly<{ kind: "flagValue"; flag: FlagDef }>
   | Readonly<{ kind: "positional"; arg: ArgDef }>
   | Readonly<{ kind: "path" }>
+  | Readonly<{ kind: "action" }>                        // ">" as the line's first character (C16 I68)
   | Readonly<{ kind: "none" }>;
 ```
 
 `verb` versus `executable` is D25: a leading `/` completes the manifest, bare text completes `PATH` and the filesystem. Same key, two namespaces, decided by one character.
+
+**`action` is decided before the tokeniser is asked** (C16 I68, ruling 45, ruling 67). C18 reads a leading `>` as a redirect operator, so no question put to the token list can find the palette — `> notes` is `[operator, word]` and its `notes` sits in no slot the palette owns. `contextAt` tests `input[0] === ">"` first: `prefix` is the text after the `>` and any spaces up to the cursor, `replace` starts there, and `tokens` is empty because nothing in the line is a command. A `>` anywhere else is C18's. The slot's source is the composition root's, not the framework's — the actions the prompt reaches are a fact about the keymap and the application's handlers, which this layer holds neither of — and accepting one of its rows **runs** it rather than inserting it (C16 §6c Q2).
 
 **`tokens` is C18's `Token[]`, and this is where C18 ruling 4 is tested rather than asserted.** That ruling commits that one shape serves both consumers — the delegated string's splice and this context — and the shape is the span-carrying token. The `readonly string[]` this field first declared cannot answer any of the three questions asked of it:
 
@@ -783,7 +786,7 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T2.4b** (I5): `CompletionContext.tokens` is C18's `Token`, asserted structurally — a context built with bare strings does not typecheck, and `replace.start` equals the current token's `start`.
 - **T2.5** (I12): the module graph shows no import from `terminal/` and no scheduler call.
 - **T2.6** (I4): a source scan finds no literal verb, flag or enum list in `completion/`.
-- **T2.7**: every `Slot` kind has at least one registered source — exhaustive over the union.
+- **T2.7**: every `Slot` kind has at least one registered source — exhaustive over the union. **Amended for `action`** (C16 I68): its source is the composition root's, so the framework's sources cover every kind but `none` and `action`, the exception list compared by equality.
 - **T2.9** (§8a): the sequence trace replayed row for row, asserting the **whole** state after each step — `seq`, `active`, the in-flight set, the menu and the buffer — rather than the field the step is about.
 - **T2.10** (§8b): the classification table replayed row for row, asserting the whole context — slot, prefix, tool, argument — rather than the field the row is about. Four of its ten rows were defects when it was first run.
 - **T2.8** (I8): the menu's content is `Block[]`; a compile-level test rejects React.

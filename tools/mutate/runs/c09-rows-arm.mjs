@@ -127,6 +127,25 @@ const results = runPass({
       expect: "T1.46",
     },
     {
+      // **F1258 as Ink ships it**: the shared `22` written and the bold beside
+      // the dim treated as still held, so the rest of the run is unbolded.
+      name: "REOPEN-DROPPED: a code closed by a shared end is not re-opened",
+      file: ROWS,
+      from: "    if (hasCode(from, c.code) && !(closing !== null && hasEnd(closing, c.end))) continue;",
+      to: "    if (hasCode(from, c.code)) continue;",
+      expect: "T1.85",
+    },
+    {
+      // **The correction overreaching**: every held code re-opened after any
+      // close, which reads back the same and is not Ink's bytes — T1.46's
+      // verdict refuses a divergence with nothing to correct.
+      name: "REOPEN-EVERYTHING: every held code is re-opened after any close",
+      file: ROWS,
+      from: "    if (hasCode(from, c.code) && !(closing !== null && hasEnd(closing, c.end))) continue;",
+      to: "    if (hasCode(from, c.code) && closing === null) continue;",
+      expect: "T1.46",
+    },
+    {
       // **The byte-decided end wrong** (I75): a foreground colour closed as a
       // background one.
       name: "ENDOF-SWAPPED: 38 closes with 49",

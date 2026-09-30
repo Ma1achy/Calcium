@@ -93,8 +93,8 @@ const results = runPass({
     {
       name: "NO-TICK: the cadence is asked without the tick, so a finished one-shot keeps the ticker",
       file: SESSION,
-      from: "animationIntervalOf(windowed.blocks, { tick, width })",
-      to: "animationIntervalOf(windowed.blocks)",
+      from: "animationIntervalOf(windowed.blocks, { tick, width }, graph.capabilities)",
+      to: "animationIntervalOf(windowed.blocks, undefined, graph.capabilities)",
       expect: "T4.106",
     },
     {

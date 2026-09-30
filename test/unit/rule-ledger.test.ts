@@ -20,11 +20,16 @@ const LEDGER = "docs/design/language/RULE_LEDGER.md";
 const text = (): string => readFileSync(LEDGER, "utf8");
 
 /** The tool against a mutated ledger — `{ code, out }`, because the code is the verdict. */
-function run(ledger: string, scope?: string): Readonly<{ code: number; out: string }> {
+function run(ledger: string, scope?: string, parked?: string): Readonly<{ code: number; out: string }> {
   const dir = mkdtempSync(join(tmpdir(), "ledger-"));
   const path = join(dir, "LEDGER.md");
   writeFileSync(path, ledger);
   const args = scope === undefined ? [] : ["--scope", scope];
+  if (parked !== undefined) {
+    const register = join(dir, "PARKED.md");
+    writeFileSync(register, parked);
+    args.push("--parked", register);
+  }
   try {
     const out = execFileSync("node", ["tools/rule-status.mjs", "--file", path, ...args], {
       encoding: "utf8",
@@ -113,7 +118,12 @@ describe("A03 SS66 — the rule ledger resolves against the tree", () => {
     const before = row("R-SEL-012");
     const as = (by: string): string => text().replace(before, `| **R-SEL-012** — x | \`parked\` | ${by} |`);
     // Open, so green: the control that shows the arm reads the file at all.
-    expect(run(as("parked as 18, the postures")).code, "an open question").toBe(0);
+    // **The open entry is constructed**, appended to the real register: every
+    // real question was ruled on 2026-09-27, and a control that borrowed one
+    // went red on a correct tree the day the register emptied.
+    const register = `${readFileSync("docs/design/PARKED_QUESTIONS.md", "utf8")}\n**900 · a fixture question, open**\n`;
+    expect(run(as("parked as 900, the fixture"), undefined, register).code, "an open question").toBe(0);
+    expect(run(as("parked as 900, the fixture")).code, "the same row against the real register, where 900 is no entry").toBe(1);
     // **16 is retracted** — the entry exists, and a check that only asked
     // whether the number appeared would pass it.
     const retracted = run(as("parked as 16"));

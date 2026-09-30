@@ -7,6 +7,7 @@
 // motion there, and the divider it would otherwise move is one key away.
 import { describe, expect, it, vi } from "vitest";
 
+import { defaultKeymap } from "../../src/interaction/router/keymap.js";
 import { buildGraph, buildSession } from "../support/session.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 
@@ -257,8 +258,19 @@ describe("C22 I118 — a form in a session", () => {
       await p.type("\r");
       await p.type(F1);
       await p.step(50);
-      // The keymap's own row, since the entry's heading scrolls off above it.
-      expect(p.rows().some((r) => r.includes("helpKeymap")), "F1 answers inside a field").toBe(true);
+      // **A row of the listing, whichever one is on screen.** The entry's
+      // heading scrolls off above it, and the view sits at the listing's tail —
+      // so the row this read by name was whichever binding the table happened
+      // to put last. It was the block's `?`, until `?` became a `global` row
+      // (C16 §6c, ruling 65) and the tail became `rerunEntry`. A listing row is
+      // a chord and then an action the table binds, and nothing else on this
+      // frame has that shape.
+      const actions = new Set<string>(defaultKeymap.map((b) => b.action));
+      const listed = p.rows().filter((r) => {
+        const m = /│\s+\S+\s+(\w+)\s*$/u.exec(r);
+        return m !== null && actions.has(m[1] ?? "");
+      });
+      expect(listed.length, "F1 answers inside a field").toBeGreaterThan(0);
     } finally {
       vi.useRealTimers();
     }

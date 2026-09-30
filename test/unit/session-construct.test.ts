@@ -62,7 +62,6 @@ const FRAME: FrameQueries = {
   semanticDrag: () => false,
   enterSemanticSelection: () => undefined,
   escapeSemanticSelection: () => undefined,
-  exitSemanticSelection: () => undefined,
   selectEntryUnderCaret: () => undefined,
   selectAllLoadedEntries: () => undefined,
   copySelectedEntries: () => undefined,
@@ -772,6 +771,56 @@ describe("C22 §3 — construction order", () => {
     route = "app";
     graph.graph.router.dispatch(ctrlC);
     expect(cancelled, "a value captured at step 9 would still read null").toBe(1);
+  });
+});
+
+describe("C16 I49 — a shell delegation consumes at the child rung (review batch 2, M5 item 8)", () => {
+  it("T4.84 (C16 I49, ruling 62): F1 during a shell delegation submits nothing", async () => {
+    // **A delegation registers no `child` handler**, which is the difference
+    // from an attached surface (T1.106): every key passed at the rung and fell
+    // to `global`, where `F1` is `/help keys`, so a reader pressing it inside a
+    // delegated `vim` submitted a host command behind it. Built through the
+    // graph with the route as a pull — the rung reads the route, and a real PTY
+    // would add nothing the row is about.
+    let route: "app" | "local" | "shell" | null = null;
+    const emitted: string[] = [];
+    const graph = await build({
+      pipeline: () => ({
+        submit: () => undefined,
+        emitLocal: async (line: string) => void emitted.push(line),
+        seal: () => undefined,
+        sealed: true,
+        liveStreams: 0,
+        faults: [],
+        cancelNewestStream: () => false,
+        get inFlight() {
+          return route;
+        },
+        cancel: () => undefined,
+        register: () => undefined,
+        onAction: () => undefined,
+        identityNotice: () => undefined,
+        refuse: () => undefined,
+        visibilityChanged: () => undefined,
+        resized: () => undefined,
+        producerContext: () => producerContext(),
+        greeting: () => undefined,
+        reserveGreeting: () => null,
+        abandonGreeting: () => undefined,
+        dispose: () => undefined,
+      }),
+    });
+    const f1 = { kind: "key", key: { name: "f1", ctrl: false, meta: false, shift: false, sequence: "" } } as never;
+
+    // **The control**: with nothing delegated, `F1` is `/help keys`.
+    graph.graph.router.dispatch(f1);
+    expect(emitted, "idle: the help route").toEqual(["/help keys"]);
+
+    route = "shell";
+    expect(graph.graph.router.target, "delegated: the child rung").toBe("child");
+    expect(graph.graph.router.dispatch(f1), "consumed").toBe(true);
+    expect(emitted, "and nothing was submitted behind the child").toEqual(["/help keys"]);
+    expect(graph.graph.router.lastStages.at(-1)).toBe("child:consumed");
   });
 });
 

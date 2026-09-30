@@ -473,3 +473,37 @@ describe("C22 §13a — the child surface is an entry (M9)", () => {
     await h.graph.lifecycle.release();
   });
 });
+
+describe("C16 I49 — the child rung consumes (review batch 2, M5 item 8)", () => {
+  it("T1.170 (C16 I49, ruling 62): a bare esc through the decoder's window reaches the surface as escape, and nothing else acts", async () => {
+    // **Through the decoder, which is the half T1.33's router row cannot see.**
+    // A lone `ESC` is held for C16 §2's window to be told apart from a
+    // sequence prefix, and only the timer names it — so a row that dispatched
+    // `{ name: "escape" }` directly is passed by a decoder that never releases
+    // it. vi's insert-mode exit is this byte.
+    const h = await buildGraph();
+    h.graph.lifecycle.acquire();
+    const seen: string[] = [];
+    const handle = h.graph.surface.open({
+      schema: "calcium.child-surface/1",
+      id: "vi",
+      keymap: [{ key: { name: "escape" }, action: "normal-mode" }],
+      render: () => [{ kind: "raw", id: "board", text: "VI" }],
+      onAction: (event) => void seen.push(`${event.action}:${event.phase}`),
+    });
+    const entriesBefore = h.graph.transcript.entries.length;
+
+    h.stdin.emit("\u001b");
+    expect(seen, "held while the window is open").toEqual([]);
+    h.clock.advance(80);
+    await new Promise((r) => setTimeout(r, 80));
+    await tick();
+
+    expect(seen, "the surface saw escape, once").toEqual(["normal-mode:press"]);
+    expect(h.graph.router.target, "and it is still attached").toBe("child");
+    expect(h.graph.transcript.entries.length, "nothing else acted").toBe(entriesBefore);
+
+    await handle.close();
+    await h.graph.lifecycle.release();
+  });
+});

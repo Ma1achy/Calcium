@@ -69,14 +69,16 @@ const results = runPass({
     {
       name: "a modified ⏎ answers the reply",
       file: "src/shell/confirm.ts",
-      from: '          if ((name === "return" || name === "enter") && (bare || replying === null)) return "resolve";',
-      to: '          if (name === "return" || name === "enter") return "resolve";',
+      from: '          if (is(QUESTION_KEYS.answer) && (bare || replying === null)) return "resolve";',
+      to: '          if (is(QUESTION_KEYS.answer)) return "resolve";',
       expect: "T4.80",
     },
     {
       name: "every prompt action reaches a reply",
       file: "src/shell/construct.ts",
-      from: "        if (binding !== null && !REPLY_ACTIONS.has(binding.action as KeyAction)) return false;\n",
+      // Re-anchored for C22 I134: the check reads the effective action, and it
+      // is the same check.
+      from: "        if (action !== null && !REPLY_ACTIONS.has(action as KeyAction)) return false;\n",
       to: "",
       expect: "T4.71",
     },

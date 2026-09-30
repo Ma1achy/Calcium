@@ -16,7 +16,7 @@ const ROOT = process.cwd();
 const CMD = "npx vitest run test/unit/render-focus.test.ts";
 const GLYPHS = "src/presentation/blocks/glyphs.ts";
 const NOTICE = "src/presentation/blocks/kinds/simple.ts";
-const PAINT = "src/presentation/blocks/paint.ts";
+const RESOLVE = "src/presentation/theme/resolve.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -44,7 +44,7 @@ const MUTATIONS = [
     // harmless-looking and moves `dark`'s focused head off the design's `●`.
     name: "every focused head takes the state's mark, banded theme or not",
     file: NOTICE,
-    from: '                          (focused && isBand(ctx.theme, "focusGround")) ||',
+    from: '                          (focused && isBand(ctx.theme, "focusGround", ctx.capabilities)) ||',
     to: "                          focused ||",
     expect: "T1.75",
   },
@@ -54,17 +54,18 @@ const MUTATIONS = [
     // ones included, which are on the page and whose tone still carries.
     name: "the page's heads are taken as banded",
     file: NOTICE,
-    from: '                          (focused && isBand(ctx.theme, "focusGround")) ||',
-    to: '                          isBand(ctx.theme, "focusGround") ||',
+    from: '                          (focused && isBand(ctx.theme, "focusGround", ctx.capabilities)) ||',
+    to: '                          isBand(ctx.theme, "focusGround", ctx.capabilities) ||',
     expect: "T1.75",
   },
   {
     // **Band found by exclusion** — C10 I45's recorded shape: any theme with a
-    // `bandInk` map at all counts every surface as a band.
+    // `bandInk` map at all counts every surface as a band. In `bandAt` since
+    // C10 I66, which `isBand` delegates to.
     name: "any theme with bands treats every ground as one",
-    file: PAINT,
-    from: "  return theme.tokens.bandInk?.[surface] !== undefined;",
-    to: "  return theme.tokens.bandInk !== undefined;",
+    file: RESOLVE,
+    from: "  if (theme.tokens.bandInk?.[surface] === undefined) return false;",
+    to: "  if (theme.tokens.bandInk === undefined) return false;",
     expect: "T1.75",
   },
 ];

@@ -32,11 +32,13 @@ const GAP = 2;
  * *The MARK carries chosen — `●` against `○`, `✓` against `✗` — and the WASH
  * carries focus.* All four are the registry's own records, so nothing here
  * chooses a character; `exclusive` picks which pair, and the pair is the only
- * thing it picks.
+ * thing it picks. The unchosen exclusive mark is `choiceOpen` (`○`/`@`,
+ * `choice-open`), not the plot's `hollow` (`○`/`o`), whose ASCII half the
+ * registry does not give an option (C09 I123).
  */
 function markOf(block: Choice, chosen: boolean, caps: Caps): string {
   const g = glyphs(caps);
-  return block.exclusive === true ? (chosen ? g.filled : g.hollow) : (chosen ? g.tick : g.cross);
+  return block.exclusive === true ? (chosen ? g.filled : g.choiceOpen) : (chosen ? g.tick : g.cross);
 }
 
 /** Every option's drawn text — the mark, a space, the label. The shape is both. */

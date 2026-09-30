@@ -523,7 +523,7 @@ export function psTable(
           {
             text: string;
             tone?: "ok" | "error" | "muted";
-            glyph?: "running" | "ok" | "error" | "queued";
+            glyph?: "work-unit" | "ok" | "error" | "queued";
             spark?: readonly number[];
           }
         >;
@@ -533,7 +533,7 @@ export function psTable(
         id: `r${i + 1}`,
         cells: {
           expand: { text: "" },
-          glyph: { text: "", glyph: "running" },
+          glyph: { text: "", glyph: "work-unit" },
           uuid: { text: uuids[i % uuids.length] ?? "0000000" }, // cells-ok
           family: { text: `family-${String(i + 1)}` },
           status: { text: states[i % states.length] ?? "running" }, // cells-ok

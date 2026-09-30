@@ -425,6 +425,9 @@ export { halfBlockEligible } from "./presentation/image/index.js";
 export { barStyleNames, spinnerSetNames } from "./presentation/blocks/index.js";
 export type { Measure, MeasureFn } from "./data/viewmodel/index.js";
 export type { BlockKeymap } from "./interaction/router/types.js";
+// What `TuiConfig.keyActions` is keyed by — the registry's ids for the reserved
+// chords (C24 I39, C16 §6c).
+export type { ReservedKeyAction } from "./interaction/router/types.js";
 
 export type {
   Fixture,

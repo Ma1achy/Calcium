@@ -212,9 +212,16 @@ export type Glyph =
   | "error"
   | "info"
   | "pending"
-  /** Starting, connecting, installing. Distinct from `running`: S11, S15. */
+  /** Starting, connecting, installing. Distinct from `work-unit`: S11, S15. */
   | "working"
-  | "running"
+  /**
+   * A unit of work under way, steady — `●` / `*`, the registry's `work-unit`
+   * (R-GLY-003, C04 §Glyph). **It was `running`**, which is also `CallState`'s
+   * word for the state that draws it, so `CALL_HEAD_GLYPH` read
+   * `running: "running"` and a reader could not tell the key from the value.
+   * The slot takes the registry's name and `CallState` keeps its own.
+   */
+  | "work-unit"
   | "queued"
   | "cancelled"
   | "expand"
@@ -823,6 +830,38 @@ export type Notice = Readonly<{
  * the renderer's and changes with the rung.
  */
 export type CallState = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+
+/**
+ * The tone a call head in each state carries (I141, R-BLK-214).
+ *
+ * **Above 1 bit this is the only carrier of the state**, since the dot is one
+ * character for four of the five, so a tone chosen apart from the state is a
+ * head that says nothing — which shipped, as `info` for every state. Exhaustive
+ * by its type: a sixth state is a compile error here before it is a head.
+ */
+export const CALL_STATE_TONE: Readonly<Record<CallState, Tone>> = Object.freeze({
+  queued: "muted",
+  running: "default",
+  succeeded: "ok",
+  failed: "error",
+  cancelled: "muted",
+});
+
+/**
+ * The glyph a call head in each state carries — the mark where tone carries
+ * (I141, C09 I45). `●` for four states and `○` for `queued` at every rung,
+ * hollow because it has not started (R-BLK-220), not because tone failed.
+ */
+export const CALL_HEAD_GLYPH: Readonly<Record<CallState, Glyph>> = Object.freeze({
+  queued: "queued",
+  running: "work-unit",
+  succeeded: "work-unit",
+  failed: "work-unit",
+  cancelled: "work-unit",
+});
+
+/** The states, in the order a call passes through them — for the validator's union check. */
+export const CALL_STATES: readonly CallState[] = Object.freeze(Object.keys(CALL_STATE_TONE) as CallState[]);
 
 export type KeyValue = Readonly<{
   kind: "keyValue";

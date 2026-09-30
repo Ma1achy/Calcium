@@ -178,7 +178,6 @@ export const FRAME: FrameQueries = {
   semanticDrag: () => false,
   enterSemanticSelection: () => undefined,
   escapeSemanticSelection: () => undefined,
-  exitSemanticSelection: () => undefined,
   selectEntryUnderCaret: () => undefined,
   selectAllLoadedEntries: () => undefined,
   copySelectedEntries: () => undefined,

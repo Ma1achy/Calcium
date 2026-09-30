@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { FREE_WIDTH_SLOTS, glyphs, spinnerFrameAt, spinnerFrames, spinnerIntervalMs, TICK_MS } from "../../src/presentation/blocks/index.js";
+import { FREE_WIDTH_SLOTS, glyphs, spinnerFrameAt, spinnerFrames, spinnerIntervalMs, TICK_MS, tickIntervalOf } from "../../src/presentation/blocks/index.js";
 // **The table itself is not on the barrel**, and MG24 is why: its members have
 // no reader in `src/` — the two functions are the seam. Imported from the module
 // so the rows can walk every set rather than a list they keep themselves, which
@@ -428,33 +428,52 @@ const STATED_CYCLES: Readonly<Record<string, number>> = Object.freeze(
     expect(found, "the corpus has ping-pong sets for this row to be about").toBeGreaterThan(0);
   });
 
-  it("T2.73 (C09 I98, R-MOT-010, R-MOT-011): the ASCII rung keeps the cycle, not just the alphabet", () => {
-    // **This row asserted the defect.** It was titled *the ASCII pair keeps the
-    // shape of motion* — R-MOT-010's own words — and asserted two literals it
-    // wrote itself, against no registry: `bloom` falls to `.oO@*` and `braille`
-    // to `-\|/`. A source assertion measuring the prose above it, and green for
-    // as long as the collapse shipped.
-    //
-    // T2.163 now holds the alphabet, by equality against the design. What is
-    // left for this row is the claim the character comparison does not make and
-    // the one that was actually broken: **the rung does not change the cadence.**
-    // A four-frame pattern at the set's own interval is a faster spinner —
-    // `braille` is ten frames at 80 ms, an 800 ms cycle, and its old ASCII rung
-    // ran in 320 ms. `fit-cycle` holds each glyph longer instead, so the two
-    // rungs take the same time to come round. That is what *shape of motion*
-    // means, and R-MOT-011's *one alphabet, one cadence* is the same fact.
-    for (const name of spinnerSetNames()) {
-      const set = SPINNER_SETS[name];
+  it("T2.73 (C09 I98, I112, R-MOT-010, R-MOT-011, question 40): every set's ASCII rung steps at the one ASCII cadence, and the Unicode rung at the set's own", () => {
+    // **This row has asserted three things, and the first was the defect.** As
+    // first written it asserted two literals it wrote itself against no
+    // registry — `bloom` falls to `.oO@*` and `braille` to `-\|/` — green for
+    // as long as the collapse I98 removed shipped. Its first rewrite asserted
+    // that the ASCII rung runs for as long as the Unicode one, `fit-cycle`'s
+    // promise. **Question 40 gave that up on purpose**: the nine sets sharing
+    // `|/-\` sat at nine intervals, so one alphabet turned at nine rates, and the
+    // ruling is one cadence for the whole ASCII rung. The pattern's shape is
+    // kept (T2.163); its duration is the rung's.
+    const policy = REGISTRY["spinnerPolicy"] as Readonly<{ asciiIntervalMs?: number }>;
+    const ascii = policy.asciiIntervalMs;
+    expect(ascii, "the registry records the ASCII rung's cadence").toBe(120);
+    let slower = 0;
+    for (const sp of REGISTERED) {
+      const set = SPINNER_SETS[sp.id];
       if (set === undefined) continue;
-      const ms = spinnerIntervalMs(name);
-      const unicode = set.frames.length * ms; // cells-ok — a frame count
-      const ascii = set.ascii.length * ms; // cells-ok — a frame count
-      if (REGISTERED.some((sp) => sp.id === name)) {
-        expect(ascii, `${name}: the ASCII rung runs for as long as the Unicode one`).toBe(unicode);
+      expect(spinnerIntervalMs(sp.id), `${sp.id}: no capabilities is the set's own`).toBe(sp.intervalMs);
+      expect(spinnerIntervalMs(sp.id, FULL_CAPS), `${sp.id} at full capabilities`).toBe(sp.intervalMs);
+      expect(spinnerIntervalMs(sp.id, ASCII_CAPS), `${sp.id} at ASCII`).toBe(ascii);
+      // At `wide` a narrow-only set draws its ASCII frames, so it takes their cadence.
+      expect(spinnerIntervalMs(sp.id, WIDE_CAPS), `${sp.id} at wide`).toBe(set.narrowOnly === true ? ascii : sp.intervalMs);
+      if (sp.intervalMs > (ascii ?? 0)) slower += 1;
+
+      // **The frame, not only the number**: at ASCII the drawn frame changes on
+      // the 120 ms boundaries and at no other tick — read over two cycles.
+      const frames = spinnerFrames(ASCII_CAPS, sp.id);
+      for (let tick = 0; tick < 2 * frames.length * 3; tick += 1) {
+        const at = spinnerFrameAt(ASCII_CAPS, tick, sp.id);
+        expect(at, `${sp.id} at tick ${String(tick)}`).toBe(frames[Math.floor((tick * TICK_MS) / (ascii ?? 1)) % frames.length]);
       }
     }
-    // A counter is already ASCII and the row still says so — the one case where
-    // the two rungs are the same array rather than the same duration.
+    // The corpus holds sets slower than the cadence, so the rung is seen to speed
+    // some up as well as slow others down.
+    expect(slower, "sets slower than the ASCII cadence").toBeGreaterThan(0);
+
+    // **The wake asks for the rung's cadence** given the capabilities: a toggle
+    // status is 400 ms at the Unicode rung and 120 at ASCII, so its ASCII frames
+    // are not sampled at a third of their rate.
+    const toggle = { kind: "status", id: "t", state: "loading", message: "m", spinner: "toggle" } as unknown as Block;
+    expect(tickIntervalOf(toggle, undefined, FULL_CAPS), "toggle at full capabilities").toBe(400);
+    expect(tickIntervalOf(toggle, undefined, ASCII_CAPS), "toggle at ASCII").toBe(ascii);
+    expect(tickIntervalOf(toggle), "toggle with no capabilities").toBe(400);
+
+    // A counter is already ASCII, and the row still says so — the rung is the
+    // same array at both, and only the cadence moves.
     expect(spinnerFrames(ASCII_CAPS, "decimal"), "a counter is already ASCII").toEqual(
       SPINNER_SETS["decimal"]?.frames,
     );

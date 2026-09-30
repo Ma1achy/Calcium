@@ -190,8 +190,8 @@ class Manager implements OverlayManager {
  * else (I16), and the owner is the only one that can measure its content.
  *
  * It lived as a comment in `shell/confirm.ts`, written after the defect had
- * been found once. `clearConfirmLayer` in C20 is the second centred layer in
- * the tree and declared no width at all.
+ * been found once. `clearConfirmLayer` in C20 was the second centred layer in
+ * the tree and declared no width at all; it is retired (C16 ruling 61).
  */
 function assertPlaceable(layer: Layer): void {
   // I22 — a peek is beside the thing it describes, or it is a confirm
@@ -219,6 +219,25 @@ function assertPlaceable(layer: Layer): void {
       throw new OverlayError(
         `panel ${layer.id} declares blocking=${String(layer.blocking)} dismissal=${layer.dismissal}: ` +
           `a blocking panel is an overlay and a panel that outlives esc is a peek (I27)`,
+      );
+    }
+  }
+  // **I29 — a declared owner agrees with the fields it implies.** A question
+  // is an overlay that owns input and closes on its answer; a substate is a
+  // panel; a peek takes no keys, so it has no rung to name. An owner the
+  // fields contradict is the two-derivation defect arriving as data: the
+  // router would read the owner and the stack would behave as the kind.
+  if (layer.owner !== undefined) {
+    const { owner } = layer;
+    const agrees =
+      owner.rung === "question"
+        ? layer.kind === "overlay" && layer.blocking && layer.dismissal === "answer"
+        : layer.kind === "panel";
+    if (!agrees) {
+      throw new OverlayError(
+        `${layer.kind} ${layer.id} declares owner ${owner.rung}, and its fields say otherwise: ` +
+          `a question is a blocking overlay closed by its answer, a substate is a panel, ` +
+          `and a peek takes no keys (I29)`,
       );
     }
   }

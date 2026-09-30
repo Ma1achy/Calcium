@@ -88,7 +88,13 @@ describe("C16 e2e — the mouse through a PTY (I31, §4a)", () => {
 
         // The column is inside the uuid cell; row is 0-based here and 1-based on
         // the wire, which is the translation the decoder owns (`Number(y) - 1`).
-        pty.type(click(4, b1));
+        // **Read from the frame, not written**: it was `4`, which sat in the
+        // uuid cell while a card body was four cells in and in the gutter the
+        // day it became five (C09 I5, C22 I83). The claim is *a click on the
+        // row*, so the input follows where the row's content is drawn.
+        const uuidAt = text[b1]?.indexOf("7c2d4e1") ?? -1;
+        expect(uuidAt, "the target's uuid is on the frame").toBeGreaterThan(0);
+        pty.type(click(uuidAt, b1));
         await pty.waitForFrame(() => pty.styledFrame[b1] !== before[b1], 15_000);
         await beat(200);
         const after = pty.styledFrame;
@@ -212,7 +218,9 @@ describe("C16 e2e — the mouse through a PTY (I31, §4a)", () => {
         // record with `mouse: false` (`decode.ts`), so nothing downstream sees a
         // gesture — and nothing lands in the prompt as text either, which is the
         // other way a control can fail while looking like "nothing happened".
-        pty.type(click(4, b1));
+        const uuidAt = beforeText[b1]?.indexOf("7c2d4e1") ?? -1;
+        expect(uuidAt, "the same column T5.6 clicks, read the same way").toBeGreaterThan(0);
+        pty.type(click(uuidAt, b1));
         pty.type(wheelUp(2, b1));
         await beat(600);
 

@@ -463,7 +463,7 @@ describe("C22 §6c — the render cache", () => {
     const { definition, measured } = measuring();
     const children = Array.from({ length: 40 }, (_, i) => ({ kind: "count", id: `c-${String(i)}`, ...(i === 0 ? { padding: { t: 1 } } : {}) }));
     const { screen, type } = await session(definition, [
-      { kind: "notice", id: "h", tone: "info", glyph: "running", state: "running", text: "rows · ok" },
+      { kind: "notice", id: "h", tone: "default", glyph: "work-unit", state: "running", text: "rows · ok" },
       ...children,
     ]);
     expect(screen().rows.join("\n"), "the card is on screen").toContain("counted");

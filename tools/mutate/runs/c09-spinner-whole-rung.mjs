@@ -43,8 +43,10 @@ const results = runPass({
     // The arm removed entirely: a narrow-only set keeps its Unicode frames on a
     // wide terminal. This is C02 I9's own defect and `T2.74` holds it, so a run
     // where it survives is not exercising the degradation path at all.
-    from: '  return set.narrowOnly === true && caps.ambiguousWidth === "wide" ? set.ascii : set.frames;',
-    to: "  return set.frames;",
+    // Since question 40 the rung is one predicate, `atAsciiRung`, which the
+    // cadence asks too — so the arm is removed there and both lose it.
+    from: '  return caps.unicode === "ascii" || (set.narrowOnly === true && caps.ambiguousWidth === "wide");',
+    to: '  return caps.unicode === "ascii";',
     why: "with the wide arm gone a narrow-only set keeps its Unicode frames; a run where this survives cannot see a kill",
   },
   mutations: [
@@ -56,8 +58,8 @@ const results = runPass({
       // right about every width, which is why `T2.70` cannot see it.
       name: "THE DEFECT: the fallback is taken frame by frame rather than per set",
       file: G,
-      from: '  return set.narrowOnly === true && caps.ambiguousWidth === "wide" ? set.ascii : set.frames;',
-      to: '  if (set.narrowOnly === true && caps.ambiguousWidth === "wide") {\n    return set.frames.map((f, i) => (cells(f, "wide") === 1 ? f : set.ascii[i % set.ascii.length] ?? f));\n  }\n  return set.frames;',
+      from: "  return atAsciiRung(caps, set) ? set.ascii : set.frames;",
+      to: '  if (caps.unicode !== "ascii" && atAsciiRung(caps, set)) {\n    return set.frames.map((f, i) => (cells(f, "wide") === 1 ? f : set.ascii[i % set.ascii.length] ?? f));\n  }\n  return atAsciiRung(caps, set) ? set.ascii : set.frames;',
       expect: "T2.169",
     },
     {
@@ -67,8 +69,8 @@ const results = runPass({
       // alphabet whole.
       name: "the two alphabets are spliced rather than chosen between",
       file: G,
-      from: '  return set.narrowOnly === true && caps.ambiguousWidth === "wide" ? set.ascii : set.frames;',
-      to: '  return set.narrowOnly === true && caps.ambiguousWidth === "wide"\n    ? [...set.ascii.slice(0, 1), ...set.frames.slice(1)]\n    : set.frames;',
+      from: "  return atAsciiRung(caps, set) ? set.ascii : set.frames;",
+      to: '  return atAsciiRung(caps, set)\n    ? caps.unicode === "ascii" ? set.ascii : [...set.ascii.slice(0, 1), ...set.frames.slice(1)]\n    : set.frames;',
       expect: "T2.169",
     },
     {

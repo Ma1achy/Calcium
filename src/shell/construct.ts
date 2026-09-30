@@ -115,12 +115,22 @@ import {
   MENU_ID,
 } from "../interaction/completion/index.js";
 import { createFocusStore, resolveFocus } from "../interaction/router/focus.js";
-import { chordText, createKeymap, defaultKeymap } from "../interaction/router/keymap.js";
+import { chordText, createKeymap, defaultKeymap, RESERVED_ACTIONS } from "../interaction/router/keymap.js";
+import { REGISTRY_BINDINGS } from "../interaction/router/registry-bindings.js";
 import { createRouter, type RouterDeps } from "../interaction/router/router.js";
 import { createConfirmHost, type ConfirmHost } from "./confirm.js";
 import { createDecoder } from "../interaction/router/decode.js";
 import { createKeyEffects } from "./keys.js";
-import type { ElementAddress, FocusTarget, InputEvent, Key, KeyAction, Verdict } from "../interaction/router/types.js";
+import type {
+  Binding,
+  ElementAddress,
+  FocusTarget,
+  InputEvent,
+  Key,
+  KeyAction,
+  ReservedKeyAction,
+  Verdict,
+} from "../interaction/router/types.js";
 import { createNavigator, openHistory, SEARCH_ID } from "../interaction/history/index.js";
 import type { HistoryEntry, Navigator } from "../interaction/history/index.js";
 import { detectCapabilities, type CapabilitySource, type TerminalCapabilities } from "../terminal/capabilities.js";
@@ -250,7 +260,7 @@ async function readOrAbsent(
     return null;
   }
 }
-import type { Pipeline, StopReason } from "./types.js";
+import type { OwnerHints, Pipeline, StopReason } from "./types.js";
 
 /**
  * The manifest file, read and decoded — the step that was missing (C22 I23).
@@ -340,7 +350,7 @@ export type FrameQueries = Readonly<{
    * Leave native selection (C16 §5b B1).
    *
    * **Ships with `nativeSelection` and with `enterNativeSelection`, never after them.** The
-   * `⌃c` rung already calls this, so a producer landing alone gives a mode that
+   * `esc` row calls this through the keymap, so a producer landing alone gives a mode that
    * consumes the key and does nothing — entered and not leavable, which is
    * worse than unreachable. Both stubs were in the tree for the length of C26.
    */
@@ -357,14 +367,14 @@ export type FrameQueries = Readonly<{
    * label, the selection, and the count. A boolean would give the chrome the
    * label and leave the other two with no source.
    *
-   * `escape` and `exit` are two verbs deliberately (C16 I51): `escape` clears a
-   * selection if there is one and leaves only when there is none, and `exit`
-   * always leaves. `⌃c` takes the second, `esc` the first.
+   * `escape` clears a selection if there is one and leaves only when there is
+   * none (C16 I51). There was a second verb, `exit`, which always left, and
+   * `⌃c` took it; §103 has COPY MODE reject the interrupt (C16 I62, ruling 59),
+   * so `esc` is the one way out and the second verb had no caller.
    */
   semanticSelection: () => boolean;
   enterSemanticSelection: () => void;
   escapeSemanticSelection: () => void;
-  exitSemanticSelection: () => void;
   /**
    * How many entries a copy would take right now (`R-SEL-015`).
    *
@@ -507,6 +517,12 @@ export type Graph = Readonly<{
    * (C22 I118). The prompt row draws this, and the field draws the editor.
    */
   fieldHeld: () => LineState | null;
+  /**
+   * What the owner line names its keys from (C22 I133) — the session keymap
+   * as dispatch resolves it, the substate's declared name, the open question's
+   * vocabulary, and semantic copy mode's refused interrupt. Read per frame.
+   */
+  ownerHints: () => OwnerHints;
   /**
    * The linear route's writer, or `null` on the rich route (C22 I119). The
    * session hands it every commit instead of composing a frame.
@@ -1813,6 +1829,18 @@ export async function constructGraph(
     invalidate: () => void scheduler.commit("input"),
   });
 
+  // **Where the router's refusals are explained** (C16 I62). By rung, because
+  // the explanation is the owner's: a question says `answer this first` on its
+  // own row (C23 I82), and semantic copy mode draws a chip on the owner line
+  // for one frame (C22 I133). Native selection has nothing it can draw — the
+  // scheduler is suspended — and that is the stated limit (ruling 60).
+  /** Semantic copy mode refused the last key's interrupt (C22 I133); cleared before the next. */
+  let copyRefused = false;
+  const refused = (r: Parameters<RouterDeps["refused"]>[0]): void => {
+    if (r.rung === "question") confirm.refuse();
+    else if (r.rung === "copy" && deps.frame.semanticSelection()) copyRefused = true;
+  };
+
   const router = at("router", () =>
     createRouter({
       focus,
@@ -1837,6 +1865,7 @@ export async function constructGraph(
           (row) => entryAtRegionRow(row),
           () => detection.capabilities.keyboardProtocol === "kitty",
           () => surface.attached,
+          (r) => refused(r),
         ),
         // C28 I39 — the `handler` span. Spread in here rather than threaded
         // through `routerDeps`, whose seven parameters are all C16's own and
@@ -1990,7 +2019,16 @@ export async function constructGraph(
           .entries()
           // **The design's notation, not the slot's** (C16 §6a clause 6, §019).
           // `keySlot` stays the identity and `chordText` is what a reader sees.
-          .map((b) => ({ keys: chordText(b.key, detection.capabilities.unicode !== "ascii"), does: b.action, target: b.target })),
+          // **And the effective action, not the row's** (C22 I134): a reserved
+          // row with no handler lists its fallback, or is not listed — `/help`
+          // saying `⌥⌫ queueDrop` while the key kills a word is the drift the
+          // listing exists to prevent.
+          .flatMap((b) => {
+            const does = effectiveAction(b);
+            return does === null
+              ? []
+              : [{ keys: chordText(b.key, detection.capabilities.unicode !== "ascii"), does, target: b.target }];
+          }),
       // R-KEY-005 — the reader's own rung, so `/help keys` leads with it.
       currentScope: () => router.target,
       binary: config.binary,
@@ -2256,6 +2294,9 @@ export async function constructGraph(
         content,
         blocking: false,
         dismissal: "escape",
+        // **`preview`, and `promptUnderMenu` reads it** (C15 I29, ruling 61):
+        // the substate's name is what said *the prompt answers first* by id.
+        owner: { rung: "substate", name: "preview" },
       });
     }
     previewed = chip;
@@ -3231,10 +3272,28 @@ export async function constructGraph(
     // **An emission, not a submission** (C16 I57, C23 I79): the draft stands,
     // history is untouched, and a running verb does not queue it.
     emit: (line) => void pipeline?.emitLocal(line),
+    // Late for the same reason: the rows read `bound`, built below.
+    runAction: (id) => void runPaletteAction(id),
     // **The one exit from the `child` rung** (C16 I49, R-BLK-908). Late for the
     // same reason `submit` is: the host is built below, and this is only ever
     // called from a keystroke.
     detachChild: () => void surface.close("detach"),
+    // **The prompt's `⏎`, through the table** (C22 I133, ruling 63). The line
+    // goes away, so the menu and `Esc`'s hold on the token go with it (C19
+    // I19), and this is **the one resolution site** (roadmap 30): C23 takes a
+    // string, so a chip becomes its content here and no sentinel reaches the
+    // far side. `keys` is read when a key arrives, after it exists.
+    submitPrompt: () => {
+      keys.reset();
+      // **A `>`-led line is never a command** (C16 I68, §6c P1–P9). C18
+      // classifies `> notes` rule 3 and the shell truncates `notes`, so this is
+      // a guard before it is a palette. The **resolved** line, because that is
+      // what C18 would be handed — a chip whose content begins `>` is P8.
+      const line = stores.editor.resolved;
+      if (line.startsWith(">")) return void submitPaletteLine(line);
+      pipeline?.submit(line);
+    },
+    keepField: () => void commitField(),
     focusTranscript: () => {
       const id = stores.transcript.liveId ?? stores.transcript.entries.at(-1)?.id ?? null;
       if (id !== null) focus.enterLiveBlock(id, null);
@@ -3361,12 +3420,13 @@ export async function constructGraph(
     // now*. A chip preview composes nothing and is a projection of the caret; a
     // completion menu composes nothing **while it holds no selection** (C19
     // I20). Both are layers over a prompt that is still being typed into, and
-    // they are named rather than derived because no field distinguishes them
-    // from a search — which is a gap worth closing and not a rule to guess at.
-    return (
-      stores.overlays.top?.id === CHIP_PREVIEW_ID ||
-      (stores.overlays.top?.id === MENU_ID && keys.selected === null)
-    );
+    // **The field that distinguishes them is the substate's name** (C15 I29,
+    // ruling 61). This compared two layer ids, because no field told a preview
+    // or a menu from a search — *a gap worth closing and not a rule to guess
+    // at*, said here — and the declared owner is that field.
+    const owner = stores.overlays.top?.owner;
+    if (owner?.rung !== "substate") return false;
+    return owner.name === "preview" || (owner.name === "complete" && keys.selected === null);
   };
 
   /**
@@ -3394,12 +3454,75 @@ export async function constructGraph(
     withdrawBlockKeymap = keymap.mergeBlock(declared);
   };
 
+  /**
+   * The reserved actions by the name a row binds them under — `RESERVED_ACTIONS`
+   * inverted once (C16 §6c, C24 I39).
+   */
+  const reservedIdOf: ReadonlyMap<string, ReservedKeyAction> = new Map(
+    (Object.entries(RESERVED_ACTIONS) as [ReservedKeyAction, KeyAction][]).map(([id, action]) => [action, id]),
+  );
+  /** A spent key: the handler took it, and nothing else is to act. */
+  const spent = (): void => undefined;
+
+  /**
+   * What a resolved row stands for once the reservations are applied, or `null`
+   * when it resolves as though absent (C22 I134, C16 §6c table A).
+   *
+   * **One answer, read by every owner of a row**: `bound` below, the typed
+   * reply's and the field's allow-lists, and `/help keys`. Three readers
+   * asking the row's own `action` was how `⌥⌫` came to be dead in three
+   * owners for three different reasons.
+   */
+  const effectiveAction = (binding: Binding): string | null => {
+    const id = reservedIdOf.get(binding.action);
+    if (id === undefined || config.keyActions[id] !== undefined) return binding.action;
+    return binding.fallback ?? null;
+  };
+
+  /**
+   * A reserved row's effect: the handler, then the fallback, then nothing
+   * (C22 I134).
+   *
+   * **The handler is asked here, at resolution**, because whether it handled
+   * the key decides whether the rung consumes it — and every caller of
+   * `bound` runs a non-null answer at once, so asking now is asking at the
+   * keystroke. Nothing is mutated before the call, which is what makes the
+   * throw below containable: an application's hook failing leaves no half-state
+   * behind, and the read loop has no `catch` — uncontained, it would end the
+   * session (§6c S6).
+   */
+  const reservedEffect = (id: ReservedKeyAction, binding: Binding): (() => void) | null => {
+    const fallback = binding.fallback === undefined ? null : keys.table[binding.fallback];
+    const handler = config.keyActions[id];
+    if (handler === undefined) return fallback;
+    let handled: boolean | void;
+    try {
+      handled = handler();
+    } catch (cause) {
+      stores.transcript.append(
+        noticeDoc(
+          "",
+          `the key action \`${id}\` failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+          "warn",
+          { origin: "refresh" },
+        ),
+      );
+      return spent;
+    }
+    return handled === false ? fallback : spent;
+  };
+
   /** A bound action, or `null` when the key is not bound at this target. */
   const bound = (target: FocusTarget, e: InputEvent): (() => void) | null => {
     if (e.kind !== "key") return null;
     syncBlockKeymap();
     const binding = keymap.resolve(target, e.key);
     if (binding === null) return null;
+    // **A reserved row passes through** (C16 §6c, C22 I134): its handler, its
+    // fallback, or nothing — never the table's no-op, which is what made `⌥⌫`
+    // dead at the prompt.
+    const reserved = reservedIdOf.get(binding.action);
+    if (reserved !== undefined) return reservedEffect(reserved, binding);
     // **Unreachable for a merged block keymap since C16 I19's ruling** (F779):
     // `mergeBlock` refuses any action outside the union at merge time, so every
     // binding that reaches here names a built-in and the table is total over
@@ -3408,6 +3531,108 @@ export async function constructGraph(
     // nobody seeing the refusal. No C23 §3a route exists; `blockActionRoute` is owed.
     return keys.table[binding.action as KeyAction] ?? null;
   };
+
+  /**
+   * The palette's rows: the registry's actions the prompt reaches (C16 I68, §6c
+   * palette rulings).
+   *
+   * **In the order the prompt reaches them**: a `prompt` row, else a `global`
+   * row the prompt does not take first. The prompt takes a key it binds, `⏎`
+   * and a printable character (the insert arm) — so `?` is not offered, and
+   * `confirm`, which is the prompt's `submit`, has nothing to send once the
+   * query is cleared. **The effective action decides**, as it
+   * does for `/help keys` (C22 I134): a reserved action with no handler is not
+   * the design's action and is not listed under its name.
+   *
+   * `keys` is every chord reaching the chosen row's action at its target, so
+   * a kitty session's `transcript.top` carries `⌘↑` beside `⌃home`.
+   */
+  /** A row's chord as the key that presses it — the decoder's shape, with no bytes. */
+  const pressOf = (k: Binding["key"]): Key => ({
+    name: k.name,
+    ctrl: k.ctrl === true,
+    meta: k.meta === true,
+    shift: k.shift === true,
+    ...(k.super === true ? { super: true } : {}),
+    sequence: "",
+  });
+  const paletteRows = (): readonly Readonly<{ id: string; binding: Binding; keys: readonly string[] }>[] => {
+    const unicode = detection.capabilities.unicode !== "ascii";
+    const actionOf = new Map(REGISTRY_BINDINGS.map((r) => [r.id, r.actionId]));
+    const promptTakes = (b: Binding): boolean =>
+      keymap.resolve("prompt", pressOf(b.key)) !== null ||
+      b.key.name === "enter" ||
+      (b.key.ctrl !== true && b.key.meta !== true && b.key.super !== true && [...b.key.name].length === 1);
+    const rows = new Map<string, { id: string; binding: Binding; keys: string[] }>();
+    for (const target of ["prompt", "global"] as const) {
+      for (const b of keymap.entries()) {
+        if (b.target !== target || b.registry === undefined) continue;
+        const id = actionOf.get(b.registry);
+        const does = effectiveAction(b);
+        // **`submit` is not an action the palette can run**: the palette's line
+        // is its query and is cleared before the row runs, so `confirm` at the
+        // prompt — a row since C22 I133 — would send nothing.
+        if (id === undefined || does === null || does === "submit") continue;
+        // **A reserved action is the application's** (C22 I134): with no handler
+        // its row falls back to something else, which is not what its name says.
+        const reserved = reservedIdOf.get(b.action);
+        if (reserved !== undefined && config.keyActions[reserved] === undefined) continue;
+        if (target === "global" && promptTakes(b)) continue;
+        const held = rows.get(id);
+        if (held === undefined) rows.set(id, { id, binding: b, keys: [chordText(b.key, unicode)] });
+        else if (held.binding.target === b.target && held.binding.action === b.action) {
+          held.keys.push(chordText(b.key, unicode));
+        }
+      }
+    }
+    return [...rows.values()];
+  };
+
+  /**
+   * Run a palette row by its registry id — through `bound`, the effect a key
+   * reaches, never a second table (C16 I68, §6c Q6). `false` when the id is not
+   * a row: the caller says so rather than guessing a nearest match.
+   */
+  const runPaletteAction = (id: string): boolean => {
+    const row = paletteRows().find((r) => r.id === id);
+    if (row === undefined) return false;
+    bound(row.binding.target, { kind: "key", key: pressOf(row.binding.key) })?.();
+    return true;
+  };
+  /**
+   * A `>`-led line's `⏎` (C16 I68, §6c P1–P5): an exact name runs, and anything
+   * else keeps the line and says why — the reader's text is not thrown away for
+   * a typo, and a prefix is a query, not a command.
+   */
+  const submitPaletteLine = (line: string): void => {
+    const name = line.slice(1).trim();
+    if (name !== "" && paletteRows().some((r) => r.id === name)) {
+      stores.editor.clear();
+      runPaletteAction(name);
+      return;
+    }
+    stores.transcript.append(
+      noticeDoc(
+        "",
+        name === ""
+          ? "`>` opens the action palette — type an action's name after it"
+          : `no action is named \`${name}\` — a line starting with \`>\` is an action's name, never a command`,
+        "warn",
+        { origin: "refresh" },
+      ),
+    );
+  };
+  built.completion.register({
+    id: "actions",
+    slots: ["action"],
+    dynamic: false,
+    // The delimiter is empty: an action's name ends the line, and a space after
+    // it would make `⏎` look for a name with a space in it (§6c Q3).
+    // A row's chords are joined with the separator slot, never a literal `·`
+    // (C09 I49, F828): the literal is non-ASCII at the ASCII rung (T2.116).
+    complete: () =>
+      paletteRows().map((r) => ({ value: r.id, detail: r.keys.join(` ${chipLook.separator} `), delimiter: "" })),
+  });
 
   /**
    * The pointer's gesture table, onto the key effects (C16 §4a, I31).
@@ -3719,11 +3944,15 @@ export async function constructGraph(
       const composing = confirm.composing;
       if (composing && e.kind === "key") {
         const binding = keymap.resolve("prompt", e.key);
+        // **The effective action, not the row's** (C22 I134): `⌥⌫` is
+        // `killWordLeft` here while no handler is registered, and a registered
+        // `queue.drop` is the prompt's queue, which the reply does not own (I54).
+        const action = binding === null ? null : effectiveAction(binding);
         // A key the reply does not own passes, and I8's reject answers it.
-        if (binding !== null && !REPLY_ACTIONS.has(binding.action as KeyAction)) return false;
+        if (action !== null && !REPLY_ACTIONS.has(action as KeyAction)) return false;
         // ⏎ belongs to the question (C23 I73): it answers before this runs, so
         // reaching the submit arm below from a reply would be a second owner.
-        if (binding === null && e.key.name === "enter") return false;
+        if (action === null && e.key.name === "enter") return false;
       }
       const effect = bound("prompt", e);
       if (effect !== null) {
@@ -3731,21 +3960,13 @@ export async function constructGraph(
         return true;
       }
 
-      // **`enter`, not `return`** — C16 I17's rule applied to a handler rather
-      // than to a keymap row. The decoder has only ever produced `enter` for
-      // `\r`, so this test named a key nothing sends and Enter did not submit.
-      // It was invisible because no decoded event ever reached the router: the
-      // two halves were each correct about a name and never compared.
+      // **A bare `⏎` is the `submit` row above** (C22 I133, ruling 63); this is
+      // the same effect for an `enter` carrying a modifier nothing binds — the
+      // prompt sends on any `enter` whatever its modifiers, which is what keeps
+      // an unbound `⇧⏎` from being a dead key (C16 §6c). `enter`, not `return`:
+      // C16 I17's rule, and the decoder has only ever produced `enter` for `\r`.
       if (e.kind === "key" && e.key.name === "enter") {
-        // The line goes away, so the menu and `Esc`'s hold on the token go with
-        // it (C19 I19): suppression is per token, and the next line's first
-        // token starts at the same offset the dismissed one did.
-        keys.reset();
-        // **The one resolution site** (roadmap 30). C23 takes a string, C18
-        // classifies one and C05 describes `argv`, so a chip becomes its content
-        // here and no sentinel reaches the far side. Every other reader sees the
-        // buffer as it is, because five of them read an index alongside it.
-        pipeline?.submit(stores.editor.resolved);
+        keys.table.submit();
         return true;
       }
 
@@ -3941,18 +4162,18 @@ export async function constructGraph(
       }
       if (e.kind !== "key") return false;
       // **`⏎` and `esc` first** (C16 I60): the field's own two answers, ahead
-      // of the prompt's `⏎`, which would submit.
-      if (e.key.name === "enter" && e.key.ctrl !== true && e.key.meta !== true && e.key.shift !== true) {
-        commitField();
-        return true;
-      }
+      // of the prompt's `⏎`, which would submit. Both are `interaction` rows —
+      // `keepField` and `exitInside` — so the owner line names the chords this
+      // resolves (C22 I133).
       const inside = keymap.resolve("interaction", e.key);
-      if (inside !== null && inside.action === "exitInside") {
+      if (inside !== null && (inside.action === "keepField" || inside.action === "exitInside")) {
         bound("interaction", e)?.();
         return true;
       }
       const binding = keymap.resolve("prompt", e.key);
-      if (binding !== null && FIELD_ACTIONS.has(binding.action as KeyAction)) {
+      // The effective action, as the reply reads it (C22 I134).
+      const action = binding === null ? null : effectiveAction(binding);
+      if (action !== null && FIELD_ACTIONS.has(action as KeyAction)) {
         bound("prompt", e)?.();
         return true;
       }
@@ -4098,6 +4319,9 @@ export async function constructGraph(
     // paste of two hundred characters would read as one very slow route.
     const routed = (e: InputEvent): void => {
       using _s = probe?.span("route") ?? NO_SPAN;
+      // **One-shot by construction** (C16 I62, ruling 60): the chip describes
+      // the key just refused, so the next key takes it down whatever it does.
+      copyRefused = false;
       router.dispatch(e);
       // **After every event** (C22 I118): whatever moved focus, the borrow
       // follows it here rather than at each place that can move it.
@@ -4278,6 +4502,19 @@ export async function constructGraph(
     focusedEntryId,
     focusedElements,
     fieldHeld: () => fieldBorrow?.held.line ?? null,
+    ownerHints: (): OwnerHints => {
+      const top = stores.overlays.top?.owner;
+      const question = confirm.vocabulary();
+      return {
+        // **The session's table, on this terminal's profile** (C16 I35):
+        // `entries()` holds only the rows that can fire, so the chip names a
+        // chord this reader can press, and a rebinding moves it.
+        chord: (target, action) => keymap.entries().find((b) => b.target === target && b.action === action)?.key,
+        ...(top?.rung === "substate" ? { substate: top.name } : {}),
+        ...(question === null ? {} : { question }),
+        ...(copyRefused ? { refused: true } : {}),
+      };
+    },
     linear,
     capabilitySources: detection.sources,
     pageBlock,
@@ -4413,12 +4650,22 @@ function routerDeps(
   keyReleasesReported: () => boolean,
   /** The `child` rung's second source, late because the host is built after the router (C16 I49). */
   childAttached: () => boolean,
+  /** Where a refusal is explained, by rung (C16 I62). L4's, because the explanation is the owner's. */
+  refused: RouterDeps["refused"],
 ): RouterDeps {
-  const top = (): Readonly<{ id: string; kind: "overlay" | "panel"; blocking: boolean; dismissal: "escape" | "focus" | "answer" }> | null => {
+  const top = (): ReturnType<RouterDeps["overlayTop"]> => {
     const layer = stores.overlays.top;
+    // **The owner goes through** (C15 I29, C16 I63): it is the rung, and a
+    // projection that dropped it would hand the router the kind's answer.
     return layer === null
       ? null
-      : { kind: layer.kind, id: layer.id, blocking: layer.blocking, dismissal: layer.dismissal };
+      : {
+          kind: layer.kind,
+          id: layer.id,
+          blocking: layer.blocking,
+          dismissal: layer.dismissal,
+          ...(layer.owner === undefined ? {} : { owner: layer.owner }),
+        };
   };
 
   return {
@@ -4430,10 +4677,7 @@ function routerDeps(
     placed: () => stores.overlays.layout(frame.overlayRegion()).filter(takesInput),
     popLayer: () => void stores.overlays.pop(),
     nativeSelection: frame.nativeSelection,
-    exitNativeSelection: frame.exitNativeSelection,
     semanticSelection: frame.semanticSelection,
-    escapeSemanticSelection: frame.escapeSemanticSelection,
-    exitSemanticSelection: frame.exitSemanticSelection,
     // `liveId`, not a `live` entry: C13 exposes the id and C16 only compares it.
     liveEntry: () => {
       const id = stores.transcript.liveId;
@@ -4481,6 +4725,7 @@ function routerDeps(
       scheduler.commit("input");
     },
     raiseExitConfirm: frame.raiseExitConfirm,
+    refused,
   };
 }
 

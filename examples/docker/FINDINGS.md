@@ -50005,9 +50005,9 @@ the row arm and a `minRows` column decline. Byte-identical: `make golden` moved
 
 ```
                         before (open)      after (Phase A)
-frame work  p50           479 ms             27 ms      17.7× 
-frame work  p95           680 ms             85 ms       8.0× 
-frame work  max         1 020 ms            272 ms       3.8× 
+frame work  p50           479 ms             27 ms      17.7×
+frame work  p95           680 ms             85 ms       8.0×
+frame work  max         1 020 ms            272 ms       3.8×
 react renders / frame       ~145             ~3         a subsequence, kept whole
 ```
 
@@ -56266,6 +56266,13 @@ by a `{bold}` one. **Open**, and it is a C09 ruling rather than a fix: correctin
 T1.46's equality with the tokeniser by design, so the ruling is whether the canonical form keeps
 Ink's serialiser or the terminal's meaning. Symbol: `between`.
 
+**Ruled 2026-09-27: the terminal's meaning.** When a dim run ends inside a bold run, `between`
+re-emits bold after the `22`. **T1.46 was pinning Ink's behaviour, not a property**: its equality
+with the tokeniser held the defect in place, so it is amended to assert what the terminal draws —
+the cells read back bold where the painter said bold — and to say that it no longer matches Ink's
+bytes, where and why. C09 I72's *a normaliser that corrected any of them would move a golden* is
+the cost accepted, and the moved goldens are named before the run. **Owed**, with batch 2.
+
 ---
 
 ## F1259 — a patch window ending on a collapse marker shows the next hunk's header in its place ★★★★☆
@@ -56300,3 +56307,198 @@ is not pays its header to `dropRows`. Symbol: `windowRows`.
 T2.16's window agreement is clean over the patch corpus at every offset. The comment claiming *both
 lead* is rewritten to say which header does not. `tools/mutate/runs/c25-elements.mjs` restores the
 old count and T2.16 dies on it (C25 T6.32).
+
+## F1260 — R-BLK-214 draws a call *blocked on you*, and `CallState` has no member for it ★★☆☆☆
+*2026-09-27 · review batch 2, M4 item 3 (C04 I141), at e1c16e7c.*
+
+**Expected.** Every row of the registry's dot table (R-BLK-214, §030) is a state a call head can
+be in. **Measured**, reading the table out of `calcium-registry.json`: seven rows — the agent
+working, a call running, succeeded, *the agent said something*, **blocked on you** (`warn`,
+blinking), cancelled, failed — and `○` queued. `CallState` has five members. *Said something* is
+prose and has no outcome, so it is not a call head. **Blocked on you has no member**, and it is not
+an omission a union edit fixes: the state is *this call is waiting on a question*, and nothing in
+the tree ties a question (C15, `confirm.ts`) to the call that raised it. A call that is blocked
+today draws `running`, white and still, beside a question elsewhere on screen.
+
+**Open.** The review asked to *reconcile `queued` with the registry's four states*; the registry
+has `queued` (`○`, R-BLK-220), so that reconciliation is to keep it, and this row is what the
+reconciliation found instead. Symbol: `CallState`. Its subject is the question-to-call link.
+
+**Ruled 2026-09-27.** Build the question → call link in batch 3's M15 work, with the question
+queue and its lifecycle, since that work gives a question an owner record to carry the link.
+**Waiting on you** is `warn`-toned and blinks; **with reduced motion it is static `warn` plus the
+words *waiting on you***, so it keeps two carriers when motion is gone (R-COR-003). **Owed**: the
+`CallState` member, the link, and rows at full motion and at `reduced`.
+
+## F1261 — a queued call head draws `●` wherever tone carries, and the registry reserves `○` for it ★★☆☆☆
+*2026-09-27 · review batch 2, M4 item 1 (C09 I45), at e1c16e7c.*
+
+**Measured.** `headMark("queued", caps)` returns `running` whenever `toneCarries(caps)`, so above
+1 bit a queued head is `●` — and with `callHead`'s tone fixed at `info` it was the same `●` in the
+same colour as a running call whose duration spinner had not yet ticked. R-BLK-220: *in a
+call-lifecycle gutter, `○` is reserved for queued*, and R-BLK-214 draws it *hollow, muted, still*.
+C09 I45 said `running`'s `●` for every state where tone carries, and T2.45 in `tool-call.test.ts`
+asserted `["●", "●", "●", "●", "●"]` — the spec and the row agreeing with each other and not with
+the registry. Found reading the registry's table while checking the review's premise for item 3,
+not by the review. **And it spun**: the duration slot drew a spinner for every unsettled call, and a
+queued call has no outcome, so a head R-BLK-214 draws *still* was the one live mark on its row —
+found walking C23 I81. Symbols: `headMark`, `toolCallHeader`.
+
+**Closed, the same round.** `headMark` returns `CALL_HEAD_GLYPH[state]` where tone carries, so a
+queued head is `○` at every rung, and the duration slot spins for `running` alone. C09 T2.187
+renders all five states at 24-, 8- and 4-bit and reads the cell; C23 T1.76 asserts a queued head
+does not move with the tick. `tools/mutate/runs/c23-call-state.mjs` restores both and dies on each.
+
+## F1262 — the design's fixtures draw the result branch two ways, and its three-rung specimen moves a column R-GLY-003 fixes ★★☆☆☆
+*2026-09-27 · review batch 2, M4 item 6 (C09 I5), at d36d9ed8.*
+
+**Measured**, counting the blanks between `⎿` and the text in every file under
+`docs/design/language/fixtures/`: **33 draw one, 8 draw two** — the tool-result gallery (§050)
+and `/ps` (§081) among the eight. And §068, the one specimen drawing the same exchange at three
+rungs, draws `····⎿·let` at 24-bit and 8-bit and `` ····`-·let `` at ASCII: the text at column 6
+above and 7 below. R-GLY-003 is the rule — *pads the selected representation to the reservation,
+so changing capability rung moves no column* — and the registry's `branch` reserves two. So the
+two-blank form is the rule drawn, and 33 fixtures and §068's upper rungs draw the one-blank form
+it forbids.
+
+**Ruled here, for the rule over the specimens**: the registry marks its sections' specimens as
+examples (R-SEC-036, *specimen values and sample content remain examples*), and rules as
+`current`. The tree now draws `  ⎿  ` and `` `- `` five cells wide at every rung (C09 I5, C22 I83).
+**Open**, and it is the design's to close: the fixtures are its record, and correcting them is a
+registry edit this repository does not make unasked. Symbol: `branch`.
+
+**Ruled 2026-09-27: correct them.** The fixtures disagree with each other (33 against 8), so the
+rule decides — two blanks, the same column at every rung. The 33 fixtures and §068 are corrected
+**through successor blocks via the builder**, never by editing released blocks in place, and
+`make design-check` holds the result. **Owed**, with batch 2.
+
+
+## F1263 — `isBand` asked the theme, not the resolver, and disagreed at 1 bit ★★☆☆☆
+
+**Measured over every shipped theme × surface × {1, 4, 8, 24} (1100 cells)**: `isBand`
+disagreed with what the resolver paints in exactly the 1-bit band cells of both HC themes (and
+the `high-contrast` alias). `toneCarries`' own depth clause masked it for the head mark; what
+leaked was `RenderContext.washed` keying the render cache at 1 bit, where selecting and clearing
+cost two `focus` misses for an unchanged picture. Two latent cells — a band with no 4-bit pair,
+and an orphan pair — are closed in the resolver and the validator (rulings 55, 56). Closed by
+C10 I66: `bandAt` is the resolver's answer, and `isBand` delegates to it. Measured on landing:
+T6.130's mutation fails T1.51 **and** the written-out band lists in T2.72 and C09 T1.84, so the
+spec's "only T1.51" was corrected (433f2555's successor on the batch 2 branch). Ruling 56's
+premise was measured before building: in a stale panel, the four started states drew `●` in one
+dim ink in dark, hcDark and light at 24, 8 and 4 bits.
+
+## F1264 — a golden prediction's grep saw one spelling of the token ★☆☆☆☆
+
+M4 item 9's prediction said zero golden movers for the `running` → `work-unit` rename; six lines
+moved, all in `design-surfaces` (the vocabulary table at dark-unicode, dark-mono-unicode and
+dark-ascii, 40 and 80). The grep behind the prediction matched `"running"` and `glyph…running`;
+the surface prints the vocabulary as bare token names. The same class as *a matcher that sees one
+encoding*: the instrument that names the movers saw one form of the subject.
+
+## F1265 — `c23-operation-head`'s "stopped head composed as running" mutation survives ★☆☆☆☆
+
+`const running = true;` in `operationHead` survives T1.71, identically before this batch
+(f8fd47bb). From reading, not measured: the run's comment says every settled line would start
+with a spinner frame, but `operationHeader` asks `operationRunning` itself, so the text does not
+move; what the mutation changes is the settled head's `state`, `tone` and gutter glyph, which
+T1.71 does not read. **Owed**: a row reading the settled head's mark and tone, or a corrected
+run comment. Symbol: `operationHead`.
+
+## F1266 — C15 I29 is built in its narrow form ★☆☆☆☆
+
+A declared layer owner must agree with its layer's fields, but an **undeclared** keyed layer is
+still admitted and reads as `question` (overlay) or `substate` (panel). The strict form — every
+keyed layer declares an owner — rewrites 52 layer-pushing rows across 11 test files that are not
+M5's subject. **Owed** as its own change. Symbol: `LayerOwner`.
+
+## F1267 — a shell delegation forwards no key to its child ★★☆☆☆
+
+Ruling 62 made the `child` rung consume keys nobody binds, so F1 during `!cmd` no longer submits
+`/help keys`; but a delegated `vim` never receives F1 or anything else the rung consumes.
+Forwarding bytes to the delegated child's stdin needs a C21/C23 mechanism that does not exist.
+A question raised under an attached surface child is owed to batch 3's M9 item 4.
+
+## F1268 — a truncated question redrew untruncated after a selection move ★☆☆☆☆
+
+The confirm layer's `cut` flag was lost on redraw, so a question truncated to fit redrew at full
+length once the reader moved the selection. Found and fixed while building C23 I82: `cut` is held
+across redraws.
+
+## F1269 — `/history clear` was never wired ★☆☆☆☆
+
+`clearConfirmLayer` pushed a blocking layer with no answer callback, and no `src` path pushed it
+at all; under a declared `question` owner nothing could have answered it. Retired with its
+module-graph exemption and SS56 allow entry (ruling 61).
+
+## F1270 — stale `OWNER_ACTIONS` references, and an overlay row that no longer fires ★☆☆☆☆
+
+`registry-bindings.ts` and `generate-keymap.mjs` still name `OWNER_ACTIONS`, which does not
+exist. The overlay `escape → dismiss` row is dead in practice: the only blocking overlay is a
+question, whose own handler takes `esc`. Also recorded: a refused `⌃c` during a semantic drag no
+longer stops the autoscroll (C14 I48, consistent with R-SEL-013); C22 T4.49 and T4.53 are
+load-sensitive at the base as well as after M5.
+
+## F1271 — `⌥⌫` was dead in three owners, for three different reasons ★★☆☆☆
+
+At the prompt the reserved no-op ran; in a typed reply the key was refused; in a form field it
+was dropped. Three readers each asked the binding row directly, and each answered the missing
+handler its own way. Closed by C22 I134: a reserved key resolves once — to the application's
+handler, the row's fallback, or nothing — and every owner reads that answer. The premise also
+miscounted: sixteen bindings were mislabelled `default-terminal`, not fifteen (lane m6).
+
+## F1272 — kitty `⌃⇧C` was read as `⌃c` ★★☆☆☆
+
+`CSI 99;6u` satisfied both `isCtrlC` and `interceptOf`. Measured: it cancelled a running verb
+(stages `arming, intercept:interrupt:scope:handle, cancel`) and armed the exit — copy, the chord's
+registry meaning, never ran. When C16 §6c was walked the question's classifier was a third loose
+reader; ruling 59 has since taken `⌃c` out of it. Closed by C16 I67: `isExactCtrlC` is the one
+predicate, read by `interceptOf` and the router.
+
+## F1273 — `> notes` then ⏎ truncated the file `notes` ★★★☆☆
+
+C18 classifies a `>`-led line as rule 3 and delegates it to the shell, which opens the file for
+writing. The palette guard (C16 I68) reads the *resolved* line, so a pasted chip that begins with
+`>` is caught too; a `>`-led line now runs the action it names or says there is none and keeps the
+line. **Residue**: `rerunFocused` still submits `entry.doc.command` without the guard. No `>`-led
+command can be recorded after this change, so it reaches only transcripts persisted before it.
+
+## F1274 — two walk artefacts named states that cannot be constructed ★☆☆☆☆
+
+C16 §6c table B's cell *`?` at global, idle* has no construction: `activeTarget` never answers
+`global`. And `⌘1` as the profile witness cannot be observed, because `/help` omits reserved rows
+with no handler; the witness is now `⌘↑`/`⌃home`. Both cells read as coverage and were corrected
+before code.
+
+## F1275 — two instruments undercounted what they claimed to count ★★☆☆☆
+
+T1.97's registry-chord metric was keyed by action id, so it kept the last record per action — 68
+where the table has 89. T4.101 read whichever `/help` row came last by name. Both repaired on the
+lane. The walk also found three gaps before code: the copy-mode switch had no mechanism, a global
+`?` reached step 3 in native selection, and a throwing application handler would end the read loop
+(now contained with a warn notice).
+
+## F1317 — C09 T2.116 was red at the batch 2 tip, and it blinded every mutation run that reads it ★★☆☆☆
+
+c810c521 (M6's `>` palette) joined a row's chords with a literal `" · "`, which T2.116's walk
+over `src/shell` refuses (C09 I49, F828: the literal is non-ASCII at the ASCII rung). Nothing ran
+the suite between the lane's landing and f593c4c1, so the red reached the branch tip. **The cost
+was not the row**: every mutation run whose command includes `test/contract/blocks.test.ts`
+refuses to start on an unmutated suite that already fails, so two lanes lost their runs to it —
+b2-res until it fixed the site itself, and b3-d's `c09-shed`, whose re-anchored mutation is
+unverified until batch 3 takes the fix (b3-d filed the same observation for batch 3). Closed by
+4fdbcdea: the detail joins with `chipLook.separator`.
+
+## F1318 — the duration slot's spinner never reaches ruling 40 ★★☆☆☆
+
+`spin()` in `src/shell/documents.ts` indexes the frame by the readout tick and bypasses
+`spinnerFrameAt`, so the ASCII rung's 120 ms (C09 I112) does not apply to the call head's
+duration spinner. Found by b2-res while building question 40; not fixed. Symbol: `spin`.
+
+## F1319 — two item premises counted the wrong unit ★☆☆☆☆
+
+F1262's *33* counted fixture lines, and fixtures repeat blocks: the unit the supersession acts on
+is 28 blocks and 31 branch lines. And C09 T1.46's first specced premise — a full read-back of
+every seeded row — was falsified by measurement: 82 of 10,000 rows fail it for both Ink and the
+normaliser, on faithful oddities, while the random corpus holds **no** bold-beside-dim case at all.
+The row now asserts intensity and carries a dense corpus built to hold the case (0fdcddee).
+
