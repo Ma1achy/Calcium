@@ -9,13 +9,13 @@
  * renderer must agree to the cell, and `fitAt` is where truncation and padding
  * meet in one place so they cannot disagree.
  */
-import { glyphFor, glyphs } from "../blocks/glyphs.js";
+import { glyphFor, glyphs, type GlyphCaps } from "../blocks/glyphs.js";
 import { pad, padStart, paintRuns, tone, type Span } from "../blocks/paint.js";
 import { runsOf, runsText, sliceRuns } from "../runs.js";
 import { pairFor, sparkline, valueBar } from "../plot/index.js";
 import { cells, stripControl, truncate, truncateParts } from "../text.js";
 import type { AmbiguousWidth } from "../text.js";
-import type { Cell, ColumnDef, Table, TableRow } from "../../data/viewmodel/index.js";
+import type { Cell, ColumnDef, Table, TableRow, Tone } from "../../data/viewmodel/index.js";
 import type { RenderContext } from "../blocks/types.js";
 import type { PlannedColumns } from "./plan.js";
 import type { Alignment } from "./kind.js";
@@ -188,6 +188,34 @@ function decimalColumns(
 function integerPart(text: string): string {
   const at = text.indexOf(".");
   return at < 0 ? text : text.slice(0, at); // cells-ok — a code-unit offset
+}
+
+/**
+ * A trend cell's arrow and the tone its column's polarity gives it (C11 I30,
+ * C04 I128, C09 I111), or `undefined` for a cell with no trend.
+ *
+ * **Derived, never read off the cell** — construction refuses a trend cell that
+ * carries a glyph or a tone, so this is the only answer there is. The arrow is
+ * the sign of `to − from`; its tone is `ok` when that runs with the column's
+ * polarity, `error` against it, and none in a neutral column. **A reading that
+ * did not move draws no arrow** and the text alone (question 37): a flat reading
+ * has no direction to be good or bad about.
+ */
+export function trendMark(
+  cell: Cell | undefined,
+  column: ColumnDef | undefined,
+  capabilities: GlyphCaps,
+): Readonly<{ mark: string; tone: Tone | undefined }> | undefined {
+  if (cell?.trend === undefined) return undefined;
+  const { from, to } = cell.trend;
+  if (to === from) return { mark: "", tone: undefined };
+  const up = to > from;
+  const wants = column?.polarity ?? "neutral";
+  const g = glyphs(capabilities);
+  return {
+    mark: up ? g.trendUp : g.trendDown,
+    tone: wants === "neutral" ? undefined : (wants === "higher") === up ? "ok" : "error",
+  };
 }
 
 export function markedSeriesColumns(block: Table): ReadonlySet<string> {
@@ -414,7 +442,7 @@ export function rowSpans(
     // character. A cell with a glyph is not missing: the glyph is its content.
     if (
       options.unknown?.has(planned.key) === true &&
-      (cell === undefined || (isMissing(cell.text) && cell.glyph === undefined))
+      (cell === undefined || (isMissing(cell.text) && cell.glyph === undefined && cell.trend === undefined))
     ) {
       // In an aligned decimal column the values end short of the column's edge,
       // and the dash ends where they do; everywhere else, at the edge.
@@ -444,7 +472,11 @@ export function rowSpans(
         ? []
         : runsOf(displayText(cell.text, options.grouping.has(planned.key)), cell.spans);
     const text = runsText(textRuns);
-    const glyph = cell?.glyph === undefined ? "" : glyphFor(cell.glyph, ctx.capabilities);
+    // A trend's arrow stands where a glyph would (I30 — I23's lead), so it is
+    // inside the planned width like any other mark.
+    const trend = trendMark(cell, column, ctx.capabilities);
+    const glyph =
+      trend !== undefined ? trend.mark : cell?.glyph === undefined ? "" : glyphFor(cell.glyph, ctx.capabilities);
 
     // The glyph is part of the cell's width, not an addition to it: a status
     // column declaring `minWidth` for "succeeded" plus its glyph is the surface
@@ -461,7 +493,10 @@ export function rowSpans(
     // spliced into the string the offsets address.
     const lead = glyph !== "" && text !== "" ? `${glyph} ` : glyph;
     const body = lead + text;
-    const bodyRuns = lead === "" ? textRuns : [{ text: lead }, ...textRuns];
+    // The arrow's tone is the lead's own, resolved against the row's ground like
+    // any run; the text keeps the cell's default.
+    const bodyRuns =
+      lead === "" ? textRuns : [{ text: lead, ...(trend?.tone === undefined ? {} : { tone: trend.tone }) }, ...textRuns];
 
     // **Focus is rendered, never owned** (I14). It changes the ground and the
     // mark and no geometry — no extra row, no width. `measure` receives no

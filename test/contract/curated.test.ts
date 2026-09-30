@@ -26,8 +26,9 @@
 // pin is `npx tsx tools/curated/pin.ts --write`, an act with a diff to read
 // afterwards, not a keystroke that records whatever the code now does.
 //
-// **Driven, not an allow-list I keep by hand.** Every exported frozen table in
-// the curated modules must be named in `CURATED` or in `DERIVED` with a reason.
+// **Driven, not an allow-list I keep by hand.** Every exported table the type
+// checker finds in the curated scope must be named in `CURATED` or in `DERIVED`
+// with a reason.
 // A table added and pinned by neither fails T2.40 — which is the failure mode
 // an allow-list has by construction, and the one `an exemption list must be
 // driven` was written for.
@@ -44,7 +45,8 @@ import {
 } from "../../src/presentation/theme/four-bit.js";
 import { glyphs } from "../../src/presentation/blocks/glyphs.js";
 import { defaultTheme } from "../../src/presentation/theme/index.js";
-import { CURATED, DERIVED, MODULES, canonical, entryDiff } from "../support/curated.js";
+import { CURATED, DERIVED, PROJECTIONS, SCOPE, canon, canonical, entryDiff } from "../support/curated.js";
+import { discoverTables } from "../support/exported-tables.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PINNED = JSON.parse(
@@ -96,35 +98,63 @@ describe("C10 §2 / C09 §4 — the curated tables", () => {
     expect(defaultTheme["hcLight"]!.fourBit).toBe(LIGHT_FOUR_BIT);
   });
 
-  it("T2.40 (C10 I44): every exported frozen table in the curated modules is pinned or declared derived", () => {
+  it("T2.40 (C10 I44): the tables the checker discovers are the curated and derived sets, and the projections are named", () => {
     // **The driver, and it is what stops this file becoming a list that rots.**
-    // An allow-list is only as good as the discipline of adding to it; an
-    // equality check over the module's own exports makes the addition
-    // compulsory. A table added and named in neither set fails here, with the
-    // name it was given.
-    const declared = new Set([...Object.keys(CURATED), ...Object.keys(DERIVED)]);
-    const found: string[] = [];
-    for (const rel of MODULES) {
-      const src = readFileSync(resolve(here, "../..", rel), "utf8");
-      for (const m of src.matchAll(/^export const ([A-Za-z_][A-Za-z0-9_]*)\b[^=]*=\s*(?:Object\.freeze|\{|\[)/gmu)) {
-        found.push(m[1]!);
-      }
+    // The type checker names every exported table in scope — by its declared
+    // type, not its initialiser's spelling — and three sets are compared by
+    // equality. A table added and named in neither fails here, with its name.
+    const root = resolve(here, "../..");
+    const tables = discoverTables(root, SCOPE(root));
+    const names = tables.map((t) => t.name);
+
+    // Two declarations under one name: a pin by name covers whichever the pin
+    // file happened to import, and the other goes unpinned.
+    const twice = names.filter((n, i) => names.indexOf(n) !== i);
+    expect(twice, "one declaration per table name").toEqual([]);
+
+    // **The checker is asked something it must get right**, one table per
+    // initialiser shape, so an answer of nothing — or of literals only, which is
+    // what the regex saw — is a failure rather than a green run.
+    for (const [shape, name] of [
+      ["literal", "ANSI16_HEX"],
+      ["identifier", "defaultTheme"],
+      ["member", "DARK_FOUR_BIT"],
+      ["constructor", "FREE_WIDTH_SLOTS"],
+    ] as const) {
+      expect(names, `the ${shape}-initialised table is discovered`).toContain(name);
     }
-    expect(found.length, "the scan found the modules' exports").toBeGreaterThan(10);
 
-    const unpinned = found.filter((n) => !declared.has(n));
+    const exported = Object.keys(CURATED).filter((n) => !Object.hasOwn(PROJECTIONS, n));
+    const both = exported.filter((n) => Object.hasOwn(DERIVED, n));
+    expect(both, "a table is pinned or derived, not both").toEqual([]);
+
+    // Equality, both directions at once: an undeclared table and a declaration
+    // whose table is gone both show up as a difference here.
     expect(
-      unpinned,
+      [...names].sort(),
       "a curated table is pinned by value; a derived one is named in DERIVED with why it needs no pin",
-    ).toEqual([]);
+    ).toEqual([...exported, ...Object.keys(DERIVED)].sort());
 
-    // **Both directions.** A name in `DERIVED` that no module exports any more
-    // is an exemption outliving its subject — the shape a subset check lets
-    // through, and the reason `compare-exemption-lists-by-equality` exists.
-    // `CURATED` needs no such row: every entry imports its table, so a retired
-    // one fails to compile.
-    const stale = Object.keys(DERIVED).filter((n) => !found.includes(n));
-    expect(stale, "a derived-table exemption whose table is gone").toEqual([]);
+    // The projection keys are CURATED's non-exported keys exactly.
+    expect(
+      Object.keys(CURATED).filter((n) => !names.includes(n)).sort(),
+      "a CURATED key that is no exported table names the private table it projects",
+    ).toEqual(Object.keys(PROJECTIONS).sort());
+  }, 60_000);
+
+  it("T2.40a (C10 I44): canon reads a Set as its sorted members and refuses other non-plain objects", () => {
+    expect(canon(new Set(["b", "a"]))).toEqual(["a", "b"]);
+    expect(canon({ s: new Set([2, 1]) })).toEqual({ s: [1, 2] });
+    expect(canonical()["FREE_WIDTH_SLOTS"], "pinned as its member, not as {}").toEqual(["residue"]);
+    class Box {
+      readonly v = 1;
+    }
+    for (const v of [new Map([["a", 1]]), new Date(0), new Box()]) {
+      expect(() => canon(v), `a ${v.constructor.name} is refused`).toThrow(/canon cannot read/u);
+    }
+    // The control: plain records, null-prototype records and arrays still read.
+    expect(canon(Object.assign(Object.create(null) as object, { b: 1, a: 2 }))).toEqual({ a: 2, b: 1 });
+    expect(canon([{ b: 1, a: 2 }])).toEqual([{ a: 2, b: 1 }]);
   });
 
   it("T2.41 (C09 I45, C02 I9): the ASCII set is also the wide set, and that is a ruling", () => {

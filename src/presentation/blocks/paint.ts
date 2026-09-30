@@ -258,6 +258,22 @@ export function focusStyle(theme: ResolvedTheme, caps: TerminalCapabilities): St
 }
 
 /**
+ * Focus on a shape that has **no mark** (C09 I121, R-FOC-001, R-STA-003).
+ *
+ * `focusStyle` has no 1-bit rung because `▸` carries focus there — and `▸` is
+ * the table's. A notice, a pill, a choice option and a control have no mark
+ * column, so at 1-bit the ground answered `NO_STYLE` and their focused frames
+ * were byte-identical to their resting ones. **The same ladder `selectionStyle`
+ * already is**: the ground where it carries, and where it does not, the whole
+ * shape inverts — an attribute, so no cell moves and `measure` still sees no
+ * focus. One function, so a fifth shape cannot choose a different fallback.
+ */
+export function focusShapeStyle(theme: ResolvedTheme, caps: TerminalCapabilities): Style {
+  const ground = focusStyle(theme, caps);
+  return ground.background === undefined ? { inverse: true } : ground;
+}
+
+/**
  * Whether `surface` is a band in this theme (C10 I45): a ground whose one ink
  * answers for every slot drawn on it, so tone carries nothing there.
  */

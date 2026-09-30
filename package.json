@@ -8,7 +8,7 @@
     "examples/plots"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.1 <23"
   },
   "exports": {
     ".": {
@@ -48,7 +48,7 @@
     "build": "tsc -p tsconfig.build.json && node tools/bundle.mjs",
     "check": "tsc --noEmit && eslint .",
     "enforce": "node tools/enforce/index.mjs",
-    "test": "vitest run --dir test --exclude '{e2e,golden}/**'",
+    "test": "vitest run --dir test --exclude '{e2e,golden,browser}/**'",
     "golden": "vitest run --dir test/golden",
     "e2e": "npm run build && vitest run --dir test/e2e --no-file-parallelism",
     "audit": "npm audit --audit-level=high"

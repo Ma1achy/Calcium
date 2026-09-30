@@ -24,3 +24,5 @@ export declare function renderKeymapTable(
 ): string;
 
 export declare function liveTable(): string;
+
+export declare function keysDocument(): string;

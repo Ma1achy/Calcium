@@ -34,6 +34,12 @@ SEMANTIC ASCII FALLBACKS · GENERATED FROM THE SPINNER REGISTRY [R-MOT-005]
 ✦  pipe            rotation         | / - \                            100ms ·  8 frames
 ✦  arrow           rotation         < ^ > v                            200ms ·  4 frames
 ✦  pulse           pulse            . o O @ O o                        120ms ·  6 frames
+✦  braille2        rotation         | / - \                            110ms ·  8 frames
+✦  decimal         count            0 1 2 3 4 5 6 7 8 9                140ms · 10 frames
+✦  binary4         count            0 1 2 3 4 5 6 7 8 9 a b c d e f    120ms · 16 frames
+✦  line            rotation         - \ | /                            130ms ·  4 frames
+✦  balloon         growth           . o O @ *                          160ms ·  5 frames
+✦  arc             rotation         | / - \                            130ms ·  6 frames
 Each base pattern is fitted once across the primary trajectory; composite sets concatenate named source trajectories. The same resolved frames generate the ASCII CSS.
 
 2 · WORK FRAMES ARE 80–200 ms. Deliberate WAIT sets may be slower. [R-MOT-002]

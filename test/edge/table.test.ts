@@ -19,6 +19,40 @@ function widthsOf(lines: readonly string[]): readonly number[] {
 }
 
 describe("C11 tier 3 — edges", () => {
+  it("T3.22 (I15): at widths 1, 2 and 3 every row fits, measure agrees, and the gutter outranks the data", () => {
+    // Every row kind this renderer emits: header, a focused body row, an expanded
+    // row's detail, the action bar — and, separately, the empty message.
+    const base = psTable({ rows: 3, expanded: [1], detail: true });
+    const full: Table = {
+      ...base,
+      rows: base.rows.map((row, i) =>
+        i === 0 ? { ...row, actions: [{ kind: "fill" as const, label: "≡ logs", command: "/ps --logs" }] } : row,
+      ),
+    };
+    const empty: Table = { kind: "table", id: "e", columns: psColumns(), rows: [], emptyMessage: "No results." };
+    const head = full.rows[0]!.id;
+    const kits = [FULL_CAPS, ASCII_CAPS].map((capabilities) =>
+      measurable({ definitions: [tableDefinition], capabilities, focus: { blockId: full.id, rowId: head } }),
+    );
+    for (const kit of kits) {
+      for (const width of [1, 2, 3]) {
+        for (const block of [full, empty]) {
+          const lines = kit.renderToLines(block, width);
+          for (const [i, line] of lines.entries()) {
+            expect(cells(visible(line)), `${block.id} row ${String(i)} at ${String(width)}`).toBeLessThanOrEqual(width);
+          }
+          expect(lines.length, `${block.id} measure at ${String(width)}`).toBe(kit.measure(block, width)); // cells-ok
+        }
+      }
+      // The focused row is the mark and no data where the gutter fills the width —
+      // the header is row 0, the focused row sorts to row 1.
+      const focusedAt = (width: number): string =>
+        visible(kit.renderToLines(full, width).find((line) => visible(line).trimStart().length > 0 && /[▸>]/u.test(visible(line))) ?? "");
+      expect(focusedAt(2).trimEnd(), "width 2: the mark alone").toMatch(/^[▸>]$/u);
+      expect(focusedAt(1), "width 1: the mark's first cell").toMatch(/^[▸>]$/u);
+    }
+  });
+
   it("T3.1: zero columns renders the empty message and does not throw", () => {
     const block: Table = { kind: "table", id: "z", columns: [], rows: [], emptyMessage: "No results." };
     const lines = r.renderToLines(block, 40);

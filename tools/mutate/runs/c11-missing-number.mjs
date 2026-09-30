@@ -63,8 +63,10 @@ const MUTATIONS = [
     // **A glyph read as absence** — the warn mark replaced by a dash.
     name: "a glyph-only cell is missing",
     file: CELLS,
-    from: "(cell === undefined || (isMissing(cell.text) && cell.glyph === undefined))",
-    to: "(cell === undefined || isMissing(cell.text))",
+    // Re-anchored on the clause it removes: a trend's clause joined the line
+    // (C11 I30) and the whole-line anchor rotted with it.
+    from: "isMissing(cell.text) && cell.glyph === undefined && ",
+    to: "isMissing(cell.text) && ",
     expect: "T1.38",
   },
   {

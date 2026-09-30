@@ -1433,6 +1433,15 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
   table: (b, e, at) => {
     requireArray(b, "columns", e, at);
     requireArray(b, "rows", e, at);
+    // I128 — a column's polarity is one of three words, or absent for neutral.
+    if (isArray(b["columns"])) {
+      for (const column of b["columns"]) {
+        if (!isRecord(column) || column["polarity"] === undefined) continue;
+        if (!["higher", "lower", "neutral"].includes(column["polarity"] as string)) {
+          e.push(`${at} column "${String(column["key"])}": "polarity" is "higher", "lower" or "neutral" (C04 I128)`);
+        }
+      }
+    }
     // The other half of I6's glyph rule. A `Cell` carries one too, and a table
     // is where the far side's own status strings most often arrive.
     if (isArray(b["rows"])) {
@@ -1465,6 +1474,20 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
               `${at} cell "${key}": carries a "spark" and a "bar" (C04 I50c) — both fill ` +
                 `the planned width, so there is no rule for which wins`,
             );
+          }
+          // I128 — the same refusal `block()` makes, at the wire.
+          if (cell["trend"] !== undefined) {
+            const trend = cell["trend"];
+            if (!isRecord(trend) || !isFiniteNumber(trend["from"]) || !isFiniteNumber(trend["to"])) {
+              e.push(`${at} cell "${key}": "trend" is { from, to }, both finite numbers (C04 I128)`);
+            }
+            const second = ["glyph", "tone", "spark", "bar"].filter((k) => cell[k] !== undefined);
+            if (second.length > 0) {
+              e.push(
+                `${at} cell "${key}": a trend cell carries ${second.map((k) => `"${k}"`).join(", ")} (C04 I128) — ` +
+                  `its arrow and tone are derived`,
+              );
+            }
           }
           if (isRecord(cell["bar"])) {
             const spec = cell["bar"];
@@ -1511,13 +1534,10 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
           `nothing in it reports that something happened and not what`,
       );
     }
+    // **Absent is the fitted box** (C04 I66, C09 §3a-quater): `measure` sizes it
+    // at the width it is given. Present, it is a commitment and has to be one.
     const height = b["height"];
-    if (height === undefined) {
-      e.push(
-        `${absentMessage(`${at}: "height"`, "a positive integer")} (C04 I66) — the box is ` +
-          `bound by the number \`measure\` committed and cannot choose its own`,
-      );
-    } else if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
+    if (height !== undefined && (typeof height !== "number" || !Number.isInteger(height) || height < 1)) {
       e.push(
         `${at}: "height" must be a positive integer (C04 I66) — the box is bound by ` +
           `the number \`measure\` committed and cannot choose its own`,
@@ -2057,6 +2077,10 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
         requireString(raw, "label", e, here);
         for (const key of ["value", "hint", "error", "flag"]) {
           if (raw[key] !== undefined && !isString(raw[key])) e.push(`${here}: "${key}" must be a string when present (C04 I135)`);
+        }
+        // C04 I140 — the registry's availability axis, word for word.
+        if (raw["availability"] !== undefined && !["enabled", "readonly", "disabled"].includes(raw["availability"] as string)) {
+          e.push(`${here}: "availability" is "enabled", "readonly" or "disabled" (C04 I140)`);
         }
         count(raw["id"]);
       });

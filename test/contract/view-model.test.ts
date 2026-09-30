@@ -875,12 +875,22 @@ describe("C04 §7 — the update model and the view state, checked rather than c
     for (const [why, over, field] of [
       ["an empty message", { message: "" }, /"message"/u],
       ["a non-positive height", { height: 0 }, /"height"/u],
-      ["an absent height", { height: undefined }, /"height"/u],
+      ["a negative height", { height: -2 }, /"height"/u],
+      ["a fractional height", { height: 1.5 }, /"height"/u],
+      ["a height that is not a number", { height: "3" }, /"height"/u],
     ] as const) {
       const bad = status(over);
       expect(bad.ok, why).toBe(false);
       expect(bad.error?.join(" "), `${why}: naming its field (I57)`).toMatch(field);
     }
+    // **An absent height is the fitted box** (C09 §3a-quater) — the row asserted
+    // the opposite until `b.status` stopped declaring one. The key is removed
+    // rather than set to `undefined`, so the row is about absence and not about
+    // how a validator reads an undefined value.
+    const { height: _declared, ...fitted } = {
+      kind: "status", id: "st", state: "error", message: "the fetch failed", height: 3,
+    };
+    expect(validateBlock(fitted as never).ok, "an absent height").toBe(true);
 
     /**
      * **Supplied rather than derived, measured rather than scanned.** `tick`
@@ -1063,6 +1073,45 @@ describe("C04 §7 — the update model and the view state, checked rather than c
   });
 });
 
+describe("C04 I140 — a field's availability", () => {
+  it("T2.134 (C04 I140, R-STA-001): availability is one of enabled, readonly and disabled by both doors", () => {
+    const form = (availability?: string) => ({
+      kind: "form",
+      id: "f",
+      fields: [{ id: "port", label: "port", ...(availability === undefined ? {} : { availability }) }],
+    });
+    for (const a of [undefined, "enabled", "readonly", "disabled"]) {
+      expect(validateBlock(form(a)).ok, String(a)).toBe(true);
+      expect(() => blockOf(form(a) as never), String(a)).not.toThrow();
+    }
+    const bad = validateBlock(form("off"));
+    expect(bad.ok ? "" : bad.error.join("\n")).toMatch(/"availability" is "enabled", "readonly" or "disabled" \(C04 I140\)/u);
+    expect(() => blockOf(form("off") as never)).toThrow(/C04 I140/u);
+  });
+});
+
 describe("C04 I128 — a trend cell", () => {
-  it.todo("T2.133 (C04 I128, R-COL-006): block() refuses a trend cell carrying glyph, tone, spark or bar — not deferred on a component: parked as 38, the down arrow has no ASCII half (docs/design/PARKED_QUESTIONS.md)");
+  it("T2.133 (C04 I128, R-COL-006): block() refuses a trend cell carrying glyph, tone, spark or bar", () => {
+    const table = (cell: Record<string, unknown>, polarity?: string) => ({
+      kind: "table",
+      id: "m",
+      columns: [{ key: "v", label: "val loss", priority: 1, minWidth: 12, sortable: false, ...(polarity === undefined ? {} : { polarity }) }],
+      rows: [{ id: "r", cells: { v: { text: "from 0.41", trend: { from: 0.41, to: 0.3 }, ...cell } } }],
+    });
+    // The trend alone is a cell, and so is every declared polarity.
+    expect(() => blockOf(table({}) as never), "a trend cell").not.toThrow();
+    for (const polarity of ["higher", "lower", "neutral"]) {
+      expect(validateBlock(table({}, polarity)).ok, polarity).toBe(true);
+    }
+    // Each second answer is refused, by both doors, and named.
+    for (const [field, value] of [["glyph", "ok"], ["tone", "ok"], ["spark", [1, 2]], ["bar", { value: 1, max: 2 }]] as const) {
+      expect(() => blockOf(table({ [field]: value }) as never), field).toThrow(new RegExp(`"${field}".*C04 I128`, "u"));
+      const r = validateBlock(table({ [field]: value }));
+      expect(r.ok ? "" : r.error.join("\n"), `${field} at the wire`).toMatch(new RegExp(`"${field}".*C04 I128`, "u"));
+    }
+    // The readings are finite numbers, and a polarity is one of three words.
+    expect(() => blockOf(table({ trend: { from: 0.41, to: Number.NaN } }) as never)).toThrow(/C04 I128/u);
+    const bad = validateBlock(table({}, "up"));
+    expect(bad.ok ? "" : bad.error.join("\n")).toMatch(/"polarity" is "higher", "lower" or "neutral" \(C04 I128\)/u);
+  });
 });

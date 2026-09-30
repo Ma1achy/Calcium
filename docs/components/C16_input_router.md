@@ -1430,6 +1430,21 @@ taken. A reserved name is every consumer's namespace.
 5. `docs/KEYS.md` is generated from the same source, with `Route`, `Profile` and
    `Condition` columns, and `npx tsx tools/keymap-table.mjs --check` gates it.
 
+   **One file, one writer, two projections of one registry.** The registry names
+   the file (`keymapPolicy.help.docsTarget`), and the builder resolves that path
+   against the **repository root** — `keysOutputPath` — and writes no copy of its
+   own. `tools/keymap-table.mjs` is the only writer: the design's binding table
+   first, as the builder renders it (`renderKeysMarkdown`), then the live ladder
+   from `defaultKeymap`. KT1's byte equality covers both halves, and
+   `check-calcium.mjs` checks the first half against the registry.
+
+   **Why, measured.** The builder resolved `docs/KEYS.md` against its own
+   directory, so `make design` wrote `docs/design/language/docs/KEYS.md` — 64
+   lines — beside the 106 of `docs/KEYS.md`, two generated keymaps under one name,
+   and `docs/INDEX.md` recorded the second as *distinct*. The contract it was
+   generated to keep reads *docs/KEYS.md and the help entry come from the same
+   source; a hand-written keymap drifts* — and two generated ones drift too.
+
    **`?` and `F1` emit the entry; they do not submit a line** (I57, `R-KEY-005`,
    C23 I79). *Emits the generated keymap as a durable entry* is an append, and a
    submission is three more things besides — the prompt cleared (C23 I28), the

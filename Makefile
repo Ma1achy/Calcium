@@ -9,7 +9,7 @@
 SHELL := /usr/bin/env bash
 .SHELLFLAGS := -o pipefail -c
 
-.PHONY: install hooks quantised check design design-check enforce catalogue instruments roadmap regime test golden e2e audit proof all clean
+.PHONY: install hooks quantised check design design-check released chromium design-browser enforce catalogue instruments roadmap regime test golden e2e audit proof all clean
 
 install:            ## npm ci, no install scripts, then the one named build (A04 §3)
 	git config core.hooksPath .githooks
@@ -103,9 +103,31 @@ design-check:       ## the registry ↔ HTML projection, released-rule immutabil
 	@# fails. Its fourth check is a claim about the tree that goes stale the
 	@# moment a rule lands, so it has to gate rather than report.
 	node tools/rule-status.mjs
+	@# The fixtures are the page's projection (AUTHORITY.md §Fixtures); --check writes nothing.
+	npx tsx tools/design/fixtures.ts --check
+	@# The themes are the registry's projection (C10 §4b); --check renders in memory and writes nothing.
+	node tools/theme/from-registry.mjs --check
 
-design:             ## regenerate the HTML and KEYS.md from the registry
+# **The page's own conformance checks, executed** (AUTHORITY.md §Browser conformance).
+# `chromium` is the explicit install step — pinned by version and digest, into `.cache/`
+# (A04 §3) — and `design-browser` proves the runner can see a failure before it
+# loads the page. Not inside `design-check`: the pre-commit hook must not need a
+# 120 MB download.
+chromium:           ## fetch the pinned headless Chromium, verify its digest, unpack it
+	node tools/design/chromium.mjs install
+
+design-browser: chromium  ## the generated page in the pinned browser: every flag pass, no console error
+	npx vitest run --dir test/browser
+
+# **Not inside `design-check`**, because its subject is a ref the working tree cannot
+# supply: a clone with no `origin/main` fails it by design (AUTHORITY.md §Release 4),
+# and the pre-commit hook must not depend on what was last fetched.
+released:           ## the released baseline against origin/main's copy — added, never changed or removed
+	node tools/design/released-against.mjs --ref origin/main
+
+design:             ## regenerate the HTML, KEYS.md and the fixtures from the registry
 	node docs/design/language/build-calcium.mjs
+	npx tsx tools/design/fixtures.ts
 
 # **The types are a gate, and they were not one.** `make enforce` ran 402 files
 # of source scans, the suite ran 6 416 rows, golden 528, tier 5 136 and three
@@ -140,7 +162,15 @@ catalogue:          ## the frames `instruments` and `test` sweep — generated, 
 
 # **A prerequisite, not a step in `all`** — the degraded jobs run `make test` alone
 # and PC11 lives in the suite too, so the dependency has to travel with the target.
-instruments: catalogue  ## every instrument's own fixture, and the inventory by equality (group 9)
+#
+# **`chromium` and the build for the same reason.** The design page's runner has
+# its fixture under `test/browser/`, which needs the pinned browser; and eight
+# fixtures read `dist/` — `profile.mjs`'s from the start, then the bundle, the
+# quantised writer, three benches and the docker recorder. A stale `dist/` is
+# worse than a missing one: the rows pass against the previous commit's code
+# (`check`'s F447, one target on). `chromium` fetches once and verifies after.
+instruments: catalogue chromium  ## every instrument's own fixture, and the inventory by equality (group 9)
+	npm run build
 	node tools/instruments.mjs
 
 mutate: catalogue     ## every mutation run, serially, the tree hashed either side (F952) — SHARD=k/n ONLY=substr

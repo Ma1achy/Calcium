@@ -5,11 +5,11 @@ missing rather than refused. Each is built from what already exists.
 
 a TREE — the twisty is CONTENT, the guides are DECORATION
 
-  ▾ src
-  │  ▾ interaction
-  │  │  ▸ parser
+  ▿ src
+  │  ▿ interaction
+  │  │  ▹ parser
   │  │    frame.ts                      4.1 kB
-  │  ▸ data
+  │  ▹ data
     package.json                        1.2 kB
 
   so at narrow widths the GUIDES go first and the names never do — and

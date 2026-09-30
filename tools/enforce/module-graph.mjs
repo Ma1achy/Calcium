@@ -3597,6 +3597,16 @@ export function checkExportedArguments(files, readFile = (f) => readFileSync(f, 
 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
+  // **`bandFourBitShortfalls` measures a curation, not a terminal** (C10 I61).
+  // It scores the curated 4-bit band pairs on xterm's default sixteen — and a
+  // running terminal's sixteen are its own and unknowable, so no load-time
+  // caller could measure anything real with it. Its subject is the table, as
+  // C10 I44's pin's is, and T2.64 holds it by equality. It goes the day a
+  // theme can curate its own 4-bit pairs and a loader has to judge them.
+  bandFourBitShortfalls:
+    "C10 I61 — the curated 4-bit band pairs scored on the reference palette, consumed by "
+    + "T2.64 and by no caller in src/: a terminal's own sixteen colours are not knowable at "
+    + "load, so the measurement's subject is the curation and not a session",
   // **`configBlock` is ruling 28's table with no verb** (C23 I80). §075 names
   // the verb `/config`, docker-tui ships a `/config` of its own, and a framework
   // verb of that name is a parse error for it — parked as 43. The day 43 is

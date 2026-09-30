@@ -307,6 +307,31 @@ export type ThemeTokens = Readonly<{
    * `validateBands`, and T2.55 is what enforces it.
    */
   bandInk?: Readonly<Record<string, string>>;
+  /**
+   * Each band's curated ANSI16 pair, for `colourDepth: 4` (C10 I61).
+   *
+   * The flat 4-bit map is per ref and composes nothing, so without this a band
+   * at 4-bit had no ground and one index per tone — the one ink it promises
+   * spread across six. Keyed like `bandInk`, by the band's surface name, and
+   * `validateBands` refuses a band in `bandInk` with no pair here.
+   */
+  bandFourBit?: BandFourBit;
+}>;
+
+/** One ANSI16 index for a band's ground and one for everything drawn on it. */
+export type BandFourBit = Readonly<Record<string, Readonly<{ ground: number; ink: number }>>>;
+
+/**
+ * One row of the floor's scope (C10 I60, R-THM-004): a ground a theme paints text
+ * on, the walker that measures it at the common floor (`pairing`), and the refs
+ * that land on it — `"meaning"` for every slot of every palette that carries
+ * meaning, or an explicit table of palette → slots. The rows are the registry's
+ * `terminalPalettes.textGrounds`, projected as `TEXT_GROUNDS`.
+ */
+export type TextGround = Readonly<{
+  ground: string;
+  pairing: string;
+  refs: "meaning" | Readonly<Record<string, readonly string[]>>;
 }>;
 
 /**

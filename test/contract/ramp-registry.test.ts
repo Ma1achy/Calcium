@@ -245,9 +245,8 @@ describe("C04 §3am — the ink ramps are the registry's", () => {
     // at one full extent later is the frame you started with.
     expect(row("marquee", n), "marquee wraps").toEqual(row("marquee", 0));
 
-    // `drift` does not repeat inside any window a session will show. 37 · 53 is
-    // its true period; asserted as *not equal* across the shorter one, which is
-    // the claim §037 actually makes.
+    // `drift` does not repeat at either term's own period — the short form of
+    // the claim. T2.117k is the long form: no period at all (C04 I139).
     expect(row("drift", 37), "drift does not repeat at 37").not.toEqual(row("drift", 0));
     expect(row("drift", 53), "nor at 53").not.toEqual(row("drift", 0));
 
@@ -283,6 +282,53 @@ describe("C04 §3am — the ink ramps are the registry's", () => {
     expect(early[n / 2]!, "ripple starts in the middle").toBeGreaterThan(early[0]!);
     expect(late[0]!, "and reaches the ends").toBeGreaterThan(late[n / 2]!);
   });
+
+  it("T2.117j (C04 I138): scatter lights one cell per frame, every cell once per pass, in a per-pass permutation", () => {
+    // Every width a bar or span can have, not a chosen few: the shipped form
+    // was correct at n = 2, 3 and 4 and at nothing wider.
+    for (let n = 2; n <= 80; n += 1) {
+      const period = n + 3;
+      const orders: string[] = [];
+      for (let pass = 0; pass < 3; pass += 1) {
+        const order: number[] = [];
+        for (let step = 0; step < period; step += 1) {
+          const k = pass * period + step;
+          const lit = Array.from({ length: n }, (_v, i) => i).filter(
+            (i) => animateT("scatter", i / (n - 1), k, n, i) === 1,
+          );
+          expect(lit.length, `n=${String(n)} pass ${String(pass)} step ${String(step)}`).toBe(step < n ? 1 : 0);
+          order.push(...lit);
+        }
+        expect([...order].sort((a, b) => a - b), `n=${String(n)} pass ${String(pass)} covers every cell`).toEqual(
+          Array.from({ length: n }, (_v, i) => i),
+        );
+        orders.push(order.join(","));
+      }
+      if (n >= 4) expect(new Set(orders).size, `n=${String(n)}: the order is redrawn per pass`).toBeGreaterThan(1);
+    }
+  });
+
+
+  it("T2.117k (C04 I139): drift has no period within 100 000 ticks", () => {
+    // Two rows, at ticks 0 and 5, so a shift that happens to match one row by
+    // coincidence of phase is not taken for a period. 10⁻⁹ is far above float
+    // noise (the shipped 37 / 53 form returned at 1 961 to 5.8e-15) and far
+    // below the closest near-return this form makes (2.7e-4 at 95 608).
+    const n = 12;
+    const row = (k: number): number[] => Array.from({ length: n }, (_v, i) => animateT("drift", i / (n - 1), k, n, i));
+    const at0 = row(0);
+    const at5 = row(5);
+    const returns: number[] = [];
+    for (let p = 1; p <= 100_000; p += 1) {
+      const a = row(p);
+      const b = row(5 + p);
+      let d = 0;
+      for (let i = 0; i < n; i += 1) d = Math.max(d, Math.abs(a[i]! - at0[i]!), Math.abs(b[i]! - at5[i]!));
+      if (d < 1e-9) returns.push(p);
+    }
+    expect(returns, "no shift returns the row").toEqual([]);
+  });
+
 
   it("T2.117g (C04 I109): two one-shots in one frame time independently", () => {
     // **The half the deferral got wrong, asserted rather than argued.** §3am

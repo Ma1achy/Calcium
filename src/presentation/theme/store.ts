@@ -34,8 +34,48 @@ export interface ThemeStore {
    * the check, so the throw leaves no half-applied state.
    */
   setTheme(name: string): void;
+  /**
+   * The name this set answers to `name` — itself if declared, else a retired
+   * name's successor, else `undefined` (C10 I63). `setTheme` accepts exactly the
+   * names this resolves; `names` lists only the declared ones.
+   */
+  resolveName(name: string): string | undefined;
   /** Empty means applied. Non-empty means nothing changed at all (I4). */
   applyOverrides(overrides: Overrides): readonly ThemeError[];
+}
+
+/**
+ * **Retired theme names and the generated theme that replaced each** (C10 I63).
+ * One entry: `high-contrast` named the hand-written dark high-contrast set, and
+ * that set is `hcDark` now. Resolved to one fixed theme rather than by polarity,
+ * because the name named one theme and it was dark.
+ */
+const THEME_ALIASES: Readonly<Record<string, string>> = Object.freeze({ "high-contrast": "hcDark" });
+
+/**
+ * A name as this set understands it (C10 I63): itself if the set declares it,
+ * else its alias's target if the set declares that, else `undefined`. **The
+ * declared key is asked first**, so an alias never shadows a set's own theme of
+ * that name — and `Object.hasOwn`, not `in`, so `toString` is not a theme.
+ */
+export function resolveThemeName(set: ThemeSet, name: string): string | undefined {
+  if (Object.hasOwn(set, name)) return name;
+  const target = Object.hasOwn(THEME_ALIASES, name) ? THEME_ALIASES[name] : undefined;
+  return target !== undefined && Object.hasOwn(set, target) ? target : undefined;
+}
+
+/**
+ * Every word `/theme` accepts for this set (C10 I63): its declared names, then
+ * each alias that resolves here to something other than itself. Separate from
+ * `ThemeStore.names`, which answers *which themes are there* — an alias is a
+ * second spelling of one of them, not another.
+ */
+export function themeNames(set: ThemeSet): readonly string[] {
+  const aliases = Object.keys(THEME_ALIASES).filter((alias) => {
+    const to = resolveThemeName(set, alias);
+    return to !== undefined && to !== alias;
+  });
+  return Object.freeze([...Object.keys(set), ...aliases]);
 }
 
 function identity(tokens: ThemeTokens, serial: number): string {
@@ -80,11 +120,13 @@ export function loadTheme(
   }
 
   const first = names[0];
-  const opened = opening ?? first;
-  if (first !== undefined && opened !== undefined && !(opened in set)) {
+  // Resolved (C10 I63), so an opening named by an alias opens its target and
+  // the store's active name is always one the set declares.
+  const opened = opening === undefined ? first : resolveThemeName(set, opening);
+  if (first !== undefined && opening !== undefined && opened === undefined) {
     errors.push({
-      path: opened,
-      message: `no theme named "${opened}"; this set declares ${names.join(", ")}`,
+      path: opening,
+      message: `no theme named "${opening}"; this set declares ${names.join(", ")}`,
     });
   }
 
@@ -105,10 +147,17 @@ export function loadTheme(
       return Object.freeze([...Object.keys(tokens)]);
     },
 
-    setTheme(next: string): void {
-      const wanted = tokens[next];
-      if (wanted === undefined) {
-        throw new Error(`no theme named "${next}"; this set declares ${Object.keys(tokens).join(", ")}`);
+    resolveName(name: string): string | undefined {
+      return resolveThemeName(tokens, name);
+    },
+
+    setTheme(requested: string): void {
+      // Resolved before the lookup (C10 I63), so an alias and its target are one
+      // switch and switching to either from the other is no switch at all.
+      const next = resolveThemeName(tokens, requested);
+      const wanted = next === undefined ? undefined : tokens[next];
+      if (next === undefined || wanted === undefined) {
+        throw new Error(`no theme named "${requested}"; this set declares ${Object.keys(tokens).join(", ")}`);
       }
       // **By name and not by variant.** Two dark themes are a legitimate pair,
       // so comparing polarity would refuse a real switch — and `identity()`

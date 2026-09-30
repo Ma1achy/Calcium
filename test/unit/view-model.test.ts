@@ -853,7 +853,10 @@ describe("C04 required fields report absence and wrong type differently", () => 
 
     // Non-vacuity, and the count by equality: without this the row passes on a
     // corpus that reaches nothing.
-    expect(found).toHaveLength(51); // §018's four — `choice.options`, `control.label`, `.at`, `.value` — `tree.nodes` (C04 §3ap), `split.height`, `split.children` (C04 §3aq), and `form.fields` (C04 §3ar)
+    // 50, where it was 51: `status.height` left the set when an absent height
+    // became the fitted box (C04 I66, C09 §3a-quater), and the row says so.
+    expect(found, "status.height is optional now").not.toContain("status.height");
+    expect(found).toHaveLength(50); // §018's four — `choice.options`, `control.label`, `.at`, `.value` — `tree.nodes` (C04 §3ap), `split.height`, `split.children` (C04 §3aq), and `form.fields` (C04 §3ar)
     expect(found.filter((at) => EXEMPT.includes(at)), "the exemption is reached").toEqual(EXEMPT);
   });
 

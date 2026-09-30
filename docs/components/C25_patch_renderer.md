@@ -427,6 +427,98 @@ component and who most likely owns them.
 
 ---
 
+## 3d. Focus and selection over a diff — walked by hand
+
+**A patch line is an element, and C10 §4k.2's row 3 is why** (review batch 1, item 22). *Selection
+over a diff ground* was ruled — selection takes the ground, the diff keeps `+` and `−` — and could
+not be drawn, because `patch` declared no elements and read `ctx.focus` nowhere. Both facts were
+built; the **addressability** was not. I24 gives each line an element and I25 says what a focused or
+selected line looks like. Walked before the code, as two artefacts, because the component has both
+kinds of interaction.
+
+### The row walk — where each element sits (a sequence over the drawing)
+
+Rows are the renderer's, counted in the order `render` emits them. The fixture is §2's illustration
+— one remove, two adds — behind a context line, with `collapsedBefore: 4` and `collapsedAfter: 2`.
+
+| row | unified | element (id, cols) | split | element(s) (id, cols) |
+|---|---|---|---|---|
+| 0 | `── path ──` | — | `── path ──` | — |
+| 1 | collapse marker (4) | — | collapse marker (4) | — |
+| 2 | `@@ … @@` | — | `@@ … @@` | — |
+| 3 | ` 18 18   ctx` | `18:18`, `[0, w)` | `18   ctx │ 18   ctx` | `18:18`, `[0, w)` |
+| 4 | `19   − old` | `19:`, `[0, w)` | `19 − old │ 19 + new` | `19:`, `[0, s)` · `:19`, `[s + 1, 2s + 1)` |
+| 5 | `   19 + new` | `:19`, `[0, w)` | `         │ 20 + new` | `:20`, `[s + 1, 2s + 1)` |
+| 6 | `   20 + new` | `:20`, `[0, w)` | tail marker (2) | — |
+| 7 | tail marker (2) | — | | |
+
+`s` is one side's width, `⌊(w − 1) / 2⌋` — `patchLayout`'s `perSide` — and the separator is the cell
+at `s`. **The right half stops at `2s + 1`, not at `w`**: at an even width one cell is left over, and
+it is `line()`'s padding, dressed as the row and not as either side — so a selected addition's wash
+ends one cell short of the frame's edge, and an element claiming that cell claims a ground it does
+not have. The first draft of this table said `w`; T2.17's row f read the page ground there. **What the walk found**: split rows hold **two** elements, side by side, so disjointness
+(C26 I6) holds by columns and not by rows; the blank left half of row 5 is nothing and is not an
+element; and a context row in split is **one** element across the whole row, separator included,
+because it is one line drawn twice rather than two lines.
+
+**The id is the line's numbers, never its position.** `h0:1` — hunk 0, line 1, which the owed
+attempt had guessed — does not survive a window: `BlockDefinition.window` hands the transcript a
+**smaller** `Patch` whose first hunk is whichever hunk the window starts in (§3c), so a positional id
+names a different line in every slice, and C26 I7's window agreement fails on the first offset that
+drops a hunk. `oldNo:newNo`, with the absent side empty, is the same string in the whole and in
+every window, because a window carries its lines verbatim (I21). A line with **neither** number, or
+with the number its kind needs missing, declares no element: it cannot be addressed stably, so it
+is not addressed at all. **A repeated id keeps its first line**, since a producer numbering two lines
+alike would otherwise break C26 I6 for the whole block.
+
+**Not cached, and I7 is why.** The element list is O(lines) per call; T2.4 asserts `patch/` holds
+no module state, so a memo inside the kind is the one answer ruled out. The callers ask on
+navigation and on the selection spans, not per frame.
+
+### The classification table — what a line looks like (a table over structure)
+
+Every row is a cell where two rules could both claim a line. **Head** is `ctx.focus.rowId`, when the
+focus is this block's; **selected** is `ctx.focus.selected` filtered by *its own* block id, so a
+selection whose head sits in a sibling block still paints here (C11 I14's T6.17 lesson).
+
+| # | line | selected | head | ground | inks resolve on | weight | 1-bit |
+|---|---|---|---|---|---|---|---|
+| a | add / remove | — | — | `diffAdd` / `diffRemove` | that ground (I23) | — | `+` / `−` alone |
+| b | add / remove | ✓ | — | `selection` | `selection` | — | inverse, `+` / `−` kept |
+| c | add / remove | ✓ | ✓ | `selection` | `selection` | **bold** | inverse + bold |
+| d | add / remove | — | ✓ | `focusGround` | `focusGround` | **bold** | bold |
+| e | context | ✓ / — | ✓ / — | as b–d, else the page | as the ground | as b–d | as b–d |
+| f | split, one side selected | the side | — | that side only | that side's | — | that side inverse |
+| g | header, marker, tail | never | never | as before | as before | — | as before |
+| h | context, at 1-bit | — / ✓ | ✓ | as d / c | as d / c | **bold replaces the gutter's dim** | bold, or inverse + bold |
+
+**Selection wins the ground and the diff keeps its marks** — C10 §4k.2 row 3, which is row b. The
+marks were never the ground's: I4 puts `+` and `−` on every changed line at every depth, so taking
+the ground away from `diffAdd` loses a carrier the diff had twice.
+
+**The head is weight, and that is the one ruling the table forced.** A table carries focus with `▸`
+in a gutter column (C11 I15); a patch has none, and adding one moves every golden and every column
+for a mark. `focusShapeStyle`'s answer — invert where the ground is gone — would make row d and row b
+the same frame at 1-bit, which is the defect `focusStyle` exists to end. So the head takes **bold**
+at every rung, its displaced carrier under R-STA-002 (*a displaced fact keeps a mark, an edge or a
+weight*), and at 1-bit the three states are three frames: bold, inverse, inverse and bold. Bold is
+what C10 §4k.3 ruling 4 gives hover at 1-bit, and the two cannot meet on a patch line, because
+nothing declares a hover on one.
+
+**Row h is the one the table missed, and the frame read found it.** At 1-bit a context line's
+gutter is `muted`, whose mono rung is **dim** (F34), and bold and dim are **one channel**: SGR 1 and
+2 both close with 22. Painted with both, the head's bold held on the two dim cells and on nothing
+after them — the row composer re-encodes cells as transitions, closes the dim with `22`, and does
+not re-open the bold (F1258, measured through `@xterm/headless`: the painter's bytes carry bold on
+six cells of six, the composed row on two). So the head's weight **replaces** the dim, which is
+F34's own rule — *`muted`'s mono class is dim, and focus turns it bold* — arriving at a line rather
+than a frame. The finding is the composer's and stays open there; this row does not depend on it.
+
+**Row f is split's own**: the ground is a side's (§2, *the background belongs to a side, not to a
+row*), so a selected removal beside an unselected addition takes the wash on its half and leaves
+`diffAdd` on the other. A selected context row takes it across the whole row, separator included,
+because its element does.
+
 ## 4. Tokenisation
 
 C25 does not tokenise. It calls C09's tokeniser with `(line.text minus its prefix, block.language)` and receives token spans, which it resolves through C10's `syntax` palette.
@@ -473,6 +565,8 @@ Consequences that matter:
 - **I21a** — **The gutter width is pinned on a window and never recomputed from its slice.** `numberWidth` walks every line of every hunk, so a window whose widest line number is narrower than the block's draws a narrower gutter — and every row of text shifts sideways as the reader scrolls. Measured on the shipped fullscreen view: a patch whose first lines are numbered 1–9 and whose body reaches 4050 renders a **4**-cell gutter whole and a **1**-cell gutter in the window at offset 0, so scrolling down moves every line three columns right. **I21 is this argument about the neighbouring field** — a hunk header is carried verbatim so that its counts describe the whole hunk — and the gutter is the same fact one field along: it describes the *block*, not the slice, so it travels with the window rather than being derived again inside it. Height conformance cannot see any of this (C09 I26 checks rows), and the generic check does not reach a patch at all, because a patch does not declare `BlockDefinition.window` — this window is C25's own route (§3c). FINDINGS F134.
 - **I22** — **A window is built over a plan, and the plan is derived once per block and width.** `windowPlan(patch, width)` returns the layout, the rows — one record per screen row of the whole patch, `rowsOf`'s — the row indices a window may begin at, the hunk header rows and the pinned gutter width (I21a), and every window function is written over it: `build` walks from the offset until the budget is spent and so touches the window's rows and no others; the bottom search is a binary search over the plan's start rows, each probe a `build`; the clamp is a `snapDown` over the plan's rows; the header rows and the total are the plan's lists. The patch-taking signatures — `windowPatch`, `clampOffset`, `hunkHeaderRows`, `totalRows`, `windowRows` — remain and derive the plan themselves, so a caller with no plan pays one walk and gets the same bytes. **Why** (F1187): every function here was a pure function of the patch and derived the rows from scratch, so a `windowPatch` was 3 + ⌈log₂ starts⌉ walks of `rowsOf` and a view motion about twice that — 5.3 ms at 5,000 lines, 103 ms at 50,000, linear in the patch when a scroll step changes the offset alone. SS24 forbids module state in `patch/`, rightly; the derived form is therefore a value a caller may hold, and C22 I41 says the pushed view holds it. T1.24 holds the plan's lists to the patch-taking functions over the corpus at both layouts and every offset, and the planned window to `windowPatch` byte for byte. **The plan travels through the seam** (F1191): `window` takes the caller's scratch as its sixth argument (C09 I76) and holds the plan there — owner the patch's `hunks`, the payload the rows are derived from (C12 I107's rule, keyed on the carriers), key the width — and reads it back only when the held plan's `patch` is this block and its `width` this width; anything else is rebuilt and overwrites, so a stale plan is never read, and SS24 still holds because the store is the caller's. **And a planned window costs the window**: `windowRows` walks the plan's rows from the window's first row to its last and no others, and the touched hunks' first body rows come from the plan's `bodyStarts` rather than a second walk — at 20,000 lines a planned 37-row window was 1.7 ms for its two whole-patch walks, and the unplanned one 4.3–5.4 (F1191).
 - **I23** — *(C10 I48, R-THM-001, R-THM-004)* **A row's inks resolve against the ground the row lands on.** An added row sits on `diffAdd` and a removed one on `diffRemove`, and every run on it — the gutter's `ok`/`error`/`muted` and each `syntax.*` token — is resolved with that ground as `on`, so a theme's composition for the diff ground reaches the frame. The inks were resolved against the page, which the generator's own comment on `solveDiffGrounds` said they were not: every composed diff ink in every theme was a declaration nothing read. A context row has no ground and resolves against the page, as before. → T1.27
+- **I24** — *(C10 §4k.2 row 3, C26 I6, I7)* **Every numbered diff line is one `row` element, placed where `render` draws it.** The id is `oldNo:newNo` with the absent side empty, so it is the same string in the whole patch and in every window of it; a line without the number its kind needs declares none, and a repeated id keeps its first line. Unified: one element per line, the full width. Split: a paired row holds the removal on the left half `[0, s)` and the addition on the right `[s + 1, 2s + 1)`, and a context row is one element across the row. Header, collapse marker and tail rows are never elements. `copy` is the line as unified diff — its marker and its text (C09 I86, `R-SEL-004`). Computed per call and never cached (I7). → T1.28, T2.16
+- **I25** — *(C10 I47, §4k.2 row 3, R-SEL-006, R-STA-002)* **A selected line takes `surface.selection` and a focused one `focusGround`, and the diff keeps `+` and `−` on either.** Selection wins where both hold. Every ink on a line — the gutter's tone and each syntax token — resolves against the ground the line lands on, which is I23 with the ground widened from the diff's to whichever took the line. The head takes **bold** at every rung, because a patch has no mark column and `inverse` is selection's 1-bit rung: at 1-bit a focused line, a selected line and the head inside a selection are bold, inverse, and both — and the head's bold **replaces** any dim on the line, because intensity is one channel (§3d row h, F34, F1258). In split the ground is a side's. `measure` never sees focus (C09 I1), so nothing here moves a row. → T2.17
 
 ---
 
@@ -566,6 +660,7 @@ Six tiers. No state machine, so no transition table (A02 §7).
 - **T1.25** (I22, F1191): over the patch corpus at both layouts and every window a plan's rows may begin at, `windowRows` handed a plan whose `rows` is a recording proxy reads no row index outside `[from, to)`, and its block equals the unplanned window's byte for byte; the plan's `bodyStarts` equal each hunk's first body row found by a full scan, `-1` for a hunk with no body. Not deferred on a component: the code commit replaces this row.
 - **T1.26** (I22, F1191): the definition's `window` through a `RenderScratchStore`: two calls over one patch at one width build one plan — the store set once, the second call's block equal to a call with no scratch byte for byte — and a call at another width, or over another patch sharing the same `hunks` array, rebuilds rather than reads; with no scratch, as before. Not deferred on a component: the code commit replaces this row.
 - **T1.27** (I23, C10 I48): an added and a removed row → the gutter's tone and a syntax token each carry the ink `tone(…, "diffAdd")` / `slot(…, "diffRemove")` answers, in a theme that composes those grounds differently from the page; a context row carries the page's. The control asserts the composed and the page ink differ, so the row cannot pass on a theme where they coincide.
+- **T1.28** (I24): §3d's row walk as data — the fixture at a unified width and a split width gives exactly the table's ids, rows and columns, in reading order; a positional id (`h0:1`) is absent; a line with no number declares nothing; a repeated id is listed once.
 
 ### Tier 2 — contract / interface
 
@@ -584,6 +679,8 @@ Six tiers. No state machine, so no transition table (A02 §7).
 - **T2.13** (C04 I34, C23 I31): `ACTION_KINDS` is `fill`, `exec`, `open`, `expand` — four, by equality — and a document carrying a fifth is refused at the gate. The `view` kind's retirement is asserted where a far side could reintroduce it, because the union type is erased at runtime and the validator is the only thing standing between an adapter and a kind nothing dispatches.
 - ~~**T2.14** (the retired offset rule): a motion and its inverse return to where they started~~ — **struck with the offsets** (§3b). The reasoning it carried is kept because it is general and was learned expensively: the round trip is the only observable form from outside, since a second source for *where am I* is how two answers come to disagree, and neither direction is visible to a test that drives one motion. T2.13 above is that argument applied to what replaced it.
 - ~~**T2.15** (C15 I25, §8a A7): the ⌃c ladder's `overlays.pop()` with the view open~~ — **struck with the view** (§3b). An expanded patch is not a layer, so there is no stack for `⌃c` to pop it off and no id to dismiss twice. What F944 measured — that the *other* caller is the one to drive — is a standing lesson and not a row here.
+- **T2.16** (I24, C26 I4–I7): C26's element conformance over a patch corpus — containment, order, disjointness per level, stability, and the window agreement at every offset of every split and unified fixture — with `patch` among the kinds reported and the agreement counted. The corpus carries a patch whose first window drops a hunk, so a positional id fails the agreement rather than passing it.
+- **T2.17** (I25): §3d's classification table at 24-bit, 1-bit and ASCII — rows a–g, each asserted on the frame: the ground behind the line, the ink of its marker resolved on that ground, `+` / `−` present, bold on the head alone, and — row h — every cell of a focused context line bold through a headless terminal at 1-bit, with no dim left on it; at 1-bit the head, the extent and the head in the extent are three different frames; a selection whose head is in a sibling block paints this block's lines; `measure` is unchanged by any focus.
 
 ### Tier 3 — edge cases
 
@@ -654,6 +751,7 @@ Six tiers. No state machine, so no transition table (A02 §7).
 - **T6.29** (I10): dropping the unrelated-pair rule → T1.13 fails, and every token of `foo bar` / `baz qux` is underlined on both sides. Dropping whitespace from the tokeniser → T1.12 fails, and a re-indent is a pair with no visible change. Dropping the cap → T1.11 fails.
 - **T6.30** (I22): the plan's start rows built from every row rather than the unit-first rows → T1.24's clamp arm, a window beginning inside a paired run; the bottom search probing from the row after the start → T1.24's bottom arm against `clampOffset`; the plan's gutter width derived from the window's slice → T3.20; the plan built afresh inside `build` on every probe → **nothing fails, recorded**: byte-identical and fifteen times the walks, which is the bench's to see (`tools/bench/patch-window.mjs`) and not a row's. `tools/mutate/runs/c25-window-plan.mjs`.
 - **T6.31** (I22, F1191): `windowRows` restored to its walk over every row → T1.25's proxy records an index outside the window; `bodyStarts` taken from the last body row rather than the first → T1.25's byte equality; the plan read back without the `patch` check → T1.26's shared-`hunks` arm shows the other patch's rows. `tools/mutate/runs/c25-window-plan.mjs`.
+- **T6.32** (I24, I25): the id made positional → T2.16's window agreement; the split right half starting at `s` rather than `s + 1` → T1.28; selection losing to the diff ground → T2.17 row b; the head's bold dropped → T2.17's 1-bit arm, where the head and the extent become one frame; the dim kept beside the bold → T2.17 row h, four cells of a focused context line read as normal weight; the hunk header a trailing collapse marker forces counted as leading slack rather than trailing → T2.16's window agreement on `patch-three-hunks` (F1259); the extent filtered by the head's block rather than its own → T2.17's sibling arm. `tools/mutate/runs/c25-elements.mjs`.
 
 ---
 

@@ -127,7 +127,8 @@ const MUTATIONS = [
     // chooser, which is what it removes.
     name: "the head chip loses the ground",
     file: SIMPLE,
-    from: '                  ...(selected.has(id) ? selectionStyle : focusStyle)(ctx.theme, ctx.capabilities),\n',
+    // Re-anchored 2026-09-27 (C09 I121): the focus shapes read focusShapeStyle.
+    from: '                  ...(selected.has(id) ? selectionStyle : focusShapeStyle)(ctx.theme, ctx.capabilities),\n',
     to: "",
     expect: "T1.24",
   },

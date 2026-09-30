@@ -56233,3 +56233,70 @@ its value. And the first version of the arm **passed**: its per-row check looked
 for a lead followed by a count, and a mark the clamp takes whole leaves no lead
 to find. What sees it is block-wide — the plan is the block's (C09 I81), so a
 render marks every row or none, and a render that marks some is the damage.
+
+---
+
+## F1258 — the row composer closes a dim run with `22` and never re-opens the bold beside it ★★★☆☆
+*2026-09-27 · review batch 1, item 22 (C25 §3d), at a7248226.*
+
+**Expected.** A span painted `{bold, dim}` followed by spans painted `{bold}` reaches the terminal
+bold throughout: `paint` writes each span as its own sequence and reset, and the painter's bytes
+say so.
+
+**Measured.** `out/p22-intensity.mts`, the painter's bytes and `normaliseRow`'s, each written to
+`@xterm/headless` and read back a cell at a time:
+
+    painted    "\u001b[1;2m18\u001b[0m\u001b[1m \u001b[0m\u001b[1mctx\u001b[0m"
+    normalised "\u001b[1m\u001b[2m18\u001b[22m ctx\u001b[22m"
+    painted    1:BD 8:BD  :B- c:B- t:B- x:B-
+    normalised 1:BD 8:BD  :-- c:-- t:-- x:--
+
+Six cells bold of six, then two. **SGR 1 and 2 are one channel** — both close with `22` — and
+`between` (`rows.ts`) closes the dim with `22` and treats the bold as still held, because the
+state it carries says it is. That is `@alcalzone/ansi-tokenize`'s `diffAnsiCodes`, which the file
+reproduces rule for rule on purpose (C09 I72: *a normaliser that corrected any of them would move
+a golden*), and T1.46 holds the two equal over ten thousand seeded rows — so the defect is Ink's,
+carried faithfully, and the equality row is what keeps it.
+
+**Found by reading a frame**, not by a row: a focused context line in a patch at 1-bit, where the
+`muted` gutter is dim (F34) and the head is bold (C25 I25). The patch no longer paints the shape —
+the head's bold replaces the dim, which is F34's rule (C25 §3d row h) — so nothing shipped is known
+to hit it. **Not measured**: how many frames in the golden corpus carry a `{bold, dim}` cell followed
+by a `{bold}` one. **Open**, and it is a C09 ruling rather than a fix: correcting `between` breaks
+T1.46's equality with the tokeniser by design, so the ruling is whether the canonical form keeps
+Ink's serialiser or the terminal's meaning. Symbol: `between`.
+
+---
+
+## F1259 — a patch window ending on a collapse marker shows the next hunk's header in its place ★★★★☆
+*2026-09-27 · review batch 1, item 22 (C25 I24, T2.16), at e7879b92.*
+
+**Expected.** C25 I18: a window carries the sticky headers and **declares** them through `skipRows`
+and `dropRows`, so the rows it shows are the rows `[from, to)` of the whole patch.
+
+**Measured.** `out/p22-window.mts`, `patch-three-hunks` at 20 columns, rows `[5, 7)`:
+
+    whole     5 "     19 + b: 3      "   6 "⋯ 40 unchanged lines"
+    window    skip 3 drop 0
+              0 path · 1 "@@ -18,2 +18,2 @@" · 2 "     19 + b: 3" · 3 "⋯ 40 unchanged lines" · 4 "@@ -90,1 +91,2 @@"
+
+Skipping three leaves `⋯ 40` and `@@ -90,1 +91,2 @@` — **the window is shifted by one row**: the
+added line the reader scrolled to is gone and a header from below the range is drawn at the bottom.
+`windowRows` counts every out-of-range hunk header as leading slack, and one is not: a hunk whose
+**collapse marker** is the window's last row renders its header after the marker, past `to`. The
+comment beside the return says *a patch's slack is a path header and a hunk header, and both lead*
+— true of every header above a body row, and false of the one a marker forces.
+
+**Why nothing saw it.** C09's window conformance checks `measure(window) − skip − drop = to −
+from`, and the arithmetic holds with the slack on the wrong side. It took a **consumer of positions**:
+C26 I7's window agreement maps each element of a window back through `skipRows`, and `patch` had
+no elements until C25 I24 gave it some — `:19` sat at row 5 of the block and at row 4 through the
+window. A consumer finds variance a producer cannot.
+
+**Open** — the fix is one branch in `windowRows`: a hunk whose marker is in range and whose header
+is not pays its header to `dropRows`. Symbol: `windowRows`.
+
+**Closed, the same round.** The branch as sized: the same window answers `skip 2 drop 1`, and C25
+T2.16's window agreement is clean over the patch corpus at every offset. The comment claiming *both
+lead* is rewritten to say which header does not. `tools/mutate/runs/c25-elements.mjs` restores the
+old count and T2.16 dies on it (C25 T6.32).

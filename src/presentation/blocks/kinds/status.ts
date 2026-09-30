@@ -16,7 +16,7 @@
 import { normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Status } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate, wrapCells } from "../../text.js";
-import { glyphs, spinnerFrameAt, spinnerFrames } from "../glyphs.js";
+import { glyphs, spinnerFrameAt } from "../glyphs.js";
 import { background, fit, paint, rows, slot as surface, tone, withBackground, type Span } from "../paint.js";
 import type { BlockDefinition, RenderContext, Rendered } from "../types.js";
 import type { Style } from "../../theme/index.js";
@@ -375,14 +375,27 @@ function bodyOf(
 }
 
 /**
+ * The cells the `warning` mark takes, asked of **both** arms and the wider kept.
+ *
+ * `glyphCells` cannot answer it: `warning` is a `GlyphSet` member, not a
+ * `GLYPH_TABLE` token, and the set's arms are not held 1:1 — the residue mark
+ * is `⋯` against `...`. Today both arms of this one are a cell (`▲`, `!`), so
+ * the maximum is exact; were they to part, the wider errs in the direction
+ * I34's top rung already errs in — a row of slack, never a row short.
+ */
+const MARK_CELLS = Math.max(
+  cells(glyphs({ unicode: "full", ambiguousWidth: "narrow" }).warning),
+  cells(glyphs({ unicode: "ascii", ambiguousWidth: "narrow" }).warning),
+); // cells-ok — a cell count
+
+/**
  * The rows a **present, non-empty** detail wants, bounded by its own cap.
  *
  * One function, so nothing can disagree about what a detail costs — the same
  * argument `errorStatus` makes for the box's height one level up (C09 I34).
- * Published because the **producer** needs it too: `framedStatus` sizes its box
- * from C23's frame readings (F234, F235) and has to add the detail's rows to
- * them, and a second `Math.min(3, …)` in L4 is the drift this file already
- * refuses one level down.
+ * It was published for `framedStatus`, which added the detail's rows to a
+ * declared height; that box is fitted now (§3a-quater) and asks nothing of a
+ * producer, so the function is this file's again.
  */
 export function statusDetailRows(text: string | undefined): number {
   if (text === undefined || text === "") return 0; // cells-ok — a row count
@@ -414,12 +427,14 @@ export function statusDetailRows(text: string | undefined): number {
  * computes, appearing when the message is short and giving way as it grows —
  * which is what the ladder already does with them. Counting them would make a
  * two-line failure seven rows rather than five.
+ *
+ * **No capability record, because `measure` has none** (C09 I34, §3a-quater).
+ * This function also sizes a box that declares no height, and a measure cannot
+ * ask which set the terminal draws — so the mark is counted at `MARK_CELLS`,
+ * the widest of its arms, and the activity line is asked with a placeholder frame, because what is read here is
+ * whether it is *empty*, and that never depends on the frame.
  */
-export function statusRowsFor(
-  block: Status,
-  width: number,
-  caps: RenderContext["capabilities"],
-): number {
+export function statusRowsFor(block: Status, width: number): number {
   const w = normaliseWidth(width);
   // The **top** rung deliberately, not the rung this block currently has: the
   // question is how tall the good figure needs to be, and the answer is read
@@ -435,11 +450,12 @@ export function statusRowsFor(
   const rowWidth = rung.frame.border ? Math.max(1, w - 2) : w; // cells-ok — a cell count
   const textWidth = Math.max(1, rowWidth - 2 * (rung.frame.pad ? PAD : 0)); // cells-ok — a cell count
 
-  const g = glyphs(caps);
-  const mark = block.state === "error" || block.state === "retrying" ? `${g.warning} ` : "";
-  // Tick zero: the *emptiness* of the line is a function of the state and the
-  // fields, never of which frame the spinner is on, so any tick answers it.
-  const line = activityLine(block, spinnerFrames(caps, block.spinner)[0] ?? "");
+  // A stand-in of the mark's width: `wrapCells` counts cells, so a run of `x`
+  // as wide as the mark wraps the message exactly as the mark does.
+  const mark = block.state === "error" || block.state === "retrying" ? `${"x".repeat(MARK_CELLS)} ` : "";
+  // A placeholder frame: the *emptiness* of the line is a function of the state
+  // and the fields, never of which frame the spinner is on.
+  const line = activityLine(block, "x");
 
   const wrapped = wrapCells(`${mark}${stripControl(block.message)}`, textWidth).length; // cells-ok — a row count
   // **The message is served first and has no cap of its own** (I84). What is
@@ -450,9 +466,25 @@ export function statusRowsFor(
   const messageRows = Math.max(1, wrapped); // cells-ok — a row count
   const detailRows = statusDetailRows(block.detail); // cells-ok — a row count
   const rows = Math.min(CONTENT_LINE_CAP, messageRows + detailRows); // cells-ok — a row count
-  const tagRows = rung.frame.tag && rung.tag !== "none" ? 1 : 0;
+  // **`empty` draws no banner, so it counts none** (I85, F10). Counted, it was a
+  // row of slack the render centres inside a granted height — harmless there,
+  // and a wrong measure in a fitted box.
+  const tagRows = rung.frame.tag && rung.tag !== "none" && block.state !== "empty" ? 1 : 0;
   const lineRows = line === "" ? 0 : 1;
   return rows + (rung.frame.border ? 2 : 0) + tagRows + lineRows; // cells-ok — a row count
+}
+
+/**
+ * The rows the box occupies: the declared height, or the fit when there is none
+ * (C09 I31, C04 I66, §3a-quater).
+ *
+ * **One function for `measure` and `render`**, so the two cannot answer the
+ * question differently — the fitted box is a promise `render` keeps because it
+ * asks the same thing `measure` asked, at the same width.
+ */
+function statusHeight(block: Status, width: number): number {
+  if (block.height === undefined) return statusRowsFor(block, width);
+  return Math.max(1, Math.floor(block.height)); // cells-ok — a row count
 }
 
 export const statusDefinition: BlockDefinition<Status> = {
@@ -465,13 +497,14 @@ export const statusDefinition: BlockDefinition<Status> = {
   copy: (block) => (block.detail === undefined ? block.message : `${block.message}\n${block.detail}`),
 
   /**
-   * The declared height and nothing else (C09 I31).
+   * The declared height, or the fit at this width when none is declared (C09 I31).
    *
-   * **`measure` never reads `ctx` and this kind is why it must not**: the box is
-   * bound by a number the caller already committed, so a measurer free to
-   * recompute is a measurer free to disagree with it.
+   * **`measure` never reads `ctx` and this kind is why it must not**: a declared
+   * box is bound by a number the caller already committed, so a measurer free to
+   * recompute is a measurer free to disagree with it. A fitted box is bound by
+   * `statusRowsFor`, which takes no capability record for the same reason.
    */
-  measure: (block: Status): number => Math.max(1, Math.floor(block.height)), // cells-ok — a row count
+  measure: (block: Status, width: number): number => statusHeight(block, width),
 
   // No `window` (C09 I27, C09 I31) — a bounded box has its border at both ends
   // and cannot measure less without becoming a different box. `scroll`'s
@@ -480,7 +513,7 @@ export const statusDefinition: BlockDefinition<Status> = {
   render(block: Status, ctx: RenderContext): Rendered {
     const width = normaliseWidth(ctx.width);
     const g = glyphs(ctx.capabilities);
-    const height = Math.max(1, Math.floor(block.height)); // cells-ok — a row count
+    const height = statusHeight(block, width);
     // C28 I45 — the rows it was given, which is what the rung selection and the
     // fill both scale with. Taken after the floor, because a fractional or
     // negative height draws one row and gauging the declared value would report

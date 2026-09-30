@@ -1,10 +1,13 @@
 // C10 §4k — the six compositions, as frames rather than as a classification.
 //
-// **§4k.2 rules all six and this file draws the ones a producer can construct.**
-// A frame that fakes a state is not drawn: a fixture has to be shown to respond
-// to the thing under test before it is asserted against (`test/support/README.md`),
-// and four of the six have no subject in this tree for three different reasons,
-// each named in §4k.4 and each watched by C10 T2.48 rather than by a comment.
+// **§4k.2 rules all six and this file draws the ones a producer can construct**,
+// generated from one case table (`test/support/compositions.ts`) that C10 T2.48
+// reads too. A frame that fakes a state is not drawn: a fixture has to be shown
+// to respond to the thing under test before it is asserted against
+// (`test/support/README.md`), so each snapshot carries the frame with each fact
+// removed beside the frame with all of them — the response, in the record. A
+// case no producer can construct is `owed` with its reason, and T2.48 attempts
+// it rather than a comment promising to.
 //
 // **The snapshot is a frame AND a report, and the report is the point.** These
 // compositions are about *which fact took the ground*, which is colour — so a
@@ -20,21 +23,14 @@
 // mark is the whole of it; ASCII is where the mark itself is substituted.
 import { describe, expect, it } from "vitest";
 
-import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_UNICODE_CAPS, measurable, visible } from "../support/render.js";
+import { COMPOSITIONS, RUNGS } from "../support/compositions.js";
+import { DARK_THEME, visible } from "../support/render.js";
 import { background, tone } from "../../src/presentation/blocks/paint.js";
-import { plotDefinition } from "../../src/presentation/plot/index.js";
-import { tableDefinition } from "../../src/presentation/table/index.js";
 import { sgr } from "../../src/terminal/escapes.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 
 const SGR_RE = /\u001b\[([0-9;]*)m/u;
 const SPLIT_RE = /(\u001b\[[0-9;]*m)/u;
-
-const RUNGS = [
-  { name: "24-bit", capabilities: FULL_CAPS },
-  { name: "1-bit", capabilities: MONO_UNICODE_CAPS },
-  { name: "ascii", capabilities: ASCII_CAPS },
-] as const;
 
 /**
  * The surfaces a run could be standing on, in R-STA-002's own order.
@@ -49,6 +45,10 @@ const GROUNDS = [
   "surface.diffAdd",
   "surface.diffRemove",
   "surface.bgElev",
+  // **The well** (C09 I122). Missing from this list, the disabled field of case 5
+  // read back as `page` — the report naming the one ground its ruling is about
+  // as absent.
+  "surface.bgDeep",
 ] as const;
 
 /** The tones a run could be inked in, so the report names one rather than a hex. */
@@ -178,153 +178,64 @@ function runsOf(line: string, caps: TerminalCapabilities): string {
   return out.length === 0 ? "(blank)" : out.join(" ");
 }
 
-/**
- * Case 1 — **focused + selected + failed**, on a table row.
- *
- * §4k.2 row 1: selection takes the ground, focus keeps its mark, and failure
- * keeps its glyph, its word and its tone. All three facts hold on **one** cell,
- * which is what makes it the composition rather than three states side by side.
- */
-const COLUMNS = [
-  { key: "name", label: "Name", align: "left", priority: 10, minWidth: 12, sortable: false },
-  { key: "state", label: "State", align: "left", priority: 5, minWidth: 10, sortable: false },
-];
-const ROWS = [
-  { id: "a", cells: { name: { text: "alpha" }, state: { text: "running", tone: "ok", glyph: "ok" } } },
-  { id: "b", cells: { name: { text: "bravo" }, state: { text: "failed", tone: "error", glyph: "error" } } },
-  { id: "c", cells: { name: { text: "charlie" }, state: { text: "running", tone: "ok", glyph: "ok" } } },
-];
-const TABLE = { kind: "table", id: "t", columns: COLUMNS, rows: ROWS };
-
-/**
- * Case 4 — **focus over a heatmap**.
- *
- * §4k.2 row 4: nothing is contested. R-FOC-004 takes focus onto the border and
- * the axes rather than onto the data, because a plot's ground **is** its
- * reading — so the heat cells are untouched at every rung and the frame's ink
- * moves from `muted` to `accent`, which at 1-bit is a weight. A composition
- * whose ruling is *these two never meet* still needs a frame, because the way it
- * would be got wrong is a focus ring painted over the data.
- */
-const HEAT = {
-  kind: "plot",
-  id: "h",
-  form: "heatmap",
-  height: 3,
-  axes: true,
-  series: [
-    { values: [1, 4, 9, 16], label: "one" },
-    { values: [16, 9, 4, 1], label: "two" },
-    { values: [4, 4, 9, 9], label: "three" },
-  ],
-};
-
 describe("C10 §4k — the compositions, as frames", () => {
-  for (const rung of RUNGS) {
-    it(`case 1 — focused + selected + failed, at ${rung.name}`, () => {
-      const kit = measurable({
-        capabilities: rung.capabilities,
-        definitions: [tableDefinition],
-        focus: { blockId: "t", rowId: "b", selected: [{ blockId: "t", rowId: "b" }] },
+  for (const c of COMPOSITIONS.filter((k) => k.owed === undefined)) {
+    for (const rung of RUNGS) {
+      it(`case ${String(c.row)} — ${c.name}, at ${rung.name}`, () => {
+        const all = new Set(c.facts);
+        const lines = c.draw(rung.capabilities, all);
+        const without = c.facts.map((fact) => {
+          const on = new Set(all);
+          on.delete(fact);
+          return [fact, c.draw(rung.capabilities, on)] as const;
+        });
+        // **Every fact moves the frame**, asserted here as well as in T2.48 so a
+        // snapshot is never re-accepted over a fact that stopped answering.
+        for (const [fact, rest] of without) {
+          expect(rest, `removing ${fact} changes the frame`).not.toEqual(lines);
+        }
+        if (c.row === 4) {
+          // R-FOC-004: focus moves the frame's ink and no glyph or width — the
+          // data keeps its reading. Both halves, or a focus that did nothing
+          // passes the first.
+          const rest = without.find(([fact]) => fact === "focus")![1];
+          expect(rest.map(visible), "focus changes no glyph and no width").toEqual(lines.map(visible));
+        }
+        expect(
+          [
+            "-- the frame",
+            ...lines.map((l) => `  ${visible(l)}`),
+            "",
+            "-- which fact took the ground, run by run",
+            ...lines.map((l) => `  ${runsOf(l, rung.capabilities)}`),
+            ...without.flatMap(([fact, rest]) => [
+              "",
+              `-- without ${fact}, run by run`,
+              ...rest.map((l) => `  ${runsOf(l, rung.capabilities)}`),
+            ]),
+            "",
+            `-- the ruling (C10 §4k.2 row ${String(c.row)})`,
+            `  ${c.ruling}`,
+            ...(c.notes === undefined
+              ? []
+              : ["", "-- and what drawing it found, kept because the record is the point", ...c.notes.map((n) => `  ${n}`)]),
+          ].join("\n"),
+        ).toMatchSnapshot();
       });
-      const lines = kit.renderToLines(TABLE as never, 40);
-      expect(
-        [
-          "-- the frame",
-          ...lines.map((l) => `  ${visible(l)}`),
-          "",
-          "-- which fact took the ground, run by run",
-          ...lines.map((l) => `  ${runsOf(l, rung.capabilities)}`),
-          "",
-          "-- the ruling (C10 §4k.2 row 1)",
-          "  selection takes the ground · focus keeps its mark · failure keeps its glyph, its word and its tone",
-          "",
-          "-- and what drawing it found, kept because the record is the point (F1240)",
-          "  This frame reported two of row 1's three clauses for as long as it existed. A focused or",
-          "  selected row was repainted in ONE ink \u2014 accent, or default under selection \u2014 so `failed` kept",
-          "  \u2717 and the word and lost the error tone. The two halves of the remedy were one change and",
-          "  neither worked alone: C11 I14's drop-to-one-ink rule, and a painter that resolves a tone",
-          "  against the surface it lands on. `inkOn` was that resolver and was called only from",
-          "  `contrast.ts` \u2014 74 of 100 tone x surface pairs were an ink the gate checked and the painter",
-          "  never emitted. C10 I48 gives `resolve` the ground, `inkOn` is its composition step, and the",
-          "  ink beside each ground above is the value C10 T2.49 measures the gate against.",
-        ].join("\n"),
-      ).toMatchSnapshot();
-    });
-
-    it(`case 4 — focus over a heatmap, at ${rung.name}`, () => {
-      const at = (focus: boolean): readonly string[] =>
-        measurable({
-          capabilities: rung.capabilities,
-          definitions: [plotDefinition],
-          // **`rowId: "h"` and not `null`, and the row asserted nothing until
-          // this** (F802). A plot reads `rowId === block.id` — *the block as
-          // its own element* — because the null form is one the type admits
-          // and no session produces, so it paints nothing deliberately. This
-          // case focused in the null form for as long as it has existed: the
-          // two frames it composed were byte-identical, and the snapshot
-          // recorded them side by side under a ruling that says *the border
-          // and the axes take the focus*. Every assertion held, because both
-          // of them are true of two identical frames.
-          ...(focus ? { focus: { blockId: "h", rowId: "h" } } : {}),
-        }).renderToLines(HEAT as never, 40);
-      const lit = at(true);
-      const rest = at(false);
-      // **The data is untouched, and that is the assertion R-FOC-004 makes.**
-      // Stripped of SGR the two frames are the same picture; what moved is the
-      // frame's ink, and the report below is where it shows.
-      expect(lit.map(visible), "focus changes no glyph and no width").toEqual(rest.map(visible));
-      // **And something moved**, which is the half that was missing. *The data
-      // keeps its reading* is satisfied by a frame where focus did nothing at
-      // all, so the two assertions have to be made together or the first one
-      // is the whole row.
-      expect(lit, "the frame's ink answers focus").not.toEqual(rest);
-      expect(
-        [
-          "-- the frame, focused",
-          ...lit.map((l) => `  ${visible(l)}`),
-          "",
-          "-- at rest, run by run",
-          ...rest.map((l) => `  ${runsOf(l, rung.capabilities)}`),
-          "",
-          "-- focused, run by run",
-          ...lit.map((l) => `  ${runsOf(l, rung.capabilities)}`),
-          "",
-          "-- the ruling (C10 §4k.2 row 4, R-FOC-004)",
-          "  nothing is contested · the border and the axes take the focus · the data keeps its reading",
-        ].join("\n"),
-      ).toMatchSnapshot();
-    });
+    }
   }
 
   /**
-   * The four with no subject, and the change that gives each one.
+   * The compositions with no subject, and the change that would give each one.
    *
    * **Not a comment**, because a comment is where a deferral goes to stop being
    * watched. The snapshot is what a reader of this directory sees when they ask
-   * why it holds two compositions and not six, and C10 T2.48 is the row that
-   * goes red the day one of the blockers lifts.
+   * why it holds fewer than six; C10 T2.48 is what goes red when one of them
+   * becomes constructible.
    */
-  it("the four compositions with no subject name the change that would give them one", () => {
-    // Each blocker is an acceptance item of the MR that lifts it, in
-    // `docs/design/language/MILESTONES.md`, so this row going red is scheduled
-    // work rather than a surprise at the end of an unrelated change.
-    const owed = [
-      "2 · hover beside focus     no block declares `hovered`; the router discards a hover by rule (M7)",
-      "3 · selection over a diff  both facts ship; `patch` declares no elements and reads ctx.focus nowhere (M9)",
-      "5 · disabled + error       `disabled` is an availability fact and no block carries the field (M4)",
-      "6 · stale + running        `stale` is a freshness fact and no block carries the field (M4)",
-    ];
-    expect(owed, "four, and the classification rules all six").toHaveLength(4);
-    // **Two constructible \u00d7 three rungs is the six tests above**, asserted as
-    // arithmetic against the same numbers so the file cannot quietly hold five.
-    // The question this answers is *do all six compositions exist at all three
-    // rungs* \u2014 they do not, and the four that do not are at **no** rung rather
-    // than at one: they have no subject a producer can construct, not a missing
-    // capability. What watches the conditions is C10 T2.48, which asserts each
-    // absence against the tree and goes red the day one acquires a subject; this
-    // row watches the **count**, so a blocker lifting without a frame being drawn
-    // is a failure here rather than a silence.
-    expect((6 - owed.length) * RUNGS.length, "the frames this file draws").toBe(6);
+  it("the owed compositions name the change that would give each a subject", () => {
+    const owed = COMPOSITIONS.filter((c) => c.owed !== undefined);
+    expect(owed.map((c) => `${String(c.row)} · ${c.name}\n    ${c.owed!}`).join("\n")).toMatchSnapshot();
+    expect(COMPOSITIONS, "§4k.2 rules six").toHaveLength(6);
   });
 });

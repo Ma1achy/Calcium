@@ -382,15 +382,11 @@ class Registry implements BlockRegistry {
       // diagnostic and never a request: the shell only records one inside the
       // scope a *render* opens, so a measure fault with no request is exactly
       // the case that cannot produce one. Asking for rows would be answering a
-      // question nobody put.
+      // question nobody put. **The count itself needs no capabilities** (C09
+      // I34) — `caps` is read here as the sign of a render's scope, not as an
+      // input to the arithmetic.
       const rows =
-        caps === undefined
-          ? 0
-          : statusRowsFor(
-              errorStatus(Registry.#errorText(block, "measure", error), 1),
-              width,
-              caps,
-            );
+        caps === undefined ? 0 : statusRowsFor(errorStatus(Registry.#errorText(block, "measure", error), 1), width);
       this.#report(block, "measure", error, rows);
       return { ok: false, rows: Math.max(1, floor) };
     }
@@ -1180,7 +1176,7 @@ class Registry implements BlockRegistry {
         block,
         "render",
         error,
-        statusRowsFor(errorStatus(text, 1), inner, childContext.capabilities),
+        statusRowsFor(errorStatus(text, 1), inner),
       );
       return this.#floored(block, this.#padded(block, this.#errorBlock(text, committed.rows, childContext), inner));
     }

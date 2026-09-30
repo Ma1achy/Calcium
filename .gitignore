@@ -5,6 +5,8 @@ coverage/
 .DS_Store
 test/golden/__received__/
 __pycache__/
+# The pinned browser `make chromium` fetches (A04 §3) — never committed.
+.cache/
 
 # The default state directory (C22 §3) — history and the theme preference,
 # beside whatever project the shell was opened in.

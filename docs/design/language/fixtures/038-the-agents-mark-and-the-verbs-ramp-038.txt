@@ -60,7 +60,7 @@ the ramp is chosen by the verb, because it describes the action
 and what does NOT get a semantic ramp
 
   a settled call        ● pytest · 4.2s · 47 passed
-  state-bearing chrome  ▾ thinking · 4s · 312 tok
+  state-bearing chrome  ▿ thinking · 4s · 312 tok
   the reader's own text ❯ refactor the parser
   a finished todo       ◼ read the current implementation
   below 8-bit colour  interpolation stops; discrete glyph motion remains

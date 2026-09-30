@@ -59,7 +59,7 @@ import { BlockFaultLog } from "./block-faults.js";
 import { tableDefinition } from "../presentation/table/index.js";
 import { cursorable, legendHitAt, plotDefinition, sampleIndexAt } from "../presentation/plot/index.js";
 import { patchDefinition } from "../presentation/patch/index.js";
-import { loadTheme, type ThemeStore } from "../presentation/theme/index.js";
+import { loadTheme, themeNames, type ThemeStore } from "../presentation/theme/index.js";
 import { createTranscriptStore } from "../viewport/transcript/index.js";
 import type { EntryId, TranscriptEntry, TranscriptView } from "../viewport/transcript/index.js";
 import { createViewport } from "../viewport/viewport/index.js";
@@ -68,6 +68,7 @@ import { RenderCache } from "./render-cache.js";
 import { ChromeCache } from "./chrome-cache.js";
 import { Cameras } from "./cameras.js";
 import { Frames } from "./frames.js";
+import { OneShots } from "./one-shots.js";
 import { CursorPositions } from "./cursor-positions.js";
 import { SeriesVisibility } from "./series-visibility.js";
 import { VisibleIds } from "./visible-ids.js";
@@ -617,6 +618,8 @@ export type Graph = Readonly<{
   cameras: Cameras;
   /** C22 I77 — the frame each animated image is on, keyed like the two above and dropped with them. */
   frames: Frames;
+  /** When each one-shot began, per entry and identity (C22 I131). */
+  oneShots: OneShots;
   /** C22 I76 — the crosshair of each plot, keyed like the two above and dropped with them. */
   cursorPositions: CursorPositions;
   /** C22 I78 — the reader's series overrides per plot, keyed like the three above and dropped with them. */
@@ -879,8 +882,10 @@ export async function constructGraph(
     // **`/theme`'s values, supplied where both facts are held** (C10 I27). The
     // manifest describes the verb and the config declares the themes, and this
     // is the one place with each — so the enum, the completion and the usage
-    // text all name the set the session actually holds.
-    manifest.load(withThemeNames(parsed.value, Object.keys(config.theme)));
+    // text all name the set the session actually holds. **Plus the aliases that
+    // resolve in it** (C10 I63): a word the store would honour, refused at the
+    // parser, is the membership test failing one layer early.
+    manifest.load(withThemeNames(parsed.value, themeNames(config.theme)));
 
     // **The product's source-error sink** (C19 T3.6, C22 §8 step 3). Every
     // test supplied `onSourceError` and nothing in `src/` did, so a failing
@@ -1090,6 +1095,10 @@ export async function constructGraph(
     // shape, same subscription, same reason — and the fourth store to join it,
     // which is the count the argument was written to survive.
     const frames = new Frames();
+    // **And the one-shots' stamps — the sixth** (C22 I131). Same key shape, same
+    // subscription, same reason: a stamp outliving its entry would time a
+    // re-run's flash from the first run's tick.
+    const oneShots = new OneShots();
     // **And the series overrides — the fifth** (C22 I78). Same key shape, same
     // subscription, same reason; the first store whose writer is a keymap the
     // block declares rather than a row of the default table.
@@ -1110,6 +1119,7 @@ export async function constructGraph(
           cameras.delete(id);
           cursorPositions.delete(id);
           frames.delete(id);
+          oneShots.delete(id);
           seriesVisibility.delete(id);
         }
       } else if (change.kind === "clear") {
@@ -1118,6 +1128,7 @@ export async function constructGraph(
         cameras.clear();
         cursorPositions.clear();
         frames.clear();
+        oneShots.clear();
         seriesVisibility.clear();
       }
     });
@@ -1204,8 +1215,10 @@ export async function constructGraph(
     // (C10 I27). The migration is nothing — `dark` and `light` are names in
     // the shipped set — and a literal pair here would refuse a legitimate
     // name the moment a third theme existed.
-    const stated = themed.value.names.includes(trimmed);
-    if (stated) themed.value.setTheme(trimmed);
+    // **Resolved, not merely looked up** (C10 I63): a persisted `high-contrast`
+    // is a preference the set can honour, as `hcDark`.
+    const stated = trimmed === "" ? undefined : themed.value.resolveName(trimmed);
+    if (stated !== undefined) themed.value.setTheme(stated);
     else if (trimmed !== "") {
       // Appended here rather than carried out to `start()`: the transcript
       // exists at this point and a warning threaded through the graph is a
@@ -1429,6 +1442,7 @@ export async function constructGraph(
       cursorPositions,
       seriesVisibility,
       frames,
+      oneShots,
       scratch,
       measures,
       overlays,

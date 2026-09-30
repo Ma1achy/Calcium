@@ -87,8 +87,9 @@ const results = runPass({
       // the ground reaches every span, which is here.
       name: "the wash covers the track alone",
       file: FILE,
-      from: "      ? spans.map((s) => ({ ...s, style: { ...s.style, ...focusStyle(ctx.theme, ctx.capabilities) } }))",
-      to: "      ? spans.map((s, i) => (i === 2 ? { ...s, style: { ...s.style, ...focusStyle(ctx.theme, ctx.capabilities) } } : s))",
+      // Re-anchored 2026-09-27 (C09 I121): the focus shapes read focusShapeStyle.
+      from: "      ? spans.map((s) => ({ ...s, style: { ...s.style, ...focusShapeStyle(ctx.theme, ctx.capabilities) } }))",
+      to: "      ? spans.map((s, i) => (i === 2 ? { ...s, style: { ...s.style, ...focusShapeStyle(ctx.theme, ctx.capabilities) } } : s))",
       expect: "T1.73",
     },
     {

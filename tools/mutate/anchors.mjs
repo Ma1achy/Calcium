@@ -61,6 +61,7 @@
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync, existsSync, statSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
+import { dirname } from "node:path";
 import { importsOf, resolve as resolveSpec } from "../enforce/module-graph.mjs";
 
 const ROOT = process.cwd();
@@ -646,7 +647,11 @@ function testCorpusOf(src, _run) {
       (e.isDirectory() ? walk(`${d}/${e.name}`) : /\.test\.[cm]?tsx?$/u.test(e.name) ? [`${d}/${e.name}`] : []));
   };
   const parts = testPathsOf(src).map((p) => rootsFor(p).map(read).join(""));
-  for (const m of src.matchAll(/vitest run --dir (\S+)/gu)) {
+  // **Up to a quote, not up to whitespace** — a command string that *ends* in
+  // `--dir test/browser` is followed by its own closing quote, and `\S+` took
+  // `test/browser";` whole, resolved nothing, and reported every row the run
+  // names as unreachable. Found by `design-chromium`, the first run to end so.
+  for (const m of src.matchAll(/vitest run --dir ([^\s"'`;]+)/gu)) {
     const dir = [`${ROOT}/${pkg}${m[1]}`, `${ROOT}/${m[1]}`].find((d) => existsSync(d));
     if (dir !== undefined) parts.push(...walk(dir).map(read));
   }
@@ -888,6 +893,39 @@ function reachableUncached(src) {
   return answer;
 }
 
+/**
+ * The directories a run's reached `test/` modules list with `readdirSync`.
+ *
+ * **A listing is reach at the granularity of a directory.** C10 T2.40 hands
+ * every module in `src/presentation/theme/` to the type checker, found by
+ * listing the directory inside `test/support/curated.ts` — so the test reaches
+ * `budget.ts` without importing it or naming it, and the check below reported
+ * the one mutation that proves the reach as unreachable.
+ *
+ * **Not "any walk makes reach unknown"**, which is the rule for a walk in the
+ * test's own text: two other support modules list directories (`/proc/self/fd`,
+ * the ink oracle's fixture directory), and blanking reach for every run that
+ * imports them would blind this gate to the case it exists for. What counts is
+ * a listing whose argument ends in the mutated file's own directory.
+ */
+const listedCache = new Map();
+function listedBy(src) {
+  const held = listedCache.get(src);
+  if (held !== undefined) return held;
+  const listed = [];
+  for (const p of testPathsOf(src)) {
+    const at = rootsFor(p).find((q) => existsSync(q));
+    if (at === undefined) continue;
+    for (const m of reachOf(at.slice(ROOT.length + 1))) {
+      if (!m.startsWith("test/")) continue;
+      const body = readFileSync(`${ROOT}/${m}`, "utf8");
+      for (const hit of body.matchAll(/\breaddirSync\(\s*[`'"]([^`'"]+)[`'"]/gu)) listed.push(hit[1].replace(/\/+$/u, ""));
+    }
+  }
+  listedCache.set(src, listed);
+  return listed;
+}
+
 // An absolute `--dir` is used as given; the default is repo-relative.
 const RUNS_AT = DIR.startsWith("/") ? DIR : `${ROOT}/${DIR}`;
 
@@ -1056,6 +1094,8 @@ for (const run of runs) {
         // **A path named in the corpus.** A source scan opens a file by path,
         // and a markdown spec can be reached no other way.
         corpus.includes(file) ||
+        // **A directory a reached support module lists** — see `listedBy`.
+        listedBy(src).some((d) => d === dirname(file) || d.endsWith(`/${dirname(file)}`)) ||
         // **A build the command runs first.** `c24-bundle` mutates the bundler
         // and asserts against `dist/bundle/index.js`; the edge is the build, and
         // it is a real one — the mutation changes what the tests import.

@@ -33,8 +33,10 @@ const results = runPass({
     // A change the census can see: no patch line takes a ground at all, so the
     // painted set loses its largest member and every mask row empties.
     file: LINES,
-    from: "  if (behind.background === undefined) return spans;",
-    to: "  return spans;\n  if (behind.background === undefined) return spans;",
+    // Re-anchored 2026-09-27: the early return gained the mark's two carriers
+    // (C25 I25), and returning before it still paints no changed line.
+    from: "  if (behind.background === undefined && !inverse && !bold) return spans;",
+    to: "  return spans;\n  if (behind.background === undefined && !inverse && !bold) return spans;",
     why: "no changed line is painted, so the painted set is two kinds and the diff's mask is empty",
   },
   mutations: [
@@ -45,8 +47,10 @@ const results = runPass({
       // and every count, every width and every stripped frame is unmoved.
       name: "the ground stops at the text rather than the block's edge",
       file: LINES,
-      from: "  return spans.map((span) => ({ text: span.text, style: withBackground(span.style, behind) }));",
-      to: "  return spans.map((span) => ({ text: span.text.trimEnd(), style: withBackground(span.style, behind) }));",
+      // Re-anchored 2026-09-27 on the text alone: the map's body grew the
+      // mark's carriers (C25 I25), and the trim is the whole of the mutation.
+      from: "      text: span.text,\n",
+      to: "      text: span.text.trimEnd(),\n",
       expect: "T2.159",
     },
     {

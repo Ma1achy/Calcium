@@ -34,6 +34,18 @@ import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
 import { checkSourceScans, checkTextGrounds, SCANS, SURFACE_ROLES } from "../../tools/enforce/source-scans.mjs";
 import * as contrastModule from "../../src/presentation/theme/contrast.js";
 import { caps, DEPTHS, store, SURFACES, SYNTAX_SLOTS, TONES } from "../support/theme.js";
+// **The composition harness is imported inside the rows that use it, never at
+// the top.** `render.ts` loads the shipped dark theme when it is imported, so a
+// top-level import made this whole file fail to load — zero tests, and a
+// mutation pass reading *no summary* — on exactly the mutations that stop a
+// theme loading, which are the ones this file exists to catch (review batch 1,
+// item 22: c10-ground-table went blind on both of its rows).
+const harness = async () => ({
+  ...(await import("../support/compositions.js")),
+  ...(await import("../support/render.js")),
+});
+import { background, focusStyle, selectionStyle } from "../../src/presentation/blocks/paint.js";
+import { sgr } from "../../src/terminal/escapes.js";
 
 // This file walks `src/`; `budget.ts` carries the measurement and why the 5 s
 // default is not a margin. Re-measure before raising it.
@@ -53,6 +65,14 @@ const VARIANTS = Object.keys(defaultTheme);
 
 /** The tokens beside the name, so no row indexes a record and finds `undefined`. */
 const SHIPPED = Object.entries(defaultTheme);
+/** The registry's own statement of the floor's scope (C10 I60), read as JSON so a row can check the projection against it. */
+const REGISTRY = JSON.parse(
+  readFileSync(new URL("../../docs/design/language/calcium-registry.json", import.meta.url), "utf8"),
+) as {
+  terminalPalettes: {
+    textGrounds: { grounds: readonly { ground: string; pairing: string; refs: "meaning" | Record<string, string[]> }[] };
+  };
+};
 
 /**
  * Every hex a theme's palettes carry, with **every** slot that carries it — so
@@ -228,27 +248,50 @@ describe("C10 contract", () => {
    * and asserts that the failure names the *path* that has to move — which is what
    * makes the message the reason rather than the number.
    */
-  it("T2.59 (C10 I60, R-THM-004): textGrounds is the page, the diff grounds and bgDeep, each with the refs that land on it", () => {
+  /**
+   * **T2.59 — the table is the registry's, read from the registry.** Not from
+   * `TEXT_GROUNDS`: a row reading the projection it checks agrees with whatever
+   * the generator wrote. This row named `diffAdd`, `diffRemove` and `bgDeep` by
+   * hand until C10 I60 moved the table into the registry — a fourth copy.
+   */
+  it("T2.59 (C10 I60, R-THM-004): textGrounds is the registry's terminalPalettes.textGrounds, row by row, for every theme", () => {
+    const table = REGISTRY.terminalPalettes.textGrounds.grounds;
+    expect(table.map((r) => r.ground), "the registry's six").toEqual(["bg", "bgElev", "focusGround", "diffAdd", "diffRemove", "bgDeep"]);
     for (const [variant, tokens] of SHIPPED) {
-      const rows = textGrounds(tokens);
-      const names = rows.map(([n]) => n);
-      expect(names, `${variant}: every ground this theme paints text on`).toEqual([
-        ...textSurfaces(tokens).map(([n]) => n),
-        ...(["diffAdd", "diffRemove", "bgDeep"] as const).filter((n) => tokens.surfaces[n] !== undefined),
-      ]);
-      const refs = new Map(rows.map(([n, , r]) => [n, r]));
-      // The chip's well carries one ink, and a diff row the gutter's tones and the text's syntax.
-      if (refs.has("bgDeep")) expect(refs.get("bgDeep"), `${variant}: the chip's ink on its well`).toEqual(["tone.meta"]);
-      const diff = refs.get("diffAdd");
-      if (diff !== undefined) {
-        expect(diff, `${variant}: the gutter's three tones`).toEqual(expect.arrayContaining(["tone.ok", "tone.error", "tone.muted"]));
-        expect(diff.filter((r) => r.startsWith("syntax.")).length, `${variant}: the text's syntax`).toBeGreaterThan(0);
-      }
+      const meaning = Object.entries(tokens.palettes)
+        .filter(([, p]) => p.carries === "meaning")
+        .flatMap(([n, p]) => Object.keys(p.slots).map((slot) => `${n}.${slot}`));
+      const want = table
+        .filter((r) => (tokens.surfaces as Record<string, string | undefined>)[r.ground] !== undefined)
+        .map((r) => [
+          r.ground,
+          (tokens.surfaces as Record<string, string>)[r.ground],
+          r.refs === "meaning" ? meaning : Object.entries(r.refs).flatMap(([p, names]) => names.map((n) => `${p}.${n}`)),
+        ]);
+      expect(textGrounds(tokens).map((row) => [...row]), `${variant}: the registry's rows, in its order`).toEqual(want);
+      // **Every theme has all six** — a row that silently drops a ground a theme
+      // lacks would pass for a theme that forgot one.
+      expect(want, `${variant} has every ground`).toHaveLength(table.length);
     }
-    // **Every theme has all three** — a row that silently drops a ground when a
-    // theme lacks it would pass for a theme that forgot one.
+  });
+
+  it("T2.71 (C10 I60): each walker selects by pairing, and every shipped theme validates clean over the table", () => {
+    const table = REGISTRY.terminalPalettes.textGrounds.grounds;
+    const of = (pairing: string) => table.filter((r) => r.pairing === pairing).map((r) => r.ground);
+    expect(of("page"), "the control: the table has page rows").not.toEqual([]);
+    expect(of("diff"), "and diff rows").not.toEqual([]);
     for (const [variant, tokens] of SHIPPED) {
-      expect(textGrounds(tokens).length, variant).toBe(textSurfaces(tokens).length + 3);
+      expect(textSurfaces(tokens).map(([n]) => n), `${variant}: textSurfaces is the page rows`).toEqual(of("page"));
+      const pairs = diffPairs(tokens);
+      expect([...new Set(pairs.map(([, , surface]) => surface))], `${variant}: diffPairs' grounds are the diff rows`).toEqual(of("diff"));
+      const diffRefs = table.find((r) => r.pairing === "diff")!.refs as Record<string, string[]>;
+      expect(
+        [...new Set(pairs.map(([palette, slot]) => `${palette}.${slot}`))].sort(),
+        `${variant}: and its refs are theirs`,
+      ).toEqual(Object.entries(diffRefs).flatMap(([p, names]) => names.map((n) => `${p}.${n}`)).sort());
+      // **The half that makes the scope the registry's**: a ground the registry
+      // adds is measured here with no edit to the validator (C10 T6.123).
+      expect(validateTokens(tokens), `${variant} validates over the whole table`).toEqual([]);
     }
   });
 
@@ -433,6 +476,9 @@ describe("C10 contract", () => {
       ...hc,
       surfaces: { ...hc.surfaces, probe: ground },
       bandInk: { ...hc.bandInk, probe: ink },
+      // Every band carries its 4-bit pair (C10 I61) — without one the probe is
+      // refused for that, and this row's subject is the hex ground.
+      bandFourBit: { ...hc.bandFourBit, probe: { ground: 0, ink: 15 } },
     });
 
     // **The direction that matters: a defect the old lookup let through.** Black
@@ -1458,49 +1504,88 @@ describe("C10 §4j — the categorical separation debt", () => {
  * the window where somebody is building painters.
  */
 describe("C10 §4k — focus, selection and the facts that contest a ground", () => {
-  it.todo(
-    "T2.45 (I47, R-SEL-006): focused and selected take two grounds and one mark — the ground resolves to `surface.selection` and `\u25b8` is on the head row, at 24-bit, at 1-bit where the row is `inverse`, and in ASCII where the mark is `>`; asserted as a pair, because the mechanism this replaces draws one ground and tells the two apart by ink, which satisfies any row naming a single fact — not deferred on a component: the ground and the mark land with §4k's resolver change in this same MR",
-  );
+  it("T2.45 (I47, R-SEL-006): focused and selected take two grounds and one mark, at every rung", async () => {
+    const { COMPOSITIONS, DARK_THEME, RUNGS, visible } = await harness();
+    const c = COMPOSITIONS.find((k) => k.row === 1)!;
+    // The row the head is on, and the same row with focus alone: the pair is the
+    // assertion, because one ground told apart by ink satisfies any row that
+    // names a single fact.
+    const bravo = (lines: readonly string[]): string => lines.find((l) => visible(l).includes("bravo"))!;
+    const open = (style: Parameters<typeof sgr>[0]): string => sgr(style);
+    for (const rung of RUNGS) {
+      const both = bravo(c.draw(rung.capabilities, new Set(c.facts)));
+      const focusOnly = bravo(c.draw(rung.capabilities, new Set(["focus", "failure"])));
+      const mark = rung.capabilities.unicode === "ascii" ? ">" : "\u25b8";
+      expect(visible(both).trimStart().startsWith(`${mark} `), `${rung.name}: the head row carries ${mark}`).toBe(true);
+      expect(visible(focusOnly).trimStart().startsWith(`${mark} `), `${rung.name}: and so does focus alone`).toBe(true);
+      const wash = selectionStyle(DARK_THEME, rung.capabilities);
+      const ground = focusStyle(DARK_THEME, rung.capabilities);
+      if (rung.capabilities.colourDepth === 1) {
+        // No ground at 1-bit: selection falls to `inverse` and focus to nothing,
+        // so the mark is the whole of focus there.
+        expect(wash, "selection's 1-bit rung").toEqual({ inverse: true });
+        expect(both, `${rung.name}: the selected row inverts`).toContain(open({ inverse: true }));
+        expect(focusOnly, `${rung.name}: focus alone does not`).not.toContain(open({ inverse: true }));
+      } else {
+        expect(both, `${rung.name}: selection takes the ground`).toContain(open(wash));
+        expect(both, `${rung.name}: and focus's ground is displaced`).not.toContain(open(ground));
+        expect(focusOnly, `${rung.name}: focus alone takes a ground of its own`).toContain(open(ground));
+        expect(open(ground), "two grounds, not one").not.toEqual(open(wash));
+      }
+    }
+  });
   it.todo(
     "T2.46 (I47, R-STA-003): hover and focus hold disjoint carrier sets at every rung — focus has `\u25b8` at all three and hover never does; at 1-bit, where hover's ground is gone, hover holds bold and focus does not. A disjointness over sets, because two rows each naming one carrier agree while the two facts render identically — not deferred on a component: it lands with §4k's resolver change, and its hover half is exercised through a constructed state until a block declares `hovered`. **This clause used to name mouse mode 1003 and that was the wrong condition** — `lifecycle.ts:125` takes 1003 behind a `hover?: boolean` option and the decoder reads a no-button move, so a pointer move already arrives; the router discards it by rule (§4a row t) and no block carries the field, which is what T2.48 watches",
   );
-  it.todo(
-    "T2.47 (I47, R-STA-004): where availability meets validity the well takes the ground and the error keeps two carriers — its mark and its outcome word. The row asserts the count, not just the winner: a row naming only which ground won passes a ruling that left validity with nothing — not deferred on a component: it lands with §4k's resolver change, on a constructed availability state until a block declares one",
-  );
+  it("T2.47 (I47, R-STA-004): where availability meets validity the well takes the ground and the error keeps its mark and its word, on case 5", async () => {
+    const { COMPOSITIONS, DARK_THEME, RUNGS, visible } = await harness();
+    const c = COMPOSITIONS.find((k) => k.row === 5)!;
+    for (const rung of RUNGS) {
+      const lines = c.draw(rung.capabilities, new Set(c.facts));
+      const field = lines.find((l) => visible(l).includes("port"))!;
+      const error = lines.find((l) => visible(l).includes("not a port number"))!;
+      const well = background("surface.bgDeep", DARK_THEME, rung.capabilities);
+      if (well.background !== undefined) {
+        expect(field, `${rung.name}: the field stands in the well`).toContain(sgr(well));
+        expect(error, `${rung.name}: and the error row does not`).not.toContain(sgr(well));
+      }
+      // **The count, not just the winner**: the displaced fact keeps two
+      // carriers at every rung, neither of them colour.
+      const mark = rung.capabilities.unicode === "ascii" ? "x" : "\u2717";
+      expect(visible(error).trim(), `${rung.name}: mark and word`).toBe(`${mark} not a port number`);
+    }
+  });
 
-  /**
-   * **A negative row, and the one that expires by its condition rather than by
-   * its remedy** (F855, F856). Three of the facts §4k.1 tabulates have no
-   * subject in this tree, and a fourth composition is unconstructible for a
-   * different reason — which is why the row has two halves rather than one
-   * sweep. A comment saying so watches nothing; this goes red the day any of
-   * them acquires a subject, which is the day §4k.4's list needs re-reading.
-   *
-   * **The first draft of this row asserted the wrong absence**, and it is the
-   * reason the row exists in this shape. It claimed nothing painted the diff
-   * grounds; the grep behind that claim was truncated and `patch/lines.ts` was
-   * below the cut. The grounds and the `+` / `−` marks both ship. What is
-   * missing is the **addressability** — `patch` declares no elements and reads
-   * `ctx.focus` nowhere — so the assertion is on the seam and not on the slot.
-   */
-  it("T2.48 (I47, §4k.1): the facts with no subject are asserted to have none", () => {
-    // **Case 3's blocker is addressability, not the ground.** `patch` paints
-    // `surface.diffAdd` and the marks already; what it does not do is declare
-    // an element or read focus, so no patch row can be selected.
-    const patch = new URL("../../src/presentation/patch/", import.meta.url);
-    const patchSrc = readdirSync(patch)
-      .filter((f) => f.endsWith(".ts"))
-      .map((f) => readFileSync(new URL(f, patch), "utf8"))
-      .join("\n");
-    expect(/surface\.diffAdd/.test(patchSrc), "the diff ground is painted").toBe(true);
-    expect(/ctx\.focus|\belements\s*[:(]/.test(patchSrc), "and no patch row is addressable").toBe(false);
+  it("T2.48 (I47, §4k.4): every composition §4k.2 rules is in one case table, every drawn case responds to both its facts, and every owed case is attempted", async () => {
+    const { COMPOSITIONS, RUNGS, responds } = await harness();
+    // §4k.2's rows as the document names them, bold in the first column.
+    const spec = readFileSync(new URL("../../docs/components/C10_theme_resolution.md", import.meta.url), "utf8");
+    const section = /### 4k\.2 [\s\S]*?\n### /u.exec(spec)?.[0] ?? "";
+    const ruled = [...section.matchAll(/^\|\s*\*\*([^*]+)\*\*\s*\|/gmu)].map((m) => m[1]!.trim());
+    expect(ruled, "§4k.2 rules six").toHaveLength(6);
+    expect(COMPOSITIONS.map((c) => c.name).sort(), "the case table is §4k.2's rows").toEqual([...ruled].sort());
 
-    // No block declares availability, freshness, or a pointer hover.
-    const types = readFileSync(new URL("../../src/presentation/blocks/types.ts", import.meta.url), "utf8");
-    const declared = ["disabled", "stale", "hovered"].filter((f) =>
-      new RegExp(`^\\s*${f}\\??:`, "m").test(types),
-    );
-    expect(declared, "no block carries an availability, freshness or hover field").toEqual([]);
+    for (const c of COMPOSITIONS) {
+      for (const rung of RUNGS) {
+        const answers = responds(c, rung.capabilities);
+        if (c.owed === undefined) {
+          // A drawn case answers every fact, or its frame is drawn on a state
+          // nothing constructs.
+          for (const a of answers) {
+            expect(a.answers, `case ${String(c.row)} at ${rung.name}: removing ${a.fact} changes the frame${a.why === undefined ? "" : ` (${a.why})`}`).toBe(true);
+          }
+        } else {
+          // **The attempt.** Both facts answering is a composition a producer
+          // can construct with no golden frame — draw it, and take `owed` off.
+          expect(
+            answers.every((a) => a.answers),
+            `case ${String(c.row)} at ${rung.name} is constructible with no golden — draw it (owed: ${c.owed})`,
+          ).toBe(false);
+        }
+      }
+    }
+    // Drawn and owed partition the six, and the golden file draws the first set.
+    expect(COMPOSITIONS.filter((c) => c.owed === undefined).map((c) => c.row), "drawn today").toEqual([1, 3, 4, 5, 6]);
   });
 });
 
@@ -1525,13 +1610,13 @@ describe("C10 I52 — the registry's state axes and the spec's declarations", ()
   it("T2.53 (C10 I53, §070, §093): the ten hues are three tiers per theme, and the order is a sequence", () => {
     const registry = JSON.parse(
       readFileSync(new URL("../../docs/design/language/calcium-registry.json", import.meta.url), "utf8"),
-    ) as { themes: readonly { id: string }[]; themeRules: readonly { selector: string; declarations: string }[] };
+    ) as { themes: readonly { id: string }[]; themeRules: readonly { selector: string; declarations: string; status: string }[] };
 
     // The registry side, read out of the 300 tokens rather than written down here.
     // `c-h-X` is the hue's ink, `bg-h-X` its ground, `c-hi-X` the ink ON that ground.
     const expected = new Map<string, Map<string, Record<string, string>>>();
     const order: string[] = [];
-    for (const rule of registry.themeRules) {
+    for (const rule of registry.themeRules.filter((r) => r.status === "current")) {
       const colour = /(?:^|[;{\s])color:\s*(#[0-9a-fA-F]{3,8})/u.exec(rule.declarations);
       const ground = /background(?:-color)?:\s*(#[0-9a-fA-F]{3,8})/u.exec(rule.declarations);
       // The theme is in the selector and not a field — `[data-theme="dark"] .c-h-blue`.
@@ -1822,10 +1907,10 @@ describe("C10 I52 — the registry's state axes and the spec's declarations", ()
       expect(violates(row.carriers), `${row.axis}: tone and ground are one carrier written twice`).toBe(false);
     }
 
-    // The population is measured, not quoted — eight of the twelve have a
+    // The population is measured, not quoted — ten of the twelve have a
     // subject, and a table that lost them all would otherwise pass.
-    expect(withSubject, "axes with a subject in this tree").toBe(8);
-    expect(rows.length - withSubject, "and the four with none").toBe(4);
+    expect(withSubject, "axes with a subject in this tree").toBe(10);
+    expect(rows.length - withSubject, "and the two with none").toBe(2);
 
     // **The fabricated violation, because the shipped table contains no such
     // pair** — a rule with nothing to be wrong about passes exactly like one

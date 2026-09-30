@@ -27,7 +27,7 @@ const FIND = "src/data/manifest/find.ts";
 const SUBPROCESS = "src/data/transport/subprocess.ts";
 const TEXT = "src/presentation/text.ts";
 const CONTRAST = "src/presentation/theme/contrast.ts";
-const TOKENS_DARK = "src/presentation/theme/tokens-dark.ts";
+const GENERATED_TOKENS = "src/presentation/theme/tokens.generated.ts";
 const VIEWPORT = "src/viewport/viewport/viewport.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -132,12 +132,13 @@ const results = runPass({
       // for a failure that cannot be seen. The exclusion is the invariant.
       name: "contrast is validated against bgDeep as well",
       file: CONTRAST,
-      // **Re-anchored: the old anchor reached the closing bracket** and rotted when
-      // `focusGround` joined the list (R-THM-004) — a change with nothing to do
-      // with this mutation. The anchor is now the one line the mutation inserts
-      // after, which is the least context that makes it unique.
-      from: '    ["bgElev", tokens.surfaces.bgElev],',
-      to: '    ["bgElev", tokens.surfaces.bgElev],\n    ["bgDeep", tokens.surfaces.bgDeep],',
+      // **Re-anchored twice.** The first anchor reached the closing bracket and
+      // rotted when `focusGround` joined the list (R-THM-004); the second was a
+      // list entry, and the list became the registry's table (C10 I60, review
+      // batch 1 item 21). The subject is unchanged — `textSurfaces` answers with
+      // `bgDeep` among its grounds — so the mutation appends it to the answer.
+      from: '  return rowsOf("page", tokens).map(([row, hex]) => [row.ground, hex] as const);',
+      to: '  return [...rowsOf("page", tokens).map(([row, hex]) => [row.ground, hex] as const), ["bgDeep", tokens.surfaces.bgDeep] as const];',
       expect: "T2.4",
     },
     {
@@ -145,9 +146,13 @@ const results = runPass({
       // reading A01 A.1's figures cannot see a shipped token move, and the
       // recorded ratio would still be the one the catalogue holds.
       name: "a shipped surface moves under its own catalogue",
-      file: TOKENS_DARK,
-      from: '    bg: "#1a1a1a",',
-      to: '    bg: "#8a8a8a",',
+      // **Re-pointed at the shipped value** (review batch 1, item 21). The
+      // anchor named `tokens-dark.ts`, whose `DARK` stopped being the shipped
+      // theme when `defaultTheme` became `REGISTRY_THEMES` — so T2.4, which
+      // walks every *shipped* theme, could not see the edit and it survived.
+      file: GENERATED_TOKENS,
+      from: '      "bg": "#1a1a1a",',
+      to: '      "bg": "#8a8a8a",',
       expect: "T2.4",
     },
     {

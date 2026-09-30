@@ -89,9 +89,15 @@ const SHIMMER_HALF_WIDTH = 1.5;
 const GLINT_REST = 60;
 /** §037's *a slow swell*: two and a half times `breathe`, so the two do not read alike. */
 const TIDE_TICKS = 50;
-/** Two periods with no common factor, which is how *never repeating* is spelled in integers. */
+/**
+ * **Two periods whose ratio is irrational**, which is how *never repeating* is
+ * spelled for a deterministic function (C04 I139). This read *two periods with
+ * no common factor* — 37 and 53 — and coprime integers still share a period,
+ * their product: the row at tick 1 961 was the row at tick 0. `φ` is
+ * irrational, so `k / DRIFT_B` never lands on an integer again.
+ */
 const DRIFT_A = 37;
-const DRIFT_B = 53;
+const DRIFT_B = 37 * ((1 + Math.sqrt(5)) / 2);
 /** §037's *unsteady, irregular, **low***: the amplitude is the word `low`. */
 const FLICKER_CEILING = 0.35;
 /** §037's *a chase of three points*. */
@@ -101,6 +107,46 @@ const NEON: readonly number[] = Object.freeze([1, 0.2, 0.9, 0.1, 1, 1, 1, 1, 0.3
 /** How long a one-shot runs before it holds its final frame, beyond the extent it crosses. */
 const POP_TICKS = 6;
 const RIPPLE_TICKS = 12;
+
+/**
+ * **How long each one-shot runs, over an extent of `span` cells — one table**
+ * (C09 I120). `animateT`'s held frame and the ticker's *done* both read it, so the
+ * painter cannot hold a frame the ticker is still asking to draw, nor the reverse.
+ * Keyed on exactly the five `RAMP_ONE_SHOTS` names; a row asserts the two sets
+ * are equal.
+ */
+const ONE_SHOT_TICKS = Object.freeze({
+  sweep: (span: number) => span + 3,
+  pop: () => POP_TICKS,
+  wipe: (span: number) => span,
+  typewriter: (span: number) => span,
+  ripple: () => RIPPLE_TICKS,
+});
+
+/** The one-shots `ONE_SHOT_TICKS` times, for the row comparing it with `RAMP_ONE_SHOTS`. */
+export const TIMED_ONE_SHOTS: readonly string[] = Object.freeze(Object.keys(ONE_SHOT_TICKS));
+
+/** Ticks a one-shot runs over an extent of `n`, or `undefined` for an effect that does not end (C09 I120). */
+export function oneShotTicks(effect: RampAnimation | undefined, n: number): number | undefined {
+  if (effect === undefined || !Object.hasOwn(ONE_SHOT_TICKS, effect)) return undefined;
+  return ONE_SHOT_TICKS[effect as keyof typeof ONE_SHOT_TICKS](Math.max(1, n));
+}
+
+/**
+ * **Whether a one-shot has run its course** at `tick`, over an extent no longer
+ * than `bound` (C09 I120, C22 §6o.2 row 11).
+ *
+ * The bound is what makes this answerable before rendering: every duration grows
+ * with the extent, so done over the bound is done over the drawn length. A
+ * periodic effect, `none` and an **unstamped** one-shot are never done — the last
+ * because it has not started, and the shell stamps it on the frame that draws it.
+ * `k` is `animateT`'s own, so the two agree on the tick the held frame begins.
+ */
+export function oneShotDone(ramp: Ramp, tick: number, bound: number): boolean {
+  const ticks = oneShotTicks(ramp.animate, bound);
+  if (ticks === undefined || ramp.since === undefined) return false;
+  return Math.max(0, Math.floor(tick)) - Math.floor(ramp.since) >= ticks;
+}
 
 /**
  * **A deterministic hash, because a frame must be reproducible.**
@@ -119,6 +165,24 @@ function hash01(a: number, b: number): number {
   h = Math.imul(h, 0x2545f491) >>> 0;
   h ^= h >>> 13;
   return (h >>> 0) / 0x100000000;
+}
+
+/**
+ * Cell `i`'s rank among `n` cells ordered by `hash01(cell, pass)` — so over `i`
+ * in `0 … n − 1` the ranks are a permutation (C04 I138), and each pass draws a
+ * new one. **No tiebreak, because there are no ties**: for a fixed second
+ * argument `hash01` is a bijection on the first — an odd multiply, a constant
+ * XOR and two xorshifts, each invertible on 32 bits — so distinct cells never
+ * share a key. Counted rather than sorted: a rank is what one cell needs, and
+ * it keeps the function pure with no cache.
+ */
+function scatterRank(i: number, n: number, pass: number): number {
+  const own = hash01(i, pass + 1);
+  let rank = 0;
+  for (let j = 0; j < n; j += 1) {
+    if (hash01(j, pass + 1) < own) rank += 1;
+  }
+  return rank;
 }
 
 /** A triangular band of half-width `w` centred on `c`, at cell `i`: 1 at the centre, 0 outside. */
@@ -162,9 +226,9 @@ function shotProgress(since: number | undefined, k: number, ticks: number): numb
  * | `marquee` | a rectangular window of width `n/3` sliding and wrapping | `n` ticks |
  * | `chase` | three narrow bands evenly spaced, all moving one cell per tick | `n` ticks |
  * | `neon` | a sixteen-tick envelope: two bursts of jitter, then steady | 16 ticks |
- * | `drift` | two sines at 37 and 53 ticks — no common period inside any session | ≈37·53 ticks |
+ * | `drift` | two sines at 37 and 37·φ ticks — an irrational ratio | none |
  * | `bookend` | `converge` reversed: the edges arrive first and the centre last | `⌈n/2⌉ + 3` |
- * | `scatter` | each cell lights in a hashed order within one pass | `n + 3` ticks |
+ * | `scatter` | one cell per tick in a per-pass permutation, then three dark ticks | `n + 3` ticks |
  * | `sweep` | **one-shot** — a band crosses once; after, every cell at `to` | `n + 3` then held |
  * | `pop` | **one-shot** — one flash, then rest | 6 ticks then held |
  * | `wipe` | **one-shot** — a hard edge crosses once; after, every cell changed | `n` then held |
@@ -273,9 +337,9 @@ export function animateT(
       // not noise: the settling is the part that reads as connecting.
       return NEON[k % NEON.length] ?? 1; // cells-ok — an envelope length
     case "drift": {
-      // Two sines whose periods share no factor. It repeats after 37·53 = 1 961
-      // ticks, which at the spinner cadence is minutes — *never repeating* for
-      // any run that will see it, and honest about being periodic underneath.
+      // Two sines whose periods have an irrational ratio (C04 I139), so the
+      // row has no period. It comes near itself — within 2.7e-4 at tick 95 608,
+      // the closest inside 100 000 — and never back.
       const a = Math.sin((2 * Math.PI * k) / DRIFT_A);
       const b = Math.sin((2 * Math.PI * k) / DRIFT_B + t * Math.PI);
       return 0.5 * (1 + (a + b) / 2);
@@ -291,33 +355,36 @@ export function animateT(
       return Math.max(band(i, from, SHIMMER_HALF_WIDTH), band(i, span - 1 - from, SHIMMER_HALF_WIDTH));
     }
     case "scatter": {
-      // Each cell has a place in a hashed order and lights when the pass reaches
-      // it — *one glyph at a time, irregular*. Hashed on `i` alone, so the order
-      // is stable within a pass rather than re-rolled every tick.
+      // *One glyph at a time, irregular* (C04 I138). A cell's place is its rank
+      // in this pass's order, so the places are a permutation of `0 … n − 1`
+      // and no two cells share a tick; the pass's last three ticks are dark.
+      // This hashed each cell's place independently into `[0, n + 3)`, which is
+      // not a permutation — two to six cells lit at once on 76 of 79 widths.
       const period = span + 3;
-      const place = Math.floor(hash01(i, 0) * period);
-      return (k % period) === place ? 1 : 0;
+      const step = k % period;
+      if (step >= span) return 0;
+      return scatterRank(i, span, Math.floor(k / period)) === step ? 1 : 0;
     }
 
     // --- the five one-shots --------------------------------------------------
     case "sweep": {
       // A band crosses once. Finished, every cell sits at `to`: *done* is a state
       // and the frame that shows it is the full one.
-      const p = shotProgress(since, k, span + 3);
+      const p = shotProgress(since, k, ONE_SHOT_TICKS.sweep(span));
       if (p === undefined) return 1;
       return band(i, p * (span + 3) - SHIMMER_HALF_WIDTH, SHIMMER_HALF_WIDTH);
     }
     case "pop": {
       // One flash, then it settles — so the resting frame is 0 and not 1, which
       // is the difference between *arrived once* and *done*.
-      const p = shotProgress(since, k, POP_TICKS);
+      const p = shotProgress(since, k, ONE_SHOT_TICKS.pop());
       if (p === undefined) return 0;
       return 1 - p;
     }
     case "wipe": {
       // A hard edge, not a band: *cleanly*. Behind it the new state, ahead of it
       // the old, and afterwards the whole run is the new one.
-      const p = shotProgress(since, k, span);
+      const p = shotProgress(since, k, ONE_SHOT_TICKS.wipe(span));
       if (p === undefined) return 1;
       return i <= p * span ? 1 : 0;
     }
@@ -325,14 +392,14 @@ export function animateT(
       // Cells brighten one per tick from inline-start. It reveals by brightening
       // and never by withholding a cluster, which is what keeps it inside
       // R-MOT-005 and out of `measure`'s way.
-      const p = shotProgress(since, k, span);
+      const p = shotProgress(since, k, ONE_SHOT_TICKS.typewriter(span));
       if (p === undefined) return 1;
       return i <= p * span ? 1 : 0;
     }
     case "ripple": {
       // A ring leaving the centre, once. *Acknowledged* — it says a thing was
       // received, and then there is nothing more to say, so it rests at 0.
-      const p = shotProgress(since, k, RIPPLE_TICKS);
+      const p = shotProgress(since, k, ONE_SHOT_TICKS.ripple());
       if (p === undefined) return 0;
       const centre = (span - 1) / 2;
       const radius = p * (centre + 1);
@@ -421,8 +488,22 @@ export function rampMoves(ramp: Ramp | undefined): boolean {
   return ramp !== undefined && ramp.animate !== undefined && ramp.animate !== "none";
 }
 
-function spansMove(spans: readonly TextSpan[] | undefined): boolean {
-  return spans !== undefined && spans.some((span) => rampMoves(span.ramp));
+/**
+ * Where the ticker is asking (C09 I120): the session's tick and the region's
+ * width. Absent, a moving ramp is any `animate` but `none` — I54 as first
+ * written, which is what a caller with no tick can know.
+ */
+export type TickAt = Readonly<{ tick: number; width: number }>;
+
+/** A ramp that still moves at `at`: I54's answer, less a one-shot that has run its course. */
+function rampLive(ramp: Ramp | undefined, at: TickAt | undefined, bound: number): boolean {
+  if (!rampMoves(ramp) || ramp === undefined) return false;
+  return at === undefined || !oneShotDone(ramp, at.tick, bound);
+}
+
+// A span's extent is its drawn clusters, never more than its code units.
+function spansMove(spans: readonly TextSpan[] | undefined, at?: TickAt): boolean {
+  return spans !== undefined && spans.some((span) => rampLive(span.ramp, at, span.to - span.from));
 }
 
 /**
@@ -445,7 +526,7 @@ function rampExtentOf(kind: BlockKind): RampExtent | undefined {
   return (RAMP_EXTENT as Readonly<Partial<Record<BlockKind, RampExtent>>>)[kind];
 }
 
-export function animatesByContent(block: Block): boolean {
+export function animatesByContent(block: Block, at?: TickAt): boolean {
   switch (rampExtentOf(block.kind)) {
     // **An app's kind, and the arm the closed table made visible** (C04 I119).
     // The lookup was `Record<BlockKind, …>` and answered `RampExtent` for every
@@ -460,12 +541,74 @@ export function animatesByContent(block: Block): boolean {
     case "none":
       return false;
     case "axis":
-      return rampMoves((block as Progress).ramp);
+      // A bar is never wider than the region it is drawn in.
+      return rampLive((block as Progress).ramp, at, at?.width ?? 0);
     case "clusters": {
       if (block.kind === "table") {
-        return block.rows.some((row) => Object.values(row.cells).some((cell) => spansMove(cell.spans)));
+        return block.rows.some((row) => Object.values(row.cells).some((cell) => spansMove(cell.spans, at)));
       }
-      return spansMove((block as Readonly<{ spans?: readonly TextSpan[] }>).spans);
+      return spansMove((block as Readonly<{ spans?: readonly TextSpan[] }>).spans, at);
+    }
+  }
+}
+
+/**
+ * **Every ramp a block carries itself, with its address, rebuilt through `f`**
+ * (C22 I131). Children are not visited — the caller recurses, because which
+ * blocks hold blocks is `tree.ts`'s question and not this one's.
+ *
+ * The addresses are C22 I131's: `ramp` on a bar, `spans.i` on a span carrier,
+ * `rows.<row id>.<column>.spans.i` in a table cell. Driven by `RAMP_EXTENT`, the
+ * table `animatesByContent` reads, so the two walks cannot disagree about where a
+ * ramp may sit. **The block is returned by reference when `f` returns every ramp
+ * by reference**, which is what keeps a still document's memo keys stable.
+ */
+export function mapRamps(block: Block, f: (ramp: Ramp, address: string) => Ramp): Block {
+  const spansOf = (spans: readonly TextSpan[], prefix: string): readonly TextSpan[] => {
+    let changed = false;
+    const next = spans.map((span, i) => {
+      if (span.ramp === undefined) return span;
+      const ramp = f(span.ramp, `${prefix}spans.${String(i)}`);
+      if (ramp === span.ramp) return span;
+      changed = true;
+      return { ...span, ramp };
+    });
+    return changed ? next : spans;
+  };
+  switch (rampExtentOf(block.kind)) {
+    case undefined:
+    case "none":
+      return block;
+    case "axis": {
+      const bar = block as Progress;
+      if (bar.ramp === undefined) return block;
+      const ramp = f(bar.ramp, "ramp");
+      return ramp === bar.ramp ? block : ({ ...bar, ramp } as Block);
+    }
+    case "clusters": {
+      if (block.kind === "table") {
+        let changed = false;
+        const rows = block.rows.map((row) => {
+          let rowChanged = false;
+          const cells = Object.fromEntries(
+            Object.entries(row.cells).map(([column, cell]) => {
+              if (cell.spans === undefined) return [column, cell];
+              const spans = spansOf(cell.spans, `rows.${row.id}.${column}.`);
+              if (spans === cell.spans) return [column, cell];
+              rowChanged = true;
+              return [column, { ...cell, spans }];
+            }),
+          );
+          if (!rowChanged) return row;
+          changed = true;
+          return { ...row, cells };
+        });
+        return changed ? ({ ...block, rows } as Block) : block;
+      }
+      const spans = (block as Readonly<{ spans?: readonly TextSpan[] }>).spans;
+      if (spans === undefined) return block;
+      const next = spansOf(spans, "");
+      return next === spans ? block : ({ ...block, spans: next } as Block);
     }
   }
 }

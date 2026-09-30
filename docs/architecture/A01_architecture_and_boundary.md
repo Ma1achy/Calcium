@@ -183,7 +183,7 @@ What the far side must do for `SubprocessTransport` to work. Not our build — a
 
 ## 5. Integration checklist
 
-**Host assumptions.** Node ≥ 22 — Ink 7's floor, not ours; it is a runtime dependency and its requirement is the package's. A TTY whose `TERM` supports the alternate screen. For subprocess transport, the target binary on `PATH`.
+**Host assumptions.** Node `>=22.22.1 <23` — **the measurer's floor, and ours.** `cells()` segments through `Intl.Segmenter`, so the Unicode version is Node's ICU, and v22.22.1 is the first Node 22 shipping Unicode 17 (ICU 78.2); v22.22.0 (ICU 77.1, Unicode 16) fails C09 T1.38 and T6.114, the measurer disagreeing with the property at U+00AD and 27 combining marks from U+1ACF. `<23` because no other major is measured. The line used to read *Ink 7's floor*, and Ink left the tree in F1209: a reason that outlived its subject, over a floor that was wrong by eight minor releases. `test/unit/node-floor.test.ts` fails on any Unicode but 17.0, because `engine-strict` binds an install in this checkout and nothing at run time. A TTY whose `TERM` supports the alternate screen. For subprocess transport, the target binary on `PATH`.
 
 **Wiring, in order.** Seven steps, of which one — step 5 — is real work.
 

@@ -8,7 +8,7 @@ import type { CallState, Tape } from "../../../data/viewmodel/index.js";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate } from "../../text.js";
 import { CALL_STATE_GLYPH, glyphFor, glyphs, spinnerFrameAt } from "../glyphs.js";
-import { clampSpans, focusStyle, paint, rows, selectionStyle, tone, type Span } from "../paint.js";
+import { clampSpans, focusShapeStyle, paint, rows, selectionStyle, tone, type Span } from "../paint.js";
 import { tapeWindow, type TapeMarks } from "../tape-window.js";
 import type { BlockDefinition, NavElement, RenderContext, Rendered } from "../types.js";
 import { glyphTick } from "../ramp.js";
@@ -229,7 +229,7 @@ export const tapeDefinition: BlockDefinition<Tape> = {
         id === held
           ? {
               ...tone("accent", ctx.theme, ctx.capabilities, on),
-              ...(selected.has(id) ? selectionStyle : focusStyle)(ctx.theme, ctx.capabilities),
+              ...(selected.has(id) ? selectionStyle : focusShapeStyle)(ctx.theme, ctx.capabilities),
             }
           : selected.has(id)
             ? { ...tone(name, ctx.theme, ctx.capabilities, on), ...selectionStyle(ctx.theme, ctx.capabilities) }

@@ -389,7 +389,7 @@ Measured in M-T3 and recorded in A01 Appendix B. **This column is the finding ra
 
 ### Compatibility
 
-Node ≥ 22 (Ink 7's floor). macOS Terminal, iTerm2, Ghostty, Kitty, WezTerm, Windows Terminal, VTE-based Linux terminals, plus tmux and SSH. Anything without alternate-screen support refuses to open (D28).
+Node `>=22.22.1 <23` — the first Node 22 shipping Unicode 17, which `cells()` measures through (A01 §Host assumptions). macOS Terminal, iTerm2, Ghostty, Kitty, WezTerm, Windows Terminal, VTE-based Linux terminals, plus tmux and SSH. Anything without alternate-screen support refuses to open (D28).
 
 ### Failure isolation
 

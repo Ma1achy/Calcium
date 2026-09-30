@@ -15,7 +15,7 @@
  * this record stays what it was, the kinds that animate by nature.
  */
 import { spinnerIntervalMs } from "./glyphs.js";
-import { animatesByContent, rampCadenceMs } from "./ramp.js";
+import { animatesByContent, rampCadenceMs, type TickAt } from "./ramp.js";
 import type { Block, BlockKind, KnownBlockKind, Notice, Status } from "../../data/viewmodel/index.js";
 
 // **`KnownBlockKind` and not `BlockKind`** (C04 I119): the union is open and
@@ -79,8 +79,13 @@ function childrenOf(block: Block): readonly Block[] {
  *
  * Driven by `ANIMATES` rather than by a second list, so the two cannot disagree
  * about which kinds are in scope.
+ *
+ * **`at` is where the ticker is asking** (C09 I120): given the session's tick and
+ * the region's width, a one-shot that has run its course asks for nothing, so a
+ * transcript whose only motion was a finished `pop` disarms. Without it the
+ * answer is I54's — a caller with no tick cannot know an effect has ended.
  */
-export function tickIntervalOf(block: Block): number | null {
+export function tickIntervalOf(block: Block, at?: TickAt): number | null {
   // **Read through a widening cast, for the reason `rampExtentOf` states**
   // (C04 I119): the declaration is the exhaustiveness assertion and the read is
   // total. `=== true` was already the right comparison — an app's kind answers
@@ -97,7 +102,7 @@ export function tickIntervalOf(block: Block): number | null {
   // By content (C09 I54): a moving ramp asks for the default set's cadence
   // through the lookup the kinds use; its periods are counted in the ticks C03
   // then delivers.
-  return animatesByContent(block) ? rampCadenceMs() : null;
+  return animatesByContent(block, at) ? rampCadenceMs() : null;
 }
 
 /**
@@ -107,10 +112,10 @@ export function tickIntervalOf(block: Block): number | null {
  * is exactly where a live part puts one — a scan of the top level only would
  * answer *nothing animates* for the arrangement the framework itself builds.
  */
-export function animationIntervalOf(blocks: readonly Block[]): number | null {
+export function animationIntervalOf(blocks: readonly Block[], at?: TickAt): number | null {
   let fastest: number | null = null;
   const visit = (block: Block): void => {
-    const own = tickIntervalOf(block);
+    const own = tickIntervalOf(block, at);
     if (own !== null && (fastest === null || own < fastest)) fastest = own;
     for (const child of childrenOf(block)) visit(child);
   };

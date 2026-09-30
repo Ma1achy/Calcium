@@ -476,7 +476,7 @@ exports[`§079, §074 — tones, surfaces and weight, across ten themes > at 4-b
   bg            a0       plain
   bgElev        a0       plain
   bgDeep        a0       plain
-  selection     —        plain
+  selection     a11      plain
   meterFill     —        plain
   border        a8       plain
   borderStrong  a7       plain
@@ -488,7 +488,7 @@ exports[`§079, §074 — tones, surfaces and weight, across ten themes > at 4-b
   mPlan         —        plain
   mManual       —        plain
   skipGround    —        plain
-  focusGround   —        plain
+  focusGround   a12      plain
   errorInk      a0       plain
   mInk          —        plain
   skipInk       —        plain
@@ -514,7 +514,7 @@ exports[`§079, §074 — tones, surfaces and weight, across ten themes > at 4-b
   bg            a15      plain
   bgElev        a15      plain
   bgDeep        a15      plain
-  selection     —        plain
+  selection     a5       plain
   meterFill     —        plain
   border        a7       plain
   borderStrong  a8       plain
@@ -526,7 +526,7 @@ exports[`§079, §074 — tones, surfaces and weight, across ten themes > at 4-b
   mPlan         —        plain
   mManual       —        plain
   skipGround    —        plain
-  focusGround   —        plain
+  focusGround   a7       plain
   errorInk      a15      plain
   mInk          —        plain
   skipInk       —        plain

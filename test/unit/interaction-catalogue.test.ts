@@ -183,15 +183,15 @@ describe("interaction-catalogue — the corpus renders", () => {
     expect(cellOf(lines, "exited"), "the head: accent over the focus ground").toEqual({ fg: accent, bg: params(focusStyle(theme, c)), attrs: [] });
     expect(cellOf(lines, "running"), "the active chip: accent, no ground").toEqual({ fg: accent, bg: "", attrs: [] });
     expect(cellOf(lines, "all").bg, "an ordinary chip has no ground").toBe("");
-    // **At 1-bit the head is bold and NOT inverse** (C10 I47): `focusStyle` has
-    // no inverse rung, because inverse is selection's and a second one would draw
-    // a focused chip and a selected one as the same frame. The head and the
-    // active chip are then both bold — which is the cost of a scene with no
-    // selection in it, and the reason `▸` exists one block-kind over (C11 §5b).
+    // **At 1-bit the head inverts** (C09 I121, R-FOC-001). This row asserted
+    // *bold and NOT inverse*, and read the cost aloud — the head and the active
+    // chip were then both bold, one frame for two facts. A pill has no `▸` to
+    // carry focus, so the focus-shape rung does: the ground where it carries,
+    // the whole chip inverted where it does not. The active chip is untouched.
     const mono = frameFor(scene("pills-focus"), capsNamed("1bit"));
-    expect(cellOf(mono, "exited").attrs, "bold, and no inverse").toEqual([1]);
+    expect(cellOf(mono, "exited").attrs, "bold and inverse").toEqual([1, 7]);
     expect(cellOf(mono, "running").attrs).toContain(1);
-    expect(cellOf(mono, "running").attrs).not.toContain(7);
+    expect(cellOf(mono, "running").attrs, "the active chip stays upright").not.toContain(7);
   });
 
   it("IC8 (C26 §7, C04 §3, C09 I83): the focused notice keeps its own tone over the focus ground and the plain notice beside it is untouched", () => {
@@ -213,9 +213,11 @@ describe("interaction-catalogue — the corpus renders", () => {
     expect(cell?.bg, "the chosen ground is not the focus ground").not.toBe(params(focusStyle(theme, c)));
     expect(cellOf(lines, "no containers"), "the plain notice: its tone, no ground").toEqual({ fg: info, bg: "", attrs: [] });
     const mono = frameFor(scene("notice-action-focus"), capsNamed("1bit"));
-    // **No ground and no inverse at 1-bit** (C09 I83): the notice keeps its own
-    // tone at its mono class, and says nothing false about focus.
-    expect(cellOf(mono, "image pull failed").attrs, "no inverse").not.toContain(7);
+    // **At 1-bit the focused notice inverts** (C09 I121, C09 I83 superseded). The
+    // old arm read *no ground and no inverse — says nothing false about focus*,
+    // and it also said nothing true: the frame was the resting one. The plain
+    // notice beside it declares no element and stays upright.
+    expect(cellOf(mono, "image pull failed").attrs, "inverse carries focus").toContain(7);
     expect(cellOf(mono, "no containers").attrs).not.toContain(7);
   });
 

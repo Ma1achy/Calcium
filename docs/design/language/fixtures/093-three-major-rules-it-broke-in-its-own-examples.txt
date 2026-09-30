@@ -11,16 +11,35 @@ three major rules this document broke in its own examples, measured
   ▾  U+25BE   Narrow         ✓  U+2713   Narrow
   ✗  U+2717   Narrow         ›  U+203A   Narrow
 
-  FOUR AMBIGUOUS, EIGHT NARROW — a mixed set, which is exactly the
+  TWELVE AMBIGUOUS, SIX NARROW — a mixed set, which is exactly the
   condition that sent the scrollbar to its ascii rung. At
   ambiguousWidth: wide the gutter is two cells for some marks and one
   for others, and every measured height is wrong.
 
   so the mark set takes an ascii rung too, whole:
   ● ⎿ ⟩ ▲ ❯ ▸ ▾ ○ ✓ ✗ › ⋯   →   o `- ? ^ $ > v @ + x * ...
+ 1a · THE CORRECTED MEASUREMENT  [F1246]
+  R-BLK-742 above stands as the record of the defect. Two of its
+  twelve rows are wrong, measured with cells() against the derived
+  EastAsianWidth-17.0.0 table:
+
+  ●  U+25CF   Ambiguous      ⎿  U+23BF   Narrow
+  ▲  U+25B2   Ambiguous      ⟩  U+27E9   Narrow
+  ○  U+25CB   Ambiguous      ❯  U+276F   Narrow
+  ⋯  U+22EF   Ambiguous      ▸  U+25B8   Ambiguous
+  ▾  U+25BE   Ambiguous      ✓  U+2713   Narrow
+  ✗  U+2717   Narrow         ›  U+203A   Narrow
+
+  ▸ and ▾ were recorded Narrow. Both are ONE cell at narrow and
+  TWO at wide, so the count is SIX AMBIGUOUS, SIX NARROW — not
+  four and eight, which UNDERSTATES the mixed-set hazard the
+  block above argues for. The set is more mixed than it said.
+
+  ▾ is no longer the disclosure mark: disclosure is ▿ U+25BF and
+  ▾ keeps sort descending. §4's glyph table is the live record.
 
 2 · THE 800–1600 ms BAND WAS WRONG, NOT THE TABLE
-  measured against the catalogue: 8 of 21 sets passed. noise is 300ms,
+  measured against the catalogue: 11 of 27 sets passed. noise is 300ms,
   triangle 480, bloom 1680, hex 1760. The rule was unshippable.
 
   the property that actually decides whether a thing reads as alive is

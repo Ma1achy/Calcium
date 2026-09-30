@@ -584,17 +584,21 @@ because it is derived from the arguments rather than accepted as one.
 | `message` | the driver or the containment boundary caught it | **relayed** from `err` |
 | `retryInMs` | the source's backoff | **relayed** |
 | `attempt` | `src.failures`, once per source | **relayed** |
-| `height` | a committed measure, or C23's frame read | **no** — derived |
+| `height` | absent: the box is fitted at its layout width (C09 §3a-quater) | **no** — fitted |
 | `elapsedMs` | whoever holds the clock | **no** |
 | `spinner` | the renderer, per capability set | **no** |
 
 **`height` is the one the scoping does not reach, and it is the one worth naming.**
-The framework's own defaults choose 1 for `error` and 2 for `retrying`, and those
-two numbers are a frame read rather than an arithmetic: both boxes land inside
-`b.live`'s panel, so three rows spend one on a second border inside the first, and
-two rows drew `loading` over `⠋ loading` — the same word twice. A consumer picking
-a height reintroduces exactly that, so `b.status` derives it the way the default
-does. **The builder and the default are one implementation**, which is the other
+`b.status` declares none, and the box is **fitted**: C09's `statusRowsFor` sizes it at
+the width the layout hands it — border, banner, the message wrapped whole, the detail
+within its cap (C09 §3a-quater, C04 I66). It used to declare 1 for `error` and 2 for
+`retrying`, numbers read from a frame *inside `b.live`'s panel* and applied to a box
+that was not in one: at 80 columns a 158-cell message with two `details` drew a border,
+no banner, one row cut at `…`, and no detail at all. **A consumer picking a height
+reintroduces that**, so the builder does not take one; the fit is the same function
+the render allocates with, which is what makes it a measurement rather than a guess.
+Free-standing, a one-row failure is now the full figure — border, banner, message,
+four rows — where it was a red line. **The builder and the default are one implementation**, which is the other
 half of the ruling: the same kind constructed in three places drifts, and the
 place that drifts is the one with fewer tests.
 
@@ -769,9 +773,12 @@ builder constructed, so an override could reach for a `notice` and nothing else 
 a red line of text where the framework draws a bordered box with a tag, a spinner
 and a countdown. Both example apps did exactly that, independently, which is the
 signal: **an override is not a request to render worse.** `b.status` takes
-`renderError`'s own three parameters in its own order, so the null override is
-`renderError: b.status` and the useful one wraps it — `b.group("column", [history,
-b.status(err, retryInMs, attempt)])`, which keeps the data the default replaces.
+`renderError`'s own three parameters in its own order, and the useful override wraps
+it — `b.group("column", [history, b.status(err, retryInMs, attempt)])`, which keeps the
+data the default replaces. **`renderError: b.status` is not the null override**, and
+this paragraph said it was: the default is the *framed* figure, drawn without a border
+because the panel has one, and `b.status` is the free-standing one, so inside a live
+panel it draws a border within the border. Supplying no override is the null override.
 
 **`renderError`'s third parameter is a deliberate widening, and the alternative is recorded
 because it is invisible from the result.** `attempt` is the source's consecutive failure count
@@ -1313,6 +1320,7 @@ one more line on §3's list.
 - **T4.4b** (I28, with C23, C14): a hosting entry scrolled out of the viewport → the `fetch` spy stops advancing; scrolled back → it advances again. Both halves, because a pause that never resumes satisfies the first.
 - **T4.5** (with C10): `defaultTheme` passes every contrast floor at every colour depth.
 - **T4.6** (with C07): an adapter written using only the public surface produces a document indistinguishable from one written against internals.
+- **T4.8** (§4b, C09 §3a-quater, C04 I66): **through `b.status`**, at 80 and 40 columns — a 158-cell message with two `details` draws the banner, **every word of the message** and **both detail lines**, and `measure` equals the rows drawn; the same at `ASCII` and 1-bit, where the words are the check because the furniture differs. A one-row message draws border, banner and message: four rows. The builder's block carries no `height`, asserted on the object, because a declared one is the defect.
 - **T4.7** (with the reference app): the docker app compiles against the public entry only — no deep imports.
 
 ### Tier 5 — e2e
@@ -1334,6 +1342,7 @@ one more line on §3's list.
 - **T6.19** (I36, F1188): restoring `export { mermaidCode }` to `src/index.ts` → **T5.6** fails on the graph — the renderer's bundle is in the import's list — while every contract row on `mermaidCode` stays green, which is why the row is a graph row and not a contract one.
 - **T6.17** (I34): dropping `Camera` or `PlotForm` from the runtime entry → T2.21's **resolution** arm fails, and the consumer's spelling of a *view* becomes a property of a plot again. **Which arm fails is the part worth writing down, because it was measured and it is not the obvious one.** The residue arm — *no app indexes for a name `src/` declares* — stays **green** under that revert: closing the finding deleted the index expressions, so its population no longer holds them and cannot hold them again until an app re-indexes. A residue watches the consumers; the surface is watched by resolving `Plot.form` and `Plot.camera` against the published set by name. **The revert that reads as tidiness**: nothing else breaks, and the only other evidence is an alias reappearing in an app file under a framework name.
 - **T6.20** (I37, F1192): **Retired with I37** (F1209). It named the two reverts — arming on `includes` instead of the exact line, and dropping the `existsSync` guard — and both name code that no longer exists.
+- **T6.22** (§4b): `framedStatus` declaring its old height again (`1`/`2` free-standing) → **T4.8** fails on the words: the message is cut at `…` and the details are gone, with `measure` and the rows still agreeing.
 - **T6.21** (I38, F1193): building each entry alone (`splitting: false`) → **T5.8**'s one-instance arm fails — `SurfaceError` through the runtime and through `testing` are two classes — while every other row stays green, which is why the arm is a class identity and not an export list; pointing one `default` back at the `tsc` file → the parity arm holds and the module-count arm fails on the same child.
 
 - **T6.1** (I2): exporting one of the eleven absent components → T2.1 fails, and the layering starts leaking.

@@ -1,15 +1,24 @@
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const registryPath = resolve(here, 'calcium-registry.json');
-export const outputPath = resolve(here, 'calcium-design-language-revised.html');
-export const keysOutputPath = resolve(here, 'docs/KEYS.md');
+export const outputPath = resolve(here, 'calcium-design-language.html');
+export const repoRoot = resolve(here, '../../..');
+// **The registry names the keymap file, and it is named from the repository root**
+// (C16 §6a clause 5). Resolved against this directory it was a second generated
+// keymap at `docs/design/language/docs/KEYS.md`. The builder writes nothing here:
+// `tools/keymap-table.mjs` is the file's one writer, and it takes this path and
+// `renderKeysMarkdown` from this module.
+export const keysOutputPath = resolve(repoRoot, JSON.parse(readFileSync(registryPath, 'utf8')).keymapPolicy.help.docsTarget);
 
 const RULE_ID = /^R-[A-Z]{3}-[0-9]{3}$/;
 const BLOCK_RULE_ID = /^R-(?:BLK|BK[A-Z])-[0-9]{3}$/;
+// One flat sequence: seventeen theme rules span several themes through `:is(…)`,
+// so an id scoped to a theme would have no theme to name (AUTHORITY §Release 5).
+const THEME_RULE_ID = /^TR-[0-9]{4}$/;
 const STATUSES = new Set(['current', 'superseded', 'exploratory', 'example']);
 const STATE_FACT_KEYS = ['entry', 'carriers', 'actions', 'escape', 'motion-off', 'one-bit', 'residue'];
 const STATE_FACT_LABELS = {
@@ -32,6 +41,13 @@ export const ruleContentDigest = rule => createHash('sha256').update(JSON.string
   rule.title,
   rule.text,
   rule.sectionKey ?? null
+])).digest('hex');
+// **A theme rule's content is its value and what it applies to.** `ruleIds` are
+// citations and sit outside the digest, as a rule's `tags` do — citing a rule
+// that gives a value its reason is not a change to the value (AUTHORITY §Release 5).
+export const themeRuleContentDigest = rule => createHash('sha256').update(JSON.stringify([
+  rule.selector,
+  rule.declarations
 ])).digest('hex');
 export const barSpecimenContentDigest = specimen => createHash('sha256').update(JSON.stringify([
   specimen.id,
@@ -101,25 +117,12 @@ export function closureOf(registry, domains) {
   return out;
 }
 
-export function validateRuleRecords(ruleList) {
-  const ids = new Set();
-  const legacyIds = new Set();
-  const rules = new Map();
-  for (const rule of ruleList) {
-    if (!RULE_ID.test(rule.id)) throw new Error(`invalid stable rule id ${rule.id}`);
-    if (ids.has(rule.id)) throw new Error(`duplicate stable rule id ${rule.id}`);
-    if (!STATUSES.has(rule.status)) throw new Error(`${rule.id} has invalid status ${rule.status}`);
-    if (typeof rule.title !== 'string' || !rule.title.trim()) throw new Error(`${rule.id} has no title`);
-    if (typeof rule.text !== 'string' || !rule.text.trim()) throw new Error(`${rule.id} has no normative text`);
-    if (!Array.isArray(rule.supersedes)) throw new Error(`${rule.id} has no supersedes array`);
-    if (rule.contentDigest !== ruleContentDigest(rule)) throw new Error(`${rule.id} immutable rule content drifted`);
-    ids.add(rule.id);
-    rules.set(rule.id, rule);
-    for (const legacyId of rule.legacyIds ?? []) {
-      if (legacyIds.has(legacyId)) throw new Error(`duplicate legacy rule alias ${legacyId}`);
-      legacyIds.add(legacyId);
-    }
-  }
+/**
+ * The supersession graph over one kind of record, walked to its terminus — shared
+ * by rules and theme rules, because a second copy of this walk is a second set
+ * of ways for a chain to fail that one of them forgot.
+ */
+function validateSupersession(ruleList, rules) {
   for (const rule of ruleList) {
     if (rule.status === 'superseded') {
       if (!rule.supersededBy) throw new Error(`${rule.id} is superseded without a successor`);
@@ -167,7 +170,100 @@ export function validateRuleRecords(ruleList) {
       if (!cursor) throw new Error(`dangling supersededBy link from ${rule.id}`);
     }
   }
+}
+
+export function validateRuleRecords(ruleList) {
+  const ids = new Set();
+  const legacyIds = new Set();
+  const rules = new Map();
+  for (const rule of ruleList) {
+    if (!RULE_ID.test(rule.id)) throw new Error(`invalid stable rule id ${rule.id}`);
+    if (ids.has(rule.id)) throw new Error(`duplicate stable rule id ${rule.id}`);
+    if (!STATUSES.has(rule.status)) throw new Error(`${rule.id} has invalid status ${rule.status}`);
+    if (typeof rule.title !== 'string' || !rule.title.trim()) throw new Error(`${rule.id} has no title`);
+    if (typeof rule.text !== 'string' || !rule.text.trim()) throw new Error(`${rule.id} has no normative text`);
+    if (!Array.isArray(rule.supersedes)) throw new Error(`${rule.id} has no supersedes array`);
+    if (rule.contentDigest !== ruleContentDigest(rule)) throw new Error(`${rule.id} immutable rule content drifted`);
+    ids.add(rule.id);
+    rules.set(rule.id, rule);
+    for (const legacyId of rule.legacyIds ?? []) {
+      if (legacyIds.has(legacyId)) throw new Error(`duplicate legacy rule alias ${legacyId}`);
+      legacyIds.add(legacyId);
+    }
+  }
+  validateSupersession(ruleList, rules);
   return rules;
+}
+
+/**
+ * The (theme, selector) pairs one theme-rule selector addresses: comma lists split
+ * at the top level, `:is([data-theme="a"],[data-theme="b"]) rest` expanded to one
+ * pair per theme, whitespace normalised. A part naming no theme is refused rather
+ * than skipped — a slot the check cannot place is a slot it cannot compare.
+ */
+export function themeSlotsOf(selector) {
+  const parts = [];
+  let depth = 0;
+  let current = '';
+  for (const ch of selector) {
+    if (ch === '(') depth += 1;
+    if (ch === ')') depth -= 1;
+    if (ch === ',' && depth === 0) { parts.push(current); current = ''; } else current += ch;
+  }
+  parts.push(current);
+  const out = [];
+  for (const raw of parts) {
+    const part = raw.trim();
+    const grouped = part.match(/^:is\(((?:\[data-theme="[^"]+"\],?)+)\)(.*)$/s);
+    const single = part.match(/^\[data-theme="([^"]+)"\](.*)$/s);
+    if (grouped) {
+      for (const [, theme] of grouped[1].matchAll(/data-theme="([^"]+)"/g)) out.push([theme, grouped[2].replace(/\s+/g, ' ').trim()]);
+    } else if (single) {
+      out.push([single[1], single[2].replace(/\s+/g, ' ').trim()]);
+    } else {
+      throw new Error(`theme rule selector part names no theme: ${part}`);
+    }
+  }
+  return out;
+}
+
+/**
+ * Every theme rule checked as a released record (AUTHORITY §Release 5): a stable
+ * id, a digest over its value, the supersession graph walked as rules' is — and
+ * **one current value per slot**. Two current records setting one property for
+ * one theme and selector is a supersession nobody recorded: the later wins in the
+ * cascade and in the generator alike, so nothing on screen says so. Measured when
+ * this landed, over 863 records: one — `nord`'s `.c-meta`.
+ */
+export function validateThemeRuleRecords(list) {
+  const records = new Map();
+  for (const rule of list) {
+    if (!THEME_RULE_ID.test(rule.id)) throw new Error(`invalid stable theme rule id ${rule.id}`);
+    if (records.has(rule.id)) throw new Error(`duplicate stable theme rule id ${rule.id}`);
+    if (rule.status !== 'current' && rule.status !== 'superseded') throw new Error(`${rule.id} has invalid status ${rule.status}`);
+    if (typeof rule.selector !== 'string' || !rule.selector.trim()) throw new Error(`${rule.id} has no selector`);
+    if (typeof rule.declarations !== 'string' || !rule.declarations.trim()) throw new Error(`${rule.id} has no declarations`);
+    if (!Array.isArray(rule.supersedes)) throw new Error(`${rule.id} has no supersedes array`);
+    if (rule.contentDigest !== themeRuleContentDigest(rule)) throw new Error(`${rule.id} immutable theme rule content drifted`);
+    records.set(rule.id, rule);
+  }
+  validateSupersession(list, records);
+  const slots = new Map();
+  for (const rule of list) {
+    if (rule.status !== 'current') continue;
+    const properties = rule.declarations.split(';').filter(d => d.includes(':')).map(d => d.split(':')[0].trim());
+    for (const [theme, selector] of themeSlotsOf(rule.selector)) {
+      for (const property of properties) {
+        const key = `${theme}\u0000${selector}\u0000${property}`;
+        const held = slots.get(key);
+        if (held !== undefined) {
+          throw new Error(`${held} and ${rule.id} are both current for ${property} on ${theme} ${selector} — supersede one`);
+        }
+        slots.set(key, rule.id);
+      }
+    }
+  }
+  return records;
 }
 
 export function loadRegistry() {
@@ -231,6 +327,7 @@ function assertCurrentCitations(registry, owner, ids) {
 
 export function validateRegistry(registry) {
   const rules = validateRuleRecords(registry.rules);
+  validateThemeRuleRecords(registry.themeRules);
 
   for (const [name, source] of Object.entries(registry.countSources)) {
     const items = collectionFor(registry, name);
@@ -800,9 +897,17 @@ ${rows}</pre>`;
 }
 
 function renderGlyphReservationProbe(registry) {
-  const rows = [...active(registry.glyphs), ...active(registry.delimiters)].flatMap(glyph => ['unicode', 'ascii'].map(form => {
+  // **A state-resolved ASCII half has no character to measure**, so it gets no
+  // ASCII row and its Unicode row says why — the same exclude-and-declare the
+  // collision check applies. The first browser run found this probe writing
+  // `esc(undefined)`: nine cells of the word in a one-cell slot, which failed
+  // the page's own check while every text search passed (AUTHORITY.md
+  // §Browser conformance). A form with no value is now a build error.
+  const rows = [...active(registry.glyphs), ...active(registry.delimiters)].flatMap(glyph => (glyph.asciiResolution === 'state' ? ['unicode'] : ['unicode', 'ascii']).map(form => {
     const value = glyph[form];
-    return `<span class="glyph-grid-probe-row" style="display:block" data-glyph-grid-probe="${esc(glyph.id)}" data-glyph-form="${form}" data-reserved-cells="${glyph.reservedCells}"><span class="glyph-grid-slot" style="display:inline-block;inline-size:${glyph.reservedCells}ch;white-space:pre"><span class="glyph-grid-value">${esc(value)}</span></span><span class="glyph-grid-sentinel">|</span></span>`;
+    if (typeof value !== 'string' || value === '') throw new Error(`${glyph.id}: the ${form} probe has no glyph to measure`);
+    const resolution = glyph.asciiResolution === 'state' ? ' data-ascii-resolution="state"' : '';
+    return `<span class="glyph-grid-probe-row" style="display:block" data-glyph-grid-probe="${esc(glyph.id)}" data-glyph-form="${form}"${resolution} data-reserved-cells="${glyph.reservedCells}"><span class="glyph-grid-slot" style="display:inline-block;inline-size:${glyph.reservedCells}ch;white-space:pre"><span class="glyph-grid-value">${esc(value)}</span></span><span class="glyph-grid-sentinel">|</span></span>`;
   })).join('');
   return `<div id="glyph-grid-probes" aria-hidden="true" data-rule-ids="R-GLY-002" style="position:absolute;left:-10000px;top:0;visibility:hidden;white-space:pre;font:12.5px/1.45 &quot;SF Mono&quot;,Menlo,Consolas,&quot;DejaVu Sans Mono&quot;,monospace"><span id="glyph-grid-cell" style="display:inline-block;inline-size:1ch">0</span>${rows}</div>`;
 }
@@ -890,7 +995,7 @@ export function renderKeysMarkdown(registry) {
   // Route and Condition are columns, not omissions. `/help` under a "Key" column
   // with no condition read as an unconditional global keystroke.
   const sections = [...groups.entries()].map(([scope, entries]) => `## ${scope}\n\n| Route | Binding | Condition | Action | Meaning |\n| --- | --- | --- | --- | --- |\n${entries.map(binding => `| ${markdownCell(binding.kind ?? 'key')} | ${markdownCell(binding.chord)} | ${markdownCell(binding.when ?? 'always')} | ${markdownCell(binding.actionId)} | ${markdownCell(binding.label)} |`).join('\n')}`).join('\n\n');
-  return `<!-- GENERATED FILE — DO NOT EDIT. Source: ../calcium-registry.json; builder: ../build-calcium.mjs -->\n# Calcium keys\n\nRevision ${registry.meta.revision} · ${bindings.length} current bindings · profile: default-terminal\n\n${registry.keymapPolicy.universal}\n\n${registry.keymapPolicy.help.docsContract}\n\n${sections}\n`;
+  return `<!-- GENERATED FILE — DO NOT EDIT. Source: docs/design/language/calcium-registry.json, rendered by build-calcium.mjs's renderKeysMarkdown; written with the key ladder below by tools/keymap-table.mjs -->\n# Calcium keys\n\nRevision ${registry.meta.revision} · ${bindings.length} current bindings · profile: default-terminal\n\n${registry.keymapPolicy.universal}\n\n${registry.keymapPolicy.help.docsContract}\n\n${sections}\n`;
 }
 
 function renderSpinners(registry) {
@@ -1226,11 +1331,11 @@ const probe=document.createElement('span');probe.className='sp sp-agent';probe.s
 const glyphGridRuntimeCheck = `<script id="generated-glyph-grid-check">
 (()=>{const fail=message=>{document.documentElement.dataset.glyphGridCheck='fail';throw Error(message)};
 try{const fixture=document.getElementById('glyph-grid-probes'),cell=document.getElementById('glyph-grid-cell');if(!fixture||!cell)fail('glyph grid fixture missing');
-const cellWidth=cell.getBoundingClientRect().width;if(!(cellWidth>0))fail('one-cell reference has no width');const byGlyph=new Map();
-for(const row of fixture.querySelectorAll('[data-glyph-grid-probe]')){const id=row.dataset.glyphGridProbe,form=row.dataset.glyphForm,reserved=Number(row.dataset.reservedCells),slot=row.querySelector('.glyph-grid-slot'),value=row.querySelector('.glyph-grid-value'),sentinel=row.querySelector('.glyph-grid-sentinel');if(!id||!['unicode','ascii'].includes(form)||!Number.isInteger(reserved)||reserved<1||!slot||!value||!sentinel)fail('malformed glyph probe row');
+const cellWidth=cell.getBoundingClientRect().width;if(!(cellWidth>0))fail('one-cell reference has no width');const byGlyph=new Map(),stateResolved=new Set();
+for(const row of fixture.querySelectorAll('[data-glyph-grid-probe]')){const id=row.dataset.glyphGridProbe,form=row.dataset.glyphForm,reserved=Number(row.dataset.reservedCells),slot=row.querySelector('.glyph-grid-slot'),value=row.querySelector('.glyph-grid-value'),sentinel=row.querySelector('.glyph-grid-sentinel');if(!id||!['unicode','ascii'].includes(form)||!Number.isInteger(reserved)||reserved<1||!slot||!value||!sentinel)fail('malformed glyph probe row');if(row.dataset.asciiResolution==='state'){if(form!=='unicode')fail(id+' declares a state-resolved ASCII half and carries an ASCII row');stateResolved.add(id)}
 const slotRect=slot.getBoundingClientRect(),sentinelRect=sentinel.getBoundingClientRect(),range=document.createRange();range.selectNodeContents(value);const valueWidth=range.getBoundingClientRect().width,expected=reserved*cellWidth,tolerance=Math.max(1,cellWidth*.08);if(Math.abs(slotRect.width-expected)>tolerance)fail(id+' '+form+' reserves '+slotRect.width+'px, expected '+expected+'px');if(valueWidth>slotRect.width+tolerance)fail(id+' '+form+' overflows reservedCells: '+valueWidth+'px > '+slotRect.width+'px');
 const coordinate=sentinelRect.left-row.getBoundingClientRect().left;if(!byGlyph.has(id))byGlyph.set(id,new Map());byGlyph.get(id).set(form,coordinate)}
-for(const [id,forms] of byGlyph){if(forms.size!==2)fail(id+' lacks both measured capability forms');if(Math.abs(forms.get('unicode')-forms.get('ascii'))>1)fail(id+' shifts the following composed-grid column')}
+for(const [id,forms] of byGlyph){if(stateResolved.has(id)){if(forms.size!==1)fail(id+' is state-resolved and measured '+forms.size+' forms');continue}if(forms.size!==2)fail(id+' lacks both measured capability forms');if(Math.abs(forms.get('unicode')-forms.get('ascii'))>1)fail(id+' shifts the following composed-grid column')}if(byGlyph.size-stateResolved.size<1)fail('no glyph measured in both forms — an empty comparison is not a check');
 fixture.dataset.measurement='pass';document.documentElement.dataset.glyphGridCheck='pass';const out=document.getElementById('build-status');if(out&&!out.textContent.includes('composed glyph grid pass'))out.textContent+=' · composed glyph grid pass'}catch(error){fail(error.message)}})();
 </script>`;
 
@@ -1265,11 +1370,8 @@ export function build() {
   const raw = readFileSync(registryPath, 'utf8');
   const registry = JSON.parse(raw);
   const output = buildHtml(registry, raw);
-  const keys = renderKeysMarkdown(registry);
   writeFileSync(outputPath, output);
-  mkdirSync(dirname(keysOutputPath), { recursive: true });
-  writeFileSync(keysOutputPath, keys);
-  return { outputPath, keysOutputPath, bytes: Buffer.byteLength(output), rules: registry.rules.length, sections: registry.sections.length };
+  return { outputPath, bytes: Buffer.byteLength(output), rules: registry.rules.length, sections: registry.sections.length };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

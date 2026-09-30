@@ -11,8 +11,10 @@
 
 export { DEFAULT_DEFINITIONS } from "./defaults.js";
 export { ANIMATES, animationIntervalOf, tickIntervalOf } from "./animation.js";
+// C22 I131: the shell stamps one-shots through the same extent table the ticker reads.
+export { mapRamps } from "./ramp.js";
 // The floor the shell reserves for a contained failure (C22 I69, C04 I67).
-export { countdown, elapsed, statusDetailRows, statusRowsFor } from "./kinds/status.js";
+export { countdown, elapsed, statusRowsFor } from "./kinds/status.js";
 export { age } from "./kinds/containers.js";
 export { tapeStart } from "./kinds/tape.js";
 export { defaultButton } from "./kinds/form.js";

@@ -13,10 +13,28 @@ exports[`C10 §4k — the compositions, as frames > case 1 — focused + selecte
   inverse+bold/-:"▸ " inverse/-:"bravo         " inverse+bold/-:"✗ failed  "
   page/-:"  charlie       " bold/-:"✓ running "
 
+-- without copy selection, run by run
+  dim/-:"Name        " dim/-:"State     "
+  page/-:"  alpha         " bold/-:"✓ running "
+  bold/-:"▸ " page/-:"bravo         " bold/-:"✗ failed  "
+  page/-:"  charlie       " bold/-:"✓ running "
+
+-- without focus, run by run
+  dim/-:"Name        " dim/-:"State     "
+  page/-:"  alpha         " bold/-:"✓ running "
+  inverse/-:"  bravo         " inverse+bold/-:"✗ failed  "
+  page/-:"  charlie       " bold/-:"✓ running "
+
+-- without failure, run by run
+  dim/-:"Name        " dim/-:"State     "
+  page/-:"  alpha         " bold/-:"✓ running "
+  inverse+bold/-:"▸ " inverse/-:"bravo         " inverse+bold/-:"✓ running "
+  page/-:"  charlie       " bold/-:"✓ running "
+
 -- the ruling (C10 §4k.2 row 1)
   selection takes the ground · focus keeps its mark · failure keeps its glyph, its word and its tone
 
--- and what drawing it found, kept because the record is the point (F1240)
+-- and what drawing it found, kept because the record is the point
   This frame reported two of row 1's three clauses for as long as it existed. A focused or
   selected row was repainted in ONE ink — accent, or default under selection — so \`failed\` kept
   ✗ and the word and lost the error tone. The two halves of the remedy were one change and
@@ -40,10 +58,28 @@ exports[`C10 §4k — the compositions, as frames > case 1 — focused + selecte
   selection/accent:"▸ " selection/default:"bravo       " selection/error:"✗ failed  "
   page/default:"charlie     " page/ok:"✓ running "
 
+-- without copy selection, run by run
+  bgElev/muted:"Name        " bgElev/muted:"State     "
+  page/default:"alpha       " page/ok:"✓ running "
+  focusGround/accent:"▸ " focusGround/default:"bravo       " focusGround/error:"✗ failed  "
+  page/default:"charlie     " page/ok:"✓ running "
+
+-- without focus, run by run
+  bgElev/muted:"Name        " bgElev/muted:"State     "
+  page/default:"alpha       " page/ok:"✓ running "
+  selection/default:"bravo       " selection/error:"✗ failed  "
+  page/default:"charlie     " page/ok:"✓ running "
+
+-- without failure, run by run
+  bgElev/muted:"Name        " bgElev/muted:"State     "
+  page/default:"alpha       " page/ok:"✓ running "
+  selection/accent:"▸ " selection/default:"bravo       " selection/ok:"✓ running "
+  page/default:"charlie     " page/ok:"✓ running "
+
 -- the ruling (C10 §4k.2 row 1)
   selection takes the ground · focus keeps its mark · failure keeps its glyph, its word and its tone
 
--- and what drawing it found, kept because the record is the point (F1240)
+-- and what drawing it found, kept because the record is the point
   This frame reported two of row 1's three clauses for as long as it existed. A focused or
   selected row was repainted in ONE ink — accent, or default under selection — so \`failed\` kept
   ✗ and the word and lost the error tone. The two halves of the remedy were one change and
@@ -67,10 +103,28 @@ exports[`C10 §4k — the compositions, as frames > case 1 — focused + selecte
   selection/accent:"> " selection/default:"bravo       " selection/error:"x failed  "
   page/default:"charlie     " page/ok:"+ running "
 
+-- without copy selection, run by run
+  bgElev/muted:"Name        " bgElev/muted:"State     "
+  page/default:"alpha       " page/ok:"+ running "
+  focusGround/accent:"> " focusGround/default:"bravo       " focusGround/error:"x failed  "
+  page/default:"charlie     " page/ok:"+ running "
+
+-- without focus, run by run
+  bgElev/muted:"Name        " bgElev/muted:"State     "
+  page/default:"alpha       " page/ok:"+ running "
+  selection/default:"bravo       " selection/error:"x failed  "
+  page/default:"charlie     " page/ok:"+ running "
+
+-- without failure, run by run
+  bgElev/muted:"Name        " bgElev/muted:"State     "
+  page/default:"alpha       " page/ok:"+ running "
+  selection/accent:"> " selection/default:"bravo       " selection/ok:"+ running "
+  page/default:"charlie     " page/ok:"+ running "
+
 -- the ruling (C10 §4k.2 row 1)
   selection takes the ground · focus keeps its mark · failure keeps its glyph, its word and its tone
 
--- and what drawing it found, kept because the record is the point (F1240)
+-- and what drawing it found, kept because the record is the point
   This frame reported two of row 1's three clauses for as long as it existed. A focused or
   selected row was repainted in ONE ink — accent, or default under selection — so \`failed\` kept
   ✗ and the word and lost the error tone. The two halves of the remedy were one change and
@@ -81,80 +135,358 @@ exports[`C10 §4k — the compositions, as frames > case 1 — focused + selecte
   ink beside each ground above is the value C10 T2.49 measures the gate against."
 `;
 
-exports[`C10 §4k — the compositions, as frames > case 4 — focus over a heatmap, at 1-bit 1`] = `
-"-- the frame, focused
+exports[`C10 §4k — the compositions, as frames > case 3 — selection over a diff ground, at 1-bit 1`] = `
+"-- the frame
+  ── serving/volatility-estimator.yaml ───
+  @@ -18,1 +18,1 @@
+  18    - const a = 1
+     18 + const b = 2                     
+
+-- which fact took the ground, run by run
+  page/-:"── serving/volatility-estimator.yaml ───"
+  page/-:"@@ -18,1 +18,1 @@"
+  bold/-:"18" bold/-:"-" bold/-:"const" page/-:" a = 1"
+  inverse+bold/-:"   18 + const b = 2                     "
+
+-- without copy selection, run by run
+  page/-:"── serving/volatility-estimator.yaml ───"
+  page/-:"@@ -18,1 +18,1 @@"
+  bold/-:"18" bold/-:"-" bold/-:"const" page/-:" a = 1"
+  bold/-:"18" bold/-:"+" bold/-:"const" page/-:" b = 2"
+
+-- without a semantic extent, run by run
+  page/-:"── serving/volatility-estimator.yaml ───"
+  page/-:"@@ -18,2 +18,2 @@"
+  dim/-:"18" dim/-:"18" bold/-:"const" page/-:" a = 1"
+  inverse+bold/-:"19 19   const b = 2                     "
+
+-- the ruling (C10 §4k.2 row 3)
+  selection takes the ground · the diff keeps + and −
+
+-- and what drawing it found, kept because the record is the point
+  Owed until C25 I24 and I25: both facts shipped, and \`patch\` declared no elements and read
+  ctx.focus nowhere, so no line could be selected. The owed attempt named the line \`h0:1\` — hunk
+  0, line 1 — and that id does not survive a window, which hands the transcript a smaller patch
+  whose first hunk is wherever the window starts. The ids are the lines' numbers now."
+`;
+
+exports[`C10 §4k — the compositions, as frames > case 3 — selection over a diff ground, at 24-bit 1`] = `
+"-- the frame
+  ── serving/volatility-estimator.yaml ───
+  @@ -18,1 +18,1 @@
+  18    - const a = 1                     
+     18 + const b = 2                     
+
+-- which fact took the ground, run by run
+  page/-:"── serving/volatility-estimator.yaml ───"
+  page/-:"@@ -18,1 +18,1 @@"
+  diffRemove/error:"18" diffRemove/error:"-" diffRemove/-:" const" diffRemove/default:" a = " diffRemove/-:"1                     "
+  selection/ok:"18" selection/ok:"+" selection/-:" const" selection/default:" b = " selection/-:"2                     "
+
+-- without copy selection, run by run
+  page/-:"── serving/volatility-estimator.yaml ───"
+  page/-:"@@ -18,1 +18,1 @@"
+  diffRemove/error:"18" diffRemove/error:"-" diffRemove/-:" const" diffRemove/default:" a = " diffRemove/-:"1                     "
+  diffAdd/ok:"18" diffAdd/ok:"+" diffAdd/-:" const" diffAdd/default:" b = " diffAdd/-:"2                     "
+
+-- without a semantic extent, run by run
+  page/-:"── serving/volatility-estimator.yaml ───"
+  page/-:"@@ -18,2 +18,2 @@"
+  page/muted:"18" page/muted:"18" page/-:" const" page/default:" a = " page/-:"1"
+  selection/dim:"19" selection/dim:"19" selection/-:" const" selection/default:" b = " selection/-:"2                     "
+
+-- the ruling (C10 §4k.2 row 3)
+  selection takes the ground · the diff keeps + and −
+
+-- and what drawing it found, kept because the record is the point
+  Owed until C25 I24 and I25: both facts shipped, and \`patch\` declared no elements and read
+  ctx.focus nowhere, so no line could be selected. The owed attempt named the line \`h0:1\` — hunk
+  0, line 1 — and that id does not survive a window, which hands the transcript a smaller patch
+  whose first hunk is wherever the window starts. The ids are the lines' numbers now."
+`;
+
+exports[`C10 §4k — the compositions, as frames > case 3 — selection over a diff ground, at ascii 1`] = `
+"-- the frame
+  -- serving/volatility-estimator.yaml ---
+  @@ -18,1 +18,1 @@
+  18    - const a = 1                     
+     18 + const b = 2                     
+
+-- which fact took the ground, run by run
+  page/-:"-- serving/volatility-estimator.yaml ---"
+  page/-:"@@ -18,1 +18,1 @@"
+  diffRemove/error:"18" diffRemove/error:"-" diffRemove/-:" const" diffRemove/default:" a = " diffRemove/-:"1                     "
+  selection/ok:"18" selection/ok:"+" selection/-:" const" selection/default:" b = " selection/-:"2                     "
+
+-- without copy selection, run by run
+  page/-:"-- serving/volatility-estimator.yaml ---"
+  page/-:"@@ -18,1 +18,1 @@"
+  diffRemove/error:"18" diffRemove/error:"-" diffRemove/-:" const" diffRemove/default:" a = " diffRemove/-:"1                     "
+  diffAdd/ok:"18" diffAdd/ok:"+" diffAdd/-:" const" diffAdd/default:" b = " diffAdd/-:"2                     "
+
+-- without a semantic extent, run by run
+  page/-:"-- serving/volatility-estimator.yaml ---"
+  page/-:"@@ -18,2 +18,2 @@"
+  page/muted:"18" page/muted:"18" page/-:" const" page/default:" a = " page/-:"1"
+  selection/dim:"19" selection/dim:"19" selection/-:" const" selection/default:" b = " selection/-:"2                     "
+
+-- the ruling (C10 §4k.2 row 3)
+  selection takes the ground · the diff keeps + and −
+
+-- and what drawing it found, kept because the record is the point
+  Owed until C25 I24 and I25: both facts shipped, and \`patch\` declared no elements and read
+  ctx.focus nowhere, so no line could be selected. The owed attempt named the line \`h0:1\` — hunk
+  0, line 1 — and that id does not survive a window, which hands the transcript a smaller patch
+  whose first hunk is wherever the window starts. The ids are the lines' numbers now."
+`;
+
+exports[`C10 §4k — the compositions, as frames > case 4 — focus over a heatmap ground, at 1-bit 1`] = `
+"-- the frame
     one ┤⠄⠄⠄⠄⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⣿⣿⣿⣿⣿⣿⣿⣿
     two ┤⣿⣿⣿⣿⣿⣿⣿⣿⣿⠷⠷⠷⠷⠷⠷⠷⠷⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄⠄⠄⠄
   three ┤⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷
   
   1 ⠄⠔⠖⠶⠷⠿⡿⣿ 16
 
--- at rest, run by run
-  dim/-:"  one ┤" page/-:"⠄⠄⠄⠄⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⣿⣿⣿⣿⣿⣿⣿⣿"
-  dim/-:"  two ┤" page/-:"⣿⣿⣿⣿⣿⣿⣿⣿⣿⠷⠷⠷⠷⠷⠷⠷⠷⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄⠄⠄⠄"
-  dim/-:"three ┤" page/-:"⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷"
-  (blank)
-  dim/-:"1 ⠄⠔⠖⠶⠷⠿⡿⣿ 16"
-
--- focused, run by run
+-- which fact took the ground, run by run
   dim/-:"  one " bold/-:"┤" page/-:"⠄⠄⠄⠄⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⣿⣿⣿⣿⣿⣿⣿⣿"
   dim/-:"  two " bold/-:"┤" page/-:"⣿⣿⣿⣿⣿⣿⣿⣿⣿⠷⠷⠷⠷⠷⠷⠷⠷⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄⠄⠄⠄"
   dim/-:"three " bold/-:"┤" page/-:"⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷"
   (blank)
   dim/-:"1 ⠄⠔⠖⠶⠷⠿⡿⣿ 16"
 
--- the ruling (C10 §4k.2 row 4, R-FOC-004)
+-- without focus, run by run
+  dim/-:"  one ┤" page/-:"⠄⠄⠄⠄⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⣿⣿⣿⣿⣿⣿⣿⣿"
+  dim/-:"  two ┤" page/-:"⣿⣿⣿⣿⣿⣿⣿⣿⣿⠷⠷⠷⠷⠷⠷⠷⠷⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄⠄⠄⠄"
+  dim/-:"three ┤" page/-:"⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠔⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷"
+  (blank)
+  dim/-:"1 ⠄⠔⠖⠶⠷⠿⡿⣿ 16"
+
+-- without the data's own colour, run by run
+  dim/-:"  one " bold/-:"┤" page/-:"⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶"
+  dim/-:"  two " bold/-:"┤" page/-:"⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶"
+  dim/-:"three " bold/-:"┤" page/-:"⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶"
+  (blank)
+  dim/-:"4 ⠄⠔⠖⠶⠷⠿⡿⣿ 4"
+
+-- the ruling (C10 §4k.2 row 4)
   nothing is contested · the border and the axes take the focus · the data keeps its reading"
 `;
 
-exports[`C10 §4k — the compositions, as frames > case 4 — focus over a heatmap, at 24-bit 1`] = `
-"-- the frame, focused
+exports[`C10 §4k — the compositions, as frames > case 4 — focus over a heatmap ground, at 24-bit 1`] = `
+"-- the frame
     one ┤                                 
     two ┤                                 
   three ┤                                 
   
   1          16
 
--- at rest, run by run
-  page/muted:"  one ┤"
-  page/muted:"  two ┤"
-  page/muted:"three ┤"
-  (blank)
-  page/muted:"1 " page/muted:" 16"
-
--- focused, run by run
+-- which fact took the ground, run by run
   page/muted:"  one " page/accent:"┤"
   page/muted:"  two " page/accent:"┤"
   page/muted:"three " page/accent:"┤"
   (blank)
   page/muted:"1 " page/muted:" 16"
 
--- the ruling (C10 §4k.2 row 4, R-FOC-004)
+-- without focus, run by run
+  page/muted:"  one ┤"
+  page/muted:"  two ┤"
+  page/muted:"three ┤"
+  (blank)
+  page/muted:"1 " page/muted:" 16"
+
+-- without the data's own colour, run by run
+  page/muted:"  one " page/accent:"┤"
+  page/muted:"  two " page/accent:"┤"
+  page/muted:"three " page/accent:"┤"
+  (blank)
+  page/muted:"4 " page/muted:" 4"
+
+-- the ruling (C10 §4k.2 row 4)
   nothing is contested · the border and the axes take the focus · the data keeps its reading"
 `;
 
-exports[`C10 §4k — the compositions, as frames > case 4 — focus over a heatmap, at ascii 1`] = `
-"-- the frame, focused
+exports[`C10 §4k — the compositions, as frames > case 4 — focus over a heatmap ground, at ascii 1`] = `
+"-- the frame
     one +                                 
     two +                                 
   three +                                 
   
   1          16
 
--- at rest, run by run
-  page/muted:"  one +"
-  page/muted:"  two +"
-  page/muted:"three +"
-  (blank)
-  page/muted:"1 " page/muted:" 16"
-
--- focused, run by run
+-- which fact took the ground, run by run
   page/muted:"  one " page/accent:"+"
   page/muted:"  two " page/accent:"+"
   page/muted:"three " page/accent:"+"
   (blank)
   page/muted:"1 " page/muted:" 16"
 
--- the ruling (C10 §4k.2 row 4, R-FOC-004)
+-- without focus, run by run
+  page/muted:"  one +"
+  page/muted:"  two +"
+  page/muted:"three +"
+  (blank)
+  page/muted:"1 " page/muted:" 16"
+
+-- without the data's own colour, run by run
+  page/muted:"  one " page/accent:"+"
+  page/muted:"  two " page/accent:"+"
+  page/muted:"three " page/accent:"+"
+  (blank)
+  page/muted:"4 " page/muted:" 4"
+
+-- the ruling (C10 §4k.2 row 4)
   nothing is contested · the border and the axes take the focus · the data keeps its reading"
+`;
+
+exports[`C10 §4k — the compositions, as frames > case 5 — disabled + error, at 1-bit 1`] = `
+"-- the frame
+  name    web
+  port    80a                             
+          ✗ not a port number
+
+-- which fact took the ground, run by run
+  dim/-:"name" page/-:"    web"
+  dim/-:"port    80a                             "
+  bold/-:"✗ not a port number"
+
+-- without availability, run by run
+  dim/-:"name" page/-:"    web"
+  dim/-:"port" page/-:"    80a"
+  bold/-:"✗ not a port number"
+
+-- without validity, run by run
+  dim/-:"name" page/-:"    web"
+  dim/-:"port    80a                             "
+
+-- the ruling (C10 §4k.2 row 5)
+  the well takes the ground · the error keeps its mark and its word"
+`;
+
+exports[`C10 §4k — the compositions, as frames > case 5 — disabled + error, at 24-bit 1`] = `
+"-- the frame
+  name    web
+  port    80a                             
+          ✗ not a port number
+
+-- which fact took the ground, run by run
+  page/muted:"name" page/default:"web"
+  bgDeep/dim:"port    80a                             "
+  page/error:"✗ not a port number"
+
+-- without availability, run by run
+  page/muted:"name" page/default:"web"
+  page/muted:"port" page/default:"80a"
+  page/error:"✗ not a port number"
+
+-- without validity, run by run
+  page/muted:"name" page/default:"web"
+  bgDeep/dim:"port    80a                             "
+
+-- the ruling (C10 §4k.2 row 5)
+  the well takes the ground · the error keeps its mark and its word"
+`;
+
+exports[`C10 §4k — the compositions, as frames > case 5 — disabled + error, at ascii 1`] = `
+"-- the frame
+  name    web
+  port    80a                             
+          x not a port number
+
+-- which fact took the ground, run by run
+  page/muted:"name" page/default:"web"
+  bgDeep/dim:"port    80a                             "
+  page/error:"x not a port number"
+
+-- without availability, run by run
+  page/muted:"name" page/default:"web"
+  page/muted:"port" page/default:"80a"
+  page/error:"x not a port number"
+
+-- without validity, run by run
+  page/muted:"name" page/default:"web"
+  bgDeep/dim:"port    80a                             "
+
+-- the ruling (C10 §4k.2 row 5)
+  the well takes the ground · the error keeps its mark and its word"
+`;
+
+exports[`C10 §4k — the compositions, as frames > case 6 — stale + running, at 1-bit 1`] = `
+"-- the frame
+  ┌ ⠋ workers ────────────────── updated 4m ago ─┐
+  │● pytest(tests/unit) · ⠋ 4s                   │
+  └──────────────────────────────────────────────┘
+
+-- which fact took the ground, run by run
+  dim/-:"┌" bold/-:" ⠋ workers " dim/-:"──────────────────" bold/-:" updated 4m ago " dim/-:"─┐"
+  dim/-:"│● pytest(tests/unit) · ⠋ 4s" dim/-:"│"
+  dim/-:"└──────────────────────────────────────────────┘"
+
+-- without freshness, run by run
+  dim/-:"┌" bold/-:" ⠋ workers " dim/-:"───────────────────────────────────┐"
+  dim/-:"│" page/-:"● pytest(tests/unit) · ⠋ 4s                   " dim/-:"│"
+  dim/-:"└──────────────────────────────────────────────┘"
+
+-- without liveness, run by run
+  dim/-:"┌" bold/-:" ⠋ workers " dim/-:"──────────────────" bold/-:" updated 4m ago " dim/-:"─┐"
+  dim/-:"│✓ pytest(tests/unit) · 4s · 47 passed" dim/-:"│"
+  dim/-:"└──────────────────────────────────────────────┘"
+
+-- the ruling (C10 §4k.2 row 6)
+  nothing is contested · staleness dims the content and names its age · the spinner keeps the duration slot"
+`;
+
+exports[`C10 §4k — the compositions, as frames > case 6 — stale + running, at 24-bit 1`] = `
+"-- the frame
+  ┌ ⠋ workers ────────────────── updated 4m ago ─┐
+  │● pytest(tests/unit) · ⠋ 4s                   │
+  └──────────────────────────────────────────────┘
+
+-- which fact took the ground, run by run
+  page/dim:"┌" page/accent:" ⠋ workers " page/dim:"──────────────────" page/warn:" updated 4m ago " page/dim:"─┐"
+  page/dim:"│● pytest(tests/unit) · ⠋ 4s" page/dim:"│"
+  page/dim:"└──────────────────────────────────────────────┘"
+
+-- without freshness, run by run
+  page/dim:"┌" page/accent:" ⠋ workers " page/dim:"───────────────────────────────────┐"
+  page/dim:"│" page/info:"● pytest(tests/unit) · ⠋ 4s" page/dim:"│"
+  page/dim:"└──────────────────────────────────────────────┘"
+
+-- without liveness, run by run
+  page/dim:"┌" page/accent:" ⠋ workers " page/dim:"──────────────────" page/warn:" updated 4m ago " page/dim:"─┐"
+  page/dim:"│● pytest(tests/unit) · 4s · 47 passed" page/dim:"│"
+  page/dim:"└──────────────────────────────────────────────┘"
+
+-- the ruling (C10 §4k.2 row 6)
+  nothing is contested · staleness dims the content and names its age · the spinner keeps the duration slot"
+`;
+
+exports[`C10 §4k — the compositions, as frames > case 6 — stale + running, at ascii 1`] = `
+"-- the frame
+  + | workers ------------------ updated 4m ago -+
+  |* pytest(tests/unit) : | 4s                   |
+  +----------------------------------------------+
+
+-- which fact took the ground, run by run
+  page/dim:"+" page/accent:" | workers " page/dim:"------------------" page/warn:" updated 4m ago " page/dim:"-+"
+  page/dim:"|* pytest(tests/unit) : | 4s" page/dim:"|"
+  page/dim:"+----------------------------------------------+"
+
+-- without freshness, run by run
+  page/dim:"+" page/accent:" | workers " page/dim:"-----------------------------------+"
+  page/dim:"|" page/info:"* pytest(tests/unit) : | 4s" page/dim:"|"
+  page/dim:"+----------------------------------------------+"
+
+-- without liveness, run by run
+  page/dim:"+" page/accent:" | workers " page/dim:"------------------" page/warn:" updated 4m ago " page/dim:"-+"
+  page/dim:"|+ pytest(tests/unit) : 4s : 47 passed" page/dim:"|"
+  page/dim:"+----------------------------------------------+"
+
+-- the ruling (C10 §4k.2 row 6)
+  nothing is contested · staleness dims the content and names its age · the spinner keeps the duration slot"
+`;
+
+exports[`C10 §4k — the compositions, as frames > the owed compositions name the change that would give each a subject 1`] = `
+"2 · hovering one link while another has keyboard focus
+    the subject is a link and none exists in the view model; R-PTR-003 admits hover on links, buttons and chips only, and links are built first as their own MR (C10 §4k.4)"
 `;

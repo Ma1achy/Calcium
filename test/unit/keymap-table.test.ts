@@ -8,11 +8,12 @@
 // the table claims: every binding appears exactly once, the marked keys are
 // exactly the ones bound at two or more targets, and the columns are
 // `FOCUS_ORDER`.
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
   KEYS_DOC,
+  keysDocument,
   LADDER_MARK,
   liveTable,
   renderKeymapTable,
@@ -23,11 +24,19 @@ import { FOCUS_ORDER } from "../../src/interaction/router/focus.js";
 import type { BuiltinBinding } from "../../src/interaction/router/types.js";
 
 describe("tools/keymap-table.mjs — the ladder as a table", () => {
-  it("KT1: docs/KEYS.md is the live keymap rendered — the table cannot drift", () => {
+  it("KT1 (C16 §6a clause 5): docs/KEYS.md is the registry's table then the live ladder — one file, neither half can drift", () => {
     const onDisk = readFileSync(KEYS_DOC, "utf8");
-    expect(onDisk, `${KEYS_DOC} is stale; run \`npx tsx tools/keymap-table.mjs\``).toBe(
-      liveTable(),
-    );
+    expect(onDisk, `${KEYS_DOC} is stale; run \`npx tsx tools/keymap-table.mjs\``).toBe(keysDocument());
+    // Both halves, in order — a document that dropped either would still equal
+    // a renderer that dropped it, so the halves are named.
+    expect(onDisk.indexOf("# Calcium keys"), "the registry's table first").toBeGreaterThanOrEqual(0);
+    expect(onDisk.indexOf("# Key ladder"), "the ladder after it").toBeGreaterThan(onDisk.indexOf("# Calcium keys"));
+    expect(onDisk.endsWith(liveTable()), "the ladder is the live keymap").toBe(true);
+  });
+
+  it("KT1a (C16 §6a clause 5): the registry names the file and it resolves from the repository root — no second keymap", () => {
+    expect(KEYS_DOC).toBe("docs/KEYS.md");
+    expect(existsSync("docs/design/language/docs/KEYS.md"), "the builder's old copy").toBe(false);
   });
 
   it("KT2 (fabricated violation): a binding added to a copy of the keymap → the check fires and names the key", () => {

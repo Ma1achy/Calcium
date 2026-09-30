@@ -7,7 +7,15 @@
 //
 // **Every replacement asserts it matched** (CLAUDE.md, *An edit script asserts every
 // replacement matched*): a run that reports success having changed nothing is a
-// failure, and this exits non-zero if any rule already exists or any section is missing.
+// failure, and this exits non-zero if a section is missing or the registry holds
+// **some** of the fifteen and not the rest.
+//
+// **Re-running it is a no-op** (review batch 1, item 23). All fifteen present is
+// the state this script produces, so it says so and exits 0 without writing —
+// whatever has happened to the rules since, because a later supersession or
+// amendment is the registry's history and not this script's to judge. It used to
+// exit 1 with *already exists* on every rule, which refused correctly and read as
+// a failure to anyone running the tools directory in sequence.
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -61,7 +69,14 @@ const byId = new Map(registry.rules.map((r) => [r.id, r]));
 let failed = 0;
 const fail = (m) => { console.error("  " + m); failed += 1; };
 
-for (const [id] of RULES) if (byId.has(id)) fail(`${id} already exists — this script has run`);
+const present = RULES.filter(([id]) => byId.has(id)).map(([id]) => id);
+if (present.length === RULES.length) {
+  const moved = present.filter((id) => byId.get(id).status !== "current");
+  console.log(`already registered · ${present.length} of ${RULES.length} R-SEL rules present, nothing written`);
+  if (moved.length > 0) console.log(`  since superseded, which is the registry's history: ${moved.join(", ")}`);
+  process.exit(0);
+}
+for (const id of present) fail(`${id} already exists, and ${RULES.length - present.length} of the fifteen do not — a partial run`);
 
 // **`sectionKey` must resolve, and that is all it does here.** `renderContract`
 // (`build-calcium.mjs:689`) projects *every* `current` rule irrespective of section,

@@ -360,7 +360,7 @@ and painted per cell. What a theme chooses is whether it also paints the page
 underneath.
 
 *This paragraph read "Calcium paints no background" until it was measured
-against `tokens-light.ts:24`. The claim was true of `dark` alone, and its own
+against `tokens-light.ts:24`, a file since retired — `light` is generated from the registry now. The claim was true of `dark` alone, and its own
 next sentence — that the image above needs a light terminal for that reason —
 was a consequence of the false half.*
 

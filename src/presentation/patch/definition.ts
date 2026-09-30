@@ -22,13 +22,43 @@ import { atLeastOne, changedRuns, normaliseWidth, type ChangedRun } from "../../
 import { collapseText } from "./collapse.js";
 import { hunkRows, isCollapsed, layoutFor, patchHeight, type Layout } from "./height.js";
 import { planFrom, windowRows } from "./window.js";
-import { blankSide, dress, gutterSpans, line, textSpans } from "./lines.js";
+import { blankSide, dress, gutterSpans, line, REST, textSpans, type Mark } from "./lines.js";
+import { lineId, patchElements } from "./elements.js";
 import { patchLayout, type PatchLayout } from "./layout.js";
 import type { Hunk, Patch } from "../../data/viewmodel/index.js";
 import type { Span } from "../blocks/paint.js";
 import type { BlockDefinition, RenderContext, Rendered } from "../blocks/types.js";
 
 type Line = Hunk["lines"][number];
+
+/** What focus says about each line, asked once per line in drawing order (I25). */
+type MarkOf = (line: Line) => Mark;
+
+/**
+ * The marks for one render (C25 I25, §3d).
+ *
+ * **The extent is filtered by its own block id, never gated on the head's** —
+ * a selection whose head sits in a sibling block still names lines here, which
+ * is C11 I14's T6.17 lesson. **Claimed in drawing order**, the order
+ * `patchElements` places them in, so a repeated id marks the one line that
+ * declared it and not both (I24).
+ */
+function marksFor(block: Patch, ctx: RenderContext): MarkOf {
+  const focus = ctx.focus;
+  if (focus === null) return () => REST;
+  const head = focus.blockId === block.id ? focus.rowId : null;
+  const selected = new Set((focus.selected ?? []).filter((s) => s.blockId === block.id).map((s) => s.rowId));
+  if (head === null && selected.size === 0) return () => REST;
+  const claimed = new Set<string>();
+  return (item) => {
+    const id = lineId(item);
+    if (id === null || claimed.has(id)) return REST;
+    claimed.add(id);
+    const isSelected = selected.has(id);
+    const isHead = id === head;
+    return isSelected || isHead ? { selected: isSelected, head: isHead } : REST;
+  };
+}
 
 /** The one cell split spends on telling the two halves apart. */
 const SEPARATOR = "\u2502";
@@ -63,12 +93,16 @@ function header(block: Patch, layout: PatchLayout, ctx: RenderContext): string {
 }
 
 /** Unified: both number columns, then the marker, then the text. */
-function unifiedRow(item: Line, block: Patch, layout: PatchLayout, ctx: RenderContext): string {
+function unifiedRow(item: Line, block: Patch, layout: PatchLayout, ctx: RenderContext, mark: Mark): string {
   return line(
-    [...gutterSpans(item, layout, ctx), ...textSpans(item.text, block.language, layout.text, ctx, item.spans, item.kind)],
+    [
+      ...gutterSpans(item, layout, ctx, undefined, mark),
+      ...textSpans(item.text, block.language, layout.text, ctx, item.spans, item.kind, mark),
+    ],
     item.kind,
     layout,
     ctx,
+    mark,
   );
 }
 
@@ -80,22 +114,31 @@ function unifiedRow(item: Line, block: Patch, layout: PatchLayout, ctx: RenderCo
  * carries that, and `pairedRows` computes the same number this loop draws — the two
  * are written as a pair for I1's sake, exactly as every other kind's halves are.
  */
-function splitRows(run: Run, block: Patch, layout: PatchLayout, ctx: RenderContext): readonly string[] {
+function splitRows(run: Run, block: Patch, layout: PatchLayout, ctx: RenderContext, markOf: MarkOf): readonly string[] {
   const height = Math.max(run.removes.length, run.adds.length); // cells-ok — a row count
   const out: string[] = [];
 
   for (let i = 0; i < height; i += 1) {
     const left = run.removes[i];
     const right = run.adds[i];
+    // Left before right, as `patchElements` places them.
+    const leftMark = left === undefined ? REST : markOf(left);
+    const rightMark = right === undefined ? REST : markOf(right);
 
     const leftSpans =
       left === undefined
         ? blankSide(layout)
-        : [...gutterSpans(left, layout, ctx, "old"), ...textSpans(left.text, block.language, layout.text, ctx, left.spans, left.kind)];
+        : [
+            ...gutterSpans(left, layout, ctx, "old", leftMark),
+            ...textSpans(left.text, block.language, layout.text, ctx, left.spans, left.kind, leftMark),
+          ];
     const rightSpans =
       right === undefined
         ? blankSide(layout)
-        : [...gutterSpans(right, layout, ctx, "new"), ...textSpans(right.text, block.language, layout.text, ctx, right.spans, right.kind)];
+        : [
+            ...gutterSpans(right, layout, ctx, "new", rightMark),
+            ...textSpans(right.text, block.language, layout.text, ctx, right.spans, right.kind, rightMark),
+          ];
 
     // **Each side carries its own background**, and the row carries none. A paired
     // row changed on both sides in different directions, so one colour across it
@@ -105,9 +148,9 @@ function splitRows(run: Run, block: Patch, layout: PatchLayout, ctx: RenderConte
     out.push(
       line(
         [
-          ...dress(padTo(leftSpans, layout), left === undefined ? "context" : "remove", ctx),
+          ...dress(padTo(leftSpans, layout), left === undefined ? "context" : "remove", ctx, leftMark),
           { text: SEPARATOR },
-          ...dress(padTo(rightSpans, layout), right === undefined ? "context" : "add", ctx),
+          ...dress(padTo(rightSpans, layout), right === undefined ? "context" : "add", ctx, rightMark),
         ],
         "context",
         layout,
@@ -126,7 +169,7 @@ function padTo(spans: readonly Span[], layout: PatchLayout): readonly Span[] {
   return short <= 0 ? spans : [...spans, { text: " ".repeat(short) }];
 }
 
-function hunkLines(hunk: Hunk, block: Patch, layout: PatchLayout, ctx: RenderContext): readonly string[] {
+function hunkLines(hunk: Hunk, block: Patch, layout: PatchLayout, ctx: RenderContext, markOf: MarkOf): readonly string[] {
   const out: string[] = [];
 
   if (isCollapsed(hunk.collapsedBefore)) {
@@ -136,7 +179,7 @@ function hunkLines(hunk: Hunk, block: Patch, layout: PatchLayout, ctx: RenderCon
   out.push(line([{ text: hunk.header }], "context", layout, ctx));
 
   if (layout.layout === "unified") {
-    for (const item of hunk.lines) out.push(unifiedRow(item, block, layout, ctx));
+    for (const item of hunk.lines) out.push(unifiedRow(item, block, layout, ctx, markOf(item)));
     return out;
   }
 
@@ -144,25 +187,31 @@ function hunkLines(hunk: Hunk, block: Patch, layout: PatchLayout, ctx: RenderCon
     if ("kind" in group) {
       // A context line is one row in both layouts, and in split it is the same text
       // on both sides — which is what makes the eye track across the separator.
+      // One element across the row (I24), so one mark and one ground for it.
+      const mark = markOf(group);
       out.push(
         line(
           [
             ...padTo(
-              [...gutterSpans(group, layout, ctx, "old"), ...textSpans(group.text, block.language, layout.text, ctx)],
+              [
+                ...gutterSpans(group, layout, ctx, "old", mark),
+                ...textSpans(group.text, block.language, layout.text, ctx, undefined, "context", mark),
+              ],
               layout,
             ),
             { text: SEPARATOR },
-            ...gutterSpans(group, layout, ctx, "new"),
-            ...textSpans(group.text, block.language, layout.text, ctx),
+            ...gutterSpans(group, layout, ctx, "new", mark),
+            ...textSpans(group.text, block.language, layout.text, ctx, undefined, "context", mark),
           ],
           "context",
           layout,
           ctx,
+          mark,
         ),
       );
       continue;
     }
-    out.push(...splitRows(group, block, layout, ctx));
+    out.push(...splitRows(group, block, layout, ctx, markOf));
   }
 
   return out;
@@ -185,6 +234,9 @@ export const patchDefinition: BlockDefinition<Patch> = {
         ...h.lines.map((l) => `${l.kind === "add" ? "+" : l.kind === "remove" ? "-" : " "}${l.text}`),
       ]),
     ].join("\n"),
+
+  // C25 I24, §3d — every numbered line, where `render` draws it.
+  elements: (block: Patch, width: number) => patchElements(block, width),
 
   // Exact at every width, constant within a layout, and it never tokenises (I3).
   // `collapsedBefore` is a field, so measuring a collapsed region reads it rather
@@ -235,7 +287,8 @@ export const patchDefinition: BlockDefinition<Patch> = {
     using _lines = probe?.span("patch.lines") ?? NO_SPAN;
 
     const out: string[] = [header(block, columns, ctx)];
-    for (const hunk of block.hunks) out.push(...hunkLines(hunk, block, columns, ctx));
+    const markOf = marksFor(block, ctx);
+    for (const hunk of block.hunks) out.push(...hunkLines(hunk, block, columns, ctx, markOf));
 
     // The tail, below everything (C04 §3). The same row a `collapsedBefore` draws,
     // from the block's field rather than a hunk's — which is why `collapseText` takes

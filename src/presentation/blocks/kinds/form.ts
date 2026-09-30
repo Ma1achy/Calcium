@@ -21,7 +21,7 @@ import { normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Form, FormField } from "../../../data/viewmodel/index.js";
 import { cells, graphemes, stripControl, truncate, wrapCells } from "../../text.js";
 import { glyphFor, glyphs } from "../glyphs.js";
-import { focusStyle, paint, rows, tone, type Span } from "../paint.js";
+import { background, focusStyle, pad as padTo, paint, rows, tone, type Span } from "../paint.js";
 import { fitRow } from "../../rows.js";
 import type { BlockDefinition, NavElement, RenderContext, Rendered } from "../types.js";
 
@@ -175,6 +175,9 @@ function formElements(block: Form, width: number): readonly NavElement[] {
   const l = layout(block, w);
   const out: NavElement[] = [];
   for (const p of l.fields) {
+    // **A disabled field is no element** (C04 I140): nothing can focus it, which
+    // is how `⇥` skips it and why no focus ground ever meets its well.
+    if (p.field.availability === "disabled") continue;
     out.push(
       Object.freeze({
         id: p.field.id,
@@ -183,7 +186,8 @@ function formElements(block: Form, width: number): readonly NavElement[] {
         cols: Object.freeze({ from: 0, to: w }),
         // **`⏎` enters it** (C26 I29): the inside mode a control uses, and the
         // shell lends the prompt's editor for as long as it lasts (C22 I118).
-        viewState: true,
+        // A readonly field is focused and copied and never entered (C04 I140).
+        ...(p.field.availability === "readonly" ? {} : { viewState: true as const }),
         copy: `${p.field.label}\t${p.field.value ?? ""}`,
       }),
     );
@@ -230,13 +234,22 @@ export const formDefinition: BlockDefinition<Form> = {
       out[row] = paint(spans);
     };
 
+    // **The well, for a field nobody can act on** (C09 I122, R-STA-004): the
+    // ground §017 gives *structural, nothing to act on*, and `dim` on it — the
+    // weight is what carries availability at 1-bit, where the well is gone.
+    const well = { ...tone("dim", ctx.theme, caps, "bgDeep"), ...background("surface.bgDeep", ctx.theme, caps) };
     for (const p of l.fields) {
       const focused = focus?.rowId === p.field.id;
+      const disabled = p.field.availability === "disabled";
       const draft = focused ? focus?.draft : undefined;
       const label = stripControl(p.field.label);
       const value: Span[] =
         draft === undefined
-          ? [{ text: truncate(p.field.value ?? "", l.room, caps), style: focused ? washed : plain }]
+          ? disabled
+            // The well is the field's whole width, so an empty disabled field
+            // still shows the region nobody can act on.
+            ? [{ text: padTo(truncate(p.field.value ?? "", l.room, caps), l.room, caps.ambiguousWidth), style: well }]
+            : [{ text: truncate(p.field.value ?? "", l.room, caps), style: focused ? washed : plain }]
           : (() => {
               const caret = glyphs(caps).bar;
               const d = draftRow(draft.text, draft.cursor, l.room, caret, caps.ambiguousWidth ?? "narrow");
@@ -250,14 +263,14 @@ export const formDefinition: BlockDefinition<Form> = {
       // **One wash over the label and the value** (C09 I119): a field is one
       // focus shape, as a choice's option is (I105).
       if (l.stacked) {
-        set(p.top, [{ text: " ".repeat(INDENT) }, { text: truncate(label, Math.max(1, w - INDENT), caps), style: focused ? washed : muted }]);
+        set(p.top, [{ text: " ".repeat(INDENT) }, { text: truncate(label, Math.max(1, w - INDENT), caps), style: disabled ? well : focused ? washed : muted }]);
         set(p.valueRow, [{ text: " ".repeat(l.col) }, ...value]);
       } else {
         const pad = " ".repeat(Math.max(0, l.labelWidth - cells(label, caps.ambiguousWidth) + LABEL_GAP));
         set(p.valueRow, [
           { text: " ".repeat(INDENT) },
-          { text: label, style: focused ? washed : muted },
-          { text: pad, ...(focused ? { style: washed } : {}) },
+          { text: label, style: disabled ? well : focused ? washed : muted },
+          { text: pad, ...(disabled ? { style: well } : focused ? { style: washed } : {}) },
           ...value,
         ]);
       }

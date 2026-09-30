@@ -26,7 +26,14 @@ import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { PLOT_UNIONS } from "../../src/data/viewmodel/validate.js";
-import { validateRuleRecords, type RuleRecord } from "../../docs/design/language/build-calcium.mjs";
+import {
+  themeRuleContentDigest,
+  themeSlotsOf,
+  validateRuleRecords,
+  validateThemeRuleRecords,
+  type RuleRecord,
+  type ThemeRuleRecord,
+} from "../../docs/design/language/build-calcium.mjs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -3656,6 +3663,90 @@ describe("the design registry — supersession chains", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  /**
+   * **A current rule the baseline never held was checked by nothing** (AUTHORITY.md
+   * §Release). Every comparison in `lint-immutable.mjs` walked the baseline, so 22
+   * current rules at revision 0.9 were outside every gate, and one was rewritten
+   * under its own ID with all of them green. Removing the registry walk from the
+   * lint → this row fails; it is the only row whose fabrication the baseline walk
+   * cannot see.
+   */
+  it("A03-DSN1 fires: a current rule absent from the baseline", () => {
+    const dir = mkdtempSync(join(tmpdir(), "calcium-release-"));
+    const from = "docs/design/language";
+    copyFileSync(`${from}/lint-immutable.mjs`, join(dir, "lint-immutable.mjs"));
+    copyFileSync(`${from}/released-baseline.json`, join(dir, "released-baseline.json"));
+    const reg = JSON.parse(readFileSync(`${from}/calcium-registry.json`, "utf8")) as {
+      rules: Record<string, unknown>[];
+    };
+    const lint = () => spawnSync("node", [join(dir, "lint-immutable.mjs")], { encoding: "utf8" });
+
+    writeFileSync(join(dir, "calcium-registry.json"), JSON.stringify(reg));
+    const clean = lint();
+    expect(clean.status, clean.stdout + clean.stderr).toBe(0);
+
+    reg.rules.push(linked("R-ZZZ-010", "current", [], null));
+    writeFileSync(join(dir, "calcium-registry.json"), JSON.stringify(reg));
+    const fired = lint();
+    expect(fired.status, "an unreleased current rule is refused").toBe(1);
+    expect(fired.stderr).toMatch(/R-ZZZ-010: CURRENT RULE NOT RELEASED/u);
+    expect(fired.stderr.match(/NOT RELEASED/gu), "and it is the only rule refused").toHaveLength(1);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  /**
+   * **The release only adds** (AUTHORITY.md §Release). The tool is run as it ships,
+   * against a copy: it seals a rule the baseline lacks and the lint then passes,
+   * and it refuses — writing nothing — when a sealed rule's content has changed or
+   * the revision was not bumped. A writer that re-derived every entry would seal
+   * the rewrite the baseline exists to catch; comparing sealed entries instead of
+   * rewriting them → the second fabrication below passes, and this row fails.
+   */
+  it("A03-DSN1: release.mjs seals what is missing and refuses to rewrite what is sealed", () => {
+    const dir = mkdtempSync(join(tmpdir(), "calcium-release-"));
+    const from = "docs/design/language";
+    for (const f of ["lint-immutable.mjs", "released-baseline.json", "calcium-registry.json"]) {
+      copyFileSync(`${from}/${f}`, join(dir, f));
+    }
+    const release = (rev: string) =>
+      spawnSync("node", ["tools/design/release.mjs", rev, "--dir", dir], { encoding: "utf8" });
+    const lint = () => spawnSync("node", [join(dir, "lint-immutable.mjs")], { encoding: "utf8" });
+    const read = () => readFileSync(join(dir, "calcium-registry.json"), "utf8");
+    const write = (r: unknown) => { writeFileSync(join(dir, "calcium-registry.json"), `${JSON.stringify(r, null, 2)}\n`); };
+    type Reg = { meta: { revision: string }; rules: Record<string, unknown>[] };
+
+    // The revision must move.
+    const same = release((JSON.parse(read()) as Reg).meta.revision);
+    expect(same.status, same.stdout + same.stderr).toBe(1);
+    expect(same.stderr).toMatch(/is the current one — a release bumps it/u);
+
+    // A new current rule is sealed, and the lint agrees.
+    const reg = JSON.parse(read()) as Reg;
+    reg.rules.push(linked("R-ZZZ-011", "current", [], null));
+    write(reg);
+    expect(lint().status, "unreleased first").toBe(1);
+    const ok = release("9.1");
+    expect(ok.status, ok.stdout + ok.stderr).toBe(0);
+    expect(ok.stdout).toMatch(/released 9\.1 · 1 rules sealed \(1 current\)/u);
+    const after = lint();
+    expect(after.status, after.stdout + after.stderr).toBe(0);
+
+    // A sealed rule rewritten under its own ID is refused, and nothing is written.
+    const edited = JSON.parse(read()) as Reg;
+    const target = edited.rules.find((r) => r["id"] === "R-SEL-005");
+    expect(target, "the rule the review rewrote").toBeDefined();
+    if (target !== undefined) target["contentDigest"] = "0".repeat(64);
+    write(edited);
+    const baselineBefore = readFileSync(join(dir, "released-baseline.json"), "utf8");
+    const refused = release("9.2");
+    expect(refused.status, refused.stdout + refused.stderr).toBe(1);
+    expect(refused.stderr).toMatch(/R-SEL-005: sealed digest changed — supersede it, do not edit it/u);
+    expect(readFileSync(join(dir, "released-baseline.json"), "utf8"), "nothing written").toBe(baselineBefore);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("A03-DSN1 fires: a link the target does not acknowledge", () => {
     const rules = [
       ...load(),
@@ -3664,4 +3755,379 @@ describe("the design registry — supersession chains", () => {
     ];
     expect(() => { validate(rules); }).toThrow(/supersession is not reciprocal/u);
   });
+
+  // ── A03-DSN4 — theme rules, sealed like rules (AUTHORITY §Release 5) ──
+  type ThemeRule = ThemeRuleRecord & { supersedes: string[] };
+  const themeRules = (): ThemeRule[] =>
+    (JSON.parse(readFileSync("docs/design/language/calcium-registry.json", "utf8")) as { themeRules: ThemeRule[] }).themeRules;
+  const themeRule = (
+    id: string, selector: string, declarations: string, status: string, supersedes: string[], supersededBy: string | null,
+  ): ThemeRule => ({
+    id, selector, declarations, status, ruleIds: ["R-THM-001"], supersedes, supersededBy,
+    contentDigest: themeRuleContentDigest({ selector, declarations }),
+  });
+
+  it("A03-DSN4 (AUTHORITY §Release 5): the checker refuses a theme rule's digest drift, a non-reciprocal link, a chain not ending current, a malformed or repeated id, and two current values for one slot", () => {
+    // The shipped records pass, or every refusal below is about the fixture.
+    expect(validateThemeRuleRecords(themeRules()).size).toBe(themeRules().length);
+    const sel = '[data-theme="dark"] .c-zzz';
+
+    const drifted = [...themeRules(), { ...themeRule("TR-9001", sel, "color:#111111", "current", [], null), declarations: "color:#222222" }];
+    expect(() => validateThemeRuleRecords(drifted)).toThrow(/TR-9001 immutable theme rule content drifted/u);
+
+    const oneSided = [
+      ...themeRules(),
+      themeRule("TR-9001", sel, "color:#111111", "superseded", [], "TR-9002"),
+      themeRule("TR-9002", sel, "color:#222222", "current", [], null),
+    ];
+    expect(() => validateThemeRuleRecords(oneSided)).toThrow(/TR-9001 \/ TR-9002 supersession is not reciprocal/u);
+
+    const deadEnd = [
+      ...themeRules(),
+      themeRule("TR-9001", sel, "color:#111111", "superseded", [], "TR-9002"),
+      themeRule("TR-9002", sel, "color:#222222", "superseded", ["TR-9001"], null),
+    ];
+    expect(() => validateThemeRuleRecords(deadEnd)).toThrow(/TR-9001's supersession chain ends at TR-9002, which is superseded/u);
+
+    expect(() => validateThemeRuleRecords([...themeRules(), themeRule("TR-01", sel, "color:#111111", "current", [], null)]))
+      .toThrow(/invalid stable theme rule id TR-01/u);
+    const first = themeRules()[0]!;
+    expect(() => validateThemeRuleRecords([...themeRules(), themeRule(first.id, sel, "color:#111111", "current", [], null)]))
+      .toThrow(new RegExp(`duplicate stable theme rule id ${first.id}`, "u"));
+
+    // **Two current values for one slot**, reached through the expansion: one
+    // record names `nord` inside an `:is(…)` group with a comma list, the other
+    // names it plainly — nord's `.c-meta` was this shape before §Release 5.
+    const slot = [
+      ...themeRules(),
+      themeRule("TR-9001", ':is([data-theme="dark"],[data-theme="nord"]) .c-zzz, [data-theme="ink"] .c-yyy', "color:#111111", "current", [], null),
+      themeRule("TR-9002", '[data-theme="nord"]  .c-zzz', "color:#222222;background:#000000", "current", [], null),
+    ];
+    expect(() => validateThemeRuleRecords(slot)).toThrow(/TR-9001 and TR-9002 are both current for color on nord \.c-zzz/u);
+    // The control: the same pair with the first superseded by the second is history, not a collision.
+    const recorded = [
+      ...themeRules(),
+      themeRule("TR-9001", ':is([data-theme="dark"],[data-theme="nord"]) .c-zzz, [data-theme="ink"] .c-yyy', "color:#111111", "superseded", [], "TR-9002"),
+      themeRule("TR-9002", '[data-theme="nord"]  .c-zzz', "color:#222222;background:#000000", "current", ["TR-9001"], null),
+    ];
+    expect(() => validateThemeRuleRecords(recorded)).not.toThrow();
+    expect(themeSlotsOf(':is([data-theme="dark"],[data-theme="nord"]) .c-zzz, [data-theme="ink"] .c-yyy')).toEqual([
+      ["dark", ".c-zzz"], ["nord", ".c-zzz"], ["ink", ".c-yyy"],
+    ]);
+    expect(() => themeSlotsOf(".c-zzz")).toThrow(/names no theme/u);
+  });
+
+  it("A03-DSN4 (AUTHORITY §Release 5): lint-immutable fails a theme rule unreleased, its digest changed, its link redirected, or deleted", () => {
+    const dir = mkdtempSync(join(tmpdir(), "calcium-theme-immutable-"));
+    const from = "docs/design/language";
+    copyFileSync(`${from}/lint-immutable.mjs`, join(dir, "lint-immutable.mjs"));
+    copyFileSync(`${from}/released-baseline.json`, join(dir, "released-baseline.json"));
+    const fresh = () => JSON.parse(readFileSync(`${from}/calcium-registry.json`, "utf8")) as { themeRules: ThemeRule[] };
+    const lint = (reg: unknown) => {
+      writeFileSync(join(dir, "calcium-registry.json"), JSON.stringify(reg));
+      const r = spawnSync("node", [join(dir, "lint-immutable.mjs")], { encoding: "utf8" });
+      return { status: r.status, out: r.stdout + r.stderr };
+    };
+    const clean = lint(fresh());
+    expect(clean.status, clean.out).toBe(0);
+    expect(clean.out).toMatch(/and 869 released theme rules/u);
+
+    const unreleased = fresh();
+    unreleased.themeRules.push(themeRule("TR-9001", '[data-theme="dark"] .c-zzz', "color:#111111", "current", [], null));
+    expect(lint(unreleased).out).toMatch(/TR-9001: CURRENT THEME RULE NOT RELEASED/u);
+
+    const rewritten = fresh();
+    const band = rewritten.themeRules.find((r) => r.selector === '[data-theme="hcDark"] .bg-selection' && r.status === "current")!;
+    band.declarations = "background:#00405c";
+    band.contentDigest = themeRuleContentDigest(band);
+    const r1 = lint(rewritten);
+    expect(r1.status).toBe(1);
+    expect(r1.out).toMatch(new RegExp(`${band.id}: released digest changed`, "u"));
+
+    const redirected = fresh();
+    const old = redirected.themeRules.find((r) => r.id === "TR-0106")!;
+    expect(old.supersededBy, "nord's meta, the sealed link the fabrication redirects").toBe("TR-0748");
+    old.supersededBy = "TR-0001";
+    expect(lint(redirected).out).toMatch(/TR-0106: supersededBy REDIRECTED TR-0748 → TR-0001/u);
+
+    const deleted = fresh();
+    deleted.themeRules = deleted.themeRules.filter((r) => r.id !== "TR-0864");
+    expect(lint(deleted).out).toMatch(/TR-0864: RELEASED THEME RULE DELETED/u);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("A03-DSN4 (AUTHORITY §Release 5): release.mjs seals theme rules and refuses to rewrite a sealed one", () => {
+    const dir = mkdtempSync(join(tmpdir(), "calcium-theme-release-"));
+    const from = "docs/design/language";
+    for (const f of ["lint-immutable.mjs", "released-baseline.json", "calcium-registry.json"]) copyFileSync(`${from}/${f}`, join(dir, f));
+    const release = (rev: string) => spawnSync("node", ["tools/design/release.mjs", rev, "--dir", dir], { encoding: "utf8" });
+    const lint = () => spawnSync("node", [join(dir, "lint-immutable.mjs")], { encoding: "utf8" });
+    type Reg = { themeRules: ThemeRule[] };
+    const read = () => JSON.parse(readFileSync(join(dir, "calcium-registry.json"), "utf8")) as Reg;
+    const write = (r: unknown) => { writeFileSync(join(dir, "calcium-registry.json"), `${JSON.stringify(r, null, 2)}\n`); };
+
+    const reg = read();
+    reg.themeRules.push(themeRule("TR-9001", '[data-theme="dark"] .c-zzz', "color:#111111", "current", [], null));
+    write(reg);
+    expect(lint().status, "unreleased first").toBe(1);
+    const ok = release("9.1");
+    expect(ok.status, ok.stdout + ok.stderr).toBe(0);
+    expect(ok.stdout).toMatch(/1 theme rules sealed · 870 in the baseline/u);
+    expect(lint().status, "and sealed after").toBe(0);
+
+    const edited = read();
+    edited.themeRules.find((r) => r.id === "TR-0748")!.contentDigest = "0".repeat(64);
+    write(edited);
+    const before = readFileSync(join(dir, "released-baseline.json"), "utf8");
+    const refused = release("9.2");
+    expect(refused.status).toBe(1);
+    expect(refused.stderr).toMatch(/TR-0748: sealed digest changed — supersede it, do not edit it/u);
+    expect(readFileSync(join(dir, "released-baseline.json"), "utf8"), "nothing written").toBe(before);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("A03-DSN4 (AUTHORITY §Release 5): the restored history — four band predecessors, the composed hcDark rule, mono's accent and nord's meta — each superseded and linked", () => {
+    // Record by record, value by value: this is what each slot drew before the
+    // value that stands, read out of git at the commit that overwrote it.
+    const all = themeRules();
+    const byId = new Map(all.map((r) => [r.id, r]));
+    const history = all.filter((r) => r.status === "superseded");
+    const row = (r: ThemeRule) => [r.selector.split(",")[0], r.declarations, byId.get(r.supersededBy!)!.declarations];
+    expect(history.map(row)).toEqual([
+      ['[data-theme="nord"] .c-meta', "color:#b48ead", "color:#ba96b3"],
+      ['[data-theme="hcDark"] .bg-selection', "background:#00405c", "background:#efc51c;color:#000000"],
+      ['[data-theme="hcDark"] .bg-focusGround', "background:#2e2e2e", "background:#234f92;color:#ffffff"],
+      ['[data-theme="hcLight"] .bg-selection', "background:#a8ccf0", "background:#46176d;color:#ffffff"],
+      ['[data-theme="hcLight"] .bg-focusGround', "background:#c9c9c9", "background:#7face3;color:#000000"],
+      ['[data-theme="hcDark"] .bg-selection .c-dim', "color:#fff", "background:#efc51c;color:#000000"],
+      ['[data-theme="mono"] .c-accent', "color:#fff", "color:#f0f0f0"],
+    ]);
+    // The deleted composed rule is whole — nine tones, each in both forms.
+    const composed = history.find((r) => r.selector.startsWith('[data-theme="hcDark"] .bg-selection .c-dim'))!;
+    expect(themeSlotsOf(composed.selector).map(([, s]) => s)).toHaveLength(18);
+    // And every link is reciprocal, and every successor is current.
+    for (const r of history) {
+      const next = byId.get(r.supersededBy!)!;
+      expect(next.status, `${r.id}'s successor`).toBe("current");
+      expect(next.supersedes, `${next.id} acknowledges ${r.id}`).toContain(r.id);
+    }
+  });
+});
+
+/**
+ * **The seal is outside the branch** (AUTHORITY.md §Release 4). The in-tree lint
+ * compares two files a branch can both edit, and its anchor is recomputable; this
+ * compares the branch's baseline with a ref's copy, which the branch cannot edit.
+ * Each row builds a throwaway repository — a commit holding the baseline as `main`,
+ * then an edit in the working tree — so no row depends on what `origin/main` holds
+ * today. Dropping the digest comparison → DSN3's rewrite row passes and fails
+ * here; treating a ref with no baseline as unresolved → the first-release row
+ * fails; passing on an unresolved ref → the shallow-clone row fails.
+ */
+describe("A03-DSN3 — the released baseline against another ref's copy", () => {
+  type Entry = { digest: string; status: string; supersedes: string[]; supersededBy: string[] };
+  type Baseline = { rules: Record<string, Entry>; count: number; themeRules?: Record<string, Entry>; themeCount?: number };
+  const real = JSON.parse(readFileSync("docs/design/language/released-baseline.json", "utf8")) as Baseline;
+  const git = (repo: string, ...a: string[]) =>
+    spawnSync("git", ["-C", repo, "-c", "user.email=t@t", "-c", "user.name=t", ...a], { encoding: "utf8" });
+  const repoWith = (base: Baseline | null): string => {
+    const repo = mkdtempSync(join(tmpdir(), "calcium-released-"));
+    git(repo, "init", "-q", "-b", "main");
+    const dir = join(repo, "docs/design/language");
+    spawnSync("mkdir", ["-p", dir]);
+    writeFileSync(join(repo, "README"), "x\n");
+    if (base !== null) writeFileSync(join(dir, "released-baseline.json"), JSON.stringify(base, null, 1));
+    git(repo, "add", "-A");
+    expect(git(repo, "commit", "-q", "-m", "base").status, "the base commit").toBe(0);
+    return repo;
+  };
+  const head = (repo: string, edit: (b: Baseline) => void): void => {
+    const b = structuredClone(real);
+    edit(b);
+    writeFileSync(join(repo, "docs/design/language/released-baseline.json"), JSON.stringify(b, null, 1));
+  };
+  const check = (repo: string, ref = "main") =>
+    spawnSync("node", ["tools/design/released-against.mjs", "--repo", repo, "--ref", ref], { encoding: "utf8" });
+  const run = (edit: (b: Baseline) => void, ref = "main") => {
+    const repo = repoWith(real);
+    head(repo, edit);
+    const r = check(repo, ref);
+    rmSync(repo, { recursive: true, force: true });
+    return { status: r.status, out: r.stdout + r.stderr };
+  };
+  const someCurrent = Object.keys(real.rules).find((id) => real.rules[id]!.status === "current")!;
+  const someSuperseded = Object.keys(real.rules).find((id) => real.rules[id]!.status === "superseded")!;
+
+  it("A03-DSN3 (AUTHORITY §Release 4): an unchanged baseline passes, and one with an entry added passes", () => {
+    const same = run(() => undefined);
+    expect(same.status, same.out).toBe(0);
+    expect(same.out).toMatch(new RegExp(`OK · ${String(Object.keys(real.rules).length + Object.keys(real.themeRules ?? {}).length)} entries sealed on main kept, 0 added`, "u"));
+    const added = run((b) => { b.rules["R-ZZZ-900"] = { digest: "a".repeat(64), status: "current", supersedes: [], supersededBy: [] }; });
+    expect(added.status, added.out).toBe(0);
+    expect(added.out).toMatch(/kept, 1 added/u);
+  });
+
+  it("A03-DSN3 (AUTHORITY §Release 4): a sealed digest rewritten — the re-anchor the in-tree lint passes — fails", () => {
+    const r = run((b) => { b.rules["R-SEL-005"]!.digest = "0".repeat(64); });
+    expect(r.status, r.out).toBe(1);
+    expect(r.out).toMatch(/R-SEL-005: digest changed from main's/u);
+  });
+
+  it("A03-DSN3 (AUTHORITY §Release 4): a removed entry, a changed supersedes, an illegal status and a redirected link each fail", () => {
+    const removed = run((b) => { delete b.rules[someCurrent]; });
+    expect(removed.status, removed.out).toBe(1);
+    expect(removed.out).toMatch(new RegExp(`${someCurrent}: REMOVED`, "u"));
+
+    const supersedes = run((b) => { b.rules[someCurrent]!.supersedes = ["R-ZZZ-901"]; });
+    expect(supersedes.out).toMatch(new RegExp(`${someCurrent}: supersedes changed`, "u"));
+
+    const revived = run((b) => { b.rules[someSuperseded]!.status = "current"; });
+    expect(revived.out).toMatch(new RegExp(`${someSuperseded}: status superseded → current is not a legal transition`, "u"));
+
+    const redirected = run((b) => { b.rules[someSuperseded]!.supersededBy = ["R-ZZZ-902"]; });
+    expect(redirected.status, redirected.out).toBe(1);
+    expect(redirected.out).toMatch(new RegExp(`${someSuperseded}: supersededBy changed`, "u"));
+  });
+
+  it("A03-DSN4 (AUTHORITY §Release 5): released-against fails a rewritten theme digest and passes a theme supersession", () => {
+    const theme = Object.keys(real.themeRules ?? {}).find((id) => real.themeRules![id]!.status === "current")!;
+    expect(theme, "the baseline seals theme rules").toBeDefined();
+    const rewritten = run((b) => { b.themeRules![theme]!.digest = "0".repeat(64); });
+    expect(rewritten.status, rewritten.out).toBe(1);
+    expect(rewritten.out).toMatch(new RegExp(`${theme}: digest changed from main's`, "u"));
+    const removed = run((b) => { delete b.themeRules![theme]; });
+    expect(removed.out).toMatch(new RegExp(`${theme}: REMOVED`, "u"));
+    const superseded = run((b) => {
+      b.themeRules![theme]!.status = "superseded";
+      b.themeRules![theme]!.supersededBy = ["TR-9999"];
+      b.themeRules!["TR-9999"] = { digest: "a".repeat(64), status: "current", supersedes: [theme], supersededBy: [] };
+    });
+    expect(superseded.status, superseded.out).toBe(0);
+    expect(superseded.out).toMatch(/kept, 1 added/u);
+  });
+
+  it("A03-DSN3 (AUTHORITY §Release 4): a supersession — status to superseded, a successor linked — is not a change", () => {
+    const r = run((b) => {
+      b.rules[someCurrent]!.status = "superseded";
+      b.rules[someCurrent]!.supersededBy = ["R-ZZZ-903"];
+      b.rules["R-ZZZ-903"] = { digest: "b".repeat(64), status: "current", supersedes: [someCurrent], supersededBy: [] };
+    });
+    expect(r.status, r.out).toBe(0);
+    // The control: the same link added *without* the transition is a change.
+    const linkOnly = run((b) => { b.rules[someCurrent]!.supersededBy = ["R-ZZZ-903"]; });
+    expect(linkOnly.status, linkOnly.out).toBe(1);
+  });
+
+  it("A03-DSN3 (AUTHORITY §Release 4): a ref holding no baseline passes and says so; a ref that does not resolve fails", () => {
+    const repo = repoWith(null);
+    head(repo, () => undefined);
+    const first = check(repo);
+    expect(first.status, first.stdout + first.stderr).toBe(0);
+    expect(first.stdout).toMatch(/main holds no docs\/design\/language\/released-baseline\.json — nothing is released there yet/u);
+    const shallow = check(repo, "origin/main");
+    expect(shallow.status, shallow.stdout + shallow.stderr).toBe(1);
+    expect(shallow.stderr).toMatch(/origin\/main does not resolve/u);
+    rmSync(repo, { recursive: true, force: true });
+  });
+});
+
+/**
+ * **The fixtures are the page's projection** (AUTHORITY.md §Fixtures). They were
+ * committed once and sixteen of them went stale while the page was rebuilt around
+ * them, because nothing derived them and nothing compared them. `--check` is what
+ * `make design-check` runs, and each row below fabricates one kind of drift in a
+ * copy and asserts it is named — the clean control first, so a check that refused
+ * everything could not pass. Replacing `--check`'s comparison with a count of
+ * files → the content, dimension and hash rows fail; dropping the directory walk
+ * → the unexpected-file rows fail.
+ */
+describe("the design fixtures — derived from the page, checked against it", () => {
+  const from = "docs/design/language/fixtures";
+  const check = (dir: string) =>
+    spawnSync("npx", ["tsx", "tools/design/fixtures.ts", "--check", "--out", dir], { encoding: "utf8" });
+  const copy = (): string => {
+    const dir = mkdtempSync(join(tmpdir(), "calcium-fixtures-"));
+    for (const f of readdirSync(from)) copyFileSync(join(from, f), join(dir, f));
+    return dir;
+  };
+  const problems = (r: ReturnType<typeof check>): string[] =>
+    r.stderr.split("\n").map((l) => l.trim()).filter((l) => l !== "" && !l.startsWith("FAIL"));
+  type Entry = { file: string; cols: number; rows: number; sha: string };
+  const index = (dir: string): Entry[] => JSON.parse(readFileSync(join(dir, "INDEX.json"), "utf8")) as Entry[];
+  const writeIndex = (dir: string, entries: Entry[]) => {
+    writeFileSync(join(dir, "INDEX.json"), JSON.stringify(entries, null, 1));
+  };
+
+  it("A03-DSN2 passes: the committed corpus equals the derivation", () => {
+    const r = check(from);
+    expect(r.status, r.stdout + r.stderr).toBe(0);
+    expect(r.stdout).toMatch(/^fixtures · \d+ derived from the page, all equal, nothing unexpected$/mu);
+  });
+
+  it("A03-DSN2 fires on every kind of drift, one at a time, naming the file", () => {
+    const dir = copy();
+    const first = index(dir)[0]!;
+    const control = check(dir);
+    expect(control.status, "the copy is clean before anything is fabricated").toBe(0);
+
+    // Contents: one character of one panel.
+    const text = readFileSync(join(dir, first.file), "utf8");
+    writeFileSync(join(dir, first.file), `${text.slice(0, -1)}x\n`);
+    const content = check(dir);
+    expect(content.status).toBe(1);
+    expect(problems(content)).toEqual([`${first.file}: differs from the page`]);
+    writeFileSync(join(dir, first.file), text);
+
+    // Dimensions and hashes: each field of the index alone.
+    for (const field of ["cols", "rows", "sha"] as const) {
+      const entries = index(dir);
+      const e = entries[0]!;
+      if (field === "sha") e.sha = "0".repeat(16);
+      else e[field] += 1;
+      writeIndex(dir, entries);
+      const r = check(dir);
+      expect(r.status, field).toBe(1);
+      expect(problems(r), field).toEqual(["INDEX.json: differs from the page"]);
+      copyFileSync(join(from, "INDEX.json"), join(dir, "INDEX.json"));
+    }
+
+    // Names: a rename is one missing file and one unexpected one.
+    const renamed = first.file.replace(/^\d{3}/u, "999");
+    copyFileSync(join(dir, first.file), join(dir, renamed));
+    rmSync(join(dir, first.file));
+    const rename = check(dir);
+    expect(rename.status).toBe(1);
+    expect(problems(rename).sort()).toEqual(
+      [`${first.file}: missing — the page produces it`, `${renamed}: unexpected — the page does not produce it`].sort(),
+    );
+    rmSync(join(dir, renamed));
+
+    // Missing alone, then restored.
+    const missing = check(dir);
+    expect(problems(missing)).toEqual([`${first.file}: missing — the page produces it`]);
+    copyFileSync(join(from, first.file), join(dir, first.file));
+
+    // Unexpected alone: a file the page does not produce.
+    writeFileSync(join(dir, "stray.txt"), "kept by hand\n");
+    const extra = check(dir);
+    expect(extra.status).toBe(1);
+    expect(problems(extra)).toEqual(["stray.txt: unexpected — the page does not produce it"]);
+    rmSync(join(dir, "stray.txt"));
+
+    // And the copy is clean again, so every refusal above was the fabrication's.
+    expect(check(dir).status, "restored").toBe(0);
+    rmSync(dir, { recursive: true, force: true });
+  }, 60_000);
+
+  it("A03-DSN2: --check writes nothing", () => {
+    const dir = copy();
+    writeFileSync(join(dir, "stray.txt"), "kept by hand\n");
+    const before = readdirSync(dir).sort().map((f) => [f, readFileSync(join(dir, f), "utf8")]);
+    expect(check(dir).status).toBe(1);
+    const after = readdirSync(dir).sort().map((f) => [f, readFileSync(join(dir, f), "utf8")]);
+    expect(after).toEqual(before);
+    rmSync(dir, { recursive: true, force: true });
+  }, 30_000);
 });

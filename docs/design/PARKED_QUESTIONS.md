@@ -20,7 +20,7 @@ held at the point where a choice would be mine to invent.
 
 ## Entries
 
-**Open: 18, 23, 32, 36, 37, 38, 39, 40.** Every other entry is ruled or retracted. A ruled entry keeps its body, with the ruling directly above it and a premise note wherever the ruling rested on something the entry or the design contradicts.
+**Open: 18, 23, 32, 36, 37, 39, 40.** Every other entry is ruled or retracted. A ruled entry keeps its body, with the ruling directly above it and a premise note wherever the ruling rested on something the entry or the design contradicts.
 
 > **Ruled 2026-09-24.** Already answered, by the chain rule. The repo-side spec (C09 §4, I5) carries the narrowed rule and the registry does not. That assumption stands as the answer.
 
@@ -800,7 +800,9 @@ that held. **Taken unless you say otherwise** (C11 I30): no arrow, the text alon
 good or bad about. The alternative is a third mark (`→`, or `=` at ASCII), which
 is a glyph the registry does not record.
 
-**38 · OPEN — Ruling 26's `v` collides with disclosure's `v` in a content row.**
+> **Ruled 2026-09-27 (review batch 1, item 22).** **(a)** — `trendDown` takes **`V`** at ASCII; `trendUp` keeps `^`, and `collapse` keeps `v`. The case-only difference between `v` and `V` is accepted as the cost, since both alternatives cost more: (b) moves every ASCII golden with an expanded row, and (c) reads as *low* rather than *down*. **Premise note:** C09 I111 said *the registry records them as `trend-up` and `trend-down`*, and no registry glyph carries `↑` or `↓` — the ruling in 26 was written and the records never were. They land with `GLYPH_TABLE`'s rows in one commit, because SS65 refuses a current record the tree cannot draw.
+
+**38 · RULED — Ruling 26's `v` collides with disclosure's `v` in a content row.**
 Ruling 26 gave the trend `^`/`v` in the `inline` domain, on the premise that the
 domain model separates it from sort's `^`/`v` in `table-header` — which it does.
 **It does not separate it from `collapse`'s `v`**: the registry's

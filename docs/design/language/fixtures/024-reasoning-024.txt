@@ -1,6 +1,6 @@
-  ▸ thinking · 4s · 312 tok                    collapsed — the default
+  ▹ thinking · 4s · 312 tok                    collapsed — the default
 
-  ▾ thinking · 4s · 312 tok
+  ▿ thinking · 4s · 312 tok
     │ The parser tracks quotes with a boolean, so a nested quote
     │ flips it back and the run ends early. A depth counter fixes
     │ that, but I should check whether escaping is handled first.

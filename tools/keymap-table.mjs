@@ -26,12 +26,15 @@
 // which the table says rather than omits.
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { relative } from "node:path";
+
+import { keysOutputPath, registryPath, renderKeysMarkdown, repoRoot } from "../docs/design/language/build-calcium.mjs";
 
 import { chordText, defaultKeymap, keySlot } from "../src/interaction/router/keymap.js";
 import { FOCUS_ORDER } from "../src/interaction/router/focus.js";
 
-export const KEYS_DOC = "docs/KEYS.md";
+/** The registry names the file; the builder resolves it against the repository root. */
+export const KEYS_DOC = relative(repoRoot, keysOutputPath);
 
 /** The mark on a key bound at more than one target. */
 export const LADDER_MARK = "†";
@@ -154,11 +157,21 @@ export function liveTable() {
   return renderKeymapTable(defaultKeymap, FOCUS_ORDER);
 }
 
+/**
+ * **The whole of `docs/KEYS.md`, and this tool is its one writer** (C16 §6a
+ * clause 5): the design's binding table, as the builder renders it from the
+ * registry, then the live ladder. Two projections of one source in one file —
+ * where there were two generated files under one name.
+ */
+export function keysDocument() {
+  return `${renderKeysMarkdown(JSON.parse(readFileSync(registryPath, "utf8")))}\n${liveTable()}`;
+}
+
 const isMain =
   process.argv[1] !== undefined && import.meta.url === new URL(`file://${process.argv[1]}`).href;
 if (isMain) {
-  const path = join(process.cwd(), KEYS_DOC);
-  const want = liveTable();
+  const path = keysOutputPath;
+  const want = keysDocument();
   if (process.argv.includes("--check")) {
     let have = "";
     try {

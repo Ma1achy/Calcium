@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { block } from "../../src/data/viewmodel/index.js";
 import { spinnerFrames } from "../../src/presentation/blocks/index.js";
-import { ASCII_CAPS, FULL_CAPS, measurable } from "../support/render.js";
+import { ASCII_CAPS, FULL_CAPS, MONO_UNICODE_CAPS, measurable } from "../support/render.js";
 import { CONTENT_LINE_CAP, DETAIL_LINE_CAP, statusRowsFor } from "../../src/presentation/blocks/kinds/status.js";
 import { cells } from "../../src/presentation/text.js";
 
@@ -523,7 +523,7 @@ describe("C09 I34 — the height fits the message and the width does not", () =>
     block({ kind: "status", id: "s", state: "error", message, height } as never) as never;
 
   const framed = (message: string, w: number, caps = FULL_CAPS): readonly string[] => {
-    const rows = statusRowsFor(errStatus(message, 1), w, caps);
+    const rows = statusRowsFor(errStatus(message, 1), w);
     return measurable({ capabilities: caps }).renderToLines(errStatus(message, rows), w).map(plain);
   };
 
@@ -573,7 +573,7 @@ describe("C09 I34 — the height fits the message and the width does not", () =>
     const r = measurable({ capabilities: FULL_CAPS });
     for (const w of [12, 20, 40, 80, 120]) {
       for (const msg of ["ENOENT", "a message that needs a second line at eighty columns and several at twelve", "x\ny\nz\nq\nw"]) {
-        const asked = statusRowsFor(errStatus(msg, 1), w, FULL_CAPS);
+        const asked = statusRowsFor(errStatus(msg, 1), w);
         const drawn = r.renderToLines(errStatus(msg, asked), w).length;
         expect(drawn, `w=${w} asked ${asked} for ${JSON.stringify(msg.slice(0, 24))}`).toBe(asked);
       }
@@ -658,14 +658,14 @@ describe("C09 I34 — the height fits the message and the width does not", () =>
     // At a width that cannot hold ` ERROR ` and a rule, `widthRung` drops the tag
     // — so the sum must drop it too, or the box asks for a row it will not draw.
     const msg = "ENOENT";
-    expect(statusRowsFor(errStatus(msg, 1), 40, FULL_CAPS), "border, tag, one message row").toBe(4);
+    expect(statusRowsFor(errStatus(msg, 1), 40), "border, tag, one message row").toBe(4);
 
     // **The property is that the tag is not *counted*, not that the box is
     // shorter.** The first draft asserted the height shrinks and it grows: at
     // eight columns the content is four cells wide, so `ENOENT` wraps to two
     // rows and the wrap costs more than the dropped tag saves. A number moving
     // the way you expected is not evidence about the rule you meant.
-    const narrow = statusRowsFor(errStatus(msg, 1), 8, FULL_CAPS);
+    const narrow = statusRowsFor(errStatus(msg, 1), 8);
     const drawn = framed(msg, 8);
     expect(drawn, "and the frame is the height that was asked for").toHaveLength(narrow);
     expect(drawn.some((r) => r.includes("ERROR")), "no tag at this width").toBe(false);
@@ -689,13 +689,13 @@ describe("C09 I34 — the height fits the message and the width does not", () =>
     // Counting it gives six, which turns the gutter on, narrows the content to
     // four, and splits `ENOENT` across two rows to pay for a tag that is never
     // drawn.
-    expect(statusRowsFor(errStatus(msg, 1), 8, FULL_CAPS), "border and two wrapped rows").toBe(5);
+    expect(statusRowsFor(errStatus(msg, 1), 8), "border and two wrapped rows").toBe(5);
 
     // And the half that is a property rather than a figure: the granted height
     // shows the whole message at every width.
     const r = measurable({ capabilities: FULL_CAPS });
     for (const w of [8, 12, 20, 40, 80]) {
-      const asked = statusRowsFor(errStatus(msg, 1), w, FULL_CAPS);
+      const asked = statusRowsFor(errStatus(msg, 1), w);
       expect(
         r.renderToLines(errStatus(msg, asked), w).map(plain).join(""),
         `w=${w}: the granted height shows it all`,
@@ -763,5 +763,96 @@ describe("C09 §3a-ter — a status has three parts", () => {
     // `detail: ""` has said nothing, and a row taken for nothing is a row of the
     // message lost to a field's presence rather than to its content.
     expect(shrug, "an empty detail is not a part").toEqual(absent);
+  });
+});
+
+describe("C09 §3a-quater — a status with no height is fitted", () => {
+  const SHORT = "the far side is gone";
+  // 158 cells — the message §3a-quater measured `b.status` cutting at `4099bb6e`.
+  const LONG =
+    "plot failed to render: series 'loss' has 0 points after filtering by the window you asked " +
+    "for, and the fallback axis could not be derived from an empty domain";
+  const HUGE = `${LONG} ${LONG} ${LONG}`;
+  const DETAIL = "code: ENOENT\npath: /var/run/docker.sock";
+  type State = "error" | "retrying" | "loading" | "empty";
+
+  const fitted = (state: State, message: string, framed: boolean, detail?: string): never =>
+    block({
+      kind: "status",
+      id: "s",
+      state,
+      message,
+      ...(framed ? { framed } : {}),
+      ...(detail === undefined ? {} : { detail }),
+      ...(state === "retrying" ? { retryInMs: 4000, attempt: 2 } : {}),
+      ...(state === "loading" ? { elapsedMs: 3000 } : {}),
+    } as never) as never;
+
+  it("T3.98 (C09 I31, C09 I34, §3a-quater): measure is the fit, render draws it, and no capability moves it", () => {
+    // **The classification table's axes, swept whole** — framed × state ×
+    // message × detail — at every width 1–120 and at three capability sets.
+    // `measure` takes no capability record, so the fit has to be the same number
+    // at `FULL`, `ASCII` and 1-bit; `render` does take one, and draws the mark
+    // and the spinner each set resolves — so row-count agreement at all three is
+    // what says the capability-free count was not a guess.
+    //
+    // **Row agreement alone is a tautology here**, and the first draft was only
+    // that: `render` allocates from the same `statusHeight`, so it draws exactly
+    // the fit whatever the fit is. A fit one row short shows up as a *cut* — the
+    // message's tail replaced by `…` — so the second half asks for every word and
+    // every detail line wherever the content fits the cap: from 40 columns, for
+    // the short and the long message (table rows F1–F8).
+    const kits = [FULL_CAPS, ASCII_CAPS, MONO_UNICODE_CAPS].map((capabilities) => ({
+      name: capabilities === FULL_CAPS ? "full" : capabilities === ASCII_CAPS ? "ascii" : "1-bit",
+      kit: measurable({ capabilities }),
+    }));
+    const wrong: string[] = [];
+    let checked = 0;
+    for (const framed of [false, true]) {
+      for (const state of ["error", "retrying", "loading", "empty"] as const) {
+        for (const [mname, message] of [["short", SHORT], ["long", LONG], ["huge", HUGE]] as const) {
+          for (const detail of [undefined, DETAIL]) {
+            const blk = fitted(state, message, framed, detail);
+            for (let w = 1; w <= 120; w += 1) {
+              const fit = statusRowsFor(blk, w);
+              const at = `${framed ? "framed" : "free"} ${state} ${mname} ${detail === undefined ? "-" : "detail"} w=${String(w)}`;
+              for (const { name, kit } of kits) {
+                const measured = kit.measure(blk, w);
+                const lines = kit.renderToLines(blk, w);
+                const drawn = lines.length;
+                if (measured !== fit || drawn !== fit) {
+                  wrong.push(`${at} ${name}: fit ${String(fit)}, measure ${String(measured)}, drawn ${String(drawn)}`);
+                }
+                if (w >= 40 && mname !== "huge") {
+                  const text = lines.map(plain).join(" ");
+                  const missing = [...message.split(" "), ...(detail === undefined ? [] : detail.split("\n"))].filter(
+                    (part) => !text.includes(part),
+                  );
+                  if (missing.length > 0) wrong.push(`${at} ${name}: cut — missing ${missing.slice(0, 3).join(" | ")}`);
+                }
+                checked += 1;
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(checked, "the sweep ran").toBe(2 * 4 * 3 * 2 * 120 * 3);
+    expect(wrong.slice(0, 10), `${String(wrong.length)} disagreements`).toEqual([]);
+  });
+
+  it("T3.98 (C09 I34, F10): an `empty` box counts no banner, and the table's figures hold", () => {
+    const kit = measurable({ capabilities: FULL_CAPS });
+    // F10 — the banner an `empty` box never draws. Border and one message row,
+    // not a fourth row of centred slack.
+    expect(kit.measure(fitted("empty", SHORT, false), 80), "border, message, border").toBe(3);
+    expect(kit.measure(fitted("empty", SHORT, true), 80), "framed: the message alone").toBe(1);
+    // F1–F4 at 80 and 40, the figures C23 I51 read from a frame among them.
+    for (const w of [80, 40]) {
+      expect(kit.measure(fitted("error", SHORT, false), w), `F1 w=${String(w)}`).toBe(4);
+      expect(kit.measure(fitted("retrying", SHORT, false), w), `F2 w=${String(w)}`).toBe(5);
+      expect(kit.measure(fitted("error", SHORT, true), w), `F3 w=${String(w)}`).toBe(2);
+      expect(kit.measure(fitted("retrying", SHORT, true), w), `F4 w=${String(w)}`).toBe(3);
+    }
   });
 });

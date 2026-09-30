@@ -43,12 +43,15 @@ const MUTATIONS = [
     // a keeper before this change and T2.60 is a second expression of it. The
     // curated 16-colour map had none.
     name: "two categorical slots take one 4-bit index",
-    file: "src/presentation/theme/four-bit.ts",
+    // **Re-pointed at `four-bit.generated.ts` by C10 I62**, where the indices
+    // live since the 4-bit maps moved into the registry; `four-bit.ts` names
+    // the generated objects and holds no index to mutate.
+    file: "src/presentation/theme/four-bit.generated.ts",
     // The **dark** map: `c4` is 11 there and 3 in the high-contrast one, which
     // is what tells the two `c5: 12` lines apart. T2.61 reads all three maps,
     // so either would have killed — and only one is the map this row is about.
-    from: '  "categorical.c4": 11,\n  "categorical.c5": 12,',
-    to: '  "categorical.c4": 11,\n  "categorical.c5": 3,',
+    from: '    "categorical.c4": 11,\n    "categorical.c5": 12,',
+    to: '    "categorical.c4": 11,\n    "categorical.c5": 3,',
     expect: "T2.61",
   },
   {

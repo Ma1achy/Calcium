@@ -266,8 +266,12 @@ export function shadeColour(colour: ColourValue, intensity: number): ColourValue
  * reference values the mapping measures distance against. A child asking for
  * *the terminal's red* keeps its index and never reaches this table (I38); it is
  * consulted only when an `rgb` or an `ansi256` has to come down to four bits.
+ *
+ * **Exported for C10 I61**: the curated 4-bit band pairs are held to C10 I45's
+ * constraints against these values, because the user's own sixteen cannot be
+ * known and the reference is the one statement a gate can check.
  */
-const ANSI16_HEX: readonly string[] = Object.freeze([
+export const ANSI16_HEX: readonly string[] = Object.freeze([
   "#000000", "#800000", "#008000", "#808000", "#000080", "#800080", "#008080", "#c0c0c0",
   "#808080", "#ff0000", "#00ff00", "#ffff00", "#0000ff", "#ff00ff", "#00ffff", "#ffffff",
 ]);

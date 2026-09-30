@@ -554,6 +554,16 @@ export type Cell = Readonly<{
    * numbers for everyone.
    */
   bar?: BarSpec;
+  /**
+   * Two readings of one metric, the earlier and the later (I128, §088 §4).
+   *
+   * `text` is what follows the arrow — `from 0.41` — so the producer keeps its
+   * own formatting. **The direction and the tone are derived, never supplied**:
+   * the arrow is the sign of `to − from` and its tone the column's `polarity`,
+   * which is why construction refuses a trend cell that also carries `glyph`,
+   * `tone`, `spark` or `bar` — a second answer to a question the rule gives one.
+   */
+  trend?: Readonly<{ from: number; to: number }>;
 }>;
 
 /** A quantity against a scale (I50c, C12 §3b). */
@@ -631,6 +641,14 @@ export type ColumnDef = Readonly<{
    * side is being described, on a field set once per column and never revisited.
    */
   truncateFrom?: "start" | "end";
+  /**
+   * Which movement the column's metric wants (I128, §086, `R-COL-006`).
+   *
+   * On the column because §086 homes a metric inside a table cell, and a column
+   * is one metric. Undeclared is `neutral`, so no adapter changes: a trend in a
+   * neutral column draws its arrow in the cell's default tone.
+   */
+  polarity?: "higher" | "lower" | "neutral";
 }>;
 
 export type TableRow = Readonly<{
@@ -3274,6 +3292,13 @@ export type FormField = Readonly<{
   error?: string;
   /** The flag a submit writes the value under — absent is `--<id>`, `""` is positional (C04 I137). */
   flag?: string;
+  /**
+   * Whether the field takes input (C04 I140) — the registry's `availability`
+   * axis, word for word; absent is `enabled`. `readonly` is focusable and
+   * copyable and not entered; `disabled` is no element at all, so `⇥` skips it,
+   * stands in the well (C09 I122), and is not submitted.
+   */
+  availability?: "enabled" | "readonly" | "disabled";
 }>;
 
 /** One button of a form (C04 §3ar). */
@@ -3895,14 +3920,17 @@ export type Status = Readonly<{
    */
   detail?: string;
   /**
-   * The rows the box occupies — required, on `plot`'s argument (C09 I31).
+   * The rows the box occupies — **absent, it is fitted** (C04 I66, C09 §3a-quater).
    *
-   * A box the framework sized by guess is silently wrong and nobody notices it
-   * is wrong. On the error path the registry supplies the number `measure` has
-   * already committed, which is what makes the pair self-consistent by
-   * construction rather than by agreement.
+   * Present, it is a committed measure and the box occupies it exactly: on the
+   * error path the registry supplies the number `measure` has already committed,
+   * which is what makes the pair self-consistent by construction rather than by
+   * agreement. Absent, `measure` and `render` both take `statusRowsFor` at the
+   * width they are given — the same function, so not a guess. The field was
+   * required on the argument that a guessed height is silently wrong, and what
+   * requiring it produced was `b.status` guessing 1 or 2 with no width to fit at.
    */
-  height: number;
+  height?: number;
   /**
    * Supplied by whoever holds the clock, never derived from `ctx.tick` (C04 I66).
    *

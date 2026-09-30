@@ -853,15 +853,16 @@ describe("C09 I83 — a notice takes the focus ground and no column", () => {
       "the ground moves at least one of them",
     ).not.toBe(params(tone("error", DARK_THEME, FULL_CAPS)));
 
-    // **At one bit the ground is gone and the tone's mono class is what is
-    // left.** `focusStyle` has no inverse rung — inverse is selection's only
-    // carrier — so what survives here is the notice's own ink, and `▸` is what
-    // says *focus* (R-SEL-006). A second inverse rung would make a focused row
-    // and a selected one one frame.
+    // **At one bit the whole notice inverts, keeping its tone's mono class**
+    // (C09 I121). This arm asserted the focused frame *equal* to the resting one
+    // and said `▸` carried focus — a notice has no `▸`, C09 I83 reserves it no
+    // column, so the frame carried nothing. The resting frame is the control.
     const mono = kitAt({ blockId: "h", rowId: "h" }, MONO_UNICODE_CAPS).renderSequence([HEAD], WIDTH);
     const monoPlain = kitAt(null, MONO_UNICODE_CAPS).renderSequence([HEAD], WIDTH);
-    expect(cellFor(mono, "ps · ok").attrs, "no inverse at 1-bit").not.toContain(7);
-    expect(cellFor(mono, "ps · ok"), "the tone's mono class, focused or not").toEqual(cellFor(monoPlain, "ps · ok"));
+    expect(cellFor(mono, "ps · ok").attrs, "inverse at 1-bit").toContain(7);
+    expect(cellFor(monoPlain, "ps · ok").attrs, "and not at rest").not.toContain(7);
+    const without = (attrs: readonly number[]): readonly number[] => attrs.filter((a) => a !== 7);
+    expect(without(cellFor(mono, "ps · ok").attrs), "the tone's mono class is kept").toEqual(cellFor(monoPlain, "ps · ok").attrs);
   });
 });
 
@@ -988,11 +989,30 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
     // message and is 7 on the box, so a message that wrapped past four rows asks
     // for more than it used to and nothing asks for less.
     const asked = (message: string, width: number): number =>
-      statusRowsFor(statusAt({ message, height: 1 }) as never, width, FULL_CAPS);
+      statusRowsFor(statusAt({ message, height: 1 }) as never, width);
     expect(asked(LONG, 40), "a nine-row message used to be held to four").toBeGreaterThan(4);
     expect(asked(LONG, 40), "and is held by the box's cap instead").toBeLessThanOrEqual(CONTENT_LINE_CAP + 3);
     for (const width of WIDTHS) {
       expect(asked("decode failed", width), `w=${String(width)}: a short message is unmoved`).toBeLessThanOrEqual(5);
+    }
+  });
+
+  it("T2.182 (C09 I31): a declared height wins over the fit, at every width", () => {
+    // **The fit is for a box that declares nothing** (C09 §3a-quater). A box
+    // with a height is a commitment its producer made — the registry's error
+    // path, `loading`'s one row, `empty`'s three — and re-sizing it behind the
+    // producer's back would break the pair the registry builds by construction.
+    // The message is one the fit would give seven content rows at any width.
+    const kit = measurable({ capabilities: FULL_CAPS });
+    const huge = Array.from({ length: 40 }, (_u, i) => `word${String(i)}`).join(" ");
+    const declared = statusAt({ message: huge, height: 2 });
+    const fitted = block({ kind: "status", id: "s", state: "error", message: huge } as never) as Block;
+    for (let width = 1; width <= 120; width += 1) {
+      expect(kit.measure(declared, width), `w=${String(width)}: the declared two`).toBe(2);
+      expect(kit.renderToLines(declared, width), `w=${String(width)}: drawn at two`).toHaveLength(2);
+      // The control: the same message undeclared is not two anywhere, so the
+      // row above is about the declaration and not about a message that fits.
+      expect(kit.measure(fitted, width), `w=${String(width)}: the fit differs`).toBeGreaterThan(2);
     }
   });
 
@@ -1271,5 +1291,15 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
 });
 
 describe("C09 I111 — the trend arrows", () => {
-  it.todo("T2.174 (C09 I111, R-COL-006): trendUp and trendDown resolve to ↑ ↓ and ^ v — not deferred on a component: parked as 38, the down arrow has no ASCII half (docs/design/PARKED_QUESTIONS.md)");
+  it("T2.174 (C09 I111, R-COL-006): trendUp and trendDown resolve to ↑ ↓ and ^ V", () => {
+    const at = (caps: Parameters<typeof glyphs>[0]) => [glyphs(caps).trendUp, glyphs(caps).trendDown];
+    expect(at({ unicode: "full", ambiguousWidth: "narrow" })).toEqual(["\u2191", "\u2193"]);
+    expect(at({ unicode: "ascii", ambiguousWidth: "narrow" })).toEqual(["^", "V"]);
+    // Both arrows are Ambiguous, so `wide` takes the ASCII rung with the set (C09 I48).
+    expect(at({ unicode: "full", ambiguousWidth: "wide" })).toEqual(["^", "V"]);
+    // **`V` and not `v`** (question 38): `v` is disclosure's, and a row's lead and
+    // a cell share one content row.
+    expect(glyphFor("collapse", { unicode: "ascii", ambiguousWidth: "narrow" })).toBe("v");
+    expect(glyphs({ unicode: "ascii", ambiguousWidth: "narrow" }).trendDown).not.toBe("v");
+  });
 });

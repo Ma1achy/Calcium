@@ -66,6 +66,24 @@ jobs:
           cache: npm
       - run: make install
       - run: make enforce      # A03 · ~5s · fails first, deliberately
+
+      # **The released baseline against main's** (AUTHORITY.md §Release 4). The
+      # in-tree lint compares two files this branch can both edit; this compares
+      # against a copy it cannot. The checkout is one commit deep and holds no
+      # `origin/main`, so main is fetched by its full refspec — and the check
+      # fails on a ref it cannot resolve, so a missing fetch is red, not green.
+      - run: git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+      - run: make released
+
+      # **The design page's own conformance checks, in a pinned browser**
+      # (AUTHORITY.md §Browser conformance). Five system libraries by name —
+      # the runner image ships Chrome and would supply them silently, which is
+      # a dependency on the image rather than on this file (A04 §4 has the
+      # same list). Then the install as its own step, pinned by version and
+      # digest (A04 §3), then the page.
+      - run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends libnspr4 libnss3 libatk1.0-0t64 libatspi2.0-0t64 libxdamage1
+      - run: make chromium
+      - run: make design-browser
       - run: make check        # includes both examples' own `check` scripts (F150)
 
       # **`instruments` was in `make all` and in no CI job** (F154). The
