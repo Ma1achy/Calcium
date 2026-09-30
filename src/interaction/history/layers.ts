@@ -20,9 +20,6 @@ import type { Anchor, HistoryEntry, SearchState } from "./types.js";
 export const SEARCH_ID = "reverse-search";
 export const LIST_ID = "history-list";
 
-/** Padding either side plus C15's border, as C19's menu reckons it. */
-const CHROME_CELLS = 4;
-
 /**
  * The prompt line.
  *
@@ -36,8 +33,17 @@ export function searchLine(state: SearchState): string {
   return `${label} \`${state.query}': ${match}`;
 }
 
+/**
+ * **The upper edge, then the line** (I30, §097, ruling 90). *A transient panel
+ * floats, between two rules*: the lower one is the prompt's, which C22 I81
+ * draws on every frame, and the upper one is the layer's own first row, as
+ * C19's menu draws it. Without it the search line sat directly on the
+ * transcript's last row and read as one more line of it (F1502). An empty
+ * label is a plain line, and it degrades with the rest (C09 I21).
+ */
 export function searchBlocks(state: SearchState): readonly Block[] {
   return Object.freeze([
+    { kind: "rule", id: `${SEARCH_ID}-edge-top`, label: "" } satisfies Block,
     { kind: "raw", id: `${SEARCH_ID}-line`, text: searchLine(state) } satisfies Block,
   ]);
 }
@@ -67,7 +73,12 @@ export function searchLayer(state: SearchState, anchor: Anchor): Layer {
     blocking: false,
     dismissal: "escape",
     owner: Object.freeze({ rung: "substate" as const, name: "find" as const }),
-    width: cells(searchLine(state)) + CHROME_CELLS,
+    // **No `width`, which is how a layer says *the whole region*** (I30, C15
+    // I16). It declared `cells(line) + 4`, and the declaration was taken at the
+    // push — from the empty query — and never again, because narrowing updates
+    // `content` and `cursor`: `⌃r h` over `/help` drew `/h…` in 27 cells, and
+    // `his` over `/history` drew `…` alone (F1502). The region's width is
+    // resolved at every layout, so the hit is whole wherever it fits.
     // **The search has a cursor and the menu does not** (C15 I19). Text is
     // being typed into this one, and leaving the terminal's cursor blinking at
     // a prompt that is not taking keys is the *somewhere invisible* symptom
@@ -77,8 +88,8 @@ export function searchLayer(state: SearchState, anchor: Anchor): Layer {
     // the history's text, not the user's, and a caret sitting after a recalled
     // command claims the recall is editable here. Relative to the layer's own
     // origin, which is what lets this be stated without knowing where the
-    // layer will be placed.
-    cursor: Object.freeze({ row: 0, col: cells(queryPrefix(state)) }),
+    // layer will be placed — row 1, because the rule is row 0 (I30).
+    cursor: Object.freeze({ row: 1, col: cells(queryPrefix(state)) }),
   });
 }
 

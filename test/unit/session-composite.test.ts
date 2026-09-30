@@ -23,7 +23,9 @@ import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { createOverlayManager, type Placed } from "../../src/viewport/overlay/index.js";
 import { displayCells } from "../../src/presentation/text.js";
 import { anchored, registry as measurer, rows as contentRows } from "../support/overlay.js";
-import { DARK_THEME, FULL_CAPS, visible } from "../support/render.js";
+import { DARK_THEME, FULL_CAPS, MONO_UNICODE_CAPS, visible } from "../support/render.js";
+import { groundSequence } from "../../src/presentation/blocks/paint.js";
+import { styledScreenFrom } from "../support/styled-screen.js";
 import type { SessionSnapshot } from "../../src/shell/types.js";
 
 /** C09's measurer, for the footer's height (C22 I82). */
@@ -681,8 +683,58 @@ describe("C22 §6q — a scroll box inside a layer scrolls (F1302), owed at the 
   });
 });
 
-describe("C22 §6s — a panel's ground (I151, F1501), owed at the spec commit", () => {
-  it.todo(
-    "T1.184 (C22 I151, I29): a panel layer's rule line carries no bgElev and its raw line does, through a reset, to the box's last cell; a peek and an overlay take none; at 1 bit the rows are unchanged — not deferred on a component: the compositor lands in this round's code commit",
-  );
+describe("C22 §6s — a panel's ground (I151, F1501)", () => {
+  it("T1.184 (C22 I151, I29): a panel's rows take bgElev and its edge does not; a peek and an overlay take none; at 1 bit nothing is written", () => {
+    const registry = createBlockRegistry({ defaults: true });
+    // **A span with its own ink in the middle of the line**, so the row asks
+    // whether the ground survives the reset that closes it — the case `based`
+    // exists for, and the one a ground written once at the row's head fails.
+    const content = [
+      block({ kind: "rule", id: "edge", label: "" }),
+      block({ kind: "raw", id: "line", text: "find this here", spans: [{ from: 5, to: 9, tone: "accent" }] }),
+    ];
+    const SIZE = { columns: 40, rows: 12 };
+    const REGION = { width: 39, height: 10 };
+    const draw = (kind: "panel" | "peek" | "overlay", capabilities: typeof FULL_CAPS): readonly string[] => {
+      const manager = createOverlayManager({ registry: measurer });
+      manager.push({
+        id: "L",
+        kind,
+        placement: { kind: "anchored", row: 8, prefer: "above" },
+        content,
+        blocking: false,
+        dismissal: kind === "peek" ? "focus" : "escape",
+      } as never);
+      const base = Array.from({ length: SIZE.rows }, () => " ".repeat(SIZE.columns));
+      return composite(base, manager.layout(REGION), {
+        registry,
+        theme: DARK_THEME,
+        capabilities,
+        columns: SIZE.columns,
+        regionTop: 1,
+        region: REGION,
+      } as never);
+    };
+    const cellsOf = (rows: readonly string[]) => styledScreenFrom([rows.join("\r\n")], SIZE);
+    const elev = styledScreenFrom([`${groundSequence("surface.bgElev", DARK_THEME, FULL_CAPS)}x`], { columns: 1, rows: 1 })[0]![0]!.style.bg;
+    expect(elev, "the fixture's theme resolves a panel ground").not.toBe("");
+
+    // Two rows over the anchor at region row 8, and the region starts a row
+    // down: the edge is frame index 7 and the line index 8.
+    const panel = cellsOf(draw("panel", FULL_CAPS));
+    expect(panel[8]!.map((c) => c.ch).join("").trimEnd(), "the line is where the placement put it").toBe("find this here");
+    expect(panel[7]!.slice(0, 39).map((c) => c.style.bg), "the edge is on the page").not.toContain(elev);
+    expect(panel[8]!.slice(0, 39).map((c) => c.style.bg), "every cell of the line, through the span, to the box's edge").toEqual(Array(39).fill(elev));
+    expect(panel[8]![39]!.style.bg, "and not the margin past the box").not.toBe(elev);
+
+    // **Only a panel.** The same content as a peek and as an overlay (§6s.2 row 6).
+    for (const kind of ["peek", "overlay"] as const) {
+      const other = cellsOf(draw(kind, FULL_CAPS));
+      expect(other.flat().map((c) => c.style.bg), kind).not.toContain(elev);
+    }
+
+    // **Where no ground resolves nothing is written**: at 1 bit the panel is
+    // the overlay's rows byte for byte (§6s.2 row 5).
+    expect(draw("panel", MONO_UNICODE_CAPS)).toEqual(draw("overlay", MONO_UNICODE_CAPS));
+  });
 });

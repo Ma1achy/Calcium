@@ -15,6 +15,13 @@ import * as history from "../../src/interaction/history/index.js";
 import { LIST_ID, SEARCH_ID } from "../../src/interaction/history/index.js";
 import { registry } from "../support/overlay.js";
 import { openWith, seedFiles, entry } from "../support/history.js";
+import { buildSession } from "../support/session.js";
+import { fakeStdin } from "../support/fake-terminal.js";
+
+const settle = async (): Promise<void> => {
+  for (let i = 0; i < 3; i += 1) await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setTimeout(r, 0));
+};
 
 const REGION = { width: 80, height: 24 };
 const ANCHOR = { row: 20, rows: 1 };
@@ -55,8 +62,9 @@ describe("T4.3 (with C15) — the search overlay", () => {
     // before and after narrowing, because a cursor stated once and never
     // updated passes every assertion about the layer's content.
     const opened = store.searchLayer(ANCHOR);
+    // Row 1: the panel's own rule is row 0 (C20 I30).
     expect(opened.cursor, "at the end of an empty query").toEqual({
-      row: 0,
+      row: 1,
       col: "(reverse-i-search) `".length,
     });
 
@@ -76,11 +84,13 @@ describe("T4.3 (with C15) — the search overlay", () => {
     const placed = overlays.layout(REGION);
     const line = placed.find((p) => p.layer.id === SEARCH_ID);
     expect(line?.layer.content).toEqual([
+      { kind: "rule", id: `${SEARCH_ID}-edge-top`, label: "" },
       { kind: "raw", id: `${SEARCH_ID}-line`, text: "(reverse-i-search) `logs': /logs digit-42" },
     ]);
     expect(line?.cursor, "and placement carries it through unchanged").toEqual(narrowed.cursor);
-    // Anchored above the prompt, and measured by C09 rather than asserted.
-    expect(line?.height).toBe(1);
+    // Anchored above the prompt, and measured by C09 rather than asserted:
+    // the edge and the line (C20 I30).
+    expect(line?.height).toBe(2);
     expect(line?.top).toBeLessThan(ANCHOR.row);
 
     handle[Symbol.dispose]();
@@ -94,9 +104,10 @@ describe("T4.3 (with C15) — the search overlay", () => {
     store.searchType("deploy");
     overlays.push(store.searchLayer(ANCHOR));
 
+    // The edge and one line — the match does not add rows (C20 I30).
     const placed = overlays.layout(REGION);
-    expect(placed[0]?.height).toBe(1);
-    expect(placed[0]?.layer.content[0]).toMatchObject({ text: expect.stringContaining("\\\\n") });
+    expect(placed[0]?.height).toBe(2);
+    expect(placed[0]?.layer.content[1]).toMatchObject({ text: expect.stringContaining("\\\\n") });
   });
 });
 
@@ -186,8 +197,38 @@ describe("T4.5 (with C18) — a stored command re-parses to what it was", () => 
   });
 });
 
-describe("C20 §5 — the search drawn between two rules (I30, F1502), owed at the spec commit", () => {
-  it.todo(
-    "T4.9 (I30): in a session, the search line sits between a rule and the prompt's rule, and his over /history is drawn whole — not deferred on a component: the layer lands in this round's code commit",
-  );
+describe("C20 §5 — the search drawn between two rules (I30, F1502)", () => {
+  it("T4.9 (I30, C22 I81, §097): the search line sits between its own rule and the prompt's, and the hit is whole", async () => {
+    // **Through a session, because the defect was the push** (F1502). The
+    // width was declared from the empty query and never updated, so a layer
+    // asserted on its own read right and the frame read `…`. `his` over
+    // `/history` is the measured case: eight cells of hit the old width had
+    // no room for at all.
+    const stdin = fakeStdin();
+    const size = { columns: 80, rows: 24 };
+    const { screen } = await buildSession({ stdin: stdin as never }, size);
+    await settle();
+    for (const line of ["/help", "/history", "/clear"]) {
+      for (const ch of line) {
+        stdin.emit(ch);
+        await settle();
+      }
+      stdin.emit("\r");
+      await settle();
+    }
+    stdin.emit(String.fromCharCode(18));
+    await settle();
+    for (const ch of "his") {
+      stdin.emit(ch);
+      await settle();
+    }
+    const rows = screen().rows;
+    const at = rows.findIndex((r) => r.startsWith("(reverse-i-search)"));
+    expect(at, "the search is drawn").toBeGreaterThan(0);
+    expect(rows[at]?.trimEnd(), "the hit whole").toBe("(reverse-i-search) `his': /history");
+    // The upper edge is the layer's, at the region's width; the lower is the
+    // prompt's, at the frame's (C22 I81, C22 I109).
+    expect(rows[at - 1]?.slice(0, 79), "its own rule above").toBe("─".repeat(79));
+    expect(rows[at + 1], "the prompt's rule below").toBe("─".repeat(80));
+  });
 });

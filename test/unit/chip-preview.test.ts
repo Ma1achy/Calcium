@@ -9,7 +9,7 @@
 import { describe, expect, it } from "vitest";
 
 import { NO_EDITOR, openChipInEditor } from "../../src/shell/chip-editor.js";
-import { buildGraph, buildSession, fakeFs } from "../support/session.js";
+import { buildGraph, buildSession, fakeFs, FRAME } from "../support/session.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 
 /** Written as a code point rather than a literal, so no control byte is in the file. */
@@ -146,37 +146,64 @@ describe("C22 §6l.12 — a chip previews above the prompt", () => {
 });
 
 describe("C22 §6q — the chip preview's box and keys (ruling 53), owed at the spec commit", () => {
-  it("T1.175 (C22 I143, ruling 53): the preview is a bounded scroll box, and its last row names the chords from the keymap", async () => {
-    // The harness frame's layer region is 24 rows, so the box's ceiling is
-    // `floor(24 / 2) − 3 = 9` — C15's default fraction less the panel's two
-    // borders and the key row.
+  it("T1.175 (C22 I143, ruling 53): the preview is the edge, the header, a bounded box and the key row, and the layer is never cut", async () => {
+    // The harness frame's layer region is 24 rows, so a box that fits is
+    // capped at `floor(24 / 2) − 3 = 9` and one that overflows at 8 — C15's
+    // default fraction less the edge, the header and the key row, and less the
+    // box's own residue row when it overflows (C04 I49, §6s.3 rows 1–2).
     const { graph, stdin } = await buildGraph();
     graph.lifecycle.acquire();
     const preview = () => graph.overlays.stack.find((l) => l.id === "chip-preview");
     const parts = () => {
-      const panel = preview()?.content[0];
-      if (panel === undefined || panel.kind !== "panel") return null;
-      const [box, keys] = panel.children;
+      const content = preview()?.content;
+      if (content === undefined) return null;
+      const [edge, header, box, keys] = content;
       return {
+        kinds: content.map((b) => b.kind),
+        edge: edge?.kind === "rule" ? edge.label : null,
+        header: header?.kind === "raw" ? header.text : null,
         height: box?.kind === "scroll" ? box.height : null,
         keys: keys?.kind === "raw" ? keys.text : null,
       };
     };
+    /** Whether C15 cut the layer — the half the cap exists for. */
+    const cut = () =>
+      graph.overlays.layout(FRAME.overlayRegion()).find((p) => p.layer.id === "chip-preview")?.truncated;
+    const KINDS = ["rule", "raw", "scroll", "raw"];
 
     stdin.emit(`${ESC}[200~${pasteOf(47, "long")}${ESC}[201~`);
     await settle();
     expect(parts(), "a 47-line chip overflows the bounded box").toEqual({
-      height: 9,
+      kinds: KINDS,
+      edge: "",
+      header: "#1 pasted · 47L",
+      height: 8,
       keys: "⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor",
     });
+    expect(cut(), "and its residue row fits: the layer is whole").toBe(false);
     expect(graph.ownerHints().previewScrolls, "the owner line names the scroll too").toBe(true);
+
+    // **The boundary, from both sides.** Nine rows fit the cap exactly and
+    // draw no residue; ten overflow, and the box gives the residue its row.
+    for (const [lines, height, keys] of [
+      [9, 9, "⌥o open in editor"],
+      [10, 8, "⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor"],
+    ] as const) {
+      graph.editor.clear();
+      stdin.emit(`${ESC}[200~${pasteOf(lines, "edge")}${ESC}[201~`);
+      await settle();
+      expect(parts()?.height, `${String(lines)} lines`).toBe(height);
+      expect(parts()?.keys, `${String(lines)} lines`).toBe(keys);
+      expect(cut(), `${String(lines)} lines: the layer is whole`).toBe(false);
+    }
 
     // **The control: a chip that fits is exactly its rows**, and a chord that
     // would move nothing is not offered.
     graph.editor.clear();
     stdin.emit(`${ESC}[200~${pasteOf(6, "short")}${ESC}[201~`);
     await settle();
-    expect(parts(), "a 6-line chip fits").toEqual({ height: 6, keys: "⌥o open in editor" });
+    expect(parts()?.height, "a 6-line chip fits").toBe(6);
+    expect(parts()?.keys).toBe("⌥o open in editor");
     expect(graph.ownerHints().previewScrolls, "and names no scroll").toBeUndefined();
   });
 
@@ -262,8 +289,34 @@ describe("C22 §6q — the chip preview's box and keys (ruling 53), owed at the 
   });
 });
 
-describe("C22 §6s — the preview's key row names the other chips (I143), owed at the spec commit", () => {
-  it.todo(
-    "T1.185 (C22 I143): two chips with the caret on the second end the key row with the other-chips legend; one chip does not — not deferred on a component: the key row lands in this round's code commit",
-  );
+describe("C22 §6s — the preview's key row names the other chips (I143)", () => {
+  it("T1.185 (C22 I143, §6s.3 row 4): `←→ other chips` is offered while the prompt holds another chip", async () => {
+    // **The prompt's own pair**, `left` and `acceptGhostOrForward`: the
+    // preview binds nothing that moves the caret, and the legend names what
+    // the caret's motion already does (§101). Offered on the scroll pair's
+    // rule — not while there is nothing for it to reach.
+    const { graph, stdin } = await buildGraph();
+    graph.lifecycle.acquire();
+    const keys = (): string | null => {
+      const row = graph.overlays.stack.find((l) => l.id === "chip-preview")?.content.at(-1);
+      return row?.kind === "raw" ? row.text : null;
+    };
+
+    stdin.emit(`${ESC}[200~${pasteOf(6, "one")}${ESC}[201~`);
+    await settle();
+    expect(keys(), "one chip: nowhere for ←→ to go").toBe("⌥o open in editor");
+
+    stdin.emit(`${ESC}[200~${pasteOf(6, "two")}${ESC}[201~`);
+    await settle();
+    expect(keys(), "two chips, the caret on the second").toBe("⌥o open in editor  ←→ other chips");
+
+    // **And back, with the caret still on a chip.** Deleting the second from
+    // behind the caret leaves the first previewed with no other to reach, so
+    // the row is rebuilt although the chip did not change.
+    stdin.emit(`${ESC}[D`);
+    await settle();
+    stdin.emit(`${ESC}[3~`);
+    await settle();
+    expect(keys(), "the other chip deleted").toBe("⌥o open in editor");
+  });
 });

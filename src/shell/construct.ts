@@ -83,7 +83,7 @@ import { ScrollOffsets } from "./scroll-offsets.js";
 import { waitingEntries } from "./semantic-selection.js";
 import { createOverlayManager, takesPointer, type Layer, type Placed } from "../viewport/overlay/index.js";
 import type { LayerView } from "./composite.js";
-import { chipLabel, createEditor } from "../interaction/editor/index.js";
+import { chipLabel, chipSpans, createEditor } from "../interaction/editor/index.js";
 import type { Chip, ChipLook, HeldLine, LineState } from "../interaction/editor/index.js";
 
 /** An empty line, for a restore with nothing held (C17 I28). */
@@ -174,7 +174,7 @@ import {
   persistPolicy,
   persists,
 } from "./transcript-persist.js";
-import { RULE_ROWS, transcriptWidth } from "./config.js";
+import { PROMPT_GUTTER, RULE_ROWS, transcriptWidth } from "./config.js";
 import type { ResolvedConfig } from "./config.js";
 import { anyBlinking, CURSOR_BLINK_MS } from "./cursor-style.js";
 import { createSessionStore, type SessionStore } from "./state.js";
@@ -2461,9 +2461,14 @@ export async function constructGraph(
    * another opens — so a projection with no guard here would push itself back
    * over a menu once a frame rather than losing to it once.
    *
-   * **The title is C17's label, composed from the chip's parts** (C17 I25) and
+   * **The header is C17's label, composed from the chip's parts** (C17 I25) and
    * with the session's own rung, so the panel's header and the chip in the
    * prompt cannot spell the same chip two ways.
+   *
+   * **§101's menu panel, not a `panel` block** (I113, §6s ruling 2): the upper
+   * rule, the header, the box and the key row, between that rule and the
+   * prompt's. The block drew a titled box the menu and the search do not, and
+   * its bottom border was the row C15 cut (F1503).
    */
   const CHIP_PREVIEW_ID = "chip-preview";
   /** The preview's box — the one its keys and the wheel move (C22 I143, I141). */
@@ -2472,19 +2477,56 @@ export async function constructGraph(
   const previewChord = (action: KeyAction): Binding["key"] | undefined =>
     keymap.entries().find((b) => b.target === "panel" && b.action === action)?.key;
   /**
+   * Whether the prompt holds a chip other than the one previewed — what `←→`
+   * would reach (I143, §6s.3 row 4). Counted off C17's own walk, one span a
+   * chip (C17 I26), so a count here cannot disagree with the chips drawn.
+   */
+  const otherChips = (): boolean =>
+    chipSpans(stores.editor.text, deps.frame.region().width, PROMPT_GUTTER, stores.editor.drawAs).length > 1;
+  /**
    * The panel's last row, named from the keymap (C22 I143): scrolling only
    * while the box overflows — a chord that moves nothing is not offered — and
    * opening always. Spelled by the owner line's own `keyHint`, so the two
    * cannot name one chord two ways.
+   *
+   * **And `←→ other chips` while there is another** (§6s ruling 4, §101). The
+   * pair is the prompt's own — `left` and `acceptGhostOrForward` — because the
+   * preview binds nothing that moves the caret, and the legend is offered on
+   * the scroll pair's rule: not while there is nothing for it to reach.
    */
-  const previewKeyRow = (scrolls: boolean): string => {
+  const previewKeyRow = (scrolls: boolean, others: boolean): string => {
     const caps = detection.capabilities;
     const pair = (["previewScrollUp", "previewScrollDown"] as const).flatMap((a) => previewChord(a) ?? []);
     const open = previewChord("previewOpen");
+    const walk = (["left", "acceptGhostOrForward"] as const).flatMap(
+      (a) => keymap.entries().find((b) => b.target === "prompt" && b.action === a)?.key ?? [],
+    );
     return [
       ...(scrolls && pair.length > 0 ? [keyHint(pair, "scroll", caps)] : []),
       ...(open === undefined ? [] : [keyHint([open], "open in editor", caps)]),
+      ...(others && walk.length === 2 ? [keyHint(walk, "other chips", caps)] : []),
     ].join("  ");
+  };
+  /**
+   * The header: the chip as C17 composes it, the name bold and the size
+   * `muted` (§6s ruling 2). **Without the painted rung's two spaces**, which
+   * belong to a ground a `raw` span cannot paint (C04 I89) — kept, the name
+   * would stand a cell in from the box and the key row under it. The bracketed
+   * rung keeps its brackets: they are the carrier there.
+   */
+  const previewHeader = (chip: Chip): Block => {
+    const label = chipLabel(chip, chipLook);
+    const text = chipLook.painted ? label.slice(1, -1) : label;
+    const size = chip.lines === undefined ? "" : ` ${chipLook.separator} ${String(chip.lines)}L`;
+    const at = size === "" ? -1 : text.lastIndexOf(size);
+    const spans =
+      at <= 0
+        ? [{ from: 0, to: text.length, bold: true }]
+        : [
+            { from: 0, to: at, bold: true },
+            { from: at, to: at + size.length, tone: "muted" as const },
+          ];
+    return makeBlock({ kind: "raw", id: "chip-preview-header", text, spans });
   };
   /**
    * The preview at a box height (C22 I143): the panel, a `scroll` box holding
@@ -2498,40 +2540,56 @@ export async function constructGraph(
       height,
       children: [makeBlock({ kind: "code", id: "chip-preview-content", language: "text", text: chip.content })],
     });
-  const chipPreviewBlocks = (chip: Chip, box: Block, scrolls: boolean): readonly Block[] => [
-    makeBlock({
-      kind: "panel",
-      id: "chip-preview-panel",
-      title: chipLabel(chip, chipLook),
-      children: [box, makeBlock({ kind: "raw", id: "chip-preview-keys", text: previewKeyRow(scrolls) })],
-    }),
-  ];
+  const chipPreviewBlocks = (chip: Chip, box: Block, scrolls: boolean, others: boolean): readonly Block[] => {
+    const keys = previewKeyRow(scrolls, others);
+    return [
+      // The upper edge; the lower is the prompt's rule (§097, ruling 90).
+      makeBlock({ kind: "rule", id: "chip-preview-edge-top", label: "" }),
+      previewHeader(chip),
+      box,
+      makeBlock({
+        kind: "raw",
+        id: "chip-preview-keys",
+        text: keys,
+        ...(keys === "" ? {} : { spans: [{ from: 0, to: keys.length, tone: "muted" as const }] }),
+      }),
+    ];
+  };
   /**
    * The preview's content for this region (C22 I143, F1307). **The box is
    * bounded so the layer is never cut**: C15's default fraction of the region,
-   * less the panel's two borders and the key row — `floor(h / 2) − 3`, floored
-   * at 1 — and no taller than the content, so a short paste draws no blank
-   * rows. The content's rows are asked of the box at the width the layer is
-   * drawn at, through `boxGeometry`, which is the clamp the keys use.
+   * less the edge, the header and the key row — `floor(h / 2) − 3` — and no
+   * taller than the content, so a short paste draws no blank rows.
+   *
+   * **One row fewer where it overflows**, because a box that overflows draws
+   * its residue row under its rows (C04 I49). The cap was `− 3` in both cases
+   * and counted two borders instead; at 80 × 24 the layer was a row taller
+   * than its placement and C15 cut its last (§6s.1, F1503). Floored at 1, so
+   * a region under ten rows still cuts it, from the key row (§6s.3 row 3).
+   * The content's rows are asked of the box at the width the layer is drawn
+   * at, through `boxGeometry`, which is the clamp the keys use.
    */
-  const chipPreviewContent = (chip: Chip): Readonly<{ blocks: readonly Block[]; scrolls: boolean }> => {
+  const chipPreviewContent = (chip: Chip, others: boolean): Readonly<{ blocks: readonly Block[]; scrolls: boolean }> => {
     const region = deps.frame.overlayRegion();
-    const cap = Math.max(1, Math.floor(region.height / 2) - 3);
+    const half = Math.floor(region.height / 2);
+    const cap = Math.max(1, half - 3);
     const box = previewBox(chip, cap);
-    const probe = chipPreviewBlocks(chip, box, true);
+    const probe = chipPreviewBlocks(chip, box, true, others);
     const ceiling = boxGeometry(probe, region.width, PREVIEW_BOX_ID)?.ceiling ?? 0;
-    if (ceiling > 0) return { blocks: probe, scrolls: true };
+    if (ceiling > 0) return { blocks: chipPreviewBlocks(chip, previewBox(chip, Math.max(1, half - 4)), true, others), scrolls: true };
     // It fits in the cap: the box is exactly its rows.
     const at = blockWidthInEntry(built.blocks, probe, region.width, PREVIEW_BOX_ID);
     const rows = at === null || box.kind !== "scroll" ? cap : barOf(box, at.inner, built.blocks.measure).content;
     const fitted = previewBox(chip, Math.max(1, Math.min(rows, cap)));
-    return { blocks: chipPreviewBlocks(chip, fitted, false), scrolls: false };
+    return { blocks: chipPreviewBlocks(chip, fitted, false, others), scrolls: false };
   };
   let previewed: Chip | null = null;
   /** The region height the preview was built at — a new one rebuilds it (C22 I143). */
   let previewedHeight: number | null = null;
   /** Whether the preview's box overflows, for the owner line's scroll chip (C22 I143). */
   let previewScrolls = false;
+  /** Whether the key row offered `←→ other chips` — a change rebuilds it (C22 I143). */
+  let previewedOthers = false;
   const syncChipPreview = (): void => {
     const have = stores.overlays.stack.some((l) => l.id === CHIP_PREVIEW_ID);
     // **Focus, not the router's target**, and the first draft read the target.
@@ -2550,12 +2608,15 @@ export async function constructGraph(
       return;
     }
     const height = deps.frame.overlayRegion().height;
-    if (have && chip === previewed && height === previewedHeight) return;
+    const others = otherChips();
+    if (have && chip === previewed && height === previewedHeight && others === previewedOthers) return;
     // **A new chip, or a new region height, is a new document** (C22 I143,
     // §6q.3 row 3): it opens at its top. A content update keeps the layer's
-    // namespace (I141), so the owner drops it here.
-    stores.scrollOffsets.delete(layerKey(CHIP_PREVIEW_ID));
-    const { blocks: content, scrolls } = chipPreviewContent(chip);
+    // namespace (I141), so the owner drops it here. **Only the other chips
+    // changing is not a new document**: the key row is rebuilt and the box
+    // stays where the reader scrolled it.
+    if (!have || chip !== previewed || height !== previewedHeight) stores.scrollOffsets.delete(layerKey(CHIP_PREVIEW_ID));
+    const { blocks: content, scrolls } = chipPreviewContent(chip, others);
     const anchor = deps.frame.promptAnchor();
     const placement = { kind: "anchored" as const, row: anchor.row, rows: anchor.rows, prefer: "above" as const };
     if (have) {
@@ -2579,6 +2640,7 @@ export async function constructGraph(
     previewed = chip;
     previewedHeight = height;
     previewScrolls = scrolls;
+    previewedOthers = others;
   };
   // **A resize is a new region height** (C22 I143): C14 emits on it, and the
   // preview is rebuilt at its top rather than cut by C15 at the old size.

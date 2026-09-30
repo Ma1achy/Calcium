@@ -116,10 +116,12 @@ const results = runPass({
       // **The panel's title is the chip's own label.** Composed from a literal
       // instead, two chips spell the same and the prompt's inline label and the
       // panel's header part company — C17 I25's *never supplied as a string*.
-      name: "the panel's title is a literal rather than the chip's composed label",
+      name: "the panel's header is a literal rather than the chip's composed label",
       file: CONSTRUCT,
-      from: "      title: chipLabel(chip, chipLook),",
-      to: "      title: \"Chip\",",
+      // Re-anchored by lane b4-panels: the title is §101's header row now
+      // (C22 I113 amended, §6s ruling 2).
+      from: "    const label = chipLabel(chip, chipLook);",
+      to: "    const label = \" Chip \";",
       expect: "T1.69",
     },
     {

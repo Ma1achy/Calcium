@@ -36,6 +36,7 @@
  */
 
 import { renderSequenceToLines, type RenderOptions } from "../presentation/render-lines.js";
+import { based, groundSequence } from "../presentation/blocks/paint.js";
 import type { ChromeCache } from "./chrome-cache.js";
 import type { Block } from "../data/viewmodel/index.js";
 import type { RenderScratch } from "../presentation/blocks/types.js";
@@ -231,7 +232,44 @@ function layerRows(p: Placed, deps: CompositeDeps): readonly string[] {
   const from = Math.min(deps.layerScroll?.(p.layer.id) ?? 0, Math.max(0, lines.length - p.height));
   const out: string[] = [];
   for (let i = 0; i < p.height; i += 1) out.push(exact(lines[from + i] ?? "", p.width));
-  return out;
+  return panelGround(p, out, from, deps);
+}
+
+/**
+ * **A panel's rows take `bgElev`, and its edge does not** (C22 I151, §6s,
+ * `R-BLK-569`). *A panel takes bgElev*, and §097 draws the menu's rows on it
+ * between two rules that are on the page's ground — the lower rule is the
+ * prompt's and not in the layer, the upper one is the layer's leading `rule`
+ * blocks. So the exemption is those lines, counted in the content rather than
+ * in the box: a row-scrolled panel whose rule has left the box has no edge
+ * left in it (§6s.2 row 7).
+ *
+ * **Here, from the kind, because every panel passes through here** and each
+ * owner built its own half of §097 — the menu, the search and the preview
+ * would otherwise each declare a ground, and the one that forgot would be the
+ * one that drew flat. `based` is the ground behind lines a child has already
+ * painted: a span that sets its own background — the menu's `pick` row — keeps
+ * its cells, and the padding `exact` added is grounded with the rest, because
+ * the box is the panel's (I29). Where no ground resolves the sequence is `""`
+ * and the rows go back untouched, byte for byte (§6s.2 row 5).
+ *
+ * A `peek` and an `overlay` take none: the registry's rule is about a panel
+ * (§6s.2 row 6).
+ */
+function panelGround(
+  p: Placed,
+  rows: readonly string[],
+  from: number,
+  deps: CompositeDeps,
+): readonly string[] {
+  if (p.layer.kind !== "panel") return rows;
+  const ground = groundSequence("surface.bgElev", deps.theme, deps.capabilities);
+  if (ground === "") return rows;
+  let leading = 0;
+  while (p.layer.content[leading]?.kind === "rule") leading += 1;
+  const edge = leading === 0 ? 0 : deps.registry.measureSequence(p.layer.content.slice(0, leading), p.width);
+  const cut = Math.min(rows.length, Math.max(0, edge - from));
+  return [...rows.slice(0, cut), ...based(rows.slice(cut), ground)];
 }
 
 /**
