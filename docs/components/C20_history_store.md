@@ -196,6 +196,16 @@ Searching an empty query shows nothing rather than the whole history — a full 
 
 **C20 builds the layer; L4 pushes it and calls `update`.** `searchLayer` returns a `Layer` anchored to the prompt row with `prefer: "above"` — the prompt is near the bottom by definition and C15 flips when there is no room. Narrowing is `update(id, { content })` on each keystroke, never a pop and a re-push: C15 §2 spells out what re-pushing costs (focus churn inside the thing being typed into, and the layer losing its position under anything stacked above it), and C19's menu already narrows through this seam. This is also the shape that keeps C20 a data structure — it constructs `Block[]` and hands it over, exactly as C19's `menuLayer` does, and touches no manager.
 
+**The layer is §097's panel: region-wide, and opening with its own upper rule** (I30, F1502,
+ruling 90). *A transient panel floats, between two rules* — the lower one is the prompt's, which
+C22 I81 draws on every frame, and the upper one is the layer's own first row, as C19's menu draws
+it. Without it the search line reads as the transcript's last row. **No `width`**, which is how a
+layer says *the whole region* (C15 I16): measured at 80 × 24, the declaration `cells(line) + 4`
+was taken at the push, from the empty query, and narrowing updates `content` and `cursor` and never
+`width` — so `⌃r h` over `/help` drew `/h…` in 27 cells and `his` over `/history` drew `…` alone.
+The hit is whole wherever the region holds it and cut by C09 only where it does not. The caret is
+on row 1, the rule being row 0 (C15 I19).
+
 ---
 
 ## 6. `/history`
@@ -396,6 +406,7 @@ Redaction has no events. Its rules all hold at rest and interact structurally �
 - **I27** — `drain()` writes from the last confirmed write, and the duplicate this may produce is collapsed on load by I4.
 - **I28** — A load that warned is repaired at open: both files are rewritten from what survived, so damage is not inherited by the next session.
 - **I29** — The entropy net measures each half of an assignment and the whole of anything else. Neither half alone is sufficient, and each miss is a shape the other catches.
+- **I30** — *(§097, `R-BLK-775`, `R-BLK-776`, ruling 90, F1502)* **Reverse search is a panel between two rules, at the region's width.** `searchLayer`'s content opens with a `rule` block whose label is empty — the upper edge; the lower is the prompt's rule (C22 I81) — and the search line follows it. The layer declares no `width`, so C15 gives it the region's (I16) at every narrowing, and the caret is on row 1 at the end of the query. → T1.21, T4.9, T6.27, T6.28
 
 ---
 
@@ -429,6 +440,7 @@ Redaction has no events. Its rules all hold at rest and interact structurally �
 26. The exit drain writes from the last confirmed write; I4 collapses the overlap on load (I27).
 27. A damaged file is repaired at open, so no session inherits it (I28).
 28. The entropy net measures both halves of an assignment and every piece of a quoted compound (I29, I25).
+29. Reverse search opens between two rules and spans the region, so the hit is drawn whole where it fits (I30).
 
 ---
 
@@ -458,6 +470,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.18** (I22): a keystroke that matches nothing → `failed`, the query and the previous hit retained; a backspace resumes from that hit rather than from the newest. §7a Trace 2.
 - **T1.19** (I23): the hit's command is returned after `entries` has changed underneath it.
 - **T1.20** (I4): a file containing consecutive duplicates → collapsed on load, not only on append.
+- **T1.21** (I30, C15 I16, C15 I19): `searchLayer` over an empty query and over `logs` → the content is `[rule, raw]` with the rule's label empty, the layer declares no `width`, and the cursor is `{ row: 1, col }` at the end of the query in both. Asserted on both because a field set at the push and never updated is the defect this row exists for.
 
 ### Tier 2 — contract / interface
 
@@ -517,6 +530,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T4.6** (with C13, L4): `/clear` empties the transcript and leaves history untouched (C13 T4.7 from this side).
 - **T4.7** (with L4): `/history` renders as a block table whose rows carry `fill` actions.
 - **T4.8** (with C17, L4, I3): the `setText` L4 applies for a navigation step does not reset navigation, and a keystroke the user types does. §7a Trace 3, and the only tier that can see both halves.
+- **T4.9** (I30, C22 I81, §097): through a built session at 80 × 24 with `/help`, `/history`, `/clear` submitted, `⌃r` then `his` → the frame row above the search line is a rule, the row below it is the prompt's rule, and the line reads ``(reverse-i-search) `his': /history`` whole. *It read `…` alone, the width taken at the push.*
 
 ### Tier 5 — e2e
 
@@ -555,6 +569,8 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.25** (I25): treating a quoted compound as opaque → T5.4 fails, and a `PRIVATE-TOKEN:` header reaches disk in full.
 - **T6.26** (I28): seeding the writer without the damaged flag → T5.6's second session fails, and a corrupt file is inherited by every session that follows.
 - **T6.22** (I3): resetting navigation on C20's own `setText` → T4.8 fails, `↑` works once and `↓` never does.
+- **T6.27** (I30): `width: cells(searchLine(state)) + 4` restored on the layer → **T4.9** fails on the hit and **T1.21** on the declared width.
+- **T6.28** (I30): the upper rule dropped from `searchBlocks` → **T1.21** fails on the content and the cursor row, and **T4.9** on the row above the line.
 - **T6.23** (I27): draining from the last issued write rather than the last confirmed one → T5.7 fails, and the command lost is the one just typed.
 
 ---

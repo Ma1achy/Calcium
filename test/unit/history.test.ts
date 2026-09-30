@@ -260,3 +260,9 @@ describe("C20 §7a — where the two machines meet", () => {
     expect(store.previous("gi")).toBeNull();
   });
 });
+
+describe("C20 §5 — reverse search is a panel between two rules (I30, F1502), owed at the spec commit", () => {
+  it.todo(
+    "T1.21 (I30): searchLayer opens with an empty rule, declares no width, and puts the cursor on row 1 at the query's end, before and after narrowing — not deferred on a component: the layer lands in this round's code commit",
+  );
+});

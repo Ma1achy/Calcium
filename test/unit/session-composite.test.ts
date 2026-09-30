@@ -680,3 +680,9 @@ describe("C22 §6q — a scroll box inside a layer scrolls (F1302), owed at the 
     expect(drawn.map((r) => visible(r)).join("\n")).not.toContain("line 1 ");
   });
 });
+
+describe("C22 §6s — a panel's ground (I151, F1501), owed at the spec commit", () => {
+  it.todo(
+    "T1.184 (C22 I151, I29): a panel layer's rule line carries no bgElev and its raw line does, through a reset, to the box's last cell; a peek and an overlay take none; at 1 bit the rows are unchanged — not deferred on a component: the compositor lands in this round's code commit",
+  );
+});

@@ -185,3 +185,9 @@ describe("T4.5 (with C18) — a stored command re-parses to what it was", () => 
     }
   });
 });
+
+describe("C20 §5 — the search drawn between two rules (I30, F1502), owed at the spec commit", () => {
+  it.todo(
+    "T4.9 (I30): in a session, the search line sits between a rule and the prompt's rule, and his over /history is drawn whole — not deferred on a component: the layer lands in this round's code commit",
+  );
+});

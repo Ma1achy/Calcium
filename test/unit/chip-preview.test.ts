@@ -261,3 +261,9 @@ describe("C22 §6q — the chip preview's box and keys (ruling 53), owed at the 
     expect(calls).toEqual([["sh", "-c", 'code -w "$1"', "sh", "/work/notes.md"]]);
   });
 });
+
+describe("C22 §6s — the preview's key row names the other chips (I143), owed at the spec commit", () => {
+  it.todo(
+    "T1.185 (C22 I143): two chips with the caret on the second end the key row with the other-chips legend; one chip does not — not deferred on a component: the key row lands in this round's code commit",
+  );
+});
