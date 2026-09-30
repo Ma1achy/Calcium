@@ -1218,6 +1218,24 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1474). **The completion menu's current candidate carries §097's `›` at rest.** The footer offers `⏎ accept`, and the key has to act on something the frame shows. The registry is normative on appearance.
+
+**89 · RULED — Whether the completion menu marks its current candidate at rest.** The golden lane found three candidates styled alike beside a footer offering to accept one (F1474).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1475). **The completion menu closes on the prompt's upper rule, not on a rule of its own.** §097's panel layer floats between two rules, and the lower one is the prompt's. C22 T4.34, which asserts the menu's own closing rule, is amended with the build.
+
+**90 · RULED — Whether the menu and the prompt share their rule.** The golden lane found two stacked rules where §097 draws one (F1475).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1476). **A notice's tone agrees with its document's status.** A handed-off child that exits non-zero, or ends on a signal other than SIGINT, SIGTERM or SIGHUP, has failed: error tone and ✗. SIGINT, SIGTERM and SIGHUP are what an interrupt or a closed terminal sends, and they settle `cancelled`, as C23 I66's ladder does.
+
+**91 · RULED — What a handed-off child's non-zero exit is.** The golden lane found a warn-toned ▲ on an `error` document (F1476).
+
+---
+
 ## Not yet recovered
 
 The gap between the entries and the running count in the per-MR reports was chased and closed: some questions had been counted twice. The list is the count. **No total is stated here in prose**, because the one that used to be here said *sixteen* long after that stopped being true — this file's own subject, arriving inside it.

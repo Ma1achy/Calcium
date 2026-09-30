@@ -92,6 +92,11 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   is kept as typed: the submitted command, history and the kill buffer are unchanged. Linear
   mode also shows C0 and C1 in caret form where it deleted them, so a notice reads as one line
   rather than two, and a screen reader speaks the form.
+- **A failed `status` leads with `✗` (`x` in ASCII), where it led with `▲` (`!`)** (b8307c68,
+  ruling 85, C09 I138). `▲` stays the warning's mark, so at 1 bit an error and a warning no
+  longer share their only non-colour carrier. The change is that one cell; nothing measures
+  differently. In `calcium-tui/testing`, the `status` row of the document-premise table names
+  the `cross` mark.
 - **A window title and a system notification show control characters in caret form**
   (46746909, 1e2c5525, ruling 86, C01 I26). `ESC[2J` in a tool's output reaches the title as
   `^[[2J` where it was `[2J`, and tab and newline appear as `^I` and `^J`. Bidi format characters

@@ -113,6 +113,8 @@ Nothing reports these. Read each against what your application relies on.
   format characters as `<U+XXXX>`. Copy carries the same form.
 - **The prompt, the command echo and linear mode show a bidi character as `<U+XXXX>`**, and
   linear shows C0 and C1 in caret form rather than deleting them. What was typed is unchanged.
+- **A failed `status` leads with `✗`** (`x` in ASCII) rather than `▲`. A snapshot of a failed
+  status changes in that one cell.
 - **A window title and a system notification show control characters in caret form** (`^[`,
   `^I`), where they were deleted.
 - **A finished `progress` or `count` bar draws zero rows.** A `capacity` bar persists.

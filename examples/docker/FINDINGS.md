@@ -57402,6 +57402,8 @@ Two more, from the shell lane's chain at 1ba5e868 (five-minute load 5.0): C28 T1
 area for 100× the data against a bound of 40) and C16 T1.170 (`surface.test.ts`, an extra `normal-mode:release` after
 the escape). Each passed three of three alone at load about 1; neither file was changed by the lane.
 
+**Three more under load, 2026-09-30**, in a chain on the golden lane's tip while the harness lane ran mutation passes (load 4.9 at the report, 8.4 on the 15-minute average): `plot-performance`'s *one-sample update* at a ratio of 2.91 against 2, and SS66's T1.154b and T1.154c each timed out at 120 s. Re-run alone: 13 of 13 pass, but T1.154b took 112 s of its 120, against 18 s in a full suite at load 1.08. T1.154 was timed on b4 and the golden tip alternately in one process: 4908 and 2353 ms against 2442 and 2913 ms at load 8.6–9.7, so the tips do not differ and the time is the machine's.
+
 ## F1407 — `oscText` passes bidi characters into window titles and notifications ★★☆☆☆
 
 Found by lane b4-m12. `oscText` in `terminal/escapes.ts` removes `[\u0000-\u001f\u007f-\u009f]` before
@@ -57706,9 +57708,13 @@ Found integrating lane b4-classes. The rebased lane's chain failed the three *F5
 
 Found by lane b4-fixtures building the figure comparison (M16.1). §097's frame in `design-surfaces` draws the `panel` block kind: a titled box headed *Confirm*, with box corners. §097 specifies the panel **layer**, a menu floating between two rules above the prompt (M8). The probe `kind: "panel"` names the block, so the row compares the right name against the wrong thing, and its listed difference (`│ ┌ ┐ └ ┘` only in the frame, `— › ▌ ● ❯` only in the figure) is that confusion measured. **Owed**: a frame of the panel layer under §097's heading.
 
+**Closed** (ruling 87, c34b181f). §97 is drawn from a real session with `/c` typed over an empty transcript, from below the header to the prompt's lower rule, under its own heading. Below `MIN_COLUMNS` the 40-column golden draws it at 60 with a caption. §97's probe is `promptUnderMenu`, and a classification row records the homonym. The census is unchanged at 58 framed. The measured difference is now `figure only: — › ▌ ●`, `frame only: (none)`, and two of its causes are F1474 and F1475.
+
 ## F1461 — the design leads every error with ✗ and the tree's status block leads with ▲, the warning mark ★★☆☆☆
 
 Found by lane b4-fixtures. Every ERROR in the design's figures (§048, §061, §066, §096) opens its message with ✗. The tree's `status` block opens an error with ▲, which is the `warning` mark, so at 1-bit and in monochrome an error and a warning share their only non-colour carrier. `status.ts` cites a design drawing of `[▲ plot failed…]` that no current fixture contains, which is a citation into a picture the design no longer has. **Owed**: a ruling. The registry is normative on appearance, so the expected answer is ✗, with the golden movers named before the change.
+
+**Closed** (ruling 85; f9a193eb and c396cc81 spec, b8307c68 code). C09 I138: `status` draws `cross` for `error` and `retrying`. `GlyphSet.warning` is retired with its only reader, and ▲ stays reachable as the vocabulary's `warn` token. The golden movers were written down before the run (49 snapshots in blocks T2.10, containment and design-surfaces §96, §72 and §58) and moved exactly so: 88 changed cells paired, 56 `▲`→`✗` and 32 `!`→`x`, with no other change. `tools/mutate/runs/c09-status-mark.mjs` reports 4 of 4 caught by T2.230. That verdict was taken under the harness F1472 describes and is re-taken once it is fixed. The design texts that still name ▲ are F1477.
 
 ## F1462 — §019's hand-written counts were stale three ways, and so was the census prose ★★☆☆☆
 
@@ -57781,3 +57787,23 @@ Found by lane b4-osc (ruling 88). `tools/mutate/mutate.mjs:565` sets `byNamedTes
 Measured: against C22 T1.4h as it stood at 0e08af20, both key mutations in `c22-key-targets.mjs` printed `caught T1.4h`. The only `FAIL` line was C16 T2.17, and the log carried `✓ T1.4h (C22 I26): every binding in the table is consumed at its target`. `caughtBy`, two lines below, already reads `failedRows(output)`, so the harness holds the right instrument and uses it only for the other verdict.
 
 **The scope is unmeasured, and it is every run.** A killed mutation whose named row sits in a file with the row that did fail reads as named whether it was or not. 73 distinct `expect` values are prose rather than row ids, from probe and tool runs, and they need their own rule rather than `failedRows`. **Owed**: `byNamedTest` from `failedRows` for a row-id `expect`, a decision for the prose ones, a harness row that fails on the substring form, and a re-run of every run on a quiet machine to count the verdicts that change.
+
+## F1473 — T2.144's `img-fault` never reaches the fault arm in a whole-file run ★★★☆☆
+
+Found by lane b4-golden (ruling 85). The fixture overrides an image's `data` but keeps the corpus image's `digest`. The decode cache (`DECODED`, keyed on digest) then returns the real picture once T2.143 has decoded it. Its capture is `▀▀`, a picture, not a fault. With `src` at 0e08af20, `npx vitest run test/contract/rows-arm.test.ts -t "T2.144"` fails alone (`img-fault at 2: expected [ …(3) ] to deeply equal [ Array(1) ]`) and passes in the whole-file run. The row depends on the one before it and does not construct the state it names. **Owed**: a digest of the fixture's own, and the row shown to fail on the fault arm removed.
+
+## F1474 — the completion menu marks no current candidate at rest ★★★☆☆
+
+Found by lane b4-golden building §097's frame (ruling 87). The frame's three candidates have identical styles in a `readFrame` read: no mark, no ground, no weight. §097 draws `current`'s `›` on one, and the footer offers `⏎ accept`, so the reader is offered a key that acts on a candidate the frame does not show. **Ruled (89)**: the registry is normative on appearance, so the current candidate carries the mark at rest.
+
+## F1475 — the completion menu closes on a rule of its own above the prompt's ★★☆☆☆
+
+Found by lane b4-golden. The menu's closing rule and the prompt's upper rule draw as two stacked rows. §097's menu closes on the prompt's own rule, the "between two rules" of the panel layer. Mark comparison cannot see it, since both rows are the same glyph; it is recorded in §97's difference reason. C22 T4.34 asserts the menu's own closing rule, so the row and the design disagree. **Ruled (90)**: one rule, the prompt's. T4.34 is amended with the build.
+
+## F1476 — a handed-off child that fails gets a warning's tone on an error document ★★★☆☆
+
+Found by lane b4-golden (ruling 85). `src/shell/execution.ts:1041–1047`: a handed-off child that exits non-zero, or ends on any signal, is appended as `noticeDoc(…, "warn", …, "error")`. The document's status says it failed, and its only visible carriers, the tone and the ▲ mark, say warning. **Ruled (91)**: a notice's tone agrees with its document's status. A non-zero exit, or a signal other than SIGINT, SIGTERM or SIGHUP, is a failure: error tone and ✗. SIGINT, SIGTERM and SIGHUP are what an interrupt or a closed terminal sends, and they settle `cancelled` as C23 I66's ladder does.
+
+## F1477 — two design texts still name ▲ as the error mark ★★☆☆☆
+
+Found by lane b4-golden (ruling 85). §096's empty-case annotation reads *no banner, no ▲, no red* beside its own ✗ error. The registry's `attention` asciiNote cites `GlyphSet.warning`, which ruling 85 retired. Both are in the normative design, which the lane rightly did not edit. **Owed at the release seal**, which already re-seals the baseline and bumps the revision: both texts corrected, the HTML regenerated, and the sealed digests re-taken.
