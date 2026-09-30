@@ -270,6 +270,12 @@ describe("C22 §6b — the write is a difference", () => {
   });
 });
 
+describe("C22 I150 — the completion footer at rest and after Tab", () => {
+  it.todo(
+    "T4.120 (C22 I150, C19 I20, C19 I29, ruling 96): the footer read at rest and after Tab differs, and each names only keys that do what it says — not deferred on a component: lands in the next commit, ruling 96",
+  );
+});
+
 describe("C22 integration — the frame's viewport", () => {
   it("T4.12 (I34, with C14): a document taller than the region stays pinned to its last row at every prompt height", async () => {
     // **`/help keys` is the tall document, and it needs no transport.** It is a

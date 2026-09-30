@@ -1329,6 +1329,12 @@ describe("C22 I133 — the owner line's chords are the keymap's (review batch 2,
   });
 });
 
+describe("C22 I150 — the completion footer names what each key does", () => {
+  it.todo(
+    "T1.182 (C22 I150, ruling 96): the complete line at rest offers the prompt's complete chord and the way out, and once selected the move keys and accept — not deferred on a component: lands in the next commit, ruling 96",
+  );
+});
+
 describe("C22 I33 — a command of several lines", () => {
   it("T1.172 (C22 I33): commandRows draws each line of the command and no row carries a line break", async () => {
     const W = 30;
