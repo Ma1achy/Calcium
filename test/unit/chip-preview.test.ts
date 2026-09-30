@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import { NO_EDITOR, openChipInEditor } from "../../src/shell/chip-editor.js";
 import { buildGraph, buildSession, fakeFs, FRAME } from "../support/session.js";
 import { fakeStdin } from "../support/fake-terminal.js";
+import { ASCII_CAPS } from "../support/render.js";
 
 /** Written as a code point rather than a literal, so no control byte is in the file. */
 const ESC = String.fromCharCode(27);
@@ -318,5 +319,42 @@ describe("C22 §6s — the preview's key row names the other chips (I143)", () =
     stdin.emit(`${ESC}[3~`);
     await settle();
     expect(keys(), "the other chip deleted").toBe("⌥o open in editor");
+  });
+
+  it("T1.185 (C22 I143, §6s.3 row 9): where the row does not fit it sheds whole entries from its end", async () => {
+    // **Read from the frame, where it was found**: at ASCII the three entries
+    // are 64 cells, and a 60-column frame's region is 59 — the `raw` row cut
+    // the legend to `oth~`. Two six-line chips over a 20-row frame overflow the
+    // box, so the scroll pair is drawn and the row is at its widest.
+    const stdin = fakeStdin();
+    const { screen, resize } = await buildSession({ stdin: stdin as never, capabilities: ASCII_CAPS } as never, { columns: 60, rows: 20 });
+    await settle();
+    stdin.emit(`${ESC}[200~${pasteOf(7, "one")}${ESC}[201~`);
+    stdin.emit(`${ESC}[200~${pasteOf(6, "two")}${ESC}[201~`);
+    const rows = await (async () => {
+      await settle();
+      return screen().rows;
+    })();
+    const row = rows.find((r) => r.includes("open in editor"));
+    expect(row?.trimEnd(), "scroll and open kept, the legend shed whole").toBe("M-S-Up/M-S-Down scroll  M-o open in editor");
+    expect(rows.some((r) => r.includes("oth~")), "and never a legend cut mid-word").toBe(false);
+
+    // **A width-only resize rebuilds it** (§6s.3 row 9): the height is the
+    // same, and at 80 columns the whole row fits again. Keyed on the height
+    // alone, the 59-cell row would stand in a 79-cell region.
+    //
+    // **Polled, because a resize's frame is paced** (C03): the scheduler draws
+    // it on its own clock rather than in the batch, and the first read of this
+    // arm found the 60-column frame still on the screen and read it as a
+    // preview that had not rebuilt. The poll is bounded; the assertion is on
+    // what it settles to.
+    resize({ columns: 80, rows: 20 });
+    const WANT = "M-S-Up/M-S-Down scroll  M-o open in editor  Left/Right other chips";
+    const keyRow = (): string | undefined => screen().rows.find((r) => r.includes("open in editor"))?.trimEnd();
+    for (let i = 0; i < 80 && (screen().rows[0]?.trimEnd().length ?? 0) <= 60; i += 1) {
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    await settle();
+    expect(keyRow(), "the legend is back").toBe(WANT);
   });
 });

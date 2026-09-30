@@ -79,6 +79,7 @@ import { RenderScratchStore } from "./render-scratch.js";
 import type { BoxSpan, DragContainer } from "./drag-selection.js";
 import { barTarget, pullIntoView } from "./pull.js";
 import { neutraliseControl } from "../data/text.js";
+import { cells } from "../presentation/text.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
 import { waitingEntries } from "./semantic-selection.js";
 import { createOverlayManager, takesPointer, type Layer, type Placed } from "../viewport/overlay/index.js";
@@ -2493,19 +2494,27 @@ export async function constructGraph(
    * pair is the prompt's own — `left` and `acceptGhostOrForward` — because the
    * preview binds nothing that moves the caret, and the legend is offered on
    * the scroll pair's rule: not while there is nothing for it to reach.
+   *
+   * **Shed from the end, whole, where the row does not fit** the width the
+   * layer is drawn at. At ASCII the three spell `M-S-Up/M-S-Down scroll  M-o
+   * open in editor  Left/Right other chips`, 64 cells, and a `raw` row cut to
+   * 59 named `oth~` — a legend half-drawn, where the owner line sheds whole
+   * entries. The legend C22 I143 does not require goes first.
    */
-  const previewKeyRow = (scrolls: boolean, others: boolean): string => {
+  const previewKeyRow = (scrolls: boolean, others: boolean, width: number): string => {
     const caps = detection.capabilities;
     const pair = (["previewScrollUp", "previewScrollDown"] as const).flatMap((a) => previewChord(a) ?? []);
     const open = previewChord("previewOpen");
     const walk = (["left", "acceptGhostOrForward"] as const).flatMap(
       (a) => keymap.entries().find((b) => b.target === "prompt" && b.action === a)?.key ?? [],
     );
-    return [
+    const parts = [
       ...(scrolls && pair.length > 0 ? [keyHint(pair, "scroll", caps)] : []),
       ...(open === undefined ? [] : [keyHint([open], "open in editor", caps)]),
       ...(others && walk.length === 2 ? [keyHint(walk, "other chips", caps)] : []),
-    ].join("  ");
+    ];
+    while (parts.length > 1 && cells(parts.join("  "), caps.ambiguousWidth) > width) parts.pop();
+    return parts.join("  ");
   };
   /**
    * The header: the chip as C17 composes it, the name bold and the size
@@ -2540,8 +2549,14 @@ export async function constructGraph(
       height,
       children: [makeBlock({ kind: "code", id: "chip-preview-content", language: "text", text: chip.content })],
     });
-  const chipPreviewBlocks = (chip: Chip, box: Block, scrolls: boolean, others: boolean): readonly Block[] => {
-    const keys = previewKeyRow(scrolls, others);
+  const chipPreviewBlocks = (
+    chip: Chip,
+    box: Block,
+    scrolls: boolean,
+    others: boolean,
+    width: number,
+  ): readonly Block[] => {
+    const keys = previewKeyRow(scrolls, others, width);
     return [
       // The upper edge; the lower is the prompt's rule (§097, ruling 90).
       makeBlock({ kind: "rule", id: "chip-preview-edge-top", label: "" }),
@@ -2574,18 +2589,25 @@ export async function constructGraph(
     const half = Math.floor(region.height / 2);
     const cap = Math.max(1, half - 3);
     const box = previewBox(chip, cap);
-    const probe = chipPreviewBlocks(chip, box, true, others);
+    const probe = chipPreviewBlocks(chip, box, true, others, region.width);
     const ceiling = boxGeometry(probe, region.width, PREVIEW_BOX_ID)?.ceiling ?? 0;
-    if (ceiling > 0) return { blocks: chipPreviewBlocks(chip, previewBox(chip, Math.max(1, half - 4)), true, others), scrolls: true };
+    if (ceiling > 0) {
+      return { blocks: chipPreviewBlocks(chip, previewBox(chip, Math.max(1, half - 4)), true, others, region.width), scrolls: true };
+    }
     // It fits in the cap: the box is exactly its rows.
     const at = blockWidthInEntry(built.blocks, probe, region.width, PREVIEW_BOX_ID);
     const rows = at === null || box.kind !== "scroll" ? cap : barOf(box, at.inner, built.blocks.measure).content;
     const fitted = previewBox(chip, Math.max(1, Math.min(rows, cap)));
-    return { blocks: chipPreviewBlocks(chip, fitted, false, others), scrolls: false };
+    return { blocks: chipPreviewBlocks(chip, fitted, false, others, region.width), scrolls: false };
   };
   let previewed: Chip | null = null;
   /** The region height the preview was built at — a new one rebuilds it (C22 I143). */
   let previewedHeight: number | null = null;
+  /**
+   * And the width: the key row sheds against it and the box's content wraps
+   * at it, so a width-only resize is a new document too (C22 I143, §6s.3 row 9).
+   */
+  let previewedWidth: number | null = null;
   /** Whether the preview's box overflows, for the owner line's scroll chip (C22 I143). */
   let previewScrolls = false;
   /** Whether the key row offered `←→ other chips` — a change rebuilds it (C22 I143). */
@@ -2603,19 +2625,21 @@ export async function constructGraph(
     if (chip === null || blocked) {
       previewed = null;
       previewedHeight = null;
+      previewedWidth = null;
       previewScrolls = false;
       if (have) stores.overlays.dismiss(CHIP_PREVIEW_ID);
       return;
     }
-    const height = deps.frame.overlayRegion().height;
+    const { height, width } = deps.frame.overlayRegion();
     const others = otherChips();
-    if (have && chip === previewed && height === previewedHeight && others === previewedOthers) return;
-    // **A new chip, or a new region height, is a new document** (C22 I143,
+    const same = have && chip === previewed && height === previewedHeight && width === previewedWidth;
+    if (same && others === previewedOthers) return;
+    // **A new chip, or a new region size, is a new document** (C22 I143,
     // §6q.3 row 3): it opens at its top. A content update keeps the layer's
     // namespace (I141), so the owner drops it here. **Only the other chips
     // changing is not a new document**: the key row is rebuilt and the box
     // stays where the reader scrolled it.
-    if (!have || chip !== previewed || height !== previewedHeight) stores.scrollOffsets.delete(layerKey(CHIP_PREVIEW_ID));
+    if (!same) stores.scrollOffsets.delete(layerKey(CHIP_PREVIEW_ID));
     const { blocks: content, scrolls } = chipPreviewContent(chip, others);
     const anchor = deps.frame.promptAnchor();
     const placement = { kind: "anchored" as const, row: anchor.row, rows: anchor.rows, prefer: "above" as const };
@@ -2639,6 +2663,7 @@ export async function constructGraph(
     }
     previewed = chip;
     previewedHeight = height;
+    previewedWidth = width;
     previewScrolls = scrolls;
     previewedOthers = others;
   };

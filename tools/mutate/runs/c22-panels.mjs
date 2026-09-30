@@ -91,6 +91,22 @@ const results = runPass({
       expect: "T1.185",
     },
     {
+      // C22 I143, §6s.3 row 9 — the row cut by C09 rather than shed whole.
+      name: "the key row is not shed to the region's width",
+      file: CONSTRUCT,
+      from: "    while (parts.length > 1 && cells(parts.join(\"  \"), caps.ambiguousWidth) > width) parts.pop();\n",
+      to: "",
+      expect: "T1.185",
+    },
+    {
+      // C22 I143, §6s.3 row 9 — a width-only resize keeps the stale row.
+      name: "the preview is not rebuilt on a width-only resize",
+      file: CONSTRUCT,
+      from: " && width === previewedWidth;",
+      to: ";",
+      expect: "T1.185",
+    },
+    {
       // T6.27 (C20 I30) — the width declared at the push again (F1502).
       name: "find declares its width from the line at the push",
       file: LAYERS,
