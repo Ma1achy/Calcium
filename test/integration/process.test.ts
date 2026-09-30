@@ -322,6 +322,15 @@ describe("C21 with C06", () => {
       "SIGHUP: muted cancelled partial · vim ended on SIGHUP",
     ]);
   });
+  it.todo(
+    "T4.94 (C23 I96, C23 I66, ruling 92): the shell route's cancel settles partial, muted, with the cancelled mark above the kept screen — not deferred on a component: lands with the F1479 code commit of review batch 4",
+  );
+  it.todo(
+    "T4.95 (C23 I96, C23 I5, ruling 92): a cleared queue's entries settle partial, muted, with the cancelled mark — not deferred on a component: lands with the F1479 code commit of review batch 4",
+  );
+  it.todo(
+    "T4.96 (C23 I97, C23 I29, F1480): a handoff's code reaches meta and C20, 128+n for a signal and -1 for neither — not deferred on a component: lands with the F1480 code commit of review batch 4",
+  );
   it("T4.7 (with C22): session exit signals every child before the terminal is released", async () => {
     // A02 Seam 4's `Shutdown` row, and the whole claim is the **order**: a
     // child still running when the alternate screen is released writes onto the
