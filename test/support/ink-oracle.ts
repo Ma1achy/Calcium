@@ -73,6 +73,8 @@ const SPINNER_ASCII =
 const FAILURE_MARK =
   "C09 I138 / ruling 85 / §048 / §096 (F1461): a failed status leads its message with the failure mark `✗`/`x` where Ink drew the warning's `▲`/`!` — the mark an error shared with a warning at the rungs where it is one of two carriers";
 const SPINNER_AND_FAILURE_MARK = `${SPINNER_ASCII} — and, at this rung too, ${FAILURE_MARK}`;
+const SHARED_DIGEST =
+  "F1473 (C04 I73): T2.144's `img-fault` kept the corpus image's `digest` while overriding its `data`, and the decode cache is keyed on the digest — so the recorder was handed the corpus picture and Ink drew `▀▀`. The capture is of the picture and never of the fault arm; with a digest of its own the fixture draws the fault, which T2.144 asserts by shape because no capture of it exists or can be made";
 const BAR_PERCENT =
   "C09 I96 / §034 (M16): the bar's percentage is `muted` where Ink drew `meta` — all five of §034's bars read it in `c-muted`, painted and drawn alike, and the tree drew `meta` from the day the kind landed with no row naming the tone";
 
@@ -226,11 +228,17 @@ const RETIRED: ReadonlyMap<string, string> = new Map(
       // alone. No other capture draws a failed status — a sweep for `ERROR`
       // and for a leading `▲`/`!` returns this key and nothing else. The
       // image fault's key (`t2144-image-img-fault`) is not one, and not because
-      // the fault draws no status: the fixture keeps the corpus image's
-      // `digest`, so once T2.143 has decoded that image the decode cache hands
+      // the fault draws no status: the fixture kept the corpus image's
+      // `digest`, so once T2.143 had decoded that image the decode cache handed
       // the fault arm the picture — its capture is `▀▀`, not the fault.
       ["t2143-status-status-1", ALL_WIDTHS, SPINNER_AND_FAILURE_MARK, ["ascii", "mono"]],
       ["t2143-status-status-1", ALL_WIDTHS, FAILURE_MARK, ["full"]],
+      // **Every capture of that key, at every rung and width** (F1473): each is
+      // the corpus picture, so none can hold the fault. Retired rather than
+      // deleted, because the files are the record of what the shared digest
+      // produced; the row asserts they still differ, and asserts the fault arm's
+      // shape separately since no capture of it can be made.
+      ["t2144-image-img-fault", ALL_WIDTHS, SHARED_DIGEST],
       ["t2143-progress-prog-1", BAR_WIDTHS, BAR_EMPTY, ["ascii", "mono"]],
       ["t2143-progress-adv-zero-total", BAR_WIDTHS, BAR_EMPTY, ["ascii", "mono"]],
       // **The percentage's tone, and the shape of the list is the measurement.**
