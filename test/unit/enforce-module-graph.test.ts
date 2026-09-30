@@ -146,6 +146,15 @@ describe("A03 MG23 — one store per component, above L0", () => {
     for (const f of Object.keys(MARK_EXEMPTIONS)) {
       expect(files, `${f} is excused and must be in scope`).toContain(f);
     }
+
+    // **By equality** (F1326): the files that fire with no list at all are
+    // exactly the list's keys. The bidirectional arm answers each direction one
+    // entry at a time; this is both at once, over the tree, and it is what saw
+    // eight files arrive when the rule began decoding escapes.
+    const unexcused = new Set(checkMarks(files, undefined, {}).map((v) => v.file));
+    expect([...unexcused].sort(), "the files carrying a mark are the files excused").toEqual(
+      Object.keys(MARK_EXEMPTIONS).sort(),
+    );
   });
 
   it("MG27: the real tree is clean, and the rule can see it", () => {

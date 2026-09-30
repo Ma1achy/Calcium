@@ -42,7 +42,7 @@ import {
 import type { TerminalSize } from "../terminal/lifecycle.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Block } from "../data/viewmodel/index.js";
-import type { Chrome, CopyState, Label, OwnerHints, SessionSnapshot } from "./types.js";
+import type { Chrome, CopyState, GuardRefusal, Label, OwnerHints, SessionSnapshot, WatchRowState } from "./types.js";
 import type { OwnerRung } from "../interaction/router/types.js";
 
 /** What the frame is, before anything paints it. */
@@ -111,8 +111,13 @@ export type ComposeDeps = Readonly<{
    * had reached the end of that argument for.
    */
   owner: () => OwnerRung | null;
-  /** C16 I44 — whether that owner is still refusing its first activation. */
+  /** C16 I44 — whether that owner is still refusing activations. */
   ownerArmed: () => boolean;
+  /**
+   * C16 I70 — the key the guard refused, and the way out. Optional for
+   * `bufferedEntries`' reason: a composition with no session graph has no guard.
+   */
+  ownerRefused?: () => GuardRefusal | null;
   /**
    * Entries held out of the frame by copy mode (C14 I34).
    *
@@ -137,6 +142,12 @@ export type ComposeDeps = Readonly<{
    * default, and absent is that.
    */
   hints?: () => OwnerHints | undefined;
+  /**
+   * C22 I139 — the watches and the row's selection. Optional for
+   * `bufferedEntries`' reason: a composition with no session graph has no
+   * watches, and absent is *no row*.
+   */
+  watches?: () => WatchRowState | undefined;
   /** C02's resolved record, for the chrome's marks (A03 SS47). `null` before
    * the session graph exists, which is also when there is no owner. */
   capabilities: () => TerminalCapabilities | null;
@@ -203,6 +214,8 @@ export function compose(deps: ComposeDeps): Composed {
   const editingField = deps.editingField?.() === true;
   const toast = deps.toast?.();
   const hints = deps.hints?.();
+  const ownerRefused = deps.ownerRefused?.() ?? null;
+  const watches = deps.watches?.();
   const ctx = {
     session,
     now,
@@ -219,6 +232,8 @@ export function compose(deps: ComposeDeps): Composed {
     ...(editingField ? { editingField } : {}),
     ...(toast === undefined ? {} : { toast }),
     ...(hints === undefined ? {} : { hints }),
+    ...(ownerRefused === null ? {} : { ownerRefused }),
+    ...(watches === undefined ? {} : { watches }),
   };
 
   const { header, footer, label } = chromeOf(deps, ctx);

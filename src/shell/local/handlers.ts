@@ -32,6 +32,10 @@ import type { LocalHandler } from "./registry.js";
 import type { StopReason } from "../types.js";
 import type { CapabilitySource, TerminalCapabilities } from "../../terminal/capabilities.js";
 import { scopesInReadingOrder } from "../../interaction/router/keymap.js";
+import { configBlock } from "../config-table.js";
+import { watchName } from "../watches.js";
+import type { WatchStore } from "../watches.js";
+import type { Setting } from "../config.js";
 
 export type HandlerDeps = Readonly<{
   manifest: () => Manifest | null;
@@ -99,20 +103,49 @@ export type HandlerDeps = Readonly<{
    * off the report's own `regime.tier` and nothing here can change it.
    */
   profileCapture: ((ms: number) => Promise<CaptureResult>) | null;
+  /**
+   * `ResolvedConfig.settings` — every reader-facing value and where it came
+   * from (C22 I115), for `/config` (C23 I80, ruling 43). The resolved record,
+   * never a second derivation of it.
+   */
+  settings: () => readonly Setting[];
+  /**
+   * The session's watches, for `/watch` and `/unwatch` (C22 I135, I136). The
+   * set itself rather than a view of it: the two verbs are its producers.
+   */
+  watches: WatchStore;
 }>;
+
+/**
+ * The entry a watch verb names (C22 I136, §6p.2): `back` counted from the
+ * transcript's end as `/debug` counts, or — with none — the verb's own default.
+ * An answer or the notice that says why there is none.
+ */
+type Named = Readonly<{ entry: TranscriptStore["entries"][number] }> | Readonly<{ refusal: string }>;
+
+const nthBack = (transcript: TranscriptStore, raw: string | undefined): Named | null => {
+  if (raw === undefined) return null;
+  // C05 has validated `int` already; a value below one is `/debug`'s one.
+  const back = Math.max(1, Number.parseInt(raw, 10) || 1);
+  const entries = transcript.entries;
+  const entry = entries[entries.length - back];
+  return entry === undefined
+    ? { refusal: `no entry ${String(back)} back — the transcript holds ${String(entries.length)}` }
+    : { entry };
+};
 
 const isSection = (x: unknown): x is ProfileSection =>
   typeof x === "string" && (SECTIONS as readonly string[]).includes(x);
 
 /**
- * `/profile [section]` — open C28's view (C23 I68, I69).
+ * `/profile [section]` — compose C28's deck into an entry (C23 I68, I69).
  *
- * **It appends a notice and never the cards.** The deck is drawn in the layer
- * the view refreshes; a document holding a report would freeze one reading into
- * the transcript's record and read as current on every later frame, which is
- * I18's stale-data shape with the framework's own figures inside it. The two
- * verbs that *do* put a card in the transcript — `snapshot` and `live` — carry a
- * stamp or a cadence for exactly that reason (C23 I69, amended).
+ * **Every card that reaches the transcript is stamped or live.** A document
+ * holding a report would freeze one reading into the transcript's record and
+ * read as current on every later frame, which is I18's stale-data shape with
+ * the framework's own figures inside it — so a section's cards and
+ * `snapshot`'s one card carry a stamp, and `live`'s carries a cadence
+ * (C23 I69, amended).
  *
  * **The section comes from `ctx.args`, never from `argv[0]`** (C22 I66), for
  * `/theme`'s reason: C05 parsed and enum-checked it, and a second reader of one
@@ -120,9 +153,10 @@ const isSection = (x: unknown): x is ProfileSection =>
  * is empty there, because a local verb is not gated on validation — to quote
  * the token that was typed, and to tell *no argument* from *a bad one*.
  *
- * Every refusal is a document on this route rather than a throw (C23 I2): the
- * view's own strings for *no profiler* and *something is open*, and a usage
- * line for a section that is not one of C28's three.
+ * Every refusal is a document on this route rather than a throw (C23 I2): a
+ * `warn` notice naming `TuiConfig.profile` on every arm when there is no
+ * profiler, and a usage line for a token that is none of C28's three sections
+ * and none of the three verbs.
  */
 /**
  * The stamp (C23 I69, amended).
@@ -159,17 +193,17 @@ const stampOf = (r: ProfileReport, card: string, caps: GlyphCaps): string => {
   ].join(sep);
 };
 
-/** How often a live card refetches — the view's cadence, for the view's reasons. */
+/** How often a live card refetches — the sampler's cadence (C23 §2). */
 const LIVE_EVERY_MS = 1000;
 
 /**
  * The rows a snapshot card is drawn at.
  *
- * **A figure and not the region**, which is the whole of why the verb exists:
- * the overlay is one screen and does not scroll, so an icicle of a 47 ms frame
- * is cramped there and right in scrollback, where it can be scrolled past and
- * compared with the next one. `ctx.height` is the *viewport's* height and would
- * reproduce the cramping in the one place that is not bound by it.
+ * **A figure and not the region.** An entry is as tall as its blocks and the
+ * transcript scrolls it, so an icicle of a 47 ms frame is drawn at a height it
+ * reads at, where it can be scrolled past and compared with the next one.
+ * `ctx.height` is the *viewport's* height and would reproduce a one-screen
+ * cramping in the one place that is not bound by it.
  *
  * The width is `ctx.width` — that one is a real constraint, and a card drawn
  * wider than the transcript wraps (C01's width rule, the direction that
@@ -180,11 +214,9 @@ const SNAPSHOT_ROWS = 32;
 /**
  * The card a document verb draws, named or defaulted.
  *
- * **The verdict rather than whatever the view is showing**, and the difference
- * matters: the prompt takes no keys while a view is top (C16 §3), so a reader
- * who has walked to `frame on a clock` has to close the view before they can
- * type `/profile snapshot` — and by then there is no open card to mean. The
- * card is named on the line or it is the verdict.
+ * **Named on the line or the verdict**, and never *the card on screen*: there
+ * is no open card to mean — the deck is entries in the transcript, several of
+ * which may be visible at once (C23 §2).
  */
 const cardFor = (wanted: unknown): string =>
   typeof wanted === "string" && CARDS.some((c) => c.id === wanted) ? wanted : "verdict";
@@ -680,6 +712,64 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
           })),
         }),
       ]);
+    },
+
+    /**
+     * **The ninth** (C23 I80, §075, ruling 43) — *the commonest question is not
+     * what is it, it is WHY is it that*. One table, one row per setting, the
+     * source column toned by §075's ladder.
+     */
+    config: () => doc("/config", [configBlock(deps.settings(), blockId("config"))]),
+
+    /**
+     * **The tenth** (C22 I136, §085, ruling 50) — *pin one that is not yours*.
+     *
+     * **Whose it is decides nothing** (§6p.2): the sentence names the use the
+     * verb was drawn for, and a reader's own run is as watchable. The default is
+     * the newest running entry **that is not the shell's own** — a queued line is
+     * `streaming` and `transport: "local"` until it runs, and when `/watch`
+     * itself was queued the newest such line is this one (§6p.1).
+     */
+    watch: (argv) => {
+      const named =
+        nthBack(deps.transcript, argv[0]) ??
+        (() => {
+          const running = [...deps.transcript.entries]
+            .reverse()
+            .find((e) => e.streaming && e.doc.meta.transport !== "local");
+          return running === undefined ? { refusal: "nothing is running to watch" } : { entry: running };
+        })();
+      if ("refusal" in named) return doc("/watch", [warnNotice(named.refusal, blockId("watch-none"))]);
+      const name = watchName(named.entry);
+      if (deps.watches.has(named.entry.id)) {
+        return doc("/watch", [b.notice("muted", `already watching ${name}`, undefined, { id: blockId("watch") })]);
+      }
+      // I130's `false` — a run that has ended has no future to watch — with words.
+      if (!deps.watches.watch(named.entry.id)) {
+        return doc("/watch", [warnNotice(`${name} has settled — nothing left to watch`, blockId("watch-settled"))]);
+      }
+      return doc("/watch", [b.notice("muted", `watching ${name}`, undefined, { id: blockId("watch") })]);
+    },
+
+    /**
+     * **The eleventh** (C22 I136, §085) — *or it drops itself when the run
+     * ends*. With no argument, the newest watch: a verb with nothing named acts
+     * on what it would most recently have affected.
+     */
+    unwatch: (argv) => {
+      const named: Named =
+        nthBack(deps.transcript, argv[0]) ??
+        (() => {
+          const newest = deps.watches.ids().at(-1);
+          const entry = newest === undefined ? undefined : deps.transcript.entries.find((e) => e.id === newest);
+          return entry === undefined ? { refusal: "nothing is watched" } : { entry };
+        })();
+      if ("refusal" in named) return doc("/unwatch", [warnNotice(named.refusal, blockId("unwatch-none"))]);
+      const name = watchName(named.entry);
+      if (!deps.watches.unwatch(named.entry.id)) {
+        return doc("/unwatch", [warnNotice(`${name} is not watched`, blockId("unwatch-not"))]);
+      }
+      return doc("/unwatch", [b.notice("muted", `stopped watching ${name}`, undefined, { id: blockId("unwatch") })]);
     },
   };
 }

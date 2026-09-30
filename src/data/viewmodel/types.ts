@@ -656,6 +656,17 @@ export type ColumnDef = Readonly<{
    * neutral column draws its arrow in the cell's default tone.
    */
   polarity?: "higher" | "lower" | "neutral";
+  /**
+   * The closed set of words this column's cells are drawn from (I6, ruling 44).
+   *
+   * **What lets a word carry a tone without a glyph.** §075's source column is
+   * the case — `env` is `warn`, `flag` is `error` — and the word *is* the fact,
+   * so the tone is its second carrier and colour is not alone (tie-break 4
+   * counts carriers per fact). **Declared, never inferred from the text**: a
+   * cell outside the set is refused, so a cell cannot opt itself out by
+   * spelling. Absent, the column is held to I6's glyph exactly as before.
+   */
+  vocabulary?: readonly string[];
 }>;
 
 export type TableRow = Readonly<{
@@ -921,6 +932,17 @@ export type KeyValue = Readonly<{
    * exists so a *window* can say what its parent measured.
    */
   keyWidth?: number;
+  /**
+   * The shed parts drawn beneath each row, the block expanded in place (C09
+   * I124, ruling 42).
+   *
+   * **The table's expanded row, block-wide**, because the plan is block-wide:
+   * every row sheds the same parts. Written by the kind's `fold` as a
+   * shell-origin `replace` — `true`, then absent — when `⏎` lands on a shed
+   * row; a far-side `replace` drops it, as it drops every flag (C23 I84).
+   * Where the block sheds nothing at the width it draws nothing.
+   */
+  expanded?: boolean;
 }> & Padded & Floor;
 
 export type Table = Readonly<{
@@ -984,6 +1006,17 @@ export type Steps = Readonly<{
     detail?: string;
     state: "pending" | "active" | "done" | "failed";
   }>[];
+  /**
+   * The shed parts drawn beneath each row, the block expanded in place (C09
+   * I124, ruling 42).
+   *
+   * **The table's expanded row, block-wide**, because the plan is block-wide:
+   * every row sheds the same parts. Written by the kind's `fold` as a
+   * shell-origin `replace` — `true`, then absent — when `⏎` lands on a shed
+   * row; a far-side `replace` drops it, as it drops every flag (C23 I84).
+   * Where the block sheds nothing at the width it draws nothing.
+   */
+  expanded?: boolean;
 }> & Padded & Floor;
 
 export type Logs = Readonly<{
@@ -1010,6 +1043,17 @@ export type Events = Readonly<{
    * never carries alone (D29).
    */
   events: readonly Readonly<{ ts: string; type: string; message: string; tone?: Tone }>[];
+  /**
+   * The shed parts drawn beneath each row, the block expanded in place (C09
+   * I124, ruling 42).
+   *
+   * **The table's expanded row, block-wide**, because the plan is block-wide:
+   * every row sheds the same parts. Written by the kind's `fold` as a
+   * shell-origin `replace` — `true`, then absent — when `⏎` lands on a shed
+   * row; a far-side `replace` drops it, as it drops every flag (C23 I84).
+   * Where the block sheds nothing at the width it draws nothing.
+   */
+  expanded?: boolean;
 }> & Padded & Floor;
 
 /**
@@ -3070,6 +3114,17 @@ export type Comparison = Readonly<{
     /** The judgement axis, and the only half that takes a colour. */
     verdict?: "better" | "worse";
   }>[];
+  /**
+   * The shed parts drawn beneath each row, the block expanded in place (C09
+   * I124, ruling 42).
+   *
+   * **The table's expanded row, block-wide**, because the plan is block-wide:
+   * every row sheds the same parts. Written by the kind's `fold` as a
+   * shell-origin `replace` — `true`, then absent — when `⏎` lands on a shed
+   * row; a far-side `replace` drops it, as it drops every flag (C23 I84).
+   * Where the block sheds nothing at the width it draws nothing.
+   */
+  expanded?: boolean;
 }> & Padded & Floor;
 
 export type Hunk = Readonly<{
@@ -3111,11 +3166,16 @@ export type Patch = Readonly<{
    */
   collapsedAfter?: number;
   /**
-   * The affordances this patch offers — `view` for fullscreen (C25 §3b).
+   * The affordances this patch offers (C25 §3b). It read *`view` for
+   * fullscreen*; the kind and the screen went with the pushed view (R-EXA-082).
+   * **An `expand` naming a patch unfolds it where it carries a `cap`**: the
+   * dispatcher resolves the id through the registry's fold (C23 I84, C09 I124),
+   * which toggles `expanded`. A patch with no cap has nothing withheld, and one
+   * naming it answers *nothing to expand*.
    *
    * On the block rather than as an unconditional key binding: the offer is data
-   * the producer supplies, so a patch that should not offer fullscreen simply
-   * does not carry the action. A binding that applied to every patch would give
+   * the producer supplies, so a patch that should not offer one simply does not
+   * carry the action. A binding that applied to every patch would give
    * the block no way to decline (C04 §3).
    */
   actions?: readonly Action[];
@@ -3135,6 +3195,27 @@ export type Patch = Readonly<{
    * it exists so a *window* can say what its parent measured.
    */
   numberWidth?: number;
+  /**
+   * The collapsed form's row budget (C25 I14, D12) — **the producer's**.
+   *
+   * Hunks are admitted while the path header, the admitted hunks and one marker
+   * row fit inside it, the first always, and the rest are dropped whole behind
+   * `⋯ N more hunks`. **Data on the block and never a viewport**, so `measure`
+   * reads it as it reads `collapsedBefore` and stays pure over `(block, width)`
+   * (C25 I1). No framework route writes one: `ProducerContext.height` is `null`
+   * on every route (C07 I18), so a patch is capped where its producer says.
+   */
+  cap?: number;
+  /**
+   * The cap set aside — every hunk and the tail, in place (C25 I11, I14, D13).
+   *
+   * **Not an elision's flag**: `collapsedBefore` counts context the block does
+   * not carry, and nothing can reveal it (I11). The cap drops hunks the block
+   * *does* carry, so a flag has something to reveal. Written by the fold as a
+   * shell-origin `replace`, `true` and then absent, so a round trip restores
+   * the producer's block (C09 I124).
+   */
+  expanded?: boolean;
 }> & Padded & Floor;
 
 /**

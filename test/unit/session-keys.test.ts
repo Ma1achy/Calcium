@@ -266,6 +266,9 @@ describe("C22 §3 step 11 — the effect table", () => {
       // leaves the mode alone — the row would fail for a reason that has nothing
       // to do with whether its effect exists, which is `child`'s argument above.
       if (b.target === "interaction") enterInside(graph);
+      // **The watch row is a stored location** (C16 I76): without it the row's
+      // digits are typed into the editor, which is the `child` argument again.
+      if (b.target === "watchRow") graph.focus.toWatches("w", 0);
       // **The `copy` rung's two targets, and they were unreachable** (C16 I50).
       // `FRAME` hard-wired both flags to `false`, so no row at either could
       // resolve — and `nativeSelection`'s `escape` row passed anyway, consumed
@@ -290,6 +293,7 @@ describe("C22 §3 step 11 — the effect table", () => {
       // `keepField` after it — a no-op with no field held — the walk stayed
       // inside and every `liveBlock` row after it resolved at `interaction`.
       if (b.target === "interaction") graph.focus.setMode("navigate");
+      if (b.target === "watchRow") graph.focus.reset();
       COPY_MODES.native = false;
       COPY_MODES.semantic = false;
       graph.editor.clear();
@@ -401,6 +405,7 @@ describe("C22 §3 step 11 — the effect table", () => {
       keepField: () => undefined,
       runAction: () => undefined,
       focusTranscript: () => undefined,
+      watchKeys: { focusPrevious: () => undefined, step: () => undefined, open: () => undefined },
       // C16 I49 — the child's one exit. Counted here rather than stubbed
       // silent, because this harness is the one that walks every action.
       detachChild: () => undefined,
@@ -900,7 +905,10 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
     const effects = createKeyEffects({
       editor: {},
       completion: {},
-      overlays: {},
+      // **The one read construction makes** (C15 I32): the effects subscribe to
+      // the stack to hold a displaced panel, so a stand-in without it throws
+      // before any row here runs.
+      overlays: { subscribe: () => ({ [Symbol.dispose]: () => undefined }) },
       history: { entries: [], append: () => undefined, next: () => null },
       // No reply holds the line (C23 I77).
       reply: () => null,
@@ -1048,7 +1056,10 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
     const effects = createKeyEffects({
       editor: { copyText: (t: string) => void kill.push(t) },
       completion: {},
-      overlays: {},
+      // **The one read construction makes** (C15 I32): the effects subscribe to
+      // the stack to hold a displaced panel, so a stand-in without it throws
+      // before any row here runs.
+      overlays: { subscribe: () => ({ [Symbol.dispose]: () => undefined }) },
       history: { entries: [], append: () => undefined, next: () => null },
       // No reply holds the line (C23 I77).
       reply: () => null,
@@ -1241,7 +1252,10 @@ describe("the inside (C26 I26, I27, §102)", () => {
     const effects = createKeyEffects({
       editor: {},
       completion: {},
-      overlays: {},
+      // **The one read construction makes** (C15 I32): the effects subscribe to
+      // the stack to hold a displaced panel, so a stand-in without it throws
+      // before any row here runs.
+      overlays: { subscribe: () => ({ [Symbol.dispose]: () => undefined }) },
       history: { entries: [], append: () => undefined, next: () => null },
       // No reply holds the line (C23 I77).
       reply: () => null,

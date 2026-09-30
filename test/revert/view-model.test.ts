@@ -502,3 +502,26 @@ describe("C04 §3 both axes — fail-on-revert", () => {
     expect(drawn, "and the frame is F816's").toBe(3);
   });
 });
+
+describe("C04 I6 fail-on-revert — the vocabulary is closed", () => {
+  it("T6.105 (C04 I6, ruling 44): dropping the membership check → T2.139 fails on envx", () => {
+    // Without it the column's declaration exempts every cell under it, and a
+    // cell whose text is no word of the set carries `warn` with no glyph —
+    // free text opting itself out, the case the ruling says must not happen.
+    const outside = {
+      kind: "table",
+      id: "settings",
+      columns: [{ key: "source", label: "source", priority: 1, minWidth: 7, sortable: false, vocabulary: ["env", "flag"] }],
+      rows: [{ id: "r", cells: { source: { text: "envx", tone: "warn" } } }],
+    };
+    expect(() => block(outside as never)).toThrow(/C04 I6, ruling 44/u);
+  });
+  it("T6.106 (C04 I6, ruling 77): dropping the wire's glyph check → T2.139 fails at the wire", () => {
+    // Without it the wire accepts what `block()` throws on — one document, two
+    // verdicts, and the far side is the producer D29 exists for (F1284).
+    const colourOnly = { kind: "notice", id: "n", tone: "error", text: "failed" };
+    expect(() => block(colourOnly as never), "the builder").toThrow(/C04 I6/u);
+    const wire = validateBlock(colourOnly);
+    expect(wire.ok ? "" : wire.error.join("\n"), "the wire").toMatch(/requires a glyph \(C04 I6, D29\)/u);
+  });
+});

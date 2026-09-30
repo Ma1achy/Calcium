@@ -37,12 +37,29 @@ class Manager implements OverlayManager {
   /** Bottom-first, and already sorted — `push` maintains I2 rather than `layout` discovering it. */
   #stack: readonly Layer[] = Object.freeze([]);
 
+  /**
+   * Keyed pushes and removals, never down (I33, C16 I43).
+   *
+   * **The owner generation C16's epoch reads.** The epoch compared the rung at
+   * two reads, and a question raised and answered between them leaves the rung
+   * where it was — so an arm taken before it committed after it. Every keyed
+   * push and removal passes through here, which is why the counter is here
+   * rather than at each caller that might raise one.
+   *
+   * A peek is not an owner and `update` changes none, so neither moves it.
+   */
+  #generation = 0;
+
   constructor(opts: OverlayOptions) {
     this.#registry = opts.registry;
   }
 
   get stack(): readonly Layer[] {
     return this.#stack;
+  }
+
+  get generation(): number {
+    return this.#generation;
   }
 
   /**
@@ -82,7 +99,10 @@ class Manager implements OverlayManager {
     // that arrived.* The arriving one cannot silently sit under something the
     // reader was reading, and two layers differing on escapability make `esc`
     // ambiguous. Each goes out as its own change (I25), so every owner runs its
-    // own teardown; the reason is `explicit`, because the referent has not gone.
+    // own teardown. **The reason is `displaced`** (I32): not `explicit`, which
+    // says the reader closed it, and not an eviction, because the referent has
+    // not gone — the owner holds the panel's state and restores it when the
+    // arrival resolves (R-BLK-873: *its state is held with the prompt's*).
     if (layer.blocking) {
       // **Panels, not every `escape` layer** (I28, R-BLK-873). The rule names
       // both parties — *a panel is DISMISSABLE and a question is NOT*, *THE
@@ -91,10 +111,11 @@ class Manager implements OverlayManager {
       // with it. A panel is a transient you opened above the prompt; a view is
       // a region you are inside.
       for (const open of [...this.#stack]) {
-        if (open.kind === "panel") this.dismiss(open.id);
+        if (open.kind === "panel") this.dismiss(open.id, "displaced");
       }
     }
     this.#stack = sortLayers([...this.#stack, layer]);
+    if (layer.kind !== "peek") this.#generation += 1;
     this.#emit({ kind: "push", id: layer.id, layerKind: layer.kind });
 
     let disposed = false;
@@ -114,6 +135,7 @@ class Manager implements OverlayManager {
     const top = this.top;
     if (top === null || top.dismissal !== "escape") return null;
     this.#remove(top.id);
+    this.#generation += 1;
     this.#emit({ kind: "pop", id: top.id, layerKind: top.kind });
     return top;
   }
@@ -122,6 +144,7 @@ class Manager implements OverlayManager {
     const layer = this.#stack.find((l) => l.id === id);
     if (layer === undefined) return;
     this.#remove(id);
+    if (layer.kind !== "peek") this.#generation += 1;
     this.#emit({ kind: "dismiss", id, reason });
   }
 
@@ -193,7 +216,38 @@ class Manager implements OverlayManager {
  * been found once. `clearConfirmLayer` in C20 was the second centred layer in
  * the tree and declared no width at all; it is retired (C16 ruling 61).
  */
+/**
+ * I30 — the §2d table, row by row, as the type states it (C15 §2d).
+ *
+ * **Read off a widened view on purpose.** `Layer` is a union that already
+ * refuses every row below at a literal, so a check written against the narrowed
+ * type is one the compiler deletes as unreachable — and the caller it exists
+ * for is exactly the one holding a cast, a widened value or JavaScript. The
+ * table is the union's rows; a combination it does not list is refused.
+ */
+const FIELDS: Readonly<Record<Layer["kind"], readonly string[]>> = Object.freeze({
+  peek: Object.freeze(["false/focus"]),
+  panel: Object.freeze(["false/escape"]),
+  overlay: Object.freeze(["true/answer", "true/escape", "false/escape"]),
+});
+
+const WHY: Readonly<Record<Layer["kind"], string>> = Object.freeze({
+  peek: "a peek takes no keys, so it blocks nothing and nothing but focus leaving closes it",
+  panel: "a blocking panel is an overlay and a panel that outlives esc is a peek (I27)",
+  overlay:
+    "an overlay takes keys, so focus leaving never closes it, and one closed only by its answer " +
+    "blocks — an owner waiting while keys pass beneath it is waiting on nothing",
+});
+
 function assertPlaceable(layer: Layer): void {
+  const wide = layer as Readonly<{ id: string; kind: Layer["kind"]; blocking: boolean; dismissal: string }>;
+  const cell = `${String(wide.blocking)}/${wide.dismissal}`;
+  if (!FIELDS[wide.kind].includes(cell)) {
+    throw new OverlayError(
+      `${wide.kind} ${wide.id} declares blocking=${String(wide.blocking)} dismissal=${wide.dismissal}: ` +
+        `${WHY[wide.kind]} (I30)`,
+    );
+  }
   // I22 — a peek is beside the thing it describes, or it is a confirm
   // wearing the wrong kind. Both entry points, on I20's argument.
   if (layer.kind === "peek" && layer.placement.kind !== "anchored") {
@@ -208,27 +262,21 @@ function assertPlaceable(layer: Layer): void {
   // something; non-blocking and `escape`, because a blocking panel is an overlay
   // and a panel that outlives `esc` is a peek. A panel free to vary them would be
   // a fourth kind wearing a third one's name.
-  if (layer.kind === "panel") {
-    if (layer.placement.kind !== "anchored") {
-      throw new OverlayError(
-        `panel ${layer.id} is ${layer.placement.kind}: a panel floats above the prompt between ` +
-          `two rules, which is a placement relative to something (I27)`,
-      );
-    }
-    if (layer.blocking || layer.dismissal !== "escape") {
-      throw new OverlayError(
-        `panel ${layer.id} declares blocking=${String(layer.blocking)} dismissal=${layer.dismissal}: ` +
-          `a blocking panel is an overlay and a panel that outlives esc is a peek (I27)`,
-      );
-    }
+  // I27's two fields are the table's panel row, checked above; its placement
+  // is not in the table, because `LayerUpdate` admits it and names no kind.
+  if (layer.kind === "panel" && layer.placement.kind !== "anchored") {
+    throw new OverlayError(
+      `panel ${layer.id} is ${layer.placement.kind}: a panel floats above the prompt between ` +
+        `two rules, which is a placement relative to something (I27)`,
+    );
   }
   // **I29 — a declared owner agrees with the fields it implies.** A question
   // is an overlay that owns input and closes on its answer; a substate is a
   // panel; a peek takes no keys, so it has no rung to name. An owner the
   // fields contradict is the two-derivation defect arriving as data: the
   // router would read the owner and the stack would behave as the kind.
-  if (layer.owner !== undefined) {
-    const { owner } = layer;
+  const owner = (layer as Readonly<{ owner?: Readonly<{ rung: string }> }>).owner;
+  if (owner !== undefined) {
     const agrees =
       owner.rung === "question"
         ? layer.kind === "overlay" && layer.blocking && layer.dismissal === "answer"

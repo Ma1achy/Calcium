@@ -58,7 +58,7 @@ export function anchored(
   at: Readonly<{ row: number; rows?: number; prefer: "above" | "below" }>,
   opts: Readonly<{ width?: number; blocking?: boolean; dismissal?: Layer["dismissal"] }> = {},
 ): Layer {
-  return {
+  return overlayOf({
     id,
     kind: "overlay",
     placement: { kind: "anchored", row: at.row, prefer: at.prefer, ...(at.rows !== undefined && { rows: at.rows }) },
@@ -66,7 +66,19 @@ export function anchored(
     blocking: opts.blocking ?? false,
     dismissal: opts.dismissal ?? (opts.blocking === true ? "answer" : "escape"),
     ...(opts.width !== undefined && { width: opts.width }),
-  };
+  });
+}
+
+/**
+ * **An overlay whose fields the caller chose, typed as a `Layer` by assertion**
+ * (C15 I30). `blocking` and `dismissal` are parameters here, so the helpers can
+ * build any row of §2d's table — the refused ones included, which is what the
+ * refusal rows need and what `push` exists to catch. The union would reject a
+ * combination a parameter cannot promise, and this is the caller the run-time
+ * check is for.
+ */
+function overlayOf(fields: Readonly<{ blocking: boolean; dismissal: Layer["dismissal"] }> & Omit<Layer, "blocking" | "dismissal" | "owner">): Layer {
+  return fields as Layer;
 }
 
 /**
@@ -103,7 +115,7 @@ export function centred(
   height: number,
   opts: Readonly<{ width?: number; blocking?: boolean; dismissal?: Layer["dismissal"] }> = {},
 ): Layer {
-  return {
+  return overlayOf({
     id,
     kind: "overlay",
     placement: { kind: "centred" },
@@ -111,7 +123,7 @@ export function centred(
     blocking: opts.blocking ?? false,
     dismissal: opts.dismissal ?? (opts.blocking === true ? "answer" : "escape"),
     width: opts.width ?? REGION.width,
-  };
+  });
 }
 
 /**

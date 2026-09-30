@@ -540,6 +540,17 @@ const BYTES: Readonly<Record<string, readonly string[]>> = {
   // Re-run (C23 I18): the prompt's newline pair, at the other target.
   "liveBlock s+enter": ["\u001b[13;2u", "\u001b[27;2;13~"],
   "liveBlock m+enter": ["\u001b\r"],
+
+  // The watch row (C16 I76, I77, §6d): `liveBlock`'s arrows, `⏎`, `esc` and the
+  // tab pair, and `watch.jump[n]`'s bare digits — every one a key an xterm
+  // sends with no protocol, which is why the digits are the route.
+  "watchRow left": ["\u001b[D", "\u001bOD"],
+  "watchRow right": ["\u001b[C", "\u001bOC"],
+  "watchRow enter": ["\r"],
+  "watchRow escape": ["\u001b"],
+  "watchRow tab": ["\t"],
+  "watchRow s+tab": ["\u001b[Z"],
+  ...Object.fromEntries(["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => [`watchRow ${d}`, [d]])),
 };
 
 describe("§6 — the default table (C17 I12)", () => {
@@ -951,7 +962,7 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     ).toContain("throw new Error(`${String(found.length)} registry bindings for ${actionId} in ${profile}, not one`)");
   });
 
-  it("T1.98 (C16 §6a clause 6, R-KEY-005, §019): a chord renders in the design's notation, by equality against the registry", () => {
+  it("T1.195 (C16 §6a clause 6, R-KEY-005, §019): a chord renders in the design's notation, by equality against the registry", () => {
     // **The notation is the design's by equality and not by transcription.**
     // `chordText` reads like a table someone kept in step with §019 — eleven
     // glyphs and four modifiers, written out by hand — and a table kept in step
@@ -1014,7 +1025,7 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     expect(defaultKeymap.some((b) => !ASCII_ONLY.test(chordText(b.key)))).toBe(true);
   });
 
-  it("T1.99 (C16 §6a clause 6, I34): two keys that render one chord are still two slots", () => {
+  it("T1.196 (C16 §6a clause 6, I34): two keys that render one chord are still two slots", () => {
     // **The row a mutation asked for, and the tree could not answer.** Swapping
     // `slot` from `keySlot` to `chordText` survived a pass: both are injective
     // over the keymap that ships, so the duplicate check gives the same answer
@@ -1056,7 +1067,7 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     ).toThrow(/duplicate binding/u);
   });
 
-  it("T1.100 (C16 §6a clause 4, R-KEY-005, §022): the listing's order is the registry's, then FOCUS_ORDER — never alphabetical", () => {
+  it("T1.197 (C16 §6a clause 4, R-KEY-005, §022): the listing's order is the registry's, then FOCUS_ORDER — never alphabetical", () => {
     // **The row the first implementation would have passed.** It sorted the
     // remainder alphabetically, and §022's own picture agreed with that by
     // coincidence: it draws `global` before `transcript`, and `g` precedes `t`.
@@ -1112,8 +1123,8 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     // the 122nd: `escape → dismiss` is bound at both, because a panel is
     // escapable by its kind and an overlay by its `dismissal` (C15 I26, I27).
     // **124 from M9**: the captured child's `host.detach`, once per profile.
-    // They are the only two rows at `child`, because the child's handler
-    // consumes what it does not bind and there is nothing else to list.
+    // They are the only two rows at `child`, because the `child` rung
+    // consumes what no handler takes and there is nothing else to list.
     // **113 from M9d** (R-EXA-082, F1254): the eleven `pushedView` rows went
     // with the target — `n`, `p`, `g`, `G`, `pageup`, `pagedown`, `tab`,
     // `⇧tab` and `escape`, plus the two that were written once per profile.
@@ -1164,8 +1175,13 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     // target, chord, action and profile, which the set below is what says — the
     // base routes the registry now names (`⌥⏎`, `⌃Y`, `⌥w`, `⌥1`…) were already
     // rows, spelled as literals.
-    expect(rows).toHaveLength(134);
-    expect(new Set(rows).size, "no two rows are identical").toBe(134);
+    //
+    // **149 from C16 §6d** (ruling 50, I76, I77): the watch row's fifteen —
+    // `←` `→` `⏎` `esc` `⇥` `⇧⇥` and `watch.jump[n]`'s `1`–`9` — fifteen in,
+    // none out. The prompt's `⇧⇥` kept its row and changed its action to
+    // `focusPrevious`, which the set below is what says.
+    expect(rows).toHaveLength(149);
+    expect(new Set(rows).size, "no two rows are identical").toBe(149);
 
     // Every row whose chord the registry names resolves to the registry's key —
     // the join asserted from the table's side, so a `chordOf` call that silently
@@ -1221,8 +1237,11 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
       // `⌥.`, `⌥,`, `⌥1`–`⌥9`, `⌃home` and `⌃end` a record, so the literal rows
       // spelling them joined — and every one of the 91 now carries the record's
       // id as `registry`, which T1.37 asserts from the table's side.
+      //
+      // **106 from C16 §6d** (ruling 50): every one of the watch row's fifteen
+      // is a registry chord — the six motions' and `watch.jump.1`–`9`'s own.
       "the rows the registry supplies a chord for",
-    ).toBe(91);
+    ).toBe(106);
   });
 
   it("T1.94 (I41): ⌘↑ and ⌥↑ are two actions under the enhanced profile and one under the base", () => {
@@ -1387,10 +1406,11 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
      * active owner (R-KEY-003), so `always` admits every owner but the attached
      * child, whose keys are its own.
      */
-    const OWNERS = ["global", "overlay", "panel", "prompt", "liveBlock", "interaction", "semanticSelection", "nativeSelection"];
+    // `watchRow` is an owner of the `scope` rung (C16 I76), and focused.
+    const OWNERS = ["global", "overlay", "panel", "prompt", "liveBlock", "interaction", "semanticSelection", "nativeSelection", "watchRow"];
     const ADMITS: Readonly<Record<string, readonly string[]>> = {
       "global/always": OWNERS,
-      "global/focused": ["prompt", "panel", "liveBlock", "interaction", "semanticSelection"],
+      "global/focused": ["prompt", "panel", "liveBlock", "interaction", "semanticSelection", "watchRow"],
       "global/selectable": ["prompt", "liveBlock", "semanticSelection"],
       // `global` by I52's one exemption, and the rungs with no line.
       "global/non-typing": ["global", "liveBlock", "interaction", "semanticSelection", "nativeSelection"],
@@ -1528,7 +1548,10 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     // design's own control row rather than a character somebody meant to type:
     // *KEYBOARD CONTROLS APPEAR ONLY INSIDE*, and inside a figure there is no
     // line being composed.
-    const NOT_TYPING = ["interaction", "liveBlock", "nativeSelection", "semanticSelection"];
+    // `watchRow` joins it with ruling 50 (C16 I76, I77): the row is focused away
+    // from the prompt, nothing is composed there, and its bare `1`–`9` are
+    // `watch.jump[n]` — which is why the digits could be the route at all.
+    const NOT_TYPING = ["interaction", "liveBlock", "nativeSelection", "semanticSelection", "watchRow"];
 
     const targets = [...new Set(defaultKeymap.map((b) => b.target))].sort();
     expect(targets, "every target is classified — a new one fails here first")
@@ -1912,11 +1935,11 @@ describe("C16 §6c — routes by profile and the registry-global placement (revi
   });
 
   it("T1.173 (C16 I66): a registry-global key record is one global row or an owner row at each owner with the verb — the passes and captures declared, by equality", () => {
-    const OWNERS = ["overlay", "panel", "prompt", "liveBlock", "interaction", "semanticSelection", "nativeSelection"];
+    const OWNERS = ["overlay", "panel", "prompt", "liveBlock", "interaction", "semanticSelection", "nativeSelection", "watchRow"];
     /** The owners a `global` record's `when` names, as T1.37's placement map reads it. */
     const NAMED: Readonly<Record<string, readonly string[]>> = {
       always: OWNERS,
-      focused: ["prompt", "panel", "liveBlock", "interaction", "semanticSelection"],
+      focused: ["prompt", "panel", "liveBlock", "interaction", "semanticSelection", "watchRow"],
       selectable: ["prompt", "liveBlock", "semanticSelection"],
       "non-typing": ["liveBlock", "interaction", "semanticSelection", "nativeSelection"],
       attached: ["child"],
@@ -1949,18 +1972,31 @@ describe("C16 §6c — routes by profile and the registry-global placement (revi
       "binding.003": ["prompt"],
       "binding.004": ["overlay", "interaction", "semanticSelection", "nativeSelection"],
       "binding.005": ["overlay", "panel", "interaction", "semanticSelection", "nativeSelection"],
-      "binding.006": [],
-      "binding.007": [],
+      // The watch row is one line: `↑`/`↓` are not its motions, so they pass to
+      // `global` and scroll the transcript there (C16 §6d), as nothing else
+      // binds them at the row.
+      "binding.006": ["watchRow"],
+      "binding.007": ["watchRow"],
       "binding.008": ["panel", "semanticSelection"],
       "binding.009": ["panel", "semanticSelection"],
       "binding.010": ["prompt"],
       "binding.011": ["prompt"],
       "binding.012": ["liveBlock", "semanticSelection"],
       "binding.013": ["liveBlock", "semanticSelection"],
-      "binding.copy-enhanced": ["overlay", "panel", "nativeSelection"],
-      "binding.copy-base": ["overlay", "panel", "nativeSelection"],
+      // And `copy` passes at the row, which holds nothing to copy.
+      "binding.copy-enhanced": ["overlay", "panel", "nativeSelection", "watchRow"],
+      "binding.copy-base": ["overlay", "panel", "nativeSelection", "watchRow"],
       "binding.host-detach": [],
       "binding.host-detach-enhanced": [],
+      // **`watch.jump[n]`, bound at the row alone** (C16 I77): every other
+      // focused owner passes the digit — to the editor at `prompt`, which is
+      // the reason the row is the route and no digit is bound at `global`.
+      ...Object.fromEntries(
+        Array.from({ length: 9 }, (_, i) => [
+          `binding.watch-jump-${String(i + 1)}`,
+          ["prompt", "panel", "liveBlock", "interaction", "semanticSelection"],
+        ]),
+      ),
     };
 
     const globalRow: Record<string, readonly string[]> = {};

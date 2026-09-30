@@ -82,4 +82,13 @@ export const REGISTRY_BINDINGS: readonly RegistryBinding[] = Object.freeze([
   { id: "binding.transcript-bottom-enhanced", actionId: "transcript.bottom", profile: "enhanced-terminal", key: { name: "down", super: true } },
   { id: "binding.transcript-top-base", actionId: "transcript.top", profile: "default-terminal", key: { name: "home", ctrl: true } },
   { id: "binding.transcript-top-enhanced", actionId: "transcript.top", profile: "enhanced-terminal", key: { name: "up", super: true } },
+  { id: "binding.watch-jump-1", actionId: "watch.jump.1", profile: "default-terminal", key: { name: "1" } },
+  { id: "binding.watch-jump-2", actionId: "watch.jump.2", profile: "default-terminal", key: { name: "2" } },
+  { id: "binding.watch-jump-3", actionId: "watch.jump.3", profile: "default-terminal", key: { name: "3" } },
+  { id: "binding.watch-jump-4", actionId: "watch.jump.4", profile: "default-terminal", key: { name: "4" } },
+  { id: "binding.watch-jump-5", actionId: "watch.jump.5", profile: "default-terminal", key: { name: "5" } },
+  { id: "binding.watch-jump-6", actionId: "watch.jump.6", profile: "default-terminal", key: { name: "6" } },
+  { id: "binding.watch-jump-7", actionId: "watch.jump.7", profile: "default-terminal", key: { name: "7" } },
+  { id: "binding.watch-jump-8", actionId: "watch.jump.8", profile: "default-terminal", key: { name: "8" } },
+  { id: "binding.watch-jump-9", actionId: "watch.jump.9", profile: "default-terminal", key: { name: "9" } },
 ]);

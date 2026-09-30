@@ -58,9 +58,12 @@ function harness(over: Partial<RouterDeps> = {}, start = 1_000, keymap = createK
   // **Its own list, not `calls`** (C16 I62): a refusal is an explanation, not an
   // action, and a row asserting what acted must not have to subtract it.
   const refusals: Refusal[] = [];
-  const layer = { top: null as Placed["layer"] | null, placed: [] as Placed[] };
+  // `generation` is C16 I73's pull, moved by a row that raises or removes an
+  // owner the rung cannot see.
+  const layer = { top: null as ReturnType<RouterDeps["overlayTop"]>, placed: [] as Placed[], generation: 0 };
   const deps: RouterDeps = {
     keyReleasesReported: () => false,
+    ownerGeneration: () => layer.generation,
     // **The `child` rung's second source** (C16 I49). Required rather than
     // optional, so a harness that means to attach one has to say so.
     childAttached: () => false,
@@ -69,6 +72,10 @@ function harness(over: Partial<RouterDeps> = {}, start = 1_000, keymap = createK
     overlayTop: () => layer.top,
     overlayRegion: () => ({ width: 80, height: 24 }),
     placed: () => layer.placed,
+    // C16 I74 — each layer's scroller, logged; `false` is *nothing to scroll*.
+    scrollLayer: (id, notches) => (calls.push(`scroll:${id}:${String(notches)}`), true),
+    // C16 I75 — the escape's detach, logged.
+    detachChild: () => void calls.push("detach"),
     popLayer: () => void calls.push("pop"),
     nativeSelection: () => false,
     semanticSelection: () => false,
@@ -1054,7 +1061,7 @@ describe("C16 §5 — Ctrl-D, and the one thing C16 stores", () => {
     // again with nothing stored having changed. A cached resolution would give
     // the old answer here and no assertion above would notice.
     const before = h.focus.current;
-    h.layer.top = { id: "L1" } as unknown as Placed["layer"];
+    h.layer.top = { id: "L1" } as unknown as ReturnType<RouterDeps["overlayTop"]>;
     expect(h.focus.current, "the store did not move").toEqual(before);
 
     // And the structural half: one stored field, over the declaration, so a
@@ -1233,38 +1240,48 @@ describe("C16 §7 and §4a — the epoch, the question guard and pointer commit 
     return { ...h, q };
   };
 
-  it("T1.98 (I43, I44, R-BLK-786): a question arriving guards the router and moves the epoch", () => {
+  // **The epoch is read through what it is for** (I73): a pointer arm taken in
+  // one epoch commits only in that epoch, so an arm that survives is an epoch
+  // that did not move. The getter these rows read went private with I73.
+
+  it("T1.98 (I43, I44, R-BLK-786): a question arriving guards the router and kills an arm taken before it", () => {
     const { router, q } = withQuestion();
-    const epoch0 = router.ownerEpoch;
     expect(router.ownerArmed, "nothing is guarded before one arrives").toBe(false);
+    router.armPointer("a");
 
     q.open = true;
-    expect(router.ownerEpoch, "every owner transition increments the generation").toBe(epoch0 + 1);
     expect(router.ownerArmed).toBe(true);
+    expect(router.commitPointer("a"), "every owner transition moves the epoch").toBe(false);
   });
 
-  it("T1.98b (I43, I44): unguarded, an activation is handled and the epoch does not move", () => {
+  it("T1.98b (I43, I44): unguarded, an activation is handled and an arm survives it", () => {
     // **The control, and without it T1.98 is a restatement of *nothing
     // happened*.** A router that guarded everything, or nothing, passes one of
     // the two rows; only the pair pins the guard to a question arriving.
     const { router, q } = withQuestion();
     q.open = true;
-    const epoch = router.ownerEpoch;
     router.dispatch(key("x")); // a neutral key ends the guard
     expect(router.ownerArmed).toBe(false);
+    router.armPointer("a");
     expect(router.dispatch(key("y")), "the question takes it").toBe(true);
     expect(router.lastStages).not.toContain("question-guard");
-    expect(router.ownerEpoch, "no owner changed, so the generation did not move").toBe(epoch);
+    expect(router.commitPointer("a"), "no owner changed, so the epoch did not move").toBe(true);
   });
 
-  it("T1.99 (I44, R-BLK-788): with no release reporting the first activation is refused and the guard ends", () => {
-    const { router, q } = withQuestion();
+  it("T1.99 (I44, I69, R-BLK-788): with no release reporting an activation is refused, and one past the grace and the gap answers", () => {
+    const { router, q, advance } = withQuestion();
     q.open = true;
+    expect(router.ownerArmed).toBe(true);
 
     expect(router.dispatch(key("y")), "refused, and consumed — never dropped").toBe(true);
     expect(router.lastStages).toEqual(["arming", "question-guard", "reject"]);
+    // **The second is refused too** (I69): it arrived inside the grace, and a
+    // held key's repeat is a second press this terminal cannot tell apart.
+    expect(router.dispatch(key("y"))).toBe(true);
+    expect(router.lastStages).toContain("question-guard");
 
-    expect(router.dispatch(key("y")), "the second is the reader's own").toBe(true);
+    advance(1_000);
+    expect(router.dispatch(key("y")), "the reader's own, after a pause").toBe(true);
     expect(router.lastStages).not.toContain("question-guard");
   });
 
@@ -1305,16 +1322,24 @@ describe("C16 §7 and §4a — the epoch, the question guard and pointer commit 
     // question closes is the reader typing and is not refused.
     const { router, q } = withQuestion();
     q.open = true;
-    router.dispatch(key("y")); // spend the guard on the arrival
-    const epoch = router.ownerEpoch;
+    router.dispatch(key("x")); // end the guard on the arrival
+    router.armPointer("a");
 
     q.open = false;
-    expect(router.ownerEpoch, "the fall moves the generation too").toBe(epoch + 1);
+    expect(router.commitPointer("a"), "the fall moves the epoch too").toBe(false);
     expect(router.ownerArmed, "and guards nothing").toBe(false);
+
+    // **And a question gone takes its guard with it** (I73): closed with the
+    // guard still live, a guard left behind would refuse a row's `⏎` at `scope`.
+    const closed = withQuestion();
+    closed.q.open = true;
+    expect(closed.router.ownerArmed).toBe(true);
+    closed.q.open = false;
+    expect(closed.router.ownerArmed, "nothing is guarded once the question is gone").toBe(false);
   });
 
   it("T1.99d, T1.99e (I44, R-BLK-788): with releases reported the guard waits for the key to lift", () => {
-    const { router, q } = withQuestion({ keyReleasesReported: () => true });
+    const { router, q, advance } = withQuestion({ keyReleasesReported: () => true });
     // **The key is held first, and that is what the guard is for.** With
     // releases reported the router knows whether anything is down when the
     // question arrives; with nothing down there is nothing to wait for, which
@@ -1326,6 +1351,9 @@ describe("C16 §7 and §4a — the epoch, the question guard and pointer commit 
     // is an instruction only a terminal that says when it lifted can be given,
     // and this one does.
     for (const n of [1, 2, 3]) {
+      // **An hour before the third, and it changes nothing** — T3.20's
+      // surviving half (I69): this arm reads no clock.
+      if (n === 3) advance(3_600_000);
       expect(router.dispatch(key("y")), `refused ${String(n)}`).toBe(true);
       expect(router.lastStages, `refused ${String(n)}`).toContain("question-guard");
     }
@@ -1334,17 +1362,6 @@ describe("C16 §7 and §4a — the epoch, the question guard and pointer commit 
     expect(router.ownerArmed, "the key lifted").toBe(false);
     expect(router.dispatch(key("y"))).toBe(true);
     expect(router.lastStages).not.toContain("question-guard");
-  });
-
-  it("T3.20 (I44, §4a W9): the guard reads no clock", () => {
-    // **The assertion a 500 ms window fails**, and it fails in both directions:
-    // it would let this one through and it would refuse the one in T1.99b.
-    const { router, q, advance } = withQuestion({ keyReleasesReported: () => true });
-    router.dispatch(key("y"));
-    q.open = true;
-    advance(3_600_000);
-    expect(router.dispatch(key("y")), "an hour later, still held, still refused").toBe(true);
-    expect(router.lastStages).toContain("question-guard");
   });
 
   it("T1.99f (I44, R-BLK-788): with releases reported and nothing held, a question guards nothing", () => {
@@ -1363,7 +1380,6 @@ describe("C16 §7 and §4a — the epoch, the question guard and pointer commit 
 
   it("T1.100, T1.101 (I45, I46, R-OWN-003): press arms, release commits, and nothing else does", () => {
     const { router } = harness();
-    const epoch = router.ownerEpoch;
 
     // The control first: a release with nothing armed commits nothing.
     expect(router.commitPointer("a"), "no press, no commit").toBe(false);
@@ -1375,7 +1391,9 @@ describe("C16 §7 and §4a — the epoch, the question guard and pointer commit 
     router.armPointer("a");
     expect(router.commitPointer("a"), "the armed identity, same epoch").toBe(true);
     expect(router.commitPointer("a"), "and once only — the release spent it").toBe(false);
-    expect(router.ownerEpoch, "arming and committing move no owner").toBe(epoch);
+    // Arming and committing move no owner: a second arm commits as the first did.
+    router.armPointer("a");
+    expect(router.commitPointer("a")).toBe(true);
   });
 
   it("T1.101b (I46): a drag cancels the arm, and coming back does not restore it", () => {
@@ -1456,10 +1474,15 @@ describe("C16 §4a — the dismissing click and the scroll order (M8)", () => {
     expect(router.lastStages).toEqual(["arming", "mouse", "modal"]);
   });
 
-  it("T1.104 (I48, C15 I23, R-BLK-779): a wheel over a panel is the panel's, and over nothing is the viewport's", () => {
+  it("T1.104 (I48, I74, C15 I23, R-BLK-779): a wheel over a panel is its scroller's, and over nothing is the viewport's", () => {
     // *One ordering does both jobs*: the layer order decides which viewport a
     // wheel moves exactly as it decides which layer a key reaches.
-    const { router, layer } = harness();
+    //
+    // **The panel's scroller, by id, and no handler** (I74, §3d P2). This row
+    // registered a `panel` handler answering `true` and read that as the panel
+    // taking the wheel; the tree's handler answers `false` for every pointer
+    // event, so the wheel was dropped. A fixture that supplied the behaviour.
+    const { router, layer, calls } = harness();
     const seen: string[] = [];
     router.register("panel", () => (seen.push("panel"), true));
     router.register("liveBlock", () => (seen.push("liveBlock"), true));
@@ -1469,7 +1492,8 @@ describe("C16 §4a — the dismissing click and the scroll order (M8)", () => {
     layer.placed = [{ layer: PANEL, top: 5, left: 10, height: 3, width: 20 }];
 
     expect(router.dispatch(click(7, 12, "wheelDown")), "consumed").toBe(true);
-    expect(seen, "the panel's, and the transcript beneath it does not move").toEqual(["panel"]);
+    expect(calls, "the panel's own scroller, one notch down").toEqual(["scroll:menu:1"]);
+    expect(seen, "no rung handler, and the transcript beneath it does not move").toEqual([]);
     expect(router.lastStages).toContain("layer:menu");
 
     // **The control is one row outside it**, which is what makes the row about
@@ -1479,12 +1503,7 @@ describe("C16 §4a — the dismissing click and the scroll order (M8)", () => {
     expect(router.dispatch(click(4, 12, "wheelDown")), "consumed").toBe(true);
     expect(seen, "outside the panel: the entry under the pointer").toEqual(["liveBlock"]);
 
-    // **A peek is not a third case at this seam, and the spec row said it
-    // was.** C15 I21 keeps a peek out of `top` and L4 filters it out of
-    // `placed` before the router is handed either, so *the wheel falls past a
-    // peek* is byte-identical here to *no layer is open* — an assertion about
-    // it would be an assertion about the fixture. Where it is observable is
-    // C15's own `top` row (T1.23) and the filter in `construct.ts`.
+    // The peek is a third case now (C15 I31): T1.191 is its row.
   });
 });
 
@@ -1718,5 +1737,412 @@ describe("C16 I67 — ⌃c is recognised exactly (review batch 2, M6)", () => {
     // **The predicate is the table's**, so the ladder and the classifier cannot
     // hold a different answer for the same key.
     expect(isExactCtrlC({ name: "c", ctrl: true, meta: false, shift: false, sequence: "" })).toBe(true);
+  });
+});
+
+describe("C16 I69–I73 — the timed guard, its explanation, focus-out and the generation (review batch 3, M7)", () => {
+  const enter = key("enter");
+  /**
+   * A question on a terminal with no release reporting, arrived at `t = 0`.
+   * `at(ms)` moves the clock to `ms` after the arrival, which is how ruling 52's
+   * schedule reads.
+   */
+  const arrived = (opts: Partial<RouterDeps> = {}) => {
+    const q = { open: false, replace: false };
+    const bump = { generation: (): void => undefined };
+    const h = harness({
+      overlayTop: () => (q.open ? { kind: "overlay" as const, id: "confirm", blocking: true, dismissal: "answer" } : null),
+      // `q.replace` is a verb asking a second question from the first's answer,
+      // inside the answer's dispatch — the owner moves and the rung does not.
+      overlayAnswerCallback: () =>
+        q.open
+          ? (): boolean => {
+              if (q.replace) bump.generation();
+              return true;
+            }
+          : null,
+      overlayWouldResolve: () =>
+        q.open ? (e: InputEvent): boolean => e.kind === "key" && (e.key.name === "y" || e.key.name === "enter") : null,
+      ...opts,
+    });
+    bump.generation = () => void (h.layer.generation += 1);
+    const origin = 1_000;
+    const at = (ms: number): void => void h.advance(origin + ms - h.advance(0));
+    q.open = true;
+    // The first read stamps the arrival (I69) — L4's overlay subscription does
+    // this at the push, and a row reads the router as that subscription does.
+    void h.router.ownerArmed;
+    return { ...h, q, at };
+  };
+  const refused = (router: ReturnType<typeof harness>["router"]): boolean => router.lastStages.includes("question-guard");
+
+  it("T1.181 (I69, §3c): activations each within 250 ms of the last are refused past the grace; one after a 300 ms gap answers", () => {
+    const { router, at } = arrived();
+    for (const ms of [100, 700, 740, 900, 1100]) {
+      at(ms);
+      router.dispatch(enter);
+      expect(refused(router), `+${String(ms)}`).toBe(true);
+    }
+    at(1400);
+    router.dispatch(enter);
+    expect(refused(router), "+1400, 300 ms after the last").toBe(false);
+  });
+
+  it("T1.182 (I69, §3c — ruling 52's row): a key held across the arrival, a 660 ms first repeat, then 30 Hz repeats — none answers", () => {
+    // **The row the person asked for.** X11's default delay is 660 ms and its
+    // rate 25–30 Hz; the first form of ruling 52 — a 250 ms window from the
+    // arrival — answered at the first repeat, and T6.54 is that form mutated.
+    const { router, at } = arrived();
+    for (let ms = 660; ms <= 3000; ms += 33) {
+      at(ms);
+      router.dispatch(enter);
+      expect(refused(router), `+${String(ms)}`).toBe(true);
+    }
+    expect(router.ownerArmed, "still guarded while the key repeats").toBe(true);
+    // The control: the key lifts — no event says so here — and the reader's
+    // next press, after a pause, answers.
+    at(3400);
+    router.dispatch(enter);
+    expect(refused(router)).toBe(false);
+  });
+
+  it("T1.183 (I69, §3c): a first ⏎ at +2000 answers; at +400 and +700 refused, and at +1000 answered", () => {
+    const quiet = arrived();
+    quiet.at(2000);
+    quiet.router.dispatch(enter);
+    expect(refused(quiet.router), "a reader who read first").toBe(false);
+
+    // **The cost, stated** (§3c S5b): a reader faster than the grace pays one
+    // refusal per 250 ms of haste.
+    const fast = arrived();
+    for (const [ms, expected] of [[400, true], [700, true], [1000, false]] as const) {
+      fast.at(ms);
+      fast.router.dispatch(enter);
+      expect(refused(fast.router), `+${String(ms)}`).toBe(expected);
+    }
+  });
+
+  it("T1.184 (I69, §3c): a neutral arrow ends the timed guard, and so does ⌃c, which still meets its intercept's reject", () => {
+    const arrow = arrived();
+    arrow.at(100);
+    expect(arrow.router.dispatch(key("right"))).toBe(true);
+    expect(refused(arrow.router)).toBe(false);
+    arrow.at(120);
+    arrow.router.dispatch(enter);
+    expect(refused(arrow.router), "the arrow was the boundary").toBe(false);
+
+    // **An intercept's key is a key** (§3c S11): it stops the OS repeating the
+    // one before it, which is the boundary the guard waits for. The intercept's
+    // own verdict is untouched — a question rejects the interrupt (I62).
+    const interrupt = arrived();
+    interrupt.at(100);
+    expect(interrupt.router.dispatch(ctrlC)).toBe(true);
+    expect(refused(interrupt.router)).toBe(false);
+    expect(interrupt.refusals, "the intercept's reject, explained once").toEqual([{ rung: "question", cause: "intercept" }]);
+    interrupt.at(120);
+    interrupt.router.dispatch(enter);
+    expect(refused(interrupt.router), "and the guard ended on it").toBe(false);
+  });
+
+  it("T1.185 (I70): ownerRefused is null before a refusal and the same key after the first and the second; nextDeadline follows the grace and the gap", () => {
+    const { router, at } = arrived();
+    expect(router.ownerRefused).toBeNull();
+    expect(router.nextDeadline(), "the grace, from the arrival").toBe(1_750);
+
+    at(100);
+    router.dispatch(key("y"));
+    const first = router.ownerRefused;
+    expect(first).toEqual({ key: expect.objectContaining({ name: "y" }), untilRelease: false });
+    expect(router.nextDeadline(), "inside the grace the grace decides").toBe(1_750);
+
+    at(600);
+    router.dispatch(enter);
+    // **The first refused key, not the latest** — the frame changes once.
+    expect(router.ownerRefused).toEqual(first);
+    expect(router.nextDeadline(), "and after it the gap").toBe(1_850);
+
+    at(900);
+    expect(router.ownerArmed, "lapsed at its deadline with no event").toBe(false);
+    expect(router.ownerRefused).toBeNull();
+    expect(router.nextDeadline()).toBeUndefined();
+
+    // The release-reporting arm waits on an event, so it reports no deadline.
+    const held = harness({ keyReleasesReported: () => true });
+    held.router.dispatch(key("y"));
+    held.layer.top = { kind: "overlay", id: "confirm", blocking: true, dismissal: "answer" };
+    expect(held.router.ownerArmed).toBe(true);
+    expect(held.router.nextDeadline()).toBeUndefined();
+  });
+
+  it("T1.186 (I72, §3c): a focus-out clears held keys and the pointer arm, with no stages", () => {
+    const { router, q } = withQuestionReleases();
+    router.dispatch(enter); // down, and no release will reach us
+    router.dispatch(key("x"));
+    const before = router.lastStages;
+    router.armPointer("a");
+
+    expect(router.dispatch({ kind: "focus", focused: false }), "not routed").toBe(false);
+    expect(router.lastStages, "and the last dispatch's stages stand").toEqual(before);
+    expect(router.commitPointer("a"), "the button's release is not coming either").toBe(false);
+
+    q.open = true;
+    expect(router.ownerArmed, "nothing is held any more, so nothing is guarded").toBe(false);
+    router.dispatch(key("y"));
+    expect(refused(router)).toBe(false);
+
+    // **And a guard already waiting on a key-up ends** (§3c S8): the release
+    // it waits for will be delivered to another window.
+    const waiting = withQuestionReleases();
+    waiting.router.dispatch(enter);
+    waiting.q.open = true;
+    expect(waiting.router.ownerArmed).toBe(true);
+    waiting.router.dispatch({ kind: "focus", focused: false });
+    expect(waiting.router.ownerArmed, "the focus-out ended it").toBe(false);
+  });
+
+  it("T1.186 (cont., I72): the control — without the focus-out, the key held elsewhere guards the question", () => {
+    const { router, q } = withQuestionReleases();
+    router.dispatch(enter);
+    q.open = true;
+    expect(router.ownerArmed).toBe(true);
+    router.dispatch(key("y"));
+    expect(refused(router)).toBe(true);
+  });
+
+  it("T1.187 (I73, §3c): the generation moving twice with the rung the same at both reads kills a pointer arm; the control commits", () => {
+    const { router, layer } = harness();
+    router.armPointer("a");
+    // A question raised and answered between the press and the release: C15's
+    // count moves twice and no read of the router falls in between.
+    layer.generation += 1;
+    layer.generation += 1;
+    expect(router.commitPointer("a")).toBe(false);
+
+    router.armPointer("b");
+    expect(router.commitPointer("b"), "the control: nothing moved").toBe(true);
+  });
+
+  it("T1.188 (I73, §3c): at the question rung, a generation change within one dispatch guards afresh", () => {
+    const replaced = arrived();
+    replaced.at(2000);
+    expect(replaced.router.ownerArmed, "the first question's guard has lapsed").toBe(false);
+    replaced.q.replace = true;
+    replaced.router.dispatch(enter);
+    expect(refused(replaced.router), "the first question answered").toBe(false);
+    expect(replaced.router.ownerArmed, "and the second arrived guarded").toBe(true);
+
+    const same = arrived();
+    same.at(2000);
+    same.router.dispatch(enter);
+    expect(same.router.ownerArmed, "the control: no owner moved").toBe(false);
+  });
+
+  /** A question on a terminal that reports releases, not yet open. */
+  function withQuestionReleases() {
+    const q = { open: false };
+    const h = harness({
+      keyReleasesReported: () => true,
+      overlayTop: () => (q.open ? { kind: "overlay" as const, id: "confirm", blocking: true, dismissal: "answer" } : null),
+      overlayAnswerCallback: () => (q.open ? (): boolean => true : null),
+      overlayWouldResolve: () =>
+        q.open ? (e: InputEvent): boolean => e.kind === "key" && (e.key.name === "y" || e.key.name === "enter") : null,
+    });
+    return { ...h, q };
+  }
+});
+
+describe("C16 I74, I47 — the pointer over layers (review batch 3, M8)", () => {
+  const PANEL = { id: "menu", kind: "panel", blocking: false, dismissal: "escape" } as const;
+  const SEARCH = { id: "search", kind: "panel", blocking: false, dismissal: "escape" } as const;
+  const PEEK = { id: "peek", kind: "peek", blocking: false, dismissal: "focus" } as const;
+  const mouseAt = (row: number, col: number, over: Partial<Extract<InputEvent, { kind: "mouse" }>>): InputEvent => ({
+    ...(click(row, col) as Extract<InputEvent, { kind: "mouse" }>),
+    ...over,
+  });
+
+  it("T1.189 (I74, §3d): two overlapping layers — a press and a wheel over the overlap go to the top one; the lower alone reaches the lower", () => {
+    const { router, layer, calls } = harness();
+    const seen: string[] = [];
+    router.register("panel", () => (seen.push("panel"), true));
+    layer.top = SEARCH;
+    // Draw order, bottom first: the menu, then the search over its right half.
+    // Region top is 1, so terminal row 7 is region row 6 — inside both.
+    layer.placed = [
+      { layer: PANEL, top: 5, left: 10, height: 3, width: 20 },
+      { layer: SEARCH, top: 5, left: 20, height: 3, width: 20 },
+    ];
+
+    router.dispatch(click(7, 25));
+    expect(router.lastStages, "the press names the top one").toContain("layer:search");
+    router.dispatch(click(7, 25, "wheelDown"));
+    expect(calls, "and the wheel asks the top one's scroller").toEqual(["scroll:search:1"]);
+
+    calls.length = 0;
+    router.dispatch(click(7, 12, "wheelUp"));
+    expect(calls, "where only the lower covers, the lower").toEqual(["scroll:menu:-1"]);
+  });
+
+  it("T1.190 (I74, §3d): a wheel over a keyed layer is consumed whether scrollLayer answers true or false; a horizontal wheel asks no scroller", () => {
+    for (const answers of [true, false]) {
+      const asked: string[] = [];
+      const { router, layer } = harness({ scrollLayer: (id) => (asked.push(id), answers) });
+      const seen: string[] = [];
+      for (const t of ["panel", "liveBlock", "global"] as const) router.register(t, () => (seen.push(t), true));
+      layer.top = PANEL;
+      layer.placed = [{ layer: PANEL, top: 5, left: 10, height: 3, width: 20 }];
+
+      expect(router.dispatch(click(7, 12, "wheelDown")), `consumed, scroller answering ${String(answers)}`).toBe(true);
+      expect(asked).toEqual(["menu"]);
+      expect(seen, "no rung handler and nothing beneath").toEqual([]);
+
+      asked.length = 0;
+      expect(router.dispatch(click(7, 12, "wheelLeft")), "a horizontal wheel is consumed").toBe(true);
+      expect(asked, "and asks no scroller").toEqual([]);
+      expect(seen).toEqual([]);
+    }
+  });
+
+  it("T1.191 (I74, C15 I31, §3d): over a peek a wheel asks its scroller, and the base takes it when the peek declines; a press reaches the entry beneath", () => {
+    for (const answers of [true, false]) {
+      const asked: string[] = [];
+      const { router } = harness({
+        scrollLayer: (id) => (asked.push(id), answers),
+        // L4's seam, as `construct.ts` builds it: the peek for the wheel only.
+        placed: (gesture) => (gesture === "wheel" ? [{ layer: PEEK, top: 2, left: 0, height: 3, width: 40 }] : []),
+      });
+      const seen: string[] = [];
+      router.register("liveBlock", () => (seen.push("liveBlock"), true));
+
+      expect(router.dispatch(click(3, 5, "wheelDown"))).toBe(true);
+      expect(asked, "the peek's own scroller").toEqual(["peek"]);
+      expect(seen, answers ? "a peek that scrolled keeps the wheel" : "a peek that declined leaves it to the entry beneath").toEqual(
+        answers ? [] : ["liveBlock"],
+      );
+
+      seen.length = 0;
+      asked.length = 0;
+      router.dispatch(click(3, 5));
+      expect(seen, "a press over the peek is the row's").toEqual(["liveBlock"]);
+      expect(asked).toEqual([]);
+    }
+  });
+
+  it("T1.192 (I47, §3d): beside an escapable panel a right, a middle, a modified press and a drag are inert; the unmodified primary press dismisses", () => {
+    const cases: readonly [string, Partial<Extract<InputEvent, { kind: "mouse" }>>][] = [
+      ["right", { button: "button2" }],
+      ["middle", { button: "button1" }],
+      ["⇧", { shift: true }],
+      ["⌃", { ctrl: true }],
+      ["⌥", { meta: true }],
+      ["drag", { motion: true }],
+    ];
+    for (const [name, over] of cases) {
+      const { router, layer, calls } = harness();
+      const seen: string[] = [];
+      for (const t of ["panel", "liveBlock", "global"] as const) router.register(t, () => (seen.push(t), true));
+      layer.top = PANEL;
+      layer.placed = [{ layer: PANEL, top: 5, left: 10, height: 3, width: 20 }];
+      expect(router.dispatch(mouseAt(3, 0, over)), `${name}: consumed`).toBe(true);
+      expect(calls, `${name}: closes nothing`).toEqual([]);
+      expect(seen, `${name}: reaches nothing`).toEqual([]);
+    }
+    // The control: the primary click.
+    const { router, layer, calls } = harness();
+    layer.top = PANEL;
+    layer.placed = [{ layer: PANEL, top: 5, left: 10, height: 3, width: 20 }];
+    router.dispatch(click(3, 0));
+    expect(calls).toEqual(["pop"]);
+  });
+});
+
+describe("C16 I75 — the host escape is a reserved route (review batch 3, M9 item 4)", () => {
+  const ESCAPE = key("]", { ctrl: true });
+  const TAKES_ALL = (): boolean => true;
+
+  it("T1.193 (I75, §3e): a child handler consuming every key, registered either side of another: the escape detaches and neither is offered it; its release is consumed; at the prompt it takes handle", () => {
+    // **Both registration orders** (§3e H1, H2). The composition root's
+    // handler stood ahead of the surface host's and the escape held by that
+    // order alone; a consuming handler registered first took it.
+    for (const order of ["consumer first", "consumer second"] as const) {
+      const h = harness({ childAttached: () => true }, 1_000, createKeymap(defaultKeymap));
+      const offered: string[] = [];
+      const consumer = (e: InputEvent): boolean => {
+        if (e.kind === "key") offered.push(`consumer:${e.key.name}`);
+        return TAKES_ALL();
+      };
+      const other = (e: InputEvent): boolean => {
+        if (e.kind === "key") offered.push(`other:${e.key.name}`);
+        return false;
+      };
+      if (order === "consumer first") {
+        h.router.register("child", consumer);
+        h.router.register("child", other);
+      } else {
+        h.router.register("child", other);
+        h.router.register("child", consumer);
+      }
+      expect(h.router.target, `${order}: the child holds the keys`).toBe("child");
+
+      expect(h.router.dispatch(ESCAPE), `${order}: consumed`).toBe(true);
+      expect(h.calls, `${order}: detached once`).toEqual(["detach"]);
+      expect(offered, `${order}: and no handler at the rung it escapes was offered it`).toEqual([]);
+      expect(h.router.lastStages).toContain("intercept:host-detach:child:global-intercept");
+      expect(h.router.lastStages).toContain("intercept:detach");
+
+      // H6: the release — its press was the host's, so the child is not
+      // handed the other half.
+      expect(h.router.dispatch({ ...ESCAPE, event: "release" } as InputEvent), `${order}: the release, consumed`).toBe(true);
+      expect(h.calls, `${order}: and it detaches nothing`).toEqual(["detach"]);
+      expect(offered, `${order}: nor reaches a handler`).toEqual([]);
+
+      // The control: an ordinary key is the child's, and the first handler
+      // registered takes it — the rung is unchanged for every other key.
+      h.router.dispatch(key("a"));
+      expect(offered[0], `${order}: \`a\` reaches the rung`).toBe(order === "consumer first" ? "consumer:a" : "other:a");
+      expect(h.calls).toEqual(["detach"]);
+    }
+
+    // H7: no child. `handle`, and the ladder runs as for any key.
+    const idle = harness({}, 1_000, createKeymap(defaultKeymap));
+    const prompt: string[] = [];
+    idle.router.register("prompt", (e) => (e.kind === "key" && void prompt.push(e.key.name), false));
+    idle.router.dispatch(ESCAPE);
+    expect(idle.router.lastStages).toContain("intercept:host-detach:scope:handle");
+    expect(idle.calls, "nothing to detach").toEqual([]);
+    expect(prompt, "the prompt's rung was offered it").toEqual(["]"]);
+  });
+
+  it("T1.194 (I75, I64, §3e): the chord is the keymap's: a rebound host.detach row moves the intercept; the enhanced profile adds the meta escape; the table row", () => {
+    // The keymap's `child` rows, asked the way the router asks them.
+    const detachesIn = (bindings: Parameters<typeof createKeymap>[0], profile?: "enhanced-terminal") => {
+      const km = createKeymap(bindings, profile);
+      return (k: Key): boolean => km.resolve("child", k)?.action === "hostDetach";
+    };
+    const base = detachesIn(defaultKeymap);
+    expect(interceptOf(key("]", { ctrl: true }), base), "⌃] under the base profile").toBe("host-detach");
+    expect(interceptOf(key("escape", { meta: true }), base), "⌥esc is not a chord here (T1.106b)").toBeNull();
+    expect(interceptOf(key("]", { ctrl: true })), "no keymap asked: no escape").toBeNull();
+
+    const enhanced = detachesIn(defaultKeymap, "enhanced-terminal");
+    expect(interceptOf(key("escape", { meta: true }), enhanced), "⌥esc under the enhanced profile").toBe("host-detach");
+
+    // **Rebound**: the intercept follows the row, so the border and `/help`,
+    // which read the same rows, cannot name a chord the router does not take.
+    const rebound = detachesIn([
+      ...defaultKeymap.filter((b) => b.action !== "hostDetach"),
+      { target: "child", key: { name: "g", ctrl: true }, action: "hostDetach" },
+    ]);
+    expect(interceptOf(key("g", { ctrl: true }), rebound)).toBe("host-detach");
+    expect(interceptOf(key("]", { ctrl: true }), rebound), "the old chord is an ordinary key").toBeNull();
+
+    // `⌃c` is still the interrupt whatever the escape is: the ⌃c arm is read first.
+    expect(interceptOf(ctrlC, () => true)).toBe("interrupt");
+
+    // The table row: the detach at `child`, `handle` everywhere else.
+    for (const rung of OWNER_RUNGS) {
+      expect(interceptVerdict("host-detach", rung), rung).toBe(rung === "child" ? "global-intercept" : "handle");
+    }
+    expect(interceptVerdict("host-detach", null), "idle").toBe("handle");
+    expect(INTERCEPTS["host-detach"].exception).toBe("detach");
   });
 });

@@ -29,6 +29,7 @@ import { pipelineHarness, settled } from "../support/execution.js";
 import { FULL_CAPABILITIES, producerContext } from "../support/producer-context.js";
 import type { ProducerContext } from "../../src/data/adapters/types.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
+import { createWatches } from "../../src/shell/watches.js";
 
 const deps = (
   report: () => ProfileReport | null = () => null,
@@ -53,6 +54,10 @@ const deps = (
   // `null` by default — the state a session built without `TuiConfig.profile`
   // is in, and the one every row above this round was written against.
   profileReport: report,
+  // `/profile` reads no setting either (C23 I80's verb does).
+  settings: () => [],
+  // Nor a watch (C22 I136's two verbs do).
+  watches: createWatches(() => undefined),
 });
 
 const ctx = (
@@ -69,8 +74,11 @@ const NO_PROFILER = "no profiler to show — this session was built without `Tui
 
 /** The six the framework shipped before this round, by key. */
 const SIX = ["clear", "debug", "exit", "help", "history", "theme"];
-/** And the two since: `/profile`, and `/capabilities` (C22 I125, C05 §3). */
-const EIGHT = [...SIX, "profile", "capabilities"].sort();
+/**
+ * And the five since: `/profile`, `/capabilities` (C22 I125), `/config` (C23
+ * I80, ruling 43), and `/watch` and `/unwatch` (C22 I136, ruling 50).
+ */
+const SHIPPED = [...SIX, "profile", "capabilities", "config", "watch", "unwatch"].sort();
 
 const run = async (
   handlers: Readonly<Record<string, (argv: readonly string[], c: LocalContext) => LocalDocument | Promise<LocalDocument>>>,
@@ -130,8 +138,8 @@ const walk = (node: unknown, out: { kind: string; id?: string }[] = []): { kind:
  *
  * The spy delegates rather than replacing: `tier` and `own` are closure-backed
  * getters on the recorder, so a prototype view reads them live and only the
- * member a row counts is shadowed — the shape `profile-view.test.ts`'s rig uses,
- * reduced to the one member these rows read.
+ * member a row counts is shadowed — the shape the deleted `profile-view.test.ts`'s
+ * rig used, reduced to the one member these rows read.
  */
 const spiedProfiler = (tier: Tier): { profiler: Profiler; setTierCalls: Tier[] } => {
   let t = 0;
@@ -154,13 +162,13 @@ const spiedProfiler = (tier: Tier): { profiler: Profiler; setTierCalls: Tier[] }
 };
 
 describe("C23 — /profile, the local route", () => {
-  it("T1.64 (C23 I68, C23 I27): with no recorder the section arm is a `warn` notice of the verb's own, and the handler is one of eight either way", async () => {
+  it("T1.64 (C23 I68, C23 I27): with no recorder the section arm is a `warn` notice of the verb's own, and the handler is one of nine either way", async () => {
     // **The refusal is the verb's, not a view's** (C28 §3c, R-EXA-082, F1254).
     // It used to be a string `view.open` returned and the route wrapped; the
     // reader is `() => ProfileReport | null` now, so the arm that answers `null`
     // is the handler's own and the sentence is written where it is read.
     const handlers = shippedHandlers(deps());
-    expect(Object.keys(handlers).sort()).toEqual(EIGHT);
+    expect(Object.keys(handlers).sort()).toEqual(SHIPPED);
 
     const doc = await run(handlers, []);
     const found = notices(doc.blocks);
@@ -170,11 +178,11 @@ describe("C23 — /profile, the local route", () => {
     expect(doc.command, "the default section, named on the entry's command").toBe("/profile verdict");
 
     // **Arm 2: the handler does not depend on what the reader answers.** A
-    // session that has a profiler yields the same eight keys — the row is in
+    // session that has a profiler yields the same nine keys — the row is in
     // `FRAMEWORK_TOOLS`, so a map that dropped `profile` on any condition is
     // what C23 I27 refuses at startup.
     const accepting = shippedHandlers(deps(() => spiedProfiler("spans").profiler.report()));
-    expect(Object.keys(accepting).sort()).toEqual(EIGHT);
+    expect(Object.keys(accepting).sort()).toEqual(SHIPPED);
     expect(accepting).toHaveProperty("profile");
   });
 
@@ -238,7 +246,7 @@ describe("C23 — /profile, the local route", () => {
     expect(cardIds.length, "and every card framed one").toBe(cardsOf("framework").length);
   });
 
-  it("T1.96 (C23 I69, C09 I49): the cards are drawn with the context's capabilities, never the deck's ASCII default", async () => {
+  it("T1.66d (C23 I69, C09 I49): the cards are drawn with the context's capabilities, never the deck's ASCII default", async () => {
     // **The view handed `detection.capabilities` whole and the handler does
     // now** (R-EXA-082, F1254). The seam moved and the claim did not: the deck
     // takes an ASCII fallback for a caller with no terminal, and a verb running
@@ -371,10 +379,10 @@ describe("C23 — /profile, the local route", () => {
     // gone green the day a verb was dropped from the enum and left the
     // completion menu short of it.
     expect([...(row?.args[0]?.values ?? [])]).toEqual([...SECTIONS, "snapshot", "live", "capture"]);
-    expect(FRAMEWORK_TOOLS.map((t) => t.name).sort()).toEqual(EIGHT);
+    expect(FRAMEWORK_TOOLS.map((t) => t.name).sort()).toEqual(SHIPPED);
   });
 
-  it("T4.66 (C23 I68, C23 I27): a real pipeline over the framework's rows — `/profile framework` appends the section's deck as one entry, and `seal()` accepted the eight", async () => {
+  it("T4.66 (C23 I68, C23 I27): a real pipeline over the framework's rows — `/profile framework` appends the section's deck as one entry, and `seal()` accepted the nine", async () => {
     // Constructing the harness is the I27 assertion: `seal()` runs inside it
     // and refuses a row without a handler or a handler without a row.
     //

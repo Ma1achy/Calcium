@@ -1,5 +1,5 @@
 /**
- * S8 `/config <c> <path>`. Every test names the walk row it holds.
+ * S8 `/filediff <c> <path>`. Every test names the walk row it holds.
  *
  * The fixture is `dtui-cfg` — `nginx:alpine` with a 16-line `default.conf`
  * bind-mounted over the 44-line one the image ships. That pair is **part of the
@@ -18,12 +18,12 @@ import { describe, expect, it } from "vitest";
 import type { Block, Notice, Patch } from "@fmx/calcium";
 import {
   candidates,
-  createConfigHandler,
+  createFilediffHandler,
   diffLines,
   hunksOf,
   wholeFile,
   type Far,
-} from "../src/config.ts";
+} from "../src/filediff.ts";
 
 import { localContext } from "@fmx/calcium/testing";
 const IMAGE_CONF = [
@@ -56,7 +56,7 @@ const far = (over: Partial<Far> = {}): Far => ({
   ...over,
 });
 
-const ctx = { ...localContext(), command: "/config dtui-cfg /etc/nginx/conf.d/default.conf" };
+const ctx = { ...localContext(), command: "/filediff dtui-cfg /etc/nginx/conf.d/default.conf" };
 const ARGV = ["dtui-cfg", "/etc/nginx/conf.d/default.conf"];
 
 const patchOf = (doc: { blocks: readonly Block[] }): Patch | undefined =>
@@ -128,7 +128,7 @@ describe("the diff", () => {
 
 describe("the verb", () => {
   it("C6: a real pair renders hunks and a tally", async () => {
-    const doc = await createConfigHandler(far())(ARGV, ctx);
+    const doc = await createFilediffHandler(far())(ARGV, ctx);
     expect(doc.status).toBe("ok");
     const patch = patchOf(doc);
     expect(patch?.path).toBe("/etc/nginx/conf.d/default.conf");
@@ -142,7 +142,7 @@ describe("the verb", () => {
     // **`/drift`'s B4 in an unrelated verb**, which is what makes it a class:
     // any block computed from two sources needs a rendering for *they agree*.
     // An empty block is indistinguishable from a call that failed.
-    const doc = await createConfigHandler(far({ running: () => Promise.resolve(IMAGE_CONF) }))(
+    const doc = await createFilediffHandler(far({ running: () => Promise.resolve(IMAGE_CONF) }))(
       ARGV,
       ctx,
     );
@@ -162,7 +162,7 @@ describe("the verb", () => {
 
   it("C8 (walk A1): a missing image side keeps the block and says why beside it", async () => {
     // Must match `/drift`'s A1, or the app means two things by a missing side.
-    const doc = await createConfigHandler(far({ fromImage: () => Promise.resolve(null) }))(
+    const doc = await createFilediffHandler(far({ fromImage: () => Promise.resolve(null) }))(
       ARGV,
       ctx,
     );
@@ -181,7 +181,7 @@ describe("the verb", () => {
     // is the asymmetry: the running file is the subject and the image file is
     // the baseline. There is no useful patch of the image's file against
     // nothing — that is just the image's file, which nobody asked for.
-    const doc = await createConfigHandler(far({ running: () => Promise.resolve(null) }))(
+    const doc = await createFilediffHandler(far({ running: () => Promise.resolve(null) }))(
       ARGV,
       ctx,
     );
@@ -195,7 +195,7 @@ describe("the verb", () => {
     // this row the two calls could be swapped and every other row still pass —
     // the reader would just wait 442ms to be told the container is stopped.
     const order: string[] = [];
-    const doc = await createConfigHandler({
+    const doc = await createFilediffHandler({
       facts: () => {
         order.push("facts");
         return Promise.resolve({ image: "nginx:alpine", mounts: [] });
@@ -218,7 +218,7 @@ describe("the verb", () => {
     // `.Mounts` gives `Type: "bind"` for a file and for a directory with no
     // distinguishing field, so discovery cannot be ruled in. The set is the
     // honest answer; picking from it would be a guess wearing a feature's name.
-    const doc = await createConfigHandler(far())(["dtui-cfg"], { ...localContext(), command: "/config dtui-cfg" });
+    const doc = await createFilediffHandler(far())(["dtui-cfg"], { ...localContext(), command: "/filediff dtui-cfg" });
     expect(doc.status).toBe("error");
     expect(doc.error).toBeDefined();
     expect(JSON.stringify(doc.blocks)).toContain("/etc/nginx/conf.d/default.conf");
@@ -231,9 +231,9 @@ describe("the verb", () => {
   });
 
   it("C13: a container that does not exist is refused before either read", async () => {
-    const doc = await createConfigHandler(far({ facts: () => Promise.resolve(null) }))(
+    const doc = await createFilediffHandler(far({ facts: () => Promise.resolve(null) }))(
       ["nope", "/x"],
-      { ...localContext(), command: "/config nope /x" },
+      { ...localContext(), command: "/filediff nope /x" },
     );
     expect(doc.status).toBe("error");
     expect((doc.blocks[0] as Notice).text).toContain("no such container");

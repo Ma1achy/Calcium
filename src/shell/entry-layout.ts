@@ -18,7 +18,7 @@
  */
 
 import type { Block, Group } from "../data/viewmodel/index.js";
-import { block as rebuild, childWidths, contentWidth, hasChildren, paddingOf } from "../data/viewmodel/index.js";
+import { block as rebuild, contentWidth, hasChildren, paddingOf } from "../data/viewmodel/index.js";
 import { glyphCells, glyphFor } from "../presentation/blocks/index.js";
 import type { BlockRegistry, PlacedElement } from "../presentation/blocks/index.js";
 import type { RenderScratch } from "../presentation/blocks/types.js";
@@ -325,25 +325,34 @@ export function elementsOfEntry(
 }
 
 /**
- * The width block `id` is drawn at inside an entry, or `null` where the entry
- * holds no such block (C22 I117).
+ * The width block `id` is handed inside an entry, and the width inside its
+ * padding, or `null` where the entry holds no such block (C22 I117, C09 I126).
  *
- * **The runs' widths, then `childWidths` down the path** — the same two
- * functions the element walk and the renderer lay out with, so a split's
- * divider is clamped against the width its own columns were computed at and
- * not against the region's. A nested split is narrower than the frame, and a
- * clamp at the frame's width would write a divider the renderer then clamps
- * again, which is a key that did nothing while a patch said it had.
+ * **`outer` is what a registry member takes** — `measure`, `elementsOf` — and
+ * **`inner` is what a definition computes its own columns at**: a split's
+ * divider, a tape's window. The runs' widths, then the block library's
+ * `childWidthsOf` down the path, which is the width each renderer draws each
+ * child at — a scroll's bar, a right pane's bar and an aligned cell included.
+ *
+ * **It descended by C04's `childWidths` and that was one width too many**
+ * (C09 §7i). The division is right for a panel and a share and blind to the
+ * three narrowings the library owns, so a split inside a box with a bar was
+ * clamped one column wider than it was drawn. A nested split is narrower than
+ * the frame, and a clamp at the frame's width writes a divider the renderer
+ * then clamps again, which is a key that did nothing while a patch said it had.
  */
-export function blockWidthInEntry(blocks: readonly Block[], width: number, id: string): number | null {
-  // **Inside the padding**, which the registry takes off before a definition
-  // sees its width (C09 I80) — so the answer is the width the kind computes
-  // its own columns at.
-  const find = (block: Block, outer: number): number | null => {
-    const at = contentWidth(block, outer);
-    if (block.id === id) return at;
+export function blockWidthInEntry(
+  registry: Pick<BlockRegistry, "childWidthsOf">,
+  blocks: readonly Block[],
+  width: number,
+  id: string,
+): Readonly<{ outer: number; inner: number }> | null {
+  const find = (block: Block, outer: number): Readonly<{ outer: number; inner: number }> | null => {
+    // **Inside the padding** for `inner`, which the registry takes off before a
+    // definition sees its width (C09 I80).
+    if (block.id === id) return { outer, inner: contentWidth(block, outer) };
     if (!hasChildren(block)) return null;
-    const widths = childWidths(block, at);
+    const widths = registry.childWidthsOf(block, outer);
     for (const [i, child] of block.children.entries()) {
       const w = widths[i];
       if (w === undefined) continue;

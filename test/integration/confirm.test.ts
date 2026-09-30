@@ -139,6 +139,12 @@ function world(
     // them; this one is `as unknown as RouterDeps`, so a missing field is a
     // `TypeError` at the first dispatch rather than an error at the build.
     childAttached: () => false,
+    // C16 I73 — the stack's own count, for the cast's reason above.
+    // C16 I74 — no layer here has anything to scroll.
+    scrollLayer: () => false,
+    // C16 I75 — the escape's detach; nothing here attaches a child.
+    detachChild: () => undefined,
+    ownerGeneration: () => overlays.generation,
     overlayTop: () => {
       const top = overlays.top;
       return top === null ? null : { kind: top.kind, id: top.id, blocking: top.blocking, dismissal: top.dismissal };
@@ -168,7 +174,9 @@ function world(
     ...over,
   } as unknown as RouterDeps;
 
-  const router = createRouter({ focus, keymap: createKeymap(defaultKeymap), now: () => 0, deps });
+  // The router's clock, moved by the rows that own C16 I69's timed guard.
+  const clock = { t: 0 };
+  const router = createRouter({ focus, keymap: createKeymap(defaultKeymap), now: () => clock.t, deps });
 
   // A global binding that must not fire while a question is open (C16 I8) —
   // **and the viewport's own paging, which now must** (C16 I40). The two live in
@@ -196,6 +204,7 @@ function world(
     store,
     cancels: () => cancels,
     refusals: () => refusals,
+    clock,
   };
 }
 
@@ -317,12 +326,12 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     await expect(answer).resolves.toEqual({ key: "y" });
   });
 
-  it("T4.78 (C16 I44, R-BLK-786, R-BLK-788): a newly presented question refuses one activation and says so", async () => {
+  it("T4.78 (C16 I44, I69, R-BLK-786, R-BLK-788): a newly presented question refuses an activation and says so", async () => {
     // **The row the eight above spend their guard to get out of the way of.**
     // On a terminal that does not report key releases nothing can tell a key
-    // already in flight from a deliberate one, so the first ambiguous
-    // activation is refused — and refused is not dropped: the verdict is
-    // `reject`, the question is still open, and it is still unanswered.
+    // already in flight from a deliberate one, so activations are refused for
+    // the grace and the gap (C16 I69) — and refused is not dropped: the verdict
+    // is `reject`, the question is still open, and it is still unanswered.
     const w = world({ keyReleasesReported: () => false });
     const answer = w.confirm.ask({ question: "Stop api-gateway?", choices: YES_NO });
 
@@ -330,10 +339,12 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     expect(w.router.dispatch(key("y")), "consumed").toBe(true);
     expect(w.router.lastStages).toEqual(["arming", "question-guard", "reject"]);
     expect(w.overlays.top?.id, "still open").toBe("confirm");
-    expect(w.router.ownerArmed, "and the guard is spent on that one key").toBe(false);
+    expect(w.router.ownerArmed, "and a refusal extends the guard rather than spending it").toBe(true);
 
-    // The second `y` is the reader's own, and it answers.
+    // After a pause, the reader's own `y` answers.
+    w.clock.t += 1_000;
     expect(w.router.dispatch(key("y"))).toBe(true);
+    expect(w.router.lastStages).not.toContain("question-guard");
     await expect(answer).resolves.toEqual({ key: "y" });
   });
 
@@ -408,6 +419,11 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     });
 
     w.router.dispatch(key("y"));
+    // **Released, as this world's terminal would say** (C16 I44, I73). The menu
+    // going is an owner change at the `question` rung, so the question is
+    // guarded afresh against a key held across it — and a `y` whose release
+    // never arrives is held for ever.
+    w.router.dispatch({ kind: "key", event: "release", key: { name: "y", ctrl: false, meta: false, shift: false, sequence: "y" } });
     let settled = false;
     void answer.then(() => (settled = true));
     await Promise.resolve();

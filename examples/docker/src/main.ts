@@ -20,7 +20,7 @@ import { createContainerAdapter } from "./container.ts";
 import { createInspectAdapter } from "./inspect.ts";
 import { createLogsAdapter } from "./logs.ts";
 import { createCompareHandler, createDriftHandler } from "./drift.ts";
-import { createConfigHandler } from "./config.ts";
+import { createFilediffHandler } from "./filediff.ts";
 import {
   createDiffAdapter,
   createImagesAdapter,
@@ -190,7 +190,7 @@ const tui = createTui({
     dashboard: createDashboardHandler(engine),
     drift: createDriftHandler(),
     compare: createCompareHandler(),
-    config: createConfigHandler(),
+    filediff: createFilediffHandler(),
     // The window, fetched against `docker` directly rather than through the
     // shim: this is a local handler, so nothing appends `--json` and there is
     // nothing to translate.

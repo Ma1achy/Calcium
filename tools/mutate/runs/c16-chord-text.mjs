@@ -1,7 +1,7 @@
 // A chord's display notation, mutated — the glyphs, the capitalisation and the
 // split from the slot.
 //
-// **Why a run rather than trust in one equality row.** T1.98 compares
+// **Why a run rather than trust in one equality row.** T1.195 compares
 // `chordText` against the registry's own `chord` for all 41 registry bindings,
 // which is a strong row and is blind in one direction: it says nothing about
 // the 80 bindings the registry does not name, and nothing about the split
@@ -46,7 +46,7 @@ const results = runPass({
       file: K,
       from: "  if (!unicode) return chordName(key);",
       to: "  // the rung is gone",
-      expect: "T1.98",
+      expect: "T1.195",
     },
     {
       // **A letter is capitalised under `⌥` too.** `⌥p` becomes `⌥P`, which the
@@ -56,7 +56,7 @@ const results = runPass({
       file: K,
       from: "key.name.length === 1 && (key.ctrl === true || shift) ? key.name.toUpperCase() : key.name; // graphemes-ok",
       to: "key.name.length === 1 ? key.name.toUpperCase() : key.name; // graphemes-ok",
-      expect: "T1.98",
+      expect: "T1.195",
     },
     {
       // **The capital stops carrying the shift.** `m+C` renders `⌥C` instead of
@@ -66,7 +66,7 @@ const results = runPass({
       file: K,
       from: "  const shift = key.shift === true || capital;",
       to: "  const shift = key.shift === true;",
-      expect: "T1.98",
+      expect: "T1.195",
     },
     {
       // **The split undone.** The display becomes the identity again, which is
@@ -75,7 +75,7 @@ const results = runPass({
       file: K,
       from: "  if (!unicode) return chordName(key);",
       to: "  return keySlot(key);",
-      expect: "T1.98",
+      expect: "T1.195",
     },
     {
       // **And the other direction: the identity becomes the display.** A slot
@@ -86,7 +86,7 @@ const results = runPass({
       file: K,
       from: "  return `${target} ${keySlot(key)}`;",
       to: "  return `${target} ${chordText(key)}`;",
-      expect: "T1.99",
+      expect: "T1.196",
     },
   ],
 });

@@ -1151,9 +1151,17 @@ function patch(
      * the one a hand audit walks past.
      */
     actions?: readonly Action[];
+    /**
+     * The collapsed form's row budget (C25 I14, D12) — passed through, never
+     * defaulted. **No route here knows a viewport**: `ProducerContext.height`
+     * is `null` on every route (C07 I18), so a default would be a constant
+     * standing in for one, which C25 §3a argues is wrong at both ends. A
+     * producer that knows how many rows it wants to spend states it.
+     */
+    cap?: number;
   },
 ): Patch {
-  const { path, language, hunks, layout, collapsedAfter, actions } = spec;
+  const { path, language, hunks, layout, collapsedAfter, actions, cap } = spec;
   return finish<Patch>(
     {
       kind: "patch",
@@ -1168,6 +1176,7 @@ function patch(
       ...(layout === undefined ? {} : { layout }),
       ...(collapsedAfter === undefined ? {} : { collapsedAfter }),
       ...(actions === undefined ? {} : { actions }),
+      ...(cap === undefined ? {} : { cap }),
     } as Patch,
     spec,
     true,

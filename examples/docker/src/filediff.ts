@@ -1,5 +1,8 @@
 /**
- * S8 — `/config <c> <path>`, the patch block doing its actual job.
+ * S8 — `/filediff <c> <path>`, the patch block doing its actual job.
+ *
+ * **Named `/config` until ruling 43**, which gave that name to §075's framework
+ * verb; an app declaring a framework verb's name does not parse (C05 I6, I28).
  *
  * **Two calls and a diff**, so it is a local verb: `docker exec <c> cat <path>`
  * for the running file, and `docker run --rm <image> cat <path>` for the one the
@@ -212,7 +215,7 @@ const errorDoc = (command: string, text: string, extra: readonly Block[] = []): 
   // C04 I3 — required, and its absence is silent (F35).
   error: { message: text },
   blocks: [b.notice.error(text), ...extra],
-  meta: { adapter: "config" },
+  meta: { adapter: "filediff" },
 });
 
 /** The candidate list, which is what the verb offers instead of guessing (B1). */
@@ -222,7 +225,7 @@ export function candidates(mounts: readonly string[]): readonly Block[] {
     : [
         b.notice.info("bind mounts on this container — one of these is probably the file:"),
         b.kv(Object.fromEntries(mounts.map((m, i) => [`mount ${String(i + 1)}`, m])), {
-          id: "config-candidates",
+          id: "filediff-candidates",
         }),
       ];
 }
@@ -240,13 +243,13 @@ const languageOf = (path: string): string => {
   return "text";
 };
 
-export function createConfigHandler(
+export function createFilediffHandler(
   far: Far = realFar,
 ): (argv: readonly string[], ctx: LocalContext) => Promise<LocalDocument> {
   return async (argv, ctx) => {
     const container = argv[0];
     if (container === undefined || container === "") {
-      return errorDoc(ctx.command, "usage: /config <container> <path>");
+      return errorDoc(ctx.command, "usage: /filediff <container> <path>");
     }
 
     const facts = await far.facts(container);
@@ -258,7 +261,7 @@ export function createConfigHandler(
       // a directory bind, so the honest answer is the set.
       return errorDoc(
         ctx.command,
-        `usage: /config ${container} <path> — which file?`,
+        `usage: /filediff ${container} <path> — which file?`,
         candidates(facts.mounts),
       );
     }
@@ -267,7 +270,7 @@ export function createConfigHandler(
      * **The running side first, and the order is the ruling** (A2).
      *
      * `docker exec` fails on a stopped container where `docker inspect` answers
-     * for one, so this is where `/config` is exposed and `/drift` was not.
+     * for one, so this is where `/filediff` is exposed and `/drift` was not.
      * Fetching it first means a stopped container fails before the image call's
      * 442ms is spent, and its failure is the whole verb's — there is no useful
      * patch of the image's file against nothing.
@@ -312,13 +315,13 @@ export function createConfigHandler(
 
     return {
       schema: "tui.view/1",
-      meta: { adapter: "config" },
+      meta: { adapter: "filediff" },
       command: ctx.command,
       status: "ok",
       blocks: [
         ...missing,
         b.patch({
-          id: "config-patch",
+          id: "filediff-patch",
           path,
           language,
           // **With no baseline the whole file is one hunk of context.** Not

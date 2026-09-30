@@ -8,8 +8,11 @@
  * scroll and no frame; the rungs' bytes are the whole of the output.
  *
  * Two halves, as §6m's: `earns` is §6n.2's table as a function of three facts,
- * and `createNotifier` is the one place that remembers — what has been said,
- * what is watched, and whether the reader is here.
+ * and `createNotifier` is the one place that remembers what has been said and
+ * whether the reader is here. **What is watched is the session's** (I135): the
+ * notifier exists only while a rung is opted in, and the footer's watch row has
+ * to exist for every reader, so the set moved out and is asked through
+ * `watched`.
  */
 import type { NotifyRung } from "../terminal/capabilities.js";
 import { completionLine, failed, type LinearEntry } from "./linear.js";
@@ -44,6 +47,12 @@ export type NotifierDeps = Readonly<{
   separator: string;
   /** The entry by id, as the transcript now holds it. */
   entryOf: (id: string) => LinearEntry | undefined;
+  /**
+   * Whether the entry is watched (I135) — asked at the settle, **before** the
+   * session's set drops it, which the composition root's one subscription
+   * orders by calling this notifier first.
+   */
+  watched: (id: string) => boolean;
   bell: () => void;
   notify: (text: string) => void;
   title: (text: string) => void;
@@ -57,8 +66,6 @@ export type Notifier = Readonly<{
   settled: (id: string) => void;
   /** A question arrived; `line` is §6m's question line (I122). */
   asked: (line: string) => void;
-  /** Watch a streaming entry (I130); `false` for anything else. */
-  watch: (id: string) => boolean;
 }>;
 
 export function createNotifier(deps: NotifierDeps): Notifier {
@@ -70,7 +77,6 @@ export function createNotifier(deps: NotifierDeps): Notifier {
   let away = false;
   /** Facts already reported, by id — a second settle says nothing (I126). */
   const said = new Set<string>();
-  const watched = new Set<string>();
   const opted = new Set(deps.rungs);
 
   /** Every opted rung, in the order bell, system, title (I128). */
@@ -92,21 +98,15 @@ export function createNotifier(deps: NotifierDeps): Notifier {
       // Gone, or still running: nothing to say yet (§6n.3 row 10).
       if (entry === undefined || entry.streaming || said.has(id)) return;
       said.add(id);
-      // **The watch drops at settle** (I130), whether or not this earns — a
-      // declaration about a run that has ended has nothing left to watch.
-      const isWatched = watched.delete(id);
+      // **Read here, and dropped by the session after** (I130, I135): the
+      // drop is the store's, and the one subscription calls this first.
+      const isWatched = deps.watched(id);
       if (!away) return;
       const word = earns({ failed: failed(entry.doc), watched: isWatched, durationMs: entry.doc.meta.durationMs });
       if (word !== null) fire(word, completionLine(entry));
     },
     asked(line) {
       if (away) fire("waiting", line);
-    },
-    watch(id) {
-      const entry = deps.entryOf(id);
-      if (entry === undefined || !entry.streaming) return false;
-      watched.add(id);
-      return true;
     },
   });
 }

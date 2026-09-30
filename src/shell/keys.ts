@@ -105,6 +105,15 @@ export type KeyDeps = Readonly<{
   /** Move focus into the transcript, for `⇧⇥` (`focus.previous`, §6a). */
   focusTranscript: () => void;
   /**
+   * The watch row's keys (C16 I76, I77, C22 I140) — the composition root's,
+   * because the set, the focus store and the transcript are all there.
+   */
+  watchKeys: Readonly<{
+    focusPrevious: () => void;
+    step: (by: 1 | -1) => void;
+    open: (n?: number) => void;
+  }>;
+  /**
    * Send the prompt's line, for its `⏎` (C22 I133, ruling 63).
    *
    * **Not `submit`**, which takes a line: this sends the line the editor holds,
@@ -391,6 +400,28 @@ export interface KeyEffects {
    */
   searchTyped(text: string | null): void;
   /**
+   * What `⏎` on the element at `address` in `entryId` would do, resolved now
+   * and run later — or `null` where it would do nothing (C16 I71, §3c S1).
+   *
+   * **The pointer's press captures this, and its release runs it.** The arm
+   * held `table.rowActivate`, which reads `focus.current` when it runs — so a
+   * press on row A, `↓` to row B with the button down, and a release over A
+   * fired B's action. The identity the router compares is A's, so the effect
+   * has to be A's too. Asked of the focused entry, because a press only arms
+   * on the focused element.
+   */
+  activationAt(entryId: EntryId, address: ElementAddress): KeyEffect | null;
+  /**
+   * The wheel over the menu: move its window by `rows` candidates, and answer
+   * whether it has a window to move (C16 I74, §3d Q2).
+   *
+   * **What is shown, never what is chosen** (C19 I20). A menu holding no
+   * selection is a display, and `⏎` still submits under it — so a wheel that
+   * selected as it scrolled would turn the reader's next `⏎` into an accept.
+   * The window follows the selection again the moment a key moves it.
+   */
+  scrollMenu(rows: number): boolean;
+  /**
    * The region changed — re-place whatever is anchored to the prompt.
    *
    * **Placement is live in C15's type and nothing was keeping it current.** The
@@ -446,6 +477,12 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
    * nowhere.
    */
   let fits = 0;
+  /**
+   * Where the wheel put the window, and the selection it was put against
+   * (C16 I74). `null` is *the selection places the window*, which is every
+   * menu nobody has wheeled; a selection that has moved since reads as `null`.
+   */
+  let wheeled: Readonly<{ start: number; at: number | null }> | null = null;
   let seq = 0;
 
   /** The focused element's placed record, or `null` (C26 I10). */
@@ -515,8 +552,14 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // actually cut*, and where nothing was, there is nothing to window.
     if (remainder <= 0) return menuBlocks(candidates, selection.at, 0);
     const w = menuWindow(candidates.length, selection.at, fits);
-    const slice = candidates.slice(w.start, w.start + w.shown);
-    return menuBlocks(slice, selection.at === null ? null : selection.at - w.start, remainder);
+    // **The keys own the window again once they move the selection** (§3d Q2).
+    if (wheeled !== null && wheeled.at !== selection.at) wheeled = null;
+    const start = wheeled === null ? w.start : Math.min(wheeled.start, candidates.length - w.shown);
+    const slice = candidates.slice(start, start + w.shown);
+    const at = selection.at === null ? null : selection.at - start;
+    // A selection the wheel scrolled out of view is drawn as none on screen,
+    // and is still the selection: `⏎` accepts it, as it would have.
+    return menuBlocks(slice, at === null || at < 0 || at >= w.shown ? null : at, remainder);
   }
 
   function redrawMenu(): void {
@@ -552,6 +595,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // the state, not the code could not reach it — and the two dead clamps
     // beside it were the first disposition. They read identically in a report.
     fits = 0;
+    wheeled = null;
     const layer = menuLayer(candidates, selection.at, remainder, deps.anchor());
     if (deps.overlays.update(MENU_ID, { content: layer.content, placement: layer.placement })) {
       return;
@@ -565,6 +609,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   }
 
   function closeMenu(): void {
+    wheeled = null;
     candidates = [];
     selection.reset(0, null);
     requested = false;
@@ -743,6 +788,20 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // --- §6a, M6 ------------------------------------------------------------
     helpKeymap: () => void deps.emit("/help keys"),
     focusTranscript: () => void deps.focusTranscript(),
+    // --- the watch row (C16 I76, I77, §6d) ---------------------------------
+    focusPrevious: () => void deps.watchKeys.focusPrevious(),
+    watchPrev: () => void deps.watchKeys.step(-1),
+    watchNext: () => void deps.watchKeys.step(1),
+    watchOpen: () => void deps.watchKeys.open(),
+    watchJump1: () => void deps.watchKeys.open(1),
+    watchJump2: () => void deps.watchKeys.open(2),
+    watchJump3: () => void deps.watchKeys.open(3),
+    watchJump4: () => void deps.watchKeys.open(4),
+    watchJump5: () => void deps.watchKeys.open(5),
+    watchJump6: () => void deps.watchKeys.open(6),
+    watchJump7: () => void deps.watchKeys.open(7),
+    watchJump8: () => void deps.watchKeys.open(8),
+    watchJump9: () => void deps.watchKeys.open(9),
     agentNext: reserved,
     agentPrevious: reserved,
     agent1: reserved,
@@ -1057,26 +1116,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       const elements = deps.focusedElements();
       const i = resolveFocus(current.element, elements);
       if (i === null) return;
-      // **The way IN** (C26 I26, §102: *focused — the way IN — ⏎ enter*). An
-      // element that declares view state is entered rather than activated, and
-      // the two are disjoint by §018 — *direct-action toggles and choices act
-      // without an inside state* — so this is a ruling read off the element and
-      // not a precedence between two meanings of one key.
-      if (elements[i]?.element.viewState === true) {
-        deps.focus.setMode("interact");
-        return;
-      }
-      // `activate` is the element's own, declared by the kind (C26 §5), rather
-      // than a row shape this layer would otherwise have to know.
-      const action = elements[i]?.element.activate;
-      // **The focused entry, which is the origin C23 I18 reads** (C26 §4g row
-      // e). A settled row's action arrives here for the first time, and it is
-      // refused there — with `liveId` as the origin it would have fired against
-      // the live entry's document instead and been refused by nothing.
-      const from = deps.focusedEntryId();
-      if (action === undefined || from === null) return;
-      const fired = elements[i];
-      deps.onAction(action, from, fired === undefined ? undefined : addressOf(fired));
+      activationOf(deps.focusedEntryId(), elements[i])?.();
     },
     rowUp: () => {
       const elements = deps.focusedElements();
@@ -1438,6 +1478,102 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     ) as Record<KeyAction, KeyEffect>,
   );
 
+  /**
+   * What activating `fired` in `entry` does (C16 I71) — `rowActivate`'s body,
+   * resolved without running so the pointer can capture it at the press.
+   */
+  function activationOf(entry: EntryId | null, fired: PlacedNavElement | undefined): KeyEffect | null {
+    if (fired === undefined) return null;
+    const address = addressOf(fired);
+    // **The way IN** (C26 I26, §102: *focused — the way IN — ⏎ enter*). An
+    // element that declares view state is entered rather than activated, and
+    // the two are disjoint by §018 — *direct-action toggles and choices act
+    // without an inside state* — so this is a ruling read off the element and
+    // not a precedence between two meanings of one key.
+    //
+    // **Focused first where focus has gone elsewhere** (C16 I71): a captured
+    // entry runs after focus may have moved, and `interact` on another element
+    // would hand that element the keys.
+    if (fired.element.viewState === true) {
+      const enter = (): void => deps.focus.setMode("interact");
+      return () => {
+        const now = deps.focus.current;
+        const here =
+          now.at === "liveBlock" &&
+          deps.focusedEntryId() === entry &&
+          now.element?.blockId === address.blockId &&
+          now.element.elementId === address.elementId;
+        if (!here && entry !== null) deps.focus.focusRow(entry, address);
+        enter();
+      };
+    }
+    // `activate` is the element's own, declared by the kind (C26 §5), rather
+    // than a row shape this layer would otherwise have to know.
+    const action = fired.element.activate;
+    // **The focused entry, which is the origin C23 I18 reads** (C26 §4g row
+    // e). A settled row's action arrives here for the first time, and it is
+    // refused there — with `liveId` as the origin it would have fired against
+    // the live entry's document instead and been refused by nothing.
+    if (action === undefined || entry === null) return null;
+    return () => deps.onAction(action, entry, address);
+  }
+
+  /**
+   * What a question closed and the reader has not (C15 I32, R-BLK-873).
+   *
+   * **Held, not closed.** C15 I28 dismisses every panel when a question
+   * arrives, and the reason is `displaced` — *its state is held with the
+   * prompt's*. The menu's candidates, its selection and whether `Tab` opened it
+   * are held here, and the live fields are cleared so `hasMenu()` does not
+   * answer for a layer that is not on the stack. C20 holds the search's own
+   * state, so for it the bit is enough.
+   *
+   * **Restored when no blocking layer remains, and only onto the draft it was
+   * built for.** The borrow puts a typed reply's line back before the question
+   * disposes its layer (`confirm.ts` `settle`), so the draft here is the held
+   * one on every answer. A draft that changed under the question is another
+   * line, and a menu built for the old one is dropped rather than shown against
+   * it.
+   */
+  type Held = {
+    draft: string;
+    menu: Readonly<{ candidates: readonly Candidate[]; at: number | null; requested: boolean; builtFor: string }> | null;
+    searching: boolean;
+  };
+  let held: Held | null = null;
+
+  deps.overlays.subscribe((change) => {
+    if (change.kind === "dismiss" && change.reason === "displaced") {
+      held ??= { draft: deps.editor.text, menu: null, searching: false };
+      if (change.id === MENU_ID && candidates.length > 0) {
+        held.menu = { candidates, at: selection.at, requested, builtFor };
+        candidates = [];
+        selection.reset(0, null);
+        requested = false;
+        builtFor = "";
+        remainder = 0;
+      }
+      if (change.id === SEARCH_ID) held.searching = true;
+      return;
+    }
+    if (held === null || (change.kind !== "dismiss" && change.kind !== "pop")) return;
+    if (deps.overlays.stack.some((l) => l.blocking)) return;
+    const was = held;
+    held = null;
+    if (deps.editor.text !== was.draft) {
+      if (was.searching) deps.history.searchEnd("cancel");
+      return;
+    }
+    if (was.menu !== null) {
+      showMenu(was.menu.candidates, was.menu.at, was.menu.builtFor);
+      requested = was.menu.requested;
+      countRemainder();
+    }
+    if (was.searching && deps.history.searchState !== null) {
+      deps.overlays.push(deps.history.searchLayer(deps.anchor()));
+    }
+  });
+
   return {
     table,
     afterEdit,
@@ -1450,6 +1586,22 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       if (text === null) deps.history.searchBackspace();
       else deps.history.searchType(text);
       refreshSearchLayer();
+    },
+    scrollMenu: (rows) => {
+      // **Only a window that cuts something moves** — `windowedBlocks`' own
+      // guard, for its reason: `remainder` is what says something was cut.
+      if (candidates.length === 0 || remainder <= 0) return false;
+      const w = menuWindow(candidates.length, selection.at, fits);
+      const from = wheeled === null || wheeled.at !== selection.at ? w.start : wheeled.start;
+      const start = Math.min(Math.max(0, from + rows), candidates.length - w.shown);
+      wheeled = { start, at: selection.at };
+      redrawMenu();
+      return true;
+    },
+    activationAt: (entryId, address) => {
+      const elements = deps.focusedElements();
+      const i = resolveFocus(address, elements);
+      return i === null ? null : activationOf(entryId, elements[i]);
     },
     refreshAnchors: () => {
       const at = deps.anchor();
@@ -1465,6 +1617,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     reset: () => {
       closeMenu();
       suppressedAt = null;
+      held = null;
     },
     get selected() {
       return selection.at;

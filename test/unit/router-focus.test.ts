@@ -209,6 +209,9 @@ describe("C16 §3 — activeTarget", () => {
       at(),
       at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "navigate" } }),
       at({ stored: { at: "liveBlock", entryId: "e1", element: null, anchor: null, mode: "navigate" }, liveEntry: null }),
+      // **The watch row, produced from its stored location** (C16 I76) — a
+      // third position of `scope`, and the rule above applied to it.
+      at({ stored: { at: "watches", id: "w", index: 0 } }),
     ]);
     expect([...FOCUS_ORDER].filter((t) => t !== "global").sort()).toEqual([...reached].sort());
     expect(reached.has("global"), "no derivation answers `global` any more").toBe(false);

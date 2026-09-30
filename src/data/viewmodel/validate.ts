@@ -24,6 +24,7 @@ import {
   type Glyph,
   type RampAnimation,
   COLORMAP_NAMES,
+  GLYPH_REQUIRED_TONES,
   RAMP_ANIMATIONS,
   RAMP_FILLS,
   RAMP_KEYS,
@@ -862,6 +863,20 @@ function requireArray(b: Record<string, unknown>, key: string, e: string[], at: 
   requireField(b, key, isArray, "an array", e, `${at}: "${key}"`);
 }
 
+/**
+ * `expanded` on a block, **a boolean when present** (C09 I124, C25 I11).
+ *
+ * The four shedding kinds and `patch` carry it, and a non-boolean would draw
+ * the expanded form from a value that says neither state — `"false"` is truthy
+ * to nothing here, since the kinds compare with `=== true`, so it would read as
+ * collapsed while declaring otherwise.
+ */
+function checkExpanded(b: Record<string, unknown>, e: string[], at: string): void {
+  if (b["expanded"] !== undefined && typeof b["expanded"] !== "boolean") {
+    e.push(`${at}: "expanded" must be a boolean when present (C09 I124) — got ${JSON.stringify(b["expanded"])}`);
+  }
+}
+
 /** A finite number — not clamped here, because clamping is the renderer's (C09 I28). */
 function requireNumber(b: Record<string, unknown>, key: string, e: string[], at: string): void {
   requireField(b, key, (v) => typeof v === "number" && Number.isFinite(v), "a finite number", e, `${at}: "${key}"`);
@@ -1373,6 +1388,8 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
     requireString(b, "text", e, at);
     requireString(b, "tone", e, at);
     requireGlyph(b["glyph"], e, at);
+    // I6 (ruling 77) — a notice has no column and no exemption.
+    requireToneGlyph(b["tone"], b["glyph"], e, at);
     checkColormapName(b, e, at);
     checkSpans(b, "text", e, at);
     // **A misspelled trail is refused, not defaulted** (C04 I123, §5c). Falling
@@ -1416,6 +1433,7 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
   },
   keyValue: (b, e, at) => {
     requireArray(b, "rows", e, at);
+    checkExpanded(b, e, at);
     if (!isArray(b["rows"])) return;
     for (const row of b["rows"]) {
       if (!isRecord(row) || !isRecord(row["bar"])) continue;
@@ -1458,12 +1476,30 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
     requireArray(b, "columns", e, at);
     requireArray(b, "rows", e, at);
     // I128 — a column's polarity is one of three words, or absent for neutral.
+    // I6 (ruling 44) — a declared vocabulary is a closed set a cell can be
+    // checked against, collected here for the cell walk below.
+    const closed = new Map<string, ReadonlySet<string>>();
     if (isArray(b["columns"])) {
       for (const column of b["columns"]) {
-        if (!isRecord(column) || column["polarity"] === undefined) continue;
-        if (!["higher", "lower", "neutral"].includes(column["polarity"] as string)) {
+        if (!isRecord(column)) continue;
+        if (column["polarity"] !== undefined && !["higher", "lower", "neutral"].includes(column["polarity"] as string)) {
           e.push(`${at} column "${String(column["key"])}": "polarity" is "higher", "lower" or "neutral" (C04 I128)`);
         }
+        const words = column["vocabulary"];
+        if (words === undefined) continue;
+        if (
+          !isArray(words) ||
+          words.length === 0 ||
+          new Set(words).size !== words.length ||
+          words.some((w) => !isString(w) || w.length === 0)
+        ) {
+          e.push(
+            `${at} column "${String(column["key"])}": "vocabulary" is a non-empty list of distinct, ` +
+              `non-empty words (C04 I6, ruling 44)`,
+          );
+          continue;
+        }
+        closed.set(String(column["key"]), new Set(words as readonly string[]));
       }
     }
     // The other half of I6's glyph rule. A `Cell` carries one too, and a table
@@ -1487,6 +1523,19 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
         for (const [key, cell] of Object.entries(row["cells"])) {
           if (!isRecord(cell)) continue;
           requireGlyph(cell["glyph"], e, `${at} cell "${key}"`);
+          // I6, ruling 44 — the vocabulary is closed at the wire as at
+          // construction, or a far side's free text would take the exemption.
+          const words = closed.get(key);
+          // I6 (ruling 77) — the glyph a `warn` or `error` cell carries, held
+          // here as `block()` holds it; a word of a declared vocabulary is the
+          // exemption, and a cell outside the set is refused below either way.
+          if (words === undefined) requireToneGlyph(cell["tone"], cell["glyph"], e, `${at} cell "${key}"`);
+          if (words !== undefined && !words.has(cell["text"] as string)) {
+            e.push(
+              `${at} cell "${key}": ${JSON.stringify(cell["text"])} is not a word of column "${key}"'s ` +
+                `vocabulary (C04 I6, ruling 44) — the set is closed`,
+            );
+          }
           checkSpans(cell, "text", e, `${at} cell "${key}"`);
           // I46 — the second numeric array, and the one no round trip would
           // have surfaced: a sparkline drawn from a cell's own numbers.
@@ -1568,9 +1617,15 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
       );
     }
   },
-  steps: (b, e, at) => requireArray(b, "steps", e, at),
+  steps: (b, e, at) => {
+    requireArray(b, "steps", e, at);
+    checkExpanded(b, e, at);
+  },
   logs: (b, e, at) => requireArray(b, "lines", e, at),
-  events: (b, e, at) => requireArray(b, "events", e, at),
+  events: (b, e, at) => {
+    requireArray(b, "events", e, at);
+    checkExpanded(b, e, at);
+  },
   plot: (b, e, at) => {
     // **Before every form rule** (C04 I118). A rule that reads a member's value
     // and finds it outside the union would otherwise report a second fault about
@@ -1795,9 +1850,19 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
       e.push(`${at}: "spans" is refused on code — its syntax tokens are already a run stream over the text (C04 I88)`);
     }
   },
-  comparison: (b, e, at) => requireArray(b, "rows", e, at),
+  comparison: (b, e, at) => {
+    requireArray(b, "rows", e, at);
+    checkExpanded(b, e, at);
+  },
   patch: (b, e, at) => {
     requireString(b, "path", e, at);
+    checkExpanded(b, e, at);
+    // C25 I14 — the collapsed form's row budget. **At least 1**: the path header
+    // alone is a row, and a cap of zero is a budget nothing can be drawn inside.
+    const cap = b["cap"];
+    if (cap !== undefined && (typeof cap !== "number" || !Number.isInteger(cap) || cap < 1)) {
+      e.push(`${at}: "cap" must be a positive integer (C25 I14) — got ${JSON.stringify(cap)}`);
+    }
     requireString(b, "language", e, at);
     requireArray(b, "hunks", e, at);
     checkActions(b, e, at);
@@ -3405,6 +3470,24 @@ function requireGlyph(value: unknown, e: string[], at: string): void {
   e.push(
     `${at}: "glyph" must be one of ${[...GLYPHS].join(", ")} (C04 I6) — ` +
       `got ${JSON.stringify(value)}; a character has no ASCII fallback and no width guarantee`,
+  );
+}
+
+/**
+ * I6's first half, at the wire — a tone that says *something is wrong* carries
+ * a glyph, so colour is never the only carrier (D29, ruling 77).
+ *
+ * `block()` throws on exactly this, and until ruling 77 the wire did not look:
+ * a far side emitting `tui.view/1` could send a colour-only warning that the
+ * builder refuses, one document with two verdicts — and the far side is the
+ * producer the rule exists for. A glyph that is present but not a slot is
+ * `requireGlyph`'s refusal, not this one.
+ */
+function requireToneGlyph(tone: unknown, glyph: unknown, e: string[], at: string): void {
+  if (!(GLYPH_REQUIRED_TONES as ReadonlySet<unknown>).has(tone) || glyph !== undefined) return;
+  e.push(
+    `${at}: tone "${String(tone)}" requires a glyph (C04 I6, D29) — ` +
+      `colour alone does not survive 1-bit or a colour-blind reader`,
   );
 }
 

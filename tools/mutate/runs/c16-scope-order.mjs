@@ -42,7 +42,7 @@ const results = runPass({
       file: K,
       from: "    a === here ? -1 : b === here ? 1 : rank(a) - rank(b),",
       to: "    a === here ? -1 : b === here ? 1 : a < b ? -1 : a > b ? 1 : 0,",
-      expect: "T1.100",
+      expect: "T1.197",
     },
     {
       // **The registry's order dropped and the ladder left.** Every scope the
@@ -52,7 +52,7 @@ const results = runPass({
       file: K,
       from: "    const reg = REGISTRY_SCOPE_ORDER.indexOf(t);\n    if (reg !== -1) return reg;",
       to: "    // the design's order, dropped",
-      expect: "T1.100",
+      expect: "T1.197",
     },
     {
       // **And the other half: the ladder dropped.** The six scopes the registry
@@ -63,7 +63,7 @@ const results = runPass({
       file: K,
       from: "    return REGISTRY_SCOPE_ORDER.length + (focus === -1 ? FOCUS_ORDER.length : focus); // graphemes-ok — array lengths, not text",
       to: "    return REGISTRY_SCOPE_ORDER.length; // graphemes-ok — array lengths, not text",
-      expect: "T1.100",
+      expect: "T1.197",
     },
     {
       // **The current scope stops leading**, which is R-KEY-005's first clause
@@ -72,7 +72,7 @@ const results = runPass({
       file: K,
       from: "    a === here ? -1 : b === here ? 1 : rank(a) - rank(b),",
       to: "    rank(a) - rank(b),",
-      expect: "T1.100",
+      expect: "T1.197",
     },
   ],
 });

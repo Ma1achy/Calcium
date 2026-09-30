@@ -33,18 +33,14 @@ export type Placement =
     }>
   | Readonly<{ kind: "centred" }>;
 
-export type Layer = Readonly<{
+/**
+ * What every kind carries (§2).
+ *
+ * `kind`, `blocking`, `dismissal` and `owner` are not here: they are one table,
+ * and `Layer` below is that table written as a type (I30).
+ */
+export type LayerBase = Readonly<{
   id: string;
-  /**
-   * `overlay` and `view` take keys; a **`peek`** never does (§2a, I21).
-   *
-   * A peek is the focused element's detail drawn beside it. It is a third kind
-   * rather than a flag because C16 reads `top.kind`: measured with a plain
-   * anchored overlay standing in for one, `↓` was consumed and focus did not
-   * move, `⏎` went to the layer, and `Esc` dismissed it instead of leaving the
-   * block. A layer that is never `top` cannot reach the ladder at all.
-   */
-  kind: "overlay" | "peek" | "panel";
   placement: Placement;
   /**
    * `Block[]`, never React (I4) — so a layer is themed, degrades to ASCII and
@@ -55,6 +51,50 @@ export type Layer = Readonly<{
    * field, and C15 sees the visible ones.
    */
   content: readonly Block[];
+  /**
+   * Requested width in cells; absent means the region's.
+   *
+   * Declared rather than measured because `BlockRegistry` answers height at a
+   * width and never the reverse (I16). C19 knows its longest candidate; this
+   * component knows the region and nothing else.
+   */
+  width?: number;
+  /** Overlays; default 0.5. */
+  maxHeightFraction?: number;
+  /**
+   * Where this layer wants the terminal cursor, **relative to its own origin**
+   * (I19).
+   *
+   * On the layer rather than only on `Placed`, because `place()` computes
+   * geometry from a measured height and a region and has no idea where a
+   * search's caret is — a cursor that existed only on the output could only be
+   * invented there. The producer states it and placement copies it through;
+   * both ends are relative to the same origin, so nothing is adjusted.
+   *
+   * Absent means the layer has no cursor, which is the default and the case
+   * that matters: it is what a menu wants. Nothing is entered into a menu.
+   */
+  cursor?: Readonly<{ row: number; col: number }>;
+}>;
+
+/**
+ * The fields the §2d table is over, documented once (I26, I29).
+ *
+ * Each arm of the union below intersects this with its own literals, which
+ * narrows every field to the arm's values and keeps the prose in one place
+ * rather than three copies of it.
+ */
+type LayerFields = Readonly<{
+  /**
+   * `overlay` and `panel` take keys; a **`peek`** never does (§2a, I21).
+   *
+   * A peek is the focused element's detail drawn beside it. It is a third kind
+   * rather than a flag because C16 reads `top.kind`: measured with a plain
+   * anchored overlay standing in for one, `↓` was consumed and focus did not
+   * move, `⏎` went to the layer, and `Esc` dismissed it instead of leaving the
+   * block. A layer that is never `top` cannot reach the ladder at all.
+   */
+  kind: "overlay" | "peek" | "panel";
   /**
    * Does this layer own input while it is up (I26, R-QST-001)?
    *
@@ -106,31 +146,29 @@ export type Layer = Readonly<{
    * owner moved mid-life makes the ladder depend on when it looked.
    */
   owner?: LayerOwner;
-  /**
-   * Requested width in cells; absent means the region's.
-   *
-   * Declared rather than measured because `BlockRegistry` answers height at a
-   * width and never the reverse (I16). C19 knows its longest candidate; this
-   * component knows the region and nothing else.
-   */
-  width?: number;
-  /** Overlays; default 0.5. */
-  maxHeightFraction?: number;
-  /**
-   * Where this layer wants the terminal cursor, **relative to its own origin**
-   * (I19).
-   *
-   * On the layer rather than only on `Placed`, because `place()` computes
-   * geometry from a measured height and a region and has no idea where a
-   * search's caret is — a cursor that existed only on the output could only be
-   * invented there. The producer states it and placement copies it through;
-   * both ends are relative to the same origin, so nothing is adjusted.
-   *
-   * Absent means the layer has no cursor, which is the default and the case
-   * that matters: it is what a menu wants. Nothing is entered into a menu.
-   */
-  cursor?: Readonly<{ row: number; col: number }>;
 }>;
+
+/**
+ * A layer: one kind, one shape (I30, §2d, R-BLK-779).
+ *
+ * **The §2d table written as a type.** Each refused row is a literal that does
+ * not compile — a blocking peek, a peek closed by `escape` or `answer`, an
+ * overlay closed by `focus`, a non-blocking overlay closed by its `answer` — and
+ * `push`/`update` check the same table at run time, because a cast, a widened
+ * value or JavaScript reaches the stack without the type (§2d, D11).
+ *
+ * **`placement` is not narrowed here**, although I22 and I27 fix it for two of
+ * the kinds: `LayerUpdate` admits it and names no kind, so the run-time check is
+ * the only one both routes reach, and a narrowed type would read as a guarantee
+ * `update` does not give.
+ */
+export type Layer =
+  | (LayerBase & LayerFields & Readonly<{ kind: "peek"; blocking: false; dismissal: "focus"; owner?: undefined }>)
+  | (LayerBase & LayerFields & Readonly<{ kind: "panel"; blocking: false; dismissal: "escape"; owner?: SubstateOwner }>)
+  | (LayerBase &
+      LayerFields &
+      Readonly<{ kind: "overlay"; owner?: QuestionOwner }> &
+      (Readonly<{ blocking: true; dismissal: "answer" | "escape" }> | Readonly<{ blocking: false; dismissal: "escape" }>));
 
 /**
  * The owner rung a keyed layer declares (I29, §103).
@@ -139,9 +177,9 @@ export type Layer = Readonly<{
  * footer says which one is up and `promptUnderMenu` decides by it; both read
  * layer ids before this, and the footer said `find` for all three.
  */
-export type LayerOwner =
-  | Readonly<{ rung: "question" }>
-  | Readonly<{ rung: "substate"; name: "find" | "complete" | "preview" }>;
+export type QuestionOwner = Readonly<{ rung: "question" }>;
+export type SubstateOwner = Readonly<{ rung: "substate"; name: "find" | "complete" | "preview" }>;
+export type LayerOwner = QuestionOwner | SubstateOwner;
 
 /**
  * A layer C16 can route to — what `top` answers (I21).
@@ -161,6 +199,20 @@ export type KeyedLayer = Layer & Readonly<{ kind: "overlay" | "panel" }>;
  */
 export function takesInput(p: Placed): p is Placed & Readonly<{ layer: KeyedLayer }> {
   return p.layer.kind !== "peek";
+}
+
+/**
+ * A placed layer the pointer reaches for this gesture (I31, C16 I48).
+ *
+ * **Separate from `takesInput`, and the peek is why.** One predicate answered
+ * for keys and for the pointer, so the peek band of C16 I48's scroll order —
+ * `overlay › panel › peek › base` — was a band no event could reach: a wheel
+ * over a truncated peek scrolled the transcript row beneath it. A peek takes
+ * the wheel and nothing else; a press on it still reaches the row beneath
+ * (I21), which is the element the peek describes.
+ */
+export function takesPointer(p: Placed, gesture: "wheel" | "press"): boolean {
+  return gesture === "wheel" || takesInput(p);
 }
 
 export type Placed = Readonly<{
@@ -185,11 +237,17 @@ export type Placed = Readonly<{
 /**
  * `anchorEvicted` is supplied by the caller, not detected here (I10).
  *
+ * `displaced` is the one reason this component supplies itself: a blocking
+ * layer arriving closed the panel (I28), and its owner holds the panel's state
+ * to restore when the arrival resolves (I32). Neither the reader closing it nor
+ * its referent going is what happened, and an owner that could not tell the
+ * three apart kept a closed menu's state live.
+ *
  * C15 subscribes to nothing and holds no entry ids, so it cannot notice an
  * eviction — and the requirement was never that it should. What L4 needs is to
  * tell a user's cancellation from a referent that has gone.
  */
-export type DismissReason = "explicit" | "anchorEvicted";
+export type DismissReason = "explicit" | "anchorEvicted" | "displaced";
 
 /**
  * What `update` may change.
@@ -239,6 +297,8 @@ export interface OverlayManager {
   readonly stack: readonly Layer[];
   /** The topmost layer that takes keys — never a peek (I21). */
   readonly top: KeyedLayer | null;
+  /** Keyed pushes and removals, never down — the owner generation C16's epoch reads (I33). */
+  readonly generation: number;
 }
 
 export type OverlayOptions = Readonly<{ registry: BlockRegistryLike }>;

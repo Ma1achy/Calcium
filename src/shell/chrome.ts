@@ -16,9 +16,9 @@
 
 import { block } from "../data/viewmodel/index.js";
 import type { Block, Pills } from "../data/viewmodel/index.js";
-import { glyphFor, glyphs } from "../presentation/blocks/index.js";
-import { cells } from "../presentation/text.js";
-import type { ChromeContext, ChromeFn, CopyState, OwnerHints } from "./types.js";
+import { barStyle, glyphFor, glyphs } from "../presentation/blocks/index.js";
+import { cells, stripControl, truncate } from "../presentation/text.js";
+import type { ChromeContext, ChromeFn, CopyState, GuardRefusal, OwnerHints, WatchRowState } from "./types.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Binding, FocusTarget, KeyAction, OwnerRung } from "../interaction/router/types.js";
 import { chordText, defaultKeymap } from "../interaction/router/keymap.js";
@@ -305,6 +305,99 @@ export function shedToWidth(
   return kept;
 }
 
+/** The bar's cells in a watch chip — the ruling's `█████░` (ruling 50, §085). */
+const WATCH_BAR_CELLS = 6;
+
+/**
+ * One watch's chip text (C22 I137): the `current` mark on the selected one, the
+ * name, and — where its entry holds a `progress` block — the bar and C09's
+ * percentage. The percentage is the block's own readout, unclamped, as C09's
+ * `progress` prints it (C09 I28): a bar that stops at its end draws a busy
+ * thing like a finished one, and the number is what says which.
+ */
+function watchChip(
+  item: WatchRowState["items"][number],
+  mark: string | null,
+  name: string,
+  bars: boolean,
+  caps: TerminalCapabilities,
+): string {
+  const lead = mark === null ? "" : `${mark} `;
+  const p = item.progress;
+  if (p === undefined) return `${lead}${name}`;
+  const fraction = p.total > 0 ? Math.max(0, p.current / p.total) : 0;
+  const share = `${String(Math.round(fraction * 100))}%`;
+  if (!bars) return `${lead}${name} ${share}`;
+  const glyph = barStyle(caps);
+  const filled = Math.round(Math.min(1, fraction) * WATCH_BAR_CELLS);
+  return `${lead}${name} ${glyph.on.repeat(filled)}${glyph.off.repeat(WATCH_BAR_CELLS - filled)} ${share}`;
+}
+
+/**
+ * The footer's watch row (C22 I137, I138, §6p, ruling 50): `⋯ › a3f9b21 █████░ 43%`.
+ *
+ * **One row at every width, and the order it gives things up is the ruling's**
+ * (I138): every bar at once — the percentage already says what the bar draws —
+ * then watches from the right behind a `+N`, never the one the row is on, then
+ * the kept name, cut to what is left. Measured as the owner line is measured,
+ * because the two are drawn by the same kind in the same footer and a second
+ * measure is a second answer to one question.
+ */
+export function watchRowChips(
+  state: WatchRowState,
+  columns: number,
+  caps: TerminalCapabilities,
+): readonly Chip[] {
+  const lead: Chip = { label: glyphs(caps).residue, tone: "muted" };
+  if (state.items.length === 0) return [lead, { label: "nothing watched", tone: "muted" }];
+  const width = (chips: readonly Chip[]): number =>
+    chips.reduce((n, c, i) => n + cells(c.label, caps.ambiguousWidth) + (i > 0 ? OWNER_GAP : 0), 0);
+  const current = glyphFor("current", caps);
+  // The selection's mark and tone only while the row has the keys (I137).
+  const chipOf = (i: number, bars: boolean, name?: string): Chip => {
+    const item = state.items[i]!;
+    const on = state.selected === i;
+    return {
+      label: watchChip(item, on ? current : null, name ?? stripControl(item.name), bars, caps),
+      tone: on ? "accent" : "muted",
+    };
+  };
+  const all = (bars: boolean): Chip[] => [lead, ...state.items.map((_, i) => chipOf(i, bars))];
+
+  const full = all(true);
+  if (width(full) <= columns) return full;
+  const bare = all(false);
+  if (width(bare) <= columns) return bare;
+
+  // Watches from the right, never the one the row is on — or, with no
+  // selection, the first, which is the oldest and the one `⇧⇥` lands on.
+  const keep = state.selected ?? 0;
+  const kept = state.items.map((_, i) => i);
+  let shed = 0;
+  const line = (): Chip[] => [
+    lead,
+    ...kept.map((i) => chipOf(i, false)),
+    ...(shed > 0 ? [{ label: `+${String(shed)}`, tone: "muted" as const }] : []),
+  ];
+  for (let at = kept.length - 1; at >= 0 && width(line()) > columns; at -= 1) {
+    if (kept[at] === keep) continue;
+    kept.splice(at, 1);
+    shed += 1;
+  }
+  const shedLine = line();
+  if (width(shedLine) <= columns) return shedLine;
+
+  // Last, the kept name: cut to the cells the rest of the line leaves it.
+  const name = stripControl(state.items[keep]!.name);
+  const without = width([lead, chipOf(keep, false, ""), ...(shed > 0 ? [{ label: `+${String(shed)}`, tone: "muted" as const }] : [])]);
+  const room = Math.max(1, columns - without);
+  return [
+    lead,
+    chipOf(keep, false, truncate(name, room, caps)),
+    ...(shed > 0 ? [{ label: `+${String(shed)}`, tone: "muted" as const }] : []),
+  ];
+}
+
 /**
  * The captured child's border legend (C22 I110, R-BLK-312, R-BLK-844).
  *
@@ -333,6 +426,19 @@ export function childBorderLegend(caps: TerminalCapabilities): string {
   ].join(sep);
 }
 
+/**
+ * C16 I70's sentence: the chord a guarded question refused, and the way out on
+ * this terminal — its release where releases are reported, a pause where they
+ * are not. The owner line's chip and the linear cue both say this, so it is
+ * spelled once.
+ *
+ * **Words, not a dash**, because the ASCII rung has no dash to draw.
+ */
+export function guardRefusal(refused: GuardRefusal, caps: TerminalCapabilities): string {
+  const chord = chordText(refused.key, caps.unicode !== "ascii");
+  return refused.untilRelease ? `release ${chord} to answer` : `${chord} refused: pause, then press ${chord}`;
+}
+
 export function ownerLine(
   rung: OwnerRung | null,
   caps: TerminalCapabilities,
@@ -341,19 +447,30 @@ export function ownerLine(
   copy?: CopyState,
   field = false,
   hints: OwnerHints = DEFAULT_HINTS,
+  refused?: GuardRefusal,
 ): readonly Chip[] {
   const chips = ownerChips(rung, caps, buffered, copy, field, hints);
   // **The armed mark, and it is a chip rather than a decoration** (C16 I44,
-  // C22 §6, R-INT-008). A newly raised owner refuses one activation so a key
-  // already in flight cannot answer a question that arrived under it, and a
-  // rejected command has to explain. This is the explanation: it is drawn while
-  // the arm is live and gone after the refusal, so the refused key changes the
-  // frame — which is the whole difference between refused and swallowed.
+  // I70, C22 §6, R-INT-008). A newly raised question refuses activations so a
+  // key already in flight cannot answer it, and a rejected command has to
+  // explain. This is the explanation: `ready in a moment` while nothing has
+  // been refused, and from the first refusal the refused key and the way out —
+  // so the refused key changes the frame, which is the whole difference between
+  // refused and swallowed. **Once**: a second refusal draws the same chip.
+  //
+  // It used to be the mark *going* at the refusal, and under ruling 52 a
+  // refusal extends the guard rather than ending it, so the mark stayed and the
+  // refusal changed nothing (C16 §3c S7).
   //
   // `ownerLine(null)` stays the empty line. No owner raised is no row, and an
   // arm with no owner is not a state the router can reach.
   if (!armed || chips.length === 0) return chips;
-  return [...chips, { label: "ready in a moment", tone: "muted" }];
+  return [
+    ...chips,
+    refused === undefined
+      ? { label: "ready in a moment", tone: "muted" }
+      : { label: guardRefusal(refused, caps), tone: "warn" },
+  ];
 }
 
 /** `1 row`, `9 rows` — the count's three nouns (C14 I55). */
@@ -509,13 +626,24 @@ function ownerChips(
         ...one("interaction", "exitInside", "out"),
       ];
     case "scope":
+      // **At the watch row, the row's own keys** (C22 I139, C16 I76): the
+      // prompt's `send` and `newline` name keys that reach nothing from there.
+      if (hints.watchRow === "focused") {
+        return [
+          ...keyed(hints, "watchRow", ["watchPrev", "watchNext"], "move", caps),
+          ...keyed(hints, "watchRow", ["watchOpen"], "open", caps),
+          ...keyed(hints, "watchRow", ["focusPrompt"], "prompt", caps),
+        ];
+      }
       // No owner word: the scope is the rung a reader is on when nothing has
       // been raised, so naming it would put a label on the absence of one.
+      // **`⇧⇥` says where it goes** (C22 I139): the row while a watch stands,
+      // the transcript otherwise — `focusPrevious`'s two answers, one chip.
       return [
         ...keyed(hints, "prompt", ["submit"], "send", caps),
         ...keyed(hints, "prompt", ["insertNewline"], "newline", caps),
         ...keyed(hints, "prompt", ["complete"], "complete", caps),
-        ...keyed(hints, "prompt", ["focusTranscript"], "transcript", caps),
+        ...keyed(hints, "prompt", ["focusPrevious"], hints.watchRow === "present" ? "watches" : "transcript", caps),
       ];
     default:
       return [];
@@ -551,6 +679,20 @@ const footer = (ctx: ChromeContext): readonly Block[] => [
           },
         ],
   ),
+  // **The watch row, above the owner line** (C22 I137, §6p.4 ruling 4). §085's
+  // specimen draws it last and §103 puts the owner line last; the second is a
+  // current rule and the first a specimen, so the rule decides. **Its own
+  // block**, as the owner line is, and for the owner line's reason: a cluster
+  // pair reserves a right-hand cell and wraps on the width where it fits.
+  ...(ctx.watches === undefined || ctx.capabilities === undefined
+    ? []
+    : [
+        block<Block>({
+          kind: "pills",
+          id: "chrome.watches",
+          chips: watchRowChips(ctx.watches, ctx.columns, ctx.capabilities),
+        }),
+      ]),
   // **Last**, which is the whole of where §103 puts it: *in the footer's last
   // line*. A row above the working directory is a row a reader scans past.
   // **Both or neither** — there is no owner before there is a terminal, so the
@@ -576,6 +718,7 @@ const footer = (ctx: ChromeContext): readonly Block[] => [
               ctx.copy,
               ctx.editingField === true,
               ctx.hints,
+              ctx.ownerRefused,
             ),
             ctx.columns,
             ctx.capabilities,

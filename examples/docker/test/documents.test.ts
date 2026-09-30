@@ -40,7 +40,7 @@ import { createCompareHandler, createDriftHandler } from "../src/drift.ts";
 import { createPsAdapter } from "../src/ps.ts";
 import { createContainerAdapter } from "../src/container.ts";
 import { createInspectAdapter } from "../src/inspect.ts";
-import { createConfigHandler, type Far } from "../src/config.ts";
+import { createFilediffHandler, type Far } from "../src/filediff.ts";
 import {
   createDiffAdapter,
   createImagesAdapter,
@@ -172,14 +172,14 @@ const DOCUMENTS: readonly (readonly [
   // S8's arms. The far side is injected so every one of them is reachable —
   // three of these are daemon states that occur only sometimes, and an arm that
   // cannot be driven is an arm that never runs.
-  ["/config — no container", () => createConfigHandler(FAR({ facts: () => Promise.resolve(null) }))(["nope", "/x"], { ...localContext(), command: "/config nope /x" })],
-  ["/config — no path, with candidates", () => createConfigHandler(FAR())(["dtui-cfg"], { ...localContext(), command: "/config dtui-cfg" })],
-  ["/config — no path, no mounts", () => createConfigHandler(FAR({ facts: () => Promise.resolve({ image: "i", mounts: [] }) }))(["c"], { ...localContext(), command: "/config c" })],
-  ["/config — no arguments", () => createConfigHandler(FAR())([], { ...localContext(), command: "/config" })],
-  ["/config — the running file is unreadable", () => createConfigHandler(FAR({ running: () => Promise.resolve(null) }))(["c", "/x"], { ...localContext(), command: "/config c /x" })],
-  ["/config — the image side is unavailable", () => createConfigHandler(FAR({ fromImage: () => Promise.resolve(null) }))(["c", "/x"], { ...localContext(), command: "/config c /x" })],
-  ["/config — the files agree", () => createConfigHandler(FAR({ fromImage: () => Promise.resolve("a\nb\n") }))(["c", "/x"], { ...localContext(), command: "/config c /x" })],
-  ["/config — ok", () => createConfigHandler(FAR())(["c", "/x.conf"], { ...localContext(), command: "/config c /x.conf" })],
+  ["/filediff — no container", () => createFilediffHandler(FAR({ facts: () => Promise.resolve(null) }))(["nope", "/x"], { ...localContext(), command: "/filediff nope /x" })],
+  ["/filediff — no path, with candidates", () => createFilediffHandler(FAR())(["dtui-cfg"], { ...localContext(), command: "/filediff dtui-cfg" })],
+  ["/filediff — no path, no mounts", () => createFilediffHandler(FAR({ facts: () => Promise.resolve({ image: "i", mounts: [] }) }))(["c"], { ...localContext(), command: "/filediff c" })],
+  ["/filediff — no arguments", () => createFilediffHandler(FAR())([], { ...localContext(), command: "/filediff" })],
+  ["/filediff — the running file is unreadable", () => createFilediffHandler(FAR({ running: () => Promise.resolve(null) }))(["c", "/x"], { ...localContext(), command: "/filediff c /x" })],
+  ["/filediff — the image side is unavailable", () => createFilediffHandler(FAR({ fromImage: () => Promise.resolve(null) }))(["c", "/x"], { ...localContext(), command: "/filediff c /x" })],
+  ["/filediff — the files agree", () => createFilediffHandler(FAR({ fromImage: () => Promise.resolve("a\nb\n") }))(["c", "/x"], { ...localContext(), command: "/filediff c /x" })],
+  ["/filediff — ok", () => createFilediffHandler(FAR())(["c", "/x.conf"], { ...localContext(), command: "/filediff c /x.conf" })],
   // S10 and S11's arms. **Four verbs is four more failure arms nobody reaches
   // by accident**, which is why they arrive with the verbs rather than after
   // the first time one is seen — step 4's lesson, applied ahead of the defect

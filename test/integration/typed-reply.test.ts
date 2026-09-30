@@ -95,7 +95,13 @@ async function reply(
 ): Promise<Readonly<{ answer: Promise<unknown> }>> {
   const answer = graph.confirm.ask({ question: "what should the commit message say?", choices: REPLYABLE });
   await new Promise((r) => setTimeout(r, 0));
-  for (let i = 0; i < 2 && graph.confirm.replacing !== null; i += 1) send(press("r"));
+  // **A neutral key first, then `r`** (C16 I69): on a terminal with no
+  // release reporting the guard refuses every activation for its grace, and
+  // `→` — which moves the selection and answers nothing — is the boundary that
+  // ends it. Pressing `r` until it took was the first form of the guard's
+  // workaround, and under I69 no number of presses without a pause gets past.
+  send(press("right"));
+  send(press("r"));
   expect(graph.confirm.replacing, "reply… chosen: the question floats").toBeNull();
   expect(graph.confirm.open, "and it is still open").toBe(true);
   // **Wrapped, because an `async` function returning a promise adopts it**:

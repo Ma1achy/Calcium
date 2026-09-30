@@ -16,7 +16,17 @@ import { cells, stripControl, truncate } from "../../text.js";
 import { glyphFor, glyphs, spinnerFrameAt } from "../glyphs.js";
 import { valueBar } from "../../plot/bar.js";
 import { clampSpans, pad, paint, rows, tone, type Span } from "../paint.js";
-import { naturalSpan, shedElements, shedRow, type Part } from "../shed.js";
+import {
+  expansionRows,
+  foldExpanded,
+  naturalSpan,
+  shedElements,
+  shedRow,
+  withheldBy,
+  withheldLines,
+  type Part,
+  type Withheld,
+} from "../shed.js";
 import type { BlockDefinition, NavElement, RenderContext, Windowed, Rendered } from "../types.js";
 import { glyphTick } from "../ramp.js";
 
@@ -169,15 +179,40 @@ function keyValueParts(block: KeyValue, width: number, ambiguous: AmbiguousWidth
   ];
 }
 
+/**
+ * What each `keyValue` row withheld at `width`, or `null` where the block drew
+ * no mark (C09 I113, I124) — **at `wide`**, the convention that sheds at least
+ * as much as any drawn row, and for every reader: the elements, and the
+ * expanded form's measure and render. One plan, so the rows an expansion adds
+ * are the rows it draws (I125).
+ */
+function keyValueWithheld(block: KeyValue, width: number): readonly Withheld[] | null {
+  const parts = keyValueParts(block, width, "wide");
+  const plan = naturalSpan(parts, 0) <= width ? null : shedRow(parts, width, 0);
+  return withheldBy(plan, parts, block.rows.length, (i, gone) => { // cells-ok — an item count
+    const row = block.rows[i];
+    return row === undefined || !gone.has("value") ? [] : [{ label: row.label, value: row.value }];
+  });
+}
+
 export const keyValueDefinition: BlockDefinition<KeyValue> = {
   kind: "keyValue",
+
+  // C09 I124 — `expanded`, true and then absent.
+  fold: foldExpanded,
 
   // §7a — label and value, tab-separated (I86). Two columns is a table of two
   // columns, so it takes the same separator `table` does rather than the
   // colon-and-padding the renderer draws, which is alignment.
   copy: (block) => block.rows.map((r) => `${r.label}\t${r.value}`).join("\n"),
 
-  measure: (block: KeyValue): number => atLeastOne(block.rows.length), // cells-ok
+  // **Plus one row per withheld part where the block is expanded** (C09 I124,
+  // I125) — asked only then, so the collapsed measure stays the row count.
+  measure: (block: KeyValue, width: number): number =>
+    atLeastOne(
+      block.rows.length + // cells-ok — a row count
+        (block.expanded === true ? expansionRows(keyValueWithheld(block, normaliseWidth(width)), true) : 0),
+    ),
 
   // C09 §2c — the key column, the gap and the longest value; a row carrying a
   // bar fills, because the bar absorbs the residual. The floor of `keyWidth + 4`
@@ -214,6 +249,21 @@ export const keyValueDefinition: BlockDefinition<KeyValue> = {
    * is exact and `skipRows` is 0.
    */
   window: (block: KeyValue, width: number, from: number, to: number): Windowed => {
+    // **Expanded and shedding, the block is kept whole** (C09 I125): a slice
+    // takes its own plan over its own rows, and a slice whose values are
+    // shorter can fit where the block shed — drawing no parts beneath rows the
+    // block's measure counted parts for. Both ends are slack, which is the
+    // answer `windowSequence` gives a kind with no `window` (C11's bodyless
+    // table, the same shape).
+    if (block.expanded === true) {
+      const lists = keyValueWithheld(block, normaliseWidth(width));
+      if (lists !== null) {
+        const total = block.rows.length + expansionRows(lists, true); // cells-ok — a row count
+        const lo = Math.max(0, Math.min(Math.trunc(from), total - 1));
+        const hi = Math.max(lo + 1, Math.min(Math.trunc(to), total));
+        return Object.freeze({ block, skipRows: lo, dropRows: total - hi });
+      }
+    }
     const lo = Math.max(0, Math.min(Math.trunc(from), block.rows.length)); // cells-ok
     const hi = Math.max(lo + 1, Math.min(Math.trunc(to), block.rows.length)); // cells-ok
     return Object.freeze({
@@ -229,20 +279,13 @@ export const keyValueDefinition: BlockDefinition<KeyValue> = {
   // drawn row, so the detail can over-list and never under-list.
   elements: (block: KeyValue, width: number): readonly NavElement[] => {
     const w = normaliseWidth(width);
-    const parts = keyValueParts(block, w, "wide");
-    const plan = naturalSpan(parts, 0) <= w ? null : shedRow(parts, w, 0);
     return shedElements(
       block.id,
-      plan,
-      parts,
+      keyValueWithheld(block, w),
       w,
-      block.rows.length, // cells-ok — an item count
       0,
-      (i, gone) => {
-        const row = block.rows[i];
-        return row === undefined || !gone.has("value") ? [] : [{ label: row.label, value: row.value }];
-      },
       (i) => `${block.rows[i]?.label ?? ""}\t${block.rows[i]?.value ?? ""}`,
+      block.expanded,
     );
   },
 
@@ -286,9 +329,13 @@ export const keyValueDefinition: BlockDefinition<KeyValue> = {
       plan === null
         ? Math.max(1, width - keyWidth - COLUMN_GAP)
         : Math.max(0, (got("value") ?? COLUMN_GAP) - COLUMN_GAP);
+    // **The expansion's parts come from the `wide` plan, not this one** (C09
+    // I125): `measure` has no convention to read, so the rows it counts and the
+    // rows drawn here must share one that is fixed.
+    const opened = block.expanded === true ? keyValueWithheld(block, width) : null;
 
     return rows(
-      block.rows.map((entry) => {
+      block.rows.flatMap((entry, i) => {
         // The key truncates at the cap; the value still aligns, because the
         // column is a width rather than the longest key that happens to fit
         // (T1.5).
@@ -299,7 +346,7 @@ export const keyValueDefinition: BlockDefinition<KeyValue> = {
         );
         const value = valueWidth <= 0 ? "" : valueOf(entry, valueWidth, ctx);
 
-        return paint(
+        const drawn = paint(
           clampSpans(
             [
               { text: key, style: tone("muted", ctx.theme, ctx.capabilities) },
@@ -317,6 +364,7 @@ export const keyValueDefinition: BlockDefinition<KeyValue> = {
             ctx.capabilities,
           ),
         );
+        return [drawn, ...withheldLines(opened?.[i] ?? [], width, MIN_PART, ctx)];
       }),
     );
   },
@@ -502,38 +550,49 @@ function eventsLayout(block: Events, width: number, ambiguous: AmbiguousWidth) {
   return { parts, tsWidth, tsFloor, plan: shedRow(parts, width, COLUMN_GAP) };
 }
 
+/** What each event withheld at `width`, at `wide` (C09 I113, I124) — `keyValueWithheld`'s reason. */
+function eventsWithheld(block: Events, width: number): readonly Withheld[] | null {
+  const { parts, plan } = eventsLayout(block, width, "wide");
+  return withheldBy(plan, parts, block.events.length, (i, gone) => { // cells-ok — an item count
+    const event = block.events[i];
+    if (event === undefined) return [];
+    return [
+      ...(gone.has("ts") ? [{ label: "time", value: event.ts }] : []),
+      ...(gone.has("type") ? [{ label: "type", value: event.type }] : []),
+    ];
+  });
+}
+
 export const eventsDefinition: BlockDefinition<Events> = {
   kind: "events",
+
+  // C09 I124 — `expanded`, true and then absent.
+  fold: foldExpanded,
 
   // §7a — as `logs` (I86), with `type` where the level is.
   copy: (block) => block.events.map((e) => `${e.ts}\t${e.type}\t${e.message}`).join("\n"),
 
-  measure: (block: Events): number => atLeastOne(block.events.length), // cells-ok
+  // C09 I124, I125 — one row per withheld part where expanded.
+  measure: (block: Events, width: number): number =>
+    atLeastOne(
+      block.events.length + // cells-ok — an item count
+        (block.expanded === true ? expansionRows(eventsWithheld(block, normaliseWidth(width)), true) : 0),
+    ),
 
   // C09 I113 — a row that sheds is a target whose peek holds its type and time.
   // At `wide`, for `keyValue`'s reason.
   elements: (block: Events, width: number): readonly NavElement[] => {
     const w = normaliseWidth(width);
-    const { parts, plan } = eventsLayout(block, w, "wide");
     return shedElements(
       block.id,
-      plan,
-      parts,
+      eventsWithheld(block, w),
       w,
-      block.events.length, // cells-ok — an item count
       0,
-      (i, gone) => {
-        const event = block.events[i];
-        if (event === undefined) return [];
-        return [
-          ...(gone.has("ts") ? [{ label: "time", value: event.ts }] : []),
-          ...(gone.has("type") ? [{ label: "type", value: event.type }] : []),
-        ];
-      },
       (i) => {
         const event = block.events[i];
         return event === undefined ? "" : `${event.ts}\t${event.type}\t${event.message}`;
       },
+      block.expanded,
     );
   },
 
@@ -569,15 +628,17 @@ export const eventsDefinition: BlockDefinition<Events> = {
     const msgRoom =
       rawMsg === null || !snapped || rawTs === null ? rawMsg : rawMsg + (rawTs - tsFloor);
     const mark = plan.mark;
+    // The expansion's parts, from the `wide` plan (C09 I125).
+    const opened = block.expanded === true ? eventsWithheld(block, width) : null;
 
     return rows(
-      block.events.map((event) => {
+      block.events.flatMap((event, i) => {
         const full = stripControl(event.ts);
         // The floor form when the column is narrower than the whole time, which
         // is the shrink rather than a cut.
         const ts = tsRoom === null ? null : pad(cells(full, ambiguous) <= tsRoom ? full : shortTime(full), tsRoom, ambiguous);
 
-        return paint(
+        const drawn = paint(
           clampSpans(
             [
               ...(ts === null
@@ -615,6 +676,7 @@ export const eventsDefinition: BlockDefinition<Events> = {
             ctx.capabilities,
           ),
         );
+        return [drawn, ...withheldLines(opened?.[i] ?? [], width, MIN_PART, ctx)];
       }),
     );
   },
@@ -766,8 +828,27 @@ function comparisonParts(block: Comparison, width: number, ambiguous: AmbiguousW
   return { parts, marked, judged, labelA, labelB };
 }
 
+/** What each comparison row withheld at `width`, at `wide` (C09 I113, I124) — `keyValueWithheld`'s reason. */
+function comparisonWithheld(block: Comparison, width: number): readonly Withheld[] | null {
+  const { parts, labelA, labelB } = comparisonParts(block, width, "wide");
+  const plan = naturalSpan(parts, 0) <= width ? null : shedRow(parts, width, 0);
+  return withheldBy(plan, parts, block.rows.length, (i, gone) => { // cells-ok — an item count
+    const row = block.rows[i];
+    if (row === undefined) return [];
+    return [
+      ...(gone.has("change") && row.change !== undefined ? [{ label: "change", value: row.change }] : []),
+      ...(gone.has("a") ? [{ label: labelA, value: row.a }] : []),
+      ...(gone.has("verdict") && row.verdict !== undefined ? [{ label: "verdict", value: row.verdict }] : []),
+      ...(gone.has("b") ? [{ label: labelB, value: row.b }] : []),
+    ];
+  });
+}
+
 export const comparisonDefinition: BlockDefinition<Comparison> = {
   kind: "comparison",
+
+  // C09 I124 — `expanded`, true and then absent.
+  fold: foldExpanded,
 
   // §7a — the field and both sides, with the labels as a header row when the
   // block declares them (I86). The verdict and the change are marks this
@@ -781,36 +862,29 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
   // Rows plus the header (§3). The header is not optional here, so the `+ 1` is
   // unconditional — and `atLeastOne` never fires, which is correct: a comparison
   // with no rows is still a header.
-  measure: (block: Comparison): number => atLeastOne(block.rows.length + 1), // cells-ok
+  //
+  // C09 I124, I125 — one row per withheld part where expanded.
+  measure: (block: Comparison, width: number): number =>
+    atLeastOne(
+      block.rows.length + 1 + // cells-ok — rows and the header
+        (block.expanded === true ? expansionRows(comparisonWithheld(block, normaliseWidth(width)), true) : 0),
+    ),
 
   // C09 I113 — a row that sheds is a target whose peek holds what it withheld;
   // the header is not an item, so the elements start on the row below it. At
   // `wide`, for `keyValue`'s reason.
   elements: (block: Comparison, width: number): readonly NavElement[] => {
     const w = normaliseWidth(width);
-    const { parts, labelA, labelB } = comparisonParts(block, w, "wide");
-    const plan = naturalSpan(parts, 0) <= w ? null : shedRow(parts, w, 0);
     return shedElements(
       block.id,
-      plan,
-      parts,
+      comparisonWithheld(block, w),
       w,
-      block.rows.length, // cells-ok — an item count
       1,
-      (i, gone) => {
-        const row = block.rows[i];
-        if (row === undefined) return [];
-        return [
-          ...(gone.has("change") && row.change !== undefined ? [{ label: "change", value: row.change }] : []),
-          ...(gone.has("a") ? [{ label: labelA, value: row.a }] : []),
-          ...(gone.has("verdict") && row.verdict !== undefined ? [{ label: "verdict", value: row.verdict }] : []),
-          ...(gone.has("b") ? [{ label: labelB, value: row.b }] : []),
-        ];
-      },
       (i) => {
         const row = block.rows[i];
         return row === undefined ? "" : `${row.field}\t${row.a}\t${row.b}`;
       },
+      block.expanded,
     );
   },
 
@@ -951,7 +1025,9 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
       style: () => dim,
     });
 
-    const body = block.rows.map((entry) =>
+    // The expansion's parts, from the `wide` plan (C09 I125).
+    const opened = block.expanded === true ? comparisonWithheld(block, width) : null;
+    const body = block.rows.flatMap((entry, i) => [
       line({
         change: CHANGE_MARKERS[entry.change ?? "unchanged"],
         field: stripControl(entry.field),
@@ -966,7 +1042,8 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
               ? tone("default", ctx.theme, ctx.capabilities)
               : tone("muted", ctx.theme, ctx.capabilities),
       }),
-    );
+      ...withheldLines(opened?.[i] ?? [], width, MIN_PART, ctx),
+    ]);
 
     return rows([header, ...body]);
   },
@@ -1027,38 +1104,49 @@ function stepsParts(block: Steps, width: number, ambiguous: AmbiguousWidth) {
   return { parts, room, labelNat };
 }
 
+/** What each step withheld at `width`, at `wide` (C09 I113, I124) — `keyValueWithheld`'s reason. */
+function stepsWithheld(block: Steps, width: number): readonly Withheld[] | null {
+  const { parts, room } = stepsParts(block, width, "wide");
+  const plan = naturalSpan(parts, 0) <= room ? null : shedRow(parts, room, 0);
+  return withheldBy(plan, parts, block.steps.length, (i, gone) => { // cells-ok — an item count
+    const step = block.steps[i];
+    return step?.detail === undefined || !gone.has("detail") ? [] : [{ label: step.label, value: step.detail }];
+  });
+}
+
 export const stepsDefinition: BlockDefinition<Steps> = {
   kind: "steps",
+
+  // C09 I124 — `expanded`, true and then absent.
+  fold: foldExpanded,
 
   // §7a — the label and the detail (I86). The state is a glyph and a tone;
   // what a reader pastes a step list for is what the steps *are*.
   copy: (block) =>
     block.steps.map((s) => (s.detail === undefined ? s.label : `${s.label}\t${s.detail}`)).join("\n"),
 
-  measure: (block: Steps): number => atLeastOne(block.steps.length), // cells-ok
+  // C09 I124, I125 — one row per withheld part where expanded.
+  measure: (block: Steps, width: number): number =>
+    atLeastOne(
+      block.steps.length + // cells-ok — an item count
+        (block.expanded === true ? expansionRows(stepsWithheld(block, normaliseWidth(width)), true) : 0),
+    ),
 
   // C09 I113 — a row that sheds is a target whose peek holds its detail. A row
   // with no detail draws the block's mark and lost nothing of its own, so it is
   // a target with no peek. At `wide`, for `keyValue`'s reason.
   elements: (block: Steps, width: number): readonly NavElement[] => {
     const w = normaliseWidth(width);
-    const { parts, room } = stepsParts(block, w, "wide");
-    const plan = naturalSpan(parts, 0) <= room ? null : shedRow(parts, room, 0);
     return shedElements(
       block.id,
-      plan,
-      parts,
+      stepsWithheld(block, w),
       w,
-      block.steps.length, // cells-ok — an item count
       0,
-      (i, gone) => {
-        const step = block.steps[i];
-        return step?.detail === undefined || !gone.has("detail") ? [] : [{ label: step.label, value: step.detail }];
-      },
       (i) => {
         const step = block.steps[i];
         return step === undefined ? "" : step.detail === undefined ? step.label : `${step.label}\t${step.detail}`;
       },
+      block.expanded,
     );
   },
 
@@ -1077,9 +1165,11 @@ export const stepsDefinition: BlockDefinition<Steps> = {
     const mark = plan?.mark ?? null;
     const labelWidth = plan === null ? labelNat : (got("label") ?? 0);
     const detailWidth = plan === null ? null : Math.max(0, (got("detail") ?? COLUMN_GAP) - COLUMN_GAP);
+    // The expansion's parts, from the `wide` plan (C09 I125).
+    const opened = block.expanded === true ? stepsWithheld(block, width) : null;
 
     return rows(
-      block.steps.map((step) => {
+      block.steps.flatMap((step, i) => {
         // The spinner frame comes from `tick`, never from a clock (§2, T6.13).
         // Every frame is one cell, in both glyph sets, so an animating step
         // never shifts the row it sits on.
@@ -1136,7 +1226,7 @@ export const stepsDefinition: BlockDefinition<Steps> = {
         // The withholding, stated rather than silent (C09 I81).
         if (mark !== null) spans.push({ text: ` ${mark}`, style: tone("dim", ctx.theme, ctx.capabilities) });
 
-        return paint(clampSpans(spans, width, ctx.capabilities));
+        return [paint(clampSpans(spans, width, ctx.capabilities)), ...withheldLines(opened?.[i] ?? [], width, MIN_PART, ctx)];
       }),
     );
   },

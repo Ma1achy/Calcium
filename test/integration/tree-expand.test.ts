@@ -48,6 +48,7 @@ describe("C23 §3a — expand on a tree", () => {
       submit: () => undefined,
       refuse: (_from, text) => said.push(text),
       notify: (text) => said.push(text),
+      fold: (b) => registry.fold(b),
     });
     const rows = (): number => registry.measure(store.entries[0]?.doc.blocks[0] as Block, 40);
 

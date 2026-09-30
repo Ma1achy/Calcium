@@ -12,6 +12,7 @@
 
 import type { CaptureResult, ProfileOptions, ProfileReport, TraceFn } from "./profiling/types.js";
 import type { ConfirmHost } from "./confirm.js";
+import type { Setting } from "./config.js";
 import type { Adapter, AdapterRegistry, ProducerContext } from "../data/adapters/index.js";
 import type { ManifestDocument, ManifestStore } from "../data/manifest/index.js";
 import type { ProcessRunner, PtyFactory } from "../data/process/types.js";
@@ -19,10 +20,14 @@ import type { TransportRouter } from "../data/transport/index.js";
 import type { Action, Block, ViewDocument } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
 import type { OwnerRung } from "../interaction/router/types.js";
+
+/** What C16 I70 names: the refused chord, and whether the way out is its release or a pause. */
+export type GuardRefusal = Readonly<{ key: Binding["key"]; untilRelease: boolean }>;
 import type { RefreshHost } from "./refresh.js";
 import type { CompletionSource } from "../interaction/completion/index.js";
 import type { Binding, FocusTarget, KeyAction, ReservedKeyAction } from "../interaction/router/types.js";
 import type { CursorStyle } from "../terminal/escapes.js";
+import type { WatchItem, WatchStore } from "./watches.js";
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore } from "../interaction/history/types.js";
 import type { CommandPolicy } from "../interaction/parser/index.js";
@@ -124,8 +129,22 @@ export type ChromeContext = Readonly<{
    *
    * Optional on the same terms as `owner`: `compose` runs before the session
    * graph exists, and absent is *no arm*.
+   *
+   * *(C16 I70: the mark no longer goes at the refusal — under ruling 52 a
+   * refusal extends the guard — so the change is `ownerRefused` below.)*
    */
   ownerArmed?: boolean;
+  /**
+   * The key the guard refused first, and the way out on this terminal (C16 I70,
+   * C22 §6). Absent until the first refusal, and absent again when the guard
+   * ends.
+   *
+   * **The refused key's change to the frame.** `ownerArmed` alone could not be
+   * it: the mark is there before the refusal and after it, so a refusal that
+   * only extended the guard left the frame as it was. The owner line names this
+   * chord, once, and the linear cue says the same words.
+   */
+  ownerRefused?: GuardRefusal;
   /**
    * Entries the record holds and the frame is not showing (C14 I34, `R-SEL-010`).
    *
@@ -198,6 +217,26 @@ export type ChromeContext = Readonly<{
    * for a session that rebinds nothing and the only one before the graph exists.
    */
   hints?: OwnerHints;
+  /**
+   * The session's watches and the row's selection (C22 I139, §6p, ruling 50).
+   *
+   * **Handed to an application's own footer as `copy` and `toast` are**: the row
+   * is the default footer's drawing of a session fact, and a footer the
+   * application supplies draws it or does not. Present while a watch stands or
+   * the row has focus; `items` oldest first; `selected` is the row's index while
+   * the watch row is the active target and `null` otherwise — a question over
+   * the row takes the keys, and the mark goes with them (§6p.3 row 8).
+   */
+  watches?: WatchRowState;
+}>;
+
+/** One watch as a footer draws it (C22 I137, I139). */
+export type { WatchItem } from "./watches.js";
+
+/** `ChromeContext.watches` (C22 I139). */
+export type WatchRowState = Readonly<{
+  items: readonly WatchItem[];
+  selected: number | null;
 }>;
 
 /**
@@ -215,6 +254,13 @@ export type OwnerHints = Readonly<{
   substate?: "find" | "complete" | "preview";
   question?: Readonly<{ state: "choice" | "reply" | "inspection"; resolvesTo: string }>;
   refused?: boolean;
+  /**
+   * Where the watch row stands for the scope line (C22 I139): `present` while a
+   * watch stands and focus is elsewhere — `⇧⇥` then goes to the row, and the
+   * chip says `watches` — and `focused` while the row has the keys, where the
+   * line names the row's own. Absent is *no row*.
+   */
+  watchRow?: "present" | "focused";
 }>;
 
 export type ChromeFn = (ctx: ChromeContext) => readonly Block[];
@@ -375,9 +421,12 @@ export interface Pipeline {
    * **Heard rather than polled, for the same reason `visibilityChanged` is.** A
    * live child holds a grid whose width came from the body, and a child that has
    * gone quiet has nothing left to notice the change on — polling on the next
-   * chunk resizes only the children that were about to redraw anyway. The order
-   * inside is the invariant: the child first, so its SIGWINCH names a size the
-   * emulator has already taken by the time the repaint arrives.
+   * chunk resizes only the children that were about to redraw anyway. **The
+   * figure is the invariant, not the order** (C23 I65): the child's repaint
+   * reaches the emulator through the write queue, so it cannot land between the
+   * two calls however they are sequenced — and the listener resizes the emulator
+   * first. *As it stood:* ~~the child first, so its SIGWINCH names a size the
+   * emulator has already taken~~ — an ordering I65 rules vacuous (F1336).
    */
   resized(): void;
   /**
@@ -525,6 +574,18 @@ export type PipelineDeps = Readonly<{
   profile?: () => ProfileReport;
   /** How each field of `capabilities` was answered (C02 I13), for `/capabilities` (C22 I125). */
   capabilitySources: Readonly<Record<keyof TerminalCapabilities, CapabilitySource>>;
+  /**
+   * `ResolvedConfig.settings` (C22 I115), for `/config` (C23 I80, ruling 43) —
+   * handed down as `capabilitySources` is, so the verb draws the record the
+   * session was built from rather than resolving it a second time.
+   */
+  settings: readonly Setting[];
+  /**
+   * The session's watches (C22 I135), for `/watch` and `/unwatch` (I136) —
+   * handed down as `settings` is: the composition root owns the set, because
+   * the notifier and the footer read it too.
+   */
+  watches: WatchStore;
   /**
    * One operation from C28's recorder, for `/profile capture` (C28 I64).
    *

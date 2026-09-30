@@ -1,7 +1,7 @@
 {
   "meta": {
     "name": "Calcium design language",
-    "revision": "0.15",
+    "revision": "0.16",
     "generatedArtifact": "calcium-design-language.html",
     "ruleIdPolicy": "IDs are explicit, permanent, and never derived from order.",
     "normativeSource": "calcium-registry.json",
@@ -19469,6 +19469,20 @@
       "supersededBy": null,
       "legacyIds": [],
       "contentDigest": "e5d49976ed4a735b355cb612debe50bf35f2c36e1a8fe2e20771c7fd9f3347c3"
+    },
+    {
+      "id": "R-KEY-009",
+      "title": "A watch jump is an action, and its chord is the watch row's where no direct chord is free",
+      "text": "watch.jump[n] is an action. It receives a direct chord only when the resolved profile can assign one without a collision; in every profile, with the watch row focused, 1 to 9 scroll to the nth watch's entry and open it. ⌃⇥ remains exclusively frame and tab switching.",
+      "status": "current",
+      "sectionKey": "prism-the-six-hour-run-085",
+      "tags": [
+        "interaction"
+      ],
+      "supersedes": [],
+      "supersededBy": null,
+      "legacyIds": [],
+      "contentDigest": "e9f133f5f928512b330af1fb0a5f38fd1ea05aa4b96639f1b5f4a89e5ebc20da"
     }
   ],
   "sections": [
@@ -34566,6 +34580,78 @@
       "ruleIds": [
         "R-KEY-007"
       ]
+    },
+    {
+      "id": "watch.jump.1",
+      "label": "jump to watch 1",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-009"
+      ]
+    },
+    {
+      "id": "watch.jump.2",
+      "label": "jump to watch 2",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-009"
+      ]
+    },
+    {
+      "id": "watch.jump.3",
+      "label": "jump to watch 3",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-009"
+      ]
+    },
+    {
+      "id": "watch.jump.4",
+      "label": "jump to watch 4",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-009"
+      ]
+    },
+    {
+      "id": "watch.jump.5",
+      "label": "jump to watch 5",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-009"
+      ]
+    },
+    {
+      "id": "watch.jump.6",
+      "label": "jump to watch 6",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-009"
+      ]
+    },
+    {
+      "id": "watch.jump.7",
+      "label": "jump to watch 7",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-009"
+      ]
+    },
+    {
+      "id": "watch.jump.8",
+      "label": "jump to watch 8",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-009"
+      ]
+    },
+    {
+      "id": "watch.jump.9",
+      "label": "jump to watch 9",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-009"
+      ]
     }
   ],
   "bindings": [
@@ -35642,6 +35728,132 @@
       ],
       "kind": "key",
       "when": "attached"
+    },
+    {
+      "id": "binding.watch-jump-1",
+      "actionId": "watch.jump.1",
+      "chord": "1",
+      "scope": "global",
+      "label": "jump to watch 1",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-009"
+      ],
+      "kind": "key",
+      "when": "focused"
+    },
+    {
+      "id": "binding.watch-jump-2",
+      "actionId": "watch.jump.2",
+      "chord": "2",
+      "scope": "global",
+      "label": "jump to watch 2",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-009"
+      ],
+      "kind": "key",
+      "when": "focused"
+    },
+    {
+      "id": "binding.watch-jump-3",
+      "actionId": "watch.jump.3",
+      "chord": "3",
+      "scope": "global",
+      "label": "jump to watch 3",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-009"
+      ],
+      "kind": "key",
+      "when": "focused"
+    },
+    {
+      "id": "binding.watch-jump-4",
+      "actionId": "watch.jump.4",
+      "chord": "4",
+      "scope": "global",
+      "label": "jump to watch 4",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-009"
+      ],
+      "kind": "key",
+      "when": "focused"
+    },
+    {
+      "id": "binding.watch-jump-5",
+      "actionId": "watch.jump.5",
+      "chord": "5",
+      "scope": "global",
+      "label": "jump to watch 5",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-009"
+      ],
+      "kind": "key",
+      "when": "focused"
+    },
+    {
+      "id": "binding.watch-jump-6",
+      "actionId": "watch.jump.6",
+      "chord": "6",
+      "scope": "global",
+      "label": "jump to watch 6",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-009"
+      ],
+      "kind": "key",
+      "when": "focused"
+    },
+    {
+      "id": "binding.watch-jump-7",
+      "actionId": "watch.jump.7",
+      "chord": "7",
+      "scope": "global",
+      "label": "jump to watch 7",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-009"
+      ],
+      "kind": "key",
+      "when": "focused"
+    },
+    {
+      "id": "binding.watch-jump-8",
+      "actionId": "watch.jump.8",
+      "chord": "8",
+      "scope": "global",
+      "label": "jump to watch 8",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-009"
+      ],
+      "kind": "key",
+      "when": "focused"
+    },
+    {
+      "id": "binding.watch-jump-9",
+      "actionId": "watch.jump.9",
+      "chord": "9",
+      "scope": "global",
+      "label": "jump to watch 9",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-009"
+      ],
+      "kind": "key",
+      "when": "focused"
     }
   ],
   "spinners": [

@@ -1,7 +1,7 @@
 // C05 tier 1 — unit. The loader's transition table, the parser's structural
 // rules, longest-match resolution, and every validation row in §3.
 import { describe, expect, it } from "vitest";
-import { FRAMEWORK_TOOLS } from "../../src/data/manifest/framework.js";
+import { FRAMEWORK_NAMES, FRAMEWORK_TOOLS, RESERVED_VERBS } from "../../src/data/manifest/framework.js";
 import {
   ARG_TYPES,
   createManifestStore,
@@ -711,3 +711,75 @@ function promoteArg(source: Bag): Bag {
 function tools0(source: Bag): Bag {
   return (source["tools"] as Bag[])[0]!;
 }
+
+describe("C05 I27, I28 — a retired key and a reserved name", () => {
+  it("T1.24 (I27): a retired `view` is refused on a tool and on a flag, whatever its value, naming the retirement", () => {
+    // **Dropped, it said nothing**: an author still declaring `view` went on
+    // believing the verb opened a view. `false` is refused too — the key
+    // retired, not the value `true`.
+    const cases: readonly (readonly [string, (ps: Record<string, unknown>) => void, string])[] = [
+      ["on the tool", (ps) => { ps["view"] = true; }, "tools[0].view"],
+      ["on the tool, false", (ps) => { ps["view"] = false; }, "tools[0].view"],
+      ["on a flag", (ps) => { (ps["flags"] as Record<string, unknown>[])[0]!["view"] = true; }, "tools[0].flags[0].view"],
+    ];
+    for (const [label, declare, path] of cases) {
+      const source = raw();
+      declare((source["tools"] as Record<string, unknown>[])[0]!);
+      const errors = errorsOf(parseManifest(source));
+      expect(errors, label).toHaveLength(1);
+      expect(errors[0]?.startsWith(`${path}: "view" retired with the pushed view (C05 I27`), `${label}: ${errors[0]}`).toBe(true);
+      expect(errors[0], "and it says what replaced the tier").toContain("a transcript entry");
+    }
+
+    // **The controls.** The same manifest without the key parses, and an unknown
+    // key beside where `view` stood is still dropped — so the refusal is about
+    // the retired key and not a parser that stopped being lenient (I3, T6.2).
+    expect(errorsOf(parseManifest(raw()))).toEqual([]);
+    const lenient = raw();
+    const ps = (lenient["tools"] as Record<string, unknown>[])[0]!;
+    ps["viewport"] = true;
+    (ps["flags"] as Record<string, unknown>[])[0]!["viewport"] = true;
+    const parsed = parseManifest(lenient);
+    expect(errorsOf(parsed)).toEqual([]);
+    if (!parsed.ok) return;
+    expect("viewport" in parsed.value.tools[0]!, "an unknown key is dropped").toBe(false);
+  });
+
+  it("T1.25 (I28): the reservation is empty, and the two names it held are refused as verbs Calcium ships", () => {
+    // **Written out, not derived** — a list computed from `RESERVED_VERBS`
+    // agrees with itself whatever it holds. `config` left the list when its
+    // verb was built (ruling 43), and `watch` and `unwatch` when theirs were
+    // (ruling 50, C22 I136) — the path every reserved name takes.
+    expect(Object.keys(RESERVED_VERBS), "nothing reserved").toEqual([]);
+    for (const name of Object.keys(RESERVED_VERBS)) expect(FRAMEWORK_NAMES).not.toContain(name);
+
+    const parsed = parseManifest(raw());
+    expect(parsed.ok).toBe(true);
+    const parsedTools = parsed.ok ? parsed.value.tools.map((t) => t.name) : [];
+    for (const name of ["watch", "unwatch"]) {
+      expect(FRAMEWORK_NAMES, `${name} is a framework verb now`).toContain(name);
+      expect(parsedTools, `${name} appears in a parsed manifest as a framework row`).toContain(name);
+
+      const source = raw();
+      (source["tools"] as Record<string, unknown>[]).push({ name, local: false, summary: "mine", args: [], flags: [] });
+      const errors = errorsOf(parseManifest(source));
+      expect(errors, name).toHaveLength(1);
+      expect(errors[0], `${name}: ${String(errors[0])}`).toMatch(
+        new RegExp(`^tools\\[9\\]\\.name: "${name}" is a verb Calcium ships \\(C05 §3\\)`, "u"),
+      );
+      expect(errors[0], "never the reservation's message").not.toContain("not yet built");
+    }
+
+    // **The controls.** A flag named `watch` is not a verb — the fixture's
+    // `ps --watch` parses, which is every call to `fixture()` above — and the
+    // reservation is by exact name, so `watching` parses (I28's stated limit).
+    expect(toolNamed("ps").flags.some((f) => f.name === "watch"), "the fixture's --watch survives").toBe(true);
+    // And `constructor` parses: the reservation is a record, and a lookup that
+    // read its prototype would refuse a name nothing reserved.
+    for (const name of ["watching", "constructor"]) {
+      const near = raw();
+      (near["tools"] as Record<string, unknown>[]).push({ name, local: false, summary: "mine", args: [], flags: [] });
+      expect(errorsOf(parseManifest(near)), name).toEqual([]);
+    }
+  });
+});

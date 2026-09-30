@@ -21,6 +21,7 @@ import {
   RUNG_OF,
   type FocusTarget,
   type InputEvent,
+  type Key,
   type OwnerRung,
   type Verdict,
 } from "./types.js";
@@ -29,9 +30,56 @@ import { repeatFor, repeatSteps } from "./repeat.js";
 
 const EXIT_ARM_MS = 500;
 
+/**
+ * Ruling 52 as the person amended it on 2026-09-28 (C16 I69): without key-release
+ * reporting a question's guard refuses every activation for this long after it
+ * arrives.
+ *
+ * **The grace is what the first form of the ruling was missing.** A single window
+ * of 250 ms from the arrival closed before a held key's first repeat — X11 waits
+ * 660 ms — so the commonest case, `⏎` submitting a verb that asks at once,
+ * answered at the repeat (§3c S4).
+ */
+const GUARD_GRACE_MS = 750;
 
+/**
+ * And after the grace, the guard holds while activations keep arriving within
+ * this long of the last one refused (C16 I69). A held key repeats at 25–40 Hz, so
+ * its repeats are refused for exactly as long as it is held; a reader's
+ * deliberate press after a pause is not.
+ */
+const GUARD_GAP_MS = 250;
+
+/**
+ * A question's activation guard, live (C16 I44, I69, I70).
+ *
+ * **`held` and `timed` are R-BLK-788's two boundaries**, and the terminal decides
+ * which: with key releases reported the guard waits for the key that was down to
+ * lift, and reads no clock; without them it is ruling 52's two numbers. `refused`
+ * is the first key it refused, which is what the owner line names — the second
+ * refusal changes nothing (I70).
+ */
+type Guard = {
+  readonly arm: "held" | "timed";
+  readonly arrivedAt: number;
+  lastAt: number;
+  refused: Key | null;
+};
+
+/** When a timed guard lapses: the grace from the arrival, or the gap from the last refusal. */
+const deadlineOf = (g: Guard): number => Math.max(g.arrivedAt + GUARD_GRACE_MS, g.lastAt + GUARD_GAP_MS);
+
+
+/**
+ * A placed layer as the pointer sees it (C16 I74).
+ *
+ * **A peek is one of them now**, for the wheel alone (C15 I31): it has no rung,
+ * so its `kind` is outside `KeyedTop`, and the router never runs a handler for
+ * it — the wheel goes to its scroller by id.
+ */
 export type Placed = Readonly<{
-  layer: KeyedTop & Readonly<{ id: string; blocking: boolean; dismissal: "escape" | "focus" | "answer" }>;
+  layer: (KeyedTop | Readonly<{ kind: "peek"; owner?: undefined }>) &
+    Readonly<{ id: string; blocking: boolean; dismissal: "escape" | "focus" | "answer" }>;
   top: number;
   left: number;
   height: number;
@@ -92,7 +140,23 @@ export type RouterDeps = Readonly<{
    * callback is a refusal the question has already explained (C23 I82).
    */
   overlayAnswerCallback: () => ((e: InputEvent) => boolean | Verdict) | null;
-  placed: () => readonly Placed[];
+  /**
+   * The layers under the pointer's reach for this gesture, in draw order —
+   * C15's `takesPointer` applied by L4, so a peek is here for the wheel and not
+   * for a press (C16 I74, C15 I31). One predicate, stated once, in the
+   * component that owns the layer.
+   */
+  placed: (gesture: "wheel" | "press") => readonly Placed[];
+  /**
+   * Move a layer's own scroller by `notches` wheel steps — negative is up — and
+   * answer whether the layer has anything to scroll (C16 I74).
+   *
+   * **By id, and that is the point** (§3d P2). The layer's rung handler reads
+   * `top`, so a wheel routed through it over a lower layer would move the upper
+   * one. `false` is *nothing to scroll here*: a keyed layer still consumes the
+   * wheel, and a peek declines it to the base.
+   */
+  scrollLayer: (id: string, notches: number) => boolean;
   popLayer: () => void;
   nativeSelection: () => boolean;
   /**
@@ -132,6 +196,12 @@ export type RouterDeps = Readonly<{
    * component report another's state.
    */
   childAttached: () => boolean;
+  /**
+   * End the captured child's attachment (C16 I75). The `host-detach`
+   * intercept's exception, called at the `child` rung and nowhere else; a
+   * shell delegation has nothing here to close.
+   */
+  detachChild: () => void;
   /**
    * C23's, for the same reason. `runner.killAll()` kills the child and leaves the
    * entry streaming forever; C23 I10 settles it `partial` with output retained,
@@ -196,6 +266,20 @@ export type RouterDeps = Readonly<{
    */
   overlayWouldResolve: () => ((e: InputEvent) => boolean) | null;
   /**
+   * A count that moves whenever an owner is raised or removed — C15's
+   * `generation` plus the surface host's attachments (C16 I73, C15 I33).
+   *
+   * **The rung alone missed the owners between two reads.** The epoch is brought
+   * current lazily — at a dispatch's two ends, in the pointer calls and in the
+   * getters — so a question raised and answered between a press and its release
+   * left the rung `scope` at both reads, and the release committed across two
+   * owner changes (§3c S9). A question replaced by a question within one
+   * dispatch was the same miss at the other rung (S10b). A pull, and a sum
+   * rather than two, because the router asks one question of it: *did anything
+   * change*.
+   */
+  ownerGeneration: () => number;
+  /**
    * The router refused an event — explain it (C16 I62, R-HON-004, R-INT-009).
    *
    * Called exactly once per refusal, and only for the two the router makes
@@ -247,17 +331,35 @@ export interface InputRouter {
    */
   readonly rung: OwnerRung | null;
   /**
-   * The owner epoch, shared by the keyboard and the pointer (C16 I43,
-   * R-OWN-002). It moves on every owner change, and nothing armed in one epoch
-   * may be committed in another.
-   */
-  readonly ownerEpoch: number;
-  /**
-   * Is the current owner newly raised and still refusing its first activation
-   * (C16 I44)? Read by the footer's owner line, which is where the refusal
-   * explains itself (C22 §6, R-INT-008).
+   * Is the current owner newly raised and still refusing activations (C16 I44,
+   * I69)? Read by the footer's owner line, which is where the refusal explains
+   * itself (C22 §6, R-INT-008).
+   *
+   * **The epoch is not beside it any more** (I73). It was public for one reader,
+   * a test, and the two things it is for — a pointer arm's commit and the guard —
+   * are observable through `commitPointer` and this.
    */
   readonly ownerArmed: boolean;
+  /**
+   * What the guard has refused, and the way out — `null` until its first refusal
+   * (C16 I70).
+   *
+   * **The first refused key, and only the first**: the owner line names it, so
+   * the refused key changes the frame once and later refusals change nothing.
+   * `untilRelease` is which boundary this terminal has — the key's release where
+   * releases are reported, a pause where they are not.
+   */
+  readonly ownerRefused: Readonly<{ key: Key; untilRelease: boolean }> | null;
+  /**
+   * When a timed guard lapses, or `undefined` when nothing here is waiting on a
+   * clock (C16 I70).
+   *
+   * **The wake's half of the guard.** A guard that ends on time ends with no
+   * input, and no input is no frame — so the mark would outlive the guard for as
+   * long as the reader waited (§3c S6). L4 schedules on this as it does on the
+   * decoder's deadline, and draws the frame the lapse changed.
+   */
+  nextDeadline(): number | undefined;
   /**
    * Arm a pointer activation on a stable identity (C16 I45, R-OWN-003).
    *
@@ -296,17 +398,18 @@ export function createRouter(
    * to or from no rung alike — because R-OWN-002's first clause is *events carry
    * the owner epoch in which they began and are never replayed against a new
    * owner*, and a question closing is an owner change like any other.
-   * `guarded` is set only when a **question** arrives, because R-BLK-786's
+   * `guard` is set only when a **question** arrives, because R-BLK-786's
    * clause is *a newly presented question requires a fresh, deliberate
    * activation*. Folding them into one field refuses the first keystroke after
    * every question the reader has just answered — which is exactly when they are
    * typing deliberately, and is a defect no row asserting a *state* can see.
    *
-   * **There is no clock here and an earlier draft gave it one** (§4a W9).
-   * R-BLK-788 makes the boundary an event — *with key-release reporting, wait
-   * for the held key to lift; without it the first ambiguous activation before a
-   * neutral/key-up boundary is refused* — and a held key is precisely the thing
-   * that produces no event for a timer to be right about.
+   * **A clock on one arm only** (§4a W9, I69). R-BLK-788 makes the boundary an
+   * event where the terminal reports one — *wait for the held key to lift* —
+   * and that arm reads no clock. Where it does not, a held key produces no event
+   * at all, and ruling 52 as amended gives that arm two numbers instead: the
+   * grace and the gap. Ending on the first refusal, which is what this did, let
+   * the held key's next repeat answer.
    *
    * **`lastRung` starts at `null`, and a lazy seed was wrong** (I43). An
    * `undefined` seed taken on the first `syncOwner` swallows the first
@@ -319,7 +422,18 @@ export function createRouter(
    */
   let ownerEpoch = 0;
   let lastRung: OwnerRung | null = null;
-  let guarded = false;
+  /**
+   * The owner generation at the last sync (I73). Zero is honest at construction
+   * for `lastRung`'s reason: nothing is raised yet, and neither C15 nor the
+   * surface host has counted anything.
+   */
+  let lastGeneration = 0;
+  let guard: Guard | null = null;
+  /**
+   * The press's arm (I45, I71). The identity is the caller's; what the release
+   * commits is the activation the caller captured at the press, and that lives
+   * with the caller too — the router only answers *same identity, same epoch*.
+   */
   let pointerArm: Readonly<{ id: string; epoch: number }> | null = null;
   /**
    * Which keys are physically down, where the terminal says so (C16 I44).
@@ -476,6 +590,13 @@ export function createRouter(
       focus.toPrompt();
       return true;
     });
+    // **`liveBlock`'s rung, one position over** (I76, §6d): the watch row is a
+    // position of `scope`, and `⌃c` there is the reader stepping out.
+    register("watchRow", (e) => {
+      if (!isCtrlC(e)) return false;
+      focus.toPrompt();
+      return true;
+    });
     register("prompt", (e) => {
       if (!isCtrlC(e) && !(e.kind === "key" && e.key.ctrl && e.key.name === "d")) return false;
 
@@ -514,7 +635,17 @@ export function createRouter(
     const region = deps.region();
     const regionRow = e.row - region.top;
 
-    const covering = deps.placed().find(
+    // **Every direction is a wheel** (I30, §4a row j). This named two of the
+    // four, so the day the decoder produced `wheelLeft` a horizontal wheel fell
+    // through to the entry rung and was routed as a click on the block under
+    // the pointer.
+    const wheel = e.button.startsWith("wheel");
+
+    // **The topmost that takes this gesture** (I74, §3d P1). C15's `layout` is
+    // draw order, bottom first, and `find` took the bottom one — invisible
+    // while the only overlap was two panels answering one handler, and the
+    // wrong layer the day either of them took a gesture of its own.
+    const covering = [...deps.placed(wheel ? "wheel" : "press")].reverse().find(
       (p) =>
         regionRow >= p.top &&
         regionRow < p.top + p.height &&
@@ -522,12 +653,18 @@ export function createRouter(
         e.col < p.left + p.width,
     );
 
-    // **Every direction is a wheel** (I30, §4a row j). This named two of the
-    // four, so the day the decoder produced `wheelLeft` a horizontal wheel fell
-    // through to the entry rung and was routed as a click on the block under
-    // the pointer.
-    const wheel = e.button.startsWith("wheel");
-    if (covering !== undefined) {
+    if (covering !== undefined && wheel) {
+      stages.push(`layer:${covering.layer.id}`);
+      // **The layer's scroller, by id** (I74, §3d P2–P6). A vertical wheel asks
+      // it; a horizontal one has nothing to ask (§4a row j). A keyed layer
+      // consumes the wheel whether or not it moved — it is between the pointer
+      // and the base — and a peek with nothing to scroll declines it, as a
+      // `scroll` that cannot move does below.
+      const notches = e.button === "wheelUp" ? -1 : e.button === "wheelDown" ? 1 : 0;
+      if (notches !== 0 && deps.scrollLayer(covering.layer.id, notches)) return true;
+      if (covering.layer.kind !== "peek") return true;
+      stages.push("layer:declined");
+    } else if (covering !== undefined && covering.layer.kind !== "peek") {
       stages.push(`layer:${covering.layer.id}`);
       // **Two kinds, two targets** (I48, C15 I23, R-BLK-779). *The layer order
       // is the scroll order*, so a mouse event over a panel is the panel's
@@ -556,6 +693,11 @@ export function createRouter(
     // A wheel is carved out for I40's reason and a hover for §4a row t's: a
     // hand resting on the mouse under mode 1003 would close every panel it
     // reported over.
+    //
+    // **The primary click, and only it** (I47, §3d P8, ruling D7). Any button
+    // closed the layer; a right or a middle press, a modified press and a drag
+    // beside it are now consumed and do nothing — the thing beneath was covered
+    // a moment ago, so nothing beneath may act, and closing is the click's.
     const escapable = deps.overlayTop();
     if (
       escapable !== null &&
@@ -564,6 +706,11 @@ export function createRouter(
       !wheel &&
       e.button !== "none"
     ) {
+      const primary = e.button === "button0" && !e.motion && !e.shift && !e.ctrl && !e.meta;
+      if (!primary) {
+        stages.push("dismiss:inert");
+        return true;
+      }
       stages.push("dismiss");
       deps.popLayer();
       return true;
@@ -707,19 +854,47 @@ export function createRouter(
    */
   function syncOwner(): void {
     const rung = rungNow();
-    if (rung === lastRung) return;
-    const questionArrived = rung === "question" && lastRung !== "question";
+    const generation = deps.ownerGeneration();
+    if (rung === lastRung && generation === lastGeneration) return;
+    // **A generation change at the `question` rung is a question arriving**
+    // (I73, §3c S10b): Q1 answered and Q2 pushed inside one dispatch leave the
+    // rung `question` at both ends, and a held `⏎`'s next repeat answered Q2.
+    const questionArrived = rung === "question" && (lastRung !== "question" || generation !== lastGeneration);
     lastRung = rung;
+    lastGeneration = generation;
     // R-BLK-786: *every owner transition increments an ownership generation*.
     ownerEpoch += 1;
     // R-BLK-786 again, and it is narrower than the transition: *a newly
     // presented QUESTION requires a fresh, deliberate activation*. No other rung
-    // acts on one keystroke the way an answer does, so no other rung guards.
-    //
-    // **And narrower still where the terminal reports releases**: there the
-    // guard is for a key that was already down when the question arrived, and
-    // with nothing down there is nothing to wait for and nothing to refuse.
-    if (questionArrived) guarded = !deps.keyReleasesReported() || held.size > 0;
+    // acts on one keystroke the way an answer does, so no other rung guards —
+    // and a guard outliving its question would refuse a row's `⏎` at `scope`.
+    if (questionArrived) guard = arrive();
+    else if (rung !== "question") guard = null;
+  }
+
+  /**
+   * The guard a question arriving now is given (I44, I69).
+   *
+   * **Where the terminal reports releases, only a held key is guarded**: the
+   * guard is for a key that was already down when the question arrived, and with
+   * nothing down there is nothing to wait for and nothing to refuse. Where it
+   * does not, nothing can say whether a key is down, so every arrival is timed.
+   */
+  function arrive(): Guard | null {
+    const t = now();
+    if (deps.keyReleasesReported()) {
+      return held.size > 0 ? { arm: "held", arrivedAt: t, lastAt: t, refused: null } : null;
+    }
+    return { arm: "timed", arrivedAt: t, lastAt: t, refused: null };
+  }
+
+  /**
+   * End a timed guard whose deadline has passed (I69). Every reader of the guard
+   * calls this first, so a lapse needs no event of its own — which is what lets
+   * the wake draw it (I70).
+   */
+  function lapse(): void {
+    if (guard !== null && guard.arm === "timed" && now() >= deadlineOf(guard)) guard = null;
   }
 
   /**
@@ -756,24 +931,31 @@ export function createRouter(
    *
    * **Two boundaries, and which one applies is the terminal's answer.** Where key
    * releases are reported, the guard waits for the held key to lift, so every
-   * activation before the key-up is refused. Where they are not, nothing can tell
-   * the deliberate second press from the held first one, so the guard ends on the
-   * refusal rather than outliving a keystroke it cannot see the end of. A neutral
-   * key — one the question would not take as an answer — ends it either way.
+   * activation before the key-up is refused. Where they are not, it is timed
+   * (I69): refused through the grace, and after it for as long as activations
+   * keep arriving within the gap of the last refused one — each refusal restarts
+   * the gap, so a held key's repeats are refused for as long as it is held. A
+   * neutral key — one the question would not take as an answer — ends it either
+   * way, and that includes an intercept's key (§3c S11): any key stops the OS
+   * repeating the one before it, which is what the guard was waiting for.
    */
   function takeGuard(e: InputEvent): boolean {
-    if (!guarded || e.kind !== "key") return false;
+    lapse();
+    if (guard === null || e.kind !== "key") return false;
     if (e.event === "release") {
       // The held key lifted. `held` was updated before this ran, so an empty set
       // is *nothing is down any more* and the guard has what it was waiting for.
-      if (held.size === 0) guarded = false;
+      if (guard.arm === "held" && held.size === 0) guard = null;
       return false;
     }
     if (!isActivation(e)) {
-      guarded = false;
+      guard = null;
       return false;
     }
-    if (!deps.keyReleasesReported()) guarded = false;
+    // **The first refused key is the one the owner line names** (I70), so later
+    // refusals leave the frame as the first one drew it.
+    guard.refused ??= e.key;
+    guard.lastAt = now();
     return true;
   }
 
@@ -792,10 +974,23 @@ export function createRouter(
 
   function dispatch(e: InputEvent): boolean {
     // **A focus report is never routed** (I61): before the owner is read and
-    // before the stages reset, so the last dispatch's stages, I44's guard, the
-    // exit arm and I45's pointer arm are exactly as they were. L4 reads the
-    // report before dispatch; this is the line that keeps a stray one inert.
-    if (e.kind === "focus") return false;
+    // before the stages reset, so the last dispatch's stages and the exit arm
+    // are exactly as they were. L4 reads the report before dispatch; this is
+    // the line that keeps a stray one inert.
+    //
+    // **But a focus-out is read** (I72, §3c S8). Every key the terminal saw go
+    // down may now be released in another window, where no release reaches us,
+    // so `held` would guard every later question until a neutral key. The same
+    // for a button: its release is not coming. A timed guard is left to its
+    // clock — its numbers are about repeats, and a focus-out stops none.
+    if (e.kind === "focus") {
+      if (!e.focused) {
+        held.clear();
+        pointerArm = null;
+        if (guard?.arm === "held") guard = null;
+      }
+      return false;
+    }
     // **Read at the top as well as written at the bottom** (§4a W7). The bottom
     // call catches a raise the dispatch itself caused — a handler pushing a
     // layer. This one catches a raise nothing dispatched: `ctx.ask` is called
@@ -880,9 +1075,9 @@ export function createRouter(
     // confirm on a keystroke the reader never got an answer to.
     //
     // `reject` and not a dropped key: R-INT-008 says a rejected command
-    // explains, and the explanation is the footer's owner line losing its armed
-    // mark on this very keystroke — so the frame changes, which is the whole
-    // difference between refused and swallowed.
+    // explains, and the explanation is the footer's owner line naming the
+    // refused key from this keystroke on (I70) — so the frame changes, which is
+    // the whole difference between refused and swallowed.
     if (takeGuard(e)) {
       stages.push("question-guard");
       stages.push("reject");
@@ -899,7 +1094,9 @@ export function createRouter(
     // not `pass`: passing is a decision an owner took, and this is the absence of
     // one. The ladder then runs normally, which is how `interrupt` still reaches
     // §5's own rungs below.
-    const intercept = interceptOf(e);
+    // **The child's escape is asked of the keymap** (I75): its `child` rows are
+    // the chords the border and `/help` name, so the three cannot disagree.
+    const intercept = interceptOf(e, (key) => keymap.resolve("child", key)?.action === "hostDetach");
     if (intercept !== null) {
       // **The rung every other reader reads** (I63). An `interceptRung` asked
       // whether an answer callback was registered and answered `scope` where
@@ -930,6 +1127,15 @@ export function createRouter(
       // it asked `intercept !== "interrupt"` while `handle` meant two things,
       // and `handle` now means only *continue to this rung* (I64).
       if (declared === "global-intercept") {
+        // **The escape, ahead of every handler at the rung it escapes** (I75,
+        // §3e H1, H2). A release is consumed and detaches nothing: the press
+        // detached, and the child is not handed half of a chord the host took
+        // (H6).
+        if (INTERCEPTS[intercept].exception === "detach") {
+          stages.push("intercept:detach");
+          if (!(e.kind === "key" && e.event === "release")) deps.detachChild();
+          return true;
+        }
         if (INTERCEPTS[intercept].exception === "pointer") {
           stages.push("intercept:wheel");
           return e.kind === "mouse" ? routeMouse(e) : false;
@@ -1036,9 +1242,11 @@ export function createRouter(
     // **The child consumes what nothing at its rung took** (I49, ruling 62).
     // *Takes all but host.detach*: a shell delegation registers no handler, so
     // every key passed here and fell to `global` — `F1` at a delegated `vim`
-    // submitted `/help keys` behind it. An attached surface's handler already
-    // consumes what it does not bind; this is the rung saying so for both
-    // sources. Forwarding the bytes to the delegation's stdin is a C21/C23
+    // submitted `/help keys` behind it. **This is the only carrier, for both
+    // sources**: an attached surface's handler answers for its own bindings
+    // and passes the rest here — the wrapper that also consumed them was
+    // removed in review batch 3, because nothing could tell it from this.
+    // Forwarding the bytes to the delegation's stdin is a C21/C23
     // mechanism that does not exist, and is not built here.
     if (target === "child") {
       stages.push("child:consumed");
@@ -1086,13 +1294,22 @@ export function createRouter(
     get rung() {
       return rungNow();
     },
-    get ownerEpoch() {
-      syncOwner();
-      return ownerEpoch;
-    },
     get ownerArmed() {
       syncOwner();
-      return guarded;
+      lapse();
+      return guard !== null;
+    },
+    get ownerRefused() {
+      syncOwner();
+      lapse();
+      return guard === null || guard.refused === null
+        ? null
+        : Object.freeze({ key: guard.refused, untilRelease: guard.arm === "held" });
+    },
+    nextDeadline() {
+      syncOwner();
+      lapse();
+      return guard !== null && guard.arm === "timed" ? deadlineOf(guard) : undefined;
     },
     armPointer(id: string) {
       syncOwner();

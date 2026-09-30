@@ -113,8 +113,9 @@ const results = runPass({
       // I122, C16 I44 — the armed guard is stated on the cue.
       name: "the cue does not say the guard is armed",
       file: CONSTRUCT,
-      from: 'const ready = router.ownerArmed ? " (ready in a moment)" : "";',
-      to: 'const ready = "";',
+      // Re-anchored 2026-09-28 (review batch 3, M7): the cue names a refused key (C16 I70); the mutation is unchanged.
+      from: "            const ready = !router.ownerArmed\n              ? \"\"",
+      to: "            const ready = true\n              ? \"\"",
       expect: "T4.103",
     },
     {

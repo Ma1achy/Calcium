@@ -80,8 +80,10 @@ const MUTATIONS = [
     // container green.
     name: "the element list stops at the box's height",
     file: SRC,
-    from: "      childRanges(block, w, measureChild).map((r) =>",
-    to: "      childRanges(block, w, measureChild).filter((r) => r.to <= block.height).map((r) =>",
+    // Re-anchored when C09 I126 laid the rows out at the bar's width (`laidAt`);
+    // the mutation is the same clip.
+    from: "      childRanges(block, laidAt, measureChild).map((r) =>",
+    to: "      childRanges(block, laidAt, measureChild).filter((r) => r.to <= block.height).map((r) =>",
     expect: "T2.22",
   },
   {

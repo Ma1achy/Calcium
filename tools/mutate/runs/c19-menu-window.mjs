@@ -41,9 +41,13 @@ const MUTATIONS = [
     // shipped in. `menuWindow` still exists and still computes the right
     // answer; nothing hands it to the blocks. Every assertion about the
     // remainder passes, because the number was always right.
+    //
+    // Re-anchored 2026-09-28 (review batch 3, M8): the slice starts at a
+    // wheeled start when the reader has scrolled the menu (C16 I74); the
+    // mutation is unchanged.
     name: "the menu hands over every candidate again",
     file: KEYS,
-    from: "    const slice = candidates.slice(w.start, w.start + w.shown);",
+    from: "    const slice = candidates.slice(start, start + w.shown);",
     to: "    const slice = candidates;",
     expect: "T4.9",
   },
@@ -91,10 +95,14 @@ const MUTATIONS = [
     //
     // **Re-anchored** (F1118): `selected` became `selection.at`, a rename with
     // nothing to re-derive — the argument the mutation is about is the third.
+    //
+    // Re-anchored 2026-09-28 (review batch 3, M8): the wheel's `scrollMenu`
+    // computes the same window, so the anchor carries the comment after it to
+    // name the drawing one; the mutation is unchanged.
     name: "the window takes one row more than the placement holds",
     file: KEYS,
-    from: "    const w = menuWindow(candidates.length, selection.at, fits);",
-    to: "    const w = menuWindow(candidates.length, selection.at, fits + 1);",
+    from: "    const w = menuWindow(candidates.length, selection.at, fits);\n    // **The keys own",
+    to: "    const w = menuWindow(candidates.length, selection.at, fits + 1);\n    // **The keys own",
     expect: "T4.9",
   },
   {
@@ -137,17 +145,21 @@ const MUTATIONS = [
     to: "",
     expect: "T4.33",
   },
-  {
-    // **Refreshed after the frame is asked for.** The ordering that reads as a
-    // preference: the commit composes from the stale placement and the fresh
-    // one lands on the frame after it, so the wrong position is drawn once and
-    // corrected by whatever comes next.
-    name: "the anchors are refreshed after the commit",
-    file: CONSTRUCT,
-    from: "      pipeline.resized();\n      scheduler.commit(\"resize\");",
-    to: "      scheduler.commit(\"resize\");\n      refreshAnchors();",
-    expect: "T4.33",
-  },
+  // **Refreshed after the commit — retired 2026-09-28 (review batch 3,
+  // b3-mut).** Its premise was that "the commit composes from the stale
+  // placement and the fresh one lands on the frame after it". That held while
+  // `resize` was an immediate reason, as it was when this run was written
+  // (2026-08-14), and stopped holding when C03 I15 made it coalesced
+  // (2026-09-01, roadmap 19): `commit("resize")` sets contamination, arms a 16 ms timer and
+  // returns, so a refresh moved after it in the same synchronous handler still
+  // runs before anything is composed. The mutation is a change with no effect,
+  // and no row can be written against it — the survivor indicted the mutation,
+  // not T4.33. `construct.ts` says the order is kept and is not load-bearing.
+  //
+  // Its sibling above did survive for a reason about the row: T4.33 read "the
+  // row above the prompt is not blank", and C22 I81's rule, added after the
+  // row, sits on that row whatever the menu does. The row now reads the menu's
+  // distance from the prompt, and that mutation fails it at 18 against 34.
 ];
 
 /**

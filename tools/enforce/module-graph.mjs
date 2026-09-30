@@ -661,6 +661,17 @@ export const BUILDER_OMISSIONS = Object.freeze({
     "the block it came from rather than the slice it shows; a hand-built keyValue setting it " +
     "would assert a column its own labels do not justify. `window` is the one writer",
 
+  "keyValue.expanded":
+    "C09 I124, C25 I11 — reader state the fold writes: `true` on the first `⏎` and removed on the second, so collapsing gives back the block the producer made. A producer shipping a block already expanded is setting aside the cap or the shed it chose to write, which it can do by not writing them; the registry's `fold` is the one writer",
+  "steps.expanded":
+    "C09 I124, C25 I11 — reader state the fold writes: `true` on the first `⏎` and removed on the second, so collapsing gives back the block the producer made. A producer shipping a block already expanded is setting aside the cap or the shed it chose to write, which it can do by not writing them; the registry's `fold` is the one writer",
+  "events.expanded":
+    "C09 I124, C25 I11 — reader state the fold writes: `true` on the first `⏎` and removed on the second, so collapsing gives back the block the producer made. A producer shipping a block already expanded is setting aside the cap or the shed it chose to write, which it can do by not writing them; the registry's `fold` is the one writer",
+  "comparison.expanded":
+    "C09 I124, C25 I11 — reader state the fold writes: `true` on the first `⏎` and removed on the second, so collapsing gives back the block the producer made. A producer shipping a block already expanded is setting aside the cap or the shed it chose to write, which it can do by not writing them; the registry's `fold` is the one writer",
+  "patch.expanded":
+    "C09 I124, C25 I11 — reader state the fold writes: `true` on the first `⏎` and removed on the second, so collapsing gives back the block the producer made. A producer shipping a block already expanded is setting aside the cap or the shed it chose to write, which it can do by not writing them; the registry's `fold` is the one writer",
+
   // **`plot.camera` was here and is gone**, on the commit that built
   // `plot3d`. Its reason was sharper than *not yet built* — a plot declaring
   // a camera becomes focusable (C12 I85), so exposing it earlier handed callers
@@ -1721,30 +1732,6 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     + "the entry it points at and `A` ignores it, so neither of M10b's two verbs reads the "
     + "position; T1.41b asserts it survives a clear, which is the property the motions rest on. "
     + "If the motions land and nothing in `src/` reads it, this entry is itself a violation.",
-  // --- C16 I43's epoch, the observable of a counter nothing else reads -------
-  //
-  // **Published so the invariant can be asserted, and consumed by no other
-  // component because there is nothing for one to do with it.** The epoch is the
-  // router's own machinery: it stamps a pointer arm and kills it across an owner
-  // transition, and both halves are inside `router.ts`. What it is *for* is
-  // R-OWN-002 — *events carry the owner epoch in which they began and are never
-  // replayed against a new owner* — and that is a claim about a number, so an
-  // invariant written against a number nobody can read is one no row can
-  // construct. T1.98 and T1.99c both assert it moves, and T1.99c is the row that
-  // separates a transition from a raise; neither is expressible through a proxy,
-  // because every proxy is exactly the behaviour the epoch is supposed to cause.
-  //
-  // **Not the same case as `ownerArmed`**, which sits beside it and *is*
-  // consumed — the chrome reads it for the owner line's guarded mark (C22 §6).
-  // The pair is the tell that this entry is about one member and not about the
-  // seam: if the epoch ever acquires a reader in `src/`, this entry is itself a
-  // violation.
-  "InputRouter.ownerEpoch":
-    "C16 I43 — the ownership generation. Internal to `router.ts` by construction: it stamps "
-    + "a pointer arm and kills it across an owner transition, and both ends are in that file. "
-    + "It is published so T1.98 and T1.99c can assert R-OWN-002's counter directly rather than "
-    + "through the behaviour the counter exists to cause, which is the only proxy available and "
-    + "is passed by a router with no counter at all.",
   // --- C29 §7g's frames, groundwork ahead of their first caller -------------
   //
   // **The queued consumer is named and the rule's honest form is what allows
@@ -3604,14 +3591,6 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
     "C10 I61 — the curated 4-bit band pairs scored on the reference palette, consumed by "
     + "T2.64 and by no caller in src/: a terminal's own sixteen colours are not knowable at "
     + "load, so the measurement's subject is the curation and not a session",
-  // **`configBlock` is ruling 28's table with no verb** (C23 I80). §075 names
-  // the verb `/config`, docker-tui ships a `/config` of its own, and a framework
-  // verb of that name is a parse error for it — parked as 43. The day 43 is
-  // answered the handler draws this, and if nothing in `src/` calls it then,
-  // this entry is the violation.
-  configBlock:
-    "C23 I80, §075, parked 43 — the `key · value · source` table, drawn by the /config "
-    + "handler once the verb's name is answered. T1.75 holds the ladder.",
   operationRows:
     "C23 I76, §036 — the operation's head and its bar, composed by the shell the day an "
     + "adapter reports an operation. Parked because the verb is a gerund the caller supplies "

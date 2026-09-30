@@ -56502,3 +56502,277 @@ every seeded row — was falsified by measurement: 82 of 10,000 rows fail it for
 normaliser, on faithful oddities, while the random corpus holds **no** bold-beside-dim case at all.
 The row now asserts intensity and carries a dense corpus built to hold the case (0fdcddee).
 
+## F1276 — a rename that rewrote its own record ★★☆☆☆
+
+`b8bbacda` renamed `PushedSurface` to `ChildSurface` across the tree, and C24 §3's record of that
+rename was in the tree too. It came out as *`ChildSurface` → `ChildSurface`, `ChildSurfaceHandle` →
+`ChildSurfaceHandle`, `"calcium.child-surface/1"` → `"calcium.child-surface/1"`* — grammatical, well
+formed, and missing the old name, which is the one part a porter needs. The paragraph's own
+justification still read correctly, which is how it survived review. **A record of a change is the
+one text a find-and-replace for that change must not touch**, and nothing marks it as such; the
+same class sits wherever a document quotes a retired identifier as history (`MILESTONES.md` M9,
+C10 T2.58's fabricated row, `c10-landing-record.mjs`), surviving only because they were outside the
+rename's files. Restored verbatim by lane b3-f (review batch 3, M9 item 5). **Owed**: the class check —
+an arrow between two identical code spans in `docs/` has no legitimate reading.
+
+## F1284 — the wire validator accepts a warn or error cell with no glyph ★★☆☆☆
+
+Probed by lane b3-g: `validateDocument` / `validateBlock` return `{"ok":true}` for a `warn` or `error`
+cell, and for a notice, carrying no glyph. C04 I6's glyph requirement is worded as a lint over block
+construction and is enforced only in `block()`, so a far side emitting `tui.view/1` can draw
+colour-only — the case D29 exists to prevent. Ruling 44's closed vocabulary is enforced at both
+`block()` and the wire; the glyph requirement underneath it is not. Not fixed: enforcing it at the
+wire refuses far-side documents that currently pass, which is a change of contract and wants a
+ruling.
+
+## F1311 — the patch cap's decision named a writer that no route has ★★☆☆☆
+
+Plan decision D12 had the producer compute a patch's cap from `ProducerContext.height`. C07 I18
+makes `height` non-null only on the view route, and R-EXA-082 retired that route, so no framework
+producer can compute *one viewport*; only an application writing `cap` itself can. Measured by lane
+b3-d before the code landed. Closed by ruling 73: I18 stands, and `Patch.cap` is a row budget its
+producer declares, with no framework default.
+
+## F1312 — T2.116's red, measured from batch 3's side ★☆☆☆☆
+
+The same defect as F1317, which is its record. Lane b3-d met it as a harness refusal: `c09-shed`
+stopped with *the unmutated suite already fails*, so its re-anchored mutation (*a kind drops a row it
+cannot draw*, now on events' `flatMap`) could not be verified. After batch 3 took batch 2's fix, the
+run is green: caught 10, survived 0.
+
+## F1313 — the patch split view draws `│` at the ASCII rung ★☆☆☆☆
+
+Reading the split view's frames at 120 columns, lane b3-d found its separator drawn as `│` under
+`ASCII_CAPS`. Not fixed; the site is in `src/presentation/patch/`.
+
+## F1314 — a child surface was told the whole region, not the room inside its entry ★★☆☆☆
+
+At 60×20 the child was told 59×13. The entry's command row, both panel borders and the closing gap
+pushed rows R00–R01 and the command row off-screen, and every visible row was cut to the rails. The
+context, the entry's measurement and the viewport agreed with each other, and the frame was still
+wrong — found by reading it. Closed by C24 I41: the child is told
+`panelInterior(width, height − chrome − gap)`, 57×9 at 60×20, and the whole entry fits in 13 rows.
+
+## F1315 — ordering the mark after the append cannot keep the child's entry out of the ledger ★☆☆☆☆
+
+The plan's mechanism was to open the attached mark after the child's entry is appended. The walk's
+row L11 defeats it: an away mark is already open when the child attaches, and C13 emits the
+append's change inside `append`, before the id is returned. Lane b3-e excludes the entry by id,
+including a record already made; with that in place the order of opening the attached mark makes
+no difference, so `c23-away-ledger`'s MARK-BEFORE-APPEND is an expected survivor, its reason
+recorded in the run.
+
+## F1316 — the footer said a child still held the keys after the app closed it ★☆☆☆☆
+
+After an application called its own `close()`, the footer kept showing `attached · keys → child`
+until the next key: the close's frame was committed before `current = null`. Now it is committed
+after ownership returns, as C22 I110 amended says (lane b3-e).
+
+## F1277 — the peek band could not be reached by the pointer ★★★☆☆
+
+Found by the router lane's M8 walk. L4's `placed` was `layout(…).filter(takesInput)`, and a peek takes no input,
+so the layer order `overlay › panel › peek › base` stopped one band short for the pointer: the one gesture a
+peek exists for, the wheel, scrolled the transcript beneath it. C16 I48 says the topmost layer under the pointer
+takes the gesture. **Two predicates were one**: *takes keys* and *takes the pointer* answered by the same
+field. Closed by C15 I31, a pointer predicate of its own, and C16 I74, the topmost layer that takes its
+gesture — built in lane b3-router.
+
+## F1278 — a layer's rung handler acts on the top layer, not the one under the pointer ★★☆☆☆
+
+Found with F1277. The rung handler at `question`/`panel` reads `stores.overlays.top`, not the layer the pointer
+hit. It was latent while no pointer gesture reached a layer below the top, and F1277's fix is what made it
+reachable: the wheel was routed by id instead (`deps.scrollLayer(id, rows)`). **Owed**: a press over a lower,
+non-blocking layer still acts on the top one. Lane ruling: presses keep the rung handler until a layer below the
+top can take a press, which no shipped layer does — the subject to grep for is a second pointer-taking layer
+kind.
+
+## F1279 — ruling 52's first quiet window closed before the first key repeat ★★★☆☆
+
+Ruling 52's first form measured its 250 ms window from the question's arrival. X11's default key-repeat delay
+is 660 ms, so a `⏎` held across a question's arrival sent its first repeat after the window had closed, and the
+repeat answered the question — the exact failure the guard exists for. Found by the router lane's sequence
+trace; closed by the person's amendment (recorded in f8fd47bb) and built as C16 I69.
+
+## F1280 — the quiet window removed the guard's explanation ★★☆☆☆
+
+I44's mark explained an armed owner and was taken down at the first refusal. Once a refusal *extended* the
+guard (ruling 52), every later refusal was silent — a refusal with no reason, against R-HON-004. Closed by C16
+I70; the chip is spelt with a colon so the ASCII rung draws it.
+
+## F1281 — the held-key set goes stale on focus-out ★★☆☆☆
+
+Under kitty the guard keys on the held set. A key released while another window had focus never reports its
+release here, so `held` kept it and every later `⏎` was refused until a neutral key. Closed by C16 I72; the
+composition root now routes a focus report to the router as well as to the away ledger (C23 I85), which is the
+merge taken at batch 3's integration.
+
+## F1282 — the owner epoch compared only the rung ★★☆☆☆
+
+A pointer arm recorded `(stableId, rung)`. An owner raised and dismissed between the press and the release left
+the rung unchanged, so the arm survived an ownership change it should not have (R-OWN-003). Closed by C16 I73:
+the epoch is the rung plus a generation pulled from C15 I33 and the surface host.
+
+## F1283 — keys.ts drew a stale menu after a question displaced it ★★☆☆☆
+
+C15 I28 dismisses the menu layer when a question arrives, and `keys.ts` kept its `candidates`: `hasMenu()`
+stayed true, `redrawMenu()` updated nothing, and the next keystroke pushed the old menu back. C20's search state
+was left the same way. Closed by C15 I32.
+
+## F1343 — the host escape was safe only by call order ★★★☆☆
+
+`⌃]` at `child` reached the host through a consuming wrapper registered first; any `child` handler registered
+ahead of it swallowed the escape (§3e H2), and a release of `⌃]` was handed to the child — half a chord the host
+had taken (§3e H6). **A safety route that holds by registration order is held by nothing.** Closed by C16 I75:
+the escape is a reserved route in the intercept table, and the composition root registers no handler for it.
+
+## F1344 — a mutation's expected id matched a row in another file ★★☆☆☆
+
+`c16-chord-text`'s `expect: "T1.98"` and `c16-scope-order`'s `"T1.100"` were each satisfied by a row of the
+same id in a different file — `router-dispatch.test.ts`, about the question guard and pointer commit — so a kill
+could be credited to a row that never saw the mutation. Found by the router lane; A03 SP15 (built there) refuses
+an id titled in more than one file within one spec, gated by equality over a debt list of 94. The rule ledger's
+R-KEY-005 cited the same two ids bare and resolved to the wrong file (755c44c6).
+
+## F1326 — SS47 reads literals lexically, so an escaped mark passes ★★☆☆☆
+
+Found by lane b3-res fixing F1313. `src/presentation/patch/definition.ts` held the split separator as a
+`\u2502` escape, and SS47 checks a literal's *source characters*, so the escape reads as ASCII and the rule
+has nothing to be wrong about. Its exemption for the file described only the header rule's ternary. Measured
+by hand with the exemption gone: a literal `│` fires SS47 and the same code point escaped does not. **63
+escaped non-ASCII literals** sit in `src` outside `glyphs.ts`, across 10 files — ramp 22, scatter3 16,
+linedraw 15, text 3, field 2, and one each in expect-document, svg, plot/definition, annotate and graphemes —
+and scatter3, field, annotate and svg are not on SS47's exemption list. **A gate phrased over spellings is
+blind to every other spelling of the same value.** The instance is fixed (007e4c8d); the class — SS47
+decoding escapes before it judges — is owed to batch 3's tail lane.
+
+## F1327 — the pane helper `profileDeck` lost its framework consumer when the pushed view retired ★☆☆☆☆
+
+Found by lane b3-res correcting `/profile`'s prose (R-EXA-082). C24 I33 says a published pane helper must have
+a consumer. `/profile <section>` walks `deckOf` and draws with `profileCard`; nothing in `src`, `examples` or
+`tools` calls `profileDeck`, and only C24 T1.11 names it. The export outlived the view it was published for.
+Ruling 78 unpublishes it. Residue found beside it: C25 T4.10 and T4.11 are test rows with no spec rows, and
+`local-profile.test.ts`'s "T1.96 (C23 I69 …)" resolves to C28's T1.96, not to any C23 row.
+
+## F1335 — C22 T4.33 passed with the anchor refresh deleted ★★★☆☆
+
+Found by lane b3-mut from c19-menu-window's two unexpected survivors. With `refreshAnchors()` deleted the menu
+stayed at rows 11–18 over sixteen blank rows, the prompt at 36 — the defect reproduces. T4.33 checked that the
+last non-blank row above `❯` was the row directly above it, and since 2026-09-05 (63257076, C22 I81) that row
+always holds the frame's own rule, so the check passed whatever the menu did. The row was written 2026-08-14
+(69d764d5), before the rule existed. **A later landing made an earlier row vacuous without touching it.** The row
+now checks the rule above the prompt, the menu's bottom edge above the rule, and a candidate's distance from the
+prompt across the resize; under the mutation it fails `expected 18 to be 34`. C22 T4.33 amended in place.
+
+## F1336 — a mutation that a later scheduler change made equivalent ★★☆☆☆
+
+The second c19-menu-window survivor. *The anchors are refreshed after the commit* was written 2026-08-14,
+when `resize` committed a frame immediately. Since 2026-09-01 (66f0a4e6, C03 I15) a resize commit only sets a
+flag and schedules the frame 16 ms later (`frame-scheduler.ts:314`), so a refresh moved after the commit still
+runs first and nothing can tell the orders apart. The survivor indicted the mutation, not T4.33. Retired with the
+reason; the comment in `construct.ts` says the order is kept and is not what makes the frame correct. **Owed**:
+`construct.ts` makes the same kind of claim for `pipeline.resized()` running before the frame, and the delay may
+make it unobservable too — measured by nobody.
+
+## F1337 — the surface's consuming wrapper was a second copy of the child rung ★★☆☆☆
+
+c16-captured-child's survivor, read by the router lane and measured by b3-mut: with the router's rung removed
+and the wrapper kept, T4.84 fails; with both removed, T1.106 and T4.84 fail; with the wrapper alone removed,
+nothing fails (172 passed). `onInput(event) ? true : event.kind === "key"` restated ruling 62's rule in the surface.
+The one difference is an unclaimed key release at `child`: the wrapper answered `true`, the router's release
+branch answers `false` and records `release-dropped`, and the composition root ignores `dispatch`'s return
+(`construct.ts:4415`). C16 I49 and its W5 row amended to name the rung; the surface registers `onInput` alone.
+
+## F1332 — nested boxes were measured and addressed at the wrong width, in two layers ★★★☆☆
+
+Found by lane b3-widths (M8 item 4), walked as a table of 12 arrangements × elementsOf, hit-testing and measure,
+with paint as the reference: 15 cells disagreed at 755c44c6. The block library had three narrowings C04's
+`childWidths` does not know — a scroll's bar, a right pane's bar and an aligned cell — and published none; a
+scroll's own `elements` laid its children out at full width while `render` drew them a column narrower. The
+shell asked every nested question at the region's width: the scroll box's ceiling, the page, the pull's and the
+wheel's `elementsOf`, the tape's start, and `blockWidthInEntry`'s descent. Measured before the code: a box of 2
+holding three 80-cell notices answered `b` on the second row of `a`; a box in a card body clamped at a ceiling
+of 1 where the frame's was 4; the wheel on a middle box's child moved the box inside it; a tape in a card body
+persisted start 0 where the frame drew 1. Closed by C09 I126.
+
+## F1333 — `semanticsOf` descends by C04's widths, not the drawn ones ★☆☆☆☆
+
+Found beside F1332. `semanticsOf` still descends by C04's `childWidths`, ignoring scroll bars and a container's
+padding. Its only shell reader, `linear.ts` `blockLines`, reads a node's role, name and value and never nested
+geometry. The condition to grep is a reader of a semantic node's geometry.
+
+## F1334 — a scroll that cuts an atomic child draws the child whole and pushes the residue row outside the box ★★☆☆☆
+
+Frame read by lane b3-widths: three 76-cell notices in a box of 3 in a card body at 81 columns drew the second
+notice's second row where `0 above, 3 below` belongs. Not new behaviour — the I58 null arm, T2.28b and F855 — but
+it makes C04 I49's residue row unreadable at any offset that cuts a child, so C09 T4.61 was built on a box of 2 to
+avoid it.
+
+## F1345 — SS47 decoded, and the escapes were all premises ★☆☆☆☆
+
+F1326's class, closed by lane b3-tail. SS47 now judges `decodeLiteral(body)` — `\uXXXX`, `\u{…}` and `\xNN`, one
+escape at a time from the left, so an escaped backslash stays ASCII. The newly fired set is 25 literals in 8 files
+(F1326's 63 counted every escape, prose and excused files included). Classified by drawn × does the ASCII rung
+need it: four files draw only behind a capability test or into SVG, four hold data; each is an exemption with its
+premise, compared to the fired files by equality (23 = 23). SS57's old decoder read `\u` only and mis-decoded an
+escaped backslash; the two rules now share the decoder. Stated blind spot: `String.fromCodePoint`, variables, and
+`String.raw` read as cooked.
+
+## F1346 — `pipeline.resized()`'s order against the resize commit is equivalent ★☆☆☆☆
+
+F1336's owed part, measured by lane b3-tail. With the call moved after `scheduler.commit("resize")`, the 24 files
+that drive a resize through the graph pass (398 passed). `resize` is never immediate (C03 I15), and the listener
+calls only `emulator.resize` and `child.resize`, neither of which commits a frame, so no path can show the order.
+Two sibling comments (`types.ts`, `execution.ts`) said *child first* while the code resizes the emulator first.
+
+## F1347 — a retired view's row survived in C28 §10 ★☆☆☆☆
+
+C28 §8a says the rows naming the view "are struck or re-aimed in §10"; T1.96 was neither and still asserted *the
+layer's body equals `profileDeck(…)`* after the layer retired, its claim living on in a C23 test titled with C28's
+id. Struck and re-aimed to a new C23 T1.66d.
+
+## F1350 — a lane worktree's examples resolved the package from the main tree ★★★☆☆
+
+Found by the batch 4 base integration. `/workspace/node_modules/@fmx/calcium` links to `../..`, the main tree; a
+worktree under `out/wt/<lane>` has no `node_modules`, so every `examples/*` import walked up and landed on the
+**main tree's `dist/`**. A lane's example tests and `make check` typechecked against main — green when the lane
+broke the public surface, red when main was ahead. It surfaced as `make check` failing on a `clipboard` field the
+lane had added and main had not. Every lane worktree then open had the same fault. Closed by a gitignored link in
+each worktree to itself; the package resolves through `dist/`, so a lane builds before an example test.
+
+## F1351 — two single-pass-frame rows go red under load ★★☆☆☆
+
+The chain at a2f82495 ran at load ~20 with three lanes building. Among ~40 timeouts two rows failed fast:
+`deferred-height.test.ts` T4.49 ("no border yet: expected true to be false") and T4.53 ("one render on the frame that
+found the fault: expected 2 to be 1"). Run alone three times they failed three times; at ac65bb09, whose chain was
+green, they failed too, alternating between the two rows. So it is not a landing — but a row about a *single-pass*
+frame whose verdict depends on load asserts something about the scheduler's timing that the invariant does not
+state. **Owed**: find what load changes (a coalesced wake landing inside the measured frame is the first
+candidate) and either state it in C22 I69 or remove it from the row.
+
+## F1338 — `/watch` cannot pin a long invoke ★★☆☆☆
+
+Found by lane b3-watch. `/watch` typed while a guard-holding invoke runs is queued behind that invoke by C23 I5, and
+runs after the settle — where it answers *nothing is running to watch*. The verb exists to pin a long-running
+call, and it cannot reach the one it was typed during. C22 T4.112 asserts the present behaviour and C22 §6p.5
+records it. The remedy is the axis C23 I5 leaves open: a framework verb that only reads the session is not a
+writer and need not queue.
+
+## F1339 — a focus target whose keymap rows were bound and never consulted, a third time ★★★☆☆
+
+Found by lane b3-watch's walk over the effect table (C16 T1.4h) once the fixture focused the row. The router
+registered only the `⌃c` rung for the new `watchRow` target, so every keymap row bound at the row resolved and was
+never consulted — keys that `/help` lists and nothing runs. **This is F765's `nativeSelection` defect a third
+time.** Three instances of one class want a check, not a fourth fix: *every focus target that has keymap rows
+registers a rung handler that consults them*, as an A03 scan or a C16 contract row over `FOCUS_ORDER`.
+
+## F1340 — the watch trace missed a submission settling while the reader is on the row ★☆☆☆☆
+
+C22 §6p.3's sequence trace had no row for a verb submitted before `⇧⇥` that settles while the reader sits on the
+watch row; C23's `resetFocus()` at every submission's end sends focus to the prompt. The build found it, not the
+walk. Ruled the same as `liveBlock`.
+
+## F1341 — spec row T1.78 was written from the design specimen, not the glyph table ★☆☆☆☆
+
+Two clauses of C22 T1.78 came from §085's specimen: an ASCII bar `###...` (C09's table draws `###---`) and a wide
+rung drawing Unicode (C09 draws its ASCII set where ambiguous-width glyphs render wide). The row's first run found
+both. **A specimen is an example (R-SEC-036)**; the table is what ships.

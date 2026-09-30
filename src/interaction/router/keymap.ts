@@ -769,7 +769,34 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   { target: "global", ...fromRegistry("help.question"), action: "helpKeymap" },
 
   // `focus.previous` — the prompt had no `⇧⇥`, and the owner line advertises it.
-  { target: "prompt", ...fromRegistry("focus.previous"), action: "focusTranscript" },
+  // **`focusPrevious` since the watch row** (I76, §6d, ruling 50): the row while
+  // a watch stands, the transcript otherwise — prompt → row → transcript is the
+  // order backward, and the row's own `⇧⇥` below is the second step.
+  { target: "prompt", ...fromRegistry("focus.previous"), action: "focusPrevious" },
+
+  // --- the watch row (C16 I76, I77, §6d, ruling 50, §085) --------------------
+  //
+  // *`⇧⇥` focus the watch row · `←→` move among watches · `⏎` scroll to its
+  // entry and open it.* A position of the `scope` rung, so its `esc` is
+  // `liveBlock`'s — back to the prompt (R-KEY-003) — and `⇥` goes forward to
+  // where the reader came from. **The digits are `watch.jump[n]`'s route in
+  // both profiles** (I77): the registry binds them `global` when `focused`, and
+  // they are bound here alone, where nothing types.
+  { target: "watchRow", ...fromRegistry("move.left"), action: "watchPrev" },
+  { target: "watchRow", ...fromRegistry("move.right"), action: "watchNext" },
+  { target: "watchRow", ...fromRegistry("confirm"), action: "watchOpen" },
+  { target: "watchRow", ...fromRegistry("escape"), action: "focusPrompt" },
+  { target: "watchRow", ...fromRegistry("focus.next"), action: "focusPrompt" },
+  { target: "watchRow", ...fromRegistry("focus.previous"), action: "focusTranscript" },
+  { target: "watchRow", ...fromRegistry("watch.jump.1"), action: "watchJump1" },
+  { target: "watchRow", ...fromRegistry("watch.jump.2"), action: "watchJump2" },
+  { target: "watchRow", ...fromRegistry("watch.jump.3"), action: "watchJump3" },
+  { target: "watchRow", ...fromRegistry("watch.jump.4"), action: "watchJump4" },
+  { target: "watchRow", ...fromRegistry("watch.jump.5"), action: "watchJump5" },
+  { target: "watchRow", ...fromRegistry("watch.jump.6"), action: "watchJump6" },
+  { target: "watchRow", ...fromRegistry("watch.jump.7"), action: "watchJump7" },
+  { target: "watchRow", ...fromRegistry("watch.jump.8"), action: "watchJump8" },
+  { target: "watchRow", ...fromRegistry("watch.jump.9"), action: "watchJump9" },
 
   // `page.up` / `page.down`. `pageup`/`pagedown` are already bound at `global`;
   // these are the design's chords for the same operation. Only these two are
@@ -800,9 +827,9 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
 
   // --- the captured child's one key (I49, R-BLK-908) ---------------------
   //
-  // **Every other key is the child's, and that is the handler's doing rather
-  // than the table's**: the child's handler consumes what it does not bind, so
-  // there is nothing here to list. What the table owns is the exception — *a
+  // **Every other key is the child's, and that is the router's doing rather
+  // than the table's**: the `child` rung consumes what no handler at it takes
+  // (I49, ruling 62), so there is nothing here to list. What the table owns is the exception — *a
   // captured child reserves one `host.detach` action because a `/command`
   // cannot reach the host while capture is active.*
   //
@@ -1017,6 +1044,19 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
     // --- §6a, M6 ------------------------------------------------------------
     helpKeymap: true,
     focusTranscript: true,
+    focusPrevious: true,
+    watchPrev: true,
+    watchNext: true,
+    watchOpen: true,
+    watchJump1: true,
+    watchJump2: true,
+    watchJump3: true,
+    watchJump4: true,
+    watchJump5: true,
+    watchJump6: true,
+    watchJump7: true,
+    watchJump8: true,
+    watchJump9: true,
     agentNext: true,
     agentPrevious: true,
     agent1: true,

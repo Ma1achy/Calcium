@@ -186,22 +186,25 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       bindings: () => deps.bindings(),
       currentScope: () => deps.currentScope(),
       stop: deps.stop,
-      // C28 §3c's view, for `/profile` (C23 I68) — the row is in
-      // `FRAMEWORK_TOOLS`, so a handler missing here is what `seal()` refuses.
-      // C23 I69's amended pair — `/profile snapshot` and `/profile live` read
-      // the same reader `LocalContext.profile` carries, and `null` where that
-      // is absent. **The reader, never the recorder**: the two verbs put a card
-      // in the transcript and a transcript part has no close, so a tier raise
-      // from here would pin the tier for the session and reset the ring doing
-      // it (C28 I50, I18). There is nothing to reach it with.
+      // `/profile`'s reader (C23 I68) — the row is in `FRAMEWORK_TOOLS`, so a
+      // handler missing here is what `seal()` refuses. Every arm reads the same
+      // reader `LocalContext.profile` carries, and `null` where that is absent.
+      // **The reader, never the recorder**: every arm puts cards in the
+      // transcript and a transcript entry has no close, so a tier raise from
+      // here would pin the tier for the session and reset the ring doing it
+      // (C28 I18). There is nothing to reach it with.
       profileReport: () => deps.profile?.() ?? null,
       // C22 I125 — the record and its sources, as C02 resolved them.
       capabilities: () => ({ values: deps.capabilities, sources: deps.capabilitySources }),
+      // C22 I115 — the record `/config` draws (C23 I80, ruling 43).
+      settings: () => deps.settings,
       // **The one operation, `null` where there is no profiler** (C28 I64).
       // Required rather than optional for the same reason `profileReport` is:
       // a wiring site that may omit a member is a wiring site that will, and
       // the verb would then answer *no profiler* in a session that has one.
       profileCapture: deps.profileCapture ?? null,
+      // C22 I135 and C22 I136 — the session's watches, whose producers the two verbs are.
+      watches: deps.watches,
     }),
   )) {
     local.register(verb, handler);
@@ -1818,6 +1821,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     refuse,
 
     notify: (text) => void appendAndCommit(noticeDoc("", text, "warn", { origin: "action" })),
+
+    // The registry's fold hook and nothing wider (C23 I84, C09 I124): the
+    // dispatcher asks a block whether it folds, and never what kind it is.
+    fold: (block) => deps.blocks.fold(block),
   });
 
   /**
@@ -2032,8 +2039,9 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     },
     identityNotice: (text) => void refresh.identityNotice(text),
     visibilityChanged: () => void refresh.visibilityChanged(),
-    // C23 I65 — the listeners resize the child first and the emulator second;
-    // this is only the delivery.
+    // C23 I65 — each listener tells the emulator and then the child one width,
+    // computed once; the order between them is not the invariant (F1336). This
+    // is only the delivery.
     resized: () => {
       for (const listener of [...resizeListeners]) listener();
     },

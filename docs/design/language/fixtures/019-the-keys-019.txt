@@ -1,6 +1,6 @@
-RESOLVED KEYMAP · 57 bindings · default and enhanced terminals
+RESOLVED KEYMAP · 66 bindings · default and enhanced terminals
 The universal set gives one purpose to each key and does not depend on what has focus; the active owner resolves that purpose.
-Actions are primary. Chords are the resolved profile. A named command route is the intended contract; only 1 of 57 bindings carry one today.
+Actions are primary. Chords are the resolved profile. A named command route is the intended contract; only 1 of 66 bindings carry one today.
 
  global
   key ⏎      confirm · send · activate · open
@@ -48,6 +48,15 @@ Actions are primary. Chords are the resolved profile. A named command route is t
   key ⌥⇧V    enter Calcium copy mode
   key ⌃]     host escape · attached
   key ⌥esc   enhanced detach · attached · enhanced
+  key 1      jump to watch 1 · focused
+  key 2      jump to watch 2 · focused
+  key 3      jump to watch 3 · focused
+  key 4      jump to watch 4 · focused
+  key 5      jump to watch 5 · focused
+  key 6      jump to watch 6 · focused
+  key 7      jump to watch 7 · focused
+  key 8      jump to watch 8 · focused
+  key 9      jump to watch 9 · focused
 
  prompt
   key ⇧⏎     newline · enhanced

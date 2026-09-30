@@ -246,7 +246,7 @@ describe("C26 §4g — the stored location", () => {
     // A notice — no command ran, so C16 I2's reset does not fire — becomes the
     // live entry and the table is settled under focus.
     const notice = graph.transcript.append(
-      doc("", [{ kind: "notice", id: "n", tone: "warn", text: "history will not persist" }]) as never,
+      doc("", [{ kind: "notice", id: "n", tone: "warn", glyph: "warn", text: "history will not persist" }]) as never,
     );
     expect(graph.transcript.liveId).toBe(notice);
 

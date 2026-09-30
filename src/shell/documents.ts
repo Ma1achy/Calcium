@@ -229,6 +229,28 @@ export function noticeDoc(
 }
 
 /**
+ * A count and what it counted, as one entry — C23 I86's ledger notice.
+ *
+ * **A `work-unit` head and one `continuation` line per item**: the head is a
+ * fact for the reader in `info`, and each line is subordinate to it inside the
+ * same entry, which is the one place the continuation mark's condition (see
+ * `noticeDoc`) is met without a command line — the line above is this entry's
+ * own head. No command, so nothing that counts command entries counts it.
+ */
+export function settledDoc(head: string, lines: readonly string[], metaSpec: MetaSpec): ViewDocument {
+  return compose({
+    command: "",
+    blocks: [
+      block({ kind: "notice", id: blockId("notice"), tone: "info", glyph: "work-unit", text: head }),
+      ...lines.map((text) =>
+        block({ kind: "notice", id: blockId("notice"), tone: "muted", glyph: "continuation", text }),
+      ),
+    ],
+    meta: metaSpec,
+  });
+}
+
+/**
  * A tool call — `AGENT_TUI_DESIGN.md` §9c, as a composition and not a kind.
  *
  * **A header, a body, and the residue row the body already has.** The header is

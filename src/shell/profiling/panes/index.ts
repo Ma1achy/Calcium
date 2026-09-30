@@ -265,27 +265,11 @@ export const deckOf = (report: ProfileReport, section: ProfileSection): readonly
     return worst.map((f) => ({ spec, seq: f.seq }));
   });
 
-/**
- * The view's seam — an address in, one card's blocks out.
- *
- * The index is **clamped rather than refused**: the deck shortens when a frame
- * leaves `worst`, and a reader sitting on the last per-frame card of a section
- * would otherwise be shown nothing between one tick and the next keypress. A
- * clamp moves them one card and says which frame it is; an empty answer is
- * indistinguishable from a timer that has stopped (F1130's reading).
- */
-export function profileDeck(
-  report: ProfileReport,
-  section: ProfileSection,
-  index: number,
-  region: Region,
-  caps: GlyphCaps = ASCII_CAPS,
-): readonly Block[] {
-  const deck = deckOf(report, section);
-  const entry = deck[Math.max(0, Math.min(index, deck.length - 1))];
-  if (entry === undefined) return [];
-  return profileCard(report, entry.spec.id, region, caps, entry.seq);
-}
+// **`profileDeck` was here and is gone** (ruling 78, F1327; C24 I33). It was
+// the pushed view's seam — an address in, one card's blocks out — and when the
+// view retired the verb walked `deckOf` itself, so what read it was C24 T1.11
+// and nothing in `src/`. A published helper held up by its own test row is
+// `paneTitle`'s shape, and it was deleted rather than kept interior.
 
 export { CARDS, CARD_GROUPS } from "./register.js";
 export type { CardSpec, CardGroup, Region };

@@ -459,7 +459,7 @@ here*, and the second reads as the first every time.
 | step | the cut | what was actually there |
 |---|---|---|
 | 2 | `head -20` | the entry was at rows 29–39 |
-| 5 | `[:12]` on `/config dtui-cfg` | the notice and the candidates at rows 12–15 |
+| 5 | `[:12]` on `/filediff dtui-cfg` | the notice and the candidates at rows 12–15 |
 | 5 | `[:16]` on a stopped container | the refusal at rows 26–27, below the dashboard |
 
 The third is the sharpest, because the byte stream *contained* the text — `grep` found

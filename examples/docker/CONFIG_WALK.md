@@ -1,10 +1,14 @@
-# `/config <c> <path>` — the walk
+# `/filediff <c> <path>` — the walk
+
+**Renamed from `/config` on 2026-09-28** (ruling 43): §075 names the framework's configuration
+table `/config`, and a framework verb shadowed by an app's is a parse error (C05 I6, I28). The walk
+below is unchanged except for the verb's name; the file keeps its own so the records citing it resolve.
 
 Walked by hand against a real pair before any of it was written: `dtui-cfg`, an
 `nginx:alpine` container with a 16-line `default.conf` bind-mounted over the 44-line one the
 image ships. Every cost here is measured.
 
-`/config` is **two calls and a diff**, so the sequence trace carries most of it — but the
+`/filediff` is **two calls and a diff**, so the sequence trace carries most of it — but the
 structural half is where the verb's shape was decided, because three of the drawing's
 premises are structural and two of them failed.
 
@@ -31,7 +35,7 @@ Every row is a cell where **two rules overlap**.
 
 ### B1 · which file, and why discovery is not rulable in — R3
 
-S8 writes `/config api-gateway` with no path, which implies the verb finds the file. **It
+S8 writes `/filediff api-gateway` with no path, which implies the verb finds the file. **It
 cannot, from what `inspect` returns.** Measured on both fixtures:
 
 ```
@@ -43,7 +47,7 @@ Identical shapes. Distinguishing them costs a `docker exec test -f` per mount, a
 a bind-mounted file is not necessarily a *config* file — a mounted socket or certificate
 would answer `test -f` just as well.
 
-**Ruled: `/config <c> <path>` takes the path.** Given the bare form, the verb lists the bind
+**Ruled: `/filediff <c> <path>` takes the path.** Given the bare form, the verb lists the bind
 destinations from the inspect it has already made, as **candidates rather than a guess** —
 which costs nothing, tells the reader exactly what the verb could not decide, and is the
 same shape as a completion menu: offer the set, do not pick from it.
@@ -110,7 +114,7 @@ running file as all-context lines: the file, unannotated, with a notice saying t
 copy could not be fetched.
 
 **The two verbs must agree and this is why the row is here.** `/drift` ruled it for a
-comparison block and `/config` renders a patch; if the answer differed, the app would mean
+comparison block and `/filediff` renders a patch; if the answer differed, the app would mean
 two things by *a missing side* and the reader would have to learn which verb they were in.
 The fifth blind spot's whole point is that this ruling is invisible to both artefacts
 afterwards — it is a fact about what a frame **contains**, and nothing renders it wrong, it
@@ -119,7 +123,7 @@ just renders less.
 ### A2 · the container stops between the two calls — R1 × R7
 
 `docker exec` fails on a stopped container, unlike `docker inspect`, which answers for one.
-So `/config` is exposed where `/drift` was not, and the ordering decides what the reader
+So `/filediff` is exposed where `/drift` was not, and the ordering decides what the reader
 gets: exec first, and a stopped container fails before the 442ms is spent.
 
 **Ruled: the running side is fetched first, and its failure is the whole verb's failure** —
@@ -168,7 +172,7 @@ than `/drift`.
 
 ## §4 What this walk settled before any code
 
-1. **`/config <c> <path>` takes the path** (B1) — discovery is unrulable from `inspect`, and
+1. **`/filediff <c> <path>` takes the path** (B1) — discovery is unrulable from `inspect`, and
    the bare form offers mount candidates instead of guessing.
 2. **The image side costs 442ms and a throwaway container** (R2, A4) — affordable, and named
    rather than hidden.

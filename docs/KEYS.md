@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT. Source: docs/design/language/calcium-registry.json, rendered by build-calcium.mjs's renderKeysMarkdown; written with the key ladder below by tools/keymap-table.mjs -->
 # Calcium keys
 
-Revision 0.15 · 57 current bindings · a `default-terminal` chord is one a terminal without the Kitty protocol sends; an `enhanced-terminal` chord needs the protocol
+Revision 0.16 · 66 current bindings · a `default-terminal` chord is one a terminal without the Kitty protocol sends; an `enhanced-terminal` chord needs the protocol
 
 The universal set gives one purpose to each key and does not depend on what has focus; the active owner resolves that purpose.
 
@@ -56,6 +56,15 @@ docs/KEYS.md and the help entry come from the same source; a hand-written keymap
 | key | ⌥⇧V | default-terminal | always | selection.semantic | enter Calcium copy mode |
 | key | ⌃] | default-terminal | attached | host.detach | host escape |
 | key | ⌥esc | enhanced-terminal | attached | host.detach | enhanced detach |
+| key | 1 | default-terminal | focused | watch.jump.1 | jump to watch 1 |
+| key | 2 | default-terminal | focused | watch.jump.2 | jump to watch 2 |
+| key | 3 | default-terminal | focused | watch.jump.3 | jump to watch 3 |
+| key | 4 | default-terminal | focused | watch.jump.4 | jump to watch 4 |
+| key | 5 | default-terminal | focused | watch.jump.5 | jump to watch 5 |
+| key | 6 | default-terminal | focused | watch.jump.6 | jump to watch 6 |
+| key | 7 | default-terminal | focused | watch.jump.7 | jump to watch 7 |
+| key | 8 | default-terminal | focused | watch.jump.8 | jump to watch 8 |
+| key | 9 | default-terminal | focused | watch.jump.9 | jump to watch 9 |
 
 ## prompt
 
@@ -90,98 +99,107 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 
 **Every `⌥` route needs the terminal to send Option as Meta** — ESC-prefixing rather than composing a character, which on macOS means *Use Option as Meta Key* in Terminal.app and `Esc+` in iTerm2. Not a new assumption: every `⌥` row in this table has always required it — they were spelled `m+` until the key column moved to the design's notation (C16 §6a clause 6).
 
-| key | profile | child | overlay | nativeSelection | semanticSelection | panel | interaction | prompt | liveBlock | global |
-|---|---|---|---|---|---|---|---|---|---|---|
-| `+` | both |  |  |  |  |  | dollyIn |  |  |  |
-| `⌥,` | both |  |  |  |  |  |  |  |  | agentPrevious |
-| `-` | both |  |  |  |  |  | dollyOut |  |  |  |
-| `⌥.` | both |  |  |  |  |  |  |  |  | agentNext |
-| `⌥1` | both |  |  |  |  |  |  |  |  | agent1 |
-| `⌘1` | enhanced-terminal |  |  |  |  |  |  |  |  | agent1 |
-| `⌥2` | both |  |  |  |  |  |  |  |  | agent2 |
-| `⌘2` | enhanced-terminal |  |  |  |  |  |  |  |  | agent2 |
-| `⌥3` | both |  |  |  |  |  |  |  |  | agent3 |
-| `⌘3` | enhanced-terminal |  |  |  |  |  |  |  |  | agent3 |
-| `⌥4` | both |  |  |  |  |  |  |  |  | agent4 |
-| `⌘4` | enhanced-terminal |  |  |  |  |  |  |  |  | agent4 |
-| `⌥5` | both |  |  |  |  |  |  |  |  | agent5 |
-| `⌘5` | enhanced-terminal |  |  |  |  |  |  |  |  | agent5 |
-| `⌥6` | both |  |  |  |  |  |  |  |  | agent6 |
-| `⌘6` | enhanced-terminal |  |  |  |  |  |  |  |  | agent6 |
-| `⌥7` | both |  |  |  |  |  |  |  |  | agent7 |
-| `⌘7` | enhanced-terminal |  |  |  |  |  |  |  |  | agent7 |
-| `⌥8` | both |  |  |  |  |  |  |  |  | agent8 |
-| `⌘8` | enhanced-terminal |  |  |  |  |  |  |  |  | agent8 |
-| `⌥9` | both |  |  |  |  |  |  |  |  | agent9 |
-| `⌘9` | enhanced-terminal |  |  |  |  |  |  |  |  | agent9 |
-| `=` | both |  |  |  |  |  | dollyIn |  |  |  |
-| `?` † | both |  |  | passToTerminal |  |  |  |  |  | helpKeymap |
-| `⇧A` | both |  |  |  | selectAllLoadedEntries |  |  |  |  |  |
-| `⌥⇧C` | both |  |  |  |  |  |  |  |  | enterNativeSelection |
-| `⌥⇧V` | both |  |  |  |  |  |  |  |  | enterSemanticSelection |
-| `⌃]` | both | hostDetach |  |  |  |  |  |  |  |  |
-| `a` | both |  |  |  | selectEntryUnderCaret |  |  |  |  |  |
-| `⌃A` † | both |  |  |  |  |  |  | home | selectAllElements |  |
-| `⌥a` | both |  |  |  |  |  |  | selectAll |  |  |
-| `⌥b` | both |  |  |  |  |  |  | wordLeft |  |  |
-| `⌫` | both |  |  |  |  |  |  | backspace |  |  |
-| `⌥⌫` | both |  |  |  |  |  |  | queueDrop, else killWordLeft |  |  |
-| `⌃⇧C` † | enhanced-terminal |  |  |  | copySelectedEntries |  | copyElement | copySelection | copyElement |  |
-| `⌥d` | both |  |  |  |  |  |  | killWordRight |  |  |
-| `delete` | both |  |  |  |  |  |  | delete |  |  |
-| `↓` † | both |  |  |  | moveSemanticCaretDown | menuNext | insideDown | historyNext | rowDown |  |
-| `⌥↓` | both |  |  |  |  |  |  |  |  | scrollPageDown |
-| `⇧↓` † | both |  |  |  | extendSemanticSelectionDown |  |  |  | extendRowDown |  |
-| `⌘↓` | enhanced-terminal |  |  |  |  |  |  |  |  | scrollBottom |
-| `⌃E` | both |  |  |  |  |  |  | end |  |  |
-| `⌃end` | both |  |  |  |  |  |  |  |  | scrollBottom |
-| `end` | both |  |  |  |  |  |  | end |  |  |
-| `⇧end` | both |  |  |  |  |  |  | extendLineEnd |  |  |
-| `⏎` † | both |  |  |  | copySelectedEntries | menuAccept | keepField | submit | rowActivate |  |
-| `⌥⏎` † | both |  |  |  |  |  |  | insertNewline | rerunEntry |  |
-| `⇧⏎` † | both |  |  |  |  |  |  | insertNewline | rerunEntry |  |
-| `esc` † | both |  | dismiss | exitNativeSelection | escapeSemanticSelection | dismiss | exitInside |  | focusPrompt |  |
-| `⌥esc` | enhanced-terminal | hostDetach |  |  |  |  |  |  |  |  |
-| `⌥f` | both |  |  |  |  |  |  | wordRight |  |  |
-| `F1` | both |  |  |  |  |  |  |  |  | helpKeymap |
-| `⌃H` | both |  |  |  |  |  |  | backspace |  |  |
-| `⌃home` | both |  |  |  |  |  |  |  |  | scrollTop |
-| `home` | both |  |  |  |  |  |  | home |  |  |
-| `⇧home` | both |  |  |  |  |  |  | extendLineStart |  |  |
-| `⌃J` | both |  |  |  |  |  |  | insertNewline |  |  |
-| `⌃K` | both |  |  |  |  |  |  | killToEnd |  |  |
-| `⌃←` | both |  |  |  |  |  |  | wordLeft |  |  |
-| `←` † | both |  |  |  |  |  | insideLeft | left | paneLeft |  |
-| `⌥←` † | both |  |  |  |  |  |  | wordLeft | dividerLeft |  |
-| `⌥⇧←` | both |  |  |  |  |  |  | extendWordLeft |  |  |
-| `⇧←` | both |  |  |  |  |  |  | extendCharLeft |  |  |
-| `o` | both |  |  |  |  |  | orbitToggle |  |  |  |
-| `⌥p` | both |  |  |  |  |  |  |  |  | postureCycle |
-| `pagedown` † | both |  |  |  |  |  |  |  | blockPageDown | scrollPageDown |
-| `pageup` † | both |  |  |  |  |  |  |  | blockPageUp | scrollPageUp |
-| `⌃R` † | both |  |  |  |  | searchOlder |  | reverseSearch |  |  |
-| `r` | both |  |  |  |  |  | cameraReset |  |  |  |
-| `⌃→` | both |  |  |  |  |  |  | wordRight |  |  |
-| `⌥→` † | both |  |  |  |  |  |  | wordRight | dividerRight |  |
-| `⌥⇧→` | both |  |  |  |  |  |  | extendWordRight |  |  |
-| `→` † | both |  |  |  |  |  | insideRight | acceptGhostOrForward | paneRight |  |
-| `⇧→` | both |  |  |  |  |  |  | extendCharRight |  |  |
-| `⌃⇥` | enhanced-terminal |  |  |  |  |  |  |  |  | agentNext |
-| `⌃⇧⇥` | enhanced-terminal |  |  |  |  |  |  |  |  | agentPrevious |
-| `⇧⇥` † | both |  |  |  |  |  |  | focusTranscript | entryPrev |  |
-| `⇥` † | both |  |  |  |  | menuNext |  | complete | entryNext |  |
-| `⌃U` | both |  |  |  |  |  |  | killToStart |  |  |
-| `⌥↑` | both |  |  |  |  |  |  |  |  | scrollPageUp |
-| `⇧↑` † | both |  |  |  | extendSemanticSelectionUp |  |  |  | extendRowUp |  |
-| `⌘↑` | enhanced-terminal |  |  |  |  |  |  |  |  | scrollTop |
-| `↑` † | both |  |  |  | moveSemanticCaretUp | menuPrev | insideUp | historyPrev | rowUp |  |
-| `⌃⇧V` | enhanced-terminal |  |  |  |  |  |  | yank |  |  |
-| `⌥v` † | both |  |  |  |  |  |  | valuesToggle | valuesToggle |  |
-| `⌃W` | both |  |  |  |  |  |  | killWordLeft |  |  |
-| `⌥w` † | both |  |  |  | copySelectedEntries |  | copyElement | copySelection | copyElement |  |
-| `⌃Y` | both |  |  |  |  |  |  | yank |  |  |
-| `y` † | both |  |  |  | copySelectedEntries |  |  |  | copyElement |  |
-| `⌃Z` | both |  |  |  |  |  |  | undo |  |  |
-| `⌥z` | both |  |  |  |  |  |  | redo |  |  |
+| key | profile | child | overlay | nativeSelection | semanticSelection | panel | interaction | prompt | watchRow | liveBlock | global |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `+` | both |  |  |  |  |  | dollyIn |  |  |  |  |
+| `⌥,` | both |  |  |  |  |  |  |  |  |  | agentPrevious |
+| `-` | both |  |  |  |  |  | dollyOut |  |  |  |  |
+| `⌥.` | both |  |  |  |  |  |  |  |  |  | agentNext |
+| `1` | both |  |  |  |  |  |  |  | watchJump1 |  |  |
+| `⌥1` | both |  |  |  |  |  |  |  |  |  | agent1 |
+| `⌘1` | enhanced-terminal |  |  |  |  |  |  |  |  |  | agent1 |
+| `2` | both |  |  |  |  |  |  |  | watchJump2 |  |  |
+| `⌥2` | both |  |  |  |  |  |  |  |  |  | agent2 |
+| `⌘2` | enhanced-terminal |  |  |  |  |  |  |  |  |  | agent2 |
+| `3` | both |  |  |  |  |  |  |  | watchJump3 |  |  |
+| `⌥3` | both |  |  |  |  |  |  |  |  |  | agent3 |
+| `⌘3` | enhanced-terminal |  |  |  |  |  |  |  |  |  | agent3 |
+| `4` | both |  |  |  |  |  |  |  | watchJump4 |  |  |
+| `⌥4` | both |  |  |  |  |  |  |  |  |  | agent4 |
+| `⌘4` | enhanced-terminal |  |  |  |  |  |  |  |  |  | agent4 |
+| `5` | both |  |  |  |  |  |  |  | watchJump5 |  |  |
+| `⌥5` | both |  |  |  |  |  |  |  |  |  | agent5 |
+| `⌘5` | enhanced-terminal |  |  |  |  |  |  |  |  |  | agent5 |
+| `6` | both |  |  |  |  |  |  |  | watchJump6 |  |  |
+| `⌥6` | both |  |  |  |  |  |  |  |  |  | agent6 |
+| `⌘6` | enhanced-terminal |  |  |  |  |  |  |  |  |  | agent6 |
+| `7` | both |  |  |  |  |  |  |  | watchJump7 |  |  |
+| `⌥7` | both |  |  |  |  |  |  |  |  |  | agent7 |
+| `⌘7` | enhanced-terminal |  |  |  |  |  |  |  |  |  | agent7 |
+| `8` | both |  |  |  |  |  |  |  | watchJump8 |  |  |
+| `⌥8` | both |  |  |  |  |  |  |  |  |  | agent8 |
+| `⌘8` | enhanced-terminal |  |  |  |  |  |  |  |  |  | agent8 |
+| `9` | both |  |  |  |  |  |  |  | watchJump9 |  |  |
+| `⌥9` | both |  |  |  |  |  |  |  |  |  | agent9 |
+| `⌘9` | enhanced-terminal |  |  |  |  |  |  |  |  |  | agent9 |
+| `=` | both |  |  |  |  |  | dollyIn |  |  |  |  |
+| `?` † | both |  |  | passToTerminal |  |  |  |  |  |  | helpKeymap |
+| `⇧A` | both |  |  |  | selectAllLoadedEntries |  |  |  |  |  |  |
+| `⌥⇧C` | both |  |  |  |  |  |  |  |  |  | enterNativeSelection |
+| `⌥⇧V` | both |  |  |  |  |  |  |  |  |  | enterSemanticSelection |
+| `⌃]` | both | hostDetach |  |  |  |  |  |  |  |  |  |
+| `a` | both |  |  |  | selectEntryUnderCaret |  |  |  |  |  |  |
+| `⌃A` † | both |  |  |  |  |  |  | home |  | selectAllElements |  |
+| `⌥a` | both |  |  |  |  |  |  | selectAll |  |  |  |
+| `⌥b` | both |  |  |  |  |  |  | wordLeft |  |  |  |
+| `⌫` | both |  |  |  |  |  |  | backspace |  |  |  |
+| `⌥⌫` | both |  |  |  |  |  |  | queueDrop, else killWordLeft |  |  |  |
+| `⌃⇧C` † | enhanced-terminal |  |  |  | copySelectedEntries |  | copyElement | copySelection |  | copyElement |  |
+| `⌥d` | both |  |  |  |  |  |  | killWordRight |  |  |  |
+| `delete` | both |  |  |  |  |  |  | delete |  |  |  |
+| `↓` † | both |  |  |  | moveSemanticCaretDown | menuNext | insideDown | historyNext |  | rowDown |  |
+| `⌥↓` | both |  |  |  |  |  |  |  |  |  | scrollPageDown |
+| `⇧↓` † | both |  |  |  | extendSemanticSelectionDown |  |  |  |  | extendRowDown |  |
+| `⌘↓` | enhanced-terminal |  |  |  |  |  |  |  |  |  | scrollBottom |
+| `⌃E` | both |  |  |  |  |  |  | end |  |  |  |
+| `⌃end` | both |  |  |  |  |  |  |  |  |  | scrollBottom |
+| `end` | both |  |  |  |  |  |  | end |  |  |  |
+| `⇧end` | both |  |  |  |  |  |  | extendLineEnd |  |  |  |
+| `⏎` † | both |  |  |  | copySelectedEntries | menuAccept | keepField | submit | watchOpen | rowActivate |  |
+| `⌥⏎` † | both |  |  |  |  |  |  | insertNewline |  | rerunEntry |  |
+| `⇧⏎` † | both |  |  |  |  |  |  | insertNewline |  | rerunEntry |  |
+| `esc` † | both |  | dismiss | exitNativeSelection | escapeSemanticSelection | dismiss | exitInside |  | focusPrompt | focusPrompt |  |
+| `⌥esc` | enhanced-terminal | hostDetach |  |  |  |  |  |  |  |  |  |
+| `⌥f` | both |  |  |  |  |  |  | wordRight |  |  |  |
+| `F1` | both |  |  |  |  |  |  |  |  |  | helpKeymap |
+| `⌃H` | both |  |  |  |  |  |  | backspace |  |  |  |
+| `⌃home` | both |  |  |  |  |  |  |  |  |  | scrollTop |
+| `home` | both |  |  |  |  |  |  | home |  |  |  |
+| `⇧home` | both |  |  |  |  |  |  | extendLineStart |  |  |  |
+| `⌃J` | both |  |  |  |  |  |  | insertNewline |  |  |  |
+| `⌃K` | both |  |  |  |  |  |  | killToEnd |  |  |  |
+| `⌃←` | both |  |  |  |  |  |  | wordLeft |  |  |  |
+| `←` † | both |  |  |  |  |  | insideLeft | left | watchPrev | paneLeft |  |
+| `⌥←` † | both |  |  |  |  |  |  | wordLeft |  | dividerLeft |  |
+| `⌥⇧←` | both |  |  |  |  |  |  | extendWordLeft |  |  |  |
+| `⇧←` | both |  |  |  |  |  |  | extendCharLeft |  |  |  |
+| `o` | both |  |  |  |  |  | orbitToggle |  |  |  |  |
+| `⌥p` | both |  |  |  |  |  |  |  |  |  | postureCycle |
+| `pagedown` † | both |  |  |  |  |  |  |  |  | blockPageDown | scrollPageDown |
+| `pageup` † | both |  |  |  |  |  |  |  |  | blockPageUp | scrollPageUp |
+| `⌃R` † | both |  |  |  |  | searchOlder |  | reverseSearch |  |  |  |
+| `r` | both |  |  |  |  |  | cameraReset |  |  |  |  |
+| `⌃→` | both |  |  |  |  |  |  | wordRight |  |  |  |
+| `⌥→` † | both |  |  |  |  |  |  | wordRight |  | dividerRight |  |
+| `⌥⇧→` | both |  |  |  |  |  |  | extendWordRight |  |  |  |
+| `→` † | both |  |  |  |  |  | insideRight | acceptGhostOrForward | watchNext | paneRight |  |
+| `⇧→` | both |  |  |  |  |  |  | extendCharRight |  |  |  |
+| `⌃⇥` | enhanced-terminal |  |  |  |  |  |  |  |  |  | agentNext |
+| `⌃⇧⇥` | enhanced-terminal |  |  |  |  |  |  |  |  |  | agentPrevious |
+| `⇧⇥` † | both |  |  |  |  |  |  | focusPrevious | focusTranscript | entryPrev |  |
+| `⇥` † | both |  |  |  |  | menuNext |  | complete | focusPrompt | entryNext |  |
+| `⌃U` | both |  |  |  |  |  |  | killToStart |  |  |  |
+| `⌥↑` | both |  |  |  |  |  |  |  |  |  | scrollPageUp |
+| `⇧↑` † | both |  |  |  | extendSemanticSelectionUp |  |  |  |  | extendRowUp |  |
+| `⌘↑` | enhanced-terminal |  |  |  |  |  |  |  |  |  | scrollTop |
+| `↑` † | both |  |  |  | moveSemanticCaretUp | menuPrev | insideUp | historyPrev |  | rowUp |  |
+| `⌃⇧V` | enhanced-terminal |  |  |  |  |  |  | yank |  |  |  |
+| `⌥v` † | both |  |  |  |  |  |  | valuesToggle |  | valuesToggle |  |
+| `⌃W` | both |  |  |  |  |  |  | killWordLeft |  |  |  |
+| `⌥w` † | both |  |  |  | copySelectedEntries |  | copyElement | copySelection |  | copyElement |  |
+| `⌃Y` | both |  |  |  |  |  |  | yank |  |  |  |
+| `y` † | both |  |  |  | copySelectedEntries |  |  |  |  | copyElement |  |
+| `⌃Z` | both |  |  |  |  |  |  | undo |  |  |  |
+| `⌥z` | both |  |  |  |  |  |  | redo |  |  |  |
 
-134 bindings · 91 keys · 23 resolved by the ladder (†).
+149 bindings · 100 keys · 23 resolved by the ladder (†).

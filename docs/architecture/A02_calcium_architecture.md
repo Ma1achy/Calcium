@@ -190,16 +190,16 @@ No component reaches sideways or upward to cause an effect in another. Where an 
 | Command submit | `parser.parse()` → `editor.clear()` → `transport` → `adapters` → `transcript.append()` → `router.resetFocus()` → `scheduler.commit()`, **then at settlement** `history.append(line, exitCode)` | C23 |
 | Completion menu | `engine.menuLayer()` → `overlays.push()`, then `overlays.update(id, …)` per keystroke — never pop-and-repush (C19, C15 §2) | C23 |
 | History search | `history.searchLayer()` → `overlays.push()` → `update` per keystroke → `searchEnd(action)` → `editor.setText()` | C23 |
-| Patch fullscreen | the block's action → `overlays.push()` a view (C25 §3b) | C23 |
 | Resume from `SIGCONT` | C01's `onResume` → `scheduler.invalidate()` — the same call an orchestrated `resume()` makes, because C01 sets no contamination flag (C01 §Signals) | C22 |
 | Terminal too small | size gate → C22's layout-engine-free fallback → `onResize` → resume the normal frame, state intact (C22 §4) | C22 |
 | Shutdown | `session.stopping = true` → `lifecycle.release()` (which runs `beforeRelease`) → diagnostics → exit (C22 §8) | C22 |
-| Pop a pushed view | `overlays.pop()` → `commit`. **No append** — a trace would freeze the block the pop returns to and clear the selection A01 D7 preserves (C13 §4 step 2) | C23 |
 | Stall detected | inject a notice patch → `commit("stream")` (C23 §3b, I25) | C23 |
 | View refresh tick | `fetch()` → `render` → `replace` the part's panel on its host → `commit("stream")` (C23 §3b) | C23 |
-| Refresh teardown | entry settles, view pops, entry evicted, transcript cleared, or `stopping` set → `release(host)` (C23 §3b, I33) | C23 |
+| Refresh teardown | entry settles, entry evicted, transcript cleared, or `stopping` set → `release(host)` (C23 §3b, I33) | C23 |
 | Identity notice | C22's identity loop signals → compose → `transcript.append` with `origin: "refresh"` → `commit` (C22 §7, C23 §3b) | C23 |
 | `cd` / `export` | apply to `session` → `commit` | C23 |
+
+**Two rows are struck with the pushed view** (R-EXA-082, F1254), together with C23 §4's, because SP4 compares the tables by equality: ~~`Patch fullscreen` — the block's action → `overlays.push()` a view (C25 §3b)~~ and ~~`Pop a pushed view` — `overlays.pop()` → `commit`, no append~~. No layer is a view and a patch expands in place; *Refresh teardown* lost its `view pops` clause with them.
 
 This is the rule that keeps L0's two halves unaware of each other and keeps L1 and L2 unaware of the terminal. It has caught four attempted violations during specification — contamination, invalidation, scroll commits and handoff — and it is the first thing to check when a component wants a dependency that feels awkward.
 

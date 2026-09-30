@@ -26,8 +26,8 @@
 
 import { createAdapterRegistry } from "../data/adapters/index.js";
 import { blankRowsAbove, commandRows } from "./paint.js";
-import { childBorderLegend } from "./chrome.js";
-import { compose, noticeDoc } from "./documents.js";
+import { childBorderLegend, guardRefusal } from "./chrome.js";
+import { compose, noticeDoc, settledDoc } from "./documents.js";
 import {
   answerEvent,
   createLinearOutput,
@@ -38,11 +38,13 @@ import {
   type BodyDeps,
 } from "./linear.js";
 import { createNotifier } from "./notify.js";
+import { createWatches, watchItem } from "./watches.js";
+import { createLedger, summaryOf, type MarkKind, type Settlement } from "./away.js";
 import { BELL, systemNotification } from "../terminal/escapes.js";
 import type { AskOptions } from "./local/registry.js";
 import type { MeasureMemo, NavElement, PaneRef, PlacedElement } from "../presentation/blocks/index.js";
 import { initialRegionHeight } from "./frame.js";
-import { blockWidthInEntry, elementsOfEntry, measureEntry } from "./entry-layout.js";
+import { blockWidthInEntry, elementsOfEntry, ENTRY_GAP, measureEntry } from "./entry-layout.js";
 import { createManifestStore, parseManifest, withThemeNames } from "../data/manifest/index.js";
 import type { ManifestError } from "../data/manifest/index.js";
 import { NO_SPAN, block as makeBlock, descendants, splitColumns, splitPaneKey, splitPanes } from "../data/viewmodel/index.js";
@@ -77,7 +79,7 @@ import { RenderScratchStore } from "./render-scratch.js";
 import type { BoxSpan, DragContainer } from "./drag-selection.js";
 import { pullIntoView } from "./pull.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
-import { createOverlayManager, takesInput } from "../viewport/overlay/index.js";
+import { createOverlayManager, takesPointer } from "../viewport/overlay/index.js";
 import { chipLabel, createEditor } from "../interaction/editor/index.js";
 import type { Chip, ChipLook, HeldLine, LineState } from "../interaction/editor/index.js";
 
@@ -114,7 +116,7 @@ import {
   frameworkSources,
   MENU_ID,
 } from "../interaction/completion/index.js";
-import { createFocusStore, resolveFocus } from "../interaction/router/focus.js";
+import { createFocusStore, resolveFocus, resolveWatch } from "../interaction/router/focus.js";
 import { chordText, createKeymap, defaultKeymap, RESERVED_ACTIONS } from "../interaction/router/keymap.js";
 import { REGISTRY_BINDINGS } from "../interaction/router/registry-bindings.js";
 import { createRouter, type RouterDeps } from "../interaction/router/router.js";
@@ -135,7 +137,7 @@ import { createNavigator, openHistory, SEARCH_ID } from "../interaction/history/
 import type { HistoryEntry, Navigator } from "../interaction/history/index.js";
 import { detectCapabilities, type CapabilitySource, type TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Motion } from "../presentation/blocks/index.js";
-import { defaultButton, glyphFor, glyphs, tapeStart } from "../presentation/blocks/index.js";
+import { barOf, defaultButton, glyphFor, glyphs, interiorOf, panelInterior, tapeStart } from "../presentation/blocks/index.js";
 import { submitAction } from "./form-submit.js";
 import { createFrameScheduler, type CommitReason } from "../terminal/frame-scheduler.js";
 import type { CaptureResult, Profiler, ProfileReport, TraceFn } from "./profiling/types.js";
@@ -260,7 +262,7 @@ async function readOrAbsent(
     return null;
   }
 }
-import type { OwnerHints, Pipeline, StopReason } from "./types.js";
+import type { OwnerHints, Pipeline, StopReason, WatchRowState } from "./types.js";
 
 /**
  * The manifest file, read and decoded — the step that was missing (C22 I23).
@@ -523,6 +525,8 @@ export type Graph = Readonly<{
    * vocabulary, and semantic copy mode's refused interrupt. Read per frame.
    */
   ownerHints: () => OwnerHints;
+  /** C22 I139 — the watches and the row's selection, for the chrome. Read per frame. */
+  watchRow: () => WatchRowState | undefined;
   /**
    * The linear route's writer, or `null` on the rich route (C22 I119). The
    * session hands it every commit instead of composing a frame.
@@ -630,6 +634,8 @@ export type Graph = Readonly<{
   rendered: RenderCache;
   /** C22 I102 — header, footer and layer lines held per content, one session's worth. */
   chrome: ChromeCache;
+  /** C16 I74 — a layer's own row offset, as the wheel left it; 0 for a layer never wheeled. */
+  layerScroll: (id: string) => number;
   scrollOffsets: ScrollOffsets;
   cameras: Cameras;
   /** C22 I77 — the frame each animated image is on, keyed like the two above and dropped with them. */
@@ -1555,12 +1561,14 @@ export async function constructGraph(
         // origin travels with the *call* instead: a surface brackets its
         // refresh in `profiler.own`, and `commit` reads the bracket.
         //
-        // `profile-view.ts` is the one surface that brackets — every redraw
-        // it raises, on the timer and on a key, runs inside `profiler.own`
-        // (C28 I49) — so this line is unchanged from the day it passed `false`
-        // unconditionally and now means what it says: the seam's own answer,
-        // with the bracket's read on top. C28 T4.4 drives it through this
-        // scheduler; T1.92 asserts it at the view.
+        // **No surface brackets any more.** `profile-view.ts` was the one that
+        // did — every redraw it raised ran inside `profiler.own` (C28 I49) —
+        // and it retired with the pushed view (R-EXA-082, F1254): `/profile`
+        // composes its deck once, in the reader's own submission, so the frame
+        // that draws it is the reader's. This line is unchanged from the day it
+        // passed `false` unconditionally: the seam's own answer, with the
+        // bracket's read on top for any surface that brackets. C28 T4.4 drives
+        // it through this scheduler.
         prof.commit(reason, false);
         inner.commit(reason);
       },
@@ -1656,10 +1664,24 @@ export async function constructGraph(
       // anchored to the previous region height until the next character. C15
       // clamps, so nothing faults and no number disagrees; the menu is simply
       // in the wrong place, which is a frame's finding and not an assertion's.
+      //
+      // **The order against the commit is kept and is not what holds it.** A
+      // `resize` commit is coalesced (C03 I15): it sets contamination, arms a
+      // 16 ms timer and returns, so a refresh after it in this synchronous
+      // handler still lands before anything is composed. The mutation that
+      // swaps the two survived for that reason and is retired in
+      // `c19-menu-window`; what the frame depends on is that the refresh runs
+      // on the signal at all, which T4.33 reads.
       refreshAnchors();
-      // **A live child is told, before the frame** (C23 I65). The route resizes
-      // its child and then its emulator; composing first would draw one frame
-      // from a grid that is about to be reflowed.
+      // **A live child is told on the signal** (C23 I65). The order against the
+      // commit is the refresh's case again and is not what holds it (F1336): a
+      // `resize` commit is coalesced (C03 I15), and nothing a resize listener
+      // calls commits an immediate frame — the emulator reflows in place and
+      // the child's repaint arrives later through the write queue — so the
+      // frame is composed after both lines whichever runs first. Measured by
+      // swapping them: the 24 test files that drive a resize through the graph
+      // pass either way. What the frame depends on is I65's figure — the child
+      // and the emulator told one width — and not this line's position.
       pipeline.resized();
       scheduler.commit("resize");
     });
@@ -1684,6 +1706,71 @@ export async function constructGraph(
   // only `createRouter` could see is why `enterLiveBlock` had no caller for four
   // components (C16 I22).
   const focus = createFocusStore();
+
+  /**
+   * **The session's watches** (C22 I135, §6p, ruling 50). Built whether or not
+   * a rung is opted in — the notifier below exists only when one is, and the
+   * footer's row has to exist for every reader.
+   */
+  const watches = createWatches((id) => stores.transcript.entries.find((e) => e.id === id));
+
+  /** `⇧⇥`'s second step and the transcript's way in from the prompt (C16 §6a). */
+  const focusTranscript = (): void => {
+    const id = stores.transcript.liveId ?? stores.transcript.entries.at(-1)?.id ?? null;
+    if (id !== null) focus.enterLiveBlock(id, null);
+  };
+
+  /**
+   * The watch row's keys (C16 I76, I77, C22 I140, §6p).
+   *
+   * **Every step reads the set as it stands**, through `resolveWatch`, so a
+   * watch that dropped since the last key cannot be stepped from or opened.
+   */
+  const watchKeys = Object.freeze({
+    /** `⇧⇥` at the prompt: the row while a watch stands, else the transcript. */
+    focusPrevious: (): void => {
+      const first = watches.ids()[0];
+      if (first === undefined) return void focusTranscript();
+      focus.toWatches(first, 0);
+    },
+    step: (by: 1 | -1): void => {
+      const at = focus.current;
+      if (at.at !== "watches") return;
+      const ids = watches.ids();
+      const i = resolveWatch(at, ids);
+      if (i === null) return;
+      const j = Math.min(Math.max(0, i + by), ids.length - 1);
+      focus.toWatches(ids[j]!, j);
+    },
+    /** `⏎`, or `watch.jump[n]` with `n`: focus lands on the entry, and the watch stands. */
+    open: (n?: number): void => {
+      const at = focus.current;
+      if (at.at !== "watches") return;
+      const ids = watches.ids();
+      const i = n === undefined ? resolveWatch(at, ids) : n - 1;
+      const id = i === null ? undefined : ids[i];
+      // Past the count names no watch: consumed, and nothing moves (I140).
+      if (id === undefined) return;
+      focus.enterLiveBlock(id, null);
+    },
+  });
+
+  /**
+   * `ChromeContext.watches` (C22 I139): present while a watch stands or the row
+   * has focus, the selection only while the row is the active target — a
+   * question over the row takes the keys, and the mark goes with them.
+   */
+  const watchRow = (): WatchRowState | undefined => {
+    const ids = watches.ids();
+    const at = focus.current;
+    if (ids.length === 0 && at.at !== "watches") return undefined;
+    const items = ids.map((id) => {
+      const entry = stores.transcript.entries.find((e) => e.id === id);
+      return entry === undefined ? { id, name: id } : watchItem(entry);
+    });
+    const active = at.at === "watches" && router.rung === "scope";
+    return { items, selected: active ? resolveWatch(at, ids) : null };
+  };
 
   /**
    * `ctx.ask`'s host (C23 I36, C16 I25).
@@ -1723,12 +1810,18 @@ export async function constructGraph(
         input: () => {
           const { text, cursor } = stores.editor;
           if (asking !== null && !confirm.composing) {
-            // **Armed, it says so in the footer's own words** (I122, R-OWN-002):
-            // the key the guard refuses redraws the cue without them, which
-            // is the refusal stated where rich mode states it in a chip.
+            // **Armed, it says so in the footer's own words** (I122, R-OWN-002,
+            // C16 I70): the first key the guard refuses redraws the cue naming
+            // it and the way out, which is the refusal stated where rich mode
+            // states it in a chip — the same sentence, from the same function.
             // `router` is built below and read only when the line is drawn —
             // the temporal dead zone, as `pipeline`'s thunk, not a quiet default.
-            const ready = router.ownerArmed ? " (ready in a moment)" : "";
+            const refusedKey = router.ownerRefused;
+            const ready = !router.ownerArmed
+              ? ""
+              : refusedKey === null
+                ? " (ready in a moment)"
+                : ` (${guardRefusal(refusedKey, detection.capabilities)})`;
             return { label: `answer 1 to ${String(Math.min(9, asking.choices.length))}${ready}: `, text: "", cursor: 0 };
           }
           if (asking !== null) return { label: `${asking.question}: `, text, cursor };
@@ -1765,16 +1858,53 @@ export async function constructGraph(
           mark: glyphFor("bullet", notifyCaps),
           separator: glyphs(notifyCaps).separator,
           entryOf: (id) => stores.transcript.entries.find((e) => e.id === id),
+          watched: (id) => watches.has(id),
           bell: () => void lifecycle.writer.write(BELL),
           notify: (text) => void lifecycle.writer.write(systemNotification(text)),
           title: (text) => lifecycle.title(text),
           restoreTitle: () => lifecycle.restoreTitle(),
         });
-  if (notifier !== null) {
-    stores.transcript.subscribe((change) => {
-      if (change.kind === "append" || change.kind === "settle") notifier.settled(change.id);
+  /**
+   * **One subscription, two readers, in this order** (C22 I135, §6p.3 row 4):
+   * the notifier reads whether a settling entry was watched, and then the set
+   * drops it. Two subscriptions would make the order a registration sequence
+   * nothing states, and the wrong one silences a watched short end.
+   */
+  stores.transcript.subscribe((change) => {
+    if (change.kind === "clear") return void watches.clear();
+    if (change.kind !== "append" && change.kind !== "settle") return;
+    notifier?.settled(change.id);
+    watches.settled(change.id);
+  });
+
+  /**
+   * **The away ledger** (C23 I85–I87, ruling 51, R-BLK-314): what settled while
+   * the reader was not watching, said once when they come back. Always built —
+   * its attached mark needs nothing opted in — and its away mark opens only
+   * on a focus report, which arrives only when a rung is (C22 §6n.4 ruling 2).
+   */
+  const ledger = createLedger();
+  stores.transcript.subscribe((change) => {
+    if (change.kind !== "append" && change.kind !== "settle") return;
+    const entry = stores.transcript.entries.find((e) => e.id === change.id);
+    if (entry !== undefined) ledger.settled(entry);
+  });
+  /**
+   * A close's notice, appended — `true` when there was one (C23 I86). The chord
+   * is the session keymap's `scrollBottom` row at this terminal's profile,
+   * spelled by `chordText` (C16 I58), so a rebinding moves it with `/help`.
+   */
+  const sayLedger = (kind: MarkKind, settlements: readonly Settlement[]): boolean => {
+    const bottom = keymap.entries().find((b) => b.target === "global" && b.action === "scrollBottom")?.key;
+    const said = summaryOf(kind, settlements, {
+      separator: glyphs(detection.capabilities).separator,
+      bottom: bottom === undefined ? null : chordText(bottom, detection.capabilities.unicode !== "ascii"),
     });
-  }
+    if (said === null) return false;
+    // A system notice with no user behind it (C23 §3a): the reader's return.
+    stores.transcript.append(settledDoc(said.head, said.lines, { origin: "refresh" }));
+    return true;
+  };
 
   const confirm = createConfirmHost({
     overlays: stores.overlays,
@@ -1865,7 +1995,10 @@ export async function constructGraph(
           (row) => entryAtRegionRow(row),
           () => detection.capabilities.keyboardProtocol === "kitty",
           () => surface.attached,
+          () => surface.generation,
           (r) => refused(r),
+          (id, notches) => scrollLayer(id, notches),
+          () => void surface.close("detach"),
         ),
         // C28 I39 — the `handler` span. Spread in here rather than threaded
         // through `routerDeps`, whose seven parameters are all C16's own and
@@ -1922,6 +2055,10 @@ export async function constructGraph(
       scheduler,
       // C22 I125 — `/capabilities` reads how the record the session opened on was answered.
       capabilitySources: detection.sources,
+      // C22 I115 — `/config` reads where each value came from (C23 I80).
+      settings: config.settings,
+      // C22 I135, I136 — `/watch` and `/unwatch` fill the session's set.
+      watches,
       // **The report reaches a surface through the local route and no other**
       // (C24 I31, C22 I93). A `/profile` verb is where it is wanted, and
       // `LocalContext` is L4; `ProducerContext` is L0 and putting it there
@@ -2195,6 +2332,8 @@ export async function constructGraph(
   };
   let peekKey: string | null = null;
   let peekRow: number | null = null;
+  /** C16 I74 — each non-menu layer's row offset; `scrollLayer` below writes it. */
+  const layerScroll = new Map<string, number>();
   const syncPeek = (): void => {
     const want = peekWanted();
     const have = stores.overlays.stack.some((l) => l.id === PEEK_ID);
@@ -2205,6 +2344,8 @@ export async function constructGraph(
       return;
     }
     if (have && want.key === peekKey && want.row === peekRow) return;
+    // Another element's detail opens at its top (C16 I74).
+    if (want.key !== peekKey) layerScroll.delete(PEEK_ID);
     // A panel, so the peek is delimited by its rails rather than by a dim the
     // terminal cannot draw (C15 I11). Anchored below and flipped by C15 when
     // there is no room (I17); the width is the region's on the confirm's
@@ -2402,11 +2543,16 @@ export async function constructGraph(
     const found = focusedBlock();
     if (found === null) return;
     const { entryId, block } = found;
+    const entry = stores.transcript.entries.find((e) => e.id === entryId);
+    const drawn = entry === undefined ? null : widthIn(entry, block.id);
+    if (entry === undefined || drawn === null) return;
 
     // One row of overlap, which is what lets a reader join two screens — and
-    // a floor of one, so a box of a single row still moves.
-    const height = built.blocks.measure(block, deps.frame.overlayRegion().width);
-    stores.scrollOffsets.nudge(entryId, block.id, direction * Math.max(1, height - 1), scrollBox(block));
+    // a floor of one, so a box of a single row still moves. **Measured at the
+    // box's own width** (C09 I126): in a card's body that is five columns
+    // narrower than the region, and the residue row is decided there.
+    const height = built.blocks.measure(block, drawn.outer);
+    stores.scrollOffsets.nudge(entryId, block.id, direction * Math.max(1, height - 1), scrollBox(entry, block));
     scheduler.commit("input");
   };
 
@@ -2416,15 +2562,29 @@ export async function constructGraph(
    * The store spells *following* as `TAIL` and cannot resolve it — it does not
    * know the width — so the caller who measured the content hands over the
    * ceiling, and whether the block asked to follow. Without it `⇞` on a followed
-   * box is `∞ + δ`, a no-op (Lane B's T7). The sum is `childRanges`'s: every child
-   * of a scroll gets the full width, and `gapBefore` is not counted.
+   * box is `∞ + δ`, a no-op (Lane B's T7).
+   *
+   * **The content is the kind's own answer, at the box's own width** (C09
+   * I126). This summed the children at the region's width, which is right for
+   * exactly one box — top level, not in a card, no bar — and a box in a card's
+   * body clamped against a ceiling of 1 where the frame's was 4. `barOf` is
+   * what the renderer asks, so the two cannot be describing different content.
    */
-  const scrollBox = (block: Block): { ceiling: number; follow?: boolean } | undefined => {
+  const scrollBox = (entry: TranscriptEntry, block: Block): { ceiling: number; follow?: boolean } | undefined => {
     if (block.kind !== "scroll") return undefined;
-    const width = deps.frame.overlayRegion().width;
-    const content = block.children.reduce((n, c) => n + built.blocks.measure(c, width), 0);
+    const at = widthIn(entry, block.id);
+    if (at === null) return undefined;
+    const { content } = barOf(block, at.inner, built.blocks.measure);
     return { ceiling: Math.max(0, content - block.height), follow: block.follow === true };
   };
+
+  /**
+   * The width block `id` is handed in `entry`, and the width inside its
+   * padding (C09 I126, C22 I117) — asked of the block library, never
+   * re-derived. `null` where the entry holds no such block.
+   */
+  const widthIn = (entry: TranscriptEntry, id: string): Readonly<{ outer: number; inner: number }> | null =>
+    blockWidthInEntry(built.blocks, entry.doc.blocks, deps.frame.overlayRegion().width, id);
 
   /**
    * A split of an entry by id, and the width it is drawn at (C22 I117).
@@ -2442,8 +2602,8 @@ export async function constructGraph(
     if (entry === undefined) return null;
     const found = blockIn(entry, id);
     if (found === null || found.kind !== "split") return null;
-    const width = blockWidthInEntry(entry.doc.blocks, deps.frame.overlayRegion().width, id);
-    return width === null ? null : { entry, split: found, width };
+    const at = widthIn(entry, id);
+    return at === null ? null : { entry, split: found, width: at.inner };
   };
 
   /** The box a split pane's offset is clamped against — `scrollBox`'s, per pane. */
@@ -2669,7 +2829,7 @@ export async function constructGraph(
    * focus, and the move is what brings it back.
    */
   let pulledTo: string | null = null;
-  const pullScroll = (entry: TranscriptEntry, width: number): void => {
+  const pullScroll = (entry: TranscriptEntry): void => {
     const at = focus.current;
     if (at.at !== "liveBlock" || at.entryId !== entry.id) return;
     const where = `${entry.id}/${at.element?.blockId ?? ""}/${at.element?.elementId ?? ""}`;
@@ -2702,24 +2862,33 @@ export async function constructGraph(
     // element's `blockId` names the box itself rather than the child.
     const box = blockIn(entry, found.blockId);
     if (box === null || box.kind !== "scroll") return;
-    const geometry = scrollBox(box);
-    if (geometry === undefined) return;
-    const interior = box.collapsed === true ? 0 : box.height; // cells-ok — a row count
+    const geometry = scrollBox(entry, box);
+    const drawn = widthIn(entry, box.id);
+    if (geometry === undefined || drawn === null) return;
+    const interior = interiorOf(box);
     // **The box's own coordinates.** The placed element's rows are in entry
     // space and the offset is in the box's content, so the rows are re-asked of
-    // the box alone at the width the frame laid it out at.
-    const local = built.blocks.elementsOf(box, width).find((e) => e.id === found.element.id);
+    // the box alone at the width the frame laid it out at — **the box's**, and
+    // not the region's (C09 I126): in a card's body the region's width is five
+    // columns too wide, a child is a row shorter there, and `↓` focused a child
+    // this pull then left out of view.
+    const local = built.blocks.elementsOf(box, drawn.outer).find((e) => e.id === found.element.id);
     if (local === undefined) return;
     const held = stores.scrollOffsets.resolved(entry.id, box.id, geometry);
     const next = pullIntoView(held, local.rows.from, local.rows.to, interior);
     if (next !== held) stores.scrollOffsets.set(entry.id, box.id, next, geometry);
   };
-  const pullTapes = (entry: TranscriptEntry, width: number): void => {
+  const pullTapes = (entry: TranscriptEntry): void => {
     for (const top of entry.doc.blocks) {
       for (const block of [top, ...descendants(top)]) {
         if (block.kind !== "tape") continue;
+        // **The width the tape is drawn at** (C09 I126) — inside its padding,
+        // which is what `layout` is handed at render. At the region's width a
+        // tape in a card's body persisted a start the frame did not draw.
+        const at = widthIn(entry, block.id);
+        if (at === null) continue;
         const held = stores.scrollOffsets.get(entry.id, block.id);
-        const next = tapeStart(block, width, detection.capabilities, held);
+        const next = tapeStart(block, at.inner, detection.capabilities, held);
         // **No `box`**, because a tape has no ceiling to follow: `TAIL` on this
         // axis would mean *the last member*, and the window that reaches it is
         // the one `tapeWindow` already computed. The store holds the number.
@@ -2728,15 +2897,14 @@ export async function constructGraph(
     }
   };
   const syncPull = (): void => {
-    const width = deps.frame.overlayRegion().width;
     // **The entries the frame is showing**, which is the peek's own bound: a
     // container nobody can see has no window to pull, and walking the whole
     // transcript would make one key cost the scrollback.
     for (const ve of stores.viewport.visible().entries) {
       const entry = stores.transcript.entries.find((e) => e.id === ve.id);
       if (entry === undefined) continue;
-      pullScroll(entry, width);
-      pullTapes(entry, width);
+      pullScroll(entry);
+      pullTapes(entry);
     }
   };
   stores.viewport.subscribe(() => syncPull());
@@ -2753,7 +2921,7 @@ export async function constructGraph(
   const nudgeScroll = (entryId: EntryId, blockId: string, rows: number): void => {
     const entry = stores.transcript.entries.find((e) => e.id === entryId);
     const block = entry === undefined ? null : blockIn(entry, blockId);
-    stores.scrollOffsets.nudge(entryId, blockId, rows, block === null ? undefined : scrollBox(block));
+    stores.scrollOffsets.nudge(entryId, blockId, rows, block === null || entry === undefined ? undefined : scrollBox(entry, block));
     scheduler.commit("input");
   };
 
@@ -3043,7 +3211,7 @@ export async function constructGraph(
     entryId: EntryId,
     start: Readonly<{ block: Block; element: NavElement; row: number }>,
   ): Block => {
-    const width = deps.frame.overlayRegion().width;
+    const entry = stores.transcript.entries.find((e) => e.id === entryId);
     let box = start.block;
     let elementId = start.element.id;
     let rowInChild = start.row;
@@ -3053,8 +3221,14 @@ export async function constructGraph(
       if (child === undefined || child.kind !== "scroll") return box;
 
       // Inside `child`'s box now. Its content rows are measured from the box's
-      // top and never from the offset (C26 I3), so the offset is added here.
-      const els = built.blocks.elementsOf(child, width);
+      // top and never from the offset (C26 I3), so the offset is added here —
+      // **at the width the child is drawn at** (C09 I126), which is inside the
+      // outer's bar and a card's gutter. At the region's width a child that
+      // wraps there is a row shorter, and the wheel on its second row fell
+      // through to the box below it.
+      const drawn = entry === undefined ? null : widthIn(entry, child.id);
+      if (drawn === null) return box;
+      const els = built.blocks.elementsOf(child, drawn.outer);
       const content = els.reduce((n, el) => Math.max(n, el.rows.to), 0);
       const held = stores.scrollOffsets.get(entryId, child.id);
       const contentRow =
@@ -3294,10 +3468,8 @@ export async function constructGraph(
       pipeline?.submit(line);
     },
     keepField: () => void commitField(),
-    focusTranscript: () => {
-      const id = stores.transcript.liveId ?? stores.transcript.entries.at(-1)?.id ?? null;
-      if (id !== null) focus.enterLiveBlock(id, null);
-    },
+    focusTranscript,
+    watchKeys,
     editor: stores.editor,
     completion: built.completion,
     overlays: stores.overlays,
@@ -3377,6 +3549,36 @@ export async function constructGraph(
   });
   // Step 8's handler reaches the anchors through this, declared above it.
   refreshAnchors = () => void keys.refreshAnchors();
+
+  /**
+   * Each layer's own scroller, as C16's `scrollLayer` asks for it (C16 I74,
+   * §3d P2–P6).
+   *
+   * **The menu's is its window** — `keys.ts` holds the candidates and the
+   * selection, and a window offset beside them is the only form that cannot
+   * select (C19 I20). **Every other layer's is a row offset into its own
+   * rendered lines**, which the compositor reads (`layerRows`): a truncated
+   * peek shows the rows the wheel moved it to, and one that fits answers
+   * `false` so the base takes the wheel. Clamped at write against the layer's
+   * measure — the same function that sized it — so a wheel held past the end
+   * does not bank rows the way back has to spend. The map is declared with
+   * the peek, which resets it.
+   */
+  const scrollLayer = (id: string, notches: number): boolean => {
+    if (id === MENU_ID) return keys.scrollMenu(notches * WHEEL_ROWS);
+    const placed = stores.overlays.layout(deps.frame.overlayRegion()).find((p) => p.layer.id === id);
+    if (placed === undefined || !placed.truncated) return false;
+    const rows = built.blocks.measureSequence(placed.layer.content, placed.width, stores.measures);
+    const most = Math.max(0, rows - placed.height);
+    const held = Math.min(layerScroll.get(id) ?? 0, most);
+    layerScroll.set(id, Math.min(most, Math.max(0, held + notches * WHEEL_ROWS)));
+    return true;
+  };
+  // **A layer that goes takes its offset with it**, and one pushed again under
+  // the same id opens at its top — the peek is pushed per element.
+  stores.overlays.subscribe((change) => {
+    if (change.kind !== "content") layerScroll.delete(change.id);
+  });
 
   /**
    * When the last input batch landed, for the cursor's blink edge (C22 I64).
@@ -3826,27 +4028,35 @@ export async function constructGraph(
     // complementary cells of one layout — so at most one of `sample` and
     // `series` answers, and the focus call below is shared by both.
     const series = sample === null ? legendUnder(hit.id, under, e.col) : null;
-    const aim = sample !== null
+    const crosshair = sample !== null
       ? (): void => {
           stores.cursorPositions.set(hit.id, under.block.id, sample);
           scheduler.commit("input");
         }
-      : series !== null
-        // **The legend's toggle is an activation and waits for the release**
-        // (C16 I45, §4a's legend row). The press below still carries the focus
-        // call, so the plot is focused in the press's frame and the swatch goes
-        // hollow in the release's: one gesture, one effect, each half drawn in
-        // the half of the gesture that caused it.
-        ? armActivation(armId(hit.id, under.block.id, under.element.id), (): void =>
-            toggleSeriesIn(hit.id, under.block as Plot, series),
-          )
-        : null;
+      : null;
+    const aim = crosshair ?? (series !== null
+      // **The legend's toggle is an activation and waits for the release**
+      // (C16 I45, §4a's legend row). The press below still carries the focus
+      // call, so the plot is focused in the press's frame and the swatch goes
+      // hollow in the release's: one gesture, one effect, each half drawn in
+      // the half of the gesture that caused it.
+      ? armActivation(armId(hit.id, under.block.id, under.element.id), (): void =>
+          toggleSeriesIn(hit.id, under.block as Plot, series),
+        )
+      : null);
 
     if (e.motion || e.shift) {
       // **Over the focused plot, motion is the crosshair's** (§4a row o): the
       // anchor and the head would be one block-level element, which is no
       // selection in any case, so nothing is lost by not calling `extendRow`.
-      if (onFocused && aim !== null) return aim;
+      //
+      // **The crosshair's and never the legend's** (C16 I71, §3c S2). `aim` is
+      // the legend's arming thunk where the pointer is over an entry, so a drag
+      // off the entry and back re-armed it and the release toggled — trace 15's
+      // *only a press arms*, true of a row and false of a legend. Over the
+      // legend, motion does nothing: the drag has already cancelled the arm.
+      if (onFocused && crosshair !== null) return crosshair;
+      if (onFocused && series !== null) return null;
       // A drag and a shift-click are both `⇧↓` (C16 §4a): the head lands on the
       // element under the pointer and the anchor is placed on the first
       // extension, so click `a` then shift-click `c` selects `a..c`. Within the
@@ -3866,7 +4076,12 @@ export async function constructGraph(
       // keys (C26 I14) and the framework fires nothing, so there is nothing to
       // arm either.
       if (at.mode === "interact") return null;
-      return armActivation(armId(hit.id, address.blockId, address.elementId), keys.table.rowActivate);
+      // **The activation is captured here, at the press** (C16 I71, §3c S1).
+      // `rowActivate` reads focus when it runs, so a `↓` between the press and
+      // the release fired the row focus had moved to — under the identity of the
+      // row the reader pressed. What the release commits is what was pressed.
+      const activation = keys.activationAt(hit.id, address);
+      return armActivation(armId(hit.id, address.blockId, address.elementId), activation ?? ((): void => undefined));
     }
     // A click is a way in exactly as `↓` is, so from the prompt it takes the
     // same call; from a row it is a move, and `focusRow` collapses a selection
@@ -4089,19 +4304,11 @@ export async function constructGraph(
       return false;
     });
 
-    // **The captured child's one key, registered before any child exists**
-    // (C16 I49, R-BLK-908). *A captured child reserves one `host.detach`
-    // action* — reserving it at construction is what makes it a reservation:
-    // the surface host registers its consuming handler at attach time and
-    // lands behind this one, so the escape is in front of the capture rather
-    // than inside it. An ordinary key resolves to nothing here and falls to
-    // the child's handler, which is the rest of *takes all but host.detach*.
-    router.register("child", (e) => {
-      const effect = bound("child", e);
-      if (effect === null) return false;
-      effect();
-      return true;
-    });
+    // **No handler at `child` for the escape** (C16 I75, §3e). One stood here,
+    // registered before any attach so the surface host's consuming handler
+    // landed behind it — a reservation held by call order. `host.detach` is
+    // the intercept table's now, read before the ladder, and the router calls
+    // `detachChild` itself.
 
     // **An escapable overlay still needs its `esc` run** (C16 I26). The menu
     // and the search moved to `panel` above and took `bound` with them, and
@@ -4211,6 +4418,17 @@ export async function constructGraph(
     // (F765). `pushedView` had the same pair for as long as it existed.
     router.register("nativeSelection", (e) => {
       const effect = bound("nativeSelection", e);
+      if (effect === null) return false;
+      effect();
+      return true;
+    });
+
+    // **The watch row's table rows** (C16 I76, I77, §6d). The router registers
+    // the target's `⌃c` rung and nothing else, so without this every row at the
+    // target is bound and never consulted — `nativeSelection`'s defect above,
+    // arriving a third time, and T1.4h's walk is what found it.
+    router.register("watchRow", (e) => {
+      const effect = bound("watchRow", e);
       if (effect === null) return false;
       effect();
       return true;
@@ -4328,15 +4546,33 @@ export async function constructGraph(
       reconcileField();
     };
 
-    const deliver = (batch: readonly InputEvent[]): void => {
+    const deliver = (batch: readonly InputEvent[], lapsed = false): void => {
       // **A focus report is read here and routed nowhere** (C16 I61, C22 I129):
-      // it moves no focus and commits no frame, so a batch holding only one is
-      // an empty batch below.
+      // it moves no focus. It commits a frame only when something drawn moved:
+      // the return has something to say (C23 I86) — the record changed, which
+      // the rungs' bytes never do — or a guard ended.
+      //
+      // **But the router reads a focus-out too** (C16 I72): the keys it saw go
+      // down may be released in another window, and a guard waiting on one of
+      // them ends here — the owner line's mark moves, so the commit is owed.
+      let returned = false;
+      let guardMoved = lapsed;
       const events = batch.filter((e) => {
         if (e.kind !== "focus") return true;
-        notifier?.focus(e.focused);
+        const was = router.ownerArmed;
+        router.dispatch(e);
+        if (router.ownerArmed !== was) guardMoved = true;
+        if (notifier === null) return false;
+        notifier.focus(e.focused);
+        // **The away mark** (C23 I85): opened by the leaving, closed by the
+        // return — and only where the report was asked for. With no rung opted
+        // in `?1004h` was never taken, so a report that arrives anyway is not
+        // one this session can vouch for, and it is read as the rungs read it.
+        if (!e.focused) ledger.open("away");
+        else if (sayLedger("away", ledger.close("away"))) returned = true;
         return false;
       });
+      if (events.length === 0 && (returned || guardMoved)) scheduler.commit("input");
       if (events.length > 0) {
         for (const e of events) routed(e);
         // After the keys and before the frame: the peek follows the focus the
@@ -4387,22 +4623,33 @@ export async function constructGraph(
       }, CURSOR_BLINK_MS);
     };
 
-    // The three timeouts C16 reports and does not fire: the escape window, the
-    // paste heuristic, the exit arming. Without this a lone `Esc` is delivered
-    // when the *next* key arrives — a key that appears to do nothing until you
-    // press another one.
+    // The timeouts C16 reports and does not fire: the escape window, the paste
+    // heuristic, the exit arming — and the question guard's (C16 I70). Without
+    // this a lone `Esc` is delivered when the *next* key arrives — a key that
+    // appears to do nothing until you press another one — and a guard that
+    // lapsed with no input keeps its mark on screen until one does.
     function arm(): void {
       wake?.[Symbol.dispose]();
       wake = null;
-      const at = decoder.nextDeadline();
-      if (at === null) return;
+      const decoderAt = decoder.nextDeadline();
+      const guardAt = router.nextDeadline();
+      const at = decoderAt === null ? guardAt : guardAt === undefined ? decoderAt : Math.min(decoderAt, guardAt);
+      if (at === undefined) return;
       wake = config.schedule(() => {
         wake = null;
-        deliver(decoded(() => decoder.poll()));
+        // **The guard's lapse is a frame nobody else draws** (C16 I70, §3c S6):
+        // no key arrived, so no batch commits, and the mark would stay.
+        deliver(decoded(() => decoder.poll()), guardAt !== undefined && config.clock() >= guardAt);
       }, Math.max(0, at - config.clock()));
     }
 
     lifecycle.onInput((chunk) => void deliver(decoded(() => decoder.push(chunk))));
+    // **A question arrives on no input of its own** (C16 I69, I70): a verb asks
+    // from a promise, and the guard's grace is timed from when the router first
+    // sees it. Re-arming on every overlay change is what stamps the arrival at
+    // the push and schedules the wake for its lapse; the router's read is a pull
+    // either way (C16 §4), so this is L4 asking, not C16 subscribing.
+    stores.overlays.subscribe(() => arm());
   });
 
   /**
@@ -4420,6 +4667,11 @@ export async function constructGraph(
    * an entry it holds is the other claim, and a captured child is exactly that —
    * nothing is streaming, the host is rewriting a block it owns.
    */
+  /** The child's entry's command line — one spelling, read by the append and by the room it leaves (C24 I41). */
+  const childCommand = (id: string): string => `child ${id}`;
+  /** The hold on the attached child's entry (C14 I56), while there is one. */
+  let childHold: Disposable | null = null;
+
   const childBlock = (id: string, blocks: readonly Block[]): Block =>
     Object.freeze({
       kind: "panel",
@@ -4433,7 +4685,7 @@ export async function constructGraph(
     entry: {
       append: (id, blocks) =>
         stores.transcript.append(
-          compose({ command: `child ${id}`, blocks: [childBlock(id, blocks)] }),
+          compose({ command: childCommand(id), blocks: [childBlock(id, blocks)] }),
         ),
       replace: (entryId, id, blocks) => {
         stores.transcript.patch(
@@ -4443,14 +4695,40 @@ export async function constructGraph(
         );
       },
     },
+    // **The attachment's edges** (C23 I85, C14 I56). The child's entry is
+    // counted by no mark and kept whole while it holds the keyboard; the
+    // detach says what settled — unless the session is what closed it, when
+    // nobody comes back to read it (L9).
+    attachment: {
+      opened: (entryId) => {
+        ledger.exclude(entryId);
+        ledger.open("attached");
+        childHold?.[Symbol.dispose]();
+        childHold = stores.viewport.keepWhole(entryId);
+      },
+      closed: (_entryId, reason) => {
+        childHold?.[Symbol.dispose]();
+        childHold = null;
+        const settlements = ledger.close("attached");
+        if (reason !== "session") sayLedger("attached", settlements);
+      },
+    },
     router,
     lifecycle,
-    context: () => {
+    // **The room inside the entry, not the region** (C24 I41). The child's
+    // blocks sit in a panel in an entry, so it is told the panel's interior
+    // at the region's width, less the entry's command rows — the measurer's
+    // own `chromeRowsOf` — and its closing blank. Told the region, a child that
+    // filled it lost its command row, top border and first body rows off the
+    // screen, and every row two cells to the panel's rails.
+    context: (id) => {
       const region = deps.frame.overlayRegion();
+      const chrome = chromeRowsOf({ doc: { command: childCommand(id) } }, region.width) + ENTRY_GAP;
+      const room = panelInterior(region.width, region.height - chrome);
       return Object.freeze({
         ...pipeline.producerContext(),
-        width: region.width,
-        height: region.height,
+        width: room.width,
+        height: room.height,
       });
     },
     now: config.clock,
@@ -4502,6 +4780,7 @@ export async function constructGraph(
     focusedEntryId,
     focusedElements,
     fieldHeld: () => fieldBorrow?.held.line ?? null,
+    watchRow,
     ownerHints: (): OwnerHints => {
       const top = stores.overlays.top?.owner;
       const question = confirm.vocabulary();
@@ -4513,6 +4792,12 @@ export async function constructGraph(
         ...(top?.rung === "substate" ? { substate: top.name } : {}),
         ...(question === null ? {} : { question }),
         ...(copyRefused ? { refused: true } : {}),
+        // C22 I139 — where the watch row stands, for the scope line's chips.
+        ...(focus.current.at === "watches"
+          ? { watchRow: "focused" as const }
+          : watches.ids().length > 0
+            ? { watchRow: "present" as const }
+            : {}),
       };
     },
     linear,
@@ -4579,6 +4864,7 @@ export async function constructGraph(
     get bufferedEntries() {
       return stores.bufferedEntries;
     },
+    layerScroll: (id: string) => layerScroll.get(id) ?? 0,
     semanticCaretAt,
     scrollBoxSpans,
     scrollContainerBy,
@@ -4650,8 +4936,14 @@ function routerDeps(
   keyReleasesReported: () => boolean,
   /** The `child` rung's second source, late because the host is built after the router (C16 I49). */
   childAttached: () => boolean,
+  /** The surface host's half of `ownerGeneration`, late for `childAttached`'s reason (C16 I73). */
+  surfaceGeneration: () => number,
   /** Where a refusal is explained, by rung (C16 I62). L4's, because the explanation is the owner's. */
   refused: RouterDeps["refused"],
+  /** Each layer's scroller, late for `childAttached`'s reason (C16 I74). */
+  scrollLayer: RouterDeps["scrollLayer"],
+  /** The escape's detach, late for `childAttached`'s reason (C16 I75). */
+  detachChild: RouterDeps["detachChild"],
 ): RouterDeps {
   const top = (): ReturnType<RouterDeps["overlayTop"]> => {
     const layer = stores.overlays.top;
@@ -4673,8 +4965,12 @@ function routerDeps(
     overlayAnswerCallback: confirm.answerHandler,
     overlayWouldResolve: confirm.resolvesHandler,
     overlayRegion: frame.overlayRegion,
-    // A peek is not hit-tested (C15 I21): a click on it reaches the row beneath.
-    placed: () => stores.overlays.layout(frame.overlayRegion()).filter(takesInput),
+    // **Per gesture, through C15's own predicate** (C16 I74, C15 I31): a peek
+    // takes the wheel and no press, so a click on it still reaches the row
+    // beneath (C15 I21). Filtering by `takesInput` left the peek band of the
+    // scroll order unreachable by the one gesture it is for (§3d P5).
+    placed: (gesture) => stores.overlays.layout(frame.overlayRegion()).filter((p) => takesPointer(p, gesture)),
+    scrollLayer,
     popLayer: () => void stores.overlays.pop(),
     nativeSelection: frame.nativeSelection,
     semanticSelection: frame.semanticSelection,
@@ -4701,6 +4997,14 @@ function routerDeps(
     // inside `construct`, after the router that takes these deps — the same
     // lateness `pipeline` is threaded as a thunk for.
     childAttached,
+    // **The escape is the intercept table's** (C16 I75): the router calls this
+    // before any handler at `child` is offered the chord.
+    detachChild,
+    // **Every owner raised or removed, counted where it happens** (C16 I73,
+    // C15 I33): the stack's keyed pushes and removals and the surface host's
+    // attachments. The rung alone missed an owner raised and gone between two
+    // of the router's reads.
+    ownerGeneration: () => stores.overlays.generation + surfaceGeneration(),
     // §5's subscription rung. Read through the same accessor as `inFlight`,
     // because the pipeline is constructed after the router and a captured
     // reference here would be the null one.

@@ -8,7 +8,7 @@
  *
  * `contextAt` builds the context the way the shell does, so these rows go
  * through the same derivation the prompt does rather than a hand-built `Slot` —
- * which is what makes them a claim about `/config dtui-cfg /etc/` rather than
+ * which is what makes them a claim about `/filediff dtui-cfg /etc/` rather than
  * about an object literal.
  */
 
@@ -122,7 +122,7 @@ describe("image repositories", () => {
 describe("paths inside a container — the argument that needs another argument", () => {
   it("lists the directory the prefix is inside, in the container named first", async () => {
     const { run, calls } = runner(LS);
-    const got = await containerPathSource(run).complete(at("/config dtui-cfg /etc/nginx/ngi‸"));
+    const got = await containerPathSource(run).complete(at("/filediff dtui-cfg /etc/nginx/ngi‸"));
 
     // **The container comes from argument one**, which is the whole reason this
     // source exists as a test of the context model rather than as a third list.
@@ -136,7 +136,7 @@ describe("paths inside a container — the argument that needs another argument"
 
   it("a directory continues and a file is finished (C19 I16)", async () => {
     const { run } = runner(LS);
-    const got = await containerPathSource(run).complete(at("/config dtui-cfg /etc/nginx/‸"));
+    const got = await containerPathSource(run).complete(at("/filediff dtui-cfg /etc/nginx/‸"));
 
     const dir = got.find((c) => c.value === "/etc/nginx/conf.d/");
     const file = got.find((c) => c.value === "/etc/nginx/nginx.conf");
@@ -159,7 +159,7 @@ describe("paths inside a container — the argument that needs another argument"
     // working completion until someone notices the paths are the machine's
     // rather than the container's.
     const { run, calls } = runner(LS);
-    expect(await containerPathSource(run).complete(at("/config /et‸"))).toEqual([]);
+    expect(await containerPathSource(run).complete(at("/filediff /et‸"))).toEqual([]);
     expect(calls).toEqual([]);
   });
 
@@ -168,6 +168,6 @@ describe("paths inside a container — the argument that needs another argument"
     // throw — an empty answer is the honest one for a directory that is not
     // there yet, and it keeps a line out of the debug sink for ordinary typing.
     const run: Run = () => Promise.reject(new Error("Error: No such container: gone"));
-    expect(await containerPathSource(run).complete(at("/config gone /et‸"))).toEqual([]);
+    expect(await containerPathSource(run).complete(at("/filediff gone /et‸"))).toEqual([]);
   });
 });

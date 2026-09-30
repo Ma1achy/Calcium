@@ -1,5 +1,6 @@
 /**
- * C05 §3 — the six verbs Calcium ships, as rows in every parsed manifest.
+ * C05 §3 — the verbs Calcium ships, as rows in every parsed manifest (§3
+ * holds the count; nothing here repeats it).
  *
  * **They are verbs.** They have names, take arguments, complete, validate and
  * appear in help; everything the manifest exists to describe is true of them,
@@ -130,7 +131,7 @@ export const FRAMEWORK_TOOLS: readonly ToolDef[] = Object.freeze([
     flags: [],
   }),
   // **The seventh, and the one whose handler needs the root** (C23 §2, C23 I68).
-  // `/profile` opens C28's view; the section is an `enum` so C05 parses and
+  // `/profile` appends C28's deck as an entry; the section is an `enum` so C05 parses and
   // checks it before the handler sees it, and `/profile foo` reaches the handler
   // with `args` empty and answers a usage notice (C22 I66's reason: one reader
   // of one fact). The three values are C28's `SECTIONS` written down at L0,
@@ -153,12 +154,12 @@ export const FRAMEWORK_TOOLS: readonly ToolDef[] = Object.freeze([
         required: false,
         // **Three sections and two document verbs in one enum**, because they
         // occupy one positional slot and C05 has to accept both: `/profile app`
-        // opens the view on a group and `/profile snapshot` appends a stamped
-        // card (C23 I69, amended). The alternative was a flag, which would make
+        // appends a group's deck and `/profile snapshot` one stamped card
+        // (C23 I69, amended). The alternative was a flag, which would make
         // `/profile --snapshot` the spelling of a verb and read as a modifier of
-        // an open that does not happen.
+        // a section that is not being drawn.
         values: Object.freeze(["verdict", "app", "framework", "snapshot", "live", "capture"]),
-        summary: "`verdict`, `app` or `framework` to open the view; `snapshot` or `live` to append a card; `capture` takes a CPU profile",
+        summary: "`verdict`, `app` or `framework` to append that section's cards; `snapshot` or `live` to append one; `capture` takes a CPU profile",
       }),
       Object.freeze({
         name: "card",
@@ -174,12 +175,76 @@ export const FRAMEWORK_TOOLS: readonly ToolDef[] = Object.freeze([
     ],
     flags: [],
   }),
+  // **The ninth, and the first to arrive through a reservation** (C05 I28,
+  // ruling 43). §075's configuration table (C23 I80): every reader-facing value
+  // with where it came from. docker-tui's own `config` was renamed `filediff`,
+  // the name was reserved, and building the verb moved it here.
+  Object.freeze({
+    name: "config",
+    local: true,
+    summary: "every setting, its value, and where the value came from",
+    args: [],
+    flags: [],
+  }),
+  // **The tenth and eleventh, through the reservation** (C05 I28, ruling 50,
+  // §085, C22 I136). Reserved first — the grep found no manifest declaring
+  // either — and building them moved both names here. Ruling 50 called them the
+  // ninth and tenth; `/config` was built after it was written. After it, so no
+  // index an app could read moves (C05 T4.10).
+  Object.freeze({
+    name: "watch",
+    local: true,
+    summary: "pin a running entry to the footer's watch row",
+    args: [
+      Object.freeze({
+        name: "back",
+        type: "int" as const,
+        required: false,
+        summary: "how many entries back; default the newest running one",
+      }),
+    ],
+    flags: [],
+  }),
+  Object.freeze({
+    name: "unwatch",
+    local: true,
+    summary: "release a watch; one also drops itself when its run ends",
+    args: [
+      Object.freeze({
+        name: "back",
+        type: "int" as const,
+        required: false,
+        summary: "how many entries back; default the newest watch",
+      }),
+    ],
+    flags: [],
+  }),
 ] satisfies readonly ToolDef[]);
 
 /** The names, for the collision message and for tests that must not derive them. */
 export const FRAMEWORK_NAMES: readonly string[] = Object.freeze(
   FRAMEWORK_TOOLS.map((t) => t.name),
 );
+
+/**
+ * The verbs ruled and not yet built, whose names are reserved now (C05 I28,
+ * ruling 50).
+ *
+ * **Reserved before built, because the collision is the breaking change** (C05
+ * §3): an app declaring one of these fails at parse, and the only moment that
+ * breaks nobody is before any app has. Each carries the ruling that made it, so
+ * the refusal can say why rather than only that.
+ *
+ * **Disjoint from `FRAMEWORK_NAMES`** — building a verb moves its name from
+ * here to `FRAMEWORK_TOOLS`, and a name on both would be a verb with two
+ * statuses. It has no row, so it is neither completable nor invocable until it
+ * is built.
+ */
+export const RESERVED_VERBS: Readonly<Record<string, string>> = Object.freeze({
+  // **Empty today, and the mechanism stands** (C05 I28, ruling 50): `config`
+  // left for `FRAMEWORK_TOOLS` when §075's verb was built, and `watch` and
+  // `unwatch` when §085's were. The next ruled verb is reserved here first.
+});
 
 /**
  * The flags Calcium reserves on **every** tool, appended as the six verbs above

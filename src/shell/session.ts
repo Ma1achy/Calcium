@@ -1450,6 +1450,8 @@ class Session implements TuiInstance {
       // I74, §7f). It stays on the stack — C16's ladder reads the stack, and a
       // question nothing routes keys to is not a question — so what changes is
       // where it is painted and nothing else.
+      // C16 I74 — where the wheel left each layer.
+      layerScroll: (id) => graph.layerScroll(id),
       overlays: () => {
         const replacing = graph.confirm.replacing;
         const placed = graph.overlays.layout(frame.overlayRegion);
@@ -1973,6 +1975,8 @@ class Session implements TuiInstance {
       // line and the dispatch that honours it must not be able to disagree.
       owner: () => this.#graph?.router.rung ?? null,
       ownerArmed: () => this.#graph?.router.ownerArmed ?? false,
+      // C16 I70 — what the guard refused, named on the owner line once.
+      ownerRefused: () => this.#graph?.router.ownerRefused ?? null,
       // C14 I34 — the hold's only observable, read per frame from the graph
       // where the subtraction lives. Zero on every frame outside the mode.
       bufferedEntries: () => this.#graph?.bufferedEntries ?? 0,
@@ -1983,6 +1987,8 @@ class Session implements TuiInstance {
       editingField: () => this.#graph?.fieldHeld() != null,
       // C22 I133 — the owner line's keys, from the session's keymap.
       hints: () => this.#graph?.ownerHints(),
+      // C22 I139 — the watch row, and which watch it is on while it has the keys.
+      watches: () => this.#graph?.watchRow(),
       // C22 I116 — the live toast, drawn in the footer's tail while it lives.
       toast: () => this.#toast ?? undefined,
       // A03 SS47 — the owner line draws chords, so the chrome resolves them.

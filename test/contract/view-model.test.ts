@@ -645,7 +645,7 @@ describe("C04 §7 — the update model and the view state, checked rather than c
      * arriving somewhere else, and a fifth arriving somewhere else is the only
      * way this invariant can be false.
      */
-    const MOVES: readonly [string, AnyBlock, AnyBlock, number, number][] = [
+    const MOVES: readonly [string, AnyBlock, AnyBlock, number, number, number?][] = [
       ["TableRow.expanded", tableWith({ expanded: false }), tableWith({ expanded: true }), 3, 4],
       [
         "Scroll.collapsed",
@@ -677,16 +677,36 @@ describe("C04 §7 — the update model and the view state, checked rather than c
         { kind: "tip", id: "x", text: "a", padding: { t: 1, b: 2 } } as never,
         1, 4,
       ],
+      // **The sixth and seventh, from ruling 42 and C25 I14** (review batch 3).
+      // A patch's `expanded` moves nothing without a `cap` that drops a hunk, and
+      // a shedding kind's moves nothing at a width that sheds nothing — so each
+      // is measured where it bites, which is the width the tuple carries.
+      [
+        "Patch.expanded",
+        { kind: "patch", id: "p", path: "f", language: "ts", cap: 4, hunks: [{ header: "@@ -1 +1 @@", lines: [{ kind: "add", text: "x" }] }, { header: "@@ -9 +9 @@", lines: [{ kind: "add", text: "y" }] }] } as never,
+        { kind: "patch", id: "p", path: "f", language: "ts", cap: 4, expanded: true, hunks: [{ header: "@@ -1 +1 @@", lines: [{ kind: "add", text: "x" }] }, { header: "@@ -9 +9 @@", lines: [{ kind: "add", text: "y" }] }] } as never,
+        4, 5,
+      ],
+      [
+        "KeyValue.expanded",
+        { kind: "keyValue", id: "k", rows: [{ label: "endpoint", value: "https://api.internal.example/v2" }] } as never,
+        { kind: "keyValue", id: "k", expanded: true, rows: [{ label: "endpoint", value: "https://api.internal.example/v2" }] } as never,
+        1, 2, 9,
+      ],
     ];
 
     const moved: string[] = [];
-    for (const [name, before, after, wasRows, isRows] of MOVES) {
-      expect(kit.measure(before, 60), `${name}: off`).toBe(wasRows);
-      expect(kit.measure(after, 60), `${name}: on`).toBe(isRows);
+    for (const [name, before, after, wasRows, isRows, width = 60] of MOVES) {
+      expect(kit.measure(before, width), `${name}: off`).toBe(wasRows);
+      expect(kit.measure(after, width), `${name}: on`).toBe(isRows);
       moved.push(name);
     }
-    expect(moved, "the whole set, so a sixth fails here").toEqual([
+    // `KeyValue.expanded` stands for the four shedding kinds' one field (C09
+    // I124): one flag, one fold, measured through one kind here and through all
+    // four by C09 T2.191.
+    expect(moved, "the whole set, so an eighth fails here").toEqual([
       "TableRow.expanded", "Scroll.collapsed", "Floor.minHeight", "Patch.collapsedAfter", "Padded.padding",
+      "Patch.expanded", "KeyValue.expanded",
     ]);
 
     // **The counter-example that remains, and it is a different kind of field.**
@@ -1113,5 +1133,59 @@ describe("C04 I128 — a trend cell", () => {
     expect(() => blockOf(table({ trend: { from: 0.41, to: Number.NaN } }) as never)).toThrow(/C04 I128/u);
     const bad = validateBlock(table({}, "up"));
     expect(bad.ok ? "" : bad.error.join("\n")).toMatch(/"polarity" is "higher", "lower" or "neutral" \(C04 I128\)/u);
+  });
+});
+
+describe("C04 I6 — a closed vocabulary carries its own fact (ruling 44)", () => {
+  const WORDS = ["default", "config", "env", "flag"];
+  // `null` is *declares none* — an `undefined` would take the default.
+  const table = (cells: readonly Record<string, unknown>[], vocabulary: unknown = WORDS): Record<string, unknown> => ({
+    kind: "table",
+    id: "settings",
+    columns: [{ key: "source", label: "source", priority: 1, minWidth: 7, sortable: false, ...(vocabulary === null ? {} : { vocabulary }) }],
+    rows: cells.map((cell, i) => ({ id: `r${String(i)}`, cells: { source: cell } })),
+  });
+  const wire = (b: Record<string, unknown>): string => {
+    const r = validateBlock(b);
+    return r.ok ? "" : r.error.join("\n");
+  };
+
+  it("T2.139 (C04 I6, ruling 44): a declared vocabulary lets its words carry warn and error with no glyph, and nothing else", () => {
+    // **The ladder's two loud rungs, on the word alone**, by both doors.
+    const loud = table([{ text: "env", tone: "warn" }, { text: "flag", tone: "error" }, { text: "default", tone: "muted" }]);
+    expect(() => blockOf(loud as never), "construction").not.toThrow();
+    expect(wire(loud), "the wire").toBe("");
+
+    // **Closed**: a word outside the set is refused whatever its tone — or
+    // free text would take the exemption by being put in the column.
+    for (const cell of [{ text: "envx", tone: "warn" }, { text: "envx" }]) {
+      const outside = table([cell]);
+      expect(() => blockOf(outside as never), JSON.stringify(cell)).toThrow(/"envx" is not a word of column "source"'s vocabulary \(C04 I6, ruling 44\)/u);
+      expect(wire(outside), `${JSON.stringify(cell)} at the wire`).toMatch(/"envx" is not a word of column "source"'s vocabulary \(C04 I6, ruling 44\)/u);
+    }
+
+    // **A set that cannot be checked against is refused**: empty, an empty
+    // word, a word twice.
+    for (const vocabulary of [[], ["env", ""], ["env", "env"]]) {
+      const bad = table([{ text: "env", tone: "warn" }], vocabulary);
+      expect(() => blockOf(bad as never), JSON.stringify(vocabulary)).toThrow(/"vocabulary" is a non-empty list of distinct, non-empty words \(C04 I6, ruling 44\)/u);
+      expect(wire(bad), `${JSON.stringify(vocabulary)} at the wire`).toMatch(/"vocabulary" is a non-empty list/u);
+    }
+
+    // **The controls.** The same `warn` cell in a column declaring nothing still
+    // owes its glyph, and so does a `warn` notice — the exemption is the
+    // declaration's, and I6 still fires everywhere else.
+    expect(() => blockOf(table([{ text: "env", tone: "warn" }], null) as never), "no vocabulary").toThrow(/requires a non-empty glyph \(C04 I6/u);
+    expect(() => blockOf({ kind: "notice", id: "n", tone: "warn", text: "env" } as never), "a notice").toThrow(/requires a non-empty glyph \(C04 I6/u);
+
+    // **And the same two at the wire** (ruling 77, F1284) — a document the
+    // builder refuses is not one the far side can send. Each with its glyph
+    // validates, so the refusal is the glyph's and not the fixture's.
+    for (const tone of ["warn", "error"]) {
+      expect(wire(table([{ text: "env", tone }], null)), `a ${tone} cell, no vocabulary, at the wire`).toMatch(/cell "source": tone "(warn|error)" requires a glyph \(C04 I6, D29\)/u);
+      expect(wire({ kind: "notice", id: "n", tone, text: "env" }), `a ${tone} notice at the wire`).toMatch(/tone "(warn|error)" requires a glyph \(C04 I6, D29\)/u);
+      expect(wire(table([{ text: "env", tone, glyph: tone }], null)), `a ${tone} cell with its glyph`).toBe("");
+      expect(wire({ kind: "notice", id: "n", tone, glyph: tone, text: "env" }), `a ${tone} notice with its glyph`).toBe("");
+    }
   });
 });

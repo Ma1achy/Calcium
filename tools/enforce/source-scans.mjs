@@ -1260,9 +1260,26 @@ export const SCANS = [
  * is not this rule's, which is about marks. Recorded so it is re-checkable rather
  * than rediscovered.
  *
- * A second limit: this reads literals lexically, so a mark built by
- * `String.fromCodePoint` or held in a variable passes. Every current site is a
- * literal, and a computed one would be a change worth noticing on its own.
+ * A second limit: this reads literals, so a mark built by `String.fromCodePoint`
+ * or held in a variable passes — `definition.ts` computes its braille cells as
+ * `BRAILLE_BASE + ink` and the rule never sees them. A computed mark would be a
+ * change worth noticing on its own.
+ *
+ * **It judges a literal's value, not its spelling** (F1326). It read the source
+ * characters, so `"\u2502"` was six ASCII characters and the rule had nothing
+ * to be wrong about: the split separator shipped at the ASCII rung that way,
+ * behind an exemption whose reason described a different line. Decoding before
+ * judging fired on **25 literals in eight files** the list did not name, and a
+ * classification — drawn or not, and whether the ASCII rung needs it to degrade
+ * — found no defect among them: `scatter3`, `field` and `annotate` draw only
+ * behind a capability test, `svg` draws in a document no terminal reads, and
+ * the other four are data. Each is an entry below with its premise. Three files
+ * already listed — `text`, `ramp`, `linedraw` — carried escaped marks their
+ * reasons did not describe, and the reasons now name them.
+ * `decodeLiteral` is SS57's decoder as well, so the two
+ * rules cannot read one literal two ways. What it does not decode is stated:
+ * `String.raw` is read as if cooked (a false report, never a silent pass), and a
+ * `${…}` inside a template is read as the template's text.
  *
  * **A third, and it is about the exemption rather than the scan** (F665).
  * `PROSE_MARKS` is let through *because it is prose*, so it is the one class of
@@ -1291,23 +1308,55 @@ export const MARK_EXEMPTIONS = Object.freeze({
   "src/presentation/blocks/glyphs.ts":
     "the vocabulary itself — every entry is a pair and C09 I5's test asserts each is 1:1 by cell count",
   "src/presentation/text.ts":
-    "the truncation marker resolves against the capability on the line it is written (`ascii ? \"~\" : \"…\"`)",
+    "the truncation marker resolves against the capability on the line it is written (`ascii ? \"~\" : \"…\"`). "
+    + "The other two are selectors and draw nothing: U+FE0F is searched for in a cluster `cells()` is measuring, and "
+    + "`TEXT_PRESENTATION` U+FE0E is the zero-width suffix SS57 requires after an emoji base (F1326)",
   "src/presentation/patch/collapse.ts":
     "carries its own `[unicode, ascii]` pair; the marker is a whole row, so the ASCII form's three cells cost nothing",
   "src/interaction/router/keymap.ts":
     "`chordText` resolves against the capability on the line it is written (`if (!unicode) return chordName(key)`), which is `text.ts`'s form and `chrome.ts`'s subject — key names, which no `Glyph` slot holds because a chord is text and not a mark. The eleven glyphs are the design's own (§019, the binding registry) and the registry declares no ASCII rung for any of them, so the fallback is `keySlot`'s shorthand rather than eleven spellings chosen here (C16 §6a clause 6, parked). T1.98 asserts the ASCII arm is ASCII-renderable for every binding and that the chords equal the registry's by equality, so the premise is re-checked rather than inherited",
-  "src/presentation/patch/definition.ts":
-    "picks its rule character from the capability in the expression that draws it",
   "src/presentation/plot/ramp.ts":
-    "`RAMP_UNICODE` beside `RAMP_ASCII` — the ramp is the vocabulary for a plot cell",
+    "`RAMP_UNICODE` beside `RAMP_ASCII` — the ramp is the vocabulary for a plot cell. The escaped ladders "
+    + "(`RAMP_BRAILLE`, `RAMP_DENSITY`, the extent and fill ladders' blocks and braille) are the same premise: each "
+    + "ladder function returns its ASCII arm first under `unicode: \"ascii\"` and its braille arm under "
+    + "`ambiguousWidth: \"wide\"`, so every block element here is reached only at narrow unicode (F1326)",
   "src/presentation/plot/marks.ts":
     "the category ladders, one per capability arm, side by side in the file that *is* the vocabulary — `ramp.ts`'s premise exactly, and `markOf` is the only door. The premise to re-check: all three arms are eight long and `enforce-rules.test.ts` asserts it, so a ninth mark on one arm is a test failure rather than a silent ladder that runs out at a different index than its palette",
   "src/presentation/plot/curve.ts":
     "the braille blank, folded per mode by `definition.ts`; braille is chosen only where the capability allows it",
   "src/presentation/plot/linedraw.ts":
-    "the box-drawing glyph tables — the vocabulary for line-style curves, gated by ambiguousWidth in `definition.ts`",
+    "the box-drawing glyph tables — the vocabulary for line-style curves, gated by ambiguousWidth in `definition.ts`. "
+    + "`QUADRANTS`, escaped, is the same premise with two readers: the radar's quadrant figure, reached only when "
+    + "`flatAlphabet` is false (`definition.ts`), and `scatter3.ts`'s `mixedRows`, reached only on the `half` arm, "
+    + "which `armOf` takes only where `halfBlockEligible` holds (F1326)",
   "src/presentation/plot/sankey.ts":
     "`sankeyAlphabet` is the pair resolved where the capability is in hand — `▀ ▄ █ ▒` at narrow unicode and `# - =` at ASCII or wide, one function, both arms in the same expression (C12 I111). The premise to re-check: every mark in the file is read from that table, so a glyph written beside it rather than into it is what this reason does not cover",
+  "src/presentation/plot/scatter3.ts":
+    "`LOWER` and `LEFT`, the eighths, are drawn by `areaGlyph` from `mixedRows` alone, which runs only on the `half` "
+    + "arm — and `armOf` takes that arm only where `halfBlockEligible` holds: not `ascii`, not `ambiguousWidth: \"wide\"`, "
+    + "at least 8 colours. Below it the `glyph` arm draws from C09's table. The premise to re-check: a caller of "
+    + "`areaGlyph` outside `mixedRows` is a second decision this reason does not cover (F1326)",
+  "src/presentation/plot/annotate.ts":
+    "`shadeFor`'s `░` is resolved on the two lines above it — `null` under `unicode: \"ascii\"` and under "
+    + "`ambiguousWidth: \"wide\"`, where the band falls back to its two dashed edges (C12 I25's bottom rung). "
+    + "`text.ts`'s form: the capability is in hand where the mark is written (F1326)",
+  "src/presentation/plot/field.ts":
+    "`ARROWS_UNICODE` beside `ARROWS_ASCII`, one expression choosing between them on `unicode` and "
+    + "`ambiguousWidth` — the pair resolved where the capability is in hand. And `isBlank`'s U+2800 is compared "
+    + "against, never drawn: the braille blank a raster emits (F1326)",
+  "src/presentation/plot/definition.ts":
+    "U+2800 is compared against and never drawn — `cell === \"\\u2800\"` asks whether a braille raster left the "
+    + "cell empty, so a gridline may land there. The braille cells this file does draw are computed "
+    + "(`BRAILLE_BASE + ink`), which is SS47's stated blind spot rather than an exemption (F1326)",
+  "src/presentation/plot/svg.ts":
+    "the SVG arm's truncation marker, in a `<text>` element a browser shapes with its own font — no terminal "
+    + "reads it, no capability exists on this path, and `cells()` has no counterpart here (C12 §3aj) (F1326)",
+  "src/presentation/rows.ts":
+    "U+009C is C1 ST, a byte the tokeniser matches as one of an OSC's three terminators — data being parsed, "
+    + "never a mark being drawn (F1326)",
+  "src/interaction/editor/graphemes.ts":
+    "U+FFFD replaces an unpaired surrogate in the buffer's text (C17 T3.16). It is data: the buffer is the command "
+    + "that will be sent, and a substitute that varied with the terminal would change what runs (F1326)",
   "src/presentation/image/halfblock.ts":
     "`HALF_BLOCK` is `linedraw.ts`'s premise one module over — a rendering primitive rather than framework text, and gated by ambiguousWidth in `halfBlockEligible` in the same file rather than one away. The premise to re-check: it is the *only* mark here, so a second one is a second decision and this reason would not cover it",
   "src/shell/config.ts":
@@ -1320,6 +1369,9 @@ export const MARK_EXEMPTIONS = Object.freeze({
     "the conformance report, same premise: a tool's output, not a rendered document",
   "src/testing/navigation-conformance.ts":
     "the element-conformance report, and the same premise as its sibling above: a tool's output read by a developer, never composed into a frame",
+  "src/testing/expect-document.ts":
+    "a premise table's `why` strings, naming the marks a rendering substitutes — read by a developer in a failing "
+    + "assertion and never composed into a frame, the premise of the two conformance reports above (F1326)",
 });
 
 /**
@@ -1362,7 +1414,8 @@ export function checkMarks(files, readFile = (f) => readFileSync(f, "utf8"), exe
     const code = codeOnly(readFile(file));
     for (const m of code.matchAll(LITERALS)) {
       const body = m[0].slice(1, -1);
-      const marks = [...body].filter((c) => c.codePointAt(0) > 127);
+      // **The value, not the spelling** (F1326): `"\u2502"` is `│`.
+      const marks = [...decodeLiteral(body)].filter((c) => c.codePointAt(0) > 127);
       if (marks.length === 0) continue;
       // **A letter is prose, whatever its diacritics.** `rôle` in a reason string
       // fired this on the first new file written after the rule landed, and the
@@ -1925,10 +1978,22 @@ export function parseEmojiBases(textSource) {
 /** U+FE0E — *draw the preceding character as text, not as an emoji*. */
 const TEXT_PRESENTATION = "\ufe0e";
 
-/** `\uXXXX` and `\u{X…}` in a literal's body, as the characters they spell. */
-function decodeEscapes(body) {
-  return body.replaceAll(/\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})/gu, (_, braced, plain) =>
-    String.fromCodePoint(Number.parseInt(braced ?? plain, 16)),
+/**
+ * A literal's body as the characters it spells — `\uXXXX`, `\u{X…}` and `\xNN`
+ * decoded, **one escape at a time from the left**, so `\\u2502` is a backslash
+ * and six ASCII characters rather than `│` (F1326). Any other escape is left as
+ * written, which keeps an ASCII escape ASCII and a non-ASCII one its character.
+ *
+ * **One decoder for SS47 and SS57.** SS57's own decoded `\u` alone and matched
+ * `\\u` as an escape; two copies of the grammar in one file are two readings of
+ * one literal, and the rules would disagree about it silently.
+ */
+function decodeLiteral(body) {
+  return body.replaceAll(/\\(?:u\{([0-9a-fA-F]+)\}|u([0-9a-fA-F]{4})|x([0-9a-fA-F]{2})|[\s\S])/gu, (all, braced, plain, byte) =>
+    braced !== undefined ? String.fromCodePoint(Number.parseInt(braced, 16))
+    : plain !== undefined ? String.fromCharCode(Number.parseInt(plain, 16))
+    : byte !== undefined ? String.fromCharCode(Number.parseInt(byte, 16))
+    : all,
   );
 }
 
@@ -1958,7 +2023,7 @@ export function checkEmojiBases(
     if (!f.startsWith("src/")) continue;
     const code = codeOnly(readFile(file));
     for (const m of code.matchAll(LITERALS)) {
-      const body = decodeEscapes(m[0].slice(1, -1));
+      const body = decodeLiteral(m[0].slice(1, -1));
       for (const c of body) {
         const cp = c.codePointAt(0) ?? 0;
         if (cp < 0x80 || !inEmojiRanges(cp, ranges)) continue;

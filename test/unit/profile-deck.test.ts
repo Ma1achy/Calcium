@@ -368,12 +368,10 @@ describe("C28 §3c — the deck, every card", () => {
     for (const card of api.CARDS) {
       expect(api.profileCard(report, card.id, REGIONS[0]).length, card.id).toBeGreaterThan(0);
     }
-    // And the section seam, which is what `/profile <section>` composes with —
-    // published for a consumer with its own navigation, which is the whole of
-    // why it exists (C28 §3c).
-    for (const section of api.SECTIONS) {
-      expect(api.profileDeck(report, section, 0, REGIONS[0], FULL_CAPS).length, section).toBeGreaterThan(0);
-    }
+    // **And the section seam is not published** (ruling 78, F1327). `profileDeck`
+    // was the pushed view's; the verb walks `deckOf` itself, and this row was
+    // the helper's last reader — a row exercising an export is not a consumer.
+    expect(published, "no deck seam held up by its own test row").not.toContain("profileDeck");
   });
 
   it("T1.109 (C28 I57): past the ring, one span's two populations differ in size and say so on two cards", () => {

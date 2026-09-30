@@ -1,4 +1,4 @@
-● keys · 57 bindings
+● keys · 66 bindings
 Help is an ENTRY in scrollback: copyable, filterable, and scrolled past like any other durable event.
 
  prompt
@@ -54,6 +54,15 @@ Help is an ENTRY in scrollback: copyable, filterable, and scrolled past like any
   key ⌥⇧V    enter Calcium copy mode
   key ⌃]     host escape · attached
   key ⌥esc   enhanced detach · attached · enhanced
+  key 1      jump to watch 1 · focused
+  key 2      jump to watch 2 · focused
+  key 3      jump to watch 3 · focused
+  key 4      jump to watch 4 · focused
+  key 5      jump to watch 5 · focused
+  key 6      jump to watch 6 · focused
+  key 7      jump to watch 7 · focused
+  key 8      jump to watch 8 · focused
+  key 9      jump to watch 9 · focused
 
  transcript
   key ⌥↑     scroll one page up

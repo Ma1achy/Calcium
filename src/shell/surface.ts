@@ -93,6 +93,13 @@ export type SurfaceHost = Readonly<{
   close(reason: "session" | "detach"): Promise<SurfaceCloseOutcome | null>;
   /** Whether a child holds the keyboard — C16's second source for `attachedChild` (I49). */
   readonly attached: boolean;
+  /**
+   * How many times a child has attached or let go — the surface half of C16's
+   * `ownerGeneration` (C16 I73). `attached` answers *now*; this answers *did it
+   * change between two reads*, which a child opened and closed inside one
+   * gesture leaves `attached` unable to say.
+   */
+  readonly generation: number;
 }>;
 
 export type SurfaceHostOptions = Readonly<{
@@ -114,9 +121,26 @@ export type SurfaceHostOptions = Readonly<{
     append(id: string, blocks: readonly Block[]): string;
     replace(entryId: string, id: string, blocks: readonly Block[]): void;
   }>;
+  /**
+   * The attachment's two edges, for what the host keeps beside the keyboard
+   * (C23 I85, C14 I56).
+   *
+   * `opened` runs **after** the child's entry is appended, and `closed` after
+   * ownership has returned and **before** the close's frame is committed — so
+   * whatever it appends is in the frame that ends the capture.
+   */
+  attachment: Readonly<{
+    opened(entryId: string): void;
+    closed(entryId: string, reason: SurfaceCloseOutcome["reason"]): void;
+  }>;
   router: InputRouter;
   lifecycle: TerminalLifecycle;
-  context: () => Omit<ProducerContext, "width" | "height"> &
+  /**
+   * The context a render is handed — **the room inside the child's entry**, not
+   * the region (C24 I41). Asked with the surface's id, because the entry's
+   * command row is `child <id>` and it is part of what the room is less.
+   */
+  context: (id: string) => Omit<ProducerContext, "width" | "height"> &
     Readonly<{ width: number; height: number }>;
   now: () => number;
   schedule: Schedule;
@@ -160,6 +184,7 @@ function fault(stage: SurfaceFault["stage"], cause: unknown): SurfaceFault {
 
 export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
   let current: ChildSurfaceHandle | null = null;
+  let generation = 0;
   let closeCurrent: ((outcome: SurfaceCloseOutcome) => Promise<SurfaceCloseOutcome>) | null = null;
 
   function open(surface: ChildSurface): ChildSurfaceHandle {
@@ -183,9 +208,9 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
     }
 
     // **The reservation is refusable or it is a sentence** (C16 I49,
-    // R-BLK-908). The failure this catches is the one the handler order cannot:
-    // the host's `host.detach` handler runs in front of the child's, so an
-    // application binding `⌃]` is not shadowing the escape — it is declaring a
+    // R-BLK-908). The failure this catches is the one the intercept cannot:
+    // the host's `host.detach` is read before the child's handler (C16 I75), so
+    // an application binding `⌃]` is not shadowing the escape — it is declaring a
     // key it will never be given, and silently never receiving one is worse
     // than being told at the attach. Refused with the chord named, because the
     // application's own remedy is to choose another and it cannot without it.
@@ -222,7 +247,7 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
     >();
 
     const context = (): SurfaceContext =>
-      Object.freeze({ ...options.context(), inputFidelity: fidelity });
+      Object.freeze({ ...options.context(surface.id), inputFidelity: fidelity });
 
     const render = (): readonly Block[] => {
       try {
@@ -239,6 +264,7 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
     // still there afterwards — a captured child is a thing that happened in this
     // session, and a layer is a thing that was covering it.
     const entryId = options.entry.append(surface.id, render());
+    options.attachment.opened(entryId);
 
     const emit = (
       action: string,
@@ -317,31 +343,24 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
       return true;
     };
 
-    // **The `child` rung, and the handler consumes what it does not bind** (C16
-    // I49, R-BLK-838: *takes all but host.detach*). `onInput` answers `false`
-    // for an unbound key, and at `pushedView` that was right — a view was a
-    // substate and a key it did not want belonged to the rung below (the target
-    // has since retired with its layer kind, R-EXA-082). A captured
-    // child is not a substate: a key that fell through would be the host typing
-    // into a prompt the reader cannot see while a PTY holds the terminal. So the
-    // fall-through is closed here rather than inside `onInput`, which keeps
-    // `onInput` a statement about the child's own bindings.
-    // **Registered ordinarily, and `first: true` is what had to go** (C16 I49,
-    // R-BLK-908). At `pushedView` it was right: that target carried eleven view
-    // rows and a surface had to beat them. At `child` the target carries two,
-    // both `host.detach`, and the composition root registers their handler when
-    // the graph is built — so an ordinary registration puts this **behind** it,
-    // which is exactly the order *takes all but host.detach* asks for. With
-    // `first: true` the consuming wrapper below swallowed the host escape and
-    // the one key out of capture did nothing; T1.4h is what found it.
+    // **The `child` rung, and `onInput` answers for the child's own bindings
+    // and nothing more** (C16 I49, R-BLK-838: *takes all but host.detach*). A
+    // key it does not bind comes back `false`, and **the rung** consumes it
+    // (ruling 62) — for this source and for a shell delegation, which
+    // registers no handler at all, so the rule has one carrier for both.
     //
-    // The wrapper is why the order matters at all: `onInput` answers `false`
-    // for an unbound key and this turns that into `true`, because a key that
-    // fell past a captured child would be the host typing into a line the
-    // reader cannot see.
-    const routerDisposable = options.router.register("child", (event) =>
-      onInput(event) ? true : event.kind === "key",
-    );
+    // This registration used to wrap `onInput` and turn that `false` into
+    // `true` for every key. Once the rung consumed for both sources the wrapper
+    // was a second carrier no row could tell from the first: deleting it
+    // failed nothing, and deleting the rung failed T4.84 with the wrapper
+    // still in place. It went in review batch 3. The one event they treated
+    // differently is a key release, which I65's branch drops rather than
+    // consumes; no rung below `child` is offered one either way.
+    //
+    // **Registered ordinarily, and the order does not matter** (C16 I75,
+    // R-BLK-908): the host escape is the intercept table's and is read before
+    // any handler here is offered a key.
+    const routerDisposable = options.router.register("child", (event) => onInput(event));
     const resizeDisposable = options.lifecycle.onResize(() => invalidate());
 
     function invalidate(): void {
@@ -369,9 +388,15 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
       // rendered, which is the record of what was on screen when ownership came
       // back — and a detach that swept it would be the pushed view's hole
       // arriving by another name.
-      options.invalidate();
       current = null;
+      generation += 1;
       closeCurrent = null;
+      options.attachment.closed(entryId, outcome.reason);
+      // **The frame after ownership returns, not before** (C22 I110). The
+      // commit composes at once, so above `current = null` it drew `attached`
+      // and `keys → child` into the frame that ended the capture — and an
+      // application's own `close()` has no key behind it to draw another.
+      options.invalidate();
 
       void actionQueue
         .catch(() => undefined)
@@ -401,6 +426,7 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
       close: () => beginClose({ reason: "application" }),
     });
     current = handle;
+    generation += 1;
     closeCurrent = beginClose;
     options.invalidate();
     return handle;
@@ -417,6 +443,9 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
     // answer able to disagree with this one for the length of a promise.
     get attached() {
       return current !== null;
+    },
+    get generation() {
+      return generation;
     },
   });
 }

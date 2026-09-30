@@ -40,7 +40,7 @@ describe("C22 I115 / C23 I80 — provenance", () => {
     expect(caller, "a caller's value is recorded").toEqual({ key: "motion", value: "reduced", source: "default" });
   });
 
-  it("T1.75 (C23 I80, R-HON-008): the ladder is §075's; default and config draw, env and flag meet C04 I6 (parked 44)", () => {
+  it("T1.75 (C23 I80, R-HON-008): the ladder is §075's, and all four rungs draw — env and flag on the word, by C04 I6's closed vocabulary (ruling 44)", () => {
     expect(PROVENANCE_TONE, "§075's ladder, quietest first").toEqual({ default: "muted", config: "meta", env: "warn", flag: "error" });
 
     const two: Setting[] = [
@@ -48,21 +48,30 @@ describe("C22 I115 / C23 I80 — provenance", () => {
       { key: "b", value: "2", source: "config" },
     ];
     const tones = (settings: readonly Setting[]): unknown[] => {
-      const b = configBlock(settings);
+      const b = configBlock(settings, "t");
       return b.kind === "table" ? b.rows.map((r) => r.cells["source"]?.tone) : [];
     };
     expect(tones(two)).toEqual(["muted", "meta"]);
 
     // Read off the frame too: a header and one row each, the source last.
-    const rows = measurable({ capabilities: ASCII_CAPS, definitions: [tableDefinition] }).renderToLines(configBlock(two), 60).map((l) => l.replace(SGR, "").trim()); // the focus gutter leads every row
+    const rows = measurable({ capabilities: ASCII_CAPS, definitions: [tableDefinition] }).renderToLines(configBlock(two, "t"), 60).map((l) => l.replace(SGR, "").trim()); // the focus gutter leads every row
     expect(rows[0]?.split(/\s+/u), "the header").toEqual(["key", "value", "source"]);
     expect(rows.slice(-2).map((r) => r.split(/\s+/u).at(-1)), "one row per setting, source last").toEqual(["default", "config"]);
 
-    // **The state parked as 44, recorded rather than hidden**: C04 I6 refuses a
-    // `warn` or `error` cell with no glyph. When 44 is answered this goes red.
-    for (const source of ["env", "flag"] as const) {
-      expect(() => configBlock([{ key: "k", value: "v", source }]), source).toThrow(/C04 I6/u);
-    }
+    // **Ruling 44, answered — this clause was written to go red that day.** The
+    // source column declares the ladder's four words as its closed vocabulary
+    // (C04 I6, amended), so the two loud rungs carry their tone on the word
+    // alone: the word is the fact, and the tone its second carrier.
+    const loud: Setting[] = [
+      { key: "a", value: "1", source: "env" },
+      { key: "b", value: "2", source: "flag" },
+    ];
+    expect(tones(loud), "warn and error, on the word").toEqual(["warn", "error"]);
+    const glyphs = (() => {
+      const b = configBlock(loud, "t");
+      return b.kind === "table" ? b.rows.map((r) => r.cells["source"]?.glyph) : [];
+    })();
+    expect(glyphs, "and no glyph beside it").toEqual([undefined, undefined]);
 
     // **The control**: two `default`s are two `muted`s, so the row is about the
     // ladder and not a column that is always one tone.

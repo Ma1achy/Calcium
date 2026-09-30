@@ -146,8 +146,8 @@ const results = runPass({
       // no width assertion can see. A focus then names a row that draws nothing.
       name: "a kind drops a row it cannot draw",
       file: KINDS,
-      from: "      block.events.map((event) => {",
-      to: "      block.events.filter(() => width > 20).map((event) => {",
+      from: "      block.events.flatMap((event, i) => {",
+      to: "      block.events.filter(() => width > 20).flatMap((event, i) => {",
       expect: "T3.94",
     },
   ],

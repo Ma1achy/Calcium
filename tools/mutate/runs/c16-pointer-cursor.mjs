@@ -84,7 +84,8 @@ const MUTATIONS = [
     // Motion extends the (empty) selection instead of aiming.
     name: "a drag over the focused plot is ⇧↓ rather than the crosshair",
     file: CONSTRUCT,
-    from: "      if (onFocused && aim !== null) return aim;\n",
+    // Re-anchored 2026-09-28 (review batch 3, M7): motion aims the crosshair and never the legend (C16 I71); the mutation is unchanged.
+    from: "      if (onFocused && crosshair !== null) return crosshair;\n",
     to: "",
     expect: "T4.71",
   },

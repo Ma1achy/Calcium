@@ -48,6 +48,12 @@ function wire(editor: LineEditor): {
     // **The `child` rung's second source** (C16 I49). Required rather than
     // optional, so a harness that means to attach one has to say so.
     childAttached: () => false,
+    // C16 I73 — no stack and no surface host, so nothing is ever raised.
+    // C16 I74 — no layer here has anything to scroll.
+    scrollLayer: () => false,
+    // C16 I75 — the escape's detach; nothing here attaches a child.
+    detachChild: () => undefined,
+    ownerGeneration: () => 0,
     overlayWouldResolve: () => null,
     overlayAnswerCallback: () => null,
     overlayTop: () => null,
