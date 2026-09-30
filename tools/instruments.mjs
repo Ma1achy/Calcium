@@ -312,14 +312,6 @@ const NOT_INSTRUMENTS = {
   "tools/theme/sta-availability.mjs": ONE_SHOT("R-STA-004 already exists — this script has run"),
   "tools/bench/env.mjs":
     "not an instrument: one line, `NODE_ENV ??= \"production\"`, imported first by `stress.mjs` and `plots.mjs` so React's production build is the one measured (F1167). It measures nothing; bench-probes runs it with NODE_ENV cleared, and no row asserts its effect",
-  // **Not an instrument any more, and running it is destructive.** It wrote
-  // `DESIGN_FIXTURES.md` from its own table; the file has since been edited by
-  // hand — the `figure` column, the rule-interaction table — and is parsed by
-  // `design-fixtures.test.ts` by equality. Run against a copy at 78cd90e1 it
-  // rewrote the file +114/−192. What survives is `M`, the classification that
-  // `design-prose-with-surfaces.py` parses out of this file's text.
-  "tools/design-fixture-map.py":
-    "a retired generator: `test/golden/DESIGN_FIXTURES.md` is now maintained by hand and gated by design-fixtures.test.ts, and a run overwrites it (+114/−192 at 78cd90e1). Its `M` table is still read by design-prose-with-surfaces.py, whose fixture is design-census.test.ts",
 };
 
 /** The reason every one-shot shares, with what it printed when it was run again. */
