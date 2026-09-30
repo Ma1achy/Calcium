@@ -166,7 +166,15 @@ catalogue:          ## the frames `instruments` and `test` sweep — generated, 
 
 # **A prerequisite, not a step in `all`** — the degraded jobs run `make test` alone
 # and PC11 lives in the suite too, so the dependency has to travel with the target.
-instruments: catalogue  ## every instrument's own fixture, and the inventory by equality (group 9)
+#
+# **`chromium` and the build for the same reason.** The design page's runner has
+# its fixture under `test/browser/`, which needs the pinned browser; and eight
+# fixtures read `dist/` — `profile.mjs`'s from the start, then the bundle, the
+# quantised writer, three benches and the docker recorder. A stale `dist/` is
+# worse than a missing one: the rows pass against the previous commit's code
+# (`check`'s F447, one target on). `chromium` fetches once and verifies after.
+instruments: catalogue chromium  ## every instrument's own fixture, and the inventory by equality (group 9)
+	npm run build
 	node tools/instruments.mjs
 
 mutate: catalogue     ## every mutation run, serially, the tree hashed either side (F952) — SHARD=k/n ONLY=substr
