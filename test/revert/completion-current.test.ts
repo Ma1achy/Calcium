@@ -31,4 +31,8 @@ describe("C19 T6.25, T6.26", () => {
       expect(kinds.filter((k) => k === "rule"), `${String(remainder)}: and it is its only rule`).toHaveLength(1);
     }
   });
+
+  it.todo(
+    "T6.27 (C19 I23): menuRowsShown still charging the bottom edge → T4.9 fails — not deferred on a component: lands with the F1474 code commit of review batch 4",
+  );
 });
