@@ -65,12 +65,18 @@ export type MetaSpec = Readonly<{
 /**
  * Defaults for everything except `origin`, which is the field this exists to
  * make unforgettable.
+ *
+ * **The code's default is the status's** (C23 I100, ruling 98, F1491): 1 for an
+ * `error` document, 0 otherwise — what `completeLocal` derives and what
+ * `errorDoc` used to restate by hand. A flat 0 gave every `noticeDoc` at
+ * `error` — F15's fault notice, ruling 93's failed key action — a document
+ * saying failed with exit 0.
  */
-export function meta(spec: MetaSpec): ViewDocument["meta"] {
+export function meta(spec: MetaSpec, status: DocumentStatus = "ok"): ViewDocument["meta"] {
   return {
     verb: spec.verb ?? null,
     adapter: spec.adapter ?? "none",
-    exitCode: spec.exitCode ?? 0,
+    exitCode: spec.exitCode ?? (status === "error" ? 1 : 0),
     durationMs: spec.durationMs ?? 0,
     truncated: spec.truncated ?? false,
     argv: spec.argv ?? [],
@@ -103,7 +109,7 @@ export function compose(spec: DocSpec): ViewDocument {
     status: spec.status ?? "ok",
     blocks: spec.blocks,
     ...(spec.error === undefined ? {} : { error: spec.error }),
-    meta: meta(spec.meta ?? { origin: "user" }),
+    meta: meta(spec.meta ?? { origin: "user" }, spec.status ?? "ok"),
   });
 }
 
@@ -965,6 +971,6 @@ export function errorDoc(
     status: "error",
     blocks,
     error,
-    meta: { exitCode: 1, ...metaSpec },
+    meta: metaSpec,
   });
 }

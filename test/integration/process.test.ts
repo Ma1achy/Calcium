@@ -445,9 +445,73 @@ describe("C21 with C06", () => {
       "SIGKILL: meta 137 · recorded /tty vim 137",
     ]);
   });
-  it.todo(
-    "T4.100 (C23 I100, C21 I19, ruling 98, F1491): the shell route's code is C07 I14's — 137 for SIGKILL on both arms, -1 and `did not start` for a spawn failure — not deferred on a component: lands with the F1491 code commit of review batch 4",
-  );
+  it("T4.100 (C23 I100, C21 I19, ruling 98, F1491): the shell route's code is C07 I14's — 137 for SIGKILL on both arms, -1 and `did not start` for a spawn failure", async () => {
+    // **The box, the code and the record, as one table**: the defect was the
+    // record disagreeing with the ending — 1 for a signal and for a child that
+    // never started, and 0 for a signal on the PTY arm.
+    const read = (h: ReturnType<typeof pipelineHarness>): string => {
+      const doc = h.transcript.entries.at(-1)?.doc;
+      const box = doc?.blocks[0] as { kind?: string; message?: string } | undefined;
+      return `${String(box?.message)} · meta ${String(doc?.meta.exitCode)} · recorded ${h.recorded.map((r) => String(r.exitCode)).join(" ")}`;
+    };
+    const piped = (exit: { code: number | null; signal: string | null }) =>
+      pipelineHarness({
+        spawnShell: () =>
+          ({
+            stdout: (async function* () {})(),
+            stderr: (async function* () {})(),
+            exited: Promise.resolve(exit),
+            overflowed: false,
+            signal: () => false,
+          }) as never,
+      });
+    const seen: string[] = [];
+    for (const [name, exit] of [
+      ["exit 3", { code: 3, signal: null }],
+      ["SIGKILL", { code: null, signal: "SIGKILL" }],
+      ["never started", { code: null, signal: null }],
+    ] as const) {
+      const h = piped(exit);
+      h.pipeline.submit("!x");
+      for (let i = 0; i < 40 && h.recorded.length === 0; i += 1) await new Promise((r) => void setTimeout(r, 0));
+      seen.push(`pipe ${name}: ${read(h)}`);
+    }
+
+    // **The PTY arm through C21's own normalisation**, not a fake `Exit`: the
+    // port answers as `node-pty` 1.1.0 does for `kill -9 $$` (C21 I19), and the
+    // runner is the real one. A fake handing `{code: null, signal}` would
+    // assert the fix to C21 from inside C23 and see nothing of it.
+    const runner = createProcessRunner({
+      env: {},
+      stdin: {},
+      pty: {
+        spawn: () => ({
+          pid: 1,
+          onData: () => undefined,
+          onExit: (cb: (e: { exitCode: number; signal?: number }) => void) => {
+            setTimeout(() => cb({ exitCode: 0, signal: 9 }), 0);
+          },
+          write: () => undefined,
+          resize: () => undefined,
+          kill: () => undefined,
+        }),
+      } as never,
+    });
+    const pty = pipelineHarness({
+      hasPty: true,
+      spawnPty: (command, size) => runner.spawnPty(command, { cwd: () => "/w", ...size }) as never,
+    });
+    pty.pipeline.submit("!x");
+    for (let i = 0; i < 80 && pty.recorded.length === 0; i += 1) await new Promise((r) => void setTimeout(r, 0));
+    seen.push(`pty SIGKILL: ${read(pty)}`);
+
+    expect(seen).toEqual([
+      "pipe exit 3: The command exited with code 3. · meta 3 · recorded 3",
+      "pipe SIGKILL: Killed by SIGKILL. · meta 137 · recorded 137",
+      "pipe never started: The command did not start. · meta -1 · recorded -1",
+      "pty SIGKILL: Killed by SIGKILL. · meta 137 · recorded 137",
+    ]);
+  });
   it.todo(
     "T4.101 (C23 I29, C23 I5, F1492): a line a ⌃c cleared from the queue is recorded in C20 at settlement, as -1 — not deferred on a component: lands with the F1492 code commit of review batch 4",
   );

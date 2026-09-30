@@ -913,10 +913,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // and mark. The code has nowhere to go on `partial` (C04 I3) and nothing
       // read it; 130 in `meta.exitCode` and C20 is what a consumer keeps.
       const failed = !cancelled && (exit.code !== 0 || exit.signal !== null);
+      // **C07's sentences and C07's table** (I100, ruling 98, F1491). A child
+      // with neither a code nor a signal never started — C21 I13 settles a
+      // spawn failure that way — and `exited with code 1` named a code it never
+      // returned; the text is C07's for the same `Exit`.
       const message =
         exit.signal !== null
           ? `Killed by ${exit.signal}.`
-          : `The command exited with code ${String(exit.code ?? 1)}.`;
+          : exit.code === null
+            ? "The command did not start."
+            : `The command exited with code ${String(exit.code)}.`;
 
       /**
        * **The final snapshot, then the disposal** (C23 I67, C27 §6): the cursor
@@ -959,7 +965,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
             : {}),
           meta: {
             origin: "user",
-            exitCode: cancelled ? 130 : (exit.code ?? 1),
+            // 128 + n for a signal, -1 for a child that never started (C07
+            // I14). `code ?? 1` gave 1 for both, and 0 for a signal on the PTY
+            // arm until C21 I19 nulled the code there.
+            exitCode: cancelled ? 130 : exitCodeOf({ exitCode: exit.code, signal: exit.signal }),
             transport: "subprocess",
             argv: [command],
           },

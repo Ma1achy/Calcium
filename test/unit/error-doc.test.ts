@@ -7,7 +7,7 @@
 // 48's, and the axis that sorted the three is *could anyone but the framework
 // know this value* — which keeps all three and moves who writes them.
 import { describe, expect, it } from "vitest";
-import { errorDoc } from "../../src/shell/documents.js";
+import { errorDoc, noticeDoc } from "../../src/shell/documents.js";
 
 const meta = { origin: "user" } as const;
 
@@ -96,7 +96,18 @@ describe("C23 §5 — errorDoc", () => {
 
     expect(doc.error, "the document carries what the far side said").toEqual(error);
   });
-  it.todo(
-    "T1.106 (C23 I100, ruling 98, F1491): an error document composed with no code carries 1, noticeDoc and errorDoc alike — not deferred on a component: lands with the F1491 code commit of review batch 4",
-  );
+  it("T1.106 (C23 I100, ruling 98, F1491): an error document composed with no code carries 1, noticeDoc and errorDoc alike", () => {
+    // **The code beside the status, as one table**, because the defect was the
+    // two disagreeing: `noticeDoc` at `error` said failed with exit 0. The `ok`
+    // row is the control — the default moves with the status and not for
+    // everything — and `errorDoc` given 2 keeps it, so the default is a default.
+    const row = (name: string, doc: ReturnType<typeof noticeDoc>): string =>
+      `${name}: ${doc.status} ${String(doc.meta.exitCode)}`;
+    expect([
+      row("noticeDoc error", noticeDoc("", "the key action `x` failed: boom", "error", { origin: "refresh" }, "error")),
+      row("noticeDoc ok", noticeDoc("/ps", "ps finished", "muted", meta)),
+      row("errorDoc", errorDoc("docker rm x", { message: "no such container" }, meta)),
+      row("errorDoc 2", errorDoc("docker rm x", { message: "usage" }, { ...meta, exitCode: 2 })),
+    ]).toEqual(["noticeDoc error: error 1", "noticeDoc ok: ok 0", "errorDoc: error 1", "errorDoc 2: error 2"]);
+  });
 });

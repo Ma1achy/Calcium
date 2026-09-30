@@ -312,8 +312,12 @@ describe("C21 · C22 — the PTY port, spec-first rows", () => {
       code: 3,
       signal: null,
     });
-    expect(await exitWith({ exitCode: 0, signal: 15 }), "and a signal is named, not numbered").toEqual({
-      code: 0,
+    // **And the code goes with it** (F1491): the port says `exitCode: 0` beside
+    // every signal — measured, `sh -c 'kill -9 $$'` → `{exitCode: 0, signal: 9}`
+    // — and the pipe arm never reports a code beside a signal. Left at 0, C07's
+    // `exitCodeOf` read the code first and recorded a killed child as a success.
+    expect(await exitWith({ exitCode: 0, signal: 15 }), "and a signal is named, not numbered, with no code").toEqual({
+      code: null,
       signal: "SIGTERM",
     });
 
@@ -325,8 +329,9 @@ describe("C21 · C22 — the PTY port, spec-first rows", () => {
     });
 
     // **The fallback, so an unknown number is reported rather than swallowed.**
+    // An unknown signal is still a signal, so the code goes with it too (F1491).
     expect(await exitWith({ exitCode: 0, signal: 199 }), "nothing is lost").toEqual({
-      code: 0,
+      code: null,
       signal: "SIG199",
     });
   });
