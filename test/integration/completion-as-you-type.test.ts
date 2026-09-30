@@ -499,3 +499,15 @@ describe("C22 I51 — a menu that opens by itself does not stop typing", () => {
     expect(graph.editor.text, "and the character lands").toBe("x");
   });
 });
+
+describe("C19 I30, I31 — the ladder, and a line that goes away (ruling 99, F1497, F1498)", () => {
+  it.todo(
+    "T3.30 (C19 I30, I23, ruling 99, F1496): sixty candidates with no detail draw one a row, the first marked, the box full and N the rest — not deferred on a component: lands with lane b4-menu3's code commit",
+  );
+  it.todo(
+    "T3.31 (C19 I31, I19, F1498): Esc, backspace to an empty line, and the retyped /c opens the menu — not deferred on a component: lands with lane b4-menu3's code commit",
+  );
+  it.todo(
+    "T3.32 (C19 I31, I20, I22, F1497): a recall closes the menu at rest and ends the hold — not deferred on a component: lands with lane b4-menu3's code commit",
+  );
+});
