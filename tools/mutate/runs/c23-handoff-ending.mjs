@@ -62,8 +62,9 @@ const results = runPass({
       // `error` document.
       name: "T6.110: the failure arm's tone put back to warn",
       file: EXECUTION,
-      from: ': noticeDoc(line, text, "error", { origin: "user" }, "error"),',
-      to: ': noticeDoc(line, text, "warn", { origin: "user" }, "error"),',
+      // Re-anchored 2026-09-30: the arm's meta became `metaSpec` (C23 I97).
+      from: ': noticeDoc(line, text, "error", metaSpec, "error"),',
+      to: ': noticeDoc(line, text, "warn", metaSpec, "error"),',
       expect: "T4.93",
     },
     {
@@ -77,10 +78,12 @@ const results = runPass({
     {
       // **The walk's row 5**: the cancel keeps its tone and status and takes
       // the continuation mark, because the tone's derivation answers first.
+      // Re-anchored 2026-09-30: the arm is `cancelledDoc` now (C23 I96), and
+      // the same defect is the arm composed by `noticeDoc` again.
       name: "T6.110: the cancel arm's mark left to the tone's derivation",
       file: EXECUTION,
-      from: '"partial", "cancelled")',
-      to: '"partial")',
+      from: "? cancelledDoc(line, text, metaSpec)",
+      to: '? noticeDoc(line, text, "muted", metaSpec, "partial")',
       expect: "T4.93",
     },
   ],

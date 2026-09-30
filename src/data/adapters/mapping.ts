@@ -52,8 +52,12 @@ const SIGNUM: Readonly<Record<string, number>> = Object.freeze({
  * no "we do not know" hiding in the sentinel. The two split on *status* — the
  * aborted one carries `cancelled` and settles as `partial` — which is the
  * mapping working rather than a collision.
+ *
+ * **Two fields, not the result**, because a handed-off child has an `Exit` and
+ * no `RawResult` (C23 I97): the table is this one, and a second copy of it in
+ * the shell would be a record free to disagree.
  */
-export function exitCodeOf(raw: RawResult): number {
+export function exitCodeOf(raw: Pick<RawResult, "exitCode" | "signal">): number {
   if (raw.exitCode !== null) return raw.exitCode;
   if (raw.signal !== null) {
     const signum = SIGNUM[raw.signal];

@@ -26,7 +26,6 @@ import type {
   DocumentMeta,
   DocumentStatus,
   ErrorLike,
-  Glyph,
   ViewDocument,
 } from "../data/viewmodel/index.js";
 
@@ -185,12 +184,8 @@ const GLYPH_OF = Object.freeze({
  * message is the notice's own text, which is what an `ErrorLike` carrying
  * anything else would be paraphrasing.
  *
- * **`mark` is a state's mark, where the notice says a call's state** (C23 I95).
- * A cancelled handoff is `muted` under a command, which the derivation below
- * answers with the continuation mark — and the `cancelled` state has a mark of
- * its own. Both claim the one slot, and the state's wins: the notice is the
- * entry's only block, so there is nothing above it to continue. Absent, the
- * mark is the tone's, as it always was.
+ * A cancel is not composed here: its notice carries a state's mark rather than
+ * the tone's, and `cancelledDoc` below is the one place it is built.
  */
 export function noticeDoc(
   command: string,
@@ -198,7 +193,6 @@ export function noticeDoc(
   tone: "muted" | "warn" | "error" | "info",
   metaSpec: MetaSpec,
   status: DocumentStatus = "ok",
-  mark?: Glyph,
 ): ViewDocument {
   // **`muted` takes the continuation mark, and the condition is the command**
   // (C09 §4). Eligibility is a property of the *entry*, not of the block: the
@@ -218,8 +212,7 @@ export function noticeDoc(
   // F15's fault notice is exactly that fifth case and it is already here: it
   // is `error`, so the tone alone would have spared it — but only by accident,
   // and its own `command` is `""`.
-  const glyph =
-    mark ?? (tone === "muted" ? (command === "" ? undefined : "continuation") : GLYPH_OF[tone]);
+  const glyph = tone === "muted" ? (command === "" ? undefined : "continuation") : GLYPH_OF[tone];
   return compose({
     command,
     status,
@@ -233,6 +226,42 @@ export function noticeDoc(
         ...(glyph === undefined ? {} : { glyph }),
       }),
     ],
+    meta: metaSpec,
+  });
+}
+
+/**
+ * **A cancel, drawn as the `cancelled` call state** (C23 I96, ruling 92): `muted`,
+ * with the state's own mark — ⊘, `/` in ASCII.
+ *
+ * **One composer for every route that settles a cancel into a document**: the
+ * shell route's `Cancelled.` above the screen it kept, a handed-off child that
+ * ended on an interrupt or a closed terminal, and each queued entry a `⌃c`
+ * clears. They were three forms — an `error` box, this, and a `warn` ▲ — so a
+ * cancel read as a failure, a cancel or a warning depending on where it
+ * happened.
+ *
+ * **The state's mark displaces the continuation mark** (C23 §8a A6.6 row 5).
+ * A `muted` notice under a command would take `⎿`, and the `cancelled` state
+ * has a mark of its own; both claim the one slot, and the state's wins — on
+ * the routes that use this the notice heads its entry, so there is nothing
+ * above it inside the entry to continue.
+ */
+export function cancelledNotice(text: string, id: string): Block {
+  return block({ kind: "notice", id, tone: "muted", glyph: "cancelled", text });
+}
+
+/**
+ * A cancel as a whole document: the notice alone, on `partial` (C23 I10, I96).
+ * **Never `error`**: a stopped child says nothing about whether it would have
+ * worked (C23 I81), and C04 I3 then admits no `error` field — so there is no
+ * `code` to carry, and `meta.exitCode` is where a consumer reads the ending.
+ */
+export function cancelledDoc(command: string, text: string, metaSpec: MetaSpec): ViewDocument {
+  return compose({
+    command,
+    status: "partial",
+    blocks: [cancelledNotice(text, blockId("notice"))],
     meta: metaSpec,
   });
 }

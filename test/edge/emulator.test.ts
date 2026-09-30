@@ -393,7 +393,9 @@ describe("C23 — the shell route as a live screen, spec-first rows", () => {
 
     expect(signals, "the rung reached the child").toEqual(["SIGINT"]);
     const entry = h.transcript.entries[0];
-    expect(entry?.doc.status, "the card settles failed").toBe("error");
+    // **Partial, not failed** (C23 I96, ruling 92): a stopped child says nothing
+    // about whether it would have worked. It settled `error` until ruling 92.
+    expect(entry?.doc.status, "the entry settles cancelled").toBe("partial");
     const text = JSON.stringify(entry?.doc.blocks);
     expect(text, "naming the cancel rather than a code").toContain("Cancelled.");
     // **The screen survives it**, which is the half a signal assertion misses: a

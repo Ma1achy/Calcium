@@ -287,7 +287,8 @@ describe("C21 with C06", () => {
     const endings: readonly (readonly [string, { code: number | null; signal: string | null }])[] = [
       ["exit 0", { code: 0, signal: null }],
       ["exited 1", { code: 1, signal: null }],
-      // A child that never started (C21 I13): `code ?? 1`, and still a failure.
+      // A child that never started (C21 I13): still a failure, and it names no
+      // exit it never returned (ruling 94, F1482).
       ["never started", { code: null, signal: null }],
       // A grandchild's SIGINT under `sh -c` arrives as 128+n with no signal, and
       // ruling 91 says a non-zero exit is a failure (A6.6 row 4).
@@ -313,7 +314,7 @@ describe("C21 with C06", () => {
     expect(seen).toEqual([
       "exit 0: muted continuation ok · vim finished",
       "exited 1: error error error · vim exited 1",
-      "never started: error error error · vim exited 1",
+      "never started: error error error · vim ended without an exit status",
       "exited 130: error error error · vim exited 130",
       "SIGKILL: error error error · vim ended on SIGKILL",
       "SIGQUIT: error error error · vim ended on SIGQUIT",
@@ -322,15 +323,128 @@ describe("C21 with C06", () => {
       "SIGHUP: muted cancelled partial · vim ended on SIGHUP",
     ]);
   });
-  it.todo(
-    "T4.94 (C23 I96, C23 I66, ruling 92): the shell route's cancel settles partial, muted, with the cancelled mark above the kept screen — not deferred on a component: lands with the F1479 code commit of review batch 4",
-  );
-  it.todo(
-    "T4.95 (C23 I96, C23 I5, ruling 92): a cleared queue's entries settle partial, muted, with the cancelled mark — not deferred on a component: lands with the F1479 code commit of review batch 4",
-  );
-  it.todo(
-    "T4.96 (C23 I97, C23 I29, F1480): a handoff's code reaches meta and C20, 128+n for a signal and -1 for neither — not deferred on a component: lands with the F1480 code commit of review batch 4",
-  );
+  it("T4.94 (C23 I96, C23 I66, ruling 92): the shell route's cancel settles partial, muted, with the cancelled mark above the kept screen", async () => {
+    // **The status and the mark together**, because the defect was an `error`
+    // box on an `error` document: a row reading the status alone passes a build
+    // that moves it and keeps the box, and one reading the notice alone passes
+    // the reverse. A real child dies *of* the signal, so the fake settles from
+    // `signal` — one that resolved on its own would settle cancelled unsignalled.
+    let emit: ((c: string) => void) | null = null;
+    let settleChild: ((e: { code: number | null; signal: string | null }) => void) | null = null;
+    const h = pipelineHarness({
+      hasPty: true,
+      spawnPty: () => ({
+        pid: 4242,
+        exited: new Promise((r) => {
+          settleChild = r as (e: { code: number | null; signal: string | null }) => void;
+        }),
+        running: true,
+        onData: (cb) => {
+          emit = cb;
+        },
+        write: () => undefined,
+        resize: () => undefined,
+        signal: (sig) => {
+          settleChild?.({ code: null, signal: sig });
+          return true;
+        },
+      }),
+    });
+    h.pipeline.submit("!sleep 100");
+    // The route imports the emulator before it spawns (C23 I71), so the child
+    // exists a few turns after the submit rather than one.
+    for (let i = 0; i < 40 && emit === null; i += 1) await new Promise((r) => void setTimeout(r, 0));
+    (emit as unknown as (c: string) => void)("still working\r\n");
+    for (let i = 0; i < 40; i += 1) await new Promise((r) => void setTimeout(r, 0));
+
+    h.pipeline.cancel();
+    await settled(h.pipeline);
+    for (let i = 0; i < 40 && h.recorded.length === 0; i += 1) await new Promise((r) => void setTimeout(r, 0));
+
+    const doc = h.transcript.entries[0]?.doc;
+    const first = doc?.blocks[0] as { kind?: string; tone?: string; glyph?: string; text?: string } | undefined;
+    const kinds = (doc?.blocks ?? []).map((b) => b.kind);
+    expect(
+      [
+        `status ${String(doc?.status)} · error ${JSON.stringify(doc?.error ?? null)}`,
+        `first ${String(first?.kind)} ${String(first?.tone)} ${String(first?.glyph)} · ${String(first?.text)}`,
+        `kinds ${kinds.join(" ")}`,
+        `code ${String(doc?.meta.exitCode)} · recorded ${h.recorded.map((r) => r.exitCode).join(" ")}`,
+      ],
+    ).toEqual([
+      "status partial · error null",
+      "first notice muted cancelled · Cancelled.",
+      "kinds notice scroll",
+      "code 130 · recorded 130",
+    ]);
+    // **The screen survives it** (C23 I66): the kept block still holds the line.
+    expect(JSON.stringify(doc?.blocks[1]), "the line written before the press").toContain("still working");
+  });
+  it("T4.95 (C23 I96, C23 I5, ruling 92): a cleared queue's entries settle partial, muted, with the cancelled mark", async () => {
+    // Two behind a held one, because the defect a single queued item cannot
+    // show is one entry cleared and the next left saying it waits.
+    const h = pipelineHarness({ invoke: () => new Promise<never>(() => undefined) });
+    h.pipeline.submit("/ps");
+    await new Promise((r) => void setTimeout(r, 0));
+    h.pipeline.submit("/ps --all");
+    h.pipeline.submit("/ps -q");
+    // Not `settled(h.pipeline)`: it waits for the guard, and the held `/ps` never
+    // releases it until the cancel below.
+    await settled();
+
+    h.pipeline.cancel();
+    await settled(h.pipeline);
+    await settled(h.pipeline);
+
+    const cleared = h.transcript.entries
+      .filter((e) => e.doc.command !== "/ps")
+      .map((e) => {
+        const n = e.doc.blocks[0] as { tone?: string; glyph?: string; text?: string } | undefined;
+        return `${e.doc.command}: ${String(n?.tone)} ${String(n?.glyph)} ${e.doc.status} · ${String(n?.text)} · ${String(e.doc.blocks.length)}`;
+      });
+    expect(cleared).toEqual([
+      "/ps --all: muted cancelled partial · cancelled before it ran · 1",
+      "/ps -q: muted cancelled partial · cancelled before it ran · 1",
+    ]);
+    expect(
+      h.transcript.entries.some((e) => /queued behind/.test(JSON.stringify(e.doc))),
+      "and nothing is left saying it is still waiting",
+    ).toBe(false);
+  });
+  it("T4.96 (C23 I97, C23 I29, F1480): a handoff's code reaches meta and C20, 128+n for a signal and -1 for neither", async () => {
+    // **Both records are read**, because the defect was the record disagreeing
+    // with the notice above it: `vim` exiting 1 said failed and was kept as 0.
+    // 128+n is C07 I14's arithmetic, not C21's — C21's `Exit` carries the
+    // signal's name beside a null code.
+    const endings: readonly (readonly [string, { code: number | null; signal: string | null }])[] = [
+      ["exit 0", { code: 0, signal: null }],
+      ["exit 1", { code: 1, signal: null }],
+      ["exit 2", { code: 2, signal: null }],
+      ["exit 130", { code: 130, signal: null }],
+      ["neither", { code: null, signal: null }],
+      ["SIGINT", { code: null, signal: "SIGINT" }],
+      ["SIGTERM", { code: null, signal: "SIGTERM" }],
+      ["SIGKILL", { code: null, signal: "SIGKILL" }],
+    ];
+    const seen: string[] = [];
+    for (const [name, exit] of endings) {
+      const h = pipelineHarness({ handoff: () => Promise.resolve(exit) });
+      h.pipeline.submit("/tty vim");
+      await settled(h.pipeline);
+      const doc = h.transcript.entries.at(-1)?.doc;
+      seen.push(`${name}: meta ${String(doc?.meta.exitCode)} · recorded ${h.recorded.map((r) => `${r.command} ${String(r.exitCode)}`).join(", ")}`);
+    }
+    expect(seen).toEqual([
+      "exit 0: meta 0 · recorded /tty vim 0",
+      "exit 1: meta 1 · recorded /tty vim 1",
+      "exit 2: meta 2 · recorded /tty vim 2",
+      "exit 130: meta 130 · recorded /tty vim 130",
+      "neither: meta -1 · recorded /tty vim -1",
+      "SIGINT: meta 130 · recorded /tty vim 130",
+      "SIGTERM: meta 143 · recorded /tty vim 143",
+      "SIGKILL: meta 137 · recorded /tty vim 137",
+    ]);
+  });
   it("T4.7 (with C22): session exit signals every child before the terminal is released", async () => {
     // A02 Seam 4's `Shutdown` row, and the whole claim is the **order**: a
     // child still running when the alternate screen is released writes onto the

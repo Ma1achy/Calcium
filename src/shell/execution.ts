@@ -28,11 +28,12 @@ import type { Builtin, ParseResult } from "../interaction/parser/index.js";
 import type { RawPatch } from "../data/transport/index.js";
 import type { Exit } from "../data/process/types.js";
 import type { Block, ViewDocument } from "../data/viewmodel/index.js";
-import { approvalPrompt, blockId, callHead, callStatus, cardOver, completeLocal, compose, DENY_KEY, errorDoc, noticeDoc, refusalNotice, toolCallDoc, usageDoc } from "./documents.js";
+import { approvalPrompt, blockId, callHead, callStatus, cancelledDoc, cancelledNotice, cardOver, completeLocal, compose, DENY_KEY, errorDoc, noticeDoc, refusalNotice, toolCallDoc, usageDoc } from "./documents.js";
 import { createActionDispatcher } from "./actions.js";
 import { createRefreshDriver } from "./refresh.js";
 import type { ProducerContext } from "../data/adapters/types.js";
 import { overflowNotice, withOverflowNotice } from "../data/adapters/overflow.js";
+import { exitCodeOf } from "../data/adapters/mapping.js";
 import { BODY_INDENT } from "./entry-layout.js";
 import { jsonFlagFor } from "../data/manifest/index.js";
 import type { ValidationResult } from "../data/manifest/index.js";
@@ -597,14 +598,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    *
    * **The work is not discarded silently**, and the entry appended at submission
    * is what pays for that: it already exists and settles in place saying what
-   * happened to it.
+   * happened to it — as a cancel, on `partial` (I96, ruling 92). It was a `warn`
+   * ▲ on an `ok` document, which drew a cancel as a warning.
    */
   const clearQueue = (): void => {
     for (const item of queue.splice(0)) {
-      deps.transcript.settle(
-        item.id,
-        noticeDoc(item.line, "cancelled before it ran", "warn", { origin: "user" }),
-      );
+      deps.transcript.settle(item.id, cancelledDoc(item.line, "cancelled before it ran", { origin: "user" }));
     }
   };
 
@@ -908,10 +907,14 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         pipeOverflowed = child.overflowed;
       }
 
-      const failed = cancelled || exit.code !== 0 || exit.signal !== null;
-      const message = cancelled
-        ? "Cancelled."
-        : exit.signal !== null
+      // **A cancel is not a failure** (I66, I96, ruling 92): it settles `partial`
+      // under the `cancelled` state's notice, where it was an `error` box on an
+      // `error` document with `error.code` `CANCELLED` — failure's status, tone
+      // and mark. The code has nowhere to go on `partial` (C04 I3) and nothing
+      // read it; 130 in `meta.exitCode` and C20 is what a consumer keeps.
+      const failed = !cancelled && (exit.code !== 0 || exit.signal !== null);
+      const message =
+        exit.signal !== null
           ? `Killed by ${exit.signal}.`
           : `The command exited with code ${String(exit.code ?? 1)}.`;
 
@@ -942,24 +945,17 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       appendAndCommit(
         compose({
           command: line,
-          status: failed ? "error" : "ok",
+          status: cancelled ? "partial" : failed ? "error" : "ok",
           blocks: withOverflowNotice(
-            failed
-              ? [callStatus("error", message, { id: blockId("shell-failed") }), settled]
-              : [settled],
+            cancelled
+              ? [cancelledNotice("Cancelled.", blockId("shell-cancelled")), settled]
+              : failed
+                ? [callStatus("error", message, { id: blockId("shell-failed") }), settled]
+                : [settled],
             pipeOverflowed,
           ),
           ...(failed
-            ? {
-                error: {
-                  message,
-                  code: cancelled
-                    ? "CANCELLED"
-                    : exit.signal !== null
-                      ? "KILLED_BY_SIGNAL"
-                      : "UNEXPECTED_EXIT",
-                },
-              }
+            ? { error: { message, code: exit.signal !== null ? "KILLED_BY_SIGNAL" : "UNEXPECTED_EXIT" } }
             : {}),
           meta: {
             origin: "user",
@@ -1053,21 +1049,31 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // said warning. Three endings, each the call state of the same name:
       // `failed` is `error` and ✗ on `error`; `cancelled` is `muted` and ⊘ on
       // `partial`, the status C07 gives a cancelled call (C23 T3.4) — never
-      // I66's error document, which would draw the cancel as the failure the
-      // ruling separates it from. The signal is read first (§8a A6.6 row 7).
-      const code = exit.code ?? 1;
+      // the error document I66 then drew, which read the cancel as the failure
+      // the ruling separates it from. The signal is read first (§8a A6.6 row 7).
+      //
+      // **No code and no signal is not `exited 1`** (ruling 94, F1482): C21 I13
+      // settles a child that never started that way, and `code ?? 1` named an
+      // exit it never returned. It is still a failure.
       const text =
         exit.signal !== null
           ? `${label} ended on ${exit.signal}`
-          : code === 0
-            ? `${label} finished`
-            : `${label} exited ${String(code)}`;
+          : exit.code === null
+            ? `${label} ended without an exit status`
+            : exit.code === 0
+              ? `${label} finished`
+              : `${label} exited ${String(exit.code)}`;
+      // **The child's code, for the record beneath the notice** (I97, F1480).
+      // `meta()` defaulted it to 0, so a `vim` that exited 1 said failed and was
+      // kept in history as a success. C07 I14's table, not a second copy: 128 + n
+      // for a signal, -1 for neither.
+      const metaSpec = { origin: "user", exitCode: exitCodeOf({ exitCode: exit.code, signal: exit.signal }) } as const;
       appendAndCommit(
         exit.signal !== null && CANCEL_SIGNALS.has(exit.signal)
-          ? noticeDoc(line, text, "muted", { origin: "user" }, "partial", "cancelled")
-          : exit.signal === null && code === 0
-            ? noticeDoc(line, text, "muted", { origin: "user" })
-            : noticeDoc(line, text, "error", { origin: "user" }, "error"),
+          ? cancelledDoc(line, text, metaSpec)
+          : exit.signal === null && exit.code === 0
+            ? noticeDoc(line, text, "muted", metaSpec)
+            : noticeDoc(line, text, "error", metaSpec, "error"),
         settle,
       );
     } catch (cause) {
