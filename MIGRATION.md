@@ -135,3 +135,5 @@ Nothing reports these. Read each against what your application relies on.
 - **A PTY command killed by a signal records 128+n**; it recorded 0. **A shell command that never
   started records −1** and reads `The command did not start.`
 - **Lines cleared from the queue are recorded in history** at −1.
+- **A stream's own end is recorded in history**, and a denied or expired approval's `meta.exitCode`
+  is 126 where it was 0.

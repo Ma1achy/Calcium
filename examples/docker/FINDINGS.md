@@ -58111,11 +58111,15 @@ Found by lane b4-exec3. A stream's natural `end`, a malformed patch and a stream
 
 **Owed**: record at each stream settlement, with the code the entry settled with (ruling 100).
 
+**Closed** by lane b4-exec4 (99e2c39f spec, 9b4a51e3 code, C23 I101). `settleKept(code)` settles the card as it stood, with the code in its `meta`, and C20 is recorded from that same document. It uses `settle(id)` when the card already carries the code, so `rev` does not move (C13 I13). The natural `end` takes `exitCodeOf(result)`. The malformed-patch and throw arms take 1, which is the lane's ruling: neither arm reads the child's ending, and 1 is what I100 gives a failure whose own code is unknown. T4.102, indexed by the twenty routes C23 names, read `recorded nothing` on five and `meta 0 · recorded 126` on two before the fix.
+
 ## F1509 — a stall row survives a cancel ★★☆☆☆
 
 Found by lane b4-exec3's trace (C23 §8a A6.8 row 8). `cancelThis` does not call `refresh.settled`, so the settled card keeps `no output for 2m`. Calling it would rewrite the row as `resumed after 2m`, which is false for a cancel. §8a A4's remedy was written for a stream that resumed.
 
 **Ruled (100 d):** the shell composes the cancel's document (ruling 97), and it leaves the stall row out. `settle(id, doc)` replaces the view, so no delete is needed.
+
+**Closed** by lane b4-exec4 (9b4a51e3, C23 I98, I102). It measured first that the stall row is a block of the entry's document (`stall-notice`, patched in by `refresh.ts`) and not chrome drawn elsewhere, so ruling 100(d)'s remedy held. The cancel's document leaves it out. **The walk found a second defect behind it**: the watch itself outlived the settlement (F1515).
 
 ## F1510 — a denied approval settles with code 0 while C20 records 126 ★★★☆☆
 
@@ -58123,8 +58127,48 @@ Found by lane b4-exec3. A denied or expired approval settles through `settle(id)
 
 **Ruled (100 a):** the document carries 126. The status is unchanged, because a refusal is not an error (§047).
 
+**Closed** by lane b4-exec4 (9b4a51e3, C23 I101). A denied or expired approval's document carries 126, with status `ok`. The expired row needed the harness's confirm host to take the harness's timer; before that, no row could reach an expired approval. **Ruling 100(a)'s reason is contradicted by the head**, which is drawn failed; that is F1518.
+
 ## F1511 — one `Exit` is worded two ways ★★☆☆☆
 
 Found by lane b4-exec3. `{code: null, signal: null}` reads *X ended without an exit status* on the handoff (ruling 94 c), and *The command did not start.* on the shell route and in C07. On every C21 arm it is produced only by a spawn failure, so the handoff's sentence describes an ending no arm produces.
 
 **Ruled (100 c):** the handoff says the child did not start.
+
+**Closed** by lane b4-exec4 (9b4a51e3, C23 I95). `{null, null}` reads `vim did not start`, where T4.93 read `vim ended without an exit status`.
+
+## F1515 — the stall watch outlived a settlement ★★★☆☆
+
+Found by lane b4-exec4's sequence trace (C23 §8a A6.10 rows 3–5), which ruling 100 had not reached. `cancelThis` never called `refresh.settled`, and neither did the malformed-patch and throw arms, so the stall watch stayed alive after the entry settled. Two minutes later `no output for 2m` was appended under `Cancelled.`, the truncated box or the failed box, because C13 admits a `"shell"` patch on a settled entry. A `/ps` invocation is watched as well.
+
+**Closed** by lane b4-exec4 (9b4a51e3, C23 I102). The watch ends on C13's `settle` change, which already releases the readout, so every route ends it and not only those that remember to. T4.104 read the row appended under four endings before the fix.
+
+## F1516 — a stream a signal ended read `exit null` over `succeeded` ★★☆☆☆
+
+Found by lane b4-exec4's classification table (C23 §8a A6.9 row 7). A stream killed by a signal settled with its head reading `succeeded · exit null`, while C21 reported the signal.
+
+**Closed** by lane b4-exec4 (9b4a51e3, C23 I101): the head's word and `meta.exitCode` read one `exitCodeOf` value.
+
+## F1517 — the completion line appends exit codes the shell wrote ★★☆☆☆
+
+Found by lane b4-exec4 (C23 §8a A6.9 row 11), measured with `completionLine`. `outcomeOf` appends `exit N` for any non-zero code on a non-local document, and assumes the code is the subprocess's. A denial now reads `/ps — failed, exit 126`, and a cancel has read `cancelled, exit 130` since ruling 97. Neither code is a child's ending: the shell wrote both.
+
+**Ruled (103 b).**
+
+## F1518 — a denied or expired approval's head is drawn failed ★★☆☆☆
+
+Found by lane b4-exec4 (C23 §8a A6.9 row 12). `FAILURE_WORDS` gives `denied` the `failed` call state, so the head takes error tone and ✗. Ruling 100(a) kept the status `ok` on the ground that a refusal *is not an error and never red* (§047), and the head contradicts the reason the ruling gave. §106 draws an expired question as `○ the question expired`, and says *denied would be a lie about what happened*.
+
+**Ruled (103 a).**
+
+## F1519 — a stall row is kept when a stall ends in a malformed patch or a throw ★☆☆☆☆
+
+Found by lane b4-exec4 (C23 §8a A6.10 row 6). Ruling 100(d) dropped `stall-notice` from the cancel's document. The malformed-patch and throw arms keep the card as it stood, so a stall that ended in one of them keeps `no output for 2m` in the settled card. After I102 the watch no longer adds the row later, but the row it had already added stays.
+
+**Ruled (103 c).**
+
+## F1520 — a waiting approval is said to have gone quiet ★★☆☆☆
+
+Found by lane b4-exec4 (C23 §8a A6.10 row 7). The stall watch is armed at dispatch, and the readout only on approval. A question left open for three minutes reads `ps · ⠋ waiting` over `no output for 2m`, and a denial then rewrites the row as `resumed after`. The entry was waiting on the user, not on output.
+
+**Ruled (103 d).**

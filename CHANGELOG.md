@@ -128,6 +128,12 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   `The command did not start.` and records −1, where it read `exited with code 1`. An `error`
   document composed with no code carries 1.
 - **Lines `⌃c` clears from the queue reach history** (c839dc14, C23 I29), with code −1.
+- **A stream that ends on its own reaches history** (9b4a51e3, ruling 100, C23 I101): its natural
+  end, a malformed patch and a stream failure, with the same code in `meta.exitCode` — the child's,
+  128+n for a signal, and 1 for a truncated or failed stream. A stream killed by a signal reads
+  `exit 137`, failed, where it read `exit null`. A denied or expired approval's `meta.exitCode` is
+  126, the code history already recorded. A settled entry no longer keeps or gains `no output for
+  2m` (C23 I98, I102), and a handed-off command that never started reads `X did not start`.
 - **A key action that throws appends an `error` notice** (70f5fcb1, ruling 93, C22 I134), `✗`
   on an `error` document, where it was a warning on an `ok` one.
 - **A window title and a system notification show control characters in caret form**

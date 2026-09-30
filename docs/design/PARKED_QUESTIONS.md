@@ -1290,6 +1290,12 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1517, F1518, F1519, F1520). **What a settled entry says about how it ended.** (a) **A denied or expired approval's head is not drawn failed.** Expiry takes §106's form, `○ the question expired`, muted: *denied would be a lie about what happened*, and so would failed. A denial is the user's decision, not a failure. It is drawn muted with its word `denied`, never in error tone or with ✗ (§047, *never red*), and this is the reason ruling 100(a) gave. The tool still does not run: only the drawing changes. (b) **The completion line appends `exit N` only for a child's own ending.** 126 for a denial and 130 for a cancel are codes the shell wrote, and C20 still records both. The line names the state word instead: `denied`, `cancelled`, `expired`. (c) **Every settlement the shell composes leaves the stall row out**, as ruling 100(d) did for the cancel. That includes the malformed-patch and throw arms. A stall is a condition of a live entry. (d) **The stall watch arms with the readout, on approval, not at dispatch.** An entry waiting on the user is not quiet output. (e) Lane b4-exec4's ruling is adopted: **a malformed patch and a stream throw carry 1**, the code C23 I100 gives a failure whose own code is unknown.
+
+**103 · RULED — How a denial, an expiry and a stall read once an entry has settled.** Lane b4-exec4 found a denied head drawn failed against ruling 100(a)'s own reason, a completion line reading `failed, exit 126`, a stall row left in two arms, and a question said to have gone quiet.
+
+---
+
 ## Not yet recovered
 
 The gap between the entries and the running count in the per-MR reports was chased and closed: some questions had been counted twice. The list is the count. **No total is stated here in prose**, because the one that used to be here said *sixteen* long after that stopped being true — this file's own subject, arriving inside it.
