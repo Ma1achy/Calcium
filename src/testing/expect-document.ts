@@ -93,9 +93,10 @@ import { DEFAULT_WIDTHS, checkAsciiParity, checkMeasurement, formatReport } from
  * *field* on an exempt kind was silence — and `events` gaining a `tone` (F51)
  * is exactly that, verified by fabricated violation before this was written.
  *
- * `no-field` is checkable: the premise is *this kind carries no tone*, and a
- * tone appearing anywhere in the block falsifies it, whatever it is called and
- * however deeply it is nested. `by-rendering` is not, and says so — `plot`'s
+ * `no-field` is checkable: the premise is *this block carries no tone or
+ * semantic foreground*, and either field appearing anywhere in the block
+ * falsifies it, whatever it is called and however deeply it is nested.
+ * `by-rendering` is not, and says so — `plot`'s
  * exemption is C12's stacked strips at one bit, which no walk of the document
  * can see.
  */
@@ -148,13 +149,13 @@ const KINDS_WITH_NOTHING_TO_CHECK: ReadonlyMap<BlockKind, Exemption> = new Map<
   ],
 ]);
 
-/** Any `tone` anywhere in a block, at any depth. The premise, falsifiable. */
-function carriesATone(value: unknown): boolean {
-  if (Array.isArray(value)) return value.some(carriesATone);
+/** Any meaning-bearing colour field anywhere in a block, at any depth. */
+function carriesMeaningColour(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(carriesMeaningColour);
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  if (typeof record["tone"] === "string") return true;
-  return Object.values(record).some(carriesATone);
+  if (typeof record["tone"] === "string" || typeof record["foreground"] === "string") return true;
+  return Object.values(record).some(carriesMeaningColour);
 }
 
 /**
@@ -206,8 +207,8 @@ function assertContainerPremise(block: Block & { children: readonly Block[] }): 
  * checker is indistinguishable from compliance.
  *
  * **And the runtime half, which is the one the compiler cannot do**: an
- * exemption claiming the kind has no tone-bearing field, on a block that has
- * one. F102 — the guard against a new kind was blind to a new field.
+ * exemption claiming the kind has no meaning-bearing colour field, on a block
+ * that has one. F102 — the guard against a new kind was blind to a new field.
  */
 function assertNothingToCheck(block: Block): void {
   const exemption = KINDS_WITH_NOTHING_TO_CHECK.get(block.kind);
@@ -217,11 +218,11 @@ function assertNothingToCheck(block: Block): void {
         `nor listed in KINDS_WITH_NOTHING_TO_CHECK with a reason (D29, A03 §2)`,
     );
   }
-  if (exemption.premise === "no-field" && carriesATone(block)) {
+  if (exemption.premise === "no-field" && carriesMeaningColour(block)) {
     throw new Error(
       `expectDocument: block kind "${block.kind}" is exempt from the D29 sweep on the premise ` +
         `that it carries no meaning-bearing field (${exemption.why}), and this one carries a ` +
-        `tone — the premise has expired and the kind needs an arm, not an entry (C04 I37, F102)`,
+        `tone or semantic foreground — the premise has expired and the kind needs an arm, not an entry (C04 I37, F102)`,
     );
   }
 }

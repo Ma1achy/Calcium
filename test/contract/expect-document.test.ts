@@ -398,6 +398,34 @@ describe("C24 §7 — expectDocument", () => {
     ).not.toThrow();
   });
 
+  it("T2.13e (C04 I37, C10 I33): semantic foreground expires a no-field premise", () => {
+    const complaint = (subject: Block): string => {
+      try {
+        expectDocument(docOf([subject])).hasNoColourOnlyDistinction();
+      } catch (error) {
+        if (error instanceof Error) return error.message;
+        throw error;
+      }
+      throw new Error("the fabricated colour-only violation passed");
+    };
+    const tone = block({
+      kind: "raw",
+      id: "semantic",
+      text: "x",
+      spans: [{ from: 0, to: 1, tone: "error" }],
+    });
+    const foreground = block({
+      kind: "raw",
+      id: "semantic",
+      text: "x",
+      spans: [{ from: 0, to: 1, foreground: "tone.error" }],
+    });
+
+    const toneComplaint = complaint(tone);
+    expect(toneComplaint).toMatch(/tone or semantic foreground.*premise has expired/u);
+    expect(complaint(foreground)).toBe(toneComplaint);
+  });
+
   it("hasNoColourOnlyDistinction walks into panels, groups and expanded rows", () => {
     // A container that did not recurse would pass every document whose only
     // offence is nested — which is most real ones, since a detail row is where

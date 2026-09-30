@@ -219,11 +219,11 @@ No ruling here throws mid-mutation: the gate reports before anything is stored, 
 renderer never writes. That is why this section is short, and it was checked rather than
 assumed (C13's `settle` is the precedent for a throw leaving an unpatchable entry).
 
-| ~~semantic foreground, dim and inverse~~ **discharged 2026-09-30** | `TextSpan.foreground`, `.dim`, `.inverse` | a full-region application consumer; foreground is a theme meaning-slot reference, attributes are direct, and all three preserve geometry (C04 I85, C10 I33) |
 ## 7 · Deferred, each with the symbol that expires it
 
 | deferral | symbol to grep | consumer that would expire it |
 |---|---|---|
+| ~~semantic foreground, dim and inverse~~ **discharged 2026-09-30** | `TextSpan.foreground`, `.dim`, `.inverse` | a full-region application consumer; foreground is a theme meaning-slot reference, attributes are direct, and all three preserve geometry (C04 I85, C10 I33) |
 | ~~a span tone~~ **discharged 2026-09-04** | `TextSpan.tone` | inline code → `tone: "identifier"`, exactly the consumer named here; C04 I89, C09 §5, C10 §4e. The tone *replaces* the block's for the run, the attributes spread on top, the 1-bit collapse is the tone's and uncompensated |
 | ~~a span value~~ **discharged 2026-09-04** | `TextSpan.value` | ML-1 per-token value, C04 I90; background through `continuousColour` on the block's `colormap` (`Raw` and `Notice` gain the member), nothing below 8-bit; **a valued run is a wrap unit** — `wrapCellsParts` takes atoms, `notice` measures and renders through one `noticeRows`, and the one span member `measure` may read is `value`'s boundaries (C09 §5). Measured: a single-word token changes the count only where the row has no space at all |
 | ~~`Hunk.lines[].spans`~~ **discharged 2026-09-04** | `Hunk` in `types.ts` + C25 I10 | the intra-line diff arrived as `intralineSpans`/`intralineLines` (`src/data/viewmodel/intraline.ts`), called by `b.patch`: a word-token LCS over each paired remove/add run, capped at 200 tokens a side, emitting `underline` and never a tone (C04 I91). The field was never the missing half and the note said so |

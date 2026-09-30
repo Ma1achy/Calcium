@@ -254,10 +254,11 @@ export function validatePaintedFloors(tokens: ThemeTokens): readonly ThemeError[
 export function resolveForeground(ref: ColourRef, theme: ResolvedTheme, caps: Caps): Style {
   const parts = parseSpanForegroundRef(ref);
   if (parts === null) return NO_STYLE;
-  const [paletteName] = parts;
+  const [paletteName, slot] = parts;
   if (paletteName === "surface" || paletteName === "syntax") return NO_STYLE;
+  if (!Object.hasOwn(theme.tokens.palettes, paletteName)) return NO_STYLE;
   const palette = theme.tokens.palettes[paletteName];
-  if (palette?.carries !== "meaning") return NO_STYLE;
+  if (palette?.carries !== "meaning" || !Object.hasOwn(palette.slots, slot)) return NO_STYLE;
   return resolve(ref, theme, caps);
 }
 

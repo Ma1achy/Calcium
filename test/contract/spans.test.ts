@@ -196,6 +196,52 @@ describe("C04 §3am — spans, the contract", () => {
       if (!hunk.ok) expect(hunk.error.join(" ")).toMatch(/is refused on this member/u);
     }
   });
+
+  it("T2.31c (C10 I33): semantic foreground resolves own palette slots only", () => {
+    const theme = store().current;
+    const inheritedPropertyRefs = [
+      "tone.toString",
+      "tone.constructor",
+      "tone.__proto__",
+      "toString.ok",
+      "constructor.ok",
+      "__proto__.ok",
+    ] as const;
+    for (const ref of inheritedPropertyRefs) {
+      const resolved = resolveForeground(ref, theme, FULL_CAPS);
+      expect(resolved, ref).toBe(NO_STYLE);
+      expect(sgr(resolved), `${ref} remains paintable`).toBe("");
+    }
+
+    const inheritedPalettes = Object.assign(
+      Object.create({ inherited: theme.tokens.palettes["tone"] }),
+      theme.tokens.palettes,
+    ) as typeof theme.tokens.palettes;
+    const inheritedPaletteTheme = {
+      ...theme,
+      name: `${theme.name}-inherited-palette`,
+      tokens: { ...theme.tokens, palettes: inheritedPalettes },
+    };
+    expect(resolveForeground("inherited.ok", inheritedPaletteTheme, FULL_CAPS)).toBe(NO_STYLE);
+
+    const tonePalette = theme.tokens.palettes["tone"]!;
+    const inheritedSlots = Object.assign(
+      Object.create({ inherited: "#123456" }),
+      tonePalette.slots,
+    ) as typeof tonePalette.slots;
+    const inheritedSlotTheme = {
+      ...theme,
+      name: `${theme.name}-inherited-slot`,
+      tokens: {
+        ...theme.tokens,
+        palettes: {
+          ...theme.tokens.palettes,
+          tone: { ...tonePalette, slots: inheritedSlots },
+        },
+      },
+    };
+    expect(resolveForeground("tone.inherited", inheritedSlotTheme, FULL_CAPS)).toBe(NO_STYLE);
+  });
 });
 
 describe("C04 §3am.1 — tone and value, the rendering half", () => {
