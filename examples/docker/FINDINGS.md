@@ -57406,6 +57406,8 @@ the escape). Each passed three of three alone at load about 1; neither file was 
 
 **Three more under load, 2026-09-30**, in a chain on the golden lane's tip while the harness lane ran mutation passes (load 4.9 at the report, 8.4 on the 15-minute average): `plot-performance`'s *one-sample update* at a ratio of 2.91 against 2, and SS66's T1.154b and T1.154c each timed out at 120 s. Re-run alone: 13 of 13 pass, but T1.154b took 112 s of its 120, against 18 s in a full suite at load 1.08. T1.154 was timed on b4 and the golden tip alternately in one process: 4908 and 2353 ms against 2442 and 2913 ms at load 8.6–9.7, so the tips do not differ and the time is the machine's.
 
+**2026-09-30, RS14b (`roadmap-status.test.ts`).** It spawns the tool four times, and each spawn walks the tree over the bind mount. It took 1.35 s alone, and 46.6 s (b4-menu at 312f4e3b), 34.1 s (b4-fixmap at 788f7923) and 38.2 s (b4-fixmap at aa4e1741) in three consecutive loaded chains, against the file's 30 s `testTimeout`. It passed alone each time. It was red in more chains than not, so it now carries its own 120 s limit. The row asserts counts rather than speed, so the limit is kept on asymmetry: raising it costs nothing on a correct tree, and a timeout diagnosed as drift costs a session.
+
 ## F1407 — `oscText` passes bidi characters into window titles and notifications ★★☆☆☆
 
 Found by lane b4-m12. `oscText` in `terminal/escapes.ts` removes `[\u0000-\u001f\u007f-\u009f]` before
@@ -57865,6 +57867,8 @@ Found by lane b4-exec while fixing F1473. Under ASCII, the image decoder's fault
 Found by lane b4-instr while classifying the unfixtured tools. `tools/design-fixture-map.py` writes `test/golden/DESIGN_FIXTURES.md` from its own table, `M`. The file has since been edited by hand: the `figure` column and the rule-interaction table were added, and `design-fixtures.test.ts` parses it by equality. Run against a copy at 78cd90e1, the script rewrote the file `+114/−192` and dropped both. Nothing prevents it being run. `design-prose-with-surfaces.py` still parses `M` out of the script's text. Today `M` agrees with the markdown's class column (109 rows, 33 `prose` in each), but it is a second record of one fact.
 
 **Ruled (95):** the writer half goes and the markdown is the one record. The census reads the class column from the markdown. **Owed**: both changes, and the instruments exemption replaced by a fixture if a reader remains.
+
+**Closed** by lane b4-fixmap (aa4e1741). Before any edit, the census read from `M` and from the markdown's class column agreed: 109 rows and 33 `prose` in each, with no class disagreements. `design-prose-with-surfaces.py` now reads the class column with the slice and pattern `rows()` in `tools/design/figures.ts` uses, and its 17-line output is byte-identical before and after. The generator is deleted (300 lines) and its `NOT_INSTRUMENTS` entry removed; nothing in the Makefile or the docs named it. DC1 and DC2 run over a fabricated markdown with escaped pipes. DC6 reads nothing outside the table, and DC7 ties the real census's `of N` to `rows()`. Four reader mutations each turned at least one row red; DC7 cannot see the cell-pattern mutation, because the real map's escaped pipes sit only in `surface` rows, and DC1 covers it.
 
 ## F1485 — `make instruments` ran only in CI, and thirty-eight tools accumulated with no fixture ★★★★☆
 

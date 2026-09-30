@@ -385,7 +385,12 @@ describe("roadmap-status — the Order column's verifier", () => {
     const field = run(mutate("reads `ghost()` fresh per paint", "reads `ghost()` `#anchor` fresh per paint"));
     expect(field.ok, "and a real field is still demanded of the file").toBe(false);
     expect(field.out, "by name").toContain("#anchor");
-  });
+  // **Its own limit, and the reason is the asymmetry** (F1406). Four spawns of the
+  // tool, each walking the tree over the bind mount: 1.35 s alone, and 46.6 s,
+  // 34.1 s and 38.2 s in three consecutive loaded chains against the file's 30 s.
+  // The row asserts counts, not speed, so a timeout here is a verdict about the
+  // machine; 120 s costs nothing when the tree is right.
+  }, 120_000);
 
   it("RS9: the grep-reach signal counts the sweep's own evidence, not the Order row", () => {
     // **The sixth sweep's finding, made countable.** Every earlier sweep claimed
