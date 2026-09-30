@@ -103,6 +103,12 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   warning with `▲`. SIGINT, SIGTERM and SIGHUP give a `muted` notice with `⊘` (`/`) on a
   `partial` document, where they gave a warning on an `error` document. A consumer matching
   the handoff notice's tone, mark or status should update.
+- **The completion menu marks its current candidate at rest, and closes on the prompt's
+  rule** (74c17b8b, rulings 89 and 90, C19 I29 and I23). The first candidate is current until
+  one is selected, drawn with `›` (`*` in ASCII), the pick ground and bold; the menu no longer
+  draws a rule of its own above the prompt's. `Table` gains `current?: string`, the id of the
+  row a chooser is on (C04 I150, C11 I33). `menuBlocks`' second parameter is now the current
+  index, and `menuRowsShown` charges one row of chrome fewer.
 - **A window title and a system notification show control characters in caret form**
   (46746909, 1e2c5525, ruling 86, C01 I26). `ESC[2J` in a tool's output reaches the title as
   `^[[2J` where it was `[2J`, and tab and newline appear as `^I` and `^J`. Bidi format characters

@@ -56993,6 +56993,8 @@ alone (F1385). F1351's class — a row whose verdict depends on the machine — 
 **2026-09-29.** design-fixtures T1.5 is retired and its source walk deleted (M16.6, lane b4-fixtures). The figure
 comparison that replaced it parses each golden once and T1.8 takes about 0.5 s. contract/theme T2.62 stands.
 
+**2026-09-30, the chain on lane b4-menu at 312f4e3b.** T4.49 in `deferred-height.test.ts` (C22 I69: one row, then three) failed once in the full suite, in 212 ms. Run alone it passed three times out of three, the first run at load 23.95 and the last at 2.26. In the same chain, RS14b took 46.6 s and T1.154b 207.5 s; each passed alone. The flip is still a verdict that depends on contention, not on the code; the diagnosis is still owed.
+
 ## F1352 — a sixth `overlayRegion` site told a PTY child one column too many ★★★☆☆
 
 Found by lane C running the tier-5 rows M11.1's rail reservation reaches: T5.3a and T5.5 failed with the
@@ -57881,3 +57883,32 @@ Eleven mutations were run and each turned its row red. Three defects of the gate
 The cost is that CI's `fast` job builds twice. That is accepted: a stale `dist/` passes against the previous commit.
 
 **Closed.** `make instruments` reads `65 instruments, every one with a fixture · 810 rows · all green`, and `/tmp/gates-wt.sh` runs it as the seventh gate. **#62 and #63 still carry the red** until their own trees are repaired.
+
+## F1486 — the completion footer offers `⏎ accept` where `⏎` submits the line ★★★★☆
+
+Found by lane b4-menu's walk while building ruling 89 (`out/b4-menu-walk.txt`, row A). A typed menu holds no selection (C19 I20), so the prompt's keys resolve first: `⏎` submits the line and `↑` walks history. The footer's `complete` hints (`chrome.ts`, the `substate` arm) are built from the menu's own rows whatever the selection. So at rest it offers `↑↓ move` and `⏎ accept`, and both are false. Measured: `⏎` at rest submitted `/c` and printed `unknown verb: /c` beneath a footer offering to accept.
+
+**Ruling 89 made it worse, and hid the one difference.** The menu now marks its current candidate with `›` and the pick ground at rest. A reader sees a marked candidate and `⏎ accept`, and `⏎` runs the partial line instead. The old `bullet` after `Tab` was the only visible sign that the menu held the keys. With it gone, the frames at rest and after `Tab` are identical.
+
+**Ruled (96):** the footer names what each key does in the state the frame shows. **Owed**: the footer's two states, and a row that reads the footer at rest and after `⇥` and asserts they differ.
+
+## F1487 — the pills form of the menu under-fills its box ★★☆☆☆
+
+Found by lane b4-menu's mutation pass. `menuRowsShown` counts one candidate per row, which is the table form's shape. The pills form wraps several candidates onto one row, so its window is sized for rows it never draws. Measured: 60 pills under a five-row cap drew three pills on one row, followed by `+ 57 more`. This holds on the clean tree before and after the lane. C19 T4.9's fill clause is scoped to the table form (cbb21e6d), with this recorded beside it.
+
+**Owed**: size the pills window by the rows its pills wrap to at the menu's width, and extend T4.9's fill clause to that form.
+
+## F1488 — §097's menu is half-built: pills carry no `›`, the other rows no `bgElev`, and find and preview draw no rules ★★☆☆☆
+
+Three gaps, reported by lane b4-menu against §097 and not built by rulings 89 and 90:
+- **The pills form** carries `active` with no `›`. R-BLK-866 draws a ladder of marks for it.
+- **§097's `bgElev` ground** on the rows that are not current is not drawn.
+- **The find and chip-preview panels** draw no rules, while §097 says every menu floats between two. This one is unmeasured.
+
+**Owed**: read R-BLK-866 and §097 against the three panels in frames, then build what the registry draws. The design fixtures' `figureOnly` for §097 is where a miss will show.
+
+## F1489 — a session row is named T4.34 and is not C22's T4.34 ★★☆☆☆
+
+Found by lane b4-menu. The menu's closing-rule row in `test/integration/session.test.ts` is named T4.34. C22 T4.34 is a different row, citing C22 I66. The session row has no spec row of its own. So a mutation `expect` of `T4.34` resolves to whichever the harness reads first. Lane b4-menu's first draft of `c19-menu-current.mjs` was scored `caught T4.34` from the id's presence while T4.34 stayed green, which is F1472's second instance.
+
+**Owed**: give the session row an id of its own and a spec row, and have SP9 or a sibling rule refuse one id in two tables.

@@ -1260,6 +1260,12 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1486). **The menu's footer names what each key does in the state the frame shows.** With no selection the prompt's keys resolve first (C19 I20), so `⏎` submits and `↑` walks history, and the footer's `⏎ accept` and `↑↓ move` are false. At rest it offers `⇥ complete`, which is the registry's label for `binding.004`, and the way out. `⏎ accept` and the move keys appear once `⇥` or `↓` has made a selection. **The registry decides**: it binds `⇥` to complete in the prompt and binds `⏎` to no accept (tie-break 1), and C19 I20's *a typed menu holds no selection* is what ships. **This corrects ruling 89's premise, not its ruling.** Ruling 89 said *the key has to act on something the frame shows*, meaning `⏎`. The key that acts on the marked candidate at rest is `⇥`, so the mark stays and the footer changes. The footer is also what tells rest from selection now that ruling 89 draws the mark in both: measured by lane b4-menu, the two frames were otherwise identical.
+
+**96 · RULED — What the menu's footer offers before a selection.** Lane b4-menu measured `⏎` at rest submitting `unknown verb: /c` beneath a footer offering `⏎ accept` (F1486).
+
+---
+
 ## Not yet recovered
 
 The gap between the entries and the running count in the per-MR reports was chased and closed: some questions had been counted twice. The list is the count. **No total is stated here in prose**, because the one that used to be here said *sixteen* long after that stopped being true — this file's own subject, arriving inside it.

@@ -43,7 +43,7 @@ type change.
 | **12** | [**A time-based assertion under contention**](#12) | 26 | **7 open** | — | **new at F80** · Calcium's own suite · **F877 is the first that repairs an instrument rather than recording a reading** |
 | **13** | [Text the framework emits](#13) | 26 | **5 open** · 2 unread | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 59 | **5 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
-| — | [Singles](#singles) | 133 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
+| — | [Singles](#singles) | 137 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
 
 **Four groups are new since F55** — 9, 10, 12, and F81's arrival in 4. Group 9 is the one
 that changes the picture, and it is the only group whose subject is the apparatus rather
@@ -2888,7 +2888,15 @@ written as one. Every member reads as deliberate, which is why none was found by
 
 **F1093** — **a budget written to widen a five-second default became a narrowing when the default went to thirty.** C12 T2.1 sweeps twelve fuzz corpora across every width from one to two hundred through three rasteriser entry points, one corpus being a hundred thousand points, and it carries the only hand-written row timeout in the tree with a comment defending it: *an explicit budget, because 3.2 s against a 5 s default is not a margin … twenty seconds says the seconds are expected*. Every sentence of that is right and the number it produced now does the opposite of what it was for, because `vitest.config.ts` set `testTimeout` to thirty thousand on 2026-08-22 — so the override stopped being a widening of five and became **a third off** the limit the row would otherwise have had, in a file whose comment says the row exists because the default was too small. Measured: the row is **6936 ms** in the devcontainer and **20960 ms** on the runner, against its explicit twenty thousand and a global thirty. **It would have passed on the default it was written to escape** — the failure is the override, not the runner and not the row. **The population is exactly one**: swept over `test/`, every other explicit row timeout is at or above the global, almost all of them in tier five where a real PTY needs its own budget, and four candidates that looked sub-global on a first pass are not row timeouts at all — two arguments to `waitForFrame`, one to `elapsedNeeded`, one an assertion bound. **F967's class, third instance in a day, and the first that is a number rather than prose**: a stale sentence misleads a reader, a stale number fails the build on the one machine that was not available to disagree when it was written. **And the direction is the surprise** — an override reads as *more room*, this one is less, and nothing in the syntax says so; twenty thousand beside a comment about a five-second default reads as generous at every glance. **Open** — `CORPUS_BUDGET_MS`, which is what the row is in `budget.ts`'s own taxonomy, sixty seconds against a runner figure of twenty-one; the number leaves the file so the next regime change moves it once, and the comment keeps its argument and gains the measurement the argument was missing · **Closed** — and the one way this repair could fail silently is the constant not being read, a wrong argument position leaving the row on the global and green, which is indistinguishable from the fix working. Driven rather than assumed: with the constant set to one the row fails with `Test timed out in 1ms`, and `budget.ts` was restored from a copy with its md5 compared. The row runs in two thousand three hundred and nine milliseconds alone and six thousand nine hundred and thirty-six inside the suite, against sixty thousand
 
-## Singles — one consumer each — **22 open** · 97 closed · 14 with no verdict
+## Singles — one consumer each — **24 open** · 99 closed · 14 with no verdict
+
+**F1489** — **a session row is named T4.34 and is not C22's T4.34** · **Open** — owed: the session row takes an id of its own and a spec row
+
+**F1488** — **§097's menu is half-built: pills carry no `›`, the other rows no `bgElev`, and find and preview draw no rules** · **Open** — owed: a survey of R-BLK-866 and §097 against the three panels
+
+**F1487** — **the pills form of the menu under-fills its box** · **Open** — owed: `menuRowsShown` counts pills by the rows they wrap to, not one candidate a row
+
+**F1486** — **the completion footer offers `⏎ accept` where `⏎` submits the line** · **Open** — ruling 96: at rest the footer offers `⇥ complete`; `⏎ accept` and the move keys once a selection exists
 
 **F1485** — **`make instruments` ran only in CI, and thirty-eight tools accumulated with no fixture** · **Closed** — 65 found, 65 with a fixture (lane b4-instr); exemptions checked for presence; `instruments` builds `dist/` first; the local gate chain now runs it
 
@@ -2908,9 +2916,9 @@ written as one. Every member reads as deliberate, which is why none was found by
 
 **F1476** — **a handed-off child that fails gets a warning's tone on an error document** · **Closed** — C23 I95 (eb33893b, cf3b6f86): a non-zero exit or crash is error ✗, SIGINT/SIGTERM/SIGHUP the `cancelled` form (muted ⊘, `partial`), from a seven-row walk table (C23 §8a A6.6); T4.93, `c23-handoff-ending.mjs` 3 of 3 with a control. Ruling 91's cited precedent was wrong about I66: F1479, ruling 92
 
-**F1475** — **the completion menu closes on a rule of its own above the prompt's** · **Open** — ruled (90): it closes on the prompt's upper rule; C22 T4.34 amended with the build
+**F1475** — **the completion menu closes on a rule of its own above the prompt's** · **Closed** — C19 I23 (74c17b8b): the menu's bottom edge is gone and its last row sits on the prompt's upper rule; `menuRowsShown` charges one row fewer, which T4.9's table form and T6.27 now catch
 
-**F1474** — **the completion menu marks no current candidate at rest** · **Open** — ruled (89): the current candidate carries §097's `›`; owed: the build
+**F1474** — **the completion menu marks no current candidate at rest** · **Closed** — C04 I150, C11 I33, C19 I29 (dc4bbf3a, 74c17b8b): `Table.current` draws `›`, the pick ground and bold at rest; `c11-current-row.mjs` 4 of 4, `c19-menu-current.mjs` 5 of 5, each with a control. The footer that ruling 89 leaned on is F1486
 
 **F1464** — **§035's parked ASCII rung was already settled by R-PRG-003** · **Closed** — the rule decides; listed with its reason
 
