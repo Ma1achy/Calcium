@@ -1467,3 +1467,7 @@ describe("C04 I145 — a finished bar has zero rows (review batch 4 M16.2)", () 
     expect(padded.lines.map((l) => l.trim()), "and renders one blank row").toEqual([""]);
   });
 });
+
+describe("C09 I32 — a status asks for a tick only while it moves (ruling 106 c, F1526)", () => {
+  it.todo("T2.231 (C09 I32, ruling 106 c; F1526): tickIntervalOf asks for a status's tick exactly when its activity line draws — not deferred on a component: ruling 106's code commit lands it");
+});

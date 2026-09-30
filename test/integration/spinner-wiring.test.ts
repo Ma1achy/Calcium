@@ -225,3 +225,7 @@ describe("C09 I32 — the animating record", () => {
     );
   });
 });
+
+describe("C22 I60a — a settled error box arms no ticker (ruling 106 c, F1526)", () => {
+  it.todo("T4.122 (C22 I60a, C09 I32, ruling 106 c; F1526): a settled error status at idle writes nothing for three seconds of timers — not deferred on a component: ruling 106's code commit lands it");
+});

@@ -209,3 +209,7 @@ describe("C19 tier 5 — at a real prompt", () => {
     }
   }, 60_000);
 });
+
+describe("C19 tier 5 — a key behind an in-flight request (ruling 106)", () => {
+  it.todo("T5.6 (C19 I15, ruling 106 a, b; F1524): ⇥⏎ in one write through a PTY runs /ps --status= and leaves no candidate row over an empty prompt — not deferred on a component: ruling 106's code commit lands it");
+});

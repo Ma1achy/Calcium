@@ -275,6 +275,16 @@ One thing is deliberately *not* tagged this way, and §7 says why: the spinner's
 
 `ghost` is synchronous by construction: it consults static sources only — which means manifest-backed slots only — and returns the completion of a unique match, or null.
 
+### What ends a request, and what a key behind one does (ruling 106)
+
+**Every way the line goes away invalidates the request made against it** — an edit, a submit, a clear and a recall, as well as a dismissal of the menu. A result answers the context it was asked for, and that context is a line; once the line has gone, the answer is to a question nobody is asking. C19 holds the mechanism, `cancel()` making `active` null and a result resolving after it arriving `superseded` with no candidates (I13). The shell is the caller, so the callers are the shell's, and §8c's classification table lists them by route. **This section said *`Esc`* and nothing else**, and C19 I15 with it. So a result for a submitted line was applied to the next, empty one, and opened a selected menu over it (F1524).
+
+**The shell's continuation reads `superseded`, not only its own sequence.** The effect table's sequence guards a request against a later `Tab`, and nothing else moves it. A superseded result is empty by I13, so before ruling 106 it reached §5's *none* arm and closed whatever menu the superseding keystroke had just opened.
+
+**A key typed behind an in-flight request acts on the line as it stands** (ruling 106 a). `⏎` while `Tab`'s request is in flight is `⏎` at rest: it submits the line shown (I20). Input never waits on a fetch (C22 I18), and a line whose content depends on something decided after the keystroke is what C23 I28 rules out. So the user runs what they saw when they pressed the key, and never the line `Tab` would have produced afterwards.
+
+**`Esc` at a bare prompt is the one arm the shell does not reach, and it is a question rather than a landing.** With no menu on screen the prompt binds no `esc`, so a `Tab` on a slot with no static candidates cannot be cancelled by `esc`, and its result opens the menu when it lands (§8c trace 11, row 10). Building it needs a prompt binding for `esc`, and a key's binding is the registry's to give.
+
 ---
 
 ## 5. Accepting
@@ -682,6 +692,45 @@ Walked at ae00b6dd before anything here was built (I31, F1497, F1498), and measu
 
 **Step 7 is the limit, stated.** The hold is per token, and a token shortened and retyped is the same token, so it holds. The same is true of a later token deleted back to its start while earlier tokens remain: the line has not gone. Step 9 is the control that the close is caused by the replacement and not by the key.
 
+### Trace 11 — a key behind an in-flight request (ruling 106)
+
+Walked at a1284cb0 before anything here was built (F1524), and measured rather than read: a built session at 100 × 24 over `/ps --status=`, with the menu at rest over its three values. Indexed by the rows where *a request is in flight* meets *the line it was asked against goes away*. Each event is one input batch, so the request is still in flight when the second key is read, which is the order a PTY read of `\t\r` produces (the locksmith's forced-order run, 3 of 3). `alpha` rows use a dynamic source held open by the test; the rest are the static set, which resolves a microtask later.
+
+| Row | Line, then one batch | buffer once it settles | at a1284cb0, once it settles | ruled |
+|---|---|---|---|---|
+| 1 | `/ps --status=`, `⇥` | `/ps --status=` | `› running` selected, `⏎ accept` | the control: unchanged |
+| 2 | `/ps --status=`, `⇥⏎` | empty; `/ps --status=` submitted | **`› running` selected over the empty prompt** | none, `⏎ send`; the line submitted is the one shown (106 a) |
+| 3 | `/ps --status=`, `⇥⌫` | `/ps --status` | **`--status=`'s values, selected, over `/ps --status`** | what the edit's recompute gives: none |
+| 4 | `/ps --status=`, `⇥⌃u` | empty | **`› running` selected over the empty prompt** | none |
+| 5 | `/help` submitted, `/ps --status=`, `⇥↑` | `/help` | **`› running` selected over `/help`** | none (I31) |
+| 6 | `/ps --status=`, `⇥⌃c` | `/ps --status=` | **dismissed by `⌃c`, then reopened selected** | none, and held as `Esc` holds |
+| 7 | `/ps --status=`, `⇥`, `esc`, the source answers | `/ps --status=` | **reopened, `alpha` and `beta` among the values** | none, and held |
+| 8 | `/ps --search=`, `⇥`, `⌃c`, the source answers | empty | **`› alpha` selected over the empty prompt** | none |
+| 9 | `/`, `⇥h` | `/h` | **no menu** — `h` opened `/help` and `/history`, and the superseded result closed it | `/help` and `/history`, at rest |
+| 10 | `/ps --search=`, `⇥`, `esc`, the source answers | `/ps --search=` | `› alpha` selected | **not built**: the prompt binds no `esc` (§4) |
+| 11 | `/ps --status=`, `⇥x` | `/ps --status=x` | none | the control: the route that did cancel |
+
+**Row 2 is ruling 106's subject and has two halves.** The line submitted was already right: `⏎` at rest submits (I20), and it ran `/ps --status=` before the result existed, so 106 (a) rules that this is the answer rather than a race to be closed the other way. What was wrong is the half after it: `reset()` closed a menu that did not exist yet, and moved neither the shell's sequence nor C19's token, so the late result opened a selected menu over the next line. **Rows 3 to 8 are the same defect by five other routes**, and no two of them share a line of code. **Row 9 is the converse**: the route that *did* cancel, a printable key, produced a superseded result, and the continuation read only its own sequence, which a printable key does not move. So the empty result reached §5's *none* arm, which closes the menu.
+
+**Row 10 is the limit, stated.** It is the one row where the invalidating event has no handler of its own to put the call in. Building it needs a binding, which §4 says is a question.
+
+### The classification table — who invalidates, by route
+
+Structural, and the trace's companion: the rows are the routes by which the line can go away, and the question is whether the route reaches `cancel()`. No event mediates the two rules — *the shell calls `cancel()`* and *this route changes the line* — so a trace indexed by keys found the rows, and this table says why each one was open.
+
+| # | The line goes by | The route through the shell | Reached `cancel()` at a1284cb0 | Ruled |
+|---|---|---|---|---|
+| 1 | a printable key, a paste | the composition root's input handler | **yes**, before the insert | unchanged |
+| 2 | `⌫`, a kill, a yank, undo, redo, a newline | the effect table's recompute set | no | before the effect |
+| 3 | a submit, a palette line | `submitPrompt` → `reset()` | no | in `reset()` |
+| 4 | a clear, `⌃c` at a prompt holding text | the router's `clearPrompt` | no | through `reset()` |
+| 5 | a recall, `↑` or `↓` | `recall()` | no | in `recall()` |
+| 6 | the menu dismissed by `esc` | the panel's `dismiss` | no | in `dismiss` |
+| 7 | the menu dismissed by `⌃c` or a click outside | the router's `popLayer`, straight to C15 | no, and the effect table's menu state was never closed | through `dismiss`, as `esc` |
+| 8 | `esc` with no menu on screen | nothing binds it | no | **not built** (§4) |
+
+**Row 7 is two defects in one cell.** The router pops the layer directly, so the effect table's `candidates` and `requested` survive the pop: the menu is gone from the stack while the table still believes it is open. *`⌃c` closes it exactly as `esc` does* is the router's own comment on the panel's rung, and routing the pop through `dismiss` makes the comment true.
+
 ### The classification table — who owns a key while a layer is up
 
 Structural: no event mediates these, and a trace indexed by keystrokes reaches none of them.
@@ -716,9 +765,9 @@ Structural: no event mediates these, and a trace indexed by keystrokes reaches n
 - **I10** — Dynamic results are cached on `(sourceId, contextKey)` and expire at their TTL.
 - **I11** — Accepting a candidate produces exactly one undo unit in C17.
 - **I12** — C19 imports nothing from `terminal/` and never commits a frame.
-- **I13** — A keystroke arriving during a pending request supersedes it: the sequence advances, the spinner clears, and the older result is discarded on arrival (I1). No state from the superseded request survives into the next one.
+- **I13** — A keystroke arriving during a pending request supersedes it: the sequence advances, the spinner clears, and the older result is discarded on arrival (I1). No state from the superseded request survives into the next one. **A keystroke is every edit, whichever route it takes into the buffer** (ruling 106 b): a backspace, a kill, a yank, an undo, a redo and a newline supersede as a printable key and a paste do, and a superseded result closes nothing the superseding keystroke opened.
 - **I14** — A leading `/` completes the manifest; bare text completes `PATH` and the filesystem, never both.
-- **I15** — Every piece of state outliving a single event carries the sequence it belongs to and is used only while that sequence is `active` (§4). The one exception is the spinner, which asks how long the earliest call still in flight has been outstanding (§7).
+- **I15** — *(amended by ruling 106, F1524)* Every piece of state outliving a single event carries the sequence it belongs to and is used only while that sequence is `active` (§4). The one exception is the spinner, which asks how long the earliest call still in flight has been outstanding (§7). **The token is invalidated whenever the line it answers goes away**: an edit, a submit, a clear, a recall and a dismissal of the menu, not `Esc` alone (§4, §8c's classification table). Before ruling 106 only a printable key and a paste reached `cancel()`, so a result for a submitted line opened a selected menu over the next, empty one. **A key typed while a request is in flight acts on the line as it stands**: `⏎` at rest submits the line shown, never `Tab`'s later result. → T3.33, T3.34, T3.35, T5.6, T6.30
 - **I16** — A unique match is inserted whole followed by its own `delimiter`; a common prefix is inserted without one. The delimiter is declared by the candidate, because only its source knows whether the value is a directory, a flag taking a value, or a finished word.
 - **I17** — C19 reads no filesystem. The `path` and `executable` sources take an injected directory reader, so every test runs without one.
 - **I18** — Every candidate the menu holds is legible in it. The table form declares a flex column, so C11 has somewhere to put residual width — it gives residual width only to columns declaring `flex: true` — and the value column's floor is the widest candidate label **plus the selection glyph**, which is on whichever row is selected. Without the flex column every cell rendered `…` at any width; without the glyph in the floor, exactly the selected row truncates, which reads as a flicker rather than as a width defect. It held for every verb carrying a summary and for no verb without one, because a candidate with no `detail` took the pills path then — so half the menu was correct and a row asserting the menu appears passed against both. Since ruling 99 that candidate is a table row with an empty hint cell (I30), legible by the same floor.
@@ -765,7 +814,7 @@ Structural: no event mediates these, and a trace indexed by keystrokes reaches n
 12. `/` completes verbs; bare text completes executables and paths (I14).
 13. Static sources ship with the framework, and so do the two generic dynamic ones — `path` and `executable`, over an injected directory reader. Only **domain-backed** dynamic sources are the app's, because a filesystem is not a domain (I3, I17).
 14. **Completion never blocks input** (I2). The prompt stays fully responsive while a request is pending, and every other mechanism here exists to make that true: sequence numbers so a late result cannot land on a changed line, the static/dynamic split so per-keystroke work is synchronous, the spinner threshold so a slow source is visible rather than silent, and source-level failure containment so one hung source cannot take the prompt with it. Stated as a commitment because without it that machinery reads as complexity in service of nothing.
-15. The sequence is a token of validity rather than a counter: state outliving an event is tagged with it, `cancel()` invalidates it, and staleness is structural rather than remembered (I15). The spinner is the one named exception: it asks how long the earliest call still in flight has been outstanding (§7).
+15. The sequence is a token of validity rather than a counter: state outliving an event is tagged with it, `cancel()` invalidates it, and staleness is structural rather than remembered (I15). The spinner is the one named exception: it asks how long the earliest call still in flight has been outstanding (§7). **Every way the line goes away invalidates it**, and a key typed behind an in-flight request acts on the line as shown (ruling 106).
 16. **The menu opens as you type**, on two or more static candidates, and closes at one — where ghost text takes over — or at none (I19). `Esc` holds for the rest of the token, so dismissing it is not undone by the next character.
 17. A menu nobody asked for takes no keys from the prompt: it has no selection, the prompt's bindings resolve first, and `Tab` is how the user enters it (I20). `Tab` still means `Tab` there — §5's algorithm, dynamic sources and all — rather than moving a highlight (I21).
 18. **Nothing about typing runs a dynamic source.** The as-you-type path calls `suggest`, which is static and synchronous; the split I3 states is unchanged and T2.1a is the row that keeps it (I3, I22).
@@ -869,6 +918,9 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T3.30** (I30, I23, ruling 99, F1496): through a built session at 100 × 16, a static source offering sixty candidates with no `detail` under `/z`. **The menu is a ladder from its first frame**: between the top rule and `+ N more`, which sits directly on the prompt's rule, every row holds exactly one candidate, the first row opens `›`, and N is sixty less the rows drawn. After `⇥` and enough `↓` to pass the first window, the selected candidate is drawn and the box keeps its height. **A wheel run far past the end clamps** (C16 I74): the last candidate is drawn, the box keeps its height, and N is again sixty less the rows drawn. The control is the same source with a `detail` on every candidate: the same box, the same labels in the same rows, and a hint on each. *It was the pills window's row (F1487), and ruling 99 retired the form it measured.*
 - **T3.31** (I31, I19, F1498): `/c` typed, `Esc`, backspace to an empty line, `/c` typed again → the menu is open over `/c`'s candidates. The control is the hold still standing where the line never went: `Esc`, one backspace, `c` again → no menu.
 - **T3.32** (I31, I20, I22, F1497): through a built session at 80 × 24, `/help` submitted and `/c` typed, so the menu is at rest over `/c`'s candidates. `↑` → the prompt reads `❯ /help` and no candidate row is drawn above it; `↓` back to the draft `/c` → still none, because a recall rebuilds nothing, and a backspace then opens it. **`↓` closes one too**: `↑`, backspaces down to `/h`, which opens the menu over `/help` and `/history`, then `↓` → the draft `/c` and no candidate row. **The hold ends on a recall**: `/c`, `Esc`, `↑`, then backspaces down to `/h` → the menu opens over `/help` and `/history`. The control is `↑` with nothing to recall: the line is unchanged and the menu stays open.
+- **T3.33** (I15, I20, ruling 106 a, b; F1524): through a built session at 100 × 24 over `/ps --status=`, with the menu at rest, `⇥⏎` in one input batch → once the request settles there is no menu layer, the prompt is empty, the owner line reads `⏎ send`, and the line submitted is `/ps --status=` exactly: the transcript echoes it and history's newest entry is it. The control is `⇥` alone: the requested menu opens with `› running` and `⏎ accept`, so the fixture reaches the arm under test (§8c trace 11, rows 1 and 2).
+- **T3.34** (I15, I13, I31, ruling 106 b; F1524): the same session, and `⇥` followed in the same batch by each other way the line goes away → once the request settles, no menu is drawn: `⌫` (the buffer `/ps --status`), `⌃u` (the buffer empty), `↑` after `/help` was submitted (the buffer `/help`), and `⌃c` over the panel (the buffer `/ps --status=`). Behind a dynamic source the test holds open: `esc` over the menu, and `⌃c` at `/ps --search=` with no menu, which clears the prompt → no menu once the source answers. The control is the held source answering with nothing pressed: the menu opens with `› alpha` (trace 11, rows 3 to 8).
+- **T3.35** (I13, I15, ruling 106 b): `/`, then `⇥h` in one batch → once the superseded request settles the menu `h` opened is still drawn, `/help` and `/history` at rest. The control is `⇥` alone, which opens the requested verb menu (trace 11, row 9).
 
 ### Tier 4 — integration
 
@@ -897,6 +949,7 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T5.3**: `Tab` near the bottom of the terminal → the menu flips above and shows every candidate.
 - **T5.4**: completing a path with `ls ` and `Tab` → filesystem candidates, not verbs.
 - **T5.5**: sixty seconds of repeated `Tab` on the same dynamic slot → one source invocation, then a second after expiry.
+- **T5.6** (I15, ruling 106 a, b; F1524): through a PTY at 100 × 24, `/ps --status=` typed and the menu at rest waited for as a frame, then `⇥⏎` in one write → the refusal for `/ps --status=` is drawn (`bad_value`), and once the frame settles no candidate row stands above an empty prompt and the owner line reads `⏎ send`. The locksmith's `tabenter-noresize` mode, 3 of 3 red at a1284cb0.
 
 ### Tier 6 — fail-on-revert
 
@@ -927,6 +980,7 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T6.27** (I23, ruling 90): `menuRowsShown` still charging the bottom edge it lost → **T4.9** fails: the window shows one candidate fewer than the box holds, and the remainder counts it as missing. Before T4.9 compared the box against its first placement this revert failed nothing, because a window one row short fits inside the box it was sized for.
 - **T6.28** (I30, I23, ruling 99): the pills form put back for candidates with no `detail` → **T3.30** fails on its first frame, several candidates to a row and no `›`, and **T1.72** on its plain arm. The value cell dropping the candidate's `tone` → **T1.72**. The wheel's clamp dropped → **T3.30**'s wheel arm fails: the window runs off the end and draws fewer rows than the box. `tools/mutate/runs/c19-menu-ladder.mjs`, which replaces `c19-pills-window.mjs`: F1487's window retired with the form.
 - **T6.29** (I31): the recall putting the line in without closing the menu, which is F1497 → **T3.32** fails: `/help` under `/c`'s candidates. The hold kept past an emptied line, which is F1498 → **T3.31** fails: no menu over the retyped `/c`. The recall leaving the hold standing → **T3.32**'s hold arm fails: no menu over `/h`. The prompt's `↓` putting its line in by hand → **T3.32**'s `↓` arm fails: `/h`'s candidates over `/c`. A recall that rebuilds rather than closes → **T3.32** fails on the draft, which opens a menu. `tools/mutate/runs/c19-line-gone.mjs`.
+- **T6.30** (I15, ruling 106 b): `reset()` not invalidating → **T3.33** fails, `› running` over an empty prompt, and **T5.6** with it. `recall()` not → **T3.34**'s `↑` arm. The recompute set's wrapper not → **T3.34**'s `⌫` and `⌃u` arms. `dismiss` not → **T3.34**'s `esc` arm. The router's `popLayer` popping the menu straight off the stack → **T3.34**'s `⌃c` arm. `clearPrompt` not going through `reset()` → **T3.34**'s clear arm. The continuation reading its own sequence and not `superseded` → **T3.35**. `tools/mutate/runs/c19-request-gone.mjs`.
 - **T6.17** (I19): recomputing the menu on a keystroke through `request` rather than `suggest` → T2.1a fails, a keystroke spawns a subprocess in every app that registers a domain source, and no assertion about the candidate set changes.
 - **T6.18** (I20): giving a typed menu a selection at index 0 on open → T3.20's Enter case fails: the user types `/ps`, presses Enter, and a candidate is accepted instead of the command being run.
 - **T6.19** (I21): letting `overlay`/`tab` answer for a typed menu → T3.22 fails and no dynamic source is ever reachable once the menu opens by itself.

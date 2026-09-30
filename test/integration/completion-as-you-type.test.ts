@@ -624,3 +624,9 @@ describe("C19 I31 — a line that goes away takes its menu and its hold (F1497, 
     expect(none.menu(), "and the menu stays").toEqual(before);
   });
 });
+
+describe("C19 I15 — a key behind an in-flight request (ruling 106, F1524)", () => {
+  it.todo("T3.33 (C19 I15, I20, ruling 106 a, b; F1524): ⇥⏎ in one batch over /ps --status= submits the line shown and leaves no menu over the empty prompt — not deferred on a component: ruling 106's code commit lands it");
+  it.todo("T3.34 (C19 I15, I13, I31, ruling 106 b; F1524): every other way the line goes away behind an in-flight ⇥ leaves no menu once it settles — not deferred on a component: ruling 106's code commit lands it");
+  it.todo("T3.35 (C19 I13, I15, ruling 106 b): a superseded result closes nothing the superseding keystroke opened — not deferred on a component: ruling 106's code commit lands it");
+});
