@@ -43,7 +43,7 @@ type change.
 | **12** | [**A time-based assertion under contention**](#12) | 26 | **7 open** | — | **new at F80** · Calcium's own suite · **F877 is the first that repairs an instrument rather than recording a reading** |
 | **13** | [Text the framework emits](#13) | 26 | **5 open** · 2 unread | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 59 | **5 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
-| — | [Singles](#singles) | 137 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
+| — | [Singles](#singles) | 141 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
 
 **Four groups are new since F55** — 9, 10, 12, and F81's arrival in 4. Group 9 is the one
 that changes the picture, and it is the only group whose subject is the apparatus rather
@@ -2888,7 +2888,15 @@ written as one. Every member reads as deliberate, which is why none was found by
 
 **F1093** — **a budget written to widen a five-second default became a narrowing when the default went to thirty.** C12 T2.1 sweeps twelve fuzz corpora across every width from one to two hundred through three rasteriser entry points, one corpus being a hundred thousand points, and it carries the only hand-written row timeout in the tree with a comment defending it: *an explicit budget, because 3.2 s against a 5 s default is not a margin … twenty seconds says the seconds are expected*. Every sentence of that is right and the number it produced now does the opposite of what it was for, because `vitest.config.ts` set `testTimeout` to thirty thousand on 2026-08-22 — so the override stopped being a widening of five and became **a third off** the limit the row would otherwise have had, in a file whose comment says the row exists because the default was too small. Measured: the row is **6936 ms** in the devcontainer and **20960 ms** on the runner, against its explicit twenty thousand and a global thirty. **It would have passed on the default it was written to escape** — the failure is the override, not the runner and not the row. **The population is exactly one**: swept over `test/`, every other explicit row timeout is at or above the global, almost all of them in tier five where a real PTY needs its own budget, and four candidates that looked sub-global on a first pass are not row timeouts at all — two arguments to `waitForFrame`, one to `elapsedNeeded`, one an assertion bound. **F967's class, third instance in a day, and the first that is a number rather than prose**: a stale sentence misleads a reader, a stale number fails the build on the one machine that was not available to disagree when it was written. **And the direction is the surprise** — an override reads as *more room*, this one is less, and nothing in the syntax says so; twenty thousand beside a comment about a five-second default reads as generous at every glance. **Open** — `CORPUS_BUDGET_MS`, which is what the row is in `budget.ts`'s own taxonomy, sixty seconds against a runner figure of twenty-one; the number leaves the file so the next regime change moves it once, and the comment keeps its argument and gains the measurement the argument was missing · **Closed** — and the one way this repair could fail silently is the constant not being read, a wrong argument position leaving the row on the global and green, which is indistinguishable from the fix working. Driven rather than assumed: with the constant set to one the row fails with `Test timed out in 1ms`, and `budget.ts` was restored from a copy with its md5 compared. The row runs in two thousand three hundred and nine milliseconds alone and six thousand nine hundred and thirty-six inside the suite, against sixty thousand
 
-## Singles — one consumer each — **23 open** · 100 closed · 14 with no verdict
+## Singles — one consumer each — **23 open** · 104 closed · 14 with no verdict
+
+**F1493** — **C07's cancelled notice draws no ⊘** · **Open** — owed: measure whether the app route reaches it, then give it ruling 92's mark
+
+**F1492** — **lines cleared from the queue never reach history** · **Open** — owed: `clearQueue` records each cleared line at settlement (C23 I29)
+
+**F1491** — **the shell route records `code ?? 1`, and an `error` notice carries exit 0** · **Open** — ruling 98: codes go through C07 I14's `exitCodeOf`, and an `error` document with no known code carries 1
+
+**F1490** — **an app-route cancel settles `ok` with exit 0 while history records 130** · **Open** — ruling 97: it settles `partial` with a document the shell writes, exit 130
 
 **F1489** — **a session row is named T4.34 and is not C22's T4.34** · **Open** — owed: the session row takes an id of its own and a spec row
 
@@ -2904,13 +2912,13 @@ written as one. Every member reads as deliberate, which is why none was found by
 
 **F1483** — **the image fault text carries an em dash onto the ASCII rung** · **Open** — owed: find how framework-authored prose meets the ASCII rung elsewhere, then rule
 
-**F1482** — **a handed-off child with no exit status is said to have exited 1** · **Open** — ruling 94: it says *ended without an exit status*; 128+n and SIGQUIT stay failures as written
+**F1482** — **a handed-off child with no exit status is said to have exited 1** · **Closed** — ruling 94 in C23 I95 (7f92f76e): *ended without an exit status*, code −1, state failed; 128+n and SIGQUIT stay failures; T4.93 and T6.113
 
-**F1481** — **a failed key action is drawn as a warning on an `ok` document** · **Open** — ruling 93: an `error` document in error tone with ✗
+**F1481** — **a failed key action is drawn as a warning on an `ok` document** · **Closed** — C22 I134 (70f5fcb1): a throwing key action appends an `error` notice with ✗ on an `error` document; T1.38c red first (`warn warn ok`)
 
-**F1480** — **a handed-off child's exit code never reaches history** · **Open** — owed: `noticeDoc`'s meta carries the child's code, so a `vim` exiting 1 is recorded as 1 (C23 I29)
+**F1480** — **a handed-off child's exit code never reaches history** · **Closed** — C23 I97 (7f92f76e): the handoff's `Exit` goes through C07 I14's `exitCodeOf`: 130/143/129 for the cancel signals, the code for an exit, −1 for a child that never started; T4.96 reads meta and C20
 
-**F1479** — **a cancel is drawn as a failure on the shell route and as a warning in the queue** · **Open** — ruling 92: C23 I66's shell arm settles `partial` in the `cancelled` form, and `clearQueue`'s notice takes it too
+**F1479** — **a cancel is drawn as a failure on the shell route and as a warning in the queue** · **Closed** — C23 I96 (6a12dfc4, 7f92f76e): the shell route, the queue and the handoff settle a cancel `partial`, muted ⊘, through `cancelledDoc`; code `CANCELLED` retired (C04 I3, no reader); `c23-cancel-state.mjs` 9 of 9 by the named row with a control. The app route is F1490
 
 **F1478** — **T4.102 cites C22 I123 and cannot see it: removing the unchanged-line guard passes it** · **Closed** — T4.102 waits out the scheduler's timer after a resize and reads the write exactly: `""` when the line survives, one line when it narrows; the guard's removal now fails T4.102 itself
 

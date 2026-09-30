@@ -120,3 +120,10 @@ Nothing reports these. Read each against what your application relies on.
 - **A finished `progress` or `count` bar draws zero rows.** A `capacity` bar persists.
 - **A bar's alphabet follows the work it counts**: segmented work with no style draws posts.
 - **At 256 colours some indices move** to hold the contrast floor. No 24-bit value changes.
+
+**Documents and history.**
+- **A cancelled shell command settles `partial`.** Code that detects one with
+  `status === "error" && error?.code === "CANCELLED"` tests `status === "partial"` instead;
+  `meta.exitCode === 130` is unchanged.
+- **A handed-off child's exit code reaches `meta.exitCode` and history**: 128+n for a signal,
+  −1 when it never started. It was always 0.

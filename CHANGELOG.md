@@ -109,6 +109,13 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   draws a rule of its own above the prompt's. `Table` gains `current?: string`, the id of the
   row a chooser is on (C04 I150, C11 I33). `menuBlocks`' second parameter is now the current
   index, and `menuRowsShown` charges one row of chrome fewer.
+- **A cancelled shell command settles `partial`, not `error`** (7f92f76e, ruling 92, C23 I96).
+  `!cmd` then Ctrl-C leaves a muted `⊘ Cancelled.` notice above the screen it kept, where it
+  was an `error` document with an error box and `error.code: "CANCELLED"`. The code is gone;
+  `meta.exitCode` is still 130. Queued lines cleared by Ctrl-C settle the same way, with
+  `⊘ cancelled before it ran`, where they were a `▲` warning on an `ok` document.
+- **A key action that throws appends an `error` notice** (70f5fcb1, ruling 93, C22 I134), `✗`
+  on an `error` document, where it was a warning on an `ok` one.
 - **A window title and a system notification show control characters in caret form**
   (46746909, 1e2c5525, ruling 86, C01 I26). `ESC[2J` in a tool's output reaches the title as
   `^[[2J` where it was `[2J`, and tab and newline appear as `^I` and `^J`. Bidi format characters

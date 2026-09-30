@@ -1266,6 +1266,18 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1490). **An app-route cancel settles the entry `partial`, with a document the shell writes.** The document keeps what the entry had drawn and adds the cancelled notice; its `meta.exitCode` is 130, which is what C20 already records. C23 I10 says a cancellation settles `partial` with output retained, and C23 I96 now draws the cancel that way on the shell route, the queue and the handoff. The app route is the one that settles `ok` with code 0 beside a history entry of 130. The patch gate's axis is who is writing, and a cancel is the shell writing, so the shell may write the document. `cancelThis`'s `settle(id)` with no document is what gives way.
+
+**97 · RULED — How an app-route cancel settles.** Lane b4-exec2 measured `⌃c`, a withdrawn approval and a cancelled stream settling `ok`, exit 0, while history recorded 130 (F1490).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1491). **A document's exit code agrees with its status and with C07 I14.** An `error` document whose code is unknown carries 1, as `errorDoc` and `completeLocal` already do, never 0. A route that knows the child's ending takes its code through `exitCodeOf`: 128+n for a signal, −1 for a child that never started. The shell route's `exit.code ?? 1`, which records 1 for SIGKILL and for a spawn failure, goes through the table, and a spawn failure stops being said to have *exited with code 1*. It is the same rule F1480 and ruling 94 applied to the handoff, carried to the neighbouring route.
+
+**98 · RULED — What exit code an `error` document carries.** Lane b4-exec2 found `noticeDoc` at status `error` leaving 0, and the shell route recording `code ?? 1` (F1491).
+
+---
+
 ## Not yet recovered
 
 The gap between the entries and the running count in the per-MR reports was chased and closed: some questions had been counted twice. The list is the count. **No total is stated here in prose**, because the one that used to be here said *sixteen* long after that stopped being true — this file's own subject, arriving inside it.

@@ -57838,11 +57838,15 @@ A second site: `clearQueue` (`execution.ts` about 598) writes `noticeDoc(item.li
 
 **Ruled (92):** a cancel is the `cancelled` call state on every route. I66 is amended and both sites follow. **Owed**: the I66 amendment, both code sites, T2.97 moved with them, and a row per site that reads tone, mark and status.
 
+**Closed** by lane b4-exec2 (6a12dfc4 spec, 7f92f76e code). The walk (C23 §8a A6.7) found the shell route and the queue breaking C23 I10 as well as I66, so I96 cites both. `cancelledNotice` and `cancelledDoc` in `documents.ts` are now the one place the cancel form is composed. Code `CANCELLED` does not survive as data: C04 I3 gives a `partial` document no `error` field, and a grep found no reader. **Two premises were corrected.** Ruling 92's *what C07 already gives a cancelled call* holds for the tone and the status, not for ⊘, which is F1493. And *every route* does not reach the app route, which is F1490 and ruling 97. Frames: `⊘ Cancelled.` muted at full colour, dim at 1-bit, `/ Cancelled.` in ASCII. The golden movers were predicted exactly: four `continuation` snapshots.
+
 ## F1480 — a handed-off child's exit code never reaches history ★★★☆☆
 
 Found by lane b4-exec. `noticeDoc`'s meta has no `exitCode`, so `meta()` defaults it to 0, and a handed-off `vim` that exits 1 is recorded in history as a success. This goes against C23 I29, which has history record what the command returned. Ruling 91 made the notice say failure; the record beneath it still says success, so the two disagree about one run.
 
 **Owed**: the handoff's notice carries the child's exit code into meta (`128 + n` for a signal, as C21 reports one), and a row that reads the history entry after a non-zero handoff.
+
+**Closed** by lane b4-exec2 (7f92f76e, C23 I97). **The finding's remedy named the wrong component.** C21's `Exit` is `{code: null, signal}`, and the 128+n arithmetic belongs to C07 I14 (`exitCodeOf`) and C01 I17. So the handoff now goes through `exitCodeOf`, which takes `Pick<RawResult, "exitCode" | "signal">`, rather than through a second copy of the table. A child with neither a code nor a signal gets −1, C07's *never started*. T4.96 was red first (`exit 1: meta 0 · recorded /tty vim 0`). The shell route's own `code ?? 1` is F1491.
 
 ## F1481 — a failed key action is drawn as a warning on an `ok` document ★★☆☆☆
 
@@ -57916,3 +57920,29 @@ Three gaps, reported by lane b4-menu against §097 and not built by rulings 89 a
 Found by lane b4-menu. The menu's closing-rule row in `test/integration/session.test.ts` is named T4.34. C22 T4.34 is a different row, citing C22 I66. The session row has no spec row of its own. So a mutation `expect` of `T4.34` resolves to whichever the harness reads first. Lane b4-menu's first draft of `c19-menu-current.mjs` was scored `caught T4.34` from the id's presence while T4.34 stayed green, which is F1472's second instance.
 
 **Owed**: give the session row an id of its own and a spec row, and have SP9 or a sibling rule refuse one id in two tables.
+
+## F1490 — an app-route cancel settles `ok` with exit 0 while history records 130 ★★★☆☆
+
+Found by lane b4-exec2's walk (C23 §8a A6.7, row 7). On the app route, `⌃c`, a withdrawn approval and a cancelled stream all settle through `cancelThis`, which does `finishCard` and then `settle(id)` with no document. So no status can change. Measured: the head reads `notice muted work-unit «ps · cancelled»`, the status is `ok`, `meta.exitCode` is 0, and C20 records `/ps 130`. This goes against C23 I10, *cancellation settles as `partial` with output retained*, and it disagrees with I96, which the shell route, the queue and the handoff now follow.
+
+**Ruled (97):** the shell writes a `partial` document that keeps what was drawn, with exit 130. **Owed**: the settle path, a row per cancel source, and a check that C07's cancelled mapping (F1493) is or is not on this path.
+
+## F1491 — the shell route records `code ?? 1`, and an `error` notice carries exit 0 ★★☆☆☆
+
+Found by lane b4-exec2. Two sites disagree with C07 I14's table, which the handoff now uses (I97).
+- **The shell route** records `exit.code ?? 1`. A child killed by an outside signal records 1 where the table gives 128+n (137 for SIGKILL). A spawn failure records 1 where the table gives −1, and its text *exited with code 1* names a code the child never returned.
+- **`noticeDoc` at status `error`** leaves `meta.exitCode` at 0. That covers the key-action document ruling 93 made `error`, and F15's fault notice. `errorDoc` defaults to 1, and `completeLocal` derives 1 from the status. Neither site is a submission, so history is unaffected, but the document says error with code 0.
+
+**Ruled (98).** **Owed**: both sites, and a row per site that reads the code beside the status.
+
+## F1492 — lines cleared from the queue never reach history ★★☆☆☆
+
+Found by lane b4-exec2. C23 I29 records every submitted line at settlement. `clearQueue` settles each queued line with the cancelled notice (ruling 92) and records none of them. Measured: after `⌃c` with two lines queued behind a running `/ps`, C20 held only `/ps 130`.
+
+**Owed**: each cleared line recorded at settlement. Its code is 0, the document's own (C04: `partial`, and nothing ran); if a spec says otherwise, amend the spec first. A row reads the history after a clear.
+
+## F1493 — C07's cancelled notice draws no ⊘ ★☆☆☆☆
+
+Found by lane b4-exec2 while checking ruling 92's citation. C07's mapping for a cancelled call (`mapping.ts` about 190–200) is `muted` on `partial` with no glyph. So ruling 92's *what C07 already gives a cancelled call* holds for the tone and the status, not for ⊘. The lane did not measure whether the path is reachable on `⌃c`, because `cancelThis` settles the entry before `invoke` resolves.
+
+**Owed**: measure its reachability; F1490's build decides the path. If it is reachable, it takes the cancelled mark.
