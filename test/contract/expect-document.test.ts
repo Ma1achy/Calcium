@@ -30,6 +30,7 @@ import { b } from "../../src/shell/builders/index.js";
 import type { AnyBlockDefinition } from "../../src/presentation/blocks/index.js";
 import { rows } from "../../src/presentation/blocks/paint.js";
 import { expectDocument, liveParts } from "../../src/testing/index.js";
+import { DARK_THEME, LIGHT_THEME } from "../support/render.js";
 import { producerContext, FULL_CAPABILITIES as FULL } from "../support/producer-context.js";
 import { CORPUS, doc } from "../support/blocks.js";
 
@@ -197,8 +198,8 @@ describe("C24 §7 — expectDocument", () => {
      * `scroll` and `mosaic` sat in `KINDS_WITH_NOTHING_TO_CHECK`, each with a
      * reason ending *"the children are swept as blocks in their own right"*.
      * Nothing swept them — `visit` reached `default` and returned. What made it
-     * visible rather than silent is that `carriesATone` is deep: F102's guard
-     * fired on a *descendant's* tone, so a document holding a properly toned
+     * visible rather than silent is that `carriesMeaningColour` is deep: F102's
+     * guard fired on a *descendant's* colour. A document holding a properly toned
      * notice inside a scroll was **refused**, and one holding a real offence was
      * refused with the container named instead of the offender.
      *
@@ -236,15 +237,24 @@ describe("C24 §7 — expectDocument", () => {
     ).toThrow(/notice "n" is toned error/u);
 
     // **The premise, still falsifiable.** F102's guard survives the change,
-    // scoped to the container's own fields: a tone appearing on a `scroll`
-    // itself is a new field the arm does not check, and it says so.
-    expect(
-      () =>
+    // scoped to the container's own fields: a meaning-bearing field appearing
+    // on a `scroll` itself is a new field the arm does not check, and it says so.
+    const expiredPremise = (field: Record<string, unknown>): string => {
+      try {
         expectDocument(
-          doc([{ kind: "scroll", id: "s", height: 4, tone: "error", children: [good] }]),
-        ).degradesTo1Bit(),
-      "a tone outside the children expires the premise",
-    ).toThrow(/the premise has expired and the arm needs a check/u);
+          doc([{ kind: "scroll", id: "s", height: 4, ...field, children: [good] }]),
+        ).degradesTo1Bit();
+      } catch (error) {
+        if (error instanceof Error) return error.message;
+        throw error;
+      }
+      throw new Error("the fabricated container premise violation passed");
+    };
+    const toneComplaint = expiredPremise({ tone: "error" });
+    expect(toneComplaint).toMatch(
+      /tone or semantic foreground outside its children.*premise has expired/u,
+    );
+    expect(expiredPremise({ foreground: "tone.error" })).toBe(toneComplaint);
   });
 
   it("degradesTo1Bit accepts a renderer that changes layout to keep the information", () => {
@@ -397,6 +407,34 @@ describe("C24 §7 — expectDocument", () => {
     ).not.toThrow();
   });
 
+  it("T2.13e (C04 I37, C10 I33): semantic foreground expires a no-field premise", () => {
+    const complaint = (subject: Block): string => {
+      try {
+        expectDocument(docOf([subject])).hasNoColourOnlyDistinction();
+      } catch (error) {
+        if (error instanceof Error) return error.message;
+        throw error;
+      }
+      throw new Error("the fabricated colour-only violation passed");
+    };
+    const tone = block({
+      kind: "raw",
+      id: "semantic",
+      text: "x",
+      spans: [{ from: 0, to: 1, tone: "error" }],
+    });
+    const foreground = block({
+      kind: "raw",
+      id: "semantic",
+      text: "x",
+      spans: [{ from: 0, to: 1, foreground: "tone.error" }],
+    });
+
+    const toneComplaint = complaint(tone);
+    expect(toneComplaint).toMatch(/tone or semantic foreground.*premise has expired/u);
+    expect(complaint(foreground)).toBe(toneComplaint);
+  });
+
   it("hasNoColourOnlyDistinction walks into panels, groups and expanded rows", () => {
     // A container that did not recurse would pass every document whose only
     // offence is nested — which is most real ones, since a detail row is where
@@ -499,6 +537,16 @@ describe("lines() — a frame, and it is the production renderer (C24 I23, F126)
     const doc = docOf([b.notice.ok("done")]);
     expect(expectDocument(doc).lines(40).join("")).not.toContain("\u001b[");
     expect(expectDocument(doc).lines(40, { colour: true }).join("")).toContain("\u001b[");
+  });
+
+  it("T2.22a: a caller can select a resolved theme deterministically without changing the default", () => {
+    const doc = docOf([b.notice.ok("done")]);
+    const implicit = expectDocument(doc).lines(40, { colour: true });
+    const dark = expectDocument(doc).lines(40, { colour: true, theme: DARK_THEME });
+    const light = expectDocument(doc).lines(40, { colour: true, theme: LIGHT_THEME });
+    expect(implicit).toEqual(dark);
+    expect(light).not.toEqual(dark);
+    expect(light.join("")).toContain("\u001b[");
   });
 });
 

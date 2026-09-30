@@ -20,6 +20,7 @@ export {
   clearResolutionCache,
   quantisedHex,
   resolve,
+  resolveForeground,
   resolveBackground,
   resolveBase,
   resolveTone,

@@ -50,6 +50,7 @@ import {
   type ViewDocument,
 } from "./types.js";
 import { parseAreas } from "./mosaic.js";
+import { parseSpanForegroundRef } from "./span-foreground.js";
 import { ALIGN_ENTRIES } from "./measure.js";
 import { overlayFault } from "./overlay.js";
 import { parseStartDate } from "../dates.js";
@@ -968,9 +969,11 @@ function checkAction(raw: unknown, where: string, e: string[]): void {
  * a reader can find each one.
  */
 /**
- * `attributesOnly` is the hunk-line arm (C04 I91): bold/italic/underline and
- * neither `tone` nor `value`, because the line's gutter and syntax palettes are
- * already the two a row may carry (C25 §3).
+ * `attributesOnly` is the hunk-line arm (C04 I91): offsets,
+ * bold/italic/underline and `elide` only. It refuses `foreground`, `tone`,
+ * `value` and `ramp` because the line's gutter and syntax palettes are already
+ * the two a row may carry, and refuses `dim`/`inverse` because the hunk's
+ * attribute vocabulary is closed (C25 §3).
  */
 /**
  * C04 I110, I111 — a screen line's text and its runs.
@@ -1105,6 +1108,14 @@ function checkSpans(b: Record<string, unknown>, member: string, e: string[], at:
       e.push(`${where}: a boundary falls between the two halves of a surrogate pair (C04 I84)`);
       return;
     }
+    if (span["foreground"] !== undefined && span["tone"] !== undefined) {
+      e.push(`${where}: "foreground" and "tone" both claim the run's foreground channel (C04 I85)`);
+      return;
+    }
+    if (span["foreground"] !== undefined && span["ramp"] !== undefined) {
+      e.push(`${where}: "foreground" and "ramp" both claim the run's foreground channel (C04 I85)`);
+      return;
+    }
     // C04 I107 — two colour channels from two owners on one cell, neither floored.
     if (span["value"] !== undefined && span["ramp"] !== undefined) {
       e.push(`${where}: "value" and "ramp" on one span — a background from the map and a foreground from the ramp is two unmeasured colours on one cell (C04 I107)`);
@@ -1112,8 +1123,26 @@ function checkSpans(b: Record<string, unknown>, member: string, e: string[], at:
     }
     for (const key of Object.keys(span)) {
       if (!TEXT_SPAN_KEYS.has(key)) {
-        e.push(`${where}: unknown member "${key}" — a span carries from, to, bold, italic, underline, tone, value, elide, ramp and nothing else (C04 I85)`);
+        e.push(
+          `${where}: unknown member "${key}" — a span carries offsets, five attributes, semantic colour references and bounded fit metadata only (C04 I85)`,
+        );
         return;
+      }
+      if (key === "foreground") {
+        const ref = span[key];
+        if (attributesOnly) {
+          e.push(
+            `${where}: "foreground" is refused on this member — its palettes are spoken for (C04 I85, I91)`,
+          );
+          return;
+        }
+        if (parseSpanForegroundRef(ref) === null) {
+          e.push(
+            `${where}: "foreground" must name a theme palette slot as "palette.slot" (C04 I85)`,
+          );
+          return;
+        }
+        continue;
       }
       if (key === "ramp") {
         if (attributesOnly) {
@@ -1149,6 +1178,12 @@ function checkSpans(b: Record<string, unknown>, member: string, e: string[], at:
           return;
         }
         continue;
+      }
+      if (attributesOnly && (key === "dim" || key === "inverse")) {
+        e.push(
+          `${where}: "${key}" is refused on this member — its attribute vocabulary is closed (C04 I85, I91)`,
+        );
+        return;
       }
       if (key !== "from" && key !== "to" && typeof span[key] !== "boolean") {
         e.push(`${where}: "${key}" must be a boolean (C04 I85)`);

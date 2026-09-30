@@ -86,7 +86,7 @@ visible without a segmenter). **The renderer snaps** any other boundary that lan
 grapheme cluster outward to the cluster's end — width-preserving by construction, because
 the cluster is painted whole. C04 I84; C09 owes the snapping row in the code phase.
 
-**Q3 What a span carries → `bold`, `italic`, `underline` only** (M16, C10 §3, §4a).
+**Q3 What the first-pass span carried → `bold`, `italic`, `underline` only** (M16, C10 §3, §4a).
 - *tone*: its one consumer, structured diff, is ruled onto `underline` by C25 I10 (M16); and a
   run tone would collapse at 1-bit onto the same `bold`/`dim` the span's own attributes use,
   so a span tone and a span attribute would be indistinguishable there. Deferred, symbol
@@ -97,6 +97,14 @@ the cluster is painted whole. C04 I84; C09 owes the snapping row in the code pha
 - *inverse*: swaps both colour channels (C10 §4a). Refused.
 - *value*: ML-1 is unscheduled. Deferred, symbol `TextSpan.value` (§7).
 C04 I85; C10 I33 for the merge and the depths.
+
+**Superseded for the 2026-09-30 consumer, without a second span type.** `dim`
+and `inverse` are now direct appearance attributes. `foreground` names a
+`ColourRef`, never a literal value; C10 admits only a non-`syntax` meaning
+palette and owns every degradation rung. It is mutually exclusive with `tone`
+and `ramp`, since each claims the run's foreground channel. These members remain
+appearance-only and are refused on hunk-line spans, whose two channels were
+already committed (C04 I85, I91; C10 I33).
 
 **Q4 Wrapping → carried by source offset** (M5, M6). A bold word broken across rows is bold
 on both. `wrapCells` drops break spaces, so slicing spans by prefix sums of row lengths is
@@ -162,7 +170,7 @@ A row governed by one rule is a restatement and finds nothing; each row below na
 | 8 | *a span is an attribute* × *tone collapses to `bold`/`dim` at 1-bit* | bold span on an `ok` notice at depth 1 | absorbed, asserted identical, not compensated (C10 I33, T3.67) | the accepted loss, made visible |
 | 9 | *a span is an attribute* × *the `unicode` axis has an ASCII rung* | italic span at `unicode: "ascii"` | SGR 3 still written; attributes are not glyphs (C10 T3.11) | — |
 | 10 | *a span is an attribute* × *the selection wash is a background* | selected row containing a bold span | compose through `withBackground`; `sliceCells` carries the SGR across the window | — |
-| 11 | *`inverse` swaps both channels* × *a span composes with tone* | — | `inverse` is not a span member; refused at the type (Q3) | — |
+| 11 | *`inverse` swaps both channels* × *a span composes with tone* | an inverse span on a toned run | `TextSpan.inverse` composes by spread with the one resolved foreground; SGR 7 is emitted and the terminal performs the swap (C04 I85, C10 I33, T2.31a) | — |
 | 12 | *spans are sorted and non-overlapping* × *markdown nests* (`**a *b* c**`) | nested emphasis | the **writer** splits: `[a ]bold`, `[b]bold+italic`, `[ c]bold`; the type has no nesting (C04 I84) | keeps `runsOf` one pass |
 | 13 | *`from < to`* × *the translator meets `****`* or an empty emphasis | a zero-length run | refused by the gate; the translator emits none (T1.24) | — |
 | 14 | *`stripControl` runs before wrap* × *offsets are into `text`* | `"abc d"` with a span at `[4,6)` (M9) | **runs first**: build `Run[]` from `(text, spans)` in code units, strip control **per run**, wrap the concatenation — alignment holds because each run shrank independently | a defect the trace would not reach, because nothing between the rules is an event |
@@ -215,6 +223,7 @@ assumed (C13's `settle` is the precedent for a throw leaving an unpatchable entr
 
 | deferral | symbol to grep | consumer that would expire it |
 |---|---|---|
+| ~~semantic foreground, dim and inverse~~ **discharged 2026-09-30** | `TextSpan.foreground`, `.dim`, `.inverse` | a full-region application consumer; foreground is a theme meaning-slot reference, attributes are direct, and all three preserve geometry (C04 I85, C10 I33) |
 | ~~a span tone~~ **discharged 2026-09-04** | `TextSpan.tone` | inline code → `tone: "identifier"`, exactly the consumer named here; C04 I89, C09 §5, C10 §4e. The tone *replaces* the block's for the run, the attributes spread on top, the 1-bit collapse is the tone's and uncompensated |
 | ~~a span value~~ **discharged 2026-09-04** | `TextSpan.value` | ML-1 per-token value, C04 I90; background through `continuousColour` on the block's `colormap` (`Raw` and `Notice` gain the member), nothing below 8-bit; **a valued run is a wrap unit** — `wrapCellsParts` takes atoms, `notice` measures and renders through one `noticeRows`, and the one span member `measure` may read is `value`'s boundaries (C09 §5). Measured: a single-word token changes the count only where the row has no space at all |
 | ~~`Hunk.lines[].spans`~~ **discharged 2026-09-04** | `Hunk` in `types.ts` + C25 I10 | the intra-line diff arrived as `intralineSpans`/`intralineLines` (`src/data/viewmodel/intraline.ts`), called by `b.patch`: a word-token LCS over each paired remove/add run, capped at 200 tokens a side, emitting `underline` and never a tone (C04 I91). The field was never the missing half and the note said so |

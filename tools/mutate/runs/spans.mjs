@@ -105,8 +105,8 @@ const MUTATIONS = [
     // row still passes, because the attributes still spread.
     name: "a span's tone is ignored and the block's style painted",
     file: PAINT,
-    from: "  const base = run.tone === undefined ? style : resolveTone(run.tone, ctx.theme, ctx.capabilities);",
-    to: "  const base = style;",
+    from: "  const base = run.foreground !== undefined\n    ? resolveForeground(run.foreground, ctx.theme, ctx.capabilities)\n    : run.tone === undefined\n      ? style\n      : resolveTone(run.tone, ctx.theme, ctx.capabilities);",
+    to: "  const base = run.foreground !== undefined\n    ? resolveForeground(run.foreground, ctx.theme, ctx.capabilities)\n    : style;",
     expect: "T2.35",
   },
   {
@@ -115,8 +115,8 @@ const MUTATIONS = [
     // the one place the two readings differ (C10 T6.85).
     name: "a span's tone composes with the block's instead of replacing it",
     file: PAINT,
-    from: "  const base = run.tone === undefined ? style : resolveTone(run.tone, ctx.theme, ctx.capabilities);",
-    to: "  const base = run.tone === undefined ? style : { ...style, ...resolveTone(run.tone, ctx.theme, ctx.capabilities) };",
+    from: "  const base = run.foreground !== undefined\n    ? resolveForeground(run.foreground, ctx.theme, ctx.capabilities)\n    : run.tone === undefined\n      ? style\n      : resolveTone(run.tone, ctx.theme, ctx.capabilities);",
+    to: "  const base = run.foreground !== undefined\n    ? resolveForeground(run.foreground, ctx.theme, ctx.capabilities)\n    : run.tone === undefined\n      ? style\n      : { ...style, ...resolveTone(run.tone, ctx.theme, ctx.capabilities) };",
     expect: "T2.26",
   },
   {

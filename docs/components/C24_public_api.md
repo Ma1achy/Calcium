@@ -68,7 +68,7 @@ export type {
 export type {
   Block, Rule, Notice, KeyValue, Table, TableRow, Cell, Steps, Logs, Events,
   Plot, PlotForm, Camera, Series, Progress, Code, Comparison, Patch, Hunk, Pills, Tip, Panel, Group, Raw,
-  Tone, Glyph, Action, ErrorLike, ViewDocument, ViewPatch,
+  Tone, Glyph, Action, ErrorLike, TextSpan, ViewDocument, ViewPatch,
 };
 
 // builders — §4
@@ -219,6 +219,11 @@ could not annotate it, which is the omission below described from the other side
 **`PlotForm` and `Camera` are exported because a consumer aliased its way to both** (I34, §8e). They are the two names `examples/plots` recovered by indexing — `Plot["form"]` and `NonNullable<Plot["camera"]>` — and they are on this list for different halves of one reason. A form is what a consumer *switches on*, so a catalogue keyed by one wants the union under its own name rather than under a local alias carrying the framework's; and a camera is a **view**, which C04 I75 keeps off the block deliberately and `RenderContext.cameras` carries live, so naming it through `Plot` says the one thing the type is at pains not to be. Neither is the general case: fifty named types sit in a published member's type position unpublished, and the population that picks these two out is the consumers' aliases rather than that list.
 
 **The builder-argument types are exported because §4's signatures name them.** A list that exports `b.table` and not `ColumnDef` gives a consumer a function whose parameter they cannot annotate, and the workaround — `Parameters<typeof b.table>[0]["columns"][number]` — is the shape of an omission rather than a design. Six of the seven are introduced by the builders themselves and exist nowhere else; `ColumnDef` is C04's and was absent from this list while `TableRow`, `Series` and `Hunk` were on it, which is the same omission caught by consistency rather than by use.
+
+**`TextSpan` is public because an application that supplies styled text must be
+able to name the data it stores and emits.** Its foreground is a `ColourRef`,
+not a literal colour, and the theme resolver remains the sole owner of colour
+degradation (C04 I85, C10 §4e).
 
 ### What is deliberately absent
 
@@ -804,6 +809,12 @@ The adapter story is "pure function, fixture in, document out". The assertions t
 ```typescript
 export function expectDocument(doc: ViewDocument, blocks?: readonly AnyBlockDefinition[]): DocumentAssertions;
 
+type RenderOpts = Readonly<{
+  capabilities?: TerminalCapabilities;
+  theme?: ResolvedTheme;
+  colour?: boolean;
+}>;
+
 interface DocumentAssertions {
   isValid(): this;                                 // C04 validateDocument
   measuresCorrectly(widths?: number[]): this;      // C09 T2.1, default 7 widths — wraps C04's conformance suite
@@ -859,6 +870,12 @@ and `lines()` is that prerequisite met.
 **It is the production renderer, not a second one.** `expectDocument` already holds a registry internally — which is why `renderToLines` was never usable and this is — and already calls `renderSequenceToLines` to do its own work. `lines()` returns what that call produces instead of asserting about it. A parallel renderer here would be the fifth instance of a suite building its own version of the thing under test, and it would diverge silently the first time the render chain changes.
 
 **Which it will.** The render chain gains diffing, caching, block windowing and capping, in that order and as one change. A consumer reading frames through this stays on the production path across all four **only** if `session.ts` composes through the same unit — which is why the extraction is a rule and not a convention (C22 §4).
+
+The resolved theme is an explicit deterministic testing input. Omitting it
+preserves the shipped dark default; supplying one returned by `loadTheme`
+renders the same document through the same production path under that theme.
+The option mutates no global store, so two golden captures cannot leak theme
+state into one another.
 
 ### `liveParts` — the declaration, readable from the side that made it (I24)
 
@@ -1150,7 +1167,7 @@ one more line on §3's list.
 - **I20** — Every field a block type carries is reachable from its builder, or `BUILDER_OMISSIONS` names it with the reason. I18 stated this and nothing read it; MG27 is the mechanism, and it found `patch.collapsedAfter`, `patch.actions` and `table.sort` on the run that created it (F41, F114). The reasons are data rather than prose for the reason C09 §4a gives: a rule with nothing reading it passes exactly like a rule that is satisfied.
 - **I21** — A public option is implemented or it is not declarable. `LiveSpec.stream` was accepted, validated by two throws policing a choice against `fetch`, and read by nothing — so a part declared with it rendered `render(null)` once, and a part that streams nothing looked exactly like a part that produced nothing. **Accepted, validated and inert is the third state, and it is A03 §2's vacuity class arriving in an API rather than in a rule.** The remedy is removal and a required `fetch`, because a compile error is where a runtime throw was and the option is additive to restore the day something drives it (F78).
 - **I22** — **`registerGrammar` is exported, because a block kind whose vocabulary is closed is a kind an app cannot use for its own domain.** C09 §4a promised registration and shipped none; the default set is sixteen grammars and a mainstream set never covers a consumer's nouns. Exported block kinds with unexported grammars is the asymmetry a factory you can import and cannot install has, and it is the one this API exists to refuse (F93, C09 I23).
-- **I23** — **A consumer can obtain a frame, and it is the frame the shell draws.** `expectDocument().lines()` returns what `renderSequenceToLines` produced rather than asserting about it; the registry it needs is the one `expectDocument` already holds, which is why this is publishable where `renderToLines` was not. Every other method on that interface measures or asserts a *property*, and a property of a document is not a picture of one — which is why the surface could not have caught the class the change axis produced, where the rows say `added` and only the frame says `+` (F37, F81, F126).
+- **I23** — **A consumer can obtain a frame, and it is the frame the shell draws.** `expectDocument().lines()` returns what `renderSequenceToLines` produced rather than asserting about it; the registry it needs is the one `expectDocument` already holds, which is why this is publishable where `renderToLines` was not. Capabilities and a resolved theme are explicit deterministic inputs, with the shipped dark theme as the documented default. Every other method on that interface measures or asserts a *property*, and a property of a document is not a picture of one — which is why the surface could not have caught the class the change axis produced, where the rows say `added` and only the frame says `+` (F37, F81, F126).
 - **I24** — **What `b.live` declared is readable from the testing entry and not from the runtime one.** A `fetch` exercisable only by running the whole refresh driver pushes every consumer toward whole-stack tests or none — the shape that let four defects survive a green suite — and a *production* consumer reading its own declaration back holds a second record of the document (F28).
 - **I25** — **No component composes a frame twice.** The composition `session.ts` performs is a named unit that `session.ts` calls, and a source scan says so, because the render chain's four coming stages — diffing, caching, windowing, capping — would diverge silently from any copy. **The class is one level up from an unreachable member**: every prior instance was *a member nobody could call*, this was *a sequence nobody named*, and no rule that walks members can see it — MG24 counts consumers, MG25 and MG27 compare declared shapes against builders, and all three are satisfied by a tree where every member is consumed and only the order is missing. A private method is the perfect hiding place, because the composition **is** consumed, sixty times a second, by the one caller inside the class (F126).
 - **I26** — **A consumer can build a `ProducerContext`**, with the real measurer in it. `ProducerContext.measure` is the frame's own — one arithmetic, or a split decided in a producer and the rows drawn on screen disagree — and `BlockRegistry` stays interior (§3), so a consumer whose adapter or handler *takes* a context could not call it outside a session. That is I19's argument a second time: a producer the framework can test and a consumer cannot is a producer whose app-side tests assert against something the user never sees. **Found by deleting the reference app's reimplementation of the measurer** (F37), which was also the fixture its own suite measured with. `localContext` comes with it for the same reason and adds `ask`, defaulting to the **decline** path — C23 I36's own semantics, so a handler tested without a scripted answer takes the route `Esc` takes rather than a stub's.

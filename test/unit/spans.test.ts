@@ -242,7 +242,16 @@ describe("C04 §3am.1 — the value member and the measurer", () => {
     const kit = measurable();
     for (const width of [1, 3, 5, 7, 12, 40, 80]) {
       const plain = kit.measure(withSpans(), width);
-      for (const member of [{ bold: true }, { italic: true }, { underline: true }, { tone: "identifier" as const }, { tone: "meta" as const, bold: true }]) {
+      for (const member of [
+        { bold: true },
+        { dim: true },
+        { italic: true },
+        { inverse: true },
+        { underline: true },
+        { foreground: "tone.ok" as const },
+        { tone: "identifier" as const },
+        { tone: "meta" as const, bold: true },
+      ]) {
         expect(kit.measure(withSpans(perToken(member)), width), `${JSON.stringify(member)} at ${String(width)}`).toBe(plain);
       }
       // A value per token: prose already breaks at the spaces between tokens,
@@ -387,7 +396,7 @@ describe("C10 §4e — span attributes and the resolved tone", () => {
 
   it("T1.22 (C10 I33): for every attribute, tone and depth the merge keeps both colour channels and sets the attribute", () => {
     const theme = store().current;
-    for (const attr of ["bold", "italic", "underline"] as const) {
+    for (const attr of ["bold", "dim", "italic", "inverse", "underline"] as const) {
       for (const tone of TONES) {
         for (const depth of DEPTHS) {
           const base = resolveTone(tone, theme, caps(depth));
