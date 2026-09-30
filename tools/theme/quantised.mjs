@@ -5,11 +5,21 @@
 // they measure`). Every shipped theme's surfaces and each of its palettes gets
 // an entry keyed by `quantisationKey`, in key order so a regeneration with no
 // change is a byte-identical file. T3.73 holds the table to the computation.
+//
+// **`--out` points the writer elsewhere**, `from-registry.mjs`'s flag for the
+// same reason: T3.73 checks the table and never runs this, so the claim above —
+// *a regeneration with no change is a byte-identical file* — had nothing that
+// could fail it. QT1 writes to a temporary file and compares.
 import { writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { defaultTheme } from "../../dist/index.js";
 import { computeQuantisation, quantisationKey } from "../../dist/presentation/theme/quantise.js";
 
-const OUT = new URL("../../src/presentation/theme/quantised.generated.ts", import.meta.url);
+const outAt = process.argv.indexOf("--out");
+const OUT = outAt >= 0
+  ? pathToFileURL(resolve(process.argv[outAt + 1]))
+  : new URL("../../src/presentation/theme/quantised.generated.ts", import.meta.url);
 
 const sets = [];
 for (const [name, tokens] of Object.entries(defaultTheme)) {
