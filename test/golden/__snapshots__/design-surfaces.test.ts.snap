@@ -116,11 +116,11 @@ download ###################-------- 70%
 
 
 
+
 -----------------------------------------------------------
-  /capabilities
-  /clear
-  /config
------------------------------------------------------------
+  * /capabilities
+    /clear
+    /config
 ------------------------------------------------------------
 $ /c
 ------------------------------------------------------------
@@ -885,11 +885,11 @@ download ###############################################-------------------- 70%
 
 
 
+
 -------------------------------------------------------------------------------
-  /capabilities               the rendering route, and what the terminal can do
-  /clear                     empty the transcript; command history is untouched
-  /config               every setting, its value, and where the value came from
--------------------------------------------------------------------------------
+  * /capabilities             the rendering route, and what the terminal can do
+    /clear                   empty the transcript; command history is untouched
+    /config             every setting, its value, and where the value came from
 --------------------------------------------------------------------------------
 $ /c
 --------------------------------------------------------------------------------
@@ -1644,11 +1644,11 @@ download ███████████████████░░░░�
 
 
 
+
 ───────────────────────────────────────────────────────────
-  /capabilities
-  /clear
-  /config
-───────────────────────────────────────────────────────────
+  › /capabilities
+    /clear
+    /config
 ────────────────────────────────────────────────────────────
 ❯ /c
 ────────────────────────────────────────────────────────────
@@ -2353,11 +2353,11 @@ download ███████████████████████�
 
 
 
+
 ───────────────────────────────────────────────────────────────────────────────
-  /capabilities               the rendering route, and what the terminal can do
-  /clear                     empty the transcript; command history is untouched
-  /config               every setting, its value, and where the value came from
-───────────────────────────────────────────────────────────────────────────────
+  › /capabilities             the rendering route, and what the terminal can do
+    /clear                   empty the transcript; command history is untouched
+    /config             every setting, its value, and where the value came from
 ────────────────────────────────────────────────────────────────────────────────
 ❯ /c
 ────────────────────────────────────────────────────────────────────────────────
@@ -3059,11 +3059,11 @@ download ███████████████████░░░░�
 
 
 
+
 ───────────────────────────────────────────────────────────
-  /capabilities
-  /clear
-  /config
-───────────────────────────────────────────────────────────
+  › /capabilities
+    /clear
+    /config
 ────────────────────────────────────────────────────────────
 ❯ /c
 ────────────────────────────────────────────────────────────
@@ -3829,11 +3829,11 @@ download ███████████████████████�
 
 
 
+
 ───────────────────────────────────────────────────────────────────────────────
-  /capabilities               the rendering route, and what the terminal can do
-  /clear                     empty the transcript; command history is untouched
-  /config               every setting, its value, and where the value came from
-───────────────────────────────────────────────────────────────────────────────
+  › /capabilities             the rendering route, and what the terminal can do
+    /clear                   empty the transcript; command history is untouched
+    /config             every setting, its value, and where the value came from
 ────────────────────────────────────────────────────────────────────────────────
 ❯ /c
 ────────────────────────────────────────────────────────────────────────────────

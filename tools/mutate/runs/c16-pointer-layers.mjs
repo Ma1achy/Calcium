@@ -115,11 +115,12 @@ const results = runPass({
     },
     {
       // C16 I74, C19 I20 — a selection scrolled out of view is still drawn,
-      // at a row index past the slice.
+      // at a row index past the slice. Re-anchored for C19 I29: the index is
+      // the current's, the selection or the first candidate, and never null.
       name: "a selection out of the window is still marked",
       file: KEYS,
-      from: "    return menuBlocks(slice, at === null || at < 0 || at >= w.shown ? null : at, remainder);\n",
-      to: "    return menuBlocks(slice, at === null ? null : Math.min(Math.max(at, 0), w.shown - 1), remainder);\n",
+      from: "    return menuBlocks(slice, at < 0 || at >= w.shown ? null : at, remainder);\n",
+      to: "    return menuBlocks(slice, Math.min(Math.max(at, 0), w.shown - 1), remainder);\n",
       expect: "T4.92",
     },
   ],

@@ -686,6 +686,11 @@ export const BUILDER_OMISSIONS = Object.freeze({
     "pins what the *parent* derived; a hand-built table setting it would assert two rows its " +
     "own rows do not justify. `window` is the one writer and it recomputes rather than " +
     "remembers, so the pin cannot describe the previous document",
+  "table.current":
+    "C04 I150, C11 I33 — the row a chooser is on, and the one chooser over a table is C19's " +
+    "completion menu, which builds its blocks in L3 and never through `b.table`. No surface built " +
+    "with the builder walks a current, so an option there would be a mark no key moves; it lands " +
+    "with the first surface that has a chooser over a table, as `b.tape`'s `current` did",
   "table.presorted":
     "C11 I19 — the same argument one field over, about an order rather than a presence. " +
     "`sortedRows` is not idempotent under a slice because `kindOf` reads the values present, " +

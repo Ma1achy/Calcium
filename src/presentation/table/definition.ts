@@ -25,9 +25,9 @@ import type { Block, MeasureFn, Table, TableRow } from "../../data/viewmodel/ind
 import { cells } from "../text.js";
 import { fitRow, rowCells } from "../rows.js";
 import { glyphCells, glyphFor } from "../blocks/glyphs.js";
-import { background, based, clampSpans, focusStyle, groundSequence, paint, selectionStyle, tone, withBackground, type Span } from "../blocks/paint.js";
+import { background, based, clampSpans, focusStyle, groundSequence, paint, selectionStyle, slot, tone, withBackground, type Span } from "../blocks/paint.js";
 import type { BlockDefinition, NavElement, Rendered, RenderContext, Windowed } from "../blocks/types.js";
-import { decimalEnds, decimalPoints, emptySpans, headerSpans, markedSeriesColumns, rowSpans, trendMark } from "./cells.js";
+import { decimalEnds, decimalPoints, emptySpans, headerSpans, markedSeriesColumns, rowSpans, trendMark, type CurrentLead } from "./cells.js";
 import { columnAlignments, groupingColumns, unknownColumns } from "./kind.js";
 import { detailBlocks, isExpandable } from "./detail.js";
 import { planDisclosed, type PlannedColumns } from "./plan.js";
@@ -482,6 +482,25 @@ export const tableDefinition: BlockDefinition<Table> = {
     const focusGround = focusStyle(ctx.theme, ctx.capabilities);
     const grounded = (spans: readonly Span[], ground: Span["style"]): readonly Span[] =>
       spans.map((s) => ({ ...s, style: { ...(s.style ?? {}), ...ground } }));
+    // **The current row** (I33, §5d, §097): the `pick` ground and its matched
+    // ink, **one pair resolved together** as the button's is (C10 I51) — a
+    // ground taken without its ink borrows a foreground nothing measured
+    // against it. Carried as the row's ground, so `grounded` re-inks every run
+    // on the row, the mark and the hint included, which is R-BLK-775's
+    // `c-pickInk` on both cells. **Where `pick` does not resolve** — one bit, a
+    // theme declaring none — the row takes no ground and no padding, the
+    // header's guard (I24), and the mark's accent and the weight carry it.
+    const pick = background("surface.pick", ctx.theme, ctx.capabilities);
+    const pickGround =
+      pick.background === undefined ? null : withBackground(slot("surface.pickInk", ctx.theme, ctx.capabilities), pick);
+    // The lead goes in the first visible column C11 does not fill itself. The
+    // reservation follows the field's **presence**, so a current that names no
+    // row — a chooser scrolled past it — keeps every label where it was.
+    const leadKey =
+      block.current === undefined
+        ? undefined
+        : plan.visible.find((p) => block.columns.find((c) => c.key === p.key)?.role !== "expand")?.key;
+    const leadFor = (on: boolean): CurrentLead | undefined => (leadKey === undefined ? undefined : { key: leadKey, on });
 
     // **Every part is a row** (C09 I73). There was a `finishTable` here that
     // answered rows when they all were and lifted them into a column of `Text`
@@ -541,10 +560,10 @@ export const tableDefinition: BlockDefinition<Table> = {
         // would put trailing blanks on every monochrome frame in the corpus for
         // a surface that is not there — which is what the first draft did, and
         // four goldens that carry no colour at all moved to say so.
-        emit(headerSpans(block, plan, ctx, columnAlignments(block)));
+        emit(headerSpans(block, plan, ctx, columnAlignments(block), undefined, leadFor(false)));
       } else {
         const spans = clampSpans(
-          headerSpans(block, plan, ctx, columnAlignments(block), "bgElev"),
+          headerSpans(block, plan, ctx, columnAlignments(block), "bgElev", leadFor(false)),
           inner,
           ctx.capabilities,
         );
@@ -605,6 +624,7 @@ export const tableDefinition: BlockDefinition<Table> = {
     for (const row of sortedRows(block)) {
       const expandable = isExpandable(row, plan);
       const isHead = focused !== null && focused === row.id;
+      const isCurrent = block.current !== undefined && block.current === row.id;
       // **The head is told from the extent by its own ground**, not by ink
       // inside a shared one (I14 as amended, R-SEL-006).
       const isSelected = !isHead && selected.has(row.id);
@@ -625,12 +645,15 @@ export const tableDefinition: BlockDefinition<Table> = {
           ? "focusGround"
           : undefined;
       const hidden = hiddenCount(row, plan);
-      const spans = rowSpans(block, row, plan, ctx, { expandable, hidden, on, marked, points, aligns, grouping, unknown, ends });
+      const spans = rowSpans(block, row, plan, ctx, { expandable, hidden, on, marked, points, aligns, grouping, unknown, ends, current: leadFor(isCurrent) });
       // **The ground goes to `emit`, not to the spans** (§5c). Applied here it
       // stopped at the gutter, which is the divergence: the reserved column is
       // part of the row it leads, so the ground has to be put on where the
       // gutter is known and that is the one exit.
-      const ground = on === "selection" ? wash : on === "focusGround" ? focusGround : null;
+      // **Reader state wins the ground** (I33, §5c): the extent and the head are
+      // what the reader did, and `current` is what the producer is on. The mark
+      // and the weight stay under either.
+      const ground = on === "selection" ? wash : on === "focusGround" ? focusGround : isCurrent ? pickGround : null;
       emit(spans, isHead, ground);
 
       if (row.expanded !== true) continue;

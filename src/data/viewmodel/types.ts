@@ -1039,6 +1039,22 @@ export type Table = Readonly<{
    * the block cannot be checked against.
    */
   presorted?: boolean;
+  /**
+   * The row a chooser is on — **an id, never an index** (I150, C11 I33, §097,
+   * ruling 89).
+   *
+   * **The table's `active`.** A chip carries `active` and a tape `current`; a
+   * table had neither, so the completion menu marked its selection with a cell
+   * glyph, and a glyph is all a cell can carry. §097 draws the current row with
+   * `›`, the `pick` ground and its ink across the row, and the label in bold,
+   * and a ground across a row is C11's to paint.
+   *
+   * **Presence reserves the mark's cells on every row; the value places the
+   * mark.** So an id naming no row is valid and draws no mark, and a chooser
+   * whose current has scrolled out of its window keeps its labels where they
+   * were. Nothing `measure` or the plan reads follows it.
+   */
+  current?: string;
 }> & Padded & Floor;
 
 export type Steps = Readonly<{

@@ -42,7 +42,9 @@ describe("C16 I74 — the wheel over a layer, through the graph (review batch 3,
     const rows = (): readonly { text: string; selected: boolean }[] => {
       const table = menu()?.content.find((b) => b.kind === "table");
       if (table === undefined || table.kind !== "table") return [];
-      return table.rows.map((r) => ({ text: String(r.cells["value"]?.text ?? ""), selected: r.cells["value"]?.glyph === "bullet" }));
+      // **The mark is the table's `current` (C19 I29)**, which a typed menu
+      // holds at rest; whether anything is *chosen* is `promptLive` (C22 I145).
+      return table.rows.map((r) => ({ text: String(r.cells["value"]?.text ?? ""), selected: table.current === r.id }));
     };
     expect(rows().map((r) => r.text)[0], "the window opens at the first").toBe("/alpha00");
     const placed = graph.overlays.layout({ width: 80, height: 24 }).find((p) => p.layer.id === MENU_ID);
@@ -55,7 +57,8 @@ describe("C16 I74 — the wheel over a layer, through the graph (review batch 3,
     const topRow = graph.viewport.scroll.topRow;
     expect(graph.router.dispatch(wheel(row, 5, "wheelDown")), "consumed").toBe(true);
     expect(rows().map((r) => r.text)[0], "the window moved three candidates").toBe("/alpha03");
-    expect(rows().some((r) => r.selected), "and chose nothing (C19 I20)").toBe(false);
+    expect(menu()?.promptLive, "and chose nothing (C19 I20)").toBe(true);
+    expect(rows().some((r) => r.selected), "the current, the first, is out of the window").toBe(false);
     expect(graph.editor.text, "the line is untouched").toBe("/");
     expect(graph.viewport.scroll.topRow, "the transcript beneath did not move").toBe(topRow);
 

@@ -273,8 +273,8 @@ describe("C19 §6a — the menu opens as you type", () => {
   });
 });
 
-describe("C19 §6 — the menu's bottom edge", () => {
-  it("T3.25 (C19 I23): the last rendered row is a rule and not a candidate", async () => {
+describe("C19 §6 — the menu's edges", () => {
+  it("T3.25 (C19 I23, ruling 90): the first rendered row is a rule, and the last is a candidate", async () => {
     // **Read from the rows, not from the block list.** A block appended and
     // never placed satisfies a test that counts blocks — which is how the same
     // component came to declare a table with no flex column and render a page
@@ -295,13 +295,18 @@ describe("C19 §6 — the menu's bottom edge", () => {
 
     // **Both ends**, because the two seams close independently — the bottom one
     // shipped for a round with the top one open, and the menu still read as
-    // continuous with the transcript above it.
+    // continuous with the transcript above it. **The bottom one is the
+    // prompt's since ruling 90** (F1475): C22 I81 draws a rule above the
+    // prompt on every frame, and a rule of the menu's own stacked two. So the
+    // menu's last row is a candidate, and C22's session T4.34 reads the rule
+    // under it.
     const first = rows[0] ?? "";
     const last = rows[rows.length - 1] ?? "";
     expect(first, "a line above, against the transcript").toMatch(/^[─-]/);
-    expect(last, "and one below, against the prompt").toMatch(/^[─-]/);
-    expect(first + last, "neither carries a candidate").not.toContain("/help");
-    expect(rows.slice(1, -1).join("\n"), "the candidates are between them").toContain("/history");
+    expect(first, "which carries no candidate").not.toContain("/help");
+    expect(last, "and no rule of its own below").not.toMatch(/^[─-]/);
+    expect(rows.slice(1).filter((r) => /^[─-]{6,}/u.test(r)), "no rule after the first").toEqual([]);
+    expect(rows.slice(1).join("\n"), "the candidates are under it").toContain("/history");
   });
 
   it("T3.26 (C19 I23): the remainder counts rows, and the caller is what is asked", async () => {

@@ -79,8 +79,9 @@ const results = runPass({
       // resolver stopped agreeing about which ground a row took.
       name: "the header's ink is resolved off its ground",
       file: TABLE,
-      from: '          headerSpans(block, plan, ctx, columnAlignments(block), "bgElev"),',
-      to: "          headerSpans(block, plan, ctx, columnAlignments(block)),",
+      // Re-anchored for C11 I33: the header takes the current lead after its ground.
+      from: '          headerSpans(block, plan, ctx, columnAlignments(block), "bgElev", leadFor(false)),',
+      to: "          headerSpans(block, plan, ctx, columnAlignments(block), undefined, leadFor(false)),",
       expect: "T2.161",
     },
     {

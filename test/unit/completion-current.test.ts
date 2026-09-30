@@ -1,10 +1,44 @@
-// C19 §6 — the current candidate (I29, ruling 89).
+// C19 §6 — the current candidate (I29, ruling 89, F1474).
 //
-// Spec-first: the rows land with the code commit that builds them.
-import { describe, it } from "vitest";
+// The current is the selection when there is one and the first candidate when
+// there is none. It is declared on the table as `current` (C04 I150) and C11
+// draws it; the pills form sets `active`. These rows read the layer the shell
+// pushes, which is where a typed menu's `null` selection arrives.
+import { describe, expect, it } from "vitest";
 
-describe("C19 I29", () => {
-  it.todo(
-    "T1.72 (C19 I29): with no selection the table declares current naming the first row, with selection 1 the second, no cell carries a glyph, and a pill menu marks its first chip active — not deferred on a component: lands with the F1474 code commit of review batch 4",
-  );
+import { MENU_ID, menuLayer } from "../../src/interaction/completion/index.js";
+import type { Block } from "../../src/data/viewmodel/index.js";
+
+const DETAILED = [
+  { value: "/capabilities", detail: "the rendering route" },
+  { value: "/clear", detail: "empty the transcript" },
+  { value: "/config", detail: "every setting" },
+];
+const PLAIN = [{ value: "--status" }, { value: "--since" }];
+const ANCHOR = { row: 20, rows: 1 };
+
+const tableOf = (content: readonly Block[]) => {
+  const t = content.find((b) => b.kind === "table");
+  if (t === undefined || t.kind !== "table") throw new Error("the detailed menu is a table");
+  return t;
+};
+
+describe("C19 I29 — the current candidate", () => {
+  it("T1.72 (C19 I29): with no selection the table declares current naming the first row, with selection 1 the second, no cell carries a glyph, and a pill menu marks its first chip active", () => {
+    const rest = tableOf(menuLayer(DETAILED, null, 0, ANCHOR).content);
+    expect(rest.current, "at rest, the first candidate").toBe(rest.rows[0]?.id);
+    expect(rest.rows[0]?.id, "and the row is the menu's").toBe(`${MENU_ID}-0`);
+
+    const moved = tableOf(menuLayer(DETAILED, 1, 0, ANCHOR).content);
+    expect(moved.current, "the selection").toBe(moved.rows[1]?.id);
+
+    // **No cell glyph**: the mark is C11's, drawn from `current`, so a cell
+    // glyph beside it would draw two marks and move one row's label alone.
+    const glyphs = [rest, moved].flatMap((t) => t.rows.flatMap((r) => Object.values(r.cells).map((c) => c.glyph)));
+    expect(glyphs.filter((g) => g !== undefined), "no cell carries a glyph").toEqual([]);
+
+    const pills = menuLayer(PLAIN, null, 0, ANCHOR).content.find((b) => b.kind === "pills");
+    if (pills === undefined || pills.kind !== "pills") throw new Error("the plain menu is pills");
+    expect(pills.chips.map((c) => c.active === true), "the first chip is current at rest").toEqual([true, false]);
+  });
 });

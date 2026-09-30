@@ -1543,6 +1543,10 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
   table: (b, e, at) => {
     requireArray(b, "columns", e, at);
     requireArray(b, "rows", e, at);
+    // I150 — the tape's rule (I124): a row's id, and one naming no row is valid.
+    if (b["current"] !== undefined && !isString(b["current"])) {
+      e.push(`${at}: "current" is a row's id, a string, never an index (C04 I150)`);
+    }
     // I128 — a column's polarity is one of three words, or absent for neutral.
     // I6 (ruling 44) — a declared vocabulary is a closed set a cell can be
     // checked against, collected here for the cell walk below.

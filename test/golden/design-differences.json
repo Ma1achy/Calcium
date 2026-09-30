@@ -608,12 +608,11 @@
    "figureCells": 78,
    "figureOnly": [
     "— U+2014",
-    "› U+203A",
     "▌ U+258C",
     "● U+25CF"
    ],
    "frameOnly": [],
-   "reason": "The frame is the panel LAYER since ruling 87 (F1460) — a session with the completion menu open over an empty transcript — and the box marks the block kind brought are gone with the homonym. ● is the figure's reply specimen above the menu, which this frame leaves out so every mark is the layer's or the prompt's; ▌ is the figure's drawn cursor, where the tree's is the terminal's own; — is line 32's prose. **› is a real difference**: §097 marks the current candidate with `current`'s ›, and the tree's menu draws its three candidates alike, with no mark, ground or weight on any of them at rest. And one the marks cannot see: the menu's closing rule and the prompt's upper rule are two rows here, where the figure's menu closes on the prompt's rule"
+   "reason": "The frame is the panel LAYER since ruling 87 (F1460) — a session with the completion menu open over an empty transcript — and the box marks the block kind brought are gone with the homonym. ● is the figure's reply specimen above the menu, which this frame leaves out so every mark is the layer's or the prompt's; ▌ is the figure's drawn cursor, where the tree's is the terminal's own; — is line 32's prose. **› is shared since ruling 89** (C19 I29, C11 I33, F1474): the menu's current candidate is the first at rest, drawn with `current`'s mark, the `pick` ground and the weight, and the other rows keep the mark's cells. **And the menu closes on the prompt's upper rule since ruling 90** (C19 I23, F1475): one rule under the candidates where the frame drew two stacked rows, which the marks cannot see and this frame's rows show. What the figure still draws and the frame does not: the other candidates on `bgElev`, which is not ruled"
   },
   {
    "section": 99,

@@ -157,7 +157,7 @@ describe("C19 + C15 — the menu is an overlay (I8)", () => {
     expect(remainderOf(menu, many.length, 10)).toBe(50);
   });
 
-  it("T4.9 (I23): the indicator and the bottom edge are inside the drawn box", () => {
+  it("T4.9 (I23): the indicator is inside the drawn box, and is its last row", () => {
     // **The row T4.5 reads as covering and does not.** T4.5 asserts the count
     // and hands `menuRowsShown` its answer by hand; it never asks where the
     // indicator lands. Read from a frame, it landed in the cut: `composite.ts`
@@ -191,7 +191,9 @@ describe("C19 + C15 — the menu is an overlay (I8)", () => {
       true,
     );
     expect(lines.length, "and nothing is cut at all now").toBeLessThanOrEqual(placed.height);
-    expect(drawn[drawn.length - 1]?.trim().length, "the bottom edge is a rule").toBeGreaterThan(0);
+    // **The indicator is the box's last row** (ruling 90): the edge under it is
+    // the prompt's own rule, which the frame draws and the layer does not.
+    expect(drawn[drawn.length - 1] ?? "", "the indicator closes the box").toContain(`+ ${String(remainder)} more`);
   });
 
   it("T4.10 (I23, I20): the selection stays inside the window as it moves", () => {

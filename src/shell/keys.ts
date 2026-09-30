@@ -613,16 +613,20 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // so a `fits` from the wrong one silently dropped candidates that fitted
     // perfectly well. `remainder` is the only thing that says *something was
     // actually cut*, and where nothing was, there is nothing to window.
-    if (remainder <= 0) return menuBlocks(candidates, selection.at, 0);
+    // **The current is the selection, or the first candidate while a typed
+    // menu holds none** (C19 I29, ruling 89): marked at rest, and not chosen.
+    const current = selection.at ?? 0;
+    if (remainder <= 0) return menuBlocks(candidates, current, 0);
     const w = menuWindow(candidates.length, selection.at, fits);
     // **The keys own the window again once they move the selection** (§3d Q2).
     if (wheeled !== null && wheeled.at !== selection.at) wheeled = null;
     const start = wheeled === null ? w.start : Math.min(wheeled.start, candidates.length - w.shown);
     const slice = candidates.slice(start, start + w.shown);
-    const at = selection.at === null ? null : selection.at - start;
-    // A selection the wheel scrolled out of view is drawn as none on screen,
-    // and is still the selection: `⏎` accepts it, as it would have.
-    return menuBlocks(slice, at === null || at < 0 || at >= w.shown ? null : at, remainder);
+    const at = current - start;
+    // A current the wheel scrolled out of view is drawn as none on screen, and
+    // is still the current: `⏎` accepts a selection, as it would have, and the
+    // mark's cells stay reserved so no label moves (C11 I33).
+    return menuBlocks(slice, at < 0 || at >= w.shown ? null : at, remainder);
   }
 
   function redrawMenu(): void {

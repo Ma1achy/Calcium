@@ -138,7 +138,9 @@ describe("C22 §6b — the write is a difference", () => {
     // frame's own rule while the menu sat stranded at rows 11–18 over sixteen
     // blank rows. So the row reads two things the rule cannot supply: a
     // candidate's distance from the prompt, which must survive the resize, and
-    // the row above I81's rule, which must be the menu's bottom edge.
+    // the row above I81's rule, which must be the menu's last row — a
+    // candidate or its indicator, since the menu closes on I81's rule (C19
+    // I23, ruling 90).
     const stdin = fakeStdin();
     const { screen, resize } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 24 });
     await settle();
@@ -157,7 +159,7 @@ describe("C22 §6b — the write is a difference", () => {
 
     /**
      * The menu against the prompt: I81's rule is the row directly above `❯`,
-     * so the menu's bottom edge is the last non-blank row above **that**, and
+     * so the menu's last row is the last non-blank row above **that**, and
      * a candidate's row is the menu's position. `/capabilities` and not
      * `/help`, which the footer also names.
      */
@@ -199,7 +201,7 @@ describe("C22 §6b — the write is a difference", () => {
     );
   });
 
-  it("T4.34 (C19 I23, entry 16): the truncated menu's indicator is on the screen", async () => {
+  it("T4.34 (C19 I23, entry 16, ruling 90): the truncated menu's indicator is on the screen, and the menu closes on the prompt's rule", async () => {
     // **Through the real wiring, because that is where it was missing.** The
     // window and the remainder are both unit-tested and both were right; what
     // shipped was a call site that handed C15 every candidate and let the frame
@@ -221,15 +223,19 @@ describe("C22 §6b — the write is a difference", () => {
     const menu = rows.slice(0, prompt - 1);
     expect(menu.some((r) => /\+ \d+ more/u.test(r)), "the indicator is drawn").toBe(true);
     // **And the box closes**, which is the half a row about the indicator alone
-    // does not cover: the bottom edge sits between the menu and the prompt, and
-    // C19 §6 argues it is what stops the list reading as continuous with the
-    // line below it. A window one row too generous keeps the indicator and
-    // loses this — the original defect, one row's worth — and the mutation pass
-    // is what asked for the assertion.
-    expect(menu[menu.length - 1] ?? "", "the rule closes the menu").toMatch(/^[─-]{20,}/u);
-    expect(menu[menu.length - 2] ?? "", "with the indicator directly above it").toMatch(
-      /\+ \d+ more/u,
-    );
+    // does not cover: an edge sits between the menu and the prompt, and C19 §6
+    // argues it is what stops the list reading as continuous with the line
+    // below it. A window one row too generous keeps the indicator and loses
+    // this — the original defect, one row's worth — and the mutation pass is
+    // what asked for the assertion.
+    //
+    // **The edge is the prompt's own rule, and there is one** (ruling 90,
+    // F1475). The menu drew a rule of its own above I81's, two stacked rows
+    // where §097's panel floats between two rules and the lower one is the
+    // prompt's. So the indicator sits directly on I81's rule.
+    expect(rows[prompt - 1] ?? "", "the prompt's rule closes the menu").toMatch(/^[─-]{20,}/u);
+    expect(menu[menu.length - 1] ?? "", "with the indicator directly on it").toMatch(/\+ \d+ more/u);
+    expect(menu[menu.length - 2] ?? "", "and no second rule above it").not.toMatch(/^[─-]{20,}/u);
   });
 
   it("T4.15 (I56): a write that throws leaves the next frame whole", async () => {
