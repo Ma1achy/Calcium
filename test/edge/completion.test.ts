@@ -293,7 +293,7 @@ describe("C19 §6 — the menu", () => {
     );
   });
 
-  it("T3.29 (I18): a candidate with a detail renders its label and its hint, at every width", () => {
+  it("T3.29 (I18, I30): a candidate with a detail renders its label and its hint, at every width", () => {
     // **Asserted on the rendered rows rather than on the block**, because the
     // block was correct throughout. C11 hands residual width only to columns
     // declaring `flex: true` (plan.ts step 8), the menu's table declared
@@ -306,7 +306,7 @@ describe("C19 §6 — the menu", () => {
       { value: "/promote", detail: "Promote a build" },
       { value: "/ps", detail: "List processes" },
     ];
-    const plain = [{ value: "/serving" }];
+    const plain = [{ value: "/serving" }, { value: "/status" }];
 
     const rowsAt = (candidates: readonly Candidate[], width: number): readonly string[] =>
       renderSequenceToLines(registry, menuBlocks(candidates, 0, 0), width, {
@@ -341,10 +341,19 @@ describe("C19 §6 — the menu", () => {
       .toContain("/promote");
 
     // **The control, and it is why this survived four components.** A candidate
-    // with no `detail` takes the pills path, which never had the defect — so a
-    // row asserting only that the menu appears passed against it.
-    expect(rowsAt(plain, menuWidth(plain))[1], "the pills path drew correctly all along")
-      .toContain("/serving");
+    // with no `detail` took the pills path, which never had the defect — so a
+    // row asserting only that the menu appears passed against it. Since ruling
+    // 99 it is a table row too (C19 I30): the label whole, one row a
+    // candidate, and nothing in the hint cell.
+    for (const width of [menuWidth(plain), 60, 100]) {
+      const rows = rowsAt(plain, width);
+      expect(rows, `${String(width)}: the edge and one row a candidate`).toHaveLength(1 + plain.length);
+      for (const [i, candidate] of plain.entries()) {
+        expect(rows[i + 1]?.replace(/^\s*[›*]?\s*/u, "").trimEnd(), `${String(width)}: ${candidate.value}, and no hint`).toBe(
+          candidate.value,
+        );
+      }
+    }
   });
 
   it("T3.19b (I18): at a width too narrow for both columns, the label survives", () => {

@@ -103,8 +103,8 @@ Nothing reports these. Read each against what your application relies on.
 - **`⌥⇧↑`/`⌥⇧↓` no longer page the transcript**; `⌥↑`/`⌥↓` do.
 - **A line starting with `>` is never submitted**; it opens the action palette.
 - **A key release reaches an attached child only.**
-- **The completion footer at rest offers `⇥ complete`**, not `↑↓ move` and `⏎ accept`: until
-  `⇥` selects, `⏎` submits the line and `↑` walks history.
+- **The completion footer at rest offers `⏎ run` and `⇥ complete`**, not `↑↓ move` and
+  `⏎ accept`: until `⇥` selects, `⏎` runs the line and `↑` walks history.
 
 **Layout and drawing.**
 - **The transcript is one column narrower.** Column 0 is the selection rail, so a block in the

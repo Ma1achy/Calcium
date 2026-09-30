@@ -1,5 +1,5 @@
 // C22 I150 — the completion footer names what each key does in the state the
-// frame shows (ruling 96, F1486; T6.152).
+// frame shows (ruling 96, F1486; T6.152), and offers `⏎ run` at rest (ruling 99).
 //
 // **Two sites, two directions.** The line decides in `chrome.ts` and the graph
 // supplies the hint in `construct.ts`; each can fail by never saying *at rest*
@@ -59,6 +59,22 @@ const MUTATIONS = [
     file: CHROME,
     from: "              ...keyed(hints, \"prompt\", [\"complete\"], \"complete\", caps),\n              ...one(\"panel\", \"dismiss\", \"close\"),",
     to: "              ...keyed(hints, \"prompt\", [\"complete\"], \"complete\", caps),\n              ...keyed(hints, \"panel\", [\"menuAccept\"], \"accept\", caps),\n              ...one(\"panel\", \"dismiss\", \"close\"),",
+    expect: "T1.182",
+  },
+  {
+    // **T6.152, ruling 99's amendment undone**: the rest line drops `⏎ run`.
+    name: "T6.152: the rest arm drops ⏎ run",
+    file: CHROME,
+    from: "              ...keyed(hints, \"prompt\", [\"submit\"], \"run\", caps),\n",
+    to: "              // ⏎ run dropped\n",
+    expect: "T4.120",
+  },
+  {
+    // **`⏎ run` spelled literally** (C22 I133): a rebound `submit` is not named.
+    name: "the rest arm spells ⏎ itself",
+    file: CHROME,
+    from: "              ...keyed(hints, \"prompt\", [\"submit\"], \"run\", caps),\n",
+    to: "              { label: \"⏎ run\", tone: \"muted\" as const },\n",
     expect: "T1.182",
   },
   {

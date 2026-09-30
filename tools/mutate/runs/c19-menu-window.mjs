@@ -111,10 +111,12 @@ const MUTATIONS = [
     //
     // Re-anchored 2026-09-30 (F1487): the draw and the wheel share one call
     // now, `windowFrom`, so the anchor is that call; the mutation is unchanged.
+    // Re-anchored again the same day (ruling 99, C19 I30): the call lost the
+    // pills window's width and measure; the mutation is unchanged.
     name: "the window takes one row more than the placement holds",
     file: KEYS,
-    from: "    return menuWindowOf(candidates, selection.at, fits, across, deps.measure, from);",
-    to: "    return menuWindowOf(candidates, selection.at, fits + 1, across, deps.measure, from);",
+    from: "    return menuWindowOf(candidates.length, selection.at, fits, from);",
+    to: "    return menuWindowOf(candidates.length, selection.at, fits + 1, from);",
     // T4.12, not T4.9, for the reason on the first mutation above.
     expect: "T4.12",
   },

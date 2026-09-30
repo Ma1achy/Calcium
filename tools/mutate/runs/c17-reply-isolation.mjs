@@ -101,8 +101,10 @@ const results = runPass({
     {
       name: "↓ past a reply's floor falls through to the prompt's walk and the live block",
       file: "src/shell/keys.ts",
-      from: "        if (entry !== null) deps.editor.setText(entry);\n        return;\n      }\n      const entry = deps.history.next();",
-      to: "        if (entry !== null) deps.editor.setText(entry);\n      }\n      const entry = deps.history.next();",
+      // Re-anchored 2026-09-30 (C19 I31, F1497): a walk's line goes in through
+      // `recall`, which closes the menu; the mutation is unchanged.
+      from: "        if (entry !== null) recall(entry);\n        return;\n      }\n      const entry = deps.history.next();",
+      to: "        if (entry !== null) recall(entry);\n      }\n      const entry = deps.history.next();",
       expect: "T4.71",
     },
     {

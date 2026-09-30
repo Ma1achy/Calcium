@@ -36,7 +36,6 @@ import type {
   Candidate,
   CompletionContext,
   CompletionEngine,
-  MeasureBlock,
 } from "../interaction/completion/index.js";
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore, Navigator } from "../interaction/history/index.js";
@@ -150,12 +149,6 @@ export type KeyDeps = Readonly<{
   anchor: () => PromptAnchor;
   /** How big a layer may be (C15 `Region`), for the menu's "… n more". */
   overlayRegion: () => Readonly<{ width: number; height: number }>;
-  /**
-   * The registry's `measure` (C09 I1), for the menu's pills window (C19 I23,
-   * F1487): the rows a run of chips packs into is the pills block's own answer,
-   * and a second count of cells here would drift from it.
-   */
-  measure: MeasureBlock;
   /** C16's stored focus — the one piece of it in the system (C16 §3). */
   focus: FocusStore;
   /**
@@ -522,8 +515,6 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
    * nowhere.
    */
   let fits = 0;
-  /** The placement's width, which the pills form packs its rows at (C19 I23, F1487). */
-  let across = 0;
   /**
    * Where the wheel put the window, and the selection it was put against
    * (C16 I74). `null` is *the selection places the window*, which is every
@@ -635,20 +626,14 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // is still the current: `⏎` accepts a selection, as it would have, and the
     // mark's cells stay reserved so no label moves (C11 I33).
     //
-    // **The indicator counts what this window leaves out** (F1487). The table
-    // shows `fits` whatever its start, so `remainder` was that number; a pills
-    // window's count depends on where it starts, because chips repack. With no
-    // candidate row at all (`fits` 0) the window is the whole list, and the
-    // count stays the placement's, as it was.
-    return menuBlocks(slice, at < 0 || at >= w.shown ? null : at, fits <= 0 ? remainder : candidates.length - w.shown);
+    // **The indicator is the placement's count**: a row is a candidate (C19
+    // I30), so the window shows `fits` whatever its start.
+    return menuBlocks(slice, at < 0 || at >= w.shown ? null : at, remainder);
   }
 
-  /**
-   * The window over the candidates, in the placement's rows at its width
-   * (C19 I23, F1487). One call for both readers, the draw and the wheel.
-   */
+  /** The window over the candidates (C19 I23), for the draw and the wheel alike. */
   function windowFrom(from: number | null): Readonly<{ start: number; shown: number }> {
-    return menuWindowOf(candidates, selection.at, fits, across, deps.measure, from);
+    return menuWindowOf(candidates.length, selection.at, fits, from);
   }
 
   function redrawMenu(): void {
@@ -716,6 +701,22 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   }
 
   /**
+   * A history walk's line, put in the prompt (C19 I31, F1497).
+   *
+   * **The line the menu and the hold were built against is gone**, so both go
+   * with it. `RECOMPUTES` leaves the walks out because a menu over a recalled
+   * command is noise, and that reason held for opening a menu and not for the
+   * one already open: `↑` at rest put `/help` under `/c`'s candidates. Closed
+   * rather than rebuilt, because a rebuild here is the menu that reason
+   * excludes; the next edit rebuilds it (C19 I22).
+   */
+  function recall(line: string): void {
+    deps.editor.setText(line);
+    if (hasMenu()) closeMenu();
+    suppressedAt = null;
+  }
+
+  /**
    * How many the placement could not show (C15 I8).
    *
    * The indicator needs the placement and the placement needs the region — how
@@ -729,7 +730,6 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // table holding sixty candidates is one of them — so a menu clamped to ten
     // rows used to report fifty-nine missing where fifty are.
     fits = menuRowsShown(placed ?? null);
-    across = placed?.width ?? 0;
     remainder = remainderOf(placed ?? null, candidates.length, fits);
     redrawMenu();
   }
@@ -836,7 +836,13 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       return;
     }
 
-    if (suppressedAt !== null && suppressedAt !== ctx.replace.start) suppressedAt = null;
+    // **An emptied line ends the hold as well** (C19 I31, F1498). The hold is
+    // taken against the token's start, and a line's first token starts at 0
+    // whatever the line, so backspacing to nothing and typing again read as the
+    // same token and the menu never came back.
+    if (suppressedAt !== null && (suppressedAt !== ctx.replace.start || deps.editor.text === "")) {
+      suppressedAt = null;
+    }
 
     const next = deps.completion.suggest(ctx);
     // **Two, and one is ghost text's case** (C19 I19). A one-row menu under a
@@ -1090,7 +1096,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     historyPrev: () => {
       // The owner's walk (C23 I77): a reply's, or the prompt's.
       const entry = (deps.reply() ?? deps.history).previous(deps.editor.text);
-      if (entry !== null) deps.editor.setText(entry);
+      if (entry !== null) recall(entry);
     },
     // **One binding, two effects, in order** (C16 I22). C20's walk has a defined
     // bottom — `↓` past the newest entry restores the stashed draft — so
@@ -1104,12 +1110,12 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       const own = deps.reply();
       if (own !== null) {
         const entry = own.next();
-        if (entry !== null) deps.editor.setText(entry);
+        if (entry !== null) recall(entry);
         return;
       }
       const entry = deps.history.next();
       if (entry !== null) {
-        deps.editor.setText(entry);
+        recall(entry);
         return;
       }
       const elements = deps.liveElements();

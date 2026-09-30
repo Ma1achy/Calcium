@@ -669,9 +669,13 @@ function ownerChips(
           // candidate is the prompt's `complete`, which selects it. And this
           // line is the only thing on screen that tells rest from a selection,
           // because the mark is drawn in both (C19 I29).
+          //
+          // **`⏎ run` first** (ruling 99's amendment to 96): §029's footer draws
+          // it, and at rest the prompt's `submit` does run the line.
           if (hints.promptUnderMenu === true) {
             return [
               { label: "complete", tone: "accent" },
+              ...keyed(hints, "prompt", ["submit"], "run", caps),
               ...keyed(hints, "prompt", ["complete"], "complete", caps),
               ...one("panel", "dismiss", "close"),
             ];

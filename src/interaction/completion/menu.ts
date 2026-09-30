@@ -63,12 +63,16 @@ function widestLabel(candidates: readonly Candidate[]): number {
 
 
 /**
- * Pills when the set is short and nothing carries a hint; a table when entries
- * have `detail` (§6).
+ * A ladder in every case: one candidate a row, drawn as a table (§6, I30).
  *
- * The current entry is the table's `current` or the chip's `active` rather
- * than a tone, so the highlight is C11's and C10's business and this file names
- * no colour and no glyph (I29).
+ * **There was a pills form, and ruling 99 retired it.** Candidates with no
+ * `detail` drew as two rows of pills; §029, §097 and `R-BLK-866` draw one
+ * candidate a row with `›` on the current, and no picture draws pills. A
+ * candidate with no hint has an empty hint cell.
+ *
+ * The current entry is the table's `current` rather than a tone, so the
+ * highlight is C11's and C10's business and this file names no colour and no
+ * glyph (I29).
  */
 export function menuBlocks(
   candidates: readonly Candidate[],
@@ -83,64 +87,64 @@ export function menuBlocks(
 ): readonly Block[] {
   // The caller windows; this draws what it is given (`menuWindow`).
 
-  const detailed = candidates.some((c) => c.detail !== undefined);
-  const body: Block = detailed
-    ? {
-        kind: "table",
-        id: `${MENU_ID}-table`,
-        columns: [
-          {
-            key: "value",
-            label: "",
-            align: "left",
-            // **Higher than the hint's, and it was lower** (I18). C11 admits
-            // columns by priority *descending* (plan.ts step 2), so `1` against
-            // the detail's `2` meant the labels were dropped first — at 80
-            // columns over a diff the menu drew four summaries and not one verb
-            // name, which is I18's own claim failing in the direction it was
-            // written about. §6 says which way round it goes in as many words:
-            // the label is what the user is reading, and the hint is
-            // right-aligned against it.
-            priority: 2,
-            minWidth: widestLabel(candidates),
-            // **The flex is C19's declaration, not a default C11 should
-            // change** (I18). C11 gives residual width only to a `flex` column
-            // — plan.ts step 8, a stated decision — and every surface's drop
-            // table was computed against it, so widening the default would
-            // invalidate twelve column declarations to repair one programmatic
-            // table. The label is the column that should absorb: it is what the
-            // user is reading, and the hint is right-aligned against it.
-            flex: true,
-            sortable: false,
-          },
-          {
-            key: "detail",
-            label: "",
-            align: "right",
-            priority: 1,
-            minWidth: widestDetail(candidates),
-            sortable: false,
-          },
-        ],
-        rows: candidates.map((c, i) => ({
-          id: `${MENU_ID}-${String(i)}`,
-          cells: {
-            value: { text: c.display ?? c.value },
-            detail: { text: c.detail ?? "" },
-          },
-        })),
-        // **The current is the table's, not a cell's** (I29, C04 I150, ruling
-        // 89). §097 draws it three ways at once — `current`'s `›`, the `pick`
-        // ground with its ink across the row, and the label in bold — and a
-        // cell glyph can carry only the first: a ground across a row is C11's
-        // (C11 §5c). This was a `bullet` in the selected row's cell, ruled so
-        // because `TableRow` has no `selected`; that stays true of the row, and
-        // `current` is the block's declaration about which row its producer is
-        // on, as a chip's `active` is. C11 draws it and degrades it (C11 I33).
-        current: current === null ? OUT_OF_VIEW : `${MENU_ID}-${String(current)}`,
-        showHeader: false,
-      }
-    : pillsOf(candidates, current);
+  const body: Block = {
+    kind: "table",
+    id: `${MENU_ID}-table`,
+    columns: [
+      {
+        key: "value",
+        label: "",
+        align: "left",
+        // **Higher than the hint's, and it was lower** (I18). C11 admits
+        // columns by priority *descending* (plan.ts step 2), so `1` against
+        // the detail's `2` meant the labels were dropped first — at 80
+        // columns over a diff the menu drew four summaries and not one verb
+        // name, which is I18's own claim failing in the direction it was
+        // written about. §6 says which way round it goes in as many words:
+        // the label is what the user is reading, and the hint is
+        // right-aligned against it.
+        priority: 2,
+        minWidth: widestLabel(candidates),
+        // **The flex is C19's declaration, not a default C11 should
+        // change** (I18). C11 gives residual width only to a `flex` column
+        // — plan.ts step 8, a stated decision — and every surface's drop
+        // table was computed against it, so widening the default would
+        // invalidate twelve column declarations to repair one programmatic
+        // table. The label is the column that should absorb: it is what the
+        // user is reading, and the hint is right-aligned against it.
+        flex: true,
+        sortable: false,
+      },
+      {
+        key: "detail",
+        label: "",
+        align: "right",
+        priority: 1,
+        minWidth: widestDetail(candidates),
+        sortable: false,
+      },
+    ],
+    rows: candidates.map((c, i) => ({
+      id: `${MENU_ID}-${String(i)}`,
+      cells: {
+        // **The tone goes on the label** (I30). The pills form was the only
+        // reader of `Candidate.tone`, and retiring it alone would have left
+        // a public field that nothing draws.
+        value: { text: c.display ?? c.value, ...(c.tone === undefined ? {} : { tone: c.tone }) },
+        detail: { text: c.detail ?? "" },
+      },
+    })),
+    // **The current is the table's, not a cell's** (I29, C04 I150, ruling
+    // 89). §097 draws it three ways at once — `current`'s `›`, the `pick`
+    // ground with its ink across the row, and the label in bold — and a
+    // cell glyph can carry only the first: a ground across a row is C11's
+    // (C11 §5c). This was a `bullet` in the selected row's cell, ruled so
+    // because `TableRow` has no `selected`; that stays true of the row, and
+    // `current` is the block's declaration about which row its producer is
+    // on, as a chip's `active` is. C11 draws it and degrades it (C11 I33).
+    current: current === null ? OUT_OF_VIEW : `${MENU_ID}-${String(current)}`,
+    showHeader: false,
+  };
 
   // **The edges, and there are two** (I23). The menu spans the region, so its
   // neighbours in both directions are left-aligned text at the same width: the
@@ -190,23 +194,6 @@ export function menuBlocks(
 }
 
 /**
- * The pills form's body: one chip a candidate, the current one `active` (I29).
- * **One builder for the drawing and the window**, so the rows the window is
- * sized by are the rows of the block that is drawn (F1487).
- */
-function pillsOf(candidates: readonly Candidate[], current: number | null): Block {
-  return {
-    kind: "pills",
-    id: `${MENU_ID}-pills`,
-    chips: candidates.map((c, i) => ({
-      label: c.display ?? c.value,
-      ...(c.tone === undefined ? {} : { tone: c.tone }),
-      ...(i === current ? { active: true } : {}),
-    })),
-  };
-}
-
-/**
  * The candidates that fit, and where the window starts (I23).
  *
  * **The compositor cuts from the end, so anything the owner puts last is what
@@ -247,67 +234,26 @@ export function menuWindow(
 }
 
 /**
- * A block's height at a width — the registry's `measure` (C09 I1), handed down
- * by the shell, which holds the registry. The pills window is sized by it.
- */
-export type MeasureBlock = (block: Block, width: number) => number;
-
-/**
- * The window the menu draws, sized by the rows its placement gives the
- * candidates (I23, F1487). `rows` is `menuRowsShown`'s answer and `width` the
- * placement's; `from` is where the wheel put the start, `null` while the
- * selection places it (C16 I74).
+ * The window the menu draws, in the rows its placement gives the candidates
+ * (I23, F1487). `rows` is `menuRowsShown`'s answer; `from` is where the wheel
+ * put the start, `null` while the selection places it (C16 I74). One call for
+ * both readers, the draw and the wheel.
+ *
+ * **A row is a candidate** (I30), which is the shape `menuWindow` counts in.
+ * F1487 sized a pills window here by the pills block's own `measure` at the
+ * placement's width, because chips packed several to a row; ruling 99 retired
+ * that form the same day, and the measure went with it.
  */
 export function menuWindowOf(
-  candidates: readonly Candidate[],
+  total: number,
   selected: number | null,
   rows: number,
-  width: number,
-  measure: MeasureBlock,
   from: number | null = null,
 ): Readonly<{ start: number; shown: number }> {
-  const total = candidates.length; // graphemes-ok: a candidate count, not text
-  // **The table spends one row a candidate**, which is the shape `menuWindow`
-  // counts in, so its window is that function's and the wheel clamps as it did.
-  if (candidates.some((c) => c.detail !== undefined)) {
-    const w = menuWindow(total, selected, rows);
-    if (from === null) return w;
-    return Object.freeze({ start: Math.min(Math.max(0, from), total - w.shown), shown: w.shown });
-  }
-  // **Pills pack several a row** (F1487). The row count was handed to
-  // `menuWindow` as a count of candidates, so the pills form drew one row of
-  // chips in a box sized for several. Whether a run fits is the pills block's
-  // own answer at the placement's width — measured, never counted in cells
-  // here, where the count would drift from `chipRows`.
-  const fits = (start: number, n: number): boolean =>
-    measure(pillsOf(candidates.slice(start, start + n), null), width) <= rows; // graphemes-ok: a candidate count, not text
-  if (rows <= 0 || fits(0, total)) return Object.freeze({ start: 0, shown: total });
-  /** The longest run from `start` that fits, and never fewer than one chip. */
-  const longest = (start: number): number => {
-    let lo = 1;
-    let hi = total - start;
-    while (lo < hi) {
-      const mid = Math.ceil((lo + hi) / 2);
-      if (fits(start, mid)) lo = mid;
-      else hi = mid - 1;
-    }
-    return lo;
-  };
-  /** The earliest start whose run to `to` fits — the window that follows the selection. */
-  const earliest = (to: number): number => {
-    let lo = 0;
-    let hi = to;
-    while (lo < hi) {
-      const mid = Math.floor((lo + hi) / 2);
-      if (fits(mid, to - mid + 1)) hi = mid;
-      else lo = mid + 1;
-    }
-    return lo;
-  };
-  // The wheel's start is clamped to the last start that still reaches the end,
-  // as the table's is clamped to `total - shown`.
-  const start = from === null ? earliest(selected ?? 0) : Math.min(Math.max(0, from), earliest(total - 1));
-  return Object.freeze({ start, shown: longest(start) });
+  const w = menuWindow(total, selected, rows);
+  if (from === null) return w;
+  // The wheel's start is clamped to the last start that still reaches the end.
+  return Object.freeze({ start: Math.min(Math.max(0, from), total - w.shown), shown: w.shown });
 }
 
 /**

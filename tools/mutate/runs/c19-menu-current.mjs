@@ -29,9 +29,10 @@ const FILES = [
 
 const CONTROL = {
   // **A change the corpus can see** (F1254): the table names no current.
+  // Re-anchored 2026-09-30 (ruling 99, C19 I30): one form, one indent less.
   file: MENU,
-  from: "        current: current === null ? OUT_OF_VIEW : `${MENU_ID}-${String(current)}`,",
-  to: "        current: OUT_OF_VIEW,",
+  from: "    current: current === null ? OUT_OF_VIEW : `${MENU_ID}-${String(current)}`,",
+  to: "    current: OUT_OF_VIEW,",
   why:
     "no candidate is ever current, so no row is marked at rest or after Tab — "
     + "if this survives, the rows are not reading the mark",

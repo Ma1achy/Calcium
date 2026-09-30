@@ -168,14 +168,15 @@ describe("C19 + C15 — the menu is an overlay (I8)", () => {
     // the indicator fired. A mechanism observable exactly never, which is
     // A03 §2's vacuity class arriving in shipped code.
     //
-    // **Both forms, with C11 registered.** Candidates without details draw as
-    // pills and candidates with them as a table (C19 §6), and the harness's
-    // bare registry draws an unregistered `table` as `raw` (C09 I130's reason).
+    // **With a detail and without, with C11 registered.** Both draw the table
+    // since ruling 99 (C19 I30); the arm without was the pills form until then.
+    // The harness's bare registry draws an unregistered `table` as `raw` (C09
+    // I130's reason).
     const r = measurable({ definitions: [tableDefinition] });
     const forms = [
-      { form: "pills", many: Array.from({ length: 60 }, (_, i) => ({ value: `entry-${String(i)}` })) },
+      { form: "plain", many: Array.from({ length: 60 }, (_, i) => ({ value: `entry-${String(i)}` })) },
       {
-        form: "table",
+        form: "detailed",
         many: Array.from({ length: 60 }, (_, i) => ({ value: `entry-${String(i)}`, detail: "a detail" })),
       },
     ];
@@ -190,9 +191,8 @@ describe("C19 + C15 — the menu is an overlay (I8)", () => {
       if (first === undefined) throw new Error("unreachable");
       const fits = menuRowsShown(first);
       expect(remainderOf(first, many.length, fits), `${form}: the first placement cut something`).toBeGreaterThan(0);
-      // **The window `keys.ts` draws** (F1487): sized in the placement's rows at
-      // its width, over the registry that will measure the result.
-      const w = menuWindowOf(many, 0, fits, first.width, (b, width) => r.registry.measure(b, width));
+      // **The window `keys.ts` draws**, one row a candidate (C19 I30).
+      const w = menuWindowOf(many.length, 0, fits);
       const remainder = many.length - w.shown;
       manager.update(MENU_ID, {
         content: menuBlocks(many.slice(w.start, w.start + w.shown), 0, remainder),
@@ -212,14 +212,14 @@ describe("C19 + C15 — the menu is an overlay (I8)", () => {
       expect(drawn[drawn.length - 1] ?? "", `${form}: the indicator closes the box`).toContain(
         `+ ${String(remainder)} more`,
       );
-      // **And the window fills the box it was sized for, in both forms** (T6.27,
-      // T6.28). A chrome count charging a row the menu no longer draws hands
-      // back a window one row short, which fits inside the box and so passes
-      // the assertions above: the box shrinks to it, one candidate fewer is
-      // shown, and the remainder counts it as missing. The first placement is
-      // the cap the window was sized against. **The pills form was exempt
-      // until F1487**: its window was sized one candidate a row, the table's
-      // shape, and drew three pills on one row in a five-row cap.
+      // **And the window fills the box it was sized for, in both arms** (T6.27).
+      // A chrome count charging a row the menu no longer draws hands back a
+      // window one row short, which fits inside the box and so passes the
+      // assertions above: the box shrinks to it, one candidate fewer is shown,
+      // and the remainder counts it as missing. The first placement is the cap
+      // the window was sized against. **The pills form was exempt until
+      // F1487**, three pills on one row in a five-row cap, and ruling 99
+      // retired it.
       expect(placed.height, `${form}: the window fills the box it was sized for`).toBe(first.height);
     }
   });

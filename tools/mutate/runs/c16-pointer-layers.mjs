@@ -118,11 +118,13 @@ const results = runPass({
       // at a row index past the slice. Re-anchored for C19 I29: the index is
       // the current's, the selection or the first candidate, and never null.
       // Re-anchored 2026-09-30 (F1487): the count argument became the window's
-      // own; the mutation is unchanged.
+      // own; the mutation is unchanged. Re-anchored again the same day
+      // (ruling 99, C19 I30): the pills form retired and the count is the
+      // placement's again; the mutation is unchanged.
       name: "a selection out of the window is still marked",
       file: KEYS,
-      from: "    return menuBlocks(slice, at < 0 || at >= w.shown ? null : at, fits <= 0 ? remainder : candidates.length - w.shown);\n",
-      to: "    return menuBlocks(slice, Math.min(Math.max(at, 0), w.shown - 1), fits <= 0 ? remainder : candidates.length - w.shown);\n",
+      from: "    return menuBlocks(slice, at < 0 || at >= w.shown ? null : at, remainder);\n",
+      to: "    return menuBlocks(slice, Math.min(Math.max(at, 0), w.shown - 1), remainder);\n",
       expect: "T4.92",
     },
   ],

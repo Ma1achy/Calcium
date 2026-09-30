@@ -1342,12 +1342,13 @@ describe("C22 I150 — the completion footer names what each key does", () => {
   const line = (hints: OwnerHints): readonly string[] =>
     ownerLine("substate", FULL_CAPS, false, 0, undefined, false, hints).map((c) => c.label);
 
-  it("T1.182 (C22 I150, ruling 96): at rest the line offers the prompt's complete chord and the way out; once selected, the move keys and accept", async () => {
+  it("T1.182 (C22 I150, ruling 96, ruling 99): at rest the line offers the prompt's run and complete chords and the way out; once selected, the move keys and accept", async () => {
     // **At rest the prompt answers first** (C19 I20): `⏎` submits and `↑` is
     // history, so a chip saying `accept` or `move` names a key that goes
     // somewhere else. F1486 measured `⏎` submitting `/c` under `⏎ accept`.
     const rest = line(over(defaultKeymap, true));
-    expect(rest).toEqual(["complete", "⇥ complete", "esc close"]);
+    // **`⏎ run` is ruling 99's amendment** (§029): at rest `⏎` runs the line.
+    expect(rest).toEqual(["complete", "⏎ run", "⇥ complete", "esc close"]);
     expect(rest.some((l) => /accept|move/u.test(l)), "no chip names a key the menu does not hold").toBe(false);
 
     // **The control, and the other state**: with a selection the menu owns its
@@ -1362,6 +1363,16 @@ describe("C22 I150 — the completion footer names what each key does", () => {
     const moved = line(over(ctrlO, true));
     expect(moved).toContain(`${chordText({ name: "o", ctrl: true })} complete`);
     expect(moved, "and the old chord is not named").not.toContain("⇥ complete");
+    // And the prompt's `submit`: moved to `⌃o` alone, the rest line says so.
+    const submitO = defaultKeymap.filter((b) => !(b.target === "prompt" && b.action === "submit")).concat(
+      defaultKeymap
+        .filter((b) => b.target === "prompt" && b.action === "submit")
+        .slice(0, 1)
+        .map((b) => ({ ...b, key: { name: "o", ctrl: true } })),
+    );
+    const run = line(over(submitO, true));
+    expect(run).toContain(`${chordText({ name: "o", ctrl: true })} run`);
+    expect(run, "and the old chord is not named").not.toContain("⏎ run");
 
     // **Through the graph, from the router's own predicate** (C22 I51, I145): a
     // `complete` panel declaring `promptLive` answers the hint, and one that
@@ -1385,7 +1396,7 @@ describe("C22 I150 — the completion footer names what each key does", () => {
     };
     expect(hintsWith(true).promptUnderMenu, "a menu at rest").toBe(true);
     expect(hintsWith(false).promptUnderMenu, "a menu holding a selection").toBeUndefined();
-    expect(line(hintsWith(true))).toEqual(["complete", "⇥ complete", "esc close"]);
+    expect(line(hintsWith(true))).toEqual(["complete", "⏎ run", "⇥ complete", "esc close"]);
   });
 });
 

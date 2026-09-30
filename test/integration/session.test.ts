@@ -298,13 +298,13 @@ describe("C22 I150 — the completion footer at rest and after Tab", () => {
   const DOWN = "\u001b[B";
   const ENTER = "\r";
 
-  it("T4.120 (C22 I150, C19 I20, C19 I29, ruling 96, F1486): the footer at rest and after ⇥ differ, and each names only keys that do what it says", async () => {
+  it("T4.120 (C22 I150, C19 I20, C19 I29, ruling 96, ruling 99, F1486): the footer at rest and after ⇥ differ, and each names only keys that do what it says", async () => {
     const s = await atRest();
     // **The subject before the claim**: the menu is up and marks its current.
     expect(s.menu().some((l) => l.includes("› /capabilities")), "the menu is up at rest, marked").toBe(true);
     const restMenu = s.menu();
     const rest = s.footer();
-    expect(rest).toBe("complete  ⇥ complete  esc close");
+    expect(rest).toBe("complete  ⏎ run  ⇥ complete  esc close");
 
     await s.press(TAB);
     const selected = s.footer();
@@ -323,10 +323,10 @@ describe("C22 I150 — the completion footer at rest and after Tab", () => {
     expect(s.prompt()).toBe("❯ /clear");
   });
 
-  it("T4.120 (C22 I150, C19 I20, ruling 96): the controls — ⏎ at rest submits, and ↓ at rest selects nothing", async () => {
-    // **What the rest line leaves out, pressed.** `⏎` is not offered at rest
-    // because it submits the partial line; measured before the footer moved,
-    // this is the frame that sat beneath `⏎ accept`.
+  it("T4.120 (C22 I150, C19 I20, ruling 96, ruling 99): the controls — ⏎ at rest runs the line, and ↓ at rest selects nothing", async () => {
+    // **What the rest line names, pressed.** `⏎ run` at rest runs the partial
+    // line; measured before the footer moved, this is the frame that sat
+    // beneath `⏎ accept`.
     const enter = await atRest();
     await enter.press(ENTER);
     expect(enter.rows().some((l) => l.includes("unknown verb: /c")), "⏎ at rest ran the line").toBe(true);
@@ -338,7 +338,7 @@ describe("C22 I150 — the completion footer at rest and after Tab", () => {
     const before = { footer: down.footer(), menu: down.menu() };
     await down.press(DOWN);
     expect({ footer: down.footer(), menu: down.menu() }).toEqual(before);
-    expect(down.footer()).toBe("complete  ⇥ complete  esc close");
+    expect(down.footer()).toBe("complete  ⏎ run  ⇥ complete  esc close");
   });
 });
 
