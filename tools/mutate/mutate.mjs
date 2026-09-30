@@ -843,15 +843,38 @@ export function report(results) {
       ? ""
       : `\n${broke.length} mutation(s) did not compile — the suites failed to load, so nothing ` +
         `was measured. Fix the \`to\`, not the test it names`;
+  // **The verdicts counted, because the all-clear hid one** (F1472). A kill
+  // attributed elsewhere, or to nothing, is still a kill — every run exits on
+  // `!r.killed` and that does not change — but `every mutation was caught` sat
+  // under a CAUGHT ELSEWHERE row, and a reader of the last line alone saw an
+  // all-clear on the one finding the named-row verdict exists to surface.
+  const killedRows = results.filter((r) => r.killed);
+  const named = killedRows.filter((r) => r.byNamedTest === true).length;
+  const unattributed = killedRows.filter((r) => r.byNamedTest === null).length;
+  const elsewhere = killedRows.length - named - unattributed;
+  // Label before number, so `N survived` stays the sentence that *claims* a
+  // survivor: MH4c, MH9e and MH11 assert its absence with /\d+ survived/, and a
+  // count reading `0 survived` would trip all three while claiming nothing.
+  const counts =
+    `\ncaught by the named row ${String(named)} · caught elsewhere ${String(elsewhere)} · ` +
+    `unavailable ${String(unattributed)} · survived ${String(survivors.length)}`;
+  const misnamed =
+    elsewhere + unattributed === 0
+      ? ""
+      : `\n${String(elsewhere + unattributed)} kill(s) not shown to be the named row's — each is ` +
+        `still a kill. CAUGHT ELSEWHERE means the row the \`expect\` names passed; KILLED, NAMED ` +
+        `CHECK UNAVAILABLE means the run printed no FAIL line to say (F1472)`;
+  lines.push(counts);
   lines.push(
     blind.length > 0
-      ? `\n${blind.length} run(s) produced no summary — the harness went blind mid-pass. ` +
+      ? `${blind.length} run(s) produced no summary — the harness went blind mid-pass. ` +
           `Nothing above those rows means anything`
       : (survivors.length === 0
-          ? stale.length + ambiguous.length + broke.length + unsure.length + untyped.length === 0
-            ? "\nevery mutation was caught"
-            : "\nno survivors among the rows that ran"
-          : `\n${survivors.length} survived — a finding about the tests, about the sentence they ` +
+          ? stale.length + ambiguous.length + broke.length + unsure.length + untyped.length === 0 &&
+            elsewhere + unattributed === 0
+            ? "every mutation was caught by the row it names"
+            : "no survivors among the rows that ran"
+          : `${survivors.length} survived — a finding about the tests, about the sentence they ` +
             `were written from, or about the mutation. **Ask why the mutation cannot reach the ` +
             `test before rewriting the test** (F277): the anchor may be textually perfect and ` +
             `name a line whose callers moved, which reads exactly like a weak row`) +
@@ -859,7 +882,8 @@ export function report(results) {
         staleNote +
         ambiguousNote +
         brokeNote +
-        untypedNote,
+        untypedNote +
+        misnamed,
   );
   return lines.join("\n");
 }

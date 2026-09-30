@@ -336,6 +336,22 @@ const results = runPass({
       to: '  if (typeof expect !== "string") return output.includes(expect);',
       expect: "MH12b",
     },
+    {
+      // **The all-clear under a CAUGHT ELSEWHERE row**, which is what a reader
+      // of the last line alone saw.
+      name: "the all-clear ignores kills the named row did not make",
+      file: FILE,
+      from: " &&\n            elsewhere + unattributed === 0\n",
+      to: "\n",
+      expect: "MH13",
+    },
+    {
+      name: "an unattributable kill is counted as caught elsewhere",
+      file: FILE,
+      from: "  const unattributed = killedRows.filter((r) => r.byNamedTest === null).length;",
+      to: "  const unattributed = 0;",
+      expect: "MH13",
+    },
   ],
 });
 

@@ -92,11 +92,14 @@ const strip = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 /** The counts a run's report carries, read off its own state column (`report()` in `mutate.mjs`). */
 export function summarise(output) {
-  const s = { caught: 0, elsewhere: 0, survived: 0, anchorMissed: 0, unbuilt: 0, noSummary: 0, expected: 0, staleExemption: 0 };
+  const s = { caught: 0, elsewhere: 0, unavailable: 0, survived: 0, anchorMissed: 0, unbuilt: 0, noSummary: 0, expected: 0, staleExemption: 0 };
   for (const raw of strip(output).split("\n")) {
     const line = raw.trimEnd();
     if (line.startsWith("caught ")) s.caught += 1;
     else if (line.startsWith("CAUGHT ELSEWHERE")) s.elsewhere += 1;
+    // A kill with no `FAIL` line to attribute it (F1472). Uncounted, it fell out
+    // of every bucket and the sweep's `caught` total under-reported the kills.
+    else if (line.startsWith("KILLED, NAMED CHECK UNAVAILABLE")) s.unavailable += 1;
     else if (line.startsWith("SURVIVED")) s.survived += 1;
     else if (line.startsWith("ANCHOR MISSED")) s.anchorMissed += 1;
     else if (line.startsWith("DID NOT BUILD")) s.unbuilt += 1;
@@ -218,7 +221,7 @@ function main() {
     }
     rows.push({ run, exit, seconds, state, restored, ...summary });
     const tail = restored > 0 ? `  LEFT THE TREE MUTATED — ${String(restored)} file(s) restored from the snapshot` : "";
-    console.log(`  ${state.padEnd(11)} ${run.padEnd(36)} exit ${String(exit).padStart(2)}  ${String(seconds).padStart(4)}s  caught ${String(summary.caught + summary.elsewhere)}  survived ${String(summary.survived)}  expected ${String(summary.expected)}  anchors missed ${String(summary.anchorMissed)}${tail}`);
+    console.log(`  ${state.padEnd(11)} ${run.padEnd(36)} exit ${String(exit).padStart(2)}  ${String(seconds).padStart(4)}s  caught ${String(summary.caught + summary.elsewhere + summary.unavailable)} (elsewhere ${String(summary.elsewhere)}, unavailable ${String(summary.unavailable)})  survived ${String(summary.survived)}  expected ${String(summary.expected)}  anchors missed ${String(summary.anchorMissed)}${tail}`);
   }
   const red = rows.filter((r) => r.state === "red");
   const knownStaleRows = rows.filter((r) => r.state === "known-stale");

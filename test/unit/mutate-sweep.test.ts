@@ -18,7 +18,7 @@ import { describe, expect, it } from "vitest";
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
 import { ANCHORS, RUNS_DIR, discoverRuns, knownStale, parseArgs, plan, redTails, shardOf, summarise, verdict } from "../../tools/mutate/sweep.mjs";
 
-type Summary = Readonly<{ caught: number; elsewhere: number; survived: number; anchorMissed: number; unbuilt: number; noSummary: number; expected: number; staleExemption: number }>;
+type Summary = Readonly<{ caught: number; elsewhere: number; unavailable: number; survived: number; anchorMissed: number; unbuilt: number; noSummary: number; expected: number; staleExemption: number }>;
 type Args = { shard: { k: number; n: number } | null; only: string | null; list: boolean; out: string; skipAnchors: boolean };
 const discover = discoverRuns as (dir?: string) => readonly string[];
 const shard = shardOf as (runs: readonly string[], k: number, n: number) => readonly string[];
@@ -114,6 +114,7 @@ describe("MS4: the reader counts the report's own state column", () => {
     `${ESC}[32mcaught          ${ESC}[39m T1.139   the radar's category labels are written one code point per slot`,
     "caught           T1.140   the line arm reads its label row by code point",
     "CAUGHT ELSEWHERE 'SS61' fires on a fabricated violation RULE-BLIND: SS61 asks only for the first element",
+    "KILLED, NAMED CHECK UNAVAILABLE T1.142   the suite never returned",
     "SURVIVED         T1.141   the tick labels are written one code point per cell",
     "ANCHOR MISSED    XA8      the x axis forgets its ticks",
     "DID NOT BUILD    T1.1     a `to` that does not parse",
@@ -124,12 +125,12 @@ describe("MS4: the reader counts the report's own state column", () => {
     "EXEMPTION IS STALE  the deduplication runs on the un-reversed edge",
   ].join("\n");
   it("one count per state, colour codes stripped, reasons not counted", () => {
-    expect(summary(REPORT)).toEqual({ caught: 2, elsewhere: 1, survived: 1, anchorMissed: 1, unbuilt: 1, noSummary: 1, expected: 1, staleExemption: 1 });
+    expect(summary(REPORT)).toEqual({ caught: 2, elsewhere: 1, unavailable: 1, survived: 1, anchorMissed: 1, unbuilt: 1, noSummary: 1, expected: 1, staleExemption: 1 });
   });
 });
 
 describe("MS5: the verdict tolerates exactly the known anchor misses", () => {
-  const base: Summary = { caught: 3, elsewhere: 0, survived: 0, anchorMissed: 0, unbuilt: 0, noSummary: 0, expected: 0, staleExemption: 0 };
+  const base: Summary = { caught: 3, elsewhere: 0, unavailable: 0, survived: 0, anchorMissed: 0, unbuilt: 0, noSummary: 0, expected: 0, staleExemption: 0 };
   const list = { "c12-x-axis.mjs": 1 };
   it("green on exit 0, known-stale on the listed misses alone, red on anything else", () => {
     expect(judge("c12-x-axis.mjs", 0, base, list)).toBe("green");

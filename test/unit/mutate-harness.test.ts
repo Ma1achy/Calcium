@@ -1066,4 +1066,45 @@ describe("mutation harness", () => {
     expect(results.map((r) => [r.killed, r.byNamedTest])).toEqual([[true, null]]);
     expect(report(results).split("\n")[0]).toMatch(/^KILLED, NAMED CHECK UNAVAILABLE T9\.2 /u);
   });
+
+  it("MH13 (F1472): the summary counts each verdict, and the all-clear needs every kill made by its named row", () => {
+    // **A row that reads CAUGHT ELSEWHERE is the thing F1472 exists to surface**,
+    // and the summary under it said `every mutation was caught`. A reader of the
+    // last line alone — the sweep's log, a lane's report — saw an all-clear.
+    // The exit status is not the subject: a kill is still a kill, and every run
+    // exits on `!r.killed`.
+    const files = new Map([["a.ts", "const x = 1;\n"]]);
+    const run = (): string => {
+      const src = files.get("a.ts") ?? "";
+      if (src.includes("const x = 1;")) return PASSED;
+      return src.includes("const x = 7;") ? `     ${E}[32m✓${E}[39m T9.2\nTIMED OUT after 300000ms` : ONE_FILE;
+    };
+    const pass = (mutations: { name: string; to: string; expect: string }[]) =>
+      runPass({
+        typecheck: TYPED,
+        mutations: mutations.map((m) => ({ ...m, file: "a.ts", from: "const x = 1;" })),
+        control: { file: "a.ts", from: "const x = 1;", to: "const x = 0;", why: "T9.1 asserts x" },
+        read: (f) => files.get(f) as string,
+        write: (f, s) => void files.set(f, s),
+        run,
+      });
+
+    const mixed = report(
+      pass([
+        { name: "aimed at the row that failed", to: "const x = 8;", expect: "T9.1" },
+        { name: "aimed at the row that passed", to: "const x = 9;", expect: "T9.2" },
+        { name: "never returns", to: "const x = 7;", expect: "T9.2" },
+      ]),
+    );
+    expect(mixed, "each verdict counted").toContain(
+      "caught by the named row 1 · caught elsewhere 1 · unavailable 1 · survived 0",
+    );
+    expect(mixed, "and no all-clear").not.toContain("every mutation was caught");
+
+    const clean = report(pass([{ name: "aimed at the row that failed", to: "const x = 8;", expect: "T9.1" }]));
+    expect(clean).toContain("caught by the named row 1 · caught elsewhere 0 · unavailable 0 · survived 0");
+    expect(clean, "the all-clear, when every kill is its named row's").toContain(
+      "every mutation was caught by the row it names",
+    );
+  });
 });
