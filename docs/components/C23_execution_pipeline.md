@@ -1258,6 +1258,7 @@ Per submission.
 - **I92** — *(§7g ruling 4, `R-QST-002`, `R-BLK-881`, I36)* **Every question resolves exactly once: answered, cancelled or expired.** `AskAnswer.outcome` says which. A question whose `signal` aborts resolves `cancelled`; one whose `expiresAfterMs` passes resolves `expired`, and a toast reads `○ the question expired · <question> after <n>s`, its mark `queued`'s hollow `○` in `muted` (C22 I116) — the time counts from when the question is **shown**, because one waiting behind another has not yet been put to the reader; a signal already aborted at `ask` resolves `cancelled` with nothing pushed. A cancelled or expired question resolves with its **default's key** and no `text` — the safe answer, never another choice — and a held draft is restored. Cancelling a waiting question removes it without drawing it. When the session stops, every open and waiting question resolves `cancelled` before teardown. → T1.102, T1.103, T3.82, T3.83, T6.108
 - **I93** — *(§7g ruling 6, F1296)* **A choice set is checked at `ask`, before anything is queued or pushed.** More than one `default`, or a `default` on a `reply…` or an inspection choice, rejects `ask` with nothing queued, pushed or held. With no default marked, the initial selection and `esc` take the last choice that answers — neither a `reply…` nor an inspection. → T1.104, T6.109
 - **I94** — *(§7g rulings 4, 5 and 8, `R-BLK-348`, `R-BLK-881`, F1260, → I60, C04 I149)* **An approval's safe answer is `deny`, and only an answer runs the tool.** `approvalPrompt`'s choices are `deny` first and marked default, then `allow`. The call head reads `waiting` (C04 I149) while the question is open. `answered` with `deny` settles the card `denied` (I60); `cancelled` and `expired` settle it with that word and run nothing — the head in the `cancelled` state for both, because an approval nobody answered did not run, and history `130` for a withdrawal and `126` otherwise; only `answered` with another key starts the tool. The approval record carries `signal?` and `expiresAfterMs?` through to its question, which is how an asker withdraws it. → T1.105, T4.92
+- **I95** — *(ruling 91, F1476, I66, I81, C04 I6, C04 I141)* **A handoff's notice says how the child ended, and its tone and mark agree with its document's status.** Exit 0 reads `X finished`: tone `muted`, the continuation mark, status `ok`. **A non-zero exit, or a signal other than `SIGINT`, `SIGTERM` or `SIGHUP`, is a failure** — `X exited N` or `X ended on SIG…` in tone `error` with the `error` mark (✗), on status `error`: the `failed` state's tone and mark (`CALL_STATE_TONE`, `CALL_STATE_GLYPH`). **`SIGINT`, `SIGTERM` and `SIGHUP` are what an interrupt or a closed terminal sends, and they settle `cancelled`** — `X ended on SIG…` in tone `muted` with the `cancelled` mark (⊘), on status `partial`: the `cancelled` state's tone and mark, and the status C07 gives a cancelled call (T3.4). A stopped child says nothing about whether it would have worked, which is I81's reason for keeping `cancelled` apart from `failed`. The signal is read before the code, and the state's mark displaces the continuation mark a `muted` notice under a command would otherwise take — the notice is the entry's only block, so there is nothing above it to continue. **What it does not cover**: a signalled grandchild under `sh -c` reaches this as `128+n` with no signal, and is a failure as written (§8a A6.6 row 4); the entry's C20 code is I29's and is not this invariant's. *As it stood:* ~~every non-zero exit and every signal appended a `warn` notice with ▲ on an `error` document~~ — the document said failed and its only visible carriers said warning. → T4.93, T6.110
 
 ## 7f. Replace or float — does the answer need the prompt? (§101)
 
@@ -1471,6 +1472,7 @@ row is a cell where two rules could both claim the key.
 67. A question composing a typed reply walks and searches its own history, not the prompt's, and `↓` at the end of that walk leaves nothing (I77, §052, `R-QST-003`).
 68. **A refresh host is an entry and only an entry** (I83). A second host kind is a spec change before it is a member of the union, because the triggers, the visibility rule and C24's promise are each written for entries.
 69. **What settled while the reader was not watching is said once, when they come back, as an entry** (I85, I86, I87, ruling 51). A child's detach and a return of focus each close a mark; a close appends one notice naming what settled, nothing when nothing did, and a settlement two marks saw is reported by the first to close.
+70. **A handed-off child ended one of three ways, and the notice's tone, mark and status name the same one** (I95, ruling 91, F1476). Finished is muted on `ok`; a failure is ✗ in `error` on `error`; an interrupt or a closed terminal is ⊘ in `muted` on `partial`, as a cancelled call is.
 
 ---
 
@@ -1764,6 +1766,36 @@ else can happen while they are running.
 | `runner.handoff` rejects | **the throw path** | See below |
 | an app verb whose flags decide the contract | structural, not sequential | Resolved at C05 (I23), and the rows where two declarations meet are C05 §8a's table. It is here to record that a trace was asked and is the wrong artefact: there is no event between a tool's declaration and a flag's |
 | an app verb declaring `interactive` and `streams` | structural, not sequential | Refused at parse (C05 I19). It is in this table only to record that it was asked and answered somewhere else — the interaction is between two manifest fields with no event between them, so it is C05's classification rule and not a row of this trace |
+| the child ends — its code × its signal | structural, not sequential | Classified in A6.6 below. Nothing happens between the rules that meet there: the ending is one `Exit`, read once |
+
+**A6.6 — how the child ended, as a classification table** (I95, ruling 91). The rows are the cells
+where two rules claim one `Exit`; a row governed by one rule restates it and is omitted.
+
+| # | code | signal | rules that meet | state | tone | mark | status | text |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 0 | none | exit 0 × the continuation mark | succeeded | `muted` | continuation | `ok` | `X finished` |
+| 2 | 1 | none | non-zero × C04 I6 × C04 I3 | failed | `error` | `error` ✗ | `error` | `X exited 1` |
+| 3 | none | none | `code ?? 1` × non-zero | failed | `error` | `error` ✗ | `error` | `X exited 1` |
+| 4 | 130 | none | non-zero × *`SIGINT` is a cancel* | failed | `error` | `error` ✗ | `error` | `X exited 130` |
+| 5 | none | `SIGINT`, `SIGTERM`, `SIGHUP` | the cancel set × the continuation mark | cancelled | `muted` | `cancelled` ⊘ | `partial` | `X ended on SIGINT` |
+| 6 | none | any other, `SIGQUIT` included | a signal × *not one of the three* | failed | `error` | `error` ✗ | `error` | `X ended on SIGKILL` |
+| 7 | 1 | `SIGTERM` | the signal × non-zero | cancelled | `muted` | `cancelled` ⊘ | `partial` | `X ended on SIGTERM` |
+
+**Row 5 is the one the walk found.** A `muted` notice under a command takes the continuation
+mark (C09 §4), and the `cancelled` state has a mark of its own; both claim the one glyph slot.
+The state's wins, because the notice is the entry's only block and there is nothing above it
+inside the entry to continue. **Row 4 is recorded rather than ruled**: `/tty` hands the line to
+`sh -c`, and a shell that is not itself signalled reports a signalled grandchild as `128+n`
+with no signal. A simple command is exec'd, so `/tty vim` reaches row 5; a compound line
+reaches row 4 and is a failure as ruling 91 is written. Row 3 is a child that never started
+(C21 I13), and `exited 1` names a code nobody returned. Row 6 includes `SIGQUIT`, which a
+terminal also sends; the ruling's set is three. Row 7 cannot arise from Node, which reports one
+or the other, and is here because the arm's order decides it.
+
+**The cancel is the call state's, and not I66's document.** I66's shell route settles a cancel
+on status `error` with an `error` box and code `CANCELLED` — failure's status and failure's
+tone. Drawn that way a cancelled handoff would read as the failure ruling 91 separates it from,
+so the notice takes the `cancelled` state's tone and mark (I81) and C07's `partial` (T3.4).
 
 **A6.5 — the rejected handoff leaves a suspended terminal, and nothing resumes
 it.** This is the row worth the whole subsection, and it is the second instance of
@@ -2506,6 +2538,7 @@ Fake transport, fake stores.
 - **T4.90** (I90): through a built session, a reply with a pasted chip → the handler's `text` is the paste.
 - **T4.91** (I91): through a built session, two local verbs ask at once → one question on screen titled `· 1 more`; answering it shows the second; a completion menu open before the first comes back only after the second is answered.
 - **T4.92** (I94, I60): through a built session with an approval, `esc` → the card settles `denied` and nothing runs; with the signal aborted → `cancelled`, and nothing runs.
+- **T4.93** (I95, ruling 91, F1476): `/tty vim` through `pipelineHarness`, the handoff answering `{0, null}`, `{1, null}`, `{null, null}`, `{130, null}`, `{null, "SIGKILL"}`, `{null, "SIGQUIT"}`, `{null, "SIGINT"}`, `{null, "SIGTERM"}` and `{null, "SIGHUP"}` → each entry's notice tone, notice glyph and document status, as one table: `muted`/`continuation`/`ok` for the first; `error`/`error`/`error` for the five failures; `muted`/`cancelled`/`partial` for the three cancels. **The table is asserted whole**, so a build that moves the tone without the status, or the status without the mark, fails on the row it moved.
 
 ### Tier 5 — e2e
 
@@ -2653,6 +2686,7 @@ Fake transport, fake stores.
 - **T6.107** (I91): the queue bypassed, a second `ask` pushed at once → **T1.101** fails on the stack (C15 throws on the id). `tools/mutate/runs/c23-question-queue.mjs`.
 - **T6.108** (I92): a cancelled question resolved with the first choice's key rather than the default's → **T1.102** fails.
 - **T6.109** (I93): the validation removed → **T1.104** fails on the two-default arm.
+- **T6.110** (I95): the failure arm's tone put back to `warn` → **T4.93** fails on `exited 1`; `SIGHUP` dropped from the cancel set → **T4.93** fails on `SIGHUP`; the cancel arm's mark left to the tone's derivation → **T4.93** fails on `SIGINT`, drawn with the continuation mark.
 
 ## 10. Out of scope
 

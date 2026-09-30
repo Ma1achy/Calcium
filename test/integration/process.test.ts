@@ -279,6 +279,9 @@ describe("C21 with C06", () => {
     expect(entry?.doc.status, "the failure is reported rather than swallowed").toBe("error");
     expect(JSON.stringify(entry?.doc)).toMatch(/raw mode/);
   });
+  it.todo(
+    "T4.93 (C23 I95, ruling 91, F1476): a handoff's notice takes the tone and mark of the status it sits on — finished, failed or cancelled — not deferred on a component: lands with the F1476 code commit of review batch 4",
+  );
   it("T4.7 (with C22): session exit signals every child before the terminal is released", async () => {
     // A02 Seam 4's `Shutdown` row, and the whole claim is the **order**: a
     // child still running when the alternate screen is released writes onto the
