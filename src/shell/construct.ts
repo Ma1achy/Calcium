@@ -4198,8 +4198,11 @@ export async function constructGraph(
         noticeDoc(
           "",
           `the key action \`${id}\` failed: ${cause instanceof Error ? cause.message : String(cause)}`,
-          "warn",
+          // A failure, so an `error` document with ✗ (ruling 93, F1481) — it
+          // was a warning with ▲ on an `ok` document that said *failed*.
+          "error",
           { origin: "refresh" },
+          "error",
         ),
       );
       return spent;
