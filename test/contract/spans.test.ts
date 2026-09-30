@@ -8,7 +8,11 @@ import type { Block, Ramp, TextSpan } from "../../src/data/viewmodel/index.js";
 import { doc } from "../support/blocks.js";
 import { paint, paintRuns, withSpan } from "../../src/presentation/blocks/paint.js";
 import { runsOf } from "../../src/presentation/runs.js";
-import { resolveTone } from "../../src/presentation/theme/index.js";
+import {
+  resolveBackground,
+  resolveForeground,
+  resolveTone,
+} from "../../src/presentation/theme/index.js";
 import { COLORMAPS, continuousColour, sample } from "../../src/presentation/theme/colormap.js";
 import { NO_STYLE, CATEGORY_REFS, refOf, resolve } from "../../src/presentation/theme/index.js";
 import * as marks from "../../src/presentation/plot/marks.js";
@@ -70,6 +74,127 @@ describe("C04 §3am — spans, the contract", () => {
     expect(code.ok).toBe(false);
     if (!code.ok) expect(code.error.join(" ")).toMatch(/"spans" is refused on code .*\(C04 I88\)/u);
     expect(validateBlock({ kind: "raw", id: "r", text: "abc", spans }).ok).toBe(true);
+  });
+
+  it("T2.31a (C04 I85, C10 I33): dim and inverse survive as attributes while a semantic foreground stays theme-owned", () => {
+    const theme = store().current;
+    const tone = resolveTone("default", theme, FULL_CAPS);
+    const semantic = resolveForeground("tone.ok", theme, FULL_CAPS);
+    expect(semantic).toEqual(resolve("tone.ok", theme, FULL_CAPS));
+    const dottedTheme = {
+      ...theme,
+      name: `${theme.name}-dotted-slot`,
+      tokens: {
+        ...theme.tokens,
+        surfaces: { ...theme.tokens.surfaces, "bg.detail": "#654321" },
+        palettes: {
+          ...theme.tokens.palettes,
+          tone: {
+            ...theme.tokens.palettes["tone"]!,
+            slots: { ...theme.tokens.palettes["tone"]!.slots, "ok.detail": "#123456" },
+          },
+        },
+      },
+    };
+    expect(resolve("tone.ok.detail", dottedTheme, FULL_CAPS)).toEqual({
+      colour: { kind: "rgb", hex: "#123456" },
+    });
+    expect(resolveBackground("surface.bg.detail", dottedTheme, FULL_CAPS)).toEqual({
+      background: { kind: "rgb", hex: "#654321" },
+    });
+    expect(resolveForeground("categorical.c1", theme, FULL_CAPS)).toBe(NO_STYLE);
+    expect(resolveForeground("application.missing", theme, FULL_CAPS)).toBe(NO_STYLE);
+    expect(resolveForeground("syntax.keyword", theme, FULL_CAPS)).toBe(NO_STYLE);
+    expect(resolveForeground("surface.bg", theme, FULL_CAPS)).toBe(NO_STYLE);
+    expect(resolveForeground("a..b", theme, FULL_CAPS)).toBe(NO_STYLE);
+
+    const wellFormedButDisallowed = validateBlock({
+      kind: "raw",
+      id: "r",
+      text: "x",
+      spans: [{ from: 0, to: 1, foreground: "categorical.c1" }],
+    });
+    expect(wellFormedButDisallowed.ok).toBe(true);
+    const disallowed = paintRuns(
+      runsOf("x", [{ from: 0, to: 1, foreground: "categorical.c1" }]),
+      tone,
+      { theme, capabilities: FULL_CAPS },
+    );
+    expect(paint(disallowed)).toBe("x");
+
+    const runs = runsOf("a b c", [
+      { from: 2, to: 3, foreground: "tone.ok", dim: true, inverse: true },
+    ]);
+    const merged = sgr(withSpan(semantic, { dim: true, inverse: true }));
+    expect(merged).toMatch(/^\x1b\[2;7;38;/u);
+    expect(paint(paintRuns(runs, tone, { theme, capabilities: FULL_CAPS }))).toContain(
+      `${merged}b${SGR_RESET}`,
+    );
+
+    const [line] = noticeWith([{ from: 2, to: 3, dim: true, inverse: true }]);
+    expect(attrs(line ?? "")).toBe("a \x1b[2m\x1b[7mb\x1b[27m\x1b[22m c");
+  });
+
+  it("T2.31b (C04 I85, I91): the gate refuses competing foreground owners and hunk-only vocabulary widening", () => {
+    const conflict = validateBlock({
+      kind: "raw",
+      id: "r",
+      text: "x",
+      spans: [{ from: 0, to: 1, foreground: "tone.ok", tone: "ok" }],
+    });
+    expect(conflict.ok).toBe(false);
+    if (!conflict.ok) {
+      expect(conflict.error.join(" ")).toMatch(/both claim the run's foreground channel/u);
+    }
+
+    const hostileRefs: readonly unknown[] = [
+      "unqualified",
+      "a..b",
+      " tone.ok",
+      "tone.ok ",
+      "tone.ok.more",
+      ".ok",
+      "tone.",
+      "tone.\0ok",
+      "tone.ok\n",
+      "töne.ok",
+      "tone/o.ok",
+      null,
+      42,
+      true,
+      {},
+    ];
+    for (const foreground of hostileRefs) {
+      const malformed = validateBlock({
+        kind: "raw",
+        id: "r",
+        text: "x",
+        spans: [{ from: 0, to: 1, foreground }],
+      });
+      expect(malformed.ok, JSON.stringify(foreground)).toBe(false);
+      if (!malformed.ok) expect(malformed.error.join(" ")).toMatch(/palette\.slot/u);
+    }
+
+    for (const member of [
+      { foreground: "tone.ok" },
+      { dim: true },
+      { dim: false },
+      { inverse: true },
+      { inverse: false },
+    ]) {
+      const hunk = validateBlock({
+        kind: "patch",
+        id: "p",
+        path: "a.ts",
+        language: "ts",
+        hunks: [{
+          header: "@@",
+          lines: [{ kind: "add", text: "x", spans: [{ from: 0, to: 1, ...member }] }],
+        }],
+      });
+      expect(hunk.ok, JSON.stringify(member)).toBe(false);
+      if (!hunk.ok) expect(hunk.error.join(" ")).toMatch(/is refused on this member/u);
+    }
   });
 });
 
@@ -175,8 +300,11 @@ describe("C04 §3am.1 — `elide`", () => {
   const TEXT = "verb(a-rather-long-argument-that-will-not-fit) · 4s · 12 rows";
   const ARG: TextSpan = { from: TEXT.indexOf("(") + 1, to: TEXT.indexOf(")"), elide: true };
 
-  it("T2.114 (C04 I105, I107): the eighth and ninth members are admitted, inert on a wrapped token, and the boundary the fitter shortens first on a fitted one", () => {
-    expect(TEXT_SPAN_KEYS.size).toBe(9);
+  it("T2.114 (C04 I85, I105, I107): the widened key set admits semantic appearance and fit metadata without moving geometry", () => {
+    expect(TEXT_SPAN_KEYS.size).toBe(12);
+    expect(TEXT_SPAN_KEYS.has("foreground")).toBe(true);
+    expect(TEXT_SPAN_KEYS.has("dim")).toBe(true);
+    expect(TEXT_SPAN_KEYS.has("inverse")).toBe(true);
     expect(TEXT_SPAN_KEYS.has("elide")).toBe(true);
     expect(TEXT_SPAN_KEYS.has("ramp")).toBe(true);
     const marked = block({ kind: "notice", id: "n", tone: "info", glyph: "info", text: TEXT, spans: [ARG] });

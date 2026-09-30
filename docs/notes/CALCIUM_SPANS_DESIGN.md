@@ -86,7 +86,7 @@ visible without a segmenter). **The renderer snaps** any other boundary that lan
 grapheme cluster outward to the cluster's end — width-preserving by construction, because
 the cluster is painted whole. C04 I84; C09 owes the snapping row in the code phase.
 
-**Q3 What a span carries → `bold`, `italic`, `underline` only** (M16, C10 §3, §4a).
+**Q3 What the first-pass span carried → `bold`, `italic`, `underline` only** (M16, C10 §3, §4a).
 - *tone*: its one consumer, structured diff, is ruled onto `underline` by C25 I10 (M16); and a
   run tone would collapse at 1-bit onto the same `bold`/`dim` the span's own attributes use,
   so a span tone and a span attribute would be indistinguishable there. Deferred, symbol
@@ -97,6 +97,14 @@ the cluster is painted whole. C04 I84; C09 owes the snapping row in the code pha
 - *inverse*: swaps both colour channels (C10 §4a). Refused.
 - *value*: ML-1 is unscheduled. Deferred, symbol `TextSpan.value` (§7).
 C04 I85; C10 I33 for the merge and the depths.
+
+**Superseded for the 2026-09-30 consumer, without a second span type.** `dim`
+and `inverse` are now direct appearance attributes. `foreground` names a
+`ColourRef`, never a literal value; C10 admits only a non-`syntax` meaning
+palette and owns every degradation rung. It is mutually exclusive with `tone`
+and `ramp`, since each claims the run's foreground channel. These members remain
+appearance-only and are refused on hunk-line spans, whose two channels were
+already committed (C04 I85, I91; C10 I33).
 
 **Q4 Wrapping → carried by source offset** (M5, M6). A bold word broken across rows is bold
 on both. `wrapCells` drops break spaces, so slicing spans by prefix sums of row lengths is
@@ -211,6 +219,7 @@ No ruling here throws mid-mutation: the gate reports before anything is stored, 
 renderer never writes. That is why this section is short, and it was checked rather than
 assumed (C13's `settle` is the precedent for a throw leaving an unpatchable entry).
 
+| ~~semantic foreground, dim and inverse~~ **discharged 2026-09-30** | `TextSpan.foreground`, `.dim`, `.inverse` | a full-region application consumer; foreground is a theme meaning-slot reference, attributes are direct, and all three preserve geometry (C04 I85, C10 I33) |
 ## 7 · Deferred, each with the symbol that expires it
 
 | deferral | symbol to grep | consumer that would expire it |

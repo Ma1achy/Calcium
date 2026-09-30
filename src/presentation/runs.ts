@@ -4,8 +4,9 @@
  *
  * **A `TextSpan` is an input in code units; a run is what the renderer paints.**
  * `runsOf` turns `(text, spans)` into pieces that concatenate to the text, with
- * the three attributes a span may carry on the pieces it covers. Everything
- * after that — wrapping, truncating, painting — works on runs and never looks
+ * the span's appearance attributes and semantic foreground on the pieces it
+ * covers. Everything after that — wrapping, truncating, painting — works on
+ * runs and never looks
  * at an offset again, which is what keeps one arithmetic in one place.
  *
  * **The slicer is the one `code` already had.** `sliceTokens` sliced a token
@@ -20,22 +21,36 @@
  * nothing outside it, and the runs still concatenate to `stripControl(text)`,
  * which is what the measurer wrapped (C09 I1).
  */
-import type { TextSpan, Tone, Ramp } from "../data/viewmodel/index.js";
+import type { ColourRef, Ramp, TextSpan, Tone } from "../data/viewmodel/index.js";
 import { stripControl } from "../data/text.js";
 import { clusterEnds, placeableClusters, wrapCellsParts, type AmbiguousWidth, type Atom, graphemes } from "./text.js";
 
 /** What a span contributes to a `Style` — and nothing a palette resolves (C10 I33). */
-export type SpanAttrs = Readonly<{ bold?: boolean; italic?: boolean; underline?: boolean }>;
+export type SpanAttrs = Readonly<{
+  bold?: boolean;
+  dim?: boolean;
+  italic?: boolean;
+  inverse?: boolean;
+  underline?: boolean;
+}>;
 
 /**
- * A run: the text, and the three things a span may say about it.
+ * A run: text plus the bounded appearance metadata a span may say about it.
  *
- * `tone` names a slot and `value` a reading (C04 I89, I90); neither is a
- * colour, and `paintRuns` resolves each through the resolver its owner already
+ * `tone` and `foreground` name slots and `value` a reading (C04 I85, I89, I90);
+ * none is a colour, and `paintRuns` resolves each through the resolver its owner
  * has. `value` is the one member the wrapper reads — a valued run is an atom
  * (C09 §5) — which is why it rides on the run and not only on the style.
  */
-export type Run = Readonly<{ text: string; attrs?: SpanAttrs; tone?: Tone; value?: number; elide?: true; ramp?: RunRamp }>;
+export type Run = Readonly<{
+  text: string;
+  attrs?: SpanAttrs;
+  foreground?: ColourRef;
+  tone?: Tone;
+  value?: number;
+  elide?: true;
+  ramp?: RunRamp;
+}>;
 
 /**
  * A run's place in its ramped span (C09 I51): `at` is the grapheme index of the
@@ -75,9 +90,17 @@ function snapDown(offset: number, ends: readonly number[]): number {
 }
 
 function attrsOf(span: TextSpan): SpanAttrs | undefined {
-  const attrs: { bold?: boolean; italic?: boolean; underline?: boolean } = {};
+  const attrs: {
+    bold?: boolean;
+    dim?: boolean;
+    italic?: boolean;
+    inverse?: boolean;
+    underline?: boolean;
+  } = {};
   if (span.bold === true) attrs.bold = true;
+  if (span.dim === true) attrs.dim = true;
   if (span.italic === true) attrs.italic = true;
+  if (span.inverse === true) attrs.inverse = true;
   if (span.underline === true) attrs.underline = true;
   return Object.keys(attrs).length === 0 ? undefined : attrs; // cells-ok — a key count
 }
@@ -88,6 +111,7 @@ function runOf(text: string, span: TextSpan, ordinal: number): Run {
   return {
     text,
     ...(attrs === undefined ? {} : { attrs }),
+    ...(span.foreground === undefined ? {} : { foreground: span.foreground }),
     ...(span.tone === undefined ? {} : { tone: span.tone }),
     ...(span.value === undefined ? {} : { value: span.value }),
     // A boundary the fitter reads and the painter never does (C04 I105).

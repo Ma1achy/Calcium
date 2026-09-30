@@ -11,7 +11,13 @@
  */
 import type { AmbiguousWidth } from "../text.js";
 import { SGR_RESET, sgr } from "../../terminal/escapes.js";
-import { resolve, resolveBackground, resolveTone, type Style } from "../theme/index.js";
+import {
+  resolve,
+  resolveBackground,
+  resolveForeground,
+  resolveTone,
+  type Style,
+} from "../theme/index.js";
 import type { ColourRef, ColourValue, ResolvedTheme } from "../theme/index.js";
 import { COLORMAPS, continuousColour } from "../theme/colormap.js";
 import type { ColormapName, Tone } from "../../data/viewmodel/index.js";
@@ -28,12 +34,11 @@ export type Span = Readonly<{ text: string; style?: Style }>;
 /**
  * A run's attributes onto the style its block resolved (C10 I33, C04 I85).
  *
- * **A spread, and it touches neither colour channel.** The span contributes at
- * most `bold`, `italic` and `underline`; `colour` and `background` are the
- * tone's and `withBackground`'s, so a span never enters `MONO`, the ladder or a
- * floor — there is no colour for a floor to be about. Returning `style` itself
- * when there is nothing to add is what lets `paintRuns` coalesce unstyled
- * pieces by reference and keep a plain row's bytes exactly what they were.
+ * **A spread, and it touches neither colour channel.** The span contributes
+ * only appearance attributes; `colour` and `background` belong to the
+ * foreground and background resolvers. Returning `style` itself when there is
+ * nothing to add is what lets `paintRuns` coalesce unstyled pieces by reference
+ * and keep a plain row's bytes exactly what they were.
  */
 export function withSpan(style: Style, attrs: SpanAttrs | undefined): Style {
   return attrs === undefined ? style : { ...style, ...attrs };
@@ -54,14 +59,14 @@ export type RunContext = Readonly<{
 }>;
 
 /**
- * A run's style: the block's, or its span's tone in place of it; the span's
- * attributes spread on top; and its value as a background (C10 I33, C04 I89,
- * C04 I90).
+ * A run's style: the block's, or its span's tone or semantic foreground in
+ * place of it; the span's attributes spread on top; and its value as a
+ * background (C10 I33, C04 I85, C04 I89, C04 I90).
  *
  * **Each colour comes from the resolver its owner already has.** A `tone` goes
- * through `resolveTone` — the same call, the same memo, so two runs of one tone
- * are one reference and coalesce below — and *replaces* `style`, because a run
- * cannot be two tones. A `value` goes through `continuousColour` on the block's
+ * through `resolveTone`, while a `foreground` goes through the meaning-only
+ * `resolveForeground`; either *replaces* `style`, because a run cannot have two
+ * foreground owners. A `value` goes through `continuousColour` on the block's
  * map, so the ladder is the colormap's: `undefined` below 8-bit, and the run
  * then paints as its neighbours do and coalesces with them by reference — a
  * 4-bit frame is byte-identical with and without the value (C10 I31). The gate
@@ -69,7 +74,11 @@ export type RunContext = Readonly<{
  * arm is a total function's and not a branch anything reaches.
  */
 export function runStyle(run: Run, style: Style, ctx: RunContext): Style {
-  const base = run.tone === undefined ? style : resolveTone(run.tone, ctx.theme, ctx.capabilities);
+  const base = run.foreground !== undefined
+    ? resolveForeground(run.foreground, ctx.theme, ctx.capabilities)
+    : run.tone === undefined
+      ? style
+      : resolveTone(run.tone, ctx.theme, ctx.capabilities);
   const merged = withSpan(base, run.attrs);
   if (run.value === undefined || ctx.colormap === undefined) return merged;
   const map = COLORMAPS[ctx.colormap];

@@ -296,6 +296,8 @@ function plain(line: string): string {
 export type RenderOpts = Readonly<{
   /** Defaults to the truecolour, full-unicode record. */
   capabilities?: TerminalCapabilities;
+  /** Resolved theme to render with. Defaults to Calcium's shipped dark theme. */
+  theme?: ResolvedTheme;
   /** Keep SGR. Defaults to `false`, because a frame read by eye is a frame without escapes. */
   colour?: boolean;
 }>;
@@ -491,7 +493,7 @@ export function expectDocument(
     lines(width, opts = {}) {
       const caps = opts.capabilities ?? TRUECOLOUR;
       const drawn = renderSequenceToLines(registry, doc.blocks, width, {
-        theme: resolved,
+        theme: opts.theme ?? resolved,
         capabilities: caps,
       });
       return opts.colour === true ? drawn : drawn.map(plain);

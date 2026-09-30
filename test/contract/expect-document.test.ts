@@ -30,6 +30,7 @@ import { b } from "../../src/shell/builders/index.js";
 import type { AnyBlockDefinition } from "../../src/presentation/blocks/index.js";
 import { rows } from "../../src/presentation/blocks/paint.js";
 import { expectDocument, liveParts } from "../../src/testing/index.js";
+import { DARK_THEME, LIGHT_THEME } from "../support/render.js";
 import { producerContext, FULL_CAPABILITIES as FULL } from "../support/producer-context.js";
 import { CORPUS, doc } from "../support/blocks.js";
 
@@ -499,6 +500,16 @@ describe("lines() — a frame, and it is the production renderer (C24 I23, F126)
     const doc = docOf([b.notice.ok("done")]);
     expect(expectDocument(doc).lines(40).join("")).not.toContain("\u001b[");
     expect(expectDocument(doc).lines(40, { colour: true }).join("")).toContain("\u001b[");
+  });
+
+  it("T2.22a: a caller can select a resolved theme deterministically without changing the default", () => {
+    const doc = docOf([b.notice.ok("done")]);
+    const implicit = expectDocument(doc).lines(40, { colour: true });
+    const dark = expectDocument(doc).lines(40, { colour: true, theme: DARK_THEME });
+    const light = expectDocument(doc).lines(40, { colour: true, theme: LIGHT_THEME });
+    expect(implicit).toEqual(dark);
+    expect(light).not.toEqual(dark);
+    expect(light.join("")).toContain("\u001b[");
   });
 });
 

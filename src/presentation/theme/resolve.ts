@@ -16,6 +16,7 @@
  */
 
 import type { Tone } from "../../data/viewmodel/index.js";
+import { parseSpanForegroundRef } from "../../data/viewmodel/span-foreground.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { floorFor, isHex, ratio } from "./contrast.js";
 import { cubeHexOf, quantiseSet } from "./quantise.js";
@@ -238,6 +239,26 @@ export function validatePaintedFloors(tokens: ThemeTokens): readonly ThemeError[
   }
 
   return Object.freeze(errors);
+}
+
+/**
+ * Resolve a semantic span foreground without opening every theme palette to
+ * arbitrary text (C10 §4e).
+ *
+ * Only a palette explicitly declared to carry meaning is admitted. `surface`
+ * belongs to the background channel, decoration palettes intentionally have no
+ * one-bit meaning, and `syntax` remains reserved for code and patch renderers.
+ * Like `resolve`, this function is total: a missing or disallowed ref paints
+ * the empty style rather than failing a render.
+ */
+export function resolveForeground(ref: ColourRef, theme: ResolvedTheme, caps: Caps): Style {
+  const parts = parseSpanForegroundRef(ref);
+  if (parts === null) return NO_STYLE;
+  const [paletteName] = parts;
+  if (paletteName === "surface" || paletteName === "syntax") return NO_STYLE;
+  const palette = theme.tokens.palettes[paletteName];
+  if (palette?.carries !== "meaning") return NO_STYLE;
+  return resolve(ref, theme, caps);
 }
 
 /** The ergonomic form. `tone` is the overwhelmingly common case (§2). */

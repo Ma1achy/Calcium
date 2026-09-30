@@ -162,9 +162,6 @@ export type ThemeTokens = Readonly<{
  */
 export type ThemeSet = Readonly<Record<string, ThemeTokens>>;
 
-/** `"tone.ok"`, `"syntax.keyword"`, `"surface.bgElev"`. */
-export type ColourRef = `${string}.${string}`;
-
 /**
  * A colour with its depth named. C10 cannot write an escape — that is
  * `terminal/escapes.ts` alone — so it hands out a description, and the tag is
@@ -179,9 +176,9 @@ export type ColourRef = `${string}.${string}`;
  * that first declared it, and a duplicate of an identical shape is the
  * reimplemented-rule hazard rather than a second opinion.
  */
-import type { ColourValue } from "../../data/viewmodel/types.js";
+import type { ColourRef, ColourValue } from "../../data/viewmodel/types.js";
 
-export type { ColourValue };
+export type { ColourRef, ColourValue };
 
 export type Style = Readonly<{
   colour?: ColourValue;

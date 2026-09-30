@@ -296,6 +296,9 @@ export const ACTION_KINDS: ReadonlySet<Action["kind"]> = new Set<Action["kind"]>
 
 // --- spans ----------------------------------------------------------------
 
+/** A theme-owned palette slot such as `"tone.ok"` (C10). */
+export type ColourRef = `${string}.${string}`;
+
 /**
  * A styled run inside the text member it sits beside (§3am, I83–I88).
  *
@@ -304,8 +307,8 @@ export const ACTION_KINDS: ReadonlySet<Action["kind"]> = new Set<Action["kind"]>
  * already use, and the one JSON carries without a second index. Half-open:
  * `[from, to)`, `from < to`, sorted by `from`, no two overlapping (I84).
  *
- * **Three attributes, a tone and a value; no colour, `dim` or `inverse`** (I85,
- * I89, I90). The attributes are appearance a renderer sets from the span.
+ * **Five attributes, semantic foreground owners and a value; no literal colour**
+ * (I85, I89, I90). The attributes are appearance a renderer sets from the span.
  * `tone` names a palette slot exactly as `Cell.tone` does and resolves through
  * C10 for the run alone — its consumer is markdown's inline code, which
  * admitted it on 2026-09-04. `value` is a number in `[0, 1]` the renderer maps
@@ -326,8 +329,12 @@ export type TextSpan = Readonly<{
   from: number;
   to: number;
   bold?: boolean;
+  dim?: boolean;
   italic?: boolean;
+  inverse?: boolean;
   underline?: boolean;
+  /** A meaning-carrying theme slot for this run; never a literal colour (I85). */
+  foreground?: ColourRef;
   /** A palette slot for the run, resolved by C10; replaces the block's tone inside the span (I89). */
   tone?: Tone;
   /** A reading in `[0, 1]`, mapped through the block's `colormap` (I90). Refused where the block has none. */
@@ -343,8 +350,21 @@ export type TextSpan = Readonly<{
   ramp?: Ramp;
 }>;
 
-/** The members of a span, for a gate that cannot silently take a tenth (I85) — the eighth, `elide`, arrived with I105 and the ninth, `ramp`, with I107. */
-export const TEXT_SPAN_KEYS: ReadonlySet<string> = new Set(["from", "to", "bold", "italic", "underline", "tone", "value", "elide", "ramp"]);
+/** The members of a span, for a gate that cannot silently widen (I85). */
+export const TEXT_SPAN_KEYS: ReadonlySet<string> = new Set([
+  "from",
+  "to",
+  "bold",
+  "dim",
+  "italic",
+  "inverse",
+  "underline",
+  "foreground",
+  "tone",
+  "value",
+  "elide",
+  "ramp",
+]);
 
 // --- ramps ----------------------------------------------------------------
 

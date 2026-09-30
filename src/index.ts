@@ -151,6 +151,7 @@ export type {
   Tone,
   ViewDocument,
   ViewPatch,
+  TextSpan,
 } from "./data/viewmodel/index.js";
 
 /**

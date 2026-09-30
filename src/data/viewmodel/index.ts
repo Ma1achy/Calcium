@@ -43,6 +43,7 @@ export type {
   Notice,
   Panel,
   Image,
+  ColourRef,
   Terminal,
   TerminalLine,
   TerminalRun,

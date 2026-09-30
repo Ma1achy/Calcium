@@ -68,7 +68,7 @@ export type {
 export type {
   Block, Rule, Notice, KeyValue, Table, TableRow, Cell, Steps, Logs, Events,
   Plot, PlotForm, Camera, Series, Progress, Code, Comparison, Patch, Hunk, Pills, Tip, Panel, Group, Raw,
-  Tone, Glyph, Action, ErrorLike, ViewDocument, ViewPatch,
+  Tone, Glyph, Action, ErrorLike, TextSpan, ViewDocument, ViewPatch,
 };
 
 // builders — §4
