@@ -212,8 +212,8 @@ const results = runPass({
     {
       name: "teardown: release on settle *and* on the arrival of a newer entry",
       file: "src/shell/refresh.ts",
-      from: "    if (change.kind === \"settle\") release({ kind: \"entry\", id: change.id });",
-      to: "    if (change.kind === \"settle\" || change.kind === \"append\") hosts.clear();",
+      from: "    if (change.kind === \"settle\") {\n      release({ kind: \"entry\", id: change.id });",
+      to: "    if (change.kind === \"settle\" || change.kind === \"append\") {\n      hosts.clear();",
       expect: "T2.21",
     },
     {

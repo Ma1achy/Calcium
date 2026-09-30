@@ -30,7 +30,7 @@ import type { Exit } from "../data/process/types.js";
 import type { Block, ViewDocument } from "../data/viewmodel/index.js";
 import { approvalPrompt, blockId, callHead, callStatus, cancelledCard, cancelledDoc, cardOver, completeLocal, compose, DENY_KEY, errorDoc, noticeDoc, refusalNotice, toolCallDoc, usageDoc } from "./documents.js";
 import { createActionDispatcher } from "./actions.js";
-import { createRefreshDriver } from "./refresh.js";
+import { createRefreshDriver, STALL_BLOCK } from "./refresh.js";
 import type { ProducerContext } from "../data/adapters/types.js";
 import { overflowNotice, withOverflowNotice } from "../data/adapters/overflow.js";
 import { cancelledNotice, exitCodeOf } from "../data/adapters/mapping.js";
@@ -1072,12 +1072,15 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       //
       // **No code and no signal is not `exited 1`** (ruling 94, F1482): C21 I13
       // settles a child that never started that way, and `code ?? 1` named an
-      // exit it never returned. It is still a failure.
+      // exit it never returned. It is still a failure, and it says what
+      // happened (ruling 100 c, F1511): a spawn failure is the only producer of
+      // `{null, null}` on every C21 arm, so *ended without an exit status*
+      // described an ending none of them reaches.
       const text =
         exit.signal !== null
           ? `${label} ended on ${exit.signal}`
           : exit.code === null
-            ? `${label} ended without an exit status`
+            ? `${label} did not start`
             : exit.code === 0
               ? `${label} finished`
               : `${label} exited ${String(exit.code)}`;
@@ -1380,8 +1383,43 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
      */
     const settleCancelled = (): void => {
       const held = deps.transcript.entries.find((e) => e.id === pendingId)?.doc;
-      if (held === undefined) deps.transcript.settle(pendingId);
-      else deps.transcript.settle(pendingId, cancelledCard(held));
+      if (held === undefined) {
+        deps.transcript.settle(pendingId);
+        deps.history.append(line, 130);
+        return;
+      }
+      // **The stall row is left out** (ruling 100 d): a stall is a condition of a
+      // live entry, and this document is the shell's to compose, so the settle
+      // replaces the view and nothing is deleted. `refresh.settled` is not
+      // called — its *resumed after* would be false for a cancel — and the
+      // watch ends on the settle change regardless (I102).
+      const doc = cancelledCard({ ...held, blocks: held.blocks.filter((blk) => blk.id !== STALL_BLOCK) });
+      deps.transcript.settle(pendingId, doc);
+      recordHistory(line, doc); // I29, I101 — the code the document carries.
+    };
+
+    /**
+     * **Every settlement that keeps the card carries its code** (I101, ruling
+     * 100). The card as it stands, with `code` in its `meta`, and C20 records
+     * from that document, so the entry and the record cannot say two things.
+     * They did on four routes: a stream's own ending recorded nothing (F1508),
+     * and a denial settled at 0 while C20 was told 126 (F1510).
+     *
+     * `settle(id)` when the card already carries the code: C13 I13 moves `rev`
+     * only when the document changed, and a stream ending at 0 over a card
+     * that says 0 did not.
+     */
+    const settleKept = (code: number): void => {
+      const held = deps.transcript.entries.find((e) => e.id === pendingId)?.doc;
+      if (held === undefined) {
+        // Cleared underneath: nothing to settle into, and the line was still typed.
+        deps.transcript.settle(pendingId);
+        deps.history.append(line, code);
+        return;
+      }
+      const doc = held.meta.exitCode === code ? held : { ...held, meta: { ...held.meta, exitCode: code } };
+      deps.transcript.settle(pendingId, doc === held ? undefined : doc);
+      recordHistory(line, doc);
     };
 
     // **A call that needs a decision waits for it** (I60, §8f P10, P12, §8g rows
@@ -1411,10 +1449,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         refresh.settled(pendingId);
         // A withdrawal is a cancel (I98); a denial and an expiry are not, and
         // keep the card alone.
+        // 130 for a withdrawal, as `cancelThis` records one; 126 otherwise, in
+        // the document as in C20 (I101, ruling 100 a) — the status stays `ok`.
         if (answer.outcome === "cancelled") settleCancelled();
-        else deps.transcript.settle(pendingId);
-        // 130 for a withdrawal, as `cancelThis` records one; 126 otherwise.
-        deps.history.append(line, answer.outcome === "cancelled" ? 130 : 126);
+        else settleKept(126);
         deps.scheduler.commit("completion");
         guard.release();
         return;
@@ -1450,11 +1488,11 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // I54 — the card survives a cancel (I98 keeps it inside the document), so
       // the header says what happened to it. §8f P5.
       finishCard("cancelled");
-      settleCancelled();
       // I29 — the streaming route settles here rather than through
       // `appendAndCommit`, so these are the settlements the funnel does not
-      // reach. A cancellation is a settlement and carries its own code.
-      deps.history.append(line, 130);
+      // reach. A cancellation is a settlement and carries its own code, which
+      // `settleCancelled` records from the document it settles.
+      settleCancelled();
       deps.scheduler.commit("completion");
     };
     cancelInFlight = cancelThis;
@@ -1489,7 +1527,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         // run for a subscription that had already finished.
         liveStreams.push({ id: pendingId, cancel: cancelThis });
         try {
-          await streamInto(pendingId, displayed, verb, transport.stream(invocation), result.validation.ok ? result.validation.args : {}, finishCard, controller.signal);
+          await streamInto(pendingId, displayed, verb, transport.stream(invocation), result.validation.ok ? result.validation.args : {}, finishCard, settleKept, controller.signal);
         } finally {
           forgetStream(pendingId);
         }
@@ -1590,10 +1628,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     /**
      * Writes the card's verdict into its header (C23 I54). Called on every
      * ending of this route **before** the settle that ends it, because each of
-     * them is a `settle(id)` that keeps the card, and the settle change is what
+     * them keeps the card (`settleKept`, below), and the settle change is what
      * persistence writes (§8f P3, P8).
      */
     finishCard: (outcome: string) => void,
+    /**
+     * Settles the card with the code the entry ended with, and records it
+     * (I101, F1508). Every ending of this route but the cancel came through a
+     * bare `settle(id)` and none of them reached C20.
+     */
+    settleKept: (code: number) => void,
     /**
      * The invocation's own, so a cancel is visible here (I99). `cancelThis` has
      * settled the entry by the time the far side's `end` arrives — a subprocess
@@ -1635,11 +1679,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           // such — `exit 1` — not as a claim about what it was following. **A
           // zero is no outcome** (I59): the head reads `verb · 4s` and the tone
           // carries the verdict; `exit 0` was `ok` with a number on it.
-          finishCard(patch.result.exitCode === 0 ? "" : `exit ${String(patch.result.exitCode)}`);
+          //
+          // **One number for the head and the record** (I101): C07 I14's table,
+          // so a stream a signal ended reads `exit 137` where it read
+          // `exit null` over `succeeded`.
+          const code = exitCodeOf(patch.result);
+          finishCard(code === 0 ? "" : `exit ${String(code)}`);
           // C23 I8 — settlement flushes at `"completion"`. §8a A4: settling
           // clears the stall state, so a notice does not outlive its condition.
           refresh.settled(id);
-          deps.transcript.settle(id);
+          settleKept(code);
           deps.scheduler.commit("completion");
           return;
         }
@@ -1688,7 +1737,9 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
             block: callStatus("error", `output truncated: ${outcome.error.message}`, { id: blockId("truncated") }),
           });
           finishCard("truncated"); // I54, §8f P8 — the box carries the why
-          deps.transcript.settle(id);
+          // I101 — 1, I100's code for a failure whose own is unknown: the
+          // stream stops here, before any `end` could say how the child ended.
+          settleKept(1);
           deps.scheduler.commit("completion");
           return;
         }
@@ -1707,7 +1758,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         block: callStatus("error", `stream failed: ${String(cause)}`, { id: blockId("stream-error") }),
       });
       finishCard("failed"); // I54, §8f P8
-      deps.transcript.settle(id);
+      settleKept(1); // I101 — the transport failed, as the invoke arm's throw carries 1
       deps.scheduler.commit("completion");
     }
   };

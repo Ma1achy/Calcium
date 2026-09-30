@@ -61,8 +61,8 @@ const results = runPass({
       // **What shipped** (F1490): the card settled with no document.
       name: "T6.114: the cancel's settle carries no document",
       file: EXECUTION,
-      from: "else deps.transcript.settle(pendingId, cancelledCard(held));",
-      to: "else deps.transcript.settle(pendingId);",
+      from: "deps.transcript.settle(pendingId, doc);",
+      to: "deps.transcript.settle(pendingId);",
       expect: "T4.97",
     },
     {
@@ -84,8 +84,10 @@ const results = runPass({
       // One source of three: the withdrawal is its own branch, not `cancelThis`.
       name: "T6.114: the withdrawn approval settles with no document",
       file: EXECUTION,
-      from: 'if (answer.outcome === "cancelled") settleCancelled();\n        else deps.transcript.settle(pendingId);',
-      to: "deps.transcript.settle(pendingId);",
+      // Since ruling 100 the kept card carries its code: this settles the card
+      // at 130 with no cancel document, which is the defect with the record fixed.
+      from: 'if (answer.outcome === "cancelled") settleCancelled();\n        else settleKept(126);',
+      to: 'settleKept(answer.outcome === "cancelled" ? 130 : 126);',
       expect: "T4.97",
     },
     {

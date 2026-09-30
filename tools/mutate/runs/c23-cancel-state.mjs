@@ -128,7 +128,7 @@ const results = runPass({
       // **What shipped** (F1482): an exit the child never returned.
       name: "T6.113: the no-status text put back to exited 1",
       file: EXECUTION,
-      from: "? `${label} ended without an exit status`",
+      from: "? `${label} did not start`",
       to: "? `${label} exited 1`",
       expect: "T4.93",
     },

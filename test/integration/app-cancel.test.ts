@@ -16,9 +16,9 @@ import type { RawPatch, RawResult } from "../../src/data/transport/index.js";
 
 type Harness = ReturnType<typeof pipelineHarness>;
 
-/** A stream the row feeds by hand; `end` is the far side's last word. */
-function heldStream(): { stream: () => AsyncIterable<RawPatch>; push: (p: RawPatch) => void } {
-  const queue: RawPatch[] = [];
+/** A stream the row feeds by hand; `end` is the far side's last word, and `fail` throws from the loop. */
+function heldStream(): { stream: () => AsyncIterable<RawPatch>; push: (p: RawPatch) => void; fail: (e: Error) => void } {
+  const queue: (RawPatch | Error)[] = [];
   let wake: (() => void) | null = null;
   return {
     stream: () =>
@@ -32,6 +32,7 @@ function heldStream(): { stream: () => AsyncIterable<RawPatch>; push: (p: RawPat
             wake = null;
             continue;
           }
+          if (next instanceof Error) throw next;
           yield next;
           if (next.kind === "end") return;
         }
@@ -40,8 +41,28 @@ function heldStream(): { stream: () => AsyncIterable<RawPatch>; push: (p: RawPat
       queue.push(p);
       wake?.();
     },
+    fail: (e) => {
+      queue.push(e);
+      wake?.();
+    },
   };
 }
+
+/** One-second wakes, as the session's clock gives them. */
+const seconds = (h: Harness, n: number): void => {
+  for (let i = 0; i < n; i += 1) h.tick(1_000);
+};
+
+/** The entry's blocks in order: ids, and a notice's text where it is not the head. */
+const blocksOf = (h: Harness): string =>
+  (h.transcript.entries[0]?.doc.blocks ?? [])
+    // The shell's ids end in a module-wide counter, so the count is dropped:
+    // what the row reads is which blocks, in what order.
+    .map((blk, i) => {
+      const id = blk.id.replace(/-\d+$/u, "");
+      return i > 0 && blk.kind === "notice" ? `${id}: ${blk.text}` : id;
+    })
+    .join(" · ");
 
 /** One appended `raw` per data patch, numbered so the body's ids are visible. */
 function appender(): () => { op: "append"; block: ReturnType<typeof b.raw> } {
@@ -241,10 +262,97 @@ describe("C23 I98, I99 — the app route's cancel", () => {
     );
   });
 
-  it.todo(
-    "T4.103 (C23 I98, ruling 100 d, F1509): a cancel's document leaves the stall row out, on a stream and on an invocation — not deferred on a component: lands with the F1509 code commit of review batch 4",
-  );
-  it.todo(
-    "T4.104 (C23 I102, F1509): no stall row lands on an entry after it settles — not deferred on a component: lands with the F1509 code commit of review batch 4",
-  );
+  it("T4.103 (C23 I98, ruling 100 d, F1509): a cancel's document leaves the stall row out, on a stream and on an invocation", async () => {
+    // **Measured first that the row is the document's** (§8a A6.10): the stall
+    // notice is a block `refresh.ts` patches into the entry, id `stall-notice`,
+    // so the document the shell composes is where it has to be left out.
+    const seen: string[] = [];
+
+    const held = heldStream();
+    const streamed = pipelineHarness({ stream: held.stream, adaptPatch: appender() });
+    streamed.pipeline.submit("/tail web.log");
+    await settled();
+    held.push({ kind: "data", value: {} });
+    await settled();
+    seconds(streamed, 121);
+    // **The fixture responds** (test/support/README.md): the row is there to be left out.
+    expect(blocksOf(streamed), "stalled, before the cancel").toBe("call · o1 · stall-notice: no output for 2m");
+    streamed.pipeline.cancelNewestStream();
+    await settled();
+    seen.push(`stream: ${blocksOf(streamed)}`);
+
+    const invoked = pipelineHarness({ invoke: () => new Promise<RawResult>(() => undefined) });
+    invoked.pipeline.submit("/ps");
+    await settled();
+    seconds(invoked, 121);
+    expect(blocksOf(invoked), "stalled, before the cancel").toBe("call · stall-notice: no output for 2m");
+    invoked.pipeline.cancel();
+    await settled();
+    seen.push(`⌃c: ${blocksOf(invoked)}`);
+
+    expect(seen).toEqual([
+      "stream: call · o1 · cancelled: Cancelled.",
+      "⌃c: call · cancelled: Cancelled.",
+    ]);
+  });
+
+  it("T4.104 (C23 I102, F1509): no stall row lands on an entry after it settles, on any route", async () => {
+    // **Each settled inside three seconds, then three minutes pass** (§8a A6.10
+    // rows 3–5). A `"shell"` patch lands on a settled entry (C13 §6), so a watch
+    // that outlived the settle appended `no output for 2m` under the ending.
+    const seen: string[] = [];
+    const after = async (route: string, h: Harness): Promise<void> => {
+      await settled();
+      const final = h.transcript.entries[0]?.doc;
+      seconds(h, 180);
+      seen.push(`${route}: ${String(h.transcript.entries[0]?.doc === final)} · ${blocksOf(h)}`);
+    };
+
+    const invoked = pipelineHarness({ invoke: () => new Promise<RawResult>(() => undefined) });
+    invoked.pipeline.submit("/ps");
+    await settled();
+    seconds(invoked, 2);
+    invoked.pipeline.cancel();
+    await after("⌃c", invoked);
+
+    const cancelled = heldStream();
+    const c = pipelineHarness({ stream: cancelled.stream, adaptPatch: appender() });
+    c.pipeline.submit("/tail web.log");
+    await settled();
+    seconds(c, 2);
+    c.pipeline.cancelNewestStream();
+    await after("stream cancelled", c);
+
+    const bad = heldStream();
+    const m = pipelineHarness({ stream: bad.stream, adaptPatch: () => ({ op: "replace", blockId: "absent", block: b.raw("x", { id: "x" }) }) });
+    m.pipeline.submit("/tail web.log");
+    await settled();
+    seconds(m, 2);
+    bad.push({ kind: "data", value: {} });
+    await after("malformed patch", m);
+
+    const thrown = heldStream();
+    const t = pipelineHarness({ stream: thrown.stream, adaptPatch: appender() });
+    t.pipeline.submit("/tail web.log");
+    await settled();
+    seconds(t, 2);
+    thrown.fail(new Error("pipe closed"));
+    await after("stream throws", t);
+
+    // **The control**: a stream still running over the same three minutes gains the row.
+    const live = heldStream();
+    const l = pipelineHarness({ stream: live.stream, adaptPatch: appender() });
+    l.pipeline.submit("/tail web.log");
+    await settled();
+    seconds(l, 182);
+    seen.push(`still running: ${blocksOf(l)}`);
+
+    expect(seen).toEqual([
+      "⌃c: true · call · cancelled: Cancelled.",
+      "stream cancelled: true · call · cancelled: Cancelled.",
+      "malformed patch: true · call · truncated",
+      "stream throws: true · call · stream-error",
+      "still running: call · stall-notice: no output for 2m",
+    ]);
+  });
 });

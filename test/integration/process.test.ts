@@ -314,7 +314,7 @@ describe("C21 with C06", () => {
     expect(seen).toEqual([
       "exit 0: muted continuation ok · vim finished",
       "exited 1: error error error · vim exited 1",
-      "never started: error error error · vim ended without an exit status",
+      "never started: error error error · vim did not start",
       "exited 130: error error error · vim exited 130",
       "SIGKILL: error error error · vim ended on SIGKILL",
       "SIGQUIT: error error error · vim ended on SIGQUIT",

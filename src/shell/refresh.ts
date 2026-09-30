@@ -39,8 +39,12 @@ export const STALL_MS = 120_000;
 /** C23 §3b — a failing refresh doubles from its interval to here (C23 I21). */
 export const BACKOFF_CAP_MS = 300_000;
 
-/** The block id a stall notice always uses, so it can be found and removed. */
-const STALL_BLOCK = "stall-notice";
+/**
+ * The block id a stall notice always uses, so it can be found and replaced —
+ * and left out of a cancel's document, which the shell composes (C23 I98,
+ * ruling 100 d).
+ */
+export const STALL_BLOCK = "stall-notice";
 
 export type ViewRefresh = Readonly<{
   /** Which part — never which host. The host is `declare`'s argument (C23 I32). */
@@ -1370,7 +1374,18 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
    * listens for exactly this.
    */
   const watchHosts = deps.transcript.subscribe((change) => {
-    if (change.kind === "settle") release({ kind: "entry", id: change.id });
+    if (change.kind === "settle") {
+      release({ kind: "entry", id: change.id });
+      // **The stall watch ends here too** (C23 I102, F1509). `settled` was the
+      // only thing that ended it, and a cancel, a malformed patch and a stream
+      // throw settle without calling it — so two minutes later a `"shell"`
+      // patch, which C13 admits on a settled entry, appended `no output for 2m`
+      // under the ending (§8a A6.10 rows 3–5). Not in `release`, which the
+      // sweep also calls for a host with nothing left to refresh while its
+      // entry still streams. Dropped without `resolveStall`: a settle that
+      // wanted *resumed after* called `settled` before it.
+      watched.delete(change.id);
+    }
     else if (change.kind === "evict") {
       for (const id of change.ids) release({ kind: "entry", id });
     } else if (change.kind === "clear") {
