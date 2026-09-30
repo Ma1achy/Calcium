@@ -201,6 +201,10 @@ describe("C22 §6b — the write is a difference", () => {
     );
   });
 
+  it.todo(
+    "C19 T4.12 (I23, entry 16, ruling 90, F1489): the truncated menu's indicator is on the screen, and the menu closes on the prompt's rule — not deferred on a component: the T4.34 row below is retitled to it in the next commit, F1489",
+  );
+
   it("T4.34 (C19 I23, entry 16, ruling 90): the truncated menu's indicator is on the screen, and the menu closes on the prompt's rule", async () => {
     // **Through the real wiring, because that is where it was missing.** The
     // window and the remainder are both unit-tested and both were right; what
