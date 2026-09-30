@@ -43,7 +43,7 @@ type change.
 | **12** | [**A time-based assertion under contention**](#12) | 26 | **7 open** | — | **new at F80** · Calcium's own suite · **F877 is the first that repairs an instrument rather than recording a reading** |
 | **13** | [Text the framework emits](#13) | 26 | **5 open** · 2 unread | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 59 | **5 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
-| — | [Singles](#singles) | 165 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
+| — | [Singles](#singles) | 168 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
 
 **Four groups are new since F55** — 9, 10, 12, and F81's arrival in 4. Group 9 is the one
 that changes the picture, and it is the only group whose subject is the apparatus rather
@@ -2888,7 +2888,13 @@ written as one. Every member reads as deliberate, which is why none was found by
 
 **F1093** — **a budget written to widen a five-second default became a narrowing when the default went to thirty.** C12 T2.1 sweeps twelve fuzz corpora across every width from one to two hundred through three rasteriser entry points, one corpus being a hundred thousand points, and it carries the only hand-written row timeout in the tree with a comment defending it: *an explicit budget, because 3.2 s against a 5 s default is not a margin … twenty seconds says the seconds are expected*. Every sentence of that is right and the number it produced now does the opposite of what it was for, because `vitest.config.ts` set `testTimeout` to thirty thousand on 2026-08-22 — so the override stopped being a widening of five and became **a third off** the limit the row would otherwise have had, in a file whose comment says the row exists because the default was too small. Measured: the row is **6936 ms** in the devcontainer and **20960 ms** on the runner, against its explicit twenty thousand and a global thirty. **It would have passed on the default it was written to escape** — the failure is the override, not the runner and not the row. **The population is exactly one**: swept over `test/`, every other explicit row timeout is at or above the global, almost all of them in tier five where a real PTY needs its own budget, and four candidates that looked sub-global on a first pass are not row timeouts at all — two arguments to `waitForFrame`, one to `elapsedNeeded`, one an assertion bound. **F967's class, third instance in a day, and the first that is a number rather than prose**: a stale sentence misleads a reader, a stale number fails the build on the one machine that was not available to disagree when it was written. **And the direction is the surprise** — an override reads as *more room*, this one is less, and nothing in the syntax says so; twenty thousand beside a comment about a five-second default reads as generous at every glance. **Open** — `CORPUS_BUDGET_MS`, which is what the row is in `budget.ts`'s own taxonomy, sixty seconds against a runner figure of twenty-one; the number leaves the file so the next regime change moves it once, and the comment keeps its argument and gains the measurement the argument was missing · **Closed** — and the one way this repair could fail silently is the constant not being read, a wrong argument position leaving the row on the global and green, which is indistinguishable from the fix working. Driven rather than assumed: with the constant set to one the row fails with `Test timed out in 1ms`, and `budget.ts` was restored from a copy with its md5 compared. The row runs in two thousand three hundred and nine milliseconds alone and six thousand nine hundred and thirty-six inside the suite, against sixty thousand
 
-## Singles — one consumer each — **29 open** · 122 closed · 14 with no verdict
+## Singles — one consumer each — **28 open** · 126 closed · 14 with no verdict
+
+**F1523** — **C22 T1.175's spec row and its test described different regions** · **Closed** — 01916624: the row rewritten to the figures its test drives (24 rows, 9)
+
+**F1522** — **§101's header draws the chip's name on `pick`, and no block can** · **Open** — owed: a ground on a span, or a kind that draws a chip as the prompt does
+
+**F1521** — **no chip reaches the transcript, so §101's transcript half has nothing to stand beside** · **Open** — ruling 104(c): the echo keeps its chips, drawn as the prompt draws them, with the content as the peek
 
 **F1520** — **a waiting approval is said to have gone quiet** · **Open** — ruling 103(d): the stall watch arms with the readout, on approval, not at dispatch
 
@@ -2918,11 +2924,11 @@ written as one. Every member reads as deliberate, which is why none was found by
 
 **F1504** — **the release notes call types exported that no package entry reaches** · **Open** — owed: CHANGELOG c007d8ef's `WatchItem`/`WatchRowState` claim corrected, MIGRATION §2's rows measured for reachability, and a check that a name the notes call exported resolves in `dist/`
 
-**F1503** — **the chip preview is a bordered box, not §101's panel** · **Open** — owed: the preview drawn as a menu panel between two rules, with §101's keys; lane b4-panels
+**F1503** — **the chip preview is a bordered box, not §101's panel** · **Closed** — C22 I113, I143 (01916624, a5b93d0b, 337f3763): the preview is a rule, a header, the box and a key row that sheds whole entries; the cut corner was I143's cap missing the residue row; T1.175, T1.185, `c22-chip-preview.mjs` 11 of 11 (ruling 104 b)
 
-**F1502** — **find draws no upper rule, declares its width, and cuts its hit** · **Open** — owed: `searchLayer` takes the menu's upper rule and drops its `width`; lane b4-panels
+**F1502** — **find draws no upper rule, declares its width, and cuts its hit** · **Closed** — C20 I30 (01916624, a5b93d0b): find opens with an empty rule, declares no `width` and puts the caret on row 1, so the hit is drawn whole; T1.21, T4.9
 
-**F1501** — **no panel paints `bgElev`** · **Open** — owed: a layer-level panel ground (C15 field, C22 compositor paint); lane b4-panels
+**F1501** — **no panel paints `bgElev`** · **Closed** — C22 I151 (01916624 spec, a5b93d0b code): the compositor paints `surface.bgElev` behind a panel layer's rows except its leading rules; T1.184, T4.121, `c22-panels.mjs` 11 of 11 by the named row (ruling 104 a)
 
 **F1500** — **639 titled rows name an id no spec declares** · **Open** — owed: resolve the population, or state why SP16 counts it rather than gating it
 

@@ -118,6 +118,10 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
   was an `error` document with an error box and `error.code: "CANCELLED"`. The code is gone;
   `meta.exitCode` is still 130. Queued lines cleared by Ctrl-C settle the same way, with
   `⊘ cancelled before it ran`, where they were a `▲` warning on an `ok` document.
+- **The completion menu, reverse search and a chip's preview draw as one kind of panel** (a5b93d0b,
+  337f3763, ruling 104, C22 I151, C20 I30). Each floats between two rules on the theme's elevated ground.
+  Reverse search spans the width and shows its match whole, where a match longer than the empty
+  query was cut. A chip's preview lost its box border and gained a header row and a key row.
 - **An app-route cancel settles `partial`, keeping the card** (13abac71, ruling 97, C23 I98). `⌃c`
   over an invocation or a stream, or an approval its asker withdrew, leaves the head reading
   `cancelled`, what had streamed, and `⊘ Cancelled.` beneath, with `meta.exitCode` 130, where it

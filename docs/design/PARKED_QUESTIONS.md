@@ -1296,6 +1296,12 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1501, F1503, F1521). **Three rulings for the transient panels. Lane b4-panels took the first two and they are adopted as its rulings.** (a) **A transient panel's rows take `surface.bgElev`, and its edges stay on the page's ground.** The edges are its own upper rule and the prompt's rule. The compositor paints the ground from the layer's kind, so the completion menu, find and the chip preview take it alike. §097's picture and R-BLK-569/628 agree, and §101's specimen, which draws its content rows ungrounded, is outvoted (tie-break 2). A peek and an overlay take no ground. (b) **Where §101's hint row and the registry's `preview.*` bindings disagree, the bindings decide** (tie-break 1): `⌥⇧↑⌥⇧↓ scroll` and `⌥o open in editor`, and `⏎` sends. `←→ other chips` is drawn from the prompt's own bindings, and only while the prompt holds another chip, so it names a key that works. (c) **The echo of a submitted line keeps its chips.** §101 names two places a chip previews, and one of them is *focus in the TRANSCRIPT — a PEEK, anchored BESIDE the element*. That can only be true if the chip is an element there. Today the echo is the resolved text, so a 200-line paste echoes 200 lines and no element carries it. The echo draws the chip's label as the prompt does, and the chip's content is what its peek shows. What the application receives is unchanged: the resolved text.
+
+**104 · RULED — The panels' ground and keys, and whether a chip survives submission.** Lane b4-panels built the ground and the preview's keys, and found that no chip reaches the transcript, so §101's transcript half had nothing to stand beside (F1521).
+
+---
+
 ## Not yet recovered
 
 The gap between the entries and the running count in the per-MR reports was chased and closed: some questions had been counted twice. The list is the count. **No total is stated here in prose**, because the one that used to be here said *sixteen* long after that stopped being true — this file's own subject, arriving inside it.

@@ -58029,6 +58029,8 @@ Found by lane b4-menu2 at 3ed61fde's survey. R-BLK-569 (*a panel takes bgElev*) 
 
 **Owed**: a ground for the panel layer, through the theme's surface. Every golden with a panel moves.
 
+**Closed** by lane b4-panels (01916624 spec; a5b93d0b, 337f3763 code; C22 I151). `panelGround` in `composite.ts` paints `surface.bgElev` through `based` behind every line of a `kind: "panel"` layer except its leading `rule` lines, so the menu's `pick` row keeps its own ground. Measured at 80×24 on `dark`: the non-current menu rows, find's line and every preview row take bg 235 at 8 bits; the edges take none; and the rows above each panel's edge are the frame from before it opened, cell for cell (T4.121). 1-bit and a theme that inherits `bgElev` write nothing (T1.184). **No golden records a panel's ground**; T4.121 is the only row that sees it.
+
 ## F1502 — find draws no upper rule, declares its width, and cuts its hit ★★★☆☆
 
 Found by lane b4-menu2 at 3ed61fde's survey at 80×24, with history `/help`, `/history`, `/clear`, then `⌃r h`:
@@ -58043,6 +58045,8 @@ Found by lane b4-menu2 at 3ed61fde's survey at 80×24, with history `/help`, `/h
 There is no rule above the panel, and §097 warns that without it a panel reads as transcript content. Its hit is cut to `/h…`. It still declares `width: cells(line) + 4`, the declaration C19's menu gave up (*the menu spans the region*).
 
 **Owed**: the upper rule, the region's width, and a hit drawn whole where it fits.
+
+**Closed** by lane b4-panels (01916624, a5b93d0b, C20 I30). **The premise was corrected**: the hit was cut not by the width declaration as such but by when it was taken. It was taken at the push, from the empty query (27 cells), and never again, because `refreshSearchLayer` updates only `content` and `cursor`. `his` over `/history` drew `…` alone. Find now opens with an empty rule, spans the region, and draws its hit whole.
 
 ## F1503 — the chip preview is a bordered box, not §101's panel ★★★☆☆
 
@@ -58061,6 +58065,8 @@ Found by lane b4-menu2 at 3ed61fde's survey, after a six-line paste then `←`:
 It is a `panel` block's border with no bottom corner. §101 draws a menu panel between two rules: a header row, the content with a scrollbar, and a hint row. §101's hints also differ: `↑↓ scroll  ⏎ open in the editor  ←→ other chips`.
 
 **Owed**: the preview as a menu-style panel. Where its keys disagree with the registry's `preview.*` bindings (C22 I143), the registry decides.
+
+**Closed** by lane b4-panels (01916624, a5b93d0b, 337f3763; C22 I113, I143). The preview is the upper rule, a header (the chip's label, the name bold and the size muted), the box, and a muted key row. **The premise was corrected**: the missing bottom corner was a cut, not a style. I143's `floor(h/2) − 3` counted two borders and not the box's residue row, so at a 17-row region nine rows met a placement of eight. The keys follow the registry (ruling 104 b). A frame read after the build found the ASCII key row at 60 columns cut to `oth~`; it now sheds whole entries, and a change of width rebuilds the preview (T1.185).
 
 ## F1504 — the release notes call types exported that no package entry reaches ★★☆☆☆
 
@@ -58172,3 +58178,21 @@ Found by lane b4-exec4 (C23 §8a A6.10 row 6). Ruling 100(d) dropped `stall-noti
 Found by lane b4-exec4 (C23 §8a A6.10 row 7). The stall watch is armed at dispatch, and the readout only on approval. A question left open for three minutes reads `ps · ⠋ waiting` over `no output for 2m`, and a denial then rewrites the row as `resumed after`. The entry was waiting on the user, not on output.
 
 **Ruled (103 d).**
+
+## F1521 — no chip reaches the transcript, so §101's transcript half has nothing to stand beside ★★★☆☆
+
+Found by lane b4-panels while measuring F1503's other focus. A submitted line echoes its resolved text (C17 `resolved`), so a six-line paste appears in the transcript as six lines, a 200-line paste as 200, and no element carries the chip. §101's *focus in the TRANSCRIPT — a PEEK beside the element* is the general peek (§6l.12), and here it has no element to stand beside.
+
+**Ruled (104 c):** the echo keeps its chips. **Owed**: the echo draws each chip's label as the prompt does, and its content is what the peek shows; the application still receives the resolved text.
+
+## F1522 — §101's header draws the chip's name on `pick`, and no block can ★☆☆☆☆
+
+Found by lane b4-panels. `Raw` spans carry a tone and no ground (C04 I89), so the preview's header draws the label bold with its size muted, on the panel's `bgElev`, and not on §101's `pick`. C22 §6s.5 records it. Ruling 104(c) will want the same drawing for a chip in the transcript echo.
+
+**Owed**: a ground on a span, or a block kind that draws a chip as the prompt does.
+
+## F1523 — C22 T1.175's spec row and its test described different regions ★☆☆☆☆
+
+Found by lane b4-panels. The row said a 20-row region and 7 rows. The test drove 24 and asserted 9. Both agreed with the formula, so neither was wrong on its own terms, and nothing compared them.
+
+**Closed** in 01916624: the row now states the figures its test drives.
