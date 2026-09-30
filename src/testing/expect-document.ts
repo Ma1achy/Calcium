@@ -168,8 +168,8 @@ function carriesMeaningColour(value: unknown): boolean {
  * subtree was never read. The reason named a mechanism this file does not have.
  *
  * It did not fail silently, which is the half worth keeping and the half that
- * made it visible: `carriesATone` is deep, so F102's guard fired on a
- * *descendant's* tone. What that produced was a **false refusal** — a `scroll`
+ * made it visible: `carriesMeaningColour` is deep, so F102's guard fired on a
+ * *descendant's* colour. What that produced was a **false refusal** — a `scroll`
  * holding a properly toned notice, text and all, could not be swept at all —
  * and, on a real offence, the container named where the offender should be.
  *
@@ -187,14 +187,15 @@ const CONTAINER_PREMISE: ReadonlyMap<BlockKind, string> = new Map<BlockKind, str
   ["mosaic", "pure geometry — a grid string, a height and two share arrays"],
 ]);
 
-/** `carriesATone` over a container's **own** fields, its children excluded. */
+/** `carriesMeaningColour` over a container's **own** fields, its children excluded. */
 function assertContainerPremise(block: Block & { children: readonly Block[] }): void {
   const { children: _children, ...own } = block;
-  if (!carriesATone(own)) return;
+  if (!carriesMeaningColour(own)) return;
   throw new Error(
     `expectDocument: block kind "${block.kind}" is swept as a container on the premise that ` +
       `its own fields carry no meaning colour alone could convey ` +
-      `(${CONTAINER_PREMISE.get(block.kind) ?? "?"}), and this one carries a tone outside its ` +
+      `(${CONTAINER_PREMISE.get(block.kind) ?? "?"}), and this one carries a tone or ` +
+      `semantic foreground outside its ` +
       `children — the premise has expired and the arm needs a check, not a recursion ` +
       `(C04 I37, F102, F925)`,
   );

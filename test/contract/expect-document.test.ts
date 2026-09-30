@@ -198,8 +198,8 @@ describe("C24 §7 — expectDocument", () => {
      * `scroll` and `mosaic` sat in `KINDS_WITH_NOTHING_TO_CHECK`, each with a
      * reason ending *"the children are swept as blocks in their own right"*.
      * Nothing swept them — `visit` reached `default` and returned. What made it
-     * visible rather than silent is that `carriesATone` is deep: F102's guard
-     * fired on a *descendant's* tone, so a document holding a properly toned
+     * visible rather than silent is that `carriesMeaningColour` is deep: F102's
+     * guard fired on a *descendant's* colour. A document holding a properly toned
      * notice inside a scroll was **refused**, and one holding a real offence was
      * refused with the container named instead of the offender.
      *
@@ -237,15 +237,24 @@ describe("C24 §7 — expectDocument", () => {
     ).toThrow(/notice "n" is toned error/u);
 
     // **The premise, still falsifiable.** F102's guard survives the change,
-    // scoped to the container's own fields: a tone appearing on a `scroll`
-    // itself is a new field the arm does not check, and it says so.
-    expect(
-      () =>
+    // scoped to the container's own fields: a meaning-bearing field appearing
+    // on a `scroll` itself is a new field the arm does not check, and it says so.
+    const expiredPremise = (field: Record<string, unknown>): string => {
+      try {
         expectDocument(
-          doc([{ kind: "scroll", id: "s", height: 4, tone: "error", children: [good] }]),
-        ).degradesTo1Bit(),
-      "a tone outside the children expires the premise",
-    ).toThrow(/the premise has expired and the arm needs a check/u);
+          doc([{ kind: "scroll", id: "s", height: 4, ...field, children: [good] }]),
+        ).degradesTo1Bit();
+      } catch (error) {
+        if (error instanceof Error) return error.message;
+        throw error;
+      }
+      throw new Error("the fabricated container premise violation passed");
+    };
+    const toneComplaint = expiredPremise({ tone: "error" });
+    expect(toneComplaint).toMatch(
+      /tone or semantic foreground outside its children.*premise has expired/u,
+    );
+    expect(expiredPremise({ foreground: "tone.error" })).toBe(toneComplaint);
   });
 
   it("degradesTo1Bit accepts a renderer that changes layout to keep the information", () => {
