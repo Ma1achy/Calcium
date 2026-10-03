@@ -106,8 +106,8 @@ const MUTATIONS = [
     // **The wake**: a status asks for its set's own cadence whatever the rung.
     name: "a status's wake ignores the capabilities",
     file: "src/presentation/blocks/animation.ts",
-    from: "spinnerIntervalMs((block as Status).spinner, caps)",
-    to: "spinnerIntervalMs((block as Status).spinner)",
+    from: "spinnerIntervalMs(status.spinner, caps)",
+    to: "spinnerIntervalMs(status.spinner)",
     expect: "T2.73",
   },
   {

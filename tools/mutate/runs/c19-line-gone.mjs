@@ -21,8 +21,8 @@ const FILES = ["test/integration/completion-as-you-type.test.ts", "test/integrat
 const CONTROL = {
   // **A change the corpus can see** (F1254): the recalled line altered.
   file: KEYS,
-  from: "  function recall(line: string): void {\n    deps.editor.setText(line);",
-  to: "  function recall(line: string): void {\n    deps.editor.setText(`${line}x`);",
+  from: "  function recall(line: string): void {\n    abandonRequest();\n    deps.editor.setText(line);",
+  to: "  function recall(line: string): void {\n    abandonRequest();\n    deps.editor.setText(`${line}x`);",
   why: "every recalled line gains a character — if this survives, no row reads a recall",
 };
 
