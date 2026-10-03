@@ -5,7 +5,7 @@
   // where the plan put it and where it does not work. A devcontainer config
   // under a subdirectory makes that subdirectory the workspace, so only
   // `examples/docker` gets bind-mounted — and the app's dependency is
-  // `"@fmx/calcium": "file:../.."`, which then points outside the mount and
+  // `"calcium-tui": "file:../.."`, which then points outside the mount and
   // fails to install. `.devcontainer/<name>/devcontainer.json` is the supported
   // multi-container layout: VS Code offers both by name and each mounts the
   // repository root, so `file:../..` resolves to the thing it names.
@@ -59,7 +59,7 @@
   "onCreateCommand": "sudo apt-get update && sudo apt-get install -y python3 make g++ fonts-symbola && sudo sh -c 'curl -sL -o /usr/local/bin/agg https://github.com/asciinema/agg/releases/download/v1.9.0/agg-$(uname -m)-unknown-linux-gnu && chmod 755 /usr/local/bin/agg'",
 
   // **Both installs, in order, and the order is load-bearing.** The app
-  // resolves `@fmx/calcium` to `file:../..`, and npm packs that directory using
+  // resolves `calcium-tui` to `file:../..`, and npm packs that directory using
   // its `files` list — which is `["dist"]`. An app installed before the
   // framework is built gets a package with no `dist/`, and the failure arrives
   // as an unresolvable import rather than as a missing build step.

@@ -1,7 +1,7 @@
 /**
  * S12 — every document this app produces, put through B04's compliance sweep.
  *
- * **`degradesTo1Bit` is the one assertion in `@fmx/calcium/testing` that no
+ * **`degradesTo1Bit` is the one assertion in `calcium-tui/testing` that no
  * consumer would write themselves**, which is C24 I13's argument for the module
  * existing, and this file is the first time an application has run it. It makes
  * two mechanical claims:
@@ -18,8 +18,8 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { expectDocument, localContext, producerContext } from "@fmx/calcium/testing";
-import type { ViewDocument } from "@fmx/calcium";
+import { expectDocument, localContext, producerContext } from "calcium-tui/testing";
+import type { ViewDocument } from "calcium-tui";
 import { containerView, createContainerAdapter } from "../src/container.ts";
 import { dashboard } from "../src/dashboard.ts";
 import { parseNdjson } from "../src/ndjson.ts";
@@ -34,10 +34,10 @@ import {
 } from "../src/verbs.ts";
 
 
-import { createAdapterRegistry } from "@fmx/calcium";
-import type { Adapter, AdapterContext, RawResult } from "@fmx/calcium";
-import { completeLocal } from "@fmx/calcium";
-import type { LocalDocument } from "@fmx/calcium";
+import { createAdapterRegistry } from "calcium-tui";
+import type { Adapter, AdapterContext, RawResult } from "calcium-tui";
+import { completeLocal } from "calcium-tui";
+import type { LocalDocument } from "calcium-tui";
 
 /** A local handler's answer, completed the way `runLocal` completes it (F13). */
 async function viaLocal(

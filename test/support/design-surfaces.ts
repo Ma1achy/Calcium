@@ -16,6 +16,8 @@
 // **An entry is a §, a reason and a function returning rows** — the shape
 // `STATES` chose, for its reason: adding one is three lines and the frame comes
 // free, so the cost of covering a surface never argues against covering it.
+import { readFileSync } from "node:fs";
+
 import { block } from "../../src/data/viewmodel/index.js";
 import { chordText, defaultKeymap, scopesInReadingOrder } from "../../src/interaction/router/keymap.js";
 import {
@@ -44,6 +46,10 @@ import { styledScreenFrom } from "./styled-screen.js";
 import type { ResolvedTheme } from "../../src/presentation/theme/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 import { RAMP_ANIMATIONS, RAMP_ONE_SHOTS } from "../../src/data/viewmodel/types.js";
+import { HEADER_ROWS, HEADER_RULE_ROWS, MIN_COLUMNS } from "../../src/shell/config.js";
+import { fakeStdin } from "./fake-terminal.js";
+import { opening, settle } from "./frame-golden.js";
+import { buildSession } from "./session.js";
 import type { Block, CallState, Ramp, RampAnimation } from "../../src/data/viewmodel/types.js";
 
 export type Surface = Readonly<{
@@ -51,7 +57,13 @@ export type Surface = Readonly<{
   section: number;
   /** What the fixture specifies, in the design's own words where it has them. */
   name: string;
-  rows: (width: number, caps: TerminalCapabilities, theme: ResolvedTheme) => readonly string[];
+  /**
+   * The frame's rows. **A promise where the subject is a session** (§097): the
+   * panel layer is composed by L4 and nothing below it can draw one, so the
+   * only honest picture is a real `Session`'s screen, and a session settles
+   * asynchronously.
+   */
+  rows: (width: number, caps: TerminalCapabilities, theme: ResolvedTheme) => readonly string[] | Promise<readonly string[]>;
 }>;
 
 // **The theme and the capabilities go to `measurable`, not to `renderToLines`.**
@@ -103,13 +115,56 @@ const STATUS = block({
 // corpus with a label set, which the session goldens do not have: every rule in
 // them is bare. That is `built` and not `framed`, exactly.
 
-/** §097: a transient panel, between two rules. */
-const PANEL = block({
-  kind: "panel",
-  id: "panel",
-  title: "Confirm",
-  children: [block({ kind: "raw", id: "p1", text: "apply this change?" })],
-});
+/**
+ * §097: a transient panel floats, between two rules — **the LAYER, not the
+ * block kind** (ruling 87, F1460).
+ *
+ * **The first draft drew the `panel` block kind here, and it was §069's defect
+ * again.** A `panel` block is a titled box; §097's panel is C15's layer — the
+ * completion menu, find, a chip's preview — floating above the prompt between
+ * two rules, drawn over what is behind it. The probe named the block, so the
+ * row compared the right word against the wrong thing, and its listed
+ * difference (`┌ ┐ └ ┘ │` only in the frame) was that confusion measured.
+ *
+ * **So the frame is a session's**, because L4 is what composes a layer over the
+ * transcript (A02 Seam 4) and nothing below it can draw one: a real `Session`
+ * against the fake terminal, `/c` typed so the completion menu opens, and the
+ * screen read from below the header to the prompt's lower rule — the region
+ * §097's figure draws. The header and the footer are §003's and are not the
+ * subject. The transcript is left empty, so every mark in the frame is the
+ * layer's or the prompt's.
+ *
+ * **Every variant is `dark`**, so the session opens the `dark` theme and the
+ * variant's capabilities go in through `TuiConfig.capabilities`, the door
+ * `frame-golden.ts` takes for a rung the environment cannot reach. **Below
+ * `MIN_COLUMNS` a session draws no frame at all** — it refuses with a notice —
+ * so the narrow golden draws the layer at `MIN_COLUMNS` and says so in a
+ * caption rather than recording the refusal as §097's picture.
+ */
+const PANEL_ROWS = 20;
+const panelLayer = async (width: number, capabilities: TerminalCapabilities): Promise<readonly string[]> => {
+  const columns = Math.max(width, MIN_COLUMNS);
+  const stdin = fakeStdin();
+  const { screen } = await buildSession(
+    { name: "calcium", binary: "prism", stdin: stdin as never, theme: opening("dark"), capabilities },
+    { columns, rows: PANEL_ROWS },
+  );
+  await settle();
+  stdin.emit("/c");
+  await settle();
+  const rows = screen().rows;
+  // **The prompt's lower rule is the last full-width rule on the screen**; the
+  // footer below it is chrome. A rule is `─` at Unicode and `-` at ASCII.
+  const rule = new RegExp(`^[─-]{${String(columns)}}$`, "u");
+  const lower = rows.reduce((last, r, i) => (rule.test(r) ? i : last), -1);
+  const drawn = rows.slice(HEADER_ROWS + HEADER_RULE_ROWS, lower + 1).map((r) => r.replace(/\s+$/u, ""));
+  return [
+    ...(columns === width
+      ? []
+      : [`· drawn at ${String(columns)} columns: below that a session draws no frame, only the notice that it needs ${String(MIN_COLUMNS)}`]),
+    ...drawn,
+  ];
+};
 
 /** §048: block states, one row per state of the same kind. */
 const STEPS = block({
@@ -585,13 +640,36 @@ const WELL = block({
  * are restated here deliberately, because a presentation choice is what a
  * census is *for* comparing.
  *
- * **121 bindings and not the fixture's 39.** §019 pictures the registry's own
- * bindings; the tree's resolved keymap is the registry's plus the routes and
- * the block rungs, which is the thing a reader actually presses. The census
+ * **The keymap's count and not the fixture's.** §019 pictures the registry's
+ * own bindings; the tree's resolved keymap is the registry's plus the routes
+ * and the block rungs, which is the thing a reader actually presses. The census
  * draws what ships, so the two numbers are expected to differ — the check is
  * that the *grouping* and the *order* are the design's, not that the totals
  * match. `prompt` is the rung because it is where a session opens.
+ *
+ * **Both numbers are derived, in the heading** (review batch 4, M16.7). This
+ * comment carried them by hand — *121 bindings and not the fixture's 39* — and
+ * both were stale by the time anyone read them again: the keymap is generated
+ * from the registry since batch 2's M6, and batch 1's regeneration moved the
+ * fixture's figure to the registry's current count. `keymapCounts` reads the
+ * two sources the numbers come from, so the golden's heading moves when either
+ * does, and a sentence here cannot fall behind.
  */
+/**
+ * `N bindings across S scopes · the registry's current R`, read from the
+ * keymap and the registry when the module loads — the figure the §019 heading
+ * carries, and the only place it is written. No number appears in this comment
+ * on purpose: a worked example would be the hand count again.
+ */
+function keymapCounts(): string {
+  const registry = JSON.parse(
+    readFileSync(new URL("../../docs/design/language/calcium-registry.json", import.meta.url), "utf8"),
+  ) as { bindings: readonly { status: string }[] };
+  const scopes = new Set(defaultKeymap.map((b) => b.target)).size;
+  const current = registry.bindings.filter((b) => b.status === "current").length;
+  return `${String(defaultKeymap.length)} bindings across ${String(scopes)} scopes · the registry's current ${String(current)}`;
+}
+
 const keymapCensus = (width: number, caps: TerminalCapabilities, theme: ResolvedTheme): readonly string[] => {
   const all = defaultKeymap.map((b) => ({ keys: chordText(b.key, caps.unicode !== "ascii"), does: b.action, target: b.target }));
   const here = "prompt";
@@ -776,7 +854,7 @@ const EXPANSION_TABLE = block({
           kind: "keyValue" as const,
           id: "r1-detail",
           rows: [
-            { label: "node", value: "gpu-04.fmx.internal · 2×A100" },
+            { label: "node", value: "gpu-04.example.internal · 2×A100" },
             { label: "mr", value: "!1248  auto-merged" },
           ],
         },
@@ -1028,7 +1106,7 @@ const streamHead = (
   const settled = block({ kind: "notice", id: "sh", tone: "default", text: STREAM_TEXT }) as unknown as Block;
   const mono = { ...capabilities, colourDepth: 1 } as TerminalCapabilities;
   return [
-    ...pass(streaming, capabilities, "· streaming, hot edge — the head arrives in accent and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent"),
+    ...pass(streaming, capabilities, "· streaming, hot edge — the head arrives above the accent, the design's overshoot (C09 I133), and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent"),
     ...pass(settled, capabilities, "· settled — no band and no mark: nothing replaces the mark and nothing is left behind (R-BLK-188)"),
     ...pass(streaming, mono, "· streaming at 1-bit — the trail is gone and the mark is not: colour dies, shape does not, which is what makes them two carriers and not one fact twice"),
     // **At a width of the frame's own choosing, because the reservation is
@@ -1239,10 +1317,13 @@ const contextFill = (
  * chip is one wrap unit, so the row either holds the whole label or none of it.
  */
 const mentionChip = (width: number, capabilities: TerminalCapabilities): readonly string[] => {
-  const sep = glyphs(capabilities).separator;
+  const set = glyphs(capabilities);
+  const sep = set.separator;
+  // The separator's tier, as `construct.ts` reads it (C17 I32).
+  const unicode = set === glyphs({ unicode: "ascii", ambiguousWidth: "narrow" }) ? "ascii" : capabilities.unicode;
   const out: string[] = [];
   for (const painted of [true, false]) {
-    const e = createEditor({ chips: { separator: sep, painted } });
+    const e = createEditor({ chips: { separator: sep, painted, unicode } });
     e.insert("summarise ");
     e.insertChip({ kind: "file", name: "parse.ts", lines: 184, content: "…" }, { delimiter: " " });
     e.insert("for me");
@@ -1260,7 +1341,7 @@ const mentionChip = (width: number, capabilities: TerminalCapabilities): readonl
   }
   // **The resolved line is what leaves the prompt**, and it is not what is drawn:
   // the label never reaches the far side, the content does.
-  const e = createEditor({ chips: { separator: sep, painted: true } });
+  const e = createEditor({ chips: { separator: sep, painted: true, unicode } });
   e.insertChip({ kind: "file", name: "parse.ts", lines: 184, content: "<the file>" });
   out.push("· and what leaves the prompt is the content, never the label", `  │${e.resolved}│`, "");
   return out;
@@ -1422,11 +1503,17 @@ const focusShapes = (
     const lines = kit.renderToLines(b, at);
     const grid = styledScreenFrom([lines.join("\n")], { columns: at, rows: lines.length });
     // `maskOf` already writes the text beside its mask, so the plain line would
-    // be the same row twice.
-    return [`  ${caption}`, ...maskOf(grid).map((l) => `    ${l}`)];
+    // be the same row twice. **The choice also shows its weight** (C09 I132):
+    // `maskOf` reads grounds only, and chosen's second carrier is bold, which
+    // a ground mask cannot draw — so a choice's pass adds a row marking every
+    // bold cell with `W`.
+    const weight = b.kind === "choice"
+      ? grid.map((row) => `${row.map((c) => (c.style.attrs.includes(1) ? "W" : ".")).join("")} weight`)
+      : [];
+    return [`  ${caption}`, ...maskOf(grid).map((l) => `    ${l}`), ...weight.map((l) => `    ${l}`)];
   };
   return [
-    "· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape",
+    "· a choice — the MARK and the WEIGHT carry chosen, the WASH carries focus, and the label is part of the shape",
     ...pass("at rest", radio, null),
     ...pass("focused on `linear` — NOT chosen: the mark did not move", radio, { blockId: "c", rowId: "lin" }),
     ...pass("focused on `log` — chosen: the same wash, the same mark", radio, { blockId: "c", rowId: "log" }),
@@ -1450,7 +1537,7 @@ export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 42, name: "widgets — a row of peers that sheds", rows: draw(PILLS) },
   { section: 34, name: "active progress bars", rows: draw(BAR) },
   { section: 96, name: "a status has three parts, and a frame is separate", rows: draw(STATUS) },
-  { section: 97, name: "a transient panel floats, between two rules", rows: draw(PANEL) },
+  { section: 97, name: "a transient panel floats, between two rules — the layer, over an empty transcript", rows: (w, c) => panelLayer(w, c) },
   { section: 48, name: "block states", rows: draw(STEPS) },
   { section: 6, name: "the canonical marks, as a glyph census", rows: glyphCensus },
   { section: 30, name: "the head mark's three rungs", rows: headMarks },
@@ -1479,7 +1566,7 @@ export const SURFACES: readonly Surface[] = Object.freeze([
     ...paintedChrome(w, c, t),
     ...buttonRungs(w, c, t),
   ] },
-  { section: 19, name: "the resolved keymap, the reader's own rung first", rows: keymapCensus },
+  { section: 19, name: `the resolved keymap, the reader's own rung first — ${keymapCounts()}`, rows: keymapCensus },
   { section: 21, name: "the scrollbar — the set, and the bar beside a box", rows: (w, c, t) => [
     ...scrollbarCensus(w, c),
     ...draw(SCROLLED)(w, c, t),

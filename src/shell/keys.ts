@@ -25,7 +25,7 @@ import {
   menuBlocks,
   menuLayer,
   menuRowsShown,
-  menuWindow,
+  menuWindowOf,
   remainderOf,
   MENU_ID,
   SPINNER_MS,
@@ -114,6 +114,15 @@ export type KeyDeps = Readonly<{
     open: (n?: number) => void;
   }>;
   /**
+   * The chip preview's keys (C22 I143, I144) — the composition root's, because
+   * the layer, the store and the editor are all there. Each asks whether the
+   * preview is the panel on top, and does nothing when it is not.
+   */
+  previewKeys: Readonly<{
+    scroll: (rows: 1 | -1) => void;
+    open: () => void;
+  }>;
+  /**
    * Send the prompt's line, for its `⏎` (C22 I133, ruling 63).
    *
    * **Not `submit`**, which takes a line: this sends the line the editor holds,
@@ -172,14 +181,29 @@ export type KeyDeps = Readonly<{
    * a copy cannot leave the process is the mode's statement rather than a key's.
    */
   copySelectedEntries: () => void;
+  /** `⏎` — the same copy, then the mode's exit (C14 I59, I47). */
+  copyAndLeaveSemanticSelection: () => void;
+  /** `⌃V` — the rectangle on or off (C14 I60, ruling 36). */
+  toggleSemanticRect: () => void;
   /**
    * A toast in the footer's tail (C22 I116, §012) — for a fact that changed
    * nothing, which a copy is: *you pressed a key and something happened. What
    * says so?*
    */
   toast: (text: string) => void;
-  /** The caret's four, as one dep with two axes (C14 I37, §6c). */
-  moveSemanticCaret: (delta: number, extend: boolean) => void;
+  /**
+   * How many questions wait behind the open one (C23 I91). A panel a question
+   * displaced comes back only when no question remains, open **or waiting**:
+   * between one question's disposal and the next one's push the stack holds no
+   * blocking layer, and a restore there is a menu drawn for no frame and taken
+   * down again. Absent is none.
+   */
+  questionsWaiting?: () => number;
+  /**
+   * The caret's eight, as one dep with three axes (C14 I37, I60, §6c): rows,
+   * columns — which only the rectangle takes — and whether the anchor holds.
+   */
+  moveSemanticCaret: (rows: number, columns: number, extend: boolean) => void;
   /**
    * Every navigable element in the live entry, addressed and in reading order,
    * or empty (C16 I22, C26 §5).
@@ -359,6 +383,20 @@ const passedOver = (from: PlacedNavElement | undefined, to: PlacedNavElement): b
   return to.pane.side !== 0;
 };
 
+/**
+ * Whether two placed elements are one row (C26 I30, §8c.2): the same pane, or
+ * both in none, and rows that overlap.
+ *
+ * **Overlap, not equality**, so a one-row element beside a taller one shares
+ * its row. **And the same pane**, so a split is not a wide row: its two panes
+ * overlap by construction, and crossing between them stays I28's.
+ */
+const oneRow = (a: PlacedNavElement, b: PlacedNavElement): boolean =>
+  a.pane?.split === b.pane?.split &&
+  a.pane?.side === b.pane?.side &&
+  a.element.rows.from < b.element.rows.to &&
+  b.element.rows.from < a.element.rows.to;
+
 /** The address of a placed element. One expression, so no call site spells it. */
 const addressOf = (p: PlacedNavElement): ElementAddress =>
   Object.freeze({ blockId: p.blockId, elementId: p.element.id });
@@ -511,6 +549,31 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     if (target !== undefined) deps.focus.focusRow(entry, addressOf(target));
   };
 
+  /**
+   * `←`/`→` along the focused row (C26 I30, §8c; `R-BLK-853`).
+   *
+   * The next element in element order that shares the focused one's row, in
+   * the direction pressed; at the row's end, the split's divider where I28
+   * allows it, and nothing otherwise. **Focus moves, never `current`** (ruling
+   * 80): the shell cannot write the producer's field, so a tape's window
+   * follows focus (C26 I31) and `⏎` is how a member is chosen.
+   */
+  const alongRow = (direction: -1 | 1): void => {
+    const found = focusedPlaced();
+    const entry = deps.focusedEntryId();
+    if (found === null || entry === null) return;
+    const here = found.elements[found.at];
+    if (here === undefined) return;
+    for (let j = found.at + direction; j >= 0 && j < found.elements.length; j += direction) {
+      const q = found.elements[j];
+      if (q !== undefined && oneRow(here, q)) {
+        deps.focus.focusRow(entry, addressOf(q));
+        return;
+      }
+    }
+    crossPane(direction === 1 ? 1 : 0);
+  };
+
   /** `⌥←`/`⌥→` — the innermost split holding focus (C04 §3aq E4). */
   const nudgeDivider = (delta: number): void => {
     const found = focusedPlaced();
@@ -550,21 +613,34 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // so a `fits` from the wrong one silently dropped candidates that fitted
     // perfectly well. `remainder` is the only thing that says *something was
     // actually cut*, and where nothing was, there is nothing to window.
-    if (remainder <= 0) return menuBlocks(candidates, selection.at, 0);
-    const w = menuWindow(candidates.length, selection.at, fits);
+    // **The current is the selection, or the first candidate while a typed
+    // menu holds none** (C19 I29, ruling 89): marked at rest, and not chosen.
+    const current = selection.at ?? 0;
+    if (remainder <= 0) return menuBlocks(candidates, current, 0);
     // **The keys own the window again once they move the selection** (§3d Q2).
     if (wheeled !== null && wheeled.at !== selection.at) wheeled = null;
-    const start = wheeled === null ? w.start : Math.min(wheeled.start, candidates.length - w.shown);
-    const slice = candidates.slice(start, start + w.shown);
-    const at = selection.at === null ? null : selection.at - start;
-    // A selection the wheel scrolled out of view is drawn as none on screen,
-    // and is still the selection: `⏎` accepts it, as it would have.
-    return menuBlocks(slice, at === null || at < 0 || at >= w.shown ? null : at, remainder);
+    const w = windowFrom(wheeled?.start ?? null);
+    const slice = candidates.slice(w.start, w.start + w.shown);
+    const at = current - w.start;
+    // A current the wheel scrolled out of view is drawn as none on screen, and
+    // is still the current: `⏎` accepts a selection, as it would have, and the
+    // mark's cells stay reserved so no label moves (C11 I33).
+    //
+    // **The indicator is the placement's count**: a row is a candidate (C19
+    // I30), so the window shows `fits` whatever its start.
+    return menuBlocks(slice, at < 0 || at >= w.shown ? null : at, remainder);
+  }
+
+  /** The window over the candidates (C19 I23), for the draw and the wheel alike. */
+  function windowFrom(from: number | null): Readonly<{ start: number; shown: number }> {
+    return menuWindowOf(candidates.length, selection.at, fits, from);
   }
 
   function redrawMenu(): void {
     if (candidates.length === 0) return;
-    deps.overlays.update(MENU_ID, { content: windowedBlocks() });
+    // `promptLive` goes with every redraw a selection move causes (C22 I145):
+    // a field set only at push reads correct and is stale on the first `Tab` that selects.
+    deps.overlays.update(MENU_ID, { content: windowedBlocks(), promptLive: selection.at === null });
   }
 
   /**
@@ -597,7 +673,13 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     fits = 0;
     wheeled = null;
     const layer = menuLayer(candidates, selection.at, remainder, deps.anchor());
-    if (deps.overlays.update(MENU_ID, { content: layer.content, placement: layer.placement })) {
+    if (
+      deps.overlays.update(MENU_ID, {
+        content: layer.content,
+        placement: layer.placement,
+        promptLive: layer.promptLive ?? false,
+      })
+    ) {
       return;
     }
     remainder = 0;
@@ -616,6 +698,22 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     builtFor = "";
     remainder = 0;
     deps.overlays.dismiss(MENU_ID);
+  }
+
+  /**
+   * A history walk's line, put in the prompt (C19 I31, F1497).
+   *
+   * **The line the menu and the hold were built against is gone**, so both go
+   * with it. `RECOMPUTES` leaves the walks out because a menu over a recalled
+   * command is noise, and that reason held for opening a menu and not for the
+   * one already open: `↑` at rest put `/help` under `/c`'s candidates. Closed
+   * rather than rebuilt, because a rebuild here is the menu that reason
+   * excludes; the next edit rebuilds it (C19 I22).
+   */
+  function recall(line: string): void {
+    deps.editor.setText(line);
+    if (hasMenu()) closeMenu();
+    suppressedAt = null;
   }
 
   /**
@@ -738,7 +836,13 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       return;
     }
 
-    if (suppressedAt !== null && suppressedAt !== ctx.replace.start) suppressedAt = null;
+    // **An emptied line ends the hold as well** (C19 I31, F1498). The hold is
+    // taken against the token's start, and a line's first token starts at 0
+    // whatever the line, so backspacing to nothing and typing again read as the
+    // same token and the menu never came back.
+    if (suppressedAt !== null && (suppressedAt !== ctx.replace.start || deps.editor.text === "")) {
+      suppressedAt = null;
+    }
 
     const next = deps.completion.suggest(ctx);
     // **Two, and one is ghost text's case** (C19 I19). A one-row menu under a
@@ -802,6 +906,10 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     watchJump7: () => void deps.watchKeys.open(7),
     watchJump8: () => void deps.watchKeys.open(8),
     watchJump9: () => void deps.watchKeys.open(9),
+    // --- the chip preview (C22 I143, I144) ---------------------------------
+    previewScrollUp: () => void deps.previewKeys.scroll(-1),
+    previewScrollDown: () => void deps.previewKeys.scroll(1),
+    previewOpen: () => void deps.previewKeys.open(),
     agentNext: reserved,
     agentPrevious: reserved,
     agent1: reserved,
@@ -827,14 +935,20 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     selectEntryUnderCaret: () => void deps.selectEntryUnderCaret(),
     selectAllLoadedEntries: () => void deps.selectAllLoadedEntries(),
     copySelectedEntries: () => void deps.copySelectedEntries(),
-    // **Four actions over one dep**, because the two axes are the whole
-    // difference: a plain arrow moves and a shifted one extends (C14 I37), and
-    // the direction is the sign. Four deps would be four places for the pair to
-    // come apart.
-    moveSemanticCaretUp: () => void deps.moveSemanticCaret(-1, false),
-    moveSemanticCaretDown: () => void deps.moveSemanticCaret(1, false),
-    extendSemanticSelectionUp: () => void deps.moveSemanticCaret(-1, true),
-    extendSemanticSelectionDown: () => void deps.moveSemanticCaret(1, true),
+    copyAndLeaveSemanticSelection: () => void deps.copyAndLeaveSemanticSelection(),
+    toggleSemanticRect: () => void deps.toggleSemanticRect(),
+    // **Eight actions over one dep**, because the axes are the whole
+    // difference: a plain arrow moves and a shifted one extends (C14 I37), the
+    // direction is the sign, and a column is the rectangle's (I60). Eight deps
+    // would be eight places for the pair to come apart.
+    moveSemanticCaretUp: () => void deps.moveSemanticCaret(-1, 0, false),
+    moveSemanticCaretDown: () => void deps.moveSemanticCaret(1, 0, false),
+    moveSemanticCaretLeft: () => void deps.moveSemanticCaret(0, -1, false),
+    moveSemanticCaretRight: () => void deps.moveSemanticCaret(0, 1, false),
+    extendSemanticSelectionUp: () => void deps.moveSemanticCaret(-1, 0, true),
+    extendSemanticSelectionDown: () => void deps.moveSemanticCaret(1, 0, true),
+    extendSemanticSelectionLeft: () => void deps.moveSemanticCaret(0, -1, true),
+    extendSemanticSelectionRight: () => void deps.moveSemanticCaret(0, 1, true),
 
     // --- C17 ---------------------------------------------------------------
     insertNewline: () => void deps.editor.insert("\n"),
@@ -982,7 +1096,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     historyPrev: () => {
       // The owner's walk (C23 I77): a reply's, or the prompt's.
       const entry = (deps.reply() ?? deps.history).previous(deps.editor.text);
-      if (entry !== null) deps.editor.setText(entry);
+      if (entry !== null) recall(entry);
     },
     // **One binding, two effects, in order** (C16 I22). C20's walk has a defined
     // bottom — `↓` past the newest entry restores the stashed draft — so
@@ -996,12 +1110,12 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       const own = deps.reply();
       if (own !== null) {
         const entry = own.next();
-        if (entry !== null) deps.editor.setText(entry);
+        if (entry !== null) recall(entry);
         return;
       }
       const entry = deps.history.next();
       if (entry !== null) {
-        deps.editor.setText(entry);
+        recall(entry);
         return;
       }
       const elements = deps.liveElements();
@@ -1032,16 +1146,17 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       deps.focus.focusRow(to.entryId, addressOf(to.first));
     },
 
-    // --- a split's panes and its divider (C04 §3aq, C26 I28, C22 I117) ------
+    // --- along a row, and a split's panes (C26 I30, I28, C22 I117) ---------
     //
-    // **`←`/`→` are the only way focus leaves a pane**, and they go to the
-    // other pane's element nearest the focused row **on screen**: each pane's
-    // own offset is taken off, because the two scroll apart and a content row
-    // in one is not the same line of the frame as the same number in the
-    // other. The first element whose visible rows reach the focused one's, or
-    // the pane's last where none does. Outside a split both do nothing.
-    paneLeft: () => crossPane(0),
-    paneRight: () => crossPane(1),
+    // **`←`/`→` move along the focused row first** (C26 I30), and at its end
+    // **they are the only way focus leaves a pane**: they go to the other
+    // pane's element nearest the focused row **on screen**, with each pane's
+    // own offset taken off, because the two scroll apart and a content row in
+    // one is not the same line of the frame as the same number in the other.
+    // The first element whose visible rows reach the focused one's, or the
+    // pane's last where none does. Outside a split the row's end is a stop.
+    elementLeft: () => alongRow(-1),
+    elementRight: () => alongRow(1),
     // **The divider moves a cell and focus stays** (C04 §3aq E4): element ids
     // do not change with width, and the next resolution finds the same one.
     dividerLeft: () => nudgeDivider(-1),
@@ -1075,8 +1190,12 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       const i = resolveFocus(current.element, elements);
       if (i === null) return;
       // **The next element this step can reach**, which is the next in reading
-      // order unless a split pane is in the way (C26 I28).
-      const next = elements.slice(i + 1).find((q) => !passedOver(elements[i], q));
+      // order unless a split pane is in the way (C26 I28) — **and not on the
+      // focused row** (C26 I30, D10): `↓` leaves a row of elements rather than
+      // walking it, and the first element past the row is the first of the
+      // row it enters.
+      const here = elements[i];
+      const next = elements.slice(i + 1).find((q) => !passedOver(here, q) && (here === undefined || !oneRow(here, q)));
       // **The resolved entry, not the stored one** (C26 I22): after an eviction
       // the two differ, and writing the stored one back would leave the store
       // pointing at nothing while the frame highlights the live entry.
@@ -1130,12 +1249,24 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       // rule below reads it so.
       let reach = -1;
       if (found !== null) {
+        const here = elements[found];
         for (let j = found - 1; j >= 0; j -= 1) {
           const q = elements[j];
-          if (q !== undefined && !passedOver(elements[found], q)) {
+          // **Off the focused row** (C26 I30, D10), as `↓` is.
+          if (q !== undefined && !passedOver(here, q) && (here === undefined || !oneRow(here, q))) {
             reach = j;
             break;
           }
+        }
+        // **The first element of the row it enters**, which is where `↓` lands
+        // on it too (§8c.3 row 5): back along the run that shares the row. The
+        // run is contiguous, so a block beside this one whose rows overlap is
+        // not reached from here.
+        for (let k = reach - 1; reach > 0 && k >= 0; k -= 1) {
+          const q = elements[k];
+          const at = elements[reach];
+          if (q === undefined || at === undefined || passedOver(here, q) || !oneRow(at, q)) break;
+          reach = k;
         }
       }
       const i = found === null ? null : reach === -1 ? 0 : found;
@@ -1558,6 +1689,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     }
     if (held === null || (change.kind !== "dismiss" && change.kind !== "pop")) return;
     if (deps.overlays.stack.some((l) => l.blocking)) return;
+    if ((deps.questionsWaiting?.() ?? 0) > 0) return;
     const was = held;
     held = null;
     if (deps.editor.text !== was.draft) {
@@ -1591,9 +1723,8 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       // **Only a window that cuts something moves** — `windowedBlocks`' own
       // guard, for its reason: `remainder` is what says something was cut.
       if (candidates.length === 0 || remainder <= 0) return false;
-      const w = menuWindow(candidates.length, selection.at, fits);
-      const from = wheeled === null || wheeled.at !== selection.at ? w.start : wheeled.start;
-      const start = Math.min(Math.max(0, from + rows), candidates.length - w.shown);
+      const here = windowFrom(wheeled === null || wheeled.at !== selection.at ? null : wheeled.start);
+      const start = windowFrom(Math.max(0, here.start + rows)).start;
       wheeled = { start, at: selection.at };
       redrawMenu();
       return true;

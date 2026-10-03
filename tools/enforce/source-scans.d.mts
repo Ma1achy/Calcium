@@ -140,6 +140,22 @@ export declare function checkTextGrounds(
   roles?: Readonly<Record<string, SurfaceRole>>,
 ): (Violation & { line: number })[];
 
+/** SS68 — the directories whose `R-XXX-NNN` citations must resolve against the design registry. */
+export declare const RULE_CITATION_DIRS: readonly string[];
+
+/** SS68 — the Markdown files under `RULE_CITATION_DIRS`, sorted. */
+export declare function ruleCitationCorpus(dirs?: readonly string[]): string[];
+
+/**
+ * SS68 — every `R-XXX-NNN` a spec cites is a rule id the registry holds, in any
+ * status; a corpus citing nothing or a registry holding nothing is reported.
+ */
+export declare function checkRuleCitations(
+  docs?: readonly string[],
+  readFile?: (file: string) => string,
+  registrySource?: string,
+): (Violation & { line: number })[];
+
 /** SS63 — the hex ranges of a named table in `text.ts`, parsed out of its source (C09 I48). */
 export declare function parseRangeTable(textSource: string, name: string): number[];
 
@@ -168,3 +184,26 @@ export declare function checkMarkDomains(
   registrySource?: string,
   glyphSource?: string,
 ): Violation[];
+
+/** SS69 — the files allowed to hold a literal bidi format character, each with its reason. */
+export declare const BIDI_LITERAL_EXEMPTIONS: Readonly<Record<string, string>>;
+
+/** SS69 — the code points `text.ts`'s `isBidiFormat` answers true for, parsed from its source, sorted. */
+export declare function bidiFormatCodePoints(textSource?: string): number[];
+
+/** SS69 — the tracked text files holding any of `codePoints`, by `git grep`, and the tracked count. */
+export declare function trackedBidiCandidates(
+  codePoints: readonly number[],
+  cwd?: string,
+): { tracked: number; files: string[] };
+
+/**
+ * SS69 — a literal bidi format character in a tracked text file, with the
+ * exemptions compared by equality; an unread set or corpus is reported alone.
+ */
+export declare function checkBidiLiterals(options?: {
+  codePoints?: readonly number[];
+  candidates?: { tracked: number; files: readonly string[] };
+  readFile?: (file: string) => string;
+  exemptions?: Readonly<Record<string, string>>;
+}): (Violation & { line: number })[];

@@ -337,8 +337,26 @@ export type RenderContext = Readonly<{
    * **`theme` draws the subtree in another theme** (I110): a stale panel hands
    * its children `recede(ctx.theme)` so their content dims while its own chrome
    * does not. Absent is the caller's theme, which is every other caller.
+   *
+   * **`focus` draws the child as if focus were on it** (I137): a pane whose
+   * child declares `frame` forwards `{ …focus, blockId: child.id, rowId:
+   * child.id }` — the child's own block element (I85) — so its frame answers
+   * with the child's own predicate. Absent is the caller's focus.
    */
-  renderChild: (block: Block, width: number, theme?: ResolvedTheme) => Rendered;
+  renderChild: (block: Block, width: number, theme?: ResolvedTheme, focus?: FocusState | null) => Rendered;
+  /**
+   * The shape a child's kind declares for focus, or `null` where it declares
+   * none (I137, §7k) — the registry's answer, supplied as `measureChild` is.
+   *
+   * **What lets a container light a pane without knowing what is in it.** A
+   * `mosaic` pane and a `split` pane are regions, and I100 gave them
+   * `focusGround` — which is right behind text and wrong across a picture,
+   * whose background is half of what braille draws with (`R-FOC-004`). The
+   * container cannot tell the two apart by kind without a switch over kinds,
+   * which is the class `copyChild` was written to end; the kind says what it
+   * is, and a `frame` child is lit through `renderChild`'s `focus` instead.
+   */
+  focusShapeOf: (block: Block) => FocusShape | null;
   /**
    * The registry's slice of a child, or `null` when it cannot take one (I58, §6b).
    *
@@ -385,7 +403,7 @@ export type RenderContext = Readonly<{
  * honours three — which is what says it generalises past one surface.
  * FINDINGS F85.
  */
-export type RenderContextInput = Omit<RenderContext, "measureChild" | "widthChild" | "renderChild" | "windowChild">;
+export type RenderContextInput = Omit<RenderContext, "measureChild" | "widthChild" | "renderChild" | "windowChild" | "focusShapeOf">;
 
 /**
  * A block reduced to a smaller one, plus the leading rows of it the caller drops
@@ -743,7 +761,38 @@ export interface BlockDefinition<B extends Block = Block> {
    * a member of `AnyBlockDefinition`'s registration surface.
    */
   fold?: (block: B) => Block | null;
+  /**
+   * What focus on this kind's elements paints (I137, §7k, §017, `R-COL-005`).
+   *
+   * **Declared by every kind that declares `elements`, and by no other** —
+   * T2.228 compares the two sets by equality over a constructed session's
+   * registry. I121's treatments existed and the partition did not: five kinds
+   * were a list in a test, and a kind that drew nothing (the four shedding
+   * kinds) or the wrong thing (`form`) was a kind nobody had listed.
+   *
+   * **Optional for the reason the other members are**, and an app kind with
+   * `elements` and no shape is not refused: a container reads it as `null`,
+   * which is *not a picture*.
+   */
+  focusShape?: FocusShape;
 }
+
+/**
+ * `R-COL-005`'s partition (§7k, I137), less its two members no kind here is —
+ * a RUN (a link) and a painted identity chip (C17's chips). A kind that is one
+ * adds the member with its first consumer.
+ *
+ *   - `box` — `R-FOC-001`: the focus ground where it carries, whole-shape
+ *     inversion where it does not (`focusShapeStyle`).
+ *   - `control` — `R-FOC-002`, `R-FOC-003`: the same function, as a wash over
+ *     the whole control — label, mark or track, and value.
+ *   - `row` — `R-SEL-006`: a selectable row. `focusGround`, and a carrier that
+ *     is **not** inversion — `▸` where the kind has the column, weight where it
+ *     has not — because at 1-bit inversion is selection's.
+ *   - `frame` — `R-FOC-004`: the furniture takes it (a border, axes, a bar) and
+ *     no ground is painted behind the content.
+ */
+export type FocusShape = "box" | "control" | "row" | "frame";
 
 
 /**

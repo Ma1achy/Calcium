@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` |
+| **Package** | `calcium-tui` |
 | **Layer** | L3 interaction |
 | **Depends on** | C09 (`BlockDefinition.elements`, `measure`) · C13 (the entry a scope names) · C14 (the visible range, and `#restoreFromAnchor`'s shape) · C11 (`focusableRowIds`, which this generalises) |
 | **Consumed by** | C16 router · L4 |
@@ -1009,6 +1009,12 @@ the space a focus ring would occupy is reserved by the data or it does not exist
 
 Background and reverse video are free. Anything that changes size is not.
 
+**One cell moves with focus, and it changes no size: a tape's window (I31, ruling 80).** A member
+the resting window does not draw brings the window to it when focus lands there, so the row
+draws other members in the same cells. The row is still one row, and `measure` still sees no
+focus. The reason for the edge is a height moving without `rev`, and that holds. What the
+exception gives up is only the literal *nothing else*, and C09 T2.184 asserts the two arms apart.
+
 **A block-level focus paints the cells the block already reserves, and three kinds now do**
 (F769's recorded residue, ruled here). The rule above bounds the answer — no ring, no marker, no
 row — so the affordance is a tone on furniture the data draws whether or not focus is on it, and
@@ -1275,15 +1281,18 @@ the behaviour §095's first paragraph exists to separate a tape from.
   The fall is to the live entry's **first** element — I10's block-went clause one scope up —
   because nothing about an evicted entry's position survives to name a nearer neighbour.
 - **I23** — **A call's head is an element whose `⏎` toggles its body's fold and never re-runs the
-- **I24** — *(§7a, §021, §095, `R-NAV-004`)* **Focus pulls the viewport by the minimum, and scrolling never moves focus.** A move that puts the focused element outside its container's window moves the window the least distance that brings it back — the window's start where the element begins if it begins before, its end where the element ends if it ends after, and nothing otherwise. **A target larger than the window shows its head**, which is the end rule applied before the start rule and is a ruling rather than an order the code fell into. The converse binds equally: a reader who scrolls away keeps the focused element focused, and a viewport that dragged focus with it would make scrolling a navigation gesture and give two mechanisms one piece of state.
+- **I24** — *(§7a, §021, §095, `R-INT-003`, `R-INT-004`)* **Focus pulls the viewport by the minimum, and scrolling never moves focus.** A move that puts the focused element outside its container's window moves the window the least distance that brings it back — the window's start where the element begins if it begins before, its end where the element ends if it ends after, and nothing otherwise. **A target larger than the window shows its head**, which is the end rule applied before the start rule and is a ruling rather than an order the code fell into. The converse binds equally: a reader who scrolls away keeps the focused element focused, and a viewport that dragged focus with it would make scrolling a navigation gesture and give two mechanisms one piece of state.
 - **I25** — *(§7a, C04 I48, C04 I124)* **One store holds how far a container is scrolled, and the container is what knows the unit.** A scroll box's offset is rows and a tape's is members, and neither is clamped where it is stored — `ScrollOffsets` does not know the width, so the renderer clamps at read on both axes. The shell **persists** the window a tape computed rather than recomputing it: `tapeWindow` already moves by the minimum, and a held start that is always zero makes every frame recompute from the head, which snaps the window back whenever the current comes near the start.
   entry, whose `y` copies the invocation, and `⇧⏎`/`⌥⏎` remain the only re-run** (§5c, →
   C09 I47, C22 I90, C23 I18). A head with no body has no `activate` and `⏎` is silent there; a
   subagent's head pushes a view rather than expanding (→ C15 §2b).
 - **I26** — *(§8b.9, §102, §018, `R-INT-005`, `R-FOC-002`)* **An inside is declared, entered and reflected, and all three are one chain.** `NavElement.viewState` says the element has one; `⏎` on an element that declares it stores `mode: "interact"` and `Esc` there stores `"navigate"`; `focusFor` reflects the stored mode into `FocusState.inside`, which is what a kind's renderer reads. **The declaration is per element**, because §018's three sliders in one document are three insides in one block, and a kind whose figure fills its block declares it on the element it produces — which recovers §102's per-kind table without a second field to disagree with this one. An element that declares `viewState` and an `activate` is a construction error: §018 rules that *direct-action toggles and choices act without an inside state*, so the two are disjoint and `⏎` never has to choose.
 - **I27** — *(§8b.9, §018, §102, `R-INT-005`)* **A continuous control's domain value is committed only from inside it.** Every binding that moves a camera, a cursor or a handle sits at the `interaction` target and nowhere else, so arrowing down a document past three sliders moves no slider. A pointer readout **may** preview from outside where the element declares one, because a preview commits nothing — §102's *KEYBOARD CONTROLS APPEAR ONLY INSIDE; POINTER READOUT MAY PREVIEW OUTSIDE*. The rule was satisfied by vacuity until I26's chain existed: with `FocusState.inside` constant `false` there was no inside for a commit to be outside of, and the camera family committed from `liveBlock` with nothing able to report it.
-- **I28** — *(C04 §3aq E1–E3, C04 I134, §105)* **Inside a split, the vertical arrows keep to their pane and the horizontal ones cross it.** The walk records the innermost split pane each element sits in. `↓` and `↑` pass over every element of the split's other pane, so the last element on the left steps to what follows the split, never to the right pane's first. From outside a split they land on its left pane. `←` and `→` move to the other pane's element nearest the focused row on screen, with each pane's own offset applied, and they are no-ops outside a split. This is the sense of *explicit focus transfer* in the registry's definition of `split`: a pane is left only by a key that names the direction of the other one.
+- **I28** — *(C04 §3aq E1–E3, C04 I134, §105)* **Inside a split, the vertical arrows keep to their pane and the horizontal ones cross it.** The walk records the innermost split pane each element sits in. `↓` and `↑` pass over every element of the split's other pane, so the last element on the left steps to what follows the split, never to the right pane's first. From outside a split they land on its left pane. `←` and `→` move to the other pane's element nearest the focused row on screen, with each pane's own offset applied. **Inside a pane they move along the focused row first (I30)**, and cross only at the row's end; outside a split, at a row's end, they do nothing. This is the sense of *explicit focus transfer* in the registry's definition of `split`: a pane is left only by a key that names the direction of the other one.
 - **I29** — *(C04 §3ar F1, F4, §105)* **A form publishes its fields, then its buttons, and `⏎` walks the fields in order.** One element per field, `viewState: true`, whose rows are the field's extent from its label to its last hint or error row; one per button, whose cells are its mark slot and label and whose `activate` is its action. `⏎` on a field enters it; `⏎` inside commits and enters the next field, and from the last lands on the default button without pressing it. A submit is a command, so it takes a key aimed at its button.
+- **I30** — *(§8c, `R-BLK-851`, `R-BLK-853`, I28, D10; review batch 4 M14.1)* **`←` and `→` move along a row of elements, and `↓` and `↑` leave it.** A row is the elements of one pane (or of no pane) whose rows overlap the focused one's. `→` focuses the next such element in element order, and `←` the previous. At the row's end they cross a split's divider where I28 allows, and otherwise do nothing. `↓` steps to the first element after the focused one whose rows do not overlap it, and `↑` to the nearest one before; either way, **focus lands on the first element of the row it enters**. So a tape's members are walked sideways, and a table's rows, one element per row, still step as they did. → T1.164, T1.165, T6.1, T6.2
+- **I31** — *(§8c, ruling 80, `R-BLK-857`, I24, I25, C04 I124, C04 I125; review batch 4 M14.1, M14.2)* **While focus is in a tape, the window follows the focused member; otherwise it follows `current`.** The anchor is one argument to the `layout` that `render`, `tapeStart` and `tapeMemberCols` all take, so the drawn window, the persisted start and the pointer's columns are one answer. The shell cannot write the producer's `current` — that is ruling 80's reason, and why it departs from *nothing moves the tape's window without moving the current* — so `←`/`→` move focus and `⏎` activates. **A press on a tape reaches the member drawn under it**: `elementAt` asks `tapeMemberCols` at the held start and the same anchor, offset by the element's origin, and a press on a residue mark or a gap reaches nothing. → T1.166, T4.34, T6.3, T6.4
+- **I32** — *(§8c, I24, D15; review batch 4 M14.5)* **The pull re-runs when the focused element's layout changes, unless the reader has scrolled its box since focus arrived.** The pull is keyed on the focus address, the entry's `rev` and the width, so a resize or a patch that moves the focused element pulls it back into view. A manual scroll of a box — a page key, the wheel, a press on its bar — **latches that box** until focus next moves, and a latched box is not re-pulled. The latch is per box: the wheel's subject is the box under the pointer (C16 I48), and a box nobody scrolled keeps following. → T4.35, T4.36, T4.37, T6.5, T6.6
 
 ---
 
@@ -1715,6 +1724,91 @@ already clears the mode on every move between rows, so the mode cannot arrive an
 drift. The one path in is `⏎` on an element that declares view state, which is the link this
 section builds.
 
+## 8c. Along a row, and the window that follows — walked by hand (review batch 4, M14.1, M14.2, M14.3, M14.5; ruling 80, D10, D15)
+
+**Both artefact shapes again**, because the four items meet in two ways. Which elements *are*
+a row is structural — two rules holding at rest over the same pair of elements — and what a
+key does to focus, the tape's window and the pull is event-mediated.
+
+### 8c.1 — measured before ruling (at b65c37ee)
+
+- `←`/`→` at `liveBlock` are `paneLeft`/`paneRight`, and both call `crossPane`, which returns
+  outside a split. `rowDown` steps in reading order, so **`↓` walks a tape's members one at a
+  time** and nothing walks them sideways.
+- **The render anchors the window on `current`, not only the pull.** `tape.ts`'s `layout`
+  hands `tapeWindow` the current's index, and `render`, `tapeStart` and `tapeMemberCols` all
+  take that `layout`. So a start the shell computed for the focused member would be slid
+  straight back by the next frame. Ruling 80 is therefore **a change to the anchor all three
+  readers share**, and not a second computation in the shell — two anchors would be the two
+  roundings §7a exists to prevent.
+- `elementAt` tests every tape member against `[0, w)` — C04 I124's `elements` columns — and
+  takes the first at equal depth, so **a press anywhere on a tape focuses its first member**.
+  `tapeMemberCols` exists and has no reader.
+- **M14.3's first half is already built.** A box's children are laid out and addressed at the
+  width they are drawn at (C09 I126, batch 3). What remains is the bar. `containers.ts` keeps
+  a child element's columns at the box's whole width on purpose — *the bar is the box's, and
+  a pointer on it is in the box* — so the bar is resolved by the pointer before the element,
+  as the transcript's is (C14 I63), and `elements` does not change.
+- `pulledTo` is the focus address alone. A comment records *a resize does not re-pull* as the
+  intended reading of the refusal half of I24; it is a code comment and not a ruling (D15).
+
+### 8c.2 — the classification table: which elements are one row
+
+| the pair | one row? | rules that meet | ruling |
+|---|---|---|---|
+| two members of a tape | yes | `R-BLK-853` (*a row of elements: move between elements on the row*) × I5's reading order | `←`/`→` step between them in element order |
+| two buttons of a legend or a form, drawn on one line | yes | `R-BLK-851` (*a legend is three buttons*) × I29 | the same |
+| a mosaic's cells on one line | yes | `R-BLK-851` (*a mosaic is three cells*) | the same, and `↓` leaves for the next line's first cell — the column is not kept (§8c.5) |
+| a left-pane and a right-pane element whose rows overlap | **no** | I28 × row overlap | the row test requires **the same pane**, so crossing stays I28's and a split is not a wide row |
+| a multi-row element and a one-row element inside its rows, same pane | yes | overlap is the whole test | recorded as the test's reach: *one row* is *rows that overlap*, not *rows that are equal* |
+| an element with no rows | never | `[from, to)` empty | overlaps nothing, so it is its own row |
+| a tape member the resting window does not draw, focused | — | I31 × §7's *focus changes tone and nothing else* (C09 I121) | **found by the suite, not the walk**: C09 T2.184 went red on `tape/seams` at 7 columns. The window follows, so a cell moves. §7 now names this as the one exception, and it changes no size |
+
+### 8c.3 — the sequence trace
+
+| # | from | event | after | rules that meet |
+|---|---|---|---|---|
+| 1 | focus on member *k* of a tape, *k*+1 drawn | `→` | focus on *k*+1; window unchanged | I30 × C04 I125's minimum |
+| 2 | *k*+1 past the window | `→` | focus on *k*+1; the window slides by the minimum that reaches it, and `›` may leave | **ruling 80** × `R-BLK-857`. The design says *nothing moves the tape's window without moving the current*; the shell cannot write the producer's `current`, so the window follows focus while focus is in the tape |
+| 3 | focus in the tape | the producer patches `current` | the window keeps following focus; the new current's lead is priced wherever it lands | ruling 80 × C23 I47 (the producer owns the field) |
+| 4 | focus in the tape, window slid off the current | `↓` | focus leaves the row; **the next frame's window moves by the minimum from the held start back to the current** | ruling 80 × I25 (the start is persisted, so the return is a minimum and not a snap to the head) |
+| 5 | any member | `↓` / `↑` | leaves the row; **lands on the first element of the row it enters** | **D10** × I16's collapse at an end. The design rules leaving and is silent on entering; the first element is where reading starts. §8c.5 names the cost |
+| 6 | the row's last element, in a left pane | `→` | crosses to the right pane (I28) | I30 × I28: **the row first, the divider at the row's end** |
+| 7 | the row's last element, no split | `→` | nothing | I30's end is a stop, like `↓`'s tail |
+| 8 | a member | `⏎` | its `activate` — the producer's route to moving `current` | ruling 80: activation is the only write the shell can make to it |
+| 9 | anywhere | press on a member's drawn cells | that member is focused | C04 I124's helper, at the held start **and the anchor the frame drew** |
+| 10 | anywhere | press on `«n`, `n»` or a gap | nothing | C04 I124: those cells are nobody's |
+| 11 | focus on *e* in a box, pulled | the width changes and *e*'s rows move | **re-pulled** | I32 × I24 |
+| 12 | focus on *e*, pulled | a patch moves *e* (`rev`) | re-pulled | I32 |
+| 13 | focus on *e* | `PgDn`, the wheel or a bar press on *e*'s box, then a patch or a resize | **not** re-pulled: the box is latched | **D15** × I24's refusal half |
+| 14 | latched | focus moves | pulled, and the latch is dropped | D15 |
+| 15 | focus in box A | the wheel over box B, then a patch | A still re-pulls; B's latch is B's | the latch is per box, because the wheel's subject is the box under the pointer (C16 I48) |
+
+### 8c.4 — the bar, by column (a classification)
+
+| column under a primary press | what it hits |
+|---|---|
+| the outermost box's bar column, beside its interior | **that box's bar**: jump by proportion; focus does not move (`R-BLK-363`) |
+| an inner box's bar column, its bar drawn | **the inner box's bar** — bars sit at distinct columns, so at most one answers |
+| the bar column of a box whose content fits | the element: no bar is drawn, so there is nothing to press |
+| the bar column on the residue row | the element: the bar runs beside the interior and not beside the residue row (C09 §7f) |
+
+**The jump is the transcript's arithmetic, one function.** Row *r* of an *h*-row bar goes to
+`round(r × max / (h − 1))`, so the first row is the top and the last the bottom (C14 I63).
+Written once and called by both bars, since two copies would be two chances to round
+differently.
+
+### 8c.5 — what the rulings leave behind, named so it is not read as coverage
+
+- **Entering a slid tape lands on member 0** (F1448), so the window slides to the head on entry and
+  the current may leave it. The design is silent on entry; a reader expecting the current is
+  a question for the design, and it is filed rather than guessed.
+- **`↓` from a mosaic cell loses its column** (F1449). Leaving the row lands on the next line's first
+  cell, where a grid reader expects the cell below.
+- **The anchor is focus's stored member, not the resolved one.** A stored member that has left
+  the tape anchors on `current` in both the pull and the frame, so the two agree; what they
+  agree on is not a fall-forward inside the tape.
+
 ---
 
 ## 9. Commitments
@@ -1740,6 +1834,10 @@ section builds.
 19. **A tape's window is persisted, not recomputed from the head** (I25, → C04 I124). *The window moves only when the current leaves it* is a statement about the previous window, so there has to be one; without it the arithmetic is still correct and the behaviour is a cursor dragging the row along.
 20. **An inside is declared on the element, entered with `⏎` and left with `Esc`, and reflected into `FocusState.inside`** (I26, §102, §018). Three links, landed together, because each alone is a half-seam a test can only reach through a backdoor (§8b.2b).
 21. **The camera family binds at `interaction` and at no other target, and its chords are the arrows** (I27, §102, → C16 I28). `[` `]` `{` `}` retire: they were chosen because `liveBlock`'s arrows step elements, and inside an element there is nothing to step.
+
+22. **`←`/`→` move along a row of elements, and `↓`/`↑` leave it** (I30, D10). A row is overlapping rows within one pane; its end crosses a split where I28 allows.
+23. **A tape's window follows focus while focus is in it** (I31, ruling 80), through one anchor that the frame, the pull and the pointer share; a press reaches the member drawn under it.
+24. **The pull re-runs on a layout change unless the box was scrolled by hand since focus arrived** (I32, D15), with the latch held per box.
 
 **The four-kind validation of §4 is not here, and SP1 is why.** *If it is none of those, it
 is a § detail rather than a commitment* — it is a step the implementation takes, and no
@@ -1841,6 +1939,20 @@ Named against the invariants; the tiers are the six.
   restored → the `⇧tab` row fails. `rowActivate` taking `liveId` as the origin → the refusal
   row fails, because the action fires against the wrong entry and is not refused at all.
 - **T6.x** (I23) — `rowActivate` submitting `doc.command` on a second `⏎` at a head → T1.47's no-submission assertion fails; the head's `copy` left as its text → T1.47's `y` assertion copies the head line.
+
+- **T1.164** (I30, I28): over a keys graph with a tape of five members, a two-button row and a split, `→`/`←` step the tape's members in order and stop at its ends; the buttons are one row; `→` at the row's end in a left pane crosses to the right pane, and outside a split it does nothing.
+- **T1.165** (I30, D10): `↓` from any tape member leaves the row for the next row's first element; `↑` from below the tape lands on member 0, not on the last member; a table's rows still step one at a time.
+- **T1.166** (I31, C04 I124, C04 I125): `tapeStart`, `tapeMemberCols` and the render agree at every anchor — the focused member, and `current` with focus elsewhere — over a tape that does not fit; a focused member past the window is drawn, and the current's lead is priced wherever it lands.
+- **T4.34** (I31): through a built session, `→` past the window slides it — the frame is read, and the focused member is on screen while `›` is not; `↓` out of the tape brings the current back by the minimum. A press on a drawn member's cells focuses that member, and a press on `«n` focuses nothing new.
+- **T4.35** (I32): focus on a box's child, then a resize that moves its rows: the box is re-pulled so the child is in view.
+- **T4.36** (I32): focus on a box's child, then a patch that moves it (`rev`): re-pulled.
+- **T4.37** (I32, D15): `PgDn` on the focused box, then a patch: the offset stays where the reader put it; `↓` then pulls, and a later patch re-pulls. The wheel over a second box latches that box alone, and the wheel over the focused box latches it. *(A resize is T4.35's, and C22 T4.118 covers the bar's own latch through one.)*
+- **T6.1** (I30): `elementRight` as the old `crossPane(1)` → **T1.164** fails at the tape's second member.
+- **T6.2** (I30): `rowDown`'s row skip removed → **T1.165** fails: `↓` walks to member 1.
+- **T6.3** (I31): `layout`'s anchor back to `current` → **T1.166** and **T4.34** fail: the focused member is off screen.
+- **T6.4** (I31): `elementAt`'s tape arm removed → **T4.34**'s press arm focuses member 0.
+- **T6.5** (I32): the key back to the focus address alone → **T4.35** and **T4.36** fail.
+- **T6.6** (I32): the latch never set → **T4.37** fails: the patch drags the box back.
 
 **The mutation pass is scheduled, not optional.** Every module mutated on landing; a mutation
 that fails nothing indicts the tests or the prose, and §5's vacuity note is the sentence most

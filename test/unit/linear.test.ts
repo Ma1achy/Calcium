@@ -12,11 +12,15 @@ import { patchDefinition } from "../../src/presentation/patch/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import {
+  answerEvent,
   blockLines,
+  completionLine,
   linearEvents,
   linearState,
   type BodyDeps,
   type LinearEntry,
+  questionLine,
+  windowLine,
 } from "../../src/shell/linear.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
 
@@ -140,5 +144,36 @@ describe("C22 §6m — linear events", () => {
         expect(/[●○◌◐⊘✗✓›▸⏺]/u.test(line), `${kind}: ${JSON.stringify(line)}`).toBe(false);
       }
     }
+  });
+
+
+  // **F1470.** The override and the escape are built from their code points so
+  // no literal reaches this file (SS69, C01 I1). The expected strings are the
+  // shown forms, written out by hand from C09 I128's table.
+  const RLO = String.fromCharCode(0x202e);
+  const ESC = String.fromCharCode(0x1b);
+  const hostile = `invoice${RLO}fdp.exe${ESC}[2J`;
+  const shown = "invoice<U+202E>fdp.exe^[[2J";
+
+  it("T1.180 (C22 I149, F1470): far-side and typed text reach the linear stream in the shown form", () => {
+    const notice = block({ kind: "notice", id: "n1", tone: "info", text: hostile } as never);
+    const lines = blockLines(notice, deps);
+    // One line: the name is in the form the copy is in, so the dedupe holds.
+    expect(lines).toEqual([`note: ${shown}`]);
+    const q = questionLine({ question: hostile, choices: [{ label: hostile }] });
+    expect(q).toBe(`question: ${shown} 1 ${shown}`);
+    const done = completionLine({ id: "e3", seq: 3, streaming: false, doc: docOf([head("succeeded")], { command: `cat ${hostile}` }) });
+    expect(done.startsWith(`entry 3: cat ${shown} — `), done).toBe(true);
+    expect(answerEvent(hostile).lines).toEqual([`answer: ${shown}`]);
+    for (const line of [...lines, q, done]) {
+      expect(line.includes(RLO) || line.includes(ESC), JSON.stringify(line)).toBe(false);
+    }
+  });
+
+  it("T1.181 (C22 I149): the input line windows the shown form, and the caret stands on its cell", () => {
+    const after = windowLine({ label: "> ", text: `a${RLO}b`, cursor: 3 }, 40);
+    expect(after).toEqual({ text: "> a<U+202E>b", caret: 2 + 1 + 8 + 1 });
+    const before = windowLine({ label: "> ", text: `a${RLO}b`, cursor: 1 }, 40);
+    expect(before.caret).toBe(2 + 1);
   });
 });

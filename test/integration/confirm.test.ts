@@ -49,6 +49,9 @@ import type { Choice } from "../../src/shell/local/registry.js";
 import { ASCII_CAPS, measurable, visible } from "../support/render.js";
 import type { OverlayManager } from "../../src/viewport/overlay/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
+import { buildGraph, buildSession } from "../support/session.js";
+import { MENU_ID } from "../../src/interaction/completion/index.js";
+import { fakeStdin } from "../support/fake-terminal.js";
 
 /**
  * The confirm's layer, rendered — the frame rather than the blocks.
@@ -234,7 +237,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
 
     // **Through the router.** This is the line the mutation removes.
     expect(w.router.dispatch(key("y"))).toBe(true);
-    await expect(answer).resolves.toEqual({ key: "y" });
+    await expect(answer).resolves.toEqual({ key: "y", outcome: "answered" });
 
     // Answering pops it — the owner's disposal, not the router's.
     expect(w.overlays.top).toBeNull();
@@ -244,7 +247,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     const w = world();
     const answer = present(w, { question: "Stop api-gateway?", choices: YES_NO });
     expect(w.router.dispatch(key("escape"))).toBe(true);
-    await expect(answer).resolves.toEqual({ key: "n" });
+    await expect(answer).resolves.toEqual({ key: "n", outcome: "answered" });
   });
 
   it("T4.81 (C16 I62, C23 I36, ruling 59): ⌃c at an open question leaves it open, unanswered and saying so", async () => {
@@ -272,7 +275,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
 
     // The control: an answer still answers it.
     w.router.dispatch(key("n"));
-    await expect(answer).resolves.toEqual({ key: "n" });
+    await expect(answer).resolves.toEqual({ key: "n", outcome: "answered" });
   });
 
   it("T4.4 (C23 I36): arrows move the selection and Enter takes it", async () => {
@@ -282,7 +285,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     // Default is `n` (index 1); up moves to `y`.
     expect(w.router.dispatch(key("up"))).toBe(true);
     expect(w.router.dispatch(key("return"))).toBe(true);
-    await expect(answer).resolves.toEqual({ key: "y" });
+    await expect(answer).resolves.toEqual({ key: "y", outcome: "answered" });
   });
 
   it("T4.5 (C16 I8, I40): ⌥↑ scrolls the transcript with a question open, and the question is neither answered nor dismissed", async () => {
@@ -323,7 +326,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     // rather than of "the question stopped taking keys".** An ordinary key still
     // goes to the question: `y` answers it.
     w.router.dispatch(key("y"));
-    await expect(answer).resolves.toEqual({ key: "y" });
+    await expect(answer).resolves.toEqual({ key: "y", outcome: "answered" });
   });
 
   it("T4.78 (C16 I44, I69, R-BLK-786, R-BLK-788): a newly presented question refuses an activation and says so", async () => {
@@ -345,7 +348,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     w.clock.t += 1_000;
     expect(w.router.dispatch(key("y"))).toBe(true);
     expect(w.router.lastStages).not.toContain("question-guard");
-    await expect(answer).resolves.toEqual({ key: "y" });
+    await expect(answer).resolves.toEqual({ key: "y", outcome: "answered" });
   });
 
   it("T4.79 (C16 I44): a neutral key ends the guard without answering", async () => {
@@ -362,7 +365,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
 
     expect(w.router.dispatch(key("y")), "and the next key answers, unrefused").toBe(true);
     expect(w.router.lastStages).not.toContain("question-guard");
-    await expect(answer).resolves.toEqual({ key: "y" });
+    await expect(answer).resolves.toEqual({ key: "y", outcome: "answered" });
   });
 
   it("T4.5b (C16 I8): an ordinary global binding is still held under a question", async () => {
@@ -396,7 +399,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     expect(w.overlays.top?.id).toBe("confirm");
 
     w.router.dispatch(key("y"));
-    await expect(answer).resolves.toEqual({ key: "y" });
+    await expect(answer).resolves.toEqual({ key: "y", outcome: "answered" });
   });
 
   it("T4.7 (C16 I25): the callback comes from the top layer only", async () => {
@@ -431,7 +434,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
 
     w.overlays.pop();
     w.router.dispatch(key("y"));
-    await expect(answer).resolves.toEqual({ key: "y" });
+    await expect(answer).resolves.toEqual({ key: "y", outcome: "answered" });
   });
 
   it("T4.9 (C16 I8, C23 I36): the flag is the backstop for what the handler declines", async () => {
@@ -614,7 +617,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     expect(w.overlays.top?.id).toBe("confirm");
 
     w.router.dispatch(key("escape"));
-    return expect(answer).resolves.toEqual({ key: "n" });
+    return expect(answer).resolves.toEqual({ key: "n", outcome: "answered" });
   });
 
   it("T4.28 (entry 16 R2, C15 I8): a question that does not fit keeps its choices", () => {
@@ -742,7 +745,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     expect(drawn.find((l) => l.includes("[n]")), "opens on the last").toContain("•");
 
     w.router.dispatch(key("escape"));
-    return expect(answer, "and escapes to it").resolves.toEqual({ key: "n" });
+    return expect(answer, "and escapes to it").resolves.toEqual({ key: "n", outcome: "answered" });
   });
 
   it("T4.33 (entry 16): the whole entry, read at 24 rows with a twenty-row payload", () => {
@@ -829,7 +832,7 @@ describe("C23 I82 — a question refuses once and says so (review batch 2, M5)",
 
     // The notice stays with the question and is not an answer: `n` answers.
     w.router.dispatch(key("n"));
-    await expect(answer).resolves.toEqual({ key: "n" });
+    await expect(answer).resolves.toEqual({ key: "n", outcome: "answered" });
   });
 
   it("T4.82b (C23 I82, entry 16 R2): at 12 rows the choices are still drawn after the notice lands", () => {
@@ -892,5 +895,299 @@ describe("C23 I82 — a question refuses once and says so (review batch 2, M5)",
     void present(choosing, { question: "Apply?", choices: YES_NO });
     choosing.router.dispatch(letter);
     expect(JSON.stringify(choosing.overlays.top?.content)).toContain("answer this first");
+  });
+});
+
+describe("C23 I88 — the inspection scrolls in a built session", () => {
+  it("T4.88 (C23 I88, C22 I141, C22 I142): an approval overflowing its region; show full diff; down three times puts line 4 first in the prompt slot, the question unresolved, and the last row names the scroll keys", async () => {
+    const stdin = fakeStdin();
+    let answered: unknown = null;
+    const s = await buildSession(
+      {
+        stdin: stdin as never,
+        manifest: {
+          schema: "tui.manifest/1",
+          binary: "prism",
+          version: "1.0.0",
+          tools: [{ name: "apply", local: true, summary: "apply", args: [], flags: [] }],
+        },
+        localHandlers: {
+          apply: async (_argv: unknown, ctx: { ask: (o: unknown) => Promise<unknown> }) => {
+            answered = await ctx.ask({
+              question: "Apply the patch?",
+              detail: block({
+                kind: "raw",
+                id: "d",
+                text: Array.from({ length: 30 }, (_, i) => `patch line ${String(i + 1)}`).join("\n"),
+              }),
+              choices: [
+                { key: "n", label: "no", default: true },
+                { key: "s", label: "show full diff", inspect: true },
+              ],
+            });
+            return { schema: "tui.view/1", status: "ok", blocks: [] };
+          },
+        },
+      } as never,
+      { columns: 80, rows: 30 },
+    );
+    const flush = async (): Promise<void> => {
+      for (let i = 0; i < 4; i += 1) await Promise.resolve();
+      await new Promise((r) => setTimeout(r, 20));
+    };
+    // One byte at a time: a run arriving together is a paste (C16 §7).
+    for (const ch of "/apply\r") {
+      stdin.emit(ch);
+      await flush();
+    }
+    // `→` ends C16 I44's arrival guard; `s` suspends into the inspection.
+    stdin.emit("\u001b[C");
+    await flush();
+    stdin.emit("s");
+    await flush();
+    const text = (): readonly string[] => s.screen().text;
+    const first = (): number => text().findIndex((l) => /patch line \d+\b/u.test(l));
+    const at = first();
+    expect(at, "the payload is drawn").toBeGreaterThanOrEqual(0);
+    expect(text()[at], "at its top").toMatch(/patch line 1\b/u);
+    expect(text().some((l) => l.includes("patch line 30")), "and it overflows").toBe(false);
+
+    for (let i = 0; i < 3; i += 1) {
+      stdin.emit("\u001b[B");
+      await flush();
+    }
+    expect(first(), "the box's first row is where it was").toBe(at);
+    expect(text()[at], "and now reads line 4").toMatch(/patch line 4\b/u);
+    expect(text().some((l) => /patch line 3\b/u.test(l)), "line 3 is above the box").toBe(false);
+    // **In the prompt slot, whole** (C22 I142, C23 I74): the panel sits between
+    // the two rules that bound the prompt's rows, and the slot's cap did not cut
+    // its key row or its bottom border (C23 I88's sizing).
+    const top = text().findIndex((l) => l.startsWith("┌ Confirm"));
+    const bottom = text().findIndex((l, i) => i > at && l.startsWith("└"));
+    const rule = (l: string | undefined) => /^─+$/u.test(l ?? "");
+    expect([rule(text()[top - 1]), rule(text()[bottom + 1])], "between the prompt's two rules").toEqual([true, true]);
+    expect(text()[bottom - 1], "the panel's last row is the key row").toContain("↑↓ scroll  esc back to the question");
+    expect(answered, "the question is unresolved").toBeNull();
+  });
+});
+
+describe("C23 §7g — a question's life in a built session", () => {
+  /**
+   * A session whose local verb `q` waits on a gate the row opens, then asks —
+   * so a row can type while the verb is running and have the questions arrive
+   * over whatever it typed.
+   */
+  const session = async (ask: (ctx: { ask: (o: unknown) => Promise<unknown> }) => Promise<unknown>) => {
+    const stdin = fakeStdin();
+    let open: () => void = () => undefined;
+    const gate = new Promise<void>((r) => (open = r));
+    const answers: unknown[] = [];
+    const s = await buildSession(
+      {
+        stdin: stdin as never,
+        manifest: {
+          schema: "tui.manifest/1",
+          binary: "prism",
+          version: "1.0.0",
+          tools: [{ name: "q", local: true, summary: "ask", args: [], flags: [] }],
+        },
+        localHandlers: {
+          q: async (_argv: unknown, ctx: { ask: (o: unknown) => Promise<unknown> }) => {
+            await gate;
+            answers.push(await ask(ctx));
+            return { schema: "tui.view/1", status: "ok", blocks: [] };
+          },
+        },
+      } as never,
+      { columns: 80, rows: 30 },
+    );
+    const flush = async (): Promise<void> => {
+      for (let i = 0; i < 4; i += 1) await Promise.resolve();
+      await new Promise((r) => setTimeout(r, 20));
+    };
+    /** One byte at a time: a run arriving together is a paste (C16 §7). */
+    const type = async (text: string): Promise<void> => {
+      for (const ch of text) {
+        stdin.emit(ch);
+        await flush();
+      }
+    };
+    const paste = async (text: string): Promise<void> => {
+      stdin.emit(`\u001b[200~${text}\u001b[201~`);
+      await flush();
+    };
+    return {
+      s,
+      type,
+      paste,
+      flush,
+      answers,
+      open: async () => {
+        open();
+        await flush();
+      },
+      text: () => s.screen().text,
+      /** The prompt's own row: the line the reader is composing. */
+      prompt: () => s.screen().text.find((l) => l.startsWith("❯")) ?? "",
+    };
+  };
+
+  const REPLY = {
+    question: "Proceed?",
+    choices: [
+      { key: "n", label: "no", default: true },
+      { key: "y", label: "yes" },
+      { key: "r", label: "reply…", reply: true },
+    ],
+  };
+
+  it("T4.89 (C23 I89): r, type, esc, r — the prompt holds the composed text again, and enter answers with it", async () => {
+    const w = await session((ctx) => ctx.ask(REPLY));
+    await w.type("/q\r");
+    await w.open();
+    // `→` ends C16 I44's arrival guard without answering.
+    await w.type("\u001b[C");
+    await w.type("r");
+    await w.type("because");
+    expect(w.prompt(), "composing in the borrowed line").toContain("because");
+    // C16 holds a lone `Esc` for 50 ms (§2); the window has to elapse.
+    w.s.clock.advance(1_000);
+    await w.type("\u001b");
+    w.s.clock.advance(80);
+    await new Promise((r) => setTimeout(r, 80));
+    await w.flush();
+    expect(w.answers, "esc did not answer").toEqual([]);
+    expect(w.text().some((l) => l.includes("[r]")), "the choices are back").toBe(true);
+    expect(w.prompt().includes("because"), "the line is the reader's again").toBe(false);
+    await w.type("r");
+    expect(w.prompt(), "the composed text comes back").toContain("because");
+    await w.type("\r");
+    expect(w.answers).toEqual([{ key: "r", text: "because", outcome: "answered" }]);
+  });
+
+  it("T4.90 (C23 I90): a reply with a pasted chip reaches the handler as the paste", async () => {
+    const w = await session((ctx) => ctx.ask(REPLY));
+    await w.type("/q\r");
+    await w.open();
+    await w.type("\u001b[C");
+    await w.type("r");
+    const pasted = Array.from({ length: 6 }, (_, i) => `alpha ${String(i)}`).join("\n");
+    await w.paste(pasted);
+    expect(w.prompt(), "a chip, drawn as its label").toContain("#1");
+    await w.type("\r");
+    expect(w.answers, "the owner is handed the paste, not the sentinel").toEqual([
+      { key: "r", text: pasted, outcome: "answered" },
+    ]);
+  });
+
+  it("T4.91 (C23 I91): two local verbs ask at once; one question on screen titled · 1 more; a menu open before them comes back after the second answer", async () => {
+    // **One verb asking twice at once** — two verbs submitted together are
+    // deferred one behind the other by the submission guard (C23 I5), which
+    // queues the *verbs*; this row is about two *questions* at once.
+    const w = await session((ctx) =>
+      Promise.all([
+        ctx.ask({ question: "First question?", choices: [{ key: "y", label: "yes" }, { key: "n", label: "no", default: true }] }),
+        ctx.ask({ question: "Second question?", choices: [{ key: "y", label: "yes" }, { key: "n", label: "no", default: true }] }),
+      ]),
+    );
+    await w.type("/q\r");
+    // The reader types while the verb runs, and a menu opens.
+    await w.type("/h");
+    const menuUp = (): boolean => w.text().some((l) => l.includes("/history"));
+    expect(menuUp(), "the menu is open").toBe(true);
+
+    await w.open();
+    const confirms = w.text().filter((l) => l.startsWith("┌ Confirm"));
+    expect(confirms, "one question on screen, counting the other").toEqual([expect.stringMatching(/^┌ Confirm · 1 more/u)]);
+    expect(w.text().some((l) => l.includes("First question?"))).toBe(true);
+    expect(w.text().some((l) => l.includes("Second question?")), "the second is not drawn").toBe(false);
+    expect(menuUp(), "the menu was displaced").toBe(false);
+
+    w.s.clock.advance(1_000);
+    await w.type("y");
+    expect(w.text().some((l) => l.includes("Second question?")), "the second is shown").toBe(true);
+    expect(w.text().filter((l) => l.startsWith("┌ Confirm")), "uncounted now").toEqual([expect.stringMatching(/^┌ Confirm ─/u)]);
+    expect(menuUp(), "the menu waits for the last question").toBe(false);
+
+    w.s.clock.advance(1_000);
+    await w.type("n");
+    expect(w.answers).toEqual([[{ key: "y", outcome: "answered" }, { key: "n", outcome: "answered" }]]);
+    expect(menuUp(), "and comes back when no question remains").toBe(true);
+
+    // **And never between them, which no frame shows** (C15 I32): between the
+    // first question's removal and the second's push the stack holds nothing
+    // blocking, and a restore there is a menu pushed and displaced again inside
+    // one keystroke. Read off the stack's changes, since the screen cannot.
+    const { graph, stdin, clock } = await buildGraph();
+    graph.lifecycle.acquire();
+    for (const ch of "/h") stdin.emit(ch);
+    expect(graph.overlays.top?.id, "the menu is open").toBe(MENU_ID);
+    const menuPushes: string[] = [];
+    graph.overlays.subscribe((c) => {
+      if (c.kind === "push" && c.id === MENU_ID) menuPushes.push(graph.confirm.open ? "under a question" : "alone");
+    });
+    void graph.confirm.ask({ question: "First?", choices: YES_NO });
+    void graph.confirm.ask({ question: "Second?", choices: YES_NO });
+    clock.advance(1_000);
+    stdin.emit("y");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(menuPushes, "not restored between the two").toEqual([]);
+    clock.advance(1_000);
+    stdin.emit("n");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(menuPushes, "restored once, after the last").toEqual(["alone"]);
+  });
+
+  it("T4.92 (C23 I94, I60): an approval's esc settles the card denied and runs nothing; an aborted signal settles it cancelled", async () => {
+    const { pipelineHarness, settled: drained } = await import("../support/execution.js");
+    const head = (h: ReturnType<typeof pipelineHarness>): string | undefined => {
+      const blocks = h.transcript.entries[0]?.doc.blocks ?? [];
+      const first = blocks[0];
+      return first?.kind === "notice" ? first.text : undefined;
+    };
+
+    // `esc` resolves with the default, and the default is `deny`.
+    const denied = pipelineHarness({ approval: () => ({}) });
+    denied.pipeline.submit("/ps");
+    // Unargued: the route holds the guard while it waits, so a drain would wait out its cap.
+    await drained();
+    const waiting = denied.transcript.entries[0]?.doc.blocks[0];
+    expect(waiting?.kind === "notice" && waiting.state, "the head reads waiting (C04 I149)").toBe("waiting");
+    denied.confirm.answerHandler()?.(key("escape"));
+    await drained(denied.pipeline);
+    await drained(denied.pipeline);
+    expect(head(denied)).toBe("ps · denied");
+    expect(denied.calls, "nothing ran").not.toContain("invoke");
+
+    // The asker withdraws: `cancelled`, not `denied`, and nothing runs.
+    const gone = new AbortController();
+    const cancelled = pipelineHarness({ approval: () => ({ signal: gone.signal }) });
+    cancelled.pipeline.submit("/ps");
+    await drained();
+    gone.abort();
+    await drained(cancelled.pipeline);
+    await drained(cancelled.pipeline);
+    expect(head(cancelled)).toBe("ps · cancelled");
+    expect(cancelled.calls).not.toContain("invoke");
+    expect(cancelled.recorded).toEqual([{ command: "/ps", exitCode: 130 }]);
+    expect(cancelled.confirm.answerHandler(), "the layer is gone").toBeNull();
+
+    // **An answer is the only thing that runs the tool, whatever the default**
+    // (C23 I94). An asker widening the choices may mark `allow` default; a
+    // withdrawal resolves with that key and must still run nothing.
+    const widened = new AbortController();
+    const permissive = pipelineHarness({
+      approval: () => ({
+        signal: widened.signal,
+        choices: [{ key: "y", label: "allow", default: true }, { key: "n", label: "deny" }],
+      }),
+    });
+    permissive.pipeline.submit("/ps");
+    await drained();
+    widened.abort();
+    await drained(permissive.pipeline);
+    await drained(permissive.pipeline);
+    expect(head(permissive)).toBe("ps · cancelled");
+    expect(permissive.calls, "withdrawn with allow as its key, and nothing ran").not.toContain("invoke");
   });
 });

@@ -14,6 +14,7 @@ import {
   type FakeStdout,
 } from "../support/fake-terminal.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
+import { CLIPBOARD_LIMIT, clipboardWrite, systemNotification, windowTitle } from "../../src/terminal/escapes.js";
 
 type Harness = {
   lifecycle: TerminalLifecycle;
@@ -716,7 +717,156 @@ describe("C01 focus reporting and the title stack (I23, I24)", () => {
     lifecycle.title("c\x1b[31m");
     lifecycle.release();
     const tail = stdout.output.slice(again);
-    expect(tail.startsWith(`${PUSH}\x1b]2;c[31m\x07`), "pushed, and the text control-stripped").toBe(true);
+    expect(tail.startsWith(`${PUSH}\x1b]2;c^[[31m\x07`), "pushed, and the control shown (C01 I26)").toBe(true);
     expect(count(tail, POP), "popped at release").toBe(1);
+  });
+});
+
+describe("C01 the clipboard's OSC 52 (I25)", () => {
+  /** The payload between the introducer and the terminator, or null for any other shape. */
+  const payloadOf = (sequence: string): string | null =>
+    /^\x1b\]52;c;([A-Za-z0-9+/=]*)\x07$/u.exec(sequence)?.[1] ?? null;
+
+  it("T1.32 (I25): clipboardWrite is base64, write-only, never empty and capped at CLIPBOARD_LIMIT", () => {
+    const text = "a; b\nline \x1b[31mred\x1b[0m bell\x07 é 🦀";
+    const sequence = clipboardWrite(text);
+    expect(sequence).not.toBeNull();
+    expect(sequence!.startsWith("\x1b]52;c;"), "the introducer and the clipboard selection").toBe(true);
+    expect(sequence!.endsWith("\x07")).toBe(true);
+    expect(sequence!.indexOf("\x07"), "one BEL, the terminator").toBe(sequence!.length - 1);
+    const payload = payloadOf(sequence!);
+    expect(payload, "the payload is base64 and nothing else").not.toBeNull();
+    // Byte for byte: ESC, BEL and the newline survive, because nothing is stripped.
+    expect(Buffer.from(payload!, "base64")).toEqual(Buffer.from(text, "utf8"));
+    expect([...payload!].some((c) => c.charCodeAt(0) < 0x20), "no control between the brackets").toBe(false);
+    // Write-only: the payload is never the query.
+    expect(payload).not.toBe("?");
+
+    // W1: the empty text writes nothing — xterm reads an empty payload as *clear*.
+    expect(clipboardWrite("")).toBeNull();
+
+    // The cap is on the payload. 75 000 bytes of text encode to exactly the limit;
+    // one more byte crosses it by a whole step of four.
+    expect(CLIPBOARD_LIMIT).toBe(100_000);
+    const atLimit = clipboardWrite("x".repeat(75_000));
+    expect(payloadOf(atLimit ?? "")?.length).toBe(CLIPBOARD_LIMIT);
+    expect(clipboardWrite("x".repeat(75_001))).toBeNull();
+    // And it is bytes, not characters: 37 500 two-byte characters are the same 75 000.
+    expect(clipboardWrite("é".repeat(37_500))).not.toBeNull();
+    expect(clipboardWrite("é".repeat(37_501))).toBeNull();
+  });
+});
+
+describe("C01 the OSC text payloads (I26)", () => {
+  /**
+   * Ruling 71's twelve, **written as escapes** — a literal override in this
+   * file would reorder what a reviewer reads against what runs (F1402, A03
+   * SS69).
+   */
+  const BIDI = [0x061c, 0x200e, 0x200f, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068, 0x2069];
+  const shown = (cp: number): string => `<U+${cp.toString(16).toUpperCase().padStart(4, "0")}>`;
+  /** The UTF-8 of one code point, to look for in the bytes a terminal would receive. */
+  const utf8 = (cp: number): Buffer => Buffer.from(String.fromCodePoint(cp), "utf8");
+
+  it("T1.33 (I26): a bidi format character through windowTitle and systemNotification is shown, never written", () => {
+    // **U+202E first, by name**, because it is F1407's case: an override in a
+    // title reorders every cell after it in the title bar.
+    expect(windowTitle("a\u202Eb")).toBe("\x1b]2;a<U+202E>b\x07");
+    expect(systemNotification("a\u202Eb")).toBe("\x1b]9;a<U+202E>b\x07");
+
+    for (const cp of BIDI) {
+      const text = `a${String.fromCodePoint(cp)}b`;
+      const title = windowTitle(text);
+      const note = systemNotification(text);
+      expect(title, `U+${cp.toString(16)} in a title`).toBe(`\x1b]2;a${shown(cp)}b\x07`);
+      expect(note, `U+${cp.toString(16)} in a notification`).toBe(`\x1b]9;a${shown(cp)}b\x07`);
+      // **The bytes, read**: the sequence a terminal receives holds none of
+      // the twelve, whichever one went in.
+      for (const other of BIDI) {
+        expect(Buffer.from(title, "utf8").includes(utf8(other)), `U+${other.toString(16)} written in a title`).toBe(false);
+        expect(Buffer.from(note, "utf8").includes(utf8(other)), `U+${other.toString(16)} written in a notification`).toBe(false);
+      }
+    }
+
+    // The other arm beside it: a C0 is shown too, in caret form (T1.34).
+    expect(windowTitle("a\x1b\u202Eb")).toBe("\x1b]2;a^[<U+202E>b\x07");
+    // And the notification's leading-number guard still reads the text it is handed.
+    expect(systemNotification("7\u202E;x")).toBe("\x1b]9;7<U+202E>;x\x07");
+
+    // **The control**: right-to-left *text* is not a format character, and
+    // passes whole — the arm is about the twelve, not about a script.
+    expect(windowTitle("\u05D0\u05D1")).toBe("\x1b]2;\u05D0\u05D1\x07");
+  });
+
+  it("T1.34 (I26, ruling 86): ESC [ 2 J reaches a title and a notification as ^[[2J, and C0, DEL, C1, tab and newline are shown in caret form", () => {
+    // **F1458's case by name**: deletion left `[2J`, which reads as text a
+    // tool meant to print. The form reads as what it is.
+    expect(windowTitle("a\x1b[2Jb")).toBe("\x1b]2;a^[[2Jb\x07");
+    expect(systemNotification("a\x1b[2Jb")).toBe("\x1b]9;a^[[2Jb\x07");
+
+    // One of each arm, and tab and newline, which a block leaves as
+    // themselves and a payload cannot (C01 I26's stated difference).
+    const cases: ReadonlyArray<readonly [number, string]> = [
+      [0x00, "^@"],
+      [0x07, "^G"],
+      [0x09, "^I"],
+      [0x0a, "^J"],
+      [0x1b, "^["],
+      [0x1f, "^_"],
+      [0x7f, "^?"],
+      [0x80, "M-^@"],
+      [0x9b, "M-^["],
+      [0x9c, "M-^\\"],
+      [0x9f, "M-^_"],
+    ];
+    for (const [cp, form] of cases) {
+      const text = `a${String.fromCharCode(cp)}b`;
+      expect(windowTitle(text), `U+${cp.toString(16)} in a title`).toBe(`\x1b]2;a${form}b\x07`);
+      expect(systemNotification(text), `U+${cp.toString(16)} in a notification`).toBe(`\x1b]9;a${form}b\x07`);
+    }
+
+    // The two arms side by side, in either order.
+    expect(windowTitle("\x1b\u202E\u202E\x1b")).toBe("\x1b]2;^[<U+202E><U+202E>^[\x07");
+    // **Idempotent**: a line C22 I149 already put in the form passes as itself.
+    const shownLine = "prism: ^[[2J <U+202E> M-^[";
+    expect(windowTitle(shownLine)).toBe(`\x1b]2;${shownLine}\x07`);
+    // The leading-number guard still reads the form, not the raw text.
+    expect(systemNotification("7\x1b;x")).toBe("\x1b]9;7^[;x\x07");
+
+    // **The control**: printable ASCII that looks like the residue passes
+    // whole, so the rows above read a rewrite and not a copy.
+    expect(windowTitle("abc [2J")).toBe("\x1b]2;abc [2J\x07");
+  });
+
+  it("T1.35 (I26): over every BMP code unit, neither payload holds a C0, DEL or C1 code unit or a bidi format character", () => {
+    // **The security property, read from the bytes a terminal receives**:
+    // anything that could end the string early or open a sequence inside it.
+    // `BIDI` is the twelve above; a code unit, not a code point, because a
+    // payload's forbidden set is all in the BMP.
+    const forbidden = (u: number): boolean => u < 0x20 || (u >= 0x7f && u <= 0x9f) || BIDI.includes(u);
+    const bad: string[] = [];
+    let rewritten = 0;
+    for (let cp = 0; cp <= 0xffff; cp += 1) {
+      if (cp >= 0xd800 && cp <= 0xdfff) continue; // a lone surrogate is not a character
+      const text = `a${String.fromCharCode(cp)}b`;
+      for (const [open, sequence] of [
+        ["\x1b]2;", windowTitle(text)],
+        ["\x1b]9;", systemNotification(text)],
+      ] as const) {
+        expect(sequence.startsWith(open) && sequence.endsWith("\x07")).toBe(true);
+        const payload = sequence.slice(open.length, -1);
+        for (let i = 0; i < payload.length; i += 1) {
+          if (forbidden(payload.charCodeAt(i))) {
+            bad.push(`U+${cp.toString(16).toUpperCase().padStart(4, "0")} in ${open.slice(2, 3)}`);
+            break;
+          }
+        }
+        if (open === "\x1b]2;" && payload !== text) rewritten += 1;
+      }
+    }
+    expect(bad, "a code unit the terminal would read as a control or a reordering").toEqual([]);
+    // The control: C0, DEL and C1 (65) and ruling 71's twelve were rewritten,
+    // so the sweep read payloads that had something to hide.
+    expect(rewritten, "65 C0, DEL and C1 and twelve bidi").toBe(77);
   });
 });

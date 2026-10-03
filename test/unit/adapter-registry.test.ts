@@ -194,6 +194,31 @@ describe("§4 (T1.7) — every row of the mapping table", () => {
     valid(doc);
   });
 
+  it("T1.23 (C07 I24, F1493): a cancelled result's notice is muted with the cancelled mark, from cancelledNotice", () => {
+    // **The mark with the tone and the text, one string per document**: the
+    // defect was a `muted` notice with no glyph, so a row reading the tone alone
+    // passed it, and one reading the glyph alone would pass a build that moved
+    // the tone. Forty lines and none, because the notice is appended in both.
+    const last = (over: Partial<RawResult>): string => {
+      const doc = registry.adapt(raw(over), CTX);
+      valid(doc);
+      const b = doc.blocks.at(-1);
+      return b?.kind === "notice" ? `${doc.status} · notice ${b.tone} ${String(b.glyph)} · ${b.text}` : `${doc.status} · ${String(b?.kind)}`;
+    };
+    const lines = Array.from({ length: 40 }, (_, i) => ({ line: String(i) }));
+    expect([
+      last({ stdout: lines, cancelled: true, exitCode: 130 }),
+      last({ stdout: undefined, stdoutRaw: "", cancelled: true, exitCode: null }),
+    ]).toEqual([
+      "partial · notice muted cancelled · Cancelled. Output produced before the stop is shown above.",
+      "partial · notice muted cancelled · Cancelled. Output produced before the stop is shown above.",
+    ]);
+    // **The control**: a timeout is a failure, with the failure's tone and mark.
+    const timedOut = registry.adapt(raw({ timedOut: true, exitCode: null, durationMs: 30_000 }), CTX);
+    const box = timedOut.blocks[0];
+    expect(box?.kind === "notice" && `${box.tone} ${String(box.glyph)}`).toBe("error error");
+  });
+
   it("T3.20: cancelled and timedOut both set → partial, per the precedence", () => {
     const doc = registry.adapt(raw({ cancelled: true, timedOut: true, exitCode: null }), CTX);
     expect(doc.status).toBe("partial");

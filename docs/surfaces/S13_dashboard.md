@@ -31,7 +31,7 @@ At 120 × 36:
 Stated because the same picture produced a live ambiguity in S01, where the deferral asserting it could not be written for two commits while the figure and the arithmetic disagreed. `frameRows` in `test/support/surfaces.ts` strips the marks, so the convention is mechanical rather than remembered.
 
 ```
-┌ ▲ prism · fmx-prod ──────────────────────── ● live · 14:23:07 · updated 3s ─┐
+┌ ▲ prism · corp-prod ──────────────────────── ● live · 14:23:07 · updated 3s ─┐
 │                                                                             │
 │ ┌ cluster ───────────────────┐ ┌ activity · last hour ────────────────────┐ │
 │ │ nodes      12  (8 GPU)     │ │ submissions   47  ████████████░░░░░░░░   │ │

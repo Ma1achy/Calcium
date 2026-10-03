@@ -27,7 +27,7 @@
  * reasoning, applied one family earlier).
  */
 
-import type { ToolDef } from "@fmx/calcium";
+import type { ToolDef } from "calcium-tui";
 
 /** `container` is the one argument every verb here takes. */
 const CONTAINER = {

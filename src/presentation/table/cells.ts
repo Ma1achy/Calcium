@@ -17,7 +17,7 @@ import { cells, stripControl, truncate, truncateParts } from "../text.js";
 import type { AmbiguousWidth } from "../text.js";
 import type { Cell, ColumnDef, Table, TableRow, Tone } from "../../data/viewmodel/index.js";
 import type { RenderContext } from "../blocks/types.js";
-import type { PlannedColumns } from "./plan.js";
+import type { PlannedColumn, PlannedColumns } from "./plan.js";
 import type { Alignment } from "./kind.js";
 import { displayText, isMissing } from "./kind.js";
 
@@ -82,6 +82,49 @@ function seriesLead(
   const lead = `${mark} `;
   const room = width - cells(lead, ctx.capabilities.ambiguousWidth);
   return room >= 0 ? { lead, room } : { lead: "", room: width };
+}
+
+/**
+ * Where a table declaring `current` puts its lead, and whether this row is the
+ * one it marks (I33, §5d). Absent on a table without the field, which is every
+ * table that drew before it and draws the same now.
+ */
+export type CurrentLead = Readonly<{ key: string; on: boolean }>;
+
+/**
+ * The current row's lead (I33, §5d, §097): `current`'s mark and its separator
+ * on the current row, and the same cells blank on every other.
+ *
+ * **Taken off the column's planned width before the cell is fitted**, as
+ * `seriesLead` takes a series' mark (I23). A lead spliced into the text would
+ * be what a cut removes first from a column truncating at its start, and the
+ * mark is the one thing on the row that must survive; outside the cut, the
+ * text shortens instead. A column narrower than the lead draws the cell with
+ * no lead, on every row alike, so the rows still agree.
+ *
+ * **The blank is measured from the mark**, not written as a literal two: C09
+ * I48 resolves an Ambiguous slot to its ASCII half at `"wide"`, and a blank
+ * counted separately is a second answer to how wide the lead is.
+ *
+ * The mark is `accent`, the registry's tone for `current`, and bold with the
+ * cell it leads (§097's `bold` is on ` › /colour `). On a row that takes the
+ * `pick` ground both are re-inked by the ground's `pickInk` in `definition.ts`;
+ * at one bit, and on a theme with no `pick`, the accent and the weight are
+ * what is left, and the weight survives both.
+ */
+function currentLead(
+  planned: PlannedColumn,
+  lead: CurrentLead | undefined,
+  ctx: RenderContext,
+  on: string | undefined,
+): Readonly<{ span: Span | null; planned: PlannedColumn }> {
+  if (lead === undefined || lead.key !== planned.key) return { span: null, planned };
+  const mark = `${glyphFor("current", ctx.capabilities)} `;
+  const used = cells(mark, ctx.capabilities.ambiguousWidth);
+  if (used > planned.width) return { span: null, planned };
+  const rest = { ...planned, width: planned.width - used };
+  if (!lead.on) return { span: { text: " ".repeat(used) }, planned: rest }; // cells-ok — the mark's own cells, measured above
+  return { span: { text: mark, style: { ...tone("accent", ctx.theme, ctx.capabilities, on), bold: true } }, planned: rest };
 }
 
 /**
@@ -286,14 +329,22 @@ export function headerSpans(
    * the caller that names it here.
    */
   on?: string,
+  /**
+   * The current row's lead column (I33, §5d), always blank here: the header is
+   * a row, and a label over a column whose cells start two cells in would sit
+   * two cells left of every value it names.
+   */
+  current?: CurrentLead,
 ): readonly Span[] {
   const g = glyphs(ctx.capabilities);
   const dim = tone("muted", ctx.theme, ctx.capabilities, on);
   const byKey = new Map<string, ColumnDef>(block.columns.map((c) => [c.key, c]));
 
   const spans: Span[] = [];
-  plan.visible.forEach((planned, index) => {
+  plan.visible.forEach((whole, index) => {
     if (index > 0) spans.push(gapSpan(plan.gap));
+    const { span: leadSpan, planned } = currentLead(whole, current, ctx, on);
+    if (leadSpan !== null) spans.push(leadSpan);
 
     const column = byKey.get(planned.key);
     const label = stripControl(column === undefined ? planned.key : column.label);
@@ -347,6 +398,11 @@ export function rowSpans(
   options: Readonly<{
     expandable: boolean;
     /**
+     * What expanding this row reveals (C11 I32, ruling 69) — drawn `+N` beside a
+     * collapsed row's mark, and not at all at zero.
+     */
+    hidden: number;
+    /**
      * **The ground this row is painted on** (C10 I48, I14) — a surface name,
      * absent being the page. One value, chosen by the caller that also picks
      * the wash, because *which ground did this row take* is one question and
@@ -365,13 +421,19 @@ export function rowSpans(
     unknown?: ReadonlySet<string>;
     /** Where each aligned decimal column's values end (I29), from `decimalEnds`. */
     ends?: ReadonlyMap<string, number> | undefined;
+    /** The current row's lead column, and whether this row is current (I33). */
+    current?: CurrentLead | undefined;
   }>,
 ): readonly Span[] {
   const byKey = new Map<string, ColumnDef>(block.columns.map((c) => [c.key, c]));
   const spans: Span[] = [];
 
-  plan.visible.forEach((planned, index) => {
+  plan.visible.forEach((whole, index) => {
     if (index > 0) spans.push(gapSpan(plan.gap));
+    // **The current row's lead, before any arm reads the column's width** (I33,
+    // §5d): every arm below fits its cell to what the lead leaves.
+    const { span: leadSpan, planned } = currentLead(whole, options.current, ctx, options.on);
+    if (leadSpan !== null) spans.push(leadSpan);
 
     const column = byKey.get(planned.key);
     const cell: Cell | undefined = row.cells[planned.key];
@@ -380,9 +442,19 @@ export function rowSpans(
     // that cannot be opened leaves the column blank rather than drawing a marker
     // that does nothing when pressed.
     if (column?.role === "expand") {
-      const marker = options.expandable
-        ? glyphFor(row.expanded === true ? "collapse" : "expand", ctx.capabilities)
-        : "";
+      // **Two carriers for a collapsed row** (C10 §4k.5, ruling 69): the mark and
+      // the count it hides, so collapsed and leaf differ by more than a glyph.
+      // An expanded row's second carrier is its content's position below it.
+      const mark = glyphFor(row.expanded === true ? "collapse" : "expand", ctx.capabilities);
+      const counted = row.expanded !== true && options.hidden > 0 ? `${mark}+${String(options.hidden)}` : mark;
+      // **A count is never cut** (C11 I32, §3a row 9): below the reservation —
+      // the column itself truncated — `▹+12` cut from the end reads `▹+1`, a
+      // different number, so the mark stands alone.
+      const marker = !options.expandable
+        ? ""
+        : cells(counted, ctx.capabilities.ambiguousWidth) <= planned.width
+          ? counted
+          : mark;
       // `fitAt` and not `fit` for the reason above, even though the internal
       // glyph table cannot reach it today: `glyphFor` collapses `expand` and
       // `collapse` to `>` and `v` at `ambiguousWidth: "wide"` (C09 I48), so the
@@ -509,7 +581,10 @@ export function rowSpans(
     // what makes that legible: the ink is resolved against the ground the
     // caller laid, so §4k.2 row 1's third clause holds — failure keeps its
     // glyph, its word and its tone, on the ground selection took.
-    const style = tone(cell?.tone ?? "default", ctx.theme, ctx.capabilities, options.on);
+    const inked = tone(cell?.tone ?? "default", ctx.theme, ctx.capabilities, options.on);
+    // **The current row's first cell is bold** (I33, §097): the weight is the
+    // carrier that survives one bit, where the ground and the accent do not.
+    const style = options.current?.on === true && options.current.key === whole.key ? { ...inked, bold: true } : inked;
 
     // The end a cell truncates from is the surface's (C04 I30) — a path keeps its
     // filename, a config key its leaf, an image its tag. C11 reads the field and

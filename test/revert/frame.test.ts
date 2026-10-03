@@ -11,7 +11,9 @@
 import { describe, expect, it } from "vitest";
 
 import { compose, type Composed } from "../../src/shell/frame.js";
-import { CONTENT_MARGIN_R, regionWidth } from "../../src/shell/config.js";
+import { commandRows } from "../../src/shell/paint.js";
+import { hardWrapCells } from "../../src/presentation/text.js";
+import { CONTENT_MARGIN_R, RAIL_COLUMNS, regionWidth, transcriptWidth } from "../../src/shell/config.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { block } from "../../src/data/viewmodel/index.js";
@@ -26,7 +28,7 @@ const SESSION: SessionSnapshot = Object.freeze({
   env: Object.freeze({}),
   lastUuid: null,
   identity: null,
-  cluster: "fmx-prod",
+  cluster: "corp-prod",
   health: "live",
   version: "1.0.0",
   retained: null,
@@ -69,13 +71,15 @@ const words = (cells: number): string => {
 describe("C22 I109 — the region's width", () => {
   it("T6.124 (C22 I109): handing `size.columns` to the resize instead of `region.width` → T3.42's wider document stops wrapping and T4.93's recorded widths move by one", () => {
     const f = frameAt(80);
-    expect(f.region.width).toBe(regionWidth(80));
+    // The transcript's width is the region's less the rail's column (C14 I57).
+    expect(f.region.width).toBe(transcriptWidth(80));
+    expect(f.region.width).toBe(regionWidth(80) - RAIL_COLUMNS);
 
     // The revert, spelled as the number rather than as an edit: a composer that
-    // hands the terminal's width down measures at 80 where the region says 79.
+    // hands the terminal's width down measures at 80 where the region says 78.
     const reverted = f.size.columns;
-    expect(reverted, "the revert is one column, and only one").toBe(
-      f.region.width + CONTENT_MARGIN_R,
+    expect(reverted, "the revert is the margin and the rail").toBe(
+      f.region.width + CONTENT_MARGIN_R + RAIL_COLUMNS,
     );
 
     // **What it costs, and it is a wrap and not a height.** A document whose
@@ -87,9 +91,25 @@ describe("C22 I109 — the region's width", () => {
     expect(rowsAt(over, reverted), "at the terminal — does not").toBe(1);
 
     // And the overlay region goes with it: a layer's content is content
-    // (§6l.9 row 5), so the revert moves a centred box by a column too.
-    expect(f.overlayRegion.width).toBe(f.region.width);
+    // (§6l.9 row 5), so the revert moves a centred box by a column too. The
+    // layer region is the content width — the transcript's plus the rail's
+    // column (C22 I28, C14 I57).
+    expect(f.overlayRegion.width).toBe(regionWidth(80));
+    expect(f.overlayRegion.width).toBe(f.region.width + RAIL_COLUMNS);
     const centred = (width: number, box: number): number => Math.floor((width - box) / 2);
     expect(centred(f.overlayRegion.width, 40)).not.toBe(centred(reverted, 40));
+  });
+});
+
+describe("C22 I33 — tier 6", () => {
+  it("T6.137 (C22 I33): commandRows wrapping the command whole → T1.172 fails", () => {
+    // **The revert, drawn**: the whole command through one wrap, as it shipped.
+    // The break is measured as nothing, so a two-line command is one row, and
+    // that row carries the line feed the terminal then acts on.
+    const command = "echo a\necho b";
+    const whole = hardWrapCells(command, 28);
+    expect(whole, "one row holds both lines").toHaveLength(1);
+    expect(whole[0], "and the break inside it").toContain("\n");
+    expect(commandRows(command, 30, FULL_CAPS), "line by line, two rows and no break").toHaveLength(2);
   });
 });

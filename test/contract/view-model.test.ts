@@ -1189,3 +1189,94 @@ describe("C04 I6 — a closed vocabulary carries its own fact (ruling 44)", () =
     }
   });
 });
+
+describe("C04 I144, I146, I148 — what a tape member, a bar and an overshoot may say (review batch 4)", () => {
+  it("T2.150 (C04 I144, §3ao.1): a tape's members are refused unless each has a unique id, a label, a string detail and a known state", () => {
+    const good = { id: "a", label: "seams", detail: "2:53", state: "succeeded" };
+    const tape = (members: readonly unknown[], extra: Record<string, unknown> = {}) =>
+      validateBlock({ kind: "tape", id: "t", members, ...extra });
+    const refused = (members: readonly unknown[], pattern: RegExp, extra: Record<string, unknown> = {}): void => {
+      const got = tape(members, extra);
+      expect(got.ok, JSON.stringify(members)).toBe(false);
+      expect(got.ok ? "" : got.error.join("\n"), JSON.stringify(members)).toMatch(pattern);
+    };
+    refused(["seams"], /member \[0\] must be an object/u);
+    refused([{ label: "x" }], /"id" must be a non-empty string/u);
+    refused([{ id: 7, label: "x" }], /"id" must be a non-empty string/u);
+    refused([{ id: "", label: "x" }], /"id" must be a non-empty string/u);
+    refused([good, { ...good }], /member id "a" appears 2 times/u);
+    refused([{ id: "a" }], /"label"/u);
+    refused([{ id: "a", label: 3 }], /"label"/u);
+    refused([{ ...good, detail: 4 }], /"detail" must be a string/u);
+    refused([{ ...good, state: "ok" }], /"state" is outside its union.*"succeeded"/u);
+    refused([good], /"current" is a member's id, a string/u, { current: 0 });
+
+    // Accepted: each fixed, a current naming no member (C5), and a bare member.
+    expect(tape([good, { id: "b", label: "arm", state: "running" }], { current: "b" }).ok).toBe(true);
+    expect(tape([good], { current: "gone" }).ok, "a current naming no member is valid (C5, T1.48)").toBe(true);
+    expect(tape([{ id: "c", label: "count" }]).ok, "no detail and no state").toBe(true);
+  });
+  it("T2.151 (C04 I146, §3as): painted, quantity, granularity and liveness are refused outside their unions, and style only when not a string", () => {
+    const bar = (extra: Record<string, unknown>) =>
+      validateBlock({ kind: "progress", id: "g", label: "x", current: 3, total: 10, ...extra });
+    const refused = (extra: Record<string, unknown>, pattern: RegExp): void => {
+      const got = bar(extra);
+      expect(got.ok, JSON.stringify(extra)).toBe(false);
+      expect(got.ok ? "" : got.error.join("\n"), JSON.stringify(extra)).toMatch(pattern);
+    };
+    refused({ painted: "yes" }, /"painted" must be a boolean/u);
+    refused({ quantity: "progres" }, /"quantity" is outside its union.*"capacity", "progress", "count"/u);
+    refused({ granularity: "stepped" }, /"granularity" is outside its union/u);
+    refused({ liveness: "moving" }, /"liveness" is outside its union/u);
+    refused({ style: 3 }, /"style" must be a string/u);
+    for (const painted of [true, false]) expect(bar({ painted }).ok, `painted ${String(painted)}`).toBe(true);
+    for (const quantity of ["capacity", "progress", "count"]) expect(bar({ quantity }).ok, quantity).toBe(true);
+    for (const granularity of ["continuous", "segmented"]) expect(bar({ granularity }).ok, granularity).toBe(true);
+    for (const liveness of ["still", "active", "stalled"]) expect(bar({ liveness }).ok, liveness).toBe(true);
+    expect(bar({ style: "no-such-style" }).ok, "an unknown style name is the default, not a refusal").toBe(true);
+  });
+  it("T2.152 (C04 I148, §5c.1): overshoot is accepted on a gradient over a slot pair and refused everywhere else and out of range", () => {
+    const stop = { lift: 1.35, share: 0.35 };
+    const onBar = (ramp: unknown) => validateBlock({ kind: "progress", id: "g", label: "x", current: 3, total: 10, ramp });
+    const onSpan = (ramp: unknown) =>
+      validateBlock({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp }] });
+    const refused = (got: ReturnType<typeof validateBlock>, why: string, pattern: RegExp = /overshoot/u): void => {
+      expect(got.ok, why).toBe(false);
+      expect(got.ok ? "" : got.error.join("\n"), why).toMatch(pattern);
+    };
+    const pair = { fill: "gradient", from: "default", to: "accent" };
+    expect(onBar({ ...pair, overshoot: stop }).ok, "a gradient over a slot pair takes it").toBe(true);
+    expect(onBar({ ...pair, overshoot: { lift: 2, share: 0.01 } }).ok, "lift 2 is inside (1, 2]").toBe(true);
+
+    refused(onBar({ fill: "gradient", colormap: "viridis", overshoot: stop }), "a colormap gradient");
+    refused(onBar({ fill: "palette", overshoot: stop }), "a palette");
+    refused(onBar({ ...pair, fill: "centred", overshoot: stop }), "a centred fill");
+    refused(onBar({ ...pair, fill: "step", bands: 3, overshoot: stop }), "a step fill");
+    refused(onSpan({ ...pair, overshoot: stop }), "on a span", /refused on a span/u);
+    expect(onSpan(pair).ok, "the control: the same pair on a span without the stop is valid").toBe(true);
+    for (const lift of [1, 2.5, Number.NaN]) refused(onBar({ ...pair, overshoot: { lift, share: 0.35 } }), `lift ${String(lift)}`, /lift/u);
+    for (const share of [0, 1, -0.1]) refused(onBar({ ...pair, overshoot: { lift: 1.35, share } }), `share ${String(share)}`, /share/u);
+    refused(onBar({ ...pair, overshoot: { ...stop, knee: 0.5 } }), "a third member", /"lift" and "share" and nothing else/u);
+    refused(onBar({ ...pair, overshoot: 1.35 }), "not a record", /"lift" and "share" and nothing else/u);
+  });
+
+  it("T2.153 (C04 I109, §5c): trailSince is accepted on a ripple trail and refused on a trail naming no one-shot and out of range", () => {
+    const on = (over: Record<string, unknown>) => validateBlock({ kind: "notice", id: "n", tone: "info", text: "abc", ...over });
+    const refused = (got: ReturnType<typeof validateBlock>, why: string, pattern: RegExp): void => {
+      expect(got.ok, why).toBe(false);
+      expect(got.ok ? "" : got.error.join("\n"), why).toMatch(pattern);
+    };
+    for (const streaming of [true, undefined]) {
+      for (const trailSince of [0, 12]) {
+        expect(on({ trail: "ripple", trailSince, ...(streaming === undefined ? {} : { streaming }) }).ok, `ripple at ${String(trailSince)}, streaming ${String(streaming)}`).toBe(true);
+      }
+    }
+    // The forms that read it are named, so a refusal says where the field belongs.
+    refused(on({ streaming: true, trailSince: 0 }), "no trail is hotEdge, which is still", /"trailSince" is a one-shot trail's stamp[^]*"ripple" read it/u);
+    refused(on({ streaming: true, trail: "hotEdge", trailSince: 0 }), "hotEdge", /trail "hotEdge" does not animate once/u);
+    refused(on({ streaming: true, trail: "weight", trailSince: 0 }), "weight", /trail "weight" does not animate once/u);
+    for (const trailSince of [-1, Number.NaN, "3"]) {
+      refused(on({ streaming: true, trail: "ripple", trailSince }), `trailSince ${String(trailSince)}`, /a finite tick at or after zero/u);
+    }
+  });
+});

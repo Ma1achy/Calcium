@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` |
+| **Package** | `calcium-tui` |
 | **Layer** | L0 terminal |
 | **Depends on** | Nothing. Pure function over an environment record |
 | **Consumed by** | C01 (what to acquire) · C03 (synchronised update) · C09 C10 C11 C12 (rendering fallbacks) · C17 (bracketed paste) · L4 (refuse-to-open decision, and the surfacing of `sources` in diagnostics) |
@@ -39,6 +39,8 @@ type TerminalCapabilities = Readonly<{
   renderMode:         "rich" | "linear";   // I15 — the route, not the terminal's
   notification:       "none" | "osc9";     // I16 — a system notification the terminal takes
   notify:             readonly ("bell" | "system" | "title")[];   // I17 — the rungs the reader opted into
+  clipboard:          "none" | "osc52";    // I18 — the terminal takes an OSC 52 write
+  editor:             string | null;       // I19 — the reader's editor command, `$VISUAL` else `$EDITOR`
 }>;
 
 function detectCapabilities(
@@ -96,6 +98,8 @@ everything the hover sets, `←`/`→` on a focused plot set too (C16 §4a).
 | `renderMode` | `CALCIUM_RENDER_MODE` is `linear` or `rich`; otherwise `rich`, `assumed`. Not gated by `dumb` (I15) |
 | `notification` | the identification: kitty, Ghostty, iTerm2, WezTerm and foot → `osc9`; Windows Terminal and an unidentified terminal → `none`; inside `TMUX`, `unreachable` (I16) |
 | `notify` | `CALCIUM_NOTIFY`, comma-separated, of `bell`, `system`, `title` — `stated`; absent → `[]`, `assumed`; an unknown member is dropped with a warning naming it (I17) |
+| `clipboard` | the identification: kitty, Ghostty, WezTerm, foot and Windows Terminal → `osc52`; iTerm2 — off by default — and an unidentified terminal → `none`; inside `TMUX`, `unreachable` (I18) |
+| `editor` | `VISUAL`, else `EDITOR` — `stated`; neither → `null`, `assumed`. Not gated by `dumb` or `TMUX`: neither is about the terminal (I19) |
 
 ### One identification, consulted by every capability
 
@@ -225,6 +229,8 @@ wrong**, which is the only property a consumer can act on:
 | `renderMode` | `assumed` | `assumed` | `assumed` | `declared` |
 | `notification` | `inferred` | `inferred` | **`unreachable`** | `declared` |
 | `notify` | `assumed` | `assumed` | `assumed` | `declared` |
+| `clipboard` | `inferred` | `inferred` | **`unreachable`** | `declared` |
+| `editor` | `stated` or `assumed` | `stated` or `assumed` | `stated` or `assumed` | `declared` |
 
 **The gate demotes `colourDepth` and refuses the other three, and that asymmetry is the table's
 content rather than an inconsistency.** Inside a multiplexer the identification is `null` for every
@@ -547,6 +553,8 @@ fine; what cannot happen is a field with no row, or a row for no field.
 | Alternate screen | `altScreen` | **The shell refuses to open**, prints help, exits 0 — on the rich route; linear needs none (I7, I15) | L4 |
 | Route | `renderMode` | **Linear**: an append-only stream of semantic events, and no frame (C22 §6m) | L4 |
 | System notification | `notification` | The `system` rung writes nothing; the bell and the title still reach a reader who opted into them (C22 I128) | L4 |
+| Clipboard by OSC 52 | `clipboard` | A copy goes to a platform clipboard tool when one is found (C21 I20); otherwise the reader is offered a file and told so. Nothing is ever claimed as copied that was not (ruling 72, C14 §6a) | L4 |
+| An editor | `editor` | `⌥o` on a chip preview says `no editor — set $VISUAL or $EDITOR` and runs nothing; the chip stays in the prompt as it was (C22 I144) | L4 |
 | Notification opt-in | `notify` | Nothing is opted in, so no rung fires and focus reporting is not taken — the default, not a failure (I17, C01 I23) | C01 L4 |
 
 Alternate screen is the sole hard requirement (D28). A fullscreen application on the primary screen destroys the user's scrollback, which is worse than not running.
@@ -579,6 +587,8 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 - **I15** — *(C22 §6m, §107, `R-ACC-001`, parked 28)* **`renderMode` is `"rich" | "linear"`, read from `CALCIUM_RENDER_MODE`, and carries its source like every field.** `linear` or `rich` there is `stated`; absent, the route is `rich` and `assumed`; any other value leaves `rich` `assumed` and warns naming the value, as an invalid override does (I4); a `capabilities.renderMode` in `TuiConfig` is `declared` and wins. **It is not gated on `TERM`**: a terminal that says `dumb` is one a screen reader may well be driving, and the route is the reader's to choose. `--linear` and persistent config are §107's other two selectors and wait on question 28's producers.
 - **I16** — *(C22 §6n.1, ruling 27, → I11)* **`notification` is `"none" | "osc9"`, read from the one identification (I11)**: every terminal the table names takes OSC 9 by its own documentation except Windows Terminal, whose OSC 9 is ConEmu's family; inside a multiplexer it is `none`, `unreachable`. OSC 777 is not an arm: the one terminal that takes it alone reports nothing that would select it.
 - **I17** — *(C22 §6n, §014 *every one is opt-in*)* **`notify` is the rungs the reader opted into, read from `CALCIUM_NOTIFY`**, a comma-separated list of `bell`, `system` and `title` in any order, duplicates collapsed, frozen in that canonical order; `stated` when present, `[]` and `assumed` when absent. An unknown member is dropped and warned about by name, as I15's invalid route is; the empty list is the default, so nothing rings unasked.
+- **I18** — *(ruling 72, D-M10-3, → I11, → C01 I25)* **`clipboard` is `"none" | "osc52"`: the identification's column for whether the terminal takes an OSC 52 write, and a declaration is the override.** kitty, Ghostty, WezTerm, foot and Windows Terminal → `osc52`; **iTerm2 → `none`**, because it takes the sequence only once the reader enables *Applications in terminal may access clipboard*, which is off by default; an unidentified terminal → `none`; inside a multiplexer → `none`, `unreachable`, because tmux's default `set-clipboard external` ignores an application's OSC 52. A reader whose terminal or tmux does take it declares `clipboard: "osc52"` (I4). **By each terminal's own documentation and unmeasured here**, as I16's column is. **`osc52` says the sequence is taken, never that a copy worked** — nothing comes back — which is why its consumer says *sent to the terminal's clipboard* and not *copied* (ruling 72). Not gated by `dumb`, on §3's boundary, as `notification` is not.
+- **I19** — *(C22 I144, → I4, I13)* **`editor` is the reader's editor command: `$VISUAL`, else `$EDITOR`, else `null`.** `stated` when either is set, `null` and `assumed` when neither is; a declared string is the override (I4), and a declared empty string is refused as out of range. **Not gated on `TERM`**, on §3's boundary — the rule is derived from neither `TERM` nor the identification. The value is a command line and is handed to a shell whole (C22 I144). → T1.30
 
 ---
 
@@ -601,6 +611,8 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 16. **The record says how each field was answered, in the same expression that answered it** — five kinds, named for what would falsify the answer, so `imageProtocol: "none"` inside a multiplexer and `imageProtocol: "none"` on an unnamed terminal stop being one value with two remedies (I13). Four fields are inferred from a name and six are not, and nothing in the record used to distinguish them; the kinds are a classification and **not** a precedence order, which is the sentence a reader would otherwise write and `TERM=dumb` falsifies.
 14. **The emulator is identified once, every capability consults that identification, and the identification is gated by `TMUX` before any of them see it** — `synchronisedUpdate` and `imageProtocol` read it, and `colourDepth` reads it too but is outranked by `COLORTERM`, because that variable is the terminal speaking for itself where a name is us inferring (I11). **Identification is not capability**, and the second question — *does a sequence reach it* — is asked in one place rather than by each reader: measured, tmux consumes both an unwrapped APC and `ESC [ ? 2026 h`, and the wrapped form is what survives (§3, FINDINGS F432).
 17. **A terminal's answer is never read, and the reason is the record's lifetime rather than the input path** — a reply is unreadable until raw mode, raw mode is `acquire()`'s, and by then six objects built at C22's construction hold the record; so a probe would run before construction and arrive as an override, on C24's surface and not this component's (I14). Neither of the reasons the file used to give survives being checked: C16 I32 makes a reply harmless where F414 said it would be typed into the prompt, and a DA1-terminated burst makes a probe one round trip where §3 said it needed a window — **both are measured in §3 for that reason**, because a justification the next reader cannot reproduce is one they delete.
+18. **`clipboard` is the identification's column for OSC 52**, `none` where a terminal takes it only after a setting the reader has to change, and declared over the top where the reader has; it says the sequence is taken and never that a copy worked (I18, → C01 I25).
+19. **`editor` is the reader's editor command, read from `$VISUAL` then `$EDITOR`**, and `null` when neither is set; it is a command line handed to a shell whole, and a declaration is the override (I19, → C22 I144).
 
 ---
 
@@ -627,10 +639,12 @@ A table of `env` fixtures. No mocks, no terminal.
 - **T1.15** (I15, I7): `CALCIUM_RENDER_MODE` at `linear`, `rich`, absent and `braille` → `linear`/`stated`, `rich`/`stated`, `rich`/`assumed`, and `rich`/`assumed` with one warning naming `braille`; an override `renderMode: "linear"` over `rich` in the environment → `linear`/`declared`; `TERM=dumb` with `linear` stays `linear`. `isUsable` with `altScreen: false` is false on `rich` and true on `linear`.
 - **T1.16** (I16, I11): `notification` for `TERM_PROGRAM` `iTerm.app`, `WezTerm`, `ghostty`, `TERM=xterm-kitty`, `TERM=foot` → `osc9`/`inferred`; `WindowsTerminal` and `TERM=xterm` → `none`; `TERM=xterm-kitty` under `TMUX` → `none`/`unreachable`.
 - **T1.17** (I17): `CALCIUM_NOTIFY` at `title,bell`, `bell,bell`, absent and `bell,beep` → `["bell","title"]`/`stated`, `["bell"]`/`stated`, `[]`/`assumed`, and `["bell"]`/`stated` with one warning naming `beep`; an override `notify: ["system"]` → `declared`.
+- **T1.29** (I18, I11, I4): `clipboard` for `TERM_PROGRAM` `ghostty`, `WezTerm`, `WindowsTerminal`, `TERM=xterm-kitty` and `TERM=foot` → `osc52`/`inferred`; `TERM_PROGRAM=iTerm.app` and `TERM=xterm` → `none`/`inferred`; `TERM=xterm-kitty` under `TMUX` → `none`/`unreachable`; the same with an override `clipboard: "osc52"` → `osc52`/`declared`; an override `clipboard: "yes"` → rejected, one warning naming the field.
 - **T1.8**: alt screen — `TERM=xterm` → true; `TERM=dumb` → false; `TERM` unset → false.
 - **T1.9** (I4): every field can be overridden, including `altScreen: true` on `TERM=dumb`.
 - **T1.10** (I7): `isUsable` is true iff `altScreen`, regardless of every other field being at its worst value.
 - **T1.11** (I10): background polarity — `COLORFGBG=15;0` → `dark`; `0;15` → `light`; `0;default;15` → `light`, which is rxvt's three-field form and the row that decides *last field* against *second field*; `15;default` → `unknown`, because the background is the thing that is not a number; **`0;15x` and `0;15.5` → `unknown`**, which is the digit test rather than a parse and was **added by the mutation pass** — `parseInt` declines `default` and answers `15` for `15x`, so the two rules agree on every value a fixture happened to hold and the sentence naming the difference was in a comment with nothing asserting it; `COLORFGBG` absent → `unknown`; `15;235` → `unknown`, the 256-index case the rule declines rather than guesses at.
+- **T1.30** (I19): `VISUAL=hx EDITOR=vi` → `hx`, `stated`; `EDITOR=vi` alone → `vi`; neither → `null`, `assumed`; `VISUAL=""` falls to `EDITOR`; a declared `editor: "code -w"` wins and is `declared`; a declared `""` is refused with a warning.
 
 ### Tier 2 — contract / interface
 
@@ -707,6 +721,7 @@ PTY harness with a controlled environment.
 - **T6.12** (I11, I12): gating `keyboardProtocol` on the ungated identification — `identified` rather than `terminal` — → T1.13's tmux arm fails while every other capability's tmux row passes, which is the per-reader gate T6.11b describes arriving in a new column.
 - **T6.14** (I13): **computing `sources` from a table beside the rules instead of from the rules** — a `Record<keyof TerminalCapabilities, CapabilitySource>` written out by hand, correct for `TERM=xterm-kitty` and for plain `xterm` — → **T1.14 fails on the tmux column alone**, because a static map cannot express a field whose kind moves with the environment and `colourDepth` is that field. The mutation is the one that *agrees* everywhere else, on T6.11's argument: a second list that disagrees proves nothing about single-sourcing.
 - **T6.15** (I4, I13): **marking any field named in `overrides` as `declared`**, before the validator runs → **T3.14 fails on the rejected and the `undefined` cases and passes on the accepted one**, which is the asymmetry the row exists for — the value is identical in all three and only the source separates them.
+- **T6.17** (I18, I11): reading `clipboard` from the ungated identification → T1.29's tmux arm answers `osc52` while every other row passes, and a copy inside tmux is *sent* to a sequence tmux discards.
 - **T6.13** (I12, C01 I6): making C01 reset the protocol with `CSI = 0 u` instead of popping → C01 T1.2 fails on the exact leave byte; making C01 push it unconditionally → C01 T1.28 and T5.6's unforced arm fail.
 
 ---

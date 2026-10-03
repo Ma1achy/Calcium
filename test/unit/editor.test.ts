@@ -8,7 +8,7 @@
 // text (§2, I1, I4).
 import { describe, expect, it } from "vitest";
 
-import { chipLabel, createEditor } from "../../src/interaction/editor/index.js";
+import { chipLabel, chipSpans, createEditor, cursorCell, layout } from "../../src/interaction/editor/index.js";
 import { selectionSpans } from "../../src/interaction/editor/index.js";
 import { UNDO_LIMIT } from "../../src/interaction/editor/undo.js";
 import type { LineEditor } from "../../src/interaction/editor/index.js";
@@ -28,7 +28,7 @@ describe("roadmap 30 — a paste chip is one grapheme to the editor", () => {
    * the atomicity, so they ask the composer what it drew; the form itself is
    * T1.44's subject and is pinned against literals there.
    */
-  const LOOK = { separator: "\u00b7", painted: true } as const;
+  const LOOK = { separator: "\u00b7", painted: true, unicode: "full" } as const;
   const CHIP_LABEL = chipLabel(CHIP, LOOK);
   const GUTTER = { first: 0, cont: 0 } as const;
 
@@ -1008,5 +1008,116 @@ describe("C17 §5b — the region's cells (roadmap entry 23)", () => {
     const beforeChip = chipped.text;
     chipped.insertChip({ kind: "file", name: "parse.ts", lines: 184, content: "line one" });
     expect(chipped.text, "insertChip moves the buffer in the same call").not.toBe(beforeChip);
+  });
+});
+
+describe("C17 I35 — a chip is edited by re-minting it, owed at the spec commit", () => {
+  it("T1.60 (C17 I35, I34): editChip re-mints a chip in place under its ordinal, as one undo unit, and refuses a chip the buffer does not hold", () => {
+    const GUTTER = { first: 0, cont: 0 } as const;
+    const e = createEditor();
+    e.insert("read ");
+    e.insertChip({ kind: "file", name: "a.ts", lines: 1, content: "first" });
+    e.insert(" and ");
+    e.insertChip({ kind: "file", name: "b.ts", lines: 3, content: "one\ntwo\nthree" });
+    e.move("charLeft");
+    const old = e.chipAt();
+    expect(old?.ordinal, "the second chip").toBe(2);
+    const [text, cursor, resolved] = [e.text, e.cursor, e.resolved];
+    const drawn = e.layout(200, GUTTER).join("");
+
+    expect(e.editChip(old!, { kind: "file", name: "b.ts", lines: 2, content: "one\nthree" })).toBe(true);
+    const fresh = e.chipAt();
+    expect([fresh?.ordinal, fresh?.lines, fresh?.content], "same ordinal, new count and content").toEqual([2, 2, "one\nthree"]);
+    expect(e.cursor, "one grapheme for one: the caret is where it was").toBe(cursor);
+    expect(e.text, "a fresh sentinel, never the old one rebound (I34)").not.toBe(text);
+    expect(e.resolved).toBe("read first and one\nthree");
+    const redrawn = e.layout(200, GUTTER).join("");
+    expect([drawn, redrawn], "the label is drawn anew, and only it").toEqual([
+      "read  a.ts · 1L  and  b.ts · 3L ",
+      "read  a.ts · 1L  and  b.ts · 2L ",
+    ]);
+
+    // **One undo unit** (I5): the old chip, its content and its sentinel.
+    e.undo();
+    expect([e.text, e.cursor, e.resolved]).toEqual([text, cursor, resolved]);
+    expect(e.chipAt()?.lines).toBe(3);
+    expect(e.layout(200, GUTTER).join("")).toBe(drawn);
+
+    // **A chip not in the buffer** — the re-minted one, now undone — answers
+    // false and moves nothing: not the text, not the history.
+    expect(e.editChip(fresh!, { kind: "file", name: "b.ts", lines: 9, content: "x" })).toBe(false);
+    expect([e.text, e.resolved]).toEqual([text, resolved]);
+    e.redo();
+    expect(e.chipAt()?.lines, "redo reaches the re-mint, so the refusal pushed no unit").toBe(2);
+  });
+});
+
+describe("C17 I36 — the reader's own bidi characters, drawn visible and kept as typed (§5g, F1401)", () => {
+  // Escapes, never literals (A03 SS69): an override in this file would
+  // reorder what a reviewer reads against what the compiler reads.
+  const LRI = "\u2066";
+  const RLO = "\u202e";
+  const BIDI = /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u;
+  const LOOK = { separator: "\u00b7", painted: true, unicode: "full" } as const;
+
+  it("T1.61 (C17 I36, I18, I4, I26): the walk draws U+2066 and U+202E as their forms, the caret either side of each is eight cells apart, no chip span, the wash covers the form, and the buffer keeps both raw", () => {
+    const typed = `/show a${LRI}b${RLO}c`;
+    const e = createEditor({ chips: LOOK });
+    e.insert(typed);
+
+    // **The row, as drawn** — both forms, and nothing a terminal would reorder.
+    const rows = e.layout(30, G);
+    expect(rows, "one row, both characters shown").toEqual(["/show a<U+2066>b<U+202E>c"]);
+    for (const r of rows) expect(BIDI.test(r), `${JSON.stringify(r)} holds a bidi character`).toBe(false);
+
+    // **The caret, one grapheme a step** (§5g row 2). Indices: `a` is 6, U+2066
+    // is 7, `b` 8, U+202E 9, `c` 10, and the end 11. Walked from the end by
+    // the editor's own motion, so a step that crossed half a form would show.
+    const at: number[] = [];
+    for (let i = 0; i < 4; i += 1) {
+      e.move("charLeft");
+      at.push(e.cursor);
+    }
+    expect(at, "one press, one character").toEqual([10, 9, 8, 7]);
+    const col = (i: number): number => cursorCell(e.text, i, 30, G, e.drawAs).col;
+    const row = rows[0] ?? "";
+    // The row carries no gutter (T4.3b) and is ASCII, so a column less the
+    // gutter indexes it.
+    expect(row[col(7) - G.first], "before U+2066: on its `<`").toBe("<");
+    expect(row.slice(col(7) - G.first, col(8) - G.first), "U+2066's cells").toBe("<U+2066>");
+    expect(row[col(9) - G.first], "before U+202E: on its `<`").toBe("<");
+    expect(row.slice(col(9) - G.first, col(10) - G.first), "U+202E's cells").toBe("<U+202E>");
+    expect([col(8) - col(7), col(10) - col(9)], "eight apart, where the raw walk answered zero").toEqual([8, 8]);
+    expect(e.cursorCell(30, G), "the editor's own answer is the walk's").toEqual({ row: 0, col: col(7) });
+
+    // **Not a chip** (§5g row 4), and the wash over the character alone covers its form.
+    expect(chipSpans(e.text, 30, G, e.drawAs), "the form takes no chip ground").toEqual([]);
+    expect(selectionSpans(e.text, 9, 10, 30, G, e.drawAs)).toEqual([{ row: 0, from: col(9), to: col(10) }]);
+
+    // **The buffer is the reader's** (§5g row 8): nothing neutralised there.
+    expect([e.text, e.resolved], "text and resolved hold both characters raw").toEqual([typed, typed]);
+
+    // **One wrap unit**: the form reaching the row's end moves whole.
+    expect(layout(`xxxxx${RLO}y`, 12, G), "moved whole, never split").toEqual(["xxxxx", "<U+202E>y"]);
+
+    // **The control**: a clean buffer draws as itself.
+    expect(layout("/show abc", 30, G)).toEqual(["/show abc"]);
+  });
+
+  it("T1.62 (C17 I36, I25, I32): a file chip whose name holds U+202E draws the form in its label, elided exactly to its limit, and chipAt keeps the name raw", () => {
+    const name = `a${RLO}gpj.exe`;
+    const parts = { kind: "file", name, lines: 3, content: "x" } as const;
+    const label = chipLabel({ ...parts, ordinal: 1 }, LOOK);
+    expect(label, "the label shows the override").toContain("a<U+202E>gpj.exe");
+    expect(BIDI.test(label), "and does not carry it").toBe(false);
+    // **Measured as drawn** (I32): the elision cuts the form as text and lands
+    // exactly on the limit.
+    const elided = chipLabel({ ...parts, ordinal: 1 }, LOOK, 12);
+    expect([cells(elided), BIDI.test(elided)], "exactly twelve cells, and no bidi character").toEqual([12, false]);
+
+    const e = createEditor({ chips: LOOK });
+    e.insertChip(parts);
+    expect(e.layout(80, G).join(""), "the prompt draws the label's form").toContain("<U+202E>");
+    expect(e.chipAt()?.name, "the chip keeps its name").toBe(name);
   });
 });

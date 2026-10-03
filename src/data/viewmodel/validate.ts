@@ -47,19 +47,23 @@ import {
   MARKER3_MEMBERS,
   STYLE_ARMS,
   TEXT_SPAN_KEYS,
+  TRAIL_ANIMATION,
   TRAIL_FORMS,
   TERMINAL_KEYS,
   TERMINAL_RUN_KEYS,
   type OHLC,
   type Plot,
   type PlotForm,
+  type Progress,
   type Result,
+  type TrailForm,
   type ViewDocument,
 } from "./types.js";
 import { parseAreas } from "./mosaic.js";
 import { ALIGN_ENTRIES } from "./measure.js";
 import { overlayFault } from "./overlay.js";
 import { parseStartDate } from "../dates.js";
+import { isBidiFormat } from "../text.js";
 import { isContainerKind } from "./tree.js";
 // **The entries, not the names.** `COLORMAP_SET` above answers *is this a map*;
 // H3 asks *does it have two halves*, which is `kind` and lives on the entry.
@@ -1021,6 +1025,15 @@ function checkTerminalLine(line: Record<string, unknown>, e: string[], at: strin
       );
       return;
     }
+    // **Bidi format characters too** (ruling 71): this kind is exempt from the
+    // registry's neutraliser (C09 I56, I127), so an override here would reorder
+    // the frame around it exactly as an escape would repaint it.
+    if (isBidiFormat(unit)) {
+      e.push(
+        `${at}: "text" carries a bidi format character U+${unit.toString(16).toUpperCase().padStart(4, "0")} at ${String(i)} (C04 I110) — a terminal line is emitted without neutralising, so it would reorder the frame`,
+      );
+      return;
+    }
     if (unit >= 0xd800 && unit <= 0xdbff) {
       const next = text.charCodeAt(i + 1);
       if (Number.isNaN(next) || next < 0xdc00 || next > 0xdfff) {
@@ -1189,6 +1202,13 @@ const TONE_SET: ReadonlySet<string> = new Set<string>(TONES);
 const RAMP_FILL_SET: ReadonlySet<string> = new Set<string>(RAMP_FILLS);
 const RAMP_ANIMATION_SET: ReadonlySet<string> = new Set<string>(RAMP_ANIMATIONS);
 
+/** `progress`'s three closed members and their unions (C04 I146, §3as) — each typed against the field it gates. */
+const PROGRESS_UNIONS: readonly (readonly [string, readonly string[]])[] = [
+  ["quantity", ["capacity", "progress", "count"] satisfies readonly NonNullable<Progress["quantity"]>[]],
+  ["granularity", ["continuous", "segmented"] satisfies readonly NonNullable<Progress["granularity"]>[]],
+  ["liveness", ["still", "active", "stalled"] satisfies readonly NonNullable<Progress["liveness"]>[]],
+];
+
 /**
  * A `Ramp` at the gate (C04 §3am.2, I106–I109). One error per fault, the first
  * fault only, each naming the rule it broke.
@@ -1205,7 +1225,7 @@ function checkRamp(value: unknown, e: string[], where: string, onSpan: boolean):
   }
   for (const key of Object.keys(value)) {
     if (!RAMP_KEYS.has(key)) {
-      e.push(`${where}: unknown member "${key}" — a ramp carries fill, from, to, colormap, bands, animate, since and nothing else (C04 I106)`);
+      e.push(`${where}: unknown member "${key}" — a ramp carries fill, from, to, colormap, bands, animate, since, overshoot and nothing else (C04 I106)`);
       return;
     }
   }
@@ -1268,6 +1288,35 @@ function checkRamp(value: unknown, e: string[], where: string, onSpan: boolean):
         e.push(`${where}: "bands" must be an integer in 2..8 — one band is a gradient wearing a different name (C04 I106)`);
         return;
       }
+    }
+  }
+  // **The overshoot stop is a gradient's over a slot pair, off a span** (I148,
+  // §5c.1). A map's end is a map stop and a lift is a colour it does not hold;
+  // a palette names nothing; a fold has no end to lift and a quantiser would
+  // step the lift away; and on a span the floor is proven per slot (I107),
+  // which a lifted `to` is not.
+  const overshoot = value["overshoot"];
+  if (overshoot !== undefined) {
+    if (fill !== "gradient" || !hasPair) {
+      e.push(`${where}: "overshoot" rides on a "gradient" over a from/to pair alone — a colormap, a palette, a centred and a stepped fill have no end to lift (C04 I148)`);
+      return;
+    }
+    if (onSpan) {
+      e.push(`${where}: "overshoot" is refused on a span — the contrast floor is proven per slot and a lifted "to" is no slot (C04 I107, I148)`);
+      return;
+    }
+    if (!isRecord(overshoot) || Object.keys(overshoot).some((k) => k !== "lift" && k !== "share")) {
+      e.push(`${where}: "overshoot" is a record of "lift" and "share" and nothing else (C04 I148)`);
+      return;
+    }
+    const { lift, share } = overshoot;
+    if (typeof lift !== "number" || !Number.isFinite(lift) || lift <= 1 || lift > 2) {
+      e.push(`${where}: "overshoot.lift" must be finite in (1, 2] — 1 is no overshoot, 2 bounds a channel doubling (C04 I148)`);
+      return;
+    }
+    if (typeof share !== "number" || !Number.isFinite(share) || share <= 0 || share >= 1) {
+      e.push(`${where}: "overshoot.share" must be finite in (0, 1) — 0 is no stop, 1 leaves nothing to mix (C04 I148)`);
+      return;
     }
   }
   if (animate !== undefined && (typeof animate !== "string" || !RAMP_ANIMATION_SET.has(animate))) {
@@ -1406,6 +1455,25 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
     if (b["streaming"] !== undefined && typeof b["streaming"] !== "boolean") {
       e.push(`${at} "streaming" must be a boolean (C04 I122)`);
     }
+    // **`trailSince` belongs to a trail that animates once** (C04 I109, ruling
+    // 81): `Ramp.since`'s rule for the one ramp the document cannot address. On
+    // a still or periodic form it is a stamp nothing reads. Not tied to
+    // `streaming`: the settle strip drops `streaming` and keeps the rest, and a
+    // settled block's stamp is inert rather than wrong.
+    const trailSince = b["trailSince"];
+    if (trailSince !== undefined) {
+      const form = b["trail"] as TrailForm | undefined;
+      const effect = form === undefined ? undefined : TRAIL_ANIMATION[form];
+      if (typeof trailSince !== "number" || !Number.isFinite(trailSince) || trailSince < 0) {
+        e.push(`${at} "trailSince" is the tick a trail's one-shot began on — a finite tick at or after zero (C04 I109)`);
+      } else if (effect === undefined || !RAMP_ONE_SHOTS.has(effect)) {
+        const readers = TRAIL_FORMS.filter((f) => { const a = TRAIL_ANIMATION[f]; return a !== undefined && RAMP_ONE_SHOTS.has(a); });
+        e.push(
+          `${at} "trailSince" is a one-shot trail's stamp and trail "${String(form ?? "hotEdge")}" does not animate once — ` +
+            `${readers.map((f) => `"${f}"`).join(", ")} read it (C04 I109)`,
+        );
+      }
+    }
     // The one button a notice may carry (C04 §3, arc 6 §5) — a chip's `Action`,
     // refused by the same rule as a tip's.
     if (b["action"] !== undefined) checkAction(b["action"], `${at}.action`, e);
@@ -1475,6 +1543,10 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
   table: (b, e, at) => {
     requireArray(b, "columns", e, at);
     requireArray(b, "rows", e, at);
+    // I150 — the tape's rule (I124): a row's id, and one naming no row is valid.
+    if (b["current"] !== undefined && !isString(b["current"])) {
+      e.push(`${at}: "current" is a row's id, a string, never an index (C04 I150)`);
+    }
     // I128 — a column's polarity is one of three words, or absent for neutral.
     // I6 (ruling 44) — a declared vocabulary is a closed set a cell can be
     // checked against, collected here for the cell walk below.
@@ -1839,6 +1911,22 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
     // C04 I108 — the one block-level carrier, and the one place a colormap
     // backing is admitted: the bar's ink fills its cell and reads by area.
     if (b["ramp"] !== undefined) checkRamp(b["ramp"], e, `${at}.ramp`, false);
+    // **The four fields were not checked at all** (C04 I146, §3as). `quantity`
+    // is refused rather than defaulted on I123's precedent: `"progres"` never
+    // finishes (I145) and nothing would say why. `style` names no closed set —
+    // an unknown name is the default (roadmap 51) — so only its type is checked.
+    if (b["painted"] !== undefined && typeof b["painted"] !== "boolean") {
+      e.push(`${at}: "painted" must be a boolean (C04 I146)`);
+    }
+    for (const [field, union] of PROGRESS_UNIONS) {
+      const value = b[field];
+      if (value !== undefined && !union.includes(value as never)) {
+        e.push(`${at}: "${field}" is outside its union (C04 I146) — one of ${union.map((v) => `"${v}"`).join(", ")}`);
+      }
+    }
+    if (b["style"] !== undefined && !isString(b["style"])) {
+      e.push(`${at}: "style" must be a string — a bar style's name; an unknown one draws the default (C04 I146)`);
+    }
   },
   code: (b, e, at) => {
     requireString(b, "language", e, at);
@@ -1910,8 +1998,50 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
   // (C04 I124). A tape nobody is in is still a tape, and a `current` naming no
   // member is the state a producer is in between rebuilding the row and
   // choosing within it — refusing it would make a document invalid for a
-  // moment that is legitimate.
-  tape: (b, e, at) => requireArray(b, "members", e, at),
+  // moment that is legitimate. **Its type is checked** (I144): an index where
+  // an id belongs names a different member the moment one is inserted.
+  //
+  // **The members are** (C04 I144). Every member is an element (I124), so its
+  // id is an address and two members `x` are two targets for one name — the
+  // tree's argument (I129) one kind over. A state outside the union reached the
+  // renderer as a crash until a guard there caught it; it is refused here now,
+  // the guard staying for a tape built without the gate.
+  tape: (b, e, at) => {
+    requireArray(b, "members", e, at);
+    const current = b["current"];
+    if (current !== undefined && !isString(current)) {
+      e.push(`${at}: "current" is a member's id, a string, never an index (C04 I124, I144)`);
+    }
+    const members = b["members"];
+    if (!isArray(members)) return;
+    const ids = new Map<string, number>();
+    members.forEach((raw, i) => {
+      const here = `${at} member [${String(i)}]`;
+      if (!isRecord(raw)) {
+        e.push(`${here} must be an object (C04 I144)`);
+        return;
+      }
+      const id = raw["id"];
+      if (!isString(id) || id === "") {
+        e.push(`${here}: "id" must be a non-empty string — every member is an element, addressed by it (C04 I144)`);
+      } else {
+        ids.set(id, (ids.get(id) ?? 0) + 1);
+      }
+      requireString(raw, "label", e, here);
+      if (raw["detail"] !== undefined && !isString(raw["detail"])) {
+        e.push(`${here}: "detail" must be a string (C04 I144)`);
+      }
+      const state = raw["state"];
+      if (state !== undefined && !CALL_STATES.includes(state as never)) {
+        e.push(`${here}: "state" is outside its union (C04 I141, I144) — one of ${CALL_STATES.map((s) => `"${s}"`).join(", ")}`);
+      }
+    });
+    for (const [id, count] of ids) {
+      if (count > 1) {
+        e.push(`${at}: member id "${id}" appears ${String(count)} times (C04 I144) — two members are two targets for one name`);
+      }
+    }
+  },
   // **Node ids are unique at any depth, not per level** (C04 I129). Each visible
   // node is an element and C26 I6 addresses one by id within the declaration,
   // and `op: "expand"` names a node by it — so two nodes `x` in different
@@ -2019,6 +2149,13 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
       e.push(`${absentMessage(`${at}: "height"`, "a positive integer")} (C04 I73)`);
     } else if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
       e.push(`${at}: "height" must be a positive integer (C04 I73) — got ${JSON.stringify(height)}`);
+    }
+    // **A record of where the bytes came from, never instead of them** (C04
+    // I142, I143): `data` is required above whether or not a path is present,
+    // and a path that is present says something.
+    const path = b["path"];
+    if (path !== undefined && (typeof path !== "string" || path === "")) {
+      e.push(`${wrongTypeMessage(`${at}: "path"`, "a non-empty string", path)} (C04 I143)`);
     }
     const data = b["data"];
     if (typeof data === "string") {

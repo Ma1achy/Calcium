@@ -279,6 +279,262 @@ describe("C21 with C06", () => {
     expect(entry?.doc.status, "the failure is reported rather than swallowed").toBe("error");
     expect(JSON.stringify(entry?.doc)).toMatch(/raw mode/);
   });
+  it("T4.93 (C23 I95, ruling 91, F1476): a handoff's notice takes the tone and mark of the status it sits on — finished, failed or cancelled", async () => {
+    // **A classification table, asserted whole** (C23 §8a A6.6). The defect was
+    // a tone and a status that disagreed — `warn` and ▲ on an `error` document —
+    // so a row per field would pass a build that moved one and not the other.
+    // Each cell is its own harness: one `Exit` per submission, read once.
+    const endings: readonly (readonly [string, { code: number | null; signal: string | null }])[] = [
+      ["exit 0", { code: 0, signal: null }],
+      ["exited 1", { code: 1, signal: null }],
+      // A child that never started (C21 I13): still a failure, and it names no
+      // exit it never returned (ruling 94, F1482).
+      ["never started", { code: null, signal: null }],
+      // A grandchild's SIGINT under `sh -c` arrives as 128+n with no signal, and
+      // ruling 91 says a non-zero exit is a failure (A6.6 row 4).
+      ["exited 130", { code: 130, signal: null }],
+      ["SIGKILL", { code: null, signal: "SIGKILL" }],
+      // A terminal sends it too; the ruling's set is three (A6.6 row 6).
+      ["SIGQUIT", { code: null, signal: "SIGQUIT" }],
+      ["SIGINT", { code: null, signal: "SIGINT" }],
+      ["SIGTERM", { code: null, signal: "SIGTERM" }],
+      ["SIGHUP", { code: null, signal: "SIGHUP" }],
+    ];
+    const seen: string[] = [];
+    for (const [name, exit] of endings) {
+      const h = pipelineHarness({ handoff: () => Promise.resolve(exit) });
+      h.pipeline.submit("/tty vim");
+      await settled(h.pipeline);
+      const doc = h.transcript.entries.at(-1)?.doc;
+      const notice = doc?.blocks[0] as { kind?: string; tone?: string; glyph?: string; text?: string } | undefined;
+      expect(doc?.blocks, `${name}: one block`).toHaveLength(1);
+      expect(notice?.kind, `${name}: a notice`).toBe("notice");
+      seen.push(`${name}: ${String(notice?.tone)} ${String(notice?.glyph)} ${String(doc?.status)} · ${String(notice?.text)}`);
+    }
+    expect(seen).toEqual([
+      "exit 0: muted continuation ok · vim finished",
+      "exited 1: error error error · vim exited 1",
+      "never started: error error error · vim did not start",
+      "exited 130: error error error · vim exited 130",
+      "SIGKILL: error error error · vim ended on SIGKILL",
+      "SIGQUIT: error error error · vim ended on SIGQUIT",
+      "SIGINT: muted cancelled partial · vim ended on SIGINT",
+      "SIGTERM: muted cancelled partial · vim ended on SIGTERM",
+      "SIGHUP: muted cancelled partial · vim ended on SIGHUP",
+    ]);
+  });
+  it("T4.94 (C23 I96, C23 I66, ruling 92): the shell route's cancel settles partial, muted, with the cancelled mark above the kept screen", async () => {
+    // **The status and the mark together**, because the defect was an `error`
+    // box on an `error` document: a row reading the status alone passes a build
+    // that moves it and keeps the box, and one reading the notice alone passes
+    // the reverse. A real child dies *of* the signal, so the fake settles from
+    // `signal` — one that resolved on its own would settle cancelled unsignalled.
+    let emit: ((c: string) => void) | null = null;
+    let settleChild: ((e: { code: number | null; signal: string | null }) => void) | null = null;
+    const h = pipelineHarness({
+      hasPty: true,
+      spawnPty: () => ({
+        pid: 4242,
+        exited: new Promise((r) => {
+          settleChild = r as (e: { code: number | null; signal: string | null }) => void;
+        }),
+        running: true,
+        onData: (cb) => {
+          emit = cb;
+        },
+        write: () => undefined,
+        resize: () => undefined,
+        signal: (sig) => {
+          settleChild?.({ code: null, signal: sig });
+          return true;
+        },
+      }),
+    });
+    h.pipeline.submit("!sleep 100");
+    // The route imports the emulator before it spawns (C23 I71), so the child
+    // exists a few turns after the submit rather than one.
+    for (let i = 0; i < 40 && emit === null; i += 1) await new Promise((r) => void setTimeout(r, 0));
+    (emit as unknown as (c: string) => void)("still working\r\n");
+    for (let i = 0; i < 40; i += 1) await new Promise((r) => void setTimeout(r, 0));
+
+    h.pipeline.cancel();
+    await settled(h.pipeline);
+    for (let i = 0; i < 40 && h.recorded.length === 0; i += 1) await new Promise((r) => void setTimeout(r, 0));
+
+    const doc = h.transcript.entries[0]?.doc;
+    const first = doc?.blocks[0] as { kind?: string; tone?: string; glyph?: string; text?: string } | undefined;
+    const kinds = (doc?.blocks ?? []).map((b) => b.kind);
+    expect(
+      [
+        `status ${String(doc?.status)} · error ${JSON.stringify(doc?.error ?? null)}`,
+        `first ${String(first?.kind)} ${String(first?.tone)} ${String(first?.glyph)} · ${String(first?.text)}`,
+        `kinds ${kinds.join(" ")}`,
+        `code ${String(doc?.meta.exitCode)} · recorded ${h.recorded.map((r) => r.exitCode).join(" ")}`,
+      ],
+    ).toEqual([
+      "status partial · error null",
+      "first notice muted cancelled · Cancelled.",
+      "kinds notice scroll",
+      "code 130 · recorded 130",
+    ]);
+    // **The screen survives it** (C23 I66): the kept block still holds the line.
+    expect(JSON.stringify(doc?.blocks[1]), "the line written before the press").toContain("still working");
+  });
+  it("T4.95 (C23 I96, C23 I5, ruling 92): a cleared queue's entries settle partial, muted, with the cancelled mark", async () => {
+    // Two behind a held one, because the defect a single queued item cannot
+    // show is one entry cleared and the next left saying it waits.
+    const h = pipelineHarness({ invoke: () => new Promise<never>(() => undefined) });
+    h.pipeline.submit("/ps");
+    await new Promise((r) => void setTimeout(r, 0));
+    h.pipeline.submit("/ps --all");
+    h.pipeline.submit("/ps -q");
+    // Not `settled(h.pipeline)`: it waits for the guard, and the held `/ps` never
+    // releases it until the cancel below.
+    await settled();
+
+    h.pipeline.cancel();
+    await settled(h.pipeline);
+    await settled(h.pipeline);
+
+    const cleared = h.transcript.entries
+      .filter((e) => e.doc.command !== "/ps")
+      .map((e) => {
+        const n = e.doc.blocks[0] as { tone?: string; glyph?: string; text?: string } | undefined;
+        return `${e.doc.command}: ${String(n?.tone)} ${String(n?.glyph)} ${e.doc.status} · ${String(n?.text)} · ${String(e.doc.blocks.length)}`;
+      });
+    expect(cleared).toEqual([
+      "/ps --all: muted cancelled partial · cancelled before it ran · 1",
+      "/ps -q: muted cancelled partial · cancelled before it ran · 1",
+    ]);
+    expect(
+      h.transcript.entries.some((e) => /queued behind/.test(JSON.stringify(e.doc))),
+      "and nothing is left saying it is still waiting",
+    ).toBe(false);
+  });
+  it("T4.96 (C23 I97, C23 I29, F1480): a handoff's code reaches meta and C20, 128+n for a signal and -1 for neither", async () => {
+    // **Both records are read**, because the defect was the record disagreeing
+    // with the notice above it: `vim` exiting 1 said failed and was kept as 0.
+    // 128+n is C07 I14's arithmetic, not C21's — C21's `Exit` carries the
+    // signal's name beside a null code.
+    const endings: readonly (readonly [string, { code: number | null; signal: string | null }])[] = [
+      ["exit 0", { code: 0, signal: null }],
+      ["exit 1", { code: 1, signal: null }],
+      ["exit 2", { code: 2, signal: null }],
+      ["exit 130", { code: 130, signal: null }],
+      ["neither", { code: null, signal: null }],
+      ["SIGINT", { code: null, signal: "SIGINT" }],
+      ["SIGTERM", { code: null, signal: "SIGTERM" }],
+      ["SIGKILL", { code: null, signal: "SIGKILL" }],
+    ];
+    const seen: string[] = [];
+    for (const [name, exit] of endings) {
+      const h = pipelineHarness({ handoff: () => Promise.resolve(exit) });
+      h.pipeline.submit("/tty vim");
+      await settled(h.pipeline);
+      const doc = h.transcript.entries.at(-1)?.doc;
+      seen.push(`${name}: meta ${String(doc?.meta.exitCode)} · recorded ${h.recorded.map((r) => `${r.command} ${String(r.exitCode)}`).join(", ")}`);
+    }
+    expect(seen).toEqual([
+      "exit 0: meta 0 · recorded /tty vim 0",
+      "exit 1: meta 1 · recorded /tty vim 1",
+      "exit 2: meta 2 · recorded /tty vim 2",
+      "exit 130: meta 130 · recorded /tty vim 130",
+      "neither: meta -1 · recorded /tty vim -1",
+      "SIGINT: meta 130 · recorded /tty vim 130",
+      "SIGTERM: meta 143 · recorded /tty vim 143",
+      "SIGKILL: meta 137 · recorded /tty vim 137",
+    ]);
+  });
+  it("T4.100 (C23 I100, C21 I19, ruling 98, F1491): the shell route's code is C07 I14's — 137 for SIGKILL on both arms, -1 and `did not start` for a spawn failure", async () => {
+    // **The box, the code and the record, as one table**: the defect was the
+    // record disagreeing with the ending — 1 for a signal and for a child that
+    // never started, and 0 for a signal on the PTY arm.
+    const read = (h: ReturnType<typeof pipelineHarness>): string => {
+      const doc = h.transcript.entries.at(-1)?.doc;
+      const box = doc?.blocks[0] as { kind?: string; message?: string } | undefined;
+      return `${String(box?.message)} · meta ${String(doc?.meta.exitCode)} · recorded ${h.recorded.map((r) => String(r.exitCode)).join(" ")}`;
+    };
+    const piped = (exit: { code: number | null; signal: string | null }) =>
+      pipelineHarness({
+        spawnShell: () =>
+          ({
+            stdout: (async function* () {})(),
+            stderr: (async function* () {})(),
+            exited: Promise.resolve(exit),
+            overflowed: false,
+            signal: () => false,
+          }) as never,
+      });
+    const seen: string[] = [];
+    for (const [name, exit] of [
+      ["exit 3", { code: 3, signal: null }],
+      ["SIGKILL", { code: null, signal: "SIGKILL" }],
+      ["never started", { code: null, signal: null }],
+    ] as const) {
+      const h = piped(exit);
+      h.pipeline.submit("!x");
+      for (let i = 0; i < 40 && h.recorded.length === 0; i += 1) await new Promise((r) => void setTimeout(r, 0));
+      seen.push(`pipe ${name}: ${read(h)}`);
+    }
+
+    // **The PTY arm through C21's own normalisation**, not a fake `Exit`: the
+    // port answers as `node-pty` 1.1.0 does for `kill -9 $$` (C21 I19), and the
+    // runner is the real one. A fake handing `{code: null, signal}` would
+    // assert the fix to C21 from inside C23 and see nothing of it.
+    const runner = createProcessRunner({
+      env: {},
+      stdin: {},
+      pty: {
+        spawn: () => ({
+          pid: 1,
+          onData: () => undefined,
+          onExit: (cb: (e: { exitCode: number; signal?: number }) => void) => {
+            setTimeout(() => cb({ exitCode: 0, signal: 9 }), 0);
+          },
+          write: () => undefined,
+          resize: () => undefined,
+          kill: () => undefined,
+        }),
+      } as never,
+    });
+    const pty = pipelineHarness({
+      hasPty: true,
+      spawnPty: (command, size) => runner.spawnPty(command, { cwd: () => "/w", ...size }) as never,
+    });
+    pty.pipeline.submit("!x");
+    for (let i = 0; i < 80 && pty.recorded.length === 0; i += 1) await new Promise((r) => void setTimeout(r, 0));
+    seen.push(`pty SIGKILL: ${read(pty)}`);
+
+    expect(seen).toEqual([
+      "pipe exit 3: The command exited with code 3. · meta 3 · recorded 3",
+      "pipe SIGKILL: Killed by SIGKILL. · meta 137 · recorded 137",
+      "pipe never started: The command did not start. · meta -1 · recorded -1",
+      "pty SIGKILL: Killed by SIGKILL. · meta 137 · recorded 137",
+    ]);
+  });
+  it("T4.101 (C23 I29, C23 I5, F1492): a line a ⌃c cleared from the queue is recorded in C20 at settlement, as -1", async () => {
+    // **The record and the documents together**, because C23 I29 records *the code
+    // the entry settled with*: a row reading C20 alone passes a build that
+    // records -1 beside documents saying 0. Two queued, as T4.95 has, so the
+    // order is visible and one cleared line cannot stand for both.
+    const h = pipelineHarness({ invoke: () => new Promise<never>(() => undefined) });
+    h.pipeline.submit("/ps");
+    await new Promise((r) => void setTimeout(r, 0));
+    h.pipeline.submit("/ps --quiet");
+    h.pipeline.submit("/ps");
+    await settled();
+
+    h.pipeline.cancel();
+    await settled(h.pipeline);
+
+    expect([
+      h.recorded.map((r) => `${r.command} ${String(r.exitCode)}`).join(", "),
+      h.transcript.entries.map((e) => `${e.doc.command} ${e.doc.status} ${String(e.doc.meta.exitCode)}`).join(", "),
+    ]).toEqual([
+      "/ps 130, /ps --quiet -1, /ps -1",
+      "/ps partial 130, /ps --quiet partial -1, /ps partial -1",
+    ]);
+  });
   it("T4.7 (with C22): session exit signals every child before the terminal is released", async () => {
     // A02 Seam 4's `Shutdown` row, and the whole claim is the **order**: a
     // child still running when the alternate screen is released writes onto the

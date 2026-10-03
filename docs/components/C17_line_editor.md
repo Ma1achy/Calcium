@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` |
+| **Package** | `calcium-tui` |
 | **Layer** | L3 interaction |
 | **Depends on** | C09 (`cells`, grapheme segmentation) |
 | **Consumed by** | C16 (dispatches keys here) · C18 (reads the buffer to classify) · C19 (cursor position for completion) · C20 (sets the buffer on history navigation) · L4 (renders the prompt) |
@@ -153,6 +153,16 @@ it does not change where the text lands inside the process. Naming it as separat
 the point: folding it in would make "one clipboard" a claim about two things, one of
 which C17 cannot see.
 
+**Amended (review batch 4, M10 item 1; ruling 72): the system clipboard is built, and
+it is a second *destination*, not a second store** (I31). L4 writes the kill buffer
+first, with the text it then sends to OSC 52, a platform tool, or — only when the
+reader takes the offer — a file (C14 I61), so
+`⌃y` yanks what the clipboard received. The axis stays separate in exactly the sense
+above — C17 sees one buffer and nothing of the terminal — and the invariant is L4's
+obligation to this component, which is why it is here: a copy that reached the
+system clipboard and not the kill buffer would make `⌃y` paste the previous kill, and
+the reader holds two clipboards and one paste key.
+
 ## 5b. Selection — an anchor, a head, and every motion twice
 
 **The model, not a binding.** Select-all is the *degenerate case* of this — the whole buffer as one region — so shipping it alone means shipping an anchor and a region for one key and then generalising them. Roadmap entry 15 step 2.
@@ -218,7 +228,7 @@ So `Chip` carries parts and the label is derived:
 
 | part | what it is |
 |---|---|
-| `ordinal` | `#1`, `#2` — per session and never reset. A paste has no name, so the ordinal is its identity; `[#2]` after `[#1]` was deleted is a reader seeing that something else was there, which is true |
+| `ordinal` | `#1`, `#2` — per owner's line and never reset within it: the prompt's for the session, a borrower's for its borrow (I33). A paste has no name, so the ordinal is its identity; `[#2]` after `[#1]` was deleted is a reader seeing that something else was there, which is true |
 | `kind` | `"paste"`, `"file"` or `"image"` — what the chip *is*, which decides the preview and nothing about the label |
 | `name` | what a reader calls it: a paste's detected content kind (`json`), a file's basename (`package.json`) |
 | `lines` | the size, drawn `47L`. Absent for an image, which is not measured in lines |
@@ -302,6 +312,223 @@ consumer is C22's projection, and the seam returns with it — which is what *na
 the queued consumer* means when the queue finally arrives.
 
 ---
+
+## 5e. A chip wider than its row — elided in the middle, by the walk (§099, `R-BLK-750`, `R-BLK-801`, `R-BLK-802`)
+
+**Measured at `c8c7a77e`, before this section was written.** A 44-cell bracketed
+label after three cells of text, at width 14 with the prompt's `{2, 2}` gutter:
+
+```
+["ab ", "[#1 a-very-long-detected-kind · 4096L]", " z"]     spans [{row: 1, from: 2, to: 14}]
+```
+
+The walk moved the chip to a row of its own and **overflowed** it, as I20 and the old
+last sentence of I26 said it should. The painter's `exact()` clips at the frame's
+right edge, so nothing wraps — what the reader sees is `[#1 a-very-lo` and nothing
+after it: a label cut on the right, with no closing bracket at 1-bit and no marker at
+any depth, which is indistinguishable from text that happens to start with `[#1`.
+
+**The reason the overflow was ruled is true, and it does not reach the decision.**
+*An editor never alters what the user typed, and a chip is what the user pasted* — the
+content is what was pasted, and the content is untouched: `resolved` still substitutes
+all of it. The **label** is not what anyone pasted. It is C17's own composition from
+the chip's parts (I25), and §099 says what a composition does with too little room:
+*a kind shortens itself, given the width it got* (`R-BLK-802`), and *a path truncates
+in the middle, because the head says where and the tail says what* (`R-BLK-801`).
+`R-BLK-750` lists a chip among the content that shrinks to its floor. So the rule is
+I20's for a typed cluster and §099's for a chip, and the distinction is who composed
+the cells.
+
+### The walk, as a classification table
+
+The interactions are **structural**: every row below is two rules that both hold at
+rest, with no event between them, so the artefact is a table rather than a trace.
+`U` is the usable cells of the row the chip is drawn on, `L` the full label's cells,
+`F` the frame — two cells at either rung, a space either side on the painted rung and
+the brackets on the bare one — and `m` the marker's cells.
+
+| Case | Which rules meet | Ruling |
+|---|---|---|
+| `L ≤ U`, the row partly used, `used + L > U` | I20 *moves whole* × I26 *one wrap unit* | Moves to a fresh row, drawn whole. Unchanged. |
+| `L > U`, the row partly used | I20 *moves whole* × I32 | **The chip opens a fresh row first, and is elided there** — never to the remainder of a partly used row. A chip is shortened only when no row can hold it; shortening it to whatever the text before it left would make its form depend on that text, and two identical pastes would draw differently a word apart. |
+| `L > U` on a fresh row | I20 *overflows* × C01 *no line wider than the frame* × `exact()`'s right clip | **Elided in the middle to exactly `U` cells, frame kept**: `open + truncate(inner, U − F, tier, "middle") + close`, C09 I103's cut — one middle cut in the tree, not two. The head keeps the ordinal and the tail keeps the size, which are the two parts that tell two chips apart. |
+| Row 0 against a continuation row | `usableAt(first)` × `usableAt(cont)` | **`U` is read after the walk opens the row the chip lands on.** At `c8c7a77e` the limit was read once, before `open()` — harmless for the fit test, which is decided on the row being left, and wrong for the elision, which must fit the row being entered. With the prompt's `{2, 2}` the two agree; with `{first: 0, cont: 6}` a chip moved off row 0 would be elided to row 0's width on a row six cells narrower. |
+| `U − F < m` (`U` of 1 or 2) | the frame × the marker | **The marker alone, padded to `U`.** Neither rung's frame fits beside it; on the painted rung the ground still covers the cells, and at 1-bit two cells cannot say *chip* at all. |
+| `U − F = m` | the frame × the marker | The frame and the marker: `[…]`, or `␠…␠` on a ground. `truncate` returns the marker alone at a zero budget, so this is its own arm rather than a special case here. |
+| A wide cluster in the name (`日本語.json`) | C09 I9 *never split a cluster* × `U` exactly | `truncate` refuses a cluster that would straddle its budget and pads the cell, so the drawn label is exactly `U` cells either way. |
+| The ASCII tier, or `ambiguousWidth: "wide"` | the marker's glyph × the walk's measure | **The marker comes from the same tier as the separator.** `glyphs()` hands the ASCII set wherever the ambiguous width is wide (C02 I9), so the separator is `:` there; `ChipLook` carries the tier the separator came from and the elision's marker is `~` at exactly the same rungs. The walk measures narrow, and so does `exact()`: with both the separator and the marker ASCII at the wide rung, the frame and the marker are measured exactly. The name's own ambiguous characters are the walk's narrow measure, which is every typed cluster's too and is not this section's (F1392). |
+| The cursor after an elided chip | I19 *a row for every position* | `used = U`, so the fullness test opens the next row and the position after the chip is that row's gutter. Unchanged. |
+| `chipSpans` and `selectionSpans` over it | I26 *the ground comes off the walk* | The span is `from + drawn width`, which now never passes the row; the `Math.min(…, width)` clamp stays as a guard for `width ≤ gutter`, where `usable` is floored at 1 and §7b records that the terminal and the count disagree. |
+| The layout memo | I24 *keyed on buffer, width and both gutter figures* | The elided form depends on the width and the row's gutter, and both are key terms; the tier is fixed when the editor is built. No new term. |
+| `chipAt`, the preview's title, `resolved` | I25, I27, C22 I113 | **Untouched.** The elision is drawing: the preview's title is `chipLabel` with no limit, and submission substitutes the content. |
+| A typed cluster wider than `U` (`日` at `U = 1`) | I20 × I32 | **Still overflows** (I20). The elision is a chip's alone, because only a chip's cells are C17's composition; a typed cluster is the user's. |
+| A held line (C22 I118) | I29 × I32 × I34 | Drawn by the same walk through the editor's `drawAs`, so it is elided exactly as the live line is, with no change at the call site. |
+
+**`ClusterText` takes the limit.** `(cluster, limit?) => string | undefined`: with no
+limit it is the label, as every caller outside the walk wants it; with one it is the
+label fitted to it. The walk asks without a limit first — the fit test needs the
+label's natural width — and asks again with `U` only when the label is wider than the
+row it has opened. This is `layout.ts`'s own note carried to its end: *a kind shortens
+itself, given the width it got*, and the walk is the only thing that knows the width.
+
+## 5f. Chips across a borrow — ordinals travel with the line, sentinels never repeat (§052, `R-QST-003`, I29)
+
+**Measured at `c8c7a77e`.** A prompt holding one chip, then `hold()`, a paste inside
+the borrow, a kill of it, `resume`, a paste at the prompt, and `⌃y`:
+
+```
+reply           ["[#2 B · 5L]"]
+after resume    ["[#1 A · 5L][#3 C · 5L]"]
+after ⌃y        ["[#1 A · 5L][#3 C · 5L][#2 B · 5L]"]     resolved "AAACCCBBB"
+```
+
+`hold()` takes the text, the caret, the region and the undo stack (I29) and leaves the
+chip table and both counters shared, so the reply's first chip is `#2` and the
+reader's next is `#3`. **§052 gives a borrower its OWN buffer, and I25 says the ordinal
+is a fact about a buffer's whole life** — so the reply's buffer is a buffer whose life
+began at the borrow, and its first chip is `#1`. The reader's `#2` is the reader's.
+
+**The remedy the review wrote down reopens I24's blind spot**: *hold the chip
+map and the counter* restarts the sentinel counter, so the reply's first paste mints
+the same sentinel as the reader's first chip. Two things then break and neither is
+visible from a row about ordinals: the one map rebinds that sentinel, so the held line
+draws the reply's label and resolves to the reply's content; and I24's memo, keyed on
+the buffer's text, answers a walk of one string for two different chips.
+
+### Which channel carries a sentinel between owners — a classification table
+
+The structural half: every way a sentinel reaches a buffer, against whose sentinel it
+can be. **A table of channels rather than a trace of events**, because the question
+is which pairs of owners each channel joins, and that holds at rest.
+
+| Channel | Whose sentinels arrive | Ruling |
+|---|---|---|
+| `insert` of typed or pasted text | none | A fresh string. A typed private-use character that happens to equal a minted sentinel is the stated blind spot of I34. |
+| `insertChip` | a fresh one, the current owner's | Minted and inserted in one call (I24's precondition). |
+| `undo`, `redo` | the current owner's own | The stack travels with the line (I29), so a stack only ever holds its owner's texts. |
+| `resume`, `restore` | the owner's own | The held line is the owner's text. |
+| `yank` | **any owner's** | **The one channel that joins two owners**: the kill buffer is the one clipboard (§5a) and §052 names *paste rules* among what a borrower shares. A foreign chip is **adopted** — minted afresh under the current owner's next ordinal, parts unchanged — and an own chip is inserted as it is, which is the same chip twice. |
+| `setText` (history, completion) | none | History records the submitted line, which is `resolved`; a candidate is text. |
+| `loadField` (a field's stored value, through `restore`) | a sentinel a past field borrow committed | Resolves through the one table and keeps the ordinal it was minted with; `restore` is not an edit and adopts nothing. That a field's value can hold a sentinel at all was a finding of its own, F1395, **closed by C22 I148**: the shell writes a field with `resolved`, so a stored value holds no sentinel and this row's input is plain text. |
+
+**One table, and that is the ruling the plan's third clause turned on.** *A held line
+draws through its own chip table* presumes one table per owner, and the row for
+`yank` is what refutes it: with per-owner tables a chip killed inside a reply and
+yanked at the prompt is a sentinel the prompt's table has never seen — it draws as a
+private-use box and `resolved` submits it as itself, which is a paste silently
+replaced by one unprintable character. The table is therefore the editor's, append-
+only and keyed by a sentinel that is **never reused and never rebound** (I34); the
+ordinal counter is the owner's and travels with the line (I33). A held line then
+draws through the editor's `drawAs` correctly with no call-site change, because no
+sentinel in it can have been rebound (C22 I118 stands as written).
+
+### The borrow, as a sequence trace
+
+The event-mediated half. Prompt owner `P`, a reply `R`, then a form field `F`. `Sn` is
+the n-th sentinel minted in the editor's life.
+
+| # | Event | Owner | Sentinels · ordinals | Drawn | Kill buffer |
+|---|---|---|---|---|---|
+| 1 | paste `A` at the prompt | P | S0 → A, P#1 | `#1 A` | — |
+| 2 | `hold()` for `reply…` | R | P's counter (1) held with P's line and stack; R starts at 0 | `""` | — |
+| 3 | paste `B` in the reply | R | S1 → B, R#1 | `#1 B` — **`#2` at `c8c7a77e`** | — |
+| 4 | `⌃u` | R | — | `""` | `S1` |
+| 5 | answer; `resume` | P | P's counter back at 1; R's discarded; S1 stays in the table, owned by R | `#1 A` | `S1` |
+| 6 | paste `C` | P | S2 → C, P#2 | `#1 A` `#2 C` — **`#3` at `c8c7a77e`** | `S1` |
+| 7 | `⌃y` | P | S1 is R's, so **adopted**: S3 → B, P#3 | `#1 A` `#2 C` `#3 B`; `resolved` ends `BBB` | `S1` |
+| 8 | `⌃y` again | P | adopted again: S4 → B, P#4 | `… #4 B` — each yank of a foreign chip is a paste | `S1` |
+| 9 | `⌃z`, `⇧⌃z` | P | S4 leaves the text and comes back; the table never forgot it | `… #4 B` | `S1` |
+| 10 | kill `S0`, `⌃y` twice | P | S0 is P's own: not adopted | `#1 A` twice — the same chip twice, which is true | `S0` |
+| 11 | enter a field: `hold()` | F | P's counter (4) held; F starts at 0 | the prompt row draws P's held line through the one table (C22 I118) | `S0` |
+| 12 | `⌃y` in the field | F | S0 is P's: adopted, S5 → A, F#1 | the field draws `#1 A` | `S0` |
+| 13 | leave the field | P | the field's value is written from `text`, so it holds S5 — a sentinel in a form's data | — | `S0` |
+
+**What the trace found beyond the premise.**
+
+1. **The restart remedy's two failures are one rule.** Step 3 under a restarted
+   counter mints S0 again and rebinds it, and every later row about P is then about a
+   chip P never pasted. *Never reused* is the rule and *never rebound* is what it
+   buys; they are one invariant (I34) because the second cannot fail without the
+   first.
+2. **Step 7 is where per-owner ordinals meet the shared clipboard**, and without
+   adoption it draws `#1 A` beside `#1 B` — the two-`#1` prompt I25's own comment
+   names as the reason the ordinal is the editor's and not the producer's. Adopting
+   under the current owner's counter is the only reading that keeps both I25 and
+   §5a; it makes the table's writers two (`insertChip` and `yank`), both of which
+   mint and insert in the same call, so I24's precondition — *the buffer moves
+   whenever the table does* — still holds, and I24 is amended to name both.
+3. **keys.ts's held draft** (the menu and search a question displaced) records
+   `editor.text` when a question arrives and compares it with `editor.text` when the
+   last blocking layer goes. With sentinels never reused or rebound, equal raw text
+   is equal chips, so that comparison needs no chip-aware answer — I34 is what makes
+   it one.
+
+### The limits, stated rather than closed
+
+- **A typed private-use character can equal a minted sentinel**. `insert`
+  keeps the Private Use Area (`stripForBuffer` strips controls only), and Nerd Font
+  glyphs live there — Pomicons at U+E000–U+E00A are the first eleven sentinels. A
+  reader who pastes one after that many chips draws a chip and submits its content.
+- **The counter walks out of the Private Use Area after 6,400 chips**:
+  `CHIP_BASE + n` passes U+F8FF into U+F900, a CJK compatibility ideograph a reader
+  can type. Never reused is true there and the sentinel is no longer private.
+
+Both are properties of the sentinel's alphabet rather than of the borrow, and changing
+the alphabet is a §5c decision with its own readers (`chipAt`, `resolved`, the walk,
+three rows that match the range by regex) — recorded here with numbers rather than
+folded into this section.
+
+---
+
+## 5g. The reader's own bidi characters — drawn visible, kept as typed (ruling 71, F1401, F1403)
+
+**Measured at `e4e99eb3`, before this section was written.** `/show ` then U+202E then `gpj.exe`, laid out at
+width 30 with the prompt's `{2, 2}` gutter: the walk returned the row with the character raw, and `cursorCell`
+answered column 8 on **both** sides of it — two positions on one cell, so the caret could not say which side of
+the override it stood on. `commandRows` drew the same line raw above the entry. Neither row is a block, so C09
+I127's resolve never saw either (F1401), and on a terminal that honours the override every cell after it on the
+row is reordered — the prompt reads `exe.jpg` where the reader typed `gpj.exe`.
+
+**And the walk disagreed with the terminal in the dangerous direction.** `cells()` reads all twelve bidi format
+characters at zero; `@xterm/headless` gives U+2066–U+2069 and U+061C a cell of their own (F1403). Drawn raw, a
+prompt row the walk filled exactly was one cell wider on screen than the walk counted, and every caret position
+after the character was one cell left of the glyph it named.
+
+**The remedy is display, not input.** The walk draws a cluster no `drawAs` substitutes through
+`neutraliseControl` (C09 I128), so a bidi format character is drawn as its `<U+XXXX>` form: eight cells of
+printable ASCII, the same at every rung, measured by the walk that draws it. Every grapheme index is untouched,
+because the buffer is untouched.
+
+### The walk, as a classification table
+
+The interactions are **structural** — each row is two rules that both hold at rest — so the artefact is a table.
+`A` is F1403's first group (U+202E, U+200F: xterm joins them to the previous cell at no width), `B` its second
+(U+2066–U+2069, U+061C: a cell of their own at width 1), `C` the members it did not place (U+200E,
+U+202A–U+202D). **Measured at `e4e99eb3`: all twelve are a grapheme cluster of their own** (`GCB=Control`)
+whatever stands either side — `a`, U+202E, U+0301 is three clusters — so *one character* and *one grapheme*
+are the same thing here, and a combining mark never joins one.
+
+| Class × column | Which rules meet | Ruling |
+|---|---|---|
+| A, B, C × the prompt row | I18 *one walk* × C09 I128 | **Drawn `<U+XXXX>` by the walk**, so `layout`, `displayRows`, `cursorCell`, `selectionSpans` and `chipSpans` read one form. Before: raw, and at `B` a cell the walk did not count. |
+| A, B, C × the caret | I1 *a grapheme index* × I4 *a column* | **One grapheme, one position, one step.** Before the character the caret stands on its `<`; after it, on the cell after its `>`. The eight cells between are not positions, as a wide glyph's second cell is not. `charLeft` and `charRight` cross it in one press and `deleteBackward` removes it whole — both unchanged, because the buffer is. Before: at `A` the two positions answered one cell; at `B` the position after answered a cell left of where the terminal drew the next glyph. |
+| A, B, C × the wrap | I20 *moves whole* × I20 *overflows* | **One wrap unit**: the form moves whole to a fresh row, and at `usable < 8` it overflows like any typed cluster wider than its row. It is the reader's character, not C17's composition, so I32's elision does not apply. Unreachable in a session: `MIN_COLUMNS` is 60, leaving 58 usable. |
+| A, B, C × a chip's ground | I26 *the ground comes off the walk* × this section's substitution | **Not a chip.** The walk records a chip span where `drawAs` answered and nowhere else, so the form takes no ground. `shown !== cluster` — the test the walk used — is true of both substitutions, and would have painted every override as a chip. |
+| A, B, C × the selection wash | I21 × I18 | The wash covers the form's eight cells when the character is in the region: the walk's cells, so no rule of its own. |
+| A, B, C × the command echo | C22 I33 × C09 I128 | **`commandRows` neutralises each line before `hardWrapCells`.** The measurer and the composer both call it, so the entry's height stays one number. **Stated divergence**: the echo is `hardWrapCells` over ASCII, so a form that reaches a row's end can break across two rows where the prompt moved it whole. The echo draws as a block would draw the same text (C09 I127), and a second wrap written here to agree with the prompt is the drift C14 I1 exists to prevent. |
+| a chip whose `name` holds one | I25 *the label is C17's* × C09 I128 | **Neutralised in `chipLabel`, before it is measured or elided.** A chip's parts come from a producer — a completion source (C19 I28) or the paste path — and a file chip's name is a filename. The label is C17's composition, so it takes ruling 71's form, and the middle cut cuts the form as text. `chipAt`, the preview's content and `resolved` keep the parts as they are. |
+| A, B, C × what is submitted | I9 × ruling 71 | **Kept.** `text`, `resolved`, the document's `command`, C23's argv and history hold the character as typed. It is the reader's input, and a command the shell altered on the way out is not the command the reader wrote. I9 strips controls on insert; a bidi format character is not one, and this section does not widen I9. |
+| A, B, C × history recall | C20 × this section | History records the submitted line, so recall `setText`s the raw character and the walk draws it visible: no rule of its own. The reverse-search box is `Block[]`, which C09 I127 already neutralises. |
+| A, B, C × the kill buffer, and a copy of a prompt region | I31 × C09 I129 | **Kept.** `⌃y` puts back what was killed, and I31 makes every copy destination the kill buffer's text. C09 I129 is about blocks and the prompt is not one: a copy of the reader's own line hands back the reader's own line. Stated rather than closed. |
+| A, B, C × a held line (C22 I118), a reply (C23 I73) | I29 × I18 | Drawn by the same walk through the editor's `drawAs`, so no call-site change. |
+| A, B, C × C23 I90's announcement | C23 I90 *as the prompt draws it* | `drawn` builds the line by its own loop over `drawAs`, so it takes the form there too — `drawAs(ch) ?? neutraliseControl(ch)` — or the prompt and the announcement disagree. **No row reaches the real `drawn`**: C23 T1.100's world supplies its own. |
+| a combining mark after one | `GCB=Control` × I20 | Its own cluster before this section and after it; it draws on the form's `>`. Positions and widths do not move. |
+| clean text | the control | `neutraliseControl` returns a clean string as itself, so a buffer holding none of the twelve lays out byte-identical to before, and the memo (I24) is untouched — its key is the buffer. |
+| F1403's disagreement | `cells()` at 0 × xterm at 1 | **Removed from these rows rather than reconciled.** Neither row writes the character, so the disagreement has no cell to act on there; `cells()` is unchanged. |
+
+**Not in this section**: the linear stream (C22 §6m) writes the typed command and its input line through
+`stripControl`, which passes a bidi format character, and it is not a frame — a separate surface with a
+screen reader's question in it (*is `<U+202E>` what a reader should hear?*), recorded as a finding with this lane.
 
 ---
 
@@ -474,7 +701,9 @@ the space at index 77; `--seed=1234` does not fit and moves whole.
   they are an off-by-one in opposite directions.
 - **A cluster wider than `usable` takes a row of its own and overflows it.** A block
   may substitute or drop a glyph it cannot draw; an editor may not alter what the
-  user typed.
+  user typed. **A chip is the exception, and the reason is the rule's own**: its
+  label is C17's composition, not what the user typed, so it is elided in the middle
+  to the row (§5e, I32).
 
 ### What it found
 
@@ -519,11 +748,11 @@ the space at index 77; `--seed=1234` does not fit and moves whole.
 - **I17** — Word motion skips whitespace in the direction of travel, then consumes one maximal run of a single non-whitespace class. `wordRight` therefore stops at run **ends** and `wordLeft` at run **starts**; the two sequences coincide only where runs abut and are not reverses of each other.
 - **I18** — `layout`, `displayRows` and `cursorCell` are one walk: `displayRows` is `layout().length` and `cursorCell` indexes the rows `layout` returned. L4 draws those rows rather than wrapping the buffer a second time, which is what makes I3 structural instead of a claim two implementations happen to satisfy.
 - **I19** — A display row exists for every position the cursor can occupy, so the count is a position count and not `ceil(cells / usable)`: a logical line whose last cluster exactly fills a row emits a trailing empty row, per line. T3.8's trailing `\n` is this rule rather than a second one, and `cursorCell` at a wrap boundary reports the following row — the two halves are an off-by-one in opposite directions if either is dropped.
-- **I20** — Rows are produced by walking clusters. A cluster that does not fit moves whole and leaves the cell behind it blank; a cluster wider than `usable` takes a row of its own and **overflows** it. C09 I9 may drop or substitute a glyph a block cannot draw and C17 may not: a block renders someone's data, an editor holds what the user typed.
+- **I20** — Rows are produced by walking clusters. A cluster that does not fit moves whole and leaves the cell behind it blank; a cluster wider than `usable` takes a row of its own and **overflows** it — **except a chip, whose label is the walk's to shorten (I32)**. C09 I9 may drop or substitute a glyph a block cannot draw and C17 may not: a block renders someone's data, an editor holds what the user typed.
 - **I21** — **A selection is an anchor plus the cursor**, in the buffer's own grapheme indices, and the cursor **is** the head. `anchor === head` is no selection rather than an empty one, so the caret has one spelling. An extending motion moves the head and never the anchor; an unshifted motion collapses. Both halves are load-bearing and fail differently: a motion that moves the anchor is right on the first keystroke and wrong on the second, and a motion that does not collapse leaves a region nobody can see the end of.
 - **I22** — **An edit over a region replaces it, in one undo unit.** `insert`, `deleteBackward`, `deleteForward` and `yank` remove the region and apply themselves as a single `structural` unit; `killTo` collapses rather than cutting, because a kill already names where to cut to and a region would be a second answer. Selection is not undo state: `undo` and `redo` collapse it, which is I16's rule inverted — a clipboard survives an undo and a statement about where the caret is does not.
 - **I23** — **`collapse()` leaves the caret where it is, the text unchanged and the undo history untouched; only the region goes.** Not a motion and not an edit, so it takes neither's bookkeeping. The distinction from `move` is the caret: a collapse implemented as a motion is right about the region and wrong about where the caret is, which a test reading `selection` alone cannot see.
-- **I24** — **`layout` answers from a one-entry memo keyed on the buffer, the width and both gutter figures**, and `displayRows` reads that memo rather than walking again, so I18's *one walk* becomes one per distinct question instead of one per call — 4.97 calls a frame measured, against a buffer that had changed on none of them (F914). **The chip table is deliberately absent from the key.** `drawAs` resolves a sentinel through it, so the obvious reading is that it belongs there; it does not, because `insertChip` is the table's only writer and it mints a fresh sentinel and inserts it in the same call. A chip can therefore never be registered for a cluster already in the buffer, and the buffer moving is a strict precondition for the table moving. **That precondition is the memo's whole blind spot, and it is a property of the writer rather than of the key** — a second writer that registered a chip without inserting its sentinel would leave this memo stale, and nothing here would see it. T1.43 pins the precondition for the writer that exists and cannot watch one that does not; the limit is recorded rather than papered over with a key term that no input can make differ (A03 §2's vacuity class, arriving in a key).
+- **I24** — **`layout` answers from a one-entry memo keyed on the buffer, the width and both gutter figures**, and `displayRows` reads that memo rather than walking again, so I18's *one walk* becomes one per distinct question instead of one per call — 4.97 calls a frame measured, against a buffer that had changed on none of them (F914). **The chip table is deliberately absent from the key.** `drawAs` resolves a sentinel through it, so the obvious reading is that it belongs there; it does not, because the table's writers — `insertChip`, and `yank` adopting a chip another owner minted (I33) — each mint a fresh sentinel and insert it in the same call. A chip can therefore never be registered for a cluster already in the buffer, and the buffer moving is a strict precondition for the table moving. **That precondition is the memo's whole blind spot, and it is a property of the writer rather than of the key** — a second writer that registered a chip without inserting its sentinel would leave this memo stale, and nothing here would see it. T1.43 pins the precondition for the writer that exists and cannot watch one that does not; the limit is recorded rather than papered over with a key term that no input can make differ (A03 §2's vacuity class, arriving in a key).
 
 - **I25** — *(§5c, §099, §101, `R-COL-005`, `R-BLK-628`, `R-BLK-116`)* **A chip's label is composed from its parts by C17, never supplied as a string.** `ordinal`, `kind`, `name` and an optional `lines`; the separator is the glyph table's, so the ASCII tier is taken from the same place every other separator is. Two rungs and one form: with colour, the name on `surface.bgDeep` in `tone.meta` with one space either side; at 1-bit, the same text in brackets and no ground. **The bracket is the unpainted rung of a painted thing** — §099's own caption is *a chip is one word that happens to be painted* — and reading the fixtures' two spellings as two formats is what would make the design contradict itself.
 
@@ -533,17 +762,24 @@ the space at index 77; `--seed=1234` does not fit and moves whole.
 
   **The evidence, stated with its weakest member.** For `file`: §099 draws `look at  parse.ts  and  #1 json · 47L  then` — **two chips in one row, one numbered and one not**, which can only be about the discriminator, and §011 draws `[parse.ts · 184L]`. Against: §101 draws `#1 package.json  47L`. §049's pair — `[#1 json · 47L]` and `[#2 nginx.conf · 44L]` — is not a counter-instance, because its own heading reads *image · paste chip · buttons · links* and `nginx.conf` there is a **detected format**, not an attached file. So the count is two figures for and one against, and the one for that decides it is the contrast drawn inside a single row; §101's subject is **where a preview goes**, and its label reuses §058's numbers with the names swapped. That figure is recorded as the counter-instance rather than explained away.
 
-  **The minting is untouched**: every chip is still numbered, per session and never reset, because the number is the map's key and `chipAt` reads it back; what changes is whether the label spends cells on it.
-- **I26** — *(§5c, §099, I18, I20)* **A chip is one wrap unit and its ground comes off the same walk that measured it.** The atomicity is `walk`'s existing *a cluster that does not fit moves whole* and was satisfied before this section was written; `chipSpans` returns the cell ranges a chip occupies, as `selectionSpans` returns the region's, so nothing measures a chip twice and a ground cannot land where the label was not — and the range is recorded **by the walk as it draws**, never derived from the position pair around the chip, which names the row the wrap moved it off. A chip wider than the whole row still overflows rather than being dropped (I20) — an editor never alters what the user typed, and a chip is what the user pasted.
+  **The minting is untouched**: every chip is still numbered, per owner's line and never reset within it (I33), and the number is what `chipAt` reads back with the chip; what changes is whether the label spends cells on it.
+- **I26** — *(§5c, §099, I18, I20)* **A chip is one wrap unit and its ground comes off the same walk that measured it.** The atomicity is `walk`'s existing *a cluster that does not fit moves whole* and was satisfied before this section was written; `chipSpans` returns the cell ranges a chip occupies, as `selectionSpans` returns the region's, so nothing measures a chip twice and a ground cannot land where the label was not — and the range is recorded **by the walk as it draws**, never derived from the position pair around the chip, which names the row the wrap moved it off. ~~A chip wider than the whole row still overflows rather than being dropped (I20) — an editor never alters what the user typed, and a chip is what the user pasted.~~ **Superseded by I32**: the content is what the user pasted and the label is C17's composition (I25), so a label wider than the row is elided in the middle rather than overflowing, and its span is the drawn width.
 - **I27** — *(§5d, §101, `R-BLK-823`, C22 I113)* **`chipAt()` answers the chip the caret is on — the one immediately before it, or the one immediately after when there is none before — and `null` otherwise.** Read from the side map `insertChip` writes and `drawAs` resolves through, never from a copy, so a preview cannot disagree with the label drawn beside it. The preference is backwards because `insertChip` leaves the caret past the chip it inserted, and both sides are read because position 0 has nothing before it.
 
 - **I28** — *(§101, C23 I28, C23 I73)* **`snapshot()` and `restore()` carry the whole of what the reader can see of their line — the text, the caret and the region — and a restore is indistinguishable from never having left.** The pair exists because §101 gives one editor two owners in sequence: a question that takes a typed reply hands the prompt to the reply and must hand it back, and *hand it back* is a claim about a state rather than about a string. **Text alone is the shape that reads as enough and is not.** A reader who had selected a phrase and returns to find the selection gone has been told their line survived and can see that something did not, which is worse than a line that was cleared outright — the restore either is exact or is a second editing operation performed on their behalf.
-- **I29** — *(§052, `R-QST-003`, → C23 I77, C16 I54)* **An owner's undo stack travels with its line.** `hold()` takes the text, the caret, the region **and the undo stack**, and leaves an empty line with an empty stack; `resume(held)` puts both back and discards the borrower's. Neither records a unit. §052 names four things a borrowing question owns — *its OWN buffer, selection, history and undo* — and three it shares — *paste rules, `⇧⏎` newline and `⌥←` word move*; `R-QST-003` is the same sentence as a rule: *editor code is shared; buffers, undo stacks, and histories are isolated by owner*. **`snapshot()`/`restore()` carry what the reader can see (I28), and the stack is not visible, which is why I28 alone could not hold this.** One stack served both owners, and it leaked at both ends: entering the borrow through `setText("")` recorded the reader's line as the reply's first unit, so `⌃z` inside a reply returned the held draft; and a reply that typed left units whose pre-states were its own text, which the restore — correctly recording nothing — also did not remove, so `⌃z` back at the prompt walked into the reply. The kill buffer is not among the four: it is the one clipboard (§5a), and §052's *paste rules are shared* is the same fact. **A form field is the third owner** (C04 §3ar, C16 I60): it takes the line with `hold()` on entering the field and gives it back with `resume()` however the field is left, and its own stack, like a reply's, never reaches the reader's. While it is held the shell draws it through this component's own walk — `layout` and `cursorCell`, exported for it, with the editor's `drawAs` — so a held line's chips are drawn as they were before it was held (C22 I118).
-- **I30** — *(§5b, §019, §063, §052)* **Every chord that extends the region has its unshifted chord bound to the motion it extends.** §5b is *every motion twice, and the second is the first with the anchor held* — and it was true of the editor's `#target` and false of the keymap: `⌥⇧←`/`⌥⇧→` extended by a word while `⌥←`/`⌥→` were bound at no target, so the anchor-held form existed and the motion did not. The design names the pair three times — §019 *⌥← and ⌥→ remain word-left and word-right in text fields*, §063 *⌥←→ is word movement*, §052 *⌥← word move* among what a borrowing question shares — and nothing checked a binding against its extension, because every row about word motion called `move` directly. **Asserted over the keymap, by pairing actions rather than listing keys**, so a rebinding moves the pair and an extend chord added without its motion fails. `→`'s motion is `acceptGhostOrForward`, which *is* the forward motion when there is no ghost, and the pairing says so rather than exempting it.
 
   **Not `setText(text, cursor)` twice.** That pair cannot express a region at all, which is why the region is on the record rather than argued away: the type is what makes *restored exactly* checkable, and a snapshot that silently drops a field is a fixture for a test that cannot fail. **And not history's stash** (C20 §4), which holds text alone for its own good reason — a history walk restores a *draft*, which is a line the reader has not finished, where this restores a *state* the reader was in the middle of. Two mechanisms because they answer two questions; one type would have to be the wider one and would make C20's exclusion unstateable.
 
   The undo history is **not** in the snapshot and that is deliberate: a restore is not an edit and must not be undoable past itself, or `⌃z` after answering a question walks backwards into text the question composed.
+
+- **I29** — *(§052, `R-QST-003`, → C23 I77, C16 I54)* **An owner's undo stack travels with its line.** `hold()` takes the text, the caret, the region **and the undo stack**, and leaves an empty line with an empty stack; `resume(held)` puts both back and discards the borrower's. Neither records a unit. §052 names four things a borrowing question owns — *its OWN buffer, selection, history and undo* — and three it shares — *paste rules, `⇧⏎` newline and `⌥←` word move*; `R-QST-003` is the same sentence as a rule: *editor code is shared; buffers, undo stacks, and histories are isolated by owner*. **`snapshot()`/`restore()` carry what the reader can see (I28), and the stack is not visible, which is why I28 alone could not hold this.** One stack served both owners, and it leaked at both ends: entering the borrow through `setText("")` recorded the reader's line as the reply's first unit, so `⌃z` inside a reply returned the held draft; and a reply that typed left units whose pre-states were its own text, which the restore — correctly recording nothing — also did not remove, so `⌃z` back at the prompt walked into the reply. The kill buffer is not among the four: it is the one clipboard (§5a), and §052's *paste rules are shared* is the same fact. **A form field is the third owner** (C04 §3ar, C16 I60): it takes the line with `hold()` on entering the field and gives it back with `resume()` however the field is left, and its own stack, like a reply's, never reaches the reader's. While it is held the shell draws it through this component's own walk — `layout` and `cursorCell`, exported for it, with the editor's `drawAs` — so a held line's chips are drawn as they were before it was held (C22 I118). That is one table serving every owner, and it is correct because no sentinel is ever rebound (I34); the ordinal counter is what travels with the line (I33).
+- **I30** — *(§5b, §019, §063, §052)* **Every chord that extends the region has its unshifted chord bound to the motion it extends.** §5b is *every motion twice, and the second is the first with the anchor held* — and it was true of the editor's `#target` and false of the keymap: `⌥⇧←`/`⌥⇧→` extended by a word while `⌥←`/`⌥→` were bound at no target, so the anchor-held form existed and the motion did not. The design names the pair three times — §019 *⌥← and ⌥→ remain word-left and word-right in text fields*, §063 *⌥←→ is word movement*, §052 *⌥← word move* among what a borrowing question shares — and nothing checked a binding against its extension, because every row about word motion called `move` directly. **Asserted over the keymap, by pairing actions rather than listing keys**, so a rebinding moves the pair and an extend chord added without its motion fails. `→`'s motion is `acceptGhostOrForward`, which *is* the forward motion when there is no ghost, and the pairing says so rather than exempting it.
+- **I31** — *(ruling 72, → C14 I61)* **A copy writes the kill buffer before any other destination, with the same text.** OSC 52, a platform tool and a file the reader asked for are destinations L4 sends the text to after `copyText(text)`; none is a second store, and `⌃y` yanks what they received. → T4.8
+- **I32** — *(§5e, §099, `R-BLK-750`, `R-BLK-801`, `R-BLK-802`, C09 I103, I25, I26)* **A chip label wider than the usable row is drawn elided in the middle, at exactly the usable width, with its frame kept; below `frame + marker` it is the marker alone, padded to the width.** The cut is C09 I103's `truncate(…, "middle")`, and the marker is taken from the tier the separator came from, so the ASCII rung — which is also the wide rung (C02 I9) — draws `~`. The usable width is the width of the row the chip is drawn on, read after the walk opens it; a chip is shortened only on a fresh row, never to fit the remainder of a partly used one. **The elision is the walk's**, so `layout`, `displayRows`, `cursorCell`, `chipSpans` and `selectionSpans` all see the drawn width and a ground cannot run past the row. **I20's reason does not reach it**: the content is what the user pasted and is untouched — `resolved`, `chipAt` and the preview's title see the whole chip — while the label is C17's own composition (I25). A typed cluster wider than the row still overflows (I20). → T1.47, T1.54–T1.56, T3.18, T6.22
+- **I33** — *(§5f, §052, `R-QST-003`, I25, I29)* **A chip's ordinal is its owner's line's, and the counter travels with the line.** `hold()` takes the owner's ordinal counter with its text, caret, region and stack, and the borrower numbers its own chips from `#1`; `resume(held)` puts the owner's counter back and discards the borrower's. **The one channel that joins two owners is the kill buffer** (§5a), so `yank` adopts a chip another owner minted — a fresh sentinel under the current owner's next ordinal, its parts unchanged — and inserts an own chip as it is. Without the adoption a reply's `#1` yanked at the prompt draws beside the prompt's `#1`, which is the two-`#1` prompt I25 exists to prevent. → T1.57, T1.58, T4.9, T6.23
+- **I34** — *(§5f, I24, I29, C22 I118)* **A sentinel is minted from a counter that lives as long as the editor, and is never reused and never rebound; so one table serves every owner.** `hold()` and `resume()` do not touch the sentinel counter or the table, and the table is never pruned (a deleted chip comes back through undo). A held line therefore draws through the editor's `drawAs` exactly as it drew before it was held (I29, C22 I118), a chip that crosses owners through the kill buffer resolves, and a comparison of two raw buffers is a comparison of their chips. **Restarting the counter at a borrow is the defect this forbids**, and it is the remedy the review wrote down: the borrower's first paste would rebind the owner's first sentinel, the held line would draw and submit the borrower's chip, and I24's memo — keyed on the text — would answer one string for two chips. **Stated blind spots**: a typed private-use character that equals a minted sentinel is not a reuse and draws as that chip, and the counter leaves the Private Use Area after 6,400 chips. → T1.59, T6.24
+- **I35** — *(C22 I144, I34, I25, I5)* **A chip is edited by re-minting it.** `editChip(chip, parts)` replaces every occurrence of the chip's sentinel in the buffer with a fresh sentinel carrying the same ordinal and `parts`, as one undo unit, and answers `true`; a chip whose sentinel is not in the buffer answers `false` and changes nothing. The old sentinel stays in the table (I34), so `⌃_` brings the chip back as it was, and a sentinel is still never rebound. → T1.60, T6.39
+- **I36** — *(§5g, ruling 71, C09 I128, F1401, F1403)* **The walk draws a bidi format character as its `<U+XXXX>` form, and only draws it.** A cluster no `drawAs` substitutes is drawn through `neutraliseControl`, so `layout`, `displayRows`, `cursorCell`, `selectionSpans` and `chipSpans` all see the eight-cell form and no row the walk returns holds a bidi format character. The character is one grapheme — one position, one step, one wrap unit — and takes no chip ground: the caret before it stands on the form's `<` and the caret after it on the cell after its `>`. A chip's `name` is neutralised in `chipLabel` before it is measured or elided. **The buffer is untouched**: `text`, `resolved`, the kill buffer and history hold the character as typed, because it is the reader's input and only its display crosses the trust boundary (§5g). → T1.61, T1.62, T4.10, T6.40
 
 ---
 
@@ -579,6 +815,9 @@ the space at index 77; `--seed=1234` does not fit and moves whole.
 27. The line can be taken and given back exactly — text, caret and region — because §101 hands one editor to two owners in sequence and *given back* is a claim about a state rather than about a string (I28, §101, C23 I28).
 28. A borrowed line gives its owner back the undo stack as well as the text, so neither owner's `⌃z` reaches the other's composition (I29, §052, `R-QST-003`).
 29. Every region-extending chord at the prompt has its unshifted chord bound to the motion it extends, so holding `⇧` is the only difference between moving and selecting (I30, §5b, §019, §063).
+30. A chip wider than its row is elided in the middle to the row, frame kept, because its label is C17's composition and not what the user typed; typed text still overflows (I32, §5e, §099).
+31. A borrowed line numbers its own chips and the owner's numbering comes back with the owner's line; a chip yanked across owners takes the current owner's next number (I33, §5f, §052).
+32. A chip's sentinel is never reused or rebound, so one table serves every owner and a held line draws as it did before it was held (I34, §5f).
 
 ---
 
@@ -636,13 +875,22 @@ test rather than as its steps: the sequence is what the invariants do not constr
 - **T1.44** (I25, §5c): the label is composed, not carried — a chip minted with `{ordinal: 1, kind: "paste", name: "json", lines: 47}` draws `#1 json · 47L` between two spaces with colour and `[#1 json · 47L]` at 1-bit, and an image chip with no `lines` draws neither a separator nor a bare `L`. The ASCII tier takes the glyph table's separator, asserted against `glyphs()` rather than against a literal, so the row cannot pass by agreeing with a copy.
 - **T1.45** (I26, §5c, §099): a chip moves whole — a label that does not fit the cells left on a row appears in full on the next, and no row holds a prefix of it. Asserted over the whole label rather than at one width, because a half-painted chip is *two things that look like chips* and a row checking only the first cell cannot tell them apart. **This was already true when the section was written**, so the row is a watch on a built property, and its fabricated violation is the walk's atomicity removed.
 - **T1.46** (I26, §5c): `chipSpans` agrees with the walk that drew the label — every span's cells slice exactly the chip's label out of the row `layout` returns, at a spread of widths and on both sides of a wrap. A span that is right about the row and wrong about the column paints the prompt's own text as a chip, and no assertion about the presence of a ground would see it.
-- **T1.47** (I25, §5c, I20): a chip wider than the whole row overflows rather than being dropped, and its span still names the cells it took. The editor never alters what the user typed, and a chip is what the user pasted.
+- **T1.47** (I32, I25, §5e): a chip wider than the whole row is drawn at exactly the row's width and still has a span naming exactly its cells. **Amended — it asserted the overflow**, and the reason it gave (*a chip is what the user pasted*) is true of the content and not of the label; the row now holds the ground to the drawn width, and `resolved` still returns the whole content.
 - **T1.48** (I27, §5d, §101): `chipAt` answers the chip before the caret across a buffer holding two chips and text between them — after the first it is the first, after the second it is the second, and at position 0 with a chip at the head it is that chip, which is the forward arm. `null` in the middle of the text, which is the control: without it *the caret is on a chip* is satisfied by a reader that answers the last chip minted wherever the caret is. The map is the editor's own, asserted by minting a chip and reading its `content` back rather than its label.
 - **T1.49** (I28, §101): a snapshot taken over a buffer with a caret inside it and a live region restores all three, and the row's discriminator is the **region** — text and caret alone are restored by a build that never knew about the third field, and that build is the one this invariant exists to refuse. Asserted after an intervening edit that changes all three, so the restore is reading the snapshot rather than finding the editor where it left it. The control is a snapshot taken with no region: restoring it leaves none, rather than leaving whatever the editor had.
 - **T1.50** (I28): a restore is not an edit — `undo()` after it does not walk back into the text that was there in between. A restore that went through `insert` passes every assertion about the three fields and leaves the reader one `⌃z` away from the question's own composition. **Amended — the row's fixture could not fail it** (I29). Its other owner writes with one `setText`, recording a single unit whose pre-state is `mine`, so walking undo meets `mine` and `""` and never `theirs` however the stack is shared. The row still asserts what it says about `restore`; the stack's isolation is T1.51 and T1.52.
 - **T1.51** (I29, §052): `hold()` over a line with undo history → the borrowed line is empty with **no** undo depth, and `⌃z` inside it never produces the held text. The discriminator is the entry: a `hold` written as `snapshot` then `setText("")` passes every assertion about the empty line and fails this one.
 - **T1.52** (I29, §052): a borrower that types in **several** units — text, a motion that ends the run, more text — then `resume(held)` → the owner's undo walk never contains any of the borrower's intermediate text, and redo is the owner's too. **This is the row T1.50 could not be**: its other owner composes with one `setText`, whose only unit's pre-state is the reader's own line, so no undo walk could meet `theirs` whatever the stack did.
 - **T1.53** (I30, §5b, §019, §063): for every `prompt` binding whose action is an `extend*`, the same chord without `⇧` resolves at `prompt` to the paired motion. Red on the tree it was written against — `⌥←` and `⌥→` resolve to nothing — and the control is the four pairs that already held: `⇧←`/`←`, `⇧→`/`→`, `⇧home`/`home`, `⇧end`/`end`.
+- **T1.54** (I32, §5e, C09 I103): a label wider than the usable row, at both rungs → the drawn label is exactly the usable width, keeps its frame (the brackets; the ground's two spaces), and is `truncate(inner, U − 2, tier, "middle")` — **both** the head (`#1`) and the tail (the size) present, which an end cut fails. The span slices exactly the drawn label out of its row, and the cursor after it is on the next row at the gutter. The control is a label that fits, drawn whole.
+- **T1.55** (I32, §5e): the usable width is read after the walk opens the row — with `{first: 0, cont: 6}`, a chip that does not fit after text on row 0 is elided to row 1's usable width, not row 0's; and a chip wider than a partly used row is moved to a fresh row before it is elided, never cut to the remainder.
+- **T1.56** (I32, §5e): the narrow end — usable widths 1 and 2 draw the marker alone padded to the width, 3 draws the frame around the marker; the ASCII tier's marker is `~` and the unicode tier's `…`, taken from `ChipLook.unicode` rather than from a literal.
+- **T1.57** (I33, §5f, §052): a prompt with one chip, `hold()`, a paste in the borrow → the borrow's chip is `#1`; `resume`, a paste at the prompt → `#2`. Both halves are the row: the first alone passes a counter that is reset and never restored, the second alone passes the shared counter.
+- **T1.58** (I33, I34, §5f, §5a): a chip killed inside a borrow and yanked at the owner's prompt → it resolves to its content and takes the owner's next ordinal, a second yank takes the next again, and an own chip killed and yanked keeps its sentinel and its number (the control: adoption is for a foreign chip only). The reverse direction too — a chip the owner killed, yanked inside a borrow, is the borrow's `#1`.
+- **T1.59** (I34, I24, §5f): across `hold`, pastes in the borrow, and `resume`, every minted sentinel is distinct and the owner's held chip draws and resolves as it did before the borrow — asserted through the memo, by laying out the owner's line before the borrow and again after it, so a counter restarted at `hold` fails on the label and on `resolved` both.
+- **T1.61** (I36, I18, I4, I26, §5g): `/show a`, U+2066, `b`, U+202E, `c` at width 30 with `{2, 2}` → the one row is `/show a<U+2066>b<U+202E>c` and holds no bidi format character; `cursorCell` either side of each character is the form's first cell and the cell after its last, eight apart; `chipSpans` is empty; `selectionSpans` over the U+202E alone covers its eight cells; `text` and `resolved` hold both characters raw. At a width where the form reaches the row's end it moves whole to the next row. The control: a clean buffer's rows are what they were.
+- **T1.62** (I36, I25, I32, §5g): a `file` chip named `a`, U+202E, `gpj.exe` → its label draws `<U+202E>` and holds no bidi format character, and elided to a narrow limit it is exactly that limit wide; `chipAt` answers the name raw.
+- **T1.60** (I35, I34): a buffer `ab`, chip `#1` (3 lines), `cd`; `editChip(chip, {…parts, content: new, lines: 2})` → `true`, the rows draw `#1 · 2L`, `resolved` holds the new content, `chipAt` answers the new record with ordinal 1; `undo` → the old chip and its content; a chip not in the buffer → `false` and nothing changes.
 
 ### Tier 2 — contract / interface
 
@@ -679,6 +927,7 @@ test rather than as its steps: the sequence is what the invariants do not constr
 - **T3.15**: a 1 MB paste → completes within budget; `displayRows` stays linear — **counted, not timed**. The walk calls `drawAs` once per cluster, so a counting `drawAs` reports the inner loop's trip count and the row asserts one visit per cluster: exact and load-free, where the duration ratio it replaces spanned 1.38 to 3.06 against a bound of 3 and was red three times. The durations stay printed as evidence with the resolution control and carry no assertion. Blind spot: a step that becomes O(rows) is quadratic and invisible to a count of iterations (F1091, F1084).
 - **T3.16**: a lone surrogate or invalid UTF-8 in a paste → replaced, never crashing the segmenter.
 - **T3.17**: `killTo("bufferStart")` from the middle then `yank` at the end → text order preserved.
+- **T3.18** (I32, C09 I9, §5e): a chip whose name holds wide clusters (`日本語` and a ZWJ family) elided at every usable width from 1 to its natural width → the drawn label is exactly the width every time, no cluster is split, and the elided form never holds a half of a two-cell glyph.
 
 ### Tier 4 — integration
 
@@ -691,6 +940,9 @@ test rather than as its steps: the sequence is what the invariants do not constr
 - **T4.5** (with C19): the cursor position determines the completion context; accepting a candidate inserts as one undo unit.
 - **T4.6** (with C20): history navigation calls `setText`; the typed draft is restored on return, cursor included.
 - **T4.7** (with L4): the prompt's rendered height equals `displayRows`, so the viewport height is correct — asserted on the frame, not the editor.
+- **T4.8** (I31, with L4): a copy sent by OSC 52, then `⌃y` → the prompt holds the text the OSC 52 payload decodes to. Written in C14's `copy-clipboard.test.ts` beside T4.43, whose session it shares.
+- **T4.10** (I36, C22 I33, C09 I131, with L4, §5g): through a built session at 80 columns, `/show a`, U+2066, `b`, U+202E, `c` typed at the prompt and the written bytes read through `@xterm/headless`: the prompt row's cells read both forms; the terminal cursor, moved by `←` to either side of each character, stands on the form's `<` and on the cell after its `>`; after `⏎` the echo row's cells read the same forms; and the local verb is handed both characters raw.
+- **T4.9** (I33, I34, with C16 and C23): through a built session's router — a multi-line paste at the prompt (`#1`), `reply…`, a multi-line paste in the reply → the reply's line draws `#1`; `⌃u`, answer; the prompt's line draws its own `#1` again; `⌃y` → the yanked chip draws `#2` and `resolved` holds both pastes' content. Written in `typed-reply.test.ts`, whose session it shares.
 
 ### Tier 5 — e2e
 
@@ -725,8 +977,13 @@ All five need a running shell and are deferred on L4, in the form `todo-expiry` 
 - **T6.19** (I20): dropping a cluster wider than the row, as C09's wrap does → T3.6 fails and the editor deletes what the user typed.
 - **T6.20** (I23): `collapse()` implemented as `move("charLeft")` → T1.42 fails on the cursor; implemented as a recorded `structural` edit → T1.42 fails on `undoDepth`.
 - **T6.21** (I24): one mutation per key term, and each is the term dropped — the width, the buffer, the gutter's first column, the continuation gutter — plus the whole comparison replaced by `hit !== null`, which is the shape a reader skims past because the null guard reads as the check, and the freeze removed. Six, all caught. Two of them were survivors first, and both indicted the row rather than the rule: the gutter row moved two figures at once, and then moved them on one editor whose single-entry memo had already missed on the other. `displayRows` calling `this.layout(…).length` rather than `layout.ts`'s own is deliberately **not** mutated — the two spellings cannot disagree, so it is a change in who walks and not in what is answered, and a survivor whose reason is known before the run is a comment rather than a row (A03 §2).
+- **T6.22** (I32): the elision's `"middle"` cut replaced by an end cut → T1.54 fails on the tail; the elision removed, which is `c8c7a77e`'s overflow → T1.47 and T1.54 fail on the width; the limit read before `open()` → T1.55 fails.
+- **T6.23** (I33): `hold()` leaving the ordinal counter on the editor → T1.57 fails on the borrow's `#1`; `yank` inserting a foreign sentinel as it is → T1.58 fails on the ordinal.
+- **T6.24** (I34): `hold()` restarting the sentinel counter, which is the review's remedy as written → T1.59 fails on the held chip's label and on `resolved`.
 
 ---
+- **T6.39** (I35): the re-mint taking a fresh ordinal → **T1.60** fails on the ordinal, 3 for 2. The row first said *the chip draws `#2`*; the editor's own label does not draw the ordinal (`b.ts · 2L`), so the assertion is on `chipAt()`. `tools/mutate/runs/c17-chip.mjs`.
+- **T6.40** (I36): the walk drawing an unsubstituted cluster raw → **T1.61** and **T4.10** fail on the rows and the caret; the chip span recorded on `shown !== cluster` → **T1.61** fails on `chipSpans`; `chipLabel` measuring the raw name → **T1.62** fails; the buffer neutralised on insert → **T1.61** fails on `text`. `tools/mutate/runs/c17-bidi-display.mjs`.
 
 ## 11. Out of scope
 

@@ -117,7 +117,7 @@ describe("C22 §6b — the write is a difference", () => {
     expect(screen().rows, "showing the same thing it showed before").toEqual(rowsBefore);
   });
 
-  it("T4.33 (C19 I23, C15 I14): a resize moves the open menu with the region", async () => {
+  it("C22 T4.33 (C19 I23, C15 I14): a resize moves the open menu with the region", async () => {
     // **Read from the screen, because the anchor number agrees with the wrong
     // place.** An anchored layer stores the row it was placed against, and
     // every writer of that row was a keystroke path: the resize handler
@@ -138,7 +138,9 @@ describe("C22 §6b — the write is a difference", () => {
     // frame's own rule while the menu sat stranded at rows 11–18 over sixteen
     // blank rows. So the row reads two things the rule cannot supply: a
     // candidate's distance from the prompt, which must survive the resize, and
-    // the row above I81's rule, which must be the menu's bottom edge.
+    // the row above I81's rule, which must be the menu's last row — a
+    // candidate or its indicator, since the menu closes on I81's rule (C19
+    // I23, ruling 90).
     const stdin = fakeStdin();
     const { screen, resize } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 24 });
     await settle();
@@ -157,7 +159,7 @@ describe("C22 §6b — the write is a difference", () => {
 
     /**
      * The menu against the prompt: I81's rule is the row directly above `❯`,
-     * so the menu's bottom edge is the last non-blank row above **that**, and
+     * so the menu's last row is the last non-blank row above **that**, and
      * a candidate's row is the menu's position. `/capabilities` and not
      * `/help`, which the footer also names.
      */
@@ -199,7 +201,7 @@ describe("C22 §6b — the write is a difference", () => {
     );
   });
 
-  it("T4.34 (C19 I23, entry 16): the truncated menu's indicator is on the screen", async () => {
+  it("C19 T4.12 (I23, entry 16, ruling 90): the truncated menu's indicator is on the screen, and the menu closes on the prompt's rule", async () => {
     // **Through the real wiring, because that is where it was missing.** The
     // window and the remainder are both unit-tested and both were right; what
     // shipped was a call site that handed C15 every candidate and let the frame
@@ -221,15 +223,19 @@ describe("C22 §6b — the write is a difference", () => {
     const menu = rows.slice(0, prompt - 1);
     expect(menu.some((r) => /\+ \d+ more/u.test(r)), "the indicator is drawn").toBe(true);
     // **And the box closes**, which is the half a row about the indicator alone
-    // does not cover: the bottom edge sits between the menu and the prompt, and
-    // C19 §6 argues it is what stops the list reading as continuous with the
-    // line below it. A window one row too generous keeps the indicator and
-    // loses this — the original defect, one row's worth — and the mutation pass
-    // is what asked for the assertion.
-    expect(menu[menu.length - 1] ?? "", "the rule closes the menu").toMatch(/^[─-]{20,}/u);
-    expect(menu[menu.length - 2] ?? "", "with the indicator directly above it").toMatch(
-      /\+ \d+ more/u,
-    );
+    // does not cover: an edge sits between the menu and the prompt, and C19 §6
+    // argues it is what stops the list reading as continuous with the line
+    // below it. A window one row too generous keeps the indicator and loses
+    // this — the original defect, one row's worth — and the mutation pass is
+    // what asked for the assertion.
+    //
+    // **The edge is the prompt's own rule, and there is one** (ruling 90,
+    // F1475). The menu drew a rule of its own above I81's, two stacked rows
+    // where §097's panel floats between two rules and the lower one is the
+    // prompt's. So the indicator sits directly on I81's rule.
+    expect(rows[prompt - 1] ?? "", "the prompt's rule closes the menu").toMatch(/^[─-]{20,}/u);
+    expect(menu[menu.length - 1] ?? "", "with the indicator directly on it").toMatch(/\+ \d+ more/u);
+    expect(menu[menu.length - 2] ?? "", "and no second rule above it").not.toMatch(/^[─-]{20,}/u);
   });
 
   it("T4.15 (I56): a write that throws leaves the next frame whole", async () => {
@@ -261,6 +267,78 @@ describe("C22 §6b — the write is a difference", () => {
     // than cleared before it, this is a diff against the frame *preceding* the
     // failed one, and the rows the partial write got wrong are the rows it skips.
     expect(written, "and it is a full repaint").toContain(HOME_SEQ);
+  });
+});
+
+describe("C22 I150 — the completion footer at rest and after Tab", () => {
+  /** A session at 80 columns with `/c` typed a byte at a time: the menu at rest. */
+  async function atRest() {
+    const stdin = fakeStdin();
+    const session = await buildSession({ stdin: stdin as never }, { columns: 80, rows: 24 });
+    await settle();
+    const press = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      // `⇥` runs §5 in a promise continuation (C19 I21), so a macrotask too.
+      await settle();
+      await new Promise((r) => setTimeout(r, 0));
+    };
+    for (const ch of "/c") await press(ch);
+    const rows = (): readonly string[] => session.screen().rows.map((r) => r.trimEnd());
+    const footer = (): string => rows().at(-1) ?? "";
+    /** The menu's rows: everything above the prompt's upper rule that is not blank. */
+    const menu = (): readonly string[] => {
+      const r = rows();
+      const prompt = r.findIndex((l) => l.startsWith("❯"));
+      return r.slice(0, prompt - 1).filter((l) => l.trim() !== "");
+    };
+    const prompt = (): string => rows().find((l) => l.startsWith("❯")) ?? "";
+    return { press, rows, footer, menu, prompt };
+  }
+  const TAB = "\t";
+  const DOWN = "\u001b[B";
+  const ENTER = "\r";
+
+  it("T4.120 (C22 I150, C19 I20, C19 I29, ruling 96, ruling 99, F1486): the footer at rest and after ⇥ differ, and each names only keys that do what it says", async () => {
+    const s = await atRest();
+    // **The subject before the claim**: the menu is up and marks its current.
+    expect(s.menu().some((l) => l.includes("› /capabilities")), "the menu is up at rest, marked").toBe(true);
+    const restMenu = s.menu();
+    const rest = s.footer();
+    expect(rest).toBe("complete  ⏎ run  ⇥ complete  esc close");
+
+    await s.press(TAB);
+    const selected = s.footer();
+    expect(selected).toBe("complete  ↑↓ move  ⏎ accept  esc close");
+    // **The difference is the claim** (ruling 96). The menu's rows are the same
+    // text in both states — ruling 89 marks the current at rest and after `⇥`
+    // alike — so the footer is the one thing on screen that tells them apart.
+    expect(s.menu(), "the menu reads the same after ⇥").toEqual(restMenu);
+    expect(selected, "and the footer does not").not.toBe(rest);
+
+    await s.press(DOWN);
+    expect(s.footer(), "↓ moves within a selection and the line holds").toBe(selected);
+    expect(s.menu().some((l) => l.includes("› /clear")), "the mark moved").toBe(true);
+    // `⏎ accept` does what it says once there is a selection.
+    await s.press(ENTER);
+    expect(s.prompt()).toBe("❯ /clear");
+  });
+
+  it("T4.120 (C22 I150, C19 I20, ruling 96, ruling 99): the controls — ⏎ at rest runs the line, and ↓ at rest selects nothing", async () => {
+    // **What the rest line names, pressed.** `⏎ run` at rest runs the partial
+    // line; measured before the footer moved, this is the frame that sat
+    // beneath `⏎ accept`.
+    const enter = await atRest();
+    await enter.press(ENTER);
+    expect(enter.rows().some((l) => l.includes("unknown verb: /c")), "⏎ at rest ran the line").toBe(true);
+
+    // **`↓` is the prompt's at rest** (C19 §6a): ruling 96 read *`⇥` or `↓`*
+    // as the keys that select, and the second does not. The footer and the
+    // mark stay where they were.
+    const down = await atRest();
+    const before = { footer: down.footer(), menu: down.menu() };
+    await down.press(DOWN);
+    expect({ footer: down.footer(), menu: down.menu() }).toEqual(before);
+    expect(down.footer()).toBe("complete  ⏎ run  ⇥ complete  esc close");
   });
 });
 
@@ -505,7 +583,7 @@ describe("C22 §7 — identity, from the app through C23", () => {
   const NOW = 1_000_000;
   const nearlyExpired = () => ({
     user: "m",
-    email: "m@fmx.io",
+    email: "s@example.com",
     groups: [] as readonly string[],
     // Inside the one-day warning window, and comfortably not expired.
     expiresAt: NOW + 14 * 60 * 60 * 1000,
@@ -971,12 +1049,14 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     expect(ps, "the first card").toBeGreaterThan(0);
     expect(note, "the second card").toBeGreaterThan(ps);
     // Row 17: the hook marks content, not the leading gap the block carried.
-    expect(rows[ps + 1]?.indexOf("⎿"), "the first hook at column 2").toBe(2);
+    // Column 2 of the transcript, which starts at the terminal's column 1: the
+    // rail reserves column 0 on every row (C14 I57), so the terminal reads 3.
+    expect(rows[ps + 1]?.indexOf("⎿"), "the first hook at column 2").toBe(3);
     expect(rows[ps + 1], "and it carries the body's content").toContain("web running");
-    expect(rows[note + 1]?.indexOf("⎿"), "the second hook at column 2").toBe(2);
+    expect(rows[note + 1]?.indexOf("⎿"), "the second hook at column 2").toBe(3);
     // Rows 18–19: one blank closes entry 1 (before entry 2's `❯ /note` echo),
     // one closes entry 2 above the upper rule.
-    expect(rows[note - 1]?.startsWith("❯ /note"), "entry 2's command echo").toBe(true);
+    expect(rows[note - 1]?.startsWith(" ❯ /note"), "entry 2's command echo, past the rail's column").toBe(true);
     expect(rows[note - 2], "one blank row closing entry 1").toBe("");
     expect(rows[note + 2], "the blank closing entry 2").toBe("");
     expect(/^[─-]{20,}/u.test(rows[note + 3] ?? ""), "then the upper rule").toBe(true);
@@ -991,14 +1071,14 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
       schema: "tui.manifest/1",
       binary: "prism",
       version: "1.0.0",
-      tools: [{ name: "wide", local: true, summary: "one notice, 99 cells", args: [], flags: [] }],
+      tools: [{ name: "wide", local: true, summary: "one notice, 98 cells", args: [], flags: [] }],
     };
     const localHandlers: NonNullable<TuiConfig["localHandlers"]> = {
       wide: () => ({
         schema: "tui.view/1",
         command: "wide",
         status: "ok",
-        blocks: [{ kind: "notice", id: "n", tone: "muted", text: "a".repeat(99) }],
+        blocks: [{ kind: "notice", id: "n", tone: "muted", text: "a".repeat(98) }],
       }),
     };
     const stdin = fakeStdin();
@@ -1016,8 +1096,11 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     // narrower than the terminal. The premise the row was written for is
     // unchanged — a notice that fits the region and not the indented body, so
     // it wraps once more under the hook — and only the split moved.
-    expect(rows[at + 1]?.startsWith(`  ⎿  ${"a".repeat(94)}`), "the body's first row: the hook at 2 and 94 cells").toBe(true);
-    expect(rows[at + 2]?.trimEnd(), "the wrapped cells, under the bar (C22 I88)").toBe("  │  aaaaa");
+    // **98 cells and 93 + 5 since the rail** (C14 I57): the transcript is a
+    // further column in, so the notice that fits it is 98 and the rows start at
+    // the terminal's column 1.
+    expect(rows[at + 1]?.startsWith(`   ⎿  ${"a".repeat(93)}`), "the body's first row: the hook at 2 and 93 cells").toBe(true);
+    expect(rows[at + 2]?.trimEnd(), "the wrapped cells, under the bar (C22 I88)").toBe("   │  aaaaa");
     expect(rows[at + 3]?.trim(), "the entry's blank row (I85)").toBe("");
     expect(/^[─-]{20,}/u.test(rows[at + 4] ?? ""), "then the upper rule — nothing dropped between").toBe(true);
     expect(rows[at + 5]?.trimStart().startsWith("❯"), "and the prompt").toBe(true);
@@ -1111,7 +1194,7 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
 });
 
 describe("C22 — native selection, entered and left (C16 §5b, C03 §4a)", () => {
-  it("T4.30 (C16 §5b B1): ⌥⇧C enters, the header says NATIVE, mouse tracking goes off", async () => {
+  it("C22 T4.30 (C16 §5b B1): ⌥⇧C enters, the header says NATIVE, mouse tracking goes off", async () => {
     // **`⌥⇧C`, not `⌥v`, since M6** (C16 §6a): the registry gives `⌥v` to
     // `values.toggle` and native selection its own two chords — `⌥⇧C` native handoff,
     // `⌥⇧V` semantic. Nothing was invented for this; the design supplied both.
@@ -1148,7 +1231,7 @@ describe("C22 — native selection, entered and left (C16 §5b, C03 §4a)", () =
     expect(screen().rows[0]).toContain("NATIVE");
   });
 
-  it("T4.31 (C16 §5b B1, I62): esc leaves it, and the screen comes back", async () => {
+  it("C22 T4.31 (C16 §5b B1, I62): esc leaves it, and the screen comes back", async () => {
     const stdin = fakeStdin();
     const { stdout, screen, clock } = await buildSession({ stdin: stdin as never });
 
@@ -1175,7 +1258,7 @@ describe("C22 — native selection, entered and left (C16 §5b, C03 §4a)", () =
     expect(stdout.output.slice(before.length), "tracking back on").toContain("[?1002h");
   });
 
-  it("T4.32 (C03 I13): while native selection is up, output does not move the screen", async () => {
+  it("C22 T4.32 (C03 I13): while native selection is up, output does not move the screen", async () => {
     // The whole point of the suspension, at the level where it is visible:
     // a selection the reader is taking must not come to mean other text.
     const stdin = fakeStdin();
@@ -1246,7 +1329,7 @@ describe("C22 — native selection: the order inside the exit, and the far side 
     for (let i = 0; i < 4; i += 1) await Promise.resolve();
   };
 
-  it("T4.31b (C16 §5b B1, C01 I10): after esc the tracking pair is the first thing written, before any byte of the frame", async () => {
+  it("C22 T4.31b (C16 §5b B1, C01 I10): after esc the tracking pair is the first thing written, before any byte of the frame", async () => {
     const stdin = fakeStdin();
     const { stdout, screen, clock } = await buildSession({ stdin: stdin as never });
     const type = typer(stdin);
@@ -1273,7 +1356,7 @@ describe("C22 — native selection: the order inside the exit, and the far side 
     ).toBe(true);
   });
 
-  it("T4.32b (C03 I13, C16 §5b B4): a verb settling during native selection writes nothing; the exit's one frame carries it", async () => {
+  it("C22 T4.32b (C03 I13, C16 §5b B4): a verb settling during native selection writes nothing; the exit's one frame carries it", async () => {
     const stdin = fakeStdin();
     let settle: ((doc: unknown) => void) | null = null;
     const { stdout, screen, clock } = await buildSession({
@@ -1316,7 +1399,7 @@ describe("C22 — native selection: the order inside the exit, and the far side 
     expect(screen().text.join("\n"), "and it carries what settled under the hold").toContain(TEXT);
   });
 
-  it("T4.32c (C16 §5c C5): ⌥⇧C a second time in native selection writes nothing — one 1002l, not two", async () => {
+  it("C22 T4.32c (C16 §5c C5): ⌥⇧C a second time in native selection writes nothing — one 1002l, not two", async () => {
     const stdin = fakeStdin();
     const { stdout, screen } = await buildSession({ stdin: stdin as never });
     const type = typer(stdin);

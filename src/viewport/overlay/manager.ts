@@ -161,6 +161,8 @@ class Manager implements OverlayManager {
       // The caret moves as the search is typed into, and `update` is how a
       // layer changes — a pop-and-repush is not (§4).
       ...(next.cursor !== undefined && { cursor: next.cursor }),
+      // I34: the one declared property that moves with the layer's state.
+      ...(next.promptLive !== undefined && { promptLive: next.promptLive }),
     });
     // **Before the stack moves, not after** (I20). A guard that throws having
     // already written leaves a layer neither placed nor removed, which is the

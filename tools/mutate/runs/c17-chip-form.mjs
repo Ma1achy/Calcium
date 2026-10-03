@@ -15,7 +15,7 @@ import { fsIo, report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const LAYOUT = "src/interaction/editor/layout.ts";
 const PAINT = "src/shell/paint.ts";
-const FILES = "test/unit/chip-form.test.ts test/unit/session-paint.test.ts";
+const FILES = "test/unit/chip-form.test.ts test/unit/session-paint.test.ts test/edge/editor.test.ts";
 
 const { read, write } = fsIo(ROOT);
 const run = () => {
@@ -37,13 +37,75 @@ const results = runPass({
     // and a ground fails at once. If this survives, nothing below reaches the
     // walk.
     file: LAYOUT,
-    from: "      const shown = drawAs?.(cluster) ?? cluster;",
-    to: "      const shown = cluster;",
+    // Re-anchored on review batch 4 (F1401): the unsubstituted arm now draws
+    // through `neutraliseControl` (C17 I36), and dropping the chip arm is
+    // still the whole of this control.
+    from: "      let shown = chip ?? neutraliseControl(cluster);",
+    to: "      let shown = neutraliseControl(cluster);",
     why:
       "the sentinel draws as itself, so no label, no span and no ground exist — "
       + "if this survives, the rows are not reading the walk they think they are",
   },
   mutations: [
+    // ---- C17 I32, §5e — the elision (T6.22) ----------------------------------
+    {
+      // **The end cut**, which keeps `#1 a-very-long-` and loses the size — the
+      // half that says how much was pasted. Nothing about the width changes.
+      name: "T6.22: the elision cuts at the end rather than the middle",
+      file: LAYOUT,
+      from: '  return frame(truncate(text, inner, tier, "middle"));',
+      to: '  return frame(truncate(text, inner, tier, "end"));',
+      expect: "T1.54",
+    },
+    {
+      // **`c8c7a77e`'s overflow**, restored: the walk never asks for the cut,
+      // so a label wider than its row is drawn whole and the painter clips it.
+      name: "T6.22: the elision removed — a chip wider than its row overflows it",
+      file: LAYOUT,
+      // Re-anchored on review batch 4 (F1401): the gate reads `chip`, since a
+      // neutralised bidi character also differs from its cluster (C17 I36).
+      from: "      if (w > limit && chip !== undefined && drawAs !== undefined) {",
+      to: "      if (w > limit && chip !== undefined && drawAs !== undefined && Number.NaN > 0) {",
+      expect: "T1.47",
+    },
+    {
+      // **The limit of the row being left**, which is what reading it before
+      // `open()` gave: right for the fit test, wrong for the row the chip lands
+      // on whenever the gutter's two figures differ.
+      name: "T6.22: the elision's limit is the row the chip left, not the row it landed on",
+      file: LAYOUT,
+      from: "      const limit = usableAt(at(), width, gutter);",
+      to: "      const limit = usableAt(used === 0 && at() > 0 ? at() - 1 : at(), width, gutter);",
+      expect: "T1.55",
+    },
+    {
+      // **A marker of its own** rather than the tier's: right at the unicode
+      // tier, and a `…` at the ASCII one — which is also the wide one.
+      name: "the elision's marker ignores the tier",
+      file: LAYOUT,
+      from: "  const tier = { unicode: look.unicode } as const;",
+      to: '  const tier = { unicode: "full" } as const;',
+      expect: "T1.56",
+    },
+    {
+      // **The marker unpadded**: the chip spends one cell of the two it was
+      // given, and the walk's `used` and the row's cells disagree by one.
+      name: "the narrow arm's marker is not padded to the width",
+      file: LAYOUT,
+      from: '  if (inner < widthOf(marker)) return marker + " ".repeat(Math.max(0, room - widthOf(marker)));',
+      to: "  if (inner < widthOf(marker)) return marker;",
+      expect: "T1.56",
+    },
+    {
+      // **A code-unit cut**, a third of the budget either side of the marker.
+      // Byte-identical to C09's on an ASCII label — T1.54 cannot see it — and a
+      // split ZWJ family or a two-cell glyph past the budget on a wide one.
+      name: "the elision cuts by code unit rather than by cluster",
+      file: LAYOUT,
+      from: '  return frame(truncate(text, inner, tier, "middle"));',
+      to: '  return frame(`${text.slice(0, Math.floor((inner - 1) / 3))}${marker}${text.slice(text.length - (inner - 1 - Math.floor((inner - 1) / 3)))}`);',
+      expect: "T3.18",
+    },
     {
       // **THE DEFECT: the span is derived from the position pair.** This is the
       // first draft, restored: a chip at position p covers `cells[p]` to
@@ -61,8 +123,8 @@ const results = runPass({
       // show a name floating in the prompt with nothing saying it is a chip.
       name: "the bracket goes to the painted rung and the padding to the bare one",
       file: LAYOUT,
-      from: "  return look.painted ? ` ${text} ` : `[${text}]`;",
-      to: "  return look.painted ? `[${text}]` : ` ${text} `;",
+      from: "  const frame = (inner: string): string => (look.painted ? ` ${inner} ` : `[${inner}]`);",
+      to: "  const frame = (inner: string): string => (look.painted ? `[${inner}]` : ` ${inner} `);",
       expect: "T1.44",
     },
     {

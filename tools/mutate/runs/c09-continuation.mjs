@@ -76,8 +76,8 @@ const results = runPass({
       // the reading that names four consumers and finds six.
       name: "the mark ignores the command, so a notice with no line above it takes one",
       file: DOCS,
-      from: '    tone === "muted" ? (command === "" ? undefined : "continuation") : GLYPH_OF[tone];',
-      to: '    tone === "muted" ? "continuation" : GLYPH_OF[tone];',
+      from: 'tone === "muted" ? (command === "" ? undefined : "continuation") : GLYPH_OF[tone]',
+      to: 'tone === "muted" ? "continuation" : GLYPH_OF[tone]',
       expect: "T2.96",
     },
     {
@@ -86,8 +86,8 @@ const results = runPass({
       // subordination mark is the cancelled notice's exact failure.
       name: "the mark displaces an obliged glyph, so `warn` and `error` lose theirs",
       file: DOCS,
-      from: '    tone === "muted" ? (command === "" ? undefined : "continuation") : GLYPH_OF[tone];',
-      to: '    command === "" ? GLYPH_OF[tone] : "continuation";',
+      from: 'tone === "muted" ? (command === "" ? undefined : "continuation") : GLYPH_OF[tone]',
+      to: 'command === "" ? GLYPH_OF[tone] : "continuation"',
       expect: "T2.97",
     },
     {

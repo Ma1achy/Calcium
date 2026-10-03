@@ -85,8 +85,9 @@ const results = runPass({
       // §3aq S6 — the pane addressed to the split draws no ground.
       name: "a focused empty pane is not lit",
       file: KIND,
-      from: "      const lit = ctx.focus?.blockId === block.id && ctx.focus.rowId === p.child.id;",
-      to: "      const lit = false as boolean;",
+      // Re-anchored on C09 I137's `paneFocus`, which now decides the pane.
+      from: "      const lit = paneFocus(block.id, p.child, ctx);",
+      to: "      const lit = null as ReturnType<typeof paneFocus>;",
       expect: "T1.58",
     },
     {
@@ -157,8 +158,8 @@ const results = runPass({
       // The step that consults the rule at all.
       name: "rowDown ignores passedOver",
       file: KEYS,
-      from: "      const next = elements.slice(i + 1).find((q) => !passedOver(elements[i], q));",
-      to: "      const next = elements.slice(i + 1).find(() => true);",
+      from: "      const next = elements.slice(i + 1).find((q) => !passedOver(here, q) && (here === undefined || !oneRow(here, q)));",
+      to: "      const next = elements.slice(i + 1).find((q) => here === undefined || !oneRow(here, q));",
       expect: "T4.96",
     },
     {
@@ -189,8 +190,8 @@ const results = runPass({
       // §3aq E5 — the drag places the divider under the pointer.
       name: "the drag places the divider one cell short",
       file: CONSTRUCT,
-      from: "      return () => placeDivider(drag.entryId, drag.split, e.col - drag.left);",
-      to: "      return () => placeDivider(drag.entryId, drag.split, e.col - drag.left - 1);",
+      from: "      return () => placeDivider(drag.entryId, drag.split, col - drag.left);",
+      to: "      return () => placeDivider(drag.entryId, drag.split, col - drag.left - 1);",
       expect: "T4.98",
     },
     {

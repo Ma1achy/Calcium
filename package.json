@@ -1,5 +1,5 @@
 {
-  "name": "@fmx/calcium",
+  "name": "calcium-tui",
   "version": "0.0.0",
   "description": "A framework for building terminal user interfaces over JSON-emitting CLIs.",
   "type": "module",
@@ -41,9 +41,6 @@
     "README.md",
     "LICENSE"
   ],
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com/"
-  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node tools/bundle.mjs",
     "check": "tsc --noEmit && eslint .",

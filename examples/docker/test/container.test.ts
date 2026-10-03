@@ -16,7 +16,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { Block, Group, KeyValue, Notice, Plot } from "@fmx/calcium";
+import type { Block, Group, KeyValue, Notice, Plot } from "calcium-tui";
 import { parseNdjson } from "../src/ndjson.ts";
 import type { Row } from "../src/ndjson.ts";
 import { axisCaption, capFor, createRing, createRingSet, TICK_MS } from "../src/history.ts";

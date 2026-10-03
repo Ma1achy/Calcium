@@ -121,15 +121,16 @@ describe("C24 I41 — the child is told the room inside its entry (M9 item 2)", 
     const seen: Array<{ width: number; height: number }> = [];
     const handle = s.tui.openSurface(filling("game", seen));
     await s.step(20);
-    // 60 columns less the content margin is a 59-cell region; 20 rows less the
+    // 60 columns less the content margin is a 59-cell region, and the rail's
+    // reserved column 0 leaves the transcript 58 (C14 I57); 20 rows less the
     // header, two rules, the prompt and the two-row footer is 13. Inside: the
     // panel's rails take 2 cells, and the command row, two borders and the
     // closing blank take 4 rows.
-    expect(seen.at(-1)).toEqual({ width: 57, height: 9 });
+    expect(seen.at(-1)).toEqual({ width: 56, height: 9 });
 
     s.resize({ columns: 80, rows: 24 });
     await s.step(20);
-    expect(seen.at(-1), "re-rendered at the new interior").toEqual({ width: 77, height: 13 });
+    expect(seen.at(-1), "re-rendered at the new interior").toEqual({ width: 76, height: 13 });
     await handle.close();
     await s.tui.stop("exit");
 
@@ -140,7 +141,7 @@ describe("C24 I41 — the child is told the room inside its entry (M9 item 2)", 
     const id = "a-surface-id-long-enough-that-its-command-row-must-wrap";
     const other = w.tui.openSurface(filling(id, long));
     await w.step(20);
-    expect(long.at(-1)).toEqual({ width: 57, height: 8 });
+    expect(long.at(-1)).toEqual({ width: 56, height: 8 });
     const rows = w.screen().rows;
     expect(rows.findIndex((r) => r.includes("R07")), `the last body row is on screen\n${shown(rows)}`).toBeGreaterThan(0);
     expect(rows.some((r) => r.trimStart().startsWith("┌")), "and so is the top border").toBe(true);

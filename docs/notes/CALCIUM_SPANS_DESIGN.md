@@ -15,7 +15,7 @@ because `CALCIUM_ML_BLOCKS.md:29` says they are and the measurement below agrees
 | consumer | where it is stated | what it needs from a span |
 |---|---|---|
 | markdown inline emphasis | roadmap 11 (PART), roadmap 50's order *spans first, then 11's translator*; `markdown.ts:23-29` *the day spans exist, the literal form is the thing they replace* | appearance — bold, italic |
-| italic's first writer | `Style.italic` (`theme/types.ts`), `SgrStyle.italic` → SGR 3 (`escapes.ts:226`); zero writers of `italic: true` in `src/`; `UNCONSUMED_MEMBERS["SgrStyle.italic"]` in `tools/enforce/module-graph.mjs:1663` | appearance — italic |
+| italic's first writer | `Style.italic` (`theme/types.ts`), `SgrStyle.italic` → SGR 3 (`escapes.ts:385`); zero writers of `italic: true` in `src/`; `UNCONSUMED_MEMBERS["SgrStyle.italic"]` in `tools/enforce/module-graph.mjs:1663` | appearance — italic |
 | word-level diff highlight | C25 I10 (*a `spans` field on a line would be additive*), C10 §4a's ruling that the carrier is `underline` | appearance — underline (**not** tone; see §3 Q3) |
 | per-token value | `CALCIUM_ML_BLOCKS.md` §1, `NOTE_AUDIT` §6 ML-1 *planned — own arc* | a number — **deferred**, §7 |
 

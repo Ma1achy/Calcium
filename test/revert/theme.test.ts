@@ -429,3 +429,19 @@ describe("C10 I48 — the ground carried from the painter into the resolver", ()
     expect(resolve("tone.error", theme, caps(24), "selection").colour).toEqual(onGround.colour);
   });
 });
+
+describe("C10 I71 — the carrier gate counts per fact", () => {
+  it("T6.153 (C10 I71): the gate accepting one carrier → T2.57 fails", () => {
+    // **The defect, as the shipped table before ruling 69**: disclosure's row
+    // read `mark` and `mark`, and the old gate asked only whether `tone` and
+    // `ground` appeared together and whether a row written `alone` cited a
+    // file — so a single carrier written without the word passed both. A gate
+    // counting distinct carriers is the only arm that sees it.
+    const distinct = (carriers: string): number => new Set(carriers.split("+").map((c) => c.trim())).size;
+    const oldGate = (carriers: string): boolean =>
+      !(/\btone\b/u.test(carriers) && /\bground\b/u.test(carriers)) && !carriers.includes("alone");
+    expect(oldGate("mark"), "the old gate passed a single carrier").toBe(true);
+    expect(distinct("mark"), "what I71 counts").toBeLessThan(2);
+    expect(distinct("mark + word"), "disclosure since ruling 69").toBe(2);
+  });
+});

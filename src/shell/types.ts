@@ -15,7 +15,7 @@ import type { ConfirmHost } from "./confirm.js";
 import type { Setting } from "./config.js";
 import type { Adapter, AdapterRegistry, ProducerContext } from "../data/adapters/index.js";
 import type { ManifestDocument, ManifestStore } from "../data/manifest/index.js";
-import type { ProcessRunner, PtyFactory } from "../data/process/types.js";
+import type { Exit, ProcessRunner, PtyFactory } from "../data/process/types.js";
 import type { TransportRouter } from "../data/transport/index.js";
 import type { Action, Block, ViewDocument } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
@@ -96,7 +96,32 @@ export type SessionSnapshot = Readonly<{
  */
 export type CopyState =
   | Readonly<{ mode: "native" }>
-  | Readonly<{ mode: "semantic"; size: Readonly<{ chars: number; rows: number; entries: number }> | null }>;
+  | Readonly<{
+      mode: "semantic";
+      size: Readonly<{ chars: number; rows: number; entries: number }> | null;
+      /**
+       * *A selection exists* — `hasSelection`, the predicate `esc` branches on
+       * (C14 I59). **Not `size !== null`**: a selection of a `rule` alone copies
+       * nothing and is still what the next `esc` clears.
+       */
+      clears: boolean;
+      /** Every span of the held view is selected — `A`'s *says what it did*, derived (C14 I55). */
+      all: boolean;
+      /**
+       * The rectangle's size in cells, or `null` at block granularity (C14 I60).
+       * Zero by zero where it resolves to no block.
+       */
+      rect: Readonly<{ columns: number; rows: number }> | null;
+      /**
+       * Why the file is offered for this selection's text — `no clipboard`,
+       * `too large for the terminal`, `pbcopy failed`, `pbcopy did not answer` —
+       * so `⏎` reads `to file` and the reason is the last of the facts (C14 I61,
+       * §6e K3, K7, K8, K13; `R-SEL-011`'s *states it and offers a file*).
+       * Absent where a route takes the text, and in a chrome composed without a
+       * session, which cannot know and draws `⏎ copy`.
+       */
+      fileOffer?: string;
+    }>;
 
 export type ChromeContext = Readonly<{
   session: SessionSnapshot;
@@ -180,6 +205,14 @@ export type ChromeContext = Readonly<{
    */
   toast?: string;
   /**
+   * What the live toast's mark says, when it is not `ok` (C22 I116, C23 I92).
+   *
+   * `expired` is a question that resolved itself because nobody answered it
+   * (`R-BLK-881`): *the question expired*, drawn hollow and muted — `✓` would
+   * say it went well. Absent is `ok`, which is every other toast.
+   */
+  toastMark?: "expired";
+  /**
    * C02's resolved record, because **the chrome draws marks and a mark needs a
    * rung** (A03 SS47, C09 I22). The owner line's chords are `⏎ ⇧ ⇥ ⌃] ←→ ↑↓`,
    * none of which an ASCII terminal can render, and a framework string carrying
@@ -252,6 +285,15 @@ export type WatchRowState = Readonly<{
 export type OwnerHints = Readonly<{
   chord(target: FocusTarget, action: KeyAction): Binding["key"] | undefined;
   substate?: "find" | "complete" | "preview";
+  /** Whether the chip preview's box overflows — the owner line's scroll chip (C22 I143). */
+  previewScrolls?: boolean;
+  /**
+   * A completion menu at rest: the prompt's keys resolve before the panel's
+   * (C22 I150, C19 I20, ruling 96). **The router's own answer** — `promptUnderMenu()`,
+   * the top layer's `promptLive` (I145) — so the line cannot name a key that
+   * dispatch sends somewhere else. Absent is *the menu owns its keys*.
+   */
+  promptUnderMenu?: boolean;
   question?: Readonly<{ state: "choice" | "reply" | "inspection"; resolvesTo: string }>;
   refused?: boolean;
   /**
@@ -340,6 +382,15 @@ export interface FileSystem {
    * `node:fs` (I10) — a second filesystem route would put two in the graph.
    */
   readDir(path: string): Promise<readonly Readonly<{ name: string; directory: boolean }>[]>;
+  /**
+   * A fresh directory only this user can read, under the system's temporary
+   * one, named from `prefix` (C22 I144) — where `⌥o` writes a chip for the
+   * reader's editor. Optional, so a filesystem an application supplies need not
+   * have one; `⌥o` then refuses and says so.
+   */
+  makeTempDir?(prefix: string): Promise<string>;
+  /** Remove a directory and everything in it (C22 I144). Optional with `makeTempDir`. */
+  removeDir?(path: string): Promise<void>;
 }
 
 /**
@@ -384,6 +435,21 @@ export interface Pipeline {
   cancelNewestStream(): boolean;
   /** Cancel what is in flight, settling the entry `partial` (C23 I10). */
   cancel(): void;
+  /**
+   * The terminal, lent to a program that is not a verb — C22 I144's editor —
+   * through the handoff's own sequence (C23 §4: suspend, C21 `handoff`,
+   * resume, reset the decoder, invalidate), **appending nothing**: what comes
+   * back is the caller's to say. `busy` names the verb holding the guard, and
+   * nothing is run then — a suspended terminal would take that verb's frames.
+   * The guard is held for the handoff, so a submission in the meantime queues.
+   *
+   * Optional, so a pipeline a harness supplies need not lend the terminal; C22
+   * refuses the editor with none.
+   */
+  borrowTerminal?(
+    argv: readonly string[],
+    label: string,
+  ): Promise<Readonly<{ kind: "ran"; exit: Exit }> | Readonly<{ kind: "busy"; verb: string | null }>>;
   /**
    * Where Calcium's own local handlers and the app's arrive (C23 §2).
    *
@@ -617,7 +683,17 @@ export type PipelineDeps = Readonly<{
    * lands with its test consumer rather than a producer nothing calls.
    */
   approval?: (call: Readonly<{ name: string; args: string }>) =>
-    Readonly<{ consequence?: string; choices?: readonly Readonly<{ key: string; label: string; default?: true }>[] }> | null;
+    Readonly<{
+      consequence?: string;
+      choices?: readonly Readonly<{ key: string; label: string; default?: true }>[];
+      /**
+       * The asker withdrawing its question (C23 I92, I94, `R-BLK-881`): the
+       * approval resolves `cancelled` and the call runs nothing.
+       */
+      signal?: AbortSignal;
+      /** How long the approval stays open before it resolves `expired` (C23 I92). */
+      expiresAfterMs?: number;
+    }> | null;
   theme: ThemeStore;
   /** Persist the chosen variant (C22 I40). Absent in harnesses with no state directory. */
   persistTheme?: (name: string) => void;

@@ -125,5 +125,17 @@ case(
     (True, 1),
 )
 
+# 10 — **the recording is the demo world's** (2026-09-29). Every beat typed a
+#      `dtui-` name while the screencast recorded against the lab daemon; those
+#      exist nowhere now, and the entry point must not call `capture.run`.
+_src = (Path(__file__).resolve().parent / "screencast.py").read_text(encoding="utf8")
+_entry = _src[_src.index('if __name__ == "__main__":'):]
+case("no beat types a dtui- name", [d for _, d in BEATS if b"dtui" in d], [])
+case(
+    "the entry records with run_world, checks the cast, and never calls capture.run",
+    ("run_world(COLS" in _entry, "assert_private(" in _entry, re.search(r"(?<![_\w])run\(COLS", _entry) is None),
+    (True, True, True),
+)
+
 if __name__ == "__main__":
     sys.exit(main("screencast.py"))

@@ -5,7 +5,7 @@
  * was its first caller, so it was written where the caller was — and then
  * `shell/paint.ts`, `shell/composite.ts` and `shell/session.ts` came to depend
  * on `renderSequenceToLines` for real frame composition. The package declares
- * `@fmx/calcium/testing` dev-only and C24 I8 says it is absent from a production
+ * `calcium-tui/testing` dev-only and C24 I8 says it is absent from a production
  * bundle; tracing the built runtime entry found three edges into
  * `dist/testing/index.js`, dragging both conformance suites in behind them.
  *

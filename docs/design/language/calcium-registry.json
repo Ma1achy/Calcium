@@ -1,7 +1,7 @@
 {
   "meta": {
     "name": "Calcium design language",
-    "revision": "0.16",
+    "revision": "0.21",
     "generatedArtifact": "calcium-design-language.html",
     "ruleIdPolicy": "IDs are explicit, permanent, and never derived from order.",
     "normativeSource": "calcium-registry.json",
@@ -4577,7 +4577,7 @@
     {
       "id": "R-BLK-007",
       "title": "The agent at work — five regions, activity present · ● edit(src/interaction/parser/parse.ts) ⎿ ── src/interaction/parser/parse.ts…",
-      "text": "● edit(src/interaction/parser/parse.ts)\n    ⎿\n    ── src/interaction/parser/parse.ts +2 −2 ────────────────────────────────\n    ⋯ 39 unchanged lines\n    @@ -40,4 +40,4 @@\n       40     const out = [];\n       41 -   let inQuote = false;\n       41 +   let depth = 0;\n       46       if (esc) { esc = false; continue; }\n       47 -     if (ch === '\"') inQuote = !inQuote;\n       47 +     if (ch === '\"') depth += (ch === q) ? (esc ? 0 : 1) : 0;\n       48       out.push(ch);\n    ⋯ 136 unchanged lines\n   updating the tests                       12s · 1.4k tok\n  ⎿ todo  3/5\n    ◼ read the current implementation\n    ◼ find where quotes are tracked\n    ◼ add a depth counter\n     update the tests\n    ◻ run the suite\n──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ████████████████░░░░░░░░░░  62%  31k/50k   step ████░░░░░░ 4/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m",
+      "text": "● edit(src/interaction/parser/parse.ts)\n    ⎿\n    ── src/interaction/parser/parse.ts +2 −2 ────────────────────────────────\n    ⋯ 39 unchanged lines\n    @@ -40,4 +40,4 @@\n       40     const out = [];\n       41 -   let inQuote = false;\n       41 +   let depth = 0;\n       46       if (esc) { esc = false; continue; }\n       47 -     if (ch === '\"') inQuote = !inQuote;\n       47 +     if (ch === '\"') depth += (ch === q) ? (esc ? 0 : 1) : 0;\n       48       out.push(ch);\n    ⋯ 136 unchanged lines\n   updating the tests                       12s · 1.4k tok\n  ⎿ todo  3/5\n    ◼ read the current implementation\n    ◼ find where quotes are tracked\n    ◼ add a depth counter\n     update the tests\n    ◻ run the suite\n──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ████████████████░░░░░░░░░░  62%  31k/50k   step ████░░░░░░ 4/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          someone   31m",
       "status": "example",
       "sectionKey": "the-agent-at-work-five-regions-activity-present-003",
       "tags": [
@@ -4587,7 +4587,7 @@
       "supersedes": [],
       "supersededBy": "R-BLK-945",
       "legacyIds": [],
-      "contentDigest": "b1a65d476a828cde18077379a20ebc84d86d32f2304c78f88c84bbcf459955c7"
+      "contentDigest": "6912850e6cc530aad183b902b43a329c7114532e09086ccc6baf489e021bb001"
     },
     {
       "id": "R-BLK-008",
@@ -4667,7 +4667,7 @@
     {
       "id": "R-BLK-013",
       "title": "Idle — the activity region and its rule are gone · ────────────────────────────────────────────────────────────────────────────…",
-      "text": "──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ███████████████░░░░░░░░░  62%  31k/50k   step ████░░░░░░ 4/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m",
+      "text": "──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ███████████████░░░░░░░░░  62%  31k/50k   step ████░░░░░░ 4/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          someone   31m",
       "status": "example",
       "sectionKey": "idle-the-activity-region-and-its-rule-are-gone-004",
       "tags": [
@@ -4677,7 +4677,7 @@
       "supersedes": [],
       "supersededBy": null,
       "legacyIds": [],
-      "contentDigest": "586cf291a944cc2bc6d1fb55d9683a05cf9080494ea85997c20e56cb27c7589c"
+      "contentDigest": "0581fc7934c7dde22ae1bf6095e8976033f196041c4aa20b131b16536dfdbe03"
     },
     {
       "id": "R-BLK-014",
@@ -4892,7 +4892,7 @@
     {
       "id": "R-BLK-028",
       "title": "Subagents · » auto ✦ qwen3-coder-next effort high localhost:8000 22:13 ████████░░░░░░░░░…",
-      "text": "» auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ████████░░░░░░░░░░░░░░░░░░░░  30%  15k/50k   step ██████░░░░ 6/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3   ⋯ 3 agents   malachy\n  ⋯ › main    seams  2:53 ✓   arm  3:46 ✓   count   4:02    ⌃⇥ switch",
+      "text": "» auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ████████░░░░░░░░░░░░░░░░░░░░  30%  15k/50k   step ██████░░░░ 6/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3   ⋯ 3 agents   someone\n  ⋯ › main    seams  2:53 ✓   arm  3:46 ✓   count   4:02    ⌃⇥ switch",
       "status": "example",
       "sectionKey": "subagents-007",
       "tags": [
@@ -4902,7 +4902,7 @@
       "supersedes": [],
       "supersededBy": null,
       "legacyIds": [],
-      "contentDigest": "1cadcf558a167cd7a7651bea6fa595faea5bfe719525780b44f71a0b62718df2"
+      "contentDigest": "632fc5eecbdc0427727af291bb22c4d570a16303d4450ae74ac595e9ff10164c"
     },
     {
       "id": "R-BLK-029",
@@ -4952,7 +4952,7 @@
     {
       "id": "R-BLK-032",
       "title": "Subagents · calcium/count verify the refusal count ✦ qwen3-coder-next 22:19 ────────────…",
-      "text": "calcium/count   verify the refusal count    ✦ qwen3-coder-next  22:19\n  ────────────────────────────────────────────────────────────────────────────\n\n ❯ count the refusals three ways and compare\n\n  ● I'll grep the prose, the register and the roadmap separately.\n\n  ● search(\"refus\") · 1.2s · 1,204 matches\n    ⎿ +1,204 more · ⏎ expand\n\n    cross-checking the register  4m 02s · 46k tok\n  ────────────────────────────────────────────────────── calcium/count ─\n  ❯ ▌\n  ────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ██████████████████████░░  92%  46k/50k   step █████████░ 18/20   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m\n  ⋯   main    seams  2:53 ✓   arm  3:46 ✓ › count   4:02    ⌃⇥ switch",
+      "text": "calcium/count   verify the refusal count    ✦ qwen3-coder-next  22:19\n  ────────────────────────────────────────────────────────────────────────────\n\n ❯ count the refusals three ways and compare\n\n  ● I'll grep the prose, the register and the roadmap separately.\n\n  ● search(\"refus\") · 1.2s · 1,204 matches\n    ⎿ +1,204 more · ⏎ expand\n\n    cross-checking the register  4m 02s · 46k tok\n  ────────────────────────────────────────────────────── calcium/count ─\n  ❯ ▌\n  ────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ██████████████████████░░  92%  46k/50k   step █████████░ 18/20   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          someone   31m\n  ⋯   main    seams  2:53 ✓   arm  3:46 ✓ › count   4:02    ⌃⇥ switch",
       "status": "example",
       "sectionKey": "subagents-007",
       "tags": [
@@ -4962,7 +4962,7 @@
       "supersedes": [],
       "supersededBy": "R-BLK-949",
       "legacyIds": [],
-      "contentDigest": "970e57026db454031a2f6f9076ec81f691faa544541dffef9a824a1149a37ba2"
+      "contentDigest": "2b083bfba2a86cb43971574123a852b3c770abe2fa2714eb194005f0c0ac2c1d"
     },
     {
       "id": "R-BLK-033",
@@ -9257,7 +9257,7 @@
     {
       "id": "R-BLK-319",
       "title": "History, search and ghost text · ────────────────────────────────────────────────────────────────────────────…",
-      "text": "──────────────────────────────────────────────────────────────────────────────\n ⌥r reverse search      3 of 214\n › /promote a3f9b21 --open-mr\n   /diff a3f9b21 7c2d4e1\n   /ps --owner=malachy --since=a3f9b21\n──────────────────────────────────────────────────────────────────────────────\n❯ a3f9b21▌\n──────────────────────────────────────────────────────────────────────────────\n⌥r older   ⌥s newer   ⏎ accept   esc cancel",
+      "text": "──────────────────────────────────────────────────────────────────────────────\n ⌥r reverse search      3 of 214\n › /promote a3f9b21 --open-mr\n   /diff a3f9b21 7c2d4e1\n   /ps --owner=someone --since=a3f9b21\n──────────────────────────────────────────────────────────────────────────────\n❯ a3f9b21▌\n──────────────────────────────────────────────────────────────────────────────\n⌥r older   ⌥s newer   ⏎ accept   esc cancel",
       "status": "example",
       "sectionKey": "history-search-and-ghost-text-046",
       "tags": [
@@ -9267,7 +9267,7 @@
       "supersedes": [],
       "supersededBy": null,
       "legacyIds": [],
-      "contentDigest": "222f814af1b58e10e318b3f99eeff5962bda1bed53f94360d2486468799217aa"
+      "contentDigest": "e0166f4f823858d4c7febfd622242260e8195484192b67120c4d3939ab7d1972"
     },
     {
       "id": "R-BLK-320",
@@ -10172,7 +10172,7 @@
     {
       "id": "R-BLK-380",
       "title": "Links · a URL asks because it leaves the machine — and a model that wrote the link i…",
-      "text": "a URL asks because it leaves the machine — and a model that wrote\n  the link is not the reader who is about to follow it:\n\n──────────────────────────────────────────────────────────────────────────────\n ⟩ Open this link?\n https://docs.internal.fmx.io/runbooks/parser\n\n  › no    open    copy it instead\n──────────────────────────────────────────────────────────────────────────────\n←→ move     ⏎ answer   esc cancels",
+      "text": "a URL asks because it leaves the machine — and a model that wrote\n  the link is not the reader who is about to follow it:\n\n──────────────────────────────────────────────────────────────────────────────\n ⟩ Open this link?\n https://docs.internal.example.com/runbooks/parser\n\n  › no    open    copy it instead\n──────────────────────────────────────────────────────────────────────────────\n←→ move     ⏎ answer   esc cancels",
       "status": "example",
       "sectionKey": "links-054",
       "tags": [
@@ -10182,7 +10182,7 @@
       "supersedes": [],
       "supersededBy": null,
       "legacyIds": [],
-      "contentDigest": "68bf6f8641d68f2c3f191d26c8b5ba12dbc46b10347d0be4769c1a2cd0c0f276"
+      "contentDigest": "01237d393b7fde72b972891961f07b5f84623b67a8f37c679f1fad72b6996967"
     },
     {
       "id": "R-BLK-381",
@@ -11732,7 +11732,7 @@
     {
       "id": "R-BLK-484",
       "title": "Scrolled back while a turn runs · editing parse.ts 41s · 3.2k tok ⎿ todo 4/5 · ◻ run the suite ↓ 3 new message…",
-      "text": "editing parse.ts  41s · 3.2k tok\n  ⎿ todo  4/5  ·  ◻ run the suite\n\n   ↓ 3 new messages ⏎\n──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ███████████████████░░░░░  78%  39k/50k   step ███████░░░ 7/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m",
+      "text": "editing parse.ts  41s · 3.2k tok\n  ⎿ todo  4/5  ·  ◻ run the suite\n\n   ↓ 3 new messages ⏎\n──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ███████████████████░░░░░  78%  39k/50k   step ███████░░░ 7/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          someone   31m",
       "status": "example",
       "sectionKey": "scrolled-back-while-a-turn-runs-067",
       "tags": [
@@ -11742,7 +11742,7 @@
       "supersedes": [],
       "supersededBy": "R-BLK-965",
       "legacyIds": [],
-      "contentDigest": "e4a072043f35fe7ed90436d699ab40c826934a3ffa698053aa94980d58ab7cf8"
+      "contentDigest": "9a3af409766b359b8427b475c73830f439a429f57de930d9f3869955c0fe929a"
     },
     {
       "id": "R-BLK-485",
@@ -11792,7 +11792,7 @@
     {
       "id": "R-BLK-488",
       "title": "Scrolled back while a turn runs · » auto ✦ qwen3-coder-next effort high localhost:8000 22:13 █████████████████…",
-      "text": "» auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ███████████████████░░░░░  78%  39k/50k   step ███████░░░ 7/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m\n  the STEP count says how far through, the CONTEXT bar says how full,\n  the TOKEN rate says it is still producing. Three live numbers, in\n  the one place this document already puts live state.\n\n  a fourth copy of what the agent is doing, pinned above the prompt,\n  would be the activity line said twice — and the second one could not\n  be scrolled to, copied, or expanded.",
+      "text": "» auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ███████████████████░░░░░  78%  39k/50k   step ███████░░░ 7/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          someone   31m\n  the STEP count says how far through, the CONTEXT bar says how full,\n  the TOKEN rate says it is still producing. Three live numbers, in\n  the one place this document already puts live state.\n\n  a fourth copy of what the agent is doing, pinned above the prompt,\n  would be the activity line said twice — and the second one could not\n  be scrolled to, copied, or expanded.",
       "status": "example",
       "sectionKey": "scrolled-back-while-a-turn-runs-067",
       "tags": [
@@ -11802,7 +11802,7 @@
       "supersedes": [],
       "supersededBy": null,
       "legacyIds": [],
-      "contentDigest": "a29c58b4a86959ad74cc8635c965e7aa6cc475f044a21b3279a531f1ce6d53c3"
+      "contentDigest": "bad1eb8df1918b1ca9d96ed8ea36736db954d295b585a1a254f1180330d3f8dc"
     },
     {
       "id": "R-BLK-489",
@@ -14027,7 +14027,7 @@
     {
       "id": "R-BLK-637",
       "title": "Prism — /ps · ❯ /ps --mine --since 24h ● ps · 0.3s · 4 of 11 ⎿ uuid family status metric ▾…",
-      "text": "❯ /ps --mine --since 24h\n\n● ps · 0.3s · 4 of 11\n  ⎿  uuid     family            status      metric ▾   age  owner\n    ▸ a3f9b21  digit-classifier  running     0.0372    23m  malachy\n      7c2d4e1  decoder-zoom      succeeded   0.0089    41m  malachy\n      2e8a04c  graphsage         failed           —   1h12m  priya\n      f410d99  flow-predictor    queued            —      3m  malachy\n      +7 more · sorted by metric\n\n──────────────────────────────────────────────────────────────────────────────\n❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n↑↓ rows   ⏎ open the run   ⌃⇧C copy the values   esc back",
+      "text": "❯ /ps --mine --since 24h\n\n● ps · 0.3s · 4 of 11\n  ⎿  uuid     family            status      metric ▾   age  owner\n    ▸ a3f9b21  digit-classifier  running     0.0372    23m  someone\n      7c2d4e1  decoder-zoom      succeeded   0.0089    41m  someone\n      2e8a04c  graphsage         failed           —   1h12m  priya\n      f410d99  flow-predictor    queued            —      3m  someone\n      +7 more · sorted by metric\n\n──────────────────────────────────────────────────────────────────────────────\n❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n↑↓ rows   ⏎ open the run   ⌃⇧C copy the values   esc back",
       "status": "example",
       "sectionKey": "prism-ps-081",
       "tags": [
@@ -14037,7 +14037,7 @@
       "supersedes": [],
       "supersededBy": null,
       "legacyIds": [],
-      "contentDigest": "202dc6613a0c19df7fa60506447ea7c08b53ff9435577ce8353aa743247d4bb3"
+      "contentDigest": "9b285cccdee38c635a82198ae1f086fc0863eac4e4088cf4fe991a24d2e827ae"
     },
     {
       "id": "R-BLK-638",
@@ -14222,7 +14222,7 @@
     {
       "id": "R-BLK-650",
       "title": "No pushed views · ● ps · 0.3s · 2 of 11 ⎿ uuid family status metric age ▸ ▾ a3f9b21 digit-clas…",
-      "text": "● ps · 0.3s · 2 of 11\n  ⎿  uuid     family            status      metric   age\n    ▸ ▾ a3f9b21  digit-classifier  running     0.0372   23m\n        node   gpu-04.fmx.internal · 2×A100 · 16GiB\n        mr     !1248  auto-merged\n        ██████████░░░░░░░░░░░░░░  43%  ep 17/40  ~18m\n        ≡ logs  ⚡ events  ⊘ cancel  { } json\n      7c2d4e1  decoder-zoom      succeeded   0.0089   41m\n      +9 more",
+      "text": "● ps · 0.3s · 2 of 11\n  ⎿  uuid     family            status      metric   age\n    ▸ ▾ a3f9b21  digit-classifier  running     0.0372   23m\n        node   gpu-04.example.internal · 2×A100 · 16GiB\n        mr     !1248  auto-merged\n        ██████████░░░░░░░░░░░░░░  43%  ep 17/40  ~18m\n        ≡ logs  ⚡ events  ⊘ cancel  { } json\n      7c2d4e1  decoder-zoom      succeeded   0.0089   41m\n      +9 more",
       "status": "example",
       "sectionKey": "no-pushed-views-082",
       "tags": [
@@ -14232,7 +14232,7 @@
       "supersedes": [],
       "supersededBy": "R-BLK-941",
       "legacyIds": [],
-      "contentDigest": "638e01243e8bdfd7aaa04f0ed051e03ab21d634c83130acfc64210c534d0b5f5"
+      "contentDigest": "1cee274a15a1240b2d979953d72042a98aeb72c954322e2db60cfa0e0245470b"
     },
     {
       "id": "R-BLK-651",
@@ -14281,8 +14281,8 @@
     },
     {
       "id": "R-BLK-654",
-      "title": "Prism — submit · ❯ /submit fmx_models.jobs.training:job ● submit · 4s ⎿ ✓ clean working tree …",
-      "text": "❯ /submit fmx_models.jobs.training:job\n\n● submit ·  4s\n  ⎿ ✓ clean working tree              HEAD a3f9b21\n    ✓ tier-1 rules                    22 rules · 0 errors\n     generating manifest              jobs/a3f9b21.yaml\n    ○ open merge request",
+      "title": "Prism — submit · ❯ /submit ml_models.jobs.training:job ● submit · 4s ⎿ ✓ clean working tree …",
+      "text": "❯ /submit ml_models.jobs.training:job\n\n● submit ·  4s\n  ⎿ ✓ clean working tree              HEAD a3f9b21\n    ✓ tier-1 rules                    22 rules · 0 errors\n     generating manifest              jobs/a3f9b21.yaml\n    ○ open merge request",
       "status": "example",
       "sectionKey": "prism-submit-083",
       "tags": [
@@ -14292,7 +14292,7 @@
       "supersedes": [],
       "supersededBy": "R-BLK-968",
       "legacyIds": [],
-      "contentDigest": "2ca5b5575c4ecfd15df2b22c4fa511edfa6ab199be968d7158fd819be972b56c"
+      "contentDigest": "eb76a0d80d7e4df97a3c465c4abae9d36c31c46372d45581120d6ef06c5c9d48"
     },
     {
       "id": "R-BLK-655",
@@ -14477,7 +14477,7 @@
     {
       "id": "R-BLK-667",
       "title": "Prism — the six-hour run · » auto ✦ qwen3-coder-next effort high localhost:8000 22:13 ████░░░░░░░░░░░░░…",
-      "text": "» auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ████░░░░░░░░░░░░░░░░░░░░░░░░░░░░  12%  6k/50k   step ░░░░░░░░░░ —   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3   ⋯ 2 watching   malachy\n  ⋯ › a3f9b21  █████░░░░░░░ 43%  ep 17/40     f410d99  queued       ⌃⇥ switch",
+      "text": "» auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ████░░░░░░░░░░░░░░░░░░░░░░░░░░░░  12%  6k/50k   step ░░░░░░░░░░ —   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3   ⋯ 2 watching   someone\n  ⋯ › a3f9b21  █████░░░░░░░ 43%  ep 17/40     f410d99  queued       ⌃⇥ switch",
       "status": "example",
       "sectionKey": "prism-the-six-hour-run-085",
       "tags": [
@@ -14487,7 +14487,7 @@
       "supersedes": [],
       "supersededBy": null,
       "legacyIds": [],
-      "contentDigest": "0847dda4a3e58e9a643a0b158d1607930377c8b2e1cb50e04eb3bef63dd4d81d"
+      "contentDigest": "1c81317fd3a578479917375ed27a573bc49f2e079c222f2d45e02457c812cb46"
     },
     {
       "id": "R-BLK-668",
@@ -18959,7 +18959,7 @@
     {
       "id": "R-BLK-941",
       "title": "No pushed views · ● ps · 0.3s · 2 of 11 ⎿ uuid family status metric age ▸ ▿ a3f9b21 digit-clas…",
-      "text": "● ps · 0.3s · 2 of 11\n  ⎿  uuid     family            status      metric   age\n    ▸ ▿ a3f9b21  digit-classifier  running     0.0372   23m\n        node   gpu-04.fmx.internal · 2×A100 · 16GiB\n        mr     !1248  auto-merged\n        ██████████░░░░░░░░░░░░░░  43%  ep 17/40  ~18m\n        ≡ logs  ⚡ events  ⊘ cancel  { } json\n      7c2d4e1  decoder-zoom      succeeded   0.0089   41m\n      +9 more",
+      "text": "● ps · 0.3s · 2 of 11\n  ⎿  uuid     family            status      metric   age\n    ▸ ▿ a3f9b21  digit-classifier  running     0.0372   23m\n        node   gpu-04.example.internal · 2×A100 · 16GiB\n        mr     !1248  auto-merged\n        ██████████░░░░░░░░░░░░░░  43%  ep 17/40  ~18m\n        ≡ logs  ⚡ events  ⊘ cancel  { } json\n      7c2d4e1  decoder-zoom      succeeded   0.0089   41m\n      +9 more",
       "status": "example",
       "sectionKey": "no-pushed-views-082",
       "tags": [
@@ -18971,7 +18971,7 @@
       ],
       "supersededBy": null,
       "legacyIds": [],
-      "contentDigest": "7670d1fba7695a9414b6efe31c6fc212d188290ec3d479518948cc24a7ccb81b"
+      "contentDigest": "083fc8e6106d05ae1e1d6a1f8018a33dfbd65591da0182bca13d3ac6f3af1d68"
     },
     {
       "id": "R-BLK-942",
@@ -19027,7 +19027,7 @@
     {
       "id": "R-BLK-945",
       "title": "The agent at work — five regions, activity present · ● edit(src/interaction/parser/parse.ts) ⎿ ── src/interaction/parser/parse.ts…",
-      "text": "● edit(src/interaction/parser/parse.ts)\n    ⎿\n    ── src/interaction/parser/parse.ts +2 −2 ────────────────────────────────\n    ⋯ 39 unchanged lines\n    @@ -40,4 +40,4 @@\n       40     const out = [];\n       41 -   let inQuote = false;\n       41 +   let depth = 0;\n       46       if (esc) { esc = false; continue; }\n       47 -     if (ch === '\"') inQuote = !inQuote;\n       47 +     if (ch === '\"') depth += (ch === q) ? (esc ? 0 : 1) : 0;\n       48       out.push(ch);\n    ⋯ 136 unchanged lines\n   updating the tests                       12s · 1.4k tok\n  ⎿  todo  3/5\n     ◼ read the current implementation\n     ◼ find where quotes are tracked\n     ◼ add a depth counter\n      update the tests\n     ◻ run the suite\n──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ████████████████░░░░░░░░░░  62%  31k/50k   step ████░░░░░░ 4/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m",
+      "text": "● edit(src/interaction/parser/parse.ts)\n    ⎿\n    ── src/interaction/parser/parse.ts +2 −2 ────────────────────────────────\n    ⋯ 39 unchanged lines\n    @@ -40,4 +40,4 @@\n       40     const out = [];\n       41 -   let inQuote = false;\n       41 +   let depth = 0;\n       46       if (esc) { esc = false; continue; }\n       47 -     if (ch === '\"') inQuote = !inQuote;\n       47 +     if (ch === '\"') depth += (ch === q) ? (esc ? 0 : 1) : 0;\n       48       out.push(ch);\n    ⋯ 136 unchanged lines\n   updating the tests                       12s · 1.4k tok\n  ⎿  todo  3/5\n     ◼ read the current implementation\n     ◼ find where quotes are tracked\n     ◼ add a depth counter\n      update the tests\n     ◻ run the suite\n──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ████████████████░░░░░░░░░░  62%  31k/50k   step ████░░░░░░ 4/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          someone   31m",
       "status": "example",
       "sectionKey": "the-agent-at-work-five-regions-activity-present-003",
       "tags": [
@@ -19038,7 +19038,7 @@
         "R-BLK-007"
       ],
       "legacyIds": [],
-      "contentDigest": "5f1127c3c4259ca5b51ff0e10888642fa32201661f362d00fb6593be582e7bbc"
+      "contentDigest": "6f2387846d5f40775cdde088ae2d0428cf9126965304a977a6cea07404cd6e39"
     },
     {
       "id": "R-BLK-946",
@@ -19091,7 +19091,7 @@
     {
       "id": "R-BLK-949",
       "title": "Subagents · calcium/count verify the refusal count ✦ qwen3-coder-next 22:19 ────────────…",
-      "text": "calcium/count   verify the refusal count    ✦ qwen3-coder-next  22:19\n  ────────────────────────────────────────────────────────────────────────────\n\n ❯ count the refusals three ways and compare\n\n  ● I'll grep the prose, the register and the roadmap separately.\n\n  ● search(\"refus\") · 1.2s · 1,204 matches\n    ⎿  +1,204 more · ⏎ expand\n\n    cross-checking the register  4m 02s · 46k tok\n  ────────────────────────────────────────────────────── calcium/count ─\n  ❯ ▌\n  ────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ██████████████████████░░  92%  46k/50k   step █████████░ 18/20   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m\n  ⋯   main    seams  2:53 ✓   arm  3:46 ✓ › count   4:02    ⌃⇥ switch",
+      "text": "calcium/count   verify the refusal count    ✦ qwen3-coder-next  22:19\n  ────────────────────────────────────────────────────────────────────────────\n\n ❯ count the refusals three ways and compare\n\n  ● I'll grep the prose, the register and the roadmap separately.\n\n  ● search(\"refus\") · 1.2s · 1,204 matches\n    ⎿  +1,204 more · ⏎ expand\n\n    cross-checking the register  4m 02s · 46k tok\n  ────────────────────────────────────────────────────── calcium/count ─\n  ❯ ▌\n  ────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ██████████████████████░░  92%  46k/50k   step █████████░ 18/20   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          someone   31m\n  ⋯   main    seams  2:53 ✓   arm  3:46 ✓ › count   4:02    ⌃⇥ switch",
       "status": "example",
       "sectionKey": "subagents-007",
       "tags": [
@@ -19102,7 +19102,7 @@
         "R-BLK-032"
       ],
       "legacyIds": [],
-      "contentDigest": "4f3cfa139dce4b5ec499d5a7b1ebdba8688e03fa95f305da44abd13b77216884"
+      "contentDigest": "8f0e582b9c3b620c9ba9c909a5c96faf917fa9ea8c82611b6c5ee498c0a1c75d"
     },
     {
       "id": "R-BLK-950",
@@ -19347,7 +19347,7 @@
     {
       "id": "R-BLK-965",
       "title": "Scrolled back while a turn runs · editing parse.ts 41s · 3.2k tok ⎿ todo 4/5 · ◻ run the suite ↓ 3 new message…",
-      "text": "editing parse.ts  41s · 3.2k tok\n  ⎿  todo  4/5  ·  ◻ run the suite\n\n   ↓ 3 new messages ⏎\n──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ███████████████████░░░░░  78%  39k/50k   step ███████░░░ 7/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m",
+      "text": "editing parse.ts  41s · 3.2k tok\n  ⎿  todo  4/5  ·  ◻ run the suite\n\n   ↓ 3 new messages ⏎\n──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ███████████████████░░░░░  78%  39k/50k   step ███████░░░ 7/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          someone   31m",
       "status": "example",
       "sectionKey": "scrolled-back-while-a-turn-runs-067",
       "tags": [
@@ -19358,7 +19358,7 @@
         "R-BLK-484"
       ],
       "legacyIds": [],
-      "contentDigest": "285ab3b1d5e5a6acddcd7d9d213e5286729eaa7a7402cb3292ff0afd36b7172a"
+      "contentDigest": "da048f7d0b885f7208d6cbb4a021c66c173c9a10a094465d48314bb64c2f4882"
     },
     {
       "id": "R-BLK-966",
@@ -19394,8 +19394,8 @@
     },
     {
       "id": "R-BLK-968",
-      "title": "Prism — submit · ❯ /submit fmx_models.jobs.training:job ● submit · 4s ⎿ ✓ clean working tree …",
-      "text": "❯ /submit fmx_models.jobs.training:job\n\n● submit ·  4s\n  ⎿  ✓ clean working tree              HEAD a3f9b21\n     ✓ tier-1 rules                    22 rules · 0 errors\n      generating manifest              jobs/a3f9b21.yaml\n     ○ open merge request",
+      "title": "Prism — submit · ❯ /submit ml_models.jobs.training:job ● submit · 4s ⎿ ✓ clean working tree …",
+      "text": "❯ /submit ml_models.jobs.training:job\n\n● submit ·  4s\n  ⎿  ✓ clean working tree              HEAD a3f9b21\n     ✓ tier-1 rules                    22 rules · 0 errors\n      generating manifest              jobs/a3f9b21.yaml\n     ○ open merge request",
       "status": "example",
       "sectionKey": "prism-submit-083",
       "tags": [
@@ -19406,7 +19406,7 @@
         "R-BLK-654"
       ],
       "legacyIds": [],
-      "contentDigest": "26698fe754bc3bf434076fe89cc6b5394d25e61b850e2b647f0acd323ca3f6b0"
+      "contentDigest": "681094934ef658e0f44200e6bed2d0ae38d33766dba30d1c80d8e7caa71e1372"
     },
     {
       "id": "R-BLK-969",
@@ -19483,6 +19483,20 @@
       "supersededBy": null,
       "legacyIds": [],
       "contentDigest": "e9f133f5f928512b330af1fb0a5f38fd1ea05aa4b96639f1b5f4a89e5ebc20da"
+    },
+    {
+      "id": "R-KEY-010",
+      "title": "A chip preview's own keys are chords the prompt does not bind, and enter always sends",
+      "text": "While a chip preview is up, the prompt keeps every key it binds, and enter sends. The preview owns three chords the prompt does not bind, each deliverable without the Kitty protocol: ⌥⇧↑ and ⌥⇧↓ scroll the preview, and ⌥o opens the chip in the reader's editor. The preview's key row names them from the keymap.",
+      "status": "current",
+      "sectionKey": "replace-or-float-and-where-a-chip-previews-101",
+      "tags": [
+        "interaction"
+      ],
+      "supersedes": [],
+      "supersededBy": null,
+      "legacyIds": [],
+      "contentDigest": "cee512e3fe6a687fa382b6fcc874b9e74946ef991adad7a9e0366722a503705a"
     }
   ],
   "sections": [
@@ -19539,7 +19553,7 @@
         "R-BLK-945"
       ],
       "sourceBlockCount": 7,
-      "sourceDigest": "018c984260279dc0af43a9da48b6f46b0da47ed241db7d71a0f96ab9d2bda987"
+      "sourceDigest": "dab28266c1c186baea35d241ac1463b8d0cf696d492f92327cf9170dc59f2a2b"
     },
     {
       "key": "idle-the-activity-region-and-its-rule-are-gone-004",
@@ -19564,7 +19578,7 @@
         "R-BLK-014"
       ],
       "sourceBlockCount": 7,
-      "sourceDigest": "44383e9deb9923d7d549819271948d68e22d5e1c7bd239a0b7594a4c7b5832f8"
+      "sourceDigest": "8a0bed38745a89f84b1805068e31ab889dfc062931f447fcdd7578ad09cd2b74"
     },
     {
       "key": "cancelled-the-spinner-stops-the-region-stays-005",
@@ -19649,7 +19663,7 @@
         "R-BLK-048"
       ],
       "sourceBlockCount": 29,
-      "sourceDigest": "6c967018c81cdb39ebef70e01f4badd328900f2ffe09e7dcaf600c3b8f494c05"
+      "sourceDigest": "fe4e1e4ab70e129e1c9e0677f26d90a987d8f047d2137c9f49ec9602ab943a94"
     },
     {
       "key": "a-message-you-sent-008",
@@ -20628,7 +20642,7 @@
         "R-BLK-324"
       ],
       "sourceBlockCount": 10,
-      "sourceDigest": "db889c4daee7f91598ef7bd6961a4c54993a90f9c655082a1de0d8eb39800475"
+      "sourceDigest": "261245e53216e86e77aca400bfe7cd7e59d94cb47e12c5f7042c66aeb327dad6"
     },
     {
       "key": "edges-empty-too-small-stale-interrupted-refused-047",
@@ -20836,7 +20850,7 @@
         "R-BLK-384"
       ],
       "sourceBlockCount": 15,
-      "sourceDigest": "bc81dbda6781dd2c2ccedc14bb47061d272aaf4dd8dd7a45db1f750699e69299"
+      "sourceDigest": "1ab1bde8bcc4f1e250481662268b11a3565c779a69bde374b2ba25de1ad77a4e"
     },
     {
       "key": "a-links-states-055",
@@ -21199,7 +21213,7 @@
         "R-BLK-500"
       ],
       "sourceBlockCount": 20,
-      "sourceDigest": "51eb55b2ab437485e496a4b7138befa894752b1aaf6d5da7f3c4f3e4a1a384d0"
+      "sourceDigest": "bf43fc090577c7ccf2859334a675d6b34070ea21557f71dc0383b81328b52434"
     },
     {
       "key": "degradation-one-exchange-three-rungs-068",
@@ -21599,7 +21613,7 @@
         "R-BLK-639"
       ],
       "sourceBlockCount": 5,
-      "sourceDigest": "5b03f216fe013893870e4e1d5000bbdbee343dc3b22dc4bf2af39190797a1d99"
+      "sourceDigest": "74d8fb2f01ffbccc5ee31efce32318a27877ffbe8caf296a2e71e3c322ec9b94"
     },
     {
       "key": "no-pushed-views-082",
@@ -21630,7 +21644,7 @@
         "R-BLK-652"
       ],
       "sourceBlockCount": 13,
-      "sourceDigest": "a7cf09eb2129ecb42fda80b27e61851a5e3abf033fc2a9284344104fd30beb24"
+      "sourceDigest": "609f5263baf06f9b46c5b7c5a147f503af567314f241b5d2a3788f68a0d4e3da"
     },
     {
       "key": "prism-submit-083",
@@ -21653,7 +21667,7 @@
         "R-BLK-657"
       ],
       "sourceBlockCount": 5,
-      "sourceDigest": "60023148ce31d2e05016d8b1cd3c79688d982fe7621181f459a650ebeb404c6c"
+      "sourceDigest": "afed48350b59ea486aa17a328cd6cdb62cbfa0833bcf5e74ceb28808eff0f59d"
     },
     {
       "key": "prism-logs-as-a-block-084",
@@ -21709,7 +21723,7 @@
         "R-BLK-676"
       ],
       "sourceBlockCount": 15,
-      "sourceDigest": "6f5a926758e0e308bea64ad936fff30b57293e7a0467d7c043723679b03c5b43"
+      "sourceDigest": "84e84852803097497f0adb54b44ba576a64a5b61b7000a4dc44eab86a8e4dfcb"
     },
     {
       "key": "prism-which-plots-it-actually-needs-086",
@@ -33015,7 +33029,7 @@
     "ruleIds": [
       "R-THM-001"
     ],
-    "note": "What a theme carries that is not CSS, or not a theme's own (C10 I62). A theme record names its fourBit map and its spectrum; a theme with no .syn-* or .cat-* rules derives those palettes from its own tones by paletteDerivation. The ANSI indices are curated for the sixteen-colour rung and measured against the xterm defaults (C10 I61).",
+    "note": "What a theme carries that is not CSS, or not a theme's own (C10 I62). A theme record names its fourBit map and its spectrum; a theme with no .syn-* or .cat-* rules derives those palettes from its own tones by paletteDerivation. The ANSI indices are curated for the sixteen-colour rung and measured against a reference palette, the legacy Windows console's sixteen; a running terminal's sixteen are its own (C10 I61).",
     "fourBit": {
       "dark": {
         "tone.default": 15,
@@ -33766,6 +33780,29 @@
       "status": "current",
       "ruleIds": [
         "R-GLY-003"
+      ],
+      "canonical": true,
+      "widthClass": "ambiguous"
+    },
+    {
+      "id": "selection-rail",
+      "unicode": "▌",
+      "ascii": "|",
+      "semanticRole": "selection rail",
+      "tone": "accent",
+      "widthByCapability": {
+        "unicode": 1,
+        "ascii": 1
+      },
+      "reservedCells": 1,
+      "collisionDomains": [
+        "gutter"
+      ],
+      "accessibleName": "selected",
+      "status": "current",
+      "ruleIds": [
+        "R-GLY-003",
+        "R-THM-005"
       ],
       "canonical": true,
       "widthClass": "ambiguous"
@@ -34651,6 +34688,30 @@
       "status": "current",
       "ruleIds": [
         "R-KEY-009"
+      ]
+    },
+    {
+      "id": "preview.scroll.up",
+      "label": "scroll the chip preview up",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-010"
+      ]
+    },
+    {
+      "id": "preview.scroll.down",
+      "label": "scroll the chip preview down",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-010"
+      ]
+    },
+    {
+      "id": "preview.open",
+      "label": "open the chip in the editor",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-010"
       ]
     }
   ],
@@ -35854,6 +35915,48 @@
       ],
       "kind": "key",
       "when": "focused"
+    },
+    {
+      "id": "binding.preview-scroll-up",
+      "actionId": "preview.scroll.up",
+      "chord": "⌥⇧↑",
+      "scope": "prompt",
+      "label": "scroll the chip preview up",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-010"
+      ],
+      "kind": "key",
+      "when": "previewing"
+    },
+    {
+      "id": "binding.preview-scroll-down",
+      "actionId": "preview.scroll.down",
+      "chord": "⌥⇧↓",
+      "scope": "prompt",
+      "label": "scroll the chip preview down",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-010"
+      ],
+      "kind": "key",
+      "when": "previewing"
+    },
+    {
+      "id": "binding.preview-open",
+      "actionId": "preview.open",
+      "chord": "⌥o",
+      "scope": "prompt",
+      "label": "open the chip in the editor",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-010"
+      ],
+      "kind": "key",
+      "when": "previewing"
     }
   ],
   "spinners": [
@@ -37157,6 +37260,16 @@
       "id": "braille",
       "filled": "⣿",
       "empty": " ",
+      "steps": [
+        "⡀",
+        "⡄",
+        "⡆",
+        "⡇",
+        "⣇",
+        "⣧",
+        "⣷",
+        "⣿"
+      ],
       "status": "current",
       "ruleIds": [
         "R-PRG-001",
@@ -40207,9 +40320,9 @@
       "id": "R-BLK-945",
       "sectionKey": "the-agent-at-work-five-regions-activity-present-003",
       "position": 7,
-      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-ok\">● </span><span class=\"c-default\">edit</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">src/interaction/parser/parse.ts</span><span class=\"c-muted\">)</span>\n<span class=\"c-muted\">    ⎿</span>\n<span class=\"c-default\">    </span><span class=\"c-default\">── src/interaction/parser/parse.ts </span><span class=\"c-ok\">+2</span><span class=\"c-default\"> </span><span class=\"c-error\">−2</span><span class=\"c-default\"> </span><span class=\"c-muted\">────────────────────────────────</span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">⋯ 39 unchanged lines</span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">@@ -40,4 +40,4 @@</span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">   40   </span><span class=\"c-default\">  const out = [];                                                 </span>\n<span class=\"c-default\">    </span><span class=\"c-error bg-diffRemove\">   41 - </span><span class=\"c-default bg-diffRemove\">  let inQuote = false;                                            </span>\n<span class=\"c-default\">    </span><span class=\"c-ok bg-diffAdd\">   41 + </span><span class=\"c-default bg-diffAdd\">  let depth = 0;                                                  </span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">   46   </span><span class=\"c-default\">    if (esc) { esc = false; continue; }                           </span>\n<span class=\"c-default\">    </span><span class=\"c-error bg-diffRemove\">   47 - </span><span class=\"c-default bg-diffRemove\">    if (ch === &#x27;&quot;&#x27;) inQuote = !inQuote;                           </span>\n<span class=\"c-default\">    </span><span class=\"c-ok bg-diffAdd\">   47 + </span><span class=\"c-default bg-diffAdd\">    if (ch === &#x27;&quot;&#x27;) depth += (ch === q) ? (esc ? 0 : 1) : 0;      </span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">   48   </span><span class=\"c-default\">    out.push(ch);                                                 </span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">⋯ 136 unchanged lines</span>\n<span class=\"c-default\">  </span><span class=\"c-accent sp sp-agent\"></span><span class=\"c-default\"> </span><span class=\"c-accent rmp rmp-shimmer\"><span style=\"--i:0\">u</span><span style=\"--i:1\">p</span><span style=\"--i:2\">d</span><span style=\"--i:3\">a</span><span style=\"--i:4\">t</span><span style=\"--i:5\">i</span><span style=\"--i:6\">n</span><span style=\"--i:7\">g</span><span style=\"--i:8\"> </span><span style=\"--i:9\">t</span><span style=\"--i:10\">h</span><span style=\"--i:11\">e</span><span style=\"--i:12\"> </span><span style=\"--i:13\">t</span><span style=\"--i:14\">e</span><span style=\"--i:15\">s</span><span style=\"--i:16\">t</span><span style=\"--i:17\">s</span></span><span class=\"c-default\">                       </span><span class=\"c-muted\">12s · 1.4k tok</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-muted\">todo  3/5</span>\n<span class=\"c-default\">    </span><span class=\"c-ok\"> ◼ </span><span class=\"c-muted\">read the current implementation</span>\n<span class=\"c-default\">    </span><span class=\"c-ok\"> ◼ </span><span class=\"c-muted\">find where quotes are tracked</span>\n<span class=\"c-default\">    </span><span class=\"c-ok\"> ◼ </span><span class=\"c-muted\">add a depth counter</span>\n<span class=\"c-default\">    </span> <span class=\"c-ok sp sp-agent\"></span><span class=\"c-default\"> </span><span class=\"c-ok rmp rmp-shimmer\"><span style=\"--i:0\">u</span><span style=\"--i:1\">p</span><span style=\"--i:2\">d</span><span style=\"--i:3\">a</span><span style=\"--i:4\">t</span><span style=\"--i:5\">e</span><span style=\"--i:6\"> </span><span style=\"--i:7\">t</span><span style=\"--i:8\">h</span><span style=\"--i:9\">e</span><span style=\"--i:10\"> </span><span style=\"--i:11\">t</span><span style=\"--i:12\">e</span><span style=\"--i:13\">s</span><span style=\"--i:14\">t</span><span style=\"--i:15\">s</span></span>\n<span class=\"c-default\">    </span><span class=\"c-muted\"> ◻ </span><span class=\"c-muted\">run the suite</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">  ❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">██████</span><span class=\"c-meta\">████</span><span class=\"c-ok\">██████</span><span class=\"c-muted\">░░░░░░░░░░</span><span class=\"c-muted\">  62%  31k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\">████</span><span class=\"c-muted\">░░░░░░</span><span class=\"c-muted\"> 4/10</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-muted\">          malachy</span><span class=\"c-muted\">   31m</span></pre>",
-      "contentDigest": "a8f1085f436e0ba76d06a7c33dfc980476d70e514652dc06a00c25be51b85348",
-      "text": "● edit(src/interaction/parser/parse.ts)\n    ⎿\n    ── src/interaction/parser/parse.ts +2 −2 ────────────────────────────────\n    ⋯ 39 unchanged lines\n    @@ -40,4 +40,4 @@\n       40     const out = [];\n       41 -   let inQuote = false;\n       41 +   let depth = 0;\n       46       if (esc) { esc = false; continue; }\n       47 -     if (ch === '\"') inQuote = !inQuote;\n       47 +     if (ch === '\"') depth += (ch === q) ? (esc ? 0 : 1) : 0;\n       48       out.push(ch);\n    ⋯ 136 unchanged lines\n   updating the tests                       12s · 1.4k tok\n  ⎿  todo  3/5\n     ◼ read the current implementation\n     ◼ find where quotes are tracked\n     ◼ add a depth counter\n      update the tests\n     ◻ run the suite\n──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ████████████████░░░░░░░░░░  62%  31k/50k   step ████░░░░░░ 4/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m",
+      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-ok\">● </span><span class=\"c-default\">edit</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">src/interaction/parser/parse.ts</span><span class=\"c-muted\">)</span>\n<span class=\"c-muted\">    ⎿</span>\n<span class=\"c-default\">    </span><span class=\"c-default\">── src/interaction/parser/parse.ts </span><span class=\"c-ok\">+2</span><span class=\"c-default\"> </span><span class=\"c-error\">−2</span><span class=\"c-default\"> </span><span class=\"c-muted\">────────────────────────────────</span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">⋯ 39 unchanged lines</span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">@@ -40,4 +40,4 @@</span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">   40   </span><span class=\"c-default\">  const out = [];                                                 </span>\n<span class=\"c-default\">    </span><span class=\"c-error bg-diffRemove\">   41 - </span><span class=\"c-default bg-diffRemove\">  let inQuote = false;                                            </span>\n<span class=\"c-default\">    </span><span class=\"c-ok bg-diffAdd\">   41 + </span><span class=\"c-default bg-diffAdd\">  let depth = 0;                                                  </span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">   46   </span><span class=\"c-default\">    if (esc) { esc = false; continue; }                           </span>\n<span class=\"c-default\">    </span><span class=\"c-error bg-diffRemove\">   47 - </span><span class=\"c-default bg-diffRemove\">    if (ch === &#x27;&quot;&#x27;) inQuote = !inQuote;                           </span>\n<span class=\"c-default\">    </span><span class=\"c-ok bg-diffAdd\">   47 + </span><span class=\"c-default bg-diffAdd\">    if (ch === &#x27;&quot;&#x27;) depth += (ch === q) ? (esc ? 0 : 1) : 0;      </span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">   48   </span><span class=\"c-default\">    out.push(ch);                                                 </span>\n<span class=\"c-default\">    </span><span class=\"c-muted\">⋯ 136 unchanged lines</span>\n<span class=\"c-default\">  </span><span class=\"c-accent sp sp-agent\"></span><span class=\"c-default\"> </span><span class=\"c-accent rmp rmp-shimmer\"><span style=\"--i:0\">u</span><span style=\"--i:1\">p</span><span style=\"--i:2\">d</span><span style=\"--i:3\">a</span><span style=\"--i:4\">t</span><span style=\"--i:5\">i</span><span style=\"--i:6\">n</span><span style=\"--i:7\">g</span><span style=\"--i:8\"> </span><span style=\"--i:9\">t</span><span style=\"--i:10\">h</span><span style=\"--i:11\">e</span><span style=\"--i:12\"> </span><span style=\"--i:13\">t</span><span style=\"--i:14\">e</span><span style=\"--i:15\">s</span><span style=\"--i:16\">t</span><span style=\"--i:17\">s</span></span><span class=\"c-default\">                       </span><span class=\"c-muted\">12s · 1.4k tok</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-muted\">todo  3/5</span>\n<span class=\"c-default\">    </span><span class=\"c-ok\"> ◼ </span><span class=\"c-muted\">read the current implementation</span>\n<span class=\"c-default\">    </span><span class=\"c-ok\"> ◼ </span><span class=\"c-muted\">find where quotes are tracked</span>\n<span class=\"c-default\">    </span><span class=\"c-ok\"> ◼ </span><span class=\"c-muted\">add a depth counter</span>\n<span class=\"c-default\">    </span> <span class=\"c-ok sp sp-agent\"></span><span class=\"c-default\"> </span><span class=\"c-ok rmp rmp-shimmer\"><span style=\"--i:0\">u</span><span style=\"--i:1\">p</span><span style=\"--i:2\">d</span><span style=\"--i:3\">a</span><span style=\"--i:4\">t</span><span style=\"--i:5\">e</span><span style=\"--i:6\"> </span><span style=\"--i:7\">t</span><span style=\"--i:8\">h</span><span style=\"--i:9\">e</span><span style=\"--i:10\"> </span><span style=\"--i:11\">t</span><span style=\"--i:12\">e</span><span style=\"--i:13\">s</span><span style=\"--i:14\">t</span><span style=\"--i:15\">s</span></span>\n<span class=\"c-default\">    </span><span class=\"c-muted\"> ◻ </span><span class=\"c-muted\">run the suite</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">  ❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">██████</span><span class=\"c-meta\">████</span><span class=\"c-ok\">██████</span><span class=\"c-muted\">░░░░░░░░░░</span><span class=\"c-muted\">  62%  31k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\">████</span><span class=\"c-muted\">░░░░░░</span><span class=\"c-muted\"> 4/10</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-muted\">          someone</span><span class=\"c-muted\">   31m</span></pre>",
+      "contentDigest": "84069e00ce9580293ce49665833bbe463ca7cbca1d9ed1b6d36463d149066cef",
+      "text": "● edit(src/interaction/parser/parse.ts)\n    ⎿\n    ── src/interaction/parser/parse.ts +2 −2 ────────────────────────────────\n    ⋯ 39 unchanged lines\n    @@ -40,4 +40,4 @@\n       40     const out = [];\n       41 -   let inQuote = false;\n       41 +   let depth = 0;\n       46       if (esc) { esc = false; continue; }\n       47 -     if (ch === '\"') inQuote = !inQuote;\n       47 +     if (ch === '\"') depth += (ch === q) ? (esc ? 0 : 1) : 0;\n       48       out.push(ch);\n    ⋯ 136 unchanged lines\n   updating the tests                       12s · 1.4k tok\n  ⎿  todo  3/5\n     ◼ read the current implementation\n     ◼ find where quotes are tracked\n     ◼ add a depth counter\n      update the tests\n     ◻ run the suite\n──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ████████████████░░░░░░░░░░  62%  31k/50k   step ████░░░░░░ 4/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          someone   31m",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
@@ -40291,9 +40404,9 @@
       "id": "R-BLK-013",
       "sectionKey": "idle-the-activity-region-and-its-rule-are-gone-004",
       "position": 6,
-      "renderHtml": "\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">  ❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">██████</span><span class=\"c-meta\">████</span><span class=\"c-ok\">█████</span><span class=\"c-muted\">░░░░░░░░░</span><span class=\"c-muted\">  62%  31k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\">████</span><span class=\"c-muted\">░░░░░░</span><span class=\"c-muted\"> 4/10</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-muted\">          malachy</span><span class=\"c-muted\">   31m</span>\n",
-      "contentDigest": "8c4efd447416f996062ca453d56122936287fa594b76a1c0c0f1e834a2501b25",
-      "text": "──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ███████████████░░░░░░░░░  62%  31k/50k   step ████░░░░░░ 4/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m",
+      "renderHtml": "\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">  ❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">██████</span><span class=\"c-meta\">████</span><span class=\"c-ok\">█████</span><span class=\"c-muted\">░░░░░░░░░</span><span class=\"c-muted\">  62%  31k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\">████</span><span class=\"c-muted\">░░░░░░</span><span class=\"c-muted\"> 4/10</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-muted\">          someone</span><span class=\"c-muted\">   31m</span>\n",
+      "contentDigest": "3a50f85a18e6bfa3140ad6beb76c58a309fc4b32574a5490d89645b2ca9ca305",
+      "text": "──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ███████████████░░░░░░░░░  62%  31k/50k   step ████░░░░░░ 4/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          someone   31m",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
@@ -40492,9 +40605,9 @@
       "id": "R-BLK-028",
       "sectionKey": "subagents-007",
       "position": 9,
-      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">█████</span><span class=\"c-meta\">███</span><span class=\"c-ok\"></span><span class=\"c-muted\">░░░░░░░░░░░░░░░░░░░░</span><span class=\"c-muted\">  30%  15k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\">██████</span><span class=\"c-muted\">░░░░</span><span class=\"c-muted\"> 6/10</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-default\">   </span><span class=\"c-accent\">⋯ 3 agents</span><span class=\"c-default\">   </span><span class=\"c-muted\">malachy</span>\n<span class=\"c-muted\">  ⋯ </span><span class=\"c-accent\">›</span><span class=\"c-dim bg-bgElev\"> main </span><span class=\"c-default\"> </span><span class=\"c-default\"> </span><span class=\"c-hi-blue bg-h-blue\"> seams </span><span class=\"c-default\"> </span><span class=\"c-muted\">2:53</span><span class=\"c-default\"> </span><span class=\"c-ok\">✓</span><span class=\"c-default\"> </span><span class=\"c-default\"> </span><span class=\"c-hi-orange bg-h-orange\"> arm </span><span class=\"c-default\"> </span><span class=\"c-muted\">3:46</span><span class=\"c-default\"> </span><span class=\"c-ok\">✓</span><span class=\"c-default\"> </span><span class=\"c-default\"> </span><span class=\"c-hi-cyan bg-h-cyan\"> count </span><span class=\"c-default\"> </span><span class=\"c-muted sp sp-braille\"></span><span class=\"c-default\"> </span><span class=\"c-accent\">4:02</span><span class=\"c-default\"> </span><span class=\"c-muted\">   ⌃⇥ switch</span>\n",
-      "contentDigest": "ea4ca5c3c0febaa1d01273d45994ccb72f40ce300c6301dcefc5b8497205ce5d",
-      "text": "» auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ████████░░░░░░░░░░░░░░░░░░░░  30%  15k/50k   step ██████░░░░ 6/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3   ⋯ 3 agents   malachy\n  ⋯ › main    seams  2:53 ✓   arm  3:46 ✓   count   4:02    ⌃⇥ switch",
+      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">█████</span><span class=\"c-meta\">███</span><span class=\"c-ok\"></span><span class=\"c-muted\">░░░░░░░░░░░░░░░░░░░░</span><span class=\"c-muted\">  30%  15k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\">██████</span><span class=\"c-muted\">░░░░</span><span class=\"c-muted\"> 6/10</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-default\">   </span><span class=\"c-accent\">⋯ 3 agents</span><span class=\"c-default\">   </span><span class=\"c-muted\">someone</span>\n<span class=\"c-muted\">  ⋯ </span><span class=\"c-accent\">›</span><span class=\"c-dim bg-bgElev\"> main </span><span class=\"c-default\"> </span><span class=\"c-default\"> </span><span class=\"c-hi-blue bg-h-blue\"> seams </span><span class=\"c-default\"> </span><span class=\"c-muted\">2:53</span><span class=\"c-default\"> </span><span class=\"c-ok\">✓</span><span class=\"c-default\"> </span><span class=\"c-default\"> </span><span class=\"c-hi-orange bg-h-orange\"> arm </span><span class=\"c-default\"> </span><span class=\"c-muted\">3:46</span><span class=\"c-default\"> </span><span class=\"c-ok\">✓</span><span class=\"c-default\"> </span><span class=\"c-default\"> </span><span class=\"c-hi-cyan bg-h-cyan\"> count </span><span class=\"c-default\"> </span><span class=\"c-muted sp sp-braille\"></span><span class=\"c-default\"> </span><span class=\"c-accent\">4:02</span><span class=\"c-default\"> </span><span class=\"c-muted\">   ⌃⇥ switch</span>\n",
+      "contentDigest": "1ac558c763248b71383378a9c921fd1bbbd6ceee61ce8d0204edb603cf0384a8",
+      "text": "» auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ████████░░░░░░░░░░░░░░░░░░░░  30%  15k/50k   step ██████░░░░ 6/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3   ⋯ 3 agents   someone\n  ⋯ › main    seams  2:53 ✓   arm  3:46 ✓   count   4:02    ⌃⇥ switch",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
@@ -40544,9 +40657,9 @@
       "id": "R-BLK-949",
       "sectionKey": "subagents-007",
       "position": 13,
-      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-hi-cyan bg-h-cyan\"> calcium/count </span><span class=\"c-default\">  verify the refusal count</span><span class=\"c-meta\">    ✦ qwen3-coder-next</span><span class=\"c-muted\">  22:19</span>\n<span class=\"c-muted\">  </span><span class=\"c-h-cyan\">────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default bg-bgElev\"> ❯ count the refusals three ways and compare                                  </span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">  </span><span class=\"c-default\">● </span><span class=\"c-default\">I&#x27;ll grep the prose, the register and the roadmap separately.</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">  </span><span class=\"c-ok\">● </span><span class=\"c-default\">search</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">&quot;refus&quot;</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">1.2s</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">1,204 matches</span>\n<span class=\"c-muted\">    ⎿  </span><span class=\"c-muted\">+1,204 more</span><span class=\"c-muted\"> · </span><span class=\"c-h-cyan\">⏎</span><span class=\"c-muted\"> expand</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">  </span><span class=\"c-h-cyan sp sp-agent\"></span><span class=\"c-default\">  </span><span class=\"c-h-cyan rmp rmp-scatter\"><span style=\"--i:0\">c</span><span style=\"--i:1\">r</span><span style=\"--i:2\">o</span><span style=\"--i:3\">s</span><span style=\"--i:4\">s</span><span style=\"--i:5\">-</span><span style=\"--i:6\">c</span><span style=\"--i:7\">h</span><span style=\"--i:8\">e</span><span style=\"--i:9\">c</span><span style=\"--i:10\">k</span><span style=\"--i:11\">i</span><span style=\"--i:12\">n</span><span style=\"--i:13\">g</span><span style=\"--i:14\"> </span><span style=\"--i:15\">t</span><span style=\"--i:16\">h</span><span style=\"--i:17\">e</span><span style=\"--i:18\"> </span><span style=\"--i:19\">r</span><span style=\"--i:20\">e</span><span style=\"--i:21\">g</span><span style=\"--i:22\">i</span><span style=\"--i:23\">s</span><span style=\"--i:24\">t</span><span style=\"--i:25\">e</span><span style=\"--i:26\">r</span></span><span class=\"c-default\">  </span><span class=\"c-muted\">4m 02s · 46k tok</span>\n<span class=\"c-default\">  </span><span class=\"c-h-cyan\">──────────────────────────────────────────────────────</span><span class=\"c-hi-cyan bg-h-cyan\"> calcium/count </span><span class=\"c-h-cyan\">─</span>\n<span class=\"c-muted\">  ❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-default\">  </span><span class=\"c-h-cyan\">────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">██████</span><span class=\"c-meta\">████</span><span class=\"c-ok\">████████████</span><span class=\"c-muted\">░░</span><span class=\"c-muted\">  92%  46k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\">█████████</span><span class=\"c-muted\">░</span><span class=\"c-muted\"> 18/20</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-muted\">          malachy</span><span class=\"c-muted\">   31m</span>\n<span class=\"c-muted\">  ⋯ </span><span class=\"c-default\"> </span><span class=\"c-dim bg-bgElev\"> main </span><span class=\"c-default\"> </span><span class=\"c-default\"> </span><span class=\"c-hi-blue bg-h-blue\"> seams </span><span class=\"c-default\"> </span><span class=\"c-muted\">2:53</span><span class=\"c-default\"> </span><span class=\"c-ok\">✓</span><span class=\"c-default\"> </span><span class=\"c-default\"> </span><span class=\"c-hi-orange bg-h-orange\"> arm </span><span class=\"c-default\"> </span><span class=\"c-muted\">3:46</span><span class=\"c-default\"> </span><span class=\"c-ok\">✓</span><span class=\"c-default\"> </span><span class=\"c-accent\">›</span><span class=\"c-hi-cyan bg-h-cyan\"> count </span><span class=\"c-default\"> </span><span class=\"c-muted sp sp-braille\"></span><span class=\"c-default\"> </span><span class=\"c-accent\">4:02</span><span class=\"c-default\"> </span><span class=\"c-muted\">   ⌃⇥ switch</span>\n",
-      "contentDigest": "748b3eb315ac29b154966b630412666c3e472082803c8f4cdad96fcf9ebd0446",
-      "text": "calcium/count   verify the refusal count    ✦ qwen3-coder-next  22:19\n  ────────────────────────────────────────────────────────────────────────────\n\n ❯ count the refusals three ways and compare\n\n  ● I'll grep the prose, the register and the roadmap separately.\n\n  ● search(\"refus\") · 1.2s · 1,204 matches\n    ⎿  +1,204 more · ⏎ expand\n\n    cross-checking the register  4m 02s · 46k tok\n  ────────────────────────────────────────────────────── calcium/count ─\n  ❯ ▌\n  ────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ██████████████████████░░  92%  46k/50k   step █████████░ 18/20   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m\n  ⋯   main    seams  2:53 ✓   arm  3:46 ✓ › count   4:02    ⌃⇥ switch",
+      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-hi-cyan bg-h-cyan\"> calcium/count </span><span class=\"c-default\">  verify the refusal count</span><span class=\"c-meta\">    ✦ qwen3-coder-next</span><span class=\"c-muted\">  22:19</span>\n<span class=\"c-muted\">  </span><span class=\"c-h-cyan\">────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default bg-bgElev\"> ❯ count the refusals three ways and compare                                  </span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">  </span><span class=\"c-default\">● </span><span class=\"c-default\">I&#x27;ll grep the prose, the register and the roadmap separately.</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">  </span><span class=\"c-ok\">● </span><span class=\"c-default\">search</span><span class=\"c-muted\">(</span><span class=\"c-identifier\">&quot;refus&quot;</span><span class=\"c-muted\">)</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">1.2s</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">1,204 matches</span>\n<span class=\"c-muted\">    ⎿  </span><span class=\"c-muted\">+1,204 more</span><span class=\"c-muted\"> · </span><span class=\"c-h-cyan\">⏎</span><span class=\"c-muted\"> expand</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">  </span><span class=\"c-h-cyan sp sp-agent\"></span><span class=\"c-default\">  </span><span class=\"c-h-cyan rmp rmp-scatter\"><span style=\"--i:0\">c</span><span style=\"--i:1\">r</span><span style=\"--i:2\">o</span><span style=\"--i:3\">s</span><span style=\"--i:4\">s</span><span style=\"--i:5\">-</span><span style=\"--i:6\">c</span><span style=\"--i:7\">h</span><span style=\"--i:8\">e</span><span style=\"--i:9\">c</span><span style=\"--i:10\">k</span><span style=\"--i:11\">i</span><span style=\"--i:12\">n</span><span style=\"--i:13\">g</span><span style=\"--i:14\"> </span><span style=\"--i:15\">t</span><span style=\"--i:16\">h</span><span style=\"--i:17\">e</span><span style=\"--i:18\"> </span><span style=\"--i:19\">r</span><span style=\"--i:20\">e</span><span style=\"--i:21\">g</span><span style=\"--i:22\">i</span><span style=\"--i:23\">s</span><span style=\"--i:24\">t</span><span style=\"--i:25\">e</span><span style=\"--i:26\">r</span></span><span class=\"c-default\">  </span><span class=\"c-muted\">4m 02s · 46k tok</span>\n<span class=\"c-default\">  </span><span class=\"c-h-cyan\">──────────────────────────────────────────────────────</span><span class=\"c-hi-cyan bg-h-cyan\"> calcium/count </span><span class=\"c-h-cyan\">─</span>\n<span class=\"c-muted\">  ❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-default\">  </span><span class=\"c-h-cyan\">────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">██████</span><span class=\"c-meta\">████</span><span class=\"c-ok\">████████████</span><span class=\"c-muted\">░░</span><span class=\"c-muted\">  92%  46k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\">█████████</span><span class=\"c-muted\">░</span><span class=\"c-muted\"> 18/20</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-muted\">          someone</span><span class=\"c-muted\">   31m</span>\n<span class=\"c-muted\">  ⋯ </span><span class=\"c-default\"> </span><span class=\"c-dim bg-bgElev\"> main </span><span class=\"c-default\"> </span><span class=\"c-default\"> </span><span class=\"c-hi-blue bg-h-blue\"> seams </span><span class=\"c-default\"> </span><span class=\"c-muted\">2:53</span><span class=\"c-default\"> </span><span class=\"c-ok\">✓</span><span class=\"c-default\"> </span><span class=\"c-default\"> </span><span class=\"c-hi-orange bg-h-orange\"> arm </span><span class=\"c-default\"> </span><span class=\"c-muted\">3:46</span><span class=\"c-default\"> </span><span class=\"c-ok\">✓</span><span class=\"c-default\"> </span><span class=\"c-accent\">›</span><span class=\"c-hi-cyan bg-h-cyan\"> count </span><span class=\"c-default\"> </span><span class=\"c-muted sp sp-braille\"></span><span class=\"c-default\"> </span><span class=\"c-accent\">4:02</span><span class=\"c-default\"> </span><span class=\"c-muted\">   ⌃⇥ switch</span>\n",
+      "contentDigest": "ad11bb4748f4525112fb95c11e710baf24457580b679f5ff636aa26532385951",
+      "text": "calcium/count   verify the refusal count    ✦ qwen3-coder-next  22:19\n  ────────────────────────────────────────────────────────────────────────────\n\n ❯ count the refusals three ways and compare\n\n  ● I'll grep the prose, the register and the roadmap separately.\n\n  ● search(\"refus\") · 1.2s · 1,204 matches\n    ⎿  +1,204 more · ⏎ expand\n\n    cross-checking the register  4m 02s · 46k tok\n  ────────────────────────────────────────────────────── calcium/count ─\n  ❯ ▌\n  ────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ██████████████████████░░  92%  46k/50k   step █████████░ 18/20   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          someone   31m\n  ⋯   main    seams  2:53 ✓   arm  3:46 ✓ › count   4:02    ⌃⇥ switch",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
@@ -44292,9 +44405,9 @@
       "id": "R-BLK-319",
       "sectionKey": "history-search-and-ghost-text-046",
       "position": 5,
-      "renderHtml": "\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\"> ⌥r </span><span class=\"c-muted\">reverse search</span><span class=\"c-default\">      </span><span class=\"c-muted\">3 of 214</span><span class=\"c-default\">                                              </span>\n<span class=\"c-pickInk bold bg-pick\"> › </span><span class=\"c-pickInk bold bg-pick\">/promote </span><span class=\"c-pickInk bold bg-pick\">a3f9b21</span><span class=\"c-pickInk bold bg-pick\"> --open-mr </span><span class=\"c-default\">                                                </span>\n<span class=\"c-default\">   </span><span class=\"c-default\">/diff </span><span class=\"c-accent bold\">a3f9b21</span><span class=\"c-default\"> 7c2d4e1</span><span class=\"c-default\">                                                      </span>\n<span class=\"c-default\">   </span><span class=\"c-default\">/ps --owner=malachy --since=</span><span class=\"c-accent bold\">a3f9b21</span><span class=\"c-default\">                                        </span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">❯ </span><span class=\"c-default\">a3f9b21</span><span class=\"c-default cur-solid\">▌</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">⌥r older   ⌥s newer   ⏎ accept   esc cancel</span>\n",
-      "contentDigest": "5bd70a7247db118c599133c8f9e94572eb483cac6f2f49167794a7c2c8f52b64",
-      "text": "──────────────────────────────────────────────────────────────────────────────\n ⌥r reverse search      3 of 214\n › /promote a3f9b21 --open-mr\n   /diff a3f9b21 7c2d4e1\n   /ps --owner=malachy --since=a3f9b21\n──────────────────────────────────────────────────────────────────────────────\n❯ a3f9b21▌\n──────────────────────────────────────────────────────────────────────────────\n⌥r older   ⌥s newer   ⏎ accept   esc cancel",
+      "renderHtml": "\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\"> ⌥r </span><span class=\"c-muted\">reverse search</span><span class=\"c-default\">      </span><span class=\"c-muted\">3 of 214</span><span class=\"c-default\">                                              </span>\n<span class=\"c-pickInk bold bg-pick\"> › </span><span class=\"c-pickInk bold bg-pick\">/promote </span><span class=\"c-pickInk bold bg-pick\">a3f9b21</span><span class=\"c-pickInk bold bg-pick\"> --open-mr </span><span class=\"c-default\">                                                </span>\n<span class=\"c-default\">   </span><span class=\"c-default\">/diff </span><span class=\"c-accent bold\">a3f9b21</span><span class=\"c-default\"> 7c2d4e1</span><span class=\"c-default\">                                                      </span>\n<span class=\"c-default\">   </span><span class=\"c-default\">/ps --owner=someone --since=</span><span class=\"c-accent bold\">a3f9b21</span><span class=\"c-default\">                                        </span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">❯ </span><span class=\"c-default\">a3f9b21</span><span class=\"c-default cur-solid\">▌</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">⌥r older   ⌥s newer   ⏎ accept   esc cancel</span>\n",
+      "contentDigest": "9e062c6ca9e03063ca49f3283a54dcfd5ee9b4d94c57ab6ee5a434d55cb7830a",
+      "text": "──────────────────────────────────────────────────────────────────────────────\n ⌥r reverse search      3 of 214\n › /promote a3f9b21 --open-mr\n   /diff a3f9b21 7c2d4e1\n   /ps --owner=someone --since=a3f9b21\n──────────────────────────────────────────────────────────────────────────────\n❯ a3f9b21▌\n──────────────────────────────────────────────────────────────────────────────\n⌥r older   ⌥s newer   ⏎ accept   esc cancel",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
@@ -45097,9 +45210,9 @@
       "id": "R-BLK-380",
       "sectionKey": "links-054",
       "position": 11,
-      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-muted\">a URL asks because it leaves the machine — and a model that wrote</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">the link is not the reader who is about to follow it:</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-warn\"> ⟩ </span><span class=\"c-default\">Open this link?</span><span class=\"c-default\">                                                            </span>\n<span class=\"c-default\"> </span><span class=\"c-identifier\">https://docs.internal.fmx.io/runbooks/parser</span><span class=\"c-default\">                                 </span>\n<span class=\"c-default\"></span><span class=\"c-default\">                                                                              </span>\n<span class=\"c-default\"> </span><span class=\"c-pickInk bold bg-pick\"> › no </span><span class=\"c-default\">  </span><span class=\"c-default bg-bgElev\"> open </span><span class=\"c-default\">  </span><span class=\"c-default bg-bgElev\"> copy it instead </span><span class=\"c-default\">  </span><span class=\"c-default\">                                          </span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">←→ move     ⏎ answer   esc cancels</span>\n",
-      "contentDigest": "f2c99ae309f507446451af17cce6d663c937ee6a40c9deeedf5417a43f91ea8d",
-      "text": "a URL asks because it leaves the machine — and a model that wrote\n  the link is not the reader who is about to follow it:\n\n──────────────────────────────────────────────────────────────────────────────\n ⟩ Open this link?\n https://docs.internal.fmx.io/runbooks/parser\n\n  › no    open    copy it instead\n──────────────────────────────────────────────────────────────────────────────\n←→ move     ⏎ answer   esc cancels",
+      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-muted\">a URL asks because it leaves the machine — and a model that wrote</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">the link is not the reader who is about to follow it:</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-warn\"> ⟩ </span><span class=\"c-default\">Open this link?</span><span class=\"c-default\">                                                            </span>\n<span class=\"c-default\"> </span><span class=\"c-identifier\">https://docs.internal.example.com/runbooks/parser</span><span class=\"c-default\">                                 </span>\n<span class=\"c-default\"></span><span class=\"c-default\">                                                                              </span>\n<span class=\"c-default\"> </span><span class=\"c-pickInk bold bg-pick\"> › no </span><span class=\"c-default\">  </span><span class=\"c-default bg-bgElev\"> open </span><span class=\"c-default\">  </span><span class=\"c-default bg-bgElev\"> copy it instead </span><span class=\"c-default\">  </span><span class=\"c-default\">                                          </span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">←→ move     ⏎ answer   esc cancels</span>\n",
+      "contentDigest": "cf53778525bded230e35e21d0d60d0004819e22a1f1171603d345d7fc58970e6",
+      "text": "a URL asks because it leaves the machine — and a model that wrote\n  the link is not the reader who is about to follow it:\n\n──────────────────────────────────────────────────────────────────────────────\n ⟩ Open this link?\n https://docs.internal.example.com/runbooks/parser\n\n  › no    open    copy it instead\n──────────────────────────────────────────────────────────────────────────────\n←→ move     ⏎ answer   esc cancels",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
@@ -46461,9 +46574,9 @@
       "id": "R-BLK-965",
       "sectionKey": "scrolled-back-while-a-turn-runs-067",
       "position": 4,
-      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-accent sp sp-agent\"></span><span class=\"c-default\">  </span><span class=\"c-accent rmp rmp-chase\"><span style=\"--i:0\">e</span><span style=\"--i:1\">d</span><span style=\"--i:2\">i</span><span style=\"--i:3\">t</span><span style=\"--i:4\">i</span><span style=\"--i:5\">n</span><span style=\"--i:6\">g</span><span style=\"--i:7\"> </span><span style=\"--i:8\">p</span><span style=\"--i:9\">a</span><span style=\"--i:10\">r</span><span style=\"--i:11\">s</span><span style=\"--i:12\">e</span><span style=\"--i:13\">.</span><span style=\"--i:14\">t</span><span style=\"--i:15\">s</span></span><span class=\"c-default\">  </span><span class=\"c-muted\">41s · 3.2k tok</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-muted\">todo  4/5  ·  </span><span class=\"c-muted\">◻ </span><span class=\"c-muted\">run the suite</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">  </span><span class=\"c-default bg-bgElev\"> ↓ 3 new messages </span><span class=\"c-muted bg-bgElev\">⏎ </span><span class=\"c-default\"> </span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">  ❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">██████</span><span class=\"c-meta\">████</span><span class=\"c-ok\">█████████</span><span class=\"c-muted\">░░░░░</span><span class=\"c-muted\">  78%  39k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\">███████</span><span class=\"c-muted\">░░░</span><span class=\"c-muted\"> 7/10</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-muted\">          malachy</span><span class=\"c-muted\">   31m</span>\n",
-      "contentDigest": "3cf432708c75fe67154f40225bafcf0043264ffcd9e38b6fd31a604df460ad19",
-      "text": "editing parse.ts  41s · 3.2k tok\n  ⎿  todo  4/5  ·  ◻ run the suite\n\n   ↓ 3 new messages ⏎\n──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ███████████████████░░░░░  78%  39k/50k   step ███████░░░ 7/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m",
+      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-accent sp sp-agent\"></span><span class=\"c-default\">  </span><span class=\"c-accent rmp rmp-chase\"><span style=\"--i:0\">e</span><span style=\"--i:1\">d</span><span style=\"--i:2\">i</span><span style=\"--i:3\">t</span><span style=\"--i:4\">i</span><span style=\"--i:5\">n</span><span style=\"--i:6\">g</span><span style=\"--i:7\"> </span><span style=\"--i:8\">p</span><span style=\"--i:9\">a</span><span style=\"--i:10\">r</span><span style=\"--i:11\">s</span><span style=\"--i:12\">e</span><span style=\"--i:13\">.</span><span style=\"--i:14\">t</span><span style=\"--i:15\">s</span></span><span class=\"c-default\">  </span><span class=\"c-muted\">41s · 3.2k tok</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-muted\">todo  4/5  ·  </span><span class=\"c-muted\">◻ </span><span class=\"c-muted\">run the suite</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">  </span><span class=\"c-default bg-bgElev\"> ↓ 3 new messages </span><span class=\"c-muted bg-bgElev\">⏎ </span><span class=\"c-default\"> </span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">  ❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">██████</span><span class=\"c-meta\">████</span><span class=\"c-ok\">█████████</span><span class=\"c-muted\">░░░░░</span><span class=\"c-muted\">  78%  39k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\">███████</span><span class=\"c-muted\">░░░</span><span class=\"c-muted\"> 7/10</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-muted\">          someone</span><span class=\"c-muted\">   31m</span>\n",
+      "contentDigest": "ea112b500d88232d711ff8c6afb83bf885b437a86fdf8ec6b6490729b1e7aae9",
+      "text": "editing parse.ts  41s · 3.2k tok\n  ⎿  todo  4/5  ·  ◻ run the suite\n\n   ↓ 3 new messages ⏎\n──────────────────────────────────────────────────────────────────────────────\n  ❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n  » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ███████████████████░░░░░  78%  39k/50k   step ███████░░░ 7/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          someone   31m",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
@@ -46516,9 +46629,9 @@
       "id": "R-BLK-488",
       "sectionKey": "scrolled-back-while-a-turn-runs-067",
       "position": 8,
-      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">██████</span><span class=\"c-meta\">████</span><span class=\"c-ok\">█████████</span><span class=\"c-muted\">░░░░░</span><span class=\"c-muted\">  78%  39k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\">███████</span><span class=\"c-muted\">░░░</span><span class=\"c-muted\"> 7/10</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-muted\">          malachy</span><span class=\"c-muted\">   31m</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">the STEP count says how far through, the CONTEXT bar says how full,</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">the TOKEN rate says it is still producing. Three live numbers, in</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">the one place this document already puts live state.</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">a fourth copy of what the agent is doing, pinned above the prompt,</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">would be the activity line said twice — and the second one could not</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">be scrolled to, copied, or expanded.</span>\n",
-      "contentDigest": "9ea3206cf2fe9a39aa01c198589f0ad33b61c2d9619e9be4e444b73d38644b8c",
-      "text": "» auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ███████████████████░░░░░  78%  39k/50k   step ███████░░░ 7/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m\n  the STEP count says how far through, the CONTEXT bar says how full,\n  the TOKEN rate says it is still producing. Three live numbers, in\n  the one place this document already puts live state.\n\n  a fourth copy of what the agent is doing, pinned above the prompt,\n  would be the activity line said twice — and the second one could not\n  be scrolled to, copied, or expanded.",
+      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">██████</span><span class=\"c-meta\">████</span><span class=\"c-ok\">█████████</span><span class=\"c-muted\">░░░░░</span><span class=\"c-muted\">  78%  39k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\">███████</span><span class=\"c-muted\">░░░</span><span class=\"c-muted\"> 7/10</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-muted\">          someone</span><span class=\"c-muted\">   31m</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">the STEP count says how far through, the CONTEXT bar says how full,</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">the TOKEN rate says it is still producing. Three live numbers, in</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">the one place this document already puts live state.</span>\n<span class=\"c-default\">  </span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">a fourth copy of what the agent is doing, pinned above the prompt,</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">would be the activity line said twice — and the second one could not</span>\n<span class=\"c-default\">  </span><span class=\"c-muted\">be scrolled to, copied, or expanded.</span>\n",
+      "contentDigest": "7162bd891c71b21e00c61e1d0d7623cc9d1ba2ea69d2fa15f15531b4967ed418",
+      "text": "» auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ███████████████████░░░░░  78%  39k/50k   step ███████░░░ 7/10   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          someone   31m\n  the STEP count says how far through, the CONTEXT bar says how full,\n  the TOKEN rate says it is still producing. Three live numbers, in\n  the one place this document already puts live state.\n\n  a fourth copy of what the agent is doing, pinned above the prompt,\n  would be the activity line said twice — and the second one could not\n  be scrolled to, copied, or expanded.",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
@@ -48459,9 +48572,9 @@
       "id": "R-BLK-637",
       "sectionKey": "prism-ps-081",
       "position": 3,
-      "renderHtml": "\n<span class=\"c-default bg-bgElev\"> ❯ /ps --mine --since 24h                                                     </span>\n<span class=\"c-default\"> </span>\n<span class=\"c-ok\">● </span><span class=\"c-default\">ps</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">0.3s</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">4 of 11</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-muted bold bg-bgElev\"> uuid     family            status      metric </span><span class=\"c-accent bold bg-bgElev\">▾</span><span class=\"c-muted bold bg-bgElev\">   age  owner </span>\n<span class=\"c-muted\">    </span><span class=\"c-pickInk bold bg-pick\">▸ </span><span class=\"c-pickInk bold bg-pick\">a3f9b21  digit-classifier  </span><span class=\"c-pickInk bold bg-pick\">running</span><span class=\"c-pickInk bold bg-pick\">     0.0372    23m  malachy </span>\n<span class=\"c-muted\">    </span><span class=\"c-default\">  7c2d4e1  decoder-zoom      </span><span class=\"c-muted\">succeeded</span><span class=\"c-default\">   0.0089    41m  malachy </span>\n<span class=\"c-muted\">    </span><span class=\"c-default\">  2e8a04c  graphsage         </span><span class=\"c-error\">failed</span><span class=\"c-default\">           —   1h12m  priya   </span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\">  f410d99  flow-predictor    </span><span class=\"c-muted\">queued</span><span class=\"c-muted\">            —      3m  malachy </span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\">  +7 more</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">sorted by metric</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">↑↓ rows   ⏎ open the run   ⌃⇧C copy the values   esc back</span>\n",
-      "contentDigest": "f53f14215dd9ceb16f86d39cc03e47d415891f1cf8ea2010befd17779ff7f7db",
-      "text": "❯ /ps --mine --since 24h\n\n● ps · 0.3s · 4 of 11\n  ⎿  uuid     family            status      metric ▾   age  owner\n    ▸ a3f9b21  digit-classifier  running     0.0372    23m  malachy\n      7c2d4e1  decoder-zoom      succeeded   0.0089    41m  malachy\n      2e8a04c  graphsage         failed           —   1h12m  priya\n      f410d99  flow-predictor    queued            —      3m  malachy\n      +7 more · sorted by metric\n\n──────────────────────────────────────────────────────────────────────────────\n❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n↑↓ rows   ⏎ open the run   ⌃⇧C copy the values   esc back",
+      "renderHtml": "\n<span class=\"c-default bg-bgElev\"> ❯ /ps --mine --since 24h                                                     </span>\n<span class=\"c-default\"> </span>\n<span class=\"c-ok\">● </span><span class=\"c-default\">ps</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">0.3s</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">4 of 11</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-muted bold bg-bgElev\"> uuid     family            status      metric </span><span class=\"c-accent bold bg-bgElev\">▾</span><span class=\"c-muted bold bg-bgElev\">   age  owner </span>\n<span class=\"c-muted\">    </span><span class=\"c-pickInk bold bg-pick\">▸ </span><span class=\"c-pickInk bold bg-pick\">a3f9b21  digit-classifier  </span><span class=\"c-pickInk bold bg-pick\">running</span><span class=\"c-pickInk bold bg-pick\">     0.0372    23m  someone </span>\n<span class=\"c-muted\">    </span><span class=\"c-default\">  7c2d4e1  decoder-zoom      </span><span class=\"c-muted\">succeeded</span><span class=\"c-default\">   0.0089    41m  someone </span>\n<span class=\"c-muted\">    </span><span class=\"c-default\">  2e8a04c  graphsage         </span><span class=\"c-error\">failed</span><span class=\"c-default\">           —   1h12m  priya   </span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\">  f410d99  flow-predictor    </span><span class=\"c-muted\">queued</span><span class=\"c-muted\">            —      3m  someone </span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\">  +7 more</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">sorted by metric</span>\n<span class=\"c-default\"> </span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">❯ </span><span class=\"c-default cur-blink\">▌</span>\n<span class=\"c-muted\">──────────────────────────────────────────────────────────────────────────────</span>\n<span class=\"c-muted\">↑↓ rows   ⏎ open the run   ⌃⇧C copy the values   esc back</span>\n",
+      "contentDigest": "4499c576b010ec2a882d886f64a03ebcf852489407c1bf87295097e3b65e2970",
+      "text": "❯ /ps --mine --since 24h\n\n● ps · 0.3s · 4 of 11\n  ⎿  uuid     family            status      metric ▾   age  owner\n    ▸ a3f9b21  digit-classifier  running     0.0372    23m  someone\n      7c2d4e1  decoder-zoom      succeeded   0.0089    41m  someone\n      2e8a04c  graphsage         failed           —   1h12m  priya\n      f410d99  flow-predictor    queued            —      3m  someone\n      +7 more · sorted by metric\n\n──────────────────────────────────────────────────────────────────────────────\n❯ ▌\n──────────────────────────────────────────────────────────────────────────────\n↑↓ rows   ⏎ open the run   ⌃⇧C copy the values   esc back",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
@@ -48628,9 +48741,9 @@
       "id": "R-BLK-941",
       "sectionKey": "no-pushed-views-082",
       "position": 11,
-      "renderHtml": "\n<span class=\"c-ok\">● </span><span class=\"c-default\">ps</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">0.3s</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">2 of 11</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-muted bold bg-bgElev\"> uuid     family            status      metric   age </span>\n<span class=\"c-muted\">    </span><span class=\"c-accent bg-focusGround\">▸ </span><span class=\"c-default bg-focusGround\">▿ a3f9b21  digit-classifier  </span><span class=\"c-accent bg-focusGround\">running</span><span class=\"c-default bg-focusGround\">     0.0372   23m </span>\n<span class=\"c-muted\">    </span><span class=\"c-default bg-bgElev\">    </span><span class=\"c-muted bg-bgElev\">node   </span><span class=\"c-identifier bg-bgElev\">gpu-04.fmx.internal</span><span class=\"c-muted bg-bgElev\"> · 2×A100 · 16GiB      </span>\n<span class=\"c-muted\">    </span><span class=\"c-default bg-bgElev\">    </span><span class=\"c-muted bg-bgElev\">mr     </span><span class=\"c-identifier ul bg-bgElev\">!1248</span><span class=\"c-muted bg-bgElev\">  auto-merged                      </span>\n<span class=\"c-muted\">    </span><span class=\"c-default bg-bgElev\">    </span><span class=\"c-accent bg-bgElev\">██████████</span><span class=\"c-muted bg-bgElev\">░░░░░░░░░░░░░░</span><span class=\"c-muted bg-bgElev\">  43%  ep 17/40  ~18m    </span>\n<span class=\"c-muted\">    </span><span class=\"c-default bg-bgElev\">    </span><span class=\"c-accent bg-bgElev\">≡</span><span class=\"c-muted bg-bgElev\"> logs  </span><span class=\"c-accent bg-bgElev\">⚡</span><span class=\"c-muted bg-bgElev\"> events  </span><span class=\"c-accent bg-bgElev\">⊘</span><span class=\"c-muted bg-bgElev\"> cancel  </span><span class=\"c-accent bg-bgElev\">{ }</span><span class=\"c-muted bg-bgElev\"> json           </span>\n<span class=\"c-muted\">    </span><span class=\"c-default\">  7c2d4e1  decoder-zoom      </span><span class=\"c-muted\">succeeded</span><span class=\"c-default\">   0.0089   41m </span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\">  +9 more</span>\n",
-      "contentDigest": "f0840f5f18e2f2cecc235c3595397e1a615eb1bb35a6593d44c4d99a91fab1a9",
-      "text": "● ps · 0.3s · 2 of 11\n  ⎿  uuid     family            status      metric   age\n    ▸ ▿ a3f9b21  digit-classifier  running     0.0372   23m\n        node   gpu-04.fmx.internal · 2×A100 · 16GiB\n        mr     !1248  auto-merged\n        ██████████░░░░░░░░░░░░░░  43%  ep 17/40  ~18m\n        ≡ logs  ⚡ events  ⊘ cancel  { } json\n      7c2d4e1  decoder-zoom      succeeded   0.0089   41m\n      +9 more",
+      "renderHtml": "\n<span class=\"c-ok\">● </span><span class=\"c-default\">ps</span><span class=\"c-muted\"> · </span><span class=\"c-muted\">0.3s</span><span class=\"c-muted\"> · </span><span class=\"c-ok\">2 of 11</span>\n<span class=\"c-muted\">  ⎿ </span><span class=\"c-muted bold bg-bgElev\"> uuid     family            status      metric   age </span>\n<span class=\"c-muted\">    </span><span class=\"c-accent bg-focusGround\">▸ </span><span class=\"c-default bg-focusGround\">▿ a3f9b21  digit-classifier  </span><span class=\"c-accent bg-focusGround\">running</span><span class=\"c-default bg-focusGround\">     0.0372   23m </span>\n<span class=\"c-muted\">    </span><span class=\"c-default bg-bgElev\">    </span><span class=\"c-muted bg-bgElev\">node   </span><span class=\"c-identifier bg-bgElev\">gpu-04.example.internal</span><span class=\"c-muted bg-bgElev\"> · 2×A100 · 16GiB      </span>\n<span class=\"c-muted\">    </span><span class=\"c-default bg-bgElev\">    </span><span class=\"c-muted bg-bgElev\">mr     </span><span class=\"c-identifier ul bg-bgElev\">!1248</span><span class=\"c-muted bg-bgElev\">  auto-merged                      </span>\n<span class=\"c-muted\">    </span><span class=\"c-default bg-bgElev\">    </span><span class=\"c-accent bg-bgElev\">██████████</span><span class=\"c-muted bg-bgElev\">░░░░░░░░░░░░░░</span><span class=\"c-muted bg-bgElev\">  43%  ep 17/40  ~18m    </span>\n<span class=\"c-muted\">    </span><span class=\"c-default bg-bgElev\">    </span><span class=\"c-accent bg-bgElev\">≡</span><span class=\"c-muted bg-bgElev\"> logs  </span><span class=\"c-accent bg-bgElev\">⚡</span><span class=\"c-muted bg-bgElev\"> events  </span><span class=\"c-accent bg-bgElev\">⊘</span><span class=\"c-muted bg-bgElev\"> cancel  </span><span class=\"c-accent bg-bgElev\">{ }</span><span class=\"c-muted bg-bgElev\"> json           </span>\n<span class=\"c-muted\">    </span><span class=\"c-default\">  7c2d4e1  decoder-zoom      </span><span class=\"c-muted\">succeeded</span><span class=\"c-default\">   0.0089   41m </span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\">  +9 more</span>\n",
+      "contentDigest": "004497a213d77993fdc89f4574e75c73c867d4819d5ef9b21f536adf13f54146",
+      "text": "● ps · 0.3s · 2 of 11\n  ⎿  uuid     family            status      metric   age\n    ▸ ▿ a3f9b21  digit-classifier  running     0.0372   23m\n        node   gpu-04.example.internal · 2×A100 · 16GiB\n        mr     !1248  auto-merged\n        ██████████░░░░░░░░░░░░░░  43%  ep 17/40  ~18m\n        ≡ logs  ⚡ events  ⊘ cancel  { } json\n      7c2d4e1  decoder-zoom      succeeded   0.0089   41m\n      +9 more",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
@@ -48680,9 +48793,9 @@
       "id": "R-BLK-968",
       "sectionKey": "prism-submit-083",
       "position": 2,
-      "renderHtml": "\n<span class=\"c-default bg-bgElev\"> ❯ /submit fmx_models.jobs.training:job                                       </span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">● </span><span class=\"c-default\">submit</span><span class=\"c-muted\"> · </span><span class=\"c-muted sp sp-braille\"></span><span class=\"c-muted\"> 4s</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-ok\">✓ </span><span class=\"c-default\">clean working tree</span><span class=\"c-default\">              </span><span class=\"c-muted\">HEAD a3f9b21</span>\n<span class=\"c-muted\">    </span><span class=\"c-ok\"> ✓ </span><span class=\"c-default\">tier-1 rules</span><span class=\"c-default\">                    </span><span class=\"c-muted\">22 rules · 0 errors</span>\n<span class=\"c-muted\">    </span> <span class=\"c-accent sp sp-triangle\"></span><span class=\"c-default\"> </span><span class=\"c-accent rmp rmp-shimmer\"><span style=\"--i:0\">g</span><span style=\"--i:1\">e</span><span style=\"--i:2\">n</span><span style=\"--i:3\">e</span><span style=\"--i:4\">r</span><span style=\"--i:5\">a</span><span style=\"--i:6\">t</span><span style=\"--i:7\">i</span><span style=\"--i:8\">n</span><span style=\"--i:9\">g</span><span style=\"--i:10\"> </span><span style=\"--i:11\">m</span><span style=\"--i:12\">a</span><span style=\"--i:13\">n</span><span style=\"--i:14\">i</span><span style=\"--i:15\">f</span><span style=\"--i:16\">e</span><span style=\"--i:17\">s</span><span style=\"--i:18\">t</span></span><span class=\"c-default\">              </span><span class=\"c-identifier\">jobs/a3f9b21.yaml</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\"> ○ </span><span class=\"c-muted\">open merge request</span>\n<span class=\"c-default\"> </span>\n",
-      "contentDigest": "a231ddac6a2e2448d4ae3204dc286e1f773985ae7a3cd80e9980e6bb144002cc",
-      "text": "❯ /submit fmx_models.jobs.training:job\n\n● submit ·  4s\n  ⎿  ✓ clean working tree              HEAD a3f9b21\n     ✓ tier-1 rules                    22 rules · 0 errors\n      generating manifest              jobs/a3f9b21.yaml\n     ○ open merge request",
+      "renderHtml": "\n<span class=\"c-default bg-bgElev\"> ❯ /submit ml_models.jobs.training:job                                       </span>\n<span class=\"c-default\"> </span>\n<span class=\"c-default\">● </span><span class=\"c-default\">submit</span><span class=\"c-muted\"> · </span><span class=\"c-muted sp sp-braille\"></span><span class=\"c-muted\"> 4s</span>\n<span class=\"c-muted\">  ⎿  </span><span class=\"c-ok\">✓ </span><span class=\"c-default\">clean working tree</span><span class=\"c-default\">              </span><span class=\"c-muted\">HEAD a3f9b21</span>\n<span class=\"c-muted\">    </span><span class=\"c-ok\"> ✓ </span><span class=\"c-default\">tier-1 rules</span><span class=\"c-default\">                    </span><span class=\"c-muted\">22 rules · 0 errors</span>\n<span class=\"c-muted\">    </span> <span class=\"c-accent sp sp-triangle\"></span><span class=\"c-default\"> </span><span class=\"c-accent rmp rmp-shimmer\"><span style=\"--i:0\">g</span><span style=\"--i:1\">e</span><span style=\"--i:2\">n</span><span style=\"--i:3\">e</span><span style=\"--i:4\">r</span><span style=\"--i:5\">a</span><span style=\"--i:6\">t</span><span style=\"--i:7\">i</span><span style=\"--i:8\">n</span><span style=\"--i:9\">g</span><span style=\"--i:10\"> </span><span style=\"--i:11\">m</span><span style=\"--i:12\">a</span><span style=\"--i:13\">n</span><span style=\"--i:14\">i</span><span style=\"--i:15\">f</span><span style=\"--i:16\">e</span><span style=\"--i:17\">s</span><span style=\"--i:18\">t</span></span><span class=\"c-default\">              </span><span class=\"c-identifier\">jobs/a3f9b21.yaml</span>\n<span class=\"c-muted\">    </span><span class=\"c-muted\"> ○ </span><span class=\"c-muted\">open merge request</span>\n<span class=\"c-default\"> </span>\n",
+      "contentDigest": "d28a47581307a6a11302ceb9a37377203b19080b4fffb83eef672c5cff1768cc",
+      "text": "❯ /submit ml_models.jobs.training:job\n\n● submit ·  4s\n  ⎿  ✓ clean working tree              HEAD a3f9b21\n     ✓ tier-1 rules                    22 rules · 0 errors\n      generating manifest              jobs/a3f9b21.yaml\n     ○ open merge request",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
@@ -48855,9 +48968,9 @@
       "id": "R-BLK-667",
       "sectionKey": "prism-the-six-hour-run-085",
       "position": 6,
-      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">██</span><span class=\"c-meta\">██</span><span class=\"c-ok\"></span><span class=\"c-muted\">░░░░░░░░░░░░░░░░░░░░░░░░░░░░</span><span class=\"c-muted\">  12%  6k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\"></span><span class=\"c-muted\">░░░░░░░░░░</span><span class=\"c-muted\"> —</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-default\">   </span><span class=\"c-accent\">⋯ 2 watching</span><span class=\"c-default\">   </span><span class=\"c-muted\">malachy</span>\n<span class=\"c-muted\">  ⋯ </span><span class=\"c-accent\">›</span><span class=\"c-dim bg-bgElev\"> a3f9b21 </span><span class=\"c-default\"> </span><span class=\"c-accent\">█████</span><span class=\"c-muted\">░░░░░░░</span><span class=\"c-muted\"> 43%  ep 17/40</span><span class=\"c-default\">    </span><span class=\"c-dim bg-bgElev\"> f410d99 </span><span class=\"c-default\"> </span><span class=\"c-muted\">queued</span><span class=\"c-default\">       </span><span class=\"c-muted\">⌃⇥ switch</span>\n",
-      "contentDigest": "37f23adf6e9feb34c834ff7193ae28c6e4ab2f181acd29eff29e6ca1adee8013",
-      "text": "» auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ████░░░░░░░░░░░░░░░░░░░░░░░░░░░░  12%  6k/50k   step ░░░░░░░░░░ —   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3   ⋯ 2 watching   malachy\n  ⋯ › a3f9b21  █████░░░░░░░ 43%  ep 17/40     f410d99  queued       ⌃⇥ switch",
+      "renderHtml": "\n<span class=\"c-default\">  </span><span class=\"c-warn bold\">» auto</span><span class=\"c-meta\">   ✦ qwen3-coder-next</span><span class=\"c-muted\">   effort high</span><span class=\"c-identifier\">            localhost:8000</span><span class=\"c-muted\">   22:13</span>\n<span class=\"c-default\">  </span><span class=\"c-info\">██</span><span class=\"c-meta\">██</span><span class=\"c-ok\"></span><span class=\"c-muted\">░░░░░░░░░░░░░░░░░░░░░░░░░░░░</span><span class=\"c-muted\">  12%  6k/50k</span><span class=\"c-muted\">   step </span><span class=\"c-accent\"></span><span class=\"c-muted\">░░░░░░░░░░</span><span class=\"c-muted\"> —</span><span class=\"c-muted\">   28 tok/s</span>\n<span class=\"c-muted\">  ~/code/calcium</span><span class=\"c-identifier\">   ⎇ feat/c26</span><span class=\"c-ok\">   +124</span><span class=\"c-muted\">/</span><span class=\"c-error\">-18</span><span class=\"c-warn\"> ~1</span><span class=\"c-warn\">   ✎ 3</span><span class=\"c-default\">   </span><span class=\"c-accent\">⋯ 2 watching</span><span class=\"c-default\">   </span><span class=\"c-muted\">someone</span>\n<span class=\"c-muted\">  ⋯ </span><span class=\"c-accent\">›</span><span class=\"c-dim bg-bgElev\"> a3f9b21 </span><span class=\"c-default\"> </span><span class=\"c-accent\">█████</span><span class=\"c-muted\">░░░░░░░</span><span class=\"c-muted\"> 43%  ep 17/40</span><span class=\"c-default\">    </span><span class=\"c-dim bg-bgElev\"> f410d99 </span><span class=\"c-default\"> </span><span class=\"c-muted\">queued</span><span class=\"c-default\">       </span><span class=\"c-muted\">⌃⇥ switch</span>\n",
+      "contentDigest": "ac7e9485bc65bca8646413a2cd88437bf4d6df1da9ebb0df9812499276fc8dc3",
+      "text": "» auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13\n  ████░░░░░░░░░░░░░░░░░░░░░░░░░░░░  12%  6k/50k   step ░░░░░░░░░░ —   28 tok/s\n  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3   ⋯ 2 watching   someone\n  ⋯ › a3f9b21  █████░░░░░░░ 43%  ep 17/40     f410d99  queued       ⌃⇥ switch",
       "status": "example",
       "classificationBasis": "retained registry specimen",
       "ruleIds": [
@@ -52498,6 +52611,11 @@
       "contains": [],
       "figure": false,
       "note": "a windowed strip of peers that slides rather than sheds (§095) — the agent strip is its first consumer. A chrome row, not a content row, so its marks do not meet a transcript row's lead."
+    },
+    "gutter": {
+      "contains": [],
+      "note": "column 0 of the transcript region, which the frame reserves on every row for the selection rail (ruling 68). Not inside `content-row`: the rail stands beside a row's lead, never in it, so a quote rail's or a tree guide's `|` one column along is a different column.",
+      "figure": false
     }
   }
 }

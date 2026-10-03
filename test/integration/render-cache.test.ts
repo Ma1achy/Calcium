@@ -10,7 +10,7 @@
 // a whole sequence, so one call is one increment however many blocks an entry
 // holds.
 import { describe, expect, it, vi } from "vitest";
-import { regionWidth } from "../../src/shell/config.js";
+import { transcriptWidth } from "../../src/shell/config.js";
 import { BODY_INDENT } from "../../src/shell/entry-layout.js";
 
 import { buildGraph, buildSession } from "../support/session.js";
@@ -584,7 +584,12 @@ describe("C22 §6c — the render cache", () => {
     const fresh = kit.renderToLines(block(group as never), 80).map((l) => visible(l).trimEnd());
     // The entry is a card (C22 I83), so each row carries the gutter in front
     // of the block's own cells; the comparison is over the cells the block drew.
-    const onScreen = s.screen().text.filter((r) => r.includes("counted ")).map((r) => r.slice(r.indexOf("counted ")).trimEnd());
+    // **Less the margin column**, which holds the transcript's bar while it
+    // overflows (C14 I62) — the frame's, not the block's.
+    const onScreen = s
+      .screen()
+      .text.filter((r) => r.includes("counted "))
+      .map((r) => [...r].slice(0, -1).join("").slice(r.indexOf("counted ")).trimEnd());
     expect(onScreen.length, "rows on screen").toBeGreaterThan(0);
     expect(fresh.join("\n"), "a slice of the fresh render, in order").toContain(onScreen.join("\n"));
 
@@ -1034,8 +1039,10 @@ describe("C22 I108 — the paced schedule, wired (F1207)", () => {
       // under the hook (I83, §6l.2 row 11) — so the number to read is the
       // region's less the indent, and it is `columns − 1 − 4` rather than
       // `columns − 4`. That one column is the whole of what this row is about.
+      // The region is the transcript's box, a further column in for the rail's
+      // reserved column 0 (C14 I57), so the number is `transcriptWidth`.
       expect(widest, `the widest ask at ${String(columns)} columns`).toBe(
-        regionWidth(columns) - BODY_INDENT,
+        transcriptWidth(columns) - BODY_INDENT,
       );
       expect(widest, "and never off the terminal's width").not.toBe(columns - BODY_INDENT);
     }

@@ -16,7 +16,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { Block, Comparison, ComparisonRow, Notice } from "@fmx/calcium";
+import type { Block, Comparison, ComparisonRow, Notice } from "calcium-tui";
 import {
   FIELDS,
   compareRows,
@@ -27,7 +27,7 @@ import {
 } from "../src/drift.ts";
 import type { Row } from "../src/ndjson.ts";
 
-import { localContext } from "@fmx/calcium/testing";
+import { localContext } from "calcium-tui/testing";
 const read = (name: string): Row =>
   JSON.parse(readFileSync(new URL(`./corpus/${name}`, import.meta.url), "utf8")) as Row;
 

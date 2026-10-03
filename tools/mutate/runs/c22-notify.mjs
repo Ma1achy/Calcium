@@ -149,11 +149,14 @@ const results = runPass({
       expect: "T1.31",
     },
     {
-      // C01 I24 — control-stripped.
+      // C01 I24 — controls shown. Re-anchored on the C0 arm alone when
+      // C01 I26 gave `oscText` a second, bidi arm, and again when ruling 86
+      // turned that arm from deletion to caret form: the mutation is still the
+      // payload keeping its controls, and the bidi arm is c01-osc-bidi's.
       name: "an OSC payload keeps its controls",
       file: ESCAPES,
-      from: 'const oscText = (text: string): string => text.replace(/[\\u0000-\\u001f\\u007f-\\u009f]/gu, "");',
-      to: "const oscText = (text: string): string => text;",
+      from: "    .replace(CONTROL, caret)\n",
+      to: "",
       expect: "T1.31",
     },
     {

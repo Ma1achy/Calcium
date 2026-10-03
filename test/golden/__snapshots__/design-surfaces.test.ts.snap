@@ -29,19 +29,24 @@ exports[`golden frames — one per design fixture > dark-ascii at 40 1`] = `
   │<the file>│
 
 ── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
-· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
+· a choice — the MARK and the WEIGHT carry chosen, the WASH carries focus, and the label is part of the shape
   at rest
     ........................................ scale  @ linear  * log  @ log2
+    .................WWWWW.................. weight
   focused on \`linear\` — NOT chosen: the mark did not move
     .......AAAAAAAA......................... scale  @ linear  * log  @ log2
       A = bg 48;2;46;46;46
+    .................WWWWW.................. weight
   focused on \`log\` — chosen: the same wash, the same mark
     .................AAAAA.................. scale  @ linear  * log  @ log2
       A = bg 48;2;46;46;46
+    .................WWWWW.................. weight
   a checkbox, on
     ........................................ + run the suite after each edit
+    WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW......... weight
   a checkbox, off — ⏎ toggled it
     ........................................ x run the suite after each edit
+    ........................................ weight
 
 · a control — three states, three mechanisms, and the VALUE is none of them
   at rest
@@ -95,16 +100,30 @@ download ###################-------- 70%
 ── §96 · a status has three parts, and a frame is separate
 +--------------------------------------+
 | -------------- ERROR --------------- |
-| ! the manifest declares a tool the   |
+| x the manifest declares a tool the   |
 | registry has no handler for, so it   |
 | would classify as local and reach    |
 | the pipeline with nothing to run     |
 | at seal(): \`prune\` is marked local ~ |
 +--------------------------------------+
-── §97 · a transient panel floats, between two rules
-+ Confirm -----------------------------+
-|apply this change?                    |
-+--------------------------------------+
+── §97 · a transient panel floats, between two rules — the layer, over an empty transcript
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+
+
+
+
+
+
+
+
+
+-----------------------------------------------------------
+  * /capabilities
+    /clear
+    /config
+------------------------------------------------------------
+$ /c
+------------------------------------------------------------
 ── §48 · block states
 + resolve  12 packages
 | fetch    3 remaining
@@ -304,7 +323,7 @@ work ###################------------ 62%
 ........................................ 20 20       matchLabels:
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 21    -       app: volatility-estimator
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    21 +       app: volatility-estimator
-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.fmx.io/family: vola~
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.example.com/family:~
 ........................................ 22 23     replicas: 2
 ........................................ 23 24     template:
   A = bg 48;2;73;0;0
@@ -312,7 +331,7 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.fmx.io/family: vola
 · a tag with extent, ex. 3 — and the error tag is the only one
 ........................................ +--------------------------------------+
 ................AAAAAAA................. | -------------- ERROR --------------- |
-........................................ | ! the manifest declares a tool the   |
+........................................ | x the manifest declares a tool the   |
 ........................................ | registry has no handler for, so it   |
 ........................................ | would classify as local and reach    |
 ........................................ | the pipeline with nothing to run     |
@@ -353,12 +372,12 @@ a patch — a unified diff, not the gutter
   drawn  -- serving/volatility-estimator.yaml ---
   drawn  ... 14 unchanged lines
   drawn  @@ -18,6 +18,7 @@
-  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.fmx.io/family: volatility↵   replicas: 2↵   template:
+  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.example.com/family: volatility↵   replicas: 2↵   template:
 
 a status — the message and its detail
   drawn  +--------------------------------------+
   drawn  | -------------- ERROR --------------- |
-  drawn  | ! the manifest declares a tool the   |
+  drawn  | x the manifest declares a tool the   |
   copy   the manifest declares a tool the registry has no handler for, so it would classify as local and reach the pipeline with nothing to run↵at seal(): \`prune\` is marked local in the manifest and has no handler
 
 a tape — the labels, not the marks
@@ -374,7 +393,7 @@ a rule — no source, so it declines
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   uuid     family            status
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB > a3f9b21  digit-classifier  running
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     open
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.example.internal · 2×A~
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
 ........................................   7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
@@ -384,7 +403,7 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   uuid     family            status
 ........................................   a3f9b21  digit-classifier  running
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     open
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.example.internal · 2×A~
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
 ........................................   7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
@@ -408,7 +427,7 @@ patch           3     18:18 :19 19:
 pills           2     chip-0 chip-1
 choice          3     linear log log2
 control         1     control-1
-tape            5     seams arm count probe
+tape            5     seams arm count probe trace
 tree            6     src interaction parser frame data package
 split           2     split-files split-code
 form            5     name port replicas save cancel
@@ -442,24 +461,25 @@ BBBBBBB............. boolean, so a nested
   C = bg 48;2;222;227;24
 
 ── §26 · the trail and the mark at the head — two carriers, and what each survives
-· streaming, hot edge — the head arrives in accent and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent
+· streaming, hot edge — the head arrives above the accent, the design's overshoot (C09 I133), and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.. The parser tracks quotes with a single
-aaaaaaabcdefghijklmnoao................. boolean, which is why .
+aaaaaaabcdefghijklmnoap................. boolean, which is why .
   a = fg 38;2;212;212;212
-  b = fg 38;2;213;209;206
-  c = fg 38;2;215;206;199
-  d = fg 38;2;216;203;193
-  e = fg 38;2;218;199;187
-  f = fg 38;2;219;196;181
-  g = fg 38;2;221;193;174
-  h = fg 38;2;222;190;168
-  i = fg 38;2;223;187;162
-  j = fg 38;2;225;184;155
-  k = fg 38;2;226;181;149
-  l = fg 38;2;228;177;143
-  m = fg 38;2;229;174;137
-  n = fg 38;2;231;171;130
-  o = fg 38;2;232;168;124
+  b = fg 38;2;214;207;202
+  c = fg 38;2;216;202;193
+  d = fg 38;2;219;197;183
+  e = fg 38;2;221;193;173
+  f = fg 38;2;223;188;164
+  g = fg 38;2;225;183;154
+  h = fg 38;2;227;178;144
+  i = fg 38;2;230;173;135
+  j = fg 38;2;232;168;125
+  k = fg 38;2;247;179;132
+  l = fg 38;2;255;191;141
+  m = fg 38;2;255;203;150
+  n = fg 38;2;255;215;159
+  o = fg 38;2;255;227;167
+  p = fg 38;2;232;168;124
 
 · settled — no band and no mark: nothing replaces the mark and nothing is left behind (R-BLK-188)
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.. The parser tracks quotes with a single
@@ -472,22 +492,23 @@ aaaaaaaaaaaaaaaaaaaaa................... boolean, which is why
 
 · the reservation, at the width where it shows — 48 columns, streaming: the mark's two cells come off the wrap, so \`boolean,\` moves down
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.......... The parser tracks quotes with a single
-aaaaaaabcdefghijklmnoao......................... boolean, which is why .
+aaaaaaabcdefghijklmnoap......................... boolean, which is why .
   a = fg 38;2;212;212;212
-  b = fg 38;2;213;209;206
-  c = fg 38;2;215;206;199
-  d = fg 38;2;216;203;193
-  e = fg 38;2;218;199;187
-  f = fg 38;2;219;196;181
-  g = fg 38;2;221;193;174
-  h = fg 38;2;222;190;168
-  i = fg 38;2;223;187;162
-  j = fg 38;2;225;184;155
-  k = fg 38;2;226;181;149
-  l = fg 38;2;228;177;143
-  m = fg 38;2;229;174;137
-  n = fg 38;2;231;171;130
-  o = fg 38;2;232;168;124
+  b = fg 38;2;214;207;202
+  c = fg 38;2;216;202;193
+  d = fg 38;2;219;197;183
+  e = fg 38;2;221;193;173
+  f = fg 38;2;223;188;164
+  g = fg 38;2;225;183;154
+  h = fg 38;2;227;178;144
+  i = fg 38;2;230;173;135
+  j = fg 38;2;232;168;125
+  k = fg 38;2;247;179;132
+  l = fg 38;2;255;191;141
+  m = fg 38;2;255;203;150
+  n = fg 38;2;255;215;159
+  o = fg 38;2;255;227;167
+  p = fg 38;2;232;168;124
 
 · and the same block settled at 48 — \`boolean,\` stays up, which is the two cells, and it is the whole of what \`measure\` has to agree with
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa. The parser tracks quotes with a single boolean,
@@ -566,7 +587,7 @@ aaaaaaaaaaaa.................................... which is why
 AAAAAAAAAAA............................. [ Approve ]
   A = bg 48;2;46;46;46
 
-── §19 · the resolved keymap, the reader's own rung first
+── §19 · the resolved keymap, the reader's own rung first — 157 bindings across 10 scopes · the registry's current 69
 -- prompt — where you are               
 Enter        submit
 S-Enter      insertNewline
@@ -656,24 +677,32 @@ Esc  dismiss
 Esc  exitNativeSelection
 ?    passToTerminal
 -- semanticSelection                    
-Esc     escapeSemanticSelection
-a       selectEntryUnderCaret
-A       selectAllLoadedEntries
-Enter   copySelectedEntries
-y       copySelectedEntries
-M-w     copySelectedEntries
-C-C     copySelectedEntries
-Up      moveSemanticCaretUp
-Down    moveSemanticCaretDown
-S-Up    extendSemanticSelectionUp
-S-Down  extendSemanticSelectionDown
+Esc      escapeSemanticSelection
+a        selectEntryUnderCaret
+A        selectAllLoadedEntries
+Enter    copyAndLeaveSemanticSelection
+y        copySelectedEntries
+M-w      copySelectedEntries
+C-C      copySelectedEntries
+Up       moveSemanticCaretUp
+Down     moveSemanticCaretDown
+S-Up     extendSemanticSelectionUp
+S-Down   extendSemanticSelectionDown
+S-Left   extendSemanticSelectionLeft
+S-Right  extendSemanticSelectionRight
+Left     moveSemanticCaretLeft
+Right    moveSemanticCaretRight
+C-v      toggleSemanticRect
 -- panel                                
-Down   menuNext
-Tab    menuNext
-Up     menuPrev
-Enter  menuAccept
-Esc    dismiss
-C-r    searchOlder
+Down      menuNext
+Tab       menuNext
+Up        menuPrev
+Enter     menuAccept
+Esc       dismiss
+C-r       searchOlder
+M-S-Up    previewScrollUp
+M-S-Down  previewScrollDown
+M-o       previewOpen
 -- interaction                          
 Left   insideLeft
 Right  insideRight
@@ -720,8 +749,8 @@ PageDown  blockPageDown
 PageUp    blockPageUp
 Tab       entryNext
 S-Tab     entryPrev
-Left      paneLeft
-Right     paneRight
+Left      elementLeft
+Right     elementRight
 M-Left    dividerLeft
 M-Right   dividerRight
 S-Enter   rerunEntry
@@ -770,19 +799,24 @@ exports[`golden frames — one per design fixture > dark-ascii at 80 1`] = `
   │<the file>│
 
 ── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
-· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
+· a choice — the MARK and the WEIGHT carry chosen, the WASH carries focus, and the label is part of the shape
   at rest
     .................................................... scale  @ linear  * log  @ log2
+    .................WWWWW.............................. weight
   focused on \`linear\` — NOT chosen: the mark did not move
     .......AAAAAAAA..................................... scale  @ linear  * log  @ log2
       A = bg 48;2;46;46;46
+    .................WWWWW.............................. weight
   focused on \`log\` — chosen: the same wash, the same mark
     .................AAAAA.............................. scale  @ linear  * log  @ log2
       A = bg 48;2;46;46;46
+    .................WWWWW.............................. weight
   a checkbox, on
     .................................................... + run the suite after each edit
+    WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW..................... weight
   a checkbox, off — ⏎ toggled it
     .................................................... x run the suite after each edit
+    .................................................... weight
 
 · a control — three states, three mechanisms, and the VALUE is none of them
   at rest
@@ -837,15 +871,28 @@ download ###############################################-------------------- 70%
 +------------------------------------------------------------------------------+
 |                                                                              |
 | ---------------------------------- ERROR ----------------------------------- |
-| ! the manifest declares a tool the registry has no handler for, so it would  |
+| x the manifest declares a tool the registry has no handler for, so it would  |
 | classify as local and reach the pipeline with nothing to run                 |
 | at seal(): \`prune\` is marked local in the manifest and has no handler        |
 |                                                                              |
 +------------------------------------------------------------------------------+
-── §97 · a transient panel floats, between two rules
-+ Confirm ---------------------------------------------------------------------+
-|apply this change?                                                            |
-+------------------------------------------------------------------------------+
+── §97 · a transient panel floats, between two rules — the layer, over an empty transcript
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------------
+  * /capabilities             the rendering route, and what the terminal can do
+    /clear                   empty the transcript; command history is untouched
+    /config             every setting, its value, and where the value came from
+--------------------------------------------------------------------------------
+$ /c
+--------------------------------------------------------------------------------
 ── §48 · block states
 + resolve  12 packages
 | fetch    3 remaining
@@ -1045,7 +1092,7 @@ work ############################################--------------------------- 62%
 ................................................................................ 20 20       matchLabels:
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 21    -       app: volatility-estimator
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    21 +       app: volatility-estimator
-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.fmx.io/family: volatility
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.example.com/family: volatility
 ................................................................................ 22 23     replicas: 2
 ................................................................................ 23 24     template:
   A = bg 48;2;73;0;0
@@ -1054,7 +1101,7 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ................................................................................ +------------------------------------------------------------------------------+
 ................................................................................ |                                                                              |
 ....................................AAAAAAA..................................... | ---------------------------------- ERROR ----------------------------------- |
-................................................................................ | ! the manifest declares a tool the registry has no handler for, so it would  |
+................................................................................ | x the manifest declares a tool the registry has no handler for, so it would  |
 ................................................................................ | classify as local and reach the pipeline with nothing to run                 |
 ................................................................................ | at seal(): \`prune\` is marked local in the manifest and has no handler        |
 ................................................................................ |                                                                              |
@@ -1094,12 +1141,12 @@ a patch — a unified diff, not the gutter
   drawn  -- serving/volatility-estimator.yaml -----------------------
   drawn  ... 14 unchanged lines
   drawn  @@ -18,6 +18,7 @@
-  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.fmx.io/family: volatility↵   replicas: 2↵   template:
+  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.example.com/family: volatility↵   replicas: 2↵   template:
 
 a status — the message and its detail
   drawn  +----------------------------------------------------------+
   drawn  | ------------------------ ERROR ------------------------- |
-  drawn  | ! the manifest declares a tool the registry has no       |
+  drawn  | x the manifest declares a tool the registry has no       |
   copy   the manifest declares a tool the registry has no handler for, so it would classify as local and reach the pipeline with nothing to run↵at seal(): \`prune\` is marked local in the manifest and has no handler
 
 a tape — the labels, not the marks
@@ -1112,20 +1159,20 @@ a rule — no source, so it declines
 
 ── §82 · no pushed views — a row expanded in place, and the rows below carrying on
 · r1 focused and expanded — the ground opens under ▸, the detail takes bgElev, and r2 beneath it takes none
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA      uuid     family            status
-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB > v  a3f9b21  digit-classifier  running
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA        uuid     family            status
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB > v    a3f9b21  digit-classifier  running
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.example.internal · 2×A100
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
-................................................................................      7c2d4e1  decoder-zoom      succeeded
+................................................................................        7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
   B = bg 48;2;46;46;46
 
 · r1 expanded with nothing focused — the detail is grounded and the row above it is not: the ground follows expansion
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA      uuid     family            status
-................................................................................   v  a3f9b21  digit-classifier  running
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA        uuid     family            status
+................................................................................   v    a3f9b21  digit-classifier  running
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.example.internal · 2×A100
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
-................................................................................      7c2d4e1  decoder-zoom      succeeded
+................................................................................        7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
 
 ── §17 · focus treatment follows the shape — what each kind publishes against what it draws
@@ -1179,23 +1226,24 @@ raw             0     — atomic: nothing to focus
   C = bg 48;2;222;227;24
 
 ── §26 · the trail and the mark at the head — two carriers, and what each survives
-· streaming, hot edge — the head arrives in accent and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent
-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabcdefghijklmnoao.................. The parser tracks quotes with a single boolean, which is why .
+· streaming, hot edge — the head arrives above the accent, the design's overshoot (C09 I133), and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabcdefghijklmnoap.................. The parser tracks quotes with a single boolean, which is why .
   a = fg 38;2;212;212;212
-  b = fg 38;2;213;209;206
-  c = fg 38;2;215;206;199
-  d = fg 38;2;216;203;193
-  e = fg 38;2;218;199;187
-  f = fg 38;2;219;196;181
-  g = fg 38;2;221;193;174
-  h = fg 38;2;222;190;168
-  i = fg 38;2;223;187;162
-  j = fg 38;2;225;184;155
-  k = fg 38;2;226;181;149
-  l = fg 38;2;228;177;143
-  m = fg 38;2;229;174;137
-  n = fg 38;2;231;171;130
-  o = fg 38;2;232;168;124
+  b = fg 38;2;214;207;202
+  c = fg 38;2;216;202;193
+  d = fg 38;2;219;197;183
+  e = fg 38;2;221;193;173
+  f = fg 38;2;223;188;164
+  g = fg 38;2;225;183;154
+  h = fg 38;2;227;178;144
+  i = fg 38;2;230;173;135
+  j = fg 38;2;232;168;125
+  k = fg 38;2;247;179;132
+  l = fg 38;2;255;191;141
+  m = fg 38;2;255;203;150
+  n = fg 38;2;255;215;159
+  o = fg 38;2;255;227;167
+  p = fg 38;2;232;168;124
 
 · settled — no band and no mark: nothing replaces the mark and nothing is left behind (R-BLK-188)
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.................... The parser tracks quotes with a single boolean, which is why
@@ -1206,22 +1254,23 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa....................
 
 · the reservation, at the width where it shows — 48 columns, streaming: the mark's two cells come off the wrap, so \`boolean,\` moves down
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.......... The parser tracks quotes with a single
-aaaaaaabcdefghijklmnoao......................... boolean, which is why .
+aaaaaaabcdefghijklmnoap......................... boolean, which is why .
   a = fg 38;2;212;212;212
-  b = fg 38;2;213;209;206
-  c = fg 38;2;215;206;199
-  d = fg 38;2;216;203;193
-  e = fg 38;2;218;199;187
-  f = fg 38;2;219;196;181
-  g = fg 38;2;221;193;174
-  h = fg 38;2;222;190;168
-  i = fg 38;2;223;187;162
-  j = fg 38;2;225;184;155
-  k = fg 38;2;226;181;149
-  l = fg 38;2;228;177;143
-  m = fg 38;2;229;174;137
-  n = fg 38;2;231;171;130
-  o = fg 38;2;232;168;124
+  b = fg 38;2;214;207;202
+  c = fg 38;2;216;202;193
+  d = fg 38;2;219;197;183
+  e = fg 38;2;221;193;173
+  f = fg 38;2;223;188;164
+  g = fg 38;2;225;183;154
+  h = fg 38;2;227;178;144
+  i = fg 38;2;230;173;135
+  j = fg 38;2;232;168;125
+  k = fg 38;2;247;179;132
+  l = fg 38;2;255;191;141
+  m = fg 38;2;255;203;150
+  n = fg 38;2;255;215;159
+  o = fg 38;2;255;227;167
+  p = fg 38;2;232;168;124
 
 · and the same block settled at 48 — \`boolean,\` stays up, which is the two cells, and it is the whole of what \`measure\` has to agree with
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa. The parser tracks quotes with a single boolean,
@@ -1300,7 +1349,7 @@ aaaaaaaaaaaa.................................... which is why
 AAAAAAAAAAA..................................................................... [ Approve ]
   A = bg 48;2;46;46;46
 
-── §19 · the resolved keymap, the reader's own rung first
+── §19 · the resolved keymap, the reader's own rung first — 157 bindings across 10 scopes · the registry's current 69
 -- prompt — where you are                                                       
 Enter        submit
 S-Enter      insertNewline
@@ -1390,24 +1439,32 @@ Esc  dismiss
 Esc  exitNativeSelection
 ?    passToTerminal
 -- semanticSelection                                                            
-Esc     escapeSemanticSelection
-a       selectEntryUnderCaret
-A       selectAllLoadedEntries
-Enter   copySelectedEntries
-y       copySelectedEntries
-M-w     copySelectedEntries
-C-C     copySelectedEntries
-Up      moveSemanticCaretUp
-Down    moveSemanticCaretDown
-S-Up    extendSemanticSelectionUp
-S-Down  extendSemanticSelectionDown
+Esc      escapeSemanticSelection
+a        selectEntryUnderCaret
+A        selectAllLoadedEntries
+Enter    copyAndLeaveSemanticSelection
+y        copySelectedEntries
+M-w      copySelectedEntries
+C-C      copySelectedEntries
+Up       moveSemanticCaretUp
+Down     moveSemanticCaretDown
+S-Up     extendSemanticSelectionUp
+S-Down   extendSemanticSelectionDown
+S-Left   extendSemanticSelectionLeft
+S-Right  extendSemanticSelectionRight
+Left     moveSemanticCaretLeft
+Right    moveSemanticCaretRight
+C-v      toggleSemanticRect
 -- panel                                                                        
-Down   menuNext
-Tab    menuNext
-Up     menuPrev
-Enter  menuAccept
-Esc    dismiss
-C-r    searchOlder
+Down      menuNext
+Tab       menuNext
+Up        menuPrev
+Enter     menuAccept
+Esc       dismiss
+C-r       searchOlder
+M-S-Up    previewScrollUp
+M-S-Down  previewScrollDown
+M-o       previewOpen
 -- interaction                                                                  
 Left   insideLeft
 Right  insideRight
@@ -1454,8 +1511,8 @@ PageDown  blockPageDown
 PageUp    blockPageUp
 Tab       entryNext
 S-Tab     entryPrev
-Left      paneLeft
-Right     paneRight
+Left      elementLeft
+Right     elementRight
 M-Left    dividerLeft
 M-Right   dividerRight
 S-Enter   rerunEntry
@@ -1482,7 +1539,7 @@ exports[`golden frames — one per design fixture > dark-mono-unicode at 40 1`] 
 
 · the compaction is an OPERATION — segmented, active, and §036's head above it
     ✦ compacting (4s · 3 of 5 turns)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 60%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 60%
 
 · and when it stops the bar goes and the delta stays — one grammar, not two specimens
     ✓ 3 turns compacted · 10.7k → 0.9k tok
@@ -1504,17 +1561,22 @@ exports[`golden frames — one per design fixture > dark-mono-unicode at 40 1`] 
   │<the file>│
 
 ── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
-· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
+· a choice — the MARK and the WEIGHT carry chosen, the WASH carries focus, and the label is part of the shape
   at rest
     ........................................ scale  ○ linear  ● log  ○ log2
+    .................WWWWW.................. weight
   focused on \`linear\` — NOT chosen: the mark did not move
     ........................................ scale  ○ linear  ● log  ○ log2
+    .................WWWWW.................. weight
   focused on \`log\` — chosen: the same wash, the same mark
     ........................................ scale  ○ linear  ● log  ○ log2
+    .................WWWWW.................. weight
   a checkbox, on
     ........................................ ✓ run the suite after each edit
+    WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW......... weight
   a checkbox, off — ⏎ toggled it
     ........................................ ✗ run the suite after each edit
+    ........................................ weight
 
 · a control — three states, three mechanisms, and the VALUE is none of them
   at rest
@@ -1528,16 +1590,16 @@ exports[`golden frames — one per design fixture > dark-mono-unicode at 40 1`] 
 · the head brackets while it runs and flattens when it stops — and the bar goes with the motion
   running · elapsed and delta
     ✦ Compacting conversation… (5m 38s · ↓ …
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
   running · elapsed alone
     ✦ Compacting conversation… (5m 38s)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
   running · delta alone
     ✦ Compacting conversation… (↓ 8.0k toke…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
   running · neither — and no empty parentheses
     ✦ Compacting conversation…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
   settled — flat, and the bar is GONE
     ✓ compacted · 6m 12s · 41k → 12k tokens…
   cancelled — muted, and the bar goes for its own reason
@@ -1549,13 +1611,13 @@ exports[`golden frames — one per design fixture > dark-mono-unicode at 40 1`] 
 
 · the same shape for every operation — §036's four, the delta in each one's own units
     ✦ Compacting conversation… (5m 38s · ↓ …
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
     ✦ Indexing the repository… (12s · 4,102…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 44%
     ✦ Uploading the checkpoint… (64s · 2.1 …
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 44%
     ✦ Running the suite… (31s · 892 of 1,20…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱ 74%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯ 74%
 
 ── §95 · a tape, where a row of peers would shed
 scout ✓  planner ✓  › builder ⋅  2»
@@ -1566,16 +1628,30 @@ download ███████████████████░░░░�
 ── §96 · a status has three parts, and a frame is separate
 ┌──────────────────────────────────────┐
 │ ────────────── ERROR ─────────────── │
-│ ▲ the manifest declares a tool the   │
+│ ✗ the manifest declares a tool the   │
 │ registry has no handler for, so it   │
 │ would classify as local and reach    │
 │ the pipeline with nothing to run     │
 │ at seal(): \`prune\` is marked local … │
 └──────────────────────────────────────┘
-── §97 · a transient panel floats, between two rules
-┌ Confirm ─────────────────────────────┐
-│apply this change?                    │
-└──────────────────────────────────────┘
+── §97 · a transient panel floats, between two rules — the layer, over an empty transcript
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────
+  › /capabilities
+    /clear
+    /config
+────────────────────────────────────────────────────────────
+❯ /c
+────────────────────────────────────────────────────────────
 ── §48 · block states
 ✓ resolve  12 packages
 ⠋ fetch    3 remaining
@@ -1644,7 +1720,7 @@ beads •••••••••••••••••••••◦◦◦�
 posts ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯ 70%
 slant ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱ 70%
 squares ■■■■■■■■■■■■■■■■■■■■□□□□□□□□ 70%
-braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿         70%
+braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣇         70%
 ascii #####################--------- 70%
 ── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
 · the fills — 24 bits, one letter per distinct ink, assigned within the row
@@ -1754,13 +1830,13 @@ ascii #####################--------- 70%
 · BUDGET · capacity · continuous · still
 work ███████████████░░░░░░░░░ 62%  31/50
 · OPERATION · progress · segmented · active
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 62%
 · a training run · progress · continuous · active
 work ███████████████████░░░░░░░░░░░░ 62%
 · a step count · count · segmented · still
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱ 31 of 50
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯ 31 of 50
 · stalled · progress · segmented · stalled
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ........................................ ── serving/volatility-estimator.yaml ───
@@ -1771,13 +1847,13 @@ work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱
 ........................................ 20 20       matchLabels:
 ........................................ 21    -       app: volatility-estimator
 ........................................    21 +       app: volatility-estimator
-........................................    22 +       prism.fmx.io/family: vola…
+........................................    22 +       prism.example.com/family:…
 ........................................ 22 23     replicas: 2
 ........................................ 23 24     template:
 · a tag with extent, ex. 3 — and the error tag is the only one
 ........................................ ┌──────────────────────────────────────┐
 ........................................ │ ────────────── ERROR ─────────────── │
-........................................ │ ▲ the manifest declares a tool the   │
+........................................ │ ✗ the manifest declares a tool the   │
 ........................................ │ registry has no handler for, so it   │
 ........................................ │ would classify as local and reach    │
 ........................................ │ the pipeline with nothing to run     │
@@ -1813,12 +1889,12 @@ a patch — a unified diff, not the gutter
   drawn  ── serving/volatility-estimator.yaml ───
   drawn  ⋯ 14 unchanged lines
   drawn  @@ -18,6 +18,7 @@
-  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.fmx.io/family: volatility↵   replicas: 2↵   template:
+  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.example.com/family: volatility↵   replicas: 2↵   template:
 
 a status — the message and its detail
   drawn  ┌──────────────────────────────────────┐
   drawn  │ ────────────── ERROR ─────────────── │
-  drawn  │ ▲ the manifest declares a tool the   │
+  drawn  │ ✗ the manifest declares a tool the   │
   copy   the manifest declares a tool the registry has no handler for, so it would classify as local and reach the pipeline with nothing to run↵at seal(): \`prune\` is marked local in the manifest and has no handler
 
 a tape — the labels, not the marks
@@ -1834,7 +1910,7 @@ a rule — no source, so it declines
 ........................................   uuid     family            status
 ........................................ ▸ a3f9b21  digit-classifier  running
 ........................................     open
-........................................     node  gpu-04.fmx.internal · 2×A100
+........................................     node  gpu-04.example.internal · 2×A…
 ........................................     mr    !1248  auto-merged
 ........................................   7c2d4e1  decoder-zoom      succeeded
 
@@ -1842,7 +1918,7 @@ a rule — no source, so it declines
 ........................................   uuid     family            status
 ........................................   a3f9b21  digit-classifier  running
 ........................................     open
-........................................     node  gpu-04.fmx.internal · 2×A100
+........................................     node  gpu-04.example.internal · 2×A…
 ........................................     mr    !1248  auto-merged
 ........................................   7c2d4e1  decoder-zoom      succeeded
 
@@ -1865,7 +1941,7 @@ patch           3     18:18 :19 19:
 pills           2     chip-0 chip-1
 choice          3     linear log log2
 control         1     control-1
-tape            5     seams arm count probe
+tape            5     seams arm count probe trace
 tree            6     src interaction parser frame data package
 split           2     split-files split-code
 form            5     name port replicas save cancel
@@ -1892,7 +1968,7 @@ raw             0     — atomic: nothing to focus
 .................... back early.
 
 ── §26 · the trail and the mark at the head — two carriers, and what each survives
-· streaming, hot edge — the head arrives in accent and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent
+· streaming, hot edge — the head arrives above the accent, the design's overshoot (C09 I133), and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent
 ........................................ The parser tracks quotes with a single
 ........................................ boolean, which is why ⋅
 
@@ -1983,7 +2059,7 @@ raw             0     — atomic: nothing to focus
 · focused — the chosen pair, and \`›\` INSIDE the ground rather than before it
 ........................................ [ Approve ]
 
-── §19 · the resolved keymap, the reader's own rung first
+── §19 · the resolved keymap, the reader's own rung first — 157 bindings across 10 scopes · the registry's current 69
 ── prompt — where you are               
 ⏎       submit
 ⇧⏎      insertNewline
@@ -2076,7 +2152,7 @@ esc  exitNativeSelection
 esc  escapeSemanticSelection
 a    selectEntryUnderCaret
 ⇧A   selectAllLoadedEntries
-⏎    copySelectedEntries
+⏎    copyAndLeaveSemanticSelection
 y    copySelectedEntries
 ⌥w   copySelectedEntries
 ⌃⇧C  copySelectedEntries
@@ -2084,6 +2160,11 @@ y    copySelectedEntries
 ↓    moveSemanticCaretDown
 ⇧↑   extendSemanticSelectionUp
 ⇧↓   extendSemanticSelectionDown
+⇧←   extendSemanticSelectionLeft
+⇧→   extendSemanticSelectionRight
+←    moveSemanticCaretLeft
+→    moveSemanticCaretRight
+⌃V   toggleSemanticRect
 ── panel                                
 ↓    menuNext
 ⇥    menuNext
@@ -2091,6 +2172,9 @@ y    copySelectedEntries
 ⏎    menuAccept
 esc  dismiss
 ⌃R   searchOlder
+⌥⇧↑  previewScrollUp
+⌥⇧↓  previewScrollDown
+⌥o   previewOpen
 ── interaction                          
 ←    insideLeft
 →    insideRight
@@ -2137,8 +2221,8 @@ pagedown  blockPageDown
 pageup    blockPageUp
 ⇥         entryNext
 ⇧⇥        entryPrev
-←         paneLeft
-→         paneRight
+←         elementLeft
+→         elementRight
 ⌥←        dividerLeft
 ⌥→        dividerRight
 ⇧⏎        rerunEntry
@@ -2165,7 +2249,7 @@ exports[`golden frames — one per design fixture > dark-mono-unicode at 80 1`] 
 
 · the compaction is an OPERATION — segmented, active, and §036's head above it
     ✦ compacting (4s · 3 of 5 turns)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 60%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 60%
 
 · and when it stops the bar goes and the delta stays — one grammar, not two specimens
     ✓ 3 turns compacted · 10.7k → 0.9k tok
@@ -2187,17 +2271,22 @@ exports[`golden frames — one per design fixture > dark-mono-unicode at 80 1`] 
   │<the file>│
 
 ── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
-· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
+· a choice — the MARK and the WEIGHT carry chosen, the WASH carries focus, and the label is part of the shape
   at rest
     .................................................... scale  ○ linear  ● log  ○ log2
+    .................WWWWW.............................. weight
   focused on \`linear\` — NOT chosen: the mark did not move
     .................................................... scale  ○ linear  ● log  ○ log2
+    .................WWWWW.............................. weight
   focused on \`log\` — chosen: the same wash, the same mark
     .................................................... scale  ○ linear  ● log  ○ log2
+    .................WWWWW.............................. weight
   a checkbox, on
     .................................................... ✓ run the suite after each edit
+    WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW..................... weight
   a checkbox, off — ⏎ toggled it
     .................................................... ✗ run the suite after each edit
+    .................................................... weight
 
 · a control — three states, three mechanisms, and the VALUE is none of them
   at rest
@@ -2211,16 +2300,16 @@ exports[`golden frames — one per design fixture > dark-mono-unicode at 80 1`] 
 · the head brackets while it runs and flattens when it stops — and the bar goes with the motion
   running · elapsed and delta
     ✦ Compacting conversation… (5m 38s · ↓ 8.0k tokens)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
   running · elapsed alone
     ✦ Compacting conversation… (5m 38s)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
   running · delta alone
     ✦ Compacting conversation… (↓ 8.0k tokens)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
   running · neither — and no empty parentheses
     ✦ Compacting conversation…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
   settled — flat, and the bar is GONE
     ✓ compacted · 6m 12s · 41k → 12k tokens · 18 turns summ…
   cancelled — muted, and the bar goes for its own reason
@@ -2232,13 +2321,13 @@ exports[`golden frames — one per design fixture > dark-mono-unicode at 80 1`] 
 
 · the same shape for every operation — §036's four, the delta in each one's own units
     ✦ Compacting conversation… (5m 38s · ↓ 8.0k tokens)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
     ✦ Indexing the repository… (12s · 4,102 of 9,318 files)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 44%
     ✦ Uploading the checkpoint… (64s · 2.1 of 4.8 GiB)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 44%
     ✦ Running the suite… (31s · 892 of 1,204 tests)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 74%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 74%
 
 ── §95 · a tape, where a row of peers would shed
 scout 4s ✓  planner 1m12s ✓  › builder ⋅ 8s  critic 2s ○  scribe 0s ○
@@ -2250,15 +2339,28 @@ download ███████████████████████�
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                                                                              │
 │ ────────────────────────────────── ERROR ─────────────────────────────────── │
-│ ▲ the manifest declares a tool the registry has no handler for, so it would  │
+│ ✗ the manifest declares a tool the registry has no handler for, so it would  │
 │ classify as local and reach the pipeline with nothing to run                 │
 │ at seal(): \`prune\` is marked local in the manifest and has no handler        │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
-── §97 · a transient panel floats, between two rules
-┌ Confirm ─────────────────────────────────────────────────────────────────────┐
-│apply this change?                                                            │
-└──────────────────────────────────────────────────────────────────────────────┘
+── §97 · a transient panel floats, between two rules — the layer, over an empty transcript
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────────────────────────
+  › /capabilities             the rendering route, and what the terminal can do
+    /clear                   empty the transcript; command history is untouched
+    /config             every setting, its value, and where the value came from
+────────────────────────────────────────────────────────────────────────────────
+❯ /c
+────────────────────────────────────────────────────────────────────────────────
 ── §48 · block states
 ✓ resolve  12 packages
 ⠋ fetch    3 remaining
@@ -2327,7 +2429,7 @@ beads ••••••••••••••••••••••••�
 posts ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 70%
 slant ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 70%
 squares ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■□□□□□□□□□□□□□□□□□□□□ 70%
-braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿                     70%
+braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣇                     70%
 ascii #################################################--------------------- 70%
 ── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
 · the fills — 24 bits, one letter per distinct ink, assigned within the row
@@ -2437,13 +2539,13 @@ ascii #################################################--------------------- 70%
 · BUDGET · capacity · continuous · still
 work ████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░ 62%  31/50
 · OPERATION · progress · segmented · active
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 62%
 · a training run · progress · continuous · active
 work ████████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░ 62%
 · a step count · count · segmented · still
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 31 of 50
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 31 of 50
 · stalled · progress · segmented · stalled
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ................................................................................ ── serving/volatility-estimator.yaml ───────────────────────────────────────────
@@ -2454,14 +2556,14 @@ work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰
 ................................................................................ 20 20       matchLabels:
 ................................................................................ 21    -       app: volatility-estimator
 ................................................................................    21 +       app: volatility-estimator
-................................................................................    22 +       prism.fmx.io/family: volatility
+................................................................................    22 +       prism.example.com/family: volatility
 ................................................................................ 22 23     replicas: 2
 ................................................................................ 23 24     template:
 · a tag with extent, ex. 3 — and the error tag is the only one
 ................................................................................ ┌──────────────────────────────────────────────────────────────────────────────┐
 ................................................................................ │                                                                              │
 ................................................................................ │ ────────────────────────────────── ERROR ─────────────────────────────────── │
-................................................................................ │ ▲ the manifest declares a tool the registry has no handler for, so it would  │
+................................................................................ │ ✗ the manifest declares a tool the registry has no handler for, so it would  │
 ................................................................................ │ classify as local and reach the pipeline with nothing to run                 │
 ................................................................................ │ at seal(): \`prune\` is marked local in the manifest and has no handler        │
 ................................................................................ │                                                                              │
@@ -2496,12 +2598,12 @@ a patch — a unified diff, not the gutter
   drawn  ── serving/volatility-estimator.yaml ───────────────────────
   drawn  ⋯ 14 unchanged lines
   drawn  @@ -18,6 +18,7 @@
-  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.fmx.io/family: volatility↵   replicas: 2↵   template:
+  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.example.com/family: volatility↵   replicas: 2↵   template:
 
 a status — the message and its detail
   drawn  ┌──────────────────────────────────────────────────────────┐
   drawn  │ ──────────────────────── ERROR ───────────────────────── │
-  drawn  │ ▲ the manifest declares a tool the registry has no       │
+  drawn  │ ✗ the manifest declares a tool the registry has no       │
   copy   the manifest declares a tool the registry has no handler for, so it would classify as local and reach the pipeline with nothing to run↵at seal(): \`prune\` is marked local in the manifest and has no handler
 
 a tape — the labels, not the marks
@@ -2514,18 +2616,18 @@ a rule — no source, so it declines
 
 ── §82 · no pushed views — a row expanded in place, and the rows below carrying on
 · r1 focused and expanded — the ground opens under ▸, the detail takes bgElev, and r2 beneath it takes none
-................................................................................      uuid     family            status
-................................................................................ ▸ ▿  a3f9b21  digit-classifier  running
-................................................................................     node  gpu-04.fmx.internal · 2×A100
+................................................................................        uuid     family            status
+................................................................................ ▸ ▿    a3f9b21  digit-classifier  running
+................................................................................     node  gpu-04.example.internal · 2×A100
 ................................................................................     mr    !1248  auto-merged
-................................................................................      7c2d4e1  decoder-zoom      succeeded
+................................................................................        7c2d4e1  decoder-zoom      succeeded
 
 · r1 expanded with nothing focused — the detail is grounded and the row above it is not: the ground follows expansion
-................................................................................      uuid     family            status
-................................................................................   ▿  a3f9b21  digit-classifier  running
-................................................................................     node  gpu-04.fmx.internal · 2×A100
+................................................................................        uuid     family            status
+................................................................................   ▿    a3f9b21  digit-classifier  running
+................................................................................     node  gpu-04.example.internal · 2×A100
 ................................................................................     mr    !1248  auto-merged
-................................................................................      7c2d4e1  decoder-zoom      succeeded
+................................................................................        7c2d4e1  decoder-zoom      succeeded
 
 ── §17 · focus treatment follows the shape — what each kind publishes against what it draws
 kind         elements  focus is drawn for
@@ -2570,7 +2672,7 @@ raw             0     — atomic: nothing to focus
 ........................................ so a nested quote flips it back early.
 
 ── §26 · the trail and the mark at the head — two carriers, and what each survives
-· streaming, hot edge — the head arrives in accent and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent
+· streaming, hot edge — the head arrives above the accent, the design's overshoot (C09 I133), and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent
 ................................................................................ The parser tracks quotes with a single boolean, which is why ⋅
 
 · settled — no band and no mark: nothing replaces the mark and nothing is left behind (R-BLK-188)
@@ -2658,7 +2760,7 @@ raw             0     — atomic: nothing to focus
 · focused — the chosen pair, and \`›\` INSIDE the ground rather than before it
 ................................................................................ [ Approve ]
 
-── §19 · the resolved keymap, the reader's own rung first
+── §19 · the resolved keymap, the reader's own rung first — 157 bindings across 10 scopes · the registry's current 69
 ── prompt — where you are                                                       
 ⏎       submit
 ⇧⏎      insertNewline
@@ -2751,7 +2853,7 @@ esc  exitNativeSelection
 esc  escapeSemanticSelection
 a    selectEntryUnderCaret
 ⇧A   selectAllLoadedEntries
-⏎    copySelectedEntries
+⏎    copyAndLeaveSemanticSelection
 y    copySelectedEntries
 ⌥w   copySelectedEntries
 ⌃⇧C  copySelectedEntries
@@ -2759,6 +2861,11 @@ y    copySelectedEntries
 ↓    moveSemanticCaretDown
 ⇧↑   extendSemanticSelectionUp
 ⇧↓   extendSemanticSelectionDown
+⇧←   extendSemanticSelectionLeft
+⇧→   extendSemanticSelectionRight
+←    moveSemanticCaretLeft
+→    moveSemanticCaretRight
+⌃V   toggleSemanticRect
 ── panel                                                                        
 ↓    menuNext
 ⇥    menuNext
@@ -2766,6 +2873,9 @@ y    copySelectedEntries
 ⏎    menuAccept
 esc  dismiss
 ⌃R   searchOlder
+⌥⇧↑  previewScrollUp
+⌥⇧↓  previewScrollDown
+⌥o   previewOpen
 ── interaction                                                                  
 ←    insideLeft
 →    insideRight
@@ -2812,8 +2922,8 @@ pagedown  blockPageDown
 pageup    blockPageUp
 ⇥         entryNext
 ⇧⇥        entryPrev
-←         paneLeft
-→         paneRight
+←         elementLeft
+→         elementRight
 ⌥←        dividerLeft
 ⌥→        dividerRight
 ⇧⏎        rerunEntry
@@ -2840,7 +2950,7 @@ exports[`golden frames — one per design fixture > dark-unicode at 40 1`] = `
 
 · the compaction is an OPERATION — segmented, active, and §036's head above it
     ✦ compacting (4s · 3 of 5 turns)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 60%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 60%
 
 · and when it stops the bar goes and the delta stays — one grammar, not two specimens
     ● 3 turns compacted · 10.7k → 0.9k tok
@@ -2862,19 +2972,24 @@ exports[`golden frames — one per design fixture > dark-unicode at 40 1`] = `
   │<the file>│
 
 ── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
-· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
+· a choice — the MARK and the WEIGHT carry chosen, the WASH carries focus, and the label is part of the shape
   at rest
     ........................................ scale  ○ linear  ● log  ○ log2
+    .................WWWWW.................. weight
   focused on \`linear\` — NOT chosen: the mark did not move
     .......AAAAAAAA......................... scale  ○ linear  ● log  ○ log2
       A = bg 48;2;46;46;46
+    .................WWWWW.................. weight
   focused on \`log\` — chosen: the same wash, the same mark
     .................AAAAA.................. scale  ○ linear  ● log  ○ log2
       A = bg 48;2;46;46;46
+    .................WWWWW.................. weight
   a checkbox, on
     ........................................ ✓ run the suite after each edit
+    WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW......... weight
   a checkbox, off — ⏎ toggled it
     ........................................ ✗ run the suite after each edit
+    ........................................ weight
 
 · a control — three states, three mechanisms, and the VALUE is none of them
   at rest
@@ -2890,16 +3005,16 @@ exports[`golden frames — one per design fixture > dark-unicode at 40 1`] = `
 · the head brackets while it runs and flattens when it stops — and the bar goes with the motion
   running · elapsed and delta
     ✦ Compacting conversation… (5m 38s · ↓ …
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
   running · elapsed alone
     ✦ Compacting conversation… (5m 38s)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
   running · delta alone
     ✦ Compacting conversation… (↓ 8.0k toke…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
   running · neither — and no empty parentheses
     ✦ Compacting conversation…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
   settled — flat, and the bar is GONE
     ● compacted · 6m 12s · 41k → 12k tokens…
   cancelled — muted, and the bar goes for its own reason
@@ -2911,13 +3026,13 @@ exports[`golden frames — one per design fixture > dark-unicode at 40 1`] = `
 
 · the same shape for every operation — §036's four, the delta in each one's own units
     ✦ Compacting conversation… (5m 38s · ↓ …
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯ 77%
     ✦ Indexing the repository… (12s · 4,102…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 44%
     ✦ Uploading the checkpoint… (64s · 2.1 …
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 44%
     ✦ Running the suite… (31s · 892 of 1,20…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱ 74%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯ 74%
 
 ── §95 · a tape, where a row of peers would shed
 scout ✓  planner ✓  › builder ⋅  2»
@@ -2928,16 +3043,30 @@ download ███████████████████░░░░�
 ── §96 · a status has three parts, and a frame is separate
 ┌──────────────────────────────────────┐
 │ ────────────── ERROR ─────────────── │
-│ ▲ the manifest declares a tool the   │
+│ ✗ the manifest declares a tool the   │
 │ registry has no handler for, so it   │
 │ would classify as local and reach    │
 │ the pipeline with nothing to run     │
 │ at seal(): \`prune\` is marked local … │
 └──────────────────────────────────────┘
-── §97 · a transient panel floats, between two rules
-┌ Confirm ─────────────────────────────┐
-│apply this change?                    │
-└──────────────────────────────────────┘
+── §97 · a transient panel floats, between two rules — the layer, over an empty transcript
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────
+  › /capabilities
+    /clear
+    /config
+────────────────────────────────────────────────────────────
+❯ /c
+────────────────────────────────────────────────────────────
 ── §48 · block states
 ✓ resolve  12 packages
 ⠋ fetch    3 remaining
@@ -3006,7 +3135,7 @@ beads •••••••••••••••••••••◦◦◦�
 posts ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯ 70%
 slant ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱ 70%
 squares ■■■■■■■■■■■■■■■■■■■■□□□□□□□□ 70%
-braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿         70%
+braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣇         70%
 ascii #####################--------- 70%
 ── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
 · the fills — 24 bits, one letter per distinct ink, assigned within the row
@@ -3120,13 +3249,13 @@ ascii #####################--------- 70%
 · BUDGET · capacity · continuous · still
 work ███████████████░░░░░░░░░ 62%  31/50
 · OPERATION · progress · segmented · active
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 62%
 · a training run · progress · continuous · active
 work ███████████████████░░░░░░░░░░░░ 62%
 · a step count · count · segmented · still
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱ 31 of 50
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯ 31 of 50
 · stalled · progress · segmented · stalled
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ........................................ ── serving/volatility-estimator.yaml ───
@@ -3137,7 +3266,7 @@ work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱
 ........................................ 20 20       matchLabels:
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 21    -       app: volatility-estimator
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    21 +       app: volatility-estimator
-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.fmx.io/family: vola…
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.example.com/family:…
 ........................................ 22 23     replicas: 2
 ........................................ 23 24     template:
   A = bg 48;2;73;0;0
@@ -3145,7 +3274,7 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.fmx.io/family: vola
 · a tag with extent, ex. 3 — and the error tag is the only one
 ........................................ ┌──────────────────────────────────────┐
 ................AAAAAAA................. │ ────────────── ERROR ─────────────── │
-........................................ │ ▲ the manifest declares a tool the   │
+........................................ │ ✗ the manifest declares a tool the   │
 ........................................ │ registry has no handler for, so it   │
 ........................................ │ would classify as local and reach    │
 ........................................ │ the pipeline with nothing to run     │
@@ -3186,12 +3315,12 @@ a patch — a unified diff, not the gutter
   drawn  ── serving/volatility-estimator.yaml ───
   drawn  ⋯ 14 unchanged lines
   drawn  @@ -18,6 +18,7 @@
-  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.fmx.io/family: volatility↵   replicas: 2↵   template:
+  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.example.com/family: volatility↵   replicas: 2↵   template:
 
 a status — the message and its detail
   drawn  ┌──────────────────────────────────────┐
   drawn  │ ────────────── ERROR ─────────────── │
-  drawn  │ ▲ the manifest declares a tool the   │
+  drawn  │ ✗ the manifest declares a tool the   │
   copy   the manifest declares a tool the registry has no handler for, so it would classify as local and reach the pipeline with nothing to run↵at seal(): \`prune\` is marked local in the manifest and has no handler
 
 a tape — the labels, not the marks
@@ -3207,7 +3336,7 @@ a rule — no source, so it declines
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   uuid     family            status
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB ▸ a3f9b21  digit-classifier  running
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     open
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.example.internal · 2×A…
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
 ........................................   7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
@@ -3217,7 +3346,7 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   uuid     family            status
 ........................................   a3f9b21  digit-classifier  running
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     open
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.example.internal · 2×A…
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
 ........................................   7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
@@ -3241,7 +3370,7 @@ patch           3     18:18 :19 19:
 pills           2     chip-0 chip-1
 choice          3     linear log log2
 control         1     control-1
-tape            5     seams arm count probe
+tape            5     seams arm count probe trace
 tree            6     src interaction parser frame data package
 split           2     split-files split-code
 form            5     name port replicas save cancel
@@ -3275,24 +3404,25 @@ BBBBBBB............. boolean, so a nested
   C = bg 48;2;222;227;24
 
 ── §26 · the trail and the mark at the head — two carriers, and what each survives
-· streaming, hot edge — the head arrives in accent and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent
+· streaming, hot edge — the head arrives above the accent, the design's overshoot (C09 I133), and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.. The parser tracks quotes with a single
-aaaaaaabcdefghijklmnoao................. boolean, which is why ⋅
+aaaaaaabcdefghijklmnoap................. boolean, which is why ⋅
   a = fg 38;2;212;212;212
-  b = fg 38;2;213;209;206
-  c = fg 38;2;215;206;199
-  d = fg 38;2;216;203;193
-  e = fg 38;2;218;199;187
-  f = fg 38;2;219;196;181
-  g = fg 38;2;221;193;174
-  h = fg 38;2;222;190;168
-  i = fg 38;2;223;187;162
-  j = fg 38;2;225;184;155
-  k = fg 38;2;226;181;149
-  l = fg 38;2;228;177;143
-  m = fg 38;2;229;174;137
-  n = fg 38;2;231;171;130
-  o = fg 38;2;232;168;124
+  b = fg 38;2;214;207;202
+  c = fg 38;2;216;202;193
+  d = fg 38;2;219;197;183
+  e = fg 38;2;221;193;173
+  f = fg 38;2;223;188;164
+  g = fg 38;2;225;183;154
+  h = fg 38;2;227;178;144
+  i = fg 38;2;230;173;135
+  j = fg 38;2;232;168;125
+  k = fg 38;2;247;179;132
+  l = fg 38;2;255;191;141
+  m = fg 38;2;255;203;150
+  n = fg 38;2;255;215;159
+  o = fg 38;2;255;227;167
+  p = fg 38;2;232;168;124
 
 · settled — no band and no mark: nothing replaces the mark and nothing is left behind (R-BLK-188)
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.. The parser tracks quotes with a single
@@ -3305,22 +3435,23 @@ aaaaaaaaaaaaaaaaaaaaa................... boolean, which is why
 
 · the reservation, at the width where it shows — 48 columns, streaming: the mark's two cells come off the wrap, so \`boolean,\` moves down
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.......... The parser tracks quotes with a single
-aaaaaaabcdefghijklmnoao......................... boolean, which is why ⋅
+aaaaaaabcdefghijklmnoap......................... boolean, which is why ⋅
   a = fg 38;2;212;212;212
-  b = fg 38;2;213;209;206
-  c = fg 38;2;215;206;199
-  d = fg 38;2;216;203;193
-  e = fg 38;2;218;199;187
-  f = fg 38;2;219;196;181
-  g = fg 38;2;221;193;174
-  h = fg 38;2;222;190;168
-  i = fg 38;2;223;187;162
-  j = fg 38;2;225;184;155
-  k = fg 38;2;226;181;149
-  l = fg 38;2;228;177;143
-  m = fg 38;2;229;174;137
-  n = fg 38;2;231;171;130
-  o = fg 38;2;232;168;124
+  b = fg 38;2;214;207;202
+  c = fg 38;2;216;202;193
+  d = fg 38;2;219;197;183
+  e = fg 38;2;221;193;173
+  f = fg 38;2;223;188;164
+  g = fg 38;2;225;183;154
+  h = fg 38;2;227;178;144
+  i = fg 38;2;230;173;135
+  j = fg 38;2;232;168;125
+  k = fg 38;2;247;179;132
+  l = fg 38;2;255;191;141
+  m = fg 38;2;255;203;150
+  n = fg 38;2;255;215;159
+  o = fg 38;2;255;227;167
+  p = fg 38;2;232;168;124
 
 · and the same block settled at 48 — \`boolean,\` stays up, which is the two cells, and it is the whole of what \`measure\` has to agree with
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa. The parser tracks quotes with a single boolean,
@@ -3400,7 +3531,7 @@ AAAAAAAAA...............................  Approve
 AAAAAAAAAAA.............................  › Approve
   A = bg 48;2;232;168;124
 
-── §19 · the resolved keymap, the reader's own rung first
+── §19 · the resolved keymap, the reader's own rung first — 157 bindings across 10 scopes · the registry's current 69
 ── prompt — where you are               
 ⏎       submit
 ⇧⏎      insertNewline
@@ -3493,7 +3624,7 @@ esc  exitNativeSelection
 esc  escapeSemanticSelection
 a    selectEntryUnderCaret
 ⇧A   selectAllLoadedEntries
-⏎    copySelectedEntries
+⏎    copyAndLeaveSemanticSelection
 y    copySelectedEntries
 ⌥w   copySelectedEntries
 ⌃⇧C  copySelectedEntries
@@ -3501,6 +3632,11 @@ y    copySelectedEntries
 ↓    moveSemanticCaretDown
 ⇧↑   extendSemanticSelectionUp
 ⇧↓   extendSemanticSelectionDown
+⇧←   extendSemanticSelectionLeft
+⇧→   extendSemanticSelectionRight
+←    moveSemanticCaretLeft
+→    moveSemanticCaretRight
+⌃V   toggleSemanticRect
 ── panel                                
 ↓    menuNext
 ⇥    menuNext
@@ -3508,6 +3644,9 @@ y    copySelectedEntries
 ⏎    menuAccept
 esc  dismiss
 ⌃R   searchOlder
+⌥⇧↑  previewScrollUp
+⌥⇧↓  previewScrollDown
+⌥o   previewOpen
 ── interaction                          
 ←    insideLeft
 →    insideRight
@@ -3554,8 +3693,8 @@ pagedown  blockPageDown
 pageup    blockPageUp
 ⇥         entryNext
 ⇧⇥        entryPrev
-←         paneLeft
-→         paneRight
+←         elementLeft
+→         elementRight
 ⌥←        dividerLeft
 ⌥→        dividerRight
 ⇧⏎        rerunEntry
@@ -3582,7 +3721,7 @@ exports[`golden frames — one per design fixture > dark-unicode at 80 1`] = `
 
 · the compaction is an OPERATION — segmented, active, and §036's head above it
     ✦ compacting (4s · 3 of 5 turns)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 60%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 60%
 
 · and when it stops the bar goes and the delta stays — one grammar, not two specimens
     ● 3 turns compacted · 10.7k → 0.9k tok
@@ -3604,19 +3743,24 @@ exports[`golden frames — one per design fixture > dark-unicode at 80 1`] = `
   │<the file>│
 
 ── §18 · focus on things that are not rows — a choice's two channels, and a control's three states
-· a choice — the MARK carries chosen, the WASH carries focus, and the label is part of the shape
+· a choice — the MARK and the WEIGHT carry chosen, the WASH carries focus, and the label is part of the shape
   at rest
     .................................................... scale  ○ linear  ● log  ○ log2
+    .................WWWWW.............................. weight
   focused on \`linear\` — NOT chosen: the mark did not move
     .......AAAAAAAA..................................... scale  ○ linear  ● log  ○ log2
       A = bg 48;2;46;46;46
+    .................WWWWW.............................. weight
   focused on \`log\` — chosen: the same wash, the same mark
     .................AAAAA.............................. scale  ○ linear  ● log  ○ log2
       A = bg 48;2;46;46;46
+    .................WWWWW.............................. weight
   a checkbox, on
     .................................................... ✓ run the suite after each edit
+    WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW..................... weight
   a checkbox, off — ⏎ toggled it
     .................................................... ✗ run the suite after each edit
+    .................................................... weight
 
 · a control — three states, three mechanisms, and the VALUE is none of them
   at rest
@@ -3632,16 +3776,16 @@ exports[`golden frames — one per design fixture > dark-unicode at 80 1`] = `
 · the head brackets while it runs and flattens when it stops — and the bar goes with the motion
   running · elapsed and delta
     ✦ Compacting conversation… (5m 38s · ↓ 8.0k tokens)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
   running · elapsed alone
     ✦ Compacting conversation… (5m 38s)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
   running · delta alone
     ✦ Compacting conversation… (↓ 8.0k tokens)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
   running · neither — and no empty parentheses
     ✦ Compacting conversation…
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
   settled — flat, and the bar is GONE
     ● compacted · 6m 12s · 41k → 12k tokens · 18 turns summ…
   cancelled — muted, and the bar goes for its own reason
@@ -3653,13 +3797,13 @@ exports[`golden frames — one per design fixture > dark-unicode at 80 1`] = `
 
 · the same shape for every operation — §036's four, the delta in each one's own units
     ✦ Compacting conversation… (5m 38s · ↓ 8.0k tokens)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 77%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯ 77%
     ✦ Indexing the repository… (12s · 4,102 of 9,318 files)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 44%
     ✦ Uploading the checkpoint… (64s · 2.1 of 4.8 GiB)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 44%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 44%
     ✦ Running the suite… (31s · 892 of 1,204 tests)
-    ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 74%
+    ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 74%
 
 ── §95 · a tape, where a row of peers would shed
 scout 4s ✓  planner 1m12s ✓  › builder ⋅ 8s  critic 2s ○  scribe 0s ○
@@ -3671,15 +3815,28 @@ download ███████████████████████�
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                                                                              │
 │ ────────────────────────────────── ERROR ─────────────────────────────────── │
-│ ▲ the manifest declares a tool the registry has no handler for, so it would  │
+│ ✗ the manifest declares a tool the registry has no handler for, so it would  │
 │ classify as local and reach the pipeline with nothing to run                 │
 │ at seal(): \`prune\` is marked local in the manifest and has no handler        │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
-── §97 · a transient panel floats, between two rules
-┌ Confirm ─────────────────────────────────────────────────────────────────────┐
-│apply this change?                                                            │
-└──────────────────────────────────────────────────────────────────────────────┘
+── §97 · a transient panel floats, between two rules — the layer, over an empty transcript
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────────────────────────
+  › /capabilities             the rendering route, and what the terminal can do
+    /clear                   empty the transcript; command history is untouched
+    /config             every setting, its value, and where the value came from
+────────────────────────────────────────────────────────────────────────────────
+❯ /c
+────────────────────────────────────────────────────────────────────────────────
 ── §48 · block states
 ✓ resolve  12 packages
 ⠋ fetch    3 remaining
@@ -3748,7 +3905,7 @@ beads ••••••••••••••••••••••••�
 posts ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 70%
 slant ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 70%
 squares ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■□□□□□□□□□□□□□□□□□□□□ 70%
-braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿                     70%
+braille ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣇                     70%
 ascii #################################################--------------------- 70%
 ── §37 · every registered ink ramp — the fills, the effects, and the rung where motion stops
 · the fills — 24 bits, one letter per distinct ink, assigned within the row
@@ -3862,13 +4019,13 @@ ascii #################################################--------------------- 70%
 · BUDGET · capacity · continuous · still
 work ████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░ 62%  31/50
 · OPERATION · progress · segmented · active
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 62%
 · a training run · progress · continuous · active
 work ████████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░ 62%
 · a step count · count · segmented · still
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 31 of 50
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 31 of 50
 · stalled · progress · segmented · stalled
-work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 62%
+work ▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯▯ 62%
 ── §72 · the background is a second channel — the ground census
 · a changed line, ex. 1 — the ground runs to the block's edge
 ................................................................................ ── serving/volatility-estimator.yaml ───────────────────────────────────────────
@@ -3879,7 +4036,7 @@ work ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰
 ................................................................................ 20 20       matchLabels:
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 21    -       app: volatility-estimator
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    21 +       app: volatility-estimator
-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.fmx.io/family: volatility
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    22 +       prism.example.com/family: volatility
 ................................................................................ 22 23     replicas: 2
 ................................................................................ 23 24     template:
   A = bg 48;2;73;0;0
@@ -3888,7 +4045,7 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 ................................................................................ ┌──────────────────────────────────────────────────────────────────────────────┐
 ................................................................................ │                                                                              │
 ....................................AAAAAAA..................................... │ ────────────────────────────────── ERROR ─────────────────────────────────── │
-................................................................................ │ ▲ the manifest declares a tool the registry has no handler for, so it would  │
+................................................................................ │ ✗ the manifest declares a tool the registry has no handler for, so it would  │
 ................................................................................ │ classify as local and reach the pipeline with nothing to run                 │
 ................................................................................ │ at seal(): \`prune\` is marked local in the manifest and has no handler        │
 ................................................................................ │                                                                              │
@@ -3928,12 +4085,12 @@ a patch — a unified diff, not the gutter
   drawn  ── serving/volatility-estimator.yaml ───────────────────────
   drawn  ⋯ 14 unchanged lines
   drawn  @@ -18,6 +18,7 @@
-  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.fmx.io/family: volatility↵   replicas: 2↵   template:
+  copy   --- a/serving/volatility-estimator.yaml↵+++ b/serving/volatility-estimator.yaml↵@@ -18,6 +18,7 @@↵ spec:↵   selector:↵     matchLabels:↵-      app: volatility-estimator↵+      app: volatility-estimator↵+      prism.example.com/family: volatility↵   replicas: 2↵   template:
 
 a status — the message and its detail
   drawn  ┌──────────────────────────────────────────────────────────┐
   drawn  │ ──────────────────────── ERROR ───────────────────────── │
-  drawn  │ ▲ the manifest declares a tool the registry has no       │
+  drawn  │ ✗ the manifest declares a tool the registry has no       │
   copy   the manifest declares a tool the registry has no handler for, so it would classify as local and reach the pipeline with nothing to run↵at seal(): \`prune\` is marked local in the manifest and has no handler
 
 a tape — the labels, not the marks
@@ -3946,20 +4103,20 @@ a rule — no source, so it declines
 
 ── §82 · no pushed views — a row expanded in place, and the rows below carrying on
 · r1 focused and expanded — the ground opens under ▸, the detail takes bgElev, and r2 beneath it takes none
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA      uuid     family            status
-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB ▸ ▿  a3f9b21  digit-classifier  running
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA        uuid     family            status
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB ▸ ▿    a3f9b21  digit-classifier  running
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.example.internal · 2×A100
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
-................................................................................      7c2d4e1  decoder-zoom      succeeded
+................................................................................        7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
   B = bg 48;2;46;46;46
 
 · r1 expanded with nothing focused — the detail is grounded and the row above it is not: the ground follows expansion
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA      uuid     family            status
-................................................................................   ▿  a3f9b21  digit-classifier  running
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.fmx.internal · 2×A100
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA        uuid     family            status
+................................................................................   ▿    a3f9b21  digit-classifier  running
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     node  gpu-04.example.internal · 2×A100
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA     mr    !1248  auto-merged
-................................................................................      7c2d4e1  decoder-zoom      succeeded
+................................................................................        7c2d4e1  decoder-zoom      succeeded
   A = bg 48;2;34;34;34
 
 ── §17 · focus treatment follows the shape — what each kind publishes against what it draws
@@ -4013,23 +4170,24 @@ raw             0     — atomic: nothing to focus
   C = bg 48;2;222;227;24
 
 ── §26 · the trail and the mark at the head — two carriers, and what each survives
-· streaming, hot edge — the head arrives in accent and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent
-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabcdefghijklmnoao.................. The parser tracks quotes with a single boolean, which is why ⋅
+· streaming, hot edge — the head arrives above the accent, the design's overshoot (C09 I133), and the band cools over the last fourteen CELLS toward the run's own ink, and the mark sits one space past the head in accent
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabcdefghijklmnoap.................. The parser tracks quotes with a single boolean, which is why ⋅
   a = fg 38;2;212;212;212
-  b = fg 38;2;213;209;206
-  c = fg 38;2;215;206;199
-  d = fg 38;2;216;203;193
-  e = fg 38;2;218;199;187
-  f = fg 38;2;219;196;181
-  g = fg 38;2;221;193;174
-  h = fg 38;2;222;190;168
-  i = fg 38;2;223;187;162
-  j = fg 38;2;225;184;155
-  k = fg 38;2;226;181;149
-  l = fg 38;2;228;177;143
-  m = fg 38;2;229;174;137
-  n = fg 38;2;231;171;130
-  o = fg 38;2;232;168;124
+  b = fg 38;2;214;207;202
+  c = fg 38;2;216;202;193
+  d = fg 38;2;219;197;183
+  e = fg 38;2;221;193;173
+  f = fg 38;2;223;188;164
+  g = fg 38;2;225;183;154
+  h = fg 38;2;227;178;144
+  i = fg 38;2;230;173;135
+  j = fg 38;2;232;168;125
+  k = fg 38;2;247;179;132
+  l = fg 38;2;255;191;141
+  m = fg 38;2;255;203;150
+  n = fg 38;2;255;215;159
+  o = fg 38;2;255;227;167
+  p = fg 38;2;232;168;124
 
 · settled — no band and no mark: nothing replaces the mark and nothing is left behind (R-BLK-188)
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.................... The parser tracks quotes with a single boolean, which is why
@@ -4040,22 +4198,23 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa....................
 
 · the reservation, at the width where it shows — 48 columns, streaming: the mark's two cells come off the wrap, so \`boolean,\` moves down
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.......... The parser tracks quotes with a single
-aaaaaaabcdefghijklmnoao......................... boolean, which is why ⋅
+aaaaaaabcdefghijklmnoap......................... boolean, which is why ⋅
   a = fg 38;2;212;212;212
-  b = fg 38;2;213;209;206
-  c = fg 38;2;215;206;199
-  d = fg 38;2;216;203;193
-  e = fg 38;2;218;199;187
-  f = fg 38;2;219;196;181
-  g = fg 38;2;221;193;174
-  h = fg 38;2;222;190;168
-  i = fg 38;2;223;187;162
-  j = fg 38;2;225;184;155
-  k = fg 38;2;226;181;149
-  l = fg 38;2;228;177;143
-  m = fg 38;2;229;174;137
-  n = fg 38;2;231;171;130
-  o = fg 38;2;232;168;124
+  b = fg 38;2;214;207;202
+  c = fg 38;2;216;202;193
+  d = fg 38;2;219;197;183
+  e = fg 38;2;221;193;173
+  f = fg 38;2;223;188;164
+  g = fg 38;2;225;183;154
+  h = fg 38;2;227;178;144
+  i = fg 38;2;230;173;135
+  j = fg 38;2;232;168;125
+  k = fg 38;2;247;179;132
+  l = fg 38;2;255;191;141
+  m = fg 38;2;255;203;150
+  n = fg 38;2;255;215;159
+  o = fg 38;2;255;227;167
+  p = fg 38;2;232;168;124
 
 · and the same block settled at 48 — \`boolean,\` stays up, which is the two cells, and it is the whole of what \`measure\` has to agree with
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa. The parser tracks quotes with a single boolean,
@@ -4135,7 +4294,7 @@ AAAAAAAAA.......................................................................
 AAAAAAAAAAA.....................................................................  › Approve
   A = bg 48;2;232;168;124
 
-── §19 · the resolved keymap, the reader's own rung first
+── §19 · the resolved keymap, the reader's own rung first — 157 bindings across 10 scopes · the registry's current 69
 ── prompt — where you are                                                       
 ⏎       submit
 ⇧⏎      insertNewline
@@ -4228,7 +4387,7 @@ esc  exitNativeSelection
 esc  escapeSemanticSelection
 a    selectEntryUnderCaret
 ⇧A   selectAllLoadedEntries
-⏎    copySelectedEntries
+⏎    copyAndLeaveSemanticSelection
 y    copySelectedEntries
 ⌥w   copySelectedEntries
 ⌃⇧C  copySelectedEntries
@@ -4236,6 +4395,11 @@ y    copySelectedEntries
 ↓    moveSemanticCaretDown
 ⇧↑   extendSemanticSelectionUp
 ⇧↓   extendSemanticSelectionDown
+⇧←   extendSemanticSelectionLeft
+⇧→   extendSemanticSelectionRight
+←    moveSemanticCaretLeft
+→    moveSemanticCaretRight
+⌃V   toggleSemanticRect
 ── panel                                                                        
 ↓    menuNext
 ⇥    menuNext
@@ -4243,6 +4407,9 @@ y    copySelectedEntries
 ⏎    menuAccept
 esc  dismiss
 ⌃R   searchOlder
+⌥⇧↑  previewScrollUp
+⌥⇧↓  previewScrollDown
+⌥o   previewOpen
 ── interaction                                                                  
 ←    insideLeft
 →    insideRight
@@ -4289,8 +4456,8 @@ pagedown  blockPageDown
 pageup    blockPageUp
 ⇥         entryNext
 ⇧⇥        entryPrev
-←         paneLeft
-→         paneRight
+←         elementLeft
+→         elementRight
 ⌥←        dividerLeft
 ⌥→        dividerRight
 ⇧⏎        rerunEntry

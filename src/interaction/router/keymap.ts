@@ -340,6 +340,15 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // layer is on top — the handler reads `overlays.top`, which is L4's to do and
   // is why C20 adds no fourth row here.
   { target: "panel", key: { name: "r", ctrl: true }, action: "searchOlder" },
+  //
+  // **The chip preview's own three** (C22 I143, C22 I144, `R-KEY-010`, ruling 53
+  // amended). `panel` because the preview is a prompt substate (C15 I29): the
+  // prompt answers first (`promptUnderMenu`) and binds none of these, so they
+  // reach the panel's rows. Over a menu or a search the row resolves too, and
+  // the effect asks the owner — consumed, and nothing moves (§6q.2).
+  { target: "panel", ...fromRegistry("preview.scroll.up"), action: "previewScrollUp" },
+  { target: "panel", ...fromRegistry("preview.scroll.down"), action: "previewScrollDown" },
+  { target: "panel", ...fromRegistry("preview.open"), action: "previewOpen" },
 
   // --- C17, readline's set and no more (I21, C16 §6) -----------------------
   //
@@ -569,11 +578,11 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // the export path writes a file instead.
   { target: "semanticSelection", key: { name: "a" }, action: "selectEntryUnderCaret" },
   { target: "semanticSelection", key: { name: "A" }, action: "selectAllLoadedEntries" },
-  // **`⏎` copies** (C14 I47, R-SEL-015, §103): the footer has said `⏎ copy`
-  // since the mode landed, and the count is defined as *what return would
-  // copy*. **First, because the order is read** (C22 I133): the owner line
-  // names an action by its first row, and §103's copy line is `⏎ copy`.
-  { target: "semanticSelection", ...fromRegistry("confirm"), action: "copySelectedEntries" },
+  // **`⏎` copies and leaves** (C14 I47, I59, R-SEL-015, §103, R-BLK-838's
+  // *leaves by esc, or a copy*): the count is defined as *what return would
+  // copy*, and return is the copy that ends the mode. Its own action over
+  // `y`'s copy path, so the held view is what both take (A6).
+  { target: "semanticSelection", ...fromRegistry("confirm"), action: "copyAndLeaveSemanticSelection" },
   // `y` is the same copy, as at `liveBlock` — the same keycap at a coarser grain
   // (`R-SEL-004`), and **a different action from the prompt's**, which is the
   // thing worth saying. `copySelection` already exists and is the prompt's `⌥w`:
@@ -584,15 +593,21 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // And the registry's `copy`, as at every owner with the verb (C16 I66).
   { target: "semanticSelection", ...fromRegistry("copy"), action: "copySelectedEntries" },
   { target: "semanticSelection", ...fromRegistry("copy", "enhanced-terminal"), action: "copySelectedEntries" },
-  // **The caret moves, and the shifted pair extends** (C14 I37, §6c). `⇧←` and
-  // `⇧→` are deliberately absent: `selection.left`/`selection.right` are
-  // horizontal, and at block granularity there is no horizontal extent — the
-  // axis belongs to `R-SEL-007`'s rectangular selection, which copies cells
-  // rather than source and is a different thing to select.
+  // **The caret moves, and the shifted pair extends** (C14 I37, §6c). The
+  // horizontal four are `R-SEL-007`'s rectangle's alone (C14 I60, rulings 36,
+  // 70): at block granularity a block is atomic, so they do nothing there, and
+  // the owner line names them only while the rectangle is up.
   { target: "semanticSelection", ...fromRegistry("move.up"), action: "moveSemanticCaretUp" },
   { target: "semanticSelection", ...fromRegistry("move.down"), action: "moveSemanticCaretDown" },
   { target: "semanticSelection", ...fromRegistry("selection.up"), action: "extendSemanticSelectionUp" },
   { target: "semanticSelection", ...fromRegistry("selection.down"), action: "extendSemanticSelectionDown" },
+  { target: "semanticSelection", ...fromRegistry("selection.left"), action: "extendSemanticSelectionLeft" },
+  { target: "semanticSelection", ...fromRegistry("selection.right"), action: "extendSemanticSelectionRight" },
+  { target: "semanticSelection", ...fromRegistry("move.left"), action: "moveSemanticCaretLeft" },
+  { target: "semanticSelection", ...fromRegistry("move.right"), action: "moveSemanticCaretRight" },
+  // **`⌃V` toggles the rectangle** (C14 I60, ruling 36) — a target-local
+  // keycap as `a`, `A` and `y` are; the registry names no rectangular action.
+  { target: "semanticSelection", key: { name: "v", ctrl: true }, action: "toggleSemanticRect" },
 
   { target: "global", key: { name: "pageup" }, action: "scrollPageUp" },
   { target: "global", key: { name: "pagedown" }, action: "scrollPageDown" },
@@ -716,8 +731,8 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // divider chord**, *the SCROLLBAR's rule on the other axis*; §019 keeps them
   // word motion *in text fields*, which is the `prompt` rows above, so one
   // chord at two targets is resolved by the ladder rather than refused.
-  { target: "liveBlock", ...fromRegistry("move.left"), action: "paneLeft" },
-  { target: "liveBlock", ...fromRegistry("move.right"), action: "paneRight" },
+  { target: "liveBlock", ...fromRegistry("move.left"), action: "elementLeft" },
+  { target: "liveBlock", ...fromRegistry("move.right"), action: "elementRight" },
   { target: "liveBlock", key: { name: "left", meta: true }, action: "dividerLeft" },
   { target: "liveBlock", key: { name: "right", meta: true }, action: "dividerRight" },
 
@@ -1006,8 +1021,8 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
     rowDown: true,
     entryPrev: true,
     entryNext: true,
-    paneLeft: true,
-    paneRight: true,
+    elementLeft: true,
+    elementRight: true,
     dividerLeft: true,
     dividerRight: true,
     insideLeft: true,
@@ -1057,6 +1072,9 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
     watchJump7: true,
     watchJump8: true,
     watchJump9: true,
+    previewScrollUp: true,
+    previewScrollDown: true,
+    previewOpen: true,
     agentNext: true,
     agentPrevious: true,
     agent1: true,
@@ -1081,6 +1099,12 @@ const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
     moveSemanticCaretDown: true,
     extendSemanticSelectionUp: true,
     extendSemanticSelectionDown: true,
+    copyAndLeaveSemanticSelection: true,
+    toggleSemanticRect: true,
+    moveSemanticCaretLeft: true,
+    moveSemanticCaretRight: true,
+    extendSemanticSelectionLeft: true,
+    extendSemanticSelectionRight: true,
   } satisfies Readonly<Record<KeyAction, true>>),
 );
 

@@ -1376,6 +1376,9 @@ function image(
       `b.image: exactly one of "data" or "path" — got ${data === undefined ? "neither" : "both"} (C04 I73)`,
     );
   }
+  // The validator's rule, before the read — not whatever `readFileSync("")`
+  // happens to throw (C04 I143).
+  if (path === "") throw new TypeError('b.image: "path" cannot be empty (C04 I143)');
   if (!Number.isInteger(height) || height < 1) {
     throw new TypeError(`b.image: height is a positive integer — got ${JSON.stringify(height)} (C04 I73)`);
   }
@@ -1411,6 +1414,9 @@ function image(
       // different overlays should decode once. The *picture's* identity is
       // `imageKey`, derived where it is needed and by one function.
       digest: digestOf(bytes),
+      // **Kept as a record beside the bytes** (C04 I142) — the copy's second
+      // line. Nothing below this function opens it.
+      ...(path === undefined ? {} : { path }),
       ...(overlay === undefined ? {} : { overlay }),
     } as Image,
     opts,

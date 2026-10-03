@@ -13,7 +13,7 @@
 
 | Deliverable | Where it lives | Contains | Publishes |
 |---|---|---|---|
-| Calcium | `Calcium/` | C01–C25, the framework | A package to GitHub Packages, private |
+| Calcium | `Calcium/` | C01–C25, the framework | The `calcium-tui` package — not published yet (§9) |
 | `docker-tui` | `Calcium/examples/docker/` | R01, the reference app | Nothing — proof, plus an import manifest |
 | `plots-tui` | `Calcium/examples/plots/` | C12's forms in a terminal, built through `b.plot` | Nothing — the one gate that reads a frame rather than comparing bytes |
 | `prism-tui` | its own repository | Prism's adapters, manifest, theme, world, surfaces | Nothing — an internal app |
@@ -42,7 +42,7 @@ Separate rather than a monorepo because R01 §8's argument generalises: **a work
 
 **`docker-tui` resolved differently, and the argument above is why it could.** R01 §8 moved it to `Calcium/examples/docker/` on the finding that separation was never the goal — *building against the packaged artefact* was, and separation was one way to get it. Two mechanisms buy the same guarantee inside the workspace:
 
-- **The seal.** `"@fmx/calcium": "file:../.."` plus `"files": ["dist"]` and an `exports` map locked to its entry points — six at C24 I37, every one resolving into `dist/bundle/` (§5, F1193) — so `import "@fmx/calcium/src/…"` is a resolution error enforced by npm rather than by discipline.
+- **The seal.** `"calcium-tui": "file:../.."` plus `"files": ["dist"]` and an `exports` map locked to its entry points — six at C24 I37, every one resolving into `dist/bundle/` (§5, F1193) — so `import "calcium-tui/src/…"` is a resolution error enforced by npm rather than by discipline.
 - **The proof.** `make proof` packs the real tarball, installs it into a tree that has never seen this repository, and runs the app's suite against it — refusing to proceed if npm resolved a symlink instead.
 
 **The distinction that makes this safe is what a repository boundary was actually protecting.** It was never the file layout; it was the resolution path. A boundary enforced by `exports` fails the same way a boundary enforced by separation does — at install, not at review — and it fails on every developer's machine rather than only in CI.
@@ -145,7 +145,7 @@ to be on `PATH`.
 **The separation is in what is installed, not in where the file sits.** Both
 configs live under `.devcontainer/`, because a devcontainer config in a
 subdirectory makes that subdirectory the workspace — and the example's
-dependency is `"@fmx/calcium": "file:../.."`, which then points outside the
+dependency is `"calcium-tui": "file:../.."`, which then points outside the
 mount and fails to install. `.devcontainer/<name>/devcontainer.json` is the
 supported multi-container layout and each mounts the repository root, so the
 path resolves to the thing it names. **This is the rule's cheapest possible
@@ -309,7 +309,7 @@ The budget argument survives intact, because a PR runs the expensive tier once p
 
 | Repo | Last stage |
 |---|---|
-| Calcium | Publish on tag to GitHub Packages, with attestation and SBOM |
+| Calcium | `make proof` (pack, install clean, examples against the tarball). Publish on tag is **held** until a registry is chosen (§9); the job keeps its attestation step |
 | `docker-tui` | Real-docker run **where available; the skip is recorded, not silent** (R01 §8) · publish the import manifest on release |
 | `prism-tui` | Conformance against the real CLI where available; `record --diff` reporting structural drift. **No CI yet — local `make all` for now** |
 
@@ -369,7 +369,28 @@ It encodes: read the spec's commitments and invariants first; one test per invar
 
 ## 9. Distribution
 
-**Not published publicly.** Calcium publishes on tag from CI to **GitHub Packages**, private.
+**Not published yet — held, 2026-09-29, by the person's ruling.** The package was renamed
+`calcium-tui` (169f8cc8), and the name is **unscoped**. GitHub Packages accepts only scoped
+names (`@owner/name`), so the arrangement below cannot publish it, and the registry is not
+yet chosen. Until it is:
+
+- `package.json` carries **no `publishConfig`**, and CI's `publish` job is **held off** with
+  its reason beside it, so no tag publishes anything anywhere.
+- `make proof` still proves the package is a package: publish is not refused, the tarball
+  installs into clean trees, and the examples run against it. With no `publishConfig`, the
+  plain `--registry` override is the one that takes, which is what the script passes and then
+  asserts (F12's rule — assert the line, do not trust the flag — is unchanged).
+- A consumer clones the repository, runs `npm install` and `npm run build`, and depends on
+  the folder with `"calcium-tui": "file:<path>"`, as the examples do. **Not a git
+  dependency**, for the reason below.
+- The name was checked free on the public npm registry on 2026-09-29, with the variants npm
+  treats as the same name (`calciumtui`, `calcium_tui`, `calcium.tui`). That is a reading, not
+  a reservation.
+
+What follows is the arrangement this replaced, kept because the reasoning about git
+dependencies and local iteration still holds whichever registry is chosen.
+
+**Formerly: not published publicly.** Calcium published on tag from CI to **GitHub Packages**, private.
 
 Consumers install it as an ordinary npm dependency pointed at that registry:
 
@@ -389,7 +410,7 @@ This is unchanged in every way that matters for R01's argument. Installing from 
 
 ### Why not a git dependency
 
-`"@fmx/calcium": "git+ssh://git@gitlab.fmx/…#v0.3.0"` avoids a registry entirely and is tempting. It does not work here.
+`"calcium-tui": "git+ssh://git@gitlab.example/…#v0.3.0"` avoids a registry entirely and is tempting. It does not work here.
 
 **Git dependencies install from source and need a `prepare` script to build** — and A04 §3 bans install scripts outright, because postinstall is the primary npm attack vector. Allowing one for this would be trading the single most valuable supply-chain control for the convenience of not configuring a registry.
 
@@ -431,7 +452,7 @@ The reference app bumping is the release gate. It lives in another repo precisel
 9. CI runs the same Makefile targets a developer runs — not equivalents.
 10. `make enforce` executes A03; it runs before the test suite so violations fail in seconds.
 11. A skipped real-integration run is recorded, never silent.
-12. Distribution is to GitHub Packages, private, from CI on tag using `GITHUB_TOKEN`; no laptop holds a credential.
+12. Nothing is published until a registry is chosen (§9). When it is, distribution is from CI on tag, and no laptop holds a credential.
 13. Not a git dependency — that would require an install script, trading the most valuable supply-chain control for a saved configuration step.
 14. GitHub Actions attestation is not npm provenance, and is not described as it.
 15. `npm link` locally, registry install in CI — the packaging test runs where a link cannot mask it.

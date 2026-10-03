@@ -71,7 +71,7 @@ const results = runPass({
     {
       name: "settledness read from the outcome beside the state",
       file: DOCUMENTS,
-      from: '  return state !== "queued" && state !== "running";',
+      from: '  return state !== "queued" && state !== "waiting" && state !== "running";',
       to: '  return state !== "running" && (call.settled === true || (call.outcome !== undefined && call.outcome !== ""));',
       expect: "T1.76",
     },

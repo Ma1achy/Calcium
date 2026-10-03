@@ -14,7 +14,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { Block, KeyValue, Notice, Table } from "@fmx/calcium";
+import type { Block, KeyValue, Notice, Table } from "calcium-tui";
 import {
   changeRow,
   createDiffAdapter,

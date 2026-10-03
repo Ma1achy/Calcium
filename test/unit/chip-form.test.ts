@@ -11,9 +11,9 @@ import { layout } from "../../src/interaction/editor/layout.js";
 import { cells, sliceCells } from "../../src/presentation/text.js";
 
 const SEP = "·";
-const PAINTED: ChipLook = { separator: SEP, painted: true };
-const BARE: ChipLook = { separator: SEP, painted: false };
-const ASCII: ChipLook = { separator: "-", painted: true };
+const PAINTED: ChipLook = { separator: SEP, painted: true, unicode: "full" };
+const BARE: ChipLook = { separator: SEP, painted: false, unicode: "full" };
+const ASCII: ChipLook = { separator: "-", painted: true, unicode: "ascii" };
 const GUTTER = { first: 0, cont: 0 } as const;
 
 const PASTE: Chip = { ordinal: 1, kind: "paste", name: "json", lines: 47, content: "{}" };
@@ -123,10 +123,11 @@ describe("C17 §5c — the chip", () => {
     expect(chipSpans(two.text, 200, GUTTER, two.drawAs).length, "two chips, two spans").toBe(2);
   });
 
-  it("T1.47 (C17 I25, §5c, I20): a chip wider than the row overflows, and its span still names its cells", () => {
-    // **An editor never alters what the user typed**, and a chip is what the
-    // user pasted (I20). A label wider than the whole row goes on one row and
-    // overflows it rather than being dropped or cut.
+  it("T1.47 (C17 I32, I25, §5e): a chip wider than the row is drawn at exactly the row, and its span names exactly its cells", () => {
+    // **Amended — this row asserted the overflow** (I26's old last sentence).
+    // *A chip is what the user pasted* is true of the content and not of the
+    // label, which is C17's composition (I25); so the content is untouched and
+    // the label is cut to the row it got (I32, §5e).
     const long: Chip = { ordinal: 1, kind: "paste", name: "a-very-long-detected-kind-name", lines: 4096, content: "x" };
     const label = chipLabel(long, PAINTED);
     const width = 12;
@@ -134,13 +135,97 @@ describe("C17 §5c — the chip", () => {
 
     const e = withChip(long, PAINTED);
     const rows = layout(e.text, width, GUTTER, e.drawAs);
-    expect(rows.some((r) => r.includes(label)), "drawn whole, overflowing").toBe(true);
+    expect(rows.every((r) => cells(r) <= width), `no row passes the width: ${JSON.stringify(rows)}`).toBe(true);
+    expect(rows.some((r) => r.includes(label)), "the whole label is drawn nowhere").toBe(false);
 
     const spans = chipSpans(e.text, width, GUTTER, e.drawAs);
     expect(spans.length, "and it still has a ground").toBe(1);
-    // The span stops at the row's width — the same rule `selectionSpans` uses
-    // for a row a region passes through. Beyond it there are no cells to paint.
-    expect(spans[0]?.to, "the span stops at the row").toBe(width);
+    const span = spans[0];
+    expect(span, "one span").toBeDefined();
+    if (span === undefined) return;
+    expect([span.from, span.to], "the ground is the whole row, and no more").toEqual([0, width]);
+    expect(sliceCells(rows[span.row] ?? "", span.from, span.to), "the span is the drawn label").toBe(rows[span.row]);
+    // **The content is not the label**: what leaves the prompt is all of it.
+    expect(e.resolved, "submission is untouched").toBe("look at x then");
+  });
+});
+
+describe("C17 §5e — a chip wider than its row", () => {
+  const LONG: Chip = { ordinal: 1, kind: "paste", name: "a-very-long-detected-kind-name", lines: 4096, content: "x" };
+
+  it("T1.54 (C17 I32, §5e, C09 I103): the label is cut in the middle to exactly the row, frame kept, at both rungs", () => {
+    // **Against literals**, because the row is the form. The head keeps the
+    // ordinal and the tail keeps the size — an end cut keeps `#1 a-very-long-`
+    // and loses `4096L`, which is the half that says how much was pasted.
+    const width = 20;
+    const drawn = { painted: ` #1 a-…name ${SEP} 4096L `, bare: `[#1 a-…name ${SEP} 4096L]` } as const;
+    for (const [rung, look] of [["painted", PAINTED], ["bare", BARE]] as const) {
+      const e = withChip(LONG, look);
+      const rows = layout(e.text, width, GUTTER, e.drawAs);
+      expect(rows, `${rung}: moved to a row of its own, cut there, and the text after it on the next`).toEqual([
+        "look at ",
+        drawn[rung],
+        " then",
+      ]);
+      expect(cells(drawn[rung]), "exactly the row").toBe(width);
+
+      const spans = chipSpans(e.text, width, GUTTER, e.drawAs);
+      expect(spans, `${rung}: the ground is the drawn label's cells`).toEqual([{ row: 1, from: 0, to: width }]);
+      // `insertChip` leaves the caret after the chip, and `withChip` typed
+      // ` then` after that — so the position after the chip is index 9.
+      e.move("bufferStart");
+      for (let i = 0; i < 9; i += 1) e.move("charRight");
+      expect(e.cursorCell(width, GUTTER), `${rung}: after the chip, the next row's first cell`).toEqual({ row: 2, col: 0 });
+    }
+
+    // **The control: a label that fits is drawn whole**, so the cut is the
+    // walk's answer to a row it does not fit and not a shorter label.
+    const fits = withChip(PASTE, PAINTED);
+    expect(layout(fits.text, 80, GUTTER, fits.drawAs), "a label that fits").toEqual([`look at ${chipLabel(PASTE, PAINTED)} then`]);
+  });
+
+  it("T1.55 (C17 I32, §5e): the row the chip lands on decides its width, and a partly used row is left before the cut", () => {
+    // **A gutter whose two figures differ**, which is the only input where
+    // the limit read before `open()` and the one read after it disagree: row 0
+    // has 20 usable cells and every continuation row 14.
+    const gutter = { first: 0, cont: 6 } as const;
+    const e = withChip(LONG, PAINTED);
+    const rows = layout(e.text, 20, gutter, e.drawAs);
+    expect(rows[0], "row 0 keeps the text, and no piece of the chip").toBe("look at ");
+    expect(rows[1], "cut to row 1's fourteen cells, not row 0's twenty").toBe(` #1 … ${SEP} 4096L `);
+    expect(cells(rows[1] ?? ""), "exactly the continuation row").toBe(14);
+    expect(chipSpans(e.text, 20, gutter, e.drawAs), "and the ground starts at the gutter").toEqual([
+      { row: 1, from: 6, to: 20 },
+    ]);
+  });
+
+  it("T1.56 (C17 I32, §5e): the narrow end — the marker alone, then the frame around it, and the marker is the tier's", () => {
+    const only = (look: ChipLook): ReturnType<typeof createEditor> => {
+      const e = createEditor({ chips: look });
+      e.insertChip(LONG);
+      return e;
+    };
+    const first = (look: ChipLook, width: number): string => {
+      const e = only(look);
+      return layout(e.text, width, GUTTER, e.drawAs)[0] ?? "";
+    };
+    // One cell: no frame fits beside the marker, at either rung.
+    expect(first(PAINTED, 1)).toBe("…");
+    expect(first(BARE, 1)).toBe("…");
+    // Two: still no frame, and the cell the marker did not take is padding,
+    // so the chip spends exactly the two cells it was given.
+    expect(first(PAINTED, 2)).toBe("… ");
+    expect(first(BARE, 2)).toBe("… ");
+    // Three: the frame and the marker, and no text.
+    expect(first(PAINTED, 3)).toBe(" … ");
+    expect(first(BARE, 3)).toBe("[…]");
+
+    // **The ASCII tier's marker is `~`**, taken through `ChipLook.unicode`: a
+    // `…` here is the glyph the ASCII rung exists to avoid, and at the wide
+    // rung (which is the same set) it is two cells the walk measures as one.
+    expect(first(ASCII, 1), "the tier's marker").toBe("~");
+    expect(first(ASCII, 3)).toBe(" ~ ");
+    expect(first(ASCII, 12), "head and tail either side of it").toBe(" #1 ~ 4096L ");
   });
 });
 
@@ -148,7 +233,7 @@ describe("C17 §5d — which chip the caret is on", () => {
   it("T1.48 (C17 I27, §5d, §101): the chip before the caret, the one after it at the head, and null between them", () => {
     const one = { ordinal: 1, kind: "paste", name: "one", lines: 6, content: "ONE" } as const;
     const two = { ordinal: 2, kind: "paste", name: "two", lines: 9, content: "TWO" } as const;
-    const e = createEditor({ chips: { separator: "\u00b7", painted: true } });
+    const e = createEditor({ chips: { separator: "\u00b7", painted: true, unicode: "full" } });
     e.insertChip(one);
     e.insert("xy");
     e.insertChip(two);

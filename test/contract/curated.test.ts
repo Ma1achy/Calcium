@@ -89,8 +89,9 @@ describe("C10 §2 / C09 §4 — the curated tables", () => {
       HIGH_CONTRAST_FOUR_BIT["syntax.type"],
     );
 
-    // The five whose distinctness is the 4-bit rung's only promise (C10 I26).
-    expect([...MUST_STAY_DISTINCT]).toEqual(["ok", "warn", "error", "info", "accent"]);
+    // The five meaning tones and `muted` (C10 I17, I26): `muted` joined by
+    // PARKED 79, so no fact shares an index with the quiet grey.
+    expect([...MUST_STAY_DISTINCT]).toEqual(["ok", "warn", "error", "info", "accent", "muted"]);
 
     // `hcDark` lends the curated map and `hcLight` does not, because that map
     // puts the bright half in the foreground *because the ground is index 0*.
@@ -116,7 +117,7 @@ describe("C10 §2 / C09 §4 — the curated tables", () => {
     // initialiser shape, so an answer of nothing — or of literals only, which is
     // what the regex saw — is a failure rather than a green run.
     for (const [shape, name] of [
-      ["literal", "ANSI16_HEX"],
+      ["literal", "ANSI16_WINDOWS_HEX"],
       ["identifier", "defaultTheme"],
       ["member", "DARK_FOUR_BIT"],
       ["constructor", "FREE_WIDTH_SLOTS"],

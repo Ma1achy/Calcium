@@ -31,6 +31,8 @@ import { truncate } from "../text.js";
 import { fitRow } from "../rows.js";
 import { statusDefinition, statusRowsFor } from "./kinds/status.js";
 import { barOf } from "./kinds/containers.js";
+import { neutralBlock } from "./neutral.js";
+import { neutraliseControl } from "../../data/text.js";
 import type {
   MeasureMemo,
   RenderScratch,
@@ -38,6 +40,8 @@ import type {
   BlockDefinition,
   BlockFault,
   BlockRegistry,
+  FocusShape,
+  FocusState,
   NavElement,
   PlacedElement,
   RenderContext,
@@ -158,7 +162,7 @@ const MISSING: BlockDefinition = {
     rows([
       paint([
         {
-          text: `[${block.kind} has no definition, and no raw fallback is registered]`,
+          text: `[${neutraliseControl(block.kind)} has no definition, and no raw fallback is registered]`,
           style: tone("error", ctx.theme, ctx.capabilities),
         },
       ]),
@@ -491,6 +495,14 @@ class Registry implements BlockRegistry {
     return this.#definitions.get(kind);
   }
 
+  /**
+   * The shape a block's kind declares for focus, or `null` (I137, §7k) — what
+   * `RenderContext.focusShapeOf` hands a container, so it asks the kind rather
+   * than switching over kinds. An unregistered kind draws as `raw`, which
+   * declares none.
+   */
+  focusShapeOf = (block: Block): FocusShape | null => this.#definitions.get(block.kind)?.focusShape ?? null;
+
   seal(): void {
     // Sealing twice is a no-op, not an error (T3.3). Composition roots compose.
     this.#sealed = true;
@@ -507,17 +519,21 @@ class Registry implements BlockRegistry {
    * and nothing registered — falls back to nothing, and says so as a block
    * rather than as a throw.
    */
+  /**
+   * **And the block is neutralised here, once** (C09 I127). This is the one
+   * function every member reaches a definition through, so measure, render,
+   * the windows, elements and copy all read the same neutralised value — the
+   * class closed at its funnel rather than at nineteen call sites. A clean
+   * block comes back as itself, and a block met again is a lookup.
+   */
   #resolve(block: Block): Readonly<{ definition: BlockDefinition; block: Block }> {
     const held = this.#definitions.get(block.kind);
-    if (held !== undefined) return { definition: held, block };
+    if (held !== undefined) return { definition: held, block: neutralBlock(block) };
 
     const fallback = this.#definitions.get("raw");
-    if (fallback === undefined) return { definition: MISSING, block };
+    if (fallback === undefined) return { definition: MISSING, block: neutralBlock(block) };
 
-    return {
-      definition: fallback,
-      block: { kind: "raw", id: block.id, text: JSON.stringify(block) },
-    };
+    return { definition: fallback, block: neutralBlock(rawOf(block)) };
   }
 
   /**
@@ -1172,9 +1188,15 @@ class Registry implements BlockRegistry {
       width: inner,
       measureChild: this.#measureChild,
       widthChild: this.width,
-      renderChild: (child: Block, childWidth: number, theme?: ResolvedTheme): Rendered =>
-        this.render(child, theme === undefined ? { ...ctx, width: childWidth } : { ...ctx, width: childWidth, theme }),
+      renderChild: (child: Block, childWidth: number, theme?: ResolvedTheme, focus?: FocusState | null): Rendered =>
+        this.render(child, {
+          ...ctx,
+          width: childWidth,
+          ...(theme === undefined ? {} : { theme }),
+          ...(focus === undefined ? {} : { focus }),
+        }),
       windowChild: this.windowChild,
+      focusShapeOf: this.focusShapeOf,
     };
 
     // **The height is committed before anything is drawn** (I11). It used to be
@@ -1285,7 +1307,25 @@ export function createBlockRegistry(
  * (C09 I34).
  */
 function errorStatus(text: string, height: number): Status {
-  return { kind: "status", id: "status", state: "error", message: text, height } as Status;
+  // **Neutralised, because a thrown message is a field too** (C09 I127): the
+  // error box is drawn by a definition the registry calls directly, and a
+  // renderer's `Error` can carry whatever the block it choked on carried.
+  return { kind: "status", id: "status", state: "error", message: neutraliseControl(text), height } as Status;
+}
+
+/**
+ * An unregistered block's `raw` stand-in (I10), one per block object — so the
+ * fallback's neutralised form is memoised as every other block's is, rather
+ * than rebuilt and re-walked on every ask. The JSON escapes C0 as a backslash-u sequence
+ * and leaves C1 and bidi as they are, which is why the neutraliser still runs.
+ */
+const RAW_OF = new WeakMap<Block, Block>();
+function rawOf(block: Block): Block {
+  const held = RAW_OF.get(block);
+  if (held !== undefined) return held;
+  const raw: Block = { kind: "raw", id: block.id, text: JSON.stringify(block) };
+  RAW_OF.set(block, raw);
+  return raw;
 }
 
 function floorOf(block: Block): number {

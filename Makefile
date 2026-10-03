@@ -21,7 +21,7 @@ install:            ## npm ci, no install scripts, then the one named build (A04
 	@# arrive** (F156). F150 wired both examples' own `check` scripts into that
 	@# target and did not wire their install, so it passed on a machine that had
 	@# run them before and failed on the first clean checkout — CI's `fast` job,
-	@# 19 seconds in, `TS2307: Cannot find module '@fmx/calcium'`.
+	@# 19 seconds in, `TS2307: Cannot find module 'calcium-tui'`.
 	@#
 	@# Two things are needed and only one is obvious. Their `node_modules` is
 	@# the obvious half. The other is `dist/`: an example resolves the package
@@ -47,7 +47,7 @@ quantised:          ## C10 I41 — the shipped themes' quantisations, regenerate
 
 check:              ## type-check and lint, including the examples
 	npm run check
-	@# **The examples resolve `@fmx/calcium` to `dist/`, and `dist/` is built by
+	@# **The examples resolve `calcium-tui` to `dist/`, and `dist/` is built by
 	@# `e2e` — the LAST target in `all`** (F447). So on any commit that widens a
 	@# public type, this target type-checks the examples against the *previous*
 	@# commit's build and passes; the failure surfaces on the next run, attributed
@@ -219,6 +219,12 @@ regime:             ## what a source-scan pass costs *here*, beside the recorded
 	node tools/scan-cost.mjs
 
 test: catalogue               ## tiers 1-4, and the examples' own suites
+	@# **`example-bins` executes each example's launcher, and the launcher reads
+	@# `dist/`** — so this target read a generated artefact without generating it,
+	@# F447's class at the second gate (F1459). CI ran `check` first and hid it;
+	@# a rebased worktree ran `test` first and failed F56's three rows on the
+	@# pre-rebase build, then passed them 16 of 16 once `e2e` had rebuilt.
+	npm run build
 	npm run test
 	@# **The example suites were in no target at all** — `make check` type-checks
 	@# them and nothing ran them, so `examples/docker`'s 313 rows could go red

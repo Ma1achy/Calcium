@@ -134,16 +134,35 @@ case("the 8-bit shot unsets COLORTERM rather than emptying it", depth8.get("COLO
 names = [n for n, *_ in SHOTS]
 case("every shot has its own name", len(names), len(set(names)))
 
-# 8 — F811: the theme statement is cleared before *every* shot's `run`, in the
-#     loop, not once at the top — a shot after `theme-light` is otherwise light.
-#     Source order rather than a call: the helper is trivially right on its own
-#     and the defect was that nothing called it.
+# 8 — **every shot is recorded against the demo world** (the person's ruling,
+#     2026-09-29). `capture.run` drives the bin against whatever daemon is
+#     reachable, and the app draws the whole host: one call to it here is a
+#     published picture of this machine. Source rather than a call, because the
+#     defect is which function the loop names. (F811's row lived here: its
+#     `forget_theme` moved into `capture.run`, and `run_world` keeps its state
+#     in memory, so the hazard has no route into this loop.)
 _src = (Path(__file__).resolve().parent / "media.py").read_text(encoding="utf8")
 _loop = _src[_src.index("for name, cols, rows, command, hold, env, still in SHOTS:"):]
 case(
-    "forget_theme() runs inside the shot loop, before run()",
-    0 < _loop.find("forget_theme()") < _loop.find("run(cols, rows, script, raw, hold, env)"),
+    "the shot loop records with run_world and never with capture.run",
+    ("run_world(cols, rows, script, raw, hold, env)" in _loop, re.search(r"(?<![_\w])run\(cols", _loop) is None),
+    (True, True),
+)
+
+# 9 — and the finished cast is read for this host before anything renders it.
+case(
+    "assert_private runs on each cast, after the recording and before render",
+    # `rfind` for the render: the `--render` branch above the recording calls
+    # it too, and that one renders a cast recorded (and checked) earlier.
+    0 < _loop.find("run_world(") < _loop.find("assert_private(cast)") < _loop.rfind("render(cast"),
     True,
+)
+
+# 10 — no shot names a lab container: `dtui-*` exists only on a daemon.
+case(
+    "no shot's command names a dtui- container",
+    [n for n, _, _, command, *_ in SHOTS if b"dtui-" in command],
+    [],
 )
 
 if __name__ == "__main__":

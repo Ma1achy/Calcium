@@ -30,7 +30,7 @@ for a glance that only wanted one.
 
   » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13
   ████████░░░░░░░░░░░░░░░░░░░░  30%  15k/50k   step ██████░░░░ 6/10   28 tok/s
-  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3   ⋯ 3 agents   malachy
+  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3   ⋯ 3 agents   someone
   ⋯ › main    seams  2:53 ✓   arm  3:46 ✓   count  ✦ 4:02    ⌃⇥ switch
 
 one row, present only while something runs, and gone with them. It is
@@ -59,7 +59,7 @@ its first entry.
   ────────────────────────────────────────────────────────────────────────────
   » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13
   ██████████████████████░░  92%  46k/50k   step █████████░ 18/20   28 tok/s
-  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m
+  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          someone   31m
   ⋯   main    seams  2:53 ✓   arm  3:46 ✓ › count  ✦ 4:02    ⌃⇥ switch
 
 all four rules take the agent's hue, and the prompt's label carries

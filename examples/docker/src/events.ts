@@ -26,12 +26,12 @@
  * eight-row trace.
  */
 
-import { b } from "@fmx/calcium";
-import type { LocalDocument, Block, EventLine } from "@fmx/calcium";
+import { b } from "calcium-tui";
+import type { LocalDocument, Block, EventLine } from "calcium-tui";
 import { parseNdjson, str } from "./ndjson.ts";
 import type { Row } from "./ndjson.ts";
 
-import type { LocalContext } from "@fmx/calcium";
+import type { LocalContext } from "calcium-tui";
 /** The tick, the window, and the ring — three numbers, and they are ordered. */
 export const TICK_MS = 3000;
 /**

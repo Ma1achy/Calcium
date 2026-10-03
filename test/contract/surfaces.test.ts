@@ -29,7 +29,7 @@ const S01_SESSION: SessionSnapshot = Object.freeze({
   env: Object.freeze({}),
   lastUuid: null,
   identity: null,
-  cluster: "fmx-prod",
+  cluster: "corp-prod",
   health: "live",
   version: "1.0.0",
   retained: null,

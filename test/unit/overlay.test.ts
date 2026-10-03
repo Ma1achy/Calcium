@@ -653,3 +653,26 @@ describe("C15 I30, I31, I33 — the layer's shape, its pointer and its generatio
     ]);
   });
 });
+
+describe("C15 I34 — promptLive", () => {
+  it("T1.38 (C15 I34): promptLive on push reads on top; an update changes it alone; absent reads false", () => {
+    const m = manager();
+    m.push(panel("bare", 2, { row: 20, prefer: "above" }));
+    expect(m.top?.promptLive ?? false, "absent reads false").toBe(false);
+    m.dismiss("bare");
+
+    m.push({ ...panel("menu", 2, { row: 20, prefer: "above" }), promptLive: true });
+    expect(m.top?.promptLive).toBe(true);
+    const before = m.top;
+    expect(m.update("menu", { promptLive: false })).toBe(true);
+    expect(m.top?.promptLive, "update carries it").toBe(false);
+    expect(m.top?.content, "and touches nothing else").toBe(before?.content);
+    expect(m.top?.placement).toBe(before?.placement);
+    // An update that does not name it leaves it where it was.
+    m.update("menu", { content: rows(3, "menu") });
+    expect(m.top?.promptLive).toBe(false);
+    m.update("menu", { promptLive: true });
+    m.update("menu", { content: rows(2, "menu") });
+    expect(m.top?.promptLive).toBe(true);
+  });
+});

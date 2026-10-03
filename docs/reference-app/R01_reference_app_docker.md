@@ -3,8 +3,8 @@
 | Field | Value |
 |---|---|
 | **Type** | Reference application |
-| **Package** | `docker-tui` at `Calcium/examples/docker/` — a monorepo example consuming `@fmx/calcium` as a packaged dependency (sealed `exports` + pack-and-install CI), not through `../../src` |
-| **Depends on** | `@fmx/calcium` only, through its public entry points (C24) |
+| **Package** | `docker-tui` at `Calcium/examples/docker/` — a monorepo example consuming `calcium-tui` as a packaged dependency (sealed `exports` + pack-and-install CI), not through `../../src` |
+| **Depends on** | `calcium-tui` only, through its public entry points (C24) |
 | **Consumed by** | Nothing. It is a proof, not a library |
 | **Source** | Scratchpad 4 · A02 §6 forcing function · C24 |
 | **Status** | Draft |
@@ -157,7 +157,7 @@ The app ships a recorded corpus (C08), which does three things:
 - C08's recording tooling gets a **second consumer**, which is the only way to know it works for anyone but Prism
 - Golden frames become reproducible
 
-Recorded via `@fmx/calcium/fixtures`, provenance-marked, with the authored ratio reported. Scenarios: `running`, `mixed`, `empty`, `daemon-down`.
+Recorded via `calcium-tui/fixtures`, provenance-marked, with the authored ratio reported. Scenarios: `running`, `mixed`, `empty`, `daemon-down`.
 
 ---
 
@@ -173,8 +173,8 @@ that is really a hard one are all invisible from inside the workspace.
 That guarantee is preserved in a monorepo by two mechanisms rather than by separation:
 
 **The seal (dev loop).** The example lives at `Calcium/examples/docker/` and depends on
-`"@fmx/calcium": "file:../.."`. Calcium's `package.json` locks `exports` to the three
-entry points and sets `"files": ["dist"]`. With that in place `import "@fmx/calcium/src/..."`
+`"calcium-tui": "file:../.."`. Calcium's `package.json` locks `exports` to the three
+entry points and sets `"files": ["dist"]`. With that in place `import "calcium-tui/src/..."`
 is a resolution error — the app can only see the public surface, enforced by npm. **Verify
 the seal before writing app code**; if `exports` does not seal it, that is a real Calcium
 finding (C24's surface is not sealed), fixed first.
@@ -223,7 +223,7 @@ Each row is a claim the framework makes and this app tests.
 6. `/stats` polls via `b.live`; `/logs` covers streaming.
 7. One `b.live` part failing leaves the others rendering.
 8. A recorded fixture corpus ships, giving C08's tooling a second consumer.
-9. A monorepo example at `examples/docker/` that consumes the packaged `@fmx/calcium` — sealed `exports` for the dev loop, a local-registry pack-and-install for the proof — never `../../src`.
+9. A monorepo example at `examples/docker/` that consumes the packaged `calcium-tui` — sealed `exports` for the dev loop, a local-registry pack-and-install for the proof — never `../../src`.
 10. Its own CI; a skipped real-docker run is recorded, never silent.
 11. It imports only from Calcium's public entry points, never a deep path.
 12. It publishes an import manifest on each release, for C24's unused-export scan.
@@ -245,7 +245,7 @@ Each row is a claim the framework makes and this app tests.
 
 - **R2.1**: every document passes `measuresCorrectly()` at seven widths.
 - **R2.2**: every document passes `degradesToAscii()` and `degradesTo1Bit()`.
-- **R2.3**: no source file imports a deep path — only `@fmx/calcium`, `@fmx/calcium/testing`, `@fmx/calcium/fixtures`.
+- **R2.3**: no source file imports a deep path — only `calcium-tui`, `calcium-tui/testing`, `calcium-tui/fixtures`.
 - **R2.4**: app source under 300 lines, excluding manifest, fixtures and tests.
 - **R2.5**: no emitted command is a mutating docker subcommand — scanned against a denylist.
 - **R2.6**: the app registers no custom block kind, theme or command policy.
@@ -290,7 +290,7 @@ Each row is a claim the framework makes and this app tests.
   checks an artefact, and this one checks a reader.
 - **R4.5**: bump Calcium to a new minor → builds with no app changes. **Requiring changes means the bump was not minor.**
 - **R4.6**: the launcher enables Node's on-disk compile cache before it imports the app, where `NODE_ENV` already goes and for the same reason — a static import hoists past it. Measured on a container-local copy, five interleaved pairs: a session's start 1 045 → 694, 883 → 560, 667 → 650, 676 → 592, 572 → 522 ms, five of five, paired median −84 ms of about 600 (F1164). `module.enableCompileCache()` with no argument, so a consumer who sets `NODE_COMPILE_CACHE` keeps their directory and one who sets nothing gets the platform's temporary directory; a cache that cannot be written is a status the launcher ignores, because a start that fails on a cache is worse than a slow one. `plots-tui` carries the same line by the same rule.
-- **R4.7**: **Retired with Ink** (C24 I37, F1209). It read: *the launcher calls `prepareLaunch()` from `@fmx/calcium/launch` between the compile cache and the app import, so the loader hands Ink one module instead of es-toolkit's compat barrel* (F1192), and the row spawned the launcher under a counting resolve hook of its own. **The measurement is kept because it is the reason, not the rule**: six interleaved pairs of a cold import on a container-local copy, 235 → 208 ms median without the compile cache and 205 → 162 with it, six of six each way. Ink is gone (F1209), so es-toolkit is not in the graph and the hooks have nothing to arm; the count the row read is zero by construction, which is a row that cannot fail rather than one that passes.
+- **R4.7**: **Retired with Ink** (C24 I37, F1209). It read: *the launcher calls `prepareLaunch()` from `calcium-tui/launch` between the compile cache and the app import, so the loader hands Ink one module instead of es-toolkit's compat barrel* (F1192), and the row spawned the launcher under a counting resolve hook of its own. **The measurement is kept because it is the reason, not the rule**: six interleaved pairs of a cold import on a container-local copy, 235 → 208 ms median without the compile cache and 205 → 162 with it, six of six each way. Ink is gone (F1209), so es-toolkit is not in the graph and the hooks have nothing to arm; the count the row read is zero by construction, which is a row that cannot fail rather than one that passes.
 
 ### Fail-on-revert
 
@@ -398,7 +398,7 @@ demonstration would have been.
 
 ### 8 — not proven, and the corpus that exists is not the one promised
 
-*"Recorded via `@fmx/calcium/fixtures`, provenance-marked, with the authored ratio
+*"Recorded via `calcium-tui/fixtures`, provenance-marked, with the authored ratio
 reported. Scenarios: `running`, `mixed`, `empty`, `daemon-down`."*
 
 `test/corpus/` holds **twelve real captures** — `ps-real.ndjson`, `stats-real.ndjson`,
@@ -407,7 +407,7 @@ They do the job the commitment's *first* reason names: CI runs the app's suite w
 docker at all.
 
 They are not C08 recordings. Nothing in this application imports
-`@fmx/calcium/fixtures` — the only reference is `seal.test.ts`, which asserts the entry
+`calcium-tui/fixtures` — the only reference is `seal.test.ts`, which asserts the entry
 point **exists** and imports nothing from it. **C08's tooling still has exactly one
 consumer**, which was the commitment's second and more interesting reason.
 
@@ -429,7 +429,7 @@ never had this consumer's data.
 
 ### 11 — held where it was written down, broken where it was not
 
-No file under `src/` imports anything but `@fmx/calcium` and two `node:` builtins —
+No file under `src/` imports anything but `calcium-tui` and two `node:` builtins —
 23 imports, checked. **`test/` reaches into `dist/` twice**, for the measurer and the
 validator (F36, F37), and both are recorded with an `eslint-disable` naming the finding.
 

@@ -250,7 +250,7 @@ const S07_IDENTITY: Block = block({
     { field: "kind", a: "candidate", b: "experiment", change: "changed" },
     { field: "status", a: "succeeded", b: "succeeded", change: "unchanged" },
     { field: "job", a: "TrainingJob", b: "TrainingJob", change: "unchanged" },
-    { field: "owner", a: "malachy", b: "malachy", change: "unchanged" },
+    { field: "owner", a: "someone", b: "someone", change: "unchanged" },
     { field: "resources", a: "2×GPU · 16Gi", b: "1×GPU · 8Gi", change: "changed" },
     { field: "duration", a: "14m 20s", b: "22m 04s", change: "changed" },
   ],
@@ -377,8 +377,8 @@ const S08_RESOLVED: Block = block({
   id: "s08-resolved",
   padding: { t: 1 },
   rows: [
-    { label: "model", value: "fmx_models.models:DigitClassifier" },
-    { label: "train_data", value: "fmx_models.data.pipeline:train_pipeline" },
+    { label: "model", value: "ml_models.models:DigitClassifier" },
+    { label: "train_data", value: "ml_models.data.pipeline:train_pipeline" },
     { label: "resources", value: "1×GPU · 8Gi        (model floor 1×GPU 8Gi — satisfied)" },
     { label: "callbacks", value: "3                  MLflowLogger · Checkpoint · EarlyStopping" },
     { label: "estimated", value: "~14 minutes        based on similar runs · confidence high" },
@@ -444,10 +444,10 @@ const S03_TABLE: Block = block({
   padding: { t: 1 },
   columns: cols("docs/surfaces/S03_ps_list.md"),
   rows: [
-    cellsOfRow("a3f9b21", { uuid: "a3f9b21", kind: "candidate", family: "digit-classifier", status: "running", detail: "ep 17/40", metric: "0.0372", age: "23m", owner: "malachy", mr: "!1248" }, "work-unit"),
-    cellsOfRow("7c2d4e1", { uuid: "7c2d4e1", kind: "experiment", family: "decoder-zoom", status: "succeeded", metric: "0.0089", age: "41m", owner: "malachy", mr: "!1201" }, "ok"),
+    cellsOfRow("a3f9b21", { uuid: "a3f9b21", kind: "candidate", family: "digit-classifier", status: "running", detail: "ep 17/40", metric: "0.0372", age: "23m", owner: "someone", mr: "!1248" }, "work-unit"),
+    cellsOfRow("7c2d4e1", { uuid: "7c2d4e1", kind: "experiment", family: "decoder-zoom", status: "succeeded", metric: "0.0089", age: "41m", owner: "someone", mr: "!1201" }, "ok"),
     cellsOfRow("2e8a04c", { uuid: "2e8a04c", kind: "experiment", family: "graphsage", status: "failed", detail: "OOM at ep 3", metric: "—", age: "1h 12m", owner: "priya", mr: "!1188" }, "error"),
-    cellsOfRow("f410d99", { uuid: "f410d99", kind: "candidate", family: "flow-predictor", status: "queued", metric: "—", age: "3m", owner: "malachy", mr: "—" }, "queued"),
+    cellsOfRow("f410d99", { uuid: "f410d99", kind: "candidate", family: "flow-predictor", status: "queued", metric: "—", age: "3m", owner: "someone", mr: "—" }, "queued"),
   ],
 });
 
@@ -487,7 +487,7 @@ const S14_KEYS: Block = block({
   padding: { t: 1 },
   columns: cols("docs/surfaces/S14_config.md"),
   rows: [
-    ["current_context", "fmx-prod", "config"],
+    ["current_context", "corp-prod", "config"],
     ["ui.theme", "dark", "config"],
     ["ui.show_banner", "true", "default"],
     ["terminal.colour_depth", "24", "env"],
@@ -506,8 +506,8 @@ const S14_CONTEXTS: Block = block({
   showHeader: false,
   columns: cols("docs/surfaces/S14_config.md", 1),
   rows: [
-    cellsOfRow("fmx-prod", { name: "fmx-prod", url: "https://prism.fmx.io/v1", token: "token valid · 30d" }),
-    cellsOfRow("fmx-staging", { name: "fmx-staging", url: "https://staging.prism.fmx.io", token: "token expired" }),
+    cellsOfRow("corp-prod", { name: "corp-prod", url: "https://prism.example.com/v1", token: "token valid · 30d" }),
+    cellsOfRow("corp-staging", { name: "corp-staging", url: "https://staging.prism.example.com", token: "token expired" }),
   ],
 });
 
@@ -519,8 +519,8 @@ const S15_SECRETS: Block = block({
   rows: [
     cellsOfRow("gitlab-readonly-token", { name: "gitlab-readonly-token", owner: "research-infra", age: "34d" }, "work-unit"),
     cellsOfRow("minio-research-creds", { name: "minio-research-creds", owner: "research-infra", age: "34d" }, "work-unit"),
-    cellsOfRow("wandb-api-key", { name: "wandb-api-key", owner: "malachy", age: "12d" }, "work-unit"),
-    cellsOfRow("huggingface-token", { name: "huggingface-token", owner: "malachy", age: "8d", note: "not accessible" }, "error"),
+    cellsOfRow("wandb-api-key", { name: "wandb-api-key", owner: "someone", age: "12d" }, "work-unit"),
+    cellsOfRow("huggingface-token", { name: "huggingface-token", owner: "someone", age: "8d", note: "not accessible" }, "error"),
   ],
 });
 
@@ -531,7 +531,7 @@ const S15_SECRETS: Block = block({
  * silent (S11 §2).
  */
 const S11_RUN: readonly Block[] = [
-  block({ kind: "rule", id: "s11-rule", label: "run · fmx_models.jobs.training:job · host-native" }),
+  block({ kind: "rule", id: "s11-rule", label: "run · ml_models.jobs.training:job · host-native" }),
   block({
     kind: "steps",
     id: "s11-steps",
@@ -592,7 +592,7 @@ const S11_RUN: readonly Block[] = [
 const S12_LOGS: Block = block({
   kind: "panel",
   id: "s12",
-  title: "logs · a3f9b21 · gpu-04.fmx.internal ─────────────────────── ● following",
+  title: "logs · a3f9b21 · gpu-04.example.internal ─────────────────────── ● following",
   footer: "esc back · / filter · l level · ⌃s pause · g top · G bottom · ⏎ follow",
   children: [
     block({
@@ -642,7 +642,7 @@ const S02_WELCOME: readonly Block[] = [
     id: "s02-connection",
     padding: { t: 1 },
     rows: [
-      { label: "", value: "Connected to prism.fmx.io as malachy.doherty@fmx.io" },
+      { label: "", value: "Connected to prism.example.com as sam.taylor@example.com" },
       { label: "Teams", value: "vision · ml-platform-readonly" },
       { label: "Token", value: "expires in 30d" },
     ],
@@ -751,7 +751,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       block({
         kind: "rule",
         id: "s09-rule",
-        label: "test · fmx_models.jobs.training:job · pytest",
+        label: "test · ml_models.jobs.training:job · pytest",
       }),
       block({
         kind: "rule",
@@ -819,7 +819,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       block({
         kind: "rule",
         id: "s08-rule",
-        label: "validate · fmx_models.jobs.training:job · T1 · in-process",
+        label: "validate · ml_models.jobs.training:job · T1 · in-process",
       }),
       S08_STEPS_OK,
       S08_RESOLVED,
@@ -851,7 +851,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       block({
         kind: "rule",
         id: "s08f-rule",
-        label: "validate · fmx_models.jobs.training:job · T1 · in-process",
+        label: "validate · ml_models.jobs.training:job · T1 · in-process",
       }),
       block({
         kind: "steps",
@@ -869,7 +869,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
         padding: { t: 1 },
         rows: [
           { label: "T1-008", value: "TrainingConfig requires at least one of: max_epochs, total_steps" },
-          { label: "file", value: "fmx_models/jobs/training.py:18" },
+          { label: "file", value: "ml_models/jobs/training.py:18" },
           { label: "field", value: "config=TrainingConfig(batch_size=128, mixed_precision=True)" },
           { label: "fix", value: "add max_epochs=N or total_steps=N" },
         ],
@@ -880,8 +880,8 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
         padding: { t: 1 },
         rows: [
           { label: "Rule 5", value: "Callback supports mismatch" },
-          { label: "file", value: "fmx_models/jobs/training.py:24" },
-          { label: "callback", value: "fmx_models.callbacks:MultiMetricEarlyStopping" },
+          { label: "file", value: "ml_models/jobs/training.py:24" },
+          { label: "callback", value: "ml_models.callbacks:MultiMetricEarlyStopping" },
           { label: "issue", value: 'supports={"inference"}, but job is a TrainingJob' },
           { label: "fix", value: 'add "training" to the callback\'s supports set' },
         ],

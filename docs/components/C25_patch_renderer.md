@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` |
+| **Package** | `calcium-tui` |
 | **Layer** | L1 presentation |
 | **Depends on** | C04 (`Patch`, `Hunk`, `Measure`) · C09 (registers into its registry; `cells()`; tokenisation) · C10 (`resolveTone`, `resolve` for the `syntax` palette, `resolveBackground` for the diff surfaces) |
 | **Consumed by** | C09's registry · S10's manifest change · any surface showing a textual change |
@@ -49,7 +49,7 @@ C09 §3 gives all nineteen kinds a measure/render row and **not one of them a dr
 20 20       matchLabels:
 21    -       app: volatility-estimator
    21 +       app: volatility-estimator
-   22 +       prism.fmx.io/family: volatility
+   22 +       prism.example.com/family: volatility
 22 23     replicas: 2
 23 24     template:
 ⋯ 170 unchanged lines
@@ -111,7 +111,7 @@ Worth recording because the palette looks like the knob and is not: authoring a 
 19     selector:                       │19     selector:
 20       matchLabels:                  │20       matchLabels:
 21 -       app: volatility-estimator   │21 +       app: volatility-estimator
-                                       │22 +       prism.fmx.io/family: volat…
+                                       │22 +       prism.example.com/family: volat…
 22     replicas: 2                     │23     replicas: 2
 23     template:                       │24     template:
 ```
@@ -784,6 +784,6 @@ Six tiers. No state machine, so no transition table (A02 §7).
 
 **`code.startLine` is not landing here.** Scratchpad 6 §3 designs it — a number rather than a boolean, absent meaning no gutter, the width derived — and its consumer is S08, which is not built. It is additive and optional so nothing breaks, but it changes golden frames for every `code` fixture that opts in, and touching a built component for no consumer is the thing the discipline exists to prevent. `markLine` is weaker again and stays open.
 
-**`hunksFromStructuredPatch` is not landing here.** The `diff` package's `structuredPatch` output maps mechanically onto `Hunk` — split the sigil, derive the header, count from `oldStart`/`newStart` — and the inclination is that the *type conversion* is worth shipping while the *dependency* stays the app's. One function, no dependency, and unresolved: it may belong in `@fmx/calcium/testing`, in the app, or nowhere.
+**`hunksFromStructuredPatch` is not landing here.** The `diff` package's `structuredPatch` output maps mechanically onto `Hunk` — split the sigil, derive the header, count from `oldStart`/`newStart` — and the inclination is that the *type conversion* is worth shipping while the *dependency* stays the app's. One function, no dependency, and unresolved: it may belong in `calcium-tui/testing`, in the app, or nowhere.
 
 **Lezer is researched and undecided.** Scratchpad 6 §4 measures it against lowlight — 856 KB against 9.5 MB, incremental by design, and a **closed** tag vocabulary of 78 tags, which is the palette-slot argument arrived at independently. Switching would rewrite C09's tokenisation section and its hljs map, change `DEPENDENCIES.md`, and re-record the goldens, and it has no consumer until either the editor or a second language exists. Recorded because the obstacle it answers — a resumable parser for Node — was the thing blocking the editor, and it is answered.

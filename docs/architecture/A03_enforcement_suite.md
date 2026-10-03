@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Architecture |
-| **Package** | `@fmx/calcium` — runs against both packages |
+| **Package** | `calcium-tui` — runs against both packages |
 | **Collects** | Every lint rule, source scan, module-graph assertion and compile-level check declared across the 43 specs |
 | **Status** | Draft |
 
@@ -395,6 +395,8 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 | SS65 | **Every `current` registry glyph resolves to a mark `glyphs.ts` can draw**, or is named in `GLYPH_HOMES` with its home and its reason. SS64 is a *collision* rule: it pairs the marks appearing on **both** sides, so a glyph with no character in the tree never enters a pair and passes every run — an absence is the one defect a collision rule is structurally blind to. Found three on its first run: `question` `⟩` in no file in `src/` while both question components name it as their first carrier, `current` `›` only in `overlay/place.ts` under another meaning, and `reader` `❯` in the shell's config (F161's shape, with the consumers present). Bidirectional — an entry whose mark has arrived is itself a violation | `docs/design/language/calcium-registry.json` × `src/presentation/blocks/glyphs.ts` | C09 §7c · C09 I88 |
 | SS66 | **Every `current` rule is in exactly one of three states, and the sets partition the population by equality** (`tools/rule-status.mjs`). SS65 asks whether a *glyph* has arrived; this asks whether a **rule** has been looked at by anything. `AUTHORITY.md` puts `status: current` at the top of the precedence ladder and the sixteen-MR plan nowhere on it, so a rule the plan never named could be unbuilt, uncited and invisible to every per-MR report — which is what the first run measured: of 118 current rules, **70 cited, 7 covered, 41 owed**. `cited` is a reference and not a behaviour, and the ledger says so. **The check that carries the weight is the negative one**: an `owed` row whose rule *has* since been cited is a violation, because a ledger asserting only its positive claims certifies whichever subset chose to carry one and the stale half is the half that reads as coverage. A `covered` row resolves like a roadmap row — every path exists and every identifier appears in a file the row cites — and **must carry an identifier at all**, which the first control pass found it did not: moving `pull.ts` to `chrome.ts` left three rows green, because a file that exists is not evidence that the rule lives in it. *Stated blind spot*: it asks the prior question only. Whether a cited rule is **satisfied** is the carrier matrix's, the golden frames' and the mutation runs' **Amended — five states, because `cited` was carrying three** (R-SPC-001). A parked rule, an audited-and-unmet rule and a rule nobody has checked were all `cited`, since each names its R-ID somewhere; a sample of five found one whose only citation reads *No field, no painter* (R-HON-002). So `cited` now means **not yet audited**, and two states take what it was hiding: **`unmet`** — cited, audited and not satisfied, which must be cited (an uncited unmet rule is `owed`) and must anchor its reason to a path, a section or an invariant; and **`parked`** — which must name `parked as N` for an **open** entry in `docs/design/PARKED_QUESTIONS.md`, so a row cannot outlive its question. The audit's measure is `cited` reaching zero, and the remainder is `unmet + parked + owed`. | `docs/design/language/calcium-registry.json` × `docs/design/language/RULE_LEDGER.md`; no allow-list | `AUTHORITY.md` · R-SPC-001, R-REG-002 |
 | SS67 | **Every ground a renderer names has a disposition against the floor's table** (`checkTextGrounds`, `SURFACE_ROLES`). The floor's scope was a list and was wrong three times: `bgElev` and `focusGround` joined `textSurfaces` only when a frame showed text on them, and `bgDeep` was excluded *because no text lands on it* while the prompt chip painted `tone.meta` there at 6.38 : 1 under a declared 7. So every `"surface.X"` literal in `src/presentation/` and `src/shell/` outside `theme/` must be **`text`** (a ground of `textGrounds`, held equal by C10 T2.61), **`gated`** (own pairs, a named check), **`ink`** (drawn as a foreground), or **`excluded`** with a reason — and an entry no renderer names is a violation too. Comment lines are dropped whole. The control: a corpus naming no `surface.diffAdd` reports that and nothing else. *Stated blind spot*: it dispositions a **surface**, not a *(site, use)* pair — the plot's box draws `surface.bgDeep` as an ink with `tone.default` on it, and passes because `bgDeep` is `text`; and a ground reached by `tokens.surfaces[name]` rather than a literal is not seen (none outside `theme/` today). | `src/presentation/**` · `src/shell/**`, excluding `src/presentation/theme/`; `SURFACE_ROLES` | C10 I60 · R-THM-004 |
+| SS68 | **Every design rule a spec cites is a rule the registry holds** (`checkRuleCitations`). Every `R-XXX-NNN` in `docs/components/` and `docs/architecture/` must be a rule id in `calcium-registry.json` — **current, example or superseded**, because an amendment cites the rule it narrowed and a superseded id still says where to look. SP3 resolves `I`/`T`/`F` numbers and SP8 `§`; an `R-` id was the one citation form nothing read, and C26 I24 cited an id from an `R-NAV` family the registry has never had until a person followed the link (corrected in review batch 4, to `R-INT-003` and `R-INT-004`). **Green on its first run**, because that one was already fixed; measured over `src/`, `test/` and `tools/` as well, nothing dangles outside the enforce suite's own fabrications. The control: a registry parsed as no rules, or a corpus citing nothing, is reported and nothing else is. *Stated blind spot*: it checks that a cited rule **exists**, never that it says what the citing sentence claims — the wrong-rule class `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass argues against mechanising; it reads the text shape alone, so a range written as one id and a bare number checks only its first end (none in the corpus today) and a mention is judged as a citation; and code comments, tests and the other documents are not read. | `docs/components/*.md` · `docs/architecture/*.md`; `calcium-registry.json`'s `rules[].id` | A03 §2 · C26 I24 |
+| SS69 | **A literal bidi format character in a tracked text file** (`checkBidiLiterals`). The set is `data/text.ts`'s `isBidiFormat`, parsed from its source — ruling 71's twelve, U+061C, U+200E, U+200F, U+202A–U+202E, U+2066–U+2069 — and the corpus is `git ls-files`, narrowed by `git grep -I -F` because reading every file through the bind mount costs seconds. An override reorders what a reviewer reads against what the compiler reads; `trust-boundary.test.ts` landed with its twelve as literals and enforce was green (F1402), and **the first run found a second**, `test/contract/image-path.test.ts`'s poisoned filename, and a third in this rule's own doc comment as it was written. Exemptions in `BIDI_LITERAL_EXEMPTIONS` with their reasons, by equality both directions — empty at landing. Controls: the parse must hold U+202E, the tracked set must be non-empty, and `git grep` must exit 0 or 1. Fabricated violation: a literal U+202E, built at run time, in a test file; every member of the set alone; a temporary repository whose tracked file fires and whose untracked one does not. *Stated blind spots*: an untracked file is not read (the pre-commit hook runs after staging, so a commit cannot carry one); the working copy is read, not the index; a file `git` classes as binary is skipped; an escape is the remedy and is not read, so a file building the character at run time is outside the rule; every other invisible or confusable character is outside the set | every tracked text file | F1402 · ruling 71 · C09 I128 · C01 I26 |
 | SS56 | **A hand-composed notice** — `kind: "notice"` as an object-literal value — anywhere the L4 family (`documents.ts`'s `noticeDoc`, `builders/`' `b.notice`) is meant to be called instead. Sixteen files carried the literal at landing and every one was allowed **by name with its reason in the rule's comment**: two are the family, two are the kind's declaration and definition (`viewmodel/types.ts`, `blocks/kinds/simple.ts`), eight were below L4 where the family is unreachable (A02 — four adapters, markdown, the cap marker, the history layer, `art.ts`), and **four were L4 surfaces that owed a migration** — fourteen sites, allowed so that SS53 would retire each entry when its last literal went. **It did** (2026-09-05, F777): every site calls `b.notice`, SS53 failed four times with the entries still present, the entries left, and `test/contract/notice-family.test.ts` holds the frames the literals drew and asserts the family draws the same bytes. Twelve entries remained; the history layer's left with `clearConfirmLayer`, whose warning was its only literal (review batch 2, C16 ruling 61), and eleven remain. *Stated blind spots*: a notice built through a helper the rule does not know, the kind held in a constant, or a spread from elsewhere all pass; it is per line and cannot tell a composition from an object-literal type guard; it does not say which member of the family a site should call | `src/`, allowing by name — the family `src/shell/documents.ts` and `src/shell/builders/`; the kind `src/data/viewmodel/types.ts` and `src/presentation/blocks/kinds/simple.ts`; below L4 `src/data/adapters/fallback.ts`, `src/data/adapters/mapping.ts`, `src/data/adapters/overflow.ts`, `src/data/adapters/registry.ts`, `src/data/viewmodel/markdown.ts`, `src/viewport/transcript/cap.ts`, `src/presentation/art.ts` | C22 T2.40 · C24 I5 · C23 I61 |
 | SS36 | A string literal assigned to a `colour` field | `src/` | C10 I24, T2.19 |
 | SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I15, T2.17 |
@@ -607,8 +609,9 @@ The suite governs the source. **SP1 governs the documents the source is written 
 | SP13 | A spec's commitment numbers **ascend in document order**; the descents outstanding are a debt list compared **by equality** | `docs/components/` | A03 §2 · A03 §7a |
 | SP14 | Each `## N ·` group heading in the register tallies the rows it heads — `X open · Y closed · Z with no verdict`, compared **by equality**; a heading stating no tally is itself a violation | `examples/docker/TRIAGE.md` | A03 §2 · A03 §7a |
 | SP15 | Within one spec, a test row's id is **titled in one file** — the spec a title names first, else the file's owner, which is SP9's attribution; the ids split across files are a debt list compared **by equality**, and rows no spec owns are counted and reported, not judged | `test/**/*.ts` | A03 §2 · A03 §7a |
+| SP16 | A titled test row **locates the row its spec declares** — not an id the file's owner declares where the attributed spec does not, and not one the attributed spec **retired** (struck, or headed *superseded*, *retired* or *struck*); the rows outstanding are a debt list keyed `spec id file`, compared **by equality**, and rows naming an id no spec declares are counted and reported, not judged. **Blind to** a row whose attributed spec declares the id about something else (the wrong-invariant class, not automated), a fifth retirement wording, SP15's unread titles (`it.each`, templates), and a file with no owner (F1489) | `test/**/*.ts` against `docs/components/` | A03 §2 · A03 §7a |
 
-They run in `make enforce` and their fire-tests are `test/unit/enforce-commitments.test.ts` — SP13's included, beside the parser it shares with SP1 and SP11, and SP15's — and SP12's reader tests are `test/unit/enforce-open-set.test.ts`.
+They run in `make enforce` and their fire-tests are `test/unit/enforce-commitments.test.ts` — SP13's included, beside the parser it shares with SP1 and SP11, and SP15's and SP16's — and SP12's reader tests are `test/unit/enforce-open-set.test.ts`.
 
 **SP14 is the second record of SP12's set, and the reason it is gated where `checkTriageInventory`'s per-group counts are not is a live decision recorded in that function.** Those counts rest on *keyed*, which has no definition strong enough — the loose reading counts a mention in another entry's prose, the strict one orphans 8 ids of 435 — so a gate over them would be red on arrival and edited to fit. A **disposition** has one, `dispositionOf`, which SP12 already compares by equality, so the tallies are exactly derivable. Run over the corpus before wiring: 14 of 15 headings agreed, §13 was out by one on `with no verdict`, and four stated a field not at all. Those were repaired and the shapes normalised, so SP14 is green on arrival with nothing edited to fit (F1080).
 
@@ -1138,6 +1141,62 @@ opposite failure. Fabricated violation: T2.155 removes the `question` slot and a
 rule fires, asserts the mark still stands in prose, and asserts the live slot is escaped, so
 neither reading can quietly come back.
 
+### SS68 — a design-rule citation with nothing behind it
+
+**The specs cite the design registry by id 1 042 times, measured when this rule landed, and nothing resolved one.**
+SP3 resolves every invariant, row and finding number and SP8 every `§`; an `R-` id was the third
+citation form and the only one with no reader. C26 I24 cited a keyboard ruling to an `R-NAV` id,
+the registry has no `R-NAV` family, and it read exactly like the citations beside it that resolve —
+it was found by a person following it, and corrected by citing the rules the sentence meant.
+
+**Every status resolves.** A superseded rule stays in the registry with its successor linked, and
+the specs cite history on purpose — an amendment names the rule it narrowed — so an id is a defect
+only when the registry has never held it. The remedy for a dangling id is the same as for any
+citation: name the rule the sentence means, or, if the id is history the registry never recorded,
+strike the citation the way the specs strike history.
+
+**The control** is F1246's shape: a registry parsed as no rules, or a corpus citing nothing, passes
+every citation vacuously, so either is the violation and is reported alone.
+
+**Stated blind spot.** It checks that a cited rule exists, never that it says what the citing
+sentence claims — a citation resolving against the wrong rule is the class
+`docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass argues no mechanism should be built for. It reads
+the text shape `R-XXX-NNN` alone: a range written as one id followed by a bare number checks only
+the id (none in the corpus today), and a mention is judged as a citation. It reads
+`docs/components/` and `docs/architecture/`; code comments, tests and the other documents cite ids
+too and are not read — measured when the rule landed, none of theirs dangled outside this suite's
+own fabricated ids.
+
+### SS69 — a character that reads one way and compiles another
+
+**Ruling 71 escaped the twelve bidi format characters everywhere a block is drawn, and nothing looked at the
+repository's own files.** `trust-boundary.test.ts` landed with its twelve as literal code points — a file write had
+turned the `\u` escapes into the characters they name — and `make enforce` passed (F1402). An override reorders
+every character after it on its line, so a reviewer reading the diff and the compiler reading the file see two
+different programs; the escapes were restored by hand, and no rule stood behind the restoration.
+
+**The scope is every tracked text file, and that is the rule's one real decision.** Every other scan here walks
+`src/`, `test/` or `tools/`, because its subject is code. This one's subject is *a file somebody reads*, which is
+every file in the repository — a spec, a finding, a fixture — so the corpus is `git ls-files` rather than a walk,
+and nothing is narrowed: a file that must hold a literal is named in `BIDI_LITERAL_EXEMPTIONS` with its reason, and
+the list is compared by equality. It was empty at landing.
+
+**The first run found a second instance and the rule's own authoring produced a third.**
+`test/contract/image-path.test.ts` built its poisoned filename with a literal U+202E where every sibling wrote an
+escape; it now writes `\u202E` and reads the same string. And the doc comment above `checkBidiLiterals` was written
+through a script that turned its own `\u202E` into the character — F1402's mechanism, in the file that forbids it,
+caught on the first `make enforce`.
+
+**The set is read out of `isBidiFormat`, not restated.** A character added to ruling 71's function joins the scan;
+the row asserting the parse equals the function's answers over the BMP is what stops the parse reading something
+else, and a function rewritten into a shape the parser does not know parses as nothing — which is the control's
+violation rather than a silent pass.
+
+**Stated blind spot.** Untracked files are not read, the working copy is read rather than the index, a file `git`
+classes as binary is skipped, and the escape is the remedy, so a file that builds the character at run time is
+outside the rule by construction. The set is ruling 71's twelve: U+2028, a zero-width joiner and a homoglyph are
+the other halves of the same class and are not here.
+
 ### SS56, widened — the builder call is the composition
 
 **The rule existed and the nine sites it was written for passed it** (F827). SS56 forbade a hand-composed `kind: "notice"` literal outside `documents.ts` and `builders/`; the shell's failure, truncation, refusal and usage notices are `b.notice.warn(…)` and `b.notice.error(…)` — builder calls, which the pattern does not see. The rule's premise was *call the family instead of composing the object*. The call grammar's is one step stricter — *compose the notice in one file*, so that two calls never read as two products — and a builder call outside that file is exactly the composition the rule exists to catch, in a form it could not.
@@ -1471,7 +1530,7 @@ the read asks is whether a builder covers it.
 
 ### MG26 — the dev-only entry points stay out of the bundle
 
-C24 I8 says `@fmx/calcium/testing` and `@fmx/calcium/fixtures` are absent from a
+C24 I8 says `calcium-tui/testing` and `calcium-tui/fixtures` are absent from a
 production bundle, and T2.3 is its test. **Until C24 there was no bundle to be
 absent from.** `src/index.ts` was `export {}`, so nothing rooted the graph and
 the invariant had nothing to be false about — A03 §2's vacuity class holding an

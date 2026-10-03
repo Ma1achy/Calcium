@@ -32,8 +32,10 @@ const MUTATIONS = [
     // **As it shipped**: a missing number is a blank.
     name: "the definition passes no unknown set",
     file: DEFINITION,
-    from: "{ expandable, on, marked, points, aligns, grouping, unknown, ends });",
-    to: "{ expandable, on, marked, points, aligns, grouping, ends });",
+    // Re-anchored for C11 I32: the options carry the hidden count. And for
+    // C11 I33: the current lead follows `ends`.
+    from: "{ expandable, hidden, on, marked, points, aligns, grouping, unknown, ends, current:",
+    to: "{ expandable, hidden, on, marked, points, aligns, grouping, ends, current:",
     expect: "T1.38",
   },
   {
@@ -48,8 +50,8 @@ const MUTATIONS = [
     // **At the column's edge**, two cells right of the digits above it.
     name: "the dash ignores the decimal end",
     file: DEFINITION,
-    from: "{ expandable, on, marked, points, aligns, grouping, unknown, ends });",
-    to: "{ expandable, on, marked, points, aligns, grouping, unknown });",
+    from: "{ expandable, hidden, on, marked, points, aligns, grouping, unknown, ends, current:",
+    to: "{ expandable, hidden, on, marked, points, aligns, grouping, unknown, current:",
     expect: "T1.38",
   },
   {

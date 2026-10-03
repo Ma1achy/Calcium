@@ -28,11 +28,12 @@ import type { Builtin, ParseResult } from "../interaction/parser/index.js";
 import type { RawPatch } from "../data/transport/index.js";
 import type { Exit } from "../data/process/types.js";
 import type { Block, ViewDocument } from "../data/viewmodel/index.js";
-import { approvalPrompt, blockId, callHead, callStatus, cardOver, completeLocal, compose, DENY_KEY, errorDoc, noticeDoc, refusalNotice, toolCallDoc, usageDoc } from "./documents.js";
+import { approvalPrompt, blockId, callHead, callStatus, cancelledCard, cancelledDoc, cardOver, completeLocal, compose, DENY_KEY, errorDoc, noticeDoc, refusalNotice, toolCallDoc, usageDoc } from "./documents.js";
 import { createActionDispatcher } from "./actions.js";
-import { createRefreshDriver } from "./refresh.js";
+import { createRefreshDriver, STALL_BLOCK } from "./refresh.js";
 import type { ProducerContext } from "../data/adapters/types.js";
 import { overflowNotice, withOverflowNotice } from "../data/adapters/overflow.js";
+import { cancelledNotice, exitCodeOf } from "../data/adapters/mapping.js";
 import { BODY_INDENT } from "./entry-layout.js";
 import { jsonFlagFor } from "../data/manifest/index.js";
 import type { ValidationResult } from "../data/manifest/index.js";
@@ -71,6 +72,14 @@ export type InFlight = "app" | "local" | "shell" | null;
  * on the answer.
  */
 const headOf = (command: string): string => command.split(/\s+/u)[0] ?? "shell";
+
+/**
+ * The signals a handed-off child ends on when it was stopped rather than when
+ * it failed (C23 I95, ruling 91): an interrupt, a termination request and a
+ * closed terminal. Any other signal is a failure, `SIGQUIT` included — a
+ * terminal sends it too, and the ruling's set is these three (§8a A6.6 row 6).
+ */
+const CANCEL_SIGNALS: ReadonlySet<string> = new Set(["SIGINT", "SIGTERM", "SIGHUP"]);
 
 /** What a handler is told when validation failed and there is nothing parsed. */
 const EMPTY_ARGS: Readonly<Record<string, unknown>> = Object.freeze({});
@@ -589,14 +598,21 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    *
    * **The work is not discarded silently**, and the entry appended at submission
    * is what pays for that: it already exists and settles in place saying what
-   * happened to it.
+   * happened to it — as a cancel, on `partial` (I96, ruling 92). It was a `warn`
+   * ▲ on an `ok` document, which drew a cancel as a warning.
    */
   const clearQueue = (): void => {
     for (const item of queue.splice(0)) {
-      deps.transcript.settle(
-        item.id,
-        noticeDoc(item.line, "cancelled before it ran", "warn", { origin: "user" }),
-      );
+      // **A cleared line is a submission, and it settles here** (I29, F1492):
+      // recorded with the code it settled with, which is -1, C07 I14's *never
+      // started*. C07 §3 names an invocation aborted before anything was
+      // spawned as one of -1's two producers, and this is that invocation one
+      // step earlier. 0 would record a success, 130 an interrupt of something
+      // that was never running. It was recorded nowhere, so `↑` could not
+      // recall a line the reader typed.
+      const doc = cancelledDoc(item.line, "cancelled before it ran", { origin: "user", exitCode: -1 });
+      deps.transcript.settle(item.id, doc);
+      recordHistory(item.line, doc);
     }
   };
 
@@ -900,12 +916,22 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         pipeOverflowed = child.overflowed;
       }
 
-      const failed = cancelled || exit.code !== 0 || exit.signal !== null;
-      const message = cancelled
-        ? "Cancelled."
-        : exit.signal !== null
+      // **A cancel is not a failure** (I66, I96, ruling 92): it settles `partial`
+      // under the `cancelled` state's notice, where it was an `error` box on an
+      // `error` document with `error.code` `CANCELLED` — failure's status, tone
+      // and mark. The code has nowhere to go on `partial` (C04 I3) and nothing
+      // read it; 130 in `meta.exitCode` and C20 is what a consumer keeps.
+      const failed = !cancelled && (exit.code !== 0 || exit.signal !== null);
+      // **C07's sentences and C07's table** (I100, ruling 98, F1491). A child
+      // with neither a code nor a signal never started — C21 I13 settles a
+      // spawn failure that way — and `exited with code 1` named a code it never
+      // returned; the text is C07's for the same `Exit`.
+      const message =
+        exit.signal !== null
           ? `Killed by ${exit.signal}.`
-          : `The command exited with code ${String(exit.code ?? 1)}.`;
+          : exit.code === null
+            ? "The command did not start."
+            : `The command exited with code ${String(exit.code)}.`;
 
       /**
        * **The final snapshot, then the disposal** (C23 I67, C27 §6): the cursor
@@ -934,28 +960,24 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       appendAndCommit(
         compose({
           command: line,
-          status: failed ? "error" : "ok",
+          status: cancelled ? "partial" : failed ? "error" : "ok",
           blocks: withOverflowNotice(
-            failed
-              ? [callStatus("error", message, { id: blockId("shell-failed") }), settled]
-              : [settled],
+            cancelled
+              ? [cancelledNotice("Cancelled.", blockId("shell-cancelled")), settled]
+              : failed
+                ? [callStatus("error", message, { id: blockId("shell-failed") }), settled]
+                : [settled],
             pipeOverflowed,
           ),
           ...(failed
-            ? {
-                error: {
-                  message,
-                  code: cancelled
-                    ? "CANCELLED"
-                    : exit.signal !== null
-                      ? "KILLED_BY_SIGNAL"
-                      : "UNEXPECTED_EXIT",
-                },
-              }
+            ? { error: { message, code: exit.signal !== null ? "KILLED_BY_SIGNAL" : "UNEXPECTED_EXIT" } }
             : {}),
           meta: {
             origin: "user",
-            exitCode: cancelled ? 130 : (exit.code ?? 1),
+            // 128 + n for a signal, -1 for a child that never started (C07
+            // I14). `code ?? 1` gave 1 for both, and 0 for a signal on the PTY
+            // arm until C21 I19 nulled the code there.
+            exitCode: cancelled ? 130 : exitCodeOf({ exitCode: exit.code, signal: exit.signal }),
             transport: "subprocess",
             argv: [command],
           },
@@ -1038,13 +1060,41 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // A notice rather than a `raw` block: the child wrote to the terminal
       // directly, so there is no output to carry. What the transcript can say
       // is that it ran and how it ended.
-      const code = exit.code ?? 1;
-      appendAndCommit(
+      //
+      // **Its tone and mark agree with its status** (C23 I95, ruling 91). This
+      // was `warn` and ▲ on an `error` document for every non-zero exit and
+      // every signal, so the document said failed and everything a reader sees
+      // said warning. Three endings, each the call state of the same name:
+      // `failed` is `error` and ✗ on `error`; `cancelled` is `muted` and ⊘ on
+      // `partial`, the status C07 gives a cancelled call (C23 T3.4) — never
+      // the error document I66 then drew, which read the cancel as the failure
+      // the ruling separates it from. The signal is read first (§8a A6.6 row 7).
+      //
+      // **No code and no signal is not `exited 1`** (ruling 94, F1482): C21 I13
+      // settles a child that never started that way, and `code ?? 1` named an
+      // exit it never returned. It is still a failure, and it says what
+      // happened (ruling 100 c, F1511): a spawn failure is the only producer of
+      // `{null, null}` on every C21 arm, so *ended without an exit status*
+      // described an ending none of them reaches.
+      const text =
         exit.signal !== null
-          ? noticeDoc(line, `${label} ended on ${exit.signal}`, "warn", { origin: "user" }, "error")
-          : code === 0
-            ? noticeDoc(line, `${label} finished`, "muted", { origin: "user" })
-            : noticeDoc(line, `${label} exited ${String(code)}`, "warn", { origin: "user" }, "error"),
+          ? `${label} ended on ${exit.signal}`
+          : exit.code === null
+            ? `${label} did not start`
+            : exit.code === 0
+              ? `${label} finished`
+              : `${label} exited ${String(exit.code)}`;
+      // **The child's code, for the record beneath the notice** (I97, F1480).
+      // `meta()` defaulted it to 0, so a `vim` that exited 1 said failed and was
+      // kept in history as a success. C07 I14's table, not a second copy: 128 + n
+      // for a signal, -1 for neither.
+      const metaSpec = { origin: "user", exitCode: exitCodeOf({ exitCode: exit.code, signal: exit.signal }) } as const;
+      appendAndCommit(
+        exit.signal !== null && CANCEL_SIGNALS.has(exit.signal)
+          ? cancelledDoc(line, text, metaSpec)
+          : exit.signal === null && exit.code === 0
+            ? noticeDoc(line, text, "muted", metaSpec)
+            : noticeDoc(line, text, "error", metaSpec, "error"),
         settle,
       );
     } catch (cause) {
@@ -1319,6 +1369,59 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       );
     };
 
+    /**
+     * **A cancel settles `partial`, through a document the shell writes** (I98,
+     * ruling 97). The card as it stands — the head `finishCard` has just written,
+     * and whatever the entry streamed under it — with the cancelled notice after
+     * it, on `partial` with 130. It was `settle(id)` with no document, which can
+     * change no status: the entry stayed `ok` with 0 while C20 recorded 130.
+     *
+     * **The shell may write it**: C13's `settle` takes a document on an entry
+     * that still streams whoever composed it, and a cancel is the first
+     * settlement the entry sees. `settle` and not `settleWithDocument`, because
+     * nothing a cancel keeps should begin to refresh.
+     */
+    const settleCancelled = (): void => {
+      const held = deps.transcript.entries.find((e) => e.id === pendingId)?.doc;
+      if (held === undefined) {
+        deps.transcript.settle(pendingId);
+        deps.history.append(line, 130);
+        return;
+      }
+      // **The stall row is left out** (ruling 100 d): a stall is a condition of a
+      // live entry, and this document is the shell's to compose, so the settle
+      // replaces the view and nothing is deleted. `refresh.settled` is not
+      // called — its *resumed after* would be false for a cancel — and the
+      // watch ends on the settle change regardless (I102).
+      const doc = cancelledCard({ ...held, blocks: held.blocks.filter((blk) => blk.id !== STALL_BLOCK) });
+      deps.transcript.settle(pendingId, doc);
+      recordHistory(line, doc); // I29, I101 — the code the document carries.
+    };
+
+    /**
+     * **Every settlement that keeps the card carries its code** (I101, ruling
+     * 100). The card as it stands, with `code` in its `meta`, and C20 records
+     * from that document, so the entry and the record cannot say two things.
+     * They did on four routes: a stream's own ending recorded nothing (F1508),
+     * and a denial settled at 0 while C20 was told 126 (F1510).
+     *
+     * `settle(id)` when the card already carries the code: C13 I13 moves `rev`
+     * only when the document changed, and a stream ending at 0 over a card
+     * that says 0 did not.
+     */
+    const settleKept = (code: number): void => {
+      const held = deps.transcript.entries.find((e) => e.id === pendingId)?.doc;
+      if (held === undefined) {
+        // Cleared underneath: nothing to settle into, and the line was still typed.
+        deps.transcript.settle(pendingId);
+        deps.history.append(line, code);
+        return;
+      }
+      const doc = held.meta.exitCode === code ? held : { ...held, meta: { ...held.meta, exitCode: code } };
+      deps.transcript.settle(pendingId, doc === held ? undefined : doc);
+      recordHistory(line, doc);
+    };
+
     // **A call that needs a decision waits for it** (I60, §8f P10, P12, §8g rows
     // 15–17). The head reads `· ⠋ waiting`, the confirm layer carries the
     // invocation, the consequence and the choices, and **no readout is
@@ -1331,12 +1434,25 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     if (approval !== null) {
       deps.transcript.patch(pendingId, { op: "replace", blockId: call.id, block: header(0, undefined, true) }, "shell");
       deps.scheduler.commit("input");
-      const answer = await deps.confirm.ask(approvalPrompt(call, approval.consequence, approval.choices));
-      if (answer.key === DENY_KEY) {
-        finishCard("denied");
+      const answer = await deps.confirm.ask({
+        ...approvalPrompt(call, approval.consequence, approval.choices),
+        // The asker's withdrawal and expiry reach the question (C23 I92, I94).
+        ...(approval.signal === undefined ? {} : { signal: approval.signal }),
+        ...(approval.expiresAfterMs === undefined ? {} : { expiresAfterMs: approval.expiresAfterMs }),
+      });
+      // **Only an answer runs the tool** (I94, §7g ruling 4). A question that
+      // was withdrawn or timed out resolves with its default's key, and the
+      // approval's default is `deny` — but the card says what happened: *expired,
+      // not denied* (`R-BLK-881`), and nothing is run on either.
+      if (answer.outcome !== "answered" || answer.key === DENY_KEY) {
+        finishCard(answer.outcome === "answered" ? "denied" : answer.outcome);
         refresh.settled(pendingId);
-        deps.transcript.settle(pendingId);
-        deps.history.append(line, 126);
+        // A withdrawal is a cancel (I98); a denial and an expiry are not, and
+        // keep the card alone.
+        // 130 for a withdrawal, as `cancelThis` records one; 126 otherwise, in
+        // the document as in C20 (I101, ruling 100 a) — the status stays `ok`.
+        if (answer.outcome === "cancelled") settleCancelled();
+        else settleKept(126);
         deps.scheduler.commit("completion");
         guard.release();
         return;
@@ -1355,17 +1471,28 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     refresh.readout(pendingId, call.id, (ms, tick) => header(ms, undefined, false, tick));
 
     const controller = new AbortController();
+    /**
+     * **Whether this run still holds the guard** (I99). A cancel releases it —
+     * `cancel()` does, after this — and a stream releases it before its loop
+     * (I6), and in both cases the run goes on unwinding afterwards: a late
+     * answer, or the stream's own end. `Guard.release()` names no holder, so a
+     * `finally` that released unconditionally released whatever the *next*
+     * submission had taken, and the queue started a third beside it (§8a A6.8
+     * rows 6 and 7).
+     */
+    let holdsGuard = true;
     const cancelThis = (): void => {
       forgetStream(pendingId);
       controller.abort();
-      // I54 — the card survives a cancel (this settle carries no document), so
+      holdsGuard = false;
+      // I54 — the card survives a cancel (I98 keeps it inside the document), so
       // the header says what happened to it. §8f P5.
       finishCard("cancelled");
-      deps.transcript.settle(pendingId);
       // I29 — the streaming route settles here rather than through
       // `appendAndCommit`, so these are the settlements the funnel does not
-      // reach. A cancellation is a settlement and carries its own code.
-      deps.history.append(line, 130);
+      // reach. A cancellation is a settlement and carries its own code, which
+      // `settleCancelled` records from the document it settles.
+      settleCancelled();
       deps.scheduler.commit("completion");
     };
     cancelInFlight = cancelThis;
@@ -1393,13 +1520,14 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       if (streams) {
         // C23 I6 — a subscription does not hold the guard. Released before the
         // loop rather than after it, or one `--watch` blocks the session.
+        holdsGuard = false;
         guard.release();
         // **Registered before the loop is awaited**, because the loop does not
         // return until the stream ends: a registration after it would only ever
         // run for a subscription that had already finished.
         liveStreams.push({ id: pendingId, cancel: cancelThis });
         try {
-          await streamInto(pendingId, displayed, verb, transport.stream(invocation), result.validation.ok ? result.validation.args : {}, finishCard);
+          await streamInto(pendingId, displayed, verb, transport.stream(invocation), result.validation.ok ? result.validation.args : {}, finishCard, settleKept, controller.signal);
         } finally {
           forgetStream(pendingId);
         }
@@ -1408,6 +1536,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
 
       // Steps 4 and 5 — invoke, then adapt.
       const raw = await transport.invoke(invocation);
+      // **I99 — the cancel settled this entry and recorded it; the answer
+      // arrives to nobody.** A real transport answers an aborted invocation with
+      // C06's `cancelled` result once the child has stopped, which is always
+      // after `cancelThis`. Run on, it was refused by C13 as `settled` and
+      // recorded in C20 a second time (§8a A6.8 row 4).
+      if (controller.signal.aborted) return;
       const doc = deps.adapters.adapt(raw, {
         command: displayed,
         verb,
@@ -1445,6 +1579,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // Step 8.
       deps.scheduler.commit("completion");
     } catch (cause) {
+      // I99 — a transport that throws once aborted is the late answer too.
+      if (controller.signal.aborted) return;
       // C23 I2 — a transport that fails, times out or throws ends in a document
       // like everything else.
       const failed = errorDoc(
@@ -1458,8 +1594,11 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       recordHistory(line, failed); // I29 — a failure is a settlement.
       deps.scheduler.commit("completion");
     } finally {
-      cancelInFlight = null;
-      guard.release();
+      // I99 — only what this run still holds. By the time a cancelled or
+      // streaming run unwinds here, the slot and the guard may be the next
+      // submission's.
+      if (cancelInFlight === cancelThis) cancelInFlight = null;
+      if (holdsGuard) guard.release();
     }
   };
 
@@ -1489,10 +1628,24 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     /**
      * Writes the card's verdict into its header (C23 I54). Called on every
      * ending of this route **before** the settle that ends it, because each of
-     * them is a `settle(id)` that keeps the card, and the settle change is what
+     * them keeps the card (`settleKept`, below), and the settle change is what
      * persistence writes (§8f P3, P8).
      */
     finishCard: (outcome: string) => void,
+    /**
+     * Settles the card with the code the entry ended with, and records it
+     * (I101, F1508). Every ending of this route but the cancel came through a
+     * bare `settle(id)` and none of them reached C20.
+     */
+    settleKept: (code: number) => void,
+    /**
+     * The invocation's own, so a cancel is visible here (I99). `cancelThis` has
+     * settled the entry by the time the far side's `end` arrives — a subprocess
+     * stream yields it once the child has exited — and `finishCard` is a
+     * `"shell"` patch, which C13 admits on a settled entry: the head read
+     * `succeeded · exit null` over the cancel (§8a A6.8 row 5).
+     */
+    cancelled: AbortSignal,
   ): Promise<void> => {
     // **The stream's own counter** (I30, C07 I15). Not decoration: C07 spends it
     // as the namespace for generated block ids *and* as the per-stream reset,
@@ -1506,6 +1659,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
 
     try {
       for await (const patch of patches) {
+        if (cancelled.aborted) return;
         if (patch.kind === "end") {
           // **An overflowed stream is a notice here too** (C07 §4, I22). The
           // registry appends it in `finish` and the `shell` route appends it
@@ -1525,11 +1679,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           // such — `exit 1` — not as a claim about what it was following. **A
           // zero is no outcome** (I59): the head reads `verb · 4s` and the tone
           // carries the verdict; `exit 0` was `ok` with a number on it.
-          finishCard(patch.result.exitCode === 0 ? "" : `exit ${String(patch.result.exitCode)}`);
+          //
+          // **One number for the head and the record** (I101): C07 I14's table,
+          // so a stream a signal ended reads `exit 137` where it read
+          // `exit null` over `succeeded`.
+          const code = exitCodeOf(patch.result);
+          finishCard(code === 0 ? "" : `exit ${String(code)}`);
           // C23 I8 — settlement flushes at `"completion"`. §8a A4: settling
           // clears the stall state, so a notice does not outlive its condition.
           refresh.settled(id);
-          deps.transcript.settle(id);
+          settleKept(code);
           deps.scheduler.commit("completion");
           return;
         }
@@ -1578,7 +1737,9 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
             block: callStatus("error", `output truncated: ${outcome.error.message}`, { id: blockId("truncated") }),
           });
           finishCard("truncated"); // I54, §8f P8 — the box carries the why
-          deps.transcript.settle(id);
+          // I101 — 1, I100's code for a failure whose own is unknown: the
+          // stream stops here, before any `end` could say how the child ended.
+          settleKept(1);
           deps.scheduler.commit("completion");
           return;
         }
@@ -1589,13 +1750,15 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         return;
       }
     } catch (cause) {
+      // I99 — a stream that dies of its own cancel says nothing more.
+      if (cancelled.aborted) return;
       // §8g row 13 — the throw settles over a `status` box (I61); the head is kept.
       deps.transcript.patch(id, {
         op: "append",
         block: callStatus("error", `stream failed: ${String(cause)}`, { id: blockId("stream-error") }),
       });
       finishCard("failed"); // I54, §8f P8
-      deps.transcript.settle(id);
+      settleKept(1); // I101 — the transport failed, as the invoke arm's throw carries 1
       deps.scheduler.commit("completion");
     }
   };
@@ -2113,6 +2276,33 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
 
     get inFlight() {
       return guard.route;
+    },
+
+    /**
+     * `runHandoff`'s five calls with no entry behind them (C22 I144, C23 §4).
+     *
+     * **The same `finally` shape, for A6.5's reason**: a rejection from C21
+     * after the suspend still resumes, resets the decoder and repaints. The
+     * guard is taken for the duration and released on every path — its
+     * `release` drains the queue, so a line typed before the editor opened runs
+     * after it closes, as one typed during a `/tty` line would.
+     */
+    borrowTerminal: async (argv: readonly string[], label: string) => {
+      if (guard.route !== null) return { kind: "busy" as const, verb: guard.verb };
+      guard.take("shell", label);
+      try {
+        deps.lifecycle.suspend();
+        try {
+          const exit = await deps.runner.handoff(argv, { cwd: () => deps.session().cwd });
+          return { kind: "ran" as const, exit };
+        } finally {
+          deps.lifecycle.resume();
+          deps.resetInput();
+          deps.scheduler.invalidate();
+        }
+      } finally {
+        guard.release();
+      }
     },
 
     cancel: () => {

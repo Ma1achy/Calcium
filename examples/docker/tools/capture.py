@@ -79,7 +79,12 @@ def run(
     A value of `""` **unsets** the variable rather than setting it empty: absent
     `COLORTERM` and empty `COLORTERM` are different inputs to C02's rules, and
     the 256-colour row needs the first.
+
+    **Forgets a stated theme first** (F811). This call lived in `media.py` and
+    `screencast.py`, which record through `run_world` now and share no disk
+    state; the PTY captures still do, so the guard moved to where they start.
     """
+    forget_theme()
     pid, fd = pty.fork()
     if pid == 0:
         os.environ["TERM"] = "xterm-256color"
@@ -195,6 +200,104 @@ def run(
         f"{len(frames)} cast frames",
         file=sys.stderr,
     )
+
+
+def run_world(
+    cols: int,
+    rows: int,
+    script: list[tuple[float, bytes]],
+    out_path: str,
+    hold: float = 3.0,
+    env: dict[str, str] | None = None,
+) -> None:
+    """`run`'s twin against the demo world, under virtual time — `tools/record.ts`.
+
+    **Every published recording goes through this, and no longer through `run`**
+    (the person's ruling, 2026-09-29: recordings never show the real docker
+    host). `run` drives the bin in a PTY against whatever daemon is reachable,
+    which is right for reading a frame and wrong for a picture anyone else will
+    see: the app draws the whole host. This draws `src/world.ts` instead.
+
+    **Same outputs, same shapes**: the raw stream, an empty teardown (the session
+    is not stopped — its clock simply ends) and the cast, written by the same
+    `write_cast`. So `media.py`'s `collapse`, `beats.py` and `screen.py` read it
+    exactly as they read a PTY capture.
+
+    **And the same bytes every time**, because the timestamps are the virtual
+    clock's rather than the wall's. No daemon is asked anything, so neither
+    `make fixtures` nor a docker socket is needed, and a recording box with no
+    docker CLI at all is the safe one (calcium-dev has none).
+    """
+    import base64
+    import json
+    import subprocess
+    import tempfile
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    payload = {
+        "script": [[at, base64.b64encode(data).decode("ascii")] for at, data in script],
+        "env": env or {},
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        frames_json = os.path.join(tmp, "frames.json")
+        subprocess.run(
+            ["node", os.path.join(here, "record.ts"), str(cols), str(rows), str(hold), frames_json],
+            input=json.dumps(payload).encode("utf8"),
+            check=True,
+            # Nothing of this process's environment reaches the shot: record.ts
+            # builds the app's from the shot alone. These are for node itself.
+            #
+            # `DOCKER_HOST` names a socket that does not exist, as a second
+            # wall: nothing in the demo world spawns docker, and if something
+            # ever did it would reach no daemon rather than this machine's.
+            env={
+                "PATH": os.environ.get("PATH", ""),
+                "LANG": "C.UTF-8",
+                "TZ": "UTC",
+                "DOCKER_HOST": "unix:///nonexistent/demo-world.sock",
+            },
+            cwd=os.path.dirname(here),
+        )
+        with open(frames_json, encoding="utf8") as fh:
+            frames = [(at, base64.b64decode(b64)) for at, b64 in json.load(fh)]
+    live = b"".join(chunk for _, chunk in frames)
+    with open(out_path, "wb") as fh:
+        fh.write(live)
+    with open(out_path + ".teardown", "wb") as fh:
+        fh.write(b"")
+    write_cast(out_path + ".cast", cols, rows, frames)
+    print(
+        f"{out_path}: {len(live)} bytes (demo world, virtual time) at {cols}x{rows}, "
+        f"{len(frames)} cast frames",
+        file=sys.stderr,
+    )
+
+
+def assert_private(path: str) -> None:
+    """Refuse a recording that carries anything of the machine it was made on.
+
+    **A backstop, not the mechanism.** The mechanism is `run_world`: the world
+    is invented and the app's working directory is the world's. This reads the
+    finished file for the things that have leaked before or could — this
+    checkout's paths, the host's name, the user, the lab fixtures' `dtui-`
+    prefix and the shim's path — and stops the pipeline on any of them, because
+    the failure it guards is a picture published and only then looked at.
+    """
+    import getpass
+    import socket
+
+    here = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    needles = {here, "/workspace/", "/Users/", socket.gethostname(), "dtui-", "docker-json", "vsc-"}
+    user = getpass.getuser()
+    # Accounts every image has say nothing about who made the picture, and
+    # `root` is a word the world's own `top` legitimately prints.
+    if user not in {"root", "node", "vscode"}:
+        needles.add(user)
+    with open(path, encoding="utf8", errors="replace") as fh:
+        text = fh.read()
+    found = sorted(n for n in needles if n and n in text)
+    if found:
+        raise SystemExit(f"{path}: carries {found} — a recording must hold nothing of this host")
 
 
 def write_cast(

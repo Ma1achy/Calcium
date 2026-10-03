@@ -209,7 +209,23 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
   const timers: { fn: () => void; at: number; live: boolean }[] = [];
 
   const harnessOverlays = createOverlayManager({ registry: overlayRegistry });
-  const harnessConfirm = createConfirmHost({ overlays: harnessOverlays, anchor: () => ({ row: 0, rows: 1 }), draft: () => "", holdDraft: () => undefined, restoreDraft: () => undefined, overlayRegion: () => ({ width: 80, height: 24 }), invalidate: () => undefined });
+  /** One timer list for the pipeline and the confirm host, both driven by `tick`. */
+  const schedule = (fn: () => void, ms: number): Disposable => {
+    const t = { fn, at: now + ms, live: true };
+    timers.push(t);
+    return {
+      [Symbol.dispose]: () => {
+        t.live = false;
+      },
+    };
+  };
+  /**
+   * **The confirm host takes the harness's timer** (C23 I92), so an approval's
+   * `expiresAfterMs` expires on `tick`. It had none, and a question built here
+   * never expired: no row could reach the expired approval's settlement, which
+   * is C23 I101's fifth route (F1510).
+   */
+  const harnessConfirm = createConfirmHost({ overlays: harnessOverlays, anchor: () => ({ row: 0, rows: 1 }), draft: () => "", holdDraft: () => undefined, restoreDraft: () => undefined, overlayRegion: () => ({ width: 80, height: 24 }), invalidate: () => undefined, schedule });
   const deps = {
     session: () => session.snapshot,
     writes: session.execution,
@@ -370,15 +386,7 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     },
     clock: () => now,
     elapsed: () => mono,
-    schedule: (fn: () => void, ms: number) => {
-      const t = { fn, at: now + ms, live: true };
-      timers.push(t);
-      return {
-        [Symbol.dispose]: () => {
-          t.live = false;
-        },
-      };
-    },
+    schedule,
     openUrl: () => Promise.resolve(),
     bindings: () => [{ keys: "c+c", does: "cancel", target: "global" }],
     currentScope: () => "prompt",

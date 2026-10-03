@@ -162,12 +162,14 @@ describe("C04 I141 — a notice's state names its tone and its glyph", () => {
     );
   });
 
-  it("T2.138 (C04 I141, I6, question 57): the four started states carry `work-unit`, and `running` is a state and not a glyph", () => {
+  it("T2.138 (C04 I141, I6, I149, question 57): the five states past queued carry `work-unit`, and `running` is a state and not a glyph", () => {
     // `work-unit` is the registry's id for `●` / `*`, and `CallState` keeps
     // `running`: a validator taking one for the other would admit a head the
     // renderer's table has no row for.
     const started = CALL_STATES.filter((s) => s !== "queued");
-    expect(started, "four states draw the slot").toHaveLength(4);
+    // Five since `waiting` (C04 I149): it has not started either, and draws
+    // the filled dot in `warn` where tone carries.
+    expect(started, "five states draw the slot").toHaveLength(5);
     for (const state of started) {
       expect(CALL_HEAD_GLYPH[state], `${state}'s head glyph`).toBe("work-unit");
       expect(errors(docWith({ state, tone: CALL_STATE_TONE[state], glyph: "work-unit" })), state).toBe("");
@@ -180,7 +182,7 @@ describe("C04 I141 — a notice's state names its tone and its glyph", () => {
 });
 
 describe("C09 I45 — the call head, rendered", () => {
-  it("T2.187 (C09 I45, C04 I141, R-BLK-214, R-BLK-220): five states through callHead and the renderer at 24-, 8- and 4-bit read as a cell and an SGR; 1 bit and ASCII five marks", async () => {
+  it("T2.187 (C09 I45, C04 I141, C04 I149, R-BLK-214, R-BLK-220): six states through callHead and the renderer at 24-, 8- and 4-bit read as a cell and an SGR; 1 bit and ASCII six marks", async () => {
     for (const depth of [24, 8, 4] as const) {
       const caps = { ...FULL_CAPS, colourDepth: depth } as TerminalCapabilities;
       const colours = new Map<string, CallState>();
@@ -198,17 +200,18 @@ describe("C09 I45 — the call head, rendered", () => {
           colours.set(key, state);
         }
       }
-      expect(colours.size, `${String(depth)}-bit: four filled states, four colours`).toBe(4);
+      expect(colours.size, `${String(depth)}-bit: five filled states, five colours`).toBe(5);
     }
-    // **Where tone is gone, the shape carries it**: five marks, no two alike,
-    // none of them the coloured rung's pair.
+    // **Where tone is gone, the shape carries it**: six marks, no two alike,
+    // none of them the coloured rung's pair. `waiting` is `warn`'s (C04 I149):
+    // `work-unit` there is `running`'s.
     for (const [rung, caps, expected] of [
-      ["1 bit", { ...FULL_CAPS, colourDepth: 1 }, ["○", "●", "✓", "✗", "⊘"]],
-      ["ASCII", { ...ASCII_CAPS, colourDepth: 8 }, ["o", "*", "+", "x", "/"]],
+      ["1 bit", { ...FULL_CAPS, colourDepth: 1 }, ["○", "▲", "●", "✓", "✗", "⊘"]],
+      ["ASCII", { ...ASCII_CAPS, colourDepth: 8 }, ["o", "!", "*", "+", "x", "/"]],
     ] as const) {
       const marks = await Promise.all(CALL_STATES.map(async (s) => (await headCell(s, caps as TerminalCapabilities)).ch));
       expect(marks, `${rung}: the states draw ${marks.join(" ")}`).toEqual(expected);
-      expect(new Set(marks).size, `${rung}: no two alike`).toBe(5);
+      expect(new Set(marks).size, `${rung}: no two alike`).toBe(6);
     }
     // **The geometry never moves** (C09 I5), carried over from the row this
     // replaced: every candidate at every rung is one cell with no indent, which
@@ -219,5 +222,36 @@ describe("C09 I45 — the call head, rendered", () => {
     expect(GLYPH_TOKENS as readonly string[], "`step` is retired as a slot, not renamed").not.toContain("step");
     // And the row reads as a head, not only a lead cell.
     expect(visible(renderSequenceToLines(registry, [callHead(call({ outcome: "exit 1" }), FULL_CAPS)], 60, { theme: DARK_THEME, capabilities: FULL_CAPS })[0] ?? "")).toMatch(/^● grep\(x\) · exit 1/u);
+  });
+});
+
+describe("C04 I149 — waiting, blocked on you", () => {
+  // The same two helpers as C04 I141's block: a document carrying one call
+  // head as plain data, and the validator's refusals as one string.
+  const docWith = (head: Record<string, unknown>): unknown => {
+    const doc = JSON.parse(JSON.stringify(compose({ command: "grep x", blocks: [callHead(call({ outcome: "exit 1" }), FULL_CAPS)] }))) as {
+      blocks: Record<string, unknown>[];
+    };
+    doc.blocks[0] = { ...doc.blocks[0], ...head };
+    return doc;
+  };
+  const errors = (doc: unknown): string => {
+    const v = validateDocument(doc);
+    return v.ok ? "" : v.error.join("\n");
+  };
+  it("T2.154 (C04 I149, I141): waiting is warn with work-unit, its shape mark is warn's, and a notice claiming it in another tone is refused naming the field", () => {
+    expect(CALL_STATE_TONE.waiting).toBe("warn");
+    expect(CALL_HEAD_GLYPH.waiting).toBe("work-unit");
+    // Where tone cannot carry it the shape does, and it is not `running`'s.
+    for (const caps of [{ ...FULL_CAPS, colourDepth: 1 }, ASCII_CAPS] as TerminalCapabilities[]) {
+      expect(headMark("waiting", caps), `${String(caps.colourDepth)}-bit`).toBe("warn");
+      for (const other of CALL_STATES.filter((s) => s !== "waiting")) {
+        expect(headMark(other, caps), `${other} at ${String(caps.colourDepth)}-bit`).not.toBe("warn");
+      }
+    }
+    expect(errors(docWith({ state: "waiting", tone: "warn", glyph: "work-unit" })), "the agreeing head").toBe("");
+    expect(errors(docWith({ state: "waiting", tone: "default", glyph: "work-unit" }))).toMatch(
+      /"tone" must be "warn" for state "waiting" \(C04 I141\)/u,
+    );
   });
 });

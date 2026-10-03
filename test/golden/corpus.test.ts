@@ -44,7 +44,12 @@ export function classify(source: string): Kind {
   if (imports.some((i) => i.includes("support/frame-golden.js") || i.includes("support/session.js"))) {
     return "frame";
   }
-  if (imports.some((i) => i.includes("../../tools/"))) return "bytes";
+  // **A baseline generator, not any tool.** The byte corpora import the tool
+  // that writes their committed corpus (`tools/*-baseline.mjs`), and this line
+  // read *imports something from `tools/`* until review batch 4 gave
+  // `design-fixtures.test.ts` the figure comparison's module — a census that
+  // imports a tool and commits no corpus, which the wider test called `bytes`.
+  if (imports.some((i) => /\.\.\/\.\.\/tools\/[^/]*-baseline\.mjs$/u.test(i))) return "bytes";
   // **A file that renders nothing is not a rendering.** This one is the case:
   // it asserts about the corpus and holds no snapshot, and calling it `lines`
   // would put a row in the count of things that draw.

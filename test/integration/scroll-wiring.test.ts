@@ -1,6 +1,6 @@
 // C04 I48 — the scroll offset reaches the frame, and the key carries it.
 //
-// **The row the mutation pass demanded.** `render-cache`'s T4.18f asserts the
+// **The row the mutation pass demanded.** `render-cache`'s T4.18e asserts the
 // store's key is canonical, which is real and is not the wiring: deleting the
 // offset from `session.ts`'s slot changes nothing that row looks at. A test that
 // calls the mechanism misses the wiring (`test/support/README.md`), so this one

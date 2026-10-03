@@ -17,7 +17,7 @@ transcript and it scrolls. It is not chrome.
 ──────────────────────────────────────────────────────────────────────────────
   » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13
   ███████████████████░░░░░  78%  39k/50k   step ███████░░░ 7/10   28 tok/s
-  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m
+  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          someone   31m
 
 ★ the activity line SCROLLS — it is part of the transcript
 
@@ -32,7 +32,7 @@ what stays visible instead, and it is enough
 
   » auto   ✦ qwen3-coder-next   effort high            localhost:8000   22:13
   ███████████████████░░░░░  78%  39k/50k   step ███████░░░ 7/10   28 tok/s
-  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          malachy   31m
+  ~/code/calcium   ⎇ feat/c26   +124/-18 ~1   ✎ 3          someone   31m
   the STEP count says how far through, the CONTEXT bar says how full,
   the TOKEN rate says it is still producing. Three live numbers, in
   the one place this document already puts live state.

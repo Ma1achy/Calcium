@@ -37,3 +37,19 @@ export function pullIntoView(held: number, from: number, to: number, window: num
   if (from < start) start = from;
   return Math.max(0, start);
 }
+
+/**
+ * Where a press on row `row` of a `height`-row bar puts a window whose largest
+ * start is `max` (C14 I63, C22 I146; `R-BLK-363`).
+ *
+ * `round(row × max / (height − 1))`, so the first row is the top and the last
+ * the bottom. **One function for both bars** — the transcript's and a scroll
+ * box's — because two copies would be two chances to round differently, which
+ * is §7a's argument for `pullIntoView` one axis over. A bar of one row has no
+ * proportion to read, and its only row is the end.
+ */
+export function barTarget(row: number, height: number, max: number): number {
+  if (max <= 0) return 0;
+  if (height <= 1) return max;
+  return Math.min(max, Math.max(0, Math.round((row * max) / (height - 1))));
+}

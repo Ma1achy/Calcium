@@ -142,7 +142,7 @@ const KINDS_WITH_NOTHING_TO_CHECK: ReadonlyMap<BlockKind, Exemption> = new Map<
     {
       premise: "by-rendering",
       why:
-        "`state` selects a tag, the glyph set's `warning` mark and an activity line, all of " +
+        "`state` selects a tag, the glyph set's `cross` mark and an activity line, all of " +
         "them text — ` ERROR ` and the mark for the two failing states, `loading` for the " +
         "third — so the three are told apart at one bit with no colour at all (C09 §3a)",
     },
@@ -271,6 +271,8 @@ const TRUECOLOUR: TerminalCapabilities = Object.freeze({
   altScreen: true,
   renderMode: "rich",
   notification: "none",
+  clipboard: "none",
+  editor: null,
   notify: [],
 });
 

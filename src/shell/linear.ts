@@ -15,7 +15,7 @@
  * appending the events, redrawing it (I123).
  */
 import { hasChildren, type Block, type ViewDocument } from "../data/viewmodel/index.js";
-import { stripControl } from "../data/text.js";
+import { neutraliseControl } from "../data/text.js";
 import type { NavElement } from "../presentation/blocks/types.js";
 import { semanticsOf, type SemanticNode } from "../presentation/blocks/semantics.js";
 import { elapsed } from "../presentation/blocks/index.js";
@@ -61,8 +61,17 @@ type LinearState = {
 
 export const linearState = (): LinearState => ({ said: new Set(), read: new Map(), highest: 0 });
 
-/** One source line, as speech takes it: control-stripped, a tab two spaces. */
-const clean = (line: string): string => stripControl(line).replaceAll("\t", "  ").trimEnd();
+/**
+ * One line, as linear writes it: every control and bidi format character in
+ * its shown form (C09 I128), a tab two spaces (I149).
+ *
+ * **Shown, not stripped** (F1470). This was `stripControl`, which deletes C0
+ * and C1 and passes a bidi override whole, so a far-side name reached the
+ * stream raw — and the copy source, already neutralised at the registry's
+ * resolve, stopped matching the stripped name, so the fact was written twice.
+ * Idempotent, so C23 I90's `drawn`, which arrives in the form, is unchanged.
+ */
+const clean = (line: string): string => neutraliseControl(line).replaceAll("\t", "  ").trimEnd();
 
 const sourceLines = (text: string | null): string[] =>
   text === null ? [] : text.split("\n").map(clean).filter((l) => l !== "");
@@ -221,7 +230,13 @@ export type InputLine = Readonly<{ label: string; text: string; cursor: number }
  */
 export function windowLine(line: InputLine, width: number): { text: string; caret: number } {
   const room = Math.max(1, width - 1);
-  const graphemes = [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(line.text)];
+  // Each grapheme in its shown form (I149): the window measures and draws what
+  // the reader sees, so the caret stands on the form's cell rather than one
+  // cell short of it. The caret's index is still found in the raw text.
+  const graphemes = [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(line.text)].map((g) => ({
+    index: g.index,
+    segment: neutraliseControl(g.segment),
+  }));
   const w = (g: string): number => cells(g); // narrow-ok — the measurer's convention for a line with no frame
   // The caret's grapheme index, from its code-unit offset.
   let at = graphemes.findIndex((g) => g.index >= line.cursor);

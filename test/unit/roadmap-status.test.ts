@@ -322,9 +322,11 @@ describe("roadmap-status — the Order column's verifier", () => {
     // that shows why: 210 had become
     // `ConfirmDeps`'s own line ± the window, so the fabrication read as
     // *anchored* and the row went red by one. **A third time with review
-    // batch 2's M5** (169 → 243), which grew the question's refusal notice.
-    const anchoredCite = "`src/shell/confirm.ts:243`";
-    // Line 150 — inside the file, non-blank, and sixty-five lines clear of the
+    // batch 2's M5** (169 → 243), which grew the question's refusal notice,
+    // and a fourth with review batch 4's §7g (243 → 312), which split `ask`
+    // into `ask` and `show` for the question queue.
+    const anchoredCite = "`src/shell/confirm.ts:312`";
+    // Line 150 — inside the file, non-blank, and sixty lines clear of the
     // nearest symbol this cell names, so the *gate* has nothing to say about
     // it. A line past the end or on a blank one fails for the gate's own
     // reasons and would prove the wrong thing.
@@ -340,7 +342,7 @@ describe("roadmap-status — the Order column's verifier", () => {
     // The control in the other direction: the same cell pointed back at a line
     // that does carry the symbol restores the count, so the counter is reading
     // the citation rather than the edit.
-    const back = run(mutate(anchoredCite, "`src/shell/confirm.ts:244`"));
+    const back = run(mutate(anchoredCite, "`src/shell/confirm.ts:313`"));
     expect(Number(/citation anchorage · (\d+)\//u.exec(back.out)?.[1]), "the control").toBe(anchored);
   });
 
@@ -383,7 +385,12 @@ describe("roadmap-status — the Order column's verifier", () => {
     const field = run(mutate("reads `ghost()` fresh per paint", "reads `ghost()` `#anchor` fresh per paint"));
     expect(field.ok, "and a real field is still demanded of the file").toBe(false);
     expect(field.out, "by name").toContain("#anchor");
-  });
+  // **Its own limit, and the reason is the asymmetry** (F1406). Four spawns of the
+  // tool, each walking the tree over the bind mount: 1.35 s alone, and 46.6 s,
+  // 34.1 s and 38.2 s in three consecutive loaded chains against the file's 30 s.
+  // The row asserts counts, not speed, so a timeout here is a verdict about the
+  // machine; 120 s costs nothing when the tree is right.
+  }, 120_000);
 
   it("RS9: the grep-reach signal counts the sweep's own evidence, not the Order row", () => {
     // **The sixth sweep's finding, made countable.** Every earlier sweep claimed

@@ -1,4 +1,4 @@
-// C04 I124–I126 — the tape's window and its ladder (§3ao, §095).
+// C04 I124–I126, I144, I147 — the tape's window, its ladder, its gate and its width (§3ao, §3ao.1, §095).
 //
 // **Every clause here is one a reader would accept at a glance**, which is what
 // the walk said about this kind before it existed: a window that grows greedily
@@ -21,7 +21,9 @@ import { fsIo, report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const WINDOW = "src/presentation/blocks/tape-window.ts";
 const KIND = "src/presentation/blocks/kinds/tape.ts";
-const FILES = "test/unit/tape.test.ts test/unit/trust-boundary.test.ts";
+const GATE = "src/data/viewmodel/validate.ts";
+const FILES =
+  "test/unit/tape.test.ts test/unit/trust-boundary.test.ts test/contract/view-model.test.ts test/revert/view-model.test.ts";
 
 const { read, write } = fsIo(ROOT);
 const run = () => {
@@ -140,6 +142,89 @@ const results = runPass({
       from: "  return list.map((t, i) => cells(t, caps.ambiguousWidth) + (i === current ? LEAD_CELLS : 0));",
       to: "  return list.map((t) => cells(t, caps.ambiguousWidth));",
       expect: "T1.50",
+    },
+    {
+      // **Review batch 4, M14.7 (C04 I144).** Two members answering to one id
+      // are two targets for one name — the arm counts and refuses, and a
+      // threshold one too generous lets exactly the pair through.
+      name: "duplicate member ids are refused only past two",
+      file: GATE,
+      from: "      if (count > 1) {\n        e.push(`${at}: member id",
+      to: "      if (count > 2) {\n        e.push(`${at}: member id",
+      expect: "T2.150",
+    },
+    {
+      // **A state outside the union passes the gate**, and the kind's guard is
+      // then the only thing between the far side and a glyph lookup.
+      name: "a member's state is not checked against CALL_STATES",
+      file: GATE,
+      from: "      if (state !== undefined && !CALL_STATES.includes(state as never)) {",
+      to: "      if (state !== undefined && typeof state !== \"string\") {",
+      expect: "T2.150",
+    },
+    {
+      // **`current` given as an index** — the shape a reader reaches for, and
+      // the one that names no member while reading as the second.
+      name: "current is not required to be a string",
+      file: GATE,
+      from: "    if (current !== undefined && !isString(current)) {",
+      to: "    if (current !== undefined && current === null) {",
+      expect: "T2.150",
+    },
+    {
+      // **THE DEFECT, review batch 4 M14.9 (C04 I147)**: the details drawn and
+      // not counted, which is most of the measured case's missing cells.
+      name: "THE DEFECT: the natural width leaves out the details",
+      file: KIND,
+      from: "      cells(stripControl(m.detail ?? \"\"), ambiguous),",
+      to: "      0,",
+      expect: "T1.81",
+    },
+    {
+      // **The marks drawn and not counted** — one cell each, and the case
+      // where it alone decides is a tape whose members have no details.
+      name: "the natural width leaves out the state marks",
+      file: KIND,
+      from: "      slot === undefined ? 0 : m.state === \"running\" ? 1 : glyphCells(slot),",
+      to: "      0,",
+      expect: "T1.81",
+    },
+    {
+      // **The current's lead drawn and not counted**: two cells, so the row at
+      // its own width slides by exactly `› `.
+      name: "the natural width leaves out the current's lead",
+      file: KIND,
+      from: "    used += text + (i === current ? LEAD_CELLS : 0) + (i > 0 ? TAPE_GAP : 0);",
+      to: "    used += text + (i > 0 ? TAPE_GAP : 0);",
+      expect: "T1.81",
+    },
+    {
+      // **`width` answering the allocation** — the policy every other inline
+      // kind reads as, and the one that makes a row of tapes never share.
+      name: "width answers the allocation rather than what the tape draws",
+      file: KIND,
+      from: "    Math.max(1, Math.min(normaliseWidth(width), naturalWidth(block))),",
+      to: "    Math.max(1, normaliseWidth(width)),",
+      expect: "T1.81",
+    },
+    {
+      // **Review batch 4, M14.2's pure half (C04 I124)**: the current's range
+      // opens at its label rather than its lead, so a press on `›` lands on
+      // nobody.
+      name: "tapeMemberCols starts the current's range after its lead",
+      file: KIND,
+      from: "      drawn.set(piece.member, { from: range?.from ?? Math.min(room, cursor), to: Math.min(room, next) });",
+      to: "      drawn.set(piece.member, { from: Math.min(room, cursor), to: Math.min(room, next) });",
+      expect: "T1.83",
+    },
+    {
+      // **The two offscreen sides swapped** — each is empty, so only the side
+      // it collapses to says which way the member went.
+      name: "an offscreen member collapses to the wrong edge",
+      file: KIND,
+      from: "(i < first ? { from: 0, to: 0 } : { from: room, to: room })",
+      to: "(i > first ? { from: 0, to: 0 } : { from: room, to: room })",
+      expect: "T1.83",
     },
   ],
 });

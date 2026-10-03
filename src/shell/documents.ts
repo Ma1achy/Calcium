@@ -14,7 +14,7 @@
  */
 
 import { CALL_HEAD_GLYPH, CALL_STATE_TONE, block, document } from "../data/viewmodel/index.js";
-import { usageBlocks } from "../data/adapters/index.js";
+import { cancelledNotice, usageBlocks } from "../data/adapters/index.js";
 import { elapsed, glyphs, spinnerFrames } from "../presentation/blocks/index.js";
 import type { AskOptions, Choice } from "./local/registry.js";
 import { defaulted } from "./builders/seq.js";
@@ -65,12 +65,18 @@ export type MetaSpec = Readonly<{
 /**
  * Defaults for everything except `origin`, which is the field this exists to
  * make unforgettable.
+ *
+ * **The code's default is the status's** (C23 I100, ruling 98, F1491): 1 for an
+ * `error` document, 0 otherwise — what `completeLocal` derives and what
+ * `errorDoc` used to restate by hand. A flat 0 gave every `noticeDoc` at
+ * `error` — F15's fault notice, ruling 93's failed key action — a document
+ * saying failed with exit 0.
  */
-export function meta(spec: MetaSpec): ViewDocument["meta"] {
+export function meta(spec: MetaSpec, status: DocumentStatus = "ok"): ViewDocument["meta"] {
   return {
     verb: spec.verb ?? null,
     adapter: spec.adapter ?? "none",
-    exitCode: spec.exitCode ?? 0,
+    exitCode: spec.exitCode ?? (status === "error" ? 1 : 0),
     durationMs: spec.durationMs ?? 0,
     truncated: spec.truncated ?? false,
     argv: spec.argv ?? [],
@@ -103,7 +109,7 @@ export function compose(spec: DocSpec): ViewDocument {
     status: spec.status ?? "ok",
     blocks: spec.blocks,
     ...(spec.error === undefined ? {} : { error: spec.error }),
-    meta: meta(spec.meta ?? { origin: "user" }),
+    meta: meta(spec.meta ?? { origin: "user" }, spec.status ?? "ok"),
   });
 }
 
@@ -183,6 +189,9 @@ const GLYPH_OF = Object.freeze({
  * rather than at the two call sites is the class rather than the instances: the
  * message is the notice's own text, which is what an `ErrorLike` carrying
  * anything else would be paraphrasing.
+ *
+ * A cancel is not composed here: its notice carries a state's mark rather than
+ * the tone's, and `cancelledDoc` below is the one place it is built.
  */
 export function noticeDoc(
   command: string,
@@ -209,8 +218,7 @@ export function noticeDoc(
   // F15's fault notice is exactly that fifth case and it is already here: it
   // is `error`, so the tone alone would have spared it — but only by accident,
   // and its own `command` is `""`.
-  const glyph =
-    tone === "muted" ? (command === "" ? undefined : "continuation") : GLYPH_OF[tone];
+  const glyph = tone === "muted" ? (command === "" ? undefined : "continuation") : GLYPH_OF[tone];
   return compose({
     command,
     status,
@@ -226,6 +234,45 @@ export function noticeDoc(
     ],
     meta: metaSpec,
   });
+}
+
+/**
+ * A cancel as a whole document: the notice alone, on `partial` (C23 I10, I96).
+ * **Never `error`**: a stopped child says nothing about whether it would have
+ * worked (C23 I81), and C04 I3 then admits no `error` field — so there is no
+ * `code` to carry, and `meta.exitCode` is where a consumer reads the ending.
+ */
+export function cancelledDoc(command: string, text: string, metaSpec: MetaSpec): ViewDocument {
+  return compose({
+    command,
+    status: "partial",
+    blocks: [cancelledNotice(text, blockId("notice"))],
+    meta: metaSpec,
+  });
+}
+
+/**
+ * **An app-route cancel, as the document the shell writes** (C23 I98, ruling 97).
+ *
+ * The card as it stood — its head, already reading `cancelled` (I54), and every
+ * block the entry streamed under it — with the cancelled notice after them, on
+ * `partial`, and 130 in `meta.exitCode`: the code C20 records for the same
+ * settlement (I29), and C01 I17's 128 + `SIGINT`. It was `settle(id)` with no
+ * document, which can change no status, so the entry stayed `ok` with 0 beside a
+ * record of 130 (F1490).
+ *
+ * **The rest of `meta` is the card's own**, because the card was composed by
+ * this route at step 3 with the verb, the transport and the argv it spawned;
+ * nothing about a cancel changes them. `held` never carries `error` — a pending
+ * card is `ok` until it settles — so there is none to drop for C04 I3.
+ */
+export function cancelledCard(held: ViewDocument): ViewDocument {
+  return {
+    ...held,
+    status: "partial",
+    blocks: [...held.blocks, cancelledNotice("Cancelled.", blockId("cancelled"))],
+    meta: { ...held.meta, exitCode: 130 },
+  };
 }
 
 /**
@@ -335,7 +382,8 @@ function isSettled(call: ToolCallSpec): boolean {
   // and the child's body reached the opposite answers when this read the
   // outcome while the head read the state.
   const state = callState(call);
-  return state !== "queued" && state !== "running";
+  // `waiting` has not started either (C04 I149): it is unsettled.
+  return state !== "queued" && state !== "waiting" && state !== "running";
 }
 
 /**
@@ -399,12 +447,17 @@ export function toolCallHeader(call: ToolCallSpec, caps: Caps, tick = 0): string
 function callState(call: ToolCallSpec): CallState {
   if (call.state !== undefined) return call.state;
   const settled = call.settled === true || (call.outcome !== undefined && call.outcome !== "");
-  if (!settled) return "running";
+  // **Awaiting a decision is `waiting`, not `running`** (C04 I149, C23 I94):
+  // the tool has not started, and R-BLK-214's *blocked on YOU* is warn.
+  if (!settled) return call.waiting === true ? "waiting" : "running";
   // **`cancelled` is its own state and not a kind of failure**, which is the
   // whole reason the design keeps `⊘` apart from `✗`: a call that was stopped
   // says nothing about whether it would have worked. `FAILURE_WORDS` counts it
   // against a parent's rollup (C23 I62) and that is a different question.
-  if (call.outcome === "cancelled") return "cancelled";
+  //
+  // **`expired` is the same state** (C23 I94, `R-BLK-881`): an approval nobody
+  // answered did not run, which is what `cancelled` draws — not `failed`.
+  if (call.outcome === "cancelled" || call.outcome === "expired") return "cancelled";
   return failureWord(call.outcome) === null ? "succeeded" : "failed";
 }
 
@@ -603,7 +656,7 @@ export function operationRows(op: OperationSpec, caps: Caps, tick = 0): readonly
 }
 
 /** The words a settled child can carry that count against the parent (C23 I62). */
-const FAILURE_WORDS: ReadonlySet<string> = new Set(["failed", "denied", "cancelled", "truncated"]);
+const FAILURE_WORDS: ReadonlySet<string> = new Set(["failed", "denied", "cancelled", "expired", "truncated"]);
 
 /**
  * A parent's outcome, derived from its children on every settlement (C23 I62).
@@ -711,9 +764,14 @@ export function questionNotice(text: string, id: string): Block {
 // residue row, which is built.
 
 /** The two answers every approval offers (C23 I60); a caller may widen them — `always allow` is a row like any other. */
+//
+// **`deny` first and marked default** (C23 I94, `R-BLK-348`): *the SAFE answer
+// opens · no is first and focused · esc resolves to it · dismissing is answering
+// no*. It was `allow` marked default, so `esc` — which resolves with the default
+// (C23 I36) — approved and ran the tool.
 const APPROVAL_CHOICES: readonly Choice[] = Object.freeze([
-  { key: "y", label: "allow", default: true },
-  { key: DENY_KEY, label: "deny" },
+  { key: DENY_KEY, label: "deny", default: true },
+  { key: "y", label: "allow" },
 ]);
 
 /**
@@ -913,6 +971,6 @@ export function errorDoc(
     status: "error",
     blocks,
     error,
-    meta: { exitCode: 1, ...metaSpec },
+    meta: metaSpec,
   });
 }

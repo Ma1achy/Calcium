@@ -550,7 +550,7 @@ export function psTable(
           spark: { text: "", spark: lossCurve(12 + (i % 5)) },
           age: { text: ages[i % ages.length] ?? "1m" }, // cells-ok
           kind: { text: "candidate" },
-          owner: { text: "malachy@fmx.io" },
+          owner: { text: "someone@example.com" },
           mr: { text: `!12${String(i)}` },
         },
       };
@@ -770,7 +770,7 @@ export const THE_ILLUSTRATION: Hunk = hunkOf(
     "     matchLabels:",
     "-      app: volatility-estimator",
     "+      app: volatility-estimator",
-    "+      prism.fmx.io/family: volatility",
+    "+      prism.example.com/family: volatility",
     "   replicas: 2",
     "   template:",
   ],

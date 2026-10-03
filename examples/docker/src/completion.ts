@@ -16,7 +16,7 @@
  * two containers shared one directory listing.
  */
 
-import type { Candidate, CompletionContext, CompletionSource } from "@fmx/calcium";
+import type { Candidate, CompletionContext, CompletionSource } from "calcium-tui";
 import { parseNdjson, str, type Row } from "./ndjson.ts";
 
 /**

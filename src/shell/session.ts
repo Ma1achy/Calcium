@@ -13,14 +13,16 @@
  * and shutdown (§8, below).
  */
 
-import { availableParallelism } from "node:os";
-import { dirname } from "node:path";
+import { availableParallelism, tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { appendFileSync, closeSync, mkdirSync, openSync, writeSync } from "node:fs";
 import {
   appendFile,
   mkdir,
+  mkdtemp,
   readdir,
   readFile,
+  rm,
   writeFile,
 } from "node:fs/promises";
 import { resolveConfig, type Ambient, type ResolvedConfig } from "./config.js";
@@ -30,7 +32,7 @@ import type { SemanticMode } from "./semantic-selection.js";
 import { drawFallback, tooSmall } from "./fallback.js";
 import { isUsable } from "../terminal/capabilities.js";
 import { usageText } from "./usage.js";
-import { compose, type Composed } from "./frame.js";
+import { compose, promptCap, type Composed } from "./frame.js";
 import { commandRows, type PaintDeps } from "./paint.js";
 import { transmitFrame, transmits, type SentImages } from "./transmit-image.js";
 import { composeFrame } from "./render-frame.js";
@@ -42,7 +44,7 @@ import { reserveNeeded } from "./block-faults.js";
 import { descendants } from "../data/viewmodel/index.js";
 import type { Block, Image, Plot } from "../data/viewmodel/index.js";
 import { blockSpansOfEntry, elementsOfEntry, entryLayout, renderEntryPieces, windowEntry } from "./entry-layout.js";
-import { washedRowsOf, washSelectedRows } from "./paint.js";
+import { RAIL_BLANK, railCell, railRowsOf, selectedElementRowsOf, washedRowsOf, washRectCells, washSelectedRows } from "./paint.js";
 import { animationIntervalOf, TICK_MS } from "../presentation/blocks/index.js";
 import { isBand } from "../presentation/blocks/paint.js";
 import type { EntryParts } from "./render-cache.js";
@@ -54,11 +56,13 @@ import type { RenderScratch } from "../presentation/blocks/types.js";
 import { contextAt } from "../interaction/completion/index.js";
 import { chipSpans, cursorCell, layout, selectionSpans, type CellSpan } from "../interaction/editor/index.js";
 import { extentOf } from "../interaction/router/focus.js";
-import { renderSequenceToLines } from "../presentation/render-lines.js";
-import { PROMPT_GUTTER, regionWidth } from "./config.js";
+import { layerLines } from "./composite.js";
+import { PROMPT_GUTTER, regionWidth, transcriptWidth } from "./config.js";
 import { cursorStyleFor, steadyWhileTyping } from "./cursor-style.js";
 import { autoscrollFor, beginDrag, clampToContainer, type Drag } from "./drag-selection.js";
 import { createIdentityLoop } from "./identity.js";
+import { copyFilePath, createCopier, offerFact, type Copier } from "./clipboard.js";
+import { findClipboardTool, writeClipboard } from "../data/process/clipboard.js";
 import {
   SessionStateError,
   UnusableTerminalError,
@@ -104,6 +108,10 @@ const nodeFileSystem: FileSystem = {
       name: e.name,
       directory: e.isDirectory(),
     })),
+  // C22 I144 — `mkdtemp` makes the directory `0700`, so the chip is the
+  // reader's alone while their editor has it.
+  makeTempDir: (prefix) => mkdtemp(join(tmpdir(), prefix)),
+  removeDir: (path) => rm(path, { recursive: true, force: true }),
 };
 
 /**
@@ -824,6 +832,10 @@ class Session implements TuiInstance {
     // 1 — C23 refuses further submissions. Before the release, so a submission
     // racing shutdown loses the race (T3.19).
     graph.session.beginStopping();
+    // **Every question resolves, before teardown** (C23 I92): an owner awaiting
+    // one would otherwise be left pending by a session that no longer exists.
+    // `cancelled`, with each one's default key — the safe answer.
+    graph.confirm.cancelAll();
     this.#identity?.stop();
     // **Before the release, and disposed rather than left to the frame that
     // never comes.** The ticker re-arms itself out of `#render`, so a session
@@ -836,6 +848,9 @@ class Session implements TuiInstance {
     this.#toastTimer = null;
     this.#toast = null;
     this.#animation = NOTHING_ANIMATES;
+    // C14 §6e *Where the copy goes* row 10 — a pending copy's deadline, on the
+    // toast's terms. The tool is detached and runs to its end (C21 I2).
+    this.#copier?.[Symbol.dispose]();
     this.#tickAt = null;
     this.#motionAt = null;
     // **Here, not in `beforeRelease`** (C23 I12). The flag `beginStopping` sets
@@ -1063,7 +1078,7 @@ class Session implements TuiInstance {
             // to. It partitions blocks and no run is measured here, which is why
             // this is affordable over every entry rather than the visible ones.
             graph.transcript.entries.flatMap((e) =>
-              entryLayout(e.doc.blocks, regionWidth(graph.lifecycle.size().columns))
+              entryLayout(e.doc.blocks, transcriptWidth(graph.lifecycle.size().columns))
                 .filter((run) => !run.blank)
                 .map((run) => ({ scope: e.id, blocks: run.blocks, width: run.width })),
             ),
@@ -1073,7 +1088,8 @@ class Session implements TuiInstance {
             // and the declared cell box is a render-time fact that was a
             // hardcoded `1` before F380.
             //
-            // **`regionWidth` rather than the region** (I109, §6l.9 row 7): the
+            // **`transcriptWidth` rather than the region** (I109, §6l.9 row 7,
+            // C14 I57 — it was `regionWidth` until the rail took a column): the
             // write seam runs after `composeFrame` has returned and holds no
             // `Composed`, so the one implementation is reached for rather than
             // the value. Spelling `columns - 1` here is what the helper exists
@@ -1081,7 +1097,7 @@ class Session implements TuiInstance {
             // the blocks were measured at, and at 80 columns a card-nested
             // picture declared 80 cells wide and addressed across 76 is what
             // F1026 measured going wrong one width along.
-            regionWidth(graph.lifecycle.size().columns),
+            transcriptWidth(graph.lifecycle.size().columns),
             graph.probe,
           )
         : "") + result.write;
@@ -1296,13 +1312,21 @@ class Session implements TuiInstance {
   #questionRows(graph: Graph, width: number): readonly string[] | null {
     const layer = graph.confirm.replacing;
     if (layer === null || layer.content.length === 0) return null;
-    const render = (blocks: readonly Block[], w: number): readonly string[] =>
-      renderSequenceToLines(graph.blocks, blocks, w, {
+    // **The compositor's function, with the layer's view** (C22 I141, F1302):
+    // this painter rendered the content with no offsets, so an inspection's
+    // box drew its top whatever the store held.
+    return layerLines(
+      layer.content,
+      width,
+      {
+        registry: graph.blocks,
         theme: graph.theme.current,
         capabilities: graph.capabilities,
         motion: graph.motion,
-      });
-    return graph.chrome.layer(layer.content, width, graph.theme.current.name, render);
+        chrome: graph.chrome,
+      },
+      graph.layerView(layer.id),
+    );
   }
 
   #paintDeps(graph: Graph, frame: Composed): PaintDeps {
@@ -1314,6 +1338,12 @@ class Session implements TuiInstance {
     // reading the wrong one and a second `frame.size.columns` here is that
     // failure spelled harmlessly.
     const width = frame.region.width;
+    // **The prompt keeps the region's content width** (C14 I57, C22 I109): the
+    // transcript is one column narrower for the rail, and `composeFrame` counts
+    // the prompt's rows at `regionWidth` — so a prompt laid out here at the
+    // transcript's width disagrees with the composed height at a wrap boundary,
+    // and the paint's own check throws. One implementation, reached for by name.
+    const promptWidth = regionWidth(frame.size.columns);
     return {
       registry: graph.blocks,
       theme: graph.theme.current,
@@ -1345,34 +1375,32 @@ class Session implements TuiInstance {
           // **The selection and the spans it was taken over** (C14 I39). Null
           // outside the mode, which is every frame the reader is not copying —
           // so the wash costs one comparison and the render path is unchanged.
-          this.#semantic === null
-            ? null
-            : { blocks: this.#semantic.blocks, spans: this.#selectionSpans(width) },
+          this.#selectionWash(width),
         ),
       // **The question's rows when one replaces the prompt** (C23 I74, §7f).
       // **And the reader's held line while a form field has the editor** (C22
       // I118): the field draws what is typed, and the prompt keeps showing what
       // the reader left there — drawn by the same walk, chips and all.
       promptRows: () => {
-        const question = this.#questionRows(graph, width);
+        const question = this.#questionRows(graph, promptWidth);
         if (question !== null) return question;
         const held = graph.fieldHeld();
         return held === null
-          ? graph.editor.layout(width, PROMPT_GUTTER)
-          : layout(held.text, width, PROMPT_GUTTER, graph.editor.drawAs);
+          ? graph.editor.layout(promptWidth, PROMPT_GUTTER)
+          : layout(held.text, promptWidth, PROMPT_GUTTER, graph.editor.drawAs);
       },
       // **No caret in a replaced prompt.** §101 draws the `▌` only once the
       // reader has chosen `reply…` and the prompt has come live beneath the
       // question; a caret left at the editor's position would sit inside the
       // question's box, on a row the editor did not write.
       promptCursor: () => {
-        if (this.#questionRows(graph, width) !== null) return { row: 0, col: 0 };
+        if (this.#questionRows(graph, promptWidth) !== null) return { row: 0, col: 0 };
         const held = graph.fieldHeld();
         return held === null
-          ? graph.editor.cursorCell(width, PROMPT_GUTTER)
-          : cursorCell(held.text, held.cursor, width, PROMPT_GUTTER, graph.editor.drawAs);
+          ? graph.editor.cursorCell(promptWidth, PROMPT_GUTTER)
+          : cursorCell(held.text, held.cursor, promptWidth, PROMPT_GUTTER, graph.editor.drawAs);
       },
-      promptReplaced: () => this.#questionRows(graph, width) !== null,
+      promptReplaced: () => this.#questionRows(graph, promptWidth) !== null,
       // **The wash, mapped through the same walk the rows came from** (C17 I18,
       // roadmap entry 23). `selection` is read here rather than a
       // `selectionSpans` method being added to `LineEditor`, because the guard
@@ -1386,7 +1414,7 @@ class Session implements TuiInstance {
         // spans are cell ranges into the editor's rows, and the rows on screen
         // are the question's — so a live region would wash cells of a box it
         // has no coordinates in.
-        if (this.#questionRows(graph, width) !== null) return EMPTY_SPANS;
+        if (this.#questionRows(graph, promptWidth) !== null) return EMPTY_SPANS;
         const held = graph.fieldHeld();
         const sel = held === null ? graph.editor.selection : held.selection;
         if (sel === null) return EMPTY_SPANS;
@@ -1394,7 +1422,7 @@ class Session implements TuiInstance {
           held?.text ?? graph.editor.text,
           sel.anchor,
           sel.head,
-          width,
+          promptWidth,
           PROMPT_GUTTER,
           // The fourth caller of the one walk, and the one the seam was nearly
           // written without: a wash measured on sentinels and drawn over labels
@@ -1410,7 +1438,7 @@ class Session implements TuiInstance {
       // ground is measured where its label was drawn or it is somewhere else,
       // which is the same argument `promptSelection` above rests on.
       promptChips: () =>
-        chipSpans(graph.fieldHeld()?.text ?? graph.editor.text, width, PROMPT_GUTTER, graph.editor.drawAs),
+        chipSpans(graph.fieldHeld()?.text ?? graph.editor.text, promptWidth, PROMPT_GUTTER, graph.editor.drawAs),
       promptFocused: () =>
         graph.router.target === "prompt" || graph.promptUnderMenu(),
       // **Read at paint, not captured** (C22 I66). `/theme light --no-bg`
@@ -1452,6 +1480,14 @@ class Session implements TuiInstance {
       // where it is painted and nothing else.
       // C16 I74 — where the wheel left each layer.
       layerScroll: (id) => graph.layerScroll(id),
+      // C22 I141 — each layer's boxes' offsets, and the box its keys move.
+      layerView: (id) => graph.layerView(id),
+      // C14 I62 — the transcript's bar, from C14's scroll; the thumb is
+      // `accent` while focus is in the transcript (`R-BLK-160`).
+      transcriptBar: () => {
+        const { topRow, totalRows } = graph.viewport.scroll;
+        return { topRow, totalRows, focused: graph.focus.current.at === "liveBlock" };
+      },
       overlays: () => {
         const replacing = graph.confirm.replacing;
         const placed = graph.overlays.layout(frame.overlayRegion);
@@ -1563,6 +1599,12 @@ class Session implements TuiInstance {
 
     const spans: semantic.BlockSpan[] = [];
     for (const entry of entries) {
+      // **The run's columns, which a rectangle clamps into** (C14 I60). One
+      // walk for both halves, so an element's span and a prose block's carry
+      // the same edges when they sit in the same run.
+      const blockSpans = blockSpansOfEntry(graph.blocks, entry.doc.blocks, width);
+      const colsAt = (row: number): Readonly<{ from: number; to: number }> | undefined =>
+        blockSpans.find((b) => b.from <= row && row < b.to)?.cols;
       for (const { blockId, element } of elementsOfEntry(
         graph.blocks,
         entry.doc.blocks,
@@ -1574,11 +1616,13 @@ class Session implements TuiInstance {
         // the set once per row — which reads as a count that climbs while the
         // selection does not change (C14 I38).
         if (element.level !== "block") continue;
+        const cols = colsAt(element.rows.from);
         spans.push(
           Object.freeze({
             key: semantic.keyOf(entry.id, blockId),
             from: element.rows.from,
             to: element.rows.to,
+            ...(cols === undefined ? {} : { cols }),
           }),
         );
       }
@@ -1588,10 +1632,10 @@ class Session implements TuiInstance {
       // rows meet the block's, so a block already reachable keeps its key and a
       // container's children are not taken twice.
       const own = spans.filter((sp) => semantic.entryOf(sp.key) === entry.id);
-      for (const b of blockSpansOfEntry(graph.blocks, entry.doc.blocks, width)) {
+      for (const b of blockSpans) {
         if (b.to <= b.from) continue;
         if (own.some((sp) => sp.from < b.to && sp.to > b.from)) continue;
-        spans.push(Object.freeze({ key: semantic.keyOf(entry.id, b.blockId), from: b.from, to: b.to }));
+        spans.push(Object.freeze({ key: semantic.keyOf(entry.id, b.blockId), from: b.from, to: b.to, cols: b.cols }));
       }
     }
     const frozen = Object.freeze(spans);
@@ -1610,6 +1654,8 @@ class Session implements TuiInstance {
    */
   #drag: Drag | null = null;
   #dragRow = 0;
+  /** The pointer's transcript column, for a rectangle's tick (C14 I60) — the row's reason, one axis over. */
+  #dragColumn = 0;
   /** The autoscroll's handle — a **second** ticker, because I35 stopped the first. */
   #autoscroll: Disposable | null = null;
 
@@ -1622,13 +1668,15 @@ class Session implements TuiInstance {
    * first's expiry, left armed, would clear the second early.
    */
   #toast: string | null = null;
+  #toastMark: "expired" | undefined = undefined;
   #toastTimer: Disposable | null = null;
 
-  #raiseToast(text: string): void {
+  #raiseToast(text: string, mark?: "expired"): void {
     const graph = this.#graph;
     if (graph === null || graph.session.snapshot.stopping) return;
     this.#toastTimer?.[Symbol.dispose]();
     this.#toast = text;
+    this.#toastMark = mark;
     this.#toastTimer = this.config.schedule(() => {
       this.#toastTimer = null;
       this.#toast = null;
@@ -1644,7 +1692,7 @@ class Session implements TuiInstance {
    * the boxes: two widths here would put the caret in a different block from
    * the one the spans describe, and the drag would work.
    */
-  #semanticDrag(regionRow: number, phase: "press" | "move" | "release"): boolean {
+  #semanticDrag(regionRow: number, phase: "press" | "move" | "release", column = 0): boolean {
     const graph = this.#graph;
     if (graph === null || this.#semantic === null) return false;
     if (phase === "release") {
@@ -1656,6 +1704,7 @@ class Session implements TuiInstance {
     const width = this.#composed().region.width;
     const caret = graph.semanticCaretAt(regionRow, width);
     this.#dragRow = regionRow;
+    this.#dragColumn = column;
     // **A row with no entry under it is most of a drag, not an error.** The
     // pointer is past the container — which is the state `R-SEL-013`'s bands
     // exist for — so the gesture stays alive and the ticker is re-armed for the
@@ -1667,9 +1716,18 @@ class Session implements TuiInstance {
       return true;
     }
 
+    // **In the rectangle the gesture moves cells, not blocks** (C14 I60): a
+    // press plants both cursors at the pointer's cell and a motion moves the
+    // head, the row clipped by I42 and the column the pointer's own.
+    const inRect = this.#semantic.rect !== null;
     if (phase === "press") {
       this.#drag = beginDrag(caret, graph.scrollBoxSpans());
-      this.#semantic = semantic.placeCaret(this.#semantic, caret);
+      this.#semantic = inRect
+        ? semantic.placeRect(this.#semantic, Object.freeze({ ...caret, column }))
+        : semantic.placeCaret(this.#semantic, caret);
+    } else if (inRect) {
+      if (this.#drag === null) return false;
+      this.#semantic = semantic.extendRectTo(this.#semantic, Object.freeze({ ...caret, column }));
     } else {
       if (this.#drag === null) return false;
       // **Clamped into the drag's container first** (C14 I50, `R-SEL-013`):
@@ -1734,12 +1792,13 @@ class Session implements TuiInstance {
     const width = this.#composed().region.width;
     const caret = graph.semanticCaretAt(rows > 0 ? rect.to - 1 : rect.from, width);
     if (caret === null) return;
-    this.#semantic = semantic.extendTo(
-      this.#semantic,
-      caret,
-      this.#selectionSpans(width),
-      this.#selectionOrder(),
-    );
+    // **The rectangle's head, in the rectangle** (C14 I60, §6e trace row 14).
+    // The tick called the block `extendTo` whatever the mode, so a rectangle
+    // drag held past the edge scrolled and took blocks nobody was drawing.
+    this.#semantic =
+      this.#semantic.rect !== null
+        ? semantic.extendRectTo(this.#semantic, Object.freeze({ ...caret, column: this.#dragColumn }))
+        : semantic.extendTo(this.#semantic, caret, this.#selectionSpans(width), this.#selectionOrder());
     graph.scheduler.commit("input");
   }
 
@@ -1759,15 +1818,40 @@ class Session implements TuiInstance {
     return this.#graph?.documentEntries.map((e) => e.id) ?? [];
   }
 
-  /** A plain arrow, and a shifted one (C14 I37, §6c). */
-  #moveSemanticCaret(delta: number, extend: boolean): void {
+  /**
+   * A plain arrow, and a shifted one (C14 I37, I60, §6c, §6e).
+   *
+   * **Columns move only in the rectangle** (ruling 70): at block granularity a
+   * block is atomic and there is no horizontal extent, so `⇧←`/`⇧→` and a plain
+   * `←`/`→` do nothing there. **And the viewport follows the caret** (I37
+   * amended): a move that takes it off the screen scrolls by the overshoot.
+   */
+  #moveSemanticCaret(rows: number, columns: number, extend: boolean): void {
     const graph = this.#graph;
     if (graph === null || this.#semantic === null) return;
-    const spans = this.#selectionSpans();
+    const width = this.#composed().region.width;
+    const spans = this.#selectionSpans(width);
     const order = this.#selectionOrder();
-    this.#semantic = extend
-      ? semantic.extendCaret(this.#semantic, delta, spans, order)
-      : semantic.moveCaret(this.#semantic, delta, spans, order);
+    if (this.#semantic.rect !== null) {
+      this.#semantic = semantic.moveRect(this.#semantic, rows, columns, extend, spans, order);
+    } else {
+      if (rows === 0) return;
+      this.#semantic = extend
+        ? semantic.extendCaret(this.#semantic, rows, spans, order)
+        : semantic.moveCaret(this.#semantic, rows, spans, order);
+    }
+    const caret = this.#semantic?.caret ?? null;
+    if (caret !== null) graph.revealSemanticCaret(caret, width);
+    graph.scheduler.commit("input");
+  }
+
+  /** `⌃V` — the rectangle on at the caret, or off (C14 I60, rulings 36, 71). */
+  #toggleSemanticRect(): void {
+    const graph = this.#graph;
+    if (graph === null || this.#semantic === null) return;
+    // A gesture in flight belongs to the granularity it began in.
+    this.#endDrag();
+    this.#semantic = semantic.toggleRect(this.#semantic, this.#selectionSpans());
     graph.scheduler.commit("input");
   }
 
@@ -1796,11 +1880,11 @@ class Session implements TuiInstance {
 
   /**
    * Leave semantic copy whole, in one step — the copy-mode switch's half
-   * (C16 I66, §6c S11).
+   * (C16 I66, §6c S11), and `⏎`'s way out after its copy (C14 I59).
    *
-   * **Its one caller is `#setNativeSelection`**: `⌃c` is a refusal in a copy
-   * mode since ruling 59, so the only thing that ends this mode without the
-   * reader's `esc` is entering the other one, which must not leave both up.
+   * **Two callers, and neither is `⌃c`**: it is a refusal in a copy mode since
+   * ruling 59. Entering native selection must not leave both modes up, and
+   * `⏎` leaves by copying (R-BLK-838's *leaves by esc, or a copy*).
    */
   #exitSemanticSelection(): void {
     if (this.#semantic === null) return;
@@ -1837,60 +1921,174 @@ class Session implements TuiInstance {
   }
 
   /**
-   * `y` — the selected entries to the clipboard (`R-SEL-004`, `R-SEL-011`).
+   * `y` and `⏎` — the selection to the kill buffer, and `⏎` leaves (C14 I59,
+   * I47, `R-SEL-004`, `R-SEL-011`, R-BLK-838).
    *
-   * **Document order is the transcript's**, and C09's `copySequence` is what
-   * turns each entry's blocks into its source. Neither is reachable from the
-   * key table, which is why this is a frame query rather than an effect.
-   *
-   * **`R-SEL-011`'s refusal is owed and is not here**, and it is blocked on the
-   * same parked word the mode label is (C14 §6a). The rule says *if neither is
-   * available the mode states it and offers a file instead*, because *a copy
-   * that appears to work and does not is the worst outcome available here* —
-   * and neither mechanism is built, so the condition holds on every copy this
-   * takes. What the rule asks for is *the mode* stating it, and the mode's
-   * statement surface is the footer label; a notice block on every `y` is the
-   * other reading and is noise on the key a reader presses most.
-   *
-   * So the refusal lands with the label, and until then the text reaches the
-   * kill buffer and nothing claims it reached the system clipboard. That is the
-   * honest half: `⌃y` yanks it back, which is a true statement about where it
-   * went, and no part of this says otherwise.
-   *
-   * A copy of nothing is not a refusal and says nothing: the count is on screen,
-   * and a notice that fired on an empty selection would be noise on the one key
-   * a reader presses repeatedly.
+   * **One copy path under both keys**, which is what I47 needed the single
+   * action for: a return that copied through another path could copy the
+   * record. **Never silent** (ruling 71): nothing selected, and a selection
+   * whose copy is empty, each say so and stay — `⏎` leaving on an empty copy
+   * would discard the mode for nothing — and neither calls `copyText("")`.
+   * **The kill buffer first, then one clipboard** (C17 I31, C14 I61): `⌃y`
+   * yanks what the clipboard received, and the copier says where that was in
+   * words that are true — it is the only sentence a copy raises.
    */
-  #copySelectedEntries(): void {
+  #copySelectedEntries(leave: boolean): void {
     const graph = this.#graph;
-    if (graph === null || this.#semantic === null) return;
-    const text = semantic.copyTextOf(
-      this.#semantic,
-      // **The held blocks, not the record's** (C14 I33, §6b A6). This is the
-      // row a paint-path freeze cannot satisfy: the screen would be right and
-      // the clipboard would carry text that was never on it, with nothing
-      // telling the reader it happened.
+    const mode = this.#semantic;
+    if (graph === null || mode === null) return;
+    if (!semantic.hasSelection(mode)) {
+      this.#raiseToast("nothing selected");
+      return;
+    }
+    const text = this.#copyText(graph, mode);
+    if (text === "") {
+      this.#raiseToast("the selection copies no text");
+      return;
+    }
+    graph.editor.copyText(text);
+    // **`⏎` takes the offer where the footer drew one** (C14 I61, §6e K4, K9,
+    // K14) — the same call over the same text, so the label and the press
+    // cannot disagree. `y` is never the offer (K13).
+    const copier = this.#copierOf(graph);
+    const save = leave && copier.fileOffer(() => text) !== null;
+    if (leave) this.#exitSemanticSelection();
+    if (save) copier.save(text);
+    else copier.copy(text);
+  }
+
+  /**
+   * The one copier, built on first use (C14 I61, ruling 72).
+   *
+   * **The tool is found once**: `findClipboardTool` walks the injected `PATH`
+   * with a `stat` per directory, and the footer asks `fileOffer` on every
+   * frame. A tool installed mid-session is not seen, which is the cost.
+   */
+  #copier: Copier | null = null;
+
+  #copierOf(graph: Graph): Copier {
+    this.#copier ??= createCopier({
+      clipboard: graph.capabilities.clipboard,
+      tool: findClipboardTool(this.config.env),
+      send: (bytes) => void graph.lifecycle.writer.write(bytes),
+      write: (tool, text) => writeClipboard(tool, text, { env: this.config.env, cwd: () => this.config.cwd }),
+      // **Its directory first** (§6e K16): the path is resolved against the
+      // session's `cwd`, and C22 I67 made `stateDir` against the process's —
+      // the same directory unless the app passed a `cwd`. `mkdir` is recursive.
+      writeFile: (path, text) => this.config.fs.mkdir(dirname(path)).then(() => this.config.fs.writeFile(path, text)),
+      path: copyFilePath(this.config.stateDir, this.config.cwd),
+      schedule: this.config.schedule,
+      say: (text) => this.#raiseToast(text),
+    });
+    return this.#copier;
+  }
+
+  /**
+   * What a copy right now takes (C14 I33, I43, I60) — the rectangle's cells
+   * while it is up, the selected blocks' sources otherwise.
+   *
+   * **The held blocks, not the record's** (C14 I33, §6b A6), in both arms. This
+   * is the row a paint-path freeze cannot satisfy: the screen would be right and
+   * the clipboard would carry text that was never on it.
+   */
+  #copyText(graph: Graph, mode: semantic.SemanticSelection): string {
+    if (mode.rect !== null) {
+      const width = this.#composed().region.width;
+      const rect = semantic.rectOf(mode, this.#selectionSpans(width), this.#selectionOrder());
+      return rect === null ? "" : this.#rectText(graph, rect, width);
+    }
+    return semantic.copyTextOf(
+      mode,
       graph.documentEntries.map((e) => ({ id: e.id, blocks: e.doc.blocks })),
       graph.blocks.copySequence,
     );
-    if (text === "") return;
+  }
 
-    graph.editor.copyText(text);
-    graph.scheduler.commit("input");
+  /** A rectangle's cells, over its entry's lines at `width` (C14 I43, I60). */
+  #rectText(graph: Graph, rect: semantic.CellRect, width: number): string {
+    return semantic.cellTextOf(
+      rect,
+      this.#entryLines(graph, semantic.entryOf(rect.key), width),
+      graph.capabilities.ambiguousWidth,
+    );
+  }
+
+  /**
+   * An entry's block rows as the frame draws them, whole (C14 I43, I60).
+   *
+   * *Cells are what the frame drew*: rendered through the frame's own
+   * per-entry options — focus, scroll offsets, cameras, cursors, frames and
+   * series — at the transcript's width, with no selection on them, because the
+   * ink comes off the copy and the ground is the selection's own.
+   */
+  #entryLines(graph: Graph, entryId: string, width: number): readonly string[] {
+    const entry = entryById(graph.documentEntries, entryId);
+    if (entry === undefined) return [];
+    const blocks = graph.oneShots.stamp(entry.id, entry.doc.blocks, this.#tick);
+    const pieces = windowEntry(entryLayout(blocks, width), 0, Number.MAX_SAFE_INTEGER, graph.blocks);
+    const focus = focusFor(graph, entry.id);
+    return renderEntryPieces(graph.blocks, pieces, {
+      theme: graph.theme.current,
+      capabilities: graph.capabilities,
+      motion: graph.motion,
+      focus,
+      tick: this.#tick,
+      scrollOffsets: graph.scrollOffsets.forEntry(entry.id),
+      cameras: graph.cameras.forEntry(entry.id),
+      cursorPositions: graph.cursorPositions.forEntry(entry.id),
+      frames: graph.frames.forEntry(entry.id),
+      placementScope: entry.id,
+      seriesVisibility: graph.seriesVisibility.forEntry(entry.id),
+    }).rows;
+  }
+
+  /** The wash's inputs for this frame, or `null` outside the mode (C14 I39, I60). */
+  #selectionWash(width: number): SelectionWash | null {
+    const mode = this.#semantic;
+    if (mode === null) return null;
+    const spans = this.#selectionSpans(width);
+    if (mode.rect === null) return { blocks: mode.blocks, spans, rect: null };
+    return { blocks: NO_KEYS, spans, rect: semantic.rectOf(mode, spans, this.#selectionOrder()) };
   }
 
   /** C14 I55 — the copy rung's mode and, in semantic mode, the selection's size. */
-  #copyState(): CopyState | undefined {
+  #copyState(width: number): CopyState | undefined {
     if (this.#nativeSelection) return { mode: "native" };
     const graph = this.#graph;
     if (this.#semantic === null || graph === null) return undefined;
-    return {
-      mode: "semantic",
-      size: semantic.sizeOf(
-        this.#semantic,
+    const mode = this.#semantic;
+    const spans = this.#selectionSpans(width);
+    // **The rectangle's own numbers while it is up** (C14 I55, I60): its size
+    // and the count over its cells, never the block set kept underneath.
+    let rect: Readonly<{ columns: number; rows: number }> | null = null;
+    let size: Readonly<{ chars: number; rows: number; entries: number }> | null;
+    let text = (): string => this.#copyText(graph, mode);
+    if (mode.rect !== null) {
+      const cells = semantic.rectOf(mode, spans, this.#selectionOrder());
+      const cellText = cells === null ? "" : this.#rectText(graph, cells, width);
+      text = () => cellText;
+      rect =
+        cells === null
+          ? { columns: 0, rows: 0 }
+          : { columns: cells.toColumn - cells.fromColumn + 1, rows: cells.toRow - cells.fromRow + 1 };
+      size = semantic.textSize(cellText, 1);
+    } else {
+      size = semantic.sizeOf(
+        mode,
         graph.documentEntries.map((e) => ({ id: e.id, blocks: e.doc.blocks })),
         graph.blocks.copySequence,
-      ),
+      );
+    }
+    // C14 I61, §6e K1–K16: the reason the file is offered for this text, or
+    // nothing where a route takes it.
+    const offer = this.#copierOf(graph).fileOffer(text);
+    return {
+      mode: "semantic",
+      size,
+      clears: semantic.hasSelection(mode),
+      all: semantic.selectsAll(mode, spans),
+      rect,
+      ...(offer === null ? {} : { fileOffer: offerFact(offer) }),
     };
   }
 
@@ -1903,10 +2101,12 @@ class Session implements TuiInstance {
       escapeSemanticSelection: () => this.#escapeSemanticSelection(),
       selectEntryUnderCaret: () => this.#selectEntries("caret"),
       selectAllLoadedEntries: () => this.#selectEntries("all"),
-      copySelectedEntries: () => this.#copySelectedEntries(),
-      toast: (text) => this.#raiseToast(text),
-      moveSemanticCaret: (delta, extend) => this.#moveSemanticCaret(delta, extend),
-      semanticDrag: (row, phase) => this.#semanticDrag(row, phase),
+      copySelectedEntries: () => this.#copySelectedEntries(false),
+      copyAndLeaveSemanticSelection: () => this.#copySelectedEntries(true),
+      toggleSemanticRect: () => this.#toggleSemanticRect(),
+      toast: (text, mark) => this.#raiseToast(text, mark),
+      moveSemanticCaret: (rows, columns, extend) => this.#moveSemanticCaret(rows, columns, extend),
+      semanticDrag: (row, phase, column) => this.#semanticDrag(row, phase, column),
       enterNativeSelection: () => this.#setNativeSelection(true),
       exitNativeSelection: () => this.#setNativeSelection(false),
       region: () => this.#composed().region,
@@ -1927,6 +2127,8 @@ class Session implements TuiInstance {
         const f = this.#composed();
         return { row: f.region.height, rows: f.promptRows };
       },
+      // C23 I88 — the slot a replacing question is drawn in, capped as the frame caps it.
+      promptCap: () => promptCap(this.#composed().size.rows),
       mouseEnabled: () => this.#graph?.capabilities.mouse ?? false,
       // Ctrl-C and Ctrl-D raise a confirm; answering it is what stops.
       //
@@ -1982,7 +2184,7 @@ class Session implements TuiInstance {
       bufferedEntries: () => this.#graph?.bufferedEntries ?? 0,
       // C14 I55 — which copy mode, and how much `⏎` would take. Over the held
       // view, as the copy itself is (A6), so the count is the paste.
-      copy: () => this.#copyState(),
+      copy: (columns) => this.#copyState(transcriptWidth(columns)),
       // C22 I118 — the owner line's field arm.
       editingField: () => this.#graph?.fieldHeld() != null,
       // C22 I133 — the owner line's keys, from the session's keymap.
@@ -1991,6 +2193,7 @@ class Session implements TuiInstance {
       watches: () => this.#graph?.watchRow(),
       // C22 I116 — the live toast, drawn in the footer's tail while it lives.
       toast: () => this.#toast ?? undefined,
+      toastMark: () => this.#toastMark,
       // A03 SS47 — the owner line draws chords, so the chrome resolves them.
       capabilities: () => graph?.capabilities ?? null,
       // C24 I32 — read per frame from the recorder rather than kept here. A
@@ -2065,25 +2268,19 @@ function entryById(entries: readonly Entry[], id: string): Entry | undefined {
  * ordinary output and part company at a wrap boundary.
  */
 /**
- * One row per selected block, at the block's first row (C14 I39).
+ * One row per selected block, at the block's first row (C14 I39) — the rows
+ * `washedRowsOf` answers in `visibleRows`.
  *
  * **The spans are the caret's own** (I36), so what is washed and what an extend
  * took cannot disagree — a second walk over the blocks would be a second answer
  * to *where does this block start*. A block whose first row is outside the
- * window contributes nothing here, which is right: the ground goes on the first
- * row and a window that begins below it is showing the body.
+ * window contributes nothing, which is right: the ground goes on the first row
+ * and a window that begins below it is showing the body. The same set leads the
+ * rail (C14 I58).
  */
-function washSelected(
-  graph: Graph,
-  lines: readonly string[],
-  entryId: string,
-  from: number,
-  width: number,
-  selection: SelectionWash,
-): readonly string[] {
-  const rows = washedRowsOf(selection.spans, selection.blocks, entryId, from, lines.length);
-  return washSelectedRows(lines, rows, graph.theme.current, graph.capabilities, width);
-}
+const NO_ROWS: ReadonlySet<number> = Object.freeze(new Set<number>());
+/** No block keys — the block set's place in the wash while the rectangle has the screen (C14 I60). */
+const NO_KEYS: ReadonlySet<string> = Object.freeze(new Set<string>());
 
 /**
  * The entry's blocks under a **banded** selection (C14 I54), or `undefined`.
@@ -2101,10 +2298,15 @@ function washedBlocksOf(graph: Graph, entryId: string, selection: SelectionWash 
   return ids.size === 0 ? undefined : ids;
 }
 
-/** What the wash needs: the selection and the spans it was taken over (I39). */
+/**
+ * What the wash needs: the selection and the spans it was taken over (I39) —
+ * and the rectangle, which replaces the block set on screen while it is up
+ * (C14 I60): `blocks` is empty then, so neither is washed twice.
+ */
 type SelectionWash = Readonly<{
   blocks: ReadonlySet<string>;
   spans: readonly semantic.BlockSpan[];
+  rect: semantic.CellRect | null;
 }>;
 
 function visibleRows(
@@ -2415,8 +2617,40 @@ function visibleRows(
     // C22 I71's *correct frame, previous state*, the symptom whose report says
     // *it froze*. A tenth cache axis would be correct and would bust an entry's
     // whole slot on every keystroke in the mode.
-    const shown = selection === null ? lines : washSelected(graph, lines, entry.id, from, width, selection);
-    out.push(...[...keptChrome, ...shown].slice(0, ve.takeRows));
+    const washedRows = selection === null
+      ? NO_ROWS
+      : washedRowsOf(selection.spans, selection.blocks, entry.id, from, lines.length);
+    const blockShown = washedRows.size === 0
+      ? lines
+      : washSelectedRows(lines, washedRows, graph.theme.current, graph.capabilities, width);
+    // **The rectangle's cells, and the rail on its first row** (C14 I60, I58's
+    // *first row of the selection*). Only in the entry its block is in.
+    const rect = selection?.rect ?? null;
+    const inRect = rect !== null && semantic.entryOf(rect.key) === entry.id;
+    const shown = inRect
+      ? washRectCells(blockShown, rect, from, graph.theme.current, graph.capabilities)
+      : blockShown;
+    const rectRail = inRect && rect.fromRow - from >= 0 && rect.fromRow - from < lines.length
+      ? new Set([rect.fromRow - from])
+      : NO_ROWS;
+    // **Column 0, the rail's** (C14 I57, I58, ruling 68). Every row the frame
+    // draws in the transcript is led by one cell the blocks never see: the rail
+    // beside the first row of each selected block and each selected element,
+    // and a blank everywhere else — the command echo, a body row, a
+    // continuation. Beside the washed row, never inside it: the wash re-opens
+    // `inverse` at 1-bit and an inverted `▌` is another glyph (I52).
+    const elementRows = focus?.selected === undefined
+      ? NO_ROWS
+      : selectedElementRowsOf(
+          elementsOfEntry(graph.blocks, entry.doc.blocks, width, entry.doc.command),
+          focus.selected,
+          from,
+          lines.length,
+        );
+    const railRows = railRowsOf(railRowsOf(washedRows, rectRail), elementRows);
+    const rail = railRows.size === 0 ? "" : railCell(graph.theme.current, graph.capabilities);
+    const led = shown.map((row, i) => (railRows.has(i) ? rail : RAIL_BLANK) + row);
+    out.push(...[...keptChrome.map((row) => RAIL_BLANK + row), ...led].slice(0, ve.takeRows));
   }
   onAnimation(
     fastest === null && orbits.length === 0 && frames.length === 0

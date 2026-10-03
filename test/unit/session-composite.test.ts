@@ -15,12 +15,17 @@ import { describe, expect, it } from "vitest";
 import { compose, type Composed } from "../../src/shell/frame.js";
 import { composeFrame, type FrameResult } from "../../src/shell/render-frame.js";
 import { cursorFor, paint, type PaintDeps } from "../../src/shell/paint.js";
+import { composite, layerLines, UNSCROLLED } from "../../src/shell/composite.js";
+import { ChromeCache } from "../../src/shell/chrome-cache.js";
+import { block, NO_PROBE } from "../../src/data/viewmodel/index.js";
 import { FrameError } from "../../src/shell/frame-error.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { createOverlayManager, type Placed } from "../../src/viewport/overlay/index.js";
 import { displayCells } from "../../src/presentation/text.js";
 import { anchored, registry as measurer, rows as contentRows } from "../support/overlay.js";
-import { DARK_THEME, FULL_CAPS, visible } from "../support/render.js";
+import { DARK_THEME, FULL_CAPS, MONO_UNICODE_CAPS, visible } from "../support/render.js";
+import { groundSequence } from "../../src/presentation/blocks/paint.js";
+import { styledScreenFrom } from "../support/styled-screen.js";
 import type { SessionSnapshot } from "../../src/shell/types.js";
 
 /** C09's measurer, for the footer's height (C22 I82). */
@@ -31,7 +36,7 @@ const SESSION: SessionSnapshot = Object.freeze({
   env: Object.freeze({}),
   lastUuid: null,
   identity: null,
-  cluster: "fmx-prod",
+  cluster: "corp-prod",
   health: "live" as const,
   version: "1.0.0",
   retained: null,
@@ -169,7 +174,9 @@ describe("C22 §6a — compositing", () => {
     // nothing any check can see — the sum holds at every width with every layer
     // misplaced.
     expect(f.overlayRegion.height, "the same height as the transcript").toBe(f.region.height);
-    expect(f.overlayRegion.width, "and the same width").toBe(f.region.width);
+    // The width is the region's content width: the transcript's plus the
+    // rail's column, because a layer floats over the whole region (C14 I57).
+    expect(f.overlayRegion.width, "the transcript's and the rail's").toBe(f.region.width + f.region.left);
     expect(f.overlayRegion.width, "which is not the terminal's").toBe(f.size.columns - 1);
 
     // And a layer at the region's first row draws on the frame's third — below
@@ -626,5 +633,108 @@ describe("C22 §6b — the diff's leading reset (C22 I57)", () => {
     // satisfied by a reset on every row of every write.
     expect(whole.startsWith("\u001b[H"), "the whole frame goes home first").toBe(true);
     expect(/\u001b\[\d+;\d+H/u.test(whole), "and positions nothing row by row").toBe(false);
+  });
+});
+
+describe("C22 §6q — a scroll box inside a layer scrolls (F1302), owed at the spec commit", () => {
+  it("T1.174 (C22 I141, F1302): a box inside a layer draws from its offset, and the chrome cache keys on it", () => {
+    const registry = createBlockRegistry({ defaults: true });
+    const lines = Array.from({ length: 12 }, (_, i) => `line ${String(i + 1)}`).join("\n");
+    const content = [
+      block({ kind: "scroll", id: "box", height: 4, children: [block({ kind: "code", id: "c", language: "text", text: lines })] }),
+    ];
+    const misses: string[] = [];
+    const probe = { ...NO_PROBE, miss: (cache: string, reason: string) => void misses.push(`${cache}:${reason}`) };
+    const chrome = new ChromeCache(probe as never);
+    const deps = { registry, theme: DARK_THEME, capabilities: FULL_CAPS, chrome };
+    const text = (rows: readonly string[]): string[] => rows.map((r) => visible(r).replace(/\s*[┃│▐█▌|#]?\s*$/u, "").trim());
+
+    // Unscrolled: the frame it always was, and a miss for the absent slot.
+    const top = layerLines(content, 30, deps, UNSCROLLED);
+    expect(text(top).slice(0, 4)).toEqual(["line 1", "line 2", "line 3", "line 4"]);
+    expect(layerLines(content, 30, deps, UNSCROLLED), "held").toBe(top);
+    expect(misses).toEqual(["chrome:absent"]);
+
+    // Scrolled by three: lines 4–7, **and one miss** — the same array, width
+    // and theme, so without the view axis the cache would serve the top.
+    const view = { offsets: { box: 3 }, key: "box=3", focus: null };
+    const scrolled = layerLines(content, 30, deps, view);
+    expect(text(scrolled).slice(0, 4)).toEqual(["line 4", "line 5", "line 6", "line 7"]);
+    expect(misses).toEqual(["chrome:absent", "chrome:focus"]);
+    expect(layerLines(content, 30, deps, view), "held at the view").toBe(scrolled);
+
+    // **Through the compositor with the same view** — `layerRows` reads
+    // `layerView` by id, so the placed layer draws what the prompt slot does.
+    const manager = createOverlayManager({ registry: measurer });
+    manager.push({ ...anchored("L", 6, { row: 8, prefer: "above" }, { width: 30 }), content } as never);
+    const placed = manager.layout({ width: 40, height: 10 });
+    const base = Array.from({ length: 12 }, () => " ".repeat(40));
+    const drawn = composite(base, placed, {
+      registry,
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      columns: 40,
+      regionTop: 1,
+      region: { width: 40, height: 10 },
+      layerView: (id: string) => (id === "L" ? view : UNSCROLLED),
+    } as never);
+    expect(drawn.map((r) => visible(r)).join("\n"), "the compositor draws the scrolled rows").toContain("line 4");
+    expect(drawn.map((r) => visible(r)).join("\n")).not.toContain("line 1 ");
+  });
+});
+
+describe("C22 §6s — a panel's ground (I151, F1501)", () => {
+  it("T1.184 (C22 I151, I29): a panel's rows take bgElev and its edge does not; a peek and an overlay take none; at 1 bit nothing is written", () => {
+    const registry = createBlockRegistry({ defaults: true });
+    // **A span with its own ink in the middle of the line**, so the row asks
+    // whether the ground survives the reset that closes it — the case `based`
+    // exists for, and the one a ground written once at the row's head fails.
+    const content = [
+      block({ kind: "rule", id: "edge", label: "" }),
+      block({ kind: "raw", id: "line", text: "find this here", spans: [{ from: 5, to: 9, tone: "accent" }] }),
+    ];
+    const SIZE = { columns: 40, rows: 12 };
+    const REGION = { width: 39, height: 10 };
+    const draw = (kind: "panel" | "peek" | "overlay", capabilities: typeof FULL_CAPS): readonly string[] => {
+      const manager = createOverlayManager({ registry: measurer });
+      manager.push({
+        id: "L",
+        kind,
+        placement: { kind: "anchored", row: 8, prefer: "above" },
+        content,
+        blocking: false,
+        dismissal: kind === "peek" ? "focus" : "escape",
+      } as never);
+      const base = Array.from({ length: SIZE.rows }, () => " ".repeat(SIZE.columns));
+      return composite(base, manager.layout(REGION), {
+        registry,
+        theme: DARK_THEME,
+        capabilities,
+        columns: SIZE.columns,
+        regionTop: 1,
+        region: REGION,
+      } as never);
+    };
+    const cellsOf = (rows: readonly string[]) => styledScreenFrom([rows.join("\r\n")], SIZE);
+    const elev = styledScreenFrom([`${groundSequence("surface.bgElev", DARK_THEME, FULL_CAPS)}x`], { columns: 1, rows: 1 })[0]![0]!.style.bg;
+    expect(elev, "the fixture's theme resolves a panel ground").not.toBe("");
+
+    // Two rows over the anchor at region row 8, and the region starts a row
+    // down: the edge is frame index 7 and the line index 8.
+    const panel = cellsOf(draw("panel", FULL_CAPS));
+    expect(panel[8]!.map((c) => c.ch).join("").trimEnd(), "the line is where the placement put it").toBe("find this here");
+    expect(panel[7]!.slice(0, 39).map((c) => c.style.bg), "the edge is on the page").not.toContain(elev);
+    expect(panel[8]!.slice(0, 39).map((c) => c.style.bg), "every cell of the line, through the span, to the box's edge").toEqual(Array(39).fill(elev));
+    expect(panel[8]![39]!.style.bg, "and not the margin past the box").not.toBe(elev);
+
+    // **Only a panel.** The same content as a peek and as an overlay (§6s.2 row 6).
+    for (const kind of ["peek", "overlay"] as const) {
+      const other = cellsOf(draw(kind, FULL_CAPS));
+      expect(other.flat().map((c) => c.style.bg), kind).not.toContain(elev);
+    }
+
+    // **Where no ground resolves nothing is written**: at 1 bit the panel is
+    // the overlay's rows byte for byte (§6s.2 row 5).
+    expect(draw("panel", MONO_UNICODE_CAPS)).toEqual(draw("overlay", MONO_UNICODE_CAPS));
   });
 });

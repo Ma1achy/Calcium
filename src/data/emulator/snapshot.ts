@@ -6,6 +6,7 @@
  * built buffer and the dependency is confined to one file.
  */
 import type { ColourValue, TerminalLine, TerminalRun } from "../viewmodel/types.js";
+import { isBidiFormat } from "../text.js";
 
 /** The cell members the walk reads — `IBufferCell`'s shape, structurally. */
 export type CellLike = Readonly<{
@@ -53,10 +54,24 @@ const isForbidden = (cp: number): boolean =>
  */
 const UNREPRESENTABLE = "?";
 
-/** C27 I2 — the walk's own gate, ahead of C04's (C04 I110). */
+/**
+ * C27 I2 — the walk's own gate, ahead of C04's (C04 I110). `text` is one
+ * cell's characters.
+ *
+ * **A bidi format character follows its cell** (ruling 71). C04 I110 refuses
+ * them now, so the snapshot has to lose them to keep validating (I8), and
+ * `@xterm/headless` places them two ways — measured: U+200F and U+202E join the
+ * previous cell's characters at no width, U+2067 and U+061C take a cell of their
+ * own at width 1. So one is dropped from a cell it shares, and a cell holding
+ * nothing else becomes the stand-in, which keeps the painted width (I6) — where
+ * `cells()` reads a bidi character as zero and the dependency painted one.
+ */
 export function containText(text: string): string {
+  let bare = "";
+  for (const ch of text) if (!isBidiFormat(ch.codePointAt(0) ?? 0)) bare += ch;
+  if (bare === "" && text !== "") return UNREPRESENTABLE;
   let out = "";
-  for (const ch of text) {
+  for (const ch of bare) {
     const cp = ch.codePointAt(0) ?? 0;
     out += isForbidden(cp) ? UNREPRESENTABLE : ch;
   }

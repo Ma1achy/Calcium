@@ -260,3 +260,25 @@ describe("C20 §7a — where the two machines meet", () => {
     expect(store.previous("gi")).toBeNull();
   });
 });
+
+describe("C20 §5 — reverse search is a panel between two rules (I30, F1502)", () => {
+  it("T1.21 (I30, C15 I16, C15 I19): the layer opens with its edge, declares no width, and its caret is on row 1", async () => {
+    // **Asserted before and after narrowing**, because the defect was a field
+    // set at the push and never again: the empty query's width is right for
+    // the empty query and for nothing typed after it.
+    const { store } = await openWith(seedFiles([entry("/logs digit-42", 1_000)]));
+    const anchor = { row: 20, rows: 1 };
+    store.searchOpen("");
+    for (const query of ["", "logs"]) {
+      if (query !== "") store.searchType(query);
+      const layer = store.searchLayer(anchor);
+      expect(layer.content.map((b) => b.kind), `the edge, then the line — at "${query}"`).toEqual(["rule", "raw"]);
+      expect(layer.content[0], "a plain rule").toMatchObject({ kind: "rule", label: "" });
+      expect(layer.width, "the region's width, by declaring none").toBeUndefined();
+      expect(layer.cursor, "row 1, at the end of the query").toEqual({
+        row: 1,
+        col: `(reverse-i-search) \`${query}`.length,
+      });
+    }
+  });
+});

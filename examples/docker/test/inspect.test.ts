@@ -12,9 +12,9 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { AdapterContext } from "@fmx/calcium";
+import type { AdapterContext } from "calcium-tui";
 // F37: no public measurer. Resolved through the package — see `deep.ts`.
-import type { Block, Code, KeyValue, Notice } from "@fmx/calcium";
+import type { Block, Code, KeyValue, Notice } from "calcium-tui";
 import { SPLIT_FLOOR, createInspectAdapter, splitRaw, structuredBlocks } from "../src/inspect.ts";
 
 /**
@@ -26,7 +26,7 @@ const codeRows = (text: string, width: number): number =>
   measure({ kind: "code", id: "m", language: "json", text, wrap: true } as Code, width);
 import type { Row } from "../src/ndjson.ts";
 
-import { producerContext } from "@fmx/calcium/testing";
+import { producerContext } from "calcium-tui/testing";
 const read = (name: string): string =>
   readFileSync(new URL(`./corpus/${name}`, import.meta.url), "utf8");
 

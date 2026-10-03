@@ -105,17 +105,26 @@ describe("C22 §6m — a linear session", () => {
       expect(at, "the start").toBeGreaterThan(-1);
       expect(out.slice(at, at + 4)).toEqual([
         "entry 1 of 1: /capabilities",
-        "entry 1: /capabilities — succeeded, 13 rows",
+        "entry 1: /capabilities — succeeded, 15 rows", // one row per C02 field; C02 I18 added `clipboard`
         "table",
         "field  value  source",
       ]);
       expect(s.since(mark).endsWith(`> xy${ESC}[5G`), "the input line after the event").toBe(true);
 
-      // C22 I119 — a resize writes no frame: at most the line, and here it fits.
+      // C22 I119 — a resize writes no frame; and C22 I123 — here the line fits at
+      // both widths, so the commit the resize causes changes nothing and writes
+      // nothing. **Not `every(l => l === "> xy")`**: an empty write satisfies it,
+      // so it held with the unchanged-line guard removed (F1478).
       const before = s.stdout.output.length;
       s.resize({ columns: 40, rows: 10 });
-      await s.step();
-      expect(s.lines(s.since(before)).every((l) => l === "> xy"), "only the input line").toBe(true);
+      // A resize commits on the scheduler's timer, not synchronously: read at
+      // 0 ms, nothing has committed and every assertion here holds vacuously.
+      await s.step(100);
+      expect(s.since(before), "a resize the line survives unchanged").toBe("");
+      // …and one that changes the line writes it once: the window narrows.
+      s.resize({ columns: 3, rows: 10 });
+      await s.step(100);
+      expect(s.lines(s.since(before)).length, "the narrowed line, once").toBe(1);
     } finally {
       vi.useRealTimers();
     }

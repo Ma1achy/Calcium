@@ -28,7 +28,7 @@ export type ChromeRole = "header" | "footer";
 
 type Rows = Readonly<{ key: string; width: number; rows: number }>;
 type Lines = Readonly<{ key: string; width: number; theme: string; lines: readonly string[] }>;
-type Layer = Readonly<{ width: number; theme: string; lines: readonly string[] }>;
+type Layer = Readonly<{ width: number; theme: string; view: string; lines: readonly string[] }>;
 
 export class ChromeCache {
   readonly #rows = new Map<ChromeRole, Rows>();
@@ -93,24 +93,34 @@ export class ChromeCache {
 
   /**
    * A layer's lines, keyed by its content's identity: rendered once per
-   * content at a width and theme, and dropped with the content.
+   * content at a width, a theme and a view, and dropped with the content.
+   *
+   * **`view` is the layer's scroll offsets** (C22 I141) — `ScrollOffsets.key`
+   * over the layer's namespace, `""` for a layer nobody has scrolled. It is the
+   * fourth axis for the reason `render-cache.ts` gives its own: an offset
+   * changes what is drawn and moves none of content, width or theme, so a
+   * layer keyed without it serves the unscrolled frame to a reader who has
+   * scrolled. Reported as `focus`, the axis the entry cache files its offsets
+   * under.
    */
   layer(
     content: readonly Block[],
     width: number,
     theme: string,
     render: (blocks: readonly Block[], width: number) => readonly string[],
+    view = "",
   ): readonly string[] {
     const held = this.#layers.get(content);
     if (held === undefined) this.#probe.miss("chrome", "absent");
     else if (held.width !== width) this.#probe.miss("chrome", "width");
     else if (held.theme !== theme) this.#probe.miss("chrome", "theme");
+    else if (held.view !== view) this.#probe.miss("chrome", "focus");
     else {
       this.#probe.hit("chrome");
       return held.lines;
     }
     const lines = render(content, width);
-    this.#layers.set(content, Object.freeze({ width, theme, lines }));
+    this.#layers.set(content, Object.freeze({ width, theme, view, lines }));
     return lines;
   }
 }

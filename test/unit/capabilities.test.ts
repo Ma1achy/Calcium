@@ -266,6 +266,9 @@ describe("C02 detection", () => {
       renderMode: "assumed",
       notification: "inferred",
       notify: "assumed",
+      clipboard: "inferred",
+      // Neither `VISUAL` nor `EDITOR` in this environment (I19).
+      editor: "assumed",
     });
 
     // **`COLORTERM` moves `colourDepth` from `inferred` to `stated` and the
@@ -281,8 +284,8 @@ describe("C02 detection", () => {
     // the three that read it are `inferred` at their `none` values — a guess,
     // and not a withheld claim.
     const plain = detectCapabilities({ TERM: "xterm" }).sources;
-    expect([plain.imageProtocol, plain.synchronisedUpdate, plain.keyboardProtocol, plain.notification, plain.mouse])
-      .toEqual(["inferred", "inferred", "inferred", "inferred", "assumed"]);
+    expect([plain.imageProtocol, plain.synchronisedUpdate, plain.keyboardProtocol, plain.notification, plain.clipboard, plain.mouse])
+      .toEqual(["inferred", "inferred", "inferred", "inferred", "inferred", "assumed"]);
 
     // **The gate demotes one field and refuses three, from one expression.**
     // `colourDepth` has a rule below the identification to fall through to, so
@@ -297,8 +300,9 @@ describe("C02 detection", () => {
       inside.sources.synchronisedUpdate,
       inside.sources.keyboardProtocol,
       inside.sources.notification,
+      inside.sources.clipboard,
       inside.sources.mouse,
-    ]).toEqual(["assumed", "unreachable", "unreachable", "unreachable", "unreachable", "unreachable"]);
+    ]).toEqual(["assumed", "unreachable", "unreachable", "unreachable", "unreachable", "unreachable", "unreachable"]);
     // And the values are identical to the unidentified terminal's, which is why
     // one value with two remedies needed a second field to tell them apart.
     expect(inside.capabilities.imageProtocol).toBe(detectCapabilities({ TERM: "xterm" }).capabilities.imageProtocol);
@@ -381,6 +385,8 @@ describe("C02 detection", () => {
       renderMode: "rich",
       notification: "osc9",
       notify: ["system", "title"],
+      clipboard: "osc52",
+      editor: "code -w",
     };
     // TERM=dumb detects every field at its floor; the overrides must win anyway.
     expect(caps({ TERM: "dumb" }, overrides)).toEqual(overrides);
@@ -399,6 +405,8 @@ describe("C02 detection", () => {
       keyboardProtocol: "none",
       notification: "none",
       notify: [],
+      clipboard: "none",
+      editor: null,
     } as const;
 
     expect(isUsable({ ...worst, altScreen: true, renderMode: "rich" })).toBe(true);
@@ -420,6 +428,8 @@ describe("C02 detection", () => {
         renderMode: "rich",
         notification: "osc9",
         notify: ["bell", "system", "title"],
+        clipboard: "osc52",
+        editor: "vi",
       }),
     ).toBe(false);
   });
@@ -498,5 +508,61 @@ describe("C02 notifications (I16, I17)", () => {
     const bad = detectCapabilities({ TERM: "xterm" }, { notify: ["siren"] as never });
     expect(bad.capabilities.notify, "an unknown rung is not an override").toEqual([]);
     expect(bad.warnings).toHaveLength(1);
+  });
+});
+
+describe("C02 the clipboard (I18)", () => {
+  const answer = (env: Record<string, string>, overrides?: Partial<TerminalCapabilities>) => {
+    const d = detectCapabilities({ TERM: "xterm-256color", ...env }, overrides);
+    return [d.capabilities.clipboard, d.sources.clipboard];
+  };
+
+  it("T1.29 (I18, I11, I4): clipboard from the one identification, gated by tmux, declared over the top", () => {
+    for (const env of [
+      { TERM_PROGRAM: "ghostty" },
+      { TERM_PROGRAM: "WezTerm" },
+      { TERM_PROGRAM: "WindowsTerminal" },
+      { TERM: "xterm-kitty" },
+      { TERM: "foot" },
+    ]) {
+      expect(answer(env), JSON.stringify(env)).toEqual(["osc52", "inferred"]);
+    }
+    // iTerm2 takes it only once the reader turns it on, and it ships off.
+    expect(answer({ TERM_PROGRAM: "iTerm.app" })).toEqual(["none", "inferred"]);
+    expect(answer({ TERM: "xterm" })).toEqual(["none", "inferred"]);
+    // W5: tmux's default `set-clipboard external` ignores an application's OSC 52.
+    expect(answer({ TERM: "xterm-kitty", TMUX: "/tmp/x" })).toEqual(["none", "unreachable"]);
+    // W14: a reader who set it on declares it, and the declaration wins.
+    expect(answer({ TERM: "xterm-kitty", TMUX: "/tmp/x" }, { clipboard: "osc52" })).toEqual(["osc52", "declared"]);
+    expect(answer({ TERM_PROGRAM: "iTerm.app" }, { clipboard: "osc52" })).toEqual(["osc52", "declared"]);
+
+    const bad = detectCapabilities({ TERM: "xterm-kitty" }, { clipboard: "yes" as never });
+    expect([bad.capabilities.clipboard, bad.sources.clipboard]).toEqual(["osc52", "inferred"]);
+    expect(bad.warnings).toHaveLength(1);
+    expect(bad.warnings[0]).toContain("clipboard");
+  });
+});
+
+describe("C02 I19 — the reader's editor, owed at the spec commit", () => {
+  it("T1.30 (C02 I19): the editor is VISUAL over EDITOR, stated when either speaks and assumed null when neither does", () => {
+    const editor = (env: NodeJS.ProcessEnv, overrides?: Parameters<typeof detectCapabilities>[1]) => {
+      const d = detectCapabilities({ TERM: "xterm", ...env }, overrides);
+      return [d.capabilities.editor, d.sources.editor, d.warnings.length];
+    };
+    expect(editor({ VISUAL: "code -w", EDITOR: "vi" }), "VISUAL wins").toEqual(["code -w", "stated", 0]);
+    expect(editor({ EDITOR: "vi" }), "EDITOR alone").toEqual(["vi", "stated", 0]);
+    expect(editor({}), "neither").toEqual([null, "assumed", 0]);
+    expect(editor({ VISUAL: "", EDITOR: "nano" }), "an empty VISUAL is unset").toEqual(["nano", "stated", 0]);
+    // **Not gated by TERM** (§3's boundary): a dumb terminal still has an editor.
+    expect(detectCapabilities({ TERM: "dumb", EDITOR: "vi" }).capabilities.editor).toBe("vi");
+
+    // Declared over the top (I4); a declared null is a declared "none".
+    expect(editor({ EDITOR: "vi" }, { editor: "hx" })).toEqual(["hx", "declared", 0]);
+    expect(editor({ EDITOR: "vi" }, { editor: null })).toEqual([null, "declared", 0]);
+    // The domain is a non-empty command line or null — an empty string is refused.
+    const refused = detectCapabilities({ TERM: "xterm", EDITOR: "vi" }, { editor: "  " });
+    expect([refused.capabilities.editor, refused.sources.editor]).toEqual(["vi", "stated"]);
+    expect(refused.warnings).toHaveLength(1);
+    expect(refused.warnings[0]).toContain("editor");
   });
 });

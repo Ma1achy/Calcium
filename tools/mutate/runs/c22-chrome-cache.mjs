@@ -92,8 +92,8 @@ const results = runPass({
       also: [
         {
           file: CACHE,
-          from: "    this.#layers.set(content, Object.freeze({ width, theme, lines }));",
-          to: "    this.#layers.set(content, Object.freeze({ width, theme, lines }));\n    this.#layers.set(LAYER_ANY, Object.freeze({ width, theme, lines }));",
+          from: "    this.#layers.set(content, Object.freeze({ width, theme, view, lines }));",
+          to: "    this.#layers.set(content, Object.freeze({ width, theme, view, lines }));\n    this.#layers.set(LAYER_ANY, Object.freeze({ width, theme, view, lines }));",
         },
         {
           file: CACHE,
@@ -116,8 +116,10 @@ const results = runPass({
       // **The composite path never asks the cache.** Layers render every frame.
       name: "LAYERS-BYPASS: layerRows renders the layer whatever the cache holds",
       file: COMPOSITE,
-      from: "      : deps.chrome === undefined\n        ? render(p.layer.content, p.width)\n        : deps.chrome.layer(p.layer.content, p.width, deps.theme.name, render);",
-      to: "      : render(p.layer.content, p.width);",
+      // Re-anchored for C22 I141: `layerLines` is the one function both of a
+      // layer's painters call.
+      from: "  return deps.chrome === undefined\n    ? render(content, width)\n    : deps.chrome.layer(content, width, deps.theme.name, render, viewKey === \"|\" ? \"\" : viewKey);",
+      to: "  return render(content, width);",
       expect: "T4.90c",
     },
   ],

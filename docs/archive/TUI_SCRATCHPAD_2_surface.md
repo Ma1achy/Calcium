@@ -139,7 +139,7 @@ Two. `/ps <uuid> --exec` is neither — it is suspend-and-handoff to a child pro
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│ ▲ prism   fmx-prod · malachy              ● live              14:23:07 │
+│ ▲ prism   corp-prod · someone              ● live              14:23:07 │
 ├────────────────────────────────────────────────────────────────────────┤
 │                                                                        │
 │   transcript — frozen blocks above, live block at the bottom           │
@@ -172,10 +172,10 @@ That is the only chrome that reflects state. Everything else stays put.
   ● running ×1   ✓ succeeded ×6   ✗ failed ×2   ○ queued ×1   --all
 
      uuid      kind       family              status              metric      age    owner    mr
- ▸ ● a3f9b21  candidate  digit-classifier    running · ep 17/40   0.0372 ▁▂▃▅▆  23m   malachy  !1248
- ▸ ✓ 7c2d4e1  experiment decoder-zoom        succeeded            0.0089        41m   malachy  —
- ▸ ✗ 2e8a04c  experiment graphsage           failed · OOM ep 3    —           1h 12m  malachy  —
- ▸ ○ f410d99  candidate  flow-predictor      queued               —             3m    malachy  !1251
+ ▸ ● a3f9b21  candidate  digit-classifier    running · ep 17/40   0.0372 ▁▂▃▅▆  23m   someone  !1248
+ ▸ ✓ 7c2d4e1  experiment decoder-zoom        succeeded            0.0089        41m   someone  —
+ ▸ ✗ 2e8a04c  experiment graphsage           failed · OOM ep 3    —           1h 12m  someone  —
+ ▸ ○ f410d99  candidate  flow-predictor      queued               —             3m    someone  !1251
 
   ⏎ detail   ␣ expand   ≡ logs   ⚡ events   ↑ promote   ⊘ cancel
 ```
@@ -192,11 +192,11 @@ Sparkline sits inline on the metric cell for running rows only. Filter pills are
   kind        candidate · TrainingJob
   family      digit-classifier
   status      ● running · epoch 17 / 40
-  owner       malachy@fmx.io
+  owner       someone@example.com
   submitted   14:00:14 UTC   (23m ago)
   mr          !1248  auto-merged (CODEOWNERS)
-  image       registry.fmx.io/fraud-detection/prism-executor:a3f9b21
-  resources   2×GPU · 16Gi · gpu-04.fmx.internal
+  image       registry.example.com/sample-team/prism-executor:a3f9b21
+  resources   2×GPU · 16Gi · gpu-04.example.internal
 
 ── loss · 17 / 40 · 43% ────────────────────────────────────────────────
 
@@ -215,16 +215,16 @@ Sparkline sits inline on the metric cell for running rows only. Filter pills are
 
 Kind-aware: evaluation shows a gate tree, inference shows throughput, study shows the Phase-2 placeholder.
 
-### `/validate fmx_models.jobs.training:job`
+### `/validate ml_models.jobs.training:job`
 
 ```
-── validate · fmx_models.jobs.training:job · T1 · in-process ───────────
+── validate · ml_models.jobs.training:job · T1 · in-process ───────────
 
   ✓ importing target                    job resolved
   ✓ tier-1 rules                        22 rules · 0 errors · 587ms
 
-  model         fmx_models.models:DigitClassifier
-  train_data    fmx_models.data.pipeline:train_pipeline
+  model         ml_models.models:DigitClassifier
+  train_data    ml_models.data.pipeline:train_pipeline
   resources     1×GPU · 8Gi        (model floor 1×GPU 8Gi — satisfied)
   callbacks     3                  MLflowLogger · Checkpoint · EarlyStopping
   estimated     ~14 minutes        based on similar runs · confidence high
@@ -242,13 +242,13 @@ Failure path keeps the same skeleton — the step turns `✗`, and each error re
   ✗ tier-1 rules                        22 rules · 2 errors
 
   T1-008  TrainingConfig requires at least one of: max_epochs, total_steps
-          file    fmx_models/jobs/training.py:18
+          file    ml_models/jobs/training.py:18
           field   config=TrainingConfig(batch_size=128, mixed_precision=True)
           fix     add max_epochs=N or total_steps=N
 
   Rule 5  Callback supports mismatch
-          file      fmx_models/jobs/training.py:24
-          callback  fmx_models.callbacks:MultiMetricEarlyStopping
+          file      ml_models/jobs/training.py:24
+          callback  ml_models.callbacks:MultiMetricEarlyStopping
           issue     supports={"inference"}, job is a TrainingJob
           fix       add "training" to the callback's supports set
 
@@ -267,7 +267,7 @@ Failure path keeps the same skeleton — the step turns `✗`, and each error re
   ✓ draft ModelServer YAML              serving/digit-classifier.yaml
   ✓ open MR                             !1252
 
-  # glass_environment/prism/research-infra/serving/digit-classifier.yaml
+  # ml_environment/prism/research-infra/serving/digit-classifier.yaml
   apiVersion: apps/v1
   kind: Deployment
   metadata:

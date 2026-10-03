@@ -99,9 +99,10 @@ export type GlyphSet = Readonly<{
    * right for a reference line and wrong for the one mark that has to survive a
    * dense column. This one sits on the rule, where nothing else is drawn.
    *
-   * It shares a code point with `warning` and never shares a figure: one is a
-   * notice's tone mark and one is a plot's axis. Named separately so a theme or
-   * a substitution can move either without moving the other.
+   * It shares a code point with the vocabulary's `warn` token and never shares
+   * a figure: one is a notice's tone mark and one is a plot's axis. Named
+   * separately so a theme or a substitution can move either without moving the
+   * other.
    */
   cursorMark: string;
   candleHollow: string;
@@ -184,7 +185,8 @@ export type GlyphSet = Readonly<{
   choiceOpen: string;
   dotted: string;
   blocked: string;
-  warning: string;
+  // **No `warning`** (C09 I138, ruling 85): it had one reader, the status's
+  // mark, which is `cross` now. `▲` stays the vocabulary's `warn` token.
   bar: string;
 
   // Sort indicators — the active column's header (C11 §4, A01 A.4).
@@ -257,6 +259,18 @@ export type GlyphSet = Readonly<{
    */
   revert: string;
   /**
+   * The selection rail — the registry's `selection-rail` (C14 I58, ruling 68,
+   * `R-THM-005`). Drawn by the frame in column 0 of the transcript beside each
+   * selected row's first row, never by a block: selection's second carrier, the
+   * ground being its first.
+   *
+   * **The same characters as `bar` and a slot of its own**, for `choiceOpen`'s
+   * reason: `bar` is a form's caret and a plot's glyph, and this is a gutter
+   * mark. Two meanings on one slot is F161's hazard, and the domains differ —
+   * `gutter` meets neither `plot` nor `form`.
+   */
+  rail: string;
+  /**
    * The separator between a call head's fields — `verb · args · duration ·
    * outcome` (C09 I49, `AGENT_TUI_DESIGN.md` §9e).
    *
@@ -276,6 +290,7 @@ const UNICODE: GlyphSet = Object.freeze({
   tapeLeft: "\u00ab",
   tapeRight: "\u00bb",
   revert: "\u21ba",
+  rail: "\u258c",
   separator: "\u00b7",
   horizontal: "─",
   vertical: "│",
@@ -312,7 +327,6 @@ const UNICODE: GlyphSet = Object.freeze({
   choiceOpen: "○",
   dotted: "◌",
   blocked: "⊘",
-  warning: "▲",
   bar: "▌",
 
   // **`▴` and `▾`, not `↑`/`↓`** — the design's sort marks (§078, §081,
@@ -353,6 +367,9 @@ const ASCII: GlyphSet = Object.freeze({
   tapeLeft: "[",
   tapeRight: "]",
   revert: "<",
+  // `|` — the rail's own column is its domain, `gutter`, so the quote rail's
+  // and the tree guide's `|` sit in columns this never shares (C14 I58).
+  rail: "|",
   // `:` and not `-` (F834): `-` is `TURN_ASCII`'s first frame, and a dispatched
   // head read `verb - -`. The rung is a character no set's ASCII frames use.
   separator: ":",
@@ -391,7 +408,6 @@ const ASCII: GlyphSet = Object.freeze({
   choiceOpen: "@",
   dotted: ".",
   blocked: "/",
-  warning: "!",
   bar: "|",
 
   sortAsc: "^",
@@ -449,6 +465,9 @@ export const FREE_WIDTH_SLOTS: ReadonlySet<keyof GlyphSet> = new Set<keyof Glyph
  */
 export const CALL_STATE_GLYPH: Readonly<Record<CallState, Glyph>> = Object.freeze({
   queued: "queued",
+  // **Not `work-unit`, which is `running`'s here** (C04 I149): a waiting head
+  // drawn as a running one says the tool is working while it waits on you.
+  waiting: "warn",
   running: "work-unit",
   succeeded: "ok",
   failed: "error",
@@ -1144,6 +1163,12 @@ type BarStyle = Readonly<{
   on: string;
   off: string;
   narrowOnly?: boolean;
+  /**
+   * **A cell's eighths, emptiest first** (C09 I136, §7j) — the partial cell a
+   * sub-cell alphabet draws between its full cells and its blanks. `braille`'s
+   * alone: every other texture steps a whole cell at a time.
+   */
+  steps?: readonly string[];
 }>;
 
 /**
@@ -1195,7 +1220,15 @@ const BAR_STYLES: Readonly<Record<string, BarStyle>> = Object.freeze({
   // **No `narrowOnly`, and it is the only one.** Braille is `Neutral`, so it is
   // one cell under both conventions — which is what makes it the style a wide
   // terminal keeps rather than the one it loses.
-  braille: Object.freeze({ on: "⣿", off: " " }),
+  //
+  // **And it steps in eighths** (C09 I136, §7j, ruling 32's amendment): the left
+  // dot column fills bottom to top, then the right — U+2840, 2844, 2846, 2847,
+  // 28C7, 28E7, 28F7, 28FF — the registry's `steps`, character for character.
+  braille: Object.freeze({
+    on: "⣿",
+    off: " ",
+    steps: Object.freeze(["\u2840", "\u2844", "\u2846", "\u2847", "\u28C7", "\u28E7", "\u28F7", "\u28FF"]),
+  }),
   ascii: BAR_ASCII,
 });
 
@@ -1211,7 +1244,7 @@ export const DEFAULT_BAR_STYLE = "block";
 export function barStyle(
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
   name: string = DEFAULT_BAR_STYLE,
-): Readonly<{ on: string; off: string }> {
+): Readonly<{ on: string; off: string; steps?: readonly string[] }> {
   const style = BAR_STYLES[name] ?? BAR_STYLES[DEFAULT_BAR_STYLE];
   if (style === undefined) return BAR_ASCII;
   if (caps.unicode === "ascii") return BAR_ASCII;
@@ -1489,8 +1522,8 @@ export const GLYPH_DOMAINS: Readonly<Record<Glyph, readonly string[]>> = {
  * **Unlike `GLYPH_DOMAINS` this one is not one sentence**, because `GlyphSet`'s
  * rôles are spread across the screen: a frame's own rows, a plot's drawing
  * region, a table's header, and — for the status group — a block's lead. The
- * status group is `row-lead` *and* `plot`: `g.warning` leads a status block
- * (`kinds/status.ts`) while `g.hollow`, `g.filled` and `g.dotted` are points and
+ * status group is `row-lead` *and* `plot`: `g.cross` leads a failed status block
+ * (`kinds/status.ts`, C09 I138) while `g.hollow`, `g.filled` and `g.dotted` are points and
  * outliers inside a plot (`plot/roles.ts`, `plot/glyph-row.ts`).
  */
 export const GLYPH_SET_DOMAINS: Readonly<Record<keyof GlyphSet, readonly string[]>> = {
@@ -1500,6 +1533,8 @@ export const GLYPH_SET_DOMAINS: Readonly<Record<keyof GlyphSet, readonly string[
   tapeLeft: ["inline"],
   tapeRight: ["inline"],
   revert: ["inline"],
+  // Column 0 of the transcript region, which the frame reserves (C14 I57).
+  rail: ["gutter"],
   separator: ["inline"],
 
   horizontal: ["border"],
@@ -1542,7 +1577,6 @@ export const GLYPH_SET_DOMAINS: Readonly<Record<keyof GlyphSet, readonly string[
   choiceOpen: ["row-lead"],
   dotted: ["row-lead", "plot"],
   blocked: ["row-lead", "plot"],
-  warning: ["row-lead", "plot"],
 
   sortAsc: ["table-header"],
   sortDesc: ["table-header"],

@@ -4,7 +4,7 @@
  * | Depth | Resolution |
  * |---|---|
  * | 24 | the hex, verbatim |
- * | 8  | nearest entry in the 256-colour cube by perceptual distance, rank order preserved |
+ * | 8  | nearest entry in the 256-colour cube by perceptual distance, rank order preserved, the floor held (I69) |
  * | 4  | the theme's curated map — never computed |
  * | 1  | no colour at all; typographic class only |
  *
@@ -17,8 +17,10 @@
 
 import type { Tone } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
-import { floorFor, inkOn, isHex, ratio } from "./contrast.js";
-import { cubeHexOf, quantiseSet } from "./quantise.js";
+import { ANSI16_WINDOWS_HEX } from "./colormap.js";
+import { DEFAULT_FLOOR, decorationTextPairs, floorFor, inkOn, isHex, luminance, ratio, textGrounds } from "./contrast.js";
+import { MUST_STAY_DISTINCT } from "./four-bit.js";
+import { computeQuantisation, cubeHexOf, quantiseSet, type Admits } from "./quantise.js";
 import {
   NO_STYLE,
   type ColourRef,
@@ -92,14 +94,137 @@ export function cacheSize(): number {
   return styles.size;
 }
 
-function quantisedFor(theme: ResolvedTheme, palette: string, slots: Readonly<Record<string, string>>): Readonly<Record<string, number>> {
+function quantisedFor(
+  theme: ResolvedTheme,
+  palette: string,
+  slots: Readonly<Record<string, string>>,
+  admits?: () => Admits | undefined,
+): Readonly<Record<string, number>> {
   const key = `${theme.name}|${palette}`;
   const held = quantised.get(key);
   if (held !== undefined) return held;
 
-  const built = quantiseSet(slots);
+  const built = holdFloor(slots, admits?.());
   quantised.set(key, built);
   return built;
+}
+
+// --- the floor, held at 8-bit (I69) -----------------------------------------
+
+/**
+ * **The set's picks, and the DP again with the floor as a constraint where a
+ * pick misses it** (I69). The nearest set comes first — the shipped table's
+ * entry where it holds one (I41), so a set whose every pick already clears is
+ * the table's own object and the DP never runs — and only a set with a refused
+ * pick is assigned again, as one problem, so rank (I6) and distinctness (I17)
+ * are held by the same computation that holds the floor. A pass that re-picked
+ * the refused slots alone would move a slot past a neighbour it was ranked
+ * below, which is §3's greedy walk arriving by a second door.
+ */
+function holdFloor(slots: Readonly<Record<string, string>>, admits: Admits | undefined): Readonly<Record<string, number>> {
+  const nearest = quantiseSet(slots);
+  if (admits === undefined) return nearest;
+  const refused = Object.entries(admits).some(([slot, admit]) => {
+    const index = nearest[slot];
+    const hex = index === undefined ? null : cubeHexOf(index);
+    return hex !== null && !admit(hex);
+  });
+  return refused ? computeQuantisation(slots, admits) : nearest;
+}
+
+/**
+ * **The 24-bit gate's scope, as a need per `(ground, ref)`** (I68's cells): every
+ * `textGrounds` ref held to `max(floorFor(slot), floor)` as
+ * `validateHighContrast` holds it, and every `decorationTextPairs` cell to
+ * `DEFAULT_FLOOR` as `validateDecorationText` does. **No wider**: a ground the
+ * gate does not measure text on holds nothing here, because a floor enforced
+ * at 8-bit where the author was never told of one at 24 is a constraint nobody
+ * can see the reason for.
+ */
+const scopes = new WeakMap<ThemeTokens, ReadonlyMap<string, ReadonlyMap<string, number>>>();
+
+function floorsOn(tokens: ThemeTokens): ReadonlyMap<string, ReadonlyMap<string, number>> {
+  const held = scopes.get(tokens);
+  if (held !== undefined) return held;
+  const out = new Map<string, Map<string, number>>();
+  const need = (ground: string, ref: string, value: number): void => {
+    const cells = out.get(ground) ?? new Map<string, number>();
+    cells.set(ref, Math.max(cells.get(ref) ?? 0, value));
+    out.set(ground, cells);
+  };
+  for (const [ground, , refs] of textGrounds(tokens)) {
+    for (const ref of refs) need(ground, ref, Math.max(floorFor(ref.slice(ref.indexOf(".") + 1)), tokens.floor ?? 0));
+  }
+  for (const [palette, slot, ground] of decorationTextPairs(tokens)) need(ground, `${palette}.${slot}`, DEFAULT_FLOOR);
+  // Kept only for a set frozen throughout, as the gate's verdict is (C10 I70):
+  // a token object mutated between two measurements was held to its first
+  // shape's needs — 61 cells refused where a fresh copy of it has 19.
+  if (frozenThrough(tokens)) scopes.set(tokens, out);
+  return out;
+}
+
+/**
+ * The cube's darkest and lightest entries — `#000000` at 16 and `#ffffff` at
+ * 231 — which bound what any ink can reach on a ground.
+ */
+const DARKEST = cubeHexOf(16)!;
+const LIGHTEST = cubeHexOf(231)!;
+
+/**
+ * **A ground admits a cube entry on which its inks can reach their floor**
+ * (I69). Asked of the cube's extreme on each ink's own side — lighter than the
+ * authored ground, or darker — so the answer depends on the tokens and the cube
+ * alone, never on an ink's pick, and the surfaces are held before any palette
+ * is quantised against them. `hcDark`'s focus band is the case: `#234f92` is
+ * nearest `#005faf`, where white is 6.45 against the declared 7, and no ink the
+ * cube has reaches 7 there.
+ */
+function sideNeeds(inks: Iterable<readonly [ink: string, need: number]>, ground: string): (hex: string) => boolean {
+  let light = 0;
+  let dark = 0;
+  for (const [ink, need] of inks) {
+    if (!isHex(ink)) continue;
+    if (luminance(ink) >= luminance(ground)) light = Math.max(light, need);
+    else dark = Math.max(dark, need);
+  }
+  return (hex) => (light === 0 || ratio(LIGHTEST, hex) >= light) && (dark === 0 || ratio(DARKEST, hex) >= dark);
+}
+
+function groundAdmits(tokens: ThemeTokens): Admits {
+  const surfaces = tokens.surfaces as Readonly<Record<string, string>>;
+  const out: Record<string, (hex: string) => boolean> = {};
+  for (const [ground, cells] of floorsOn(tokens)) {
+    const hex = surfaces[ground];
+    if (hex === undefined || !isHex(hex)) continue;
+    out[ground] = sideNeeds([...cells].map(([ref, need]) => [inkOn(tokens, ref, ground), need] as const), hex);
+  }
+  return out;
+}
+
+/**
+ * **An ink admits a cube entry that clears its floor on its ground as painted**
+ * (I69) — the ground's own quantised hex, never the token.
+ */
+function inkAdmits(
+  tokens: ThemeTokens,
+  paletteName: string,
+  slots: Readonly<Record<string, string>>,
+  ground: string,
+  painted: string | null,
+): Admits | undefined {
+  const cells = floorsOn(tokens).get(ground);
+  if (cells === undefined || painted === null) return undefined;
+  const out: Record<string, (hex: string) => boolean> = {};
+  for (const slot of Object.keys(slots)) {
+    const need = cells.get(`${paletteName}.${slot}`);
+    if (need !== undefined) out[slot] = (hex) => ratio(hex, painted) >= need;
+  }
+  return out;
+}
+
+function heldSurfaces(theme: ResolvedTheme): Readonly<Record<string, number>> {
+  const surfaces = theme.tokens.surfaces as Readonly<Record<string, string>>;
+  return quantisedFor(theme, "surface", surfaces, () => groundAdmits(theme.tokens));
 }
 
 // --- resolution -------------------------------------------------------------
@@ -212,8 +337,14 @@ function compute(ref: ColourRef, theme: ResolvedTheme, depth: Depth, on?: string
 
   // 8-bit carries the theme's own values, so the ground binds — over the
   // composed **set**, keyed by the ground so the page's picks stay the page's.
+  // And the floor binds with it (I69): the set is held against its ground as
+  // painted, and an absent ground is the page (I48).
   const set = on === undefined ? palette.slots : composedSlots(theme, paletteName, palette.slots, on);
-  const index = quantisedFor(theme, on === undefined ? paletteName : `${paletteName}@${on}`, set)[slot];
+  const ground = on ?? "bg";
+  const index = quantisedFor(theme, on === undefined ? paletteName : `${paletteName}@${on}`, set, () => {
+    const at = heldSurfaces(theme)[ground];
+    return inkAdmits(theme.tokens, paletteName, set, ground, at === undefined ? null : cubeHexOf(at));
+  })[slot];
   return index === undefined ? NO_STYLE : styleOf({ kind: "ansi256", index });
 }
 
@@ -238,7 +369,7 @@ function surface(ref: ColourRef, slot: string, theme: ResolvedTheme, depth: Dept
     return index === undefined ? NO_STYLE : styleOf({ kind: "ansi16", index });
   }
 
-  const index = quantisedFor(theme, "surface", theme.tokens.surfaces as Readonly<Record<string, string>>)[slot];
+  const index = heldSurfaces(theme)[slot];
   return index === undefined ? NO_STYLE : styleOf({ kind: "ansi256", index });
 }
 
@@ -299,8 +430,25 @@ export function resolveHueBand(
     grounds[k] = v.ground;
     inks[k] = v.on;
   }
-  const g = quantisedFor(theme, "hueGround", grounds)[name];
-  const i = quantisedFor(theme, "hueOn", inks)[name];
+  // **Both halves hold the floor** (I69), the grounds first and against the
+  // cube's extremes, the inks then against their own ground as painted — each
+  // ink on a different ground, in one set.
+  const placeGrounds = (): Readonly<Record<string, number>> =>
+    quantisedFor(theme, "hueGround", grounds, () => {
+      const out: Record<string, (hex: string) => boolean> = {};
+      for (const [k, v] of Object.entries(hues)) out[k] = sideNeeds([[v.on, DEFAULT_FLOOR]], v.ground);
+      return out;
+    });
+  const g = placeGrounds()[name];
+  const i = quantisedFor(theme, "hueOn", inks, () => {
+    const placed = placeGrounds();
+    const out: Record<string, (hex: string) => boolean> = {};
+    for (const k of Object.keys(hues)) {
+      const under = placed[k] === undefined ? null : cubeHexOf(placed[k]);
+      if (under !== null) out[k] = (hex) => ratio(hex, under) >= DEFAULT_FLOOR;
+    }
+    return out;
+  })[name];
   if (g === undefined || i === undefined) return null;
   return Object.freeze({
     ground: Object.freeze({ background: { kind: "ansi256", index: g } as const }),
@@ -326,7 +474,7 @@ export function resolveBase(theme: ResolvedTheme, caps: Caps): Style {
  */
 export function quantisedHex(tokens: ThemeTokens, slot: string): string | null {
   const surfaces = tokens.surfaces as Readonly<Record<string, string>>;
-  const index = quantiseSet(surfaces)[slot];
+  const index = holdFloor(surfaces, groundAdmits(tokens))[slot];
   if (index === undefined) return null;
   return cubeHexOf(index);
 }
@@ -378,6 +526,212 @@ export function validatePaintedFloors(tokens: ThemeTokens): readonly ThemeError[
   }
 
   return Object.freeze(errors);
+}
+
+/**
+ * **The floor measured at the rungs below 24-bit, ink and ground both as the
+ * resolver paints them** (C10 I68). The scope is the 24-bit gate's, cell for
+ * cell: every `textGrounds` row held to `max(floorFor(slot), floor)` as
+ * `validateHighContrast` holds it, every `decorationTextPairs` cell to
+ * `DEFAULT_FLOOR` as `validateDecorationText` does, and at 8-bit each hue
+ * band's ink on its ground to `DEFAULT_FLOOR` (I54). A cell the gate does not
+ * check at 24-bit is not checked here either, so a shortfall is always the
+ * rung's doing and never a wider scope's.
+ *
+ * **Both halves come from `resolve`**, because that is what reaches the screen,
+ * and **the needs are computed here and not read from `floorsOn`**: the hold and
+ * its measurement are two readings of one scope, and a measurement that asked
+ * the hold what to measure would agree with it by construction. At 8-bit an
+ * index maps back through the cube the standard fixes; at 4-bit through
+ * `ANSI16_WINDOWS_HEX`, the reference palette I61 measures bands against. **A
+ * ground the resolver does not paint at 4-bit is the page**, because that is
+ * what shows through. An ink or a page with no colour at all is the terminal's
+ * own pair and is not a cell.
+ *
+ * Moved here from `test/support` when its 8-bit list emptied (C10 I69, I70): its
+ * caller is `validateQuantisedFloors`, and T2.74 and T2.75 read both depths.
+ */
+export function quantisedShortfalls(
+  theme: ResolvedTheme,
+  depth: 8 | 4,
+): readonly Readonly<{ path: string; measured: number; need: number }>[] {
+  const tokens = theme.tokens;
+  const caps = Object.freeze({ colourDepth: depth });
+  const hexOf = (colour: ColourValue | undefined): string | null => {
+    if (colour === undefined) return null;
+    if (depth === 4) return colour.kind === "ansi16" ? (ANSI16_WINDOWS_HEX[colour.index] ?? null) : null;
+    return colour.kind === "ansi256" ? cubeHexOf(colour.index) : null;
+  };
+  const page = hexOf(resolveBackground("surface.bg", theme, caps).background);
+  const out: { path: string; measured: number; need: number }[] = [];
+  const hold = (ground: string, ref: ColourRef, need: number): void => {
+    const ink = hexOf(resolve(ref, theme, caps, ground).colour);
+    const under = hexOf(resolveBackground(`surface.${ground}`, theme, caps).background) ?? (depth === 4 ? page : null);
+    if (ink === null || under === null) return;
+    const measured = ratio(ink, under);
+    if (measured < need) out.push({ path: `${ground}.${ref}`, measured: Math.round(measured * 100) / 100, need });
+  };
+
+  for (const [ground, , refs] of textGrounds(tokens)) {
+    for (const ref of refs) {
+      hold(ground, ref as ColourRef, Math.max(floorFor(ref.slice(ref.indexOf(".") + 1)), tokens.floor ?? 0));
+    }
+  }
+  for (const [palette, slot, ground] of decorationTextPairs(tokens)) hold(ground, `${palette}.${slot}`, DEFAULT_FLOOR);
+
+  // A hue band has no 4-bit form (C10 I55, PARKED 21), so it is an 8-bit cell only.
+  if (depth === 8) {
+    for (const name of Object.keys(tokens.hues ?? {})) {
+      const band = resolveHueBand(theme, name, caps);
+      const ink = hexOf(band?.ink.colour);
+      const ground = hexOf(band?.ground.background);
+      if (ink === null || ground === null) continue;
+      const measured = ratio(ink, ground);
+      if (measured < DEFAULT_FLOOR) out.push({ path: `hueBand.${name}`, measured: Math.round(measured * 100) / 100, need: DEFAULT_FLOOR });
+    }
+  }
+  return Object.freeze(out);
+}
+
+/**
+ * The name a theme is measured under at load — no theme's identity, because
+ * `identity` joins a name and a variant with `/` and this has no `/`.
+ */
+const SCRATCH = "quantised-floor-gate";
+
+/**
+ * **The 8-bit floor as a load gate** (C10 I70): a theme whose quantised cells
+ * break the floor is refused at load, as `validateHighContrast` refuses one
+ * whose authored cells do. **On a theme the 24-bit gates pass it is empty
+ * unless the quantiser is wrong**, and that is arithmetic rather than a
+ * sample: every colour clears √21 (4.58 : 1) against `#000000` or `#ffffff`,
+ * so I69's fallback always has an extreme for an ink held to √21 or less, and
+ * above it no ground holds inks on both sides at 24 bits either. What it
+ * refuses is a ground whose inks sit on both sides at a need above √21 — a
+ * theme the 24-bit gate refuses too, and this names its 256-colour cells.
+ *
+ * **8-bit only.** The 4-bit ratios are a claim about a reference palette and
+ * not about the user's sixteen, so they stay an exemption list (T2.75), and a
+ * gate over them would refuse every shipped theme.
+ *
+ * **Measured under a scratch name that is forgotten after**, because the
+ * resolver memoises on the name: under the theme's own identity, an override
+ * validated before its serial moves would read the unpatched theme's picks.
+ */
+export function validateQuantisedFloors(tokens: ThemeTokens): readonly ThemeError[] {
+  if (!quantisable(tokens)) return Object.freeze([]);
+  const held = verdicts.get(tokens);
+  if (held !== undefined) return held;
+  const verdict = measureQuantisedFloors(tokens);
+  if (frozenThrough(tokens)) verdicts.set(tokens, verdict);
+  return verdict;
+}
+
+/**
+ * **The verdict, once per token set** — because the measurement is the held
+ * DP for every refused set on every ground, 12–40 ms a theme once warm. The
+ * shipped projections no longer reach it (the store skips them, C10 I70), so
+ * what it saves is a consumer's own frozen set loaded more than once, which
+ * nothing in the tree does today. Kept only for a set frozen all the way down,
+ * so a consumer's token object mutated between two loads is measured again
+ * rather than answered from its first shape.
+ */
+const verdicts = new WeakMap<ThemeTokens, readonly ThemeError[]>();
+
+/**
+ * **Every value the gate quantises is a hex**, and nothing more: a value that is
+ * not has no cube entry nearest it, and `validateTokens` already names it. So
+ * the gate runs beside the 24-bit ones on any theme it can read, rather than
+ * after them on the themes they pass — the only themes it can say nothing about.
+ */
+function quantisable(tokens: ThemeTokens): boolean {
+  const values = [
+    ...Object.values(tokens.surfaces),
+    ...Object.values(tokens.palettes).flatMap((palette) => Object.values(palette.slots)),
+    ...Object.values(tokens.composed ?? {}).flatMap((inks) => Object.values(inks)),
+    ...Object.values(tokens.bandInk ?? {}),
+    ...Object.values(tokens.hues ?? {}).flatMap((hue) => [hue.ink, hue.ground, hue.on]),
+  ];
+  return values.every((value) => typeof value === "string" && isHex(value)) && (tokens.floor === undefined || Number.isFinite(tokens.floor));
+}
+
+function frozenThrough(value: unknown): boolean {
+  return value === null || typeof value !== "object" || (Object.isFrozen(value) && Object.values(value).every(frozenThrough));
+}
+
+function measureQuantisedFloors(tokens: ThemeTokens): readonly ThemeError[] {
+  const theme: ResolvedTheme = Object.freeze({ name: SCRATCH, variant: tokens.variant, tokens });
+  try {
+    return Object.freeze(
+      quantisedShortfalls(theme, 8).map(({ path, measured, need }) => {
+        if (path.startsWith("hueBand.")) {
+          const name = path.slice("hueBand.".length);
+          return {
+            path: `hues.${name}`,
+            message: `the "${name}" band is ${measured.toFixed(2)} : 1 as a 256-colour terminal paints it, below ${need} : 1 — no cube entry holds this ground and its ink together`,
+          };
+        }
+        const ground = path.slice(0, path.indexOf("."));
+        const ref = path.slice(ground.length + 1);
+        return {
+          path: `palettes.${ref}`,
+          message: `"${ref}" is ${measured.toFixed(2)} : 1 on ${ground} as a 256-colour terminal paints the pair, below ${need} : 1 — no cube entry holds this ground for every ink on it`,
+        };
+      }).concat(collisions(theme)),
+    );
+  } finally {
+    forget(SCRATCH);
+  }
+}
+
+/**
+ * **I17's guarantee as a refusal** (C10 I70, §4c.4 row 13): on every ground the
+ * gate measures, two of `MUST_STAY_DISTINCT` carrying different 24-bit values
+ * must not paint one 8-bit index. The quantiser yields distinctness to the
+ * floor (§4c.4 row 4), so a ground whose floor leaves one admitted entry —
+ * a mid-grey where only black clears — paints `ok` and `error` alike and
+ * reports nothing short. That was the silent case; this names it.
+ *
+ * **One value is one ink** (row 6): a band gives every tone its ink, and a set
+ * that composes two slots to one value asked for them to match. One error per
+ * shared index, at the first slot's path, naming the ground, the slots and the
+ * index.
+ */
+function collisions(theme: ResolvedTheme): readonly ThemeError[] {
+  const grounds = new Set([
+    ...textGrounds(theme.tokens).map(([ground]) => ground),
+    ...decorationTextPairs(theme.tokens).map(([, , ground]) => ground),
+  ]);
+  const out: ThemeError[] = [];
+  for (const ground of grounds) {
+    const byIndex = new Map<number, { slot: string; value: string }[]>();
+    for (const slot of MUST_STAY_DISTINCT) {
+      const painted = resolve(`tone.${slot}`, theme, EIGHT, ground).colour;
+      const authored = resolve(`tone.${slot}`, theme, TRUE_COLOUR, ground).colour;
+      if (painted?.kind !== "ansi256" || authored?.kind !== "rgb") continue;
+      const members = byIndex.get(painted.index) ?? [];
+      members.push({ slot, value: authored.hex.toLowerCase() });
+      byIndex.set(painted.index, members);
+    }
+    for (const [index, members] of byIndex) {
+      if (new Set(members.map((m) => m.value)).size < 2) continue;
+      const slots = members.map((m) => `tone.${m.slot}`);
+      out.push({
+        path: `palettes.${slots[0]!}`,
+        message: `${slots.map((s) => `"${s}"`).join(", ")} all paint index ${String(index)} on ${ground} as a 256-colour terminal paints them — the floor there leaves no entry that keeps them apart, and C10 I17 keeps them apart`,
+      });
+    }
+  }
+  return out;
+}
+
+const EIGHT = Object.freeze({ colourDepth: 8 as const });
+const TRUE_COLOUR = Object.freeze({ colourDepth: 24 as const });
+
+/** Every memo entry resolved under `name` — the scratch gate's, and nobody else's. */
+function forget(name: string): void {
+  for (const key of [...styles.keys()]) if (key.split("|")[1] === name) styles.delete(key);
+  for (const key of [...quantised.keys()]) if (key.startsWith(`${name}|`)) quantised.delete(key);
 }
 
 /** The ergonomic form. `tone` is the overwhelmingly common case (§2). */

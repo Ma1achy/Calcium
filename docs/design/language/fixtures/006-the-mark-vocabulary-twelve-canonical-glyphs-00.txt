@@ -1,4 +1,4 @@
-NINETEEN CANONICAL GLYPHS · generated from one registry [R-GLY-001]
+TWENTY CANONICAL GLYPHS · generated from one registry [R-GLY-001]
 ASCII fallbacks are collision-checked as a co-rendered set. reservedCells is the widest rung.
 
  glyph  ascii role                        u/a   reservedCells
@@ -21,6 +21,7 @@ ASCII fallbacks are collision-checked as a co-rendered set. reservedCells is the
   ○  @     unchosen choice             1/1   1
   ✗  x     failure                     1/1   1
   ↺
+  ▌  |     selection rail              1/1   1
 
 supporting registered marks — inventory-checked, not part of the canonical twelve
   ▰  #     segmented meter fill        1/1   1

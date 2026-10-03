@@ -21,7 +21,7 @@ const SESSION: SessionSnapshot = Object.freeze({
   env: Object.freeze({}),
   lastUuid: null,
   identity: null,
-  cluster: "fmx-prod",
+  cluster: "corp-prod",
   health: "live",
   version: "1.0.0",
   retained: null,
@@ -154,11 +154,13 @@ describe("C22 §6 — the frame", () => {
     // here as part of the region rather than beside it: the region is one
     // object, and a row that destructures the height alone stops noticing when
     // an axis is added to it.
-    expect(at(30, 1).region).toEqual({ top: 2, height: 25, width: 99 });
+    // And one column in, for the rail (C14 I57): the transcript is 98 wide.
+    expect(at(30, 1).region).toEqual({ top: 2, left: 1, height: 25, width: 98 });
     expect(at(30, 4).region, "a wrapped prompt takes the rows from the transcript").toEqual({
       top: 2,
+      left: 1,
       height: 22,
-      width: 99,
+      width: 98,
     });
 
     // Clamped, not negative. The size gate normally prevents this and normally
@@ -196,10 +198,12 @@ describe("C22 §6 — the frame", () => {
     // well as the shared height. The two are still different *shapes* — the
     // transcript region carries a `top` and the layer region does not — which
     // is what this row is named for.
+    // The layer region keeps the content width, one wider than the transcript,
+    // whose column 0 is the rail's (C14 I57, C22 I28).
     expect(f.overlayRegion).toEqual({ width: 99, height: 25 });
-    expect(f.region).toEqual({ top: 2, height: 25, width: 99 });
+    expect(f.region).toEqual({ top: 2, left: 1, height: 25, width: 98 });
     expect(f.overlayRegion.height, "one number, not two").toBe(f.region.height);
-    expect(f.overlayRegion.width, "and one number on the other axis too").toBe(f.region.width);
+    expect(f.overlayRegion.width, "the transcript's and the rail's column").toBe(f.region.left + f.region.width);
   });
 });
 

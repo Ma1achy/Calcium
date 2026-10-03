@@ -9,7 +9,8 @@
 import { describe, expect, it } from "vitest";
 
 import { MENU_ID } from "../../src/interaction/completion/index.js";
-import { buildGraph } from "../support/session.js";
+import { buildGraph, buildSession } from "../support/session.js";
+import { fakeStdin } from "../support/fake-terminal.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import type { CompletionSource } from "../../src/interaction/completion/index.js";
 import type { Graph } from "../../src/shell/construct.js";
@@ -273,8 +274,8 @@ describe("C19 §6a — the menu opens as you type", () => {
   });
 });
 
-describe("C19 §6 — the menu's bottom edge", () => {
-  it("T3.25 (C19 I23): the last rendered row is a rule and not a candidate", async () => {
+describe("C19 §6 — the menu's edges", () => {
+  it("T3.25 (C19 I23, ruling 90): the first rendered row is a rule, and the last is a candidate", async () => {
     // **Read from the rows, not from the block list.** A block appended and
     // never placed satisfies a test that counts blocks — which is how the same
     // component came to declare a table with no flex column and render a page
@@ -295,13 +296,18 @@ describe("C19 §6 — the menu's bottom edge", () => {
 
     // **Both ends**, because the two seams close independently — the bottom one
     // shipped for a round with the top one open, and the menu still read as
-    // continuous with the transcript above it.
+    // continuous with the transcript above it. **The bottom one is the
+    // prompt's since ruling 90** (F1475): C22 I81 draws a rule above the
+    // prompt on every frame, and a rule of the menu's own stacked two. So the
+    // menu's last row is a candidate, and the session's C19 T4.12 reads the rule
+    // under it.
     const first = rows[0] ?? "";
     const last = rows[rows.length - 1] ?? "";
     expect(first, "a line above, against the transcript").toMatch(/^[─-]/);
-    expect(last, "and one below, against the prompt").toMatch(/^[─-]/);
-    expect(first + last, "neither carries a candidate").not.toContain("/help");
-    expect(rows.slice(1, -1).join("\n"), "the candidates are between them").toContain("/history");
+    expect(first, "which carries no candidate").not.toContain("/help");
+    expect(last, "and no rule of its own below").not.toMatch(/^[─-]/);
+    expect(rows.slice(1).filter((r) => /^[─-]{6,}/u.test(r)), "no rule after the first").toEqual([]);
+    expect(rows.slice(1).join("\n"), "the candidates are under it").toContain("/history");
   });
 
   it("T3.26 (C19 I23): the remainder counts rows, and the caller is what is asked", async () => {
@@ -355,6 +361,104 @@ describe("C19 §6 — the menu's bottom edge", () => {
   });
 });
 
+describe("C19 I30 — the menu is a ladder in every case (ruling 99)", () => {
+  /** A session at 100 × 16 whose `/z` offers sixty candidates, with or without a detail. */
+  async function sixty(detail: boolean) {
+    const many = Array.from({ length: 60 }, (_, i) => ({
+      value: `/z${String(i)}-entry`,
+      ...(detail ? { detail: "a verb" } : {}),
+    }));
+    const stdin = fakeStdin();
+    const session = await buildSession(
+      {
+        stdin: stdin as never,
+        completionSources: [{ id: "many", slots: ["verb"], dynamic: false, complete: () => many }],
+      },
+      { columns: 100, rows: 16 },
+    );
+    const settled = async (): Promise<void> => {
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setTimeout(r, 0));
+    };
+    await settled();
+    const press = async (bytes: string): Promise<void> => {
+      for (const ch of bytes) {
+        stdin.emit(ch);
+        await settled();
+      }
+    };
+    await press("/z");
+    /** Where the menu's box starts on screen: its top rule. */
+    const boxTop = (): number => {
+      const rows = session.screen().rows.map((r) => r.trimEnd());
+      const prompt = rows.findIndex((r) => r.startsWith("❯"));
+      return rows.findIndex((r, i) => i < prompt - 1 && /^[─-]{20,}$/u.test(r) && i > 1);
+    };
+    /** The menu's box: its top rule down to the row above the prompt's rule. */
+    const box = (): readonly string[] => {
+      const rows = session.screen().rows.map((r) => r.trimEnd());
+      const prompt = rows.findIndex((r) => r.startsWith("❯"));
+      return rows.slice(boxTop(), prompt - 1);
+    };
+    /** Wheel notches down over the box's first candidate row (C16 I74), as SGR bytes. */
+    const wheelDown = async (notches: number): Promise<void> => {
+      const row = boxTop() + 2;
+      for (let i = 0; i < notches; i++) {
+        stdin.emit(`\u001b[<65;10;${String(row)}M`);
+        await settled();
+      }
+    };
+    return { press, box, wheelDown };
+  }
+  /** The candidate a row names, or `null` for a row that is not one candidate. */
+  const label = (row: string): string | null => /^\s*[›*]?\s*(\/z\d+-entry)(?:\s+a verb)?$/u.exec(row)?.[1] ?? null;
+  const more = (box: readonly string[]): number => Number(/\+ (\d+) more/u.exec(box.at(-1) ?? "")?.[1] ?? "NaN");
+
+  it("T3.30 (C19 I30, I23, ruling 99, F1496): sixty candidates with no detail draw one a row, the first marked, the box full and N the rest", async () => {
+    // **The control first: the same source with a detail on every candidate.**
+    const detailed = await sixty(true);
+    const control = detailed.box();
+    expect(control[0], "the menu's top rule").toMatch(/^[─-]{20,}$/u);
+    expect(more(control), "the control was cut").toBeGreaterThan(0);
+    expect(control.slice(1, -1).every((r) => r.endsWith("a verb")), "a hint on each row").toBe(true);
+
+    // **The subject: no detail, and a ladder all the same.** Until ruling 99
+    // this drew rows of pills, several candidates to a row and no `›`.
+    const plain = await sixty(false);
+    const box = plain.box();
+    const rows = box.slice(1, -1);
+    expect(box.length, "the control's box").toBe(control.length);
+    expect(rows.map(label), "one candidate a row, and no hint").toEqual(
+      rows.map((_, i) => `/z${String(i)}-entry`),
+    );
+    expect(rows[0], "the first is current at rest (C19 I29)").toMatch(/^\s*[›*]\s/u);
+    expect(rows.map(label), "the control's labels in the control's rows").toEqual(control.slice(1, -1).map(label));
+    expect(more(box), "N is sixty less the rows drawn").toBe(60 - rows.length);
+
+    // **After ⇥ and enough ↓ to pass the first window**, the selection is drawn
+    // and the box keeps its height.
+    await plain.press("\t");
+    for (let i = 0; i < rows.length + 3; i++) await plain.press("\u001b[B");
+    const moved = plain.box();
+    expect(moved.length, "the box keeps its height").toBe(box.length);
+    expect(moved.slice(1, -1).map(label), "the selected candidate is on screen").toContain(
+      `/z${String(rows.length + 3)}-entry`,
+    );
+
+    // **A wheel run far past the end clamps** (C16 I74), at rest so the wheel
+    // owns the window: the last candidate is drawn and the box keeps its height.
+    const wheeled = await sixty(false);
+    await wheeled.wheelDown(40);
+    const end = wheeled.box();
+    const endRows = end.slice(1, -1).map(label);
+    expect(endRows, "the wheel moved the window").not.toContain("/z0-entry");
+    expect(endRows.at(-1), "and it stops at the last candidate").toBe("/z59-entry");
+    expect(end.length, "the box keeps its height").toBe(box.length);
+    expect(more(end), "N is sixty less the rows drawn").toBe(60 - endRows.length);
+  });
+});
+
 describe("C22 I51 — a menu that opens by itself does not stop typing", () => {
   it("T4.7b: a printable key reaches C17 with the menu open, and Enter submits", async () => {
     const { graph, stdin } = await buildGraph();
@@ -391,5 +495,132 @@ describe("C22 I51 — a menu that opens by itself does not stop typing", () => {
     type(stdin, "x");
     expect(graph.overlays.top, "nothing static matches, so no menu").toBeNull();
     expect(graph.editor.text, "and the character lands").toBe("x");
+  });
+});
+
+describe("C19 I31 — a line that goes away takes its menu and its hold (F1497, F1498)", () => {
+  /** `Esc` alone: C16 holds a lone `Esc` for 50 ms, so the window has to elapse. */
+  const escape = async (stdin: { emit(s: string): void }, clock: { advance(ms: number): void }): Promise<void> => {
+    stdin.emit("\u001b");
+    clock.advance(80);
+    await new Promise((r) => setTimeout(r, 80));
+  };
+
+  it("T3.31 (C19 I31, I19, F1498): Esc, backspace to an empty line, and the retyped /c opens the menu", async () => {
+    const { graph, stdin, clock } = await buildGraph();
+    graph.lifecycle.acquire();
+    type(stdin, "/c");
+    expect(menuRows(graph), "the subject: the menu is up").toEqual(["/capabilities", "/clear", "/config"]);
+    await escape(stdin, clock);
+    expect(graph.overlays.top, "Esc dismissed it").toBeNull();
+
+    type(stdin, "\u007f\u007f");
+    expect(graph.editor.text, "the line is empty").toBe("");
+    type(stdin, "/c");
+    // **F1498**: the hold was taken at offset 0, and the new line's first token
+    // starts there too, so it held and only a ghost showed.
+    expect(menuRows(graph), "a new line, and the menu opens").toEqual(["/capabilities", "/clear", "/config"]);
+
+    // **The control: where the line never went, the hold stands.**
+    const held = await buildGraph();
+    held.graph.lifecycle.acquire();
+    type(held.stdin, "/c");
+    await escape(held.stdin, held.clock);
+    type(held.stdin, "\u007f");
+    expect(held.graph.editor.text, "one backspace leaves the token").toBe("/");
+    type(held.stdin, "c");
+    expect(held.graph.overlays.top, "the same token, still held").toBeNull();
+  });
+
+  /** A session at 80 × 24 with `/help` submitted, so `↑` has a line to recall. */
+  async function recalled(submitted: boolean) {
+    const stdin = fakeStdin();
+    const session = await buildSession({ stdin: stdin as never }, { columns: 80, rows: 24 });
+    const settled = async (): Promise<void> => {
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setTimeout(r, 0));
+    };
+    await settled();
+    const press = async (bytes: string): Promise<void> => {
+      for (const ch of bytes) {
+        stdin.emit(ch);
+        await settled();
+      }
+    };
+    const key = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      await settled();
+    };
+    if (submitted) await press("/help\r");
+    const rows = (): readonly string[] => session.screen().rows.map((r) => r.trimEnd());
+    const prompt = (): string => rows().find((l) => l.startsWith("❯")) ?? "";
+    /** The menu's candidate rows: `/help`'s own output lists the verbs, so read the mark's rows and the rows under it. */
+    const menu = (): readonly string[] => {
+      const r = rows();
+      const at = r.findIndex((l) => /^\s*› \//u.test(l));
+      if (at < 0) return [];
+      const end = r.findIndex((l, i) => i > at && /^[─-]{20,}/u.test(l));
+      return r.slice(at, end).map((l) => l.replace(/^\s*›?\s*/u, "").split(/\s{2,}/u)[0] ?? "");
+    };
+    const escape = async (): Promise<void> => {
+      stdin.emit("\u001b");
+      session.clock.advance(80);
+      await new Promise((r) => setTimeout(r, 80));
+      await settled();
+    };
+    return { press, key, prompt, menu, escape };
+  }
+  const UP = "\u001b[A";
+  const DOWN = "\u001b[B";
+
+  it("T3.32 (C19 I31, I20, I22, F1497): a recall closes the menu at rest and ends the hold", async () => {
+    const s = await recalled(true);
+    await s.press("/c");
+    expect(s.menu(), "the subject: the menu at rest over /c").toEqual(["/capabilities", "/clear", "/config"]);
+
+    await s.key(UP);
+    expect(s.prompt(), "↑ at rest is the prompt's (C19 I20)").toBe("❯ /help");
+    // **F1497**: `/c`'s candidates stayed, over a line that no longer held `/c`.
+    expect(s.menu(), "the menu went with the line").toEqual([]);
+
+    await s.key(DOWN);
+    expect(s.prompt(), "the draft comes back").toBe("❯ /c");
+    expect(s.menu(), "and a recall rebuilds nothing (C19 I22)").toEqual([]);
+    await s.key("\u007f");
+    expect(s.menu().length, "an edit does").toBeGreaterThan(2);
+
+    // **`↓` closes one too**: the walk's other direction, over a menu opened
+    // by editing the recalled line.
+    const d = await recalled(true);
+    await d.press("/c");
+    await d.key(UP);
+    for (let i = 0; i < 3; i++) await d.key("\u007f");
+    expect(d.menu(), "the edit opened a menu over /h").toEqual(["/help", "/history"]);
+    await d.key(DOWN);
+    expect(d.prompt(), "↓ brings the draft back").toBe("❯ /c");
+    expect(d.menu(), "and the menu went with /h").toEqual([]);
+
+    // **The hold ends on a recall.** `Esc` holds at offset 0, and `/help`'s
+    // first token starts there too, so without this nothing would clear it.
+    const h = await recalled(true);
+    await h.press("/c");
+    await h.escape();
+    expect(h.menu(), "Esc dismissed it").toEqual([]);
+    await h.key(UP);
+    expect(h.prompt()).toBe("❯ /help");
+    for (let i = 0; i < 3; i++) await h.key("\u007f");
+    expect(h.prompt()).toBe("❯ /h");
+    expect(h.menu(), "the menu opens over the recalled line's edit").toEqual(["/help", "/history"]);
+
+    // **The control: nothing to recall, nothing replaced.** The line and the
+    // menu stay as they were, so the close is the replacement's and not the key's.
+    const none = await recalled(false);
+    await none.press("/c");
+    const before = none.menu();
+    expect(before, "the menu is up").toEqual(["/capabilities", "/clear", "/config"]);
+    await none.key(UP);
+    expect(none.prompt(), "an empty history recalls nothing").toBe("❯ /c");
+    expect(none.menu(), "and the menu stays").toEqual(before);
   });
 });

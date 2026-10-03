@@ -172,6 +172,8 @@ describe("C02 fail-on-revert", () => {
       renderMode: "assumed",
       notification: "inferred",
       notify: "assumed",
+      clipboard: "inferred",
+      editor: "assumed",
     };
 
     // It agrees with the real thing on the environment it was written from…
@@ -182,7 +184,7 @@ describe("C02 fail-on-revert", () => {
     }).sources;
     expect(BESIDE, "the static map agrees where it was written").toEqual({ ...named });
 
-    // …and is wrong for six of thirteen inside a multiplexer, which is the column
+    // …and is wrong for seven of fifteen inside a multiplexer, which is the column
     // T1.14 asserts and the reason the pair is returned by the rule.
     //
     // **The same locale and `COLORFGBG`**, so the only variable between the two
@@ -197,6 +199,7 @@ describe("C02 fail-on-revert", () => {
     }).sources;
     const wrong = Object.keys(inside).filter((f) => BESIDE[f] !== inside[f as never]);
     expect(wrong.sort()).toEqual([
+      "clipboard",
       "colourDepth",
       "imageProtocol",
       "keyboardProtocol",
@@ -245,5 +248,15 @@ describe("C02 fail-on-revert", () => {
     // And neither names one it does not — the direction a stale row survives in.
     expect(iface).not.toContain("kittyKeyboard");
     expect(degrade).not.toContain("kittyKeyboard");
+  });
+});
+
+describe("C02 fail-on-revert, the clipboard (I18)", () => {
+  it("T6.17 (I18, I11): reading clipboard from the ungated identification → T1.29's tmux arm fails", () => {
+    // The column that forgot the gate answers correctly outside tmux and wrongly
+    // inside it — so the control is the same terminal without TMUX.
+    expect(detectCapabilities({ TERM: "xterm-kitty" }).capabilities.clipboard, "control").toBe("osc52");
+    const inside = detectCapabilities({ TERM: "xterm-kitty", TMUX: "/tmp/x" });
+    expect([inside.capabilities.clipboard, inside.sources.clipboard]).toEqual(["none", "unreachable"]);
   });
 });

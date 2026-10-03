@@ -4,7 +4,14 @@
     python3 tools/screencast.py out/demo
 
 Writes `demo` (the raw stream), `demo.cast` (asciicast v2) and `demo.teardown`.
-Render with `agg demo.cast demo.gif`.
+Render with `agg --font-size 13 --theme asciinema demo.cast demo.gif`.
+
+**Against the demo world, under virtual time** (the person's ruling,
+2026-09-29: recordings never show the real docker host). The session is
+`src/world.ts`'s invented shop — `web`, `api`, `worker`, `postgres`, `cache`,
+`proxy` and a finished `migrate` — driven by `capture.run_world`, so nothing
+needs `make fixtures`, nothing asks a daemon, and two recordings are the same
+bytes. Record where there is no docker CLI (calcium-dev); render where `agg` is.
 
 **Nine beats, and still not the five depths — STEP8_WALK §B6 is the reason.** The plan's seventh
 was *the same view at five colour depths*. `capture.py` sets the environment once
@@ -29,11 +36,10 @@ record a screencast of an application appearing to ignore you.
 """
 
 import os
-import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from capture import forget_theme, run  # noqa: E402
+from capture import assert_private, run_world  # noqa: E402
 
 COLS, ROWS = 110, 34
 
@@ -166,10 +172,16 @@ def build() -> list[Beat]:
     #     real container names, each with its state as a tone and its status as
     #     the hint. Nine verbs declare a `container` argument and one source
     #     answers all of them.
-    part, t = typed(b"/container stats dtui-", t); b += part
+    #
+    #     **`Tab` on the bare argument, now that every name is a demo name.**
+    #     This typed `dtui-` first, because the daemon it recorded against held
+    #     the host's own containers too and the whole list was not a picture
+    #     anyone should publish. The demo world is seven containers, so the menu
+    #     is the shot: all of them, running and exited, before `wor` narrows it.
+    part, t = typed(b"/container stats ", t); b += part
     t += 0.6
     b.append((round(t, 3), TAB)); t += 2.6
-    part, t = typed(b"load", t); b += part
+    part, t = typed(b"wor", t); b += part
     t += 0.8
     b.append((round(t, 3), ENTER)); t += 0.9
     b.append((round(t, 3), ENTER)); t += 0.5
@@ -186,13 +198,13 @@ def build() -> list[Beat]:
 
     # 7 — immediately, so the return lands on a transcript that grows. A
     #     comparison block: two sources, one row per field, verdict-toned.
-    part, t = command(b"/drift dtui-web", t); b += part
+    part, t = command(b"/drift web", t); b += part
     t += 5.5
 
     # 8 — **the third app source, and the one that needs argument one to answer
     #     argument two.** `/etc/ng` completes to `/etc/nginx/` with no delimiter
     #     — a directory continues (C19 I16) — so the next `Tab` lists inside it.
-    part, t = typed(b"/filediff dtui-cfg /etc/ng", t); b += part
+    part, t = typed(b"/filediff proxy /etc/ng", t); b += part
     t += 0.6
     b.append((round(t, 3), TAB)); t += 1.6
     b.append((round(t, 3), TAB)); t += 2.4
@@ -211,9 +223,9 @@ def build() -> list[Beat]:
 
     # 9 — two short entries, so the tail keeps moving and the transcript is
     #     visibly longer than the screen by the time beat 10 asks about it.
-    part, t = command(b"/port dtui-web", t); b += part
+    part, t = command(b"/port web", t); b += part
     t += 3.0
-    part, t = command(b"/top dtui-web", t); b += part
+    part, t = command(b"/top web", t); b += part
     t += 3.5
 
     # 10 — **the whole session, reviewed.** Everything above has left the screen
@@ -237,24 +249,11 @@ def build() -> list[Beat]:
 BEATS: list[Beat] = build()
 
 
-def warm_the_logs() -> None:
-    """Give `dtui-web` something to have logged.
-
-    An nginx that has served nothing has an empty access log, and beat 6 would
-    then demonstrate the empty-block class rather than the log view. That is a
-    real surface and it is `DEGRADATION.md`'s subject, not this one's.
-    """
-    for _ in range(4):
-        subprocess.run(
-            ["docker", "exec", "dtui-web", "wget", "-q", "-O", "-", "http://localhost/"],
-            capture_output=True,
-            check=False,
-        )
-
-
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "out/demo"
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
-    warm_the_logs()
-    forget_theme()  # F811 — a persisted `/theme light` recolours the whole recording
-    run(COLS, ROWS, BEATS, out, hold=6.0, env={"LANG": "en_GB.UTF-8", "COLORTERM": "truecolor"})
+    # `warm_the_logs` went with the daemon: it `docker exec`ed a `wget` into the
+    # lab's nginx so the access log had lines. The world's `web` has logged
+    # since it started, and nothing here may reach a real container.
+    run_world(COLS, ROWS, BEATS, out, hold=6.0, env={"LANG": "en_GB.UTF-8", "COLORTERM": "truecolor"})
+    assert_private(out + ".cast")

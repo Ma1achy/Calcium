@@ -23,9 +23,11 @@ import {
   extendCaret,
   keyOf,
   moveCaret,
+  waitingEntries,
   type BlockSpan,
   type SemanticMode,
 } from "../../src/shell/semantic-selection.js";
+import { createTranscriptStore, type TranscriptEntry } from "../../src/viewport/transcript/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 
 const entryDoc = (id: string, text = id) =>
@@ -122,6 +124,7 @@ describe("C14 §6b — the freeze", () => {
       caret: { entryId: id, row: 0 },
       anchor: null,
       blocks: new Set([keyOf(id, "e1")]),
+      rect: null,
     };
     const textOf = (entries: readonly { id: string; doc: { blocks: readonly Block[] } }[]): string =>
       copyTextOf(
@@ -151,6 +154,95 @@ describe("C14 §6b — the freeze", () => {
 
     graph.thawView();
     expect(graph.bufferedEntries).toBe(0);
+  });
+
+  it("T1.78 (C14 I34, §6b The count): the waiting count is by id, rev and streaming, over every row of the table", async () => {
+    // **A real C13 store with a small cap**, because every row of §6b's table is
+    // a fact about what C13 does to an entry's record — a fake would supply the
+    // behaviour the row is about. The hold is what `freezeView` takes: the
+    // store's `entries` array at that moment.
+    const replace = (text: string) =>
+      ({ op: "replace", blockId: "b", block: block({ kind: "notice", id: "b", tone: "info", text }) }) as const;
+    const one = (id: string) => doc({ command: id, blocks: [block({ kind: "notice", id: "b", tone: "info", text: id })] });
+    type Row = { waiting: number; length: number; identity: number };
+    const measure = (record: readonly TranscriptEntry[], held: readonly TranscriptEntry[]): Row => ({
+      waiting: waitingEntries(record, held),
+      length: record.length - held.length,
+      identity: record.filter((e) => !held.includes(e)).length,
+    });
+
+    // An append: one entry, and C13 replaces the previous live one to clear `live`.
+    {
+      const t = createTranscriptStore();
+      t.append(one("e1"));
+      const held = t.entries;
+      t.append(one("e2"));
+      expect(measure(t.entries, held), "an append").toEqual({ waiting: 1, length: 1, identity: 2 });
+    }
+    // Patches to a held live entry, a malformed one, and the two settles.
+    {
+      const t = createTranscriptStore();
+      const id = t.append(one("e1"), { streaming: true });
+      const held = t.entries;
+      expect(t.patch(id, replace("p1")).ok).toBe(true);
+      expect(measure(t.entries, held), "a patch to a held live entry").toEqual({ waiting: 1, length: 0, identity: 1 });
+      expect(t.patch(id, replace("p2")).ok).toBe(true);
+      expect(measure(t.entries, held), "a second patch to it").toEqual({ waiting: 1, length: 0, identity: 1 });
+    }
+    {
+      const t = createTranscriptStore();
+      const id = t.append(one("e1"), { streaming: true });
+      const held = t.entries;
+      expect(t.patch(id, { ...replace("x"), blockId: "nowhere" }).ok, "the fixture's patch is refused").toBe(false);
+      expect(measure(t.entries, held), "a malformed patch").toEqual({ waiting: 0, length: 0, identity: 0 });
+      expect(t.settle(id).ok).toBe(true);
+      expect(t.entries.find((e) => e.id === id)?.rev, "a bare settle keeps rev").toBe(0);
+      expect(measure(t.entries, held), "a bare settle").toEqual({ waiting: 1, length: 0, identity: 1 });
+    }
+    {
+      const t = createTranscriptStore();
+      const id = t.append(one("e1"), { streaming: true });
+      const held = t.entries;
+      expect(t.settle(id, one("final")).ok).toBe(true);
+      expect(measure(t.entries, held), "a settle with a document").toEqual({ waiting: 1, length: 0, identity: 1 });
+    }
+    // Eviction, at a cap of three blocks: the first one adds the marker, and
+    // once the marker is held a further eviction does not count it.
+    {
+      const t = createTranscriptStore({ cap: 3 });
+      for (const id of ["e1", "e2", "e3"]) t.append(one(id));
+      const first = t.entries;
+      t.append(one("e4"));
+      expect(t.entries.map((e) => e.id).slice(1), "e1 and e2 went, e3 and e4 stay").toEqual(["e3", "e4"]);
+      expect(measure(t.entries, first), "an append evicting, the first eviction").toEqual({ waiting: 2, length: 0, identity: 3 });
+
+      const second = t.entries;
+      t.append(one("e5"));
+      expect(t.entries[0], "the sweep rebuilt the marker").not.toBe(second[0]);
+      expect(measure(t.entries, second), "an append evicting, the marker held").toEqual({ waiting: 1, length: 0, identity: 3 });
+
+      const third = t.entries;
+      const live = t.append(one("e6"), { streaming: true });
+      const fourth = t.entries;
+      expect(t.patch(live, replace("p")).ok).toBe(true);
+      expect(t.entries[0], "a patch rebuilds the marker too").not.toBe(fourth[0]);
+      expect(measure(t.entries, fourth).waiting, "a write with the marker held adds nothing for it").toBe(1);
+      expect(measure(t.entries, third).waiting, "and from the hold before the append, the append and nothing else").toBe(1);
+    }
+
+    // **The wiring**: the footer's number reads the function, not a length.
+    const { graph } = await buildGraph();
+    const id = graph.transcript.append(entryDoc("e1", "before"), { streaming: true });
+    graph.freezeView({ width: 100, height: 20 });
+    expect(
+      graph.transcript.patch(id, {
+        op: "replace",
+        blockId: "e1",
+        block: block({ kind: "notice", id: "e1", tone: "info", text: "after" }),
+      }).ok,
+    ).toBe(true);
+    expect(graph.bufferedEntries, "a patch to the held live entry is waiting").toBe(1);
+    graph.thawView();
   });
 });
 

@@ -59,7 +59,7 @@ describe("C11 tier 6", () => {
 
     const frame = r.renderToLines(bare, 60).join("\n");
     expect(frame).toContain("owner");
-    expect(frame).toContain("malachy@fmx.io");
+    expect(frame).toContain("someone@example.com");
 
     // And the marker: a row with no detail is still expandable, so it still says so.
     expect(visible(r.renderToLines(psTable({ rows: 1 }), 60)[1] ?? "")).toContain("▹");

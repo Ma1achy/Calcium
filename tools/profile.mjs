@@ -15,8 +15,8 @@
 // revisits a ruled-out candidate; and the expensive path is private, so the only
 // honest way to reach it is to be a consumer. The imports below reach two of
 // the three subpaths a consumer has — the package root and
-// `@fmx/calcium/testing` — by the paths `package.json` maps them to.
-// `@fmx/calcium/profiling` was the third and is no longer needed: the phase
+// `calcium-tui/testing` — by the paths `package.json` maps them to.
+// `calcium-tui/profiling` was the third and is no longer needed: the phase
 // table moved into the harness, because a reading computed in a script is a
 // reading no row can be written against, which is how its negative residue went
 // unasserted (C28 I41, F888).

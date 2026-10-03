@@ -7,9 +7,9 @@
  * one of them and not the call.
  */
 import type { AmbiguousWidth } from "../../text.js";
-import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
+import { atLeastOne, normaliseWidth, RAMP_ONE_SHOTS, TRAIL_ANIMATION } from "../../../data/viewmodel/index.js";
 import type { Glyph, Notice, Pills, Progress, Raw, Rule, Tip, Tone } from "../../../data/viewmodel/index.js";
-import { cells, stripControl, truncate, truncateParts, wrapCells } from "../../text.js";
+import { cells, graphemes, stripControl, truncate, truncateParts, wrapCells } from "../../text.js";
 import type { Run } from "../../runs.js";
 import { runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../runs.js";
 import { NO_STYLE, rampStyle } from "../../theme/index.js";
@@ -384,6 +384,16 @@ const TRAIL_HEAD: Readonly<Record<"hotEdge" | "fade" | "hue" | "ripple", Tone>> 
 });
 
 /**
+ * `hotEdge`'s overshoot, the design's own profile (C09 I133, C04 I148, §026).
+ *
+ * The demo lifts the accent by `1 + (1 − d / 0.35) × 0.35` below `d = 0.35`
+ * and mixes to the ink over the rest; as a ramp stop that is `{ lift: 1.35,
+ * share: 0.35 }` exactly. `TRAIL_HEAD` alone drew a plain gradient, so the
+ * newest cluster sat at the accent and never above it.
+ */
+const TRAIL_OVERSHOOT = Object.freeze({ lift: 1.35, share: 0.35 });
+
+/**
  * The trail's band, laid over the head of a streaming notice (C09 I90, I91, §7e).
  *
  * **Derived here because only here knows the width** (C04 I122). The block says
@@ -411,6 +421,7 @@ function withTrail(
 ): readonly (readonly Run[])[] {
   if (block.streaming !== true) return wrapped;
   const form = block.trail ?? "hotEdge";
+  const effect = TRAIL_ANIMATION[form];
   // **At 1-bit the four colour forms draw nothing rather than something else**
   // (I91). Substituting a mark would spend a cell the block never reserved, and
   // substituting bold for every form would make four names one.
@@ -424,16 +435,24 @@ function withTrail(
   // the one above; a row it enters part-way ends it. The cells a break
   // consumed are not in any row and so not in the band. A whole band on a short
   // text is the whole text — "never reaching further than the text".
+  //
+  // **Walked back by grapheme cluster** (I134). It stepped one UTF-16 code unit
+  // at a time, so a zero-width combining mark was a step of its own: the walk
+  // stopped between it and its base, the cut split the cluster, and the mark
+  // fell out of the frame. A cluster is wholly in the band or wholly out.
   const cuts: { row: number; start: number }[] = [];
   let left = TRAIL_CELLS;
   for (let row = wrapped.length - 1; row >= 0 && left > 0; row -= 1) { // cells-ok — an array index
     const text = runsText(wrapped[row] ?? []);
+    const clusters = graphemes(text);
     let start = text.length; // cells-ok — a code-unit cursor
-    while (start > 0 && cells(text.slice(start - 1), ambiguous) <= left) start -= 1; // cells-ok — a code-unit cursor
-    if (start < text.length) { // cells-ok — a code-unit comparison
-      cuts.unshift({ row, start });
-      left -= cells(text.slice(start), ambiguous);
+    for (let k = clusters.length - 1; k >= 0; k -= 1) { // cells-ok — a cluster index
+      const w = cells(clusters[k] ?? "", ambiguous);
+      if (w > left) break;
+      left -= w;
+      start -= (clusters[k] ?? "").length; // cells-ok — a code-unit cursor
     }
+    if (start < text.length) cuts.unshift({ row, start }); // cells-ok — a code-unit comparison
     if (start > 0) break;
   }
   if (cuts.length === 0) return wrapped; // cells-ok — a row count
@@ -446,7 +465,7 @@ function withTrail(
     return { row, head: sliceRuns(line, 0, start), band: sliceRuns(line, start, length) };
   });
   const of = bands.reduce(
-    (n, b) => n + b.band.reduce((m, r) => m + [...r.text].length, 0), // cells-ok — a cluster count
+    (n, b) => n + b.band.reduce((m, r) => m + graphemes(r.text).length, 0), // cells-ok — a cluster count, the unit `paintRuns` indexes (I134)
     0,
   );
   const out = [...wrapped];
@@ -466,9 +485,16 @@ function withTrail(
         fill: "gradient" as const,
         from: target,
         to: TRAIL_HEAD[form],
-        ...(form === "ripple" ? { animate: "ripple" as const } : {}),
+        // **The effect from the one table, and a one-shot's stamp with it**
+        // (I133, C04 I109; ruling 81). The band's ramp is derived here and has
+        // no address in the document, so its `since` travels on the notice —
+        // stamped by the shell at the arrival the band follows. Without it the
+        // ripple held its not-started frame for the life of the stream.
+        ...(effect !== undefined ? { animate: effect } : {}),
+        ...(effect !== undefined && block.trailSince !== undefined && RAMP_ONE_SHOTS.has(effect) ? { since: block.trailSince } : {}),
+        ...(form === "hotEdge" ? { overshoot: TRAIL_OVERSHOOT } : {}),
       };
-      const count = [...run.text].length; // cells-ok — a cluster count
+      const count = graphemes(run.text).length; // cells-ok — a cluster count (I134)
       // **Over `of + 1` positions, with the band at the top `of`**, so the
       // oldest cell is one step off the ink and not on it: `d = (head − i) /
       // trail` tints all fourteen and leaves the fifteenth plain. At `of`
@@ -578,6 +604,8 @@ function buttonSpans(
 
 export const noticeDefinition: BlockDefinition<Notice> = {
   kind: "notice",
+  // C09 I137 — an actionable notice is a button (I102).
+  focusShape: "box",
 
   // §7a — prose copies as its text (I86, `R-SEL-004`). The tone is a
   // rendering and the wrap is the frame's; neither reaches the source.
@@ -729,9 +757,14 @@ export const tipDefinition: BlockDefinition<Tip> = {
 export const progressDefinition: BlockDefinition<Progress> = {
   kind: "progress",
 
-  measure: () => 1,
+  // **A finished bar is gone** (C04 I145, §3as). Zero rows, where every other
+  // leaf answers at least one: `Progress.quantity`'s own comment described this
+  // as built while `measure` answered 1 at every fraction. The registry's
+  // padding and floor still apply to the zero, as they do to an empty container.
+  measure: (block: Progress) => (finished(block) ? 0 : 1),
 
   render(block: Progress, ctx: RenderContext): Rendered {
+    if (finished(block)) return [];
     const width = normaliseWidth(ctx.width);
     // **Resolved here, per render, and never stored on the block** — the same
     // rule `glyphs()` follows: a block names a style and the terminal decides
@@ -743,10 +776,14 @@ export const progressDefinition: BlockDefinition<Progress> = {
     // says nothing more; a block that names none takes the alphabet the design
     // draws for its granularity, `block` for continuous and `slant` for
     // segmented.
-    const alphabet =
-      block.style ?? (block.granularity === "segmented" ? "slant"
-        : block.granularity === "continuous" ? "block"
-        : undefined);
+    //
+    // **Counted work draws posts, and the rule normalises** (C09 I136, §7j,
+    // `R-PRG-002`, ruling 32). `segmented` drew `slant` from §035's specimens;
+    // the registry's rule is *discrete steps use posts, sub-cell progress uses
+    // braille*, so a declared style the rule gives to the other granularity is
+    // mapped at render (D26) — braille's eighths on a count claim a part of a
+    // unit that does not exist, and posts on continuous work claim steps.
+    const alphabet = alphabetOf(block.style, block.granularity);
     const bar = barStyle(ctx.capabilities, alphabet);
     // **The bar clamps and the number does not** (I28). `100/100` and `150/100`
     // drawing identically is the same defect `examples/docker`'s CPU bar was
@@ -804,7 +841,6 @@ export const progressDefinition: BlockDefinition<Progress> = {
     // there is one, so a bar with no label starts at the row's own first cell.
     const gaps = labelRoom === 0 ? 1 : 2;
     const barWidth = Math.max(0, width - cells(labelColumn, ctx.capabilities.ambiguousWidth) - cells(percent, ctx.capabilities.ambiguousWidth) - gaps);
-    const filled = Math.round(fill * barWidth);
 
     // **The ramp varies over the axis, and only the `on` cells take it** (I52).
     // Cell `i` samples `i / (barWidth − 1)` whether or not it is filled, so a
@@ -828,6 +864,17 @@ export const progressDefinition: BlockDefinition<Progress> = {
     const meter = background("surface.meterFill", ctx.theme, ctx.capabilities);
     const well = background("surface.bgDeep", ctx.theme, ctx.capabilities);
     const painted = block.painted === true && meter.background !== undefined;
+
+    // **The `on` cells, whole or in eighths** (C09 I136, §7j). With `e =
+    // round(f × n × 8)` a sub-cell alphabet draws `floor(e / 8)` full cells and
+    // then `steps[e mod 8 − 1]`; the partial cell is an `on` cell, so the ramp
+    // samples it at its own index (I52). A ground cannot be an eighth (I96), so
+    // the painted rung steps whole cells like every other alphabet.
+    const steps = painted ? undefined : bar.steps;
+    const eighths = steps === undefined ? 0 : Math.round(fill * barWidth * 8);
+    const partial = steps === undefined ? undefined : steps[(eighths % 8) - 1];
+    const filled = steps === undefined ? Math.round(fill * barWidth) : Math.floor(eighths / 8) + (partial === undefined ? 0 : 1);
+    const glyphAt = (i: number, whole: string): string => (partial !== undefined && i === filled - 1 ? partial : whole);
     const onGlyph = painted ? " " : bar.on;
     const onInk = painted ? withBackground(accent, meter) : accent;
     const muted = tone("muted", ctx.theme, ctx.capabilities);
@@ -855,7 +902,7 @@ export const progressDefinition: BlockDefinition<Progress> = {
 
     const onCells: Span[] =
       ramp === undefined
-        ? [{ text: onGlyph.repeat(filled), style: onInk }]
+        ? [{ text: onGlyph.repeat(partial === undefined ? filled : filled - 1) + (partial ?? ""), style: onInk }]
         : Array.from({ length: filled }, (_, i) => {
             const t = animateT(
               effectiveAnimation(animation, ctx.motion),
@@ -875,7 +922,7 @@ export const progressDefinition: BlockDefinition<Progress> = {
             // lose the track it is painted on. §034 carries `rmp-sweepbar` on
             // the painted bar, so the pairing is the design's.
             const ink = sampled === undefined ? onInk : { ...onInk, ...sampled };
-            return { text: onGlyph, style: painted ? withBackground(ink, meter) : ink };
+            return { text: glyphAt(i, onGlyph), style: painted ? withBackground(ink, meter) : ink };
           });
 
     return rows([
@@ -900,6 +947,27 @@ export const progressDefinition: BlockDefinition<Progress> = {
     ]);
   },
 };
+
+/**
+ * Whether a bar has finished and is gone (C04 I145, §3as): a **declared**
+ * `progress` or `count` with a proportion, at or past its total. `capacity`
+ * persists, an undeclared quantity never finishes (D25 — `examples/docker`'s
+ * bars declare none and overshoot), and `total: 0` has no proportion at all.
+ */
+function finished(block: Progress): boolean {
+  return (block.quantity === "progress" || block.quantity === "count") && block.total > 0 && block.current >= block.total;
+}
+
+/**
+ * The alphabet a bar draws, from its declared style and granularity (C09 I97,
+ * I136, §7j). A declared texture stands except where `R-PRG-002` gives it to
+ * the other granularity; with none declared, granularity picks.
+ */
+function alphabetOf(style: string | undefined, granularity: Progress["granularity"]): string | undefined {
+  if (granularity === "segmented") return style === undefined || style === "braille" ? "posts" : style;
+  if (granularity === "continuous") return style === undefined || style === "posts" ? "block" : style;
+  return style;
+}
 
 // --- pills -----------------------------------------------------------------
 
@@ -1002,6 +1070,8 @@ function pillsElements(block: Pills, width: number): readonly NavElement[] {
 
 export const pillsDefinition: BlockDefinition<Pills> = {
   kind: "pills",
+  // C09 I137 — a chip (I121).
+  focusShape: "box",
 
   // §7a — the labels, space-joined (I86). A row of peers is a row of words;
   // the shedding, the active mark and the tones are all this component's.

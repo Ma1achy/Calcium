@@ -257,7 +257,8 @@ describe("C23 — the shell route as a live screen, spec-first rows", () => {
     }
 
     const doc = c.transcript.entries[0]?.doc;
-    expect(doc?.status, "the card settles failed").toBe("error");
+    // Partial, not failed (C23 I96, ruling 92) — it settled `error` until then.
+    expect(doc?.status, "the entry settles cancelled").toBe("partial");
     const kept = JSON.stringify(doc?.blocks);
     expect(kept, "naming the cancel").toContain("Cancelled.");
     // **The lines so far**, which is what makes a cancel survivable: a route

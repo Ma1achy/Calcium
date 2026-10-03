@@ -14,7 +14,7 @@
 // reads the arm a block took — there is one, and a row asserting that is a row
 // asserting the composition happened at all.
 import { describe, expect, it } from "vitest";
-import { NO_PROBE, NO_SPAN } from "../../src/data/viewmodel/index.js";
+import { NO_PROBE, NO_SPAN, digestOf } from "../../src/data/viewmodel/index.js";
 import type { Block, Probe } from "../../src/data/viewmodel/index.js";
 import { DEFAULT_WIDTHS } from "../../src/testing/measurement-conformance.js";
 import type { BlockDefinition, RenderContextInput } from "../../src/presentation/blocks/index.js";
@@ -189,7 +189,12 @@ describe("C09 I72 — the two arms agree", () => {
         rows: ((ONE_PER_KIND.table as unknown as { rows: readonly Record<string, unknown>[] }).rows).map((row, i) =>
           i === 0 ? { ...row, expanded: true, detail: [notice("t-d-a", "detail"), { ...raw("t-d-b", "more"), padding: { t: 1 } }] } : row) }),
       B({ ...(ONE_PER_KIND.table as unknown as Record<string, unknown>), id: "t-actions", actionBar: true }),
-      { ...(ONE_PER_KIND.image as unknown as Record<string, unknown>), id: "img-fault", data: "not-a-png" } as unknown as Block,
+      // **A digest of its own, derived as the builder derives one** (F1473,
+      // C04 I73). The fixture kept the corpus image's, and the decode cache is
+      // keyed on the digest and never on the data — so once T2.143 had decoded
+      // the corpus image this block was handed its picture, and the row drew
+      // `▀▀` in a whole-file run and the fault only alone.
+      { ...(ONE_PER_KIND.image as unknown as Record<string, unknown>), id: "img-fault", data: "not-a-png", digest: digestOf("not-a-png") } as unknown as Block,
       ONE_PER_KIND.image,
       B({ kind: "group", id: "all", direction: "column", children: [
         notice("all-n", "3 tiles"),
@@ -224,6 +229,22 @@ describe("C09 I72 — the two arms agree", () => {
             expect(got, `${b.id} at ${String(width)}`).toEqual(expected);
           }
           expect(names.filter((n) => n === "rows"), `${b.id} at ${String(width)} took the rows arm`).toHaveLength(1);
+          // **The fault arm, by shape** (F1473, C09 I38). Its captures are the
+          // corpus picture and are retired, so the retirement's *still differs*
+          // is all the oracle can say — and any frame but the picture satisfies
+          // it. What the arm draws is a failed status carrying the decoder's
+          // reason over the dimmed `alt`, so that is asserted: three rows, the
+          // failure mark leading the first, the reason in it wherever a word
+          // fits, and the caption last.
+          if (b.id === "img-fault") {
+            const plain = got.map((l) => l.replace(/\u001b\[[0-9;]*m/gu, ""));
+            const at = `img-fault at ${String(width)} under ${capsName}`;
+            expect(plain, `${at}: the box's two rows and the caption`).toHaveLength(3);
+            expect(plain[0]?.[0], `${at}: led by the failure mark`).toBe(capsName === "full" ? "\u2717" : "x");
+            if (width >= 12) expect(plain[0], `${at}: the decoder's reason`).toContain("not a PNG");
+            const caption = (plain[2] ?? "").replace(/[\u2026~]$/u, "");
+            expect(caption.length > 0 && "an eight by eight red square".startsWith(caption), `${at}: the alt last`).toBe(true);
+          }
           compared += 1;
         }
       }

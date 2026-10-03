@@ -26,7 +26,7 @@ premise from here would take a false one, which is the failure mode this reposit
 | entry | what landed | the sentence here that is now false |
 |---|---|---|
 | **1** | `ProducerContext` — `width`, `height`, `capabilities`, `measure` — on every producing route; `LocalContext` and `AdapterContext` are intersections of it (C07 I17–I20, C22 I45) | *"`LocalContext` carries `command`"*, and *"Neither carries the capability record, the region, a measurer or a validator"*. All four are carried. |
-| **1** | `producerContext()` and `localContext()` on `@fmx/calcium/testing` (C24 I26) | — the consuming half F132 found, closed with it |
+| **1** | `producerContext()` and `localContext()` on `calcium-tui/testing` (C24 I26) | — the consuming half F132 found, closed with it |
 | **1** | `ProducerContext.height`, non-null exactly on a view invocation | *"no producer can see the region … this one field cannot be supplied and the split floor stays declared"*. It can be, and CLAUDE.md carries this as the second of its deferral instances. |
 | **2** | F27's three builder fields | — |
 | **3** | C04's absence/failure split, 16 of 19 | — the group's five open are later findings, not these |

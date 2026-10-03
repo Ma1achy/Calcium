@@ -1,6 +1,6 @@
 a submit is a call with steps; its choice-only question replaces the prompt
 
- ❯ /submit fmx_models.jobs.training:job
+ ❯ /submit ml_models.jobs.training:job
 
 ● submit · ✦ 4s
   ⎿  ✓ clean working tree              HEAD a3f9b21

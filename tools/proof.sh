@@ -50,16 +50,23 @@ npm run build >/dev/null
 
 # ── 2. Publish is not refused, and it goes where we say
 #
-# **`--registry` does not work here and fails silently**, which is why this
-# asserts the line rather than passing a flag and trusting it. `publishConfig.registry`
-# in package.json beats both `--registry` and `npm_config_registry`, and npm
-# reports the override as accepted while publishing to the configured host. The
-# scoped form is the one that wins. A CI job wiring a local registry with
-# `--registry` would have aimed at the real one and read the auth failure as a
-# problem with the local one. FINDINGS F12.
+# **This asserts the line rather than passing a flag and trusting it.** A
+# `publishConfig.registry` in package.json beats both `--registry` and
+# `npm_config_registry`, and npm reports the override as accepted while
+# publishing to the configured host — so a CI job wiring a local registry would
+# aim at the real one and read the auth failure as a problem with the local one.
+# FINDINGS F12. The scoped `--@scope:registry=` form was the one that won, and
+# only for a scoped name.
+#
+# **The package is unscoped (`calcium-tui`) and carries no `publishConfig`**
+# (A04 §9, not published yet), so the plain `--registry` is the override that
+# takes. If a `publishConfig` comes back with a registry choice, the grep below
+# goes red on the first run rather than the flag lying. The scrub that renamed
+# the package rewrote the scoped flag to `--@calcium-tui:registry=`, a scope no
+# package has, which npm accepts and ignores — F1469.
 say "publish --dry-run, registry override asserted"
 LOCAL="http://localhost:4873"
-OUT="$(npm publish --dry-run "--@fmx:registry=$LOCAL" 2>&1)" || die "npm publish --dry-run refused: $OUT"
+OUT="$(npm publish --dry-run "--registry=$LOCAL" 2>&1)" || die "npm publish --dry-run refused: $OUT"
 grep -q "Publishing to $LOCAL" <<<"$OUT" \
   || die "the registry override did not take — npm reports: $(grep -i 'publishing to' <<<"$OUT")"
 
@@ -91,12 +98,12 @@ install_example() {
   node -e '
     const fs = require("node:fs");
     const p = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-    const before = p.dependencies["@fmx/calcium"];
+    const before = p.dependencies["calcium-tui"];
     if (before !== "file:../..") {
       console.error(`expected file:../.., found ${before}`);
       process.exit(1);
     }
-    p.dependencies["@fmx/calcium"] = "file:" + process.argv[2];
+    p.dependencies["calcium-tui"] = "file:" + process.argv[2];
     fs.writeFileSync(process.argv[1], JSON.stringify(p, null, 2));
   ' "$app/package.json" "$TARBALL"
 
@@ -116,9 +123,9 @@ install_example() {
   # below pass against the source tree.
   node -e '
     const fs = require("node:fs");
-    const st = fs.lstatSync("node_modules/@fmx/calcium");
+    const st = fs.lstatSync("node_modules/calcium-tui");
     if (st.isSymbolicLink()) {
-      console.error("@fmx/calcium installed as a symlink — the gate is testing the repo, not the package");
+      console.error("calcium-tui installed as a symlink — the gate is testing the repo, not the package");
       process.exit(1);
     }
   ' || die "$name: the tarball did not install as a real directory"
@@ -128,7 +135,7 @@ install_example() {
   # Backticks are escaped deliberately: inside double quotes they are command
   # substitution, so an unescaped 'files' here would try to *run* files — and
   # only ever on the failure path, where nobody would be watching.
-  [ -f "node_modules/@fmx/calcium/README.md" ] \
+  [ -f "node_modules/calcium-tui/README.md" ] \
     || die "$name: the installed package has no README.md — \`files\` and the docs disagree"
 
   # **`test:package`, not `test`** — the suite minus anything that reaches back

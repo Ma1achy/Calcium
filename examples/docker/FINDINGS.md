@@ -593,7 +593,7 @@ No warning, no error, exit 0. `npm_config_registry` in the environment behaves t
 way. The flag that does win is the **scoped** one:
 
 ```
-$ npm publish --dry-run --@fmx:registry=http://localhost:4873
+$ npm publish --dry-run --@calcium-tui:registry=http://localhost:4873
 npm notice Publishing to http://localhost:4873 with tag latest and default access
 ```
 
@@ -1297,7 +1297,7 @@ toward whole-stack tests or none.
 
 **CLOSED — the seam exists and cites this finding by name.** `src/testing/live-parts.ts`
 exports `liveParts(doc): readonly LivePart[]`, giving back the `block` and *exactly* the
-`LiveSpec` the declarer supplied, and `@fmx/calcium/testing` re-exports it. Its own header
+`LiveSpec` the declarer supplied, and `calcium-tui/testing` re-exports it. Its own header
 carries the argument this entry makes, including why it lands on the testing surface rather
 than the runtime one: *a production consumer reading back what it just declared holds a second
 record of the document, which is the class this repository removes; a test reading it is
@@ -2404,7 +2404,7 @@ works around is a second defect wearing the first one's clothes.**
 
 Fixed in `test/deep.ts`: `dist/` is inside the tarball, so the same modules
 resolve from the package root — the repository in the dev loop,
-`node_modules/@fmx/calcium` under the gate. One expression, both worlds, and it
+`node_modules/calcium-tui` under the gate. One expression, both worlds, and it
 is still a deep import and still F36/F37.
 
 `make proof` now runs both examples and passes: `PROOF_EXIT=0`, 233 and 3.
@@ -2838,7 +2838,11 @@ screen. **What I photographed is what an overlay looks like.**
 
 ### The picture that settles it
 
-![The completion menu drawn over a coloured unified diff: the menu's three rows punch a clean black rectangle out of the red and green diff backgrounds, with a perfectly vertical edge at the same column on every row, and the diff's colour resuming beyond it](../../docs/media/menu-over-diff.gif)
+![The completion menu open under a coloured unified diff: since batch 3 the menu is a panel between two rules above the prompt, so the diff's red and green rows end at the rule above it and nothing is drawn over them](../../docs/media/menu-over-diff.gif)
+
+*Re-recorded 2026-09-29 from the fixture world (F1434). The picture this passage argues from — the menu drawn
+**over** the diff — no longer exists: the menu is now a panel above the prompt (M8), so the overlap it tested
+is gone rather than passed. The argument below is kept as the record of what the old frame showed.*
 
 **The menu drawn over a surface that is coloured to its right edge.** If cells
 went unwritten, the diff's red and green would show through the gaps *inside* the
@@ -5571,7 +5575,7 @@ say `added` and only the frame says `+` (F81). So the app asserts a value whose 
 cannot see.
 
 **And the framework's own testing surface has the same blind spot, for the same reason.**
-`@fmx/calcium/testing` ships `expectDocument().isValid() · measuresCorrectly() ·
+`calcium-tui/testing` ships `expectDocument().isValid() · measuresCorrectly() ·
 rendersAt() · degradesToAscii() · degradesTo1Bit() · hasNoColourOnlyDistinction()`, plus
 two conformance suites. Every one of them **measures or asserts a property and none of them
 returns a frame**. `renderToLines` was there and was removed, correctly — `src/testing/index.ts`
@@ -5875,7 +5879,7 @@ an `ask` in it.
 It is C24 I19's argument a second time — *a producer the framework can test and a consumer
 cannot is a producer whose app-side tests assert against something the user never sees* —
 which is why `createAdapterRegistry`, `completeLocal` and `contextAt` are exported. Closed the
-same way: `producerContext()` and `localContext()` on `@fmx/calcium/testing`, C24 I26.
+same way: `producerContext()` and `localContext()` on `calcium-tui/testing`, C24 I26.
 
 **`ask` defaults to declining**, and that is C23 I36's own semantics rather than a stub's: a
 question resolves with the choice marked `default` on `Esc`, so a handler tested without a
@@ -7448,7 +7452,7 @@ script the Makefile never ran. It did not wire their **install**. So the target 
 machine that had ever run the examples, and failed on the first clean checkout:
 
 ```
-main.ts(1,44): error TS2307: Cannot find module '@fmx/calcium' or its type declarations
+main.ts(1,44): error TS2307: Cannot find module 'calcium-tui' or its type declarations
 ```
 
 **Two things were missing and only one is obvious.** `node_modules` in each example is the
@@ -8747,7 +8751,7 @@ it were pointed at a function the cell does not call.
 
 ### Why the replacement is a repo test
 
-`@fmx/calcium` publishes `createTui` and the builders and **no block-to-lines renderer**, so the
+`calcium-tui` publishes `createTui` and the builders and **no block-to-lines renderer**, so the
 package cannot render a block — which is why the rows were written against a function in the
 first place. `test/repo/` is the established answer (see `banner.test.ts`) and it labels the
 reach rather than hiding it.
@@ -14071,7 +14075,7 @@ its own spec.
 ## F447 — the first target in `all` reads what the last one builds ★★★★★
 
 `make all` is `check enforce audit instruments test golden e2e`. `check` type-checks the
-examples; the examples resolve `@fmx/calcium` to the package root, whose `types` point at
+examples; the examples resolve `calcium-tui` to the package root, whose `types` point at
 `dist/`; and **`dist/` is built by `e2e`**, which runs last.
 
 **So on any commit that widens a public type, `check` reads the previous commit's build and
@@ -16119,7 +16123,7 @@ the deferral shape CLAUDE.md records, where the condition is written at the
 deferral and what satisfies it is written somewhere else.
 
 **Proved before it was ruled.** A miniature of the shape compiles with no casts
-and still narrows on `b.kind`; and `declare module "@fmx/calcium"` from
+and still narrows on `b.kind`; and `declare module "calcium-tui"` from
 `examples/plots` merges with the real declaration rather than opening a new one
 — TS2428, *all declarations must have identical type parameters*, is a merge
 complaining rather than a resolution failing.
@@ -17303,8 +17307,8 @@ ColormapName   Graph            ScaleType Origin AxisCross
 ```
 
 ```ts
-import type { HierarchyNode, QuartileSummary } from "@fmx/calcium";
-// TS2305: Module '"@fmx/calcium"' has no exported member 'HierarchyNode'.
+import type { HierarchyNode, QuartileSummary } from "calcium-tui";
+// TS2305: Module '"calcium-tui"' has no exported member 'HierarchyNode'.
 ```
 
 A literal still passes, so this refuses **only the consumer who factors** — anyone writing
@@ -23045,7 +23049,7 @@ directly passes on the day nothing calls it that way.
 
 ## F505 — a type the public surface uses and does not export ★★★
 
-`@fmx/calcium` exports `Plot`. It does not export `Camera`, which `Plot.camera` is a
+`calcium-tui` exports `Plot`. It does not export `Camera`, which `Plot.camera` is a
 `Partial<` of. A consumer writing anything typed over a camera — a helper, a control, an orbit —
 reaches it by indexing the block:
 
@@ -31578,7 +31582,7 @@ wrong about.
 
 ## F876 — the orphan barrel: an invariant vacuous in both directions at once ★★★☆☆
 
-C24 I31 says `@fmx/calcium/profiling` publishes types, `Tier`, and nothing that runs. The barrel at
+C24 I31 says `calcium-tui/profiling` publishes types, `Tier`, and nothing that runs. The barrel at
 `src/shell/profiling/index.ts` exported **five runtime values** — `createProfiler`,
 `createResourceProbe`, `Hist`, `Ring`, `profilePane` — for as long as it existed.
 
@@ -31872,7 +31876,7 @@ the row and the handler now read one implementation.
 
 **And a real gap underneath:** the row can construct the *absent* arm and not the present one,
 because `ProfileReport` is reachable only through `ctx.profile()`. There is no constructor on the
-public surface and none in `@fmx/calcium/testing`, which publishes `checkBudget(report, …)`,
+public surface and none in `calcium-tui/testing`, which publishes `checkBudget(report, …)`,
 `checkPhases` and `checkLeaks` — three functions that **take** a report to a consumer who has no way
 to make one outside a live session. `profilePane`'s own doc comment calls it *a pure function from a
 report to blocks*, which is true and is exactly why the missing half is invisible: the function is
@@ -33594,7 +33598,7 @@ one being debugged. The row's own bug is what put a real child's exit on the scr
 
 ## F925 — two of the four kinds that hold blocks could not be swept at all ★★★★☆
 
-C24 I13 is *`@fmx/calcium/testing` ships the document assertions, so no consumer reimplements
+C24 I13 is *`calcium-tui/testing` ships the document assertions, so no consumer reimplements
 them*, and `degradesTo1Bit` is the one it says earns the module. Writing T2.12 — the row that
 names the invariant — meant building a document and running the sweep over it. A `scroll` around
 a notice was the shape chosen, because a flat document exercises the assertion and not the walk.
@@ -37024,7 +37028,7 @@ with a reader that sees nothing cannot pass as a corpus that is clean.
 
 ## F999 — the type a consumer had to index for, and the sibling twelve lines above it ★★★☆☆
 
-F505 recorded that `@fmx/calcium` exports `Plot` and not `Camera`, so a consumer typing anything
+F505 recorded that `calcium-tui` exports `Plot` and not `Camera`, so a consumer typing anything
 over a camera indexes the block: `NonNullable<Plot["camera"]>`. Both halves of that are true and
 neither is the whole of it.
 
@@ -46795,7 +46799,7 @@ to the unit — printed under the column heading *elements measured*.
 
 `tools/profile.mjs`'s own header carries it:
 
-> `@fmx/calcium/profiling` was the third and is no longer needed: the phase table
+> `calcium-tui/profiling` was the third and is no longer needed: the phase table
 > moved into the harness, because **a reading computed in a script is a reading
 > no row can be written against**, which is how its negative residue went
 > unasserted (C28 I41, F888).
@@ -51027,7 +51031,7 @@ highlighter's grammars are still open there.
 | **Verdict** | **closed — built and measured.** All four remedies built: the compile cache (R01 R4.6), the quantisation table (C10 I41), the emulator off the graph (C23 I71) and the highlighter's grammars off it (C09 I71) — the last −36 ms container-local and −120 ms on the bind mount, paired |
 
 **The path, at HEAD.** An app's launcher sets `NODE_ENV` and dynamically
-imports its `main.ts`, which statically imports `@fmx/calcium`; the barrel
+imports its `main.ts`, which statically imports `calcium-tui`; the barrel
 statically imports every component, so every module Calcium can ever need is
 resolved, read, compiled and linked before `createTui` is called. That is the
 design — a block kind is a module and the registry is built from them — and
@@ -52213,7 +52217,7 @@ three is a keystroke.
 
 | | |
 |---|---|
-| **Surface** | `src/index.ts:369` re-exports `mermaidCode` from `src/presentation/mermaid.ts`, which statically imports `renderMermaidASCII` from `beautiful-mermaid` — an ESM-only package whose bundle pulls `elkjs`, 8.1 MB installed. So `import "@fmx/calcium"` resolves, reads and compiles the layout engine before `createTui` is called, for every consumer, whether or not a diagram is ever drawn. No example in the tree calls `mermaidCode`; its consumers are `test/contract/mermaid.test.ts` and, by the module-graph rule's own note, an app out of tree |
+| **Surface** | `src/index.ts:369` re-exports `mermaidCode` from `src/presentation/mermaid.ts`, which statically imports `renderMermaidASCII` from `beautiful-mermaid` — an ESM-only package whose bundle pulls `elkjs`, 8.1 MB installed. So `import "calcium-tui"` resolves, reads and compiles the layout engine before `createTui` is called, for every consumer, whether or not a diagram is ever drawn. No example in the tree calls `mermaidCode`; its consumers are `test/contract/mermaid.test.ts` and, by the module-graph rule's own note, an app out of tree |
 | **Reached for** | the F1187 build copied to `/tmp/calc/dist-cur` so the bind mount is out of the figure (F1164's protocol), `make load-down`, six interleaved pairs: a plain import of `dist/index.js` **398–483 ms**, the same import with `beautiful-mermaid` already loaded **278–334 ms**, the paired difference **80–156 ms, median about 110**; `import("beautiful-mermaid")` alone 95–114 ms. Under the import trace the barrel loads 2,458 modules, two of them the renderer's and `elkjs`'s bundles. Per dependency, cold and alone: `ink` 262, `beautiful-mermaid` 127, `@xterm/headless` 38 (off the graph since C23 I71), `react` 7 |
 | **Verdict** | **open** — measured, the remedy sized |
 
@@ -52224,11 +52228,11 @@ build to `require`, and a dynamic import is a promise. C23 I71 took the
 emulator off the graph because its route was already `async`; C09 I71 took
 the grammars off because highlight.js core has a registration seam. Neither
 shape is available here. What the tree does have is the entry-point form:
-`@fmx/calcium/testing`, `/fixtures` and `/profiling` exist so that a
+`calcium-tui/testing`, `/fixtures` and `/profiling` exist so that a
 consumer pays for what it imports (C24 §2), and a diagram renderer that
 most sessions never reach is the same argument.
 
-**Remedy, sized.** C24 I36: a fifth entry, `@fmx/calcium/mermaid`, whose
+**Remedy, sized.** C24 I36: a fifth entry, `calcium-tui/mermaid`, whose
 target is a one-line barrel over `presentation/mermaid.ts`; the runtime
 barrel exports `mermaidCode` no longer and imports nothing from
 `beautiful-mermaid` or `elkjs`. `mermaidCode` itself is untouched — the same
@@ -52275,7 +52279,7 @@ pairs as the sign and the consistency: fifteen of sixteen.
 import (262 ms alone, cold) and it is the renderer; Node's compile cache
 (R01 R4.6) is what the launchers already do about it. A consumer that does
 draw diagrams now pays the renderer at its own import, statically — the
-async form, `import("@fmx/calcium/mermaid")` inside the adapter that needs
+async form, `import("calcium-tui/mermaid")` inside the adapter that needs
 it, is the consumer's to choose and costs nothing here. The examples call
 no `mermaidCode`; the docker example's notes describe the transform and
 name no import line.
@@ -52588,7 +52592,7 @@ that reads Ink's source as the loader hands it over and matches the import
 line byte for byte; any other text leaves the barrel in place. Both failure
 modes — line changed, file gone — land on today's behaviour.
 
-**Remedy, sized.** `@fmx/calcium/launch` (C24 §2's sixth entry, **C24 I37**),
+**Remedy, sized.** `calcium-tui/launch` (C24 §2's sixth entry, **C24 I37**),
 one export `prepareLaunch()` that registers the two hooks; the docker and
 plots launchers call it between `enableCompileCache()` and the app import
 (R01 **R4.7**, **R5.9**). T5.7 is the graph row: a child under
@@ -55882,7 +55886,7 @@ and nobody knew because nothing drew one.**
 | | |
 |---|---|
 | **Surface** | F1209's plan named what Ink's removal would touch: the element arm, `elementOf`, `inked`, three registry decorations, image's dead arm, and the `ink` and `react` rows in `DEPENDENCIES.md`. Every one of those landed. |
-| **Reached for** | The gates found six more, none in the plan, each two or more components away from anything the pass edited: `SpanName`'s `react` member (MG30, C28 I39); C09 commitment 13, a promise about two width implementations agreeing; `test/support/ink.ts` and T2.16's three consumers; `rowsOfAll`, the gate every container branched on, reduced to `rendered.map((r) => r)`; `@fmx/calcium/launch` — a public entry, one commitment, one invariant, three rows and two example bins — whose whole subject was Ink's import line; and R01 R4.6's `> 50`, a threshold over a module graph that had just shrunk to exactly 50. |
+| **Reached for** | The gates found six more, none in the plan, each two or more components away from anything the pass edited: `SpanName`'s `react` member (MG30, C28 I39); C09 commitment 13, a promise about two width implementations agreeing; `test/support/ink.ts` and T2.16's three consumers; `rowsOfAll`, the gate every container branched on, reduced to `rendered.map((r) => r)`; `calcium-tui/launch` — a public entry, one commitment, one invariant, three rows and two example bins — whose whole subject was Ink's import line; and R01 R4.6's `> 50`, a threshold over a module graph that had just shrunk to exactly 50. |
 | **Verdict** | **Open.** |
 
 **The shape is one fact stated six times: a rule can lose its subject somewhere else.** Each of
@@ -56707,6 +56711,8 @@ notice's second row where `0 above, 3 below` belongs. Not new behaviour — the 
 it makes C04 I49's residue row unreadable at any offset that cuts a child, so C09 T4.61 was built on a box of 2 to
 avoid it.
 
+**Closed**, verified at 5318cd25. C09 I135 (7bf1a2d0, which landed it as I134 before e5538c4b renumbered it): a scroll box crops a child that the window cuts, so it draws `height` rows plus its residue at every offset. T3.76, T3.130 and T6.186 pass. T3.130 drives a bare box at 75 columns rather than the finding's card body at 81; the crop is in the scroll box's own render, so the host should not matter. C09 T4.61's `boxSession(2)` workaround is now unneeded and is left alone.
+
 ## F1345 — SS47 decoded, and the escapes were all premises ★☆☆☆☆
 
 F1326's class, closed by lane b3-tail. SS47 now judges `decodeLiteral(body)` — `\uXXXX`, `\u{…}` and `\xNN`, one
@@ -56732,7 +56738,7 @@ id. Struck and re-aimed to a new C23 T1.66d.
 
 ## F1350 — a lane worktree's examples resolved the package from the main tree ★★★☆☆
 
-Found by the batch 4 base integration. `/workspace/node_modules/@fmx/calcium` links to `../..`, the main tree; a
+Found by the batch 4 base integration. `/workspace/node_modules/calcium-tui` links to `../..`, the main tree; a
 worktree under `out/wt/<lane>` has no `node_modules`, so every `examples/*` import walked up and landed on the
 **main tree's `dist/`**. A lane's example tests and `make check` typechecked against main — green when the lane
 broke the public surface, red when main was ahead. It surfaced as `make check` failing on a `clipboard` field the
@@ -56776,3 +56782,1447 @@ walk. Ruled the same as `liveBlock`.
 Two clauses of C22 T1.78 came from §085's specimen: an ASCII bar `###...` (C09's table draws `###---`) and a wide
 rung drawing Unicode (C09 draws its ASCII set where ambiguous-width glyphs render wide). The row's first run found
 both. **A specimen is an example (R-SEC-036)**; the table is what ships.
+
+## F1296 — an unmarked question's default is its last choice, which may be the inspection ★★★☆☆
+
+Found by the M13–M16 plan's premise check at a4502d3c (`confirm.ts:166-173`, `choice-selection.ts:67-70`). When no
+choice is marked default, `defaultChoice` falls back to the **last** choice. §051 draws `no yes show full diff`, so
+on an unmarked §051-shaped question `esc` answers with the inspection's key, and `⏎` on opening suspends; a
+`reply…` choice placed last does the same. The plan's D24 answers it — at most one default, never on a reply or
+inspection choice, and the fallback skips those — and M15.7 builds it with the shell lane. Recorded under F1378:
+the plan held the number and FINDINGS did not.
+
+**Closed**, verified at 5318cd25 by an inspector reading the rows and running them. C23 I93 (14f078cc): `ask` rejects a second default, and a default on a reply or inspection choice, before anything is queued, and `defaultStart` falls back to the last choice that answers, so the opening selection and `esc` agree. T1.104 passes; T6.109 is its mutation run. The residue, a set in which no choice answers, is F1495.
+
+## F1297 — a scroll box's elements were measured at the width the bar leaves to render ★★☆☆☆
+
+Found by the M13–M16 plan (`containers.ts:501,506` against `:561-564`): a scroll box's `elements` measured child
+rows at the full width `w` while `render` laid them out at `w−1` whenever the bar is drawn, so a child wrapping
+differently at `w−1` gave hit rows and focus-pull rows for a different document from the one drawn, and the column
+range covered the bar. **The same defect as F1332**, found by the plan first and filed second: batch 3's C09 I126
+publishes `childWidthsOf` and asks every nested question at the drawn width, and the blocks lane, re-checking
+M14.3's premise at a022dd41, found it not owed. F1332 is the record.
+
+## F1298 — the plan's number for `tape.width()` counting labels and gaps only ★☆☆☆☆
+
+The M13–M16 plan found `tape.width()` counting labels and gaps only (`tape.ts:180-187` against `:105-111`), so a
+tape laid out at its own natural width draws `n»`. The blocks lane measured the same defect afresh under F1372 and
+closed it by C04 I147. **One defect, two numbers** — the plan's never reached this file (F1378). F1372 is the
+record.
+
+## F1299 — the plan's number for the tape's zero-width-range comment ★☆☆☆☆
+
+The M13–M16 plan found a comment in `tape.ts` (`:152-153`) saying off-screen tape members carry a zero-width column
+range while the code gave every member `{0,w}` (`:161`). The blocks lane filed it again as F1373 and closed it.
+F1373 is the record.
+
+## F1300 — holding the chip map and counter across a reply reopens C17 I24's blind spot ★★★☆☆
+
+Found by the M13–M16 plan's sequence trace over M15.6 (`editor.ts:398-408`, C17 I24). `hold()` leaves `#chips` and
+`#nextChip` shared, and the remedy as the review wrote it — *hold the chip map and counter* — would let a reply
+restart the counter and mint the same sentinel as a prompt chip; the layout memo, keyed without the chip table,
+then returns the reply's label after `resume`. The plan's trace rules sentinels from an editor-lifetime counter so
+S0 is never registered twice, and a held field draws through its own chip table (C17 I36 in the plan's numbering).
+Owed to the editor lane.
+
+## F1301 — the plan's number for a block's `streaming` surviving settlement ★☆☆☆☆
+
+The M13–M16 plan found that `settle` sets `entry.streaming = false` and leaves the document's blocks as given
+(`store.ts:211`, `simple.ts:261,501-518`), so the agent mark and its reserved cells stay on a settled entry —
+M13.3's real residue, after the review's *more is coming* premise was refuted. The blocks lane filed it again as
+F1376 and closed it by C13 I22. F1376 is the record.
+
+## F1302 — overlays render with no scroll offsets ★★★☆☆
+
+Found by the M13–M16 plan (`session.ts:2337`): only entries receive scroll offsets, so every `scroll` box inside a
+layer is pinned at offset 0. It is the single cause behind M15.5 (an inspection that cannot scroll) and M14.4 (the
+chip preview's unreachable tail). The plan orders the shell lane to begin with it.
+
+**Closed**, verified at 5318cd25. C22 I141 (6c605f19): both layer painters (`composite.ts:229`, `session.ts:1318`) render a layer's scroll boxes from `ScrollOffsets` under `layer:<id>`. T1.174 and T4.114 pass; T6.142 is its mutation run. Its two consequences are built: M15.5 is C23 I88, and M14.4 is C22 I143 (F1307).
+
+## F1303 — the tape's pull follows the producer's `current`, never focus ★★☆☆☆
+
+Found by the M13–M16 plan (`construct.ts:2676-2687`): `pullTapes` follows `block.current` and never focus, so a
+focused member off-screen is never pulled into view. R-BLK-857 (`example`) says the window never moves without
+moving the current, R-BLK-853 points the other way, and the shell cannot write a producer's `current`. Ruling 80
+(the plan's D9) decides: ←/→ moves focus, the window follows focus while it is in the tape, and `⏎` activates.
+
+**Closed**, verified at 5318cd25. C26 I31 (2edd256f): while focus is in a tape, the window follows the focused member through one anchor that render, `tapeStart` and `tapeMemberCols` share. C26 T1.166, and T4.34 reading the frame, pass; T6.3 and T6.4 are its mutation rows. `⏎` activating is the existing element activation and has no row of its own here.
+
+## F1304 — `withTrail` counted band positions in code points, a second site of M13.5's class ★☆☆☆☆
+
+Found by the M13–M16 plan (`simple.ts:449,471`: `[...r.text].length`): a second site of M13.5's code-unit class,
+beside the band's UTF-16 step back. The blocks lane's F1371 measured both halves — the walk by code unit and the
+count by code point — and C09 I134 walks and counts by grapheme cluster. F1371 is the record.
+
+## F1305 — the plan's number for hotEdge's overshoot having no seam ★☆☆☆☆
+
+The M13–M16 plan found hotEdge's overshoot-and-hold only in the design's demo script
+(`calcium-design-language.html:6458`), with R-BLK-191 an `example` and `Ramp` closed to `Tone` (C10 I16), so no
+seam could say *brighter than the accent*. The blocks lane filed it again as F1374 and closed it by C04 I148
+(`overshoot`) and C09 I133. F1374 is the record.
+
+## F1306 — the plan's number for `Progress.quantity`'s comment describing an unbuilt vanishing bar ★☆☆☆☆
+
+The M13–M16 plan found `Progress.quantity`'s doc comment stating as fact that a finished bar *is gone rather than
+full*, while `measure` always answered 1 and C04 I17 forbade 0 rows for a present block (`simple.ts:728`). The
+blocks lane filed it again as F1375 and closed it by C04 I145. F1375 is the record.
+
+## F1307 — the chip preview's deferral outlived its condition ★★☆☆☆
+
+Found by the M13–M16 plan (`construct.ts:2220-2223`): *the box, its keys and its bar … arrive with the scrollbar* —
+a deferral whose condition has been met since M14 landed `scrollbar.ts`, and which nothing revisited. CLAUDE.md's
+deferral-with-a-satisfier-elsewhere shape: the condition is written where the deferral is, the satisfier somewhere
+else. M14.4 builds the preview's box and keys, after F1302's offsets.
+
+**Closed**, verified at 5318cd25. C22 I143 (6c605f19): the chip preview is a bounded scroll box with `⌥⇧↑`/`⌥⇧↓` and `⌥o`, and the deferral comment is gone from `src/`. T1.175 and T4.116 pass; T6.144 is its mutation run. How the preview is drawn against §101 is F1503.
+
+## F1308 — TRIAGE says F1260's link lands in batch 3; M15 is in batch 4 ★☆☆☆☆
+
+Found by the M13–M16 plan: F1260's triage line says the link from a question to its call lands *with batch 3's M15
+question queue*. M15 is in batch 4. Unchanged at c8c7a77e.
+
+**Closed**, verified at 5318cd25. 19e8885f rewrote F1260's TRIAGE line as Closed, on C04 I149 and C23 §7g (14f078cc). The batch-3 wording survives only in F1260's dated ruling paragraph, which is a historical record.
+
+## F1320 — 193 text cells fell below their contrast floor at 8 bits, where C10 I26 said the rung was provable ★★★★☆
+
+Found by lane b4-contrast (M11 item 7) measuring ink and ground as the resolver paints them, both quantised, over
+exactly the cells the 24-bit gate checks. **193 cells short at 8 bits, every one clear at 24** — dark 14, light 38,
+hcDark 58, hcLight 11, ink 1, warm 16, nord 15, viol 7, mono 2, paper 31, of 1,070 text cells and 100 hue bands.
+C10 I26 called the rung *provable*, and nobody had measured it. Three shapes: (a) hcDark's focus ground `#234f92`
+quantises to `#005faf`, white on it 6.45 against a declared 7, and no cube ink reaches 7 there — 19 cells; (b) hue
+bands, `purple` 3.56 in six themes and `blue` 3.55 in hcDark — 7 cells; (c) 167 inks whose nearest cube entry
+misses the floor where a clearing entry exists a median 2.8 ΔE76 further away (worst 53.4). The plan's premise that
+a shortfall means a token change held only for (a) and (b).
+
+Ruling 75 put the remedy in the mechanism: an entry a slot's floor refuses counts as distance `Infinity` in the
+quantiser's existing assignment, so floor, rank (I6) and distinctness (I17) are held together, and a ground takes
+the nearest entry its inks clear on — hcDark's focus ground moves to `#005f87` (white 7.03), and shape (b) is fixed
+by moving the hue grounds. No registry value moved. The list is empty and T2.74 holds it empty (35d7a03c on
+lane/b4-quant; c6240116 on the batch).
+
+## F1321 — "dim blue" is index 12 on the dark maps' black page, and the 4-bit reference is not xterm's ★★☆☆☆
+
+Found by lane b4-contrast (M11 item 7, batch 1 item 21's *dim blue*). `light`'s `tone.info` goes to index 4 at 4
+bits, navy on white at 16.01 : 1 — not short. The short blue is index 12, `#0000ff` on black at 2.44 : 1, which the
+dark and high-contrast maps give `syntax.function` and `categorical.c5` in seven themes; index 4 is short only on
+the diff grounds (3.12 on green, 1.46 on maroon), because every map paints them ANSI green and maroon. The 4-bit
+total is 403 cells in four lists (dark 38, light 41, hcDark 42, hcLight 51). `focusGround` has no 4-bit entry in
+any map, so its 216 cells are measured on the page; the ten-hue 4-bit map does not exist (I55 parks it).
+
+**The reference was mislabelled.** `ANSI16_HEX`, which C10 I61 called *the xterm defaults*, is not xterm's: under
+real xterm index 12 on black is 4.43 and index 4 is 2.23. Ruling 76 relabels rather than replaces. Lane b4-quant
+then corrected the ruling's own premise: the table is the **legacy Windows console palette** (the values of HTML
+4's sixteen named colours), not VGA, whose levels are `0xaa`/`0x55`; it differs from xterm's at indices 1–8 and 12,
+not only the five this finding sampled. Renamed `ANSI16_WINDOWS_HEX` across `colormap.ts`, `contrast.ts`, the test
+support and the curated pin; the `module-graph.mjs` comment and the registry note reworded in round 2.
+
+## F1322 — a clipboard tool on `PATH` can confirm a copy to the wrong machine ★★★☆☆
+
+Found by lane b4-l0's classification walk over capability × tool presence × payload size × transport (C21 §2b, 18
+rows). Over SSH, `pbcopy` or `clip.exe` on the remote host fills **that host's** clipboard and exits 0 — an
+observable, confirmed copy to the wrong machine, which is exactly the false claim R-SEL-011 forbids. Two
+neighbours: a `PATH` search honouring a relative entry (`.`, or the empty entry) runs a `pbcopy` planted in the
+launch directory; and reading a failing tool's stderr for a reason never finishes, because `xclip`, `xsel` and
+`wl-copy` fork a server that keeps the parent's pipes for as long as it serves the selection. Neither ruling 72,
+the plan nor the review named any of them. Closed by W6 (SSH refuses `pbcopy` and `clip.exe`), W13 (absolute
+entries only) and W16 (stdout and stderr ignored); mutations NO-SSH-GATE, RELATIVE-ENTRY and PIPE-AND-CLOSE are
+caught.
+
+## F1323 — under vitest an uncaught exception during a test does not fail it ★★★☆☆
+
+Found by c21-clipboard's EPIPE-UNHANDLED survivor. With `writeClipboard`'s stdin error listener removed, a real
+`write EPIPE` escaped and T3.20 stayed green: vitest reports an uncaught exception beside the rows, so a row
+claiming *never an unhandled error* that only awaits its result passes with the guard gone. A plain Node probe
+shows the EPIPE uncaught at 1 B, 64 KiB, 1 MiB and 16 MiB of input. T3.20 now listens for `uncaughtException`
+across the operation plus one turn and asserts it heard nothing; with the listener removed it fails *no EPIPE
+escaped*. **Owed**: other rows making the same claim by awaiting alone are likely blind the same way, and none has
+been surveyed.
+
+## F1324 — I17's distinctness repair split a band's one ink at 8 bits ★★☆☆☆
+
+Found by lane b4-quant's walk (C10 §4c.4), predating the lane. I17's repair treated every slot of a band as a
+separate ink, so hcLight's black focus ink became `#000000`, `#080808`, `#121212`, `#1c1c1c` and `#262626` — the
+last is `accent`, at 6.59 against the theme's 7 — its white selection ink split into five near-whites, and both
+hcDark bands split the same way (R-THM-005). I68 had counted these cells under F1320's shape (a). Closed: slots
+with one 24-bit value count as one ink.
+
+## F1325 — holding the floor while holding rank costs hue ★★☆☆☆
+
+Found by lane b4-quant measuring ruling 75 as built. 259 cells move away from the nearest set — median 13.5 ΔE76,
+40 above 30, worst 64.3 (hcDark `syntax.keyword` on `diffAdd` becomes `#ffffff`). On `paper`'s page `tone.info`
+became `#6c6c6c`, the index of `tone.muted`, so at 8 bits info could not be told from muted; I17 did not guard the
+pair because `muted` was not one of its five. The alternative measured — re-picking each short ink on its own —
+moves 167 cells and loses less hue, and inverts 165 pairs that rank separates. Ruling 79 answered the collision
+(I17's set gains `muted`) and rejected both CIEDE2000 and re-valuing `paper`, each changing more than the one
+collision. The hue cost stands as the price of the floor; what is left is F1329.
+
+## F1328 — ruling 79's headline was stronger than its mechanism ★★☆☆☆
+
+Found by lane b4-quant building ruling 79. *No fact shares an index with `muted`* is the intent; what was built is
+narrower — I17's kept-distinct set gains `muted`, and where two members claim one index the lighter claimant moves.
+So on `paper`'s page `muted` moves (242 → 243) and `info` keeps its grey. Eight picks move, all `tone` slots, all
+clear of their floors, and three indices end up shared with a tone outside the set: hcLight `muted` = `meta` (89)
+on `diffRemove`, nord `info` = `identifier` (195) on `selection`, and nord `muted` = `default` = `dim` (254) on
+`selection`, which is one value and not a collision. Round 3 measured each for band status — none is a band — and
+PARKED 79 now states the mechanism and the table.
+
+## F1329 — on `paper`'s page the carrier ruling 79 protects is distinct by index and close by eye ★★☆☆☆
+
+Found by lane b4-quant after ruling 79. `info` (242, `#6c6c6c`, 4.53 : 1 on `#eeeeee`) and `muted` (243, `#767676`,
+3.91 : 1) differ by index and are 1.16 : 1 apart, and `info` is a grey at ΔE76 30.1 from `#1f6b94`. The rule is
+satisfied and the reader's carrier is thin. Left open by ruling 79's correction.
+
+## F1330 — C10 I70's load gate cannot refuse what the 24-bit gates pass, and cost 250–300 ms ★★☆☆☆
+
+Found by lane b4-quant building I70. Every colour clears √21 (4.58 : 1) against black or white, so a theme the
+24-bit gates pass has an empty 8-bit shortfall list unless the quantiser is wrong — exact, not sampled. Through
+`applyOverrides` the gate fires only when a slot override flips a flat ink's side on a mid-grey ground on a theme
+whose floor is above √21 (T2.80: hcDark, `tone.ok` `#000000`, `bg` `#777777`, 19 cells). And it made the first
+`loadTheme(defaultTheme)` in a process 80–86 → 323–373 ms. Round 3 skipped the gate for the shipped token objects
+(T2.82 proves the scope by identity); interleaved in one process the tree's first load is 1.03× the pre-gate
+build's CPU against 5.03× with the gate everywhere. The remedy that added held sets to I41's table is unbuilt
+because the scope removed its cost.
+
+## F1331 — a ground that cannot hold keeps the floor by painting every hue black, silently ★★☆☆☆
+
+Found by lane b4-quant (C10 §4c.4 row 13, left unruled in round 2). Where a ground cannot hold, the floor is kept
+by moving inks to the other side and the gate stays silent: `hcDark` at floor 4.57 with `diffAdd` `#767575` loaded
+fine, and at 8 bits every white ink on that ground painted `#000000` — no cell short, every hue gone, nothing
+reporting it. Round 3 made it a refusal: two of I17's six with different 24-bit values painting one index on a
+ground the gate measures is one error naming the ground, the slots and the index. Shipped themes: 0, held by T2.81.
+A 32 × 32 × 4 search of `diffAdd` overrides found none the 24-bit gates accept that still collides, so the refusal
+is reached through custom `floor` or `composed` values.
+
+## F1348 — two source-walking rows have fixed time limits and go red under lane load ★★☆☆☆
+
+Found by lane b4-quant round 3 at load 15–24 with 14 vitest processes from other lanes. design-fixtures T1.5 reads
+every `.ts` under `src` and `test` once per probe symbol over the bind mount: 12.9 s in round 2, 53.9 s in the full
+run, 85 s alone, 162 s with one worker, against 30 s. contract/theme T2.62 (the SS67 scan): 9.3 s alone, 15.2 s
+beside six other files, against 15 s. Neither reads anything the round changed. The blocks lane saw T1.5 at 38.5 s
+alone (F1385). F1351's class — a row whose verdict depends on the machine — in two rows that only read files.
+
+**2026-09-29.** design-fixtures T1.5 is retired and its source walk deleted (M16.6, lane b4-fixtures). The figure
+comparison that replaced it parses each golden once and T1.8 takes about 0.5 s. contract/theme T2.62 stands.
+
+**2026-09-30, the chain on lane b4-menu at 312f4e3b.** T4.49 in `deferred-height.test.ts` (C22 I69: one row, then three) failed once in the full suite, in 212 ms. Run alone it passed three times out of three, the first run at load 23.95 and the last at 2.26. In the same chain, RS14b took 46.6 s and T1.154b 207.5 s; each passed alone. The flip is still a verdict that depends on contention, not on the code; the diagnosis is still owed.
+
+## F1352 — a sixth `overlayRegion` site told a PTY child one column too many ★★★☆☆
+
+Found by lane C running the tier-5 rows M11.1's rail reservation reaches: T5.3a and T5.5 failed with the
+reservation and passed without it. C14 §6d's walk counted five `overlayRegion().width` lookups resting on an
+identity the reservation ends; execution's `region` was wired to `deps.frame.overlayRegion` — passing the function
+rather than calling it — so the walk's grep missed it. A PTY child and its emulator were told 94 columns (`99 − 5`)
+while the body drew at 93 (`98 − 5`), and every wrapped line landed one column off.
+
+## F1353 — a multi-line command echo wrote bare line feeds and scrolled the alternate screen ★★★★☆
+
+Found by lane C reading C17 T5.2's frame. A bracketed paste, or a chip resolving at submission, puts `\n` in the
+command; `hardWrapCells` measures the break as nothing, so the echo wrote it raw inside one frame row — the
+terminal moved down mid-row, and near the bottom it **scrolled the alternate screen**, the failure that corrupts
+state the frame can no longer see. One 200-line submission wrote 127 bare line feeds at the base; in-process a
+six-line paste writes five. T5.2 was passing on a collage, and C09 T4.107's premise was false. Closed by C22 I33:
+`commandRows` splits on `\r\n`, `\r` and `\n` and wraps each line, and the measurer reads the same function. T1.172
+asserts no bare line feed through a session; T6.134 (now T6.137) draws the revert.
+
+## F1354 — the pipe arm has no line discipline, so a child's multi-line output staircases ★★★☆☆
+
+Found by lane C reading T5.2's frame. A child run over a pipe rather than a PTY gets no line discipline to turn
+`\n` into `\r\n`, and the emulator's `convertEol` is false by default, so multi-line output steps right one line at
+a time inside the child's box. Measured on the emulator directly; pre-existing, and outside the lane's files.
+
+## F1355 — the roadmap cited the ghost's `contextAt` at a line it had left ★☆☆☆☆
+
+Found by lane C: CALCIUM_ROADMAP's reader table and index-reader block cited `session.ts:1282` for `contextAt`
+inside `completion.ghost(…)`, and the call had moved to `:1448`. Re-pointed in both places, one citation only,
+because the roadmap is single-writer.
+
+## F1356 — the eviction marker's count changes at `rev` 0 beside a cache keyed on `rev` ★☆☆☆☆
+
+Found by lane C's C14 §6b classification table (M10 item 8). C13's sweep rebuilds the eviction marker on every
+write at `rev` 0, so a second eviction changes the marker's count without moving its `rev` (C13 I13 says `rev`
+moves iff the document changed, and nothing says the marker's did). A render cache keyed on `rev` could then draw
+the first count. The same fact makes C14 I34's waiting count add nothing for a second eviction, which I34 states as
+its limit. Two probes through a session never brought the marker on screen, so whether the drawn count goes stale
+is **unmeasured**.
+
+## F1357 — C17 T5.2's byte wait resolved on the echo, not the output ★★☆☆☆
+
+Found by lane C beside F1353. T5.2's comment said the echo shows the chip's label, so `waitFor(/line-199/)` could
+only match the output; the echo holds the resolved command, and always did, so the wait resolved on the echo. Its
+last-nine-rows tail also assumed four output rows above the rules, where the output is a scrolled box closed by its
+residue row and the entry's blank. Restated; three runs green.
+
+## F1358 — copy mode's `esc` label and `esc` itself read two different predicates ★★☆☆☆
+
+Found by lane C (M10 item 5). The footer's `esc` label read `size === null` while `escape()` read the block set, so
+a selection of a `rule` alone — which copies nothing and is still what `esc` clears — showed `esc out` over a press
+that clears. `CopyState` now carries `clears`, and the label and the key read the same predicate. T6.32's revert is
+caught by T3.15, not T1.80 (F1363).
+
+## F1359 — the autoscroll tick extended the block selection whatever the mode ★★☆☆☆
+
+Found by lane C's §6e sequence trace, row 14 (M10 item 2): a rectangle drag held past the edge took blocks, because
+the edge-scroll tick extended the block selection without asking which mode was up. Rectangle mode is `rect !==
+null` (I60), and the tick extends the rectangle in it.
+
+## F1360 — the copy footer drew `all loaded entries` beside a rectangle ★☆☆☆☆
+
+Found by lane C's footer table (C14 §6e): `A` selected every loaded entry while a rectangle stayed up, and the
+footer stated both. Ruled for a consistent picture: `a` and `A` discard the rectangle, and `esc` clears the
+rectangle and the blocks together.
+
+## F1361 — the copy footer sheds from the right, and three additions each shed a rule's fact at 100 columns ★★☆☆☆
+
+Found by lane C building M10. The footer sheds from the right (§103), so where a chip is placed decides what
+survives. `⌃V rect` and `all loaded entries` each shed *the screen is frozen*, and would shed `N waiting`; later
+`no clipboard`, placed before the `⏎` it qualifies, shed the rectangle's count (T4.41: `… extend  no clipboard  ⏎
+to file  esc clear`). **The same defect three times in one item.** The chips were re-ranked so the rules' facts
+come before hints, and `⏎ to file` already says where the text goes, so `no clipboard` is the last fact.
+
+## F1362 — copy mode seeded its caret off screen when following the tail ★☆☆☆☆
+
+Found by lane C (M10 item 7). Entering copy mode seeds the caret on the last entry's row 0, which is off screen
+whenever the view follows a tail longer than it. The first keyboard move now scrolls the caret into view.
+
+## F1363 — C14 T6.32 named a row that cannot see its mutation ★☆☆☆☆
+
+Found by lane C's `c14-copy-keys` run. T6.32 said reading the `esc` label from `size` fails T1.80, but T1.80 is
+handed `clears` precomputed, so it cannot see the session computing it; T3.15 is what catches the revert. The same
+run moved a second expectation: `hasSelection` ignoring the rectangle is caught by T1.80, not T1.79.
+
+## F1364 — C14 §6a's clipboard deferral waited on a label already ruled ★☆☆☆☆
+
+Found by lane C writing C14 I61. §6a deferred the clipboard until *the same parked word the label is*; that label
+was ruled on 2026-09-24, and the condition was met in the section below the deferral. The
+deferral-with-a-satisfier-elsewhere shape again (F1307).
+
+## F1365 — a first copy's *copied* could land over a second copy's pending sentence ★★☆☆☆
+
+Found by lane C's §6e sequence trace, row 9. C21 resolves each tool write on its own exit, so two copies in flight
+answer in an order nothing controls, and the first copy's *copied* could overwrite the second's *copying with …*.
+The second copy supersedes the first, and a superseded or late answer says nothing.
+
+## F1366 — the `buildSession` harness runs from a working directory that does not exist ★★☆☆☆
+
+Found by lane C's T4.43 first run: the harness session's cwd is `/work`, the spawn failed `ENOENT`, and the toast
+said `pbcopy failed (spawn … ENOENT) — saved to /state/copy.txt` — C14's W11 path saying so honestly, about the
+harness. Any real spawn from a harness session fails the same way.
+
+## F1367 — ruling 69's `+N` was cut to the mark in every shipping table ★★★☆☆
+
+Found by lane C at M11.2. Ruling 69 gives disclosure its second carrier, the `+N` hidden count beside the mark, but
+the expand column is producer-declared (`minWidth: 1` in `fallback.ts` and every test surface) and C11 I15 kept the
+planner from reading `role`, so `▹+3` was cut to `▹` by `fitAt` everywhere. C10 I71's gate would have recorded
+*mark + word* over a word never drawn, and N itself was unspecified. Ruling 82 took option (a): the framework draws
+the marker, so the framework sizes it; N is `plan.dropped.length + (row.detail?.length ?? 0)`. S03, S05, S06 and
+S14 totals each rise by 2 and no drop set moves.
+
+## F1368 — a count cut at the column edge reads as a different number ★★☆☆☆
+
+Found by lane C's C11 §3a classification walk under ruling 82. `▹+12` cut from the end reads `▹+1` — not a
+truncated count but a wrong one, which is worse than none. Ruled: when the marker is wider than its column, draw
+the mark alone.
+
+## F1369 — `c11-disclosure`'s first pass had two survivors, and both indicted the tests ★★☆☆☆
+
+Found by lane C's new mutation run. *The bound reserves the mark alone* survived because T1.41's N ≥ 10 row never
+crossed a digit between the two planning passes; it is now ten one-cell columns at width 4, where a single pass
+reserves 3 cells for a count of 10. *N = 0 draws `+0`* survived because every N = 0 row sat in a one-cell
+reservation where the width guard hid it; T1.42 now puts a zero-count row beside a detail row, so a `+0` would fit.
+**A mutation that survives can indict its subject's rows, not the code.**
+
+## F1370 — F1355's neighbours in the roadmap reader table drifted too ★☆☆☆☆
+
+Found by lane C fixing F1355. In the same table: `session.ts:1242` (`selectionSpans`) is now `:1403`;
+`keys.ts:407`/`:716` in the table and `:382`/`:652` in the code block (`contextAt`) are now `:528`/`:924`;
+`construct.ts:2534`'s `submit(stores.editor.resolved)` no longer exists, the nearest being `pipeline?.submit` at
+3419, 3428 and 3451; `keys.ts:586` is now 640; and the `history.previous(` site is not found. Lane C re-pointed
+`:1242` with F1355 and took it out when the edit was blocked.
+
+## F1371 — the trail band walked back by code unit and counted code points ★★★☆☆
+
+Found by the blocks lane (M13.5). The band stepped back one UTF-16 code unit at a time and counted code points, so
+it dropped a U+0301 at the band's edge from the frame, drew a ZWJ family's head at `#e2b698`, and drew `y` at
+`#e7ab82` after a mark inside the band. A cluster is now wholly in the band or wholly out, and the newest sits at
+`t = 1`. The plan's F1304 was the counting half.
+
+## F1372 — `tape.width()` counted labels and gaps only ★★☆☆☆
+
+Found by the blocks lane (M14.9). `tape.width()` answered 17 and the tape drew `«1  › arm ⋅  1»`: the current's `›
+`, state marks, details and the residue marks were left out, so a tape laid out at its own natural width cut
+itself. First found by the plan as F1298.
+
+## F1373 — `tapeElements`' comment described a helper that did not exist ★☆☆☆☆
+
+Found by the blocks lane. The comment described a zero-width-range helper for off-screen members; the code gave
+every member `{0,w}`. First found by the plan as F1299.
+
+## F1374 — a `Ramp` closed to `Tone` had no way to say *brighter than the accent* ★★☆☆☆
+
+Found by the blocks lane (M13.4). hotEdge drew a plain gradient where §026's profile lifts the accent over the
+newest 35% of the band and holds it, because a ramp closed to `Tone` (C10 I16) has no seam for a colour past its
+slot. `Ramp.overshoot: { lift, share }` — on a gradient over a slot pair only, refused on a span — carries it;
+hotEdge uses `{1.35, 0.35}`. First found by the plan as F1305.
+
+## F1375 — `Progress.quantity`'s comment described a vanishing bar as built ★☆☆☆☆
+
+Found by the blocks lane (M16.2). The comment said a finished bar *is gone rather than full*; `measure` answered 1.
+First found by the plan as F1306.
+
+## F1376 — `settle` ended the entry's stream and left the blocks streaming ★★☆☆☆
+
+Found by the blocks lane (M13.3). `settle` flipped the entry's flag and left `streaming: true` on its blocks, so a
+settled entry kept the agent mark and its reserved cells. Stripped in the same change rather than a second one,
+because C13 emitting two changes for one call is history this repository already paid for. First found by the plan
+as F1301.
+
+## F1377 — nothing checked that a cited design rule exists ★★☆☆☆
+
+Found by the blocks lane. SP3 resolves invariant, row and finding numbers and SP8 resolves sections, but an
+`R-XXX-NNN` id was the one citation form nothing read. C26 I24 cited `R-NAV-004`, from a family the registry has
+never had, and a person found it by following the link (corrected in 049c69fb). SS68 reads every such id and
+resolves it against `rules[].id`, current, example and superseded alike; green on its first run, nothing exempted.
+Stated blind spot: it checks that a rule exists, not that it says what the citing sentence claims.
+
+## F1378 — the M13–M16 plan's findings from F1296 were never recorded ★☆☆☆☆
+
+Found by the blocks lane: SP5 refused the plan's numbers in specs, because the plan allocated fifteen numbers from
+F1296 in its §0 — thirteen used, two spare — and nothing wrote them here. Six of them were then found again by the
+lane under new numbers (F1298 = F1372, F1299 = F1373, F1301 = F1376, F1304 ⊂ F1371, F1305 = F1374, F1306 = F1375).
+**A number reserved in a plan is a claim with no record**, and the second finder cannot see it.
+
+## F1379 — the trail profile is stretched over a short band ★☆☆☆☆
+
+Found by the blocks lane. The trail's profile is laid over the band's own length rather than a fixed fourteen, so a
+short band compresses it; and for wide text the band's cells differ from its cluster positions.
+
+## F1380 — the `ripple` trail never started ★★☆☆☆
+
+Found by the blocks lane: `ripple` is a one-shot, and the band's derived ramp had no `since`, so the ripple held
+its not-started frame for the life of the stream — the one place C04 I109's M2 ruling had not been carried. **Not
+new**: C22 §6o.4's third bullet already said the ripple *is minted at render with no `since` … and plays frame 0
+for as long as the notice streams* (F1387). What the not-started frame draws was misread too (F1386). Ruling 81
+closes it.
+
+## F1381 — a kind's exact slice is output-equivalent to cropping, and only its cost is unmeasured ★☆☆☆☆
+
+Found by the blocks lane after C09 I135 (as I134 before the renumber). Since a bounded box crops what it cannot
+slice, a kind's exact slice changes no output — `c09-scroll-crop` declares it an expected survivor. Its only value
+is cost (2 000 `logs` lines rendered to draw 6), and no row measures that.
+
+## F1382 — a mutation was caught by a glyph collision, and survived when posts removed it ★★☆☆☆
+
+Found by the blocks lane's `c23-operation-head` run. *Stopped head composed as running* had been caught only by
+T1.71, and only because the agent spinner's frames share `▰` with the old segmented bar; posts (C09 I136) removed
+the collision and the mutation survived. C23 T1.72 now asserts the stopped mark itself.
+
+## F1383 — C09 I135's *pads counted from rows drawn* could not be reached by a conforming kind ★☆☆☆☆
+
+Found by the blocks lane (M14.6). The clause distinguishes rows drawn from rows measured, and every conforming kind
+draws what it measures, so the clause had nothing to be wrong about until a row built a child that breaks the
+agreement.
+
+## F1384 — three vacuities the mutation pass found in the blocks lane's rows ★★☆☆☆
+
+Found by the blocks lane's mutation passes. C04 T1.81 was satisfied by answering the allocation (*width answers the
+allocation* survived; closed by a tightness clause). C09 T1.56's hue/hotEdge comparison went vacuous once hotEdge
+gained a lift hue lacks. C09 T2.227's fractions were all whole eighths, so round and floor agreed; a fraction
+between eighths now rounds.
+
+## F1385 — three process faults in the blocks lane ★☆☆☆☆
+
+Found by the blocks lane. Bind-mount lag let a commit stage a stale `c09-bar-alphabet.mjs` while `enforce` read the
+fixed file, so 5f89073b first held a bare `I146` that trips SP3 (amended and re-verified). The first attempt to
+commit dbe17d36 failed for no visible reason and passed on retry. design-fixtures T1.5 exceeded its 30 s limit
+alone, at 38.5 s over the bind mount — F1348's row.
+
+## F1386 — C09's parked note was wrong about what an unstamped ripple draws ★★☆☆☆
+
+Found by the blocks lane reading every band cell. The note said the unstamped band is the ink at every position and
+tick; it is frame 0 of the ring — radius 0, one cell lit at the band's centre. T1.150 read four named cells (the
+head, the fourth-newest, the oldest and the first outside), and the centre was none of them. The control is now
+*one frame at every tick, the same frame the stamped notice draws at its own stamp*.
+
+## F1387 — F1380 was already on record, and was filed as new ★☆☆☆☆
+
+Found by the blocks lane in round 2. C22 §6o.4's third bullet had recorded the unstarted ripple before F1380 was
+written. **Ask where a claim was written down** — run on a finding before the number is taken.
+
+## F1388 — a same-length rewrite of a notice's text reads as the same arrival ★☆☆☆☆
+
+Found by the blocks lane building ruling 81. The shell's arrival identity for a trail stamp is the text's length,
+so a producer that replaces the text with a different text of the same length is the same arrival and the ripple
+does not replay. Recorded as the residue ruling 81 leaves.
+
+## F1389 — a lane reporting subset runs left three reds for the integration chain ★★☆☆☆
+
+Lane C's hand-back reported targeted test runs and never the whole suite, so three reds surfaced only in batch 4's
+integration chain. Two roadmap citations its rail had displaced: entry 25's `deps.ghost()` read, cited at
+`paint.ts:757`, had moved to `:867`, out of RS14b's anchor window; entry 29's `paint.ts:877` fell on a blank line
+and RS1 failed — all five of that entry's citations had drifted, re-pointed to `frame.ts:251`, `config.ts:76`,
+`frame.ts:70`, `frame.ts:359` and `paint.ts:1012`. And C22 T1.172's 24-row session: `/help`'s answer grew two rows
+with batch 3's watch verbs and scrolled `line-0…line-4` off the top; thirty rows hold the echo and the answer. **A
+subset chosen by the lane is chosen by what the lane thinks it touched.**
+
+## F1390 — parallel lanes took the same C22 test ids, and each lane was self-consistent ★★☆☆☆
+
+Batch 4's integration found C22 row ids taken twice: lane C's `commandRows` revert row T6.134 moved to T6.137 (the
+watch lane held T6.134), and the blocks lane's trail-stamp rows T1.78 and T6.134–T6.137 moved to T1.173 and
+T6.138–T6.141 (the watch lane holding T1.78 and T6.134–T6.136). SP2's allocation covers invariants; nothing
+reserves test ids across lanes. SP7 and SP15 caught none before the rebase, because each lane's tree was
+self-consistent — the collision exists only in the merge.
+
+## F1285 — a full-size child was scrolled off by any entry appended while it was attached ★★☆☆☆
+
+Batch 3's number, allocated by its plan's findings table (F1276–F1285) and found by the away-ledger walk, row L10:
+an append while a full-size child is attached, and tail-follow scrolls the child's top rows off the screen. Closed
+by C14 I56 in lane E's commits: while L4 keeps an entry whole, a viewport following the tail follows it only as far
+as the held entry's first row, then detaches and anchors there; a reader's scroll ends the hold. The number was
+never written here, the same gap F1378 names for batch 4's plan.
+
+## F1286 — patch leaked controls through three fields while the sweep ran on a registry without it ★★★★☆
+
+Found by the M10–M12 plan's premise check (M12.1) and measured by lane b4-m12. T2.156 called `measurable()` with no
+definitions, so `table`, `plot` and `patch` fell back to `raw` and were never swept as themselves: C09 §7d's *38 of
+the 39 registry kinds, and no control byte reaches the frame* was unsupported for all three and false for `patch`,
+whose measure read stripped text while its paint emitted raw. With the neutraliser taken out of `#resolve`, the
+per-field sweep on the production registry (C09 T2.195, the lane's T2.191 before 56551642 moved it off batch 3's
+ids) leaked `patch:path`, `patch:hunks[].header` and `patch:hunks[].lines[].text`, and T2.156 reported the patch
+payload. **A sweep that falls back is a sweep of the fallback.** Closed by ruling 71's mechanism: neutralise once
+at resolve, memoised on identity, and the sweep takes a constructed session's `graph.blocks` (C09 I127, I130; the
+lane's I124 and I127 before the renumber).
+
+## F1287 — the plan's number for C14 §6a's stale clipboard deferral ★☆☆☆☆
+
+The M10–M12 plan found C14 §6a and the session comment deferring the clipboard until *the same parked word the
+label is*, a condition met by aae861a0. Lane C found it again as F1364 while writing C14 I61. F1364 is the record.
+
+## F1288 — the plan's number for the `esc` label keyed on the copy's size ★☆☆☆☆
+
+The M10–M12 plan found copy mode's `esc` label reading `size === null` (`chrome.ts`) while `escape()` reads the
+block set, so a selection of only a `rule` shows `esc out` over a press that clears — a defect nobody had reported.
+Lane C found it again as F1358. F1358 is the record.
+
+## F1289 — the waiting count was a length difference, so a patch and an evicting append read as nothing ★★★☆☆
+
+Found by the M10–M12 plan (M10.8). `bufferedEntries` shipped as `record.length − held.length`: a patch to a held
+entry reads 0, and an eviction during an append cancels the append to 0 — wrong in the direction `R-SEL-010` exists
+to prevent. Object identity is not the fix either: an append replaces the previous live entry's record, and the
+sweep rebuilds the eviction marker on every write, so identity counts one append as two or three. Lane C ruled it
+by C13's own statements about an entry — `rev` moves iff its document changed (C13 I13), `streaming` ends at settle
+— with the marker an ordinary entry (C13 I14). T1.78 walks §6b's table over a real store with a cap of three; T6.30
+shows the length reading 0 where two arrived. The marker's second eviction is F1356.
+
+## F1290 — C10 T2.57 accepted any single carrier not written as *alone* ★★★☆☆
+
+Found by the M10–M12 plan (M11.2). T2.57 checked only for `tone+ground`: a row marked `alone` needed nothing but a
+citation, and a single carrier written without the word — disclosure's `mark` — passed with no check at all. Once
+the rail landed (b38aca61) its single-carrier arm ran over an empty population. Closed with ruling 82's count:
+carriers are a `+`-list over a closed vocabulary, each fact needs two distinct carriers and one must survive 1-bit,
+and the rows that fail must equal `["prompt selection"]`. T6.153: the old predicate passes `mark`, whose distinct
+count is 1. Lane C kept this number rather than taking a new one.
+
+## F1291 — ruling 41's rail rested on a live gutter that was never drawn ★★★☆☆
+
+Found by the M10–M12 plan (M11.1). Ruling 41 put selection's `▌` rail in *the live gutter's column*, which Q41 (a)
+said already existed *at no geometric cost*. No live gutter was drawn and no column was reserved: M4 retired `▌` as
+a live mark, nothing in `src/shell` read `VisibleEntry.live`, and SF1's row 07 starts `● help` in column 1, while
+A01 D6, C14 D6 and C14:48 still described the gutter. Ruling 68 reserved column 0 for the rail, and every session
+golden moved one column (30 movers read by hand) — the geometric cost the premise said did not exist.
+
+## F1292 — M11.1's premise misread PARKED's layout ★☆☆☆☆
+
+Found by the M10–M12 plan. The review said Q33's ruling was lost under entry 34. Every PARKED entry keeps its
+ruling blockquote **above** its heading — Q33's ruling at `:744` and its heading at `:746`, 34's at `:759`/`:761`,
+35's at `:770`/`:772`, and `git show c7158c22` gives the same layout at 738/740. The ruling was where the file puts
+every ruling; the reader expected it below.
+
+## F1293 — M10.4 was already fixed, and the row covering it asserted only a non-empty copy ★★☆☆☆
+
+Found by the M10–M12 plan: *autoscroll does not extend the selection* was fixed by a3289133b, an ancestor of the
+review's c7158c22 (C14 I49, `#extendToEdge`). What remained was the row. Lane b4-m12 measured it: T4.37c read a
+yank in the prompt, which is capped at 15 rows with its head elided, and its control ran second in the same session
+and read back the subject's text through `⌃U`'s kill, character for character. A hand mutation dropping the first
+entry (`.slice(1)` in `copyParts`) passed the old row and fails the new one.
+
+## F1294 — C14 states a horizontal autoscroll that nothing can do ★☆☆☆☆
+
+Found by the M10–M12 plan (M10.2): no container in `src/` scrolls horizontally — grep finds no horizontal offset
+anywhere, and `drag-selection.ts` has the column arithmetic with no caller for it. The plan ruled it a named *no
+subject* (D-M10-5: an invariant here would be vacuous, and the condition to grep is a horizontal offset on any
+container). At 231a611e C14 still states *Horizontal autoscroll takes the same bands on columns* beside the
+vertical bands, and the rectangle's column is clamped to its block (I60) rather than scrolled. **Owed**: the
+sentence marked as having no subject, with the condition to grep, as C29 does for its horizontal anchor.
+
+## F1295 — copy output was raw in sixteen kinds ★★★☆☆
+
+Found by the M10–M12 plan (M12). `copy` returned raw text in 16 kinds. R-BLK-898 and R-BLK-900, which show copy,
+are `example`; R-TRU-001's *escaped* is the binding clause. Ruling 71 decided the notation — `cat -v` for C0, DEL
+and C1, `<U+XXXX>` for every bidi format character — and the mechanism, once at the registry's resolve, so copy
+reads the neutralised block with everything else. T2.193 runs every kind through `copyOf` and `copySequence`. A
+file whose name holds `ESC[2J` and U+202E copies as `^[[2J<U+202E>` (C04 T2.140, the lane's T2.139).
+
+## F1401 — the reader's own typed line is written with its bidi characters raw ★★★☆☆
+
+Measured by lane b4-m12 writing C09 T4.107 (4f6ba2e8, 1f88a69a). Every document, error and far-side payload reaches
+the writer neutralised, but two shell-drawn rows write the reader's own typed line raw: the prompt being edited
+(C17's painter) and the command echo `commandRows` draws above an entry (C22 I33). Both passed U+202E, and the
+editor measured it at zero width. Neither is a block, so neither reaches the registry's resolve. `commandRows` in
+`shell/paint.ts` still does not neutralise at 86fcb10c.
+
+**Closed by lane b4-bidi** (d746cd27 spec, 26dcbbb6 code): C17 I36 draws the form through the walk, and C22 I33's `commandRows` neutralises before it wraps. **A second cost besides reordering, measured before the fix** through `@xterm/headless` at 80 columns: with U+2066 and U+202E typed, every caret position after U+2066 stood one cell left of the glyph it named, and the two positions either side of U+202E were one cell. That is where F1403's width disagreement met the prompt. Linear mode's half is F1470.
+
+## F1402 — nothing refuses a literal bidi character in a tracked file ★★☆☆☆
+
+Found by lane b4-m12. `trust-boundary.test.ts` landed in 1ef3b4d1 with its twelve bidi characters as literal code
+points — a file write turned the `\u` escapes into characters — and `make enforce` passed. 1f88a69a restored the
+escapes. A literal U+202E in a source file reorders what a reviewer sees against what the compiler reads, and no
+A03 rule looks for one.
+
+## F1403 — `cells()` measured five bidi characters at zero width where xterm painted a cell ★★☆☆☆
+
+Found by lane b4-m12 widening C27 I2 to bidi. Measured, `@xterm/headless` places them two ways: U+200F and U+202E
+join the previous cell at no width, while U+2066–U+2069 and U+061C take a cell of their own at width 1 — where
+`cells()` reads every bidi character as zero. C27 I6 (`cells(text)` equals the emulator's painted width) drifted on
+a child printing any of the second group. C27 T6.12 is the revert row.
+
+## F1404 — a child's OSC 8 link reached the snapshot as an underline with the link gone ★★☆☆☆
+
+Found by C27 T2.7 (M12 item 6). `@xterm/headless` acts on a hyperlink itself and left the linked cells `underline:
+true`, so a child's link reached the snapshot as an underline run — a claim that the text is a link, with the link
+gone. OSC 52 needed nothing: the headless build has no clipboard handler.
+
+## F1405 — neutralising lengthens text, so span offsets had to be re-based ★☆☆☆☆
+
+Found by lane b4-m12 building ruling 71's mechanism. `TextSpan` offsets index the raw text, and caret and
+`<U+XXXX>` forms are longer than the characters they show, so a span over neutralised text would have coloured the
+wrong cells. Built with the neutraliser rather than found after it; recorded because every span-bearing field
+depends on it.
+
+## F1406 — three more rows pass close to their time limits under load ★★☆☆☆
+
+Measured by lane b4-m12 at load 15–20. C11 T2.3 timed out at its own 15 s budget: alone it passed at 13.15 s, and
+the tree before the lane's change took 13.8 s. C24 T2.12 and image-kitty T1.42 hit their 30 s limits: on the
+pre-change tree at the same load 28.3 s and 28.8 s; after, T2.12 at 26.4 s and 17.0 s, T1.42 at 28.2 s and 19.9 s.
+Neither reaches the new code. F1348 records design-fixtures T1.5 and contract/theme T2.62, and F1351 C22 T4.49 and
+T4.53; none of the three here is in either.
+
+**Corrected 2026-09-29.** C11 T2.3 was not load: it was a regression from 4e3c7153, found by bisection and fixed —
+F1435. The other two stand. One more member, measured the same day: tier 5's `overlay` T5.4 failed once inside a full
+e2e run at load 3.3 (a `waitFor` timeout at 15.4 s) and passed three runs of three alone against the same `dist/`,
+at 2.3 s, 2.7 s and 0.4 s.
+Two more, from the shell lane's chain at 1ba5e868 (five-minute load 5.0): C28 T1.42 (`profiler-tree.test.ts`, 53.5× the
+area for 100× the data against a bound of 40) and C16 T1.170 (`surface.test.ts`, an extra `normal-mode:release` after
+the escape). Each passed three of three alone at load about 1; neither file was changed by the lane.
+
+**Three more under load, 2026-09-30**, in a chain on the golden lane's tip while the harness lane ran mutation passes (load 4.9 at the report, 8.4 on the 15-minute average): `plot-performance`'s *one-sample update* at a ratio of 2.91 against 2, and SS66's T1.154b and T1.154c each timed out at 120 s. Re-run alone: 13 of 13 pass, but T1.154b took 112 s of its 120, against 18 s in a full suite at load 1.08. T1.154 was timed on b4 and the golden tip alternately in one process: 4908 and 2353 ms against 2442 and 2913 ms at load 8.6–9.7, so the tips do not differ and the time is the machine's.
+
+**2026-09-30, RS14b (`roadmap-status.test.ts`).** It spawns the tool four times, and each spawn walks the tree over the bind mount. It took 1.35 s alone, and 46.6 s (b4-menu at 312f4e3b), 34.1 s (b4-fixmap at 788f7923) and 38.2 s (b4-fixmap at aa4e1741) in three consecutive loaded chains, against the file's 30 s `testTimeout`. It passed alone each time. It was red in more chains than not, so it now carries its own 120 s limit. The row asserts counts rather than speed, so the limit is kept on asymmetry: raising it costs nothing on a correct tree, and a timeout diagnosed as drift costs a session.
+
+**2026-09-30, the browser conformance row (`test/browser/design-page.test.ts`, the instruments fixture for `chromium.mjs`).** Its `beforeAll` runs nine pages in a headless browser under vitest's default 10 s hook limit. Lane pr-instr timed it alternating between #62 and #63 at load about 4: 7015, 10005 and 11581 ms on #62, and 12247, 6851 and 6096 ms on #63. So the cost belongs to the machine, not to either tree. It failed once more alone (10.68 s at load 2.49), and it failed the instruments gate in two chains (b4-fixmap at 788f7923, #63 at d99921f1). The hook now carries 60 s, on the same asymmetry as RS14b.
+
+## F1407 — `oscText` passes bidi characters into window titles and notifications ★★☆☆☆
+
+Found by lane b4-m12. `oscText` in `terminal/escapes.ts` removes `[\u0000-\u001f\u007f-\u009f]` before
+`windowTitle` and the notification sequence, and nothing else, so a title or notification built from a tool's
+output carries U+202E into the terminal's title bar or the desktop's notification. Ruling 71 escapes bidi
+everywhere a block is drawn; these two sinks are not blocks.
+
+## F1408 — definitions' own `stripControl` calls receive no control any more ★☆☆☆☆
+
+Found by lane b4-m12's mutation pass: two `stripControl` mutations survived because `#resolve` neutralises every
+field before a definition reads it, and were removed with a note in `c09-trust-boundary`. The calls remain — 110 in
+`src`, across adapters, the shell and the block kinds — and whether any is still load-bearing (a path that does not
+come through `#resolve`) is unmeasured.
+
+## F1409 — a semantic copy's first entry omits its command line and later entries include it ★☆☆☆☆
+
+Observed by lane b4-m12 hardening C14 T4.37c: a multi-entry semantic copy reads `e0-line-0 …\n\nsay\ne1-line-0 …` —
+the first entry's text begins at its blocks, and every later entry is preceded by its command. Either both carry
+the command or neither does; which is owed a ruling.
+
+## F1391 — a chip label wider than its row was clipped to a label with no closing bracket ★★★☆☆
+
+Found by the editor lane's premise check for M13.1. `layout.ts` placed a chip with `row += shown` and no limit,
+and the painter's `exact()` clipped at the right edge: `["ab ","[#1 a-very-long-detected-kind · 4096L]"," z"]` at
+width 14 read `[#1 a-very-lo` — no closing bracket and no marker, so indistinguishable from typed text. C17 I20
+and I26 justified the overflow with *a chip is what the user pasted*, which is true of the content and does not
+constrain the label, which is C17's own composition (I25). A correct sentence attached to the wrong decision.
+Closed by C17 I32: a chip wider than its row is elided in the middle to exactly the row, frame kept (dfef2062).
+
+## F1392 — the prompt measures ambiguous-width characters narrow from end to end ★★☆☆☆
+
+Found by the editor lane building C17 I32. The prompt's walk calls `cells()` with no ambiguity argument and
+`exact()` takes `fitStyled`'s narrow default, so at `ambiguousWidth: "wide"` a typed ambiguous character, or one
+inside a chip's name, occupies one cell more on the terminal than the prompt measured — the direction that wraps.
+From reading the code; not measured on a terminal. The chip's frame and elision marker are exact at the wide rung,
+because `glyphs()` hands the ASCII set there (C02 I9); the name and every typed cluster are not.
+
+## F1393 — a typed private-use character equal to a minted sentinel draws as that chip and submits its content ★★★☆☆
+
+Found by the editor lane writing C17 I34's blind spot. `stripForBuffer` strips control characters only, so a
+typed or pasted private-use character equal to a minted sentinel is that chip. Measured:
+`insertChip(json, content "SECRET")` then `insert("  typed")` with U+E000 typed gives the rows
+`["[#1 json · 5L] [#1 json · 5L] typed"]` and `resolved` = `"SECRET SECRET typed"`. Nerd Font Pomicons occupy
+U+E000–U+E00A, the first eleven sentinels, and Powerline's U+E0A0 is chip 161. The user sees the chip twice and
+submits its content twice, which is at least visible on the prompt; nothing refuses it.
+
+## F1394 — the sentinel counter leaves the Private Use Area after 6,400 chips ★☆☆☆☆
+
+Found by the editor lane ruling C17 I34 (a sentinel is never reused). `CHIP_BASE + n` runs past U+F8FF after
+6,400 chips in one editor's life, into U+F900 and beyond — CJK compatibility ideographs a reader can type, so
+F1393's collision becomes an ordinary character's. From reading the code; not fixed. The alphabet is §5c's
+decision: `chipAt`, `resolved`, the layout walk and three regex rows in `editor.test.ts` read it.
+
+## F1395 — a form field's committed value can hold a raw sentinel ★★★☆☆
+
+Found by the editor lane's C17 §5f table (row `loadField`). `endField` and `⏎` write the field with
+`writeField(…, stores.editor.text)` at `construct.ts:2718` and `:2758` — the unresolved text. Measured at the
+editor: kill a chip, `hold()`, `yank()`, and `text` is U+E001, so a chip yanked into a field reaches C04 form data
+as a private-use character. A field refuses a multi-line paste, so `yank` is the only way in. The remedy is the
+shell's — write `resolved`, or refuse to adopt a chip into a field — and it belongs to the shell lane.
+
+## F1396 — the four shedding kinds published focus targets and drew no focus ★★★☆☆
+
+Found by the focus lane declaring shapes for M16.5. `keyValue`, `events`, `comparison` and `steps` publish a `row`
+element wherever a row sheds (C09 I113) and drew nothing for it at any depth: at c8c7a77e the focused frame was
+byte-identical to the resting one at 24-bit and at 1-bit (keyValue at 8 columns, events at 12, comparison at 8,
+steps at 9). A reader landed on a target and saw nothing — the defect I100 was written against for `mosaic`.
+Closed by C09 I137: the shed row takes the focus ground and bold, gated on the plan `elements` reads (0af676a8).
+
+## F1397 — a focused form control lost weight at 1-bit instead of gaining a carrier ★★☆☆☆
+
+Found by the focus lane. `form` read `focusStyle`, which answers nothing at 1-bit, so focus there removed a field
+label's dim, and a focused non-default button differed from the resting one by bold on two blank cells —
+identical to the eye. C09 I121 says one function answers for every shape *so a fifth shape cannot choose a
+different fallback*, and its hand list of five never held `form`; `form` did differ at 1-bit, by losing weight,
+so the census passed it. Closed by C09 I137: `form` reads `focusShapeStyle` and inverts at 1-bit (0af676a8).
+
+## F1398 — C09 I121's census could not see a shed row or a picture in a pane ★★★☆☆
+
+Found by the focus lane. T2.183 ran at 80 columns, where no row sheds, over a bare `createBlockRegistry()`, where
+`table`, `plot` and `patch` fall back to `raw` — F1286's and C09 I130's class. Its subject set held neither F1396
+nor the mosaic-over-plot case, so it passed over both. T2.228 and T2.229 now run over the session's `graph.blocks`
+at the first width where each kind publishes (0af676a8).
+
+## F1399 — a split pane painted the focus ground across a framed plot, as the mosaic did ★★☆☆☆
+
+Found by the focus lane. RULE_LEDGER recorded `R-FOC-004` unmet for `mosaic` only; `split` had the same defect — a
+pane holding a framed plot painted the focus ground across the figure and left the frame muted. Closed for both
+containers by `paneFocus` (`src/presentation/blocks/paint.ts`): a `frame` child takes the focus and no ground
+(C09 I137, 0af676a8).
+
+## F1400 — C09 I100 held two false sentences, and the ledger carried one ★★☆☆☆
+
+Found by the focus lane. I100 said *the RUN and FRAME rungs have no subject in this tree* — plot's single element
+(C12 I142) and scroll's children are FRAME subjects — and *at 1-bit focusGround answers inverse, so the pane
+inverts*, when it answers nothing and I121 exempts `mosaic` for exactly that reason, so the two invariants
+contradicted each other. Both corrected in C09 (69094db4). The first sentence, with a count of 17 carried from an
+older census of 23 kinds (12 of 28, counted), was also RULE_LEDGER R-FOC-005's reasoning; corrected there
+with this entry.
+
+## F1425 — C14 §6e ruled the automatic write after a failed copy acceptable ★★★☆☆
+
+Found by the b4-clip lane applying the person's correction to ruling 72. §6e's closing paragraph said a copy that
+fell through to a file was what the reader asked for — *the file is the destination the rule names*. True of the
+rule's wording and false of the reader: the rule says *offers*, and a copy is not a request for a file. Lane C
+built the write on that sentence. Closed by the correction: nothing is written without a press (df142006,
+9e2f1983).
+
+## F1426 — a copy whose tool fails after copy mode has closed has nowhere to offer the file ★★☆☆☆
+
+Found by the b4-clip lane's C14 §6e table, row K12. `⏎` leaves copy mode before a tool can answer; the offer lives
+in the mode's footer and toasts take no keys, and the registry has no save action. Ruled (83): stated, not offered
+— the toast says the tool failed and that the kill buffer holds the text, nothing is written, and the offer,
+held against the copy's text, returns on re-entering the mode over the same selection.
+
+## F1427 — the copy file's path was relative, and resolved against a different directory from the state dir ★★☆☆☆
+
+Found by the b4-clip lane at C14 §6e K16. The default `stateDir` is relative, so the toast read `saved to
+.calcium/copy.txt` — openable only from the working directory, where the person asked for *the full path*. And
+C22 I67 resolves `stateDir` against the process cwd while the copy path resolves against `config.cwd`; the two
+differ when an app passes `cwd`. The toast now states an absolute path, and the save runs `mkdir` on its directory
+first (9e2f1983). The two resolutions still differ; the save no longer depends on their agreeing.
+
+## F1428 — C14 T4.44 watched disposal through a file that no longer exists ★★☆☆☆
+
+Found by the b4-clip lane. T4.44 checked *no `copy.txt` after the deadline* as its stand-in for the copier being
+disposed on stop; once nothing wrote files, that check passed with the dispose removed. The row now spies the
+ambient `setTimeout`/`clearTimeout` and requires every 2 000 ms timer the `y` armed to be cleared by stop (the
+toast's expiry is the same length and cannot be told apart, which the row says). Caught by the lane's mutation
+run.
+
+## F1429 — the footer offered `⏎ copy` for a text the press then wrote to a file ★★★☆☆
+
+Found by the b4-clip lane's C14 §6e table, row K3. The footer asked `hasClipboard` — true wherever OSC 52 exists —
+so with OSC 52, no tool and a selection past the cap it drew `⏎ copy`, and the press wrote a file under that
+label. The offer is now a property of the selection's text: the footer and the press read one function,
+`fileOffer(() => text)`, and cannot disagree (9e2f1983).
+
+## F1430 — C23's running card labels a two-word verb with its own second word ★★☆☆☆
+
+Found by the b4-demo lane reading every stats still. `/container stats worker` draws its running card as
+`container stats(stats worker)`: `src/shell/execution.ts:1248` builds the arguments with `result.argv.slice(1)`,
+where line 2002 slices by `verb.split(" ").length`. Every two-word verb's card carries its second word twice. Not
+fixed; framework code, and in every stats still.
+
+## F1431 — a stopped container's history row was labelled by its id ★★☆☆☆
+
+Found by the b4-demo lane's world. `nameOf` in `examples/docker/src/dashboard.ts` searched only live containers,
+so the exited `migrate` drew as `d345037c112a` in the CPU history. Fixed in the example (5f441d9d); W6 holds it and
+fails on revert.
+
+## F1432 — the real `/logs` loses its first nine lines ★★★☆☆
+
+Found by the b4-demo lane building the logs shot. C07 drops `malformed` lines until a `degraded` patch arrives, and
+C06 degrades only after ten lines (`DEGRADE_FLOOR`), so the first nine plain-text log lines of a real `docker logs`
+never reach the transcript. The fixture inserts `degraded` itself after line 9 — a copy of C06's rule that can drift
+from it. Not fixed in the framework.
+
+## F1433 — the stats entry is about 41 rows, and clearing first does not keep its top on a 34-row screen ★★☆☆☆
+
+Found by the b4-demo lane. `/container stats` draws an entry of about 41 rows, so at 34 rows its top scrolls off.
+The regeneration note held that clearing before the shot keeps it; measured, it does not. The stills now record at
+46 rows; the 34-row screencast still clips the top of that beat.
+
+## F1434 — the public repository's history and tree carry the host's docker data ★★★★☆ — **CLOSED** in the tree; history kept by the person's ruling
+
+Found by the b4-demo lane. Earlier media commits held host paths, host memory figures, a linuxkit kernel and `vsc-`
+devcontainer names (`scroll.cast`). In the tree today, and on `origin/main` since 2026-08-05 in a public repository:
+`examples/docker/test/corpus/*-real.*` — `images-real.ndjson` lists the host's images, including other projects'
+devcontainer images by name, and `top-real.txt` a container's process table — and `docs/media/menu-over-diff.gif`,
+which the fixture mode cannot regenerate. The new media draw nothing of the machine (checked by pattern over every
+cast and by reading frames). Scrubbing the tree and rewriting published history are the person's decision.
+
+**Closed forward, 2026-09-29, by the person's ruling: scrub the tree, rewrite no history, force-push nothing.** The
+audit was shown first and listed no credential. Every host-derived string in the corpus, the media and the sample
+data elsewhere in the repository was replaced by an invented one of the same shape, consistently, so every file
+reads as its old text under one mapping — checked file by file against `HEAD`, 184 of 188 exactly and the other
+four the corpus files whose devcontainer settings and path-derived image hashes were also replaced. The package
+was renamed `calcium-tui` in the same commit. `menu-over-diff` now has a row in `SHOTS` (shot 15) and is recorded
+from the fixture world, which also closes the *one shot cannot be regenerated* note under F158's heading. **What it
+does not do**: the old text stays in git history and in every clone taken before this commit.
+
+## F1435 — C11 T2.3's slowdown was a regression, not load ★★★☆☆
+
+Found by bisecting C11 T2.3's red at f0697eb0 (15.9 s alone), then fixed by lane b4-perf. 4e3c7153, ruling 82's table code, took the row from about 3 s to about 6.5 s at load 1.6–2.8 (2.8× at load 3.1). A CPU profile showed three costs multiplying: the table was planned again for every expanded row, ruling 82 runs each plan twice, and every plan re-measured four constant glyph strings. The fix shares one plan per walk over the rows (it lives only for that call, so the no-cache rule holds) and computes the mark's cells once at module load. Timings in ms, T2.3 alone, three interleaved rounds: 3d4b2241 3335 / 3009 / 2671; 4e3c7153 6589 / 6178 / 6094; f0697eb0 6777 / 6714 / 6389; with the fix 2974 / 2697 / 2661. Zero golden frames moved, as predicted. C11 T3.24 counts plans rather than timing them (one plan for 5 expanded rows or 50, no glyph measured per plan) and fails on the unfixed tip with *expected 5 to be 1*; mutation run `c11-plan-count` kills all six mutations and its control. F1406 had listed T2.3 as a load-sensitive row; this corrects it.
+
+## F1436 — a mutation survived a layout change because only the runs whose anchors moved were re-run ★★★☆☆
+
+Found by lane b4-perf. `c11-focus-gutter`'s T6.24 mutation had survived since 4e3c7153: ruling 82 moved every column-drop boundary off the seven widths T2.3 checks, and that landing re-ran only the mutation runs whose anchors had moved. Nothing re-ran this one, so the survivor went unseen for 37 commits. C11 T2.3a now measures the expanded fixture at every width from 20 to 170, and the run kills everything. **The class**: a change that moves layout can blind a row without touching its anchor, so every mutation run over the files a layout change touches is re-run with it, not only the ones whose anchors moved.
+
+## F1437 — the blocks lane added no measurable cost, and 4e3c7153 → f0697eb0 is about 5% slower unattributed ★★☆☆☆
+
+Measured by lane b4-perf, T2.3 alone, three interleaved rounds. The blocks lane's paired differences were +1316, −755 and −190 ms, so the earlier 8.4 → 10.2 s reading was load, not the lane. Separately, 4e3c7153 → f0697eb0 is slower in all three rounds (+188, +536, +295 ms, about 5%). The span holds 37 commits and has not been bisected.
+
+## F1438 — an approval's default answer was `allow`, so `esc` on an approval ran the tool ★★★★☆
+
+Found by the shell lane's walk of C23 §7g (review batch 4, group B). `APPROVAL_CHOICES` put `allow` first, and a question resolves `esc` with its default, so dismissing an approval ran the tool it asked about. R-BLK-348 draws the opposite: *the SAFE answer opens · no is first and focused · esc resolves to it*. No producer in `src/` raises an approval today, so nothing shipped reached it. Fixed by C23 I94: `deny` is first and the default, execution runs the tool only on an `answered` outcome whose key is not `deny`, and a withdrawn or expired approval settles `cancelled` (history 130 or 126). This strengthens the safety default; it weakens nothing (2cc13b21, 14f078cc).
+
+## F1439 — C23 T1.101 asked for an ordering nothing can observe ★★☆☆☆
+
+Found building C23 §7g (group B). As written at the spec commit, T1.101 asked that Q1's promise be resolved before Q2's layer is pushed. A promise's reactions run after a synchronous push whichever order the two calls are in, so the clause forbade nothing while reading as though it forbade the defect. This is A03 §2's vacuity class in prose. The row now asserts the observable order on the overlay stack: Q1's layer removed, then Q2's pushed under the same id. The push stays synchronous, so a second key in the same batch meets C16 I44's guard (a13c471a).
+
+## F1440 — the pointer hit-tested a replacing question where it is never drawn ★★★☆☆
+
+Found building C22 §6q (group A). `construct.ts`'s pointer `placed` was `overlays.layout()` filtered by gesture, while the paint's list is the same **less** the replacing question, which is drawn in the prompt's rows. So a wheel over the prompt's rows, where an inspection is, reached no layer and met C16 I8's modal consumption; a wheel over the middle of the region, where nothing of the question is drawn, reached the question. It is the defect C16 T4.1's comment names for the router, one filter away. Fixed by C22 I142: the pointer hit-tests through `layersAsDrawn`, covered by T4.115 and T6.143 (a89bf211, 6c605f19).
+
+## F1441 — Windows Terminal's default keymap may take ⌥⇧↑ and ⌥⇧↓ before the app sees them ★★☆☆☆
+
+Found in the collision check for R-KEY-010 (group A, C22 §6q.1). The chip preview scrolls on `⌥⇧↑`/`⌥⇧↓`. macOS and the common Linux desktops bind neither, but Windows Terminal's documented default keymap binds `alt+shift+arrow` to `resizePane`, so on that terminal the chords may never reach the application. The collision gate reads the registry and the keymap and cannot see an emulator's own bindings. **Unmeasured**: no Windows Terminal session was run. Owed: a measurement there, and if confirmed, a second chord or a note in the preview's footer. Recorded in C22 §6q.5.
+
+## F1442 — C16's page-scroll intercept took ⌥⇧↑ and ⌥⇧↓ as well as ⌥↑ and ⌥↓ ★★★☆☆
+
+Found building the chip preview's keys (group A). `intercepts.ts` read the route as `key.meta && (up || down)`, so `⌥⇧↑`/`⌥⇧↓` (`CSI 1;4A`/`B`, `{ up, shift, meta }`) were `page-scroll` too. The preview's scroll chords paged the transcript and never reached the panel. The check that called the chords free read the registry and the keymap, not the intercept, which is read before both. C16 I40 already said *`⌥↑`/`⌥↓` alone*; `isPageScroll` now says it too (meta, the arrow, no shift, no ctrl), covered by C16 T1.200 and T6.65 (6c605f19).
+
+## F1443 — an inspection's box was sized to the region and drawn in the prompt's slot, which cut its key row ★★★☆☆
+
+Found building C23 I88 (group A). The inspection sized its box as `region height − 6`, but a replacing question is drawn in the prompt's rows, which S01 §3 caps at `floor(rows / 2)`. At 80×30 the slot's cut took the panel's key row and bottom border and drew `⋯`. Measured in a worktree at f06f762d as well, so it predates this lane. The box is now sized to the slot (C22 §6q.4 ruling 11; `promptCap` from `frame.ts` and `ConfirmDeps.slotRows`), covered by C23 T4.88 and a mutation in `c23-inspection-scroll` (6c605f19).
+
+## F1444 — roadmap line citations drift silently wherever no anchor watches them ★★☆☆☆
+
+Measured on the shell lane's integration onto c7770e5d. RS1 and RS14b check only citations anchored to a symbol, and they stayed green while **41** unanchored citations in CALCIUM_ROADMAP.md pointed at lines this lane had moved (keys.ts, session.ts, construct.ts, types.ts, confirm.ts, editor.ts and others). Found by resolving each citation against the tree it was written for and mapping it through a line diff. A text search cannot, because targets such as `*/` and `}` recur. During the lane the anchored ones went red twice and were fixed: entry 16's `confirm.ts:243` → `:312`, and entry 25's `deps.ghost()` at `paint.ts:878` → `:886`. The ghost-text entry's `paint.ts:269` had already been adrift before the lane. All re-pointed (588da957, 6a3ae2fa). Two historical records (`paint.ts:137` and `:241`) already named other lines and were left. **Owed**: the unanchored citations have no gate, so the next line-moving change repeats this.
+
+## F1445 — no golden draws the transcript bar, the chip preview's box or an inspection ★★☆☆☆
+
+Found by the shell lane's golden prediction (group A). The prediction named four new surfaces: the transcript's scroll bar, the chip preview's bounded box, an inspection, and the keys view. Only `/keys` moved. None of the three new surfaces is in any golden scene, so each is asserted only by unit and integration rows that read numbers, and nothing reads the frame. Groups C and D did not reach it. Owed: session-frame scenes for all three.
+
+## F1446 — eight rows across three groups were blind until the first mutation pass ★★★☆☆
+
+Measured on the shell lane's first mutation passes (review batch 4). Every row below passed before its mutation and failed to see it:
+
+- **Group A.** T4.114: the chip preview's owner-side reset masked the overlay stack's namespace delete. It now also pushes a bare layer. T4.46: with 60 lines, `maxTop` was 38, a multiple of `h − 1 = 19`, so floor and round agreed at every row. The row's *some row rounds* guard compared its own trailing entry. The transcript is now 61 lines and the guard runs over the first *h* rows.
+- **Group B, four survivors in `c23-question-queue`.** The keys.ts gate: T4.91 now reads the stack's changes through `buildGraph`. The outcome check in execution: T4.92 gained an approval whose default is `allow` and which is withdrawn. The two `promptLive` update sites were each enough on its own, so they are now one mutation using `also`.
+- **Group C, two survivors in T4.34.** The persisted tape start and the pointer's anchor went unseen because the render re-slides to focus from any held start. The row now asserts that `←` from the tail keeps the tail drawn, and that a press on the first drawn member moves the window by exactly one.
+
+All fixed, and the runs catch everything (6c605f19, 14f078cc, 2edd256f).
+
+## F1447 — five rows exceed their time bounds under the batch's parallel load and pass alone ★★☆☆☆
+
+Measured by the shell lane with other lanes running (load average 8–11). Each failed only under load:
+
+- C11 T2.3 at its 15 s budget.
+- rule-ledger T1.154b and T1.156.
+- session T4.28.
+- M16 design-fixtures T1.5, which timed out at 30 s and runs in 7.7 s alone.
+- e2e session-gate T5.8, where a caught refusal exited in **4777 ms** against a 3000 ms bound, then passed twice alone and in a full e2e rerun.
+
+All pass when run alone. T5.8's bound is four times its measured 744 ms, and startup on the bind mount alone is 4.4–5 s, so the bound measures the mount as much as the subject. Owed: a decision per row between a wider bound and a paired measurement.
+
+## F1448 — entering a tape whose window has slid lands focus on member 0, off screen ★★☆☆☆
+
+Found by the walk of C26 §8c (group C) and left as residue in §8c.5. Pressing anywhere on a tape, or arriving by `↓`, focuses member 0. Once the window has slid, member 0 is not drawn, so the window follows focus back to the start (C26 I31, ruling 80) and the reader loses the members they were looking at. Owed: enter at the first drawn member.
+
+## F1449 — `↓` from a mosaic cell forgets the column it left ★★☆☆☆
+
+Found by the walk of C26 §8c (group C) and left as residue in §8c.5. `↓` leaves a row and lands on the first element of the row it enters (C26 I30, D10). From a cell in a mosaic's second column, that is the next row's first cell, so a reader walking down a column has to walk back across on every row. Owed: a column-keeping rule for grids, which is a design question before it is a mechanism.
+
+## F1450 — the walk of C26 §8c missed the interaction of C26 §7 with a tape window that follows focus ★★☆☆☆
+
+Found by the suite, not the walk (group C). §7 says *focus changes tone and nothing else* (C09 I121, T2.184 asserts it at 1-bit), and I31 makes a tape's window follow focus to a member it does not draw. C09 T2.184 went red on `tape/seams` at 7 columns. The walk's classification table had no row where the two rules meet at rest. §7 now names the tape's window as the one cell that moves with focus, a cell that changes no size, and T2.184 asserts both arms as reached (bd5c0e1b).
+
+## F1451 — focus on a tape member outside the drawn window drew nothing ★★★☆☆
+
+Found in the golden read of group C. Before ruling 80, focus could land on a tape member the window did not draw, and the frame showed no focus anywhere: the focus census at 40 columns listed `tape` without `trace` in three fixtures. With the window following focus (C26 I31), the member is drawn and focused, and the census gained `trace`. That was the one unpredicted golden move, and it was read and kept (2edd256f).
+
+## F1452 — `AskAnswer.outcome` is required, so every consumer that fakes `ask` breaks ★★☆☆☆
+
+Found by `make check` in group B. C23 I92 adds `outcome: "answered" | "cancelled" | "expired"` to what `ask` resolves with, and it is required, because the approval route runs a tool only on `answered`. The docker example's fakes in `progress.test.ts` and `transfer.test.ts` returned `{ key }` and failed to type-check. They now answer `{ key: "y", outcome: "answered" }` (14f078cc). Any other consumer's fake breaks the same way. Owed: the CHANGELOG states it as a breaking change for fakes.
+
+## F1453 — at 1-bit `muted` is dim, and a colour-only assertion could not see it ★★☆☆☆
+
+Found in the golden read of M13.6 (group D). The first build of the 1-bit label styled the rule's dashes `muted`, as the painted rung does. At 1-bit `muted` resolves to dim (SGR 2), while the bare rule there is plain text, so the labelled rule was a different rule from the one beside it. T1.178 checked only foreground and background tokens and passed. The golden's styles grid moved where the prediction said it would not. The spans are now unstyled, T1.178 asserts that the label adds no SGR token to the frame, and `c22-label-hue` carries the defect as a mutation (3dcc2810).
+
+## F1454 — a row blurred a field with a focus report, which is routed nowhere ★★☆☆☆
+
+Found writing C22 T4.119 (F1395). The first draft moved focus off a field and then sent a focus report (`ESC [ I`) to make the read loop reconcile the borrow. A focus report is read and routed nowhere (C16 I61), so `reconcileField` never ran, and the row measured a blur that never happened: the field kept `80` and the assertion blamed the write. A bare pointer motion is routed, and the row now uses one (588da957).
+
+## F1455 — F1395's first remedy would have written a chip's lines into a one-line field ★★★☆☆
+
+Found by the walk of F1395. The finding offered writing `resolved` instead of `text` so a yanked chip arrives as its content. A chip is minted for a paste of five lines or more, or for a file, so its content usually holds line breaks, and writing it would put several lines into a field C04 §3ar F9 says is one line. That is F9's defect arriving by another door. C22 I148 writes `resolved` and refuses a value holding a line break in F9's words. On `⏎` the borrow stays open so the chip can be deleted, and on blur nothing is written (c5ff281a, 588da957).
+
+## F1456 — SS69's first runs found two literal bidi characters, one shipped and one written by the lane's own edit script ★★☆☆☆
+
+Found by lane b4-classes building A03 SS69 (F1402's class check). Its first run over every tracked file found a literal U+202E at `test/contract/image-path.test.ts:50`, the poisoned filename the row feeds through, which had passed every gate since it landed. That is F1402's second instance. The third arrived while building the rule: the lane's edit script turned the `\u202E` escape in SS69's own doc comment in `tools/enforce/source-scans.mjs` into the literal character, and SS69 refused it on its first enforce, before commit. Both are escapes now, and the exemption list is empty.
+
+## F1457 — C16 T1.4h presses two rows at the wrong target, and both pass without testing anything ★★☆☆☆
+
+Measured by lane b4-classes writing C16 T2.17. `prompt:m+v -> valuesToggle` is dispatched at `liveBlock`, where the same chord is bound, and `liveBlock:m+enter -> rerunEntry` is dispatched at `prompt`, where it is consumed as `insertNewline`. Each row's assertion holds for a reason other than the one it names. T2.17 reaches both rows at their own targets, so the behaviour is covered, but T1.4h's two rows still assert nothing about what they claim. **Owed**: re-point or remove them.
+
+**Closed** (ruling 88, fc053ce7). **The row is C22's T1.4h (`test/unit/session-keys.test.ts`), not C16's.** This finding named the wrong component; C16's T2.17 is the row that reached both bindings. Each row was pressed from wherever the previous one left focus. The `⇧⏎` row re-ran the live entry and left nothing to enter, so later rows landed at the wrong target. The precondition the fix added listed **eight** mis-aimed rows, not two: this finding's two, plus the four `global` scroll chords and `⌥C`/`⌥V`, all pressed at `liveBlock`. Each row now starts at its binding's target, and asserts the router's target before the press and the `target:` stage after it. Measured: the same two key mutations failed only T2.17 before, and fail T1.4h and T2.17 now. The lane's suggested check, dropping a binding, cannot fail T1.4h or T2.17, since both walk `defaultKeymap`. It is watched elsewhere: removing the prompt's `valuesToggle` row fails KT1, KT4, C16 T1.97 and T1.37. C22's spec row, which claimed effects and fourteen cases, was amended to what the test asserts (ee5fd0da).
+
+## F1458 — window titles and notifications delete C0 and C1 rather than showing them, and leave printable residue ★★☆☆☆
+
+Found by lane b4-classes extending ruling 71's bidi clause to OSC 2 and OSC 9 (C01 I26, F1407). `oscText` still deletes C0, DEL and C1, so `ESC[2J` in a tool's output reaches the title as `[2J`: the control is gone and its arguments remain as text. *(Closed below.)* Ruling 71 replaced deletion with caret form for blocks. C01 I26 states the older form as its limit rather than choosing one. **Owed**: a ruling on whether the OSC sinks show controls as blocks do.
+
+**Closed** (ruling 86, 46746909 spec, 1e2c5525 code). `oscText` shows C0, DEL and C1 in caret form. Tab and newline are shown too, as `^I` and `^J`: this is the one departure from C09 I128's `controlForm`, because a payload is one line and no code unit below 0x20 may reach it. The L0 halves stay apart the way the bidi set already did: the form is copied into `escapes.ts`, and C01 T2.13 holds it equal to `data/text.ts`'s `controlForm` over every BMP code point. T1.35 sweeps every BMP code unit through both builders, asserts that no C0, C1 or bidi unit reaches a payload, and counts 77 rewritten so it cannot pass vacuously.
+
+## F1459 — `make test` read `dist/` through `example-bins` without building it ★★☆☆☆
+
+Found integrating lane b4-classes. The rebased lane's chain failed the three *F56: executing it reaches the application* rows in `test/contract/example-bins.test.ts`. Each example's launcher imports `calcium-tui`, which resolves to the worktree's `dist/`, and that was still the pre-rebase build: `make test` ran before anything rebuilt it. The same file passed 16 of 16 twice once `e2e` had built `dist/` at 20:30. The shell lane saw the same three reds and attributed them to a stale `dist/`. CI was never exposed, because `make check` builds first (F447) and runs before `make test`. That is the ordering hiding the dependency, not satisfying it. **F447's class at a second gate**: a target that reads a generated artefact generates it. `make test` now runs `npm run build` first.
+
+## F1460 — §097 is compared against the panel block where the design draws the panel layer ★★☆☆☆
+
+Found by lane b4-fixtures building the figure comparison (M16.1). §097's frame in `design-surfaces` draws the `panel` block kind: a titled box headed *Confirm*, with box corners. §097 specifies the panel **layer**, a menu floating between two rules above the prompt (M8). The probe `kind: "panel"` names the block, so the row compares the right name against the wrong thing, and its listed difference (`│ ┌ ┐ └ ┘` only in the frame, `— › ▌ ● ❯` only in the figure) is that confusion measured. **Owed**: a frame of the panel layer under §097's heading.
+
+**Closed** (ruling 87, c34b181f). §97 is drawn from a real session with `/c` typed over an empty transcript, from below the header to the prompt's lower rule, under its own heading. Below `MIN_COLUMNS` the 40-column golden draws it at 60 with a caption. §97's probe is `promptUnderMenu`, and a classification row records the homonym. The census is unchanged at 58 framed. The measured difference is now `figure only: — › ▌ ●`, `frame only: (none)`, and two of its causes are F1474 and F1475.
+
+## F1461 — the design leads every error with ✗ and the tree's status block leads with ▲, the warning mark ★★☆☆☆
+
+Found by lane b4-fixtures. Every ERROR in the design's figures (§048, §061, §066, §096) opens its message with ✗. The tree's `status` block opens an error with ▲, which is the `warning` mark, so at 1-bit and in monochrome an error and a warning share their only non-colour carrier. `status.ts` cites a design drawing of `[▲ plot failed…]` that no current fixture contains, which is a citation into a picture the design no longer has. **Owed**: a ruling. The registry is normative on appearance, so the expected answer is ✗, with the golden movers named before the change.
+
+**Closed** (ruling 85; f9a193eb and c396cc81 spec, b8307c68 code). C09 I138: `status` draws `cross` for `error` and `retrying`. `GlyphSet.warning` is retired with its only reader, and ▲ stays reachable as the vocabulary's `warn` token. The golden movers were written down before the run (49 snapshots in blocks T2.10, containment and design-surfaces §96, §72 and §58) and moved exactly so: 88 changed cells paired, 56 `▲`→`✗` and 32 `!`→`x`, with no other change. `tools/mutate/runs/c09-status-mark.mjs` reports 4 of 4 caught by T2.230. That verdict was taken under the harness F1472 describes and is re-taken once it is fixed. The design texts that still name ▲ are F1477.
+
+## F1462 — §019's hand-written counts were stale three ways, and so was the census prose ★★☆☆☆
+
+Found by lane b4-fixtures (M16.7). `test/support/design-surfaces.ts` said 121 bindings, eight scopes and the registry's 39. Measured, they were 154, 10 and 66, and after the shell lane's preview keys they are 157, 10 and 69. They are now derived into §19's heading rather than written by hand, so the heading moves when the keymap does, which it did at this integration. DESIGN_FIXTURES.md's *seven surface rows carry no probe* was likewise out of date (there are ten, and §035 is built again) and is corrected. Closed in a37abceb and at integration.
+
+## F1463 — no golden draws a reasoning block, so §024 has nothing to be compared against ★★☆☆☆
+
+Found by lane b4-fixtures. §024's target is `states.test.ts`, which has no reasoning block at any rung, so the fixture's regenerated ▹/▿ (batch 1) agree with the tree's `expand`/`collapse` glyphs only in the glyph table. No frame shows them.
+
+## F1464 — §035's parked ASCII rung was already settled by R-PRG-003 ★★☆☆☆
+
+Found by lane b4-fixtures (M16.8). §035's own picture draws `[#][.]` for the ASCII bar and its question was parked. R-PRG-003, in §001's current contract, rules one `#`/`-` pair at every granularity, and the golden already follows the rule. Pictures disagree, so the rule decides; the listed difference records it.
+
+## F1465 — §006's census is the tree's `GLYPH_TOKENS`, not the registry's canonical set ★★☆☆☆
+
+Found by lane b4-fixtures. §006 counts the glyphs the tree names. Nine of the registry's canonical marks are missing from `GLYPH_TOKENS` and seven tree-only marks are present, so the census agrees with itself and not with the design. **Owed**: the two sets compared by equality, with each side's extras either registered or retired.
+
+## F1466 — 36 of the 58 framed fixtures have no frame to be compared against ★★☆☆☆
+
+Found by lane b4-fixtures. The figure comparison (M16.1) locates a frame by its `── §N ·` heading in the target's own snapshot. 36 of the 58 framed rows are *unlocated*, because their goldens are indexed by kind, state or scene, or keep no golden at all (§028, §051, §052 and §101 in `question-slot.test.ts`). Each is a listed difference with a reason, so the gate is honest, but for those 36 it records an absence rather than checking a picture. **Owed**: headed frames for them, surface by surface. The shell lane's F1445 (no golden draws the transcript bar, the chip preview or an inspection) is the same gap from the other side.
+
+## F1467 — the `cells()` clause is vacuous over the current corpus ★★☆☆☆
+
+Found by lane b4-fixtures. No framed figure's widest line holds a wide glyph, so `.length` and `cells()` agree on all 58 and a mutation to `.length` would survive every corpus row. T1.10 constructs the case, a figure with a wide glyph, and catches the mutation (m16-fixtures).
+
+## F1468 — §018's `built` is `no` although its row says `choice` and `control` landed ★★☆☆☆
+
+Noticed by lane b4-fixtures and not ruled, because it belongs to M16.5's focus-shape work. §018 is excluded from `framed` by its `built: no`, and its own row text says two of its subjects shipped. Either the column or the prose is stale.
+
+## F1469 — the scrub rewrote proof's registry override to a scope no package has, and the local chain never runs `make proof` ★★★☆☆
+
+Found while completing the rename (169f8cc8). `tools/proof.sh` passed `--@<scope>:registry=$LOCAL`, the scoped override F12 chose because `publishConfig.registry` beats the bare `--registry`. The scrub's mapping turned it into `--@calcium-tui:registry=`, and `calcium-tui` is unscoped. So the flag names a scope no package has, and npm accepts and ignores it. Measured in the devcontainer on 2026-09-29, with `publishConfig` removed:
+
+```
+npm publish --dry-run --@calcium-tui:registry=http://localhost:4873
+npm notice Publishing to https://registry.npmjs.org/ with tag latest and default access (dry-run)
+npm publish --dry-run --registry=http://localhost:4873
+npm notice Publishing to http://localhost:4873/ with tag latest and default access (dry-run)
+```
+
+The scrub's line aimed the dry-run at **the public registry**. `proof.sh`'s grep for `Publishing to $LOCAL` would have stopped the gate, which is F12's guard doing its job, but no local run had ever reached it. PG3 checked that the script *contained* the scoped string, and the scrub rewrote that string in both files at once, so the fixture agreed with the defect.
+
+**Why nothing saw it**: the scrub's own chain was enforce, test, golden, check and e2e. `make proof` runs only in CI. It is the one gate that publishes and installs, and it was the one gate the change could break. This is *a gate that exists and is not run*, in the form where the gate's CI-only placement matches the one change it covers.
+
+**Closed.** A04 §9 now holds the package unpublished with no `publishConfig` (the person's ruling), so the bare `--registry` is the override that takes, and `proof.sh` passes it. PG3 now asserts the bare flag, no scoped override, and no `publishConfig`: one fact, since the bare flag is right exactly while `publishConfig` is absent. Reverting `proof.sh` to the scrub's line fails PG3, measured at 1 failed / 7 passed. `make proof` is green on the fixed tree, and the lanes' chain script runs it from now on.
+
+## F1470 — linear writes far-side and typed text with bidi raw, and a name and its copy stop matching ★★★★☆
+
+Reported by lane b4-bidi as *linear mode writes the typed command and its input line raw*. Measured, it is wider than that. linear's `clean` is `stripControl`, which deletes C0 and C1 and passes every bidi format character whole. `blockLines` reads a node's name from `semanticsOf`, which reads the raw block, while the source comes through `copyOf`, which passes the registry's resolve and is neutralised. For a notice whose text is `invoice`, U+202E, `fdp.exe` (`npx tsx out/b4-bidi-probe/linear-name.ts` at 543d554d):
+
+```
+"note: invoice\u202Efdp.exe" raw U+202E: true form: false   (the override written here as an escape, SS69)
+"invoice<U+202E>fdp.exe" raw U+202E: false form: true
+```
+
+There are two defects. **The override reaches the stream raw**, which is `R-TRU-001` on the one surface M12's suite never read: C09 T4.107 holds its site set by equality over the frame's writers, and linear composes no frame. **And the fact is written twice**, because the dedupe compares a stripped name with a neutralised source line. The same holds for a C0 escape, stripped in the name and shown as `^[` in the copy. §6n.4 row 4 routes the system notification body through the same words, so an OSC 9 body carries the override too.
+
+**Ruled (C22 §6m.4 row 6, I149):** linear takes C09 I128's shown form for every string it writes. C23 I90 already announces a reply *as drawn*, in the form, so linear had two conventions in one stream. The cost is ruling 71's, carried into speech: a screen reader speaks `<U+202E>`, and right-to-left text reads its marks. `windowLine` also builds its own `Intl.Segmenter`, and draws and measures the draft raw.
+
+**Closed** on the same branch: `clean` is `neutraliseControl`, and `windowLine` maps each grapheme to its form before measuring, so the caret lands on the form's cell. T1.180 reads the notice as one line in the form, and the question, the completion line and the answer likewise. T1.181 reads the window and the caret either side of U+202E. Both were red first: two lines, and `{ text: '> a\u202eb', caret: 4 }` against `caret: 12`. `tools/mutate/runs/c22-linear-form.mjs` caught 2 of 2, with the neutraliser a no-op as the control. The notification body takes the fix through `completionLine`. `windowLine`'s own `Intl.Segmenter` stays: it is one call, and it is the grapheme walk the window needs.
+
+## F1471 — no row reaches the real C23 I90 `drawn` ★★☆☆☆
+
+Found by lane b4-bidi. `construct.ts` builds a reply's announcement from `stores.editor.drawAs(ch) ?? neutraliseControl(ch)`. C23 T1.100's test world supplies its own `drawn`, so the lane's one-line change there is covered by no row. A mutation of that line would survive by construction, so the lane left it out of `c17-bidi-display.mjs` rather than record a survivor it had arranged. **Owed**: a row through a built session in linear mode that answers a reply holding U+202E and a chip, and reads the `answered` event's line.
+
+## F1472 — a mutation run reports `caught` by the named row when that row passed ★★★★☆
+
+Found by lane b4-osc (ruling 88). `tools/mutate/mutate.mjs:565` sets `byNamedTest: output.includes(m.expect)`, a substring test over the whole vitest output. Vitest prints a passing row's `✓` line under a file where another row failed, so the named row's id is in the output whenever it shares a file with the row that did fail. The verdict is then `caught` by the named row, which is the claim the pass exists to test.
+
+Measured: against C22 T1.4h as it stood at 0e08af20, both key mutations in `c22-key-targets.mjs` printed `caught T1.4h`. The only `FAIL` line was C16 T2.17, and the log carried `✓ T1.4h (C22 I26): every binding in the table is consumed at its target`. `caughtBy`, two lines below, already reads `failedRows(output)`, so the harness holds the right instrument and uses it only for the other verdict.
+
+**The scope is unmeasured, and it is every run.** A killed mutation whose named row sits in a file with the row that did fail reads as named whether it was or not. 73 distinct `expect` values are prose rather than row ids, from probe and tool runs, and they need their own rule rather than `failedRows`. **Owed**: `byNamedTest` from `failedRows` for a row-id `expect`, a decision for the prose ones, a harness row that fails on the substring form, and a re-run of every run on a quiet machine to count the verdicts that change.
+
+**The harness half landed** on lane b4-harness, as ff5adbae and 60cf6424. `byNamedTest` now reads `namedFailed()`, which looks only at the `FAIL` lines. `failedRows` is rebuilt on `rowsOn`, which recognises 1145 distinct row-id expectations where the old reader recognised 1055. **The prose `expect`s are ruled**: with no `FAIL` line to name them, the verdict is `KILLED, NAMED CHECK UNAVAILABLE`, which is still a kill and never reads as the named row's. MH12, MH12b and MH12c each went red first on the substring form.
+
+**The summary had the same fault one level up**, and it is closed as well. It printed `every mutation was caught` beneath CAUGHT ELSEWHERE rows. It now ends `caught by the named row N · caught elsewhere N · unavailable N · survived N` and prints the all-clear only when every kill is the named row's (MH13, red first). `tools/mutate/sweep.mjs` had no bucket for the unavailable state, so such kills dropped out of its `caught` total; it now counts them (MS4).
+
+**A five-run sample moved one verdict**, `c22-linear`'s T4.102, to CAUGHT ELSEWHERE (by T4.103). It was a vacuous row and is F1478. **Still owed**: the re-run of every run, which is what F1472 exists to count.
+
+## F1473 — T2.144's `img-fault` never reaches the fault arm in a whole-file run ★★★☆☆
+
+Found by lane b4-golden (ruling 85). The fixture overrides an image's `data` but keeps the corpus image's `digest`. The decode cache (`DECODED`, keyed on digest) then returns the real picture once T2.143 has decoded it. Its capture is `▀▀`, a picture, not a fault. With `src` at 0e08af20, `npx vitest run test/contract/rows-arm.test.ts -t "T2.144"` fails alone (`img-fault at 2: expected [ …(3) ] to deeply equal [ Array(1) ]`) and passes in the whole-file run. The row depends on the one before it and does not construct the state it names. **Owed**: a digest of the fixture's own, and the row shown to fail on the fault arm removed.
+
+**Closed** by lane b4-exec (0d185e1f, de9df639). The `img-fault` fixture has its own digest, `digestOf("not-a-png")`, so the decode cache cannot answer it from the corpus image. Its 33 Ink captures, which were the corpus image's under a second name, are retired as `SHARED_DIGEST`, and the fault arm is asserted by shape: the box's two rows, the caption, and the decoder's reason. Before the fix, the whole file passed with the alt drawn alone (`Tests 4 passed (4)`) and the row alone failed. After it, `c09-image-fault-arm.mjs` catches 3 of 3, with a control that turns T2.143, T2.144 and T2.146 red.
+
+## F1474 — the completion menu marks no current candidate at rest ★★★☆☆
+
+Found by lane b4-golden building §097's frame (ruling 87). The frame's three candidates have identical styles in a `readFrame` read: no mark, no ground, no weight. §097 draws `current`'s `›` on one, and the footer offers `⏎ accept`, so the reader is offered a key that acts on a candidate the frame does not show. **Ruled (89)**: the registry is normative on appearance, so the current candidate carries the mark at rest.
+
+## F1475 — the completion menu closes on a rule of its own above the prompt's ★★☆☆☆
+
+Found by lane b4-golden. The menu's closing rule and the prompt's upper rule draw as two stacked rows. §097's menu closes on the prompt's own rule, the "between two rules" of the panel layer. Mark comparison cannot see it, since both rows are the same glyph; it is recorded in §97's difference reason. C22 T4.34 asserts the menu's own closing rule, so the row and the design disagree. **Ruled (90)**: one rule, the prompt's. T4.34 is amended with the build.
+
+## F1476 — a handed-off child that fails gets a warning's tone on an error document ★★★☆☆
+
+Found by lane b4-golden (ruling 85). `src/shell/execution.ts:1041–1047`: a handed-off child that exits non-zero, or ends on any signal, is appended as `noticeDoc(…, "warn", …, "error")`. The document's status says it failed, and its only visible carriers, the tone and the ▲ mark, say warning. **Ruled (91)**: a notice's tone agrees with its document's status. A non-zero exit, or a signal other than SIGINT, SIGTERM or SIGHUP, is a failure: error tone and ✗. SIGINT, SIGTERM and SIGHUP are what an interrupt or a closed terminal sends, and they settle `cancelled` as C23 I66's ladder does.
+
+**Closed** by lane b4-exec (eb33893b spec, cf3b6f86 code), built from a seven-row walk table (C23 §8a A6.6). A non-zero exit or a crash is an `error` notice with ✗. SIGINT, SIGTERM and SIGHUP settle in the `cancelled` form: muted, ⊘, `partial`. `noticeDoc` gained an optional state mark, because the table's row 5 found the continuation mark and the cancelled mark both claiming one glyph slot. T4.93 was an `it.todo` and now runs. `c23-handoff-ending.mjs` catches 3 of 3 with a control. Read in frames: `⊘ vim ended on SIGINT` in muted, where it was `▲` in amber. **The ruling's cited precedent was wrong**: C23 I66 settles a cancel on `error`, which is F1479 and ruling 92. Rows 3, 4 and 6 of the table are F1482 and ruling 94.
+
+## F1477 — two design texts still name ▲ as the error mark ★★☆☆☆
+
+Found by lane b4-golden (ruling 85). §096's empty-case annotation reads *no banner, no ▲, no red* beside its own ✗ error. The registry's `attention` asciiNote cites `GlyphSet.warning`, which ruling 85 retired. Both are in the normative design, which the lane rightly did not edit. **Owed at the release seal**, which already re-seals the baseline and bumps the revision: both texts corrected, the HTML regenerated, and the sealed digests re-taken.
+
+## F1478 — T4.102 cites C22 I123 and cannot see it: removing the unchanged-line guard passes it ★★★☆☆
+
+Found by the F1472 harness fix. Its sample re-ran `tools/mutate/runs/c22-linear.mjs`, and the mutation that deletes `if (next === shown) return;` from `createLinearOutput`'s `redraw` read `CAUGHT ELSEWHERE (by T4.103) T4.102`. Under the old substring verdict it had read `caught`. T4.102 names C22 I123, *a commit that changes nothing writes nothing*. It passed with the guard gone.
+
+**Two vacuous clauses, one cause.** After `s.resize({ columns: 40, rows: 10 })` the row read the output at `step()`, which is 0 ms. A resize commits on the scheduler's timer, so nothing had committed yet. Its check, `lines(since(before)).every((l) => l === "> xy")`, is also true of an empty write. The idle-commit clause above it (`step(200)` with no commit) has no cause to commit either. Measured: narrowing to 3 columns and reading at 0 ms gave `the narrowed line, once: expected +0 to be 1`; at 100 ms it gave 1.
+
+**Closed** on the same branch. T4.102 now waits 100 ms after each resize. A resize the line survives must write `""`, and a narrowing to 3 columns must write exactly one line. With the guard hand-removed (`if (next === shown) return;` commented out), T4.102 fails on its own row: `a resize the line survives unchanged: expected '\r\u001b[2K> xy\u001b[5G' to be ''`. The class is an assertion over a write that never happened, which `every` and a 0 ms read both satisfy.
+
+## F1479 — a cancel is drawn as a failure on the shell route and as a warning in the queue ★★★☆☆
+
+Found by lane b4-exec while building ruling 91. That ruling said a handed-off child's cancel settles `cancelled` "as C23 I66's ladder does". Measured, I66's shell route (`execution.ts` about 911–960) settles a cancel on status `error`, draws an error box saying `Cancelled.`, and sets code `CANCELLED`. That is failure's status and tone, so the precedent the ruling cited draws a cancel as the failure the ruling separates it from. The lane built the handoff arm on the `cancelled` call state instead: `CALL_STATE_TONE.cancelled` is `muted`, the glyph is ⊘, and the status is `partial`, which is C07's mapping for a cancelled call (`mapping.ts:190`, C23 T3.4).
+
+A second site: `clearQueue` (`execution.ts` about 598) writes `noticeDoc(item.line, "cancelled before it ran", "warn", …)`, a warning with ▲ on an `ok` document, for a cancel. C09 T2.97 names this notice as its case.
+
+**Ruled (92):** a cancel is the `cancelled` call state on every route. I66 is amended and both sites follow. **Owed**: the I66 amendment, both code sites, T2.97 moved with them, and a row per site that reads tone, mark and status.
+
+**Closed** by lane b4-exec2 (6a12dfc4 spec, 7f92f76e code). The walk (C23 §8a A6.7) found the shell route and the queue breaking C23 I10 as well as I66, so I96 cites both. `cancelledNotice` and `cancelledDoc` in `documents.ts` are now the one place the cancel form is composed. Code `CANCELLED` does not survive as data: C04 I3 gives a `partial` document no `error` field, and a grep found no reader. **Two premises were corrected.** Ruling 92's *what C07 already gives a cancelled call* holds for the tone and the status, not for ⊘, which is F1493. And *every route* does not reach the app route, which is F1490 and ruling 97. Frames: `⊘ Cancelled.` muted at full colour, dim at 1-bit, `/ Cancelled.` in ASCII. The golden movers were predicted exactly: four `continuation` snapshots.
+
+## F1480 — a handed-off child's exit code never reaches history ★★★☆☆
+
+Found by lane b4-exec. `noticeDoc`'s meta has no `exitCode`, so `meta()` defaults it to 0, and a handed-off `vim` that exits 1 is recorded in history as a success. This goes against C23 I29, which has history record what the command returned. Ruling 91 made the notice say failure; the record beneath it still says success, so the two disagree about one run.
+
+**Owed**: the handoff's notice carries the child's exit code into meta (`128 + n` for a signal, as C21 reports one), and a row that reads the history entry after a non-zero handoff.
+
+**Closed** by lane b4-exec2 (7f92f76e, C23 I97). **The finding's remedy named the wrong component.** C21's `Exit` is `{code: null, signal}`, and the 128+n arithmetic belongs to C07 I14 (`exitCodeOf`) and C01 I17. So the handoff now goes through `exitCodeOf`, which takes `Pick<RawResult, "exitCode" | "signal">`, rather than through a second copy of the table. A child with neither a code nor a signal gets −1, C07's *never started*. T4.96 was red first (`exit 1: meta 0 · recorded /tty vim 0`). The shell route's own `code ?? 1` is F1491.
+
+## F1481 — a failed key action is drawn as a warning on an `ok` document ★★☆☆☆
+
+Found by lane b4-exec, surveying `src/shell/` for other notices whose tone disagrees with their content. `construct.ts:4198` writes *the key action `X` failed: …* as a warning on an `ok` document. The lane checked the other warning notices on `ok` documents (`construct.ts` 1243, 1300, 1370, 1406, 2602, 4310; `execution.ts` 1793, 1833): none of them reports a failure, and they follow the usual convention.
+
+**Ruled (93):** a notice that reports a failure is an `error` document, in error tone, with ✗. **Owed**: the one site and a row reading its tone, mark and status.
+
+## F1482 — a handed-off child with no exit status is said to have exited 1 ★★☆☆☆
+
+Found by lane b4-exec's walk table for ruling 91 (`out/b4-exec-walk.txt`, C23 §8a A6.6). Row 3: with neither a code nor a signal, the text is built from `code ?? 1` and reads *vim exited 1*, an exit code the child never returned. Row 4: under `sh -c`, a grandchild killed by a signal comes back as 128+n with no signal and counts as a failure. Row 6: SIGQUIT, which a terminal can also send, is a failure because the ruling names three cancel signals.
+
+**Ruled (94):** rows 4 and 6 stay as built, for the reasons recorded in the ruling. Row 3's text becomes *ended without an exit status*, and its state stays failed. **Owed**: the text and a row for it.
+
+## F1483 — the image fault text carries an em dash onto the ASCII rung ★☆☆☆☆
+
+Found by lane b4-exec while fixing F1473. Under ASCII, the image decoder's fault reads `x not a PNG or a GIF — …`: the mark takes its ASCII form and the prose beside it keeps U+2014. The ASCII rung is defined over glyphs, so whether framework-authored prose is inside it is a question, not yet a defect.
+
+**Owed**: survey how other framework-authored text meets the ASCII rung (status messages, notices, the size fallback), then rule the class rather than this instance.
+
+## F1484 — a retired generator still rewrites `DESIGN_FIXTURES.md` and drops what the tests parse ★★★☆☆
+
+Found by lane b4-instr while classifying the unfixtured tools. `tools/design-fixture-map.py` writes `test/golden/DESIGN_FIXTURES.md` from its own table, `M`. The file has since been edited by hand: the `figure` column and the rule-interaction table were added, and `design-fixtures.test.ts` parses it by equality. Run against a copy at 78cd90e1, the script rewrote the file `+114/−192` and dropped both. Nothing prevents it being run. `design-prose-with-surfaces.py` still parses `M` out of the script's text. Today `M` agrees with the markdown's class column (109 rows, 33 `prose` in each), but it is a second record of one fact.
+
+**Ruled (95):** the writer half goes and the markdown is the one record. The census reads the class column from the markdown. **Owed**: both changes, and the instruments exemption replaced by a fixture if a reader remains.
+
+**Closed** by lane b4-fixmap (aa4e1741). Before any edit, the census read from `M` and from the markdown's class column agreed: 109 rows and 33 `prose` in each, with no class disagreements. `design-prose-with-surfaces.py` now reads the class column with the slice and pattern `rows()` in `tools/design/figures.ts` uses, and its 17-line output is byte-identical before and after. The generator is deleted (300 lines) and its `NOT_INSTRUMENTS` entry removed; nothing in the Makefile or the docs named it. DC1 and DC2 run over a fabricated markdown with escaped pipes. DC6 reads nothing outside the table, and DC7 ties the real census's `of N` to `rows()`. Four reader mutations each turned at least one row red; DC7 cannot see the cell-pattern mutation, because the real map's escaped pipes sit only in `surface` rows, and DC1 covers it.
+
+## F1485 — `make instruments` ran only in CI, and thirty-eight tools accumulated with no fixture ★★★★☆
+
+`make instruments` (`tools/instruments.mjs`) runs in CI's `fast` job and in no local chain. PRs #62 and #63 went red on it, and batch 4's tip read `85 found, 47 with a fixture`, with 38 `NO FIXTURE`. It is the *gate that exists and is not run* shape again: every landing since #62 was checked against everything except this.
+
+Lane b4-instr classified all 38, verifying each by its callers and, for the one-shots, by re-running them against a `git archive` copy:
+- **11 had a test that nobody had listed**, now registered: `chromium.mjs`, `figures.ts`, `release.mjs`, `released-against.mjs`, `fixtures.ts`, `generate-keymap.mjs`, `rule-status.mjs`, `from-registry.mjs`, `curated/pin.ts`, `bundle.mjs`, `record.ts`.
+- **7 got a new one**: `wcag.mjs` (WC1–6, including equality with `contrast.ts` over a 216-colour cube), `quantised.mjs` (QT1), three benches (BP1–5), and two census reporters (DC1–5).
+- **18 one-shots and two non-instruments are exempt, one entry per file**, each with a reason quoting what the tool printed on re-run.
+
+Eleven mutations were run and each turned its row red. Three defects of the gate itself were fixed alongside:
+- `NOT_INSTRUMENTS` entries were never checked for presence, so an exemption could outlive its file.
+- Eight fixtures read `dist/` without building it; `instruments` now builds first (F447's rule).
+- `quantised.mjs`'s header claimed a byte-identical regeneration and nothing ran the writer; QT1 does.
+
+The cost is that CI's `fast` job builds twice. That is accepted: a stale `dist/` passes against the previous commit.
+
+**Closed.** `make instruments` reads `65 instruments, every one with a fixture · 810 rows · all green`, and `/tmp/gates-wt.sh` runs it as the seventh gate. **#62 and #63 still carry the red** until their own trees are repaired.
+
+**Carried down the stack** by lane pr-instr, because #61 was red on the same gate (`74 found, 47 with a fixture`), so the gap predates batch 2. The repair was ported to #61 (9ca007ad), merged forward through #62 (81581547) and #63 (d99921f1), and pushed. Each tree reads `64 found, 64 with a fixture`. **One classification differs by tree, and correctly.** On #61–#63, `design-fixture-map.py` reproduced `DESIGN_FIXTURES.md` byte for byte (md5 unchanged), so it was a live writer that nothing ran, and it got a fixture, DM1. DM1's first run on #63 found that 3b36dc74 had changed §22's citation to T1.197 in the markdown and not in the writer's table, so a regeneration would have restored the stale T1.100. The lane fixed the writer's table on #63. On batch 4 the writer is gone (ruling 95), and the merge (44555b32) took batch 4's side.
+
+## F1486 — the completion footer offers `⏎ accept` where `⏎` submits the line ★★★★☆
+
+Found by lane b4-menu's walk while building ruling 89 (`out/b4-menu-walk.txt`, row A). A typed menu holds no selection (C19 I20), so the prompt's keys resolve first: `⏎` submits the line and `↑` walks history. The footer's `complete` hints (`chrome.ts`, the `substate` arm) are built from the menu's own rows whatever the selection. So at rest it offers `↑↓ move` and `⏎ accept`, and both are false. Measured: `⏎` at rest submitted `/c` and printed `unknown verb: /c` beneath a footer offering to accept.
+
+**Ruling 89 made it worse, and hid the one difference.** The menu now marks its current candidate with `›` and the pick ground at rest. A reader sees a marked candidate and `⏎ accept`, and `⏎` runs the partial line instead. The old `bullet` after `Tab` was the only visible sign that the menu held the keys. With it gone, the frames at rest and after `Tab` are identical.
+
+**Ruled (96):** the footer names what each key does in the state the frame shows. **Owed**: the footer's two states, and a row that reads the footer at rest and after `⇥` and asserts they differ.
+
+**Closed** by lane b4-menu2 (73b59abc spec, 0d476af7 code). `OwnerHints.promptUnderMenu` comes from the router's own predicate, and `chrome.ts`'s `complete` arm gains a rest state whose chord is read from the keymap. At rest the footer reads `complete  ⇥ complete  esc close`, and after `⇥` it reads `complete  ↑↓ move  ⏎ accept  esc close` (ASCII: `Tab complete`, `Up/Down move  Enter accept`). T1.182 and T4.120 were red first; `c22-menu-footer.mjs` gave caught by the named row 5 · survived 0. **One premise was corrected**: ruling 96's *`⇥` or `↓`* holds for `⇥` alone, because `↓` at rest belongs to the prompt. Ruling 99 then amended the rest footer to add `⏎ run`, from §029.
+
+## F1487 — the pills form of the menu under-fills its box ★★☆☆☆
+
+Found by lane b4-menu's mutation pass. `menuRowsShown` counts one candidate per row, which is the table form's shape. The pills form wraps several candidates onto one row, so its window is sized for rows it never draws. Measured: 60 pills under a five-row cap drew three pills on one row, followed by `+ 57 more`. This holds on the clean tree before and after the lane. C19 T4.9's fill clause is scoped to the table form (cbb21e6d), with this recorded beside it.
+
+**Owed**: size the pills window by the rows its pills wrap to at the menu's width, and extend T4.9's fill clause to that form.
+
+**Closed** by lane b4-menu2 (3a8df408, 13144bfa spec, cfa684f7 code). `menuWindowOf` sizes the pills window by the rows its pills wrap to at the placement's width, and `+ N more` counts the pills left out. `KeyDeps.measure` is now required. T4.9 and T3.30 were red first; `c19-pills-window.mjs` gave caught by the named row 7 · survived 0. **Ruling 99 retires the pills form the same day** (F1496), so this window leaves with it; it is closed as built rather than as moot, because it was what the tree drew.
+
+## F1488 — §097's menu is half-built: pills carry no `›`, the other rows no `bgElev`, and find and preview draw no rules ★★☆☆☆
+
+Three gaps, reported by lane b4-menu against §097 and not built by rulings 89 and 90:
+- **The pills form** carries `active` with no `›`. R-BLK-866 draws a ladder of marks for it.
+- **§097's `bgElev` ground** on the rows that are not current is not drawn.
+- **The find and chip-preview panels** draw no rules, while §097 says every menu floats between two. This one is unmeasured.
+
+**Owed**: read R-BLK-866 and §097 against the three panels in frames, then build what the registry draws. The design fixtures' `figureOnly` for §097 is where a miss will show.
+
+**Closed** by lane b4-menu2's survey. **The pills premise was wrong**: R-BLK-866 draws no pills, so ruling 89's `›` had no picture to follow in that form. Ruling 99 retires the form (F1496). The other three gaps are real and are filed on their own: the panel ground (F1501), find (F1502) and the chip preview (F1503).
+
+## F1489 — a session row is named T4.34 and is not C22's T4.34 ★★☆☆☆
+
+Found by lane b4-menu. The menu's closing-rule row in `test/integration/session.test.ts` is named T4.34. C22 T4.34 is a different row, citing C22 I66. The session row has no spec row of its own. So a mutation `expect` of `T4.34` resolves to whichever the harness reads first. Lane b4-menu's first draft of `c19-menu-current.mjs` was scored `caught T4.34` from the id's presence while T4.34 stayed green, which is F1472's second instance.
+
+**Owed**: give the session row an id of its own and a spec row, and have SP9 or a sibling rule refuse one id in two tables.
+
+**Closed** by lane b4-menu2 (b7b2f3b7, 503f2710 spec, 3ed61fde code). No existing rule refused this shape: SP7 checks ids within one spec, and SP15 one title per spec. A03 SP16 refuses a titled row whose attributed spec does not declare the id when the file's owner does, or has retired it. It was red on the real tree with sixteen rows, F1489's own among them. Three rows were renumbered, thirteen prefixed, and 19 ids stay on a debt list compared by equality. `enforce-sp16-row-resolves.mjs` gave caught by the named row 6 · survived 0. The 639 rows naming an id no spec declares are counted and not gated; that is F1500.
+
+## F1490 — an app-route cancel settles `ok` with exit 0 while history records 130 ★★★☆☆
+
+Found by lane b4-exec2's walk (C23 §8a A6.7, row 7). On the app route, `⌃c`, a withdrawn approval and a cancelled stream all settle through `cancelThis`, which does `finishCard` and then `settle(id)` with no document. So no status can change. Measured: the head reads `notice muted work-unit «ps · cancelled»`, the status is `ok`, `meta.exitCode` is 0, and C20 records `/ps 130`. This goes against C23 I10, *cancellation settles as `partial` with output retained*, and it disagrees with I96, which the shell route, the queue and the handoff now follow.
+
+**Ruled (97):** the shell writes a `partial` document that keeps what was drawn, with exit 130. **Owed**: the settle path, a row per cancel source, and a check that C07's cancelled mapping (F1493) is or is not on this path.
+
+**Closed** by lane b4-exec3 (040976bf spec, 13abac71 code, C23 I98). Invoke, a cancelled stream and a withdrawn approval each settle through `settle(id, doc)` with the card as it stood — the head reading `cancelled`, every streamed block, then `⊘ Cancelled.` — at `partial`, exit 130, matching C20. Denied and expired approvals are not cancels (ruling 100 a, F1510). T4.97 read `status ok … code 0 · recorded /ps 130` on all three sources before the fix. The walk found a worse defect behind it, the late answer (F1505).
+
+## F1491 — the shell route records `code ?? 1`, and an `error` notice carries exit 0 ★★☆☆☆
+
+Found by lane b4-exec2. Two sites disagree with C07 I14's table, which the handoff now uses (I97).
+- **The shell route** records `exit.code ?? 1`. A child killed by an outside signal records 1 where the table gives 128+n (137 for SIGKILL). A spawn failure records 1 where the table gives −1, and its text *exited with code 1* names a code the child never returned.
+- **`noticeDoc` at status `error`** leaves `meta.exitCode` at 0. That covers the key-action document ruling 93 made `error`, and F15's fault notice. `errorDoc` defaults to 1, and `completeLocal` derives 1 from the status. Neither site is a submission, so history is unaffected, but the document says error with code 0.
+
+**Ruled (98).** **Owed**: both sites, and a row per site that reads the code beside the status.
+
+**Closed** by lane b4-exec3 (045a1422, C23 I100). The shell route's code goes through `exitCodeOf`. A spawn failure reads C07's *The command did not start.* and records −1, where it read *exited with code 1*. `compose` takes its default code from the status, so an `error` document composed with no code carries 1. **Ruling 98's *137 for SIGKILL* was false on the PTY arm**, which reported 0 beside the signal; that is F1507, fixed at C21.
+
+## F1492 — lines cleared from the queue never reach history ★★☆☆☆
+
+Found by lane b4-exec2. C23 I29 records every submitted line at settlement. `clearQueue` settles each queued line with the cancelled notice (ruling 92) and records none of them. Measured: after `⌃c` with two lines queued behind a running `/ps`, C20 held only `/ps 130`.
+
+**Owed**: each cleared line recorded at settlement. Its code is 0, the document's own (C04: `partial`, and nothing ran); if a spec says otherwise, amend the spec first. A row reads the history after a clear.
+
+**Closed** by lane b4-exec3 (c839dc14, C23 I29). Each line `⌃c` clears from the queue is recorded in C20. **The code is −1, not the 0 the finding proposed**: C07 §3 names *an invocation whose signal was already aborted so nothing was spawned* as a producer of −1, and a cleared line is that one step earlier. 0 would record a success and 130 an interrupt of something that never ran. The document's `meta.exitCode` is −1 as well. T4.101.
+
+## F1493 — C07's cancelled notice draws no ⊘ ★☆☆☆☆
+
+Found by lane b4-exec2 while checking ruling 92's citation. C07's mapping for a cancelled call (`mapping.ts` about 190–200) is `muted` on `partial` with no glyph. So ruling 92's *what C07 already gives a cancelled call* holds for the tone and the status, not for ⊘. The lane did not measure whether the path is reachable on `⌃c`, because `cancelThis` settles the entry before `invoke` resolves.
+
+**Owed**: measure its reachability; F1490's build decides the path. If it is reachable, it takes the cancelled mark.
+
+**Closed** by lane b4-exec3 (13abac71, C07 I24). Before C23 I99, the shell reached C07's cancelled arm only through the late answer, whose document was then discarded (F1505); after it, the shell does not reach the arm at all. It is still reachable through the public `createAdapterRegistry().adapt`, so the mark was built. `cancelledNotice` moved to `mapping.ts`, in L0, which both the adapters and the shell may import, so there is one composer. C07 T1.23 read `notice muted undefined` before the fix.
+
+## F1494 — a new advisory against a dev-only transitive turned every branch's `make audit` red ★★★☆☆
+
+Once `make instruments` passed on #61 (F1485), CI's `fast` job reached the next step and failed it: `npm audit --audit-level=high` reported brace-expansion 4.0.0–5.0.11 as high (GHSA-q2hr-2g5m-vwhr, GHSA-qhr7-859c-m2p7, GHSA-6j4f-fj2g-mc7p). No commit changed anything; the lockfile's 5.0.9 was in the range on every branch. It is `brace-expansion`, the package DEPENDENCIES.md §An advisory names as its first case, arriving a second time by the same path: `eslint@10.8.0 → minimatch@10.2.6 → brace-expansion`. It is dev-only.
+
+**Fixed under that section's procedure**, at the bottom of the stack. #61 took a three-line lockfile change (51298e2d) whose integrity equals the registry's. `npm audit fix --package-lock-only` crashed inside npm's arborist (`Cannot read properties of null (reading 'edgesOut')`, resolving vitest's optional peer set, npm 10.9.8), so the bump was `npm update brace-expansion --package-lock-only` in an isolated `git archive` copy, where `npm audit --audit-level=high`, `npm ci` and `make check` each exited 0. It was merged forward through #62 (bd41c7f2) and #63 (9eee4149) and into batch 4 (241175d3), and pushed. Two moderate vitest advisories remain below the gate; their fix would take vitest outside its declared range.
+
+**The process half.** This is the second gate in one day that CI ran and the local chain did not. `/tmp/gates-wt.sh` now runs `audit` and `released` as well. The `degraded` job (`make test` under `TERM=dumb LANG=C`, `xterm`/`C` and `xterm-256color`/`en_GB.UTF-8`) was skipped on every PR since #61's `fast` went red, so it has never run on any of this work. CI is its instrument now that `fast` passes, and its first result on each PR is owed a reading.
+
+## F1495 — a choice set in which no choice answers is accepted, and `esc` opens a reply ★★☆☆☆
+
+Found by the inspector verifying F1296 at 5318cd25, read from the source and not measured in a frame. C23 I93 rejects a second default and a default on a reply or an inspection choice, and `defaultStart` (`src/shell/choice-selection.ts:67-81`) skips reply and inspection choices when there is no default. A set made only of those passes `invalidChoices` (`src/shell/confirm.ts:405-426`), and `defaultStart` then returns the last index (`choice-selection.ts:80`), so `esc` opens a reply or an inspection instead of answering. C23 I93 says nothing about a set in which no choice answers.
+
+**Owed**: either `ask` refuses such a set, or I93 states what `esc` does in it.
+
+## F1496 — the completion menu keeps a pills form no picture draws ★★★☆☆
+
+Found by lane b4-menu2 at 3ed61fde's survey for F1488. C19 §5 draws *two rows of pills when the candidate set is short*, meaning candidates with no `detail`. R-BLK-866 names the palette *a PANEL whose list is a LADDER*, and R-BLK-867, §029 and §097 all draw one candidate a row with `›` on the current. No picture draws pills. The design's horizontal row with a current is the tape (§095), and the `current` glyph's domains are `chooser-row` and `tape`. F1487's pills window, built by the same lane (cfa684f7), retires with the form.
+
+**Ruled (99):** the menu is a ladder in every case. **Owed**: a candidate with no `detail` takes the table form with an empty hint cell; C19 §5, I18, I23, I29, T3.29 and T4.9 lose their pills clauses; the goldens that draw pills move.
+
+**Closed** by lane b4-menu3 (ef10fab2 spec, 898332f1 code, C19 I30). `menuBlocks` draws the table in every case, and a candidate with no `detail` takes an empty hint cell. `pillsOf` and F1487's pills window are gone, and `menuWindowOf` is `menuWindow` plus the wheel's clamp again. **The walk found a reader the ruling had not named**: `Candidate.tone`, a public field, was read only by the pills form, so retiring the form alone would have left a field nothing draws. Ruling 105(a) gives it to the value cell of every row. No source in `src/` or `examples/` sets a tone, so no frame moved. Predicted golden movers: none; none moved.
+
+## F1497 — `↑` at rest recalls history under a menu still showing the old line's candidates ★★★☆☆
+
+Found by lane b4-menu2 at 3ed61fde's walk at 80×24. Type `/c` and the menu opens at rest. `↑` belongs to the prompt then (C19 I20), and it puts `/help` in the prompt while the menu goes on showing `/c`'s candidates. The frame offers completions for a line that is no longer there.
+
+**Owed**: a frame, then a ruling from C19's rebuild clause (§6, *a rebuild clears the selection*): either the menu closes on a recall or it rebuilds against the recalled line.
+
+**Closed** by lane b4-menu3 (898332f1, C19 I31). Measured at ae00b6dd, 80×24: `❯ /help` sat under `/c`'s three candidates. Ruling 105(b) closes the menu rather than rebuilding it. `↓` reaches the same state: after `↑`, backspacing to `/h` opens a menu, and `↓` brings back the draft. So both walks go through `recall()` (C19 §8c trace 10, step 3′, which shares step 2's path and was not measured separately).
+
+## F1498 — the menu's `esc` suppression survives backspacing to an empty line ★★☆☆☆
+
+Found by lane b4-menu2 at 3ed61fde's walk. `esc` closes the menu and suppresses it for the line, so retyping does not reopen it. Backspacing to an empty prompt and typing `/c` again still finds it suppressed, and only a ghost completion shows. The line the suppression was taken against no longer exists.
+
+**Owed**: measure it in a frame, then end the suppression when the prompt empties.
+
+**Closed** by lane b4-menu3 (898332f1, C19 I31). Measured through a built graph: `/c`, `esc`, `⌫⌫`, `/c` gave no menu. `afterEdit` ends the hold when the line empties. **The limit is stated in I31**: a token shortened and retyped is the same token, so the hold stays, and so does a later token deleted back to its start while earlier ones remain. T3.31.
+
+## F1499 — C22 T4.18g's title repeats T4.18f's word for word ★☆☆☆☆
+
+Found by lane b4-menu2 at 3ed61fde while renumbering for F1489. C22 T4.18f (I76) and T4.18g (I78) cover different invariants, and T4.18g's title is T4.18f's copied. SP15 does not see it, because the ids differ.
+
+**Owed**: a title that names T4.18g's own assertion.
+
+**Closed** by lane b4-menu3 (898332f1). C22 T4.18g's spec text and its title in `series-visibility.test.ts` now say what it asserts. T4.18f's own test title in `cursor-positions.test.ts` is still generic, though it no longer duplicates T4.18g.
+
+## F1500 — 639 titled rows name an id no spec declares ★★☆☆☆
+
+Measured by lane b4-menu2 at 3ed61fde's survey when A03 SP16 was wired (1a9b6abb, landed as 3ed61fde). Of 4201 titled rows, 3385 resolve, 30 collided with the file owner's id, 6 reused a retired id, **639 dangle** and 141 have no owning spec. SP16 gates the collisions and the retired ids, and it counts the 639 without gating them. A row that names an id no spec declares cannot be checked against what its spec says.
+
+**Owed**: sort the 639 into rows whose spec is missing a row and rows whose title is wrong, then gate the class.
+
+## F1501 — no panel paints `bgElev` ★★★☆☆
+
+Found by lane b4-menu2 at 3ed61fde's survey. R-BLK-569 (*a panel takes bgElev*) and R-BLK-628 decide it, and §097 draws `bgElev` on the menu's rows. Nothing in `src/` paints a panel ground: the only `bgElev` painters are a notice's button and the rule label's band. Measured on the completion menu at full colour: the current row takes bg 216, and every other row is fg 188 on no ground.
+
+**Owed**: a ground for the panel layer, through the theme's surface. Every golden with a panel moves.
+
+**Closed** by lane b4-panels (01916624 spec; a5b93d0b, 337f3763 code; C22 I151). `panelGround` in `composite.ts` paints `surface.bgElev` through `based` behind every line of a `kind: "panel"` layer except its leading `rule` lines, so the menu's `pick` row keeps its own ground. Measured at 80×24 on `dark`: the non-current menu rows, find's line and every preview row take bg 235 at 8 bits; the edges take none; and the rows above each panel's edge are the frame from before it opened, cell for cell (T4.121). 1-bit and a theme that inherits `bgElev` write nothing (T1.184). **No golden records a panel's ground**; T4.121 is the only row that sees it.
+
+## F1502 — find draws no upper rule, declares its width, and cuts its hit ★★★☆☆
+
+Found by lane b4-menu2 at 3ed61fde's survey at 80×24, with history `/help`, `/history`, `/clear`, then `⌃r h`:
+
+```
+19 |(reverse-i-search) `h': /h…
+20 |────────────────────────────────────────────────
+21 |❯
+24 |find  ↑↓ hits  ⏎ open  esc close
+```
+
+There is no rule above the panel, and §097 warns that without it a panel reads as transcript content. Its hit is cut to `/h…`. It still declares `width: cells(line) + 4`, the declaration C19's menu gave up (*the menu spans the region*).
+
+**Owed**: the upper rule, the region's width, and a hit drawn whole where it fits.
+
+**Closed** by lane b4-panels (01916624, a5b93d0b, C20 I30). **The premise was corrected**: the hit was cut not by the width declaration as such but by when it was taken. It was taken at the push, from the empty query (27 cells), and never again, because `refreshSearchLayer` updates only `content` and `cursor`. `his` over `/history` drew `…` alone. Find now opens with an empty rule, spans the region, and draws its hit whole.
+
+## F1503 — the chip preview is a bordered box, not §101's panel ★★★☆☆
+
+Found by lane b4-menu2 at 3ed61fde's survey, after a six-line paste then `←`:
+
+```
+12 |┌  #1 pasted · 6L  ──────────────────────────────┐
+13 |│one                                            ┃│
+17 |│five                                           ││
+18 |│⋯ 0 above, 1 below                              │
+19 |│⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor                │
+20 |────────────────────────────────────────────────
+21 |❯  #1 pasted · 6L
+```
+
+It is a `panel` block's border with no bottom corner. §101 draws a menu panel between two rules: a header row, the content with a scrollbar, and a hint row. §101's hints also differ: `↑↓ scroll  ⏎ open in the editor  ←→ other chips`.
+
+**Owed**: the preview as a menu-style panel. Where its keys disagree with the registry's `preview.*` bindings (C22 I143), the registry decides.
+
+**Closed** by lane b4-panels (01916624, a5b93d0b, 337f3763; C22 I113, I143). The preview is the upper rule, a header (the chip's label, the name bold and the size muted), the box, and a muted key row. **The premise was corrected**: the missing bottom corner was a cut, not a style. I143's `floor(h/2) − 3` counted two borders and not the box's residue row, so at a 17-row region nine rows met a placement of eight. The keys follow the registry (ruling 104 b). A frame read after the build found the ASCII key row at 60 columns cut to `oth~`; it now sheds whole entries, and a change of width rebuilds the preview (T1.185).
+
+## F1504 — the release notes call types exported that no package entry reaches ★★☆☆☆
+
+Found while filing lane b4-menu2's proposed notes at 3ed61fde. The lane proposed CHANGELOG and MIGRATION lines for `KeyDeps.measure`, `OwnerHints.promptUnderMenu`, `menuWindowOf` and `MeasureBlock`. None of the four is in `src/index.ts` or any other entry in `package.json`'s `exports` (`./testing`, `./fixtures`, `./profiling`), and `dist/index.d.ts` names none of them, so the lines were not filed. Checking the neighbouring claims the same way:
+
+- CHANGELOG's watch-row entry (c007d8ef) says *`WatchItem` and `WatchRowState` are exported*. They are exported from `src/shell/watches.ts` and `src/shell/types.ts`, and no package entry re-exports either.
+- MIGRATION §2, *changes the compiler finds*, names `ChromeContext`, `Verdict`, `InterceptVerdict`, `RouterDeps`, `clearConfirmLayer`, `PushedSurface`, `CallState` and `KeyAction`. None is reachable by name from a package entry. Some may still reach a consumer structurally, through a public type's fields (`Notice.state` is a `CallState`), and that is unmeasured.
+
+Nothing checks a release note's claim about the public surface. C24 owns the surface and `make proof` installs the tarball, but neither reads the notes.
+
+**Owed**: correct c007d8ef's sentence; measure each MIGRATION §2 row by compiling a consumer against the packed tarball, then drop or reword the rows no consumer can hit; and add a check that every name the notes call exported resolves in `dist/`'s entries.
+
+**Closed** (lane b4-notes, d2d2f480..9c3fd9a4). The CHANGELOG no longer calls `WatchItem` or `WatchRowState` exported, MIGRATION §2 names only what a package entry reaches, and C24 T2.35 (I44) reads every name the notes call exported against the built entries, so a note naming an unreachable type fails `make test`.
+
+## F1505 — a far side's late answer rewrote a cancelled entry and released the next command's guard ★★★★☆
+
+Found by lane b4-exec3's sequence trace (C23 §8a A6.8, rows 4–6), measured at 0cb6f461 with a probe through `pipelineHarness`. With a real transport, the far side's answer arrives after an app-route cancel:
+- **Row 4.** `invoke` resolved with C06's `cancelled` result. C13 refused the document as `settled`, but `recordHistory` ran anyway, so C20 read `/ps 130, /ps 0`.
+- **Row 5.** A stream's late `end` ran `finishCard`. That is a `"shell"` patch, which C13 admits on a settled entry, so the head became `ok/succeeded · exit null`. A real subprocess stream yields `end` after every cancel.
+- **Row 6.** The late `finally` cleared the cancel slot and released the guard the next submission held. Measured: a third `/ps` ran beside `/ps --quiet` (3 invokes), and `⌃c` reached the third while `/ps --quiet` went on streaming.
+
+No row could put an answer after a cancel, because `pipelineHarness`'s transport ignores the invocation's signal.
+
+**Closed** by lane b4-exec3 (13abac71, C23 I99). The invoke continuation returns once the controller is aborted, on both the resolve and the throw path. `streamInto` takes the signal and returns at the next patch after a cancel. `finally` clears the cancel slot only if it is still this run's, and releases the guard only while `holdsGuard` is true. T4.98 read `[ true, '/ps 130, /ps 0' ]` and T4.99 read `[ 3, …]` before the fix.
+
+## F1506 — a stream that ends on its own releases the guard the next command holds ★★★☆☆
+
+Found by lane b4-exec3's trace (C23 §8a A6.8 row 7), with no cancel involved. The stream route released the guard before its loop and again in `finally`, so a stream that simply ended released the guard `/ps` held. `/ps --quiet` started beside it, and `⌃c` left `/ps` orphaned.
+
+**Closed** by lane b4-exec3 (13abac71): the pre-loop release clears `holdsGuard`, and `finally` releases only while it is set.
+
+## F1507 — the PTY arm reported a code of 0 beside a signal ★★★☆☆
+
+Found by lane b4-exec3 while building ruling 98. **Ruling 98's *137 for SIGKILL* was false on the PTY arm.** Measured with node-pty 1.1.0 in the container:
+
+```
+exit 0 -> {"exitCode":0,"signal":0}
+exit 3 -> {"exitCode":3,"signal":0}
+kill -9 $$ -> {"exitCode":0,"signal":9}
+kill -INT $$ -> {"exitCode":0,"signal":2}
+```
+
+C21 turned that into `{code: 0, signal: "SIGKILL"}`, and `exitCodeOf` reads the code first, so a PTY command killed by a signal recorded 0. C21 T2.9 asserted `{code: 0, signal: "SIGTERM"}` and called it *the pipe arm's own vocabulary*, which it is not.
+
+**Closed** by lane b4-exec3 (045a1422). `runner.ts` reports a null code when the port names a signal. T4.100 read `pty SIGKILL: Killed by SIGKILL. · meta 0 · recorded 0` before the fix.
+
+## F1508 — a stream's own end records nothing in C20 ★★★☆☆
+
+Found by lane b4-exec3. A stream's natural `end`, a malformed patch and a stream throw each settle through `settle(id)`, and none of them calls `history.append`. C23 I29 says every submitted line is recorded at settlement on every terminal path. Measured: after `/tail web.log` ended on its own, C20 held only `/ps --quiet 130`. The cancel is the only stream settlement that records.
+
+**Owed**: record at each stream settlement, with the code the entry settled with (ruling 100).
+
+**Closed** by lane b4-exec4 (99e2c39f spec, 9b4a51e3 code, C23 I101). `settleKept(code)` settles the card as it stood, with the code in its `meta`, and C20 is recorded from that same document. It uses `settle(id)` when the card already carries the code, so `rev` does not move (C13 I13). The natural `end` takes `exitCodeOf(result)`. The malformed-patch and throw arms take 1, which is the lane's ruling: neither arm reads the child's ending, and 1 is what I100 gives a failure whose own code is unknown. T4.102, indexed by the twenty routes C23 names, read `recorded nothing` on five and `meta 0 · recorded 126` on two before the fix.
+
+## F1509 — a stall row survives a cancel ★★☆☆☆
+
+Found by lane b4-exec3's trace (C23 §8a A6.8 row 8). `cancelThis` does not call `refresh.settled`, so the settled card keeps `no output for 2m`. Calling it would rewrite the row as `resumed after 2m`, which is false for a cancel. §8a A4's remedy was written for a stream that resumed.
+
+**Ruled (100 d):** the shell composes the cancel's document (ruling 97), and it leaves the stall row out. `settle(id, doc)` replaces the view, so no delete is needed.
+
+**Closed** by lane b4-exec4 (9b4a51e3, C23 I98, I102). It measured first that the stall row is a block of the entry's document (`stall-notice`, patched in by `refresh.ts`) and not chrome drawn elsewhere, so ruling 100(d)'s remedy held. The cancel's document leaves it out. **The walk found a second defect behind it**: the watch itself outlived the settlement (F1515).
+
+## F1510 — a denied approval settles with code 0 while C20 records 126 ★★★☆☆
+
+Found by lane b4-exec3. A denied or expired approval settles through `settle(id)` with `meta.exitCode` 0, while C20 records 126 (C23 I60). It is F1490's shape: the document and the history disagree about one entry. Ruling 98 does not reach it, because the document is not `error`.
+
+**Ruled (100 a):** the document carries 126. The status is unchanged, because a refusal is not an error (§047).
+
+**Closed** by lane b4-exec4 (9b4a51e3, C23 I101). A denied or expired approval's document carries 126, with status `ok`. The expired row needed the harness's confirm host to take the harness's timer; before that, no row could reach an expired approval. **Ruling 100(a)'s reason is contradicted by the head**, which is drawn failed; that is F1518.
+
+## F1511 — one `Exit` is worded two ways ★★☆☆☆
+
+Found by lane b4-exec3. `{code: null, signal: null}` reads *X ended without an exit status* on the handoff (ruling 94 c), and *The command did not start.* on the shell route and in C07. On every C21 arm it is produced only by a spawn failure, so the handoff's sentence describes an ending no arm produces.
+
+**Ruled (100 c):** the handoff says the child did not start.
+
+**Closed** by lane b4-exec4 (9b4a51e3, C23 I95). `{null, null}` reads `vim did not start`, where T4.93 read `vim ended without an exit status`.
+
+## F1515 — the stall watch outlived a settlement ★★★☆☆
+
+Found by lane b4-exec4's sequence trace (C23 §8a A6.10 rows 3–5), which ruling 100 had not reached. `cancelThis` never called `refresh.settled`, and neither did the malformed-patch and throw arms, so the stall watch stayed alive after the entry settled. Two minutes later `no output for 2m` was appended under `Cancelled.`, the truncated box or the failed box, because C13 admits a `"shell"` patch on a settled entry. A `/ps` invocation is watched as well.
+
+**Closed** by lane b4-exec4 (9b4a51e3, C23 I102). The watch ends on C13's `settle` change, which already releases the readout, so every route ends it and not only those that remember to. T4.104 read the row appended under four endings before the fix.
+
+## F1516 — a stream a signal ended read `exit null` over `succeeded` ★★☆☆☆
+
+Found by lane b4-exec4's classification table (C23 §8a A6.9 row 7). A stream killed by a signal settled with its head reading `succeeded · exit null`, while C21 reported the signal.
+
+**Closed** by lane b4-exec4 (9b4a51e3, C23 I101): the head's word and `meta.exitCode` read one `exitCodeOf` value.
+
+## F1517 — the completion line appends exit codes the shell wrote ★★☆☆☆
+
+Found by lane b4-exec4 (C23 §8a A6.9 row 11), measured with `completionLine`. `outcomeOf` appends `exit N` for any non-zero code on a non-local document, and assumes the code is the subprocess's. A denial now reads `/ps — failed, exit 126`, and a cancel has read `cancelled, exit 130` since ruling 97. Neither code is a child's ending: the shell wrote both.
+
+**Ruled (103 b).**
+
+## F1518 — a denied or expired approval's head is drawn failed ★★☆☆☆
+
+Found by lane b4-exec4 (C23 §8a A6.9 row 12). `FAILURE_WORDS` gives `denied` the `failed` call state, so the head takes error tone and ✗. Ruling 100(a) kept the status `ok` on the ground that a refusal *is not an error and never red* (§047), and the head contradicts the reason the ruling gave. §106 draws an expired question as `○ the question expired`, and says *denied would be a lie about what happened*.
+
+**Ruled (103 a).**
+
+## F1519 — a stall row is kept when a stall ends in a malformed patch or a throw ★☆☆☆☆
+
+Found by lane b4-exec4 (C23 §8a A6.10 row 6). Ruling 100(d) dropped `stall-notice` from the cancel's document. The malformed-patch and throw arms keep the card as it stood, so a stall that ended in one of them keeps `no output for 2m` in the settled card. After I102 the watch no longer adds the row later, but the row it had already added stays.
+
+**Ruled (103 c).**
+
+## F1520 — a waiting approval is said to have gone quiet ★★☆☆☆
+
+Found by lane b4-exec4 (C23 §8a A6.10 row 7). The stall watch is armed at dispatch, and the readout only on approval. A question left open for three minutes reads `ps · ⠋ waiting` over `no output for 2m`, and a denial then rewrites the row as `resumed after`. The entry was waiting on the user, not on output.
+
+**Ruled (103 d).**
+
+## F1521 — no chip reaches the transcript, so §101's transcript half has nothing to stand beside ★★★☆☆
+
+Found by lane b4-panels while measuring F1503's other focus. A submitted line echoes its resolved text (C17 `resolved`), so a six-line paste appears in the transcript as six lines, a 200-line paste as 200, and no element carries the chip. §101's *focus in the TRANSCRIPT — a PEEK beside the element* is the general peek (§6l.12), and here it has no element to stand beside.
+
+**Ruled (104 c):** the echo keeps its chips. **Owed**: the echo draws each chip's label as the prompt does, and its content is what the peek shows; the application still receives the resolved text.
+
+## F1522 — §101's header draws the chip's name on `pick`, and no block can ★☆☆☆☆
+
+Found by lane b4-panels. `Raw` spans carry a tone and no ground (C04 I89), so the preview's header draws the label bold with its size muted, on the panel's `bgElev`, and not on §101's `pick`. C22 §6s.5 records it. Ruling 104(c) will want the same drawing for a chip in the transcript echo.
+
+**Owed**: a ground on a span, or a block kind that draws a chip as the prompt does.
+
+## F1523 — C22 T1.175's spec row and its test described different regions ★☆☆☆☆
+
+Found by lane b4-panels. The row said a 20-row region and 7 rows. The test drove 24 and asserted 9. Both agreed with the formula, so neither was wrong on its own terms, and nothing compared them.
+
+**Closed** in 01916624: the row now states the figures its test drives.
+
+## F1524 — a completion result for a submitted line opens a selected menu over the next one ★★★☆☆
+
+Found by the locksmith's diagnosis of C22 T5.4, at db80ded5 and at menu3's b02975fd alike. `complete` (`src/shell/keys.ts:965-1034`) fires `deps.completion.request(ctx, mine).then(...)`, and its only guard is `if (mine !== seq) return;` (`keys.ts:993`). `request` is `async` (`engine.ts:294`), so even a static set resolves a microtask later. `construct.ts:5123` routes every key from one read synchronously. So when `⇥` and `⏎` arrive in one read, `submitPrompt` runs first. Then `keys.reset()` (`keys.ts:1748-1752`) closes the menu without bumping `seq` or calling `completion.cancel()`, and the late result opens a selected menu built from the submitted line.
+
+Forced-order reproduction, with `\t\r` in one write: 3 of 3 fail on both trees, with or without a resize. Tab, then a wait for `⏎ accept`, then Enter: 0 of 3. The row's own steps pinned to one CPU: 7 of 60 on menu3, 3 of 40 at db80ded5. Every failure on both trees matched: `✗ bad_value … got ""`, then `› running` over an empty `❯`. By reading only, menu3's `recall()` has the same gap.
+
+**Ruled (106).** **Owed**: amend C19 §4 and I15; bump `seq` (or cancel) in `reset()` and `recall()`; add a row that sends `⇥⏎` in one batch and asserts no menu layer over an empty prompt.
+
+## F1525 — C22 T5.4 sends `⏎` before the selection it means to accept exists ★★☆☆☆
+
+Found by the locksmith's diagnosis of C22 T5.4. `waitFor` matches against all output since the session started (`test/support/pty.ts`). `waitFor(/queued/)` resolves on the menu at rest, before `⇥` has selected anything. The post-resize `waitFor(/❯ \/ps --status=/)` resolves at once, on the frame from before the resize. So `⏎` is written about 1 ms after the rest frame, and the row fails whenever the session reads `\t\r` together. That is why the row was intermittent, 1 in 7 at worst, and never reproducible at will. With ruling 106's fix the row still fails in that interleaving, for the test's reason alone, because `⏎` at rest runs the line.
+
+**Owed**: wait with `waitForFrame` for `⏎ accept` after `⇥`, and for the 60-column frame after the resize. Grep for the same shape in the other tier-5 rows.
+
+## F1526 — a settled `error` status animates forever ★☆☆☆☆
+
+Found by the locksmith's diagnosis of C22 T5.4, as a symptom rather than the cause. `errorDoc`'s `status` block carries `state: "error"` (`documents.ts:941`), and `ANIMATES.status` is true for the kind whatever the state (`animation.ts`). So the session ticker (`session.ts:1184-1260`) wakes at spinner cadence for a settled error box, about every 20 ms and 140 ms, and draws an empty diff each time. At idle it reads 4 times in 3 s. Under a selected menu, where `cursorFor` is null, each frame is two cursor hides, which is the flood in T5.4's failure output.
+
+**Ruled (106 c).**

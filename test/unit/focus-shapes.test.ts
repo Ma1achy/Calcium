@@ -6,7 +6,13 @@
 // build that tones the value with focus never changes state at all.
 import { describe, expect, it } from "vitest";
 
-import { measurable, FULL_CAPS, ASCII_CAPS, DARK_THEME } from "../support/render.js";
+import { measurable, FULL_CAPS, ASCII_CAPS, DARK_THEME, MONO_CAPS, MONO_UNICODE_CAPS } from "../support/render.js";
+import { styledScreenFrom } from "../support/styled-screen.js";
+import { ONE_PER_KIND } from "../support/blocks.js";
+import { plotDefinition } from "../../src/presentation/plot/definition.js";
+import { createBlockRegistry, type BlockDefinition } from "../../src/presentation/blocks/index.js";
+import { focusStyle } from "../../src/presentation/blocks/paint.js";
+import { sgr } from "../../src/terminal/escapes.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import type { FocusState } from "../../src/presentation/blocks/index.js";
@@ -21,6 +27,9 @@ const drawn = (b: Block, focus: FocusState | null, caps: Caps = FULL_CAPS): stri
     .renderToLines(b as never, 52)[0] ?? "";
 
 const plain = (line: string): string => line.replace(SGR, "");
+
+/** One drawn row as styled cells — the channels read per cell, not per byte. */
+const grid = (line: string) => styledScreenFrom([line], { columns: 52, rows: 1 })[0]!;
 
 /** The SGR runs a line carries, in order — the channels, read off the frame. */
 const codes = (line: string): readonly string[] => [...line.matchAll(SGR)].map((m) => m[0].slice(2));
@@ -138,5 +147,177 @@ describe("C09 I106 — a continuous control has three states and the value is no
     expect(aRest.replace(/[-=]/gu, ""), "the handle is the same character at ascii").toBe(
       aIn.replace(/[-=]/gu, ""),
     );
+  });
+});
+
+describe("C09 I132 — a chosen option carries its mark and its weight", () => {
+  // **A classification table, 2 forms × 3 focus states × 5 rungs.** The cell
+  // the ruling is about is 1-bit: there the wash is `inverse`, so before I132
+  // a resting chosen option and a resting unchosen one differed by the mark
+  // alone — one carrier for a fact R-COR-003 wants two for.
+  const RUNGS = {
+    "24-bit": FULL_CAPS,
+    "8-bit": { ...FULL_CAPS, colourDepth: 8 },
+    "4-bit": { ...FULL_CAPS, colourDepth: 4 },
+    "1-bit": MONO_UNICODE_CAPS,
+    "1-bit ascii": MONO_CAPS,
+  } as const satisfies Record<string, Caps>;
+
+  const checkbox = (): Block =>
+    block({
+      kind: "choice",
+      id: "c",
+      label: "tests",
+      options: [
+        { id: "lin", label: "lint" },
+        { id: "log", label: "type-check", chosen: true },
+      ],
+    }) as unknown as Block;
+
+  it("T1.90 (C09 I132, I105, I121, ruling 54): every chosen option's mark and label are bold at every rung, focused or not, and nothing else is; measure, width and elements do not move", () => {
+    for (const [rung, caps] of Object.entries(RUNGS)) {
+      for (const [form, make] of [["radio", radio], ["checkbox", checkbox]] as const) {
+        const b = make();
+        const options = (b as unknown as { options: readonly { id: string; label: string; chosen?: boolean }[] }).options;
+        const cellsOf = new Map<string | null, ReturnType<typeof grid>>();
+        for (const focus of [null, "lin", "log"] as const) {
+          cellsOf.set(focus, grid(drawn(b, focus === null ? null : at(focus), caps)));
+        }
+        for (const [focus, row] of cellsOf) {
+          const where = `${form} at ${rung}, focus ${String(focus)}`;
+          const text = row.map((c) => c.ch).join("");
+          // **Every cell of a chosen option is bold, and no other cell is** —
+          // the mark and the label together, I105's one span.
+          const expected = new Set<number>();
+          for (const option of options) {
+            if (option.chosen !== true) continue;
+            const from = text.indexOf(` ${option.label}`) - 1;
+            expect(from, `${where}: ${option.label} is drawn`).toBeGreaterThanOrEqual(0);
+            for (let c = from; c < from + 2 + option.label.length; c += 1) expected.add(c);
+          }
+          const bold = new Set(row.flatMap((c, i) => (c.style.attrs.includes(1) ? [i] : [])));
+          expect([...bold].sort((x, y) => x - y), `${where}: the bold cells`).toEqual([...expected].sort((x, y) => x - y));
+          // F1258's channel: bold never shares a cell with dim.
+          expect(row.filter((c) => c.style.attrs.includes(1) && c.style.attrs.includes(2)), `${where}: bold and dim`).toEqual([]);
+        }
+        if (rung.startsWith("1-bit") && form === "radio") {
+          // **The four cells, pairwise distinct on a surviving carrier.** Read
+          // at the two options: `lin` unchosen, `log` chosen.
+          const cell = (focus: string | null, id: "lin" | "log"): string => {
+            const row = cellsOf.get(focus)!;
+            const text = row.map((c) => c.ch).join("");
+            const label = id === "lin" ? " linear" : " log ";
+            const i = text.indexOf(label) - 1;
+            return `${row[i]!.ch}|${row[i]!.style.attrs.join(",")}`;
+          };
+          const four = [cell(null, "lin"), cell(null, "log"), cell("lin", "lin"), cell("log", "log")];
+          expect(new Set(four).size, `${rung}: rest/focused × unchosen/chosen are four cells`).toBe(4);
+          expect(cell("log", "log"), `${rung}: focused chosen carries the mark, bold and inverse`).toMatch(/^[●*]\|1,7$/u);
+          expect(cell(null, "log"), `${rung}: resting chosen is mark and bold`).toMatch(/^[●*]\|1$/u);
+        }
+      }
+    }
+
+    // **Nothing geometric moves**: chosen and unchosen measure, size and
+    // publish the same, because weight adds no cell.
+    const kit = measurable({ theme: DARK_THEME, capabilities: FULL_CAPS });
+    const none = block({ kind: "choice", id: "c", label: "tests", options: [{ id: "lin", label: "lint" }, { id: "log", label: "type-check" }] }) as unknown as Block;
+    for (const width of [8, 20, 52]) {
+      expect(kit.registry.measure(checkbox(), width)).toBe(kit.registry.measure(none, width));
+      expect(kit.registry.width(checkbox(), width)).toBe(kit.registry.width(none, width));
+      expect(kit.registry.elementsOf(checkbox(), width).map((e) => [e.id, e.cols])).toEqual(
+        kit.registry.elementsOf(none, width).map((e) => [e.id, e.cols]),
+      );
+    }
+  });
+});
+
+describe("C09 I137 — a pane holding a frame is lit through its child", () => {
+  const PLOT = ONE_PER_KIND.plot as Block;
+  const kit = (focus: FocusState | null) =>
+    measurable({
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      definitions: [plotDefinition as unknown as BlockDefinition<never>],
+      ...(focus === null ? {} : { focus }),
+    });
+  const cellsOf = (lines: readonly string[], width: number) =>
+    styledScreenFrom([lines.join("\r\n")], { columns: width, rows: lines.length });
+  const FOCUS_BG = (sgr(focusStyle(DARK_THEME, FULL_CAPS)).match(/\u001b\[([0-9;]*)m/u) ?? [])[1] ?? "";
+  const grounded = (lines: readonly string[], width: number): number =>
+    cellsOf(lines, width).flat().filter((c) => c.style.bg === FOCUS_BG).length;
+  const reg = (() => {
+    const r = createBlockRegistry();
+    r.register(plotDefinition as never);
+    return r;
+  })();
+
+  it("T1.152 (C09 I137, I100): a mosaic or split pane holding a framed plot lights the plot's frame and paints no ground; a raw-holding pane keeps the ground", () => {
+    expect(FOCUS_BG, "the ground resolves").toMatch(/^48;/u);
+    const W = 60;
+    const fig5 = block({
+      kind: "mosaic",
+      id: "fig5",
+      height: 8,
+      areas: "AB",
+      children: [{ ...(PLOT as object), id: "fig5-a" }, { ...(PLOT as object), id: "fig5-b" }],
+    } as never) as unknown as Block;
+    const panes = reg.elementsOf(fig5, W);
+    expect(panes.map((e) => e.id), "two panes").toEqual(["fig5-a", "fig5-b"]);
+    const a = panes[0]!;
+    const rest = kit(null).renderToLines(fig5, W);
+    const lit = kit({ blockId: "fig5", rowId: "fig5-a" } as FocusState).renderToLines(fig5, W);
+
+    // **No ground across the figure** (`R-FOC-004`).
+    expect(grounded(lit, W), "no focusGround cell in the frame").toBe(0);
+    // **The treatment is inside pane A and nowhere else.**
+    const r = cellsOf(rest, W);
+    const f = cellsOf(lit, W);
+    const changed: [number, number][] = [];
+    f.forEach((row, y) => row.forEach((cell, x) => {
+      const was = r[y]![x]!;
+      if (cell.ch !== was.ch || JSON.stringify(cell.style) !== JSON.stringify(was.style)) changed.push([y, x]);
+    }));
+    expect(changed.length, "the focus changed something").toBeGreaterThan(0);
+    for (const [y, x] of changed) {
+      expect(x >= a.cols.from && x < a.cols.to && y >= a.rows.from && y < a.rows.to, `(${String(y)},${String(x)}) is pane A's`).toBe(true);
+      expect(f[y]![x]!.ch, "no glyph moves").toBe(r[y]![x]!.ch);
+    }
+    // **And it is the plot's own focus**: pane A's cells are the plot drawn
+    // alone at the pane's width with its own block element focused.
+    const alone = cellsOf(kit({ blockId: "fig5-a", rowId: "fig5-a" } as FocusState).renderToLines({ ...(PLOT as object), id: "fig5-a" } as Block, a.cols.to - a.cols.from), a.cols.to - a.cols.from);
+    for (let y = a.rows.from; y < Math.min(a.rows.to, alone.length); y += 1) {
+      for (let x = a.cols.from; x < a.cols.to; x += 1) {
+        expect(f[y]![x], `pane A (${String(y)},${String(x)})`).toEqual(alone[y - a.rows.from]![x - a.cols.from]);
+      }
+    }
+
+    // **`split`, the same rule**: the plot pane is lit with no ground, the
+    // raw pane takes the ground — the control that the rule reads the child.
+    const split = block({
+      kind: "split",
+      id: "sp",
+      height: 8,
+      children: [{ ...(PLOT as object), id: "sp-p" }, { kind: "raw", id: "sp-r", text: "one\ntwo" }],
+    } as never) as unknown as Block;
+    const splitRest = kit(null).renderToLines(split, W);
+    const splitPlot = kit({ blockId: "sp", rowId: "sp-p" } as FocusState).renderToLines(split, W);
+    const splitRaw = kit({ blockId: "sp", rowId: "sp-r" } as FocusState).renderToLines(split, W);
+    expect(grounded(splitPlot, W), "split: no ground behind the plot").toBe(0);
+    // **More than the divider**: the split lights its own divider for any
+    // focused pane (§3aq S7), one column, so a row asking only *did the frame
+    // change* passes with the plot left dark — the mutation pass found it. The
+    // plot's own frame spans many columns.
+    const sr = cellsOf(splitRest, W);
+    const columns = new Set<number>();
+    cellsOf(splitPlot, W).forEach((row, y) => row.forEach((cell, x) => {
+      if (JSON.stringify(cell) !== JSON.stringify(sr[y]![x])) columns.add(x);
+    }));
+    expect(columns.size, "split: the plot's frame lights, not only the divider").toBeGreaterThan(1);
+    expect(grounded(splitRaw, W), "split: the raw pane keeps C09 I100's ground").toBeGreaterThan(0);
+
+    // **The control for the mosaic**: the corpus's raw panes keep the ground.
+    const raw = ONE_PER_KIND.mosaic as Block;
+    expect(grounded(kit({ blockId: raw.id, rowId: "mos-a" } as FocusState).renderToLines(raw, W), W), "a raw pane keeps C09 I100's ground").toBeGreaterThan(0);
   });
 });

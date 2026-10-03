@@ -16,7 +16,11 @@ import { fsIo, report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CONSTRUCT = "src/shell/construct.ts";
 const EDITOR = "src/interaction/editor/editor.ts";
-const FILES = "test/unit/chip-preview.test.ts test/unit/chip-form.test.ts";
+const CHIP_EDITOR = "src/shell/chip-editor.ts";
+const INTERCEPTS = "src/interaction/router/intercepts.ts";
+const FILES =
+  "test/unit/chip-preview.test.ts test/unit/chip-form.test.ts test/integration/chip-preview.test.ts " +
+  "test/unit/router-dispatch.test.ts";
 
 const { read, write } = fsIo(ROOT);
 const run = () => {
@@ -51,8 +55,8 @@ const results = runPass({
       // panel's own content would show it.
       name: "THE DEFECT: the preview is not dismissed when the caret leaves the chip",
       file: CONSTRUCT,
-      from: "      previewed = null;\n      if (have) stores.overlays.dismiss(CHIP_PREVIEW_ID);\n      return;",
-      to: "      previewed = null;\n      return;",
+      from: "      previewScrolls = false;\n      if (have) stores.overlays.dismiss(CHIP_PREVIEW_ID);\n      return;",
+      to: "      previewScrolls = false;\n      return;",
       expect: "T1.69",
     },
     {
@@ -83,8 +87,10 @@ const results = runPass({
       file: CONSTRUCT,
       // Re-anchored in review batch 2: the preview is found by its declared
       // substate name now, not its id (C15 I29, ruling 61).
-      from: '    return owner.name === "preview" || (owner.name === "complete" && keys.selected === null);',
-      to: '    return owner.name === "complete" && keys.selected === null;',
+      // Re-anchored in review batch 4: the preview declares `promptLive`
+      // (C22 I145, C15 I34), and `promptUnderMenu` reads the field.
+      from: "        promptLive: true,",
+      to: "        promptLive: false,",
       expect: "T1.69",
     },
     {
@@ -93,8 +99,8 @@ const results = runPass({
       // the one position a reader arrives at without moving.
       name: "only the chip after the caret is read, so a pasted chip never previews",
       file: EDITOR,
-      from: "    return this.#chips.get(before) ?? this.#chips.get(after) ?? null;",
-      to: "    return this.#chips.get(after) ?? null;",
+      from: "    return this.#chips.get(before)?.chip ?? this.#chips.get(after)?.chip ?? null;",
+      to: "    return this.#chips.get(after)?.chip ?? null;",
       expect: "T1.48",
     },
     {
@@ -102,19 +108,56 @@ const results = runPass({
       // position `home` lands on, where there is nothing before the caret.
       name: "only the chip before the caret is read, so the head of the buffer answers nothing",
       file: EDITOR,
-      from: "    return this.#chips.get(before) ?? this.#chips.get(after) ?? null;",
-      to: "    return this.#chips.get(before) ?? null;",
+      from: "    return this.#chips.get(before)?.chip ?? this.#chips.get(after)?.chip ?? null;",
+      to: "    return this.#chips.get(before)?.chip ?? null;",
       expect: "T1.48",
     },
     {
       // **The panel's title is the chip's own label.** Composed from a literal
       // instead, two chips spell the same and the prompt's inline label and the
       // panel's header part company — C17 I25's *never supplied as a string*.
-      name: "the panel's title is a literal rather than the chip's composed label",
+      name: "the panel's header is a literal rather than the chip's composed label",
       file: CONSTRUCT,
-      from: "      title: chipLabel(chip, chipLook),",
-      to: "      title: \"Chip\",",
+      // Re-anchored by lane b4-panels: the title is §101's header row now
+      // (C22 I113 amended, §6s ruling 2).
+      from: "    const label = chipLabel(chip, chipLook);",
+      to: "    const label = \" Chip \";",
       expect: "T1.69",
+    },
+    {
+      // T6.144 (C22 I143) — the preview's content the bare `code` block again:
+      // no box, no bar, nothing for the chords to move.
+      name: "the preview's content is the bare code block, not a box",
+      file: CONSTRUCT,
+      from: "    makeBlock({\n      kind: \"scroll\",\n      id: PREVIEW_BOX_ID,\n      height,\n      children: [makeBlock({ kind: \"code\", id: \"chip-preview-content\", language: \"text\", text: chip.content })],\n    });\n",
+      to: "    makeBlock({ kind: \"code\", id: \"chip-preview-content\", language: \"text\", text: chip.content });\n",
+      expect: "T1.175",
+    },
+    {
+      // T6.145 (C22 I144) — the read-back dropped: the editor ran and nothing returns.
+      name: "the edited file is never read back",
+      file: CHIP_EDITOR,
+      from: "    const read = await deps.fs.readFile(path);\n",
+      to: "    const read = chip.content;\n",
+      expect: "T1.176",
+    },
+    {
+      // C22 I144, ruling 9 — the editor's added newline kept, so an unchanged
+      // file is a changed chip.
+      name: "an editor's added final newline is kept",
+      file: CHIP_EDITOR,
+      from: "!chip.content.endsWith(\"\\n\") && read.endsWith(\"\\n\")",
+      to: "false",
+      expect: "T1.176",
+    },
+    {
+      // C16 T6.65 (I40) — the intercept reads *meta and an arrow* again, and
+      // takes the preview's `⌥⇧` chords before the ladder.
+      name: "the page-scroll intercept takes ⌥⇧↑/⌥⇧↓",
+      file: INTERCEPTS,
+      from: "  return key.meta && !key.shift && !key.ctrl && (key.name === \"up\" || key.name === \"down\");\n",
+      to: "  return key.meta && (key.name === \"up\" || key.name === \"down\");\n",
+      expect: "T1.200",
     },
   ],
 });

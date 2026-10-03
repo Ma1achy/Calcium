@@ -15,7 +15,7 @@
  * mapping stops being checkable against `docker ps --format json`.
  */
 
-import type { ToolDef } from "@fmx/calcium";
+import type { ToolDef } from "calcium-tui";
 
 const ps: ToolDef = {
   name: "ps",

@@ -8,11 +8,12 @@
 //   - **One width per frame** (`docs/notes/resize-and-compositor.md`). A frame
 //     composed at two widths is coherent at neither, and the wrap it causes
 //     scrolls the alternate screen.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 
 import { compose, heightsSum, type Composed } from "../../src/shell/frame.js";
-import { cursorFor, paint, placedLayers, type PaintDeps } from "../../src/shell/paint.js";
+import { commandRows, cursorFor, paint, placedLayers, type PaintDeps } from "../../src/shell/paint.js";
+import { PROMPT_GUTTER } from "../../src/shell/config.js";
 import { exact, FrameError } from "../../src/shell/frame-error.js";
 import { displayCells } from "../../src/presentation/text.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
@@ -28,6 +29,7 @@ import type { Placed } from "../../src/viewport/overlay/index.js";
 import type { ProfileReport } from "../../src/shell/profiling/types.js";
 import { registry as measurer, rows as contentRows } from "../support/overlay.js";
 import { buildGraph, buildSession } from "../support/session.js";
+import { fakeStdin } from "../support/fake-terminal.js";
 import { childBorderLegend, makeDefaultChrome, ownerLine, shedToWidth } from "../../src/shell/chrome.js";
 import type { Key, OwnerRung } from "../../src/interaction/router/types.js";
 import { chordText, createKeymap, defaultKeymap } from "../../src/interaction/router/keymap.js";
@@ -44,7 +46,7 @@ const SESSION: SessionSnapshot = Object.freeze({
   env: Object.freeze({}),
   lastUuid: null,
   identity: null,
-  cluster: "fmx-prod",
+  cluster: "corp-prod",
   health: "live",
   version: "1.0.0",
   retained: null,
@@ -164,7 +166,7 @@ describe("C22 §6 — the paint", () => {
 
     const broken: Composed = Object.freeze({
       ...good,
-      region: Object.freeze({ top: 1, height: good.region.height + 1, width: good.region.width }),
+      region: Object.freeze({ ...good.region, height: good.region.height + 1 }),
     });
 
     expect(heightsSum(broken)).toBe(false);
@@ -252,7 +254,7 @@ describe("C22 §6 — the paint", () => {
     // cap of one needs three, so at three rows the sum is false and the fallback
     // draws. The cap path in `promptWindow` is still code, so the frame that
     // exercises it is built by hand with a region of zero rows, and it still sums.
-    const f: Composed = { ...frameAt(40, 5, 3), promptRows: 1, promptWanted: 3, region: { top: 2, height: 0, width: 39 }, overlayRegion: { width: 39, height: 0 } };
+    const f: Composed = { ...frameAt(40, 5, 3), promptRows: 1, promptWanted: 3, region: { top: 2, left: 1, height: 0, width: 38 }, overlayRegion: { width: 39, height: 0 } };
     expect(f.promptRows, "a cap of one").toBe(1);
 
     const lines = paint(f, deps({ promptRows: () => ["first", "second", "third"] }));
@@ -432,7 +434,7 @@ describe("C22 — the selection wash (roadmap entry 23)", () => {
   /** The painted index of prompt row `i`: header + viewport, then the prompt. */
   const promptAt = (f: Composed, i: number): number => f.region.top + f.region.height + 1 + i; // header, its rule, region, the upper rule
 
-  it("T4.22 (C11 I17, I9): the wash is appearance — no row and no cell moves", () => {
+  it("C22 T4.22 (C11 I17, I9): the wash is appearance — no row and no cell moves", () => {
     // **The invariant at every step, not a note about this one.** A row of
     // chrome — a marker line, a bracket, a status row — is forbidden by the
     // same rule that makes the wash free.
@@ -770,7 +772,7 @@ describe("C22 §4a — one overlay layout per frame, shared by the rows and the 
     expect(calls, "the thunk answered once for both").toBe(1);
   });
 
-  it("T4.64 (C09 I61, C22 I86; C28 I31): a real session's chrome children are measured once per registry call — the header pair once per frame and the footer pair twice, for compose's own call", async () => {
+  it("C22 T4.64 (C09 I61, C22 I86; C28 I31): a real session's chrome children are measured once per registry call — the header pair once per frame and the footer pair twice, for compose's own call", async () => {
     let seen: ProfileReport | null = null;
     const { tui } = await buildSession({
       profile: {
@@ -854,7 +856,7 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
         env: Object.freeze({ HOME: "/home/ada" }),
         lastUuid: null,
         identity: null,
-        cluster: "fmx-prod",
+        cluster: "corp-prod",
         health: "live" as const,
         version: "1.0.0",
         retained: null,
@@ -899,12 +901,13 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
     // The corpus, before anything is asserted over it: a walk that found nothing
     // satisfies every for-loop below it (`an exit status is the same bit for
     // clean and for did-not-run`).
-    // **Thirteen, and the last five are M5's owner line** (R-KEY-004, §103). The
+    // **Fourteen, and the last six are M5's owner line** (R-KEY-004, §103) —
+    // `⌃V rect` joined it with the rectangle (C14 I60), last. The
     // fixture's owner is `copy`, so `COPY` in the header and the owner line in
     // the footer are one fact stated at both ends — the header says *which* mode
     // and the last line says *what your keys do in it*, which is the half §103
     // says a reader fights without.
-    expect(all.map((c) => c.label), "thirteen chips, with all three conditional ones up and an owner raised").toEqual([
+    expect(all.map((c) => c.label), "fourteen chips, with all three conditional ones up and an owner raised").toEqual([
       "calcium",
       "/usr/local/bin/prism",
       "COPY",
@@ -921,6 +924,7 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
       // literal `·` inside a label is the unresolved join T2.116 refuses.
       "esc out",
       "the screen is frozen",
+      "⌃V rect",
     ]);
     for (const chip of all) {
       expect(chip.tone, `${chip.label} inherits C09's default instead of naming its own`).toBeDefined();
@@ -1038,7 +1042,7 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
 // frame says — the same reason C22's label row reads bytes.
 describe("C22 §6l.11 — the chip's ground in the prompt", () => {
   const SEP = "\u00b7";
-  const LOOK = { separator: SEP, painted: true } as const;
+  const LOOK = { separator: SEP, painted: true, unicode: "full" } as const;
   const PASTE = { ordinal: 1, kind: "paste", name: "json", lines: 47, content: "{}" } as const;
   const GUTTER = { first: 2, cont: 2 } as const;
 
@@ -1217,7 +1221,7 @@ describe("C22 I133 — the owner line's chords are the keymap's (review batch 2,
     return { chord: (target, action) => entries.find((b) => b.target === target && b.action === action)?.key };
   };
   const labelsOf = (rung: OwnerRung, hints: OwnerHints, opts: { field?: boolean; semantic?: boolean } = {}) =>
-    ownerLine(rung, ASCII_CAPS, false, 0, opts.semantic === true ? { mode: "semantic", size: null } : { mode: "native" }, opts.field === true, hints)
+    ownerLine(rung, ASCII_CAPS, false, 0, opts.semantic === true ? { mode: "semantic", size: null, clears: false, all: false, rect: null } : { mode: "native" }, opts.field === true, hints)
       .map((c) => c.label);
   const ASK = { question: "Discard the draft?", choices: [{ key: "y", label: "discard" }, { key: "n", label: "keep", default: true as const }] };
 
@@ -1262,7 +1266,7 @@ describe("C22 I133 — the owner line's chords are the keymap's (review batch 2,
     expect(drawn.length, "the owner words and facts were drawn").toBeGreaterThan(6);
 
     // The copy line names the extend rows — `⇧↑⇧↓` — and not the caret's `↑↓`.
-    expect(ownerLine("copy", FULL_CAPS, false, 0, { mode: "semantic", size: null }, false, hints).map((c) => c.label))
+    expect(ownerLine("copy", FULL_CAPS, false, 0, { mode: "semantic", size: null, clears: false, all: false, rect: null }, false, hints).map((c) => c.label))
       .toContain("⇧↑⇧↓ extend");
 
     // **A question's line is its own vocabulary**, read through the graph: the
@@ -1322,5 +1326,146 @@ describe("C22 I133 — the owner line's chords are the keymap's (review batch 2,
     // from T1.171's, so the label is the question's and not a constant.
     void graph.confirm.ask({ question: "Stop?", choices: [{ key: "y", label: "stop", default: true as const }, { key: "n", label: "go on" }] });
     expect(ownerLine("question", FULL_CAPS, false, 0, undefined, false, graph.ownerHints()).at(-1)?.label).toBe("esc → stop");
+  });
+});
+
+describe("C22 I150 — the completion footer names what each key does", () => {
+  /** Hints over a table for a completion panel, at rest or holding a selection. */
+  const over = (rows: readonly Binding[], rest: boolean): OwnerHints => {
+    const entries = createKeymap(rows, "default-terminal").entries();
+    return {
+      chord: (target, action) => entries.find((b) => b.target === target && b.action === action)?.key,
+      substate: "complete",
+      ...(rest ? { promptUnderMenu: true } : {}),
+    };
+  };
+  const line = (hints: OwnerHints): readonly string[] =>
+    ownerLine("substate", FULL_CAPS, false, 0, undefined, false, hints).map((c) => c.label);
+
+  it("T1.182 (C22 I150, ruling 96, ruling 99): at rest the line offers the prompt's run and complete chords and the way out; once selected, the move keys and accept", async () => {
+    // **At rest the prompt answers first** (C19 I20): `⏎` submits and `↑` is
+    // history, so a chip saying `accept` or `move` names a key that goes
+    // somewhere else. F1486 measured `⏎` submitting `/c` under `⏎ accept`.
+    const rest = line(over(defaultKeymap, true));
+    // **`⏎ run` is ruling 99's amendment** (§029): at rest `⏎` runs the line.
+    expect(rest).toEqual(["complete", "⏎ run", "⇥ complete", "esc close"]);
+    expect(rest.some((l) => /accept|move/u.test(l)), "no chip names a key the menu does not hold").toBe(false);
+
+    // **The control, and the other state**: with a selection the menu owns its
+    // keys and the line is the one it always drew.
+    expect(line(over(defaultKeymap, false))).toEqual(["complete", "↑↓ move", "⏎ accept", "esc close"]);
+
+    // **The chord is the keymap's** (C22 I133): the prompt's `complete` moved to
+    // `⌃o` moves the rest line's chip, which a literal `⇥` would not.
+    const ctrlO = defaultKeymap.map((b) =>
+      b.target === "prompt" && b.action === "complete" ? { ...b, key: { name: "o", ctrl: true } } : b,
+    );
+    const moved = line(over(ctrlO, true));
+    expect(moved).toContain(`${chordText({ name: "o", ctrl: true })} complete`);
+    expect(moved, "and the old chord is not named").not.toContain("⇥ complete");
+    // And the prompt's `submit`: moved to `⌃o` alone, the rest line says so.
+    const submitO = defaultKeymap.filter((b) => !(b.target === "prompt" && b.action === "submit")).concat(
+      defaultKeymap
+        .filter((b) => b.target === "prompt" && b.action === "submit")
+        .slice(0, 1)
+        .map((b) => ({ ...b, key: { name: "o", ctrl: true } })),
+    );
+    const run = line(over(submitO, true));
+    expect(run).toContain(`${chordText({ name: "o", ctrl: true })} run`);
+    expect(run, "and the old chord is not named").not.toContain("⏎ run");
+
+    // **Through the graph, from the router's own predicate** (C22 I51, I145): a
+    // `complete` panel declaring `promptLive` answers the hint, and one that
+    // does not answers nothing.
+    const { graph } = await buildGraph();
+    graph.lifecycle.acquire();
+    const hintsWith = (promptLive: boolean): OwnerHints => {
+      graph.overlays.push({
+        id: "probe-complete",
+        kind: "panel",
+        owner: { rung: "substate", name: "complete" },
+        placement: { kind: "anchored", row: 20, rows: 1, prefer: "above" },
+        content: [],
+        blocking: false,
+        dismissal: "escape",
+        promptLive,
+      });
+      const hints = graph.ownerHints();
+      graph.overlays.dismiss("probe-complete");
+      return hints;
+    };
+    expect(hintsWith(true).promptUnderMenu, "a menu at rest").toBe(true);
+    expect(hintsWith(false).promptUnderMenu, "a menu holding a selection").toBeUndefined();
+    expect(line(hintsWith(true))).toEqual(["complete", "⏎ run", "⇥ complete", "esc close"]);
+  });
+});
+
+describe("C22 I33 — a command of several lines", () => {
+  it("T1.172 (C22 I33): commandRows draws each line of the command and no row carries a line break", async () => {
+    const W = 30;
+    // **The control**: one line is one row, the prompt and the text.
+    expect(commandRows("/ps --all", W, FULL_CAPS)).toEqual(["❯ /ps --all"]);
+
+    // `\n`, `\r\n`, a blank line, and a line wider than the body.
+    const long = "x".repeat(40);
+    const rows = commandRows(`echo a\r\necho b\n\n${long}`, W, FULL_CAPS);
+    const cont = " ".repeat(PROMPT_GUTTER.cont);
+    const body = W - PROMPT_GUTTER.first;
+    expect(rows, "one row per line, the long one wrapped within its own rows").toEqual([
+      "❯ echo a",
+      `${cont}echo b`,
+      cont,
+      `${cont}${long.slice(0, body)}`,
+      `${cont}${long.slice(body)}`,
+    ]);
+    // **Over every row**, because the defect was one row holding the rest.
+    for (const r of rows) expect(/[\r\n]/u.test(r), `${JSON.stringify(r)} holds a break`).toBe(false);
+
+    // **Through a session**: a bracketed paste of six lines, submitted, writes
+    // no bare line feed into the frame's bytes — it wrote five.
+    vi.useFakeTimers();
+    try {
+      const stdin = fakeStdin();
+      // **Thirty rows, not 24**: the six echo rows and `/help`'s answer must all
+      // be on screen for the last assertion to read them. At 24 the answer's
+      // two watch rows (C22 §6p) scrolled `line-0`…`line-4` off the top, and the
+      // row failed on the screen's height rather than on a line break.
+      const s = await buildSession({ stdin: stdin as never } as never, { columns: 80, rows: 30 });
+      const step = async (): Promise<void> => {
+        await vi.advanceTimersByTimeAsync(50);
+        for (let i = 0; i < 4; i += 1) await Promise.resolve();
+      };
+      await step();
+      const before = s.stdout.output.length;
+      stdin.emit(`\u001b[200~${Array.from({ length: 6 }, (_, i) => `/help line-${String(i)}`).join("\n")}\u001b[201~`);
+      await step();
+      stdin.emit("\r");
+      for (let i = 0; i < 10; i += 1) await step();
+      const out = s.stdout.output.slice(before);
+      expect(out, "the submission reached the frame").toContain("/help line-5");
+      expect((out.match(/\n/gu) ?? []).length, "bare line feeds written into the frame").toBe(0);
+      expect(s.screen().text.some((r) => r.trimStart().startsWith("/help line-3")), "each line on its own row").toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("C22 I33 — the echo neutralised (F1401)", () => {
+  it("T1.179 (C22 I33, C17 I36): commandRows draws U+2066 and U+202E as their forms, no row holds a bidi format character, and the height counts the forms' cells", () => {
+    // Escapes, never literals (A03 SS69).
+    const typed = "/show a\u2066b\u202ec";
+    const bidi = /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u;
+    expect(commandRows(typed, 30, FULL_CAPS)).toEqual(["❯ /show a<U+2066>b<U+202E>c"]);
+    // **The height counts the forms.** At 20 columns the body is 18: the raw
+    // line measures 9 cells and would be one row, the drawn one is 25 and is
+    // two — and the measurer calls this same function (C14 I20).
+    const narrow = commandRows(typed, 20, FULL_CAPS);
+    expect(narrow, "two rows, the form's cells counted").toEqual(["❯ /show a<U+2066>b<U", `${" ".repeat(PROMPT_GUTTER.cont)}+202E>c`]);
+    for (const r of [...narrow, ...commandRows(typed, 30, FULL_CAPS)]) {
+      expect(bidi.test(r), `${JSON.stringify(r)} holds a bidi character`).toBe(false);
+    }
+    // **The control**: a clean command's rows are unchanged.
+    expect(commandRows("/show abc", 20, FULL_CAPS)).toEqual(["❯ /show abc"]);
   });
 });

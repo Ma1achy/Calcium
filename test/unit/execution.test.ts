@@ -924,7 +924,7 @@ describe("C23 §2 — the seven routes", () => {
     expect(h.transcript.entries, "and nothing was appended after shutdown began").toHaveLength(0);
   });
 
-  it("T3.72 (C22 I99, F158, F1024): the reservation is filled, not appended beside", async () => {
+  it("C23 T3.72 (C22 I99, F158, F1024): the reservation is filled, not appended beside", async () => {
     // **The id is the control.** Asserting one entry holding the greeting is
     // green for a pipeline that appended and cleared, and green for one that
     // never reserved at all; asserting that the entry's id is the one
@@ -947,7 +947,7 @@ describe("C23 §2 — the seven routes", () => {
     ).toEqual(["welcome aboard"]);
   });
 
-  it("T3.73 (C22 I99): an abandoned slot is settled, empty and evictable", async () => {
+  it("C23 T3.73 (C22 I99): an abandoned slot is settled, empty and evictable", async () => {
     // C13 never evicts a streaming entry (C13 I6), so a reservation left alone
     // outlives the cap for the life of the process. Released and abandoned
     // differ in exactly one flag, which is why this row is the only place the
@@ -962,7 +962,7 @@ describe("C23 §2 — the seven routes", () => {
     expect(h.transcript.entries[0]?.doc.blocks, "and still draws nothing").toEqual([]);
   });
 
-  it("T3.74 (C22 I99): a slot the user cleared is gone, and the greeting appends", async () => {
+  it("C23 T3.74 (C22 I99): a slot the user cleared is gone, and the greeting appends", async () => {
     // `settle` answers `unknown` and the call site acts on it. Before C22 I99
     // the outcome was discarded, so the greeting would have vanished with no
     // refusal anywhere — the failure a returned `PatchOutcome` exists to make

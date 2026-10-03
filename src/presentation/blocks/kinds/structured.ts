@@ -17,14 +17,17 @@ import { glyphFor, glyphs, spinnerFrameAt } from "../glyphs.js";
 import { valueBar } from "../../plot/bar.js";
 import { clampSpans, pad, paint, rows, tone, type Span } from "../paint.js";
 import {
+  dressShed,
   expansionRows,
   foldExpanded,
   naturalSpan,
   shedElements,
+  shedFocus,
   shedRow,
   withheldBy,
   withheldLines,
   type Part,
+  type ShedLit,
   type Withheld,
 } from "../shed.js";
 import type { BlockDefinition, NavElement, RenderContext, Windowed, Rendered } from "../types.js";
@@ -197,6 +200,8 @@ function keyValueWithheld(block: KeyValue, width: number): readonly Withheld[] |
 
 export const keyValueDefinition: BlockDefinition<KeyValue> = {
   kind: "keyValue",
+  // C09 I137 — a row that sheds (I113).
+  focusShape: "row",
 
   // C09 I124 — `expanded`, true and then absent.
   fold: foldExpanded,
@@ -333,9 +338,14 @@ export const keyValueDefinition: BlockDefinition<KeyValue> = {
     // I125): `measure` has no convention to read, so the rows it counts and the
     // rows drawn here must share one that is fixed.
     const opened = block.expanded === true ? keyValueWithheld(block, width) : null;
+    // A shed row is a `row` shape (C09 I137): its focus, gated on the plan
+    // `elements` reads.
+    const litAt = shedFocus(block.id, ctx, () => keyValueWithheld(block, width));
 
     return rows(
       block.rows.flatMap((entry, i) => {
+        const lit = litAt(i);
+        const ink = (t: Tone): ReturnType<typeof tone> => tone(t, ctx.theme, ctx.capabilities, lit?.on);
         // The key truncates at the cap; the value still aligns, because the
         // column is a width rather than the longest key that happens to fit
         // (T1.5).
@@ -348,18 +358,18 @@ export const keyValueDefinition: BlockDefinition<KeyValue> = {
 
         const drawn = paint(
           clampSpans(
-            [
-              { text: key, style: tone("muted", ctx.theme, ctx.capabilities) },
+            dressShed([
+              { text: key, style: ink("muted") },
               // **A shed part is not drawn, and neither is its gap.**
               ...(value === ""
                 ? []
                 : [
                     { text: " ".repeat(COLUMN_GAP) },
-                    { text: value, style: tone(entry.tone ?? "default", ctx.theme, ctx.capabilities) },
+                    { text: value, style: ink(entry.tone ?? "default") },
                   ]),
               // The withholding, stated rather than silent (C09 I81).
-              ...(mark === null ? [] : [{ text: ` ${mark}`, style: tone("dim", ctx.theme, ctx.capabilities) }]),
-            ],
+              ...(mark === null ? [] : [{ text: ` ${mark}`, style: ink("dim") }]),
+            ], lit, ctx),
             width,
             ctx.capabilities,
           ),
@@ -565,6 +575,8 @@ function eventsWithheld(block: Events, width: number): readonly Withheld[] | nul
 
 export const eventsDefinition: BlockDefinition<Events> = {
   kind: "events",
+  // C09 I137 — a row that sheds (I113).
+  focusShape: "row",
 
   // C09 I124 — `expanded`, true and then absent.
   fold: foldExpanded,
@@ -630,9 +642,13 @@ export const eventsDefinition: BlockDefinition<Events> = {
     const mark = plan.mark;
     // The expansion's parts, from the `wide` plan (C09 I125).
     const opened = block.expanded === true ? eventsWithheld(block, width) : null;
+    // A shed row is a `row` shape (C09 I137).
+    const litAt = shedFocus(block.id, ctx, () => eventsWithheld(block, width));
 
     return rows(
       block.events.flatMap((event, i) => {
+        const lit = litAt(i);
+        const ink = (t: Tone): ReturnType<typeof tone> => tone(t, ctx.theme, ctx.capabilities, lit?.on);
         const full = stripControl(event.ts);
         // The floor form when the column is narrower than the whole time, which
         // is the shrink rather than a cut.
@@ -640,11 +656,11 @@ export const eventsDefinition: BlockDefinition<Events> = {
 
         const drawn = paint(
           clampSpans(
-            [
+            dressShed([
               ...(ts === null
                 ? []
                 : [
-                    { text: ts, style: tone("meta", ctx.theme, ctx.capabilities) },
+                    { text: ts, style: ink("meta") },
                     { text: " ".repeat(COLUMN_GAP) },
                   ]),
               // `accent` when the producer says nothing — the behaviour before
@@ -655,7 +671,7 @@ export const eventsDefinition: BlockDefinition<Events> = {
                 : [
                     {
                       text: pad(truncate(stripControl(event.type), typeRoom, ctx.capabilities), typeRoom),
-                      style: tone(event.tone ?? "accent", ctx.theme, ctx.capabilities),
+                      style: ink(event.tone ?? "accent"),
                     },
                     { text: " ".repeat(COLUMN_GAP) },
                   ]),
@@ -664,14 +680,14 @@ export const eventsDefinition: BlockDefinition<Events> = {
                 : [
                     {
                       text: truncate(stripControl(event.message), msgRoom, ctx.capabilities),
-                      style: tone("default", ctx.theme, ctx.capabilities),
+                      style: ink("default"),
                     },
                   ]),
               // **The withholding, stated rather than silent** (C09 I81). It is
               // a count and not a list, because a list of what went is wider
               // than what stayed.
-              ...(mark === null ? [] : [{ text: ` ${mark}`, style: tone("dim", ctx.theme, ctx.capabilities) }]),
-            ],
+              ...(mark === null ? [] : [{ text: ` ${mark}`, style: ink("dim") }]),
+            ], lit, ctx),
             width,
             ctx.capabilities,
           ),
@@ -846,6 +862,8 @@ function comparisonWithheld(block: Comparison, width: number): readonly Withheld
 
 export const comparisonDefinition: BlockDefinition<Comparison> = {
   kind: "comparison",
+  // C09 I137 — a row that sheds (I113).
+  focusShape: "row",
 
   // C09 I124 — `expanded`, true and then absent.
   fold: foldExpanded,
@@ -940,7 +958,10 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
       reserve: number;
       b: string;
       style: (id: "field" | "a" | "b") => ReturnType<typeof tone>;
+      /** Focus on this row, where it is a shed row's (C09 I137); the header is never one. */
+      lit?: ShedLit | null;
     }): string => {
+      const on = cellsOf.lit?.on;
       const spans: Span[] = [];
       const lead = (): void => {
         if (spans.length > 0) spans.push({ text: " ".repeat(COLUMN_GAP) }); // cells-ok — a span count
@@ -952,7 +973,7 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
           // (` ~+-`), one cell at both conventions, so the convention has no
           // subject here (F1042).
           text: pad(cellsOf.change ?? " ", changeRoom),
-          style: tone("muted", ctx.theme, ctx.capabilities),
+          style: tone("muted", ctx.theme, ctx.capabilities, on),
         });
       }
       if (fieldWidth > 0) {
@@ -990,8 +1011,8 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
         });
       }
       // The withholding, stated rather than silent (C09 I81).
-      if (mark !== null) spans.push({ text: ` ${mark}`, style: tone("dim", ctx.theme, ctx.capabilities) });
-      return paint(clampSpans(spans, width, ctx.capabilities));
+      if (mark !== null) spans.push({ text: ` ${mark}`, style: tone("dim", ctx.theme, ctx.capabilities, on) });
+      return paint(clampSpans(dressShed(spans, cellsOf.lit ?? null, ctx), width, ctx.capabilities));
     };
 
     // **`a` and `b`, not `before` and `after`** — the rename's ruling, which the
@@ -1027,7 +1048,12 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
 
     // The expansion's parts, from the `wide` plan (C09 I125).
     const opened = block.expanded === true ? comparisonWithheld(block, width) : null;
-    const body = block.rows.flatMap((entry, i) => [
+    // A shed row is a `row` shape (C09 I137); the header is not an element.
+    const litAt = shedFocus(block.id, ctx, () => comparisonWithheld(block, width));
+    const body = block.rows.flatMap((entry, i) => {
+      const lit = litAt(i);
+      const on = lit?.on;
+      return [
       line({
         change: CHANGE_MARKERS[entry.change ?? "unchanged"],
         field: stripControl(entry.field),
@@ -1037,13 +1063,15 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
         b: stripControl(entry.b),
         style: (id) =>
           id === "b"
-            ? tone(verdictTone(entry.verdict), ctx.theme, ctx.capabilities)
+            ? tone(verdictTone(entry.verdict), ctx.theme, ctx.capabilities, on)
             : id === "a"
-              ? tone("default", ctx.theme, ctx.capabilities)
-              : tone("muted", ctx.theme, ctx.capabilities),
+              ? tone("default", ctx.theme, ctx.capabilities, on)
+              : tone("muted", ctx.theme, ctx.capabilities, on),
+        lit,
       }),
       ...withheldLines(opened?.[i] ?? [], width, MIN_PART, ctx),
-    ]);
+      ];
+    });
 
     return rows([header, ...body]);
   },
@@ -1116,6 +1144,8 @@ function stepsWithheld(block: Steps, width: number): readonly Withheld[] | null 
 
 export const stepsDefinition: BlockDefinition<Steps> = {
   kind: "steps",
+  // C09 I137 — a row that sheds (I113).
+  focusShape: "row",
 
   // C09 I124 — `expanded`, true and then absent.
   fold: foldExpanded,
@@ -1167,9 +1197,13 @@ export const stepsDefinition: BlockDefinition<Steps> = {
     const detailWidth = plan === null ? null : Math.max(0, (got("detail") ?? COLUMN_GAP) - COLUMN_GAP);
     // The expansion's parts, from the `wide` plan (C09 I125).
     const opened = block.expanded === true ? stepsWithheld(block, width) : null;
+    // A shed row is a `row` shape (C09 I137).
+    const litAt = shedFocus(block.id, ctx, () => stepsWithheld(block, width));
 
     return rows(
       block.steps.flatMap((step, i) => {
+        const lit = litAt(i);
+        const ink = (t: Tone): ReturnType<typeof tone> => tone(t, ctx.theme, ctx.capabilities, lit?.on);
         // The spinner frame comes from `tick`, never from a clock (§2, T6.13).
         // Every frame is one cell, in both glyph sets, so an animating step
         // never shifts the row it sits on.
@@ -1211,22 +1245,22 @@ export const stepsDefinition: BlockDefinition<Steps> = {
             : truncate(stripControl(step.detail), detailRoom, ctx.capabilities);
 
         const spans: Span[] = [
-          { text: `${marker} `, style: tone(markerTone, ctx.theme, ctx.capabilities) },
+          { text: `${marker} `, style: ink(markerTone) },
         ];
         if (label !== "") {
           spans.push({
             text: label,
-            style: tone(step.state === "pending" ? "muted" : "default", ctx.theme, ctx.capabilities),
+            style: ink(step.state === "pending" ? "muted" : "default"),
           });
         }
         if (detail !== "") {
           spans.push({ text: " ".repeat(COLUMN_GAP) });
-          spans.push({ text: detail, style: tone("meta", ctx.theme, ctx.capabilities) });
+          spans.push({ text: detail, style: ink("meta") });
         }
         // The withholding, stated rather than silent (C09 I81).
-        if (mark !== null) spans.push({ text: ` ${mark}`, style: tone("dim", ctx.theme, ctx.capabilities) });
+        if (mark !== null) spans.push({ text: ` ${mark}`, style: ink("dim") });
 
-        return [paint(clampSpans(spans, width, ctx.capabilities)), ...withheldLines(opened?.[i] ?? [], width, MIN_PART, ctx)];
+        return [paint(clampSpans(dressShed(spans, lit, ctx), width, ctx.capabilities)), ...withheldLines(opened?.[i] ?? [], width, MIN_PART, ctx)];
       }),
     );
   },

@@ -500,10 +500,23 @@ export type Ramp = Readonly<{
    * one-shot without a stamp would otherwise have.
    */
   since?: number;
+
+  /**
+   * **A stop past `to`** (I148, §5c.1; review batch 4 M13.4). Over the last
+   * `share` of the axis `to` is lifted channel by channel, from ×1 up to
+   * ×`lift` at `t = 1`, and `from` mixes to `to` over the rest — the hot edge's
+   * profile, which a ramp closed to `Tone` (I106) otherwise has no seam for.
+   * A gradient over a slot pair only, and never on a span (I107): a lifted
+   * `to` is no slot, so the floor has nothing to prove it against.
+   */
+  overshoot?: RampOvershoot;
 }>;
 
-/** The members of a ramp, for a gate that cannot silently take a seventh (I106). */
-export const RAMP_KEYS: ReadonlySet<string> = new Set(["fill", "from", "to", "colormap", "bands", "animate", "since"]);
+/** `lift` finite in `(1, 2]`, `share` in `(0, 1)` (I148). */
+export type RampOvershoot = Readonly<{ lift: number; share: number }>;
+
+/** The members of a ramp, for a gate that cannot silently take a ninth (I106). */
+export const RAMP_KEYS: ReadonlySet<string> = new Set(["fill", "from", "to", "colormap", "bands", "animate", "since", "overshoot"]);
 
 // --- trails ---------------------------------------------------------------
 
@@ -531,6 +544,20 @@ export type TrailForm = "hotEdge" | "fade" | "hue" | "ripple" | "weight";
 export const TRAIL_FORMS: readonly TrailForm[] = Object.freeze([
   "hotEdge", "fade", "hue", "ripple", "weight",
 ]);
+
+/**
+ * The effect each trail form animates its band with, for the forms that animate
+ * (C09 I133). A form absent here draws a still band.
+ *
+ * **One table for three readers**: C09 builds the band's ramp from it, the gate
+ * refuses `trailSince` on a form whose effect is not a one-shot, and the shell
+ * stamps the forms whose effect is (C04 I109, C22 I131; ruling 81). Three
+ * `form === "ripple"` tests would be three places for the next one-shot form to
+ * be missed.
+ */
+export const TRAIL_ANIMATION: Readonly<Partial<Record<TrailForm, RampAnimation>>> = Object.freeze({
+  ripple: "ripple",
+});
 
 /** The forms that are a colour, and therefore draw nothing at 1-bit (C09 I91). */
 export const TRAIL_COLOUR_FORMS: ReadonlySet<TrailForm> = new Set<TrailForm>([
@@ -800,6 +827,18 @@ export type Notice = Readonly<{
    * which is §026's default, and it is read only while `streaming`.
    */
   trail?: TrailForm;
+  /**
+   * The tick the trail's one-shot began on, when `trail` names one (C04 I109,
+   * C09 I133; ruling 81) — `Ramp.since` for a ramp the document cannot address,
+   * because C09 derives the band at render.
+   *
+   * **A producer need not supply it and usually cannot**: the shell stamps it at
+   * the first frame that draws each new arrival (C22 I131), so each arrival plays
+   * the ripple once and the band then holds its final frame. Refused on a notice
+   * whose `trail` names no one-shot, for the reason `since` is refused on a
+   * periodic effect.
+   */
+  trailSince?: number;
   /** Styled runs inside `text`, by code-unit offset (§3am, I83). */
   spans?: readonly TextSpan[];
   /** The map a span's `value` reads through (I90). Required the moment any span carries one. */
@@ -840,18 +879,21 @@ export type Notice = Readonly<{
  * the glyphs are how a capability rung happens to draw them — the mapping is
  * the renderer's and changes with the rung.
  */
-export type CallState = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+export type CallState = "queued" | "waiting" | "running" | "succeeded" | "failed" | "cancelled";
 
 /**
  * The tone a call head in each state carries (I141, R-BLK-214).
  *
  * **Above 1 bit this is the only carrier of the state**, since the dot is one
- * character for four of the five, so a tone chosen apart from the state is a
+ * character for five of the six, so a tone chosen apart from the state is a
  * head that says nothing — which shipped, as `info` for every state. Exhaustive
- * by its type: a sixth state is a compile error here before it is a head.
+ * by its type: a new state is a compile error here before it is a head — `waiting` was the sixth (I149).
  */
 export const CALL_STATE_TONE: Readonly<Record<CallState, Tone>> = Object.freeze({
   queued: "muted",
+  // **Blocked on you** (I149, R-BLK-214): `warn`, and the blink the design
+  // draws is not built (C23 §7g ruling 8) — the tone and the word carry it.
+  waiting: "warn",
   running: "default",
   succeeded: "ok",
   failed: "error",
@@ -865,6 +907,7 @@ export const CALL_STATE_TONE: Readonly<Record<CallState, Tone>> = Object.freeze(
  */
 export const CALL_HEAD_GLYPH: Readonly<Record<CallState, Glyph>> = Object.freeze({
   queued: "queued",
+  waiting: "work-unit",
   running: "work-unit",
   succeeded: "work-unit",
   failed: "work-unit",
@@ -996,6 +1039,22 @@ export type Table = Readonly<{
    * the block cannot be checked against.
    */
   presorted?: boolean;
+  /**
+   * The row a chooser is on — **an id, never an index** (I150, C11 I33, §097,
+   * ruling 89).
+   *
+   * **The table's `active`.** A chip carries `active` and a tape `current`; a
+   * table had neither, so the completion menu marked its selection with a cell
+   * glyph, and a glyph is all a cell can carry. §097 draws the current row with
+   * `›`, the `pick` ground and its ink across the row, and the label in bold,
+   * and a ground across a row is C11's to paint.
+   *
+   * **Presence reserves the mark's cells on every row; the value places the
+   * mark.** So an id naming no row is valid and draws no mark, and a chooser
+   * whose current has scrolled out of its window keeps its labels where they
+   * were. Nothing `measure` or the plan reads follows it.
+   */
+  current?: string;
 }> & Padded & Floor;
 
 export type Steps = Readonly<{
@@ -3293,7 +3352,7 @@ export type Pills = Readonly<{
 
 /**
  * A row of peers you navigate, which slides rather than sheds (C04 §3ao, I124,
- * §095, `R-BLK-792`).
+ * §095, `R-BLK-758`–`764`).
  *
  * **The sibling of `Pills` and not a variant of it.** The distinction §095 draws
  * is whether anything points into the row — a focus, a current, a key that walks
@@ -3841,6 +3900,14 @@ export type Image = Readonly<{
    * `measure` and `render` disagree the moment it changed between them.
    */
   data: string;
+  /**
+   * The file `b.image({ path })` read the bytes from — **a record, never a
+   * source** (I142). Nothing below the builder opens it: `data` is what is
+   * drawn and the digest is the data's, so a path gone stale changes nothing on
+   * screen. Its reader is the copy (C09 I86), and a block built from bytes has
+   * none. A non-empty string when present (I143).
+   */
+  path?: string;
   /** Rows, declared. A positive integer — `Scroll.height`'s precedent (I47). */
   height: number;
   /**
@@ -4145,7 +4212,7 @@ export type KnownBlockKinds = {
  * renderer that has none draws it degraded as `raw`.
  *
  * ```ts
- * declare module "@fmx/calcium" {
+ * declare module "calcium-tui" {
  *   interface BlockKinds { faulty: Faulty }
  * }
  * ```

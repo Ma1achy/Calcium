@@ -114,8 +114,8 @@ const results = runPass({
       // lacks the verdict. T4.40's fourth assertion reads exactly that.
       name: "the verdict is written after the settle",
       file: EX,
-      from: "          finishCard(patch.result.exitCode === 0 ? \"\" : `exit ${String(patch.result.exitCode)}`);\n          // C23 I8 — settlement flushes at `\"completion\"`. §8a A4: settling\n          // clears the stall state, so a notice does not outlive its condition.\n          refresh.settled(id);\n          deps.transcript.settle(id);",
-      to: "          refresh.settled(id);\n          deps.transcript.settle(id);\n          finishCard(patch.result.exitCode === 0 ? \"\" : `exit ${String(patch.result.exitCode)}`);",
+      from: "          finishCard(code === 0 ? \"\" : `exit ${String(code)}`);\n          // C23 I8 — settlement flushes at `\"completion\"`. §8a A4: settling\n          // clears the stall state, so a notice does not outlive its condition.\n          refresh.settled(id);\n          settleKept(code);",
+      to: "          refresh.settled(id);\n          settleKept(code);\n          finishCard(code === 0 ? \"\" : `exit ${String(code)}`);",
       expect: "T4.40",
     },
     {
@@ -150,8 +150,8 @@ const results = runPass({
       // C23 I59 (T4.49, T4.40) — a zero exit said as `exit 0`: `ok` with a number on it.
       name: "exit 0 is an outcome again",
       file: EX,
-      from: "          finishCard(patch.result.exitCode === 0 ? \"\" : `exit ${String(patch.result.exitCode)}`);",
-      to: "          finishCard(`exit ${String(patch.result.exitCode)}`);",
+      from: "          finishCard(code === 0 ? \"\" : `exit ${String(code)}`);",
+      to: "          finishCard(`exit ${String(code)}`);",
       expect: "T4.49",
     },
     {
@@ -209,8 +209,8 @@ const results = runPass({
     {
       name: "denied is recorded as exit 1",
       file: EX,
-      from: "        deps.history.append(line, 126);",
-      to: "        deps.history.append(line, 1);",
+      from: "        else settleKept(126);",
+      to: "        else settleKept(1);",
       expect: "T4.51",
     },
     {

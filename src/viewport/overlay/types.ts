@@ -146,6 +146,16 @@ type LayerFields = Readonly<{
    * owner moved mid-life makes the ladder depend on when it looked.
    */
   owner?: LayerOwner;
+  /**
+   * Does the prompt stay live beneath this layer (I34, C22 I145, ruling 23)?
+   *
+   * One of C22 §6l.9b's two properties — *whether the prompt is drawn under* —
+   * and the one that changes while the layer is up: a completion menu is live
+   * while it holds no selection and not once it holds one. So `update` carries
+   * it, unlike `blocking`, `dismissal` and `owner`, which never change (I14).
+   * Absent is `false`.
+   */
+  promptLive?: boolean;
 }>;
 
 /**
@@ -260,7 +270,7 @@ export type DismissReason = "explicit" | "anchorEvicted" | "displaced";
  * back to a prompt an owner is still waiting on. A layer that needs to change
  * either is two layers.
  */
-export type LayerUpdate = Partial<Pick<Layer, "content" | "placement" | "width" | "cursor">>;
+export type LayerUpdate = Partial<Pick<Layer, "content" | "placement" | "width" | "cursor" | "promptLive">>;
 
 export type OverlayChange =
   | Readonly<{ kind: "push"; id: string; layerKind: Layer["kind"] }>

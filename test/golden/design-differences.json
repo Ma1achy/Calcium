@@ -1,0 +1,646 @@
+{
+ "about": "The differences between each framed fixture's figure and its golden frame that are allowed, each with its reason. Compared by equality in both directions by design-fixtures T1.7 and T1.8; re-derived by `npx tsx tools/design/figures.ts --write`, which keeps a reason only while its entry keeps its kind. See DESIGN_FIXTURES.md §The figure.",
+ "rung": "dark-unicode",
+ "differences": [
+  {
+   "section": 3,
+   "target": "session-frame.test.ts",
+   "unlocated": true,
+   "reason": "session-frame.test.ts is indexed by scene and width, not by the design's sections: no frame is headed with this section, so nothing there is this fixture's picture to compare. The surface is drawn in a whole-session frame among others"
+  },
+  {
+   "section": 4,
+   "target": "session-frame.test.ts",
+   "unlocated": true,
+   "reason": "session-frame.test.ts is indexed by scene and width, not by the design's sections: no frame is headed with this section, so nothing there is this fixture's picture to compare. The surface is drawn in a whole-session frame among others"
+  },
+  {
+   "section": 5,
+   "target": "session-frame.test.ts",
+   "unlocated": true,
+   "reason": "session-frame.test.ts is indexed by scene and width, not by the design's sections: no frame is headed with this section, so nothing there is this fixture's picture to compare. The surface is drawn in a whole-session frame among others"
+  },
+  {
+   "section": 6,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 81,
+   "figureOnly": [
+    "« U+00AB",
+    "» U+00BB",
+    "— U+2014",
+    "↑ U+2191",
+    "→ U+2192",
+    "↓ U+2193",
+    "↺ U+21BA",
+    "⋯ U+22EF",
+    "─ U+2500",
+    "▌ U+258C",
+    "▰ U+25B0",
+    "▴ U+25B4",
+    "▾ U+25BE",
+    "❯ U+276F"
+   ],
+   "frameOnly": [
+    "• U+2022",
+    "⁃ U+2043",
+    "⊘ U+2298",
+    "⎸ U+23B8",
+    "ⓘ U+24D8",
+    "◌ U+25CC",
+    "◐ U+25D0"
+   ],
+   "reason": "The frame is the tree's vocabulary and the figure is the registry's. The census draws `GLYPH_TOKENS`, so the registry's ❯ ⋯ ▌ ↺, the trend arrows ↑ → ↓ and the sort marks ▴ ▾ are absent from it — the tree has most of them elsewhere — while the tree's own ⓘ ◌ ◐ ⊘ • ⎸ ⁃ are present. « » and ▰ are the figure's tape delimiters and supporting marks; ─ and — are its table rule and prose"
+  },
+  {
+   "section": 7,
+   "target": "states.test.ts",
+   "unlocated": true,
+   "reason": "states.test.ts is indexed by the repository's states (`── notice · …`), not by the design's sections, so no frame is headed with this one"
+  },
+  {
+   "section": 8,
+   "target": "blocks.test.ts",
+   "unlocated": true,
+   "reason": "blocks.test.ts is indexed by block kind (`── table · measured 1 · rendered 1`), one specimen per kind, so no frame is headed with this section and none is drawn against its figure"
+  },
+  {
+   "section": 9,
+   "target": "states.test.ts",
+   "unlocated": true,
+   "reason": "states.test.ts is indexed by the repository's states (`── notice · …`), not by the design's sections, so no frame is headed with this one"
+  },
+  {
+   "section": 10,
+   "target": "session-frame.test.ts",
+   "unlocated": true,
+   "reason": "session-frame.test.ts is indexed by scene and width, not by the design's sections: no frame is headed with this section, so nothing there is this fixture's picture to compare. The surface is drawn in a whole-session frame among others"
+  },
+  {
+   "section": 11,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 78,
+   "figureOnly": [
+    "— U+2014",
+    "› U+203A",
+    "↑ U+2191",
+    "↓ U+2193",
+    "⇥ U+21E5",
+    "⏎ U+23CE",
+    "─ U+2500",
+    "▌ U+258C",
+    "▲ U+25B2",
+    "❯ U+276F"
+   ],
+   "frameOnly": [
+    "│ U+2502"
+   ],
+   "reason": "The chip's own form agrees (`[parse.ts · 184L]`, painted and bracketed). The figure draws the whole @ completion around it — the menu (› ↑ ↓ ⏎ ⇥), the prompt's rules and caret (─ ❯ ▌) and the size warning (▲), which is M15's question work; the frame's │ is the measuring box's edge"
+  },
+  {
+   "section": 12,
+   "target": "blocks.test.ts",
+   "unlocated": true,
+   "reason": "blocks.test.ts is indexed by block kind (`── table · measured 1 · rendered 1`), one specimen per kind, so no frame is headed with this section and none is drawn against its figure"
+  },
+  {
+   "section": 13,
+   "target": "states.test.ts",
+   "unlocated": true,
+   "reason": "states.test.ts is indexed by the repository's states (`── notice · …`), not by the design's sections, so no frame is headed with this one"
+  },
+  {
+   "section": 14,
+   "target": "session-frame.test.ts",
+   "unlocated": true,
+   "reason": "session-frame.test.ts is indexed by scene and width, not by the design's sections: no frame is headed with this section, so nothing there is this fixture's picture to compare. The surface is drawn in a whole-session frame among others"
+  },
+  {
+   "section": 19,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 62,
+   "figureOnly": [
+    "· U+00B7"
+   ],
+   "frameOnly": [
+    "— U+2014",
+    "─ U+2500"
+   ],
+   "reason": "The figure joins a binding's label and its qualifiers with ` · ` (`copy source · enhanced`); the frame prints the action's name alone. The frame heads each scope with the `rule` block `/help keys` draws (`── prompt — where you are`) where the figure heads it with the bare name. The check the row makes is the grouping and the order, and they agree"
+  },
+  {
+   "section": 21,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 72,
+   "figureOnly": [
+    "· U+00B7",
+    "— U+2014",
+    "⎿ U+23BF",
+    "─ U+2500",
+    "┌ U+250C",
+    "┐ U+2510",
+    "└ U+2514",
+    "┘ U+2518",
+    "● U+25CF"
+   ],
+   "frameOnly": [
+    "⋯ U+22EF"
+   ],
+   "reason": "The bar's four marks (│ ┃ ╽ ╿) agree. The figure draws the bar beside a call's output (● ⎿ ·) and a boxed log whose count sits in the border (┌ ┐ └ ┘ ─); the frame draws the set as a table and a bare bar beside six lines with its residue row (⋯)"
+  },
+  {
+   "section": 22,
+   "target": "design-surfaces.test.ts",
+   "unlocated": true,
+   "reason": "design-surfaces.test.ts draws §019's listing, which is what §022 is about, and has no frame headed §22: the help ENTRY — its `● keys · N bindings` head in the transcript — is not drawn there"
+  },
+  {
+   "section": 23,
+   "target": "blocks.test.ts",
+   "unlocated": true,
+   "reason": "blocks.test.ts is indexed by block kind (`── table · measured 1 · rendered 1`), one specimen per kind, so no frame is headed with this section and none is drawn against its figure"
+  },
+  {
+   "section": 24,
+   "target": "states.test.ts",
+   "unlocated": true,
+   "reason": "states.test.ts is indexed by the repository's states (`── notice · …`), not by the design's sections, so no frame is headed with this one. And no golden anywhere draws a reasoning block or a `thinking` head, at any rung (review batch 4, M16.8): the fixture's regenerated ▹/▿ are the tree's `expand`/`collapse`, so the marks would agree, but the surface is not drawn"
+  },
+  {
+   "section": 26,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 78,
+   "figureOnly": [
+    "· U+00B7",
+    "… U+2026",
+    "─ U+2500",
+    "▌ U+258C",
+    "▿ U+25BF",
+    "● U+25CF",
+    "✦ U+2726",
+    "❯ U+276F"
+   ],
+   "frameOnly": [
+    "⋅ U+22C5"
+   ],
+   "reason": "✦ in a fixture is the still of an empty spinner slot (`tools/design/fixtures.ts`, SPINNER_SLOT), and the frame draws the agent set at its tick, `⋅`. The frame reads the foreground as a mask, one row per pass, so the ● head, the ▿ reasoning header, the prompt (❯ ▌ ─) and the elision (…) the figure draws around the trail are not in it"
+  },
+  {
+   "section": 27,
+   "target": "plot-forms.test.ts",
+   "unlocated": true,
+   "reason": "plot-forms.test.ts is indexed by plot form and capability rung (`bar · full · 80`), not by the design's sections"
+  },
+  {
+   "section": 28,
+   "target": "question-slot.test.ts",
+   "unlocated": true,
+   "reason": "question-slot.test.ts is an integration row: it asserts on the frames it builds and keeps no golden, so there is nothing on disk to compare. The surface is built and asserted, which is why the row stays framed"
+  },
+  {
+   "section": 29,
+   "target": "session-frame.test.ts",
+   "unlocated": true,
+   "reason": "session-frame.test.ts is indexed by scene and width, not by the design's sections: no frame is headed with this section, so nothing there is this fixture's picture to compare. The surface is drawn in a whole-session frame among others"
+  },
+  {
+   "section": 30,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 76,
+   "figureOnly": [
+    "· U+00B7",
+    "— U+2014",
+    "▌ U+258C",
+    "✦ U+2726",
+    "❯ U+276F"
+   ],
+   "frameOnly": [
+    "⊘ U+2298",
+    "✓ U+2713",
+    "✗ U+2717"
+   ],
+   "reason": "The frame is the head-mark ladder by state and the state glyph row (✓ ✗ ⊘); the figure draws the marks in context, with ✦ — the fixtures' still of a spinner slot — in the duration, the prompt's caret (❯ ▌) and heads joined by ` · `"
+  },
+  {
+   "section": 33,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 77,
+   "figureOnly": [
+    "— U+2014",
+    "│ U+2502",
+    "✦ U+2726",
+    "⡀ U+2840",
+    "⡄ U+2844",
+    "⡆ U+2846",
+    "⡇ U+2847",
+    "⣧ U+28E7",
+    "⣷ U+28F7"
+   ],
+   "frameOnly": [],
+   "reason": "The nine alphabets agree. The figure adds §033's sub-cell table — braille in eighths (⡀ ⡄ ⡆ ⡇ ⣧ ⣷) between │ edges — and a spinner (✦, the fixtures' still) for indeterminate work; the frame's braille row draws only the eighth its fill reaches"
+  },
+  {
+   "section": 34,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 84,
+   "figureOnly": [
+    "· U+00B7",
+    "— U+2014",
+    "✦ U+2726"
+   ],
+   "frameOnly": [],
+   "reason": "✦ is the fixtures' still of a spinner slot, beside the indeterminate case the frame does not draw; · and — are the figure's captions. The bar alphabets agree"
+  },
+  {
+   "section": 35,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 60,
+   "figureOnly": [
+    "· U+00B7",
+    "→ U+2192",
+    "▰ U+25B0",
+    "▱ U+25B1",
+    "✦ U+2726"
+   ],
+   "frameOnly": [],
+   "reason": "Segmented draws posts (▮ ▯) — ruling 32, `R-PRG-002`: discrete steps use posts — where §035's figure draws slant (▰ ▱) for the operation preset. ✦ is the fixtures' spinner still; → is the degradation arrow of the figure's ASCII paragraph, whose `[#][.]` `R-PRG-003` overrules"
+  },
+  {
+   "section": 37,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 92,
+   "figureOnly": [
+    "· U+00B7",
+    "▰ U+25B0",
+    "▱ U+25B1"
+   ],
+   "frameOnly": [
+    "— U+2014"
+   ],
+   "reason": "The figure's bar-carrier row draws slant cells (▰ ▱); the frame draws fills and effects as masks over letters and never draws the carrier's cells. · is the figure's attention-group column; the frame's — is its refused-on-a-span line"
+  },
+  {
+   "section": 42,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 44,
+   "figureOnly": [
+    "× U+00D7",
+    "— U+2014",
+    "− U+2212",
+    "─ U+2500",
+    "│ U+2502",
+    "┌ U+250C",
+    "┐ U+2510",
+    "└ U+2514",
+    "┘ U+2518",
+    "├ U+251C",
+    "┤ U+2524",
+    "▾ U+25BE",
+    "● U+25CF",
+    "✓ U+2713",
+    "✗ U+2717",
+    "✛ U+271B"
+   ],
+   "frameOnly": [],
+   "reason": "The frame draws `pills` — a row of peers that sheds — which is the tree's reading of §042's title; the figure draws knobs: a slider (├ ─ ● ┤), radios, toggles (✓ ✗), a stepper (− ×), a dropdown (▾) and a camera pad (┌ ┐ └ ┘ │ ✛). The slider is `control` (§018, built); segmented, switch and stepper are the kinds §073's row names as absent"
+  },
+  {
+   "section": 44,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 65,
+   "figureOnly": [
+    "· U+00B7",
+    "— U+2014",
+    "⇧ U+21E7",
+    "⌥ U+2325",
+    "▌ U+258C",
+    "● U+25CF",
+    "✗ U+2717",
+    "❯ U+276F"
+   ],
+   "frameOnly": [
+    "… U+2026"
+   ],
+   "reason": "The frame draws R-SEL-006's four grounds as masks over one table (▸, cells cut with …). The figure adds the prompt's range (❯), the ▌ selection rail, which is C14's and drawn in the transcript's column 0 rather than by the block, the rows' state marks (● ✗) and the chords (⇧ ⌥)"
+  },
+  {
+   "section": 45,
+   "target": "blocks.test.ts",
+   "unlocated": true,
+   "reason": "blocks.test.ts is indexed by block kind (`── table · measured 1 · rendered 1`), one specimen per kind, so no frame is headed with this section and none is drawn against its figure"
+  },
+  {
+   "section": 46,
+   "target": "session-frame.test.ts",
+   "unlocated": true,
+   "reason": "session-frame.test.ts is indexed by scene and width, not by the design's sections: no frame is headed with this section, so nothing there is this fixture's picture to compare. The surface is drawn in a whole-session frame among others"
+  },
+  {
+   "section": 47,
+   "target": "containment.test.ts",
+   "unlocated": true,
+   "reason": "containment.test.ts is indexed by variant, case and width (`dark-unicode capped at 30`), not by the design's sections"
+  },
+  {
+   "section": 48,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 53,
+   "figureOnly": [
+    "· U+00B7",
+    "— U+2014",
+    "─ U+2500",
+    "│ U+2502",
+    "┌ U+250C",
+    "┐ U+2510",
+    "└ U+2514",
+    "┘ U+2518",
+    "✦ U+2726"
+   ],
+   "frameOnly": [
+    "◌ U+25CC",
+    "✓ U+2713",
+    "⠋ U+280B"
+   ],
+   "reason": "The frame is the `steps` kind's states (✓ ⠋ ◌ ✗). The figure draws four boxed block states (┌ ┐ └ ┘ │ ─) with ERROR banners and ✦ spinner stills; those boxes are §047's, drawn in containment.test.ts"
+  },
+  {
+   "section": 49,
+   "target": "blocks.test.ts",
+   "unlocated": true,
+   "reason": "blocks.test.ts is indexed by block kind (`── table · measured 1 · rendered 1`), one specimen per kind, so no frame is headed with this section and none is drawn against its figure"
+  },
+  {
+   "section": 50,
+   "target": "blocks.test.ts",
+   "unlocated": true,
+   "reason": "blocks.test.ts is indexed by block kind (`── table · measured 1 · rendered 1`), one specimen per kind, so no frame is headed with this section and none is drawn against its figure"
+  },
+  {
+   "section": 51,
+   "target": "question-slot.test.ts",
+   "unlocated": true,
+   "reason": "question-slot.test.ts is an integration row: it asserts on the frames it builds and keeps no golden, so there is nothing on disk to compare. The surface is built and asserted, which is why the row stays framed"
+  },
+  {
+   "section": 52,
+   "target": "question-slot.test.ts",
+   "unlocated": true,
+   "reason": "question-slot.test.ts is an integration row: it asserts on the frames it builds and keeps no golden, so there is nothing on disk to compare. The surface is built and asserted, which is why the row stays framed"
+  },
+  {
+   "section": 58,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 66,
+   "figureOnly": [
+    "· U+00B7"
+   ],
+   "frameOnly": [
+    "… U+2026",
+    "› U+203A",
+    "↵ U+21B5",
+    "⇥ U+21E5",
+    "⋅ U+22C5",
+    "⋯ U+22EF",
+    "─ U+2500",
+    "│ U+2502",
+    "┌ U+250C",
+    "┐ U+2510",
+    "○ U+25CB",
+    "✓ U+2713",
+    "✗ U+2717"
+   ],
+   "reason": "The figure is a two-column rule table joined with ` · `; the frame draws each source beside its rendering — tab and newline shown as ⇥ and ↵, and the rendered table, patch, status and tape bringing their own marks (… ⋯ ─ │ ┌ ┐ ✗ › ⋅ ○ ✓)"
+  },
+  {
+   "section": 59,
+   "target": "session-frame.test.ts",
+   "unlocated": true,
+   "reason": "session-frame.test.ts is indexed by scene and width, not by the design's sections: no frame is headed with this section, so nothing there is this fixture's picture to compare. The surface is drawn in a whole-session frame among others"
+  },
+  {
+   "section": 60,
+   "target": "session-frame.test.ts",
+   "unlocated": true,
+   "reason": "session-frame.test.ts is indexed by scene and width, not by the design's sections: no frame is headed with this section, so nothing there is this fixture's picture to compare. The surface is drawn in a whole-session frame among others"
+  },
+  {
+   "section": 66,
+   "target": "states.test.ts",
+   "unlocated": true,
+   "reason": "states.test.ts is indexed by the repository's states (`── notice · …`), not by the design's sections, so no frame is headed with this one"
+  },
+  {
+   "section": 67,
+   "target": "session-frame.test.ts",
+   "unlocated": true,
+   "reason": "session-frame.test.ts is indexed by scene and width, not by the design's sections: no frame is headed with this section, so nothing there is this fixture's picture to compare. The surface is drawn in a whole-session frame among others"
+  },
+  {
+   "section": 68,
+   "target": "compositions.test.ts",
+   "unlocated": true,
+   "reason": "compositions.test.ts is indexed by C10 §4k's composition cases and depths (`case 1 — … at 1-bit`), not by the design's sections"
+  },
+  {
+   "section": 69,
+   "target": "session-frame.test.ts",
+   "unlocated": true,
+   "reason": "session-frame.test.ts is indexed by scene and width, not by the design's sections: no frame is headed with this section, so nothing there is this fixture's picture to compare. The surface is drawn in a whole-session frame among others"
+  },
+  {
+   "section": 72,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 88,
+   "figureOnly": [
+    "· U+00B7",
+    "» U+00BB",
+    "— U+2014",
+    "⏎ U+23CE",
+    "┤ U+2524",
+    "┼ U+253C",
+    "▀ U+2580",
+    "█ U+2588",
+    "░ U+2591",
+    "▒ U+2592",
+    "▓ U+2593",
+    "▸ U+25B8",
+    "⠉ U+2809",
+    "⠑ U+2811",
+    "⠒ U+2812",
+    "⠔ U+2814",
+    "⠢ U+2822",
+    "⡠ U+2860",
+    "⢀ U+2880",
+    "⢄ U+2884"
+   ],
+   "frameOnly": [
+    "⋯ U+22EF",
+    "│ U+2502",
+    "┌ U+250C",
+    "┐ U+2510",
+    "✗ U+2717"
+   ],
+   "reason": "Both are ground censuses over different specimens. The figure's are a diff, a context bar (█ ░ ▒ ▓), a focused row (▸), a braille plot in a well (┤ ┼ and its dots), an image (▀) and the prompt's posture (» ⏎); the frame's are a patch with its residue (⋯), a status box (┌ ┐ │ ✗), the pills posture and a plot well"
+  },
+  {
+   "section": 73,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 92,
+   "figureOnly": [
+    "» U+00BB",
+    "⏎ U+23CE",
+    "─ U+2500",
+    "┌ U+250C",
+    "┐ U+2510",
+    "├ U+251C",
+    "┤ U+2524",
+    "▸ U+25B8",
+    "○ U+25CB",
+    "● U+25CF",
+    "✓ U+2713"
+   ],
+   "frameOnly": [
+    "▀ U+2580"
+   ],
+   "reason": "The frame is §073's test run over every kind plus the button's rungs, and its ▀ is the image kind's grounded cells in that census. The figure draws buttons, titles (┌ ┐ ├ ┤ ─), widgets (○ ● ✓), a table header under ▸, and the posture (» ⏎)"
+  },
+  {
+   "section": 74,
+   "target": "theme-tokens.test.ts",
+   "unlocated": true,
+   "reason": "theme-tokens.test.ts is indexed by colour depth (`at 1-bit`), and §074's weight ladder is one column of its table rather than a frame headed with the section"
+  },
+  {
+   "section": 75,
+   "target": "blocks.test.ts",
+   "unlocated": true,
+   "reason": "blocks.test.ts is indexed by block kind (`── table · measured 1 · rendered 1`), one specimen per kind, so no frame is headed with this section and none is drawn against its figure"
+  },
+  {
+   "section": 77,
+   "target": "blocks.test.ts",
+   "unlocated": true,
+   "reason": "blocks.test.ts is indexed by block kind (`── table · measured 1 · rendered 1`), one specimen per kind, so no frame is headed with this section and none is drawn against its figure"
+  },
+  {
+   "section": 78,
+   "target": "table.test.ts",
+   "unlocated": true,
+   "reason": "table.test.ts is indexed by theme and width (`dark at 80`), not by the design's sections"
+  },
+  {
+   "section": 79,
+   "target": "theme-tokens.test.ts",
+   "unlocated": true,
+   "reason": "theme-tokens.test.ts is indexed by colour depth (`at 24-bit`), and §079's tones and surfaces are its tables rather than a frame headed with the section"
+  },
+  {
+   "section": 82,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 59,
+   "figureOnly": [
+    "≡ U+2261",
+    "⊘ U+2298",
+    "⎿ U+23BF",
+    "█ U+2588",
+    "░ U+2591",
+    "● U+25CF",
+    "⚡ U+26A1"
+   ],
+   "frameOnly": [],
+   "reason": "The ground's extent is what the frame checks (C11 §5c, I25) and it agrees; the detail's contents are the producer's, so the figure's progress row (█ ░), action bar (≡ ⚡ ⊘) and ● ⎿ call head are specimen content the table's expansion does not carry"
+  },
+  {
+   "section": 95,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 63,
+   "figureOnly": [
+    "« U+00AB",
+    "» U+00BB",
+    "⇥ U+21E5",
+    "⋯ U+22EF",
+    "⌃ U+2303",
+    "✦ U+2726"
+   ],
+   "frameOnly": [
+    "⋅ U+22C5",
+    "○ U+25CB"
+   ],
+   "reason": "At 80 columns the frame's five members fit, so it draws no «n or n» and no ⋯ lead; its state marks are ⋅ (the running spinner at its tick) and ○ (queued) where the figure's are ✦ (the fixtures' still) and ✓. ⌃⇥ is the footer's switch hint, not the tape's"
+  },
+  {
+   "section": 96,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 81,
+   "figureOnly": [
+    "· U+00B7",
+    "— U+2014",
+    "⎿ U+23BF",
+    "▲ U+25B2",
+    "● U+25CF",
+    "✦ U+2726"
+   ],
+   "frameOnly": [],
+   "reason": "The frame draws the framed container alone; the figure draws three containers — framed, under a ● call head's ⎿ gutter, and bare — and the empty case. **The message's lead agrees since ruling 85** (C09 I138, F1461): both open an ERROR with ✗. The ▲ left on the figure's side is not a lead: it is the empty case's annotation, *no banner, no ▲, no red*, which names the warning mark where the mark it withholds is now ✗. ✦ is the fixtures' spinner still"
+  },
+  {
+   "section": 97,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 78,
+   "figureOnly": [
+    "— U+2014",
+    "▌ U+258C",
+    "● U+25CF"
+   ],
+   "frameOnly": [],
+   "reason": "The frame is the panel LAYER since ruling 87 (F1460) — a session with the completion menu open over an empty transcript — and the box marks the block kind brought are gone with the homonym. ● is the figure's reply specimen above the menu, which this frame leaves out so every mark is the layer's or the prompt's; ▌ is the figure's drawn cursor, where the tree's is the terminal's own; — is line 32's prose. **› is shared since ruling 89** (C19 I29, C11 I33, F1474): the menu's current candidate is the first at rest, drawn with `current`'s mark, the `pick` ground and the weight, and the other rows keep the mark's cells. **And the menu closes on the prompt's upper rule since ruling 90** (C19 I23, F1475): one rule under the candidates where the frame drew two stacked rows, which the marks cannot see and this frame's rows show. What the figure still draws and the frame does not: the other candidates on `bgElev`, which is not ruled"
+  },
+  {
+   "section": 99,
+   "target": "design-surfaces.test.ts",
+   "width": 80,
+   "figureCells": 63,
+   "figureOnly": [
+    "· U+00B7",
+    "▌ U+258C",
+    "● U+25CF",
+    "❯ U+276F"
+   ],
+   "frameOnly": [
+    "│ U+2502"
+   ],
+   "reason": "The cut ladder and the decimal columns agree in their marks; the frame's │ is the measured box's edge, and the figure's ❯ ▌ ● are the prompt and the call heads its paths sit in"
+  },
+  {
+   "section": 100,
+   "target": "table.test.ts",
+   "unlocated": true,
+   "reason": "table.test.ts is indexed by theme and width (`dark at 80`), not by the design's sections"
+  },
+  {
+   "section": 101,
+   "target": "question-slot.test.ts",
+   "unlocated": true,
+   "reason": "question-slot.test.ts is an integration row: it asserts on the frames it builds and keeps no golden, so there is nothing on disk to compare. The surface is built and asserted, which is why the row stays framed"
+  }
+ ]
+}

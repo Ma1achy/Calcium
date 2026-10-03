@@ -13,7 +13,7 @@ import type { SessionSnapshot } from "../../src/shell/types.js";
 const SEED: SessionSeed = Object.freeze({
   cwd: "/work",
   env: Object.freeze({ TERM: "xterm-256color" }),
-  cluster: "fmx-prod",
+  cluster: "corp-prod",
   version: "1.0.0",
 });
 
@@ -53,7 +53,7 @@ describe("C22 §5 — session state", () => {
       env: { TERM: "xterm-256color", FOO: "bar" },
       lastUuid: "uuid-1",
       identity: { user: "m", email: "m@x", groups: [], expiresAt: null },
-      cluster: "fmx-prod",
+      cluster: "corp-prod",
       health: "degraded",
       version: "1.0.0",
       retained: "/ps",
@@ -89,7 +89,7 @@ describe("C22 §5 — session state", () => {
     store.refresh.setHealth("offline");
     store.beginStopping();
 
-    expect([store.snapshot.cluster, store.snapshot.version]).toEqual(["fmx-prod", "1.0.0"]);
+    expect([store.snapshot.cluster, store.snapshot.version]).toEqual(["corp-prod", "1.0.0"]);
   });
 
   it("T1.11d: a captured snapshot never changes under its holder", () => {

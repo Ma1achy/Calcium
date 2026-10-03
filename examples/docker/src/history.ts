@@ -42,8 +42,8 @@
  * stall it exists to report. So the count is taken when the attempt starts.
  */
 
-import { b } from "@fmx/calcium";
-import type { Block } from "@fmx/calcium";
+import { b } from "calcium-tui";
+import type { Block } from "calcium-tui";
 
 /** The interval, and the unit the caption is denominated in. */
 export const TICK_MS = 2000;

@@ -44,7 +44,8 @@ const MUTATIONS = [
     // pressed to undo the smaller thing.
     name: "esc always leaves, with or without a selection",
     file: MODEL,
-    from: "  return mode.blocks.size === 0 ? null : frozen(mode.caret, null, new Set<string>());",
+    // Re-anchored for C14 I59: `escape` branches on `hasSelection`.
+    from: "  return hasSelection(mode) ? frozen(mode.caret, null, new Set<string>()) : null;",
     to: "  return null;",
     expect: "T1.41b",
   },
@@ -54,7 +55,7 @@ const MUTATIONS = [
     // the key the footer tells the reader to press.
     name: "esc only ever clears, and never leaves",
     file: MODEL,
-    from: "  return mode.blocks.size === 0 ? null : frozen(mode.caret, null, new Set<string>());",
+    from: "  return hasSelection(mode) ? frozen(mode.caret, null, new Set<string>()) : null;",
     to: "  return frozen(mode.caret, null, new Set<string>());",
     expect: "T1.41b",
   },
@@ -64,8 +65,8 @@ const MUTATIONS = [
     // count, which is what a reader watches, is identical either way.
     name: "clearing the selection also drops the caret",
     file: MODEL,
-    from: "  return mode.blocks.size === 0 ? null : frozen(mode.caret, null, new Set<string>());",
-    to: "  return mode.blocks.size === 0 ? null : frozen(null, null, new Set<string>());",
+    from: "  return hasSelection(mode) ? frozen(mode.caret, null, new Set<string>()) : null;",
+    to: "  return hasSelection(mode) ? frozen(null, null, new Set<string>()) : null;",
     expect: "T1.41b",
   },
   // **"the ⌃c rung clears first instead of leaving" is retired with the rung**
@@ -89,7 +90,8 @@ const MUTATIONS = [
     name: "⏎ is unbound at semanticSelection",
     file: "src/interaction/router/keymap.ts",
     // Re-anchored for C16 §6c: the row spreads `fromRegistry` where it called `chordOf`.
-    from: '  { target: "semanticSelection", ...fromRegistry("confirm"), action: "copySelectedEntries" },\n',
+    // Re-anchored for C14 I59: ⏎ is the copy that leaves.
+    from: '  { target: "semanticSelection", ...fromRegistry("confirm"), action: "copyAndLeaveSemanticSelection" },\n',
     to: "",
     expect: "T1.47",
   },

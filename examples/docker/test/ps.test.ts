@@ -9,11 +9,11 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { cells } from "@fmx/calcium";
-import type { RawResult, Table, TableRow } from "@fmx/calcium";
+import { cells } from "calcium-tui";
+import type { RawResult, Table, TableRow } from "calcium-tui";
 import { COLUMNS, createPsAdapter, parseNdjson, stateOf } from "../src/ps.ts";
 
-import { producerContext } from "@fmx/calcium/testing";
+import { producerContext } from "calcium-tui/testing";
 const CORPUS = readFileSync(new URL("./corpus/ps-real.ndjson", import.meta.url), "utf8");
 
 const result = (over: Partial<RawResult> = {}): RawResult => ({

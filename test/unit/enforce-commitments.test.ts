@@ -37,6 +37,8 @@ import {
   specFiles,
   checkInvariantCoverage,
   checkRowFiles,
+  checkRowResolves,
+  retiredRowsOf,
   rowIdsIn,
   tableColumn,
   testRowsOf,
@@ -696,6 +698,83 @@ describe("A03 SP15 — within one spec, a test row's id is titled in one file", 
   });
 });
 
+describe("A03 SP16 — a titled row locates the row its spec declares", () => {
+  // **A file with an owner**, found by asking the attribution rather than
+  // assumed: a bare title there is its owner's, which is the half of F1489 a
+  // fabrication has to construct.
+  const PLOT = "test/unit/plot.test.ts";
+  const row = (title: string): string => `it("${title}", () => {});`;
+  const OWNER = String(rowIdsIn(PLOT, row("T9.9: bare"))[0]?.spec);
+  const MINE = `docs/components/${OWNER}_owner.md`;
+  const THEIRS = "docs/components/C98_cited.md";
+
+  /** The owner's spec, the cited spec, and one test file, judged with a list. */
+  function run(test: readonly string[], owner: readonly string[], cited: readonly string[], exempt: readonly string[] = []) {
+    const read = (f: string): string => (f === PLOT ? test : f === MINE ? owner : cited).join("\n");
+    return checkRowResolves([PLOT], [MINE, THEIRS], read, exempt);
+  }
+
+  it("SP16: the real corpus, and it is a corpus", () => {
+    const r = checkRowResolves(walkTests(), specFiles());
+    expect(r.rows, "4060 titled rows a spec owns when the rule was wired").toBeGreaterThan(3_000); // cells-ok — a row count
+    expect(r.misfiled, "and the debt it lists is still debt").toBeGreaterThan(0);
+    expect(r.dangling, "the dangling are counted, not dropped").toBeGreaterThan(0);
+    expect(r.violations, "run `make enforce` for the detail").toEqual([]);
+  });
+
+  it("SP16: F1489's shape fails — a title citing another spec first, under an id only the file's owner declares", () => {
+    expect(OWNER, "the fixture's file has an owner").toMatch(/^C\d{2}$/u);
+    // The parse first: the title is the cited spec's, which is the attribution
+    // SP9 and SP15 both make.
+    expect(rowIdsIn(PLOT, row("T4.1 (C98 I1): the menu's indicator"))[0]?.spec).toBe("C98");
+    const { violations, misfiled } = run(
+      [row("T4.1 (C98 I1): the menu's indicator")],
+      ["- **T4.1** (I66): a different row"],
+      ["- **T4.2** (I1): something else"],
+    );
+    expect(misfiled).toBe(1);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("SP16");
+    expect(violations[0]?.message).toContain(`C98 T4.1 ${PLOT} (${OWNER}, which owns the file, declares T4.1`);
+  });
+
+  it("SP16: a live row reusing a retired id fails, struck or headed superseded", () => {
+    expect(retiredRowsOf(THEIRS, () => [
+      "- ~~**T3.1**~~ — struck with the view.",
+      "- **T3.2** (I31): **Superseded with the pushed view** (F1254) — gone.",
+      "- **T3.3** (I31): **retired with I16** (F1209).",
+      "- **T3.4** (I5): a live row that says superseded in prose, not in its head.",
+    ].join("\n"))).toEqual(new Set(["T3.1", "T3.2", "T3.3"]));
+    const retired = ["- ~~**T3.1**~~ — struck.", "- **T3.2** (I31): **Superseded with the view**."];
+    for (const id of ["T3.1", "T3.2"]) {
+      const { violations } = run([row(`${id} (C98 I5): Ctrl-C clears the queue`)], [], retired);
+      expect(violations, id).toHaveLength(1);
+      expect(violations[0]?.message).toContain(`C98 retired ${id}`);
+    }
+  });
+
+  it("SP16: the controls — declared, named, dangling, and a deferral are not misfiled", () => {
+    const owner = ["- **T4.1** (I66): the owner's row"];
+    expect(run([row("T4.1 (C98 I1): x")], owner, ["- **T4.1** (I1): the cited spec's own"]).violations, "the cited spec declares it").toEqual([]);
+    expect(run([row(`${OWNER} T4.1 (C98 I1): x`)], owner, []).violations, "the title names its spec").toEqual([]);
+    const dangling = run([row("T4.7 (C98 I1): x")], owner, []);
+    expect(dangling.violations, "neither declares it: counted, not judged").toEqual([]);
+    expect(dangling.dangling).toBe(1);
+    expect(
+      run([`it.${"todo"}("T4.1 (C98 I1): lands next");`], owner, []).violations,
+      "an it.todo is not a row",
+    ).toEqual([]);
+  });
+
+  it("SP16: the debt list is compared by equality, both ways", () => {
+    const misfiled = [[row("T4.1 (C98 I1): x")], ["- **T4.1** (I66): y"], []] as const;
+    expect(run(...misfiled, [`C98 T4.1 ${PLOT}`]).violations, "listed, and still misfiled").toEqual([]);
+    const stale = run([row("T4.1 (C98 I1): x")], [], ["- **T4.1** (I1): declared now"], [`C98 T4.1 ${PLOT}`]);
+    expect(stale.violations).toHaveLength(1);
+    expect(stale.violations[0]?.message).toContain("locate their row now");
+  });
+});
+
 describe("A03 SP7 — a test row's number is unique within its spec", () => {
   const FILE = "docs/components/C99_x.md";
 
@@ -956,6 +1035,7 @@ describe("A03 SP10 — a mnemonic test-row label is unique within its spec", () 
       SP13: "checkCommitmentOrder",
       SP14: "checkGroupTallies",
       SP15: "checkRowFiles",
+      SP16: "checkRowResolves",
     };
 
     // Equality, so a rule added to `SPEC_RULES` without a carrier fails here

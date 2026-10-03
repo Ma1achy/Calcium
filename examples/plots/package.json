@@ -16,7 +16,7 @@
     "test": "vitest run --dir test"
   },
   "dependencies": {
-    "@fmx/calcium": "file:../..",
+    "calcium-tui": "file:../..",
     "sharp": "0.35.4"
   },
   "devDependencies": {

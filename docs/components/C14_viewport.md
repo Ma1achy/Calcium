@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` |
+| **Package** | `calcium-tui` |
 | **Layer** | L2 viewport |
 | **Depends on** | C13 `TranscriptView` (entries, `Change`, `rev` — never the store, C13 I19) · C09 (`measureSequence` via the registry) |
 | **Consumed by** | L4 (renders the visible range) · C16 (scroll keys) · C15 (overlays sit above it) |
@@ -45,7 +45,7 @@ type VisibleRange = Readonly<{
 }>;
 ```
 
-`live` is carried per entry so the frame can draw the **live gutter** (`▌`, D6) beside the live block's rows without re-consulting C13 per row. **C14 marks; S01 draws.** The live gutter is frame chrome, not block content — putting it in a block would make it part of every measurement and every theme.
+`live` is carried per entry so the frame can draw the **live gutter** (`▌`, D6) beside the live block's rows without re-consulting C13 per row. **C14 marks; S01 draws.** The live gutter is frame chrome, not block content — putting it in a block would make it part of every measurement and every theme. **Superseded as a drawing by ruling 68 (review batch 4, M11 item 1)**: no live gutter was ever drawn — liveness is the spinner (`R-GLY-003`, M4) — and the column it described belongs to the selection rail (§6d, I57, I58). `live` is still carried; nothing in the frame reads it for a mark.
 
 **"The live gutter", never "the marker".** C13's eviction marker is an ordinary entry that costs the rows it measures (I13); this costs none. Calling both of them the marker left T1.17 reading as a claim about the eviction one, distinguishable only by which invariant it cited — which is precisely the citation defect class the audit records, arriving through a name rather than a number.
 
@@ -494,16 +494,20 @@ the same mark.
 
 **One clipboard** (`R-SEL-011`, C17 §5a). `y` fills the same buffer `⌃k` fills and
 `⌃y` yanks, which is the reduction §1 of `CALCIUM_SELECTION_DESIGN.md` argued for
-from the other side. The system clipboard and OSC 52 are the rule's two mechanisms
-and neither is built; what **is** owed here is the rule's last sentence — *if
-neither is available the mode states it and offers a file instead*, because *a copy
-that appears to work and does not is the worst outcome available here.* So the
-refusal is **owed and blocked on the same parked word the label is**: the rule asks
-for *the mode* to state it, the mode's statement surface is the footer label, and a
-notice block on every `y` is the other reading and is noise on the key a reader
-presses most. Until then the text reaches the kill buffer and nothing claims it
-reached the system clipboard — `⌃y` yanks it back, which is a true statement
-about where it went.
+from the other side. The system clipboard and OSC 52 are the rule's two mechanisms,
+and **both are built** (ruling 72, I61): the kill buffer first, always, then OSC 52
+where C02 says the terminal takes it, then a platform tool where C21 finds one that
+reaches the reader. **A file is never a destination the copy chooses** — it is an
+action the reader takes, offered only where no route took the text (*corrected
+2026-09-29*, §6e's classification table). *Corrected on review batch 4 (M10 item 1):* this
+paragraph deferred the refusal on *the same parked word the label is* — and the label
+was ruled on 2026-09-24 (questions 4 and 35), four days before the deferral was
+re-read. The condition was met in the section below it. The rule's last sentence —
+*if neither is available the mode states it and offers a file instead* — is the
+footer's `no clipboard` and `⏎ to file` (§6e's table), and the offer is taken only by
+the press it names, because the mode's statement
+surface is the footer and a notice on every `y` is noise on the key a reader presses
+most. §6e's *Where the copy goes* walks the order.
 
 ### The label, the count and the next press
 
@@ -530,6 +534,17 @@ there is one, and a second `esc` leaves the mode. **A selection is state within 
 rung, not a rung of its own**, so this does not violate esc popping exactly one rung
 — and the footer says which press is next, which is the part that keeps the two
 presses from reading as a dropped keystroke.
+
+**Amended (review batch 4, M10 items 5 and 6; ruling 71).** *A selection exists*
+is one predicate, `hasSelection` — the rectangle is up, or the block set is not
+empty — and `escape()` and the footer's `esc` label both read it (I59). The label
+read `size === null`, which is a different fact: a selection of a `rule` alone
+copies nothing, so the footer said `esc out` over the press that cleared.
+
+**`⏎` is the other way out, and it copies on the way** (R-BLK-838's *leaves by
+esc, or a copy*). `y` copies and stays. Both go through one copy path and both
+say where the text went; with nothing to copy both stay and say so — `⏎` leaving
+on an empty selection would discard the mode for nothing.
 
 ## 6b. The freeze — a held view over a record that keeps moving
 
@@ -578,7 +593,7 @@ out of the reader's way.
 |---|---|---|
 | `visibleRows` | **view** | it is the frame |
 | the height index behind `visible()` | **view** | heights must agree with what is drawn (A2) |
-| `copySelectedEntries` / `y`, `⏎` | **view** | A6 |
+| `copySelectedEntries` / `y`, and `copyAndLeaveSemanticSelection` / `⏎` | **view** | A6 — one copy path under both (I47, I59) |
 | `selectAllLoadedEntries` | **view** | `R-SEL-008`'s *the window is not the record* is this sentence already, written about `A` |
 | `actions.ts`, `execution.ts`, `refresh.ts` reading `transcript.entries` | **record** | none of them draw, and one of them is what is arriving |
 | the footer's buffered notice | **the difference** | the only subject that needs both |
@@ -587,6 +602,42 @@ The last row is the finding. Everything else here reads one side; the notice is 
 one thing that can only be written by something holding both, and it is also the
 only observable the mode has for the hold — without it a held view and a broken
 render are the same picture.
+
+### The count — which writes are arrivals (review batch 4, M10 item 8)
+
+The notice shipped as `record.length − held.length`, and a length answers only for
+appends into a record nothing leaves. **Walked as a classification table**, because
+which writes arrive is a fact at rest about what each C13 operation does to an
+entry's record — and the finding is where two correct statements about one write
+overlap: *C13 replaces an entry's object on every write* and *an append changes the
+previous live entry too*.
+
+| write while held | what C13 does to the record (`store.ts`, `cap.ts`) | by length | by identity | **by `id`, `rev`, `streaming`** |
+|---|---|---|---|---|
+| an append | a new entry, **and** the previous live one replaced by `{ ...e, live: false }` | 1 | **2** | 1 |
+| a patch to a held live entry | the entry replaced, `rev + 1` | **0** | 1 | 1 |
+| a second patch to it | replaced again, `rev + 2` | 0 | 1 | 1 |
+| a malformed patch | nothing — `rev` does not move (C13 I13) | 0 | 0 | 0 |
+| a bare `settle` | replaced, `rev` unchanged, `streaming: false` | 0 | 1 | 1 |
+| a `settle` with a document | replaced, `rev + 1`, `streaming: false` | 0 | 1 | 1 |
+| an append that evicts one entry, the first eviction | a new entry, one gone, **the marker added** at the head | **0** | 3 | 2 |
+| an append that evicts one entry, the marker already held | a new entry, one gone, **the marker rebuilt** at `rev` 0 | **0** | 3 | 1 |
+| any write, a marker held | the sweep rebuilds the marker on every write (`cap.ts`) | — | +1 | +0 |
+
+**The rule is C13's own two statements about an entry**: `rev` moves iff its
+document changed (C13 I13), and `streaming` ends at `settle`. An entry is waiting
+when the held view has no entry with its id, or holds it at another `rev` or another
+`streaming`. Object identity is the wrong axis — both of the rows it gets wrong are
+the store doing what it should (the live flag, the marker's rebuild) — and length is
+wrong in the direction R-SEL-010 exists to prevent: a patch arriving and an eviction
+cancelling an arrival both read as *nothing is waiting*.
+
+**The marker is an ordinary entry here too** (C13 I14): the first eviction during a
+hold adds a notice the held view does not show, and it counts once. An entry the
+record dropped and the view still holds is not counted — nothing arrived. The limit
+is stated rather than hidden: a marker whose count changes stays at `rev` 0, so a
+second eviction adds nothing to the number, because C13 does not say the marker's
+document changed.
 
 ### What still moves, and it is not in the document
 
@@ -644,6 +695,11 @@ bound at `prompt` and `liveBlock`; they take a third target here. **Plain `↑`
 and `↓` move the caret without changing the selection**, which is the pair the
 mode needs and the registry does not name — a mode whose only vertical key
 extends cannot put the caret anywhere without selecting on the way.
+
+**Amended (review batch 4, M10 items 2 and 3; rulings 36, 70): `⇧←` and `⇧→`
+are bound here and act only in the rectangle** (§6e *The way in*, I60). At block
+granularity they still do nothing, for the reason below, and the footer names
+them only while the rectangle is up. The paragraph as it stood:
 
 **`⇧←` and `⇧→` are not bound here yet, and the footer stops claiming them.**
 `selection.left` and `selection.right` are horizontal, and at block granularity
@@ -725,6 +781,69 @@ and the focus mark `▸` survives with it. So at 1-bit a selected row is reverse
 video and a focused one is a mark, which is `R-SEL-006`'s last sentence with
 nothing added: **neither fact rests on colour alone.**
 
+### The rail — column 0, and selection's second carrier (I57, I58; rulings 41, 68)
+
+The ground was selection's only carrier, and `inverse` at 1-bit is the same
+channel at a rung where colour is gone rather than a second one. `R-THM-005`
+names the second: **the `▌` selection rail**, a mark in the gutter's domain.
+Ruling 41 put it in *the live gutter's column*; ruling 68 measured that no such
+column existed — nothing drew a live gutter and nothing reserved a column, and
+SF1's `● help` stood in column 0 — and ruled that **the frame reserves column 0 of
+the transcript region on every row**. The cost is stated: every composed-session
+frame moves one column right.
+
+**The classification table** — which rows take the rail, and in what (read off the
+frame at every rung, not derived from prose):
+
+| row | column 0 | the rest of the row | at 1-bit | ASCII |
+|---|---|---|---|---|
+| the first row of a selected block (semantic copy mode) | `▌` in `accent` on the selection ground | washed (I39) | `▌` upright, **not** inverted; the row inverts from column 1 | `\|` |
+| a selected block's other rows, and a wrapped continuation | blank (`R-SEL-016`, `R-SEL-003`) | unwashed | blank | blank |
+| the first row of a selected element (`focus.selected`, drawn by the block) | `▌`, the same cell | the block's own ground | the same | `\|` |
+| selected **and** focused (a table row with `▸`) | `▌` | `▸` stays in the block's lead; selection wins the ground | the same | `\|`, `>` |
+| a banded theme (`hcDark`, `hcLight`) | `▌` in the band's ink on the band (C10 I45, I53) | the band | no band at 1-bit (C10 I66) | `\|` |
+| an unselected row, a command echo, a blank row | blank | — | blank | blank |
+| the prompt's selection | none — `▌` is the caret there (ruling 69's exception) | the prompt's own | — | — |
+| native copy mode | none: nothing is selected semantically | — | — | — |
+
+**The sequence trace** — enter semantic copy mode, `⇧↓` twice, resize while
+frozen, `esc`, `esc`:
+
+| # | event | rules meeting | column 0 after |
+|---|---|---|---|
+| 1 | `⌥⇧V` | the freeze (I31), the caret seeded, nothing selected | blank on every row |
+| 2 | `⇧↓` | I37 re-derives the set; I39 washes each block's first row | `▌` on the one selected block's first row |
+| 3 | `⇧↓` | the same | `▌` on both first rows, and on nothing between |
+| 4 | a resize while frozen | the held document re-laid at the new width (I31); the spans recomputed | `▌` on the first rows **at the new width**, from the new spans — never from the old row numbers |
+| 5 | `esc` | the first press clears (C16 I51) | blank everywhere; the frame is still held |
+| 6 | `esc` | the second leaves | blank; the live frame |
+
+**What the walk found before any code, all structural** (two rules that hold at rest):
+
+1. **The region's width was also the prompt's.** `#paintDeps` lays the prompt out
+   at `frame.region.width`, and `composeFrame` counts the prompt's rows at the
+   region's content width. Reserving the column by narrowing the region alone
+   narrows the prompt by one as well, and at a wrap boundary the paint's own
+   check — *composed from N rows, painting N+1* — throws. So the prompt keeps the
+   content width (`columns − CONTENT_MARGIN_R`) and the transcript takes one less.
+2. **Five element lookups laid out at `overlayRegion().width`** on the strength of
+   `frame.ts` making it identical to the transcript's. The reservation ends the
+   identity, so each reads the transcript's width by name.
+3. **The pointer translated the row and not the column.** Every mouse row was
+   `e.row − region.top`, and every column was `e.col` as it arrived — correct only
+   while the region started at column 0. A click must subtract `region.left` once,
+   at the top of the pointer path, or every hit lands one column off.
+4. **The wash cannot carry the rail.** `washRow` re-opens `selectionStyle` after
+   every sequence (I52), and at 1-bit that is `inverse` — which turns `▌` into a
+   right-half block. The rail is drawn beside the washed row, never inside it.
+5. **Element selection is a block's ground and the frame's rail.** A table row in
+   `focus.selected` is washed by C11 with no knowledge of the frame, so its rail is
+   the frame's, placed from the entry's elements (`elementsOfEntry`), on the
+   element's first row.
+6. **A command echo no longer lines up with the prompt.** `❯ /help` in the
+   transcript moves to column 1 while the prompt's `❯` stays at column 0. The cost
+   of ruling 68, stated rather than repaired.
+
 ---
 
 ## 6e. The rectangle — cells, clipped to the block it started in
@@ -742,8 +861,8 @@ The rule has three claims and they do not have the same standing in the registry
 |---|---|---|
 | it copies **cells**, not source | the mechanism, completely | built |
 | it **never crosses a block boundary** and clips to where it started | the mechanism, completely | built |
-| it **says so in the mode label** | the requirement, and no words | **parked**, with §6a's |
-| the **way in** — a chord, a verb, a binding | **nothing.** The registry names no rectangular action and no rectangular binding | **parked** |
+| it **says so in the mode label** | the requirement, and no words | **built** — question 5's words (I55, I60) |
+| the **way in** — a chord, a verb, a binding | **nothing.** The registry names no rectangular action and no rectangular binding | **built** — `⌃V`, ruling 36 (I60) |
 
 **The label is not a second parked question.** §6a recorded that there was no
 mode-label seam at all — `ChromeContext.owner` is the *rung*, and both copy modes
@@ -811,6 +930,198 @@ over the frame's line is the defect, and it is `R-SEL-004`'s exception inverted.
 source — prose unwrapped, code with its own indentation, a patch as a unified diff
 — and this one takes the picture, which is why the rule requires it to be said out
 loud rather than left for the reader to discover in a paste.
+
+### The way in, the keys, and the walk (review batch 4, M10 items 2, 5, 6, 7)
+
+**Ruling 36 supplied the chord and ruling 70 its reach.** `⌃V` toggles the
+rectangle in semantic copy mode; `⇧←` and `⇧→` extend its columns from the
+anchor, clamped to the block, and do nothing at block granularity; there is no
+character caret over prose. **`⌃V` is a target-local keycap and not a registry
+binding**, as `a`, `A` and `y` are at this target: R-SEL-008 gives those bare
+keys in prose and the keymap holds them without a registry record, and the
+registry still names no rectangular action. Tie-break 4 — the repo ships
+copy mode's keycaps that way.
+
+**The state is one field, and rectangle mode is that field being set.** The
+selection gains `rect: { anchor, head } | null`, two cursors (a caret with a
+column). `⌃V` seeds it at the caret, at the first column of the caret's block;
+`⌃V` again sets it to `null` and the block set is as it was before (ruling 71,
+D-M10-4), because it was never touched. Rectangle mode is `rect !== null`, so
+there is no flag that can disagree with it.
+
+**The block's columns are the span's, and the clamp is in `rectBetween`.** A
+span carries the columns its run lays the block at — `run.indent` to
+`run.indent + run.width` — and the rectangle's columns are clamped into the
+anchor's block's columns when the rectangle is derived, the way its rows are.
+So a card body's gutter is never cells of the block, and a resize that narrows
+the block narrows a stored rectangle rather than leaving it pointing past the
+edge. A span with no columns clamps none, which is the pure model's case.
+
+**The head is stored with its column clamped and its row free**, and the
+asymmetry is I42's rather than a second rule: a head's row may be in another
+block or entry, and I42 clips it there; a column past the block's edge is past
+the entry's too, so storing it would only make coming back cost presses the
+reader cannot see.
+
+**The keys in rectangle mode.** `⇧↑⇧↓⇧←⇧→` move the head and leave the
+anchor; a plain arrow moves both, a 1×1 rectangle — which is how the anchor gets
+anywhere but the block's first column without the pointer. A press plants both
+at the pointer's cell and a drag moves the head, the row by I42's clip and the
+column by the pointer's own. `a` and `A` are block verbs and leave the
+rectangle, discarding it. `esc` clears (§ *Leaving*, I59).
+
+**The copy is `cellTextOf` over the entry's lines at the transcript's width**,
+rendered through the frame's own per-entry options — focus, scroll offsets,
+cameras, cursors, frames, series — so the cells are the ones drawn. The wash
+covers exactly those cells, one ground over the rectangle, and the rail leads
+its first row (I58's *first row of the selection*).
+
+#### The walk — a sequence trace
+
+Indexed by the events where two rules meet. `now` is the tree before this
+round.
+
+| # | event | rules meeting | now | ruled |
+|---|---|---|---|---|
+| 1 | `A`, then `⇧↑` | R-SEL-008 *says what it did* · I37 re-derive | nothing said | `all loaded entries` is **derived by equality** with every span, so the re-derived smaller set drops it. A stored flag would still be set. |
+| 2 | only a `rule` selected, `esc` | I55's label · `escape()` | the label read `size === null` and said `out`; `esc` cleared | the label reads `hasSelection`, the predicate `escape()` branches on |
+| 3 | `⏎` over a selection | §103 · R-BLK-838 *leaves by esc, or a copy* | copied and stayed | copies, **leaves**, and a toast says where the text went (I59) |
+| 4 | `y` over a selection | — | copied, said nothing | copies, **stays**, toast (I59) |
+| 5 | `⏎` or `y`, nothing selected | R-SEL-011 *never silent* · `⏎` leaves | returned silently | **stays**, toast `nothing selected` (ruling 71) |
+| 6 | a selection of a `rule` alone, `y` | R-SEL-011 · I38's copy text | returned silently | stays, toast `the selection copies no text` |
+| 7 | `⌃V` | ruling 36 | unbound | rectangle at the caret, first column of its block; the footer reads `RECT 1×1` and `cells, not source` |
+| 8 | `⌃V` on a row no block covers | I42's one refusal | — | the mode is up and the rectangle resolves to nothing: `RECT` with no size, no count, `esc clear` (the mode is state to clear) |
+| 9 | `⇧→` ×40 in a 12-column block | ruling 70 clamp · I37 re-derive | — | clamped at the block's last column; one `⇧←` moves back one column |
+| 10 | `⇧↓` past the block's last row | I42 clip · I37 | — | the head travels, the rectangle clips; coming back is I37's re-derivation |
+| 11 | `A` with the rectangle up, then `⌃V` off | R-SEL-008 · ruling 71 | — | `A` discards the rectangle and selects every block; `⌃V` from there is a fresh rectangle |
+| 12 | blocks selected, `⌃V`, `y` | two selections, one rung (R-SEL-005) | — | the rectangle's cells are copied and counted; the blocks are kept, unwashed and uncounted, and return on `⌃V` |
+| 13 | resize with the rectangle up | I31 re-lay · the column clamp | — | the columns are clamped against the re-laid spans; the cells are re-read from the new lines |
+| 14 | a drag in rectangle mode, held past the bottom | I49's tick extend | ticks called the block `extendTo` | a tick moves the rectangle's head to the edge row at the drag's last column |
+| 15 | `⇧↓` or `↓` with the caret on the viewport's last row | R-SEL-012's last sentence · I32 | the caret left the screen | the viewport scrolls by the overshoot (I37 amended) |
+| 16 | `↑` at the transcript's first row | the clamp in `step` | stays | stays, and nothing scrolls |
+| 17 | `⌃c` | C16 I62 | refused | unchanged |
+
+**Two findings from the trace.** Row 2 is the one M10 item 5 named, and it is
+the vacuity class in a footer: the label and the behaviour each read a correct
+predicate, and they are different predicates. Row 14 is new: the autoscroll's
+tick extended the **block** selection whatever the mode, so a rectangle drag
+held past the edge would have scrolled and selected blocks the reader was not
+drawing.
+
+#### The footer — a classification table
+
+Structural: every cell is a state at rest. Mode × selection × the waiting count.
+`w×h` is the resolved rectangle; `×` is `x` at ASCII.
+
+| mode | selection | owner line, in order |
+|---|---|---|
+| native | — | `native` · `mouse tracking off` · `the terminal owns the mouse` · `esc out` · `the screen is frozen` |
+| blocks | none | `copy` · `⇧↑⇧↓ extend` · `⏎ copy` · `esc out` · `the screen is frozen` · `⌃V rect` |
+| blocks | some | … `esc clear` · the count · `the screen is frozen` · `⌃V rect` |
+| blocks | only blocks that copy nothing | … `esc clear` · **no count** · `the screen is frozen` · `⌃V rect` |
+| blocks | every span (`A`) | … `esc clear` · the count · `the screen is frozen` · `all loaded entries` · `⌃V rect` |
+| blocks | every span, the transcript empty | as *none*: `all` over an empty set is not said |
+| rect | unresolved | `copy` · `RECT` · `cells, not source` · `⇧↑⇧↓⇧←⇧→ extend` · `⏎ copy` · `esc clear` · `the screen is frozen` · `⌃V blocks` |
+| rect | resolved | `copy` · `RECT w×h` · `cells, not source` · … `esc clear` · the count over the cells · `the screen is frozen` · `⌃V blocks` |
+| rect | blocks also selected underneath | as *rect*: never `all loaded entries`, and the count is the rectangle's |
+| any semantic | waiting > 0 | … `N waiting` straight after `the screen is frozen` |
+| any semantic | no route for this copy — C02 `none` and no tool; or `osc52`, no tool and the selection's text past the cap; or the latest copy's tool failed or went silent and the selection's text is that copy's (I61, §6e's classification table) | `⏎ to file` in place of `⏎ copy`, and the reason last of the facts — `no clipboard`, `too large for the terminal`, `pbcopy failed` or `pbcopy did not answer` — after `the screen is frozen` and `N waiting`. *Amended on landing:* it stood before the key it qualifies, and at 100 columns in the rectangle it shed the count — the rank paragraph below, a third time. `⏎ to file` already says where the text goes when the line is too narrow for both |
+
+The table found one row the trace did not: **the rectangle over a full block
+set** (row 9 of the table). `all loaded entries` computed from the block set
+alone draws beside a rectangle whose copy is twelve cells.
+
+**The order is a rank, because the line sheds from the right** (§103). The
+first draft put `⌃V rect` before `esc` and `all loaded entries` after the count,
+and at 100 columns a session with one entry selected — which `A` and `a` both
+are there — shed `the screen is frozen`, and a waiting count would have gone
+with it. Measured in T4.41's session, the line read `copy  ⇧↑⇧↓ extend  ⏎ copy
+⌃V rect  esc clear  38 chars · 4 rows · 1 entry  all loaded entries` and
+stopped. The count, the frozen screen and the waiting notice are `R-SEL-009`'s
+and `R-SEL-010`'s; `all loaded entries` and the toggle are not, so they come
+last and go first.
+
+#### Where the copy goes — a sequence trace
+
+*(review batch 4, M10 item 1; ruling 72, C21 §2b, C01 I25, C02 I18, C17 I31)* C21's
+walk classifies what each layer hands up — which capability, which tool, which
+payload. **The order is L4's, and L4 is the only layer with a clock**, so the rows
+where a copy meets something that happens *after* it are this walk's. Event-mediated,
+so a trace; the structural cells are C21's W1–W18 and are not restated.
+
+| # | state | event | the rules that meet | ruling |
+|---|---|---|---|---|
+| 1 | any | a copy with text | C17 I31 *one clipboard* × a second destination | **the kill buffer first**, with the same text, in every row below. `⌃y` yanks what the clipboard received |
+| 2 | `osc52`, within the cap | `y` | *OSC 52 first* × its success cannot be observed | `clipboardWrite(text)` on the writer, and the toast reads `sent to the terminal's clipboard` — never *copied* |
+| 3 | `osc52`, past the cap, a tool found | `y` | C21 W2 — `null` is one mechanism declining | the tool, as row 4 |
+| 4 | `none`, a tool found | `y` | a tool answers later × *never silent* | the toast reads `copying with pbcopy` at once; the answer replaces it |
+| 5 | a tool pending | it exits `0` | an observable success | `copied via pbcopy` |
+| 6 | a tool pending | it fails — a code, a signal, a spawn error | C21 W10, W11 | **nothing is written**: `pbcopy failed (exited with code 1) — the kill buffer holds it`, and the file is offered for that copy (classification rows K7–K9) |
+| 7 | a tool pending | the deadline, `COPY_DEADLINE_MS` | C21 W18 — C21 has no timer | **nothing is written**: `pbcopy did not answer — the kill buffer holds it`, and the file is offered as row 6. **2 000 ms and unmeasured**; a tool that answers at all answers in milliseconds |
+| 8 | the deadline fired | the tool exits `0` late | one copy, one sentence | **dropped.** The toast already named where the text is sure to be — the kill buffer — and a second sentence would contradict the first. The offer stands: offering a save writes nothing |
+| 9 | a tool pending | a second copy | two answers × one toast line | **the second supersedes the first**: the first's deadline is disposed and its answer, when it comes, is dropped. Without this the first copy's `copied` lands over the second's `copying…` and names the wrong text |
+| 10 | a tool pending | the session stops | the deadline × stop | the deadline is disposed with the toast's; the tool is detached (C21 I2) and runs to its end, and nothing is said, because nothing can be drawn |
+| 11 | `none`, no tool | `⏎` | *states it and offers a file* | the footer already read `no clipboard` and `⏎ to file` before the press; `⏎` is the offer taken, and writes `<stateDir>/copy.txt` resolved against the working directory, replacing the last, toasted `saved to <absolute path>` |
+| 11a | `none`, no tool | `y` | *offers a file* × *never write a file the reader did not ask for* | **nothing is written**: `no clipboard here — the kill buffer holds it`. `y` is undrawn and the offer is `⏎`'s (classification row K13) |
+| 12 | the offer taken | the write rejects | *never silent* × the kill buffer | `<absolute path> could not be written — the kill buffer holds it`, which row 1 makes true |
+| 13 | `osc52`, past the cap, no tool | `y` | C21 W3 | **nothing is written**: `too large for the terminal's clipboard — the kill buffer holds it`, and the footer already offered `⏎ to file` for this text (K3) |
+| 14 | `⏎` left the mode | a tool answers | the mode's end × the answer | the toast is the session's, not the mode's, so it is drawn |
+
+**The walk found row 9**, which no layer below could: C21 resolves each write on its
+own exit and is right to, and two correct answers to two copies arrive in an order
+nothing controls. It also found that rows 6, 7 and 13 wrote a file the reader was not
+offered at rest, and **ruled that acceptable — which was wrong.** *Corrected
+2026-09-29 by the person:* **never write a file the reader did not ask for.** Where a
+route exists the copy takes it and says where it went; the file is offered only where
+no route exists, and pressing the offer is the only thing that writes it. OSC 52's
+success cannot be detected, so a copy sent by it counts as done, not failed. The old
+paragraph read *the reader asked for a copy, the file is the destination the rule names
+when the clipboard fails* — true of the rule's text and not of the reader: a copy is
+not a request for a file, and the rule says *offers*. F1425.
+
+#### Where the copy goes — a classification table
+
+*(the person's correction, 2026-09-29; the orchestrator's ruling on the tool that
+fails)* The trace above indexes events; the correction is **structural** — which
+route exists × the payload × how the tool answered × whether the reader takes the
+offer — and three of its rules meet at rest with no event between them: *OSC 52
+counts as done*, *offer only where no route exists*, and *the offer is taken, never
+assumed*. So a table. "Offered" is the footer's `⏎ to file` in place of `⏎ copy`;
+"file" is whether `copy.txt` exists after the row. Columns not named are any value.
+
+| # | route | payload | tool answers | reader | the rules that meet | toast | offered | file |
+|---|---|---|---|---|---|---|---|---|
+| K1 | OSC 52 only | within | — | `y` / `⏎` | *OSC 52 counts as done* × *no success is observable* | `sent to the terminal's clipboard` | no | no |
+| K2 | OSC 52 and a tool | within | — (never run) | `y` / `⏎` | *OSC 52 first* × a tool whose success *is* observable | `sent to …` — the tool is not a check on OSC 52, and running it too would be a second clipboard | no | no |
+| K3 | OSC 52 only | past the cap | — | at rest | the cap × *offer only where no route exists* | — | **yes, for this text**: `too large for the terminal`. The offer is a property of the selection's text, so an extend across the cap moves the label and the press both, because both read one function | no |
+| K4 | OSC 52 only | past the cap | — | `⏎` | the offer × the key that names it | `saved to <absolute path>` | — | **yes** |
+| K5 | a tool (with or without OSC 52 past the cap) | any | exit `0` | `y` / `⏎` | an observable success | `copying with pbcopy`, then `copied via pbcopy` | no | no |
+| K6 | a tool | any | pending | at rest | a route exists × its answer is not yet in | `copying with pbcopy` | **no** — a pending copy has not failed, so `⏎` is still a copy, and pressing it supersedes (trace row 9) | no |
+| K7 | a tool | any | non-zero, a signal, a spawn error | `y`, then at rest | *a route exists* × *that route did not take this copy* | `pbcopy failed (exited with code 1) — the kill buffer holds it` | **yes, while the selection's text is that copy's**: `pbcopy failed` | **no** |
+| K8 | a tool | any | silent past `COPY_DEADLINE_MS` | `y`, then at rest | as K7 × C21 has no timer | `pbcopy did not answer — the kill buffer holds it` | yes, as K7: `pbcopy did not answer` | **no** |
+| K9 | K7 or K8 standing | same text | — | `⏎` | the offer × `⏎` otherwise copying | `saved to <absolute path>` — the offer taken, **not** a retry | — | **yes** |
+| K10 | K7 or K8 standing | the selection extended | — | at rest | *for that copy* × a different text | — | **no** — the offer was for that copy; `⏎` is a copy again | no |
+| K11 | K7 or K8 standing | same text | — | `y` | *for that copy* × a new copy | the tool again, from `copying with` | withdrawn at the press; returns only if this copy fails too | no |
+| K12 | a tool | any | fails or goes silent after **`⏎` left the mode** | — | the offer × a mode that is gone | as K7 / K8 | **no surface to draw it on**: the footer is the mode's. It stands for the text, so re-entering the mode over the same selection draws it; no key outside the mode reaches it, and the registry has no save action to bind — reported, not invented | no |
+| K13 | none (`none`, no tool) | any | — | `y` | *offers a file* × *never write a file the reader did not ask for* | `no clipboard here — the kill buffer holds it` | yes, at rest before the press: `no clipboard` | **no** — `y` is undrawn and is not the offer |
+| K14 | none | any | — | `⏎` | the offer taken | `saved to <absolute path>` | — | **yes** |
+| K15 | K4, K9 or K14 | — | — | the write rejects | *never silent* × C17 I31 | `<absolute path> could not be written — the kill buffer holds it` | unchanged | no |
+| K16 | any | — | — | `stateDir` relative (the default `.calcium`) | *states the full path* × a relative default | the path is resolved against the session's working directory: `saved to /work/.calcium/copy.txt`, never `saved to .calcium/copy.txt` | — | — |
+
+**What the table found.** Three things the trace could not reach, because each is two
+rules holding at once rather than an event between them:
+
+- **K3's offer is a property of the text, not of the session.** The old footer asked
+  `hasClipboard` — true wherever OSC 52 exists — so a selection past the cap with no
+  tool drew `⏎ copy`, and the press then wrote a file under the label `copy`. The offer
+  and the press now read one function over the selection's text (F1429).
+- **K12 has no surface.** The per-copy offer lives in the mode's footer, and `⏎`
+  leaves the mode before a tool can answer. Nothing in the registry is a save action,
+  so the row states the failure and where the text is (the kill buffer), and the gap is
+  reported rather than bound (F1426); ruling 83 keeps it unbound.
+- **K16: the default `stateDir` is relative**, so the old toast read `saved to
+  .calcium/copy.txt` — a path the reader cannot open from anywhere but the working
+  directory. The person's form is *the full path*. F1427.
 
 ---
 
@@ -938,9 +1249,9 @@ than stranding the user.
 - **I15** — Cache invalidation is incremental, driven by C13's granular `Change`. An append invalidates nothing already measured; a patch invalidates one entry through its `rev`. Dropping the cache on every change would make the Fenwick tree pointless.
 - **I16** — There is no overscan in v1. Rows outside the viewport are not measured or rendered ahead, and adding it is a measurable change against M-T3's baseline rather than a default nobody chose.
 - **I17** — A page movement is exactly `viewportHeight − 1` rows, in both directions. The overlap is the point: a full-height page turn leaves a reader with no anchor in what they just read, and the off-by-one is the difference between the two.
-- **I18** — `VisibleRange` carries `live` per entry; the gutter marker is frame chrome and never enters a block or a measurement.
+- **I18** — `VisibleRange` carries `live` per entry; the gutter marker is frame chrome and never enters a block or a measurement. **The gutter it names is superseded as a drawing** (ruling 68): no live gutter is drawn, liveness is the spinner, and the column is the selection rail's (I57, I58). `live` stays on `VisibleRange`.
 - **I19** — `entryAtRow` is pure and total: it reads the index and the current scroll, stores nothing, and returns `null` for any row the transcript does not occupy. It is the **only** place a region row becomes an entry — C16 routes mouse events by position and does not recompute the mapping, because two components computing where a row is will agree until one of them learns about a height change and the other does not. **The region row reaches it through one translation** — `paint.ts`'s `blankRowsAbove`, the bottom alignment the composer draws with — which L4 reads from the exported function rather than restating, so the painted row and the clicked row cannot drift apart separately (F755).
-- **I20** — **Chrome that occupies rows enters the height; chrome that occupies columns does not.** I18's live gutter is the second kind, and that is *why* it may stay out of every measurement — not because it is chrome. The command line each entry is drawn with is the first kind: it is not a block, so it is never adapter output and never counts toward C13's cap, but it takes a row and may wrap, so an entry's height is `chromeRows(entry, width) + measureSequence(entry.doc.blocks, width)`. `chromeRows` is injected beside `measureSequence` and defaults to none, so C14 still knows nothing about what the chrome says. **Composing the two in different places is the whole hazard**: the composer draws `chrome ++ blocks` and the index measures `blocks`, and a viewport that is arithmetically self-consistent then describes a document it is not showing.
+- **I20** — **Chrome that occupies rows enters the height; chrome that occupies columns does not.** I57's reserved column — once I18's live gutter, now the selection rail — is the second kind, and that is *why* it may stay out of every measurement — not because it is chrome. The command line each entry is drawn with is the first kind: it is not a block, so it is never adapter output and never counts toward C13's cap, but it takes a row and may wrap, so an entry's height is `chromeRows(entry, width) + measureSequence(entry.doc.blocks, width)`. `chromeRows` is injected beside `measureSequence` and defaults to none, so C14 still knows nothing about what the chrome says. **Composing the two in different places is the whole hazard**: the composer draws `chrome ++ blocks` and the index measures `blocks`, and a viewport that is arithmetically self-consistent then describes a document it is not showing.
 - **I21** — `resize` to the size already held is a no-op: nothing is captured, nothing is restored, and **no `Change` is emitted**. The emit is the load-bearing half — a change reports that the view moved, and a view that did not move must not report one, whatever the caller intended by the call. C01 delivers a `SIGWINCH` whenever the size *may* have changed and holds no previous size to compare against, so this component is the first one that can tell.
 - **I22** — The height **and the width** handed to `resize` are the **transcript region's**, not the terminal's. C14 holds no geometry above itself and cannot derive one from the other — the difference includes the prompt, whose height varies with what is typed — so the caller composing the frame owns the value (C22 I34). The failure is silent in both directions: too tall and `#maxTop()` leaves the document's last rows unreachable by any key, while the surplus rows `visible()` selects are discarded by the paint, so no count downstream is ever surprised. I10 holds throughout, because it compares the viewport with itself. **The width is the same sentence and landed later** (→ C22 I109, F1227): the region is one column narrower than the terminal, because `APPEARANCE.md` §15 rule 8 stops content one column before the right edge, and C14 cannot derive that number any more than it can derive the height — the margin is a decision about the frame's look, taken where the three rule rows and the chrome are exempted from it. The failure is silent in this direction too and in the safe sense C09 names: measured a column wide, every wrapping block answers one row too few and the paint pads the surplus column, so the frame is short rather than overrun. Both axes are therefore one rule — **the caller composing the frame owns the region's geometry** — and the two used to be one number and one guess.
 - **I23** — **The render path draws at most the region's rows of any one block, plus a residue.** Every kind whose rows are its lines declares a `window` (C09 I25) — `logs`, `patch`, `table`, `keyValue`, and `code` and `raw` since §4a landed — and a window that must pin what the whole block derived carries the pin as view state (`presorted`, `lineRange`). Kinds that are atomic by ruling (`plot`, C12 I1; `scroll`, C04 §3c) are the stated exceptions and are bounded by their own height. A frame's paint cost is then linear in the region, not in the document, which is the property D40 was mistaken for providing.
@@ -955,11 +1266,11 @@ than stranding the user.
 - **I31** — **While semantic copy mode is up the frame draws a document held at the moment of entry, and the record keeps taking every write.** The hold is entries *and* the heights measured over them, captured together (§6b A2), because an index rebuilt from a record the view no longer shows describes a document nobody is looking at. The record is never queued and never answers a write it has not applied: C13's `patch` returns an outcome C23 branches on, so a deferral there would have to fabricate a verdict (§6b). **Width invalidates the held index and nothing else does** — the hold is over content, not over geometry, which is the same sentence I8 makes about the live one.
 - **I32** — **Scroll moves under the hold; the document does not.** The caret is what pulls the viewport, so a hold that froze `visible()` would walk the caret off the screen and make the mode unusable (§6b A3). `topRow`, `followTail` and the anchor all behave exactly as they do with no mode up, over the held heights rather than the live ones — so I2's clamp is against the held total and moves only when the held document does, which is never while the mode is up.
 - **I33** — **What `y` takes is the held document, not the record** (§6b A6). This is the row a paint-path freeze cannot satisfy, because `y` is not a frame: the screen would be right and the clipboard would carry content that was never on it. `copyTextOf`'s `loaded` argument is therefore the held entries, and `A` selects the held ones for the same reason `R-SEL-008` gives about the window and the record.
-- **I34** — **The footer states the difference while it is non-zero, and the hold is dropped by one commit on exit.** The buffered notice (`R-SEL-010`) is the only subject that reads both sides, and the only observable the hold has: without it a held view and a render that has stopped working are the same picture. On exit the hold is dropped and a single `commit("input")` draws the record — an ordinary frame, not a repaint, for C03 I14's reason: nothing on the terminal became unknown.
+- **I34** — **The footer states the difference while it is non-zero, and the hold is dropped by one commit on exit.** The buffered notice (`R-SEL-010`) is the only subject that reads both sides, and the only observable the hold has: without it a held view and a render that has stopped working are the same picture. On exit the hold is dropped and a single `commit("input")` draws the record — an ordinary frame, not a repaint, for C03 I14's reason: nothing on the terminal became unknown. **Amended (review batch 4, M10 item 8): the difference is counted by entry, not by length** (§6b, *The count*). An entry of the record is waiting when the held view has no entry with its `id`, or holds that entry at a different `rev` or a different `streaming` — C13's statements that its document changed (C13 I13) and that it ended. A length reads 0 for a patch to a held entry and for an eviction that cancels an append; object identity reads an append as two, because C13 replaces the previous live entry's record, and counts the marker on every write. The marker is an ordinary entry (C13 I14) and counts when the hold did not have it.
 - **I35** — **The ticker stops with the mode and the document does not carry it.** Elapsed counts are content and a held view already holds them; the spinner's frame index is `RenderContext.tick`, a counter on the session that no document carries, so a held document still draws a turning spinner unless the ticker is stopped. `#tick`, orbit angles and animated image frames do not advance while the mode is up, which is `R-SEL-009`'s *not the spinners* and is the one clause here that constrains C22 rather than C14.
 
 - **I36** — **The caret is an entry plus an entry-local display row, and the selection's unit is the block.** The split is what makes `R-SEL-003` a rule rather than a property of the type: a selection whose unit is already the block satisfies *all of it or none of it* by construction, and nothing can be written that violates it (A03 §2). An extend maps a row range to a block set by **intersection** — every block whose entry-local rows meet the range, taken whole — so a range covering one row of a table and a range covering all of them give the same answer, and the caret continues past the block it took. The row is the entry's own and never the viewport's, for the reason I6 gives about the anchor: a viewport row moves when anything above it changes height, and an entry-local row survives a resize, which the mode must, because a resize re-lays the held document (I31).
-- **I37** — **The anchor is a second caret, planted where the extend began, and the range is re-derived from the pair on every step.** With no extend in flight there is no anchor; an extend that over-shoots and comes back gives the selection that going there directly would have given, which is `R-SEL-015`'s *the count is always the size of what return would copy right now* stated for a keyboard. A plain arrow moves the caret and touches neither the anchor nor the selection — without that pair the caret cannot be placed anywhere without selecting on the way.
+- **I37** — **The anchor is a second caret, planted where the extend began, and the range is re-derived from the pair on every step.** With no extend in flight there is no anchor; an extend that over-shoots and comes back gives the selection that going there directly would have given, which is `R-SEL-015`'s *the count is always the size of what return would copy right now* stated for a keyboard. A plain arrow moves the caret and touches neither the anchor nor the selection — without that pair the caret cannot be placed anywhere without selecting on the way. **Amended (review batch 4, M10 item 7; R-SEL-012, I44): a keyboard move that takes the caret off the viewport scrolls the viewport by the overshoot**, so the caret is on screen after every arrow, plain or shifted, at block granularity and in the rectangle. The container is the viewport: a box is one atomic block to the keyboard (I36), so the caret never stands inside a box's scroll. A caret whose entry is off screen entirely — one row past the last visible entry — is brought on by single rows until it is. The transcript's own ends clamp the caret (`step`) and nothing scrolls. → T3.14
 - **I38** — **The selection's unit is blocks, and the count is taken over what they copy.** `R-SEL-015` counts what a copy would take, and an entry-level count reports a half-taken entry as a whole one — the number wrong in exactly the direction the rule exists to prevent. **Amended 2026-09-24 (question 35)**: the *drawn* count is not the block count but the size of `copyTextOf` over the held view — chars, rows, entries (I55) — so a block that copies nothing adds nothing, and the number is the size of the paste rather than of a set the reader never sees. `a` and `A` are unchanged in meaning and changed in unit: they put every block of their entries into the set, and `R-SEL-008`'s sentence is untouched.
 
 - **I39** — **The selection's ground is painted by the shell, one row per selected block, at the block's first row and across the full width.** A kind washing its own body is what `R-SEL-003`'s third clause forbids, and a rule delegated to twenty-six kinds is a rule enforced twenty-six times. *Frame or first row* is one arm rather than two: a bordered block's first row **is** its frame, so no kind is consulted about which it has. The spans are the ones the caret moves over (I36), so what is washed and what an extend took cannot disagree.
@@ -972,7 +1283,7 @@ than stranding the user.
 - **I44** — **A drag's container is chosen at the press and held for the whole gesture.** `R-SEL-012`'s *the one place the pointer does not decide*: the wheel takes the innermost scrollable under the pointer and a drag takes the scrollable the **anchor** is in, so a pointer that leaves the box does not hand the gesture to the transcript. Re-resolving per motion report reads as responsiveness and moves the box out from under the reader mid-gesture, which is indistinguishable from the selection jumping. It is `R-PTR-005`'s mechanism on a container instead of an element — an identity taken at the press and held to the release — and a keyboard extend at an edge scrolls the same one, which is what stops the rule being about the mouse.
 - **I45** — **Autoscroll is a ticker, not a response to motion.** `R-SEL-013`'s bands are 120 ms, 60 ms and 30 ms per row for one cell past the rect, up to four, and more than four, on columns as on rows. The **arithmetic is the boundaries and the rule is the continuation**: a terminal reports motion when the pointer changes cell and not while it sits still, so an autoscroll driven by motion reports stops exactly when the reader is holding still and waiting for it. It is armed while the button is held and the pointer is outside, and it stops on release, on `esc`, and at the container's end — where it stops rather than rubber-banding, there being nothing in a cell grid to rubber-band against.
 - **I46** — **A container the drag passes through is taken whole and never scrolls**, and three of `R-SEL-014`'s four clauses are I36 and I38 seen from another side. A child inside a container has no span key, so it cannot be addressed; the copy is the block's source and never the rendered window; an intersection takes what it touches. What is new is *does not scroll*, and it follows from I44: the gesture's container is the anchor's, so every other one is scenery. The selection extends to the container's end and does not spill into the parent, which is the same sentence — the parent is a container the drag is not in.
-- **I47** — **`⏎` copies in semantic copy mode, and it is `y`'s action** (`R-SEL-015`, `R-SEL-009`, §103). §103 draws the rung's footer as `copy ←→↑↓ extend ⏎ copy esc out`, and `R-SEL-015` defines the count as *the size of what return would copy right now* — so return is the mode's copy key by the design's own definition. The footer already said `⏎ copy` and nothing was bound: a chip naming a key that does nothing is C16 I19's second keymap disagreeing with the first. **The same action, not a second one**: `copySelectedEntries` reads the held view (A6), and a return that copied through another path could copy the record. → T1.47
+- **I47** — **`⏎` copies in semantic copy mode, and it is `y`'s action** (`R-SEL-015`, `R-SEL-009`, §103). §103 draws the rung's footer as `copy ←→↑↓ extend ⏎ copy esc out`, and `R-SEL-015` defines the count as *the size of what return would copy right now* — so return is the mode's copy key by the design's own definition. The footer already said `⏎ copy` and nothing was bound: a chip naming a key that does nothing is C16 I19's second keymap disagreeing with the first. **Amended (review batch 4, M10 item 6, I59): `⏎` copies and leaves, so it is a second action over the same copy** — `copyAndLeaveSemanticSelection` runs `copySelectedEntries`' own path and then the exit, and the path is what A6 needed to be one: a return that copied through another path could copy the record. The sentence it replaces, as it stood: *The same action, not a second one: `copySelectedEntries` reads the held view (A6), and a return that copied through another path could copy the record.* → T1.47
 - **I48** — **The drag gesture ends on `esc` and on leaving the mode, and the autoscroll with it** (`R-SEL-013`, `R-SEL-005`, C16 I51). *Stops on release, on esc, or at the container's end* — release and the end were built, and `esc` and `⌃c` changed the mode while the gesture and its ticker lived on: with the pointer held outside the container the transcript kept scrolling after the reader pressed the key that means *stop*, and after `⌃c` it scrolled the live transcript the mode had just handed back. Every `esc` ends the gesture, the one that only clears as well as the one that leaves, because the rule names the key and not the outcome; the selection clear and the mode's exit are C16 I51's and unchanged. **Amended in review batch 2 (C16 I62, ruling 59): `⌃c` no longer leaves the mode — it is refused, consumed with nothing run — so it ends nothing, and a drag held through it keeps its autoscroll.** R-SEL-013 names *release, esc, or the container's end*, and `⌃c` was never one of them; it ended the gesture only because it left the mode. → T4.37b
 - **I49** — **An autoscroll tick extends the selection to the container's edge row** (`R-SEL-013`, `R-SEL-015`). *The selection extends to the container's end*: with the pointer held still outside, each row the tick scrolls into view joins the selection as though the pointer had moved onto it, so the caret is placed at the container's last row scrolling down and its first scrolling up, through the same `extendTo` a pointer move takes — all-or-none included. Measured before: a press, a drag below the transcript and 400 ms of ticks scrolled the view and selected nothing, so `y` copied an empty string. → T4.37c
 - **I50** — **A drag anchored in a box never selects outside it** (`R-SEL-013`, `R-SEL-014`). *The selection extends to the container's end and does not spill into the parent*: the drag's container is fixed at the press (I44), and every caret it extends to is first clamped into that container — to the box's first row when the pointer is above it or in an earlier entry, to its last row when below or in a later one. A drag anchored in the viewport is unclamped, which is I46's *passed through, taken whole*. Found by reading: `#semanticDrag` handed the pointer's caret to `extendTo` whatever the container, so a drag begun inside a box and moved onto the prose beneath selected the prose. → T1.48, T4.37d
@@ -980,8 +1291,16 @@ than stranding the user.
 - **I52** — **The wash is re-opened after every SGR sequence in the row, not laid once under it** (`R-SEL-003`, `R-STA-002`). A finished line is a run of styled spans each closed by `SGR_RESET`, so a wash opened once before the line lasted to the first inner reset and no further — measured on 2026-09-24 over a muted border, a plain run and a bold toned word: the ground covered the border and stopped, at colour and at 1-bit alike, leaving the rest of the row and its pad on the terminal default. And a span that opens a ground of its own (a focused row's `focusGround`, a surface) displaced the wash over its cells, which is the precedence inverted: copy selection sits above focus and above a structural surface. So the selection's opening sequence follows **every** SGR sequence in the row — a reset or an opening — and the row's text, marks, inks and weights are left as they were. At 1-bit the re-opened sequence is SGR 7, so inverse is not lost at an inner reset either. This is `based`'s mechanism with the precedence reversed: a base re-asserts only after a return to the terminal default because anything above it may displace it; the selection is the top ground and re-asserts after everything. → T1.40d
 - **I53** — **On a banded theme the wash carries the band's ink as well as its ground** (`R-THM-005`, C10 I45). A band's ink is total: everything drawn on it takes that one ink, whatever slot it names. The wash laid the ground and left the row's page inks in place. Measured on 2026-09-24: every page tone sat on the selection band at **1.25–1.68 : 1** in both high-contrast themes (`hcDark` `#efc51c` under `default #ffffff` 1.66; `hcLight` `#46176d` under `accent #5b00a8` 1.25), where the theme promises 7 : 1. The wash's opening sequence now carries the band's ink, resolved through the one path every renderer uses (`tone(…, "selection")`, which `inkOn` answers from `bandInk` first). Because I52 re-opens the wash after every sequence, no inner ink survives to a printed cell on the band. A theme with no selection band is untouched: its rows keep their inks and take the ground alone, as before. → T1.40e
 - **I54** — **Under a banded selection, a call head draws its state's own mark** (`R-THM-005`, C09 I45, C14 I53). The band's ink is total, so a head under it has spent its tone exactly as a focused one has (C09 I45's per-cell rule). The head is resolved at render, though, and the wash is laid after the cache (I40), so the renderer never learned that the head was washed: it drew `●` in the band's one ink for every state. **`RenderContext.washed`** carries the ids of the entry's blocks under the selection, **and only where the selection is painted as a band at this depth** (C10 I66) — so at 1 bit, where no band is painted and every head already takes its state's mark, it is absent and keys nothing. It keys the cache slot as an axis only when present, so a theme without a band pays nothing and keeps I40's reasoning intact: the tenth axis I40 refused is taken on exactly the themes where the picture depends on it. The wash itself stays outside the cache; only the resolution of the head's glyph moves inside. → T1.75b, T4.37f, T4.37h
-- **I55** — **The copy rung's footer says which mode, how much, and what the next `esc` does** (`R-SEL-005`, `R-SEL-009`, `R-SEL-015`, questions 4 and 35). `ChromeContext.copy` is `{ mode: "native" }` or `{ mode: "semantic", size }`, where `size` is `null` with nothing selected and otherwise `{ chars, rows, entries }` over the copy text (I38). Semantic mode's owner line is `copy`, `↑↓ extend`, `⏎ copy`, then **`esc clear` while a selection exists and `esc out` when none does** — the first press clears and the second leaves (C16 I51), and a footer saying `esc out` over a selection labels the clearing press as the leaving one — then the count as **one chip**, its three parts joined by the resolved separator (`glyphs(caps).separator`, C09 I49), so it reads as ruled and sheds as a unit; the pill's own gap is two spaces and would draw `418 chars  9 rows  2 entries` — then `the screen is frozen` and `N waiting`. Native mode's is `native`, `mouse tracking off`, `the terminal owns the mouse`, `esc out`, `the screen is frozen`. The header draws `COPY` or `NATIVE` by the same field. Absent `copy`, a `copy` rung reads as semantic mode with no selection, which is what a chrome composed without a session graph can know. → T1.50, T1.51, T4.37g
+- **I55** — **The copy rung's footer says which mode, how much, and what the next `esc` does** (`R-SEL-005`, `R-SEL-009`, `R-SEL-015`, questions 4 and 35). `ChromeContext.copy` is `{ mode: "native" }` or `{ mode: "semantic", size }`, where `size` is `null` with nothing selected and otherwise `{ chars, rows, entries }` over the copy text (I38). Semantic mode's owner line is `copy`, `↑↓ extend`, `⏎ copy`, then **`esc clear` while a selection exists and `esc out` when none does** — the first press clears and the second leaves (C16 I51), and a footer saying `esc out` over a selection labels the clearing press as the leaving one — then the count as **one chip**, its three parts joined by the resolved separator (`glyphs(caps).separator`, C09 I49), so it reads as ruled and sheds as a unit; the pill's own gap is two spaces and would draw `418 chars  9 rows  2 entries` — then `the screen is frozen` and `N waiting`. Native mode's is `native`, `mouse tracking off`, `the terminal owns the mouse`, `esc out`, `the screen is frozen`. The header draws `COPY` or `NATIVE` by the same field. Absent `copy`, a `copy` rung reads as semantic mode with no selection, which is what a chrome composed without a session graph can know. **Amended (review batch 4, M10 items 2 and 5): the semantic state carries `clears`, `all` and `rect` beside `size`, and the owner line is §6e's classification table.** `clears` is `hasSelection` (I59) and decides `esc clear` against `esc out` — never `size`, which is `null` over a selection that copies nothing. `all` is *every span of the held view is in the block set, and there is at least one*, derived by equality on every frame and `false` while the rectangle is up; it draws `all loaded entries` after `the screen is frozen` and the waiting notice (`R-SEL-008`'s *says what it did*). `rect` is `null` at block granularity and `{ columns, rows }` in the rectangle — zero by zero where it resolves to nothing — and draws `RECT w×h` (or `RECT`) and `cells, not source` after `copy`, the extend chip's four keys, and the count over the cells. `⌃V rect` or `⌃V blocks` names the toggle by where it goes, **last**, so it is the first chip the line sheds (§6e, *The order is a rank*). → T1.50, T1.51, T1.80, T4.37g
 - **I56** — *(M9 item 3, L10, → C22 I110, C24 I41)* **While L4 keeps an entry whole, an append below it does not move it.** `keepWhole(id)` returns a `Disposable`. While it is held, a viewport following the tail follows it only as far as the held entry's first row: where the tail would carry that row off the top, the viewport stops with it on the top row, **detaches**, and anchors there — so I5 holds, because a viewport short of the bottom is not following, and I4 and I6 keep it there through every later append. **The reader moving the viewport ends the hold for it** — a scroll, a page, the top or the bottom — because a hold that pulled a reader back after they had scrolled past it would be fighting them. **The release returns a viewport the hold detached, and the reader has not moved, to the tail**: the detach was the hold's and not the reader's, so ending it gives back what the reader had. A held id the store no longer holds is inert. L4 holds a child surface's entry for as long as the child is attached, sized so that it fits (C24 I41): a full-size child is exactly the region, so any entry appended under it — a settlement, a notice — would otherwise scroll its top rows off the screen while it holds the keyboard.
+- **I57** — *(ruling 68, ruling 41, `R-THM-005`, `R-SEL-016`, C22 I109; review batch 4 M11 item 1)* **The frame reserves column 0 of the transcript region on every row, and no measurement includes it.** `Composed.region` is the transcript's box: `left` is `1`, and `width` is the terminal's less `CONTENT_MARGIN_R` and less that column, floored at 1 (`transcriptWidth`). The transcript is resized to that width, and every block in it is measured, windowed, rendered, hit-tested and copied at it. Every element lookup L4 makes for the transcript reads it by name. The pointer's column is translated by `region.left` once, where its row is translated by `region.top`, so a press on column 0 is on no element. **Two things keep the content width** (`regionWidth`, one column wider): the prompt, whose rows the frame composes at that width, and the layer region (C22 I28), which floats over the whole region including the rail's column. Column 0 is blank on every row the rail does not take (I58), including a continuation row, a command echo and the blank rows above a short transcript. **Why a whole column and not a cell borrowed from the row's lead**: the lead's first cell is the call head's state mark, which carries lifecycle at 1-bit (C10 §4k.5), and a rail drawn over it would spend one carrier to add another. **Cost, stated (ruling 68):** every composed-session frame moves one column right, and a command echo no longer lines up with the prompt's `❯`. → T1.77, T4.39, T6.28
+- **I58** — *(ruling 68, `R-THM-005`, `R-SEL-003`, `R-SEL-006`, `R-SEL-016`, ruling 69)* **The rail is selection's second carrier, drawn by the frame in column 0 beside every selected row's first row, at every rung.** A row takes the rail if it is the first row of a block in the semantic copy selection (the rows I39 washes), or the first row of an element in `focus.selected`. No other row does: not a continuation, not a selected block's body, not the prompt's selection, whose `▌` is its caret (ruling 69's exception), and nothing in native copy mode. **The glyph is the registry's** (`selection-rail`, `▌`, ASCII `|`, collision domain `gutter`), read through `glyphs(caps).rail`. **Its ink is `accent` resolved against the selection ground**, so on a banded theme it is the band's ink (C10 I45, I53). **Its ground is the selection ground where that ground is a background, and never `inverse`**: at 1-bit the row inverts from column 1 and the rail stays upright, because an inverted `▌` is a right-half block. It is drawn beside the washed row, never inside the wash, since the wash re-opens `inverse` after every sequence (I52). **No block draws it and no block knows it**: it is not in the render cache (I40), and the rows C09 renders are byte-identical with and without it. → T1.77, T3.25, T4.39, T6.29
+- **I59** — *(review batch 4, M10 items 5 and 6; ruling 71, `R-SEL-005`, `R-SEL-011`, R-BLK-838)* **One predicate says a selection exists, and `⏎` leaves by copying.** `hasSelection(mode)` is *the rectangle is up, or the block set is not empty*; `escape()` clears on it and leaves without it, and the footer's `esc clear` / `esc out` is the same call — two predicates each correct alone disagreed over a selection that copies no text (§6e trace row 2). `⏎` copies and leaves the mode; `y` and the registry's `copy` copy and stay; each raises a toast naming where the text went. **An empty copy is never silent and never leaves**: nothing selected toasts `nothing selected`, a selection whose copy is empty toasts `the selection copies no text`, the mode stays up, and nothing is written to any buffer — `copyText("")` is not called. → T1.80, T3.15, T4.40
+- **I60** — *(review batch 4, M10 item 2; rulings 36, 70, 71, `R-SEL-007`)* **`⌃V` toggles the rectangle, and rectangle mode is `rect !== null`.** On, it seeds anchor and head at the caret's row and the first column of the caret's block; off, it discards the rectangle and leaves the block set as it was. `⇧←`/`⇧→` move the head's column and `⇧↑`/`⇧↓` its row, the anchor fixed; a plain arrow moves both; a press plants both at the pointer's cell and a drag moves the head, and an autoscroll tick moves the head to the edge row at the drag's last column. At block granularity `⇧←`/`⇧→` do nothing. **The column is clamped to the anchor's block** — its span's columns, the run's indent to the run's edge — both when the head is stored and when `rectBetween` derives the rectangle, so a resize narrowing the block narrows the rectangle. While it is up the copy, the count, the wash and the rail are the rectangle's: `cellTextOf` over the entry's lines rendered with the frame's per-entry options, the wash over exactly its cells, the rail on its first row; the block set is neither washed nor counted. `a` and `A` discard it. `CellRect`, `rectBetween` and `cellTextOf` are consumed, and their allow-list entries are removed. → T1.79, T4.41
+- **I61** — *(review batch 4, M10 item 1; ruling 72, `R-SEL-011`, → C01 I25, C02 I18, C21 I20, C17 I31)* **A copy goes to the kill buffer, then to one clipboard by the person's order, and says where it went in words that are true.** The kill buffer takes the text first, every time (C17 I31). Then: OSC 52 when C02's `clipboard` is `osc52` and `clipboardWrite` returns bytes, toasted `sent to the terminal's clipboard` and **never** *copied*, because nothing comes back — and counted as done, never as failed; otherwise the tool `findClipboardTool` found, toasted `copying with <tool>` and then `copied via <tool>` on its exit `0`. **A copy never writes a file** *(corrected 2026-09-29 by the person — it wrote `<stateDir>/copy.txt` when the tool failed or went silent, and past the cap with no tool)*: where no route takes the text the toast says why and that the kill buffer holds it — `no clipboard here`, `too large for the terminal's clipboard`, `<tool> failed (<reason>)`, `<tool> did not answer`. **The file is offered, and written only when the reader takes the offer**: the footer reads `⏎ to file` in place of `⏎ copy` exactly when no route exists for the selection's text, or the latest copy's tool failed or went silent and the selection's text is that copy's; `⏎` then writes `<stateDir>/copy.txt`, resolved against the working directory, and toasts `saved to <absolute path>`. `y` is never the offer. Where a route exists and has not failed for this text, nothing offers a file (§6e's classification table). **One copy speaks once**: a copy supersedes an earlier one still pending, whose deadline is disposed and whose answer is dropped, and an answer after the deadline is dropped. The footer states the reason at rest, after the waiting notice — `no clipboard`, `too large for the terminal`, `<tool> failed`, `<tool> did not answer` — beside the offer it qualifies (§6e's footer table). The routing, the wording and the pending copy are one module, `shell/clipboard.ts`; C14 performs none of it (I11). **The session disposes the copier on stop**, alongside the toast's timer, so a pending copy's deadline does not hold the process open for a session that has gone. → T1.81, T1.82, T3.26, T3.27, T4.43, T4.44, T4.45, T5.6
+- **I62** — *(C22 §6q.4 ruling 4, `R-BLK-164`, `R-BLK-159`, `R-BLK-160`, C22 I109)* **The transcript draws a bar in the margin column whenever it overflows.** On each of the region's rows, the frame's last column (`CONTENT_MARGIN_R`) holds `scrollbarColumn(viewportHeight, totalRows, topRow, set)` over this component's `scroll` — nothing when the transcript fits, because a bar that cannot move is decoration. The thumb is `accent` while focus is in the transcript and `muted` otherwise. No row is re-measured and nothing reflows: the column is blank on every row without it (C22 I109). → T1.83, T6.42
+- **I63** — *(C22 §6q, `R-BLK-363`, C16 §4a)* **A primary press on the bar jumps the view, and focus does not move.** Row *r* of an *h*-row region puts `topRow` at `round(r × maxTop / (h − 1))` — row 0 the top, row *h* − 1 the bottom; the press arms no activation and focuses nothing. While the transcript fits no bar is drawn, and a press on that column is an ordinary press. → T4.46
+- **I64** — *(C22 §6q, I4, I5)* **The jump is a scroll.** It is `scrollBy(target − topRow)`, so follow is derived from where it lands (I5): the last row follows, and any other detaches and anchors (I4). → T4.47
 
 ---
 
@@ -1002,10 +1321,10 @@ than stranding the user.
 13. Summed visible rows equal the viewport height exactly (I10).
 14. C14 never calls C03; scrolling reports a change and L4 commits (I12).
 15. The eviction marker is an ordinary entry and needs no special handling (I13).
-16. `VisibleRange` marks the live entry; the frame draws the live gutter, and no measurement includes it (I18).
+16. `VisibleRange` marks the live entry (I18); the frame reserves column 0 of the transcript region and draws the selection rail there, and no measurement includes it (I57, I58).
 17. An entry's height is `measureSequence`, and a block's own spacing is inside each `measure` rather than added between them (I1, → C09 I17, → C09 I80).
 18. A region row resolves to an entry and a row within it here, once, and C16 does not recompute the mapping (I19).
-19. Row-occupying chrome is measured and column-occupying chrome is not; the command line is the first and the live gutter is the second (I20, I18).
+19. Row-occupying chrome is measured and column-occupying chrome is not; the command line is the first and the reserved rail column is the second (I20, I57).
 20. A resize to the size already held does nothing and emits nothing (I21).
 21. The height and the width `resize` is given are the transcript region's, and the caller that composed the frame owns both (I22).
 22. One block's rows on the render path are bounded by the region plus a residue, through the window seam and not through a cap on content (I23, §4a).
@@ -1098,17 +1417,24 @@ Fake heights, no rendering.
 - **T1.44** (I44, §6f): a press inside a `scroll` box, then motion out of it and over the transcript → the container the gesture scrolls is still the box, and it stays the box for every later report including one back inside. **The control is the wheel in the same fixture**: the same position under a wheel takes the innermost scrollable under the pointer, so the row can tell *the anchor decides* from *the pointer decides* rather than asserting one against nothing.
 - **T1.45** (I45, §6f): the band for 0, 1, 2, 4, 5 and 40 cells past → nothing, 120, 60, 60, 30, 30, which pins both boundaries rather than the middle of each band. Then the continuation: with the button held and **no further motion reports**, the clock advanced by 300 ms scrolls the container by rows at the band's rate — the assertion no band table can make, and the defect a motion-driven implementation passes every other row of this file with.
 - **T1.46** (I46, §6f): a drag anchored in the transcript passing through a `scroll` box → the box's blocks are in the selection whole, the box's own offset is unchanged, and the copy carries the block's every row rather than the ones the window showed. Each of the three is a different clause of `R-SEL-014` and only the second is new, which the row says so a later reader does not take the other two for coverage of code this MR wrote.
-- **T1.47** (I47, R-SEL-015): at `semanticSelection`, `⏎` resolves to `copySelectedEntries` — the action `y` resolves to — and to nothing at `nativeSelection`, which is native handoff's rung and copies through the terminal. `docs/KEYS.md` regenerates with the row.
+- **T1.47** (I47, R-SEL-015): at `semanticSelection`, `⏎` resolves to `copyAndLeaveSemanticSelection` and `y` to `copySelectedEntries` — **amended** (I59): it resolved to `y`'s action while `⏎` stayed — and `⏎` resolves to nothing at `nativeSelection`, which is native handoff's rung and copies through the terminal. `docs/KEYS.md` regenerates with the row.
 - **T1.48** (I50, R-SEL-013): `clampToContainer` — inside the box a caret is unchanged; above it, below it, and in an earlier and a later entry it lands on the box's first or last row; a viewport drag is never clamped. The control is the unclamped `blocksTouched` from the same carets, which reaches the prose.
 - **T1.49** (I51, R-SEL-015): `blocksTouched` from a lower caret to a higher one in the **same** entry takes the blocks between them — the same set as the downward pair. The control is the two-entry upward pair, which was already ordered.
 - **T1.40d** (I52, R-SEL-003): `washRow` over a row of three spans — a toned border, a plain run, a bold toned word — and an inner span carrying its own ground → every visible cell and the pad sit under the selection's ground: the wash's opening sequence follows each SGR sequence in the row, and no inner ground sequence is the last one before a printed cell. The same at 1-bit with SGR 7. The control is an unstyled row, which one opening already covers.
 - **T1.40e** (I53, R-THM-005): `washRow` over a toned row in `hcDark` and `hcLight` → the wash's opening sequence carries the band ink, and every printed cell is governed by it; the ink clears the theme's declared floor against the selection band. The control is `dark`, which has no band: the opening carries a ground and no ink.
 - **T4.37f** (I54, R-THM-005): a session on `hcDark` with a failed call head → selected in semantic copy mode, the head's first cell is the state's own mark; after esc it is `●` again, so the axis responds both ways. The control is `dark`: selected or not, `●`.
 - **T4.37h** (I54, C10 I66): T4.37f's session in `hcDark` at `colourDepth: 1` — the failed head selected in semantic copy mode, then the selection cleared with `esc` → the render cache records **no** `focus` miss, because at 1 bit the selection changes nothing the entry renders; the head reads `✗` throughout. The control is the same session at 24 bits, where the selection and its clearing each miss on `focus` and the head reads `●`, `✗`, `●`. It is the only row that observes the 1-bit half of C10 I66: the head mark is the same either way, so a frame cannot tell.
-- **T1.50** (I55, R-SEL-005, R-SEL-009): `ownerLine` on the copy rung — semantic with no size reads `esc out` and no count; with a size, `esc clear` and the one count chip `418 chars · 9 rows · 2 entries`, `:` at ASCII; native reads `native` and `the terminal owns the mouse` and neither `↑↓ extend` nor a count. The header reads `COPY` or `NATIVE` by the same field. At ASCII every chip is ASCII.
+- **T1.50** (I55, R-SEL-005, R-SEL-009; **amended** for `clears`, `all` and `rect`, and for `⌃V rect`): `ownerLine` on the copy rung — semantic with no size reads `esc out` and no count; with a size, `esc clear` and the one count chip `418 chars · 9 rows · 2 entries`, `:` at ASCII; native reads `native` and `the terminal owns the mouse` and neither `↑↓ extend` nor a count. The header reads `COPY` or `NATIVE` by the same field. At ASCII every chip is ASCII.
 - **T1.51** (I38, I55, R-SEL-015): `sizeOf` over a held view — two entries, one selecting a block that copies nothing — counts code points of the copy text with its line breaks, its lines, and only the entries contributing text; one of each is singular; an empty selection is `null`.
 - **T4.37g** (I55, R-SEL-005, R-SEL-009): a session in semantic copy mode, `a` pressed → the footer carries the count and `esc clear`; `esc` → the count is gone and it reads `esc out`, still in the mode; `esc` again → the mode is left. The control is the frame before `a`, which reads `esc out` and no count.
 - **T1.76** (I56, I5, I6): a viewport of 10 rows following a transcript whose last entry is 10 rows high, that entry held → an append of 3 rows leaves `topRow` on the held entry's first row, `followTail` false and the anchor `{ id, 0 }`; two more appends do not move it; the release returns it to the tail with `followTail` true. The same append with nothing held moves `topRow` by 3 — the control. A scroll while held, then the release → the viewport stays where the reader put it; an append first, when the held entry is short enough that the tail keeps it whole → the viewport follows the tail and the hold never acts.
+- **T1.77** (I57, I58, I39): `railRowsOf` over a transcript window equals `washedRowsOf`'s rows unioned with each `focus.selected` element's first row, **as a set** — a selected block of three rows gives one row, a block whose first row is above the window gives none, and a selected table row inside a card body gives that row's first row in entry space less the window's start. Every other row's column 0 is a blank. The control: with nothing selected the set is empty and every row is blank-led.
+- **T1.78** (I34, §6b *The count*): `waitingEntries(record, held)` over a real C13 store with a cap of a few blocks, frozen by copying its `entries`, for every row of §6b's table — an append is 1 and not 2, a patch to a held live entry is 1 and a second patch to it still 1, a malformed patch 0, a bare settle 1, a settle with a document 1, an append evicting an entry is 2 on the first eviction (the entry and the marker) and 1 once the marker is held, and a write with a marker held adds nothing for the marker. The control: the length difference, computed over the same two lists, is 0 in the patch and eviction rows, so the fixture reaches the cells length gets wrong. **The wiring**, because the function can be right while the footer still subtracts: through a graph, `bufferedEntries` after a patch to the held live entry is 1.
+- **T1.79** (I60, I42, rulings 36, 70, 71): the rectangle's model over spans that carry columns — `⌃V` seeds anchor and head at the caret and the block's first column; `⇧→` forty times stops at the block's last column and one `⇧←` moves back one; `⇧↓` past the block clips and the rectangle survives; a plain arrow moves a 1×1; `⌃V` off leaves the block set it found, by equality; `esc` clears both; `a` and `A` discard it; and `rectBetween` over spans narrowed by a resize clamps a stored column. The control is T1.42's spans, which carry no columns and clamp none.
+- **T1.80** (I55, I59, §6e's footer table): `ownerLine` for every row of the classification table, asserted as the whole line — including *only blocks that copy nothing*, which reads `esc clear` with no count, *every span* with `all loaded entries`, *the empty transcript* without it, and *the rectangle over a full block set* without it. And `hasSelection` against `escape()` over the same states: `esc clear` exactly where `escape()` keeps the mode.
+- **T1.81** (I61, §6e *Where the copy goes*, C21 W1–W4; **amended 2026-09-29**): `routeCopy` over each capability × tool × payload cell — `osc52` within → the bytes `clipboardWrite` builds; `osc52` past the cap with a tool → the tool; without → **no route**, *too large*; `none` with a tool → the tool; without → no route, *no clipboard* — and `copyToast` over every outcome: only a tool's `ok` says *copied* (`copied via pbcopy`), OSC 52's says *sent*, and no outcome of a copy says *saved* — only the offer taken does, with an absolute path.
+- **T1.82** (I61, §6e classification table K1–K3, K7, K8, K10, K13, K16): `fileOffer` over the table's at-rest cells — OSC 52 within, with a tool or not → none; OSC 52 past the cap and no tool → *too large*; a tool → none; no route → *no clipboard*; after a failed or silent copy → that reason for that copy's text and none for another text; after a later copy of any text → none. OSC 52 is never an offer. And `copyFilePath` resolves a relative `stateDir` against the working directory to an absolute path, leaving an absolute one as it is.
+- **T1.83** (I62): `transcriptBar` over a 40-row transcript in a 10-row region at `topRow` 0, 15 and 30 → the three columns `scrollbarColumn` gives, one cell each on the margin column; over 10 rows in 10 → no bar, and the column is blank; `accent` with focus in the transcript and `muted` at the prompt, compared as painted cells.
 
 ### Tier 2 — contract / interface
 
@@ -1152,8 +1478,8 @@ Fake heights, no rendering.
 - **T3.12c** (§5 step 6): a viewport **following the tail**, resized shorter → it is still at the tail, and the transcript's last row is still the last visible row. Step 6 was written in §5 and had no mechanism: `resize` went to `#restoreFromAnchor`, which for a follower (`anchor === null`) only clamps `topRow` into the new bounds, so shrinking the region slid the tail off the bottom one row per row lost. Invisible while `resize` fired only on `SIGWINCH` — one event deep, and it reads as the terminal's doing.
 - **T3.12b** (I21): a resize to the width and height already held → **no `Change` is emitted**, and `scroll`, `anchor` and `stats` are identical afterwards. Asserted from a *detached* viewport with a captured anchor, because from a tail-following one at the top of a short transcript the capture-and-restore is a round trip to the same value and the row passes with the guard removed — the state that distinguishes the two readings is the one that has something to lose.
 - **T3.13**: a patch that shrinks an entry below the current `topRow`'s dependence → `topRow` clamps rather than exceeding `totalRows`.
-- **T3.14** (§6a): movement in semantic copy mode moves the caret and scrolls only when the caret reaches an edge.
-- **T3.15**: yank with an empty selection → clipboard untouched, no throw.
+- **T3.14** (§6a, I37 amended): through a session with more rows than the viewport — `↓` and `⇧↓` from the top keep the view still while the caret is on screen, and the press that takes the caret past the last row scrolls it by one, both plain and shifted; `↑` back to the top scrolls it back; at the transcript's first row `↑` scrolls nothing. The view is read off the screen's rows, so the row is about what is on screen; the caret has no mark of its own until it selects.
+- **T3.15** (I59, **amended**): `y` and `⏎` with nothing selected → the kill buffer is untouched, the mode is still up, and the toast reads `nothing selected`; a selection of a `rule` alone → `the selection copies no text`, the same two facts. It read *clipboard untouched, no throw*, which a silent return satisfies.
 - **T3.16**: yank of rows containing tone spans and gutter markers → clipboard receives plain text only.
 - **T3.17**: 100,000 entries, scroll from top to bottom by page → every query within budget, no leak.
 - **T3.18**: a streaming entry patched a thousand times → the cache holds one live key for it, not a thousand.
@@ -1164,12 +1490,15 @@ Fake heights, no rendering.
 - **T3.22** (I24, C13 I14): a transcript at the session block cap whose surviving entry holds a capped block → two markers on screen, D40's notice above and the row cap's beneath the block, and evicting further changes neither.
 - **T3.23** (I24, C25 I18): a `patch` over the cap → the piece is a valid `Patch` carrying its path header and `collapsedBefore` markers inside `shown`, and the registry's `capped` survives `windowRows` building a fresh block.
 - **T3.24** (I24, C09 I11): a kind whose `measure` throws on a block over the cap → contained exactly as before, one row, the fault reported once for `measure`; the cap adds no second report.
+- **T3.25** (I58, I53, C10 I45, C10 I66): a selected block's first row at 24-bit, 8-bit, 4-bit, 1-bit with Unicode and 1-bit ASCII, on `dark` and on `hcDark`. Column 0 is `▌` (`|` in ASCII); its ink is `accent` against the selection ground, and the band's ink on `hcDark` above 1-bit; it never carries `inverse`, and at 1-bit the row's cells from column 1 do. The cell is the rail's alone: no block span reaches column 0.
+- **T3.26** (I61, trace rows 7–10; **amended 2026-09-29**): a copier over a tool that never answers → the deadline toasts `did not answer — the kill buffer holds it` and writes nothing; a late `ok` after it says nothing; a second copy while the first is pending → the first's answer is dropped and only the second speaks; `dispose` → the deadline never fires.
+- **T3.27** (I61, §6e classification table K4, K7–K9, K11, K13–K15, trace rows 6, 11a, 13): **no copy writes a file** — a failed tool, a silent one, no route, and past the cap with no tool each leave the file system untouched and toast the reason with `the kill buffer holds it`; `save(text)` writes the text to the path and toasts `saved to <path>`; a rejected write toasts `<path> could not be written — the kill buffer holds it`; a later copy withdraws a failed copy's offer.
 
 ### Tier 4 — integration
 
 - **T4.37** (I44, I45, §6f): a real session, `⌥⇧V`, a press inside the transcript and a motion far below it → the view moves, and it **keeps** moving when the clock alone advances with no further report. That is the claim no model-level row can make: the chain is C16's mouse table, the mode's rung, the row-to-caret translation and the ticker, and each half passes on its own with the seam between them unbuilt. **The control is the same two reports with no mode up**, which scroll nothing — so a moved view is the drag's doing rather than a session that drifts. The release stops it, and a further 600 ms moves nothing.
 - **T4.37b** (I48, R-SEL-013): T4.37's session, the drag armed and scrolling with the pointer still — then `esc`, and the view holds across 600 ms. *Its second half, the same with `⌃c`, is retired* (C16 I62): `⌃c` is refused in the mode and leaves nothing. The control is T4.37's own: the same drag, with no key, keeps scrolling.
-- **T4.37c** (I49, R-SEL-013): a press in the transcript, the pointer dragged below it and held still for 400 ms, release, `y`, `esc` twice, `⌃Y` — the prompt holds what was copied, and it is not empty. The control is a drag that stays inside the transcript, which copies through the same keys, so an empty prompt is the selection's and not the instrument's.
+- **T4.37c** (I49, R-SEL-013): a press in the transcript, the pointer dragged below it and held still for 400 ms, release, `y` — **one copy, exactly the entries from the press to the edge the ticks reached**, read at the editor's `copyText` rather than from the prompt, and its block set is every entry in that range in order. The control is a drag that stays inside the transcript in **its own session**, which copies exactly the entries it crossed and fewer than the subject. *Both halves corrected on review batch 4 (M10 item 4):* the row read a yank in the prompt, which is capped at fifteen rows and elides its head, so it saw the last entry's tail whatever was copied above; and its control ran second in the same session, where a copy of nothing leaves the kill buffer alone and `⌃U` had just killed the subject's yank into it — measured, the control's text was the subject's, character for character.
 - **T4.37d** (I50, R-SEL-013): through a session — a press inside a scroll box, the pointer moved onto the prose below it in the same entry, release, `y`, `esc` twice, `⌃Y`: the prompt holds the box's text and not the prose's. The control drags from the prose to the prose, which copies it, so its absence above is the clamp's.
 - **T4.37e** (I51, R-SEL-003, R-SEL-004): through a session, one fresh session per copy — prose, a scroll box, prose; a drag from the lede to the tail copies all three, and so does the same drag upward. The control is the card head alone, which was selectable before either repair.
 - **T4.34** (I35): the mode is entered with a spinner on screen → its cell is the same glyph across every wake while the mode is up, and it moves again after the exit. Sampled past the set's own cadence, as T4.35 is, so the row is about the ticker being stopped rather than about two cadences aliasing.
@@ -1182,15 +1511,25 @@ Fake heights, no rendering.
 - **T4.7** (with C01): a `SIGWINCH` snapshot drives one resize; the anchor is captured before the cache is dropped.
 - **T4.8** (with C03, L4): a scroll causes **L4** to issue one `commit("input")` — immediate, never coalesced. A spy asserts C14 never calls the scheduler itself, matching the C01 and C10 orchestration pattern. **Driven through L4's read loop rather than by dispatching to the handler**, because the commit is the loop's (C22 I27): a test that dispatched directly would assert the mechanism it happened to find, and it passed while the handler and the loop would both have committed.
 - **T4.38** (I56, C22 I110, C24 I41): a real session at 60×20 with `CALCIUM_NOTIFY=bell` — `/slow` runs, a child rendering exactly its `SurfaceContext.height` rows attaches, the reader leaves, `/slow` settles and the reader returns, so two entries append under the child (the local route appends a settled document, and the return appends its notice) → the frame still shows the child's command row, both borders and every body row; after the detach the frame reaches the tail and shows the return's notice.
+- **T4.39** (I57, I58, C22 I109): a real session at 80 columns — every transcript row's column 0 is blank and `● help` stands in column 1; `⌥⇧V` then `⇧↓` puts `▌` in column 0 of the selected block's first row and nowhere else, the head mark still in column 1; the viewport's width is 78 and the prompt's content width 79; a press on the column a block's element begins at, plus one, focuses it, and a press on column 0 focuses nothing. The measured heights are equal to a session that never entered the mode.
+- **T4.40** (I59, I47, R-BLK-838): a real session — `a` then `⏎` → the kill buffer holds the entry, the mode is left, and the toast names the destination; `a` then `y` → the same text, the mode still up, a toast; the control is `⏎` with nothing selected, which stays up and toasts `nothing selected`.
+- **T4.41** (I60, I43, I55): a real session over a block of known cells — `⌃V`, `⇧→` ×3, `⇧↓` → the footer reads `RECT 4×2` and `cells, not source`, the rows are washed over four cells and the rail leads the first; `y` → the kill buffer holds those eight cells as two lines with no escape; `⌃V` → the footer is block mode's again with the earlier block count restored.
+- **T4.42** (I60, I49, §6e trace row 14): a real session over a block taller than the region — `⌃V`, a press on a cell, the pointer dragged four cells right and far below the region and held → the view scrolls, and `y` copies one text whose every line is the same four cells and which has more lines than the pointer crossed: only the ticks' extend can take the rows scrolled in after it left.
+- **T4.43** (I61, C17 I31): three real sessions. `clipboard: "osc52"` declared → the terminal receives `ESC ] 52 ; c ; <base64> BEL` of exactly the copied text, the toast reads `sent to the terminal's clipboard`, and `⌃y` yanks the same text. A `PATH` holding a `pbcopy` that writes its stdin to a file → that file holds the text and the toast reads `copied to the clipboard by pbcopy`. Neither → the footer reads `no clipboard` and `⏎ to file`, `y` writes nothing and toasts `no clipboard here — the kill buffer holds it`, and `⏎` writes `/state/copy.txt` with the text and toasts `saved to /state/copy.txt`. In the OSC 52 and tool sessions the footer never offers a file.
+- **T4.46** (I63, C16 §4a): through a built session, a press on the margin column at every region row *r* → `topRow` `round(r × maxTop / (h − 1))`, so 0 at the first and `maxTop` at the last; the sweep is the row, because the ends are exact under any rounding; focus is where it was and nothing is armed — a release there activates nothing; a press one column in is an ordinary press.
+- **T4.47** (I64, I5): the press on the last row leaves `followTail` on and an append keeps the view at the bottom; the press on the first row turns it off, and an append leaves the view where it was.
 
 ### Tier 5 — e2e
+
+- **T4.45** (I61, §6e classification table K7, K9, K10, K16): a real session whose `pbcopy` exits `1`, with a relative `stateDir` → `y` toasts `pbcopy failed (exited with code 1) — the kill buffer holds it`, no `copy.txt` exists, and the footer reads `⏎ to file` and `pbcopy failed`; an extend withdraws the offer and a shrink back restores it; `⏎` writes the file at `<cwd>/<stateDir>/copy.txt` and toasts that absolute path.
 
 - **T5.1**: a 10,000-block transcript scrolled top to bottom → on-screen rows match measured heights at every screenful.
 - **T5.2**: Page Down through 10,000 blocks → under 50 ms per page (A02 §7).
 - **T5.3**: a live `--logs` tail at 1,000 lines/s while scrolled up reading → the view does not move.
 - **T5.4**: the same, then `End` → snaps to the bottom and resumes following.
 - **T5.5**: dragging the terminal edge from 160 to 60 and back while scrolled to the middle → the same content is on screen at both ends, no blank frames.
-- **T5.6** (§6a, R-SEL-004): semantic copy mode selecting forty rows across three entries and yanking → the clipboard holds exactly those rows as plain text, in document order with a blank line between entries.
+- **T4.44** (I61, review batch 4; **amended 2026-09-29**): a real session whose `pbcopy` takes the text and does not exit for three seconds, with an injected `schedule` that records each timer → `y` toasts `copying with pbcopy` and arms one timer at `COPY_DEADLINE_MS`; the session stops, and that timer has been disposed. *It read* past `COPY_DEADLINE_MS` `<stateDir>/copy.txt` does not exist — *a proxy for the disposal that became vacuous the moment the deadline stopped writing files*: with no automatic write, an undisposed deadline leaves no file either, so the row would pass with the dispose removed. F1428. T3.26's `dispose` arm is the copier's half of this row, and this row is the session's half: T3.26 cannot see whether anything calls `dispose`. Removing `this.#copier?.[Symbol.dispose]()` from the session's stop → this row fails.
+- **T5.6** (I61, §6a, R-SEL-004, R-SEL-011): a PTY session with `clipboard: "osc52"` declared — three entries, `A`, `y` → the OSC 52 payload **decoded from the PTY's bytes** is the three entries' copy text, plain, in document order with a blank line between entries, and the toast reads `sent to the terminal's clipboard`. *Amended (review batch 4, M10 item 1):* it read *forty rows*; the count is the fixture's and not the claim, and the claim — what the clipboard holds — had no instrument until the payload could be read off the wire.
 
 - **T4.11** (I24, with C13 and C09): a viewport over a transcript whose entry holds a 25-line `logs` block under `maxBlockRows: 10` → `totalRows` is `chrome + 11`, `visible()` at the foot selects the marker row, and the frame's last block row reads `… 10 of 25 rows`.
 
@@ -1227,6 +1566,21 @@ Fake heights, no rendering.
 - **T6.23** (I26): consulting a list of kinds instead of `definition.window !== undefined` → T1.19's `panel` child row passes and the row for a test kind that declares `window` fails, because the list did not know it.
 - **T6.16** (I1, C09 I80): reading a block's `padding` at the sequence — adding `t + b` between the children — instead of letting `measure` return it → every padded block is counted twice and T2.9 fails. **This row replaces the one it is numbered after**, which reverted `measureSequence` to `Σ measure(b, w)`: under C09 I17 as it now reads those are the same fold, so that revert changes no number and the row could no longer fail. The defect moved with the rule, and this is where it went — the spacing is applied once, inside the block, and a second application is what a reader adding it back at the composer would write. C04_PADDING_WALK A9a has the finding.
 - **T6.27** (I56): following the tail past the held entry — `#follow` ignoring the hold → **T1.76** fails at the first append and **T4.38** loses the child's command row and top border off the top of the screen.
+- **T6.28** (I57): the transcript laid out at the content width rather than `transcriptWidth` → **T4.39** fails on the viewport's width and every row's column 0.
+- **T6.29** (I58): the rail drawn inside the wash, taking `inverse` at 1-bit → **T3.25** fails at both 1-bit rungs.
+- **T6.30** (I34): the waiting count taken as `record.length − held.length` → **T1.78** fails on the patch rows and on both eviction rows, and T1.34's appends-only sequence still passes.
+- **T6.31** (I59): `⏎` bound back to `copySelectedEntries`, copying and staying → **T4.40** fails on the mode still being up, and T1.47 on the action.
+- **T6.32** (I59, I55): the `esc` label read from `size === null` again → **T3.15** fails on its rule-alone half, where `escape()` clears and the footer says `esc out`. *Corrected on landing:* it named T1.80, whose *only blocks that copy nothing* row hands the footer a `CopyState` with `clears` already decided — so it checks the chip against the field and cannot see the session computing the field from `size`. The mutation pass measured it: T1.80 green, T3.15 red.
+- **T6.33** (I60): `rectBetween` ignoring a span's columns → **T1.79** fails on the forty presses and on the narrowed span, and the copy reaches into the gutter.
+- **T6.34** (I37): the edge scroll removed from the keyboard move → **T3.14** fails at the press past the last row, where the view stays put and the caret is off the screen.
+- **T6.35** (I60): the autoscroll tick extending the block selection in the rectangle, as it did → **T4.42** fails: the rectangle's head never leaves the press, and the copy is one cell.
+- **T6.36** (I61, ruling 72): OSC 52's toast worded *copied* → **T1.81** fails. The defect is the one the ruling was written against: a copy that appears to work, on the one path whose success nothing reports.
+- **T6.37** (I61, trace rows 7–9): the pending copy's deadline removed → **T3.26** fails: a `pbcopy` that never exits leaves `copying with pbcopy` up until the toast expires, and then nothing — silent, which R-SEL-011 calls the worst outcome available.
+- **T6.38** (C17 I31): the kill buffer skipped when a clipboard took the text → **T4.43** fails at `⌃y`, which yanks the previous kill.
+- **T6.39** (I61, the person's correction 2026-09-29): the automatic write on a failed or silent tool restored → **T3.27** fails: the file system holds `copy.txt` after a copy nobody asked to save.
+- **T6.40** (I61, K5, K6): the offer drawn while a route exists — `fileOffer` answering for every copy → **T1.82** fails, and **T4.43**'s OSC 52 session reads `⏎ to file` over a copy that went to the terminal.
+- **T6.41** (I61, K1): OSC 52 treated as failed — its copy recorded as the failed copy → **T1.82** fails: the OSC 52 session offers a file for the text it just sent.
+- **T6.42** (I62): the bar's column dropped from the paint → **T1.83** fails on every overflowing arm, and the goldens that overflow lose their right-hand column. `tools/mutate/runs/c14-transcript-bar.mjs`.
 
 ---
 

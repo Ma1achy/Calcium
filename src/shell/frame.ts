@@ -36,8 +36,10 @@ import {
   MAX_FOOTER_ROWS,
   PROMPT_GUTTER,
   PROMPT_SUBSTITUTION,
+  RAIL_COLUMNS,
   regionWidth,
   RULE_ROWS,
+  transcriptWidth,
 } from "./config.js";
 import type { TerminalSize } from "../terminal/lifecycle.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
@@ -69,11 +71,13 @@ export type Composed = Readonly<{
   /**
    * Where the transcript sits — C16's `region`, and the width it is drawn at.
    *
-   * `width` is the terminal's less `CONTENT_MARGIN_R` (I109): the transcript is
-   * resized, measured and rendered at it, and the paint pads what comes back to
-   * `size.columns`. C16 reads `top` and `height` and nothing else.
+   * `width` is the terminal's less `CONTENT_MARGIN_R` (I109) and less the
+   * rail's column (C14 I57): the transcript is resized, measured and rendered at
+   * it, and the paint pads what comes back to `size.columns`. `left` is that
+   * column — the pointer's column is translated by it as its row is by `top`.
+   * C16 reads `top` and `height` and nothing else.
    */
-  region: Readonly<{ top: number; height: number; width: number }>;
+  region: Readonly<{ top: number; left: number; height: number; width: number }>;
   /**
    * How big a layer may be — C15's `Region`, `{ width, height }`.
    *
@@ -129,11 +133,13 @@ export type ComposeDeps = Readonly<{
   bufferedEntries?: () => number;
   /** C22 I116 — the live toast's text, or undefined. Optional: absent is *none live*. */
   toast?: () => string | undefined;
+  /** C22 I116, C23 I92 — the live toast's mark when it is not `ok`. Absent is `ok`. */
+  toastMark?: () => "expired" | undefined;
   /**
    * The copy rung's mode and size (C14 I55). Optional for `bufferedEntries`'
    * reason: a composition with no session graph has no mode to report.
    */
-  copy?: () => CopyState | undefined;
+  copy?: (columns: number) => CopyState | undefined;
   /** C22 I118 — a form field holds the editor; the owner line names it. */
   editingField?: () => boolean;
   /**
@@ -210,9 +216,13 @@ export function compose(deps: ComposeDeps): Composed {
   const session = deps.session();
   const lastFrame = deps.lastFrame?.();
   const capabilities = deps.capabilities();
-  const copy = deps.copy?.();
+  // **The frame's own width, handed down** (C14 I60): the count over a
+  // rectangle is taken over lines laid at the transcript's width, and a copy
+  // state that composed a frame to learn it would compose one inside this one.
+  const copy = deps.copy?.(size.columns);
   const editingField = deps.editingField?.() === true;
   const toast = deps.toast?.();
+  const toastMark = toast === undefined ? undefined : deps.toastMark?.();
   const hints = deps.hints?.();
   const ownerRefused = deps.ownerRefused?.() ?? null;
   const watches = deps.watches?.();
@@ -231,6 +241,7 @@ export function compose(deps: ComposeDeps): Composed {
     ...(copy === undefined ? {} : { copy }),
     ...(editingField ? { editingField } : {}),
     ...(toast === undefined ? {} : { toast }),
+    ...(toastMark === undefined ? {} : { toastMark }),
     ...(hints === undefined ? {} : { hints }),
     ...(ownerRefused === null ? {} : { ownerRefused }),
     ...(watches === undefined ? {} : { watches }),
@@ -254,7 +265,7 @@ export function compose(deps: ComposeDeps): Composed {
   // before the height, because `promptRows` is what the height subtracts.
   const content = regionWidth(size.columns);
   const wanted = Math.max(1, deps.promptRows(content, PROMPT_GUTTER));
-  const promptRows = Math.max(1, Math.min(wanted, Math.floor(size.rows / 2)));
+  const promptRows = Math.max(1, Math.min(wanted, promptCap(size.rows)));
 
   // Clamped at zero: a terminal too short for chrome plus a prompt gets a
   // transcript of no rows rather than a negative height that would read as an
@@ -275,9 +286,18 @@ export function compose(deps: ComposeDeps): Composed {
     // while the paint pads every row to `size.columns`. The frame is the
     // terminal's width and the *document* is narrower — the one distinction a
     // composer can read the wrong side of.
-    region: Object.freeze({ top: HEADER_ROWS + HEADER_RULE_ROWS, height, width: content }),
-    // **The same height and now the same width as the transcript region** (I28,
-    // I109 · §6l.9 row 5). A layer's content is content: `place.ts` centres at
+    // **And one column in from the left** (C14 I57, ruling 68): column 0 is the
+    // selection rail's on every row, and the transcript is laid out beside it.
+    region: Object.freeze({
+      top: HEADER_ROWS + HEADER_RULE_ROWS,
+      left: RAIL_COLUMNS,
+      height,
+      width: transcriptWidth(size.columns),
+    }),
+    // **The same height as the transcript region, and the region's width** (I28,
+    // I109 · §6l.9 row 5) — the transcript's plus the rail's column, because a
+    // layer floats over the whole region and the rail is the transcript's alone
+    // (C14 I57). A layer's content is content: `place.ts` centres at
     // `⌊(region.width − width) / 2⌋` and clamps to it, so a centred layer moves
     // by nought or one column and a layer declaring no width is one cell
     // narrower — right for the reason the transcript's rows are. It was the whole
@@ -367,4 +387,14 @@ export function gutterMatchesPrompt(): boolean {
   // are compared with each other, and the equality holds under either
   // convention.
   return PROMPT_SUBSTITUTION.every((form) => PROMPT_GUTTER.first === cells(form)); // narrow-ok
+}
+
+/**
+ * The most rows the prompt's slot takes — half the terminal, floored at one
+ * (S01 §3). **One function, two readers**: `compose` caps the prompt with it,
+ * and a replacing question's inspection sizes its box to it (C23 I88), because
+ * that question is drawn in this slot (C22 I142) and not in the region.
+ */
+export function promptCap(rows: number): number {
+  return Math.max(1, Math.floor(rows / 2)); // cells-ok — a row count
 }

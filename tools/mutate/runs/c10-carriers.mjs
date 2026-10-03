@@ -47,8 +47,8 @@ const results = runPass({
       // `R-COR-003` names independence rather than count.
       name: "THE DEFECT: an axis held by tone and ground, which is one carrier written twice",
       file: SPEC,
-      from: "| **ownership** | the router's owner rung | the footer's owner line (`chrome.ts:97`, `R-KEY-004`) | word + border | both |",
-      to: "| **ownership** | the router's owner rung | the footer's owner line (`chrome.ts:97`, `R-KEY-004`) | tone + ground | both |",
+      from: "| **ownership** | the router's owner rung | the footer's owner line (`chrome.ts:97`, `R-KEY-004`) | word + border | word and border |",
+      to: "| **ownership** | the router's owner rung | the footer's owner line (`chrome.ts:97`, `R-KEY-004`) | tone + ground | word and border |",
       expect: "T2.57",
     },
     {
@@ -57,19 +57,22 @@ const results = runPass({
       // by equality rather than by membership.
       name: "an axis loses its row — the equality arm",
       file: SPEC,
-      from: "| **disclosure** | `TableRow.expanded` |",
-      to: "| **disclosurex** | `TableRow.expanded` |",
+      from: "| **disclosure** | `TableRow.expanded`, and the count",
+      to: "| **disclosurex** | `TableRow.expanded`, and the count",
       expect: "T2.57",
     },
     {
-      // **A single-carrier exception taken by writing one.** `selection` has one
-      // carrier and the tree declares it — `paint.ts:250`. Strip the citation
-      // and the exception becomes this document's to grant, which is the whole
-      // difference between a limit that is recorded and a rule that is bent.
-      name: "a single-carrier axis stops citing the file that declares it",
+      // **A single-carrier exception taken by writing one.** Re-pointed when
+      // `selection` took its rail (C14 I58, ruling 68): it was the last axis
+      // written `alone`, and the row that demanded a citation of each then ran
+      // over an empty set. So the mutation constructs the subject: a row
+      // declared single-carrier with no citation, which the arm must refuse.
+      name: "an axis is declared single-carrier — disclosure before ruling 69",
       file: SPEC,
-      from: "| **selection** | `surface.selection` | the wash, `inverse` at 1-bit (`paint.ts:250`) | **ground alone** |",
-      to: "| **selection** | `surface.selection` | the wash, and inverse at 1-bit | **ground alone** |",
+      // Re-anchored for C10 I71: the gate counts carriers, so `alone` is no
+      // longer a word it reads — a single carrier fails whatever it is called.
+      from: "| mark + word | mark and word — `▹+N` against a leaf's blank",
+      to: "| mark | mark — `▹+N` against a leaf's blank",
       expect: "T2.57",
     },
     {
@@ -82,6 +85,50 @@ const results = runPass({
       // row gained its field (C04 I140), and pointer's is next (review batch 1).
       from: "| **resolution** | — | — | **no subject** |",
       to: "| **resolution** | `Question.resolved` | — | **no subject** |",
+      expect: "T2.57",
+    },
+    {
+      // **I71's count, removed**: the arm that asks for two distinct carriers.
+      // The fabricated `mark` row passes and so does disclosure written alone —
+      // the shape the pre-I71 gate had, satisfied by a single carrier not spelled `alone`.
+      name: "the gate accepts one carrier",
+      file: "test/contract/theme.test.ts",
+      from: '      if (new Set(named).size < 2) return "fewer than two distinct carriers";',
+      to: "",
+      expect: "T2.57",
+    },
+    {
+      // **The survives column read as `both`** — any row passes the naming arm.
+      name: "the surviving carrier need not be named",
+      file: "test/contract/theme.test.ts",
+      from: '      if (surviving.length === 0) return "no carrier that survives 1-bit is named as surviving";',
+      to: "",
+      expect: "T2.57",
+    },
+    {
+      // **`both` restored** — the word the survives column held before I71.
+      // It names no carrier, so a row written with it must fail the naming arm.
+      name: "the survives column says both",
+      file: SPEC,
+      from: "| word + border | word and border |",
+      to: "| word + border | both |",
+      expect: "T2.57",
+    },
+    {
+      // **A second exception, joining quietly** — the equality arm.
+      name: "a second site on the exception list",
+      file: SPEC,
+      from: "| **prompt selection** | selection |",
+      to: "| **table selection** | selection | `x` | `y.ts:1` | ground | inverse |\n| **prompt selection** | selection |",
+      expect: "T2.57",
+    },
+    {
+      // **The exception carried and still listed** — the site given a second
+      // carrier; the list must now fail rather than keep a name it no longer needs.
+      name: "the exception carried, and the list keeps it",
+      file: SPEC,
+      from: "| ground | inverse — the ground's own rung, with the caret at one end |",
+      to: "| ground + mark | mark and inverse — the ground's own rung, with the caret at one end |",
       expect: "T2.57",
     },
   ],

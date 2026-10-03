@@ -52,6 +52,45 @@ const results = runPass({
       to: "    void stack;\n    this.restore(held.line);",
       expect: "T1.52",
     },
+    // ---- C17 I33, I34, §5f — chips across a borrow (T6.23, T6.24) --------------
+    {
+      name: "T6.23: hold leaves the ordinal counter on the editor",
+      file: "src/interaction/editor/editor.ts",
+      from: "    this.#ordinal = 0;\n    this.#owners += 1;",
+      to: "    this.#owners += 1;",
+      expect: "T1.57",
+    },
+    {
+      name: "resume leaves the borrower's ordinal counter in place",
+      file: "src/interaction/editor/editor.ts",
+      from: "    this.#ordinal = owned.ordinal;\n",
+      to: "",
+      expect: "T1.57",
+    },
+    {
+      name: "T6.23: yank inserts a foreign chip as it is",
+      file: "src/interaction/editor/editor.ts",
+      from: "    this.insert(this.#adopt(this.#kill), { atomic: true });",
+      to: "    this.insert(this.#kill, { atomic: true });",
+      expect: "T1.58",
+    },
+    {
+      name: "resume leaves the borrower as the owner",
+      file: "src/interaction/editor/editor.ts",
+      from: "    this.#owner = owned.owner;\n",
+      to: "",
+      expect: "T1.58",
+    },
+    {
+      // **The review's remedy as written** — *hold the chip map and counter* —
+      // restarts the sentinel counter at the borrow, so the borrower's first
+      // paste rebinds the owner's first sentinel.
+      name: "T6.24: hold restarts the sentinel counter",
+      file: "src/interaction/editor/editor.ts",
+      from: "    this.#ordinal = 0;\n    this.#owners += 1;",
+      to: "    this.#ordinal = 0;\n    this.#nextSentinel = 0;\n    this.#owners += 1;",
+      expect: "T1.59",
+    },
     {
       name: "↑ in a reply walks the prompt's commands",
       file: "src/shell/keys.ts",
@@ -62,15 +101,17 @@ const results = runPass({
     {
       name: "↓ past a reply's floor falls through to the prompt's walk and the live block",
       file: "src/shell/keys.ts",
-      from: "        if (entry !== null) deps.editor.setText(entry);\n        return;\n      }\n      const entry = deps.history.next();",
-      to: "        if (entry !== null) deps.editor.setText(entry);\n      }\n      const entry = deps.history.next();",
+      // Re-anchored 2026-09-30 (C19 I31, F1497): a walk's line goes in through
+      // `recall`, which closes the menu; the mutation is unchanged.
+      from: "        if (entry !== null) recall(entry);\n        return;\n      }\n      const entry = deps.history.next();",
+      to: "        if (entry !== null) recall(entry);\n      }\n      const entry = deps.history.next();",
       expect: "T4.71",
     },
     {
       name: "a modified ⏎ answers the reply",
       file: "src/shell/confirm.ts",
-      from: '          if (is(QUESTION_KEYS.answer) && (bare || replying === null)) return "resolve";',
-      to: '          if (is(QUESTION_KEYS.answer)) return "resolve";',
+      from: '      if (is(QUESTION_KEYS.answer) && (bare || replying === null)) return "resolve";',
+      to: '      if (is(QUESTION_KEYS.answer)) return "resolve";',
       expect: "T4.80",
     },
     {

@@ -26,7 +26,7 @@
 
 import { insetWidth, type KeyValue } from "../../data/viewmodel/index.js";
 import { cells, stripControl, truncate } from "../text.js";
-import { background, based, clampSpans, groundSequence, paint, tone, type Span } from "./paint.js";
+import { background, based, clampSpans, focusStyle, groundSequence, paint, selectionStyle, tone, withBackground, type Span } from "./paint.js";
 import type { NavElement, RenderContext } from "./types.js";
 
 /**
@@ -462,4 +462,75 @@ export function shedElements(
     row += height;
   }
   return Object.freeze(out);
+}
+
+/**
+ * What focus does to one shed row (C09 I137, I113, §7k): `on` is the ground the
+ * row stands on and its inks resolve against (C10 I48), `head` whether it is
+ * focus's own row.
+ */
+export type ShedLit = Readonly<{ on: "focusGround" | "selection"; head: boolean }>;
+
+const UNLIT = (): ShedLit | null => null;
+
+/**
+ * Which shed rows focus touches — `R-SEL-006`'s row (C09 I137, §7k).
+ *
+ * **Gated on the plan `elements` reads**, which the caller passes as a thunk so
+ * a block focus is not on pays nothing for it. A row is an element only where
+ * it sheds (I113), so a focus naming `shed-i` at a width where nothing sheds —
+ * the frame between a resize and C26 moving focus — paints nothing: the render
+ * and the element set are one answer, not two that agree (§7k's trace, S2).
+ *
+ * `selected` holds the head too whenever an extent exists (C26 I16), so a
+ * selected head stands on selection's ground and keeps focus's weight — the
+ * mark that persists, here, because these rows have no `▸` column.
+ */
+export function shedFocus(
+  blockId: string,
+  ctx: RenderContext,
+  plan: () => readonly Withheld[] | null,
+): (index: number) => ShedLit | null {
+  const focus = ctx.focus ?? null;
+  if (focus === null) return UNLIT;
+  const head = focus.blockId === blockId ? focus.rowId : null;
+  const selected = new Set((focus.selected ?? []).filter((s) => s.blockId === blockId).map((s) => s.rowId));
+  if (head === null && selected.size === 0) return UNLIT;
+  if (plan() === null) return UNLIT;
+  return (index) => {
+    const id = `shed-${String(index)}`;
+    const isHead = id === head;
+    const isSelected = selected.has(id);
+    if (!isHead && !isSelected) return null;
+    return { on: isSelected ? "selection" : "focusGround", head: isHead };
+  };
+}
+
+/**
+ * A shed row's spans dressed for focus (C09 I137) — C25's `dress`, the other
+ * `row` without a `▸` column, so the same rule.
+ *
+ * **The ground where it carries and weight at every rung.** At 1-bit
+ * `focusStyle` answers nothing and `selectionStyle` answers `inverse`, so the
+ * head is bold, the extent inverse, and a selected head both — never inversion
+ * for focus, which would make the head and the extent one frame (§7k's first
+ * cell). **The bold replaces a dim rather than sitting beside it**: SGR 1 and 2
+ * close with one `22`, so both on one span draws bold only up to the first
+ * close (F1258). Attributes only, so no cell moves and `measure` sees nothing.
+ */
+export function dressShed(spans: readonly Span[], lit: ShedLit | null, ctx: RenderContext): readonly Span[] {
+  if (lit === null) return spans;
+  const behind = (lit.on === "selection" ? selectionStyle : focusStyle)(ctx.theme, ctx.capabilities);
+  const inverse = behind.inverse === true;
+  return spans.map((span) => {
+    const { dim, ...grounded } = withBackground(span.style, behind);
+    return {
+      text: span.text,
+      style: {
+        ...(lit.head || dim === undefined ? grounded : { ...grounded, dim }),
+        ...(inverse ? { inverse: true } : {}),
+        ...(lit.head ? { bold: true } : {}),
+      },
+    };
+  });
 }

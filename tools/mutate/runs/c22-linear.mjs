@@ -48,8 +48,8 @@ const results = runPass({
     // **A change every row can see** (F1254): every line the stream writes
     // gains a trailing mark, so T1.74's first equality parts at once.
     file: LINEAR,
-    from: 'const clean = (line: string): string => stripControl(line).replaceAll("\\t", "  ").trimEnd();',
-    to: 'const clean = (line: string): string => `${stripControl(line).replaceAll("\\t", "  ").trimEnd()}~`;',
+    from: 'const clean = (line: string): string => neutraliseControl(line).replaceAll("\\t", "  ").trimEnd();',
+    to: 'const clean = (line: string): string => `${neutraliseControl(line).replaceAll("\\t", "  ").trimEnd()}~`;',
     why: "every written line ends in `~`, so T1.74's first equality fails",
   },
   mutations: [

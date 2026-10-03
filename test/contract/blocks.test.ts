@@ -464,10 +464,10 @@ describe("C09 contract — measurement", () => {
   it("T2.126 (I59, §6b): the kinds a bounded container cannot slice, compared by equality", () => {
     // **An exemption list held by equality, not by membership** — a kind that
     // gains a `window` has to move this list, and a new kind that cannot be
-    // bounded has to fail here rather than join a subset quietly. The overrun
-    // those kinds keep inside a `scroll` is recorded by I59 rather than asserted
-    // correct: `plot` is atomic permanently (I27, C12 I1) and the rest simply
-    // have no window yet.
+    // bounded has to fail here rather than join a subset quietly. Inside a
+    // `scroll` these kinds are cropped rather than sliced (C09 I135), so the
+    // list no longer names an overrun: `plot` is atomic permanently (I27, C12
+    // I1) and the rest simply have no window yet.
     const kit = measurable({
       definitions: [
         tableDefinition as unknown as BlockDefinition<never>,
@@ -1106,7 +1106,12 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
     // lacks a banner passes on a box too narrow to draw one.
     expect(error.map(visible).join("\n"), "the control draws all three").toMatch(/ERROR/u);
     expect(seen.join("\n"), "no banner").not.toMatch(/ERROR/u);
-    expect(seen.join(""), "no mark").not.toContain("▲");
+    // **The mark named is the one the control draws** (C09 I138): asserting
+    // the absence of a character the error box no longer draws would pass on
+    // an empty box that led with one.
+    const cross = glyphs(FULL_CAPS).cross;
+    expect(error.map(visible).join("\n"), "the control draws the mark").toContain(`${cross} `);
+    expect(seen.join(""), "no mark").not.toContain(cross);
     const tone24 = sgr(tone("error", DARK_THEME, FULL_CAPS));
     expect(error.join(""), "the control is painted in the error tone").toContain(tone24);
     expect(empty.join(""), "and this one is not").not.toContain(tone24);
@@ -1131,6 +1136,50 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
     const above = row - 1;
     const below = seen.length - row - 2;
     expect(Math.abs(above - below), "and vertically, odd row below").toBeLessThanOrEqual(1);
+  });
+  it("T2.230 (C09 I138, ruling 85, §048, §096): a failed status leads with ✗ and never with the warning's mark, at every rung, against a warn notice's lead", () => {
+    // **The rung is the subject, not the decoration.** At 24 bits the tone and
+    // the tag's ground already say *error*; at 1-bit and in ASCII the mark is
+    // one of the two carriers left, so a mark shared with a warning is a
+    // carrier that says nothing. Each rung is asserted against a `warn`
+    // notice drawn at the same capabilities, which is what makes the two
+    // leads differing a measurement rather than a description.
+    const lead = (row: string): string => row.replace(/^[│|]?\s*/u, "");
+    const warn = block({ kind: "notice", id: "w", tone: "warn", glyph: "warn", text: "disk nearly full" }) as Block;
+    for (const [name, caps] of [["full", FULL_CAPS], ["1-bit", MONO_UNICODE_CAPS], ["ascii", ASCII_CAPS]] as const) {
+      const g = glyphs(caps);
+      const kit = measurable({ capabilities: caps });
+      const notice = lead(kit.renderToLines(warn, 40).map(visible)[0] ?? "");
+      // The warning's mark is the vocabulary's `warn` token: `GlyphSet.warning`
+      // retired with this ruling, because the status was its only reader.
+      const warning = glyphFor("warn", caps);
+      expect(notice.startsWith(`${warning} `), `${name}: the control — a warn notice leads with ${warning}`).toBe(true);
+      expect(g.cross, `${name}: the two marks are distinct at this rung`).not.toBe(warning);
+      for (const state of ["error", "retrying"] as const) {
+        for (const height of [7, 1]) {
+          const drawn = kit
+            .renderToLines(statusAt({ state, message: "connection refused", retryInMs: 8000, attempt: 2, height }), 40)
+            .map(visible);
+          const row = drawn.find((r) => r.includes("connection refused")) ?? "";
+          expect(lead(row), `${name} ${state} h=${String(height)}: the message leads with ${g.cross}`).toMatch(
+            new RegExp(`^${g.cross} connection refused`, "u"),
+          );
+          expect(
+            drawn.some((r) => lead(r).startsWith(`${warning} `)),
+            `${name} ${state} h=${String(height)}: and no row leads with the warning's ${warning}`,
+          ).toBe(false);
+        }
+      }
+      for (const state of ["loading", "empty"] as const) {
+        const drawn = kit.renderToLines(statusAt({ state, message: "waiting", height: 7 }), 40).map(visible);
+        for (const mark of [g.cross, warning]) {
+          expect(
+            drawn.some((r) => lead(r).startsWith(`${mark} `)),
+            `${name} ${state}: no mark — neither ${g.cross} nor ${warning}`,
+          ).toBe(false);
+        }
+      }
+    }
   });
   it("T2.159 (C09 I95, §072, `R-COL-004`, `R-BLK-569`): three kinds paint a ground and the rest are text", () => {
     // **A background is for an EXTENT; a foreground is for a MARK.** The census
@@ -1302,12 +1351,13 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
         .map(visible)
         .join("");
 
-    // **Granularity picks the alphabet, and `style` outranks it.** The two the
-    // design draws — `block` for continuous, `slant` for segmented — and the
-    // registry's own deferral for the rest: *use only when its texture is
-    // declared by the component*.
+    // **Granularity picks the alphabet, and `style` outranks it.** `block` for
+    // continuous and `posts` for segmented — `R-PRG-002`'s *discrete steps use
+    // posts*, which ruling 32 took over §035's `slant` specimens (C09 I136) —
+    // and the registry's own deferral for the rest: *use only when its texture
+    // is declared by the component*.
     expect(at({ granularity: "continuous" }), "continuous is the block alphabet").toContain("█");
-    expect(at({ granularity: "segmented" }), "segmented is the slant alphabet").toContain("▰");
+    expect(at({ granularity: "segmented" }), "segmented is posts (C09 I136)").toContain("▮");
     expect(at({ granularity: "segmented", style: "beads" }), "a declared style outranks it").toContain("•");
 
     // **Quantity picks the readout, and it is the one axis that moves a frame
@@ -1361,7 +1411,7 @@ describe("C09 §3a-ter — the status parts and the empty state", () => {
     const training = at({ quantity: "progress", granularity: "continuous", liveness: "active", ramp });
     expect(budget, "BUDGET is continuous and carries its pair").toContain("█");
     expect(budget, "BUDGET reads both").toContain("60%  6/10");
-    expect(operation, "OPERATION is segmented").toContain("▰");
+    expect(operation, "OPERATION is segmented, and counted work draws posts (C09 I136)").toContain("▮");
     expect(operation, "and reads its share alone").not.toContain("6/10");
     expect(training, "the third triple is expressible and is neither preset").toContain("█");
     expect(training, "and it is a progress, not a capacity").not.toContain("6/10");
@@ -1379,5 +1429,41 @@ describe("C09 I111 — the trend arrows", () => {
     // a cell share one content row.
     expect(glyphFor("collapse", { unicode: "ascii", ambiguousWidth: "narrow" })).toBe("v");
     expect(glyphs({ unicode: "ascii", ambiguousWidth: "narrow" }).trendDown).not.toBe("v");
+  });
+});
+
+describe("C04 I145 — a finished bar has zero rows (review batch 4 M16.2)", () => {
+  it("T1.80 (C04 I145, §3as): progress and count vanish at and past their total; capacity and an undeclared quantity persist; padding stays", () => {
+    const kit = measurable({ theme: DARK_THEME, capabilities: FULL_CAPS });
+    const bar = (spec: Record<string, unknown>) =>
+      block({ kind: "progress", id: "m", label: "work", ...spec } as never);
+    const read = (spec: Record<string, unknown>) => {
+      const b = bar(spec);
+      const lines = kit.renderToLines(b, 40).map(visible);
+      return { measured: kit.registry.measure(b, 40), lines };
+    };
+    for (const quantity of ["progress", "count"]) {
+      expect(read({ quantity, current: 99, total: 100 }).lines.length, `${quantity} at 99/100 draws`).toBe(1);
+      for (const current of [100, 150]) {
+        const got = read({ quantity, current, total: 100 });
+        expect(got.measured, `${quantity} at ${String(current)}/100 measures 0`).toBe(0);
+        expect(got.lines, `${quantity} at ${String(current)}/100 renders nothing`).toEqual([]);
+      }
+    }
+    // `capacity` persists, and its number is not clamped (C09 I28).
+    for (const current of [100, 150]) {
+      const got = read({ quantity: "capacity", current, total: 100 });
+      expect(got.lines.length, `capacity at ${String(current)}/100`).toBe(1);
+      expect(got.lines[0], "reading its own share").toContain(`${String(current)}%`);
+    }
+    // An undeclared quantity never finishes (D25) — examples/docker's CPU bar.
+    expect(read({ current: 150, total: 100 }).lines.length, "undeclared at 150/100 draws").toBe(1);
+    // `total: 0` has no proportion, so it is never finished.
+    expect(read({ quantity: "progress", current: 0, total: 0 }).lines.length, "total 0 draws").toBe(1);
+    expect(read({ quantity: "progress", current: -1, total: 10 }).lines.length, "a negative current draws").toBe(1);
+    // The registry's padding applies to the zero, as it does to an empty container's.
+    const padded = read({ quantity: "progress", current: 100, total: 100, padding: { t: 1 } });
+    expect(padded.measured, "a finished bar with padding measures its padding").toBe(1);
+    expect(padded.lines.map((l) => l.trim()), "and renders one blank row").toEqual([""]);
   });
 });

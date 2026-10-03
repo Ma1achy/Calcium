@@ -16,7 +16,7 @@ import {
   nameExactnessSignal,
   publicSurfaceUseSignal,
 } from "./module-graph.mjs";
-import { checkSourceScans, checkMarks, checkControlBytes, checkAllowLists, checkEmojiBases, checkGlyphWidthClass, checkMarkDomains, checkGlyphPresence, checkTextGrounds } from "./source-scans.mjs";
+import { checkSourceScans, checkMarks, checkControlBytes, checkAllowLists, checkEmojiBases, checkGlyphWidthClass, checkMarkDomains, checkGlyphPresence, checkTextGrounds, checkRuleCitations, checkBidiLiterals } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
 import { checkWorkflows } from "./workflows.mjs";
 import { checkRefusals, REFUSALS, unverifiableRefusals } from "./refusals.mjs";
@@ -40,6 +40,7 @@ import {
   checkSeamFour,
   checkInvariantCoverage,
   checkRowFiles,
+  checkRowResolves,
   withoutTodos,
   referenceFiles,
   specFiles,
@@ -104,6 +105,9 @@ const coverage = checkInvariantCoverage(specs, walk("test"));
 // SP15's numbers, for SP9's reason: the list is the evidence and the count of
 // rows it cannot attribute is what a reader watches.
 const rowFiles = checkRowFiles(walk("test"));
+// SP16's numbers: the misfiled are gated by equality, and the rows that dangle
+// — no spec declares the id — are counted beside them and not judged.
+const rowResolves = checkRowResolves(walk("test"), specs);
 const openSet = checkOpenSet();
 const groupTallies = checkGroupTallies();
 
@@ -214,6 +218,16 @@ const violations = [
   // table. Its own function for SS65's reason: the subject is a membership with
   // a bidirectional arm, not a line against a regex.
   ...checkTextGrounds(files),
+  // SS68 — every `R-XXX-NNN` a spec cites resolves in the design registry. Its
+  // own function for SS63's reason: the subject is a citation against a JSON
+  // document, not a `src/` line against a regex. SP3 and SP8 resolve the
+  // other two citation forms; this was the third, and nothing read it.
+  ...checkRuleCitations(),
+  // SS69 — a literal bidi format character in any tracked text file (F1402).
+  // Its own function for SS52's reason and one more: the corpus is `git
+  // ls-files` rather than any walk here, because the subject is a file a
+  // reviewer reads, and that is every file, not the three trees `walk` visits.
+  ...checkBidiLiterals(),
   ...checkDependencies(),
   ...checkPhantomImports(files),
   // SS62 — the workflows against their record. Its own function rather than a
@@ -277,6 +291,10 @@ const violations = [
   // within one spec resolves to whichever a reader opens, and a mutation's
   // `expect` is satisfied by either.
   ...rowFiles.violations,
+  // SP16 — the question neither SP7 nor SP15 reaches: the spec a title is
+  // attributed to declares no such row, and the file's owner declares a
+  // different one under the id (F1489), or the id was retired (C23 T3.20).
+  ...rowResolves.violations,
   ...refViolations,
 ];
 
@@ -316,6 +334,9 @@ if (violations.length === 0) {
       `  ${DIM}row files · ${String(rowFiles.split)} ids titled in more than one file within their ` +
       `spec, over ${String(rowFiles.rows)} titled rows, all listed (SP15, gated by equality); ` +
       `${String(rowFiles.unowned)} rows no spec owns are not judged${RESET}\n` +
+      `  ${DIM}row resolution · ${String(rowResolves.misfiled)} ids over ${String(rowResolves.rows)} titled rows ` +
+      `locate a row the file's owner declares or their spec retired, all listed (SP16, gated by equality); ` +
+      `${String(rowResolves.dangling)} name an id no spec declares (reported, not gated)${RESET}\n` +
       `  ${DIM}section citations · ${String(sectionsDangling.length)} of ` +
       `${String(sectionRefs.resolved + sectionsDangling.length)} resolve to no section, across ` +
       `${String(sectionTargets)} targets; ${String(sectionsUnowned)} more name no document ` +

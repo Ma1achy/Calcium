@@ -108,18 +108,59 @@ export const TITLE_STACK = mode("\x1b[22;2t", "\x1b[23;2t");
 export const BELL = "\x07";
 
 /**
- * C0, DEL and C1 — anything that could end the string early or start another
- * sequence inside it. `terminal/` may not import `data/`, so the rule is
- * restated here at its narrowest: an OSC payload is text, and text has no
- * controls in it.
+ * The bidi format characters (C01 I26, ruling 71): U+061C, U+200E, U+200F,
+ * U+202A–U+202E and U+2066–U+2069 — `data/text.ts`'s `isBidiFormat`,
+ * restated because `terminal/` may not import `data/`. C01 T2.12 holds the
+ * two equal over every BMP code point, so the copy cannot drift unseen.
  */
-const oscText = (text: string): string => text.replace(/[\u0000-\u001f\u007f-\u009f]/gu, "");
+const BIDI_FORMAT = /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu;
 
-/** OSC 2 — the window title (C01 I24), control-stripped. */
+/**
+ * C0, DEL and C1, in caret form (C01 I26, ruling 86) — `data/text.ts`'s
+ * `controlForm`, restated because `terminal/` may not import `data/`, and held
+ * equal to it by C01 T2.13 over every BMP code point. `^[` for an escape, `^?`
+ * for DEL, `M-^[` for U+009B: `cat -v`'s convention.
+ *
+ * **Tab and newline included**, which is the one difference: a block lays the
+ * two out, and a payload is one line nothing lays out.
+ */
+const CONTROL = /[\u0000-\u001f\u007f-\u009f]/gu;
+const caret = (ch: string): string => {
+  const unit = ch.charCodeAt(0);
+  if (unit === 0x7f) return "^?";
+  if (unit >= 0x80) return `M-^${String.fromCharCode(unit - 0x40)}`;
+  return `^${String.fromCharCode(unit + 0x40)}`;
+};
+
+/**
+ * An OSC payload's text (C01 I26) — the one sanitiser both builders below
+ * read.
+ *
+ * A control is **shown**, never written and never deleted: anything that
+ * could end the string early or start another sequence inside it arrives as
+ * printable ASCII. Deleting it, which this did until ruling 86, left the
+ * control's arguments behind as text — `ESC [ 2 J` in a tool's output reached
+ * the title as `[2J` (F1458).
+ *
+ * A bidi format character is **shown** too, as `<U+202E>` — ruling 71's form.
+ * It is printable by category, so a C0-and-C1 filter passed it whole, and a
+ * title or a notification built from a tool's output reordered what the reader
+ * saw in the title bar (F1407).
+ *
+ * Both forms are printable ASCII and hold nothing either arm rewrites, so the
+ * two arms commute and the whole is idempotent: a line already in the shown
+ * form (C22 I149) passes through as itself.
+ */
+const oscText = (text: string): string =>
+  text
+    .replace(CONTROL, caret)
+    .replace(BIDI_FORMAT, (ch) => `<U+${(ch.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}>`);
+
+/** OSC 2 — the window title (C01 I24), through `oscText` (C01 I26). */
 export const windowTitle = (text: string): string => `\x1b]2;${oscText(text)}\x07`;
 
 /**
- * OSC 9 — a system notification (C02 I16, C22 I128), control-stripped.
+ * OSC 9 — a system notification (C02 I16, C22 I128), through `oscText` (C01 I26).
  *
  * **Never opens with a number and a semicolon**: Ghostty's documentation
  * reserves that shape for ConEmu's OSC 9 sub-commands, so `7zip;` would be read
@@ -127,6 +168,44 @@ export const windowTitle = (text: string): string => `\x1b]2;${oscText(text)}\x0
  */
 export const systemNotification = (text: string): string =>
   `\x1b]9;${oscText(text).replace(/^(\d+);/u, "$1 ;")}\x07`;
+
+// --- the clipboard ----------------------------------------------------------
+
+/**
+ * The most base64 one OSC 52 write carries (C01 I25, D-M10-3): 100 000 bytes,
+ * which is 75 000 bytes of UTF-8.
+ *
+ * **On the payload, not the text**, because the payload is what a terminal
+ * counts and base64 grows in steps of four — a cap compared against the text's
+ * length passes every case except the ones near the edge. Terminals truncate or
+ * drop a long OSC string without a word, so past this the caller is told by a
+ * `null` and says so rather than sending it.
+ */
+export const CLIPBOARD_LIMIT = 100_000;
+
+/**
+ * OSC 52 — put `text` on the terminal's clipboard (C01 I25, ruling 72).
+ *
+ * **Write-only**: the payload is base64 and never `?`, so this can never ask the
+ * terminal to report its clipboard — a reply would arrive as typed input.
+ * **Nothing is stripped**, unlike the two OSC strings above: base64's alphabet
+ * holds no control byte, so the copy survives whole — `ESC`, newlines and all —
+ * and still cannot end the string early.
+ *
+ * `null` means *write nothing*, in two cases. The empty text, because xterm reads
+ * an empty payload as *clear the selection*, which is a destructive answer to a
+ * copy of nothing. And a payload past `CLIPBOARD_LIMIT`. **It declines this
+ * mechanism, not the copy**: the caller goes on to the next one.
+ *
+ * Stateless, like the bell. Whether it worked cannot be observed — nothing
+ * comes back — so no caller calls it *copied*.
+ */
+export function clipboardWrite(text: string): string | null {
+  if (text === "") return null;
+  const payload = Buffer.from(text, "utf8").toString("base64");
+  if (payload.length > CLIPBOARD_LIMIT) return null;
+  return `\x1b]52;c;${payload}\x07`;
+}
 
 // --- settings ---------------------------------------------------------------
 

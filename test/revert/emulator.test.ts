@@ -100,6 +100,40 @@ describe("C27 terminal emulator — tier 6", () => {
     expect(() => term.snapshot("t")).toThrow();
   });
 
+  it("T6.11 (C27 I8): an OSC 52 handler writing its payload into the buffer → T2.7's deep-equal fails", async () => {
+    // **The row the mutation pass kills by fabrication** (`c27-emulator.mjs`
+    // registers a clipboard handler that writes what it was sent). Its sibling
+    // is the OSC 8 handler's removal, which leaves an underline run over the
+    // link's text: the dependency's own reading of a hyperlink.
+    const plain = createEmulator({ cols: 40, rows: 4 });
+    const noisy = createEmulator({ cols: 40, rows: 4 });
+    await plain.write("a link\r\n");
+    await noisy.write("\u001b]52;c;cHduZWQ=\u0007a \u001b]8;;https://example.org\u0007link\u001b]8;;\u0007\r\n");
+    expect(noisy.snapshot("t")).toEqual(plain.snapshot("t"));
+    expect(noisy.snapshot("t").lines[0]?.runs, "no run from a hyperlink").toBeUndefined();
+    plain.dispose();
+    noisy.dispose();
+  });
+
+  it("T6.12 (C27 I2): containText passing bidi characters through → T1.13 fails and the snapshot stops validating", () => {
+    // Both placements: a mark sharing a cell with a letter, and one alone in its cell.
+    expect(containText("b\u202e")).toBe("b");
+    expect(containText("\u2067")).toBe("?");
+    const line = lineOf(lineFrom([{ chars: "a\u200f" }, { chars: "\u2067" }, { chars: "z" }]));
+    expect(line.text).toBe("a?z");
+    const doc = {
+      schema: "tui.view/1",
+      command: "!x",
+      status: "ok",
+      meta: {
+        verb: null, adapter: "shell", stderr: "", exitCode: 0, durationMs: 1,
+        truncated: false, argv: ["x"], transport: "subprocess", origin: "user",
+      },
+      blocks: [{ kind: "terminal", id: "t", cols: 20, screen: "lines", lines: [line] }],
+    };
+    expect(validateDocument(doc as never).ok, "the walked line validates under C04 I110").toBe(true);
+  });
+
   it("T6.10 (C27 I10): applying the cap before the reflow → T1.7 loses a line", async () => {
     const term = createEmulator({ cols: 40, rows: 4, scrollback: 8 });
     await term.write(`${"y".repeat(120)}\r\n`);

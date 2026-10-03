@@ -30,9 +30,15 @@ const VARIANTS = [
 describe("golden frames — one per design fixture", () => {
   for (const variant of VARIANTS) {
     for (const width of WIDTHS) {
-      it(`${variant.name} at ${String(width)}`, () => {
-        const frame = SURFACES.map((s) => {
-          const rows = s.rows(width, variant.capabilities, variant.theme);
+      it(`${variant.name} at ${String(width)}`, async () => {
+        // **Awaited in order**, one surface after another: §097's rows come
+        // from a session (it is a layer, and only L4 composes one), and a
+        // session settles asynchronously. Sequential rather than `Promise.all`
+        // so no two sessions share a turn of the event loop.
+        const drawn: (readonly string[])[] = [];
+        for (const s of SURFACES) drawn.push(await s.rows(width, variant.capabilities, variant.theme));
+        const frame = SURFACES.map((s, i) => {
+          const rows = drawn[i]!;
           // Stripped of SGR, as the other lines corpora are: these frames are
           // about *what is drawn*, and C10's own goldens own colour. A snapshot
           // carrying both changes when either does, and then neither is

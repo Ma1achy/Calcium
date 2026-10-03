@@ -30,7 +30,8 @@ const GAP = 2;
  * else** (I105, §018).
  *
  * *The MARK carries chosen — `●` against `○`, `✓` against `✗` — and the WASH
- * carries focus.* All four are the registry's own records, so nothing here
+ * carries focus.* Chosen's second carrier, the weight, is the render's (I132).
+ * All four are the registry's own records, so nothing here
  * chooses a character; `exclusive` picks which pair, and the pair is the only
  * thing it picks. The unchosen exclusive mark is `choiceOpen` (`○`/`@`,
  * `choice-open`), not the plot's `hollow` (`○`/`o`), whose ASCII half the
@@ -94,6 +95,8 @@ function choiceElements(block: Choice, width: number): readonly NavElement[] {
 
 export const choiceDefinition: BlockDefinition<Choice> = {
   kind: "choice",
+  // C09 I137 — `R-FOC-003`: the mark and the label are one shape (I105).
+  focusShape: "control",
 
   copy: (block) => block.options.map((o) => `${o.chosen === true ? "[x]" : "[ ]"} ${o.label}`).join("  "),
 
@@ -130,7 +133,13 @@ export const choiceDefinition: BlockDefinition<Choice> = {
       const style = focused
         ? { ...tone("default", ctx.theme, ctx.capabilities, "focusGround"), ...focusShapeStyle(ctx.theme, ctx.capabilities) }
         : tone("default", ctx.theme, ctx.capabilities);
-      spans.push({ text: optionText(block, i, ctx.capabilities), style });
+      // **Chosen's second carrier is the weight** (I132, ruling 54). The mark
+      // was its only one, and at 1-bit the wash is `inverse`, so each fact had
+      // one carrier. Bold survives every rung, adds no cell, and is not
+      // `inverse`, which is focus's rung there. On this one span only: the
+      // block's `label` is `muted`, and bold never shares a span with dim.
+      const weighted = option.chosen === true ? { ...style, bold: true } : style;
+      spans.push({ text: optionText(block, i, ctx.capabilities), style: weighted });
     });
     return rows([paint(clampSpans(spans, normaliseWidth(ctx.width), ctx.capabilities))]);
   },
@@ -168,6 +177,8 @@ function track(block: Control, room: number, ctx: RenderContext): string {
 
 export const controlDefinition: BlockDefinition<Control> = {
   kind: "control",
+  // C09 I137 — `R-FOC-002`: label, track and value (I106).
+  focusShape: "control",
 
   copy: (block) => `${block.label}  ${block.value}`,
 

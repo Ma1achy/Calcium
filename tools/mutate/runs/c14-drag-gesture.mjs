@@ -58,6 +58,17 @@ const results = runPass({
       expect: "T4.37c",
     },
     {
+      // **The head of the copy lost** (review batch 4, M10 item 4). The row read
+      // a yank in the prompt, which is capped and elides its head, so a copy
+      // missing its first entry drew the same fifteen rows — measured by hand
+      // against the row as it stood: it passed. Read at `copyText`, it fails.
+      name: "the copy drops its first entry",
+      file: "src/shell/semantic-selection.ts",
+      from: '    .filter((t) => t !== "");\n',
+      to: '    .filter((t) => t !== "").slice(1);\n',
+      expect: "T4.37c",
+    },
+    {
       // The wrong edge: scrolling down, the caret goes to the container's top.
       name: "a tick extends to the edge it is scrolling away from",
       file: SESSION,
@@ -77,7 +88,8 @@ const results = runPass({
       // C14 I51 — the element-less blocks lose their spans: prose unreachable.
       name: "a block with no element has no span",
       file: SESSION,
-      from: "        spans.push(Object.freeze({ key: semantic.keyOf(entry.id, b.blockId), from: b.from, to: b.to }));\n",
+      // Re-anchored for C14 I60: the span carries its run's columns.
+      from: "        spans.push(Object.freeze({ key: semantic.keyOf(entry.id, b.blockId), from: b.from, to: b.to, cols: b.cols }));\n",
       to: "",
       expect: "T4.37e",
     },

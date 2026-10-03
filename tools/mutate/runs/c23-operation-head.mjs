@@ -79,7 +79,11 @@ const results = runPass({
       file: DOCS,
       from: "  const running = operationRunning(op);",
       to: "  const running = true;",
-      expect: "T1.71",
+      // **T1.72, and it was T1.71 by accident**: the running head's spinner
+      // frames share `▰` with the old segmented bar, so a stopped head drawing
+      // a frame failed the bar rows. C09 I136's posts removed the collision and
+      // this survived; T1.72 now asserts the stopped mark directly.
+      expect: "T1.72",
     },
     {
       // C09 I104 restored to the unconditional third — both halves at once, and

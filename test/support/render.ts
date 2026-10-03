@@ -92,6 +92,8 @@ export const FULL_CAPS: TerminalCapabilities = Object.freeze({
   altScreen: true,
   renderMode: "rich",
   notification: "none",
+  clipboard: "none",
+  editor: null,
   notify: [],
 });
 
@@ -196,6 +198,17 @@ export function measurable(
      * renderer emits, with a default that genuinely lacks the kind.
      */
     definitions?: readonly BlockDefinition<never>[];
+    /**
+     * **A registry built elsewhere — a constructed session's** (C09 I130).
+     *
+     * The option exists because the sweep that ran on this harness's bare
+     * registry reported `table`, `plot` and `patch` clean while they were
+     * falling back to `raw`, and `patch` leaked. A row whose subject is *every
+     * kind the product draws* takes `graph.blocks` here, so the kinds it sweeps
+     * are the production registry's and not a list restated in a test.
+     * `definitions`, `onError` and `maxBlockRows` do not apply to it.
+     */
+    registry?: BlockRegistry;
     focus?: RenderOptions["focus"];
     cursorPositions?: RenderOptions["cursorPositions"];
     /** Per-plot live cameras (C12 I83), so a row can move one without rebuilding the block. */
@@ -251,7 +264,7 @@ export function measurable(
     to: number,
   ) => Readonly<{ block: Block; skipRows: number; dropRows: number }> | undefined;
 }> {
-  const r = registry(options.definitions ?? [], options.onError ?? LOUD, options.maxBlockRows);
+  const r = options.registry ?? registry(options.definitions ?? [], options.onError ?? LOUD, options.maxBlockRows);
   const render: RenderOptions = {
     theme: options.theme ?? DARK_THEME,
     capabilities: options.capabilities ?? FULL_CAPS,

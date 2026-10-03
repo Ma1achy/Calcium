@@ -56,9 +56,9 @@ describe("the smallest complete example", () => {
     // both, which is the resolution that cannot see a packaging mistake.
     // The runtime resolves into `dist/` — `dist/bundle/index.js` since A04 §5's
     // bundle (F1193) — and the package root is whatever sits above `dist/`.
-    const resolved = pathToFileURL(createRequire(import.meta.url).resolve("@fmx/calcium")).href;
+    const resolved = pathToFileURL(createRequire(import.meta.url).resolve("calcium-tui")).href;
     const dist = resolved.indexOf("/dist/");
-    if (dist < 0) throw new Error(`@fmx/calcium resolved outside dist/: ${resolved}`);
+    if (dist < 0) throw new Error(`calcium-tui resolved outside dist/: ${resolved}`);
     const pkgRoot = new URL(resolved.slice(0, dist + 1));
     const readme = readFileSync(new URL("README.md", pkgRoot), "utf8");
     // **Anchored on a marker, not on "the first ts fence".** The first version

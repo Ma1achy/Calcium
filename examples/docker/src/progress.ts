@@ -44,8 +44,8 @@
  */
 
 import { spawn } from "node:child_process";
-import { b } from "@fmx/calcium";
-import type { LocalDocument, Block, LocalContext } from "@fmx/calcium";
+import { b } from "calcium-tui";
+import type { LocalDocument, Block, LocalContext } from "calcium-tui";
 
 /** One build step, as buildkit reports it. */
 export type Step = {

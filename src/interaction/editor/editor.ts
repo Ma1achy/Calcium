@@ -60,8 +60,17 @@ export type { Chip, ChipInsert, ChipKind, ChipLook, ChipParts } from "./layout.j
  */
 export type HeldLine = Readonly<{ line: LineState }>;
 
-/** The owner's stack, keyed by the record `hold()` handed out (I29). */
-const heldStacks = new WeakMap<HeldLine, History>();
+/**
+ * What travels with a held line and is not on the record (I29, I33): the
+ * owner's undo stack, the last ordinal it numbered a chip with, and which
+ * owner it is — keyed by the record `hold()` handed out.
+ *
+ * **The sentinel counter and the table are not here, and that is I34.** They
+ * belong to the editor's whole life: a counter that travelled with the line
+ * would restart at the borrow and mint the owner's sentinels a second time.
+ */
+type Owned = Readonly<{ history: History; ordinal: number; owner: number }>;
+const heldStacks = new WeakMap<HeldLine, Owned>();
 
 export type LineState = Readonly<{
   text: string;
@@ -99,8 +108,11 @@ export interface LineEditor {
    * transport cannot take.
    */
   readonly resolved: string;
-  /** What a cluster draws as, for the walk. `undefined` for ordinary text. */
-  readonly drawAs: (cluster: string) => string | undefined;
+  /**
+   * What a cluster draws as, for the walk. `undefined` for ordinary text; given
+   * a `limit` a chip's label does not fit, the label elided to it (I32).
+   */
+  readonly drawAs: (cluster: string, limit?: number) => string | undefined;
   readonly cursor: number;
   readonly lines: readonly string[];
 
@@ -139,6 +151,14 @@ export interface LineEditor {
    * forwards is what gives position 0 an answer at all.
    */
   chipAt(): Chip | null;
+  /**
+   * Re-mint `chip` with `parts`, keeping its ordinal (I35, C22 I144).
+   *
+   * Every occurrence of the chip's sentinel becomes one fresh sentinel, as one
+   * undo unit; the old stays in the table (I34), so `⌃_` brings the chip back
+   * as it was. `false`, and nothing changes, when the chip is not in the buffer.
+   */
+  editChip(chip: Chip, parts: ChipParts): boolean;
   deleteBackward(): void;
   deleteForward(): void;
   move(motion: Motion): void;
@@ -283,20 +303,31 @@ class Editor implements LineEditor {
    */
   readonly #look: ChipLook;
 
-  constructor(look: ChipLook = { separator: "\u00b7", painted: true }) {
+  constructor(look: ChipLook = { separator: "\u00b7", painted: true, unicode: "full" }) {
     this.#look = look;
     // **The label's reader, beside `chipAt`'s.** The table serves two questions
     // — what a cluster draws as, and which chip the caret is on — and both read
     // the one map, which is what keeps a preview from disagreeing with the
     // label drawn beside it (I27).
-    this.drawAs = chipText((cluster) => this.#chips.get(cluster), this.#look);
+    this.drawAs = chipText((cluster) => this.#chips.get(cluster)?.chip, this.#look);
   }
 
   #text = "";
   #cursor = 0;
-  /** Sentinel → the block it stands for. Never pruned: see `drawAs`. */
-  readonly #chips = new Map<string, Chip>();
-  #nextChip = 0;
+  /**
+   * Sentinel → the block it stands for, and the owner that minted it. Never
+   * pruned (see `drawAs`) and **one table for every owner** (I34): a sentinel
+   * is never reused or rebound, so a held line, a borrower's line and a chip
+   * yanked between them all resolve through it without asking whose it is.
+   */
+  readonly #chips = new Map<string, Readonly<{ chip: Chip; owner: number }>>();
+  /** The editor's whole life, never reset — a borrow included (I34). */
+  #nextSentinel = 0;
+  /** The last ordinal the current owner's line numbered a chip with (I33). */
+  #ordinal = 0;
+  /** Which owner's line this is: 0 for the one the editor was built with (I33). */
+  #owner = 0;
+  #owners = 0;
   /** §5b — the only new state; the head is `#cursor` itself (I21). */
   #anchor: number | null = null;
   #kill = "";
@@ -308,7 +339,7 @@ class Editor implements LineEditor {
 
   get resolved(): string {
     let out = "";
-    for (const ch of this.#text) out += this.#chips.get(ch)?.content ?? ch;
+    for (const ch of this.#text) out += this.#chips.get(ch)?.chip.content ?? ch;
     return out;
   }
 
@@ -316,10 +347,12 @@ class Editor implements LineEditor {
    * **Not pruned when a chip is deleted**, and that is deliberate. Undo restores
    * the sentinel — `#apply` replaces the whole buffer — so a map that forgot on
    * deletion would restore a character standing for nothing, which draws as a
-   * PUA box and resolves to itself on submission. It is bounded by the chips
-   * pasted into one prompt, and the prompt is cleared on every submit.
+   * PUA box and resolves to itself on submission. It grows by one entry per
+   * chip minted in the editor's life — a paste, a mention, a foreign chip
+   * adopted by `yank` — and a submit does not shrink it, because the kill
+   * buffer can still hold a sentinel from a line that was cleared (I34).
    */
-  readonly drawAs: (cluster: string) => string | undefined;
+  readonly drawAs: (cluster: string, limit?: number) => string | undefined;
 
   get cursor(): number {
     return this.#cursor;
@@ -395,17 +428,33 @@ class Editor implements LineEditor {
     this.#cursor += count(clean);
   }
 
+  /**
+   * A fresh sentinel for `parts`, numbered on the current owner's line (I33,
+   * I34).
+   *
+   * **The ordinal is the editor's, and a producer must not choose it** (C17
+   * I25, C19 I28). It is numbered per owner's line and never reset within it —
+   * `[#2]` after `[#1]` was deleted is a reader seeing that something else was
+   * there, which is true — and that is a fact about the line's whole life,
+   * which no caller holds. Two callers each keeping a counter is one prompt
+   * with two `#1`s, which is what the second producer would have made.
+   *
+   * **The sentinel is the editor's whole life's** (I34): the two counters are
+   * different subjects, and the review's remedy — hold both with the line —
+   * restarts this one at a borrow and rebinds the owner's first sentinel to the
+   * borrower's first paste.
+   */
+  #mint(parts: ChipParts): string {
+    const sentinel = String.fromCodePoint(CHIP_BASE + this.#nextSentinel);
+    this.#nextSentinel += 1;
+    this.#ordinal += 1;
+    this.#chips.set(sentinel, { chip: { ...parts, ordinal: this.#ordinal }, owner: this.#owner });
+    return sentinel;
+  }
+
   insertChip(chip: ChipParts, opts?: ChipInsert): void {
     const replace = opts?.replace;
-    const sentinel = String.fromCodePoint(CHIP_BASE + this.#nextChip);
-    this.#nextChip += 1;
-    // **The ordinal is the editor's, and a producer must not choose it** (C17
-    // I25, C19 I28). It is numbered per session and never reset — `[#2]` after
-    // `[#1]` was deleted is a reader seeing that something else was there,
-    // which is true — and that is a fact about this buffer's whole life, which
-    // no caller holds. Two callers each keeping a counter is one prompt with
-    // two `#1`s, which is what the second producer would have made.
-    this.#chips.set(sentinel, { ...chip, ordinal: this.#nextChip });
+    const sentinel = this.#mint(chip);
     // **The span becomes the region, and `insert` does the rest** (C19 I28).
     // Code units in, graphemes inside: the caret is grapheme-indexed here and
     // `accept` measures the buffer as a string, and the two disagree the moment
@@ -421,6 +470,31 @@ class Editor implements LineEditor {
     this.insert(`${sentinel}${opts?.delimiter ?? ""}`, { atomic: true });
   }
 
+  editChip(chip: Chip, parts: ChipParts): boolean {
+    // **By identity, through the table** (I34): a record is found by the
+    // sentinel bound to it, and a chip not in the buffer — deleted, or never
+    // this line's — has nothing to re-mint.
+    let found: Readonly<{ sentinel: string; owner: number }> | null = null;
+    for (const [sentinel, held] of this.#chips) {
+      if (held.chip === chip && this.#text.includes(sentinel)) {
+        found = { sentinel, owner: held.owner };
+        break;
+      }
+    }
+    if (found === null) return false;
+    this.#history.endKill();
+    // `atomic`: its own unit, closed — the re-mint is one edit (I35, I5).
+    this.#history.edit(this.#snapshot(), "atomic");
+    // **A fresh sentinel with the old ordinal** — not `#mint`, which numbers a
+    // new chip. The counter still advances, so no sentinel is rebound (I34).
+    const fresh = String.fromCodePoint(CHIP_BASE + this.#nextSentinel);
+    this.#nextSentinel += 1;
+    this.#chips.set(fresh, { chip: { ...parts, ordinal: chip.ordinal }, owner: found.owner });
+    // One grapheme for one: the caret and any region keep their positions.
+    this.#text = this.#text.split(found.sentinel).join(fresh);
+    return true;
+  }
+
   chipAt(): Chip | null {
     // Read off the same map `drawAs` resolves through (I27), so a preview
     // cannot disagree with the label drawn beside it. A chip is one grapheme
@@ -428,7 +502,7 @@ class Editor implements LineEditor {
     // — there is no position inside one to be at.
     const before = sliceBetween(this.#text, this.#cursor - 1, this.#cursor);
     const after = sliceBetween(this.#text, this.#cursor, this.#cursor + 1);
-    return this.#chips.get(before) ?? this.#chips.get(after) ?? null;
+    return this.#chips.get(before)?.chip ?? this.#chips.get(after)?.chip ?? null;
   }
 
   deleteBackward(): void {
@@ -637,7 +711,31 @@ class Editor implements LineEditor {
   /** One atomic edit (§5). A no-op when nothing has been killed (T3.9). */
   yank(): void {
     if (this.#kill === "") return;
-    this.insert(this.#kill, { atomic: true });
+    this.insert(this.#adopt(this.#kill), { atomic: true });
+  }
+
+  /**
+   * The kill buffer's text with every chip another owner minted re-minted on
+   * this line (I33, §5f).
+   *
+   * **The kill buffer is the one channel between owners** (§5a, §052's *paste
+   * rules are shared*), so a chip killed in a reply can be yanked at the
+   * prompt. Inserted as it is, it keeps the reply's `#1` beside the prompt's
+   * own — the two-`#1` line I25 exists to prevent — so it is adopted: a fresh
+   * sentinel, the parts unchanged, the next ordinal of the line it lands on.
+   * An own chip is inserted as it is, which is the same chip twice.
+   *
+   * **A second writer of the table, and I24's precondition still holds**: it
+   * mints and the `insert` below puts the sentinel in the buffer in the same
+   * call, so the table never moves behind a buffer the memo answered for.
+   */
+  #adopt(text: string): string {
+    let out = "";
+    for (const ch of text) {
+      const held = this.#chips.get(ch);
+      out += held === undefined || held.owner === this.#owner ? ch : this.#mint(held.chip);
+    }
+    return out;
   }
 
   /** Construction, not an edit: no unit is recorded (see `createEditor`). */
@@ -686,7 +784,14 @@ class Editor implements LineEditor {
     // that reached across the borrow would join two owners' kills (I16).
     this.#history.endKill();
     const held: HeldLine = Object.freeze({ line: this.snapshot() });
-    heldStacks.set(held, this.#history);
+    heldStacks.set(held, { history: this.#history, ordinal: this.#ordinal, owner: this.#owner });
+    // **The borrower numbers its own chips** (I33, §052): its buffer's life
+    // began here, so its first chip is `#1`. A new owner, so a chip it yanks
+    // from the held line is adopted rather than drawn with the owner's number.
+    // The sentinel counter is untouched (I34).
+    this.#ordinal = 0;
+    this.#owners += 1;
+    this.#owner = this.#owners;
     // **No `edit` call** — not `setText("")`, which records the owner's line as
     // the borrower's first unit and leaves it one `⌃z` away (T1.51). The
     // borrower gets a stack of its own and an empty line with nothing to undo.
@@ -698,13 +803,18 @@ class Editor implements LineEditor {
   }
 
   resume(held: HeldLine): void {
-    const stack = heldStacks.get(held);
+    const owned = heldStacks.get(held);
     // **A record `hold()` did not hand out is refused, not restored with a
     // guess** — restoring its line over the borrower's stack is the shared-stack
     // leak this pair exists to close, arriving through the one path that looks
     // like it worked.
-    if (stack === undefined) throw new Error("resume: this line was not taken by hold()");
+    if (owned === undefined) throw new Error("resume: this line was not taken by hold()");
     heldStacks.delete(held);
+    const stack = owned.history;
+    // The owner's numbering comes back with its line, and the borrower's is
+    // discarded with its stack (I33).
+    this.#ordinal = owned.ordinal;
+    this.#owner = owned.owner;
     this.#history = stack;
     this.restore(held.line);
   }
@@ -755,14 +865,16 @@ class Editor implements LineEditor {
     //
     // **The chip table is not in the key, and the reason is the writer rather
     // than the key** (I24). `drawAs` resolves a sentinel through `#chips`, so
-    // the table looks like part of what the walk reads — but `insertChip` is its
-    // only writer and it mints a fresh sentinel and inserts it in the same call,
-    // so the buffer moving is a strict precondition for the table moving. A
+    // the table looks like part of what the walk reads — but its writers,
+    // `insertChip` and `yank`'s adoption (I33), each mint a fresh sentinel and
+    // insert it in the same call, and no sentinel is ever rebound (I34), so the
+    // buffer moving is a strict precondition for the table moving. A
     // `chips.size` term would be a key term no input can make differ, which is
     // A03 §2's vacuity class wearing a memo's clothes. The blind spot is real
     // and stated: a second writer that registered a chip without inserting its
-    // sentinel would leave this stale, and T1.43 pins the precondition for the
-    // writer that exists rather than pretending to watch one that does not.
+    // sentinel would leave this stale, and T1.43 and T1.59 pin the
+    // precondition for the writers that exist rather than pretending to watch
+    // one that does not.
     const hit = this.#laidOut;
     if (
       hit !== null &&

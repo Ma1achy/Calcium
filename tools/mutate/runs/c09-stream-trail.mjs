@@ -76,8 +76,8 @@ const results = runPass({
       // six cells, and nothing about the row's text moves.
       name: "the band is fourteen characters rather than fourteen cells",
       file: SIMPLE,
-      from: "    while (start > 0 && cells(text.slice(start - 1), ambiguous) <= left) start -= 1; // cells-ok — a code-unit cursor",
-      to: "    while (start > 0 && text.length - (start - 1) <= left) start -= 1; // cells-ok — a code-unit cursor",
+      from: "      const w = cells(clusters[k] ?? \"\", ambiguous);",
+      to: "      const w = 1;",
       expect: "T1.54",
     },
     {

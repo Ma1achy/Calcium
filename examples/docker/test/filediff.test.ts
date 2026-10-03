@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { Block, Notice, Patch } from "@fmx/calcium";
+import type { Block, Notice, Patch } from "calcium-tui";
 import {
   candidates,
   createFilediffHandler,
@@ -25,7 +25,7 @@ import {
   type Far,
 } from "../src/filediff.ts";
 
-import { localContext } from "@fmx/calcium/testing";
+import { localContext } from "calcium-tui/testing";
 const IMAGE_CONF = [
   "server {",
   "    listen       80;",

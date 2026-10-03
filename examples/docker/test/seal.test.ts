@@ -3,7 +3,7 @@
  *
  * R01 §8 rests the whole monorepo arrangement on one claim: that an example
  * living inside the repository is still a real consumer, because `exports`
- * makes `@fmx/calcium/src/...` a **resolution error** rather than a matter of
+ * makes `calcium-tui/src/...` a **resolution error** rather than a matter of
  * discipline. That claim is either enforced by npm or it is a convention, and
  * the difference is not visible by reading either package.json.
  *
@@ -60,26 +60,26 @@ function resolveInNode(specifier: string): Resolution {
 }
 
 /**
- * Where `@fmx/calcium` actually is, asked of node rather than assumed.
+ * Where `calcium-tui` actually is, asked of node rather than assumed.
  *
  * Derived from the resolved entry point — `<root>/dist/index.js` — because the
  * package's location differs by install: a linked workspace resolves to the
- * repository, a tarball install to `node_modules/@fmx/calcium`. Any path
+ * repository, a tarball install to `node_modules/calcium-tui`. Any path
  * arithmetic from the test file's own URL is right in one and silently wrong in
  * the other, which is precisely the defect R2.3d used to carry.
  */
 function packageRoot(): string {
-  const r = resolveInNode("@fmx/calcium");
-  if (!r.ok) throw new Error(`@fmx/calcium does not resolve: ${r.message}`);
+  const r = resolveInNode("calcium-tui");
+  if (!r.ok) throw new Error(`calcium-tui does not resolve: ${r.message}`);
   // The runtime resolves into `dist/` — `dist/bundle/index.js` since A04 §5's
   // bundle (F1193) — and the package root is whatever sits above `dist/`.
   const dist = r.url.indexOf("/dist/");
-  if (dist < 0) throw new Error(`@fmx/calcium resolved outside dist/: ${r.url}`);
+  if (dist < 0) throw new Error(`calcium-tui resolved outside dist/: ${r.url}`);
   return fileURLToPath(new URL(r.url.slice(0, dist + 1)));
 }
 
 /** The three C24 §2 entry points, and nothing else. */
-const ENTRIES = ["@fmx/calcium", "@fmx/calcium/testing", "@fmx/calcium/fixtures"];
+const ENTRIES = ["calcium-tui", "calcium-tui/testing", "calcium-tui/fixtures"];
 
 /**
  * Paths that exist on disk and must not be reachable.
@@ -92,10 +92,10 @@ const ENTRIES = ["@fmx/calcium", "@fmx/calcium/testing", "@fmx/calcium/fixtures"
  * in the rule. R2.3d holds the control that keeps this honest.
  */
 const DEEP: readonly { specifier: string; onDisk: string }[] = [
-  { specifier: "@fmx/calcium/src/data/viewmodel/index.js", onDisk: "src/data/viewmodel/index.ts" },
-  { specifier: "@fmx/calcium/src/index.js", onDisk: "src/index.ts" },
-  { specifier: "@fmx/calcium/dist/index.js", onDisk: "dist/index.js" },
-  { specifier: "@fmx/calcium/package.json", onDisk: "package.json" },
+  { specifier: "calcium-tui/src/data/viewmodel/index.js", onDisk: "src/data/viewmodel/index.ts" },
+  { specifier: "calcium-tui/src/index.js", onDisk: "src/index.ts" },
+  { specifier: "calcium-tui/dist/index.js", onDisk: "dist/index.js" },
+  { specifier: "calcium-tui/package.json", onDisk: "package.json" },
 ];
 
 describe("R2.3: the package surface is sealed by npm, not by discipline", () => {
@@ -108,7 +108,7 @@ describe("R2.3: the package surface is sealed by npm, not by discipline", () => 
   });
 
   it("R2.3b: the runtime entry resolves into dist, never into src", () => {
-    const r = resolveInNode("@fmx/calcium");
+    const r = resolveInNode("calcium-tui");
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.url, "the bundled runtime entry (A04 §5, C24 I38)").toContain("/dist/bundle/index.js");

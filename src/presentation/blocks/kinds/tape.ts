@@ -7,7 +7,7 @@
 import type { CallState, Tape } from "../../../data/viewmodel/index.js";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate } from "../../text.js";
-import { CALL_STATE_GLYPH, glyphFor, glyphs, spinnerFrameAt } from "../glyphs.js";
+import { CALL_STATE_GLYPH, glyphCells, glyphFor, glyphs, spinnerFrameAt } from "../glyphs.js";
 import { clampSpans, focusShapeStyle, paint, rows, selectionStyle, tone, type Span } from "../paint.js";
 import { tapeWindow, type TapeMarks } from "../tape-window.js";
 import type { BlockDefinition, NavElement, RenderContext, Rendered } from "../types.js";
@@ -43,10 +43,11 @@ function memberText(
 ): string {
   const label = stripControl(member.label);
   // **A state this build does not know carries no mark, and does not throw.**
-  // `state` is not checked by `validateDocument` — a tape arriving from the far
-  // side can name anything — and indexing the glyph map with it gave
-  // `undefined`, which `glyphFor` threw on: a block's own field reaching the
-  // renderer as a crash, which C09 §7d's sweep is what found.
+  // `validateDocument` refuses one now (C04 I144), and the sentence here that
+  // said it was *not checked* is superseded. The guard stays for a tape built
+  // without the gate, where indexing the glyph map gave `undefined` and
+  // `glyphFor` threw on it — a block's own field reaching the renderer as a
+  // crash, which C09 §7d's sweep is what found.
   const state: CallState | undefined = member.state;
   const slot = state === undefined ? undefined : CALL_STATE_GLYPH[state];
   const running = state === "running";
@@ -93,10 +94,17 @@ function layout(
   width: number,
   ctx: Pick<RenderContext, "capabilities" | "tick" | "motion">,
   held: number,
+  focused: string | null,
 ) {
   const room = normaliseWidth(width);
   const n = block.members.length; // cells-ok — a count of members
   const current = block.members.findIndex((m) => m.id === block.current);
+  // **The anchor: the focused member while focus is in the tape, `current`
+  // otherwise** (C26 I31, ruling 80). The shell cannot write the producer's
+  // `current`, so `←`/`→` move focus and the window follows it. One argument
+  // to the one `layout`, so the frame, the persisted start and the pointer's
+  // columns cannot disagree about where the window is.
+  const focusedAt = focused === null ? -1 : block.members.findIndex((m) => m.id === focused);
   const caps = ctx.capabilities;
   const set = glyphs(caps);
   const marks: TapeMarks = { left: set.tapeLeft, right: set.tapeRight, gap: TAPE_GAP };
@@ -113,7 +121,7 @@ function layout(
   const rich = texts(block, true, ctx);
   const detail = whole(rich);
   const list = detail ? rich : texts(block, false, ctx);
-  const at = current < 0 ? 0 : current;
+  const at = focusedAt >= 0 ? focusedAt : current < 0 ? 0 : current;
   const window =
     n === 0
       ? { from: 0, to: 0, before: 0, after: 0 }
@@ -141,15 +149,135 @@ export function tapeStart(
   width: number,
   capabilities: RenderContext["capabilities"],
   held: number,
+  focused: string | null = null,
 ): number {
-  return layout(block, width, { capabilities, tick: 0 }, held).window.from;
+  return layout(block, width, { capabilities, tick: 0 }, held, focused).window.from;
+}
+
+/**
+ * The row's width at an unbounded width, **every part at its widest** (C04 I147).
+ *
+ * `width` takes no capability (C09 I42), so it cannot know the convention the
+ * row will be drawn at, and a width disagreement has a safe direction: over. So
+ * labels and details are measured at `wide`, a settled state's mark at its
+ * reservation (`glyphCells` — one cell at either arm, by the 1:1 rule), and a
+ * running member's spinner at one cell (C09 I44). The joins inside a member are
+ * `memberText`'s `join(" ")` over its non-empty parts.
+ *
+ * **It counted labels at `narrow` and the gaps, and nothing else**, so a tape of
+ * three members answered 17 and, laid out at 17, drew `«1  › arm ⋅  1»`: every
+ * detail, every mark and the current's lead were drawn and not counted.
+ */
+function naturalWidth(block: Tape): number {
+  const ambiguous = "wide" as const; // the widest convention: `width` cannot see the terminal's
+  const current = block.members.findIndex((m) => m.id === block.current);
+  let used = 0;
+  block.members.forEach((m, i) => {
+    const slot = m.state === undefined ? undefined : CALL_STATE_GLYPH[m.state];
+    const parts = [
+      cells(stripControl(m.label), ambiguous),
+      cells(stripControl(m.detail ?? ""), ambiguous),
+      slot === undefined ? 0 : m.state === "running" ? 1 : glyphCells(slot),
+    ].filter((n) => n > 0);
+    const text = parts.reduce((a, n) => a + n, 0) + Math.max(0, parts.length - 1); // cells-ok — measured cells and the joins between them
+    used += text + (i === current ? LEAD_CELLS : 0) + (i > 0 ? TAPE_GAP : 0);
+  });
+  return used;
+}
+
+/** One piece of the drawn row: a residue mark, a gap, the current's lead, or a member's text. */
+type Piece = Readonly<{
+  text: string;
+  role: "before" | "after" | "gap" | "lead" | "member";
+  /** The member a lead or a text belongs to; `-1` for the rest. */
+  member: number;
+}>;
+
+/**
+ * **The row as pieces, before any style** — one answer for `render` and for
+ * `tapeMemberCols`, so the columns the pointer is told are the cells the row
+ * draws rather than a second reading of the ladder (C04 I124, C26 §7a).
+ */
+function piecesOf(
+  block: Tape,
+  width: number,
+  ctx: Pick<RenderContext, "capabilities" | "tick" | "motion">,
+  held: number,
+  focused: string | null,
+): Readonly<{ room: number; current: number; pieces: readonly Piece[] }> {
+  const { room, list, window, current } = layout(block, width, ctx, held, focused);
+  const set = glyphs(ctx.capabilities);
+  const pieces: Piece[] = [];
+  const gap = (): void => {
+    if (pieces.length > 0) pieces.push({ text: " ".repeat(TAPE_GAP), role: "gap", member: -1 }); // cells-ok
+  };
+  if (window.before > 0) pieces.push({ text: `${set.tapeLeft}${String(window.before)}`, role: "before", member: -1 });
+  for (let i = window.from; i < window.to; i += 1) {
+    if (block.members[i] === undefined) continue;
+    gap();
+    if (i === current) pieces.push({ text: `${glyphFor("current", ctx.capabilities)} `, role: "lead", member: i });
+    // **A member wider than the whole width truncates** (C04 I126, C4): a tape
+    // with nothing in it says less than a tape with one truncated name.
+    pieces.push({ text: truncate(list[i] ?? "", room, ctx.capabilities), role: "member", member: i });
+  }
+  if (window.after > 0) {
+    gap();
+    pieces.push({ text: `${String(window.after)}${set.tapeRight}`, role: "after", member: -1 });
+  }
+  return { room, current, pieces };
+}
+
+/**
+ * Each member's drawn columns `[from, to)`, in member order (C04 I124; review
+ * batch 4 M14.2, D11).
+ *
+ * **A pure helper beside `tapeStart`, not a parameter on `elements`.** A
+ * member's columns move with the held start, and the held start is view state,
+ * so geometry in `elements` would move without `rev` moving — the cache C26 I3
+ * exists to keep. The shell asks this where it holds the start, as it asks
+ * `tapeStart`; that reader is batch 4's shell lane, queued behind this one.
+ *
+ * The current's lead is the current's — a press on `›` is a press on the
+ * member — while a gap and a residue mark are nobody's, and a member off either
+ * end is empty: at `0` before the window and at the width after it. Cut at the
+ * width, as `clampSpans` cuts the row.
+ */
+export function tapeMemberCols(
+  block: Tape,
+  width: number,
+  capabilities: RenderContext["capabilities"],
+  held: number,
+  focused: string | null = null,
+): readonly Readonly<{ from: number; to: number }>[] {
+  const { room, pieces } = piecesOf(block, width, { capabilities, tick: 0 }, held, focused);
+  const drawn = new Map<number, { from: number; to: number }>();
+  let cursor = 0;
+  for (const piece of pieces) {
+    const next = cursor + cells(piece.text, capabilities.ambiguousWidth);
+    if (piece.member >= 0) {
+      // The lead comes first and the text extends it: one run per member.
+      const range = drawn.get(piece.member);
+      drawn.set(piece.member, { from: range?.from ?? Math.min(room, cursor), to: Math.min(room, next) });
+    }
+    cursor = next;
+  }
+  const first = Math.min(...drawn.keys());
+  return Object.freeze(
+    block.members.map((_, i) =>
+      Object.freeze(drawn.get(i) ?? (i < first ? { from: 0, to: 0 } : { from: room, to: room })),
+    ),
+  );
 }
 
 function tapeElements(block: Tape, width: number): readonly NavElement[] {
   // **Every member declares an element, drawn or not** (C04 I124). A tape slides
   // rather than sheds, so a member off the end is still there — and an element
   // that vanished with the window would orphan the focus that §095's whole
-  // argument is about. The offscreen ones carry a zero-width column range.
+  // argument is about. **Every member carries the row's whole width**, and the
+  // sentence that said the offscreen ones carry a zero-width range described a
+  // helper that did not exist: a member's drawn columns move with the held
+  // start, which is view state, so here they would be geometry moving without
+  // `rev` (C26 I3). They are `tapeMemberCols`'s answer.
   const out: NavElement[] = [];
   const w = normaliseWidth(width);
   for (const m of block.members) {
@@ -168,6 +296,8 @@ function tapeElements(block: Tape, width: number): readonly NavElement[] {
 
 export const tapeDefinition: BlockDefinition<Tape> = {
   kind: "tape",
+  // C09 I137 — a member (I121).
+  focusShape: "box",
 
   // §7a — the labels, space-joined, and **every member** rather than the window
   // (C09 I86). What a reader copies is the row, and nothing is lost from it.
@@ -177,14 +307,8 @@ export const tapeDefinition: BlockDefinition<Tape> = {
   // which is the measurement contract holding across a kind whose content moves.
   measure: (): number => atLeastOne(1), // cells-ok — a row count
 
-  width: (block: Tape, width: number): number => {
-    const w = normaliseWidth(width);
-    let used = 0;
-    block.members.forEach((m, i) => {
-      used += cells(stripControl(m.label), "narrow") + (i > 0 ? TAPE_GAP : 0); // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42)
-    });
-    return Math.max(1, Math.min(w, used));
-  },
+  width: (block: Tape, width: number): number =>
+    Math.max(1, Math.min(normaliseWidth(width), naturalWidth(block))),
 
   elements: tapeElements,
 
@@ -195,36 +319,19 @@ export const tapeDefinition: BlockDefinition<Tape> = {
     // far this container is scrolled* and the container is what knows what that
     // means; `tapeWindow` bounds it into the members, as `offsetOf` bounds a
     // box's against its ceiling.
-    const { room, list, window, current } = layout(
-      block,
-      ctx.width,
-      ctx,
-      ctx.scrollOffsets?.[block.id] ?? 0,
-    );
-    const set = glyphs(ctx.capabilities);
     const held = ctx.focus !== null && ctx.focus.blockId === block.id ? ctx.focus.rowId : null;
+    const { room, current, pieces } = piecesOf(block, ctx.width, ctx, ctx.scrollOffsets?.[block.id] ?? 0, held);
     const selected = new Set(
       (ctx.focus?.selected ?? []).filter((s) => s.blockId === block.id).map((s) => s.rowId),
     );
-    const spans: Span[] = [];
-    const gap = (): void => {
-      if (spans.length > 0) spans.push({ text: " ".repeat(TAPE_GAP) }); // cells-ok
-    };
     const muted = tone("muted", ctx.theme, ctx.capabilities);
-
-    if (window.before > 0) {
-      spans.push({ text: `${set.tapeLeft}${String(window.before)}`, style: muted });
-    }
-    for (let i = window.from; i < window.to; i += 1) {
-      const member = block.members[i];
-      if (member === undefined) continue;
-      gap();
-      if (i === current) {
-        spans.push({ text: `${glyphFor("current", ctx.capabilities)} `, style: tone("accent", ctx.theme, ctx.capabilities) });
-      }
-      const id = member.id;
+    const spans: Span[] = pieces.map((piece): Span => {
+      if (piece.role === "gap") return { text: piece.text };
+      if (piece.role === "before" || piece.role === "after") return { text: piece.text, style: muted };
+      if (piece.role === "lead") return { text: piece.text, style: tone("accent", ctx.theme, ctx.capabilities) };
+      const id = block.members[piece.member]?.id ?? "";
       const on = id === held && !selected.has(id) ? "focusGround" : selected.has(id) ? "selection" : undefined;
-      const name = i === current ? "accent" : "default";
+      const name = piece.member === current ? "accent" : "default";
       const style =
         id === held
           ? {
@@ -234,14 +341,8 @@ export const tapeDefinition: BlockDefinition<Tape> = {
           : selected.has(id)
             ? { ...tone(name, ctx.theme, ctx.capabilities, on), ...selectionStyle(ctx.theme, ctx.capabilities) }
             : tone(name, ctx.theme, ctx.capabilities);
-      // **A member wider than the whole width truncates** (C04 I126, C4): a tape
-      // with nothing in it says less than a tape with one truncated name.
-      spans.push({ text: truncate(list[i] ?? "", room, ctx.capabilities), style });
-    }
-    if (window.after > 0) {
-      gap();
-      spans.push({ text: `${String(window.after)}${set.tapeRight}`, style: muted });
-    }
+      return { text: piece.text, style };
+    });
 
     return rows([paint(clampSpans(spans, room, ctx.capabilities))]);
   },

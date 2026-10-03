@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createConfirmHost } from "../../src/shell/confirm.js";
+import { block } from "../../src/data/viewmodel/index.js";
 import { createOverlayManager } from "../../src/viewport/overlay/index.js";
 import type { InputEvent } from "../../src/interaction/router/types.js";
 import { questionConsumer, routingFor, type QuestionConsumer } from "../../src/shell/question-routing.js";
@@ -212,6 +213,7 @@ describe("C23 §7f — replace or float", () => {
     await expect(answer, "both facts").resolves.toEqual({
       key: "r",
       text: "because the tests say so",
+      outcome: "answered",
     });
     // **Given back exactly, on the answering path** (C17 I28). The reply's own
     // line clears because it *became* the line, and the reader's comes back
@@ -233,18 +235,29 @@ describe("C23 §7f — replace or float", () => {
     // **`text` is a record of what happened, not a field always filled.** An
     // escape out of the reply state is still an escape: `""` would say the
     // reader replied with nothing.
+    //
+    // **Two escapes since C23 I89**: the first leaves the reply and not the
+    // question, so the borrow is undone there, while the question is still
+    // open; the second, at the choices, answers with the default (C23 I36).
     const e = world();
     e.type("git push --force");
     const escaped = e.confirm.ask({ question: "may I?", choices: CHOICES });
+    let settledYet = false;
+    void escaped.then(() => (settledYet = true));
     expect(e.press("r")).toBe(true);
     e.type("half a thought");
     expect(e.press("escape")).toBe(true);
-    await expect(escaped, "the default's key and no text").resolves.toEqual({ key: "d" });
-    expect(e.overlays.stack, "and the escape takes it down too").toHaveLength(0);
     // **The borrow is undone on this path too**, and it is the path where a
     // restore written on the `⏎` arm alone loses the draft: the reader changed
     // their mind about typing, which is exactly when they still want their line.
     expect(e.line(), "the reader's line survives the escape").toBe("git push --force");
+    await Promise.resolve();
+    expect(settledYet, "the first escape leaves the reply, not the question").toBe(false);
+    expect(e.confirm.replacing, "which replaces the prompt again").not.toBeNull();
+    expect(e.press("escape")).toBe(true);
+    await expect(escaped, "the default's key and no text").resolves.toEqual({ key: "d", outcome: "answered" });
+    expect(e.overlays.stack, "and the escape takes it down too").toHaveLength(0);
+    expect(e.line(), "and the line is still the reader's").toBe("git push --force");
   });
 
   it("T1.70 (C23 I75, I36, §051, `R-QST-002`): an inspection suspends, and the question settles exactly once", async () => {
@@ -299,7 +312,7 @@ describe("C23 §7f — replace or float", () => {
 
     // Only now does it resolve, and only once across the whole sequence.
     expect(w.press("y")).toBe(true);
-    await expect(answer).resolves.toEqual({ key: "y" });
+    await expect(answer).resolves.toEqual({ key: "y", outcome: "answered" });
     await flush();
     expect(settlements, "one settlement across suspend, escape and answer").toBe(1);
     expect(w.overlays.stack, "and the question is gone").toHaveLength(0);
@@ -328,7 +341,80 @@ describe("C23 §7f — replace or float", () => {
 
     w.press("escape");
     w.press("n");
-    await expect(answer).resolves.toEqual({ key: "n" });
+    await expect(answer).resolves.toEqual({ key: "n", outcome: "answered" });
   });
 
+});
+
+describe("C23 I88 — an inspection owns scrolling its payload, owed at the spec commit", () => {
+  it("T1.98 (C23 I88, C22 I141): an inspection's keys move its box — a row, a page less one — and every entry opens at the top", () => {
+    // **A store the host writes through, clamped as L4's is** — the host holds
+    // no offset of its own (C22 I141), so the row reads the one it wrote to.
+    const at = { value: 0, resets: 0 };
+    const CEILING = 16; // thirty lines in a 14-row box
+    const overlays = createOverlayManager({ registry: { measureSequence: (b) => b.length } }); // cells-ok — a row count
+    const confirm = createConfirmHost({
+      overlays,
+      anchor: () => ({ row: 18, rows: 1 }),
+      draft: () => "",
+      holdDraft: () => undefined,
+      restoreDraft: () => undefined,
+      overlayRegion: () => ({ width: 80, height: 20 }),
+      invalidate: () => undefined,
+      inspectionBox: {
+        by: (boxId, rows) => {
+          expect(boxId).toBe("confirm-source");
+          at.value = Math.min(CEILING, Math.max(0, at.value + rows));
+        },
+        reset: () => {
+          at.value = 0;
+          at.resets += 1;
+        },
+      },
+    });
+    const press = (name: string, meta = false): boolean => {
+      const answer =
+        confirm.answerHandler()?.({ kind: "key", key: { name, ctrl: false, meta, shift: false, sequence: name } } as InputEvent) ??
+        false;
+      return answer !== false && answer !== "pass";
+    };
+    const patch = Array.from({ length: 30 }, (_, i) => `line ${String(i + 1)}`).join("\n");
+    void confirm.ask({
+      question: "Apply the patch?",
+      detail: block({ kind: "raw", id: "d", text: patch }),
+      choices: INSPECTABLE,
+    });
+
+    expect(press("s"), "suspended").toBe(true);
+    expect([at.value, at.resets], "the box opens at its top").toEqual([0, 1]);
+    expect(confirm.focusedBox("confirm"), "the keys move this box, so its thumb is accent").toEqual({
+      blockId: "confirm-source",
+      rowId: null,
+    });
+    const content = JSON.stringify(overlays.top?.content);
+    expect(content, "the box is the region less the panel's chrome").toContain('"id":"confirm-source","height":14');
+    expect(content, "the last row names both keys").toContain("↑↓ scroll  esc back to the question");
+
+    expect(press("down")).toBe(true);
+    expect(at.value, "a row").toBe(1);
+    expect(press("pagedown")).toBe(true);
+    expect(at.value, "a page — the interior less one").toBe(14);
+    expect(press("pageup")).toBe(true);
+    expect(at.value, "and back").toBe(1);
+    expect(press("up")).toBe(true);
+    expect(at.value).toBe(0);
+
+    // **A modified arrow is someone else's chord** — `⌥↓` is C16's page-scroll
+    // intercept and is read before the ladder; here it is consumed silently.
+    expect(press("down", true), "consumed").toBe(true);
+    expect(at.value, "and moved nothing").toBe(0);
+
+    // Leaving and coming back is an arrival: the box is at its top again.
+    press("down");
+    press("down");
+    expect(press("escape")).toBe(true);
+    expect(confirm.focusedBox("confirm"), "no box has the keys at the choices").toBeNull();
+    press("s");
+    expect([at.value, at.resets]).toEqual([0, 2]);
+  });
 });

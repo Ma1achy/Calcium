@@ -20,7 +20,7 @@ const CMD =
   "test/contract/view-model.test.ts test/integration/blocks.test.ts " +
   "examples/docker/test/repo/banner.test.ts";
 
-// **The example's rows import `@fmx/calcium` and run against `dist/`**, so a
+// **The example's rows import `calcium-tui` and run against `dist/`**, so a
 // mutation to `src/` cannot reach them — which the pass found by leaving one
 // alive. They stay in the command because they are the consumer's evidence, and
 // every mechanism they cover has a framework-side row that a mutation can touch.

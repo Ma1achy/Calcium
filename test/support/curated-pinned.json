@@ -1,5 +1,5 @@
 {
- "ANSI16_HEX": [
+ "ANSI16_WINDOWS_HEX": [
   "#000000",
   "#800000",
   "#008000",
@@ -44,7 +44,8 @@
   "failed": "error",
   "queued": "queued",
   "running": "work-unit",
-  "succeeded": "ok"
+  "succeeded": "ok",
+  "waiting": "warn"
  },
  "CATEGORY_REFS": [
   "categorical.c1",
@@ -946,6 +947,9 @@
   "horizontal": [
    "border"
   ],
+  "rail": [
+   "gutter"
+  ],
   "residue": [
    "row-lead",
    "inline"
@@ -1014,10 +1018,6 @@
   "vertical": [
    "border",
    "tree"
-  ],
-  "warning": [
-   "row-lead",
-   "plot"
   ]
  },
  "GLYPH_SUBSTITUTIONS": [
@@ -1195,7 +1195,8 @@
   "warn",
   "error",
   "info",
-  "accent"
+  "accent",
+  "muted"
  ],
  "OKABE_ITO_CANONICAL": {
   "black": "#000000",
@@ -2086,6 +2087,10 @@
    "<"
   ],
   [
+   "▌",
+   "|"
+  ],
+  [
    "·",
    ":"
   ],
@@ -2226,10 +2231,6 @@
    "/"
   ],
   [
-   "▲",
-   "!"
-  ],
-  [
    "▌",
    "|"
   ],
@@ -2315,7 +2316,17 @@
   },
   "braille": {
    "off": " ",
-   "on": "⣿"
+   "on": "⣿",
+   "steps": [
+    "⡀",
+    "⡄",
+    "⡆",
+    "⡇",
+    "⣇",
+    "⣧",
+    "⣷",
+    "⣿"
+   ]
   },
   "halfblock": {
    "narrowOnly": true,
@@ -2367,6 +2378,7 @@
   "heavyVertical": "H",
   "hollow": "o",
   "horizontal": "-",
+  "rail": "|",
   "residue": "...",
   "revert": "<",
   "separator": ":",
@@ -2388,8 +2400,7 @@
   "trendDown": "V",
   "trendFlat": "=",
   "trendUp": "^",
-  "vertical": "|",
-  "warning": "!"
+  "vertical": "|"
  },
  "glyphs(full)": {
   "bar": "▌",
@@ -2415,6 +2426,7 @@
   "heavyVertical": "┃",
   "hollow": "○",
   "horizontal": "─",
+  "rail": "▌",
   "residue": "⋯",
   "revert": "↺",
   "separator": "·",
@@ -2436,7 +2448,6 @@
   "trendDown": "↓",
   "trendFlat": "→",
   "trendUp": "↑",
-  "vertical": "│",
-  "warning": "▲"
+  "vertical": "│"
  }
 }

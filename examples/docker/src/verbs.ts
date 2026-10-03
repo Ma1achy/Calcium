@@ -17,7 +17,7 @@
  * this is the same seam, one layer coarser.
  */
 
-import { b, cells } from "@fmx/calcium";
+import { b, cells } from "calcium-tui";
 import type {
   AdapterDocument,
   Adapter,
@@ -28,7 +28,7 @@ import type {
   RawResult,
   TableRow,
   Tone,
-} from "@fmx/calcium";
+} from "calcium-tui";
 import { parseNdjson, str } from "./ndjson.ts";
 
 /**

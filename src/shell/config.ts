@@ -132,6 +132,26 @@ export function regionWidth(columns: number): number {
   return Math.max(1, columns - CONTENT_MARGIN_R); // cells-ok — a column count
 }
 
+/**
+ * Column 0 of the transcript region, which the frame reserves on every row for
+ * the selection rail (C14 I57, ruling 68). Never configurable, for
+ * `CONTENT_MARGIN_R`'s reason.
+ */
+export const RAIL_COLUMNS = 1;
+
+/**
+ * The transcript's width — the region's less the rail's column (C14 I57).
+ *
+ * **One implementation, for `regionWidth`'s reason, and the two are not
+ * interchangeable.** The prompt and the layer region keep the region's width;
+ * the transcript is measured, windowed, rendered and hit at this. A site that
+ * reached for `regionWidth` where it meant the transcript laid its blocks out a
+ * column wider than the frame draws them — the drift the helper exists to name.
+ */
+export function transcriptWidth(columns: number): number {
+  return Math.max(1, regionWidth(columns) - RAIL_COLUMNS); // cells-ok — a column count
+}
+
 /** C13 §5a — a number rather than "all"; doubling memory is how a debug mode
  * becomes one nobody turns on. */
 export const DEFAULT_RETAIN_PAYLOADS = 50;

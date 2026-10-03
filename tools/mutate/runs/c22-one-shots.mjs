@@ -57,8 +57,8 @@ const results = runPass({
       // polls slower than the effect and reads *plays* after the first draw.
       name: "RESTAMPED: the store forgets a stamp, so every new array is stamped afresh",
       file: STORE,
-      from: "        let since = stamps.get(key);",
-      to: "        let since: number | undefined = undefined;",
+      from: "        let held = stamps.get(key);",
+      to: "        let held: { since: number } | undefined = undefined;",
       expect: "T4.107",
     },
     {

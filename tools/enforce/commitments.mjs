@@ -2038,6 +2038,163 @@ export function checkRowFiles(testFiles, readFile = (f) => readFileSync(f, "utf8
   return { violations, rows, unowned, split: found.length };
 }
 
+// --- SP16 — a titled row locates the row its spec declares ------------------
+//
+// **SP7 and SP15 each ask *one id, two rows* inside one spec, and F1489 was
+// neither.** `test/integration/session.test.ts` — a C22 file — titled a row
+// `T4.34 (C19 I23, …)`. SP9's attribution reads the first citation, so the row
+// was C19's T4.34, titled in one file (SP15 green), and C19's tables declare no
+// T4.34 at all (SP7 green, having nothing to compare). C22 declares a T4.34 about
+// `--no-bg`. So a reader opening the file's spec found a different row under the
+// id, and a mutation run's `expect: "T4.34"` was scored against whichever
+// T4.34 failed (F1472's second instance).
+//
+// **Two arms, both about where the id resolves.**
+//
+// - **Misfiled**: the spec the title is attributed to does not declare the id,
+//   and the file's owner does. Measured when this landed, **30** rows — and the
+//   larger part were not collisions at all but the *same* row whose title cites
+//   a foreign invariant first: C22 declares `T4.33 (C19 I23, C15 I14, …)` and
+//   its test reads `T4.33 (C19 I23, C15 I14)`, which SP9 and SP15 file under
+//   C19. The rule cannot tell the two apart and does not try: **both are
+//   repaired by the title, which either names its spec (`C22 T4.33 (C19 I23 …)`)
+//   or takes an id of its own.** The first is what makes SP15's attribution
+//   right for that row, which it was not.
+// - **Retired**: the attributed spec declares the id retired — a struck
+//   `~~**T3.20**~~`, or a head whose first bold span says *superseded*,
+//   *retired* or *struck* — and a live row still titles it. C23 T3.20 was
+//   superseded with the pushed view and `execution.test.ts` titles a row about
+//   `Ctrl-C` clearing the queue with it (lane b4-exec2's report).
+//
+// **Per row and compared by equality** (ruling D6, SP15's shape). The debt is
+// keyed `spec id file`, because two titles in one file under one id are one
+// entry to repair, and a line number would move on every unrelated edit.
+//
+// **Stated blind spots.** (1) A row that *dangles* — its attributed spec
+// declares no such id and neither does the file's owner — is counted and
+// reported, not gated: **639** when this landed, across 28 specs, which is a
+// different defect (a row with no spec row) and a different remedy. (2) A row
+// whose attributed spec declares the id about **something else** is invisible:
+// that is the citation-resolves-against-the-wrong-thing class, which
+// `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass argues against
+// automating. (3) The retirement vocabulary is three words and a strike; a
+// fourth wording reads as live. (4) SP15's own reader limits — `it.each` and
+// template titles, and an id placed after the title's start, are not read.
+// (5) The owner is `ownerOf`'s: a file no owner claims has no second spec to
+// collide with, and its rows can only dangle.
+const RETIRED_ROW = /^[ \t]*- (?:~~\*\*(T\d+\.\d+[a-z]?)\*\*~~|\*\*(T\d+\.\d+[a-z]?)\*\*[^*\n]{0,120}?\*\*(?:[Ss]uperseded|[Rr]etired|[Ss]truck)\b)/gmu;
+
+/** Every test row id a spec declares retired: struck, or headed *superseded*, *retired* or *struck*. */
+export function retiredRowsOf(file, readFile = (f) => readFileSync(f, "utf8")) {
+  const out = new Set();
+  for (const m of readFile(file).matchAll(RETIRED_ROW)) out.add(m[1] ?? m[2]);
+  return out;
+}
+
+/**
+ * The rows SP16 found misfiled or reusing a retired id when it was wired —
+ * **debt, compared by equality**, keyed `spec id file`. The C19 and C22 rows
+ * were repaired in the commit that landed the rule, and are not listed.
+ */
+const MISFILED_ROWS = Object.freeze([
+  "C04 T1.12b test/unit/plot.test.ts", // C12 declares it; the title cites C04 I41 first
+  "C04 T1.12c test/unit/plot.test.ts", // the same
+  "C07 T1.46 test/unit/execution.test.ts", // C23's T1.46 is a different row (I48)
+  "C07 T1.47 test/unit/execution.test.ts", // C23's T1.47 is a different row (I49)
+  "C09 T1.22 test/unit/table.test.ts", // C11's T1.22 is a different row (I20)
+  "C09 T2.16 test/contract/block-window.test.ts", // retired with C09 I16; two live rows title it
+  "C13 T6.14 test/revert/frame-scheduler.test.ts", // C03 declares it citing C13
+  "C14 T5.3a test/e2e/view-model.test.ts", // C04 declares it citing C14 I4
+  "C23 T3.20 test/unit/execution.test.ts", // superseded with the pushed view
+  "C23 T3.21 test/unit/execution.test.ts", // superseded with the pushed view
+  "C23 T3.60 test/contract/refresh.test.ts", // superseded with the pushed view
+  "C23 T4.4 test/integration/confirm.test.ts", // superseded with the pushed view
+  "C26 T1.3d test/unit/router-focus.test.ts", // C16's T1.3d is a different row (I3)
+  "C26 T1.3e test/unit/router-focus.test.ts", // C16's T1.3e is a decoder row (I17)
+  "C26 T1.3h test/unit/router-focus.test.ts", // C16's T1.3h is a decoder row (I17)
+  "C26 T1.3i test/unit/router-focus.test.ts", // C16's T1.3i is a decoder row (I17)
+  "C26 T1.3j test/unit/router-focus.test.ts", // C16's T1.3j is a decoder row (I17)
+  "C26 T1.42 test/unit/table.test.ts", // C11's T1.42 is a different row (I32)
+  "C26 T1.43 test/unit/table.test.ts", // C11's T1.43 is a different row (I33)
+]);
+
+/**
+ * A03 SP16 — **a titled row locates the row its spec declares**: not an id the
+ * file's owner declares instead, and not one its spec retired.
+ */
+export function checkRowResolves(
+  testFiles,
+  specs,
+  readFile = (f) => readFileSync(f, "utf8"),
+  exempt = MISFILED_ROWS,
+) {
+  const specOf = new Map(specs.map((f) => [(f.split("/").pop() ?? "").slice(0, 3), f]));
+  const declared = new Map();
+  const retired = new Map();
+  const of = (spec) => {
+    const file = specOf.get(spec);
+    if (file === undefined) return null;
+    if (!declared.has(spec)) {
+      declared.set(spec, new Set(testRowsOf(file, readFile)));
+      retired.set(spec, retiredRowsOf(file, readFile));
+    }
+    return { declared: declared.get(spec), retired: retired.get(spec) };
+  };
+  const found = new Map();
+  let rows = 0;
+  let dangling = 0;
+  for (const f of testFiles) {
+    let text;
+    try { text = readFile(f); } catch { continue; }
+    const owner = ownerOf(f);
+    for (const r of rowIdsIn(f, text)) {
+      const mine = r.spec === null ? null : of(r.spec);
+      if (mine === null) continue;
+      rows++;
+      const key = `${r.spec} ${r.id} ${f}`;
+      if (mine.retired.has(r.id)) {
+        found.set(key, `${r.spec} retired ${r.id}`);
+        continue;
+      }
+      if (mine.declared.has(r.id)) continue;
+      const theirs = owner === null || owner === r.spec ? null : of(owner);
+      if (theirs !== null && theirs.declared.has(r.id) && !theirs.retired.has(r.id)) {
+        found.set(key, `${owner}, which owns the file, declares ${r.id} and ${r.spec} does not`);
+        continue;
+      }
+      dangling++;
+    }
+  }
+  const keys = [...found.keys()].sort();
+  const listed = [...exempt].sort();
+  const fresh = keys.filter((k) => !listed.includes(k));
+  const cleared = listed.filter((k) => !keys.includes(k));
+  const violations = [];
+  if (fresh.length > 0) {
+    violations.push({
+      rule: "SP16",
+      file: "test",
+      spec: "A03 §2 · A03 §7a",
+      message:
+        `${String(fresh.length)} titled row(s) locate a row their spec does not declare, and are not ` +
+        `on the list — ${fresh.map((k) => `${k} (${found.get(k)})`).join("; ")}. A reader opening the ` +
+        `file's spec finds a different row under the id, and a mutation's \`expect\` is scored against ` +
+        `whichever fails. Name the row's spec in its title, or give it an id of its own and a spec row.`,
+    });
+  }
+  if (cleared.length > 0) {
+    violations.push({
+      rule: "SP16",
+      file: "tools/enforce/commitments.mjs",
+      spec: "A03 §2 · A03 §7a",
+      message:
+        `${String(cleared.length)} entr(y/ies) on SP16's list locate their row now — ${cleared.join(", ")}. ` +
+        `The list is compared by equality so it can only shrink; remove them.`,
+    });
+  }
+  return { violations, rows, misfiled: keys.length, dangling };
+}
+
 export function checkSectionReferences(
   files,
   readFile = (f) => readFileSync(f, "utf8"),
@@ -2438,5 +2595,5 @@ export function checkReferences(
 // That is A03 §2's own subject reaching the list that enforces it.
 export const SPEC_RULES = [
   "SP1", "SP2", "SP3", "SP4", "SP5", "SP6", "SP7", "SP8", "SP9", "SP10", "SP11",
-  "SP12", "SP13", "SP14", "SP15",
+  "SP12", "SP13", "SP14", "SP15", "SP16",
 ];

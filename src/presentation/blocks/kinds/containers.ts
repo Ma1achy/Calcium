@@ -27,7 +27,7 @@ import type { NavElement } from "../types.js";
 import { cells, sliceCells, stripControl, truncate } from "../../text.js";
 import { SPINNER_CELLS, glyphs, scrollbarSet, spinnerFrameAt } from "../glyphs.js";
 import { scrollbarColumn } from "../scrollbar.js";
-import { based, clampSpans, groundSequence, paint, rows, tone } from "../paint.js";
+import { based, clampSpans, paint, paneFocus, rows, tone } from "../paint.js";
 import { composeRow, fitRow, placeRows, rowCells, type Placed } from "../../rows.js";
 import { layout, measure as solveHeight, type Box, type Size } from "../../layout/index.js";
 import type { BlockDefinition, Rendered, RenderContext, Windowed } from "../types.js";
@@ -465,6 +465,8 @@ function joinChildren(children: readonly Block[], copyChild: CopyFn): string {
 
 export const scrollDefinition: BlockDefinition<Scroll> = {
   kind: "scroll",
+  // C09 I137 — the bar is its furniture: the thumb takes the accent while focus is inside the box, and a child is never painted (§7f).
+  focusShape: "frame",
 
   // C09 I124, C04 I98 — the fold is the flag inverted, and only where the box
   // declares one: a scroll without `collapsed` has no collapsed form, so there
@@ -592,15 +594,24 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
     // the interior: the route's own terminal measured 7 rows and painted 32,
     // with `follow` inert and the residue counting against a window that was
     // never applied (F855). `windowChild` returns `null` where the slice would
-    // cost the container something — an atomic kind, a floor, a cap, a residual
-    // — and the child is then kept whole, which is what every child got before.
+    // cost the container something — an atomic kind, a floor, a cap, a residual.
+    //
+    // **And a refused child is cropped, not kept whole** (C09 I135, D16). A row
+    // is a string, so cutting the whole render to `[from, to)` is exact where a
+    // kind declines to slice itself — which is what `split`'s `paneRows` already
+    // did. Kept whole, three 76-cell notices in a box of 3 drew the second
+    // notice's second row where the residue belongs, and a plot of 8 in a box
+    // of 2 measured 3 and painted 9.
     const pieces = shown.map((r) => {
       const height = r.to - r.from;
       const from = Math.max(0, offset - r.from); // cells-ok — a row index
       const to = Math.min(height, offset + interior - r.from); // cells-ok — a row index
-      const piece =
-        from === 0 && to === height ? r.child : (ctx.windowChild(r.child, width, from, to)?.block ?? r.child);
-      return { child: r.child, rendered: ctx.renderChild(piece, width) };
+      if (from === 0 && to === height) return { child: r.child, rendered: ctx.renderChild(r.child, width) };
+      const slice = ctx.windowChild(r.child, width, from, to);
+      return {
+        child: r.child,
+        rendered: slice === null ? ctx.renderChild(r.child, width).slice(from, to) : ctx.renderChild(slice.block, width),
+      };
     });
     let residueRow: string | null = null;
     // **The residue, both directions** (C04 I49). A settled container keeps the
@@ -662,14 +673,14 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
     // because both readings drew two rows; strengthening the row to ask *which*
     // two is what said so.
     //
-    // **So a child taller than the box is still drawn whole and C25 I1 is still
-    // false for that one case** — named in T2.28b rather than replaced by a
-    // frame showing the wrong rows. §3c trace 1 rules it *aligns to its top*,
-    // and taking a child's top rows needs a windowing seam `RenderContext` does
-    // not have: it offers `measureChild` and `renderChild` and nothing that
-    // slices. A ruling naming an operation the layer below lacks — C23 §8a A4's
-    // class, and the remedy is a seam rather than a clip.
-    const drawn = shown.reduce((n, r) => n + ctx.measureChild(r.child, width), 0);
+    // **A child taller than the box is sliced, or cropped where it refuses the
+    // slice** (C09 I58, I135) — the seam this paragraph once said was missing is
+    // `windowChild`, and the crop covers what it declines.
+    //
+    // **The pads are counted from the rows drawn, not the rows measured** (I135).
+    // Counting from `measureChild` charged a cut child its whole height, so a box
+    // whose pieces drew fewer rows than their measures was short of `interior`.
+    const drawn = pieces.reduce((n, p) => n + p.rendered.length, 0); // cells-ok — a row count
     const padCount = Math.max(0, interior - drawn); // cells-ok — a row count, not a width
 
     // **The rows arm** (C09 I73): the shown pieces' rows, the pads as empty
@@ -757,6 +768,8 @@ function mosaicRoom(
 
 export const mosaicDefinition: BlockDefinition<Mosaic> = {
   kind: "mosaic",
+  // C09 I137 — a pane is lit through its child when the child is a frame, and takes I100's ground otherwise.
+  focusShape: "frame",
 
   // §7a — the children that answered, one newline apart (I86). **Not two**:
   // two is `R-SEL-004`'s entry separator and this is inside one entry. A child
@@ -866,17 +879,24 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
     // so the ground has to survive every reset inside them (C11 I25). Each row
     // is padded to the rect's width first — a ground needs cells to paint, and
     // the rect is the pane's whole extent whatever its child chose to fill.
-    const focus = ctx.focus ?? null;
-    const litPane =
-      focus !== null && focus.blockId === block.id && focus.rowId !== null ? focus.rowId : null;
-    const paneGround = litPane === null ? "" : groundSequence("surface.focusGround", ctx.theme, ctx.capabilities);
+    //
+    // **Amended by I137: a pane holding a `frame` is lit through its child.**
+    // The container forwards the focus to the child's own element and paints
+    // no ground — the case this comment's second paragraph said could not
+    // happen *however the plot were written*, which was true of the plot and
+    // not of the container. `paneFocus` decides, from the child's declaration.
     const drawable = block.children.flatMap((child, i) => {
       const rect = rects[i];
       if (rect === undefined) return [];
       const room = mosaicRoom(rect, width, height);
       if (room === null) return [];
-      const drawn = ctx.renderChild(child, room.width);
-      if (child.id !== litPane || paneGround === "") return [{ child, rect, room, drawn }];
+      const lit = paneFocus(block.id, child, ctx);
+      const drawn =
+        lit !== null && "forward" in lit
+          ? ctx.renderChild(child, room.width, undefined, lit.forward)
+          : ctx.renderChild(child, room.width);
+      const paneGround = lit !== null && "ground" in lit ? lit.ground : "";
+      if (paneGround === "") return [{ child, rect, room, drawn }];
       // **Inside untouched** (`R-FOC-004`): the child's own lines are unchanged
       // and a ground is put behind them. Stripping it gives back what the
       // unfocused pane drew, byte for byte.

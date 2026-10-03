@@ -28,10 +28,10 @@ At 100 columns, `--mine`, live:
 ▌ ● running ×1  ✓ succeeded ×6  ✗ failed ×2  ○ queued ×1
 ▌
 ▌       uuid     family          status       detail            metric     age  kind        owner
-▌ ▸  ●  a3f9b21  digit-classif…  running      ep 17/40          0.0372     23m  candidate   malachy
-▌ ▸  ✓  7c2d4e1  decoder-zoom    succeeded                      0.0089     41m  experiment  malachy
+▌ ▸  ●  a3f9b21  digit-classif…  running      ep 17/40          0.0372     23m  candidate   someone
+▌ ▸  ✓  7c2d4e1  decoder-zoom    succeeded                      0.0089     41m  experiment  someone
 ▌ ▸  ✗  2e8a04c  graphsage       failed       OOM at ep 3            —  1h 12m  experiment  priya
-▌ ▸  ○  f410d99  flow-predictor  queued                              —      3m  candidate   malachy
+▌ ▸  ○  f410d99  flow-predictor  queued                              —      3m  candidate   someone
 ▌
 ▌ ⏎ detail  ␣ expand  ≡ logs  ⚡ events
 ```
@@ -50,6 +50,7 @@ The arithmetic, so the next reader does not have to derive it (`test/integration
 | Less `mr` (6 + a gap) | 104 — still over |
 | Less `spark` (8 + a gap) | **94** — fits, and the ten drawn above are what is left |
 | Residual to the two `flex` columns, `family` and `detail` | 4, two each |
+| **With the disclosure reservation** (C11 I32, ruling 82): `expand` at 3 for `▹+N`, N 1–9 | **96** — fits; residual **2**, one each |
 
 **`family` truncates at 98, and that is what the correction exposes.** `digit-classifier` is 16 cells and the column gets 14 — 12 declared plus its half of the residual. The old figure appeared to fit it only because it had dropped `owner` and spent those 10 cells on `family`. If a full family name at 100 columns matters more than `owner` does, the remedy is `owner`'s priority or `family`'s minimum in §3, not the picture.
 
@@ -60,9 +61,9 @@ Both figures in this section are generated from `planColumns` and C11's renderer
 Row 1 expanded:
 
 ```
-▌ ▾  ●  a3f9b21  digit-classif…  running      ep 17/40          0.0372     23m  candidate   malachy
+▌ ▾  ●  a3f9b21  digit-classif…  running      ep 17/40          0.0372     23m  candidate   someone
 ▌     mr    !1248  auto-merged
-▌     node  gpu-04.fmx.internal · 2×GPU · 16Gi
+▌     node  gpu-04.example.internal · 2×GPU · 16Gi
 ▌     ████████████░░░░░░░░░░░░░░░░  43%
 ▌     ≡ logs   ⚡ events   ◉ watch   ⊘ cancel   { } json
 ```
@@ -108,11 +109,11 @@ The arithmetic then works the right way round. Widening `metric` to 15 would cos
 
 ### What survives at each width
 
-Derived from the priorities, and pinned by golden frames:
+Derived from the priorities, and pinned by golden frames. **The sets hold under the disclosure reservation** (C11 §3a, ruling 82): CP6 plans every width below through `planDisclosed`, and only the totals move.
 
 | Width | Columns |
 |---|---|
-| 160 | all twelve, summing to 112 cells with gaps |
+| 160 | all twelve, summing to 112 cells with gaps — 114 with the disclosure reservation wherever a row hides something (C11 I32) |
 | 120 | all twelve, family and detail flexed |
 | 100 | drops `mr`, `spark` |
 | 80 | drops `mr`, `spark`, `owner`, `kind` |

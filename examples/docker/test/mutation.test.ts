@@ -17,7 +17,7 @@
 
 import { describe, expect, it } from "vitest";
 import { createMutationHandler } from "../src/mutation.ts";
-import type { AskOptions, LocalContext } from "@fmx/calcium";
+import type { AskOptions, LocalContext } from "calcium-tui";
 
 const RUNNING = "/api-gateway\tnginx:alpine\trunning\ttrue\tfalse";
 const STOPPED = "/api-gateway\tnginx:alpine\texited\tfalse\tfalse";

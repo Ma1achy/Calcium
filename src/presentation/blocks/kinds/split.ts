@@ -19,12 +19,21 @@ import { descendants, normaliseWidth, splitPaneKey, splitPanes } from "../../../
 import type { Block, Split } from "../../../data/viewmodel/index.js";
 import { scrollbarSet } from "../glyphs.js";
 import { scrollbarColumn } from "../scrollbar.js";
-import { based, groundSequence, paint, tone } from "../paint.js";
+import { based, paint, paneFocus, tone } from "../paint.js";
 import { fitRow, rowCells } from "../../rows.js";
-import type { BlockDefinition, RenderContext, Rendered } from "../types.js";
+import type { BlockDefinition, FocusState, RenderContext, Rendered } from "../types.js";
 
 /** Rows `[0, height)` of a pane at `offset`, each cut and padded to `width`. */
-function paneRows(child: Block, width: number, content: number, height: number, offset: number, ctx: RenderContext): string[] {
+function paneRows(
+  child: Block,
+  width: number,
+  content: number,
+  height: number,
+  offset: number,
+  ctx: RenderContext,
+  /** The pane's focus forwarded to a `frame` child (C09 I137); absent is the caller's. */
+  forward?: FocusState,
+): string[] {
   const to = Math.min(content, offset + height);
   // **Sliced, never drawn whole past the box** (C09 I58, F855): the child's
   // own `window` where it has one, and the rendered rows cut otherwise — a
@@ -32,10 +41,10 @@ function paneRows(child: Block, width: number, content: number, height: number, 
   const whole = offset === 0 && to === content;
   const piece = whole ? null : ctx.windowChild(child, width, offset, to);
   const drawn = whole
-    ? ctx.renderChild(child, width)
+    ? ctx.renderChild(child, width, undefined, forward)
     : piece !== null
-      ? ctx.renderChild(piece.block, width)
-      : ctx.renderChild(child, width).slice(offset, to);
+      ? ctx.renderChild(piece.block, width, undefined, forward)
+      : ctx.renderChild(child, width, undefined, forward).slice(offset, to);
   const out: string[] = [];
   for (let i = 0; i < height; i += 1) { // cells-ok — a row count
     const row = fitRow(drawn[i] ?? "", width);
@@ -86,12 +95,15 @@ export const splitDefinition: BlockDefinition<Split> = {
 
     const drawn = panes.map((p) => {
       const offset = offsetOf(block, p.side, p.content, ctx);
-      const rowsOf = paneRows(p.child, p.width, p.content, height, offset, ctx);
       // **A pane addressed to the split is lit as a region** (§3aq S6, C09
       // I100, `R-FOC-004`): the focus names the container, so the child
-      // cannot light itself, and the ground goes behind its whole extent.
-      const lit = ctx.focus?.blockId === block.id && ctx.focus.rowId === p.child.id;
-      const ground = lit ? groundSequence("surface.focusGround", ctx.theme, ctx.capabilities) : "";
+      // cannot light itself, and the ground goes behind its whole extent —
+      // **unless the child is a `frame`** (C09 I137), which is lit through its
+      // own furniture with no ground across the figure. `paneFocus` decides,
+      // for this container and `mosaic` alike.
+      const lit = paneFocus(block.id, p.child, ctx);
+      const rowsOf = paneRows(p.child, p.width, p.content, height, offset, ctx, lit !== null && "forward" in lit ? lit.forward : undefined);
+      const ground = lit !== null && "ground" in lit ? lit.ground : "";
       return { ...p, offset, rows: ground === "" ? rowsOf : [...based(rowsOf, ground)] };
     });
 

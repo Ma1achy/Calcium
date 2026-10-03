@@ -143,12 +143,12 @@ describe("C22 §6n — what earns a notification", () => {
     expect(wrote, "and the mark is the one resolved for it").toEqual(["title - prism · failed"]);
   });
 
-  it("T1.76 (cont., C22 I128): the system body is control-stripped and never opens with a number and a semicolon", () => {
+  it("T1.76 (cont., C22 I128): the system body shows its controls in caret form and never opens with a number and a semicolon", () => {
     // Ghostty reserves `OSC 9 ; <n> ;` for ConEmu's sub-commands, so a binary
     // named `42` would be read as a command rather than shown — and `7zip`,
     // which opens with a number and not a number then a semicolon, is left alone.
     expect(systemNotification("42;entry 1: x")).toBe("\u001b]9;42 ;entry 1: x\u0007");
     expect(systemNotification("7zip;entry 1: x")).toBe("\u001b]9;7zip;entry 1: x\u0007");
-    expect(systemNotification("prism: a\u0007b\u001b]2;c")).toBe("\u001b]9;prism: ab]2;c\u0007");
+    expect(systemNotification("prism: a\u0007b\u001b]2;c")).toBe("\u001b]9;prism: a^Gb^[]2;c\u0007");
   });
 });

@@ -418,11 +418,14 @@ describe("C09 §3a — paint and degradation", () => {
     const mono = measurable({ capabilities: { ...FULL_CAPS, colourDepth: 1 } as never })
       .renderToLines(status({ height: 6 }), 46)
       .map(plain);
-    expect(mono.some((r) => r.includes("▲")), "the mark survives one bit").toBe(true);
+    // The failure mark, never the warning's (C09 I138): at one bit it is one of
+    // the two carriers, so sharing it with a warning would leave one.
+    expect(mono.some((r) => r.includes("✗ ")), "the mark survives one bit").toBe(true);
+    expect(mono.some((r) => r.includes("▲")), "and it is not the warning's").toBe(false);
     expect(mono.some((r) => r.includes(" ERROR ")), "and the word in its gap").toBe(true);
   });
 
-  it("T3.47 (C09 I31, C09 §3a): the ascii arm draws + - | and !, and no box drawing anywhere", () => {
+  it("T3.47 (C09 I31, C09 I138, C09 §3a): the ascii arm draws + - | and the failure mark x, never the warning's !, and no box drawing anywhere", () => {
     // **Over the whole frame rather than over the corners**, because a border is
     // four glyphs and a mistake is usually one of them.
     const rows = measurable({ capabilities: ASCII_CAPS })
@@ -430,8 +433,9 @@ describe("C09 §3a — paint and degradation", () => {
       .map(plain);
     const all = rows.join("\n");
     expect(all.includes("+"), "corners").toBe(true);
-    expect(all.includes("!"), "the mark").toBe(true);
-    expect(/[┌┐└┘─│▲]/u.test(all), "no box drawing and no unicode mark").toBe(false);
+    expect(rows.some((r) => /^\|?\s*x boom/u.test(r)), "the failure mark leads the message").toBe(true);
+    expect(all.includes("!"), "and never the warning's").toBe(false);
+    expect(/[┌┐└┘─│▲✗]/u.test(all), "no box drawing and no unicode mark").toBe(false);
   });
 });
 

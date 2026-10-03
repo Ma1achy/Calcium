@@ -22,16 +22,24 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { b } from "@fmx/calcium";
+import { b } from "calcium-tui";
 import { bannerRow } from "./banner.ts";
-import type { LocalDocument, Block, ColumnDef, Glyph, TableRow, Tone } from "@fmx/calcium";
+import type { LocalDocument, Block, ColumnDef, Glyph, TableRow, Tone } from "calcium-tui";
 import { parseNdjson, str } from "./ndjson.ts";
 import type { Row } from "./ndjson.ts";
 import { stateOf } from "./ps.ts";
 import { capFor, createRingSet, historyBlock } from "./history.ts";
+import type { Runner } from "./mutation.ts";
 
-import type { LocalContext, ProducerContext } from "@fmx/calcium";
+import type { LocalContext, ProducerContext } from "calcium-tui";
 const run = promisify(execFile);
+
+/**
+ * The far side by default, and a parameter so the demo world can stand in for it
+ * (`world.ts`). Every function below that reaches docker takes one and passes it
+ * down; nothing here chooses between the two.
+ */
+const realRunner: Runner = async (args) => await run("docker", [...args], { maxBuffer: 8 << 20 });
 
 /** How often the panel re-reads. */
 export const EVERY_MS = 2000;
@@ -50,10 +58,10 @@ export const SHOWN = 5;
  */
 export type Snapshot = Readonly<{ containers: Row[]; stats: Row[]; skipped: number }>;
 
-export async function fetchSnapshot(): Promise<Snapshot> {
+export async function fetchSnapshot(docker: Runner = realRunner): Promise<Snapshot> {
   const [ps, stats] = await Promise.all([
-    run("docker", ["ps", "-a", "--format", "json"], { maxBuffer: 8 << 20 }),
-    run("docker", ["stats", "--no-stream", "--format", "json"], { maxBuffer: 8 << 20 }),
+    docker(["ps", "-a", "--format", "json"]),
+    docker(["stats", "--no-stream", "--format", "json"]),
   ]);
   const a = parseNdjson(ps.stdout);
   const c = parseNdjson(stats.stdout);
@@ -107,12 +115,19 @@ export const percent = (raw: string): number | null => {
  *
  * **The id is the fallback rather than the label**, because a row outlives the
  * container it names: `createRingSet` keeps a ring for every id it has seen, so
- * a stopped container's row is still drawn and `join` no longer has a name for
- * it. Dropping the row instead would renumber the ordinate under the reader,
- * which is the thing the set's own header refuses.
+ * a *removed* container's row is still drawn and `join` no longer has a name
+ * for it. Dropping the row instead would renumber the ordinate under the
+ * reader, which is the thing the set's own header refuses.
+ *
+ * **Looked up among every joined container, not the live ones** (2026-09-29,
+ * read off the demo world's first frame). This took the live list, so a
+ * *stopped* container — which `ps -a` still names, and whose row of absences
+ * is drawn on purpose — was labelled `d345037c112a` beside `api` and `cache`.
+ * The sentence above said *stopped* where it meant *removed*, and the call
+ * site followed the sentence.
  */
-function nameOf(live: readonly Joined[], id: string): string {
-  return live.find((c) => c.id === id)?.name ?? id.slice(0, 12);
+function nameOf(joined: readonly Joined[], id: string): string {
+  return joined.find((c) => c.id === id)?.name ?? id.slice(0, 12);
 }
 
 export function join(snap: Snapshot): Joined[] {
@@ -426,6 +441,7 @@ export function dashboard(
   width: number,
   engine: string,
   unicode = true,
+  docker: Runner = realRunner,
 ): readonly Block[] {
   const all = join(snap);
   const live = all.filter(isLive);
@@ -478,7 +494,7 @@ export function dashboard(
         id: "running",
         title: LIVE_TITLE,
         every: EVERY_MS,
-        fetch: fetchSnapshot,
+        fetch: () => fetchSnapshot(docker),
         render: (data) => {
           const s = data as Snapshot;
           // **The side effect is here and it is deliberate.** A tick is only
@@ -487,12 +503,13 @@ export function dashboard(
           // `cpuFold` has, and the same reason: one shared `fetch` between two
           // parts would stop the ring silently.
           takeTick(s);
-          const live = join(s).filter(isLive);
+          const all = join(s);
+          const live = all.filter(isLive);
           // **The history, finally drawn** (C12 §3a). `createRingSet` has been
           // filling a rectangular matrix since it landed and nothing rendered
           // it: the table says which container is busy *now*, and the matrix is
           // the only thing that says which has *been*.
-          const history = historyBlock(rings, (id) => nameOf(live, id), unicode);
+          const history = historyBlock(rings, (id) => nameOf(all, id), unicode);
           return history === null
             ? livePanelBody(live, unicode)
             : b.group("column", [livePanelBody(live, unicode), history], { id: "live-body" });
@@ -545,12 +562,15 @@ export function dashboard(
 export async function dashboardBlocks(
   ctx: ProducerContext,
   engine: string,
+  docker: Runner = realRunner,
 ): Promise<readonly Block[]> {
-  return dashboard(await fetchSnapshot(), ctx.width, engine, ctx.capabilities.unicode !== "ascii");
+  const unicode = ctx.capabilities.unicode !== "ascii";
+  return dashboard(await fetchSnapshot(docker), ctx.width, engine, unicode, docker);
 }
 
 export function createDashboardHandler(
   engine: string,
+  docker: Runner = realRunner,
 ): (argv: readonly string[], ctx: LocalContext) => Promise<LocalDocument> {
   /**
    * **Two injected parameters gone, and both were findings** (F14, F43).
@@ -570,6 +590,6 @@ export function createDashboardHandler(
     meta: { adapter: "dashboard" },
     command: ctx.command,
     status: "ok",
-    blocks: await dashboardBlocks(ctx, engine),
+    blocks: await dashboardBlocks(ctx, engine, docker),
   });
 }

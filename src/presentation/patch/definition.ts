@@ -228,6 +228,8 @@ function hunkLines(hunk: Hunk, block: Patch, layout: PatchLayout, ctx: RenderCon
 
 export const patchDefinition: BlockDefinition<Patch> = {
   kind: "patch",
+  // C09 I137 — a line with weight for its mark (C25 I25, `R-SEL-006`).
+  focusShape: "row",
 
   // §7a — *a patch as unified diff rather than the rendered two-column view*
   // (C09 I86, `R-SEL-004`). The rule names the hazard exactly: `layout: "split"`

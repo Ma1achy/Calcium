@@ -98,10 +98,18 @@ const results = runPass({
       // after it happens: the reader pages the box and the projection drags it
       // straight back. *Scrolling never moves focus* is then satisfied and
       // empty, because scrolling moves nothing.
+      //
+      // **With the latch too, since C26 I32** (review batch 4, group C). A
+      // manual scroll now latches its box, so the latch alone also stops the
+      // pull dragging it back, and removing the memo by itself fails nothing.
+      // The rerun after group C showed that. Each mechanism is enough on its
+      // own, so the defect's subject is the pair, as in c23-question-queue's
+      // `promptLive` row.
       name: "THE DEFECT: the pull fires on every viewport change rather than when focus moves",
       file: CONSTRUCT,
-      from: "    if (where === pulledTo) return;\n    pulledTo = where;",
-      to: "    pulledTo = where;",
+      from: "    if (pulledTo !== null && pulledTo.where === where && pulledTo.rev === entry.rev && pulledTo.width === width) return;\n",
+      to: "",
+      also: [{ file: CONSTRUCT, from: "    latched.add(`${entryId}\\u0000${key}`);", to: "" }],
       expect: "T4.31",
     },
     {
@@ -125,8 +133,8 @@ const results = runPass({
       // and a window that had slid snaps.
       name: "the tape's window is recomputed from the head rather than from the held start",
       file: "src/presentation/blocks/kinds/tape.ts",
-      from: "      ctx.scrollOffsets?.[block.id] ?? 0,",
-      to: "      0,",
+      from: "piecesOf(block, ctx.width, ctx, ctx.scrollOffsets?.[block.id] ?? 0, held);",
+      to: "piecesOf(block, ctx.width, ctx, 0, held);",
       expect: "T1.50",
     },
     {

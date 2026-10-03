@@ -134,7 +134,7 @@ describe("C22 I78 — the writer alone", () => {
     expect(graph.seriesVisibility.get(id, "p", 1), "the effective state was hidden (the member), so the toggle shows it").toBe(false);
   });
 
-  it("T4.18g (C22 §6c): the store joins the eviction subscription — clear takes it", async () => {
+  it("T4.18g (C22 I78): a series toggled by 2 leaves one visibility entry, and transcript.clear() leaves none", async () => {
     const { graph } = await buildGraph();
     graph.transcript.append(doc([plot("p")]) as never);
     graph.router.dispatch(press("down"));

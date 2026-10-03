@@ -21,7 +21,8 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/unit/semantic-selection.test.ts test/contract/scroll.test.ts " +
-  "test/unit/table.test.ts";
+  "test/unit/table.test.ts test/unit/trust-boundary.test.ts test/contract/image-path.test.ts " +
+  "test/revert/image-path.test.ts";
 const REGISTRY = "src/presentation/blocks/registry.ts";
 const MODEL = "src/shell/semantic-selection.ts";
 
@@ -36,6 +37,41 @@ const run = () => {
 };
 
 const MUTATIONS = [
+  {
+    // **The caller's block, not the resolved one** (C09 §7a, T6.146): every
+    // kind that copies a content string copies it raw.
+    name: "copyOf hands the definition the caller's block",
+    file: REGISTRY,
+    from: "      return definition.copy?.(resolved, (child: Block) => this.copyOf(child)) ?? null;",
+    to: "      return definition.copy?.(block, (child: Block) => this.copyOf(child)) ?? null;",
+    expect: "T2.193",
+  },
+  {
+    // **C04 I142 undone at the builder** (T6.107): the path read and dropped,
+    // so the copy is the alt alone — indistinguishable from a bytes-built image.
+    name: "b.image drops the path it read",
+    file: "src/shell/builders/index.ts",
+    from: "      ...(path === undefined ? {} : { path }),\n",
+    to: "",
+    expect: "T2.140",
+  },
+  {
+    // **The copy as it shipped**: alt alone, the path unread.
+    name: "an image copies its alt alone",
+    file: "src/presentation/blocks/kinds/image.ts",
+    from: '  copy: (block) => [block.alt, block.path ?? ""]',
+    to: '  copy: (block) => [block.alt]',
+    expect: "T2.140",
+  },
+  {
+    // **An alt ending in a newline meets the join's own** — a blank line, which
+    // is the entry separator, inside one image.
+    name: "an image's copy keeps a blank line",
+    file: "src/presentation/blocks/kinds/image.ts",
+    from: '.join("\\n").replace(/\\n{2,}/gu, "\\n"),',
+    to: '.join("\\n"),',
+    expect: "T2.140",
+  },
   {
     // **The omission ruling, inverted** (C09 I86). A declining kind answering
     // `""` is the reading everything else in the tree encourages — an element's

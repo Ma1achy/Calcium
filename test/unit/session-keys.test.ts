@@ -13,7 +13,7 @@ import { MENU_ID } from "../../src/interaction/completion/index.js";
 import { SEARCH_ID } from "../../src/interaction/history/index.js";
 import { buildGraph, COPY_MODES } from "../support/session.js";
 import { createKeyEffects } from "../../src/shell/keys.js";
-import { createFocusStore } from "../../src/interaction/router/focus.js";
+import { createFocusStore, FOCUS_ORDER } from "../../src/interaction/router/focus.js";
 import type { InputEvent, Key } from "../../src/interaction/router/types.js";
 import type { Graph } from "../../src/shell/construct.js";
 
@@ -250,6 +250,8 @@ describe("C22 §3 step 11 — the effect table", () => {
       ).toBe(true);
     }
 
+    /** Rows pressed at, or dispatched to, a target other than their own (F1457, ruling 88). */
+    const misaimed: string[] = [];
     for (const b of base) {
       if (b.target === "overlay") openOverlay(graph);
       if (b.target === "panel") openPanel(graph);
@@ -260,7 +262,19 @@ describe("C22 §3 step 11 — the effect table", () => {
       if (b.target === "child") attachChild(graph);
       // `liveBlock` needs both halves of what `activeTarget` reads: a live
       // entry in C13 and focus stored there (C16 §3).
-      if (b.target === "liveBlock") enterLive(graph);
+      if (b.target === "liveBlock") {
+        // **A re-run leaves nothing to enter** (F1457): `⇧⏎` re-runs the live
+        // entry, and the entry it leaves live is a status and a notice with no
+        // element, so `↓` stayed at the prompt and the next re-run row was
+        // pressed there — consumed as `insertNewline`. A fresh table for each
+        // re-run row, as T2.17's `liveBlock` way in does for every row.
+        if (b.action === "rerunEntry") graph.transcript.append(LIVE_DOC as never, { streaming: true });
+        enterLive(graph);
+      }
+      // **The prompt, and `global`'s way in, from the prompt** (F1457): a row
+      // with no setup was pressed wherever the previous row left focus, and
+      // `prompt:⌥v` was answered by `liveBlock`'s own `⌥v`.
+      if (b.target === "prompt" || b.target === "global") graph.focus.reset();
       // **The inside needs a block that has one** (C26 I26, §102). `enterLive`'s
       // table declares no view state, so `⏎` there dispatches a row action and
       // leaves the mode alone — the row would fail for a reason that has nothing
@@ -277,8 +291,19 @@ describe("C22 §3 step 11 — the effect table", () => {
       // the argument for walking a table rather than listing it.
       COPY_MODES.native = b.target === "nativeSelection";
       COPY_MODES.semantic = b.target === "semanticSelection";
+      const row = `${b.target}:${keySlot(b.key)} -> ${b.action}`;
+      // **The precondition, asserted** (`test/support/README.md`, F1457): a
+      // row pressed wherever the previous one left focus is consumed
+      // *somewhere*, and passes for a reason other than the one it names.
+      // `global` is not a place focus rests, so its rows are pressed at the
+      // prompt and reach it as step 3's fallback.
+      const expected = b.target === "global" ? "prompt" : b.target;
+      if (graph.router.target !== expected) misaimed.push(`${row} pressed at ${graph.router.target}`);
       const consumed = graph.router.dispatch(press(b.key));
-      expect(consumed, `${b.target}:${b.key.name} -> ${b.action} reached no handler`).toBe(true);
+      expect(consumed, `${row} reached no handler`).toBe(true);
+      // And where it was dispatched, read from the router's own record.
+      const at = graph.router.lastStages.find((st) => st.startsWith("target:"));
+      if (at !== undefined && at !== `target:${expected}`) misaimed.push(`${row} dispatched at ${at}`);
       if (b.target === "overlay") graph.overlays.dismiss("probe");
       // **Every layer, not just the probe.** `reverseSearch` is a *prompt*
       // binding that pushes one, and nothing here was taking it back down — so
@@ -298,6 +323,10 @@ describe("C22 §3 step 11 — the effect table", () => {
       COPY_MODES.semantic = false;
       graph.editor.clear();
     }
+    // **Sixteen entries before ruling 88**, eight rows pressed and dispatched
+    // elsewhere: F1457's two, and six `global` rows pressed at `liveBlock`,
+    // where `pageup` and `pagedown` are `liveBlock`'s own block paging.
+    expect(misaimed, "every row is pressed at the target its binding names").toEqual([]);
     expect([...handled].sort(), "every reserved row reached its application handler").toEqual(
       Object.keys(RESERVED_ACTIONS).sort(),
     );
@@ -368,6 +397,11 @@ describe("C22 §3 step 11 — the effect table", () => {
       // preview, which is derived from the caret rather than bound to a key —
       // so a scan over key bindings cannot see it and should not.
       "chipAt",
+      // **Driven by the shell after an editor returns** (C17 I35, C22 I144).
+      // `⌥o` is a binding, and it reaches `editChip` through an asynchronous
+      // handoff rather than as the key's effect — the edit is what came back
+      // from `$EDITOR`, which a scan over key bindings cannot see.
+      "editChip",
       // Construction rather than an edit — it records no undo unit and
       // `createEditor` is its only caller (C17 §5).
       "seed",
@@ -406,6 +440,7 @@ describe("C22 §3 step 11 — the effect table", () => {
       runAction: () => undefined,
       focusTranscript: () => undefined,
       watchKeys: { focusPrevious: () => undefined, step: () => undefined, open: () => undefined },
+      previewKeys: { scroll: () => undefined, open: () => undefined },
       // C16 I49 — the child's one exit. Counted here rather than stubbed
       // silent, because this harness is the one that walks every action.
       detachChild: () => undefined,
@@ -426,6 +461,8 @@ describe("C22 §3 step 11 — the effect table", () => {
     selectEntryUnderCaret: () => undefined,
     selectAllLoadedEntries: () => undefined,
     copySelectedEntries: () => undefined,
+    copyAndLeaveSemanticSelection: () => undefined,
+    toggleSemanticRect: () => undefined,
     toast: () => undefined,
     paneOffset: () => 0,
     moveDivider: () => undefined,
@@ -578,6 +615,114 @@ describe("C22 §3 step 11 — the effect table", () => {
     graph.transcript.append(LIVE_DOC as never, { streaming: true });
     graph.router.dispatch(press({ name: "down" }));
     expect(graph.router.target, "and a table is entered").toBe("liveBlock");
+  });
+
+  it("T2.17 (C16 I78): every focus target with keymap rows has a rung handler that consumes them", async () => {
+    // **The class, not a fourth instance** (F1339). `interaction`, then
+    // `nativeSelection` (F765), then `watchRow` each arrived with table rows and
+    // no handler registered at the target: the router's own rung takes `⌃c` and
+    // nothing else, so every row resolved and was never consulted. T1.4h found
+    // the third, and only once its fixture put focus on the row — a target it
+    // had no setup for was walked from wherever the previous row left focus,
+    // and the key was consumed *somewhere*. So this row is over `FOCUS_ORDER`
+    // rather than over the table, and asserts where it stands before it
+    // presses anything.
+    //
+    // **Reserved rows get handlers, as in T1.4h** (C16 §6c, C22 I134): with
+    // none a reserved row passes by design, which would read here as the
+    // defect.
+    const keyActions = Object.fromEntries(Object.keys(RESERVED_ACTIONS).map((id) => [id, () => undefined]));
+    const { graph } = await buildGraph({ keyActions });
+    graph.lifecycle.acquire();
+
+    /**
+     * How each target becomes the active one. **Keyed by `FOCUS_ORDER`'s own
+     * type**, so a tenth target is a compile error here until it has a way in,
+     * and the loop below refuses an absent entry at run time as well.
+     * `global` is not a place focus rests — `activeTarget` never answers it —
+     * so its rows are pressed at the prompt and reach it as step 3's fallback.
+     */
+    const REACH = {
+      child: attachChild,
+      overlay: openOverlay,
+      nativeSelection: () => void (COPY_MODES.native = true),
+      semanticSelection: () => void (COPY_MODES.semantic = true),
+      panel: openPanel,
+      interaction: enterInside,
+      prompt: (g: Graph) => g.focus.reset(),
+      watchRow: (g: Graph) => g.focus.toWatches("w", 0),
+      // A fresh table each time: `⇧⏎` re-runs the live entry, and the entry it
+      // leaves live has no rows to enter.
+      liveBlock: (g: Graph) => {
+        g.transcript.append(LIVE_DOC as never, { streaming: true });
+        g.focus.reset();
+        g.router.dispatch(press({ name: "down" }));
+      },
+      global: (g: Graph) => g.focus.reset(),
+    } satisfies Record<(typeof FOCUS_ORDER)[number], (g: Graph) => void>;
+
+    /** The stages that say the rung passed the key on (C16 §4 steps 3 and 5). */
+    const PASSED = ["global", "dropped", "child:consumed", "modal-blocked"];
+    const answered = new Map<string, number>();
+    const beforeLadder: string[] = [];
+    const shadowed: string[] = [];
+    const base = defaultKeymap.filter((b) => b.profile !== "enhanced-terminal");
+
+    for (const t of FOCUS_ORDER) {
+      const reach: ((g: Graph) => void) | undefined = (REACH as Record<string, (g: Graph) => void>)[t];
+      expect(reach, `${t} has no way in — add one to REACH`).toBeDefined();
+      for (const b of base.filter((r) => r.target === t)) {
+        const row = `${t}:${keySlot(b.key)} -> ${b.action}`;
+        reach?.(graph);
+        // **The precondition, asserted** (`test/support/README.md`): the row
+        // is about the target's handler, and a key pressed anywhere else says
+        // nothing about it.
+        expect(graph.router.target, `${row}: the fixture did not reach the target`).toBe(t === "global" ? "prompt" : t);
+        graph.router.dispatch(press(b.key));
+        const stages = graph.router.lastStages;
+        const at = stages.findIndex((st) => st.startsWith("target:"));
+        if (at === -1) {
+          // An intercept answered before the ladder (C16 I40, C16 I75) — `host.detach`,
+          // the page-scroll chords. Not a rung's key, so not this row's.
+          beforeLadder.push(row);
+        } else if (t === "global") {
+          if (!stages.includes("global")) {
+            // The prompt took it first — `?` is typed (C16 §6c's precedence).
+            shadowed.push(row);
+          } else {
+            expect(stages, `${row}: reached the fallback and nothing took it`).not.toContain("dropped");
+            answered.set(t, (answered.get(t) ?? 0) + 1);
+          }
+        } else {
+          expect(stages[at], `${row}: dispatched at another target`).toBe(`target:${t}`);
+          const after = stages.slice(at + 1);
+          expect(
+            after.filter((st) => PASSED.includes(st)),
+            `${row}: the rung passed a key its own table binds — no handler at ${t} consults the keymap`,
+          ).toEqual([]);
+          answered.set(t, (answered.get(t) ?? 0) + 1);
+        }
+        while (graph.overlays.top !== null) graph.overlays.dismiss(graph.overlays.top.id);
+        graph.focus.setMode("navigate");
+        graph.focus.reset();
+        COPY_MODES.native = false;
+        COPY_MODES.semantic = false;
+        graph.editor.clear();
+      }
+    }
+
+    // **Every target is exercised by at least one row its handler answers**,
+    // and the one exception is compared by equality: `child`'s only base row is
+    // `⌃]`, which C16 I75 takes before the ladder so that no handler is offered it.
+    const unanswered = FOCUS_ORDER.filter((t) => (answered.get(t) ?? 0) === 0);
+    expect(unanswered, "targets whose every row is answered before the ladder").toEqual(["child"]);
+    // The two residues, by equality, so a row moving into either is seen.
+    expect(beforeLadder, "rows an intercept answers").toEqual([
+      "child:c+] -> hostDetach",
+      "global:m+up -> scrollPageUp",
+      "global:m+down -> scrollPageDown",
+    ]);
+    expect(shadowed, "global rows the prompt takes first").toEqual(["global:? -> helpKeymap"]);
   });
 
   it("T1.4h2 (C22 I26): the effects that are observable from outside, each asserted", async () => {

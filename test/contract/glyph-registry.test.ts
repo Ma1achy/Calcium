@@ -87,6 +87,7 @@ const HOMES: Readonly<Record<string, Home>> = {
   ellipsis: set("residue"),
   "choice-open": set("choiceOpen"),
   revert: set("revert"),
+  "selection-rail": set("rail"),
   "tape-left": set("tapeLeft"),
   "tape-right": set("tapeRight"),
   "meter-fill": {

@@ -32,6 +32,7 @@
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import type { Motion, RenderScratch } from "../presentation/blocks/types.js";
 import { cells, fitStyled, hardWrapCells, sliceCells } from "../presentation/text.js";
+import { neutraliseControl } from "../data/text.js";
 import {
   background,
   based,
@@ -44,8 +45,8 @@ import {
 } from "../presentation/blocks/paint.js";
 import { SGR_RESET, sgr, sgrPattern } from "../terminal/escapes.js";
 import { HEADER_ROWS, HEADER_RULE_ROWS, MIN_COLUMNS, promptFor, PROMPT_GUTTER } from "./config.js";
-import { glyphs } from "../presentation/blocks/index.js";
-import { composite } from "./composite.js";
+import { glyphs, scrollbarColumn, scrollbarSet } from "../presentation/blocks/index.js";
+import { composite, type LayerView } from "./composite.js";
 import type { ChromeCache, ChromeRole } from "./chrome-cache.js";
 import { exact, FrameError } from "./frame-error.js";
 import { gutterMatchesPrompt, heightsSum, promptTop, type Composed } from "./frame.js";
@@ -54,7 +55,7 @@ import type { Block } from "../data/viewmodel/index.js";
 import type { Placed } from "../viewport/overlay/index.js";
 import type { Cell, CellSpan } from "../interaction/editor/index.js";
 import type { BlockRegistry } from "../presentation/blocks/index.js";
-import { resolveBase, resolveHueBand } from "../presentation/theme/index.js";
+import { resolveBase, resolveHueBand, resolveTone } from "../presentation/theme/index.js";
 import type { ResolvedTheme } from "../presentation/theme/index.js";
 import type { Style } from "../presentation/theme/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
@@ -104,6 +105,17 @@ export type PaintDeps = Readonly<{
    * is *every layer at its top*, which is every frame nobody has wheeled.
    */
   layerScroll?: (id: string) => number;
+  /**
+   * A layer's boxes' offsets and the box its keys move (C22 I141). Absent is
+   * every layer unscrolled.
+   */
+  layerView?: (id: string) => LayerView;
+  /**
+   * C14's scroll, for the transcript's bar (C14 I62), and whether focus is in
+   * the transcript — the thumb's tone. Absent draws no bar, which is a harness
+   * that paints a frame with no viewport behind it.
+   */
+  transcriptBar?: () => Readonly<{ topRow: number; totalRows: number; focused: boolean }>;
   /** C17's cursor as a cell in the prompt's own layout (C17 §2). */
   promptCursor: () => Cell;
   /** The session's render scratch (C12 I107), for a 3D plot inside a layer. */
@@ -247,9 +259,12 @@ function rule(width: number, deps: PaintDeps, label: Label | null = null): strin
  * not leave at least one rule glyph to its left — a label that filled the row
  * would have stopped being a label.
  *
- * At 1-bit there is no ground to paint with, so the label is shed there too:
- * drawing it as plain text would put the application's identity in the rule's
- * own voice, which is the one thing `R-COL-003` separates.
+ * **At 1-bit there is no ground, so the label takes the unpainted rung, `[name]`**
+ * (C22 I147, §6r). Plain text would put the application's identity in the rule's
+ * own voice, which is what `R-COL-003` separates. The brackets separate it
+ * without a colour, as they do for a chip (C17 I25) and a button (C09 I102).
+ * They take the two cells the ground's padding takes, so every threshold below
+ * is the same at every depth.
  */
 function labelSpansOf(
   label: Label | null,
@@ -257,7 +272,7 @@ function labelSpansOf(
   deps: PaintDeps,
 ): readonly Span[] | null {
   if (label === null || width <= MIN_COLUMNS) return null;
-  if (deps.capabilities.colourDepth === 1) return null;
+  const unpainted = deps.capabilities.colourDepth === 1;
   const glyph = glyphs(deps.capabilities).horizontal;
   const ambiguous = deps.capabilities.ambiguousWidth;
   const glyphCells = cells(glyph, ambiguous);
@@ -265,12 +280,21 @@ function labelSpansOf(
 
   // ` <label> ` between the rule and its one trailing glyph — the fixture's
   // `──── calcium ─`, whose two spaces are what keep the name off the dashes.
-  const text = ` ${label.text} `;
+  const text = unpainted ? `[${label.text}]` : ` ${label.text} `;
   const used = cells(text, ambiguous) + glyphCells;
   const left = width - used;
   if (left < glyphCells) return null;
+  const lead = glyph.repeat(Math.floor(left / glyphCells));
+  // The remainder when the glyph is two cells wide — spaces rather than a
+  // half glyph, and on the left where the rule is, not against the label.
+  const pad = left - cells(lead, ambiguous);
 
   const muted = tone("muted", deps.theme, deps.capabilities);
+  // **No span takes a style at 1-bit, the dashes included.** The bare rule is
+  // plain text there (`rule`), and `muted` at 1-bit is dim, so a styled dash
+  // would make the labelled rule a different rule from the one beside it. A hue
+  // has nothing to paint with (I114), and the brackets are the carrier.
+  if (unpainted) return [{ text: lead + " ".repeat(pad) }, { text }, { text: glyph }];
   // **The hue the application named, or `bgElev` when it named none** (I114,
   // §070, C10 I55). Both the band and its ink come from the hue, because the
   // ink on a band is a property of the band — a label whose ink is guessed is
@@ -285,10 +309,6 @@ function labelSpansOf(
   const ground = withBackground(ink, band === null
     ? background("surface.bgElev", deps.theme, deps.capabilities)
     : band.ground);
-  const lead = glyph.repeat(Math.floor(left / glyphCells));
-  // The remainder when the glyph is two cells wide — spaces rather than a
-  // half glyph, and on the left where the rule is, not against the label.
-  const pad = left - cells(lead, ambiguous);
   return [
     { text: lead + " ".repeat(pad), style: muted },
     { text, style: ground },
@@ -368,7 +388,22 @@ export function commandRows(
 ): readonly string[] {
   if (command === "") return [];
   const body = Math.max(1, width - PROMPT_GUTTER.first);
-  const wrapped = hardWrapCells(command, body);
+  // **Line by line, and no row holds a break** (C22 I33, amended). A paste or a
+  // resolved chip puts `\n` in the command, `hardWrapCells` measures it as
+  // nothing, and written raw inside a row it moved the terminal down mid-row —
+  // near the bottom, scrolling the alternate screen. Each line is wrapped on
+  // its own, as the prompt draws the same buffer. A blank line keeps its row
+  // because `hardWrapCells("")` is `[""]`, not `[]`.
+  //
+  // **Neutralised before it is wrapped** (I33 amended, C17 I36, F1401). The
+  // command is the reader's line and this row is not a block, so C09 I127's
+  // resolve never sees it: a bidi override typed at the prompt was written raw
+  // here and reordered the echo. Before the wrap, so the `<U+202E>` form's
+  // eight cells are in the height the measurer takes from this same function.
+  // `entry.doc.command` keeps the character; only the row shows it.
+  const wrapped = command
+    .split(/\r\n|\r|\n/u)
+    .flatMap((line) => hardWrapCells(neutraliseControl(line), body));
   const prompt = promptFor(caps);
   return wrapped.map((row, i) =>
     (i === 0 ? prompt : " ".repeat(PROMPT_GUTTER.cont)) + row,
@@ -588,6 +623,71 @@ export function washedRowsOf(
 }
 
 /**
+ * The rows the rail leads, as a set (C14 I57, I58, T1.77): the washed rows —
+ * one per selected block — unioned with each selected element's first row.
+ *
+ * One function because the union is the claim: a block selection and an
+ * element selection in the same window both take the rail, and a frame that
+ * consults only one of them draws the other's rows blank-led.
+ */
+export function railRowsOf(washed: ReadonlySet<number>, elements: ReadonlySet<number>): ReadonlySet<number> {
+  return elements.size === 0 ? washed : washed.size === 0 ? elements : new Set([...washed, ...elements]);
+}
+
+/**
+ * The first rows of an entry's **selected elements** (C14 I58, C26 I16).
+ *
+ * `focus.selected` is drawn by the block that holds each element — C11 washes
+ * a table row with no knowledge of the frame — so the rail beside it is the
+ * frame's, placed from the entry's elements. `placed` is `elementsOfEntry` at
+ * the transcript's width, whose rows are in the entry's block space, as `from`
+ * is. The first row only: a wrapped row's continuation carries nothing in the
+ * gutter (`R-SEL-016`).
+ */
+export function selectedElementRowsOf(
+  placed: readonly Readonly<{ blockId: string; element: Readonly<{ id: string; rows: Readonly<{ from: number }> }> }>[],
+  selected: readonly Readonly<{ blockId: string; rowId: string }>[],
+  from: number,
+  lineCount: number,
+): ReadonlySet<number> {
+  const rows = new Set<number>();
+  if (selected.length === 0) return rows;
+  const wanted = new Set(selected.map((s) => `${s.blockId}\u0000${s.rowId}`));
+  for (const p of placed) {
+    if (!wanted.has(`${p.blockId}\u0000${p.element.id}`)) continue;
+    const at = p.element.rows.from - from;
+    if (at >= 0 && at < lineCount) rows.add(at);
+  }
+  return rows;
+}
+
+/**
+ * The rail's cell (C14 I58, ruling 68) — `▌` in `accent` on the selection
+ * ground, or `|` where the rung is ASCII.
+ *
+ * **Never `inverse`, and that is why it is not the wash.** `selectionStyle`
+ * answers `inverse` where there is no colour, and an inverted `▌` is a
+ * right-half block: the mark would say a different thing at 1-bit than at every
+ * other rung. So the rail takes the selection ground only where the ground is a
+ * background, and at 1-bit it is the glyph upright beside an inverted row.
+ *
+ * **The ink through `tone(…, "selection")`**, the one path every renderer uses,
+ * so a banded theme's rail is the band's ink (C10 I45, C14 I53) with nothing
+ * here knowing which themes band.
+ */
+export function railCell(theme: ResolvedTheme, capabilities: TerminalCapabilities): string {
+  const ground = selectionStyle(theme, capabilities);
+  const style: Style = {
+    ...tone("accent", theme, capabilities, "selection"),
+    ...(ground.background === undefined ? {} : { background: ground.background }),
+  };
+  return paintSpans([{ text: glyphs(capabilities).rail, style }]);
+}
+
+/** Column 0 of a transcript row that carries no rail (C14 I57). */
+export const RAIL_BLANK = " ";
+
+/**
  * The frame's copy of an entry's lines, with the selected rows grounded
  * (C14 I40).
  *
@@ -611,6 +711,40 @@ export function washSelectedRows(
 ): readonly string[] {
   if (rows.size === 0) return lines;
   return lines.map((row, i) => (rows.has(i) ? washRow(row, theme, capabilities, width) : row));
+}
+
+/**
+ * The rectangle's cells under the selection ground, on the frame's copy of an
+ * entry's lines (C14 I60, I40).
+ *
+ * `rect`'s rows are the entry's block rows and `from` is the window's first, as
+ * in {@link washedRowsOf}; its columns are entry-line cells, inclusive. **The
+ * wash is {@link washRow} over the cells alone**, so the precedence and the
+ * 1-bit rung are the block wash's and nothing here decides them; the cells
+ * either side keep the style they were drawn in, because `sliceCells` opens a
+ * tail with the style in effect where it starts. Returns the lines unchanged
+ * where the rectangle has no row in the window, and never touches the array it
+ * was given (I40).
+ */
+export function washRectCells(
+  lines: readonly string[],
+  rect: Readonly<{ fromRow: number; toRow: number; fromColumn: number; toColumn: number }>,
+  from: number,
+  theme: ResolvedTheme,
+  capabilities: TerminalCapabilities,
+): readonly string[] {
+  const lo = rect.fromRow - from;
+  const hi = rect.toRow - from;
+  if (hi < 0 || lo >= lines.length) return lines;
+  const amb = capabilities.ambiguousWidth;
+  const left = rect.fromColumn;
+  const right = rect.toColumn + 1;
+  return lines.map((row, i) => {
+    if (i < lo || i > hi) return row;
+    const before = fitStyled(sliceCells(row, 0, left, amb), left, SGR_RESET, amb);
+    const inner = washRow(sliceCells(row, left, right, amb), theme, capabilities, right - left);
+    return `${before}${SGR_RESET}${inner}${sliceCells(row, right, Number.MAX_SAFE_INTEGER, amb)}`;
+  });
 }
 
 /**
@@ -923,6 +1057,7 @@ export function paint(
       columns: width,
       ...(deps.scratch === undefined ? {} : { scratch: deps.scratch }),
       ...(deps.layerScroll === undefined ? {} : { layerScroll: deps.layerScroll }),
+      ...(deps.layerView === undefined ? {} : { layerView: deps.layerView }),
     });
   }
 
@@ -1056,5 +1191,37 @@ function transcript(frame: Composed, deps: PaintDeps, width: number): readonly s
   for (let i = 0; i < frame.region.height - blank; i += 1) {
     out.push(exact(rows[i] ?? "", width));
   }
-  return out;
+  return withTranscriptBar(out, frame, deps, width);
+}
+
+/**
+ * The transcript's bar, on the margin column (C14 I62, `R-BLK-164`).
+ *
+ * **The margin is the one column no row writes** (C22 I109), so the bar costs
+ * no reflow and no measurement: each region row is already `width` cells, and
+ * its last cell is replaced. `scrollbarColumn` answers `null` for a transcript
+ * that fits — *a bar that cannot move is decoration* — and nothing changes.
+ * The set and the arithmetic are a `scroll` box's own (C09 §7f), and the thumb
+ * takes `accent` while focus is in the transcript, `muted` otherwise
+ * (`R-BLK-160`), the whole column at one tone as §021 draws it.
+ */
+function withTranscriptBar(
+  rows: string[],
+  frame: Composed,
+  deps: PaintDeps,
+  width: number,
+): string[] {
+  const scroll = deps.transcriptBar?.();
+  if (scroll === undefined || width < 2) return rows;
+  const column = scrollbarColumn(frame.region.height, scroll.totalRows, scroll.topRow, scrollbarSet(deps.capabilities));
+  if (column === null) return rows;
+  const ink = sgr(resolveTone(scroll.focused ? "accent" : "muted", deps.theme, deps.capabilities));
+  const amb = deps.capabilities.ambiguousWidth;
+  const inner = width - 1; // cells-ok — a width less its margin column
+  // `fitStyled` after the cut: a wide cluster straddling the margin is cut
+  // whole and padded, so the bar is always the row's last cell.
+  return rows.map(
+    (row, i) =>
+      `${fitStyled(sliceCells(row, 0, inner, amb), inner, SGR_RESET, amb)}${SGR_RESET}${ink}${column[i] ?? ""}${SGR_RESET}`,
+  );
 }

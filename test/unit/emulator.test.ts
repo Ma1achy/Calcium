@@ -222,6 +222,21 @@ describe("C27 terminal emulator — tier 1", () => {
     term.dispose();
   });
 
+  it("T1.13 (C27 I2, C27 I6, C04 I110): a bidi character follows its cell — dropped where it joined one, ? where it took one — and the snapshot validates", async () => {
+    // **Measured before the rule was written**: the dependency joins U+200F and
+    // U+202E to the cell before them at no width, and gives U+2067 and U+061C a
+    // cell of their own. A walk that replaced all four would draw two cells the
+    // child never painted; one that dropped all four would lose two it did.
+    const term = createEmulator({ cols: 20, rows: 4 });
+    await feed(term, "a\u200fb\u202ec\u2067d\u061ce");
+    const block = term.snapshot("t");
+    const [line] = block.lines;
+    expect(line?.text).toBe("abc?d?e");
+    expect(cells(line?.text ?? ""), "the painted width, which cells() now agrees with").toBe(7);
+    expect(validateDocument(documentWith(block)).ok, "the snapshot validates under C04 I110").toBe(true);
+    term.dispose();
+  });
+
   it("T1.12 (C27 I6): a styled trailing blank is kept and a plain one is trimmed", async () => {
     const term = createEmulator({ cols: 20, rows: 4 });
     await feed(term, "a\u001b[41m   \u001b[0m\r\nb   \r\n");

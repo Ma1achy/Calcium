@@ -84,8 +84,8 @@ const results = runPass({
       // `ask` now resolves `{key}`, so the anchor's old text is no longer in
       // the tree. The mutation is unchanged — the marked choice against the
       // first — and only its spelling moved.
-      from: "    ask: (opts) => Promise.resolve({ key: opts.choices[defaultStart(opts.choices)]?.key ?? \"\" }),",
-      to: "    ask: (opts) => Promise.resolve({ key: (opts.choices.find((c) => c.default) ?? opts.choices[0])?.key ?? \"\" }),",
+      from: "      Promise.resolve({ key: opts.choices[defaultStart(opts.choices)]?.key ?? \"\", outcome: \"answered\" as const }),",
+      to: "      Promise.resolve({ key: (opts.choices.find((c) => c.default) ?? opts.choices[0])?.key ?? \"\", outcome: \"answered\" as const }),",
       expect: "T2.16",
     },
     {

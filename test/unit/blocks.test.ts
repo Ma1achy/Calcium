@@ -767,16 +767,18 @@ describe("C09 §6 — kinds", () => {
     ).toContain("sparkline-3000");
   });
 
-  it("T1.11 (I18): an injected escape sequence is stripped, not passed through", () => {
+  it("T1.11 (I18, I128): an injected escape sequence is shown as an escape, not passed through", () => {
     const kit = measurable();
     const attack = `${String.fromCharCode(27)}[31mred`;
     const notice = block({ kind: "notice", id: "n-attack", tone: "info", text: attack });
 
     const line = kit.renderToLines(notice, 80)[0] ?? "";
     // The rendered row carries C10's styling and not the block's: the injected
-    // sequence is gone, and the literal text that followed it remains.
-    expect(visible(line)).toContain("[31mred");
-    expect(cells(visible(line))).toBe(cells("[31mred"));
+    // ESC is gone, and it is **shown** as `^[` rather than leaving `[31m` to read
+    // as text a tool meant to print (ruling 71).
+    expect(line.includes(`${String.fromCharCode(27)}[31m`)).toBe(false);
+    expect(visible(line)).toContain("^[[31mred");
+    expect(cells(visible(line))).toBe(cells("^[[31mred"));
   });
 
   it("T1.12 (§2): steps show a spinner while active and a settled glyph after", () => {

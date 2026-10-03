@@ -22,10 +22,11 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { b } from "@fmx/calcium";
-import type { LocalDocument, Block, Hunk } from "@fmx/calcium";
+import { b } from "calcium-tui";
+import type { LocalDocument, Block, Hunk } from "calcium-tui";
 
-import type { LocalContext } from "@fmx/calcium";
+import type { LocalContext } from "calcium-tui";
+import type { Runner } from "./mutation.ts";
 const run = promisify(execFile);
 
 /** Lines of context either side of a change — the usual three. */
@@ -160,10 +161,14 @@ export type Far = Readonly<{
   fromImage: (image: string, path: string) => Promise<string | null>;
 }>;
 
-const realFar: Far = {
+/**
+ * The three reads over a runner — the daemon by default, the demo world when
+ * `app.ts` is handed one.
+ */
+export const farOf = (docker: Runner): Far => ({
   async facts(container) {
     try {
-      const { stdout } = await run("docker", ["inspect", container], { maxBuffer: 8 << 20 });
+      const { stdout } = await docker(["inspect", container]);
       const parsed: unknown = JSON.parse(stdout);
       const first = Array.isArray(parsed) ? (parsed[0] as Record<string, unknown>) : null;
       if (first === null || typeof first !== "object") return null;
@@ -185,9 +190,7 @@ const realFar: Far = {
   },
   async running(container, path) {
     try {
-      const { stdout } = await run("docker", ["exec", container, "cat", path], {
-        maxBuffer: 8 << 20,
-      });
+      const { stdout } = await docker(["exec", container, "cat", path]);
       return stdout;
     } catch {
       return null;
@@ -198,15 +201,15 @@ const realFar: Far = {
     // in the surfaces doc rather than hidden, because it makes this verb an
     // order of magnitude slower than `/drift` and a reader deserves to know why.
     try {
-      const { stdout } = await run("docker", ["run", "--rm", image, "cat", path], {
-        maxBuffer: 8 << 20,
-      });
+      const { stdout } = await docker(["run", "--rm", image, "cat", path]);
       return stdout;
     } catch {
       return null;
     }
   },
-};
+});
+
+const realFar: Far = farOf(async (args) => await run("docker", [...args], { maxBuffer: 8 << 20 }));
 
 const errorDoc = (command: string, text: string, extra: readonly Block[] = []): LocalDocument => ({
   schema: "tui.view/1",

@@ -1,5 +1,5 @@
-import { b, createTui, defaultTheme } from "@fmx/calcium";
-import type { Adapter } from "@fmx/calcium";
+import { b, createTui, defaultTheme } from "calcium-tui";
+import type { Adapter } from "calcium-tui";
 
 /** What operations exist. One tool, no arguments, no flags. */
 const manifest = {

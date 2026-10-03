@@ -42,6 +42,7 @@ const MANIFEST: NonNullable<TuiConfig["manifest"]> = {
 const sessionAt = async (
   columns: number,
   label: string | Readonly<{ text: string; hue?: string }> | null,
+  colourDepth?: 1 | 4,
 ): Promise<{ rows: readonly string[]; bytes: string }> => {
   const stdin = fakeStdin();
   const { screen, stdout } = await buildSession(
@@ -53,6 +54,9 @@ const sessionAt = async (
         footer: () => [],
         ...(label === null ? {} : { label: () => label }),
       },
+      // The app-facing override, because no environment reaches 1-bit that the
+      // session will also start under (session-frame's MONO_ARM says why).
+      ...(colourDepth === undefined ? {} : { capabilities: { colourDepth } }),
     } as never,
     { columns, rows: 30 },
   );
@@ -63,7 +67,8 @@ const sessionAt = async (
 const framesAt = async (
   columns: number,
   label: string | Readonly<{ text: string; hue?: string }> | null,
-): Promise<readonly string[]> => (await sessionAt(columns, label)).rows;
+  colourDepth?: 1 | 4,
+): Promise<readonly string[]> => (await sessionAt(columns, label, colourDepth)).rows;
 
 /**
  * The SGR run the label's own text is drawn in.
@@ -303,5 +308,56 @@ describe("C22 §6l.10 — the labelled rule", () => {
       await framesAt(100, "n".repeat(97)),
       "a label with no room for a rule is shed whole",
     ).toEqual(await framesAt(100, null));
+  });
+
+  it("T1.178 (C22 I147, I111, §6r): at 1-bit the label is drawn as `[name]`, unstyled, and shed by width alone", async () => {
+    /** The upper of the prompt's rules — the second rule row, as T1.65 finds it. */
+    const upper = (rows: readonly string[]): string => (rows[ruleRows(rows)[1] ?? -1] ?? "").trimEnd();
+    /** Any foreground or background token: 30–38, 40–48, 90–97, 100–107. `39`/`49` are resets. */
+    const paintsColour = (bytes: string): boolean =>
+      sgrTokens(bytes).some((t) => (t >= 30 && t <= 38) || (t >= 40 && t <= 48) || (t >= 90 && t <= 97) || (t >= 100 && t <= 107));
+
+    // **The controls first, so the row is shown to respond** (test/support's
+    // rule). At 4 bits the label is the painted rung; at 1 bit with no label
+    // the rule is bare and there is no bracket anywhere in it.
+    const painted = await sessionAt(80, "Calcium", 4);
+    expect(upper(painted.rows), "4-bit: the painted rung").toMatch(new RegExp(`${RULE} Calcium ${RULE}$`, "u"));
+    expect(paintsGround(painted.bytes), "4-bit: on a ground").toBe(true);
+    const bare = await sessionAt(80, null, 1);
+    expect(upper(bare.rows), "1-bit with no label: a bare rule").toBe(RULE.repeat(80));
+    expect(paintsColour(bare.bytes), "the 1-bit frame sets no colour at all").toBe(false);
+
+    // §6r rows 1 and 7: drawn, bracketed, flush against the dashes, and no
+    // colour anywhere in the frame — the brackets are the only carrier.
+    for (const columns of [61, 80]) {
+      const mono = await sessionAt(columns, "Calcium", 1);
+      const row = upper(mono.rows);
+      expect(row, `1-bit at ${String(columns)}: the unpainted rung`).toBe(`${RULE.repeat(columns - 10)}[Calcium]${RULE}`);
+      expect(paintsColour(mono.bytes), `1-bit at ${String(columns)}: no colour`).toBe(false);
+      // **And no attribute either: the label adds no SGR token to the frame.**
+      // The first build styled the dashes `muted`, which at 1-bit is dim (2),
+      // and the colour check above passed it; the golden's styles grid did not.
+      expect(sgrTokens(mono.bytes), `1-bit at ${String(columns)}: the bare frame's SGR, token for token`).toEqual(
+        sgrTokens(bare.bytes),
+      );
+      expect(mono.rows.length, "a label costs no rows").toBe(bare.rows.length);
+    }
+
+    // §6r row 2: width sheds first, and 1-bit does not move the threshold.
+    expect(await framesAt(60, "Calcium", 1), "gone at 60").toEqual(await framesAt(60, null, 1));
+
+    // §6r row 3: the room boundary is the painted rung's, because both frames
+    // are two cells. A padded `[ n ]` would shed at 95.
+    // Read off the joined frame, as T1.66 does: a rule with one dash left is
+    // not a rule row to `ruleRows`, so `upper` would find the lower rule.
+    expect((await framesAt(100, "n".repeat(96), 1)).map((r) => r.trimEnd()), "96 draws at 100").toContain(
+      `${RULE}[${"n".repeat(96)}]${RULE}`,
+    );
+    expect(await framesAt(100, "n".repeat(97), 1), "97 sheds").toEqual(await framesAt(100, null, 1));
+
+    // §6r row 4: a named hue changes nothing at 1-bit, byte for byte.
+    const hued = await sessionAt(80, { text: "Calcium", hue: "blue" }, 1);
+    const plain = await sessionAt(80, "Calcium", 1);
+    expect(hued.bytes, "a hue at 1-bit is the no-hue frame").toBe(plain.bytes);
   });
 });

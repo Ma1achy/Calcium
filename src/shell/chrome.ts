@@ -219,6 +219,13 @@ const hint = (keys: readonly Binding["key"][], does: string, caps: TerminalCapab
 };
 
 /**
+ * `hint`, for a row outside the owner line that names keys — the chip
+ * preview's (C22 I143) — so a chord is spelled one way wherever it is named:
+ * `⌥⇧↑⌥⇧↓ scroll`, as the owner line writes `⇧↑⇧↓ extend`.
+ */
+export const keyHint = hint;
+
+/**
  * `shedToWidth`'s way out, found by its spelling (C16 I58). The one key this
  * file still names, and it names it to recognise a chip rather than to draw one.
  */
@@ -507,10 +514,29 @@ function ownerChips(
           { label: "the screen is frozen", tone: "muted" },
         ];
       }
-      const size = copy?.mode === "semantic" ? copy.size : null;
+      const semantic = copy?.mode === "semantic" ? copy : null;
+      const size = semantic?.size ?? null;
+      const rect = semantic?.rect ?? null;
       // The frozen screen is the fact, not a hint: it is why nothing responds.
       return [
         { label: "copy", tone: "warn" },
+        // **The rectangle says so in the mode label** (`R-SEL-007`, question 5,
+        // C14 I60): `RECT 12×4` and `cells, not source`, two chips for the
+        // reason the count is one chip and not three — the separator is the
+        // cluster's to draw, and T2.116 refuses a literal one. `RECT` alone
+        // where the rectangle resolves to no block.
+        ...(rect === null
+          ? []
+          : [
+              {
+                label:
+                  rect.columns === 0
+                    ? "RECT"
+                    : `RECT ${String(rect.columns)}${mark(["×", "x"], caps)}${String(rect.rows)}`,
+                tone: "warn" as const,
+              },
+              { label: "cells, not source", tone: "muted" as const },
+            ]),
         // **The refused interrupt, once** (C16 I62, ruling 60). `⌃c` is refused
         // in the mode and the frame is otherwise still, so without this the key
         // is swallowed rather than refused. Drawn on the frame after the refusal
@@ -519,19 +545,45 @@ function ownerChips(
         ...(hints.refused === true
           ? [{ label: `${glyphFor("warn", caps)} interrupt refused`, tone: "warn" as const }]
           : []),
-        // **Vertical only** (C14 §6c): at block granularity there is no
-        // horizontal extent. **And the shifted pair** — the bare arrows move the
-        // caret and `⇧↑⇧↓` extend (`extendSemanticSelection*`), which the line
-        // spelled as bare `↑↓` for as long as it spelled its own keys.
-        ...keyed(hints, "semanticSelection", ["extendSemanticSelectionUp", "extendSemanticSelectionDown"], "extend", caps),
-        ...keyed(hints, "semanticSelection", ["copySelectedEntries"], "copy", caps),
+        // **The shifted arrows extend** — the bare ones move the caret — and
+        // **the horizontal pair only in the rectangle** (C14 I60, ruling 70): at
+        // block granularity a block is atomic and `⇧←⇧→` reach nothing.
+        ...keyed(
+          hints,
+          "semanticSelection",
+          rect === null
+            ? ["extendSemanticSelectionUp", "extendSemanticSelectionDown"]
+            : [
+                "extendSemanticSelectionUp",
+                "extendSemanticSelectionDown",
+                "extendSemanticSelectionLeft",
+                "extendSemanticSelectionRight",
+              ],
+          "extend",
+          caps,
+        ),
+        // `⏎` copies and leaves (C14 I59); §103 draws it `⏎ copy`, and `y` —
+        // the copy that stays — is a bare keycap undrawn, as `a` and `A` are.
+        // **The file offered** (C14 I61, `R-SEL-011`'s *offers a file instead*):
+        // the key named by where the text goes, drawn only where no route takes
+        // this text (§6e K3, K7, K13). The reason is stated after the frozen
+        // screen — see below.
+        ...keyed(
+          hints,
+          "semanticSelection",
+          ["copyAndLeaveSemanticSelection"],
+          semantic?.fileOffer === undefined ? "copy" : "to file",
+          caps,
+        ),
         // **Two chips, not one label with a `·` in it.** The separator is the
         // cluster's to draw (C09 I49) — a literal one in a string is the head's
         // unresolved join F828 found, and T2.116 is right to refuse it here too.
-        // **Which press is next** (`R-SEL-005`, C16 I51): over a selection the
-        // first `esc` clears it, and a footer saying `out` labels that press as
-        // the leaving one.
-        ...one("semanticSelection", "escapeSemanticSelection", size === null ? "out" : "clear"),
+        // **Which press is next** (`R-SEL-005`, C16 I51, C14 I59): over a
+        // selection the first `esc` clears it. **Read from `clears`, which is
+        // `escape()`'s own predicate** — this read `size === null`, and a
+        // selection of a `rule` alone, which copies nothing, drew `esc out` over
+        // the press that cleared.
+        ...one("semanticSelection", "escapeSemanticSelection", semantic?.clears === true ? "clear" : "out"),
         // **The count, over the copy text** (C14 I38, I55, `R-SEL-015`): what
         // `⏎` would put on the clipboard now, as question 35 ruled it —
         // `418 chars · 9 rows · 2 entries`. **One chip**, because the pill's gap
@@ -558,6 +610,24 @@ function ownerChips(
         ...(buffered > 0
           ? [{ label: `${String(buffered)} waiting`, tone: "muted" as const }]
           : []),
+        // **Why the file is offered, stated at rest** (C14 I61, `R-SEL-011`'s
+        // *the mode states it*): `no clipboard`, `too large for the terminal`,
+        // `pbcopy failed`, `pbcopy did not answer` — the last of the facts.
+        // Before the key it qualifies it shed the count at 100 columns in the
+        // rectangle, and `⏎ to file` already says where the text goes when the
+        // line is too narrow for both.
+        ...(semantic?.fileOffer === undefined ? [] : [{ label: semantic.fileOffer, tone: "warn" as const }]),
+        // **After the facts, the two the line sheds first** (C14 I55). The line
+        // sheds from the right (§103), so what is last goes first: the count,
+        // the frozen screen and the waiting notice are `R-SEL-009`'s and
+        // `R-SEL-010`'s, and these two are not. **`A` says what it did**
+        // (`R-SEL-008`): *the window is not the record*, so the chip names the
+        // loaded entries — derived by equality with every span, so an extend
+        // that shrinks the set drops it.
+        ...(semantic?.all === true ? [{ label: "all loaded entries", tone: "muted" as const }] : []),
+        // **The toggle names where it goes** (C14 I60) — a hint, and the
+        // lowest-ranked thing on the line.
+        ...one("semanticSelection", "toggleSemanticRect", rect === null ? "rect" : "blocks"),
       ];
     }
     case "question": {
@@ -569,8 +639,12 @@ function ownerChips(
       const k = QUESTION_KEYS.shown;
       const key = (name: string): Binding["key"] => ({ name });
       if (q?.state === "inspection") {
+        // **An inspection owns its payload's scrolling** (C23 I88): the line
+        // names it as the panel's last row does, from the same vocabulary.
+        const scroll = QUESTION_KEYS.scroll;
         return [
           { label: "question", tone: "warn" },
+          { label: hint([key(scroll.up), key(scroll.down)], "scroll", caps), tone: "muted" },
           { label: hint([key(k.leave)], "back", caps), tone: "muted" },
         ];
       }
@@ -589,6 +663,23 @@ function ownerChips(
       // `find`, over a completion menu and a chip preview alike.
       switch (hints.substate) {
         case "complete":
+          // **At rest the prompt answers first** (C22 I150, C19 I20, ruling 96):
+          // `⏎` submits and `↑` is history, so `⏎ accept` and `↑↓ move` would
+          // name keys that go somewhere else. The key that acts on the marked
+          // candidate is the prompt's `complete`, which selects it. And this
+          // line is the only thing on screen that tells rest from a selection,
+          // because the mark is drawn in both (C19 I29).
+          //
+          // **`⏎ run` first** (ruling 99's amendment to 96): §029's footer draws
+          // it, and at rest the prompt's `submit` does run the line.
+          if (hints.promptUnderMenu === true) {
+            return [
+              { label: "complete", tone: "accent" },
+              ...keyed(hints, "prompt", ["submit"], "run", caps),
+              ...keyed(hints, "prompt", ["complete"], "complete", caps),
+              ...one("panel", "dismiss", "close"),
+            ];
+          }
           return [
             { label: "complete", tone: "accent" },
             ...keyed(hints, "panel", ["menuPrev", "menuNext"], "move", caps),
@@ -597,8 +688,17 @@ function ownerChips(
           ];
         case "preview":
           // The preview composes nothing and the prompt keeps its keys
-          // (`promptUnderMenu`), so the only key the layer owns is its way out.
-          return [{ label: "preview", tone: "accent" }, ...one("panel", "dismiss", "close")];
+          // (`promptUnderMenu`); what the layer owns is its three chords and
+          // its way out — **the panel's own key row, named the same** (C22
+          // I143): scrolling only while the box overflows.
+          return [
+            { label: "preview", tone: "accent" },
+            ...(hints.previewScrolls === true
+              ? keyed(hints, "panel", ["previewScrollUp", "previewScrollDown"], "scroll", caps)
+              : []),
+            ...one("panel", "previewOpen", "open in editor"),
+            ...one("panel", "dismiss", "close"),
+          ];
         default:
           // §103's specimen, word for word; the keys are the panel's rows.
           return [
@@ -673,9 +773,13 @@ const footer = (ctx: ChromeContext): readonly Block[] => [
       ? [{ label: foldHome(ctx.session.cwd, ctx.session.env["HOME"]), tone: "muted" }]
       : [
           {
+            // **An expiry is hollow and muted** (C23 I92, `R-BLK-881`): the
+            // question resolved itself, which did not go well or badly.
             label:
-              ctx.capabilities === undefined ? ctx.toast : `${glyphFor("ok", ctx.capabilities)} ${ctx.toast}`,
-            tone: "ok",
+              ctx.capabilities === undefined
+                ? ctx.toast
+                : `${glyphFor(ctx.toastMark === "expired" ? "queued" : "ok", ctx.capabilities)} ${ctx.toast}`,
+            tone: ctx.toastMark === "expired" ? "muted" : "ok",
           },
         ],
   ),

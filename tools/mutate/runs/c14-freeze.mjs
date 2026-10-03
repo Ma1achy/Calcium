@@ -17,7 +17,8 @@ import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const CMD =
-  "npx vitest run test/unit/copy-freeze.test.ts test/integration/copy-freeze.test.ts";
+  "npx vitest run test/unit/copy-freeze.test.ts test/integration/copy-freeze.test.ts test/revert/copy-freeze.test.ts";
+const SELECTION = "src/shell/semantic-selection.ts";
 const CONSTRUCT = "src/shell/construct.ts";
 const SESSION = "src/shell/session.ts";
 
@@ -74,9 +75,46 @@ const MUTATIONS = [
     // the moment the mode opens and says nothing about anything arriving.
     name: "the buffered count is the held size instead of the difference",
     file: CONSTRUCT,
-    from: "        return Math.max(0, transcript.entries.length - heldView.entries.length);",
+    from: "        return waitingEntries(transcript.entries, heldView.entries);",
     to: "        return heldView.entries.length;",
     expect: "T1.34",
+  },
+  {
+    // **The count as it shipped** (C14 I34, M10 item 8): a length difference.
+    // Right for appends into a record nothing leaves, which is T1.34's whole
+    // sequence — a patch reads 0, and an eviction cancels an append.
+    name: "the waiting count is the length difference",
+    file: CONSTRUCT,
+    from: "        return waitingEntries(transcript.entries, heldView.entries);",
+    to: "        return Math.max(0, transcript.entries.length - heldView.entries.length);",
+    expect: "T1.78 (C14",
+  },
+  {
+    // **Identity, the plan's first reading.** Every entry C13 rewrote counts:
+    // the previous live entry on an append, and the marker on every write.
+    name: "an entry is waiting when its record is a different object",
+    file: SELECTION,
+    from: "    if (h === undefined || h.rev !== e.rev || h.streaming !== e.streaming) n += 1;",
+    to: "    if (h !== e) n += 1;",
+    expect: "T1.78 (C14",
+  },
+  {
+    // **Arrivals only** — the reading R-SEL-010's *content arriving* invites.
+    // A patch to an entry the view already has is content arriving too.
+    name: "only an entry the view lacks is waiting",
+    file: SELECTION,
+    from: "    if (h === undefined || h.rev !== e.rev || h.streaming !== e.streaming) n += 1;",
+    to: "    if (h === undefined) n += 1;",
+    expect: "T1.78 (C14",
+  },
+  {
+    // **`rev` alone.** A bare settle keeps `rev` (C13 I13) and still changes
+    // what the head draws.
+    name: "a settle that keeps rev is not waiting",
+    file: SELECTION,
+    from: "    if (h === undefined || h.rev !== e.rev || h.streaming !== e.streaming) n += 1;",
+    to: "    if (h === undefined || h.rev !== e.rev) n += 1;",
+    expect: "T1.78 (C14",
   },
   {
     // **The ticker left running** (C14 I35). The document is perfectly held and the

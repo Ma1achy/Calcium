@@ -28,7 +28,7 @@ import {
   MUST_STAY_DISTINCT,
 } from "../../src/presentation/theme/four-bit.js";
 import { OKABE_ITO_CANONICAL, VISIONS } from "../../src/presentation/theme/cvd.js";
-import { ANSI16_HEX, COLORMAPS } from "../../src/presentation/theme/colormap.js";
+import { ANSI16_WINDOWS_HEX, COLORMAPS } from "../../src/presentation/theme/colormap.js";
 import { BAND_FOUR_BIT } from "../../src/presentation/theme/four-bit.generated.js";
 import { CATEGORY_REFS } from "../../src/presentation/theme/categorical.js";
 import { REQUIRED_SLOTS } from "../../src/presentation/theme/contrast.js";
@@ -96,10 +96,11 @@ export const CURATED: Readonly<Record<string, unknown>> = {
   // pair is legal, passes every property row that does not name the shortfall,
   // and is a different ruling.
   BAND_FOUR_BIT,
-  // **The reference palette those constraints are measured on**: xterm's
-  // defaults. The values are the emulator's; choosing *which* emulator is the
-  // ruling, and every I61 shortfall figure moves with it.
-  ANSI16_HEX,
+  // **The reference palette those constraints are measured on**: the legacy
+  // Windows console's sixteen — labelled *xterm's defaults* until C10 I61 was
+  // corrected, which they are not. The values are the emulator's; choosing
+  // *which* emulator is the ruling, and every I61 shortfall figure moves with it.
+  ANSI16_WINDOWS_HEX,
 
   // C10 §4j — the calibrating set. A *different* palette that also separates
   // under all three dichromacies would pass `collisions() === []` exactly as

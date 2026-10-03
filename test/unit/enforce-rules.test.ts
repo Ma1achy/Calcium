@@ -55,19 +55,25 @@ import {
 } from "../../tools/enforce/module-graph.mjs";
 import {
   allowListCoverage,
+  bidiFormatCodePoints,
   checkAllowLists,
+  checkBidiLiterals,
   checkControlBytes,
   checkEmojiBases,
   checkGlyphWidthClass,
   checkMarkDomains,
   checkMarks,
+  checkRuleCitations,
   checkSourceScans,
   parseDomainTable,
   parseEmojiBases,
   parseGlyphTable,
   RAMP_VOCABULARIES,
+  ruleCitationCorpus,
   SCANS,
+  trackedBidiCandidates,
 } from "../../tools/enforce/source-scans.mjs";
+import { isBidiFormat } from "../../src/data/text.js";
 import { GLYPH_TOKENS } from "../../src/presentation/blocks/glyphs.js";
 import { hasEmojiForm } from "../../src/presentation/text.js";
 import type { Scan } from "../../tools/enforce/source-scans.d.mts";
@@ -788,7 +794,11 @@ const scanIds = SCANS.map((s) => s.id);
 // **SS67 is a membership with a bidirectional arm** — every surface a renderer
 // names against `SURFACE_ROLES` — so it is SS65's shape and not a `SCANS` row.
 // Its fabrication is C10's T2.62, in `theme.test.ts`.
-const STANDALONE_SCANS = ["SS47", "SS52", "SS53", "SS54", "SS57", "SS63", "SS64", "SS65", "SS67"];
+// **SS68 reads the specs against the registry** — a citation against a JSON
+// document, SS63's shape — and fabricates in its own row below.
+// **SS69's corpus is `git ls-files`**, which no single-file row can stand for,
+// and its subject is the character SS52's reason forbids writing in this file.
+const STANDALONE_SCANS = ["SS47", "SS52", "SS53", "SS54", "SS57", "SS63", "SS64", "SS65", "SS67", "SS68", "SS69"];
 
 const implemented = [
   ...scanIds,
@@ -905,6 +915,13 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // SS67's fabrication is C10's T2.62, in `theme.test.ts`, and the arm
       // below reads it for SS65's reason.
       "SS67",
+      // SS68 reads Markdown against the registry, which `FABRICATED`'s one
+      // `src/` file cannot hold; its row is "SS68 fires" below.
+      "SS68",
+      // SS69 likewise, for SS52's reason: the subject is a character that
+      // would reorder this file if written literally, and the corpus is the
+      // tracked set. Its rows build the character at run time, below.
+      "SS69",
     ]);
     expect([...implemented].sort()).toEqual([...covered].sort());
   });
@@ -1564,6 +1581,42 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       s.cleared + s.candidates.length + s.testOnly,
       "every member lands in exactly one bucket",
     ).toBe(s.members);
+  });
+
+  it("SS68 fires: a spec citing a design rule the registry has never held", () => {
+    // **The fabrication is the defect that was found by hand**: C26 I24 cited
+    // `R-NAV-004`, and the registry has no `R-NAV` family. Two documents, so a
+    // row that fired on anything would also fire on the control file.
+    const docs: Record<string, string> = {
+      "docs/components/C98_fabricated.md": "a sentence on keys *(R-NAV-004)* moving focus.\n",
+      "docs/components/C99_control.md":
+        // A current id, an example and a superseded one — every status
+        // resolves, because specs cite history on purpose.
+        "focus *(R-INT-003)*.\nthe band *(R-BLK-191, an example)*.\nhistory *(R-REG-001, superseded)*.\n",
+    };
+    const read = (f: string): string => docs[f] ?? "";
+    const fired = checkRuleCitations(Object.keys(docs), read);
+    expect(fired.map((v) => [v.rule, v.file, v.line]), "the dangling id fires, once, where it is").toEqual([
+      ["SS68", "docs/components/C98_fabricated.md", 1],
+    ]);
+    expect(fired[0]?.message).toContain("R-NAV-004");
+
+    // **The control**: the same corpus with the citation fixed is clean — so
+    // the row is about the id and not about the file.
+    docs["docs/components/C98_fabricated.md"] = "a sentence on keys *(R-INT-004)* moving focus.\n";
+    expect(checkRuleCitations(Object.keys(docs), read)).toEqual([]);
+
+    // **The vacuity controls** (A03 §2): a registry parsed as no rules, or a
+    // corpus citing nothing, would pass every citation — so each is the
+    // violation, reported alone.
+    const empty = checkRuleCitations(Object.keys(docs), read, JSON.stringify({ rules: [] }));
+    expect(empty.map((v) => v.rule), "an empty registry").toEqual(["SS68"]);
+    expect(empty[0]?.message).toMatch(/did not read/u);
+    expect(checkRuleCitations(["docs/components/C97_silent.md"], () => "no citations here\n").map((v) => v.rule), "a silent corpus").toEqual(["SS68"]);
+
+    // And the real tree, which must be green — both directories read.
+    expect(ruleCitationCorpus().some((f) => f.startsWith("docs/architecture/")), "the architecture documents are in scope").toBe(true);
+    expect(checkRuleCitations()).toEqual([]);
   });
 
   it("SS63 fires: a recorded width class that disagrees with what `cells()` measures", () => {
@@ -3424,6 +3477,93 @@ describe("SS54 — the refusal register resolves its premises against the tree",
     expect(unverifiableRefusals().length, "judgements counted").toBeGreaterThan(0); // cells-ok — a count
     expect(unverifiableRefusals().length, "and not the majority").toBeLessThan(REFUSALS.length / 2); // cells-ok — a count
     expect(checkRefusals()).toEqual([]);
+  });
+});
+
+describe("SS69 — a literal bidi format character in a tracked file", () => {
+  // **F1402**: `trust-boundary.test.ts` landed with its twelve bidi characters
+  // as literal code points — a file write turned the escapes into characters —
+  // and enforce was green. **The character is never written in this file**: it
+  // is built from its code point, which is the remedy the rule asks for.
+  const RLO = String.fromCodePoint(0x202e);
+  const one = (file: string, source: string) =>
+    checkBidiLiterals({ candidates: { tracked: 1, files: [file] }, readFile: () => source });
+
+  it("SS69 fires: a literal U+202E in a test file, with its line and column", () => {
+    const found = one("test/contract/example.test.ts", `const a = 1;\nconst name = \`evil${RLO}.png\`;\n`);
+    expect(found.map((v) => [v.rule, v.file]), "fires once, where it is").toEqual([
+      ["SS69", "test/contract/example.test.ts:2"],
+    ]);
+    expect(found[0]?.message).toContain("U+202E at column 19");
+    // **The control**: the escape is the remedy, and six ASCII characters are
+    // not the character they name.
+    expect(one("test/contract/example.test.ts", "const name = `evil\\u202E.png`;\n")).toEqual([]);
+  });
+
+  it("SS69 fires on every member of the set, and the set is isBidiFormat's", () => {
+    // **Assert the set, not its first member**: each of the twelve, alone.
+    const set = bidiFormatCodePoints();
+    for (const cp of set) {
+      const found = one("docs/example.md", `a${String.fromCodePoint(cp)}b`);
+      expect(found.map((v) => v.rule), `U+${cp.toString(16)} fires`).toEqual(["SS69"]);
+    }
+    // **The parse agrees with the function's behaviour**: the set is read out of
+    // `text.ts`'s source, and the BMP run through `isBidiFormat` is the check
+    // that the parse read what the function answers.
+    const answered: number[] = [];
+    for (let cp = 0; cp <= 0xffff; cp += 1) if (isBidiFormat(cp)) answered.push(cp);
+    expect(set, "parsed from the source = answered at run time").toEqual(answered);
+    expect(set.length, "ruling 71's twelve").toBe(12);
+    // And a right-to-left letter is not a format character.
+    expect(one("docs/example.md", "\u05D0")).toEqual([]);
+  });
+
+  it("SS69's exemptions are compared by equality, both directions", () => {
+    const source = `x${RLO}y`;
+    const exempt = { "docs/fixture.md": "a reason" };
+    const read = (f: string): string => (f === "docs/fixture.md" ? source : "clean");
+    expect(
+      checkBidiLiterals({ candidates: { tracked: 2, files: ["docs/fixture.md"] }, readFile: read, exemptions: exempt }),
+      "an exempt file holding one is not reported",
+    ).toEqual([]);
+    // The dead entry: its file holds none, so the entry is the violation.
+    const dead = checkBidiLiterals({ candidates: { tracked: 2, files: [] }, readFile: read, exemptions: exempt });
+    expect(dead.map((v) => v.rule)).toEqual(["SS69"]);
+    expect(dead[0]?.message).toMatch(/holds no literal bidi character/u);
+  });
+
+  it("SS69's vacuity controls: an unread set or an empty corpus is the violation", () => {
+    const noSet = checkBidiLiterals({ codePoints: [], candidates: { tracked: 1, files: ["a.md"] }, readFile: () => RLO });
+    expect(noSet.map((v) => v.rule), "a set parsed as nothing").toEqual(["SS69"]);
+    expect(noSet[0]?.message).toMatch(/did not/u);
+    expect(bidiFormatCodePoints("export function isBidiFormat(cp: number): boolean {\n  return BIDI.has(cp);\n}\n"), "a reshaped function parses as nothing").toEqual([]);
+    const noCorpus = checkBidiLiterals({ candidates: { tracked: 0, files: [] } });
+    expect(noCorpus.map((v) => v.rule), "no tracked file").toEqual(["SS69"]);
+  });
+
+  it("SS69 reads through git: a tracked file is a candidate and an untracked one is not (the stated blind spot)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ss69-"));
+    try {
+      const git = (...args: string[]) => spawnSync("git", args, { cwd: dir, encoding: "utf8" });
+      expect(git("init", "-q").status, "git init").toBe(0);
+      writeFileSync(join(dir, "held.ts"), `const s = "${RLO}";\n`);
+      writeFileSync(join(dir, "clean.ts"), 'const s = "\\u202E";\n');
+      writeFileSync(join(dir, "image.png"), Buffer.concat([Buffer.from([0x89, 0x50, 0x00, 0x00]), Buffer.from(RLO)]));
+      expect(git("add", "held.ts", "clean.ts", "image.png").status, "git add").toBe(0);
+      // Untracked: the blind spot, demonstrated rather than asserted in prose.
+      writeFileSync(join(dir, "loose.ts"), `const s = "${RLO}";\n`);
+      const seen = trackedBidiCandidates(bidiFormatCodePoints(), dir);
+      expect(seen, "the tracked text file, and neither the binary nor the untracked one").toEqual({
+        tracked: 3,
+        files: ["held.ts"],
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("SS69 on the real tree: no tracked file holds one, and the list is empty", () => {
+    expect(checkBidiLiterals()).toEqual([]);
   });
 });
 

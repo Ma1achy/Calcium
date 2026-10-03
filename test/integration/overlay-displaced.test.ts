@@ -48,7 +48,7 @@ async function askAndAnswer(graph: Graph, stdin: { emit(s: string): void }, betw
   expect(closed(), "and nothing brought it back while the question is up").toBe(true);
   stdin.emit("\u001b[C");
   stdin.emit("y");
-  await expect(answer).resolves.toEqual({ key: "y" });
+  await expect(answer).resolves.toEqual({ key: "y", outcome: "answered" });
 }
 
 describe("C15 I32 — a displaced panel is held and restored", () => {

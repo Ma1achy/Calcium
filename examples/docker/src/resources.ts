@@ -21,8 +21,8 @@
  * is the part with the edge cases (F19's ragged-line class).
  */
 
-import { b } from "@fmx/calcium";
-import type { AdapterDocument, AdapterContext, Block, ColumnDef, RawResult } from "@fmx/calcium";
+import { b } from "calcium-tui";
+import type { AdapterDocument, AdapterContext, Block, ColumnDef, RawResult } from "calcium-tui";
 import { parseNdjson, str, type Row } from "./ndjson.ts";
 
 /** The nine `meta` fields, as F13 requires until `compose` is exported. */

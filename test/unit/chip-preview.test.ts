@@ -8,8 +8,10 @@
 // frame, and a test calling the mechanism directly would miss the wiring.
 import { describe, expect, it } from "vitest";
 
-import { buildSession } from "../support/session.js";
+import { NO_EDITOR, openChipInEditor } from "../../src/shell/chip-editor.js";
+import { buildGraph, buildSession, fakeFs, FRAME } from "../support/session.js";
 import { fakeStdin } from "../support/fake-terminal.js";
+import { ASCII_CAPS } from "../support/render.js";
 
 /** Written as a code point rather than a literal, so no control byte is in the file. */
 const ESC = String.fromCharCode(27);
@@ -141,5 +143,218 @@ describe("C22 §6l.12 — a chip previews above the prompt", () => {
     const under = await b.rows();
     expect(shows(under, "reverse-i-search"), "the search still holds it").toBe(true);
     expect(shows(under, "delta 0"), "nothing is pushed beneath it").toBe(false);
+  });
+});
+
+describe("C22 §6q — the chip preview's box and keys (ruling 53), owed at the spec commit", () => {
+  it("T1.175 (C22 I143, ruling 53): the preview is the edge, the header, a bounded box and the key row, and the layer is never cut", async () => {
+    // The harness frame's layer region is 24 rows, so a box that fits is
+    // capped at `floor(24 / 2) − 3 = 9` and one that overflows at 8 — C15's
+    // default fraction less the edge, the header and the key row, and less the
+    // box's own residue row when it overflows (C04 I49, §6s.3 rows 1–2).
+    const { graph, stdin } = await buildGraph();
+    graph.lifecycle.acquire();
+    const preview = () => graph.overlays.stack.find((l) => l.id === "chip-preview");
+    const parts = () => {
+      const content = preview()?.content;
+      if (content === undefined) return null;
+      const [edge, header, box, keys] = content;
+      return {
+        kinds: content.map((b) => b.kind),
+        edge: edge?.kind === "rule" ? edge.label : null,
+        header: header?.kind === "raw" ? header.text : null,
+        height: box?.kind === "scroll" ? box.height : null,
+        keys: keys?.kind === "raw" ? keys.text : null,
+      };
+    };
+    /** Whether C15 cut the layer — the half the cap exists for. */
+    const cut = () =>
+      graph.overlays.layout(FRAME.overlayRegion()).find((p) => p.layer.id === "chip-preview")?.truncated;
+    const KINDS = ["rule", "raw", "scroll", "raw"];
+
+    stdin.emit(`${ESC}[200~${pasteOf(47, "long")}${ESC}[201~`);
+    await settle();
+    expect(parts(), "a 47-line chip overflows the bounded box").toEqual({
+      kinds: KINDS,
+      edge: "",
+      header: "#1 pasted · 47L",
+      height: 8,
+      keys: "⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor",
+    });
+    expect(cut(), "and its residue row fits: the layer is whole").toBe(false);
+    expect(graph.ownerHints().previewScrolls, "the owner line names the scroll too").toBe(true);
+
+    // **The boundary, from both sides.** Nine rows fit the cap exactly and
+    // draw no residue; ten overflow, and the box gives the residue its row.
+    for (const [lines, height, keys] of [
+      [9, 9, "⌥o open in editor"],
+      [10, 8, "⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor"],
+    ] as const) {
+      graph.editor.clear();
+      stdin.emit(`${ESC}[200~${pasteOf(lines, "edge")}${ESC}[201~`);
+      await settle();
+      expect(parts()?.height, `${String(lines)} lines`).toBe(height);
+      expect(parts()?.keys, `${String(lines)} lines`).toBe(keys);
+      expect(cut(), `${String(lines)} lines: the layer is whole`).toBe(false);
+    }
+
+    // **The control: a chip that fits is exactly its rows**, and a chord that
+    // would move nothing is not offered.
+    graph.editor.clear();
+    stdin.emit(`${ESC}[200~${pasteOf(6, "short")}${ESC}[201~`);
+    await settle();
+    expect(parts()?.height, "a 6-line chip fits").toBe(6);
+    expect(parts()?.keys).toBe("⌥o open in editor");
+    expect(graph.ownerHints().previewScrolls, "and names no scroll").toBeUndefined();
+  });
+
+  it("T1.176 (C22 I144, C02 I19): the editor's arms — refused with none, re-minted on a change, the directory gone on every path", async () => {
+    const chip = { ordinal: 1, kind: "paste" as const, name: "pasted", lines: 3, content: "a\nb\nc" };
+    const calls: (readonly string[])[] = [];
+    const fs = fakeFs();
+    /** A fake terminal loan that runs `edit` over the file the argv names as `$1`. */
+    const borrowing =
+      (edit: (text: string) => string | null) =>
+      async (argv: readonly string[]) => {
+        calls.push(argv);
+        const path = argv[4] ?? "";
+        const text = await fs.readFile(path);
+        const next = edit(text);
+        if (next !== null) await fs.writeFile(path, next);
+        return { kind: "ran" as const, exit: { code: 0, signal: null } };
+      };
+    const deps = (editor: string | null, edit: (text: string) => string | null) => ({
+      editor,
+      fs,
+      borrow: borrowing(edit),
+      chord: "⌥o",
+    });
+
+    // No editor: refused, and nothing ran.
+    expect(await openChipInEditor(chip, deps(null, (t) => t))).toEqual({ kind: "refused", text: NO_EDITOR });
+    expect(calls, "nothing was lent the terminal").toEqual([]);
+
+    // A change: the content back, its lines recounted — and the path is `$1`,
+    // never text in the command.
+    const changed = await openChipInEditor(chip, deps("vi -n", (t) => t.replace("b\n", "")));
+    expect(changed).toEqual({ kind: "changed", content: "a\nc", lines: 2 });
+    expect(calls[0]?.slice(0, 4)).toEqual(["sh", "-c", 'vi -n "$1"', "sh"]);
+    const path = calls[0]?.[4] ?? "";
+    await expect(fs.readFile(path), "the directory went with its file").rejects.toThrow(/ENOENT/u);
+
+    // **An editor's final newline is the file's**: written back with one added
+    // and nothing else, the chip is unchanged.
+    expect(await openChipInEditor(chip, deps("vi", (t) => `${t}\n`))).toEqual({ kind: "unchanged" });
+    expect(await openChipInEditor(chip, deps("vi", () => null))).toEqual({ kind: "unchanged" });
+
+    // Busy: refused naming the verb, and the directory is still removed.
+    const busy = await openChipInEditor(chip, {
+      editor: "vi",
+      fs,
+      borrow: async () => ({ kind: "busy" as const, verb: "deploy" }),
+      chord: "⌥o",
+    });
+    expect(busy).toEqual({ kind: "refused", text: "deploy is still running, and ⌥o waits for it" });
+
+    // A throw from the loan: the directory is removed before it propagates.
+    let thrownPath = "";
+    await expect(
+      openChipInEditor(chip, {
+        editor: "vi",
+        fs,
+        borrow: async (argv) => {
+          thrownPath = argv[4] ?? "";
+          throw new Error("handoff refused");
+        },
+        chord: "⌥o",
+      }),
+    ).rejects.toThrow("handoff refused");
+    await expect(fs.readFile(thrownPath), "removed on the throwing path too").rejects.toThrow(/ENOENT/u);
+
+    // A target opens the target, as `$1`, and nothing comes back.
+    calls.length = 0;
+    const opened = await openChipInEditor(
+      { ...chip, target: "/work/notes.md" },
+      {
+        editor: "code -w",
+        fs,
+        borrow: async (argv) => {
+          calls.push(argv);
+          return { kind: "ran" as const, exit: { code: 0, signal: null } };
+        },
+        chord: "⌥o",
+      },
+    );
+    expect(opened).toEqual({ kind: "opened" });
+    expect(calls).toEqual([["sh", "-c", 'code -w "$1"', "sh", "/work/notes.md"]]);
+  });
+});
+
+describe("C22 §6s — the preview's key row names the other chips (I143)", () => {
+  it("T1.185 (C22 I143, §6s.3 row 4): `←→ other chips` is offered while the prompt holds another chip", async () => {
+    // **The prompt's own pair**, `left` and `acceptGhostOrForward`: the
+    // preview binds nothing that moves the caret, and the legend names what
+    // the caret's motion already does (§101). Offered on the scroll pair's
+    // rule — not while there is nothing for it to reach.
+    const { graph, stdin } = await buildGraph();
+    graph.lifecycle.acquire();
+    const keys = (): string | null => {
+      const row = graph.overlays.stack.find((l) => l.id === "chip-preview")?.content.at(-1);
+      return row?.kind === "raw" ? row.text : null;
+    };
+
+    stdin.emit(`${ESC}[200~${pasteOf(6, "one")}${ESC}[201~`);
+    await settle();
+    expect(keys(), "one chip: nowhere for ←→ to go").toBe("⌥o open in editor");
+
+    stdin.emit(`${ESC}[200~${pasteOf(6, "two")}${ESC}[201~`);
+    await settle();
+    expect(keys(), "two chips, the caret on the second").toBe("⌥o open in editor  ←→ other chips");
+
+    // **And back, with the caret still on a chip.** Deleting the second from
+    // behind the caret leaves the first previewed with no other to reach, so
+    // the row is rebuilt although the chip did not change.
+    stdin.emit(`${ESC}[D`);
+    await settle();
+    stdin.emit(`${ESC}[3~`);
+    await settle();
+    expect(keys(), "the other chip deleted").toBe("⌥o open in editor");
+  });
+
+  it("T1.185 (C22 I143, §6s.3 row 9): where the row does not fit it sheds whole entries from its end", async () => {
+    // **Read from the frame, where it was found**: at ASCII the three entries
+    // are 64 cells, and a 60-column frame's region is 59 — the `raw` row cut
+    // the legend to `oth~`. Two six-line chips over a 20-row frame overflow the
+    // box, so the scroll pair is drawn and the row is at its widest.
+    const stdin = fakeStdin();
+    const { screen, resize } = await buildSession({ stdin: stdin as never, capabilities: ASCII_CAPS } as never, { columns: 60, rows: 20 });
+    await settle();
+    stdin.emit(`${ESC}[200~${pasteOf(7, "one")}${ESC}[201~`);
+    stdin.emit(`${ESC}[200~${pasteOf(6, "two")}${ESC}[201~`);
+    const rows = await (async () => {
+      await settle();
+      return screen().rows;
+    })();
+    const row = rows.find((r) => r.includes("open in editor"));
+    expect(row?.trimEnd(), "scroll and open kept, the legend shed whole").toBe("M-S-Up/M-S-Down scroll  M-o open in editor");
+    expect(rows.some((r) => r.includes("oth~")), "and never a legend cut mid-word").toBe(false);
+
+    // **A width-only resize rebuilds it** (§6s.3 row 9): the height is the
+    // same, and at 80 columns the whole row fits again. Keyed on the height
+    // alone, the 59-cell row would stand in a 79-cell region.
+    //
+    // **Polled, because a resize's frame is paced** (C03): the scheduler draws
+    // it on its own clock rather than in the batch, and the first read of this
+    // arm found the 60-column frame still on the screen and read it as a
+    // preview that had not rebuilt. The poll is bounded; the assertion is on
+    // what it settles to.
+    resize({ columns: 80, rows: 20 });
+    const WANT = "M-S-Up/M-S-Down scroll  M-o open in editor  Left/Right other chips";
+    const keyRow = (): string | undefined => screen().rows.find((r) => r.includes("open in editor"))?.trimEnd();
+    for (let i = 0; i < 80 && (screen().rows[0]?.trimEnd().length ?? 0) <= 60; i += 1) {
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    await settle();
+    expect(keyRow(), "the legend is back").toBe(WANT);
   });
 });

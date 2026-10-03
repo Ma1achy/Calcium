@@ -18,6 +18,8 @@ import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { rows as mapRows } from "../../tools/design/figures.js";
+
 const PROSE = resolve("tools/design-prose-with-surfaces.py");
 const MARKS = resolve("tools/design-unregistered-marks.py");
 
@@ -40,15 +42,28 @@ const FIX = "docs/design/language/fixtures";
 const REG = "docs/design/language/calcium-registry.json";
 
 describe("design-prose-with-surfaces.py — `prose` sections whose fixture draws marks", () => {
-  // The classification it reads is `design-fixture-map.py`'s table, parsed out
-  // of the file's text: `  N:("prose", …`.
-  const MAP = "tools/design-fixture-map.py";
-  const map = 'M = {\n 1:("prose","—","a"),\n 2:("frame","x.test.ts","b"),\n 3:("prose","—","c"),\n 4:("prose","—","d"),\n}\n';
+  // **The classification it reads is `DESIGN_FIXTURES.md`'s class column**
+  // (ruling 95, F1484), sliced and matched as `figures.ts`'s `rows()` does it.
+  // It used to be `design-fixture-map.py`'s `M`, parsed out of that script's
+  // text; the script is gone and the markdown is the one record. §2's probe
+  // carries an escaped pipe, and so does §4's, because a probe is an
+  // alternation and the pattern that stopped at the byte dropped two rows once.
+  const MAP = "test/golden/DESIGN_FIXTURES.md";
+  const table = (body: string): string =>
+    `# The design fixtures, mapped\n\n## The table\n\n| § | class | built | target | figure | what the fixture specifies |\n|---|---|---|---|---|---|\n${body}\n## The two with no fixture\n\n| § | why |\n|---|---|\n`;
+  const map = table(
+    [
+      "| 1 | prose | — | — | — | a |",
+      "| 2 | surface | `x\\|y` | `x.test.ts` | 1-1 | b |",
+      "| 3 | prose | — | — | — | c |",
+      "| 4 | prose | `a\\|b` | — | — | d |",
+    ].join("\n") + "\n",
+  );
 
   it("DC1: only `prose` sections are read, a section with no marks is left out, and the rest rank by count", () => {
     const r = run(PROSE, {
       [MAP]: map,
-      // §1 prose, two marks. §2 frame, many — not prose, so never read.
+      // §1 prose, two marks. §2 surface, many — not prose, so never read.
       // §3 prose, no marks. §4 prose, four marks — ranked above §1.
       [`${FIX}/001-a.txt`]: "a ✦ and a ❯\n",
       [`${FIX}/002-b.txt`]: "✦✦✦✦✦✦✦✦\n",
@@ -64,14 +79,39 @@ describe("design-prose-with-surfaces.py — `prose` sections whose fixture draws
     ]);
   });
 
-  it("DC2: the control — every section classified `frame` reads as none drawn, whatever it draws", () => {
+  it("DC2: the control — every section classified `surface` reads as none drawn, whatever it draws", () => {
     const r = run(PROSE, {
-      [MAP]: map.replaceAll('("prose"', '("frame"'),
+      [MAP]: map.replaceAll("| prose |", "| surface |"),
       [`${FIX}/001-a.txt`]: "a ✦ and a ❯\n",
       [`${FIX}/004-d.txt`]: "█ █ ▸ ⎿\n",
     });
     expect(r.status, r.out).toBe(0);
     expect(r.out.trimEnd()).toBe("0 of 0 `prose` sections draw marks — a shortlist, not a defect list");
+  });
+
+  it("DC6: a row of the table's shape outside `## The table` is not a classification", () => {
+    // The document explains its columns in tables of its own, above the map
+    // and below it; `rows()` reads between the two headings and so does this.
+    const decoy = "| 5 | prose | — | — | — | e |\n";
+    const r = run(PROSE, {
+      [MAP]: `${decoy}\n${map}${decoy}`,
+      [`${FIX}/001-a.txt`]: "a ✦ and a ❯\n",
+      [`${FIX}/005-e.txt`]: "✦✦✦✦✦✦✦✦\n",
+    });
+    expect(r.status, r.out).toBe(0);
+    expect(r.out.split("\n")[0]).toBe("1 of 3 `prose` sections draw marks — a shortlist, not a defect list");
+  });
+
+  it("DC7: over the real map, its `prose` count is the one `design-fixtures.test.ts` reads", () => {
+    // **One table read one way** is the ruling's claim, and a fabricated table
+    // cannot hold it: this runs the script over the tree and compares its
+    // population with `rows()`'s, so a reader that drifts from the gate's
+    // parser disagrees here before it disagrees with anyone reading the number.
+    const r = spawnSync("python3", [PROSE], { encoding: "utf8" });
+    expect(r.status, `${r.stdout}${r.stderr}`).toBe(0);
+    const prose = mapRows().filter((row) => row.cls === "prose").length;
+    expect(prose, "the map has `prose` rows at all").toBeGreaterThan(0);
+    expect(/^\d+ of (\d+) `prose`/u.exec(r.stdout)?.[1]).toBe(String(prose));
   });
 });
 

@@ -1109,7 +1109,7 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
-> **Ruled 2026-09-28** (by the person; review batch 4, M10 item 1). **The local clipboard is approved as an optional runtime tool, not a package.** Order: **OSC 52 first** (it works over SSH), then a platform tool if present — `pbcopy`; `wl-copy`, `xclip` or `xsel`; `clip.exe` — detected at runtime and never required, spawned with a **fixed argv, no shell, payload on stdin**. If none is available the reader is offered file export and told so. OSC 52's success cannot be observed, so that path is worded honestly: *sent to the terminal's clipboard*, never *copied*. **Owed:** a `DEPENDENCIES.md` row for the optional tools, with batch 4's M10 lane.
+> **Ruled 2026-09-28** (by the person; review batch 4, M10 item 1). **The local clipboard is approved as an optional runtime tool, not a package.** Order: **OSC 52 first** (it works over SSH), then a platform tool if present — `pbcopy`; `wl-copy`, `xclip` or `xsel`; `clip.exe` — detected at runtime and never required, spawned with a **fixed argv, no shell, payload on stdin**. If none is available the reader is offered file export and told so. OSC 52's success cannot be observed, so that path is worded honestly: *sent to the terminal's clipboard*, never *copied*. **Owed:** a `DEPENDENCIES.md` row for the optional tools, with batch 4's M10 lane. **Amended 2026-09-29 by the person:** never write a file the reader did not ask for. The automatic write after a failed copy is removed. Where a clipboard route exists (OSC 52, or a platform tool detected at runtime), the copy takes it and says where it went — *copied via pbcopy*, *sent to the terminal's clipboard* — and the footer offers no file. *Save to file* is offered only where no route exists, and pressing it writes the file and states the full path. OSC 52's success cannot be detected, so a copy via OSC 52 counts as done, not failed. *Claude's ruling on the case the amendment leaves open:* a tool that exits non-zero or does not answer within `COPY_DEADLINE_MS` says it failed and why, and the file is offered for that copy (`⏎ to file`), never written; a payload over OSC 52's limit with no tool is no route for that payload — offered, not written. Built in df142006 (spec) and 9e2f1983 (code); C14 §6e K1–K16. The one case with no offer is ruling 83's.
 
 **72 · RULED — The local clipboard's mechanisms.** Batch 4's M10–M12 walk found copy reaching only the kill buffer, and spawning a platform clipboard tool is a dependency in practice, so it was the person's to decide.
 
@@ -1133,7 +1133,7 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
-> **Ruled 2026-09-28** (by Claude under the person's standing authority; review batch 4, M11 item 7). **`ANSI16_HEX` is labelled as the VGA palette it is, and the 4-bit reference does not change.** Lane b4-contrast found the table that C10 I61 and `colormap.ts` call *the xterm defaults* holds the VGA/Windows values; xterm's own differ at indices 1, 4, 7, 8 and 12. Any 4-bit reference is a stand-in for a palette the terminal owns, so which one is measured matters less than that it is named truly. **Tie-break:** structured data beats prose — the table is the fact and the label is the error. Changing the reference would move T2.64's list and both 4-bit lists for no gain in truth.
+> **Ruled 2026-09-28** (by Claude under the person's standing authority; review batch 4, M11 item 7). **`ANSI16_HEX` is labelled as the VGA palette it is, and the 4-bit reference does not change.** Lane b4-contrast found the table that C10 I61 and `colormap.ts` call *the xterm defaults* holds the VGA/Windows values; xterm's own differ at indices 1, 4, 7, 8 and 12. Any 4-bit reference is a stand-in for a palette the terminal owns, so which one is measured matters less than that it is named truly. **Tie-break:** structured data beats prose — the table is the fact and the label is the error. Changing the reference would move T2.64's list and both 4-bit lists for no gain in truth. **Corrected 2026-09-29 — the premise named the wrong palette** (a correction, not a reversal). Lane b4-quant, building this ruling, found the table is not VGA: VGA's levels are `0xaa` and `0x55`, and `ANSI16_HEX` holds `0x80` and `0xc0` — the **legacy Windows console palette**, the same values as HTML 4's sixteen named colours. It differs from xterm's defaults at indices 1–8 and 12, not only at the five this ruling listed, which were F1321's sample. The ruling stands — name the table truly, move no list — and what was built names it for what it is: `ANSI16_WINDOWS_HEX`, across `colormap.ts`, `contrast.ts`, the test support and the curated pin, with C10 I61, the `module-graph.mjs` comment and the registry note saying *the legacy Windows console's sixteen* (c6240116, 8b7a6ffe; registry 0.17).
 
 **76 · RULED — Which palette the 4-bit reference is.**
 
@@ -1143,9 +1143,174 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 **77 · RULED — Whether the wire enforces the glyph a builder requires.**
 
+---
+
 > **Ruled 2026-09-28** (by Claude under the person's standing authority; review batch 3, F1327). **`profileDeck` is unpublished.** C24 I33 says a published pane helper has a consumer, and since the pushed view retired (R-EXA-082) nothing in `src`, `examples` or `tools` calls it — `/profile <section>` walks `deckOf` and draws with `profileCard`, and only C24 T1.11 names `profileDeck`. Keeping it "for consumers with their own navigation" names no consumer and none is queued, which is the export the repository's own rule forbids. **Tie-breaks:** the repo is right about what ships, and the rule decides when the pictures disagree. **The cost, stated:** a public export is removed at 0.x with no deprecation cycle, on ruling 1's precedent (`PushedSurface`), and CHANGELOG records it. It removes surface and approves nothing, so it weakens no safety default. **Built in:** review batch 3's tail lane.
 
 **78 · RULED — Whether a pane helper with no consumer stays published.**
+
+---
+
+> **Ruled 2026-09-28** (by Claude under the person's standing authority; review batch 4). **No fact shares an index with `muted`.** C10 I17's distinctness set gains `muted`: the kept-distinct set is the five meaning tones plus `muted`. **The yield ladder stays** — the floor, then distinctness, then rank (C10 §4c.4 row 4). *Reason:* carrier rules count per fact. On `paper`, `info` rendered as `muted` loses the one carrier that tells a notice from nothing to see at 8-bit, and a consistent picture beats rank. It is a mechanism answer inside the quantiser, so no registry value moves. *Rejected:* CIEDE2000 as the quantiser's distance, and re-valuing `paper` — each changes more than the one collision. **Corrected 2026-09-29 — the record states the mechanism, not the headline** (a correction, not a reversal). *No fact shares an index with `muted`* is the intent; what was built is narrower: **I17's kept-distinct set gains `muted`, and where two members of the set claim one index the lighter claimant moves** (the repair walks the set darkest first; C10 §4c.4 row 12). So on `paper`'s page it is `muted` that moves (242 → 243, `#767676`, 3.91 : 1) and `info` keeps its grey (242, `#6c6c6c`, ΔE76 30.1 from `#1f6b94`, 4.53 : 1); the two are 1.16 : 1 apart, so the carrier is distinct by index and close by eye, and that stays open. Eight picks move across the shipped set, and **three indices are shared with a tone outside the set**, measured at 8 bits against the tokens:
+
+| theme · ground | shares | a band? | 24-bit values | recorded as |
+|---|---|---|---|---|
+| `hcLight` · `diffRemove` | `muted` = `meta`, index 89 | **no** — `hcLight`'s bands are `focusGround` and `selection` | `#454545` and `#8a006e`, different | **syntax colour**: `meta` is outside C10 I17's six and is a tone syntax roles and a paste chip resolve through (R-BLK-614, R-BLK-116), so the collision is decoration with one carrier, not a fact |
+| `nord` · `selection` | `info` = `identifier`, index 195 | **no** — `nord` declares no band | `#c4e1ff` and `#bfeaf4`, different | **syntax colour**: `identifier` is the tone of a name (R-BLK-614), and a link keeps its underline as the second carrier (R-BLK-384) |
+| `nord` · `selection` | `muted` = `default` = `dim`, index 254 | **no** | all three `#d8dee9` | **not a collision**: one value is one ink (C10 §4c.4 row 6) — the theme composed the three alike on that ground, and `default` and `dim` are outside the set by design |
+
+**And the silent case the ladder leaves is now loud** (C10 I70, §4c.4 row 13): where a floor leaves one entry for two of the six, the set is refused at load rather than painted alike.
+
+**79 · RULED — Whether `muted` is kept apart from the meaning tones at 8-bit.** Review batch 4 found that C10 I17 kept `{ok, warn, error, info, accent}` apart and left `muted` free to collapse, and on `paper`'s page the floor turned `info` into `muted`'s grey, so the two facts rendered as one colour.
+
+---
+
+> **Ruled 2026-09-29** (by Claude under the person's standing authority; review batch 4, M14.1, the M13–M16 plan's D9). **On a tape, `←`/`→` moves focus, not the producer's `current`; the tape's window follows focus while focus is in the tape, and `⏎` activates the focused member.** The shell cannot write a producer's `current` — it is the far side's field, and the repo is right about what ships. The pictures disagree: R-BLK-853 has `←`/`→` *move BETWEEN elements on the row*, and R-BLK-857 says *nothing moves the tape's window without moving the current*; both are `example`, and R-INT-004 (`current`) is that focus pulls the viewport by the minimum displacement. AUTHORITY.md leaves pictures that disagree to the rule. **Tie-breaks:** the repo is right about what ships, and when pictures disagree the rule decides. It answers F1303's direction: `pullTapes` follows `block.current` and never focus, so a focused member off screen is never pulled into view; the pull follows focus. **Built meanwhile:** nothing — M14.1's wiring is the shell lane's, after lane C and the editor lane, where the plan measured, at a4502d3c, that `↓` walks tape members in reading order (`rowDown`) and no `←`/`→` effect exists at a live block.
+
+**80 · RULED — Which a tape's `←`/`→` moves: focus or the producer's `current`.** The M13–M16 plan's walk of M14.1 (row 2: `→` onto an off-screen member) found the window has to slide on focus, where R-BLK-857 says it moves only with the current.
+
+---
+
+> **Ruled 2026-09-29** (by Claude under the person's standing authority; review batch 4, round 2 of the blocks lane, F1380). **A trail whose form animates with a one-shot stamps `since` at each arrival, so `ripple` runs once and holds its final frame.** The M2 amendment to C04 I109 made every one-shot timeable by storing its start, and the render reads elapsed time against the injected clock; the streaming trail was the one place that was not carried through — its ramp is derived at render with no `since`, so the ripple held its not-started frame for the life of the stream. The trail's ramp has no address in the document, and C22 §6o row 6 retired a per-frame `RenderContext.since`, so **the stamp travels on the notice as `Notice.trailSince`**. The shell stamps it at the first frame that draws each new arrival — the arrival is the text's length — from the session's tick, which `session.ts` advances from the injected clock; a re-emission keeps it, and a producer's own value is kept. It is refused on a notice whose trail names no one-shot, as `since` is on a periodic effect, and it is not tied to `streaming`, because the settle strip keeps the other fields. **Tie-break:** a consistent picture beats a lone rule — making `ripple` periodic only inside a trail would give one animation name two behaviours by where it sits. **The cost, stated** (C22 §6o.4's residue, F1388): a producer that replaces the text with a different text of the same length is the same arrival and does not replay. **Built in** 276dd7d9 and e29c613e (spec: C04 I109 and T2.153; C09 I133, T1.150 and T6.188; C22 I131 and §6o.4's third bullet struck), ce7f0604 (`TRAIL_ANIMATION`, `Notice.trailSince`, `src/shell/one-shots.ts`, `c22-trail-stamp`: nine mutations, nine caught) and c8c7a77e (C22 T1.173 and T6.138–T6.141, renumbered off the watch lane's ids).
+
+**81 · RULED — Whether a streaming trail's one-shot starts.** The blocks lane found the `ripple` trail never starts (F1380) — already on record in C22 §6o.4 (F1387) — and asked whether the trail should stamp `since`, or `ripple` should be periodic as a trail.
+
+---
+
+> **Ruled 2026-09-29** (by Claude under the person's standing authority; review batch 4, M11 item 2, F1367). **C11 reserves the `expand` column at the widest disclosure marker it will draw.** Ruling 69 gives disclosure a second carrier, the `+N` count beside the mark, and every shipping table declared its expand column one cell wide, so `▹+3` was cut to `▹` and C10 I71's gate would have recorded a word that is never drawn. **The marker is framework-drawn, so the framework sizes it**: the producer declares the column, and C11 draws `▹+N` into it. **N is what expansion reveals** — `plan.dropped.length + (row.detail?.length ?? 0)` — and at N = 0 the count is not drawn, because nothing is hidden. **C11 I15 is amended, not cited**: `planColumns` stays role-blind (T2.9), and `planDisclosed` reads the one role, `expand`, to reserve a marker it draws itself; an existing rule is not a reason to leave a carrier undrawn. The reservation is a **two-pass bound**, not a fixed point: the first plan reserves for everything that could be hidden, the second for what that plan hid, and because admission is a prefix of the priority order the reservation only shrinks between passes — it terminates and the drawn count always fits. A window pins the table it was cut from, so its columns do not shift as rows with detail scroll past. **A count that would be cut draws the mark alone** (F1368): `▹+12` cut at the edge reads `▹+1`, a wrong number rather than a short one. *Rejected:* (b) producers declare a wider column — any application's `minWidth: 1` would silently drop the carrier the gate claims; (c) the count elsewhere on the row — a departure from ruling 69's placement for no measured reason. **The cost, stated:** S03, S05, S06 and S14's drop totals each rise by 2 and no stated drop set moves; the table goldens move (table 8, fallback-docker 1, design-surfaces 3). **Built in** 3d4b2241 (C11 spec: I15 amended, I32, §3a's classification walk, the S-series restated), 4e3c7153 (`disclosureCells`, `planDisclosed`, the window pin, `c11-disclosure`: 9 of 9 caught), and 9836240c and f6b7c136 (C10 I71 counts carriers per fact, with prompt selection its one ruled exception).
+
+**82 · RULED — Where ruling 69's disclosure count gets its width.** Lane C stopped at M11.2: the `+N` ruling 69 gives disclosure could not be drawn in any shipping table, and C11 I15 forbade the planner from reading `role` to make room for it.
+
+---
+
+> **Ruled 2026-09-29** (by Claude under the person's standing authority; review batch 4, the correction to ruling 72, F1426). **A tool that fails after `⏎` has left copy mode is stated, not offered: no save action is added outside the mode.** The toast says the tool failed and why and that the kill buffer holds the text, and nothing is written. The offer is held against the copy's text, so re-entering copy mode over the same selection draws `⏎ to file` again. **Why:** the offer lives in the mode's footer and toasts take no keys (§105); a key outside the mode would be a global binding the registry does not carry, invented for one path of one failure — and *the repo is right about what ships* (the registry has no save or export action). Stating it keeps the person's rule whole: nothing the reader did not ask for is written, and the reader is told where the text is. **Revisit** if the registry gains a save action. Built by 9e2f1983 (C14 §6e K12).
+
+**83 · RULED — Whether a copy that fails after copy mode has closed is offered a file.** The b4-clip lane stopped at K12 of C14 §6e's table: the failure arrives after `⏎` has left the mode, where no surface can hold the offer.
+---
+
+> **Ruled 2026-09-29** (by Claude under the person's standing authority; review batch 4, the bidi lane's integration, F1470). **Linear writes every string in C09 I128's shown form, far-side and typed alike, and the notification body with it.** One form in one stream: C23 I90 already announced a reply *as drawn*, and `clean` deleted C0 and C1 and passed bidi whole, so a far-side override reached the stream raw and a notice read twice. Cost, carried from ruling 71 into speech: a screen reader speaks `<U+202E>`. C22 §6m.4 row 6 and I149.
+
+**84 · RULED — What linear does with a control or bidi character.** The bidi lane reported linear writing the typed line raw, and asked for a decision because a screen reader would speak the form. Measured, the far side's names were raw too (F1470).
+
+---
+
+> **Ruled 2026-09-29** (by Claude under the person's standing authority; review batch 4, F1461). **A status error leads with ✗, and ▲ stays the warning's.** The registry is normative on appearance and every error in §048, §061, §066 and §096 opens with ✗. With ▲ on both, an error and a warning share their only non-colour carrier, which fails the two-carrier floor at 1-bit. Golden movers are named before the change.
+
+**85 · RULED — Which mark leads a status error.** The fixtures lane found the tree leading errors with ▲, citing a design drawing no current fixture contains (F1461).
+
+---
+
+> **Ruled 2026-09-29** (by Claude under the person's standing authority; review batch 4, F1458). **The OSC sinks, the window title and the notification body, show C0, DEL and C1 in caret form, as blocks do.** Deletion left printable residue (`[2J`) that reads as text a tool meant to print, which is what ruling 71 replaced for blocks and C22 I149 for linear. The caret form is printable, so no ESC or BEL can reach an OSC payload either way; nothing is weakened. C01 I26's stated limit becomes the rule.
+
+**86 · RULED — Whether the OSC sinks show controls or delete them.** The classes lane extended ruling 71's bidi clause to OSC 2 and OSC 9 and left C0 and C1 deleting, naming the choice as owed (F1458).
+
+---
+
+> **Ruled 2026-09-29** (by Claude under the person's standing authority; review batch 4, F1460). **§097 is compared against a frame of the panel layer, a menu between two rules above the prompt, under its own heading.** The probe named the panel block kind, so the row compared the right name against the wrong thing; the listed difference was that confusion measured and is retired with it.
+
+**87 · RULED — What §097's figure is compared against.** The fixtures lane found §097 set against the `panel` block (F1460).
+
+---
+
+> **Ruled 2026-09-29** (by Claude under the person's standing authority; review batch 4, F1457). **C16 T1.4h's two rows are dispatched at their own targets, not removed.** Each row names a binding at a target; T2.17 covers the behaviour, but a table row that passes for a reason other than the one it names is a row asserting nothing, and removing it would leave the binding table with a gap where two bindings were said to be checked.
+
+**88 · RULED — Whether T1.4h's mis-aimed rows are re-pointed or removed.** The classes lane found both passing at the wrong target (F1457).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1474). **The completion menu's current candidate carries §097's `›` at rest.** The footer offers `⏎ accept`, and the key has to act on something the frame shows. The registry is normative on appearance.
+
+**89 · RULED — Whether the completion menu marks its current candidate at rest.** The golden lane found three candidates styled alike beside a footer offering to accept one (F1474).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1475). **The completion menu closes on the prompt's upper rule, not on a rule of its own.** §097's panel layer floats between two rules, and the lower one is the prompt's. C22 T4.34, which asserts the menu's own closing rule, is amended with the build.
+
+**90 · RULED — Whether the menu and the prompt share their rule.** The golden lane found two stacked rules where §097 draws one (F1475).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1476). **A notice's tone agrees with its document's status.** A handed-off child that exits non-zero, or ends on a signal other than SIGINT, SIGTERM or SIGHUP, has failed: error tone and ✗. SIGINT, SIGTERM and SIGHUP are what an interrupt or a closed terminal sends, and they settle `cancelled`, as C23 I66's ladder does.
+
+**91 · RULED — What a handed-off child's non-zero exit is.** The golden lane found a warn-toned ▲ on an `error` document (F1476).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1479). **A cancel is drawn as the `cancelled` call state on every route**: muted, ⊘ (`/` in ASCII), on a `partial` document, which is what C07 already gives a cancelled call (`mapping.ts:190`). **This corrects ruling 91's premise.** Ruling 91 said a handoff's cancel settles `cancelled` "as C23 I66's ladder does"; measured by lane b4-exec, C23 I66's shell route settles a cancel on `error`, with an error box and code `CANCELLED`, so it draws a cancel as the failure ruling 91 separates it from. A consistent picture beats a lone rule: C23 I81's `cancelled` state, the registry's call-state tones and C07's mapping agree, and C23 I66's shell arm is the one that disagrees. So C23 I66 is amended to settle `partial` in the `cancelled` form, and `clearQueue`'s *cancelled before it ran* takes the same form in place of warn and ▲.
+
+**92 · RULED — What a cancel looks like, on every route.** Lane b4-exec built ruling 91 and found its cited precedent drew a cancel as a failure (F1479).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1481). **A notice that reports a failure is an `error` document, in error tone, with ✗.** It is ruling 91's rule, *a notice's tone agrees with its document's status*, read from the content side: the key action notice at `construct.ts:4198` says *failed* and was a warning on an `ok` document, which agrees with itself and disagrees with what it says. Warnings on `ok` documents that report no failure are the usual convention and stay.
+
+**93 · RULED — Whether a failed key action is a warning.** Lane b4-exec found *the key action `X` failed* drawn as a warning on an `ok` document (F1481).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1482). **Three edges of ruling 91, each kept as written except the text.** (a) An exit of 128+n with no signal, as a grandchild killed under `sh -c` returns, is **not** decoded as a signal: the shell reports what it received, and a real `exit 130` is indistinguishable. It is a failure. (b) **SIGQUIT stays a failure**: it asks for a core dump, which is an abort, not a cancel. (c) A child that ended with neither a code nor a signal says **ended without an exit status**, not *exited 1*. `code ?? 1` names an exit the child never returned; the state stays failed.
+
+**94 · RULED — 128+n under `sh -c`, SIGQUIT, and a child with no exit status.** Lane b4-exec's walk table, rows 3, 4 and 6 (F1482).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1484). **`tools/design-fixture-map.py` loses its writer, and `DESIGN_FIXTURES.md` is the one record.** Run at 78cd90e1 the script rewrote the file `+114/−192`, dropping the `figure` column and the rule-interaction table that `design-fixtures.test.ts` parses by equality. The repository is right about what ships, and what ships is the hand-edited markdown. `design-prose-with-surfaces.py` reads its classes from the markdown's class column rather than from the script's table, so there is one record to agree with.
+
+**95 · RULED — The retired fixture-map generator.** Lane b4-instr found it destructive and still runnable (F1484).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1486). **The menu's footer names what each key does in the state the frame shows.** With no selection the prompt's keys resolve first (C19 I20), so `⏎` submits and `↑` walks history, and the footer's `⏎ accept` and `↑↓ move` are false. At rest it offers `⇥ complete`, which is the registry's label for `binding.004`, and the way out. `⏎ accept` and the move keys appear once `⇥` or `↓` has made a selection. **The registry decides**: it binds `⇥` to complete in the prompt and binds `⏎` to no accept (tie-break 1), and C19 I20's *a typed menu holds no selection* is what ships. **This corrects ruling 89's premise, not its ruling.** Ruling 89 said *the key has to act on something the frame shows*, meaning `⏎`. The key that acts on the marked candidate at rest is `⇥`, so the mark stays and the footer changes. The footer is also what tells rest from selection now that ruling 89 draws the mark in both: measured by lane b4-menu, the two frames were otherwise identical.
+
+**96 · RULED — What the menu's footer offers before a selection.** Lane b4-menu measured `⏎` at rest submitting `unknown verb: /c` beneath a footer offering `⏎ accept` (F1486).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1490). **An app-route cancel settles the entry `partial`, with a document the shell writes.** The document keeps what the entry had drawn and adds the cancelled notice; its `meta.exitCode` is 130, which is what C20 already records. C23 I10 says a cancellation settles `partial` with output retained, and C23 I96 now draws the cancel that way on the shell route, the queue and the handoff. The app route is the one that settles `ok` with code 0 beside a history entry of 130. The patch gate's axis is who is writing, and a cancel is the shell writing, so the shell may write the document. `cancelThis`'s `settle(id)` with no document is what gives way.
+
+**97 · RULED — How an app-route cancel settles.** Lane b4-exec2 measured `⌃c`, a withdrawn approval and a cancelled stream settling `ok`, exit 0, while history recorded 130 (F1490).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1491). **A document's exit code agrees with its status and with C07 I14.** An `error` document whose code is unknown carries 1, as `errorDoc` and `completeLocal` already do, never 0. A route that knows the child's ending takes its code through `exitCodeOf`: 128+n for a signal, −1 for a child that never started. The shell route's `exit.code ?? 1`, which records 1 for SIGKILL and for a spawn failure, goes through the table, and a spawn failure stops being said to have *exited with code 1*. It is the same rule F1480 and ruling 94 applied to the handoff, carried to the neighbouring route.
+
+**98 · RULED — What exit code an `error` document carries.** Lane b4-exec2 found `noticeDoc` at status `error` leaving 0, and the shell route recording `code ?? 1` (F1491).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1488). **The completion menu is a ladder in every case, and the pills form retires from it.** Every picture of the menu draws one candidate a row with `›` on the current: §029, §097, and `R-BLK-866`, which names the palette *a PANEL whose list is a LADDER*, with `R-BLK-867`'s vertical list. No picture draws a row of pills, and a consistent picture beats a lone rule (tie-break 2), here C19 §5's *two rows of pills when the candidate set is short*. **This corrects F1488's premise.** F1488 asked the pills form to draw ruling 89's `›`; the registry gives the pills form no basis to draw anything. A candidate with no `detail` takes the table form with an empty hint cell, so C19 I29's *the pills form sets `active`*, the pills half of C19 T4.9 and F1487's pills window (cfa684f7) go with it, and the one form takes `current` through C04 I150. **Ruling 96 is amended by the same pictures**: §029's panel footer offers `⏎ run` at rest, and under C19 I20 `⏎` at rest submits the line, so the rest footer is `⏎ run   ⇥ complete   esc close`. §029 also offers `↑↓ move` at rest, and that half is not taken: the registry binds no arrow in the prompt, C19 I20 gives `↑` to history, and the repository is right about what ships (tie-break 4). `⇥ complete` keeps the registry's label for `binding.004` over §029's `↹ accept` (tie-break 1).
+
+**99 · RULED — Which form the completion menu takes.** Lane b4-menu2's survey found `R-BLK-866` draws no pills, so ruling 89's mark had no picture to follow in the pills form (F1488).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1509, F1510, F1511). **An entry settles with one code, and the document and C20 both carry it.** C23 I29 already says C20 records *the code the entry settled with*. Every route that disagrees with itself is wrong on the document's side. (a) **A denied or expired approval's document carries 126**, the code C20 records (C23 I60). Its status is unchanged. A denial is a decision, not a failure: §047 says a refusal *is not an error and never red*, and ruling 98 constrains `error` documents only. (b) **A withdrawn approval stays 130** (ruling 97). The approval was asked by a far side that was already running, so the entry had started. A queued line that `⌃c` cleared never reached the pipeline, and that is why it is −1 (C07 §3). The two codes differ because one entry had started and the other had not. (c) **Ruling 94(c) is amended: a child that ended with neither a code nor a signal says *did not start* on the handoff too.** Lane b4-exec3 measured that `{code: null, signal: null}` comes only from a spawn failure on every C21 arm. So C07 and the shell route's *The command did not start.* is the true sentence, and *ended without an exit status* describes an ending no arm produces (tie-break 2). (d) **A cancel's document leaves the stall row out.** The shell composes that document (ruling 97, C23 I98), and a stall is a condition of a live entry. `settle(id, doc)` replaces the view, so no delete is needed. `refresh.settled`'s *resumed after* is not called, because it would be false for a cancel.
+
+**100 · RULED — Which code an entry settles with, and what a cancel's document keeps.** Lane b4-exec3 found a denied approval at `ok`/0 beside C20's 126, a withdrawn approval at 130 beside a cleared line's −1, one `Exit` worded two ways, and a stall row outliving a cancel.
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1517, F1518, F1519, F1520). **What a settled entry says about how it ended.** (a) **A denied or expired approval's head is not drawn failed.** Expiry takes §106's form, `○ the question expired`, muted: *denied would be a lie about what happened*, and so would failed. A denial is the user's decision, not a failure. It is drawn muted with its word `denied`, never in error tone or with ✗ (§047, *never red*), and this is the reason ruling 100(a) gave. The tool still does not run: only the drawing changes. (b) **The completion line appends `exit N` only for a child's own ending.** 126 for a denial and 130 for a cancel are codes the shell wrote, and C20 still records both. The line names the state word instead: `denied`, `cancelled`, `expired`. (c) **Every settlement the shell composes leaves the stall row out**, as ruling 100(d) did for the cancel. That includes the malformed-patch and throw arms. A stall is a condition of a live entry. (d) **The stall watch arms with the readout, on approval, not at dispatch.** An entry waiting on the user is not quiet output. (e) Lane b4-exec4's ruling is adopted: **a malformed patch and a stream throw carry 1**, the code C23 I100 gives a failure whose own code is unknown.
+
+**103 · RULED — How a denial, an expiry and a stall read once an entry has settled.** Lane b4-exec4 found a denied head drawn failed against ruling 100(a)'s own reason, a completion line reading `failed, exit 126`, a stall row left in two arms, and a question said to have gone quiet.
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1501, F1503, F1521). **Three rulings for the transient panels. Lane b4-panels took the first two and they are adopted as its rulings.** (a) **A transient panel's rows take `surface.bgElev`, and its edges stay on the page's ground.** The edges are its own upper rule and the prompt's rule. The compositor paints the ground from the layer's kind, so the completion menu, find and the chip preview take it alike. §097's picture and R-BLK-569/628 agree, and §101's specimen, which draws its content rows ungrounded, is outvoted (tie-break 2). A peek and an overlay take no ground. (b) **Where §101's hint row and the registry's `preview.*` bindings disagree, the bindings decide** (tie-break 1): `⌥⇧↑⌥⇧↓ scroll` and `⌥o open in editor`, and `⏎` sends. `←→ other chips` is drawn from the prompt's own bindings, and only while the prompt holds another chip, so it names a key that works. (c) **The echo of a submitted line keeps its chips.** §101 names two places a chip previews, and one of them is *focus in the TRANSCRIPT — a PEEK, anchored BESIDE the element*. That can only be true if the chip is an element there. Today the echo is the resolved text, so a 200-line paste echoes 200 lines and no element carries it. The echo draws the chip's label as the prompt does, and the chip's content is what its peek shows. What the application receives is unchanged: the resolved text.
+
+**104 · RULED — The panels' ground and keys, and whether a chip survives submission.** Lane b4-panels built the ground and the preview's keys, and found that no chip reaches the transcript, so §101's transcript half had nothing to stand beside (F1521).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1496, F1497). **Two consequences of ruling 99, both ruled by lane b4-menu3's walk and taken as its rulings.** (a) **`Candidate.tone` colours the value cell in every row.** The pills form was the field's only reader, so retiring the form would have left a public field that nothing draws. The ladder takes it, so a source that sets a tone sees it whether or not the candidate has a `detail`. No source in the repository sets one. (b) **A history walk closes the menu and ends its `esc` hold; it does not rebuild it.** C19's recompute set already leaves out `historyPrev` and `historyNext` because *a menu over a recalled command is noise*. I22's rebuild (*a rebuild clears the selection*) is a keystroke's, and rebuilding on a recall would draw the very menu that reason excludes. An emptied line also ends the hold, because the line it was taken against is gone (C19 I31).
+
+**105 · RULED — What the ladder draws of a candidate's tone, and what a recall does to an open menu.** Lane b4-menu3 found `Candidate.tone` read only by the retiring pills form, and a recalled line under the old line's menu (F1497).
+
+---
+
+> **Ruled 2026-09-30** (by Claude under the person's standing authority; review batch 4, F1524, F1526). **A key typed behind an in-flight completion acts on the line as it stands.** (a) **`⏎` typed while `⇥`'s request is still in flight runs the line as shown**, not `⇥`'s result. At rest `⏎` submits (C19 I20). Input never waits on a fetch (C22 I18). And a line whose content depends on something decided after the keystroke is what C23 I28 rules out. So the user runs what they saw when they pressed the key, and never a line that `⇥` would have produced afterwards. (b) **Every way the line goes away invalidates an in-flight request**: a submit, a history recall, and an emptied line, as well as `esc`. C19 I15 named only `esc`, so a result for a line that had been submitted was applied to the next, empty line, and opened a selected menu over it. (c) **A settled `error` status does not animate.** `ANIMATES.status` held for the kind whatever its state, so the session ticker woke at spinner cadence for an error box in which nothing turns, and drew an empty frame each time.
+
+**106 · RULED — What a key does behind an in-flight completion, and what ends one.** A locksmith diagnosing menu3's intermittent C22 T5.4 found that the race exists at db80ded5 too (3 of 40 runs pinned to one CPU). An Enter sent before `⇥`'s selection existed submitted `/ps --status=`, and `⇥`'s late result then opened `› running` over the empty prompt (F1524).
 
 ---
 

@@ -33,7 +33,22 @@ import type { ProducerContext } from "../../data/adapters/types.js";
  * is the distinction the floating state exists to create: *the reader typed
  * nothing* and *the reader never got the chance* must not be one value.
  */
-export type AskAnswer = Readonly<{ key: string; text?: string }>;
+export type AskAnswer = Readonly<{
+  key: string;
+  text?: string;
+  /**
+   * How the question ended (C23 I92, C24 I42, `R-QST-002`).
+   *
+   * `cancelled` and `expired` resolve with the **default's** key and no `text`,
+   * so a caller reading `key` alone is handed the safe answer and never one
+   * nobody chose; a caller for whom the difference matters — an approval, which
+   * runs nothing unless `answered` — reads this.
+   */
+  outcome: QuestionOutcome;
+}>;
+
+/** How a question ended (C23 I92, C24 I42): chosen by the reader, withdrawn by its owner, or timed out. */
+export type QuestionOutcome = "answered" | "cancelled" | "expired";
 
 export type Choice = Readonly<{
   key: string;
@@ -98,6 +113,19 @@ export type AskOptions = Readonly<{
    * is.
    */
   placement?: "centred" | "anchored";
+  /**
+   * Withdraws the question (C23 I92, C24 I43). Aborted while it is open or
+   * waiting, it resolves `cancelled` with the default's key; already aborted at
+   * `ask`, it resolves so at once and nothing is pushed.
+   */
+  signal?: AbortSignal;
+  /**
+   * How long the question stays open before it resolves `expired` with the
+   * default's key (C23 I92, `R-BLK-881`), in milliseconds, counted from when it
+   * is **shown** — a question waiting behind another has not been put to the
+   * reader yet. Absent is never.
+   */
+  expiresAfterMs?: number;
 }>;
 
 /**

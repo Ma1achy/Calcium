@@ -17,7 +17,7 @@
     "test:package": "vitest run --dir test --exclude \"**/repo/**\""
   },
   "dependencies": {
-    "@fmx/calcium": "file:../.."
+    "calcium-tui": "file:../.."
   },
   "devDependencies": {
     "@types/node": "26.1.2",

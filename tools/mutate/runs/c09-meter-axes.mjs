@@ -42,8 +42,8 @@ const results = runPass({
       // is unmoved, so only the outranking arm can see it.
       name: "granularity outranks a declared style",
       file: SIMPLE,
-      from: "      block.style ?? (block.granularity === \"segmented\" ? \"slant\"",
-      to: "      (block.granularity === \"segmented\" ? \"slant\"",
+      from: "  if (granularity === \"segmented\") return style === undefined || style === \"braille\" ? \"posts\" : style;",
+      to: "  if (granularity === \"segmented\") return \"posts\";",
       expect: "T2.162",
     },
     {
@@ -52,8 +52,8 @@ const results = runPass({
       // first claim, that the alphabet follows granularity, is gone.
       name: "segmented and continuous draw the same alphabet",
       file: SIMPLE,
-      from: "block.granularity === \"segmented\" ? \"slant\"",
-      to: "block.granularity === \"segmented\" ? \"block\"",
+      from: "  if (granularity === \"segmented\") return style === undefined || style === \"braille\" ? \"posts\" : style;",
+      to: "  if (granularity === \"segmented\") return style === undefined || style === \"braille\" ? \"block\" : style;",
       expect: "T2.162",
     },
     {

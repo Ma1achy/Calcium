@@ -28,7 +28,7 @@ The flat verbs remain for scripting. This surface is the interactive path, not a
 ▌ ── config · .calcium/config.toml ─────────────────────────────────────────────
 ▌
 ▌     key                    value                        source
-▌ ▸   current_context        fmx-prod                     config
+▌ ▸   current_context        corp-prod                     config
 ▌ ▸   ui.theme               dark                         config
 ▌ ▸   ui.show_banner         true                         default
 ▌ ▸   terminal.colour_depth  24                           env
@@ -37,8 +37,8 @@ The flat verbs remain for scripting. This surface is the interactive path, not a
 ▌
 ▌ ── contexts · 2 ──────────────────────────────────────────────────────────────
 ▌
-▌   ● fmx-prod      https://prism.fmx.io/v1        token valid · 30d
-▌     fmx-staging   https://staging.prism.fmx.io   token expired
+▌   ● corp-prod      https://prism.example.com/v1        token valid · 30d
+▌     corp-staging   https://staging.prism.example.com   token expired
 ▌
 ▌   ⏎ edit   ␣ expand   ↕ switch context   ⊘ reset
 ```
@@ -144,7 +144,7 @@ The expanded reset row states what is cleared:
 
 ## 7. Narrow widths
 
-**Nothing drops.** The table is four columns summing to 51 cells with gaps — expand 1, key 20, value 16, source 8 — and the shell's minimum is 60 × 16 (D30). Below that S01's fallback replaces the frame entirely, so there is no width at which this surface renders with a column missing.
+**Nothing drops.** The table is four columns summing to 51 cells with gaps — expand 1, key 20, value 16, source 8; 53 where a row carries detail and the marker reserves its count (C11 I32) — and the shell's minimum is 60 × 16 (D30). Below that S01's fallback replaces the frame entirely, so there is no width at which this surface renders with a column missing.
 
 Priorities are still declared, because C11 requires them and a future column would need somewhere to sit in the order. They are simply never exercised, and saying so is better than inventing a drop sequence for widths that do not occur.
 

@@ -15,6 +15,8 @@
 //     `REPLY_ACTIONS`, so I8 rejects the key and the word stays.
 //   - The `try` around the handler removed → T1.38c fails: the throw reaches
 //     the read loop, which has no `catch`.
+//   - The notice put back to `warn` on an `ok` document (ruling 93) → T1.38c
+//     fails on its tone, mark and status.
 import { describe, expect, it, vi } from "vitest";
 
 import { buildGraph } from "../support/session.js";
@@ -116,7 +118,7 @@ describe("C16 §6c — reserved actions pass through (review batch 2, M6 item 1)
     await expect(buildGraph({ keyActions: { "queue.drop": () => undefined } })).resolves.toBeDefined();
   });
 
-  it("T1.38c (C22 I134): a handler that throws leaves the session running, spends the key and appends one warn notice", async () => {
+  it("T1.38c (C22 I134, ruling 93): a handler that throws leaves the session running, spends the key and appends one error notice", async () => {
     const w = await world({
       "queue.drop": () => {
         throw new Error("the queue is on fire");
@@ -131,7 +133,14 @@ describe("C16 §6c — reserved actions pass through (review batch 2, M6 item 1)
     const said = JSON.stringify(added[0]?.doc.blocks ?? []);
     expect(said, "naming the action").toContain("queue.drop");
     expect(said, "and the cause").toContain("the queue is on fire");
-    expect(said, "as a warning").toContain('"warn"');
+    // **A notice that reports a failure is a failure** (ruling 93, F1481): tone,
+    // mark and status read together, because it was a warning with ▲ on an `ok`
+    // document — consistent with itself and not with the word *failed*.
+    const notice = added[0]?.doc.blocks[0] as { tone?: string; glyph?: string } | undefined;
+    expect(
+      `${String(notice?.tone)} ${String(notice?.glyph)} ${String(added[0]?.doc.status)}`,
+      "as a failure: error tone, the error mark, an error document",
+    ).toBe("error error error");
     // Still running: the next key is typed.
     await w.type("!");
     expect(w.graph.editor.text).toBe("git status!");

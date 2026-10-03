@@ -49,7 +49,7 @@ describe("C22 contract", () => {
     }).not.toThrow();
   });
 
-  it("T2.6b (C01 I14, TL7): the lifecycle cannot be constructed without `onFatal`", () => {
+  it("C22 T2.6b (C01 I14, TL7): the lifecycle cannot be constructed without `onFatal`", () => {
     // A failed alternate screen is the only fatal case in the system (A02 §7),
     // so it is the one failure that cannot have undefined handling — C01
     // commitment 13. Optional in the type, every consumer omits it and finds
