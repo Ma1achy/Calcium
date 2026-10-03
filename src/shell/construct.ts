@@ -2072,6 +2072,10 @@ export async function constructGraph(
           (r) => refused(r),
           (id, notches) => scrollLayer(id, notches),
           () => void surface.close("detach"),
+          // Late for `pipeline`'s reason: `keys` is built below, and both are
+          // only ever called from a key (C19 I15, ruling 106 b).
+          () => keys.table.dismiss(),
+          () => keys.reset(),
         ),
         // C28 I39 — the `handler` span. Spread in here rather than threaded
         // through `routerDeps`, whose seven parameters are all C16's own and
@@ -5623,6 +5627,17 @@ function routerDeps(
   scrollLayer: RouterDeps["scrollLayer"],
   /** The escape's detach, late for `childAttached`'s reason (C16 I75). */
   detachChild: RouterDeps["detachChild"],
+  /**
+   * The effect table's `dismiss`, for the menu (C19 I15, ruling 106 b).
+   *
+   * **`⌃c` and a click close the menu as `esc` does**, which the router says
+   * of the panel's rung and was not true: popping the layer straight off C15
+   * left the table's candidates and its request behind, so `⇥⌃c` in one read
+   * dismissed the menu and `⇥`'s result reopened it, selected.
+   */
+  dismissMenu: () => void,
+  /** The effect table's `reset`: a cleared line takes its menu, hold and request (C19 I19, I15). */
+  lineGone: () => void,
 ): RouterDeps {
   const top = (): ReturnType<RouterDeps["overlayTop"]> => {
     const layer = stores.overlays.top;
@@ -5659,7 +5674,7 @@ function routerDeps(
         frame.promptAnchor(),
       ).filter((p) => takesPointer(p, gesture)),
     scrollLayer,
-    popLayer: () => void stores.overlays.pop(),
+    popLayer: () => void (stores.overlays.top?.id === MENU_ID ? dismissMenu() : stores.overlays.pop()),
     nativeSelection: frame.nativeSelection,
     semanticSelection: frame.semanticSelection,
     // `liveId`, not a `live` entry: C13 exposes the id and C16 only compares it.
@@ -5713,6 +5728,10 @@ function routerDeps(
     mouseEnabled: frame.mouseEnabled,
     promptHasText: () => stores.editor.text.length > 0,
     clearPrompt: () => {
+      // **A clear is a way the line goes** (C19 I19, I15, ruling 106 b): `⌃c`
+      // at `/ps --search=` behind a slow source left `› alpha` selected over
+      // the empty prompt once the source answered.
+      lineGone();
       stores.editor.setText("");
       scheduler.commit("input");
     },

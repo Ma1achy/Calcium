@@ -14,6 +14,7 @@ import { fakeStdin } from "../support/fake-terminal.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import type { CompletionSource } from "../../src/interaction/completion/index.js";
 import type { Graph } from "../../src/shell/construct.js";
+import type { ManifestDocument } from "../../src/data/manifest/index.js";
 
 /** One byte at a time: a run arriving together is a paste (C16 §7). */
 function type(stdin: { emit(s: string): void }, text: string): void {
@@ -626,7 +627,185 @@ describe("C19 I31 — a line that goes away takes its menu and its hold (F1497, 
 });
 
 describe("C19 I15 — a key behind an in-flight request (ruling 106, F1524)", () => {
-  it.todo("T3.33 (C19 I15, I20, ruling 106 a, b; F1524): ⇥⏎ in one batch over /ps --status= submits the line shown and leaves no menu over the empty prompt — not deferred on a component: ruling 106's code commit lands it");
-  it.todo("T3.34 (C19 I15, I13, I31, ruling 106 b; F1524): every other way the line goes away behind an in-flight ⇥ leaves no menu once it settles — not deferred on a component: ruling 106's code commit lands it");
-  it.todo("T3.35 (C19 I13, I15, ruling 106 b): a superseded result closes nothing the superseding keystroke opened — not deferred on a component: ruling 106's code commit lands it");
+  /** `ps`, with a closed `--status` and an open `--search`: the static set and a slot only a dynamic source answers. */
+  const PS: ManifestDocument = {
+    schema: "tui.manifest/1",
+    binary: "prism",
+    version: "1.0.0",
+    tools: [
+      {
+        name: "ps",
+        local: false,
+        summary: "list processes",
+        args: [],
+        flags: [
+          { name: "status", type: "enum", values: ["running", "failed", "queued"], summary: "filter by status" },
+          { name: "search", type: "string", summary: "search" },
+        ],
+      },
+    ],
+  };
+
+  /**
+   * A session at 100 × 24, and a dynamic source the row answers when it chooses.
+   *
+   * **One `emit` is one read**, which is the whole subject: the router routes
+   * every key in a read synchronously (C22 I24), and `request` resolves no
+   * sooner than a microtask later, so a second key in the same read is handled
+   * while the first key's request is still in flight — the order a PTY read of
+   * `\t\r` produced 3 times in 3 (F1524).
+   */
+  async function behind({ held: holding = false } = {}) {
+    const stdin = fakeStdin();
+    let answer: (c: readonly { value: string }[]) => void = () => undefined;
+    const held: CompletionSource = {
+      id: "held",
+      slots: ["flagValue"],
+      dynamic: true,
+      complete: () => new Promise((r) => void (answer = r)),
+    };
+    const session = await buildSession(
+      // **Registered only where a row holds it.** It answers every
+      // `flagValue`, `--status=` included, so registered everywhere it would
+      // hold the static rows' requests open too.
+      { stdin: stdin as never, manifest: PS, ...(holding ? { completionSources: [held] } : {}) },
+      { columns: 100, rows: 24 },
+    );
+    const settled = async (): Promise<void> => {
+      for (let i = 0; i < 3; i++) await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setTimeout(r, 0));
+    };
+    await settled();
+    const typed = async (text: string): Promise<void> => {
+      for (const ch of text) {
+        stdin.emit(ch);
+        await settled();
+      }
+    };
+    /** One read: every byte in it reaches the router before anything settles. */
+    const read = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      await settled();
+    };
+    const rows = (): readonly string[] => session.screen().rows.map((r) => r.trimEnd());
+    const prompt = (): string => rows().filter((l) => l.startsWith("❯")).at(-1) ?? "";
+    /** A candidate row's label: the ladder's current mark, or a value indented under it, without its summary. */
+    const menu = (): readonly string[] =>
+      rows().filter((l) => /^\s+(›\s+)?(running|failed|queued|alpha|beta|\/help|\/history)\b/u.test(l)).map((l) => l.trim().split(/\s{2,}/u)[0]!);
+    const owner = (): string => rows().find((l) => l.includes("⏎")) ?? "";
+    const escape = async (): Promise<void> => {
+      stdin.emit("\u001b");
+      session.clock.advance(80);
+      await new Promise((r) => setTimeout(r, 80));
+      await settled();
+    };
+    const release = async (): Promise<void> => {
+      answer([{ value: "alpha" }, { value: "beta" }]);
+      await settled();
+      await settled();
+    };
+    return { typed, read, rows, prompt, menu, owner, escape, release };
+  }
+
+  it("T3.33 (C19 I15, I20, ruling 106 a, b; F1524): ⇥⏎ in one batch over /ps --status= submits the line shown and leaves no menu over the empty prompt", async () => {
+    // **The control first: the fixture reaches the arm under test.** `⇥` alone
+    // opens the requested menu, selected, so a row that sees no menu below is
+    // seeing the invalidation and not a `⇥` that never answered.
+    const control = await behind();
+    await control.typed("/ps --status=");
+    expect(control.menu(), "the menu at rest over the three values").toHaveLength(3);
+    expect(control.owner(), "at rest").toContain("⏎ run");
+    await control.read("\t");
+    expect(control.menu()[0], "⇥ selects the first").toMatch(/^› running/u);
+    expect(control.owner(), "and owns ⏎").toContain("⏎ accept");
+
+    const s = await behind();
+    await s.typed("/ps --status=");
+    await s.read("\t\r");
+    // **Once the request settles** — `settled()` has run the continuation. At
+    // a1284cb0 it opened `› running` over this empty prompt (F1524).
+    expect(s.prompt(), "the prompt is empty").toBe("❯");
+    expect(s.menu(), "no candidate row over it").toEqual([]);
+    expect(s.owner(), "and the owner line is the bare prompt's").toContain("⏎ send");
+    expect(s.owner(), "not the menu's").not.toContain("⏎ accept");
+    // **The line submitted is the one shown** (ruling 106 a): the echo, and
+    // history's newest entry, which `↑` recalls into the prompt.
+    expect(s.rows().some((l) => l.trim() === "❯ /ps --status="), "the transcript echoes it exactly").toBe(true);
+    await s.read("\u001b[A");
+    expect(s.prompt(), "and history holds it exactly").toBe("❯ /ps --status=");
+  });
+
+  it("T3.34 (C19 I15, I13, I31, ruling 106 b; F1524): every other way the line goes away behind an in-flight ⇥ leaves no menu once it settles", async () => {
+    // **Each arm is a different route through the shell** (C19 §8c's
+    // classification table), and no two share the line that invalidates.
+    const bs = await behind();
+    await bs.typed("/ps --status=");
+    await bs.read("\t\u007f");
+    expect(bs.prompt(), "⌫: the edit happened").toBe("❯ /ps --status");
+    expect(bs.menu(), "⌫: and --status='s values are not over it").toEqual([]);
+
+    const kill = await behind();
+    await kill.typed("/ps --status=");
+    await kill.read("\t\u0015");
+    expect(kill.prompt(), "⌃u: emptied").toBe("❯");
+    expect(kill.menu(), "⌃u: no menu over the empty line").toEqual([]);
+
+    const up = await behind();
+    await up.typed("/help\r");
+    await up.typed("/ps --status=");
+    await up.read("\t\u001b[A");
+    expect(up.prompt(), "↑: the recall").toBe("❯ /help");
+    expect(up.menu(), "↑: no menu over the recalled line").toEqual([]);
+
+    const ctrlc = await behind();
+    await ctrlc.typed("/ps --status=");
+    await ctrlc.read("\t\u0003");
+    expect(ctrlc.prompt(), "⌃c over the panel: the line stays").toBe("❯ /ps --status=");
+    expect(ctrlc.menu(), "⌃c closes the menu as esc does, and it stays closed").toEqual([]);
+
+    // **Behind a source the row holds open**, so the dismissal and the clear
+    // happen while the request is unmistakably in flight.
+    const esc = await behind({ held: true });
+    await esc.typed("/ps --status=");
+    await esc.read("\t");
+    await esc.escape();
+    expect(esc.menu(), "esc: dismissed").toEqual([]);
+    await esc.release();
+    expect(esc.menu(), "esc: and the answer does not reopen it").toEqual([]);
+
+    const clear = await behind({ held: true });
+    await clear.typed("/ps --search=");
+    await clear.read("\t");
+    await clear.read("\u0003");
+    expect(clear.prompt(), "⌃c at a prompt holding text: cleared").toBe("❯");
+    await clear.release();
+    expect(clear.menu(), "and the answer opens nothing over the empty line").toEqual([]);
+
+    // **The control: the held source answering with nothing pressed** opens
+    // the menu, so an empty menu above is the invalidation's and not a source
+    // that never reached the screen.
+    const control = await behind({ held: true });
+    await control.typed("/ps --search=");
+    await control.read("\t");
+    await control.release();
+    expect(control.menu()[0], "the source's answer, selected").toMatch(/^› alpha/u);
+  });
+
+  it("T3.35 (C19 I13, I15, ruling 106 b): a superseded result closes nothing the superseding keystroke opened", async () => {
+    const s = await behind();
+    await s.typed("/");
+    await s.read("\th");
+    expect(s.prompt()).toBe("❯ /h");
+    // **At a1284cb0 this was empty**: `h` cancelled in the composition root and
+    // opened `/help` and `/history`, and the superseded result — empty by C19
+    // I13 — reached §5's *none* arm and closed them.
+    expect(s.menu(), `the menu h opened, at rest:\n${s.rows().join("\n")}`).toEqual(["› /help", "/history"]);
+
+    // The control: `⇥` alone opens the requested verb menu, so the result does
+    // reach the continuation on this line.
+    const control = await behind();
+    await control.typed("/");
+    await control.read("\t");
+    expect(control.owner(), "⇥ alone: a selected menu").toContain("⏎ accept");
+  });
 });

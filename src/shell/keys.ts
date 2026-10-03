@@ -690,6 +690,21 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     return candidates.length > 0;
   }
 
+  /**
+   * The line a request was asked against has gone, so its answer is void
+   * (C19 I15, ruling 106 b).
+   *
+   * **C19's token, not this table's sequence.** `seq` guards a request
+   * against a later `Tab` and nothing else moves it, so a submit, a recall, an
+   * edit through the recompute set and a dismissal each left a request live
+   * whose result then opened a selected menu over a line it was never asked
+   * about — `› running` over the empty prompt after `⇥⏎` (F1524). `cancel()`
+   * makes the result arrive `superseded`, which the continuation reads.
+   */
+  function abandonRequest(): void {
+    deps.completion.cancel();
+  }
+
   function closeMenu(): void {
     wheeled = null;
     candidates = [];
@@ -711,6 +726,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
    * excludes; the next edit rebuilds it (C19 I22).
    */
   function recall(line: string): void {
+    abandonRequest();
     deps.editor.setText(line);
     if (hasMenu()) closeMenu();
     suppressedAt = null;
@@ -990,7 +1006,13 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         // A later request supersedes this one. The engine sequences its own
         // work; this guards the *menu*, which is state the engine has never
         // seen.
-        if (mine !== seq) return;
+        //
+        // **And `superseded`, because this sequence is not the token** (C19
+        // I13, I15, ruling 106 b). A printable key cancels in the composition
+        // root and moves nothing here, so its superseded result — empty by I13
+        // — reached the *none* arm below and closed the menu the key had just
+        // opened: `/`, `⇥h` in one read, and `/help` and `/history` gone.
+        if (mine !== seq || result.superseded) return;
 
         // **C19 §5's algorithm, which had no caller until now** (C19 I16).
         // `commonPrefix` was computed on every request and read by nothing
@@ -1080,6 +1102,10 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         // must stay closed for more than one keystroke, or the dismissal is
         // undone by the next character.
         const at = ctxNow().replace.start;
+        // **And the request behind it** (C19 §8's `Esc` column, ruling 106 b):
+        // a slow source answering after the dismissal reopened the menu it
+        // dismissed, selected.
+        abandonRequest();
         closeMenu();
         suppressedAt = at;
         return;
@@ -1601,6 +1627,12 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         action,
         RECOMPUTES.has(action as KeyAction)
           ? () => {
+              // **Every edit supersedes, not only a printable key** (C19 I13,
+              // ruling 106 b). The composition root cancels before a
+              // printable and a paste; these reached the buffer by the
+              // table, and `⇥⌫` in one read left `--status=`'s values
+              // selected over `/ps --status`.
+              abandonRequest();
               effect();
               afterEdit();
             }
@@ -1746,6 +1778,10 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     },
 
     reset: () => {
+      // **The request goes with the line** (C19 I15, ruling 106 b, F1524):
+      // `⇥⏎` in one read submits the line shown, and `⇥`'s result used to open
+      // `› running` over the empty prompt after it.
+      abandonRequest();
       closeMenu();
       suppressedAt = null;
       held = null;
