@@ -103,10 +103,16 @@ describe("C15 e2e — layers under real input", () => {
       pty.type("/ps --status=");
       pty.type("\t");
 
-      await pty.waitFor(/running/, 15_000);
-      await pty.waitFor(/queued/, 15_000);
+      // **On the frame, after `⇥`** (F1525): every one of these was in the
+      // stream from the rest menu and the typed line before `⇥` drew anything.
       // The prompt below it, still holding the line — the layer floated.
-      await pty.waitFor(/❯ \/ps --status=/, 15_000);
+      await pty.waitForFrame(
+        (f) =>
+          f.some((r) => r.includes("⏎ accept")) &&
+          ["running", "queued"].every((v) => f.some((r) => r.includes(v))) &&
+          promptRow(f).includes("❯ /ps --status="),
+        15_000,
+      );
     } finally {
       pty.kill();
     }
@@ -229,13 +235,28 @@ describe("C15 e2e — layers under real input", () => {
       await pty.waitFor(/\u276f/, 15_000);
       pty.type("/ps --status=");
       pty.type("\t");
-      await pty.waitFor(/queued/, 15_000);
+      // **The selection `⏎` will accept, as a frame** (F1525). `queued` was
+      // already on the rest frame `/ps --status=` drew, so a wait on it resolved
+      // before `⇥` had selected anything, `⏎` went out about a millisecond
+      // later, and the session read `\t\r` together 1 time in 7 — which since
+      // ruling 106 runs the line at rest.
+      await pty.waitForFrame((f) => f.some((r) => r.includes("⏎ accept")), 15_000);
 
       // Narrower and much shorter, down to the size gate\u2019s minimum. The menu
       // is anchored to a prompt whose row has moved and sized against a region
       // that has shrunk by eight rows.
       pty.resize(60, 16);
-      await pty.waitFor(/\u276f \/ps --status=/, 15_000);
+      // **The 60-column frame, not the prompt** (F1525): the prompt line was in
+      // the stream from before the resize, so this resolved at once. The
+      // harness clips the 24-row frame to 16 (`Painter.resize`), which takes
+      // the prompt and the owner line off its bottom, so only the session's
+      // redraw at the new size puts both back — asserted, so the wait below
+      // cannot be answered by the frame from before.
+      expect(promptRow(pty.frame), "the clip took the old prompt").toBe("");
+      await pty.waitForFrame(
+        (f) => promptRow(f).includes("/ps --status=") && f.some((r) => r.includes("⏎ accept")),
+        15_000,
+      );
 
       // **The session is still live afterwards**, which is the half a test of
       // the redrawn frame alone would miss: a refused frame draws the fallback

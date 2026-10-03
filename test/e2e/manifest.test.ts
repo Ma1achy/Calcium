@@ -104,7 +104,9 @@ describe("C05 e2e", () => {
 
       // (3) And a valid one reaches the far side and renders.
       await submit("/promote app.web:main");
-      await pty.waitFor(/app\.web/, 15_000);
+      // **The far side's answer, not the line** (F1525): `app.web` was on the
+      // prompt before the `⏎`, so a wait on it asserted the typing.
+      await pty.waitFor(/promoted app\.web/, 15_000);
     } finally {
       pty.kill();
     }

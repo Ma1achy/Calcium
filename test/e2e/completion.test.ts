@@ -46,9 +46,14 @@ describe("C19 tier 5 — at a real prompt", () => {
 
       // The enum's values, from the manifest rather than from a source that
       // guesses: `status` is declared `enum` with exactly these three.
-      await pty.waitFor(/running/, 15_000);
-      await pty.waitFor(/failed/, 15_000);
-      await pty.waitFor(/queued/, 15_000);
+      //
+      // **On the frame `⇥` drew, with its selection** (F1525): all three were
+      // in the stream from the rest menu before `⇥` had answered, and `↓⏎`
+      // behind an in-flight `⇥` acts on the line as it stands (ruling 106).
+      await pty.waitForFrame(
+        (f) => f.some((r) => r.includes("⏎ accept")) && ["running", "failed", "queued"].every((v) => f.some((r) => r.includes(v))),
+        15_000,
+      );
 
       // **Selectable, then inserted.** `↓` moves the selection and Enter
       // accepts it, so the prompt ends up carrying a value the user never
@@ -56,7 +61,7 @@ describe("C19 tier 5 — at a real prompt", () => {
       // that candidates appeared would miss.
       pty.type("\u001b[B");
       pty.type("\r");
-      await pty.waitFor(/--status=failed/, 15_000);
+      await pty.waitForFrame((f) => promptRow(f).includes("--status=failed"), 15_000);
     } finally {
       pty.kill();
     }
@@ -119,15 +124,21 @@ describe("C19 tier 5 — at a real prompt", () => {
       pty.type("/ps --status=");
       pty.type("\t");
 
-      await pty.waitFor(/running/, 15_000);
-
+      // **On the frame `⇥` drew** (F1525): every one of these was in the stream
+      // from the rest menu and the typed line before `⇥` had answered.
+      //
       // **Every candidate, not just the first.** A menu clamped to one row by a
       // short region shows `running` and satisfies a test that stopped there.
-      await pty.waitFor(/queued/, 15_000);
-
+      //
       // And above the prompt rather than over it: the prompt still carries what
       // was typed, so the layer did not take its rows.
-      await pty.waitFor(/--status=/, 15_000);
+      await pty.waitForFrame(
+        (f) =>
+          f.some((r) => r.includes("⏎ accept")) &&
+          ["running", "queued"].every((v) => f.some((r) => r.includes(v))) &&
+          promptRow(f).includes("--status="),
+        15_000,
+      );
     } finally {
       pty.kill();
     }

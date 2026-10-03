@@ -60,7 +60,9 @@ describe("C17 tier 5 — at a real prompt", () => {
       // And put back by hand, then submitted — so the row ends where it began
       // and the correction is the thing under test rather than the typing.
       pty.type("--mine\r");
-      await pty.waitFor(/--mine/, 15_000);
+      // **The submission, not the word** (F1525): `--mine` was in the stream
+      // from the first time it was typed, so this resolved before the `⏎`.
+      await pty.waitForFrame((f) => promptRow(f).trim() === "❯", 15_000);
     } finally {
       pty.kill();
     }
@@ -246,7 +248,9 @@ describe("C17 tier 5 — at a real prompt", () => {
       await pty.waitFor(/xxxx/, 15_000);
 
       pty.resize(60, 24);
-      await pty.waitFor(/xxxx/, 15_000);
+      // **A redraw after the resize** (F1525): the line was in the stream at
+      // 100 columns, so `waitFor` resolved on the frame this row is not about.
+      await pty.waitForNew(/xxxx/, 15_000);
 
       const screen = pty.frame;
       expect(screen, "no row was added by a wrap nobody counted").toHaveLength(24);
