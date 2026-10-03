@@ -279,3 +279,58 @@ they exist to show them.
 - **Value-colour.** Gap 3: a CPU bar encodes load on a continuum and the palette is tone
   slots. Absorbed as thresholds for now, and the threshold choice is arbitrary — which is
   the finding, not the choice.
+
+---
+
+## E. A verb, not a dashboard — the re-founding (design check E13, §080, §085)
+
+The design language is the top of the chain for appearance (CLAUDE.md, `AUTHORITY.md`), and
+two of its sections rule on this surface directly:
+
+- **§085**: *"A SHELL. The dashboard is a VERB — `/dashboard` emits one as an entry, and it
+  settles like any other. It is a picture of a moment, not a place you live in."*
+- **§080**: *"a command is a CALL"* — and the bespoke framed panel, its gutter, rules and
+  header are *"all GONE"*.
+
+The frame at a1284cb0 was a framed `┌ docker-tui · engine … ┐` panel nesting a framed
+`┌ ⠋ RUNNING ┐` live part, which a heatmap of every container's CPU sat inside. Each of
+those is one of the four pieces §080 removes. So the re-founding is **one entry, no frame,
+settled**:
+
+```
+7 containers · 6 running · CPU 79% · MEM 3% · engine 27.3.1
+  NAME                      CPU                MEM                USAGE
+  ● api                       █░░░░░░░░░ 8.8%  ░░░░░░░░░░░░ 0.6%  97.34MiB / 15.63G…
+  ● cache                     ░░░░░░░░░░ 0.8%  ░░░░░░░░░░░░ 0.1%  8.91MiB / 15.63GiB
+  …                                                                   (A7's collapse, unchanged)
+  ● worker                  ▲ ██████░░░ 64.1%  ░░░░░░░░░░░░ 1.4%  227.96MiB / 15.63…
+
+migrate                                                    (the stopped, as pills)
+```
+
+Typed as `/dashboard`, the shell puts its own call head above it — `● dashboard · 0.3s · 6
+rows` — and the body sits under `⎿`. That is the call grammar, and the app writes none of it.
+
+### The classification table — where the new rules meet the old ones
+
+Every row is a cell two rules both claim. **A row governed by one rule restates it.**
+
+| | the two rules | what happens where they meet | ruled |
+|---|---|---|---|
+| E1 | *settles* (§085) × the ring set's history (gap 1, C12 §3a) | a settled entry ticks once, so the history is one column — a heatmap of a moment, which says nothing the table beside it does not | **the history goes**, and `createRingSet` / `historyBlock` with it: an export with no reader is surface nobody asked for |
+| E2 | the head's count (`outcomeOf`, C23 §8g) × the table's nesting | `outcomeOf` counts the rows of a **document-level** table; a table inside a `group` gives a head with no count | **the table is at document level**, so `/dashboard`'s head says how many rows it drew |
+| E3 | the head's count × A7's collapse | seven running collapse to five, and the head counts the five | **kept, and stated**: the head counts what the table drew and the `… 2 more` row says what it did not — two numbers about two things, both true |
+| E4 | the greeting (C22 I44) × *a command is a call* (§080) | the greeting is appended through C23 with `command: ""`; no head is drawn, and no public builder lets an app draw one | **at startup the entry is the rows without a head**; the head arrives when `/dashboard` is typed. The startup half of *calls* is a framework seam the app cannot reach — reported, not hand-built (a hand-made `●` line is the bespoke header §080 deletes) |
+| E5 | the outer panel's title (engine, count) × *no frame* | the title was the only place the engine and the total were said | **they move into the summary row**, which already varied; F16's reason for the summary living in the body (a title cannot vary) is moot without a live part, and the row says it anyway |
+| E6 | A9 (*never no panel*) × *no frame* | there is no panel to keep | **A9 becomes *never nothing***: zero running renders the table and its empty message |
+| E7 | the banner × §080's *bespoke header* | the whale is art in a `raw` group, not a framed panel, and no section rules on art | **kept**: §080 removes chrome that carries a surface's information, and the banner carries none — what it says, the top rule and the head already say. A ruling, not a citation; the design is silent |
+| E8 | *settles* × C23 I9 (*a frozen entry keeps receiving patches*) | with no live part there is nothing to patch | **nothing to rule** — and `app.ts`'s *it keeps refreshing after the first command* stops being true and is rewritten |
+
+### What the walk changed before any code
+
+1. The history heatmap was the obvious thing to keep — it is the dashboard's one picture of
+   the past — and E1 is why it cannot: a settled entry has no past.
+2. The table's place in the document is load-bearing (E2), which a reader of the frame would
+   not see: the frame is identical with the table inside a group, and only the head differs.
+3. E4 is a finding rather than a ruling: *startup becomes calls* needs a greeting that is a
+   call, and that is C22's to grant.
