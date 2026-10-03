@@ -44,6 +44,9 @@ import {
   glyphFor,
   FREE_WIDTH_SLOTS,
   glyphs,
+  animationIntervalOf,
+  spinnerIntervalMs,
+  tickIntervalOf,
 } from "../../src/presentation/blocks/index.js";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
@@ -1469,5 +1472,31 @@ describe("C04 I145 — a finished bar has zero rows (review batch 4 M16.2)", () 
 });
 
 describe("C09 I32 — a status asks for a tick only while it moves (ruling 106 c, F1526)", () => {
-  it.todo("T2.231 (C09 I32, ruling 106 c; F1526): tickIntervalOf asks for a status's tick exactly when its activity line draws — not deferred on a component: ruling 106's code commit lands it");
+  it("T2.231 (C09 I32, ruling 106 c; F1526): tickIntervalOf asks for a status's tick exactly when its activity line draws", () => {
+    // **A named set whose interval is not the default's**, so an answer of the
+    // default interval would be the kind's and not the block's.
+    const at = (state: string, over: Record<string, unknown> = {}): Block =>
+      block({ kind: "status", id: "s", state, message: "decode failed", spinner: "line", ...over } as never) as Block;
+    const own = spinnerIntervalMs("line");
+    expect(own, "the set is distinguishable from the default").not.toBe(spinnerIntervalMs(undefined));
+
+    expect(tickIntervalOf(at("loading")), "loading moves").toBe(own);
+    expect(tickIntervalOf(at("retrying", { retryInMs: 8000 })), "retrying with a countdown moves").toBe(own);
+    expect(tickIntervalOf(at("error")), "error has nothing that moves").toBeNull();
+    expect(tickIntervalOf(at("empty")), "nor empty").toBeNull();
+    expect(tickIntervalOf(at("retrying")), "nor retrying with no countdown").toBeNull();
+    const panel = block({ kind: "panel", id: "p", title: "build", children: [at("error")] } as never) as Block;
+    expect(animationIntervalOf([panel]), "a panel holding only the error box").toBeNull();
+    expect(
+      animationIntervalOf([block({ kind: "panel", id: "p", title: "build", children: [at("loading")] } as never) as Block]),
+      "and the control: the same panel over loading asks",
+    ).toBe(own);
+
+    // **The control for the null**: the error box drawn at two ticks is the
+    // same bytes, so asking for no tick is about a box in which nothing moves.
+    const drawn = (tick: number): string => measurable({ capabilities: FULL_CAPS, tick }).renderToLines(at("error"), 60).join("\n");
+    expect(drawn(0), "error at two ticks").toBe(drawn(5));
+    const loading = (tick: number): string => measurable({ capabilities: FULL_CAPS, tick }).renderToLines(at("loading"), 60).join("\n");
+    expect(loading(0), "loading at two ticks, which the same reader can tell apart").not.toBe(loading(5));
+  });
 });

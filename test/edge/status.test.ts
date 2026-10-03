@@ -223,8 +223,8 @@ describe("C09 §3a — the box occupies what measure committed", () => {
 });
 
 describe("C09 §3a — the spinner", () => {
-  it("T3.43 (C09 I32): ten ticks give ten frames, in all three states", () => {
-    // **`error` included, which is what says the kind animates unconditionally
+  it("T3.43 (C09 I32): ten ticks give ten frames in loading and retrying, and one in error", () => {
+    // **`error` included, which is what says the kind draws unconditionally
     // rather than by state.** `retrying` is the error box plus a spinner line,
     // so a rule excluding `error` breaks the state composed out of it.
     for (const state of ["error", "retrying", "loading"] as const) {

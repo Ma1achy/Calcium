@@ -9,12 +9,14 @@
  * hand-maintained list is the one that reads as authoritative.
  *
  * **Two entries by kind, and that is the whole population of kinds.** `status`
- * animates unconditionally (C09 I32) and `steps` draws a spinner frame while a
- * step is active. A block also animates **by content** — a span or a bar whose
+ * draws unconditionally and asks for a tick while its activity line draws
+ * (C09 I32, ruling 106 c), and `steps` draws a spinner frame while a step is
+ * active. A block also animates **by content** — a span or a bar whose
  * ramp carries an `animate` (C09 I54) — and `tickIntervalOf` answers for both;
  * this record stays what it was, the kinds that animate by nature.
  */
 import { spinnerIntervalMs, type GlyphCaps } from "./glyphs.js";
+import { activityLine } from "./kinds/status.js";
 import { animatesByContent, rampCadenceMs, type TickAt } from "./ramp.js";
 import type { Block, BlockKind, KnownBlockKind, Notice, Status } from "../../data/viewmodel/index.js";
 
@@ -98,7 +100,15 @@ export function tickIntervalOf(
     // **At the rung the frames are drawn at** (C09 I112, question 40): given the
     // capabilities, a set's ASCII rung asks for its one cadence, so a set slower
     // than it is woken at the rate its ASCII frames turn.
-    return block.kind === "status" ? spinnerIntervalMs((block as Status).spinner, caps) : spinnerIntervalMs(undefined, caps);
+    if (block.kind !== "status") return spinnerIntervalMs(undefined, caps);
+    // **A status asks only while its line moves** (C09 I32, ruling 106 c,
+    // F1526). The drawing stays state-independent; the wake does not, because
+    // a settled `error` box drew the same bytes every tick and the session
+    // still woke at the set's cadence to find that out. `activityLine` is the
+    // renderer's own answer — `loading`, and `retrying` with a countdown — so
+    // this is not a second list of the states that move.
+    const status = block as Status;
+    return activityLine(status, "") === "" ? null : spinnerIntervalMs(status.spinner, caps);
   }
   // **A streaming notice animates by nature too, and did not** (C09 I101,
   // §026). `ANIMATES` says `notice: false` and `animatesByContent` reads a

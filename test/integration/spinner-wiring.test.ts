@@ -227,5 +227,50 @@ describe("C09 I32 — the animating record", () => {
 });
 
 describe("C22 I60a — a settled error box arms no ticker (ruling 106 c, F1526)", () => {
-  it.todo("T4.122 (C22 I60a, C09 I32, ruling 106 c; F1526): a settled error status at idle writes nothing for three seconds of timers — not deferred on a component: ruling 106's code commit lands it");
+  /** Writes to the terminal across three seconds of idle after `/work` settles on a `status` in `state`. */
+  async function idleWrites(state: "error" | "loading"): Promise<number> {
+    vi.useFakeTimers();
+    try {
+      const stdin = fakeStdin();
+      const { stdout, clock } = await buildSession({
+        manifest: MANIFEST,
+        localHandlers: {
+          work: () => ({
+            schema: "tui.view/1",
+            command: "work",
+            status: "ok",
+            blocks: [{ kind: "status", id: "s", state, message: "decode failed" } as never],
+          }),
+        },
+        stdin: stdin as never,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      await settle();
+      stdin.emit("/work\r");
+      // Past C03's window, so the settling frame itself is written before the count.
+      clock.advance(500);
+      await vi.advanceTimersByTimeAsync(500);
+      await settle();
+      const before = stdout.chunks.length;
+      // The clock moves with the timers (C22 I74) — see T4.35's `step`.
+      for (let i = 0; i < 30; i += 1) {
+        clock.advance(100);
+        await vi.advanceTimersByTimeAsync(100);
+        await settle();
+      }
+      return stdout.chunks.length - before;
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+
+  it("T4.122 (C22 I60a, C09 I32, ruling 106 c; F1526): a settled error status at idle writes nothing for three seconds of timers", async () => {
+    // **The control first**: the same verb answering `loading` writes frames
+    // across the same three seconds, so a zero below is the state's and not a
+    // ticker that never runs in this harness.
+    expect(await idleWrites("loading"), "loading turns its spinner").toBeGreaterThan(10);
+    // At a1284cb0 the ticker woke at the set's cadence over this box and drew
+    // a frame each time (F1526).
+    expect(await idleWrites("error"), "a settled error box asks for no tick").toBe(0);
+  });
 });
