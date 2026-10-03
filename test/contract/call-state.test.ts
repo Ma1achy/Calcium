@@ -258,3 +258,9 @@ describe("C04 I149 — waiting, blocked on you", () => {
     );
   });
 });
+
+describe("C23 I104 — the head rendered per token", () => {
+  it.todo(
+    "T2.49 (C23 I104, C10 I15, C09 I45): a succeeded and a failed head rendered at 24-bit and 1-bit, read per token — not deferred on a component: lands with the composer change in this round",
+  );
+});

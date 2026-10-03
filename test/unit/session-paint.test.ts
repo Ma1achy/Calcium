@@ -1469,3 +1469,12 @@ describe("C22 I33 — the echo neutralised (F1401)", () => {
     expect(commandRows("/show abc", 20, FULL_CAPS)).toEqual(["❯ /show abc"]);
   });
 });
+
+describe("C22 I153, I154 — the echo's wash and the prompt's mark", () => {
+  it.todo(
+    "T1.187 (C22 I153, §008): the echo rows washed bgElev at 24-bit, unwashed at 1-bit — not deferred on a component: lands with the composer change in this round",
+  );
+  it.todo(
+    "T1.188 (C22 I154, §030): the prompt mark muted, plain at 1-bit, absent under a question — not deferred on a component: lands with the paint change in this round",
+  );
+});

@@ -140,3 +140,9 @@ describe("C28 §3c — the deck's registers", () => {
     for (const c of CARDS) expect(c.floor, `${c.id} declares a floor`).toBeGreaterThan(0);
   });
 });
+
+describe("C28 I66 — a card names only keys the session binds", () => {
+  it.todo(
+    "T1.130 (C28 I66, R-INT-002): no card names n, p, tab, shift-tab or esc — not deferred on a component: lands with the card text in this round",
+  );
+});

@@ -179,3 +179,9 @@ describe("C22 §2 — config", () => {
     expect(PROMPT_SUBSTITUTION.map((f) => cells(f))).toEqual([2, 2]);
   });
 });
+
+describe("C22 I111 as amended — the label defaults to the name", () => {
+  it.todo(
+    "T1.189 (C22 I111, §069 R-BLK-512): no label member gives the config's name; a label returning null gives none — not deferred on a component: lands with the config change in this round",
+  );
+});
