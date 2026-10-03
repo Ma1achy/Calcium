@@ -57993,6 +57993,8 @@ Found by the inspector verifying F1296 at 5318cd25, read from the source and not
 
 **Owed**: either `ask` refuses such a set, or I93 states what `esc` does in it.
 
+**Closed** (lane b4-exec5, e2a62bba (spec), d6d0c898, e8eb6680: `invalidChoices` refuses a set in which every choice is a reply or an inspection, `approvalPrompt` refuses one whose `esc` does not resolve `deny`, and a refused approval settles failed with code 1 and runs nothing (T1.107, T4.107, C22 T1.186)).
+
 ## F1496 — the completion menu keeps a pills form no picture draws ★★★☆☆
 
 Found by lane b4-menu2 at 3ed61fde's survey for F1488. C19 §5 draws *two rows of pills when the candidate set is short*, meaning candidates with no `detail`. R-BLK-866 names the palette *a PANEL whose list is a LADDER*, and R-BLK-867, §029 and §097 all draw one candidate a row with `›` on the current. No picture draws pills. The design's horizontal row with a current is the tape (§095), and the `current` glyph's domains are `chooser-row` and `tape`. F1487's pills window, built by the same lane (cfa684f7), retires with the form.
@@ -58171,11 +58173,15 @@ Found by lane b4-exec4 (C23 §8a A6.9 row 11), measured with `completionLine`. `
 
 **Ruled (103 b).**
 
+**Closed** (lane b4-exec5, e2a62bba (spec), d6d0c898, e8eb6680: `verdict()` reads the shell's own word through `shellWord()`, so a denial, expiry or cancel carries no `exit N`; a child's own 130 still does (ruling 103(b))).
+
 ## F1518 — a denied or expired approval's head is drawn failed ★★☆☆☆
 
 Found by lane b4-exec4 (C23 §8a A6.9 row 12). `FAILURE_WORDS` gives `denied` the `failed` call state, so the head takes error tone and ✗. Ruling 100(a) kept the status `ok` on the ground that a refusal *is not an error and never red* (§047), and the head contradicts the reason the ruling gave. §106 draws an expired question as `○ the question expired`, and says *denied would be a lie about what happened*.
 
 **Ruled (103 a).**
+
+**Closed** (lane b4-exec5, e2a62bba (spec), d6d0c898, e8eb6680: `denied` joins `STOPPED_WORDS`, so a denied or expired head is drawn as a decision, muted with no ✗, at every rung (T4.105, ruling 103(a))).
 
 ## F1519 — a stall row is kept when a stall ends in a malformed patch or a throw ★☆☆☆☆
 
@@ -58183,11 +58189,15 @@ Found by lane b4-exec4 (C23 §8a A6.10 row 6). Ruling 100(d) dropped `stall-noti
 
 **Ruled (103 c).**
 
+**Closed** (lane b4-exec5, e2a62bba (spec), d6d0c898, e8eb6680: `settleKept(code, withoutStall)` drops the stall row on a malformed patch and a throw; a natural end keeps `resumed after` (ruling 103(c))).
+
 ## F1520 — a waiting approval is said to have gone quiet ★★☆☆☆
 
 Found by lane b4-exec4 (C23 §8a A6.10 row 7). The stall watch is armed at dispatch, and the readout only on approval. A question left open for three minutes reads `ps · ⠋ waiting` over `no output for 2m`, and a denial then rewrites the row as `resumed after`. The entry was waiting on the user, not on output.
 
 **Ruled (103 d).**
+
+**Closed** (lane b4-exec5, e2a62bba (spec), d6d0c898, e8eb6680: `refresh.watch` arms after the readout, on approval, not at dispatch (T4.106, ruling 103(d))).
 
 ## F1521 — no chip reaches the transcript, so §101's transcript half has nothing to stand beside ★★★☆☆
 
@@ -58215,14 +58225,32 @@ Forced-order reproduction, with `\t\r` in one write: 3 of 3 fail on both trees, 
 
 **Ruled (106).** **Owed**: amend C19 §4 and I15; bump `seq` (or cancel) in `reset()` and `recall()`; add a row that sends `⇥⏎` in one batch and asserts no menu layer over an empty prompt.
 
+**Closed** (lane b4-menu4, 24436f3b (spec), a8928567, 986d9cd8, b11f3517, f03f89cf: `abandonRequest()` runs from reset, recall, dismiss and every emptying edit, and a superseded result is dropped; T5.4 0/40 failing pinned where it was 7/60, and T5.6 fails 3/3 with the call removed from `reset()` (ruling 106(a, b))).
+
 ## F1525 — C22 T5.4 sends `⏎` before the selection it means to accept exists ★★☆☆☆
 
 Found by the locksmith's diagnosis of C22 T5.4. `waitFor` matches against all output since the session started (`test/support/pty.ts`). `waitFor(/queued/)` resolves on the menu at rest, before `⇥` has selected anything. The post-resize `waitFor(/❯ \/ps --status=/)` resolves at once, on the frame from before the resize. So `⏎` is written about 1 ms after the rest frame, and the row fails whenever the session reads `\t\r` together. That is why the row was intermittent, 1 in 7 at worst, and never reproducible at will. With ruling 106's fix the row still fails in that interleaving, for the test's reason alone, because `⏎` at rest runs the line.
 
 **Owed**: wait with `waitForFrame` for `⏎ accept` after `⇥`, and for the 60-column frame after the resize. Grep for the same shape in the other tier-5 rows.
 
+**Closed** (lane b4-menu4, 24436f3b (spec), a8928567, 986d9cd8, b11f3517, f03f89cf: tier 5 gains `waitForNew`, and every wait an instrumented run found answered by an earlier frame now waits for the step's own (six rows across C03, C17, C05, C19, C22)).
+
 ## F1526 — a settled `error` status animates forever ★☆☆☆☆
 
 Found by the locksmith's diagnosis of C22 T5.4, as a symptom rather than the cause. `errorDoc`'s `status` block carries `state: "error"` (`documents.ts:941`), and `ANIMATES.status` is true for the kind whatever the state (`animation.ts`). So the session ticker (`session.ts:1184-1260`) wakes at spinner cadence for a settled error box, about every 20 ms and 140 ms, and draws an empty diff each time. At idle it reads 4 times in 3 s. Under a selected menu, where `cursorFor` is null, each frame is two cursor hides, which is the flood in T5.4's failure output.
 
 **Ruled (106 c).**
+
+**Closed** (lane b4-menu4, 24436f3b (spec), a8928567, 986d9cd8, b11f3517, f03f89cf: `tickIntervalOf` asks a status for a tick only when `activityLine` draws one; T4.122 counts 0 writes over 3 s idle where it counted 34 (ruling 106(c))).
+
+## F1527 — the approval branch's `outcome !== "answered"` gate has no set that reaches it ★★☆☆☆
+
+Found by lane b4-exec5's mutation pass at e8eb6680, as `SURVIVED T4.92 a withdrawn approval settles as denied`. Since F1495, `approvalPrompt` refuses a set whose `esc` does not resolve `deny`, and withdrawal and expiry resolve with the default's key, so they always carry `deny`. The clause `answer.outcome !== "answered"` in `src/shell/execution.ts`'s approval branch therefore never decides anything: deleting it produces the same program over every constructible set. C23 I94, *only an answer runs the tool*, is now held twice and the second holder is invisible.
+
+It is kept on purpose, as the guard that would hold if `ask` ever resolved a withdrawal some other way. That is exactly the case no test can construct. The run was re-aimed at `finishCard("denied")`, the c04-scatter precedent, with the reason in the run file. Owed: a seam (a stand-in `ask` that resolves a withdrawal on a non-`deny` key) so a row can show the clause holding, after which the run can aim at it again.
+
+## F1528 — C03 T5.2's latency samples were answered by the previous lap's frame ★★★☆☆
+
+Found by lane b4-menu4's sweep for F1525, instrumenting every tier-5 `waitFor` for one run. C03 T5.2 types sixteen keys forty times round and waits with `waitFor(/KEYFRAME <key>/)` over the cumulative output. From the seventeenth key on, each wait resolved at once against the frame the same key drew a lap earlier: 24 of 40 samples timed a promise resolving. The p95 the row gates on was computed mostly over zeros, so the row could not fail on a latency it had not measured.
+
+**Closed** in b11f3517: the wait is `waitForNew`, which only accepts output after the step. The row stayed green in the one run taken after, so the old p95 was not hiding a regression then; it was not watching for one either. The same harness shape is F1525's, and `waitForNew`'s comment states the blind spot it keeps: a step written in the same tick as the one before.
