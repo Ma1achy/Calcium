@@ -1394,6 +1394,10 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     expect(rich.entries().some((b) => b.profile === "enhanced-terminal")).toBe(true);
   });
 
+  it.todo(
+    "T1.201 (I36, F1441): every default-terminal key record on a chord an emulator is recorded as taking has a second default-terminal record off the list — not deferred on a component: it lands with the second preview route in the next commit",
+  );
+
   it("T1.36 (I36): every action in the table has a `default-terminal` route", () => {
     // An action reachable only where the protocol is reported is an action most
     // readers cannot reach. The enhanced rows are additions, never the only way.

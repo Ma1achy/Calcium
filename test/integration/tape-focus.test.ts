@@ -133,4 +133,12 @@ describe("C26 I31 — a tape under the keys and the pointer", () => {
     expect(drawn(), `and ${head} is still drawn`).toContain(head);
     await stop();
   });
+
+  it.todo(
+    "C26 T4.38 (I30, I31, I24, §8c.6, F1448): → past a tape's window, ↓ out, ↑ back in — the drawn members are unchanged, the current's lead is drawn, and → reaches the second drawn member — not deferred on a component: it lands with the column rule in the next commit",
+  );
+
+  it.todo(
+    "C26 T4.39 (I30, I21, §8c.6, F1448): ↓ from the prompt into a live entry headed by a tape slid off its head lands on the first drawn member, and the drawn members are unchanged — not deferred on a component: it lands with the column rule in the next commit",
+  );
 });

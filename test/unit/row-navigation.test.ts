@@ -115,4 +115,8 @@ describe("C26 §8c — a row of elements", () => {
     go("right");
     expect(go("up"), "↑ from m2 leaves").toBe("prompt");
   });
+
+  it.todo(
+    "C26 T1.167 (I30, §8c.6): ↓ from a mosaic's second cell lands on the cell below and ↑ returns; from a three-cell row's middle cell ↓ lands on the cell under its left edge; a full-width row between two grid rows resets the column — not deferred on a component: it lands with the column rule in the next commit",
+  );
 });

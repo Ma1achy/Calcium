@@ -3045,8 +3045,9 @@ Taken while building group A, each against something the tree already does:
   vocabulary where `⏎` keeps rather than sends.
 - **A chip opened by its `target` does not come back.** No producer in `src/` mints one; a file
   changed in the editor leaves the chip's `content` as it was attached.
-- **Windows Terminal's `alt+shift+arrow`** (6q.1, F1441): the collision gate cannot see an emulator's own
-  keymap, which is ruling 53's amendment's point.
+- ~~**Windows Terminal's `alt+shift+arrow`** (6q.1, F1441)~~ *Closed (review batch 5) the way §6c closed
+  `⌘`*: the scroll has a second base route, `⌥k`/`⌥j`, and C16 I36's gate refuses an action whose only
+  base route is a chord an emulator is recorded as taking. Still unmeasured on Windows Terminal itself.
 - **A layer holding two overflowing boxes** is scrolled by the first; no layer in `src/` holds two.
 - **`⌥↑`/`⌥↓` page the transcript under an inspection** — `R-BLK-840` read as the wheel and
   `PgUp`/`PgDn`, not the intercept.
@@ -3182,6 +3183,44 @@ ground, which holds at rest, and a trace for the preview and the search, which c
 - **A peek and an overlay take no ground** (6s.2 row 6).
 - **The residue row stays** (C04 I49). §101 draws none; the scroll kind draws one whenever it
   overflows, and the bar alone does not say how many rows are hidden.
+
+## 6t. Framework prose at the ASCII rung — surveyed, then ruled once (review batch 5, F1483; I153)
+
+**The instance.** Under `LANG=C` the image decoder's fault reads `x not a PNG or a GIF — …`: the mark
+takes its ASCII form and the prose beside it keeps U+2014. The rung is defined over glyphs, so whether
+prose is inside it was a question rather than a defect.
+
+**The survey — how framework text meets the rung today, by mechanism:**
+
+| text | mechanism | where |
+|---|---|---|
+| a mark (`❯`, `…`, `⋯`, a rule) | a `Glyph` slot, or a `[unicode, ascii]` pair resolved where the capability is in hand | C09's glyph table; `chrome.ts` `mark`, `paint.ts` `ELISION`, `text.ts`'s truncation marker, `marks.ts`' ` · `/` - `; SS47 refuses anything else |
+| a key name | `chordText` spells text names at the rung (C16 ruling 15) | `keymap.ts` |
+| the size fallback | written in ASCII outright | `fallback.ts` — `Terminal too small`, `80x24` |
+| **prose punctuation** — `—`, `·`, `→`, `§`, `×` | **nothing** | SS47 lets `PROSE_MARKS` through *because it is prose*, and its own comment records the blind spot: *an em dash on a terminal reporting `unicode: ascii` is drawn as verbatim as `❯` was* |
+
+Measured at the lane's base: **525 string literals in `src/` carry one of the ten `PROSE_MARKS`**,
+181 in `validate.ts` alone, and every refusal notice, fault box, status line and toast built from one
+reaches the frame unconverted at the ASCII rung.
+
+**The ruling.** Framework prose is inside the rung: a mark and a dash are both characters the
+framework chose, and the rung is a statement about the terminal, not about the author. **One
+mechanism, at the one place every drawn character passes**: `paint` folds the ten at the ASCII rung
+(I153). The alternatives were measured against it and refused:
+
+- **A pair per literal**, the marks' mechanism: 525 sites, and SS47 cannot tell a drawn literal from a
+  thrown one, so the class would stay open behind every new message.
+- **ASCII prose everywhere**: changes every message at every rung to fix one rung, and several are
+  quoted by specs (I144's `no editor — set $VISUAL or $EDITOR`).
+- **A fold at the block that draws framework text**: a refusal is a `status` block like a producer's,
+  so the renderer cannot tell whose dash it holds — the provenance does not exist at the cell.
+
+**What the fold does not do**, so it is not read as more: it changes no measurement (each replacement
+is padded to the mark's own cells), no source (`copy` is the element's source, C26 §5c), and no
+character outside the ten — a producer's `é` is the producer's. A producer's em dash is folded with
+the framework's, because once painted a cell has no author; that is the one consequence beyond
+F1483's subject, and it is the rung doing what it says. **Linear mode** writes no frame and is outside
+it.
 
 ## 7. Health and identity
 
@@ -3512,7 +3551,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 
 - **I142** — *(§6q.4 ruling 3, C16 I74, C23 I74)* **The pointer hit-tests the layers the paint drew, where it drew them.** A replacing question is placed for the pointer over the prompt's rows — one row below the region, the prompt's height, the region's width — and never at the C15 placement it is not drawn at; every other layer keeps its C15 placement. → T4.115, T6.143
 
-- **I143** — *(§6q.4 ruling 5, §6l.12, I113, ruling 53, `R-BLK-825`)* **The chip preview is a bounded box with keys of its own, and `⏎` is never one of them.** The preview's content is a `scroll` box whose height is the content's rows where they fit in `floor(region.height / 2) − 3`, and `floor(region.height / 2) − 4` where they do not, floored at 1 — C15's default fraction less the upper rule, the header and the key row, and less the box's residue row when it overflows (C04 I49) — so the layer is never cut while `floor(region.height / 2)` is at least 5 (§6s.3 rows 1–3). *It read `− 3` in both cases, counting two borders and not the residue row, and at 80 × 24 the layer was cut by one row (F1503).* A new chip or a new region height or width rebuilds it at its top. `⌥⇧↑`/`⌥⇧↓` move the box one row (`previewScrollUp`/`previewScrollDown`, registry `preview.scroll.up`/`preview.scroll.down`), `⌥o` opens the chip (I144, `preview.open`), and every other key is the prompt's first (I51) — so `⏎` sends. **The panel's last row names the chords from the session keymap** (C16 I58): scrolling only while the box overflows, opening always; the owner line names the same. The row also names `←→ other chips` from the prompt's own `left` and `acceptGhostOrForward` bindings while the prompt holds another chip, and not otherwise (§6s ruling 4); it is drawn `muted`, and where it does not fit the region's width it sheds whole entries from its end — never a legend cut mid-word (§6s.3 row 9). → T1.175, T1.185, T4.116, T6.144, T6.155, T6.156
+- **I143** — *(§6q.4 ruling 5, §6l.12, I113, ruling 53, `R-BLK-825`)* **The chip preview is a bounded box with keys of its own, and `⏎` is never one of them.** The preview's content is a `scroll` box whose height is the content's rows where they fit in `floor(region.height / 2) − 3`, and `floor(region.height / 2) − 4` where they do not, floored at 1 — C15's default fraction less the upper rule, the header and the key row, and less the box's residue row when it overflows (C04 I49) — so the layer is never cut while `floor(region.height / 2)` is at least 5 (§6s.3 rows 1–3). *It read `− 3` in both cases, counting two borders and not the residue row, and at 80 × 24 the layer was cut by one row (F1503).* A new chip or a new region height or width rebuilds it at its top. `⌥⇧↑`/`⌥⇧↓` move the box one row (`previewScrollUp`/`previewScrollDown`, registry `preview.scroll.up`/`preview.scroll.down`), and so do `⌥k`/`⌥j` — the second base route C16 I36 requires where a terminal's own keymap may take the first (`R-KEY-011`, F1441); the row names the first pair. `⌥o` opens the chip (I144, `preview.open`), and every other key is the prompt's first (I51) — so `⏎` sends. **The panel's last row names the chords from the session keymap** (C16 I58): scrolling only while the box overflows, opening always; the owner line names the same. The row also names `←→ other chips` from the prompt's own `left` and `acceptGhostOrForward` bindings while the prompt holds another chip, and not otherwise (§6s ruling 4); it is drawn `muted`, and where it does not fit the region's width it sheds whole entries from its end — never a legend cut mid-word (§6s.3 row 9). → T1.175, T1.185, T4.116, T6.144, T6.155, T6.156
 
 - **I144** — *(§6q.4 ruling 6, ruling 53, C02 I19, C17 I35, C21 I6, C23 §4)* **`⌥o` opens a chip in the reader's editor, and an edited paste comes back as one edit.** The editor is C02's `editor` — `$VISUAL`, else `$EDITOR`. A chip carrying a `target` opens it and nothing comes back. Any other chip's content is written to a file in a fresh private temporary directory, the editor runs through the handoff sequence (C23 §4: suspend, C21 `handoff`, resume, reset the decoder, invalidate), and the file is read back: a changed content re-mints the chip in place with its `lines` recounted (C17 I35), and an unchanged one changes nothing. The directory is removed on every path. The command is `sh -c '<editor> "$1"' sh <path>`, so the path is an argument and never text in the command. **Refused visibly, with nothing run**: with no editor (`no editor — set $VISUAL or $EDITOR`), and while a verb holds C23's guard (`<verb> is still running, and <chord> waits for it`) — each a `warn` notice on the transcript, never a toast (§6q.4 ruling 8). **One final newline the editor added is dropped** before the comparison, so a file written back unchanged by `vi` is unchanged (ruling 9). → T1.176, T4.117, T6.145
 - **I145** — *(ruling 23, §6l.9b, C15 I34, I51)* **`promptUnderMenu` reads the top layer's `promptLive`.** A replacing question still answers `false` first (C23 I73). The chip preview pushes `promptLive: true`; the completion menu pushes and updates it as `selection === null` on every change to its selection, so the field is never a state behind the menu. → T1.177, T6.146
@@ -3523,6 +3562,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I150** — *(ruling 96, ruling 99, F1486, I51, I133, I145, C19 I20, C19 I29, `binding.004`)* **The completion substate's owner line names what each key does in the state the frame shows.** While the menu holds no selection the prompt's keys resolve first (C19 I20), so `⏎` submits and `↑` walks history, and the line is `complete · ⏎ run · ⇥ complete · esc close`: `⏎` is the chord the session keymap binds to the prompt's `submit`, named for what it does to the line at rest (ruling 99, §029), `⇥` is the chord the session keymap binds to the prompt's `complete` (the registry's `binding.004`, *complete in the prompt*), and `esc` is the panel's `dismiss`, which the prompt does not bind. Once `⇥` has made a selection the menu owns its keys and the line is `complete · ↑↓ move · ⏎ accept · esc close`. `↓` at rest is the prompt's and selects nothing (C19 §6a). **The line reads the router's answer, not the menu's state**: `OwnerHints.promptUnderMenu` is `promptUnderMenu()`, the top layer's `promptLive` (I145), so the footer, the cursor and the dispatch read one predicate and a footer cannot name a key that goes somewhere else. **It is the one visible difference between rest and a selection**: ruling 89 marks the current candidate in both (C19 I29), and the two frames were otherwise identical. Absent is *the menu owns its keys*, which is every line drawn with no session behind it. → T1.182, T4.120, T6.152
 - **I151** — *(§097, `R-BLK-569`, `R-BLK-628`, `R-BLK-775`, F1501; §6s ruling 1)* **A panel's rows between its edges take `surface.bgElev`.** The compositor paints `surface.bgElev` behind every line of a `kind: "panel"` layer except the lines of its leading `rule` blocks — the upper edge; the lower edge is the prompt's rule (I81) and is not in the layer — through `based`, so a span that sets its own background keeps its cells (the menu's `pick` row), and the padding to the box's width is grounded (I29). The exemption is by content line, so a row-scrolled panel keeps it (§6s.2 row 7). Where no ground resolves — 1 bit, a theme whose `bgElev` inherits — the rows are byte for byte what they were. A `peek` and an `overlay` take none. → T1.184, T4.121, T6.153, T6.154
 - **I152** — *(§6m.2, ruling 103 b, F1517, C23 I101, C23 §8a A6.9)* **A completion line says `exit N` only of a child's own ending.** Where the settled head's word is one the shell writes — `denied`, `expired`, `cancelled`, `truncated`, `failed` — the verdict names it and appends no code, because the code beside it is the shell's: 126 for a denial and an expiry, 130 for a cancel, 1 for a malformed patch and a throw (C23 I101). A `cancelled` head's word is the verdict's first part — `/ps — denied`, `/ps — expired`, `/ps — cancelled` — and a `failed` head's follows its state, `failed, truncated`. A head whose word is `exit N` keeps it, so a child that ended 130 on its own still reads `failed, exit 130`. C20 records every one of these codes as before (C23 I29). *As it stood:* ~~`exit N` for any non-zero code on a document that is not the shell's own~~ — a denial read `/ps — failed, exit 126` and a cancel `cancelled, exit 130` (F1517). → T1.186, T6.157
+- **I153** — *(§6t, F1483, C09 I22, A03 SS47, `R-DEG-002`)* **At the ASCII rung the frame folds prose punctuation, once, where it is painted.** `paint` passes every row it returns through `foldProse` when the terminal reports `unicode: "ascii"`: each character of SS47's `PROSE_MARKS` outside an escape sequence becomes its ASCII form — `—` `-`, `§` `S`, `·` `-`, `×` `x`, `≤` `<`, `≥` `>`, `→` `>`, `«` `<`, `»` `>`, `⚠` `!` — padded with spaces to the cells the mark measured, so no column moves. **The fold's domain is SS47's allowance by equality**: SS47 lets those ten through *because they are prose*, and this is where prose meets the rung, so a mark added to one and not the other fails T1.187. It folds the frame, not the text: a block's source, its `copy` and the transcript are untouched, and a producer's em dash is folded with the framework's because a cell has no author. → T1.187, T4.123, T6.158
 
 ## 11. Commitments
 
@@ -4150,6 +4190,9 @@ PTY harness.
 - **T6.155** (I143): the overflowing cap returned to `− 3` → **T1.175** fails: the 47-line layer is `truncated`.
 - **T6.156** (I143): the chip count dropped, so `←→ other chips` is offered with one chip → **T1.185** fails.
 - **T1.186** (I152, ruling 103 b, F1517): `completionLine` over a settled card whose head reads `denied`, `expired`, `cancelled`, `truncated` and `failed`, with `meta.exitCode` 126, 126, 130, 1 and 1 on a `subprocess` document → `/ps — denied`, `/ps — expired`, `/ps — cancelled`, `/ps — failed, truncated`, `/ps — failed`; a head reading `exit 130` over 130 → `/ps — failed, exit 130`; `exit 1` → `failed, exit 1`. At the ASCII separator `:` the same.
+- **T1.187** (I153, A03 SS47): `foldProse` over each of SS47's `PROSE_MARKS`, at both ambiguous conventions, is printable ASCII of the mark's own `cells`; over a row holding an SGR run and an `OSC 8` hyperlink whose URI carries `—`, it folds the text and leaves both sequences byte-identical; and the set it folds equals `PROSE_MARKS`.
+- **T4.123** (I153, F1483): through a built session at `LANG=C` (the ASCII rung), a document holding a broken image and a `warn` notice: the screen holds no character of `PROSE_MARKS`, and the fault reads `not a PNG or a GIF - `; the control is the same session at UTF-8, whose screen holds the em dash.
+- **T6.158** (I153): `paint` returning its rows unfolded → **T4.123** fails on the fault's em dash.
 - **T6.157** (I152): the verdict reading `outcomeOf` alone again → **T1.186** fails on each of the five shell words, and not on the two `exit N` rows.
 
 ---
