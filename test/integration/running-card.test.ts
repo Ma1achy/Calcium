@@ -719,6 +719,20 @@ describe("C23 — the call grammar's head states", () => {
   });
 });
 
-describe("C23 I54 — a two-word verb's card, owed at the spec commit", () => {
-  it.todo("T4.108 (C23 I54): container stats worker reads container stats(worker) — not deferred on a component: the row lands with the code commit that follows this spec commit (lane b5-shell)");
+describe("C23 I54 — a namespaced verb's card", () => {
+  it("T4.108 (C23 I54, F1430): `/serving scale web 3` reads `serving scale(web 3)`, and a one-word verb its arguments", async () => {
+    /** The head a held invoke leaves at dispatch, for one submitted line. */
+    const headAt = async (line: string): Promise<string | undefined> => {
+      const h = pipelineHarness({ invoke: () => new Promise<RawResult>(() => undefined) });
+      h.pipeline.submit(line);
+      await settled();
+      return headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text;
+    };
+    // **The sub-verb is the verb's, never an argument**: C18's argv begins with
+    // the verb split on spaces, and slicing one word left `scale` inside the
+    // parentheses — `container stats(stats worker)` in every docker still.
+    expect(await headAt("/serving scale web 3")).toBe(`serving scale(web 3) · ${SPIN(0)}`);
+    // The control: a one-word verb, where one word and the verb's length agree.
+    expect(await headAt("/tail a.log")).toBe(`tail(a.log) · ${SPIN(0)}`);
+  });
 });

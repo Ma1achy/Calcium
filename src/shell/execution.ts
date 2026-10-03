@@ -135,6 +135,18 @@ class Guard {
 /** C06's default for a non-streaming verb. Streams pass 0, which is unbounded. */
 const DEFAULT_TIMEOUT_MS = 30_000;
 
+/**
+ * **The arguments: the argv after the verb's own words** (C23 I54, F1430).
+ *
+ * C18 builds `ParseResult.argv` as the verb split on spaces followed by what
+ * is transmitted, so a namespaced verb's second word is the verb's and not an
+ * argument. Three sites took the arguments and one sliced a single word, which
+ * is how the running card read `container stats(stats worker)` in every stats
+ * still while the local route, slicing the verb's length, was right.
+ */
+const argsOf = (result: Readonly<{ tool: Readonly<{ name: string }>; argv: readonly string[] }>): readonly string[] =>
+  result.argv.slice(result.tool.name.split(" ").length);
+
 export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   /**
    * The producer context, **built at the call and never captured** (C07 §3a).
@@ -1331,7 +1343,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // was the command row and silence. The figure is I53's readout, registered
     // below with this header's id; below one second `elapsed()` draws nothing,
     // so the card is bare at dispatch and gains `· 1s` on the first wake.
-    const call = { name: verb, args: result.argv.slice(1).join(" "), id: blockId("call") };
+    const call = { name: verb, args: argsOf(result).join(" "), id: blockId("call") };
     // **Composed by `documents.ts`, with the capabilities** (C23 I61, F828): the
     // separator is a slot and the duration slot is the spinner's while the call
     // runs (I58) — `tick` is the readout's, so the frame moves at I53's cadence.
@@ -1955,7 +1967,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           runLocal(
             settle,
             result.tool.name,
-            result.argv.slice(result.tool.name.split(" ").length),
+            argsOf(result),
             result.validation.ok ? result.validation.args : EMPTY_ARGS,
           ),
         );
@@ -2225,7 +2237,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     const result = classify(line);
     if (result.kind !== "local") return;
     const verb = result.tool.name;
-    const argv = result.argv.slice(verb.split(" ").length);
+    const argv = argsOf(result);
     const handler = local.get(verb);
     if (handler === undefined) return;
     const startedAt = deps.elapsed();

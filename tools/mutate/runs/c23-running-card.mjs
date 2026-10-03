@@ -245,6 +245,16 @@ const results = runPass({
       to: "    const childBody = callBody(child, true);",
       expect: "T4.53",
     },
+    {
+      // C23 I54 (T6.127, F1430) — the card's arguments sliced at one word rather
+      // than the verb's, which is the shape the route shipped in: a namespaced
+      // verb reads its own second word inside the parentheses.
+      name: "the card's arguments are the argv after one word",
+      file: EX,
+      from: "  result.argv.slice(result.tool.name.split(\" \").length);",
+      to: "  result.argv.slice(1);",
+      expect: "T4.108",
+    },
   ],
 });
 
