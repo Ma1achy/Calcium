@@ -58087,6 +58087,8 @@ Nothing checks a release note's claim about the public surface. C24 owns the sur
 
 **Owed**: correct c007d8ef's sentence; measure each MIGRATION §2 row by compiling a consumer against the packed tarball, then drop or reword the rows no consumer can hit; and add a check that every name the notes call exported resolves in `dist/`'s entries.
 
+**Closed** (lane b4-notes, d2d2f480..9c3fd9a4). The CHANGELOG no longer calls `WatchItem` or `WatchRowState` exported, MIGRATION §2 names only what a package entry reaches, and C24 T2.35 (I44) reads every name the notes call exported against the built entries, so a note naming an unreachable type fails `make test`.
+
 ## F1505 — a far side's late answer rewrote a cancelled entry and released the next command's guard ★★★★☆
 
 Found by lane b4-exec3's sequence trace (C23 §8a A6.8, rows 4–6), measured at 0cb6f461 with a probe through `pipelineHarness`. With a real transport, the far side's answer arrives after an app-route cancel:
