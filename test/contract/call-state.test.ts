@@ -76,7 +76,10 @@ describe("C23 I81 — one classifier for a call's state and its parent's rollup"
       ["exit 1", { outcome: "exit 1" }, "failed", "1 failed"],
       ["exit 127", { outcome: "exit 127" }, "failed", "1 failed"],
       ["failed", { outcome: "failed" }, "failed", "1 failed"],
-      ["denied", { outcome: "denied" }, "failed", "1 denied"],
+      // **A denial and an expiry ran nothing** (ruling 103 a, F1518): `cancelled`,
+      // and counted under their own words, as their heads read.
+      ["denied", { outcome: "denied" }, "cancelled", "1 denied"],
+      ["expired", { outcome: "expired" }, "cancelled", "1 expired"],
       ["truncated", { outcome: "truncated" }, "failed", "1 truncated"],
       ["exit 0", { outcome: "exit 0" }, "succeeded", "counted"],
       ["a count", { outcome: "3 matches" }, "succeeded", "counted"],

@@ -69,8 +69,8 @@ const results = runPass({
       // The record kept and the code the card's own: a truncated stream as a success.
       name: "T6.118: the malformed patch's code put back to the card's 0",
       file: EXECUTION,
-      from: "the child ended.\n          settleKept(1);",
-      to: "the child ended.\n          settleKept(0);",
+      from: "left out: the shell composed this.\n          settleKept(1, true);",
+      to: "left out: the shell composed this.\n          settleKept(0, true);",
       expect: "T4.102",
     },
     {
@@ -94,7 +94,7 @@ const results = runPass({
       name: "T6.118: the stream throw's settle put back to settle(id)",
       file: EXECUTION,
       // The throw arm's line, anchored short of its comment.
-      from: "settleKept(1); /",
+      from: "settleKept(1, true); /",
       to: "deps.transcript.settle(id); /",
       expect: "T4.102",
     },

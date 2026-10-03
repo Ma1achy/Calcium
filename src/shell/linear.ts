@@ -21,7 +21,7 @@ import { semanticsOf, type SemanticNode } from "../presentation/blocks/semantics
 import { elapsed } from "../presentation/blocks/index.js";
 import { cells } from "../presentation/text.js";
 import { ERASE_LINE, cursorColumn } from "../terminal/escapes.js";
-import { outcomeOf } from "./documents.js";
+import { outcomeOf, shellWord } from "./documents.js";
 
 /** §107's three, and `none` is an event that is never written (I124). */
 export type AnnounceLevel = "polite" | "assertive";
@@ -107,12 +107,24 @@ const stateOf = (doc: ViewDocument): string => {
   return doc.status === "ok" ? "succeeded" : "failed";
 };
 
-/** `<state>[, <outcome>][, <duration>]` — the head's word, then what it counted, then how long. */
+/**
+ * `<state>[, <outcome>][, <duration>]` — the head's word, then what it counted, then how long.
+ *
+ * **`exit N` only of a child's own ending** (C22 I152, ruling 103 b, F1517).
+ * Where the head carries a word the shell wrote, the verdict names it and no
+ * code: 126 and 130 are the shell's, and a denial read `failed, exit 126`. A
+ * `cancelled` head's word replaces the state — `denied`, `expired`,
+ * `cancelled` are three endings over one state — and a `failed` head's follows
+ * it. Not decided by the code's value: a child can end 130 itself, and then its
+ * head says `exit 130` and so does this (C23 §8a A6.9 row 16).
+ */
 function verdict(doc: ViewDocument): string {
   const state = stateOf(doc);
-  const outcome = outcomeOf(doc);
-  const parts = [state];
-  if (outcome !== "" && outcome !== state) parts.push(outcome);
+  const head = headOf(doc);
+  const word = head?.kind === "notice" ? shellWord(head.text) : null;
+  const outcome = word ?? outcomeOf(doc);
+  const parts = [word !== null && state === "cancelled" ? word : state];
+  if (outcome !== "" && outcome !== parts[0]) parts.push(outcome);
   // `elapsed` is empty below a second, as the head's is — a fast call says no time.
   const took = elapsed(doc.meta.durationMs);
   if (took !== "") parts.push(took);

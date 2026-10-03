@@ -1172,14 +1172,16 @@ describe("C23 §7g — a question's life in a built session", () => {
     expect(cancelled.recorded).toEqual([{ command: "/ps", exitCode: 130 }]);
     expect(cancelled.confirm.answerHandler(), "the layer is gone").toBeNull();
 
-    // **An answer is the only thing that runs the tool, whatever the default**
-    // (C23 I94). An asker widening the choices may mark `allow` default; a
-    // withdrawal resolves with that key and must still run nothing.
+    // **An answer is the only thing that runs the tool** (C23 I94). A widened
+    // set keeps `deny` its default — `allow` marked default is refused now
+    // (F1495, T4.107), because `esc` resolved it and ran the tool — so the
+    // withdrawal resolves `deny`'s key, and the card must still read
+    // `cancelled` and not `denied`: the outcome decides, not the key.
     const widened = new AbortController();
     const permissive = pipelineHarness({
       approval: () => ({
         signal: widened.signal,
-        choices: [{ key: "y", label: "allow", default: true }, { key: "n", label: "deny" }],
+        choices: [{ key: "n", label: "deny", default: true }, { key: "y", label: "allow" }, { key: "a", label: "always allow" }],
       }),
     });
     permissive.pipeline.submit("/ps");
@@ -1188,10 +1190,56 @@ describe("C23 §7g — a question's life in a built session", () => {
     await drained(permissive.pipeline);
     await drained(permissive.pipeline);
     expect(head(permissive)).toBe("ps · cancelled");
-    expect(permissive.calls, "withdrawn with allow as its key, and nothing ran").not.toContain("invoke");
+    expect(permissive.calls, "withdrawn, and nothing ran").not.toContain("invoke");
   });
 
-  it.todo(
-    "T4.107 (C23 I94, C23 I93, F1495): a refused approval settles its card failed and runs nothing — not deferred on a component: lands with the ruling 103 code commit of lane b4-exec5",
-  );
+  it("T4.107 (C23 I94, C23 I93, F1495): a refused approval settles its card failed and runs nothing", async () => {
+    const { pipelineHarness, settled: drained } = await import("../support/execution.js");
+    // **Each set is one whose `esc` would not deny** (§8a A6.11 rows 1, 5, 6):
+    // before, `reply…` alone and `allow` alone each ran the tool on `esc`, and
+    // two defaults left the card streaming beside a second entry.
+    const sets: readonly (readonly [string, readonly Record<string, unknown>[]])[] = [
+      ["reply alone", [{ key: "r", label: "reply…", reply: true }]],
+      ["two defaults", [{ key: "n", label: "deny", default: true }, { key: "y", label: "allow", default: true }]],
+      ["allow alone", [{ key: "y", label: "allow" }]],
+      ["allow marked default", [{ key: "n", label: "deny" }, { key: "y", label: "allow", default: true }]],
+    ];
+    const seen: string[] = [];
+    for (const [label, choices] of sets) {
+      const h = pipelineHarness({ approval: () => ({ choices: choices as never }) });
+      h.pipeline.submit("/ps");
+      await drained();
+      await drained();
+      // `esc`, as a reader would press it, if anything was asked at all.
+      const asked = h.confirm.answerHandler() !== null;
+      h.confirm.answerHandler()?.(key("escape"));
+      await drained();
+      const entries = h.transcript.entries.map((e) => {
+        const first = e.doc.blocks[0];
+        const state = first?.kind === "notice" ? String(first.state) : "no head";
+        return `${e.streaming ? "streaming" : "settled"} ${state} ${String(e.doc.meta.exitCode)}`;
+      });
+      seen.push(
+        `${label}: asked ${String(asked)} · ran ${String(h.calls.includes("invoke"))} · ${entries.join(" | ")} · C20 ${h.recorded.map((r) => String(r.exitCode)).join(",")}`,
+      );
+    }
+    expect(seen).toEqual([
+      "reply alone: asked false · ran false · settled failed 1 · C20 1",
+      "two defaults: asked false · ran false · settled failed 1 · C20 1",
+      "allow alone: asked false · ran false · settled failed 1 · C20 1",
+      "allow marked default: asked false · ran false · settled failed 1 · C20 1",
+    ]);
+
+    // **The control**: `deny` default with `allow` beside it asks, and `esc` denies.
+    const ok = pipelineHarness({ approval: () => ({ choices: [{ key: "n", label: "deny", default: true }, { key: "y", label: "allow" }] }) });
+    ok.pipeline.submit("/ps");
+    await drained();
+    expect(ok.confirm.answerHandler(), "asked").not.toBeNull();
+    ok.confirm.answerHandler()?.(key("escape"));
+    await drained(ok.pipeline);
+    await drained(ok.pipeline);
+    const refusedHead = ok.transcript.entries[0]?.doc.blocks[0];
+    expect(refusedHead?.kind === "notice" ? refusedHead.text : "", "denied, and nothing ran").toBe("ps · denied");
+    expect(ok.calls).not.toContain("invoke");
+  });
 });

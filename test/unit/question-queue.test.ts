@@ -12,6 +12,7 @@ import { createOverlayManager } from "../../src/viewport/overlay/index.js";
 import type { InputEvent } from "../../src/interaction/router/types.js";
 import type { AskAnswer, AskOptions, Choice } from "../../src/shell/local/registry.js";
 import { buildSession } from "../support/session.js";
+import { localContext } from "../../src/testing/producer-context.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 
 const REGION = { width: 80, height: 24 } as const;
@@ -358,7 +359,38 @@ describe("C23 §7g — the reply, the queue, the three resolutions", () => {
     await expect(q).resolves.toEqual({ key: DENY_KEY, outcome: "answered" });
   });
 
-  it.todo(
-    "T1.107 (C23 I93, F1495): a set in which no choice answers is refused by ask and by the testing stand-in — not deferred on a component: lands with the ruling 103 code commit of lane b4-exec5",
-  );
+  it("T1.107 (C23 I93, F1495): a set in which no choice answers is refused by ask and by the testing stand-in", async () => {
+    // **Every choice a reply or an inspection** (§8a A6.11 rows 1–3). `esc`
+    // resolved with `defaultStart`'s last choice as an *answer*, with no text —
+    // it settles directly and never opens the reply — and on an approval that
+    // key is not `deny`.
+    const none: readonly (readonly [string, readonly Choice[]])[] = [
+      ["reply alone", [{ key: "r", label: "reply…", reply: true }]],
+      ["inspection alone", [{ key: "s", label: "show", inspect: true }]],
+      ["inspection and reply", [{ key: "s", label: "show", inspect: true }, { key: "r", label: "reply…", reply: true }]],
+    ];
+    const stand = localContext();
+    for (const [label, choices] of none) {
+      const w = world();
+      w.type("draft");
+      await expect(w.confirm.ask({ question: "Bad?", choices }), label).rejects.toThrow(/none answers.*\(C23 I93\)/u);
+      expect(w.overlays.stack, `${label}: nothing pushed`).toEqual([]);
+      expect(w.confirm.waiting, `${label}: nothing queued`).toBe(0);
+      expect(w.line(), `${label}: nothing held`).toBe("draft");
+      // **The stand-in refuses the same set with the same words**, or a handler
+      // tested against it passes on a question the shell throws on.
+      await expect(stand.ask({ question: "Bad?", choices }), `${label}: the stand-in`).rejects.toThrow(/none answers.*\(C23 I93\)/u);
+    }
+
+    // **The control**: one choice that answers is enough, and `esc` resolves it.
+    const w = world();
+    const q = w.confirm.ask({ question: "Fine?", choices: [{ key: "a", label: "a" }, { key: "r", label: "reply…", reply: true }] });
+    expect(w.overlays.stack.map((l) => l.id), "asked").toEqual(["confirm"]);
+    w.press("escape");
+    await expect(q).resolves.toEqual({ key: "a", outcome: "answered" });
+    await expect(stand.ask({ question: "Fine?", choices: [{ key: "a", label: "a" }, { key: "r", label: "reply…", reply: true }] })).resolves.toEqual({
+      key: "a",
+      outcome: "answered",
+    });
+  });
 });

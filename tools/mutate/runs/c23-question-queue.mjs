@@ -16,6 +16,8 @@ import { fsIo, report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const CONFIRM = "src/shell/confirm.ts";
+// `invalidChoices` moved here so the testing stand-in refuses what `ask` does (F1495).
+const CHOICES = "src/shell/choice-selection.ts";
 const KEYS = "src/shell/keys.ts";
 const DOCUMENTS = "src/shell/documents.ts";
 const EX = "src/shell/execution.ts";
@@ -72,14 +74,14 @@ const results = runPass({
     {
       // T6.109 (C23 I93).
       name: "two defaults admitted",
-      file: CONFIRM,
+      file: CHOICES,
       from: "  if (defaults.length > 1) {",
       to: "  if (false) {",
       expect: "T1.104",
     },
     {
       name: "a default on reply… admitted",
-      file: CONFIRM,
+      file: CHOICES,
       from: "  if (d !== undefined && (d.reply === true || d.inspect === true)) {",
       to: "  if (d !== undefined && d.inspect === true) {",
       expect: "T1.104",

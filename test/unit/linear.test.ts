@@ -23,6 +23,8 @@ import {
   windowLine,
 } from "../../src/shell/linear.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
+import { callHead } from "../../src/shell/documents.js";
+import { ASCII_CAPS, FULL_CAPS } from "../support/render.js";
 
 // **The registry a session builds** — `defaults` alone registers none of C11's,
 // C12's or C25's kinds, and each would degrade to `raw` and read its JSON: the
@@ -177,7 +179,45 @@ describe("C22 §6m — linear events", () => {
     expect(before.caret).toBe(2 + 1);
   });
 
-  it.todo(
-    "T1.186 (C22 I152, ruling 103 b, F1517): a completion line says exit N only of a child's own ending — not deferred on a component: lands with the ruling 103 code commit of lane b4-exec5",
-  );
+  it("T1.186 (C22 I152, ruling 103 b, F1517): a completion line says exit N only of a child's own ending", () => {
+    // **The head the shell composes, at both separators** — `callHead` is the
+    // writer the line reads, so a fixture with a hand-written head would test
+    // the reader against itself.
+    const line = (outcome: string, exitCode: number, caps: typeof FULL_CAPS): string => {
+      const head = callHead({ id: "c", name: "ps", args: "", outcome }, caps);
+      return completionLine({
+        id: "e",
+        seq: 1,
+        streaming: false,
+        doc: docOf([head], { command: "/ps" }, { verb: "ps", exitCode, transport: "subprocess" }),
+      });
+    };
+    for (const caps of [FULL_CAPS, ASCII_CAPS]) {
+      const rung = caps.unicode;
+      expect(
+        [
+          line("denied", 126, caps),
+          line("expired", 126, caps),
+          line("cancelled", 130, caps),
+          line("truncated", 1, caps),
+          line("failed", 1, caps),
+          // **The child's own endings keep their code** (C23 §8a A6.9 row 16): the
+          // same 130 and 126 the shell writes, said by the head as `exit N`.
+          line("exit 130", 130, caps),
+          line("exit 126", 126, caps),
+          line("exit 1", 1, caps),
+        ],
+        rung,
+      ).toEqual([
+        "entry 1: /ps — denied",
+        "entry 1: /ps — expired",
+        "entry 1: /ps — cancelled",
+        "entry 1: /ps — failed, truncated",
+        "entry 1: /ps — failed",
+        "entry 1: /ps — failed, exit 130",
+        "entry 1: /ps — failed, exit 126",
+        "entry 1: /ps — failed, exit 1",
+      ]);
+    }
+  });
 });

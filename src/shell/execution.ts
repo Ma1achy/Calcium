@@ -1348,8 +1348,6 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     }
     deps.resetFocus();
     deps.scheduler.commit("input");
-    // §3b — from here the entry can go quiet, so it is watched for silence.
-    refresh.watch(pendingId);
     /**
      * The verdict, into the header, **before** `settle` (I54, §8g row 6).
      *
@@ -1409,15 +1407,21 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
      * only when the document changed, and a stream ending at 0 over a card
      * that says 0 did not.
      */
-    const settleKept = (code: number): void => {
-      const held = deps.transcript.entries.find((e) => e.id === pendingId)?.doc;
-      if (held === undefined) {
+    const settleKept = (code: number, withoutStall = false): void => {
+      const found = deps.transcript.entries.find((e) => e.id === pendingId)?.doc;
+      if (found === undefined) {
         // Cleared underneath: nothing to settle into, and the line was still typed.
         deps.transcript.settle(pendingId);
         deps.history.append(line, code);
         return;
       }
-      const doc = held.meta.exitCode === code ? held : { ...held, meta: { ...held.meta, exitCode: code } };
+      // **A stall the shell's own settlement ends is left out** (I103, ruling
+      // 103 c, F1519): the malformed patch and the throw compose the card as it
+      // stood, and a stall is a condition of a live entry. The natural `end`
+      // passes `false`: `refresh.settled` has already made its row a record.
+      const stalled = withoutStall && found.blocks.some((blk) => blk.id === STALL_BLOCK);
+      const held = stalled ? { ...found, blocks: found.blocks.filter((blk) => blk.id !== STALL_BLOCK) } : found;
+      const doc = held === found && held.meta.exitCode === code ? held : { ...held, meta: { ...held.meta, exitCode: code } };
       deps.transcript.settle(pendingId, doc === held ? undefined : doc);
       recordHistory(line, doc);
     };
@@ -1434,12 +1438,29 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     if (approval !== null) {
       deps.transcript.patch(pendingId, { op: "replace", blockId: call.id, block: header(0, undefined, true) }, "shell");
       deps.scheduler.commit("input");
-      const answer = await deps.confirm.ask({
-        ...approvalPrompt(call, approval.consequence, approval.choices),
-        // The asker's withdrawal and expiry reach the question (C23 I92, I94).
-        ...(approval.signal === undefined ? {} : { signal: approval.signal }),
-        ...(approval.expiresAfterMs === undefined ? {} : { expiresAfterMs: approval.expiresAfterMs }),
-      });
+      let answer: Awaited<ReturnType<typeof deps.confirm.ask>>;
+      try {
+        answer = await deps.confirm.ask({
+          ...approvalPrompt(call, approval.consequence, approval.choices),
+          // The asker's withdrawal and expiry reach the question (C23 I92, I94).
+          ...(approval.signal === undefined ? {} : { signal: approval.signal }),
+          ...(approval.expiresAfterMs === undefined ? {} : { expiresAfterMs: approval.expiresAfterMs }),
+        });
+      } catch (cause) {
+        // **A refused question settles this card, and nothing runs** (I94,
+        // F1495). `approvalPrompt` and `ask` throw on a set whose `esc` would
+        // not deny, before anything is pushed. Unwound from here the throw
+        // reached `start`, which appended the error as a second entry and left
+        // this card streaming at `⠋ waiting` for good (§8a A6.11 row 5). The
+        // card is the entry, so the failure is settled into it, as the invoke
+        // arm's throw is.
+        const refused = errorDoc(line, { message: String(cause), stage: "pipeline" }, { origin: "user", verb });
+        settleWithDocument(pendingId, cardOver(refused, call, deps.elapsed() - startedAt, deps.capabilities));
+        recordHistory(line, refused); // I29 — a refusal is a settlement.
+        deps.scheduler.commit("completion");
+        guard.release();
+        return;
+      }
       // **Only an answer runs the tool** (I94, §7g ruling 4). A question that
       // was withdrawn or timed out resolves with its default's key, and the
       // approval's default is `deny` — but the card says what happened: *expired,
@@ -1469,6 +1490,11 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // stops it. `readout` writes with `origin: "shell"`, as the shell speaking
     // about an entry it holds. Its tick is the spinner's frame (I58).
     refresh.readout(pendingId, call.id, (ms, tick) => header(ms, undefined, false, tick));
+    // §3b — from here the entry can go quiet, so it is watched for silence.
+    // **With the readout, not at dispatch** (I103, ruling 103 d, F1520): an
+    // approval's wait is the reader's, and a question open for two minutes read
+    // `no output for 2m` — then carried it into the run once allowed.
+    refresh.watch(pendingId);
 
     const controller = new AbortController();
     /**
@@ -1637,7 +1663,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
      * (I101, F1508). Every ending of this route but the cancel came through a
      * bare `settle(id)` and none of them reached C20.
      */
-    settleKept: (code: number) => void,
+    settleKept: (code: number, withoutStall?: boolean) => void,
     /**
      * The invocation's own, so a cancel is visible here (I99). `cancelThis` has
      * settled the entry by the time the far side's `end` arrives — a subprocess
@@ -1739,7 +1765,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           finishCard("truncated"); // I54, §8f P8 — the box carries the why
           // I101 — 1, I100's code for a failure whose own is unknown: the
           // stream stops here, before any `end` could say how the child ended.
-          settleKept(1);
+          // I103 — and a stall it had is left out: the shell composed this.
+          settleKept(1, true);
           deps.scheduler.commit("completion");
           return;
         }
@@ -1758,7 +1785,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         block: callStatus("error", `stream failed: ${String(cause)}`, { id: blockId("stream-error") }),
       });
       finishCard("failed"); // I54, §8f P8
-      settleKept(1); // I101 — the transport failed, as the invoke arm's throw carries 1
+      settleKept(1, true); // I101, I103 — 1 as the invoke arm's throw carries, and no stall row
       deps.scheduler.commit("completion");
     }
   };

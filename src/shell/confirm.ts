@@ -29,7 +29,7 @@ import type { AskAnswer, AskOptions, Choice, QuestionOutcome } from "./local/reg
 import { questionNotice, warnNotice } from "./documents.js";
 import { questionConsumer, routingFor } from "./question-routing.js";
 import { cells } from "../presentation/text.js";
-import { createChoiceSelection, defaultStart } from "./choice-selection.js";
+import { createChoiceSelection, defaultStart, invalidChoices } from "./choice-selection.js";
 import { chordText } from "../interaction/router/keymap.js";
 import type { FocusState } from "../presentation/blocks/types.js";
 
@@ -399,31 +399,6 @@ export const INSPECTION_BOX_ID = "confirm-source";
  */
 function titleOf(more: number, separator: string): string {
   return more > 0 ? `Confirm ${separator} ${String(more)} more` : "Confirm";
-}
-
-/**
- * What `ask` refuses before anything is queued or pushed (C23 I93, ruling 6).
- *
- * A second default makes `esc` and the opening selection disagree about which
- * is safe, and a default on `reply…` or an inspection is a safe answer that
- * answers nothing — `esc` would open a line or suspend.
- */
-function invalidChoices(choices: readonly Choice[]): string | null {
-  if (choices.length === 0) {
-    // A question with nothing to answer it cannot resolve, and resolving it
-    // with an invented key would put a value in the handler's hands that no
-    // caller wrote. Construction error, C23 I27's standard.
-    return "ask() needs at least one choice";
-  }
-  const defaults = choices.filter((c) => c.default === true);
-  if (defaults.length > 1) {
-    return `ask() takes at most one default choice, and ${String(defaults.length)} are marked (C23 I93)`;
-  }
-  const d = defaults[0];
-  if (d !== undefined && (d.reply === true || d.inspect === true)) {
-    return `ask(): the default choice "${d.key}" ${d.reply === true ? "opens a reply" : "opens an inspection"} and answers nothing (C23 I93)`;
-  }
-  return null;
 }
 
 function inspection(opts: AskOptions, rows: number, unicode: boolean, more = 0, separator = "-"): readonly Block[] {

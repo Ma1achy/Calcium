@@ -356,7 +356,69 @@ describe("C23 I98, I99 — the app route's cancel", () => {
     ]);
   });
 
-  it.todo(
-    "T4.106 (C23 I103, ruling 103 c, ruling 103 d, F1519, F1520): the stall watch arms on approval, and a composed settlement leaves the stall row out — not deferred on a component: lands with the ruling 103 code commit of lane b4-exec5",
-  );
+  it("T4.106 (C23 I103, ruling 103 c, ruling 103 d, F1519, F1520): the stall watch arms on approval, and a composed settlement leaves the stall row out", async () => {
+    const seen: string[] = [];
+
+    // **A stall, then the shell's own settlement** (§8a A6.10 row 6). Each is
+    // shown stalled first (test/support/README.md): the row is there to be left out.
+    const stalled = async (h: Harness): Promise<void> => {
+      h.pipeline.submit("/tail web.log");
+      await settled();
+      seconds(h, 121);
+      expect(blocksOf(h), "stalled").toBe("call · stall-notice: no output for 2m");
+    };
+    const bad = heldStream();
+    const m = pipelineHarness({ stream: bad.stream, adaptPatch: () => ({ op: "replace", blockId: "absent", block: b.raw("x", { id: "x" }) }) });
+    await stalled(m);
+    bad.push({ kind: "data", value: {} });
+    await settled();
+    seen.push(`malformed patch: ${blocksOf(m)}`);
+
+    const thrown = heldStream();
+    const t = pipelineHarness({ stream: thrown.stream, adaptPatch: appender() });
+    await stalled(t);
+    thrown.fail(new Error("pipe closed"));
+    await settled();
+    seen.push(`stream throws: ${blocksOf(t)}`);
+
+    // **The boundary** (row 10): the natural end keeps A4's record of the gap.
+    const ended = heldStream();
+    const e = pipelineHarness({ stream: ended.stream, adaptPatch: appender() });
+    await stalled(e);
+    ended.push({ kind: "end", result: result({ exitCode: 0 }) });
+    await settled();
+    seen.push(`natural end: ${blocksOf(e)}`);
+
+    // **The wait is not the run** (rows 7–9): no row while the question is open,
+    // none carried into the run, and the watch armed from the approval.
+    const denied = pipelineHarness({ approval: () => ({}) });
+    denied.pipeline.submit("/ps");
+    await settled();
+    seconds(denied, 180);
+    seen.push(`waiting 3m: ${blocksOf(denied)}`);
+    denied.confirm.answerHandler()?.({ kind: "key", key: { name: "n", ctrl: false, meta: false, shift: false, sequence: "n" } });
+    await settled();
+    seen.push(`then denied: ${blocksOf(denied)}`);
+
+    const allowed = pipelineHarness({ approval: () => ({}), invoke: () => new Promise<RawResult>(() => undefined) });
+    allowed.pipeline.submit("/ps");
+    await settled();
+    seconds(allowed, 180);
+    allowed.confirm.answerHandler()?.({ kind: "key", key: { name: "y", ctrl: false, meta: false, shift: false, sequence: "y" } });
+    await settled();
+    seconds(allowed, 30);
+    seen.push(`allowed after 3m, then 30s: ${blocksOf(allowed)}`);
+    seconds(allowed, 91);
+    seen.push(`then 2m 1s after the approval: ${blocksOf(allowed)}`);
+
+    expect(seen).toEqual([
+      "malformed patch: call · truncated",
+      "stream throws: call · stream-error",
+      "natural end: call · stall-notice: resumed after 2m",
+      "waiting 3m: call",
+      "then denied: call",
+      "allowed after 3m, then 30s: call",
+      "then 2m 1s after the approval: call · stall-notice: no output for 2m",
+    ]);
+  });
 });

@@ -15,6 +15,11 @@ import { result } from "../support/transport.js";
 import { doc } from "../support/blocks.js";
 import { b } from "../../src/shell/builders/index.js";
 import type { RawPatch, RawResult } from "../../src/data/transport/index.js";
+import type { Block, Notice } from "../../src/data/viewmodel/index.js";
+import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
+import { callHead } from "../../src/shell/documents.js";
+import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_UNICODE_CAPS, registry, visible } from "../support/render.js";
 
 type Harness = ReturnType<typeof pipelineHarness>;
 
@@ -201,7 +206,91 @@ describe("C23 I101 — one code per settlement", () => {
     ]);
   });
 
-  it.todo(
-    "T4.105 (C23 I60, C23 I94, C23 I81, ruling 103 a, F1518): a denied, expired, withdrawn and cancelled head is muted in the cancelled state at every rung — not deferred on a component: lands with the ruling 103 code commit of lane b4-exec5",
-  );
+  it("T4.105 (C23 I60, C23 I94, C23 I81, ruling 103 a, F1518): a denied, expired, withdrawn and cancelled head is muted in the cancelled state at every rung", async () => {
+    // **Read as a frame, at three rungs** (C09 I45): above 1 bit the tone is the
+    // only thing saying which state the `●` is in, and at 1 bit and in ASCII the
+    // mark is. The oracle is a head built in each state and drawn the same way,
+    // so the row asks *which state's drawing is this* and not *which colour*.
+    const reg = registry();
+    const rungs = [
+      ["full", FULL_CAPS],
+      ["1-bit", MONO_UNICODE_CAPS],
+      ["ascii", ASCII_CAPS],
+    ] as const;
+    /** The row's lead: its SGR opener and its mark, which is what the state draws. */
+    const lead = (blk: Block, caps: TerminalCapabilities): string => {
+      const [row] = renderSequenceToLines(reg, [blk], 60, { theme: DARK_THEME, capabilities: caps });
+      const mark = visible(row ?? "").charAt(0);
+      return `${(row ?? "").slice(0, (row ?? "").indexOf(mark))}${mark}`;
+    };
+    const oracle = (state: "cancelled" | "failed", caps: TerminalCapabilities): string =>
+      lead(callHead({ id: "o", name: "ps", args: "", state, outcome: "x" }, FULL_CAPS), caps);
+
+    const endings: [string, Harness][] = [];
+    {
+      const h = pipelineHarness({ approval: () => ({}) });
+      h.pipeline.submit("/ps");
+      await settled();
+      h.confirm.answerHandler()?.(key("n"));
+      await settled();
+      await settled();
+      endings.push(["denied", h]);
+    }
+    {
+      const h = pipelineHarness({ approval: () => ({ expiresAfterMs: 5_000 }) });
+      h.pipeline.submit("/ps");
+      await settled();
+      h.tick(6_000);
+      await settled();
+      await settled();
+      endings.push(["expired", h]);
+    }
+    {
+      const asker = new AbortController();
+      const h = pipelineHarness({ approval: () => ({ signal: asker.signal }) });
+      h.pipeline.submit("/ps");
+      await settled();
+      asker.abort();
+      await settled();
+      await settled();
+      endings.push(["withdrawn", h]);
+    }
+    {
+      const h = pipelineHarness({ invoke: () => new Promise<RawResult>(() => undefined) });
+      h.pipeline.submit("/ps");
+      await settled();
+      h.pipeline.cancel();
+      await settled();
+      endings.push(["⌃c", h]);
+    }
+    // **The control**: a stream ending `exit 1` is failed, and draws failed's lead.
+    {
+      const s = heldStream();
+      const h = pipelineHarness({ stream: s.stream, adaptPatch: appender() });
+      h.pipeline.submit("/tail web.log");
+      await settled();
+      s.push({ kind: "end", result: result({ exitCode: 1 }) });
+      await settled();
+      await settled();
+      endings.push(["exit 1", h]);
+    }
+
+    const seen = endings.map(([label, h]) => {
+      const entry = h.transcript.entries[0];
+      const head = entry?.doc.blocks[0] as Notice | undefined;
+      const drawn = rungs.map(([rung, caps]) => {
+        const row = head === undefined ? "" : lead(head, caps);
+        const as = row === oracle("cancelled", caps) ? "cancelled" : row === oracle("failed", caps) ? "failed" : "neither";
+        return `${rung} ${visible(row)} as ${as}`;
+      });
+      return `${label}: ${String(head?.state)} · ${String(head?.tone)} · ${head?.text ?? ""} · ${drawn.join(" · ")} · ran ${String(h.calls.includes("invoke"))}`;
+    });
+    expect(seen).toEqual([
+      "denied: cancelled · muted · ps · denied · full ● as cancelled · 1-bit ⊘ as cancelled · ascii / as cancelled · ran false",
+      "expired: cancelled · muted · ps · 6s · expired · full ● as cancelled · 1-bit ⊘ as cancelled · ascii / as cancelled · ran false",
+      "withdrawn: cancelled · muted · ps · cancelled · full ● as cancelled · 1-bit ⊘ as cancelled · ascii / as cancelled · ran false",
+      "⌃c: cancelled · muted · ps · cancelled · full ● as cancelled · 1-bit ⊘ as cancelled · ascii / as cancelled · ran true",
+      "exit 1: failed · error · tail(web.log) · exit 1 · full ● as failed · 1-bit ✗ as failed · ascii x as failed · ran false",
+    ]);
+  });
 });

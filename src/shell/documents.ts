@@ -17,6 +17,7 @@ import { CALL_HEAD_GLYPH, CALL_STATE_TONE, block, document } from "../data/viewm
 import { cancelledNotice, usageBlocks } from "../data/adapters/index.js";
 import { elapsed, glyphs, spinnerFrames } from "../presentation/blocks/index.js";
 import type { AskOptions, Choice } from "./local/registry.js";
+import { defaultStart } from "./choice-selection.js";
 import { defaulted } from "./builders/seq.js";
 import type { ToolDef } from "../data/manifest/index.js";
 import type {
@@ -457,7 +458,12 @@ function callState(call: ToolCallSpec): CallState {
   //
   // **`expired` is the same state** (C23 I94, `R-BLK-881`): an approval nobody
   // answered did not run, which is what `cancelled` draws — not `failed`.
-  if (call.outcome === "cancelled" || call.outcome === "expired") return "cancelled";
+  //
+  // **And so is `denied`** (C23 I60, ruling 103 a, F1518). A denial is the
+  // reader's decision and it ran nothing; §047 draws a refusal *never red*, and
+  // this drew it `failed` — `error` and ✗ — against the reason ruling 100 (a)
+  // gave for keeping its status `ok`.
+  if (call.outcome !== undefined && STOPPED_WORDS.has(call.outcome)) return "cancelled";
   return failureWord(call.outcome) === null ? "succeeded" : "failed";
 }
 
@@ -655,8 +661,50 @@ export function operationRows(op: OperationSpec, caps: Caps, tick = 0): readonly
   ];
 }
 
-/** The words a settled child can carry that count against the parent (C23 I62). */
+/**
+ * The words a settled child can carry that count against the parent (C23 I62).
+ *
+ * **They are also every word the shell writes into a head** — `finishCard`'s
+ * outcomes besides `exit N` and the empty one — which is what `shellWord` reads
+ * them as (C22 I152).
+ */
 const FAILURE_WORDS: ReadonlySet<string> = new Set(["failed", "denied", "cancelled", "expired", "truncated"]);
+
+/**
+ * The words of a call that did not run, and so is `cancelled` (C23 I81, ruling
+ * 103 a): stopped, expired unanswered, or refused. A parent counts each under
+ * its own word, so the rollup says what the child's head says.
+ */
+const STOPPED_WORDS: ReadonlySet<string> = new Set(["cancelled", "expired", "denied"]);
+
+/** The slot's separator in each alphabet — the only two `toolCallHeader` joins with (F834). */
+const SEPARATORS: readonly string[] = [
+  glyphs({ unicode: "full", ambiguousWidth: "narrow" }).separator,
+  glyphs({ unicode: "ascii", ambiguousWidth: "narrow" }).separator,
+];
+
+/**
+ * The word the shell wrote as a settled head's outcome, or `null` (C22 I152,
+ * ruling 103 b): the text's last part after the slot's separator, when it is one
+ * of `FAILURE_WORDS`.
+ *
+ * **The code cannot say this and neither can the state.** 126 and 130 are codes
+ * the shell chose and a child can return on its own (C23 §8a A6.9 row 16), and
+ * `denied`, `expired` and `cancelled` share one state. The head's word is the
+ * one field that names the ending, so the completion line reads it here, from
+ * the file that writes it. `text` is the model's field, not a painted row; the
+ * blind spot is a far side's head whose own text ends in one of these words
+ * after a separator (C22 §6m.1).
+ */
+export function shellWord(text: string): string | null {
+  for (const sep of SEPARATORS) {
+    const at = text.lastIndexOf(` ${sep} `);
+    if (at < 0) continue;
+    const word = text.slice(at + sep.length + 2); // cells-ok — code-unit offsets into the text
+    if (FAILURE_WORDS.has(word)) return word;
+  }
+  return null;
+}
 
 /**
  * A parent's outcome, derived from its children on every settlement (C23 I62).
@@ -679,8 +727,11 @@ export function rollUp(children: readonly ToolCallSpec[]): readonly string[] {
     // state wins over the outcome here exactly as it does there.
     const state = callState(child);
     const said = failureWord(child.outcome);
+    // A stopped child under its own word (C23 I81, ruling 103 a): `1 denied`,
+    // `1 expired`, as its head reads — `cancelled` for a stated state.
+    const stopped = child.outcome !== undefined && STOPPED_WORDS.has(child.outcome) ? child.outcome : "cancelled";
     const word =
-      state === "succeeded" ? null : state === "cancelled" ? "cancelled" : said === null || said === "cancelled" ? "failed" : said;
+      state === "succeeded" ? null : state === "cancelled" ? stopped : said === null || said === "cancelled" ? "failed" : said;
     if (word !== null) {
       failures.set(word, (failures.get(word) ?? 0) + 1);
       continue;
@@ -785,6 +836,17 @@ export function approvalPrompt(
   consequence?: string,
   choices: readonly Choice[] = APPROVAL_CHOICES,
 ): AskOptions {
+  // **`esc` must deny** (C23 I94, F1495, `R-BLK-348` *dismissing is answering
+  // no*). A record's `choices` replace these whole, and `esc` resolves with the
+  // set's default — so a set with no `deny`, or with `allow` marked default,
+  // made `esc` an answer that ran the tool (§8a A6.11 row 6). Refused as `ask`
+  // refuses I93's sets: a construction error, before anything is pushed.
+  const safe = choices.length > 0 ? choices[defaultStart(choices)] : undefined; // cells-ok — a choice count
+  if (safe?.key !== DENY_KEY) {
+    throw new Error(
+      `approvalPrompt(): esc resolves "${safe?.key ?? ""}", and an approval's esc must resolve "${DENY_KEY}" (C23 I94)`,
+    );
+  }
   return {
     question: invocation(call),
     ...(consequence === undefined ? {} : { detail: warnNotice(consequence, "confirm-consequence") }),

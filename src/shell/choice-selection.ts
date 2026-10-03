@@ -77,5 +77,47 @@ export function defaultStart(
     const c = choices[i]!;
     if (c.reply !== true && c.inspect !== true) return i;
   }
+  // **Unreachable through `ask`**, which refuses a set with nothing that
+  // answers (C23 I93, F1495) — kept total so a caller that has not validated
+  // still gets an index into the set rather than `-1`.
   return choices.length - 1;
+}
+
+/**
+ * What `ask` refuses before anything is queued or pushed (C23 I93, ruling 6),
+ * and what the testing stand-in refuses too, so a handler tested against it
+ * cannot pass on a set the shell throws on.
+ *
+ * A second default makes `esc` and the opening selection disagree about which
+ * is safe, and a default on `reply…` or an inspection is a safe answer that
+ * answers nothing — `esc` would open a line or suspend.
+ *
+ * **And a set in which nothing answers has no safe answer at all** (F1495,
+ * `R-BLK-348`). `esc` resolves with `defaultStart`'s choice, and with every
+ * choice a `reply…` or an inspection that was one of them — resolved as an
+ * *answer*, with no text, because `esc` settles directly and never opens the
+ * reply. On an approval the key was not `deny`, and the tool ran (C23 §8a
+ * A6.11 rows 1–3).
+ */
+export function invalidChoices(
+  choices: readonly Readonly<{ key: string; default?: true; reply?: true; inspect?: true }>[],
+): string | null {
+  if (choices.length === 0) {
+    // A question with nothing to answer it cannot resolve, and resolving it
+    // with an invented key would put a value in the handler's hands that no
+    // caller wrote. Construction error, C23 I27's standard.
+    return "ask() needs at least one choice";
+  }
+  const defaults = choices.filter((c) => c.default === true);
+  if (defaults.length > 1) {
+    return `ask() takes at most one default choice, and ${String(defaults.length)} are marked (C23 I93)`;
+  }
+  const d = defaults[0];
+  if (d !== undefined && (d.reply === true || d.inspect === true)) {
+    return `ask(): the default choice "${d.key}" ${d.reply === true ? "opens a reply" : "opens an inspection"} and answers nothing (C23 I93)`;
+  }
+  if (choices.every((c) => c.reply === true || c.inspect === true)) {
+    return "ask(): every choice opens a reply or an inspection, so none answers and esc has nothing safe to resolve with (C23 I93)";
+  }
+  return null;
 }

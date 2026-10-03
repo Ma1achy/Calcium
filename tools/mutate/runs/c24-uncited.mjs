@@ -84,8 +84,10 @@ const results = runPass({
       // `ask` now resolves `{key}`, so the anchor's old text is no longer in
       // the tree. The mutation is unchanged — the marked choice against the
       // first — and only its spelling moved.
-      from: "      Promise.resolve({ key: opts.choices[defaultStart(opts.choices)]?.key ?? \"\", outcome: \"answered\" as const }),",
-      to: "      Promise.resolve({ key: (opts.choices.find((c) => c.default) ?? opts.choices[0])?.key ?? \"\", outcome: \"answered\" as const }),",
+      // And again when the stand-in took `invalidChoices` (F1495): the resolve
+      // became a `return` after the refusal.
+      from: "      return Promise.resolve({ key: opts.choices[defaultStart(opts.choices)]?.key ?? \"\", outcome: \"answered\" as const });",
+      to: "      return Promise.resolve({ key: (opts.choices.find((c) => c.default) ?? opts.choices[0])?.key ?? \"\", outcome: \"answered\" as const });",
       expect: "T2.16",
     },
     {
